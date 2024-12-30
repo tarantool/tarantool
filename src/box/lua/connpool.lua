@@ -8,7 +8,10 @@ local netbox = require('net.box')
 local WATCHER_DELAY = 0.1
 local WATCHER_TIMEOUT = 10
 
-local connections = {}
+-- {{{ Basic instance connection pool
+
+local pool_methods = {}
+local pool_mt = {__index = pool_methods}
 
 local function is_connection_valid(conn, opts)
     if conn == nil or conn.state == 'error' or conn.state == 'closed' then
@@ -22,25 +25,25 @@ local function is_connection_valid(conn, opts)
     return true
 end
 
-local connection_mode_update_cond = nil
-local function connect(instance_name, opts)
-    if not connection_mode_update_cond then
-        connection_mode_update_cond = fiber.cond()
-    end
-
-    checks('string', {
+--- Connect to an instance or receive a cached connection by
+--- name.
+---
+--- The method returns a connection as the first return value
+--- and an error message as the second one.
+function pool_methods.connect(self, instance_name, opts)
+    checks('table', 'string', {
         connect_timeout = '?number',
         wait_connected = '?boolean',
         fetch_schema = '?boolean',
     })
     opts = opts or {}
 
-    local conn = connections[instance_name]
+    local conn = self._connections[instance_name]
     if not is_connection_valid(conn, opts) then
         local uri = config:instance_uri('peer', {instance = instance_name})
         if uri == nil then
             local err = 'No suitable URI provided for instance %q'
-            error(err:format(instance_name), 0)
+            return nil, err:format(instance_name)
         end
 
         local conn_opts = {
@@ -51,10 +54,10 @@ local function connect(instance_name, opts)
         local ok, res = pcall(netbox.connect, uri, conn_opts)
         if not ok then
             local msg = 'Unable to connect to instance %q: %s'
-            error(msg:format(instance_name, res.message), 0)
+            return nil, msg:format(instance_name, res.message)
         end
         conn = res
-        connections[instance_name] = conn
+        self._connections[instance_name] = conn
         local function mode(conn)
             if conn.state == 'active' then
                 return conn._mode
@@ -64,7 +67,7 @@ local function connect(instance_name, opts)
         conn.mode = mode
         local function watch_status(_key, value)
             conn._mode = value.is_ro and 'ro' or 'rw'
-            connection_mode_update_cond:broadcast()
+            self._connection_mode_update_cond:broadcast()
         end
         conn:watch('box.status', watch_status)
     end
@@ -73,77 +76,99 @@ local function connect(instance_name, opts)
     -- established or an error occurs (including a timeout error).
     if opts.wait_connected ~= false and conn:wait_connected() == false then
         local msg = 'Unable to connect to instance %q: %s'
-        error(msg:format(instance_name, conn.error), 0)
+        return nil, msg:format(instance_name, conn.error)
     end
     return conn
 end
 
--- Run connecting to the instance, which if it is not already
--- connected or in process of connecting.
-local function connect_in_background(instance_name)
-    pcall(connect, instance_name, {
-        wait_connected = false,
-        connect_timeout = WATCHER_TIMEOUT
+--- This method connects to the specified instances and returns
+--- the set of successfully connected ones.
+---
+--- Specifying a callback accepting an instance name and returning
+--- a boolean value in `opts.any` changes the behavior to connect
+--- to multiple instances until there is at least one satisfying
+--- the condition or the timeout occurs.
+function pool_methods.connect_to_multiple(self, instances, opts)
+    checks('table', 'table', {
+        any = '?function',
+        timeout = '?number',
     })
-end
 
-local function is_candidate_connected(candidate)
-    local conn = connections[candidate]
-    return conn and conn.state == 'active' and conn:mode() ~= nil
-end
-
--- Checks whether the candidate has responded with success or
--- with an error.
-local function is_candidate_checked(candidate)
-    local conn = connections[candidate]
-
-    return not conn or
-           is_candidate_connected(candidate) or
-           conn.state == 'error' or
-           conn.state == 'closed'
-end
-
--- This method connects to the specified instances and returns
--- the set of successfully connected ones.
---
--- opts.any could be used to specify a condition /w
-local function connect_to_candidates(candidates, opts)
     if opts == nil then opts = {} end
-    if next(candidates) == nil then return {} end
+    if next(instances) == nil then return {} end
+    assert(opts.any == nil or type(opts.any) == 'function')
+
+    -- Checks whether the candidate is connected and active.
+    local function is_instance_connected(instance_name)
+        local conn = self._connections[instance_name]
+        return conn and conn.state == 'active' and conn:mode() ~= nil
+    end
+
+    -- Checks whether the candidate has responded with success or
+    -- with an error or connection to it isn't established.
+    local function is_instance_checked(instance_name)
+        local conn = self._connections[instance_name]
+        if conn == nil then
+            return true
+        end
+
+        return is_instance_connected(instance_name) or
+               conn.state == 'error' or conn.state == 'closed'
+    end
 
     local delay = WATCHER_DELAY
-    local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
+    local timeout = opts.timeout or WATCHER_TIMEOUT
+    local connect_deadline = clock.monotonic() + timeout
 
-    for _, instance_name in pairs(candidates) do
-        pcall(connect, instance_name, {
-            wait_connected = false,
-            connect_timeout = WATCHER_TIMEOUT
-        })
+    for _, instance_name in pairs(instances) do
+        self:connect(instance_name, {wait_connected = false})
     end
 
-    assert(connection_mode_update_cond ~= nil)
-
-    local connected_candidates = {}
+    local connected_instances = {}
     while clock.monotonic() < connect_deadline do
-        connected_candidates = fun.iter(candidates)
-            :filter(is_candidate_connected)
+        connected_instances = fun.iter(instances)
+            :filter(is_instance_connected)
             :totable()
 
-        local stop
         if opts.any then
-            assert(type(opts.any) == 'function')
-            stop = fun.iter(candidates):any(opts.any)
+            if fun.iter(instances):any(opts.any) then
+                break
+            end
         else
-            stop = fun.iter(candidates):all(is_candidate_checked)
+            if fun.iter(instances):all(is_instance_checked) then
+                break
+            end
         end
 
-        if stop then
-            break
-        end
-
-        connection_mode_update_cond:wait(delay)
+        self._connection_mode_update_cond:wait(delay)
     end
-    return connected_candidates
+    return connected_instances
+end
+
+local function create_pool()
+    return setmetatable({
+        _connections = {},
+        _connection_mode_update_cond = fiber.cond(),
+    }, pool_mt)
+end
+
+-- }}} Basic instance connection pool
+
+local pool = create_pool()
+
+local function connect(instance_name, opts)
+    checks('string', {
+        connect_timeout = '?number',
+        wait_connected = '?boolean',
+        fetch_schema = '?boolean',
+    })
+
+    local conn, err  = pool:connect(instance_name, opts)
+    if err ~= nil then
+        error(err, 0)
+    end
+
+    return conn
 end
 
 local function is_group_match(expected_groups, present_group)
@@ -234,28 +259,19 @@ local function is_mode_match(mode, instance_name)
     if mode == nil then
         return true
     end
-    local conn = connections[instance_name]
-    assert(conn ~= nil)
+    local conn = pool:connect(instance_name, {wait_connected = false})
+    assert(conn ~= nil and conn:mode() ~= nil)
     return conn:mode() == mode
 end
 
 local function is_candidate_match_dynamic(instance_name, opts)
     assert(opts ~= nil and type(opts) == 'table')
 
-    local conn = connections[instance_name]
-
-    -- No connection -> reconnect in background, exclude the candidate.
-    if conn == nil or conn.state == 'error' or conn.state == 'closed' then
-        connect_in_background(instance_name)
-        return false
+    local conn = pool:connect(instance_name, {wait_connected = false})
+    if not conn or conn:mode() == nil then
+        return
     end
 
-    -- In progress -> exclude the candidate.
-    if not (conn.state == 'active' and conn:mode() ~= nil) then
-        return false
-    end
-
-    -- Connected -> check using the provided filters.
     return is_mode_match(opts.mode, instance_name)
 end
 
@@ -345,11 +361,11 @@ local function filter(opts)
         --
         -- The connect_to_candidates() call returns quickly if it
         -- receives empty table as an argument.
-        connected_candidates = connect_to_candidates(static_candidates)
+        connected_candidates = pool:connect_to_multiple(static_candidates)
     elseif wait_mode == 'any' then
         -- Try to connect to the candidates until at least one
         -- satisfying the dynamic requirements is found.
-        connected_candidates = connect_to_candidates(static_candidates, {
+        connected_candidates = pool:connect_to_multiple(static_candidates, {
             any = function(instance_name)
                 return is_candidate_match_dynamic(instance_name, dynamic_opts)
             end,
@@ -423,7 +439,7 @@ local function get_connection(opts)
         local mode = opts.mode == 'prefer_ro' and 'ro' or 'rw'
         local weight_mode = 2
         for _, instance_name in pairs(candidates) do
-            local conn = connections[instance_name]
+            local conn = pool:connect(instance_name, {wait_connected = false})
             assert(conn ~= nil)
             if conn:mode() == mode then
                 weights[instance_name] = weights[instance_name] + weight_mode
@@ -456,7 +472,8 @@ local function get_connection(opts)
         while #preferred_candidates > 0 do
             local n = math.random(#preferred_candidates)
             local instance_name = table.remove(preferred_candidates, n)
-            local conn = connect(instance_name, {wait_connected = false})
+            local conn = pool:connect(instance_name,
+                                      {wait_connected = false})
             if conn:wait_connected() then
                 return conn
             end
