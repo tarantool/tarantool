@@ -23,17 +23,18 @@ local function is_connection_valid(conn, opts)
 end
 
 local connection_mode_update_cond = nil
-local function connect(instance_name, opts)
-    if not connection_mode_update_cond then
-        connection_mode_update_cond = fiber.cond()
-    end
-
+-- Start connecting to the instance and return the connection
+-- object.
+local function connect_to_instance(instance_name, opts)
     checks('string', {
         connect_timeout = '?number',
-        wait_connected = '?boolean',
         fetch_schema = '?boolean',
     })
     opts = opts or {}
+
+    if not connection_mode_update_cond then
+        connection_mode_update_cond = fiber.cond()
+    end
 
     local conn = connections[instance_name]
     if not is_connection_valid(conn, opts) then
@@ -69,6 +70,27 @@ local function connect(instance_name, opts)
         conn:watch('box.status', watch_status)
     end
 
+    return conn
+end
+
+-- Run connecting to the instance, which if it is not already
+-- connected or in process of connecting.
+local function connect_in_background(instance_name)
+    pcall(connect_to_instance, instance_name, {
+        connect_timeout = WATCHER_TIMEOUT
+    })
+end
+
+local function connect(instance_name, opts)
+    checks('string', {
+        connect_timeout = '?number',
+        wait_connected = '?boolean',
+        fetch_schema = '?boolean',
+    })
+    opts = opts or {}
+
+    local conn = connect_to_instance(instance_name, opts)
+
     -- If opts.wait_connected is not false we wait until the connection is
     -- established or an error occurs (including a timeout error).
     if opts.wait_connected ~= false and conn:wait_connected() == false then
@@ -76,15 +98,6 @@ local function connect(instance_name, opts)
         error(msg:format(instance_name, conn.error), 0)
     end
     return conn
-end
-
--- Run connecting to the instance, which if it is not already
--- connected or in process of connecting.
-local function connect_in_background(instance_name)
-    pcall(connect, instance_name, {
-        wait_connected = false,
-        connect_timeout = WATCHER_TIMEOUT
-    })
 end
 
 local function is_candidate_connected(candidate)
@@ -115,10 +128,7 @@ local function connect_to_candidates(candidates, opts)
     local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
 
     for _, instance_name in pairs(candidates) do
-        pcall(connect, instance_name, {
-            wait_connected = false,
-            connect_timeout = WATCHER_TIMEOUT
-        })
+        connect_in_background(instance_name)
     end
 
     assert(connection_mode_update_cond ~= nil)
@@ -456,7 +466,7 @@ local function get_connection(opts)
         while #preferred_candidates > 0 do
             local n = math.random(#preferred_candidates)
             local instance_name = table.remove(preferred_candidates, n)
-            local conn = connect(instance_name, {wait_connected = false})
+            local conn = connect_to_instance(instance_name)
             if conn:wait_connected() then
                 return conn
             end
