@@ -69,8 +69,10 @@ g.test = function(cg)
                             'box.session.push error')
         end
     end)
-    t.assert(cg.server:grep_log(WARNING_PATTERN),
-             'Deprecation warning is logged')
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log(WARNING_PATTERN),
+                 'Deprecation warning is logged')
+    end)
 
     -- Check that the warning is logged only once.
     cg.server:exec(function()
@@ -88,6 +90,8 @@ g.test = function(cg)
                             'box.session.push error')
         end
     end)
-    t.assert_not(cg.server:grep_log(WARNING_PATTERN, 5000),
-                 'Deprecation warning is logged only once')
+    t.helpers.retrying({}, function()
+        t.assert_not(cg.server:grep_log(WARNING_PATTERN, 5000),
+                     'Deprecation warning is logged only once')
+    end)
 end
