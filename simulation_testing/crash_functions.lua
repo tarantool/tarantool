@@ -8,6 +8,23 @@ local function update_node_state(node, state)
     nodes_activity_states[node.alias] = state
 end
 
+local function get_non_crashed_nodes(nodes, nodes_activity_states)
+    local non_crashed_nodes = {}
+
+    for _, node in ipairs(nodes) do
+        if nodes_activity_states[node.alias] ~= "crashed" then
+            table.insert(non_crashed_nodes, node)
+        end
+    end
+
+    if #non_crashed_nodes == 0 then
+        print("[NODE FILTER] No non-crashed nodes available.")
+        return -1
+    end
+
+    return non_crashed_nodes
+end
+
 local function count_crashed_nodes(nodes_activity_states)
     local crashed_count = 0
 
@@ -31,7 +48,7 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     -- Checking that the limit on the number of active nodes in the cluster is not violated
     local remaining_nodes = #nodes - num_to_select
     if not is_cluster_healthy(nodes_activity_states, remaining_nodes) then
-        print("Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
+        print("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
         return -1
     end
     
@@ -44,7 +61,7 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     end
 
     if #available_nodes < num_to_select then
-        print("Not enough healthy nodes to select")
+        print("[CRASH SIMULATION] Not enough healthy nodes to select")
         return -1
     end
 
@@ -69,17 +86,17 @@ local function stop_node(node, min_delay, max_delay)
 
         node:stop()
         update_node_state(node, "crashed")
-        print(string.format("Node %s is stopped for a time %s", node.alias, delay))
+        print(string.format("[CRASH SIMULATION] Node %s is stopped for a time %s", node.alias, delay))
 
         fiber.sleep(delay)
 
         node:start()
         update_node_state(node, "restored")
-        print(string.format("Node %s is started again", node.alias))
+        print(string.format("[CRASH SIMULATION] Node %s is started again", node.alias))
     end)
 end
 
-local function create_delay_to_write_operations(node, space_name, min_delay, max_delay)
+local function create_delay_to_write_operations(node, min_delay, max_delay)
     fiber.create(function()
 
         my_functions.check_node(node)
@@ -90,7 +107,7 @@ local function create_delay_to_write_operations(node, space_name, min_delay, max
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
         end)
         update_node_state(node, "crashed")
-        print(string.format("The WAL write delay for node %s is set for the time %d", node.alias, delay))
+        print(string.format("[CRASH SIMULATION] The WAL write delay for node %s is set for the time %d", node.alias, delay))
 
         fiber.sleep(delay)
 
@@ -98,7 +115,7 @@ local function create_delay_to_write_operations(node, space_name, min_delay, max
             box.error.injection.set('ERRINJ_WAL_DELAY', false)
         end)
         update_node_state(node, "restored")
-        print(string.format("The WAL write delay for node %s has been removed", node.alias))
+        print(string.format("[CRASH SIMULATION] The WAL write delay for node %s has been removed", node.alias))
     end)
 end
 
@@ -118,11 +135,11 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         local node2 = two_nodes[2]
 
         if not is_node_ready(node1) then
-            error(string.format("Node %s is not connected or is not replicated", node1.alias))
+            error(string.format("[CRASH SIMULATION] Node %s is not connected or is not replicated", node1.alias))
         end
 
         if not is_node_ready(node2) then
-            error(string.format("Node %s is not connected or is not replicated", node2.alias))
+            error(string.format("[CRASH SIMULATION] Node %s is not connected or is not replicated", node2.alias))
         end
 
         -- Replication Break Operations
@@ -148,7 +165,7 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         end, {node1.net_box_uri})
         update_node_state(node2, "crashed")
 
-        print(string.format("The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
+        print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
 
         fiber.sleep(delay)
 
@@ -163,17 +180,47 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         end, {initial_replication})
         update_node_state(node2, "restored")
     
-        print(string.format("The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
+        print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
+    end)
+end
+
+local function crash_simulation(cg, nodes_activity_states, initial_replication, lower_crash_time_bound, upper_crash_time_bound, crash_interval)
+    fiber.create(function()
+        while true do
+            fiber.sleep(crash_interval) 
+            local type_of_crashing = math.random(1, 3)
+            if type_of_crashing == 1 then
+                local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                if crash_node ~= -1 then
+                    stop_node(crash_node[1], lower_crash_time_bound, upper_crash_time_bound)
+                end
+
+            elseif type_of_crashing == 2 then
+                local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                if crash_node ~= -1 then
+                    create_delay_to_write_operations(crash_node[1], lower_crash_time_bound, upper_crash_time_bound)
+                end
+
+            else
+                local crash_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
+                if crash_nodes ~= -1 then
+                    break_connection_between_two_nodes(crash_nodes, initial_replication, lower_crash_time_bound, upper_crash_time_bound)
+                end
+            end
+
+        end
     end)
 end
 
 return {
     update_node_state = update_node_state,
+    get_non_crashed_nodes = get_non_crashed_nodes,
     count_crashed_nodes = count_crashed_nodes,
     is_cluster_healthy = is_cluster_healthy,
     get_random_nodes_for_crash = get_random_nodes_for_crash,
     stop_node = stop_node,
     create_delay_to_write_operations = create_delay_to_write_operations,
-    break_connection_between_two_nodes = break_connection_between_two_nodes
+    break_connection_between_two_nodes = break_connection_between_two_nodes,
+    crash_simulation = crash_simulation
 
 }
