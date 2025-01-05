@@ -841,8 +841,10 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 	assert(txn != NULL);
 	if (!row->is_commit)
 		return 0;
-	if (row->wait_ack)
-		box_txn_make_sync();
+	txn_set_xrow_flags(row->flags);
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	    !txn_has_flag(txn, TXN_WAIT_ACK))
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
 	/*
 	 * For fully local transactions the TSN check won't work like for global
 	 * transactions, because it is not known if there are global rows until
