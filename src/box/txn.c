@@ -1444,6 +1444,17 @@ txn_set_xrow_flags(uint8_t xrow_flags)
 	txn->flags |= flags_map[xrow_flags & IPROTO_FLAG_WAIT_ACK];
 }
 
+void
+txn_recovery_set_limbo_policy(void)
+{
+	struct txn *txn = in_txn();
+	if (!txn)
+		return;
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	    !txn_has_flag(txn, TXN_WAIT_ACK))
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
+}
+
 /** Wait for a linearization point for a transaction. */
 static int
 txn_make_linearizable(struct txn *txn)
