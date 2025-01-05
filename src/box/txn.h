@@ -568,6 +568,12 @@ txn_set_flags(struct txn *txn, unsigned int flags)
 	txn->flags |= flags;
 }
 
+/**
+ * Set flags from xrow on the transaction.
+ */
+void
+txn_set_xrow_flags(uint8_t xrow_flags);
+
 static inline void
 txn_clear_flags(struct txn *txn, unsigned int flags)
 {
