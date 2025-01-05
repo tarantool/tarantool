@@ -1287,6 +1287,26 @@ box_txn_set_timeout(double timeout)
 	return 0;
 }
 
+void
+txn_set_xrow_flags(uint8_t xrow_flags)
+{
+	struct txn *txn = in_txn();
+	/*
+	 * Do nothing if transaction is not started,
+	 * it's the same as BEGIN + COMMIT.
+	 */
+	if (!txn)
+		return;
+
+	const uint8_t flags_map[] = {
+		[IPROTO_FLAG_WAIT_SYNC] = TXN_WAIT_SYNC,
+		[IPROTO_FLAG_WAIT_ACK] = TXN_WAIT_ACK,
+	};
+
+	txn->flags |= flags_map[xrow_flags & IPROTO_FLAG_WAIT_SYNC];
+	txn->flags |= flags_map[xrow_flags & IPROTO_FLAG_WAIT_ACK];
+}
+
 /** Wait for a linearization point for a transaction. */
 static int
 txn_make_linearizable(struct txn *txn)
