@@ -6276,6 +6276,7 @@ box_storage_init(void)
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
+	txn_limbo_init();
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
@@ -6300,12 +6301,12 @@ box_storage_free(void)
 {
 	if (!is_storage_initialized)
 		return;
+	wal_free();
 	iproto_free();
 	replication_free();
+	txn_limbo_free();
 	gc_free();
 	engine_free();
-	/* schema_free(); */
-	wal_free();
 	flightrec_free();
 	audit_log_free();
 	sql_built_in_functions_cache_free();
@@ -6344,7 +6345,6 @@ box_init(void)
 	schema_module_init();
 	if (tuple_init(lua_hash) != 0)
 		diag_raise();
-	txn_limbo_init();
 	sequence_init();
 	box_watcher_init();
 	box_raft_init();
@@ -6422,8 +6422,6 @@ box_free(void)
 {
 	/* References engines. */
 	space_cache_destroy();
-	/* References engine tuples. */
-	txn_limbo_free();
 	box_storage_free();
 	builtin_events_free();
 	security_free();
