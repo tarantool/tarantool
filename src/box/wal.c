@@ -1168,7 +1168,7 @@ wal_write_to_disk(struct cmsg *msg)
 	 */
 
 	struct xlog *l = &writer->current_wal;
-
+	ERROR_INJECT_SLEEP_FOR(ERRINJ_WAL_DELAY_DURATION);
 	/*
 	 * Iterate over requests (transactions)
 	 */
@@ -1194,7 +1194,6 @@ wal_write_to_disk(struct cmsg *msg)
 		err_code = JOURNAL_ENTRY_ERR_IO;
 		goto done;
 	}
-
 	writer->checkpoint_wal_size += rc;
 	last_committed = stailq_last(&wal_msg->commit);
 	vclock_merge(&writer->vclock, &vclock_diff);
