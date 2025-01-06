@@ -1055,6 +1055,33 @@ rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj)
 	return true;
 }
 
+int
+rtree_replace(struct rtree *tree, struct rtree_rect *old_rect, record_t old_obj,
+	      struct rtree_rect *new_rect, record_t new_obj, bool *removed)
+{
+	/*
+	 * The data structure has no OOM checks, so we have to resreve the
+	 * amount of matras block allocations potentially enough to perform
+	 * the operations required. It's based on the amount of extents we
+	 * currently reserve in the memtx space prior to replace according
+	 * to the smallest page size: 512 (so we sum-up the reserved memory
+	 * and divide it into 512 and got 512 pages).
+	 */
+	if (matras_alloc_reserve(&tree->mtab, 512) != 0)
+		return -1;
+
+	/* Insert the new_obj if required. */
+	if (new_rect != NULL)
+		rtree_insert(tree, new_rect, new_obj);
+
+	/* Remove the old_obj if required. */
+	if (old_rect != NULL)
+		*removed = rtree_remove(tree, old_rect, old_obj);
+	else
+		*removed = false;
+	return 0;
+}
+
 bool
 rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 	     enum spatial_search_op op, struct rtree_iterator *itr)
