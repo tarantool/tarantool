@@ -45,6 +45,7 @@ g.before_all(function()
         compat.add_option(option_def)
     end
     option_1_called = false
+    option_2_called = false
 end)
 g.after_all( function() reset(compat) end)
 
