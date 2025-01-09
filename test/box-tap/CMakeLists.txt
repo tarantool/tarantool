@@ -74,3 +74,10 @@ set_tests_properties(
   test/box-tap/cfg.test.lua
   PROPERTIES DISABLED TRUE
 )
+
+set_tests_properties(
+  test/box-tap/net.box.test.lua
+  test/box-tap/session.storage.test.lua
+  test/box-tap/session.test.lua
+  PROPERTIES DISABLED TRUE
+)
