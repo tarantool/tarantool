@@ -180,7 +180,6 @@ test-coverage: CMAKE_PARAMS = -G Ninja \
                               -DCMAKE_BUILD_TYPE=Debug \
                               -DENABLE_GCOV=ON \
                               -DTEST_BUILD=ON
-test-coverage: TEST_RUN_PARAMS += --long
 test-coverage: OUTPUT_FILE = coverage.info
 test-coverage: build run-luajit-test run-test
 	lcov --capture \

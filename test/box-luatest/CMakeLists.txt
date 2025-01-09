@@ -63,10 +63,3 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     PROPERTIES DISABLED TRUE
   )
 endif()
-
-# See test/box-luatest/suite.ini.
-set_tests_properties(
-  test/box-luatest/gh_7605_qsort_recovery_test.lua
-  test/box-luatest/gh_7670_memtx_tx_manager_idx_rand_inconsistency_test.lua
-  PROPERTIES LABELS "long"
-)
