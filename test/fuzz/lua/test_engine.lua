@@ -30,6 +30,7 @@ local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
 
 local params = require('internal.argparse').parse(arg, {
     { 'engine', 'string' },
+    { 'fault_injection', 'boolean' },
     { 'h', 'boolean' },
     { 'seed', 'number' },
     { 'test_duration', 'number' },
@@ -60,6 +61,7 @@ if params.help or params.h then
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
    engine <string, 'vinyl'>              - engine ('vinyl', 'memtx')
+   fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
    help (same as -h)                     - print this message
@@ -80,6 +82,8 @@ local arg_test_dir = params.test_dir or DEFAULT_TEST_DIR
 local arg_engine = params.engine or 'vinyl'
 
 local arg_verbose = params.verbose or false
+
+local arg_fault_injection = params.fault_injection or false
 
 local seed = params.seed or os.time()
 math.randomseed(seed)
@@ -516,11 +520,11 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_bloom_fpr = math.random(50) / 100,
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
         vinyl_max_tuple_size = math.random(0, 100000),
-        vinyl_memory = 800 * 1024 * 1024,
-        vinyl_page_size = math.random(1024, 2048),
-        vinyl_range_size = 128 * 1024,
+        vinyl_memory = 10 * 1024 * 1024,
+        vinyl_page_size = 1024,
+        vinyl_range_size = 2 * 1024,
         vinyl_read_threads = math.random(2, 10),
-        vinyl_run_count_per_level = math.random(1, 10),
+        vinyl_run_count_per_level = math.random(1, 2),
         vinyl_run_size_ratio = math.random(2, 5),
         vinyl_timeout = math.random(1, 5),
         vinyl_write_threads = math.random(2, 10),
@@ -554,6 +558,9 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     }
     if space_opts.engine ~= 'vinyl' then
         space_opts.temporary = oneof({true, false})
+    end
+    if space_opts.engine == 'vinyl' then
+        space_opts.defer_deletes = oneof({true, false})
     end
     local space_name = ('test_%d'):format(space_id_func())
     local space = box.schema.space.create(space_name, space_opts)
@@ -589,9 +596,9 @@ local function index_opts(space, is_primary)
     }
 
     if space.engine == 'vinyl' then
-        opts.bloom_fpr = math.random(50) / 100
-        opts.page_size = math.random(10) * 1024
-        opts.range_size = 1073741824
+        opts.bloom_fpr = box.cfg.bloom_fpr
+        opts.range_size = box.cfg.vinyl_range_size
+        opts.page_size = box.cfg.vinyl_page_size
     end
 
     local indices = fun.iter(keys(tarantool_indices)):filter(
@@ -1418,8 +1425,31 @@ local function process_errors(error_messages)
     return found_unexpected_errors
 end
 
+local function start_error_injections(space, test_duration)
+    local errinj_f = fiber.new(function(test_duration)
+        log.info('Fault injection fiber has started.')
+        local max_errinj_in_parallel = 5
+        local start = os.clock()
+        while os.clock() - start <= test_duration do
+            toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
+            fiber.sleep(2)
+        end
+        disable_all_errinj(errinj_set, space)
+        log.info('Fault injection fiber has finished.')
+    end, test_duration)
+    errinj_f:set_joinable(true)
+    errinj_f:name('ERRINJ')
+
+    -- Stop the fault injection fiber first so that worker fibers can exit
+    -- without getting stuck on some random timeout injection.
+    local ok, res = fiber.join(errinj_f)
+    if not ok then
+        log.info('ERROR: %s', json.encode(res))
+    end
+end
+
 local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode)
+                        engine_name, verbose_mode, fault_injection)
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
@@ -1443,30 +1473,13 @@ local function run_test(num_workers, test_duration, test_dir,
         table.insert(workers, f)
     end
 
-    local errinj_f = fiber.new(function(test_duration)
-        log.info('Fault injection fiber has started.')
-        local max_errinj_in_parallel = 5
-        local start = os.clock()
-        while os.clock() - start <= test_duration do
-            toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
-            fiber.sleep(2)
-        end
-        disable_all_errinj(errinj_set, space)
-        log.info('Fault injection fiber has finished.')
-    end, arg_test_duration)
-    errinj_f:set_joinable(true)
-    errinj_f:name('ERRINJ')
-
-    -- Stop the fault injection fiber first so that worker fibers can exit
-    -- without getting stuck on some random timeout injection.
-    local ok, res = fiber.join(errinj_f)
-    if not ok then
-        log.info('ERROR: %s', json.encode(res))
+    if fault_injection then
+        start_error_injections(space, test_duration)
     end
 
     local error_messages = {}
     for _, fb in ipairs(workers) do
-        ok, res = fiber.join(fb)
+        local ok, res = fiber.join(fb)
         if not ok then
             log.info('ERROR: %s', json.encode(res))
         else
@@ -1484,4 +1497,4 @@ local function run_test(num_workers, test_duration, test_dir,
 end
 
 run_test(arg_num_workers, arg_test_duration, arg_test_dir,
-         arg_engine, arg_verbose)
+         arg_engine, arg_verbose, arg_fault_injection)
