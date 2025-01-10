@@ -1459,8 +1459,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows)
 	 * is synchronous or not. All txn meta flags are set only
 	 * for the last txn row.
 	 */
-	if ((item->row.flags & IPROTO_FLAG_WAIT_ACK) != 0)
-		box_txn_make_sync();
+	box_txn_set_xrow_flags(item->row.flags);
 	size_t size;
 	struct trigger *on_rollback, *on_wal_write;
 	on_rollback = region_alloc_object(&txn->region, typeof(*on_rollback),

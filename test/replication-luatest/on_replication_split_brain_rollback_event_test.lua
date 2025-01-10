@@ -1,0 +1,430 @@
+local t = require('luatest')
+local server = require('luatest.server')
+local replica_set = require('luatest.replica_set')
+
+local g = t.group()
+
+g.before_each(function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        replication = {
+            server.build_listen_uri('master', cg.replica_set.id),
+            server.build_listen_uri('replica', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+        replication_synchro_timeout = 120,
+        replication_synchro_quorum = 3,
+    }
+    cg.master = cg.replica_set:build_and_add_server{
+        alias = 'master',
+        box_cfg = cg.box_cfg,
+    }
+    cg.replica = cg.replica_set:build_and_add_server{
+        alias = 'replica',
+        box_cfg = cg.box_cfg,
+    }
+    cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
+    cg.master:exec(function()
+        rawset(_G, 'msgpack', require('msgpack'))
+        rawset(_G, 'trigger', require('trigger'))
+        rawset(_G, 'trigger_ok', false)
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        local body = 'function() rawset(_G, "trigger_called", true) end'
+        box.schema.func.create('f', {body = body, trigger = event})
+        box.schema.space.create('a', {is_sync = false}):create_index('p')
+        box.schema.space.create('s', {is_sync = true}):create_index('p')
+        box.schema.space.create('l', {is_local = true}):create_index('p')
+        box.ctl.promote()
+    end)
+    cg.master:wait_for_downstream_to(cg.replica)
+end)
+
+g.after_each(function(cg)
+    cg.replica_set:drop()
+end)
+
+local function partition_server(s)
+    s:exec(function()
+        box.cfg{replication = ''}
+    end)
+end
+
+local function check_promote_from_partitioned_server(partitioned, master,
+                                                     replication)
+    partitioned:exec(function()
+        box.ctl.promote()
+    end)
+    master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert(_G.trigger_ok)
+    end)
+    partitioned:exec(function(replication)
+        box.cfg{replication = replication}
+    end, {replication})
+    master:exec(function()
+        box.ctl.promote()
+    end)
+    master:wait_for_downstream_to(partitioned)
+end
+
+local function test_stmt(cg, request, request_arg, request_ops, old_tuple,
+                         new_tuple)
+    partition_server(cg.replica)
+    cg.master:exec(function(request, request_arg, request_ops, old_tuple,
+                            new_tuple)
+        box.atomic({wait = 'submit'}, function()
+            box.space.s[request](box.space.s, request_arg, request_ops)
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', _G.generate_trigger_test_case(
+                    box.iproto.type[request:upper()], request_arg, request_ops,
+                    old_tuple, new_tuple))
+    end, {request, request_arg, request_ops, old_tuple, new_tuple})
+    check_promote_from_partitioned_server(cg.replica, cg.master,
+                                          cg.box_cfg.replication)
+end
+
+local function test_several_stmts(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function()
+            box.space.s:replace{0}
+            box.space.s:replace{0}
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', _G.generate_trigger_test_case(
+                    box.iproto.type.REPLACE, {0}, nil, nil, {0}, 2))
+    end)
+    check_promote_from_partitioned_server(cg.replica, cg.master,
+                                          cg.box_cfg.replication)
+end
+
+g.before_test('test_different_stmts', function(cg)
+    cg.master:exec(function()
+        rawset(_G, 'generate_trigger_test_case',
+            function(request_type, request_arg, request_ops, old_tuple,
+                     new_tuple, n_stmts)
+                return function(it)
+                    n_stmts = n_stmts ~= nil and n_stmts or 1
+                    local counter = 1
+                    for num, term, tid, rid, lsn, sid, type, arg, ops, old,
+                    new in it() do
+                        _G.trigger_ok = pcall(function()
+                            t.assert_equals(num, counter)
+                            t.assert_equals(term, box.info.synchro.queue.term)
+                            t.assert_gt(tid, 0)
+                            t.assert_equals(rid, box.info.id)
+                            if counter == n_stmts then
+                               t.assert_equals(lsn, box.info.lsn)
+                            end
+                            t.assert_equals(sid, box.space.s.id)
+                            t.assert_equals(type, request_type)
+                            t.assert(box.tuple.is(arg))
+                            t.assert_equals(arg, request_arg)
+                            t.assert(ops == nil or box.tuple.is(ops))
+                            if ops ~= nil then
+                                t.assert_equals(ops, request_ops)
+                            end
+                            t.assert(old == nil or box.tuple.is(old))
+                            if counter == 1 then
+                                t.assert_equals(old, old_tuple)
+                            else
+                                t.assert_equals(old, arg)
+                            end
+                            t.assert(new == nil or box.tuple.is(new))
+                            t.assert_equals(new, new_tuple)
+                            counter = counter + 1
+                        end)
+                    end
+                    t.assert_equals(n_stmts, counter - 1)
+                end
+            end)
+        box.cfg{replication_synchro_quorum = ''}
+        box.space.s:replace{777, 0}
+        box.cfg{replication_synchro_quorum = 3}
+    end)
+end)
+
+-- Test that the event iterator returns correct information for different
+-- transaction statements.
+g.test_different_stmts = function(cg)
+    local stmts = {
+        {'replace', {0}, nil, nil, {0}},
+        {'replace', {777, 1}, nil, {777, 0}, {777, 1}},
+        {'insert', {0}, nil, nil, {0}},
+        {'delete', {0}, nil, nil, nil},
+        {'delete', {777}, nil, {777, 0}, nil},
+        {'update', {777}, {{'=', 2, 1}}, {777, 0}, {777, 1}},
+        {'update', {777}, {{'=', 2, 1}, {'=', 3, 1}}, {777, 0}, {777, 1, 1}},
+        {'upsert', {777}, {{'=', 2, 1}}, {777, 0}, {777, 1}},
+        {'upsert', {0}, {{'=', 2, 1}}, nil, {0}},
+    }
+    for _, stmt in ipairs(stmts) do
+       test_stmt(cg, stmt[1], stmt[2], stmt[3], stmt[4], stmt[5])
+    end
+
+    test_several_stmts(cg)
+end
+
+-- Test that the trigger does not fire during recovery.
+g.test_recovery = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert(_G.trigger_called)
+    end)
+    cg.master:restart()
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert_not(rawget(_G, 'trigger_called'))
+    end)
+end
+
+-- Test that the trigger does not fire for synchronously committed synchronous
+-- transactions.
+g.test_sync_committed_sync_tx = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        require('fiber').create(function()
+            box.space.s:replace{0}
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert_not(rawget(_G, 'trigger_called'))
+    end)
+end
+
+g.before_test('test_replica', function(cg)
+    local test_replica_uri =
+        server.build_listen_uri('test_replica', cg.replica_set.id)
+    table.insert(cg.box_cfg.replication, test_replica_uri)
+    cg.test_replica = cg.replica_set:build_and_add_server{
+        alias = 'test_replica',
+        box_cfg = cg.box_cfg,
+    }
+    cg.test_replica:start()
+    cg.master:update_box_cfg{replication = cg.box_cfg.replication}
+    cg.replica:update_box_cfg{replication = cg.box_cfg.replication}
+    cg.replica_set:wait_for_fullmesh()
+end)
+
+-- Test that the trigger does not fire on replicas.
+g.test_replica = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.test_replica:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 1)
+        end)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.replica:wait_for_downstream_to(cg.test_replica)
+    cg.test_replica:exec(function()
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_not(rawget(_G, 'trigger_called'))
+    end)
+end
+
+g.after_test('test_replica', function(cg)
+    cg.test_replica:drop()
+    table.remove(cg.box_cfg.replication)
+end)
+
+g.before_test('test_trigger_failure', function(cg)
+    cg.master:exec(function()
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', function()
+            rawset(_G, 'trigger_called', true)
+            error('777')
+        end)
+    end)
+end)
+
+-- Test that the trigger failure causes split brain.
+g.test_trigger_failure = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function(replica_id)
+        t.helpers.retrying({timeout = 120}, function()
+            local upstream = box.info.replication[replica_id].upstream
+            t.assert_equals(upstream.status, 'stopped')
+            local msg = 'Split-Brain discovered: ' ..
+                        'box.ctl.on_split_brain_rollback trigger failed'
+            t.assert_equals(upstream.message, msg)
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        t.assert(_G.trigger_called)
+    end, {cg.replica:get_instance_id()})
+end
+
+g.before_test('test_non_fully_local_txns', function(cg)
+    cg.master:exec(function()
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', function()
+            local msg = 'lala'
+            _G.trigger_ok = pcall(function()
+                t.assert_error_msg_content_equals(msg, function()
+                    box.space.a:replace{0}
+                end)
+            end)
+        end)
+    end)
+end)
+
+-- Test that non fully local transactions are forbidden during execution of the
+-- event triggers.
+g.test_non_fully_local_txns = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert_not(_G.trigger_ok)
+    end)
+end
+
+g.before_test('test_fully_local_txns', function(cg)
+    cg.master:exec(function()
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', function()
+            box.space.l:replace{0}
+        end)
+    end)
+end)
+
+-- Test that fully local transactions are allowed during execution of the event
+-- triggers.
+g.test_fully_local_txns = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert_equals(box.space.l:get{0}, {0})
+    end)
+    cg.master:restart()
+    cg.master:exec(function()
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.space.l:get{0}, {0})
+    end)
+end
+
+g.before_test('test_implicit_commit', function(cg)
+    cg.master:exec(function()
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', function()
+            box.begin()
+            box.space.l:replace{0}
+        end)
+    end)
+end)
+
+-- Test that any pending transaction is committed after execution of the event
+-- triggers is finished.
+g.test_implicit_commit = function(cg)
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function()
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.synchro.queue.len, 0)
+        end)
+        t.assert_equals(box.space.l:get{0}, {0})
+    end)
+    cg.master:restart()
+    cg.master:exec(function()
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.space.l:get{0}, {0})
+    end)
+end
+
+g.before_test('test_implicit_commit_failure', function(cg)
+    cg.master:exec(function()
+        local event = 'box.ctl.on_replication_split_brain_rollback'
+        _G.trigger.set(event, 't', function()
+            box.error.injection.set('ERRINJ_WAL_IO', true)
+            box.begin()
+            box.space.l:replace{0}
+            box.on_rollback(function()
+                box.error.injection.set('ERRINJ_WAL_IO', false)
+            end)
+        end)
+    end)
+end)
+
+-- Test that failure to implicitly commit a pending transaction after execution
+-- of the event triggers finishes caused split brain.
+g.test_implicit_commit_failure = function(cg)
+    t.tarantool.skip_if_not_debug()
+
+    partition_server(cg.replica)
+    cg.master:exec(function()
+        box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end)
+    cg.replica:exec(function()
+        box.ctl.promote()
+    end)
+    cg.master:exec(function(replica_id)
+        t.helpers.retrying({timeout = 120}, function()
+            local upstream = box.info.replication[replica_id].upstream
+            t.assert_equals(upstream.status, 'stopped')
+            local msg = 'Failed to write to disk'
+            t.assert_equals(upstream.message, msg)
+        end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+    end, {cg.replica:get_instance_id()})
+end
