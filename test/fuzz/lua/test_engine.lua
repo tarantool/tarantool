@@ -516,11 +516,11 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_bloom_fpr = math.random(50) / 100,
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
         vinyl_max_tuple_size = math.random(0, 100000),
-        vinyl_memory = 800 * 1024 * 1024,
-        vinyl_page_size = math.random(1024, 2048),
-        vinyl_range_size = 128 * 1024,
+        vinyl_memory = 10 * 1024 * 1024,
+        vinyl_page_size = 1024,
+        vinyl_range_size = 2 * 1024,
         vinyl_read_threads = math.random(2, 10),
-        vinyl_run_count_per_level = math.random(1, 10),
+        vinyl_run_count_per_level = math.random(1, 2),
         vinyl_run_size_ratio = math.random(2, 5),
         vinyl_timeout = math.random(1, 5),
         vinyl_write_threads = math.random(2, 10),
@@ -592,9 +592,9 @@ local function index_opts(space, is_primary)
     }
 
     if space.engine == 'vinyl' then
-        opts.bloom_fpr = math.random(50) / 100
-        opts.page_size = math.random(10) * 1024
-        opts.range_size = 1073741824
+        opts.bloom_fpr = box.cfg.bloom_fpr
+        opts.range_size = box.cfg.vinyl_range_size
+        opts.page_size = box.cfg.vinyl_page_size
     end
 
     local indices = fun.iter(keys(tarantool_indices)):filter(
