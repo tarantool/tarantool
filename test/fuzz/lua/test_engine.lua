@@ -30,6 +30,7 @@ local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
 
 local params = require('internal.argparse').parse(arg, {
     { 'engine', 'string' },
+    { 'fault_injection', 'boolean' },
     { 'h', 'boolean' },
     { 'seed', 'number' },
     { 'test_duration', 'number' },
@@ -60,6 +61,7 @@ if params.help or params.h then
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
    engine <string, 'vinyl'>              - engine ('vinyl', 'memtx')
+   fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
    help (same as -h)                     - print this message
@@ -80,6 +82,8 @@ local arg_test_dir = params.test_dir or DEFAULT_TEST_DIR
 local arg_engine = params.engine or 'vinyl'
 
 local arg_verbose = params.verbose or false
+
+local arg_fault_injection = params.fault_injection or false
 
 local seed = params.seed or os.time()
 math.randomseed(seed)
@@ -1412,31 +1416,7 @@ local function process_errors(error_messages)
     return found_unexpected_errors
 end
 
-local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode)
-    if fio.path.exists(test_dir) then
-        cleanup_dir(test_dir)
-    else
-        fio.mkdir(test_dir)
-    end
-
-    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
-    console.listen(socket_path)
-    log.info('console listen on %s', socket_path)
-
-    local workers = {}
-    local space_id_func = counter()
-    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
-
-    local test_gen = fun.cycle(fun.iter(keys(ops)))
-    local f
-    for id = 1, num_workers do
-        f = fiber.new(worker_func, id, space, test_gen, test_duration)
-        f:set_joinable(true)
-        f:name('WRK #' .. id)
-        table.insert(workers, f)
-    end
-
+local function start_error_injections(space, test_duration)
     local errinj_f = fiber.new(function(test_duration)
         log.info('Fault injection fiber has started.')
         local max_errinj_in_parallel = 5
@@ -1447,23 +1427,49 @@ local function run_test(num_workers, test_duration, test_dir,
         end
         disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
-    end, arg_test_duration)
+    end, test_duration)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
 
-    -- Stop the fault injection fiber first so that worker fibers can exit
-    -- without getting stuck on some random timeout injection.
-    local ok, res = fiber.join(errinj_f)
-    if not ok then
-        log.info('ERROR: %s', json.encode(res))
+    return errinj_f
+end
+
+local function run_test(num_workers, test_duration, test_dir,
+                        engine_name, verbose_mode, fault_injection)
+    if fio.path.exists(test_dir) then
+        cleanup_dir(test_dir)
+    else
+        fio.mkdir(test_dir)
+    end
+
+    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
+    console.listen(socket_path)
+    log.info('console listen on %s', socket_path)
+
+    local fibers = {}
+    local space_id_func = counter()
+    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+
+    local test_gen = fun.cycle(fun.iter(keys(ops)))
+    local f
+    for id = 1, num_workers do
+        f = fiber.new(worker_func, id, space, test_gen, test_duration)
+        f:set_joinable(true)
+        f:name('WRK #' .. id)
+        table.insert(fibers, f)
+    end
+
+    if fault_injection then
+        f = start_error_injections(space, test_duration)
+        table.insert(fibers, f)
     end
 
     local error_messages = {}
-    for _, fb in ipairs(workers) do
-        ok, res = fiber.join(fb)
+    for _, fb in ipairs(fibers) do
+        local ok, res = fiber.join(fb)
         if not ok then
             log.info('ERROR: %s', json.encode(res))
-        else
+        elseif res then
             for _, v in ipairs(res) do
                 local msg = tostring(v)
                 error_messages[msg] = error_messages[msg] or 1
@@ -1478,4 +1484,4 @@ local function run_test(num_workers, test_duration, test_dir,
 end
 
 run_test(arg_num_workers, arg_test_duration, arg_test_dir,
-         arg_engine, arg_verbose)
+         arg_engine, arg_verbose, arg_fault_injection)
