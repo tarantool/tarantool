@@ -2098,3 +2098,56 @@ for supported_by, standard_cases in pairs(UNSUPPORTED_DATETIME_FORMATS) do
         end
     end
 end
+
+-- Test providing a timezone doesn't affect the timestamp
+-- value but instead it affects hours/minutes represented by
+-- datetime objects.
+--
+-- The scenario has been broken before gh-10363.
+pg.test_timestamp_with_tz_in_new_preserves_timestamp = function()
+    local now = dt.now()
+    local tzoffset = now.tzoffset
+
+    local now_from_timestamp_with_tzoffset = dt.new({
+        timestamp = now.timestamp,
+        tzoffset = tzoffset,
+    })
+    local now_from_timestamp_different_tzoffset = dt.new({
+        timestamp = now.timestamp,
+        tzoffset = tzoffset + 60,
+    })
+
+    -- Provided timestamp values aren't affected by tzoffsets.
+    t.assert_equals(now.timestamp, now_from_timestamp_with_tzoffset.timestamp)
+    t.assert_equals(now.timestamp,
+                    now_from_timestamp_different_tzoffset.timestamp)
+
+    -- Hours are updated correspondingly to the provided
+    -- tzoffsets.
+    t.assert_equals(now.hour, now_from_timestamp_with_tzoffset.hour)
+    t.assert_equals(now.hour + 1, now_from_timestamp_different_tzoffset.hour)
+end
+
+-- Test setting a timezone also changes the hour represented
+-- by a datetime object and a corresponding timestamp remains
+-- the same.
+--
+-- The scenario has been broken before gh-10363.
+pg.test_tz_updates_not_change_timestamps = function()
+    local now = dt.now()
+    local tzoffset = now.tzoffset
+
+    local now_with_tzoffset_plus_60 = dt.new({timestamp = now.timestamp})
+                                        :set({tzoffset = tzoffset + 60})
+    local now_with_tzoffset_minus_60 = dt.new({timestamp = now.timestamp})
+                                         :set({tzoffset = tzoffset - 60})
+
+    -- Timestamp values aren't affected by tzoffset changes.
+    t.assert_equals(now.timestamp, now_with_tzoffset_plus_60.timestamp)
+    t.assert_equals(now.timestamp, now_with_tzoffset_minus_60.timestamp)
+
+    -- Hours are updated correspondingly to the tzoffset
+    -- changes.
+    t.assert_equals(now.hour + 1, now_with_tzoffset_plus_60.hour)
+    t.assert_equals(now.hour - 1, now_with_tzoffset_minus_60.hour)
+end

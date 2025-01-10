@@ -584,6 +584,23 @@ local function datetime_new(obj)
     else
         nsec = 0
     end
+
+    local offset = obj.tzoffset
+    if offset ~= nil then
+        offset = get_timezone(offset, 'tzoffset')
+        -- At the moment the range of known timezones is
+        -- UTC-12:00..UTC+14:00.
+        --
+        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+        check_range(offset, -720, 840, 'tzoffset')
+    end
+
+    local tzindex = 0
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
+    end
+
     local ts = obj.timestamp
     if ts ~= nil then
         if ymd then
@@ -604,6 +621,9 @@ local function datetime_new(obj)
             s = s - 1
             fraction = fraction + 1
         end
+
+        s = s + (offset or 0) * 60
+
         -- if there are separate nsec, usec, or msec provided then
         -- timestamp should be integer
         if count_usec == 0 then
@@ -613,14 +633,6 @@ local function datetime_new(obj)
                   'if nsec, usec, or msecs provided', 2)
         end
         hms = true
-    end
-
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
     end
 
     -- .year, .month, .day
@@ -638,12 +650,6 @@ local function datetime_new(obj)
             end
         end
         dt = dt_from_ymd_checked(y, M, d)
-    end
-
-    local tzindex = 0
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
     end
 
     -- .hour, .minute, .second
@@ -936,7 +942,20 @@ local function datetime_parse_from(str, obj)
     -- Override timezone, if it was not specified in a parsed
     -- string.
     if date.tz == '' and date.tzoffset == 0 then
-        datetime_set(date, { tzoffset = tzoffset, tz = tzname })
+        local offset = nil
+
+        if tzoffset ~= nil then
+            offset = get_timezone(tzoffset, 'tzoffset')
+            check_range(offset, -720, 840, 'tzoffset')
+        end
+
+        if tzname ~= nil then
+            offset, date.tzindex = parse_tzname(date.epoch, tzname)
+        end
+
+        if offset ~= nil then
+            time_localize(date, offset)
+        end
     end
 
     return date, len
@@ -1149,10 +1168,20 @@ function datetime_set(self, obj)
         if tzname ~= nil then
             offset, self.tzindex = parse_tzname(sec_int, tzname)
         end
-        self.epoch = utc_secs(sec_int, offset)
+        self.epoch = sec_int
         self.nsec = nsec
         self.tzoffset = offset
 
+        return self
+    end
+
+    -- Only timezone is changed.
+    if not hms and not ymd then
+        if tzname ~= nil then
+            offset, self.tzindex = parse_tzname(self.epoch, tzname)
+        end
+
+        self.tzoffset = offset
         return self
     end
 
