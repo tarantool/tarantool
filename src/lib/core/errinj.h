@@ -184,6 +184,7 @@ struct errinj {
 	_(ERRINJ_WAL_BREAK_LSN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_WAL_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_DELAY_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_WAL_DELAY_DURATION, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_WAL_FALLOCATE, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_WAL_IO, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_WAL_IO_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
@@ -288,6 +289,8 @@ void errinj_set_with_environment_vars(void);
 		{ crash_produce_coredump = false; illegal_instruction(); })
 #define ERROR_INJECT_INT(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_INT, COND, CODE)
 #define ERROR_INJECT_DOUBLE(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_DOUBLE, COND, CODE)
+#define ERROR_INJECT_SLEEP_FOR(ID) \
+	ERROR_INJECT_DOUBLE(ID, inj->dparam > 0, usleep(inj->dparam * 1000000))
 
 #if defined(__cplusplus)
 } /* extern "C" */
