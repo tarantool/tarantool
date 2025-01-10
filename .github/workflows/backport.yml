@@ -1,0 +1,185 @@
+name: backport
+
+on:
+  pull_request_target:
+    types: [closed]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  backport:
+    if: >
+      github.repository_owner == 'tarantool' &&
+      (
+        (
+          github.event_name == 'pull_request_target' &&
+          github.event.pull_request.merged
+        ) || (
+          github.event_name == 'issue_comment' &&
+          github.event.issue.pull_request &&
+          startsWith(github.event.comment.body, '/backport')
+        )
+      )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 60
+
+    container:
+      image: docker.io/tarantool/testing:ubuntu-focal
+      # Mount /dev to the container to be able to mount a disk image inside it
+      # for successful run of the .github/actions/environment action.
+      volumes:
+        - /dev:/dev
+
+    steps:
+      - uses: prince-chrismc/check-actor-permissions-action@v3
+        with:
+          permission: write
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+      # The following step performs one of the following.
+      # * In case of the comment trigger the step removes '/backport ' from the
+      #   beginning of the original comment body and forms target branches from
+      #   the command arguments by appending 'release/' at the beginning of each
+      #   argument.
+      # * In case of the pull request closed trigger the step finds 'backport.*'
+      #   labels and forms target branches by replacing 'backport' with
+      #   'release'.
+      - id: vars
+        run: |
+          branches_from_comment=$(echo "${{github.event.comment.body}}" | sed -n 's/\(\/backport\s\+\)\?\([0-9]\+\.[0-9]\+\)/release\/\2/gp')
+          branches_from_labels=$(echo "${{join(github.event.pull_request.labels.*.name, ' ')}}" | sed 's/ /\n/g'| sed -n 's/^backport/release/p' | xargs)
+          echo "::set-output name=target_branches::${{ github.event_name == 'issue_comment' && '$branches_from_comment' || '$branches_from_labels' }}"
+      - id: backport
+        name: Create backport pull requests
+        uses: korthout/backport-action@v3
+        with:
+          branch_name: backport/${target_branch}/${pull_number}
+          target_branches: ${{ steps.vars.outputs.target_branches }}
+          label_pattern: ''
+          copy_labels_pattern: ^((?!backport).*)$
+          pull_description: |
+            *(This PR is a backport of #${pull_number} to `${target_branch}`.)*
+
+            ----
+
+            ${pull_description}
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            let tags = await github.paginate(github.rest.repos.listTags.endpoint.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            }))
+
+            let created_backport_pulls_str =
+              "${{steps.backport.outputs.created_pull_numbers}}"
+            let created_backport_pulls =
+              created_backport_pulls_str.length > 0 ?
+                created_backport_pulls_str
+                  .split(' ')
+                  .map(Number) :
+                []
+            let backport_report = []
+
+            created_backport_pulls.forEach(pull => {
+              github.rest.issues.addAssignees({
+                issue_number: pull,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                assignees: [ context.actor ]
+              })
+            })
+
+            await Promise.all(created_backport_pulls.map(async (pull) => {
+              const issue = await github.rest.issues.get({
+                issue_number: pull,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              })
+
+              const title =
+                issue.data.title.replace(/^\[Backport release\//, '[Backport ')
+              const minor_release = title.match(/(\d+\.\d+)/g)
+
+              let patch_release
+              // Seek for the first entrypoint tag starting with the desired
+              // minor release for backporting.
+              for (const tag of tags) {
+                if (!tag.name.startsWith(minor_release) ||
+                    !tag.name.endsWith('entrypoint')) {
+                  continue
+                }
+
+                const v = tag.name.match(/(\d+\.\d+\.\d+)/g)
+
+                if (v.length < 1) {
+                  // If we're here, there is x.y-entrypoint tag, which means
+                  // there is an error in tag/release management.
+                  // Let's skip this tag since we seek the patch release
+                  // entrypoint x.y.x-entrypoint.
+                  continue
+                }
+
+                patch_release = v[0]
+                break
+              }
+
+              if (patch_release) {
+                backport_report.push({
+                  future_release: patch_release,
+                  branch: `release/${minor_release}`,
+                  pull_number: pull,
+                })
+              } else {
+                // If we're here, we were able to backport to release/x.y
+                // and at the same time hasn't been able to seek for any
+                // x.y.z-entrypoint tag. That means there is no entrypoint
+                // tags for the released versions.
+                // Handle this scenario by not specifying the future
+                // release number in the backport report.
+                backport_report.push({
+                  branch: `release/${minor_release}`,
+                  pull_number: pull,
+                })
+              }
+
+              const body =
+                patch_release &&
+                issue.data.body.replace(
+                  ".)*",
+                  ` to a future \`${patch_release}\` release.)*`
+                )
+
+              github.rest.issues.update({
+                title: title,
+                body: body,
+                issue_number: pull,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              })
+            }))
+
+            if (backport_report.length > 0) {
+              const body = `### Backport summary\n\n` +
+                backport_report.map(report_entry =>
+                  `* Created #${report_entry.pull_number} to ` +
+                  `\`${report_entry.branch}\`` +
+                  (report_entry.future_release ?
+                    ` to a future \`${report_entry.future_release}\` release` :
+                    ''))
+                  .join('\n')
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              })
+            }
