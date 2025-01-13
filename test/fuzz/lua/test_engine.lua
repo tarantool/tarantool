@@ -144,7 +144,7 @@ local function rand_char()
 end
 
 local function rand_string(length)
-    length = length or 10
+    length = length or math.random(8, 256)
     local res = ''
     for _ = 1, length do
         res = res .. rand_char()
