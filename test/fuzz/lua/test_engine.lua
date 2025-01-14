@@ -816,7 +816,7 @@ local function index_opts(space, is_primary)
     -- 'hint' is only reasonable with non-multikey memtx tree index.
     if space.engine == 'memtx' and not is_multikey and
        opts.type == 'TREE' then
-        opts.hint = true
+        opts.hint = oneof({true, false})
     end
 
     if opts.type == 'RTREE' then
