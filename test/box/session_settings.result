@@ -371,12 +371,12 @@ settings.sql_parser_debug = 'string'
  | - error: Session setting sql_parser_debug expected a value of type boolean
  | ...
 
-str = string.rep('a', 20 * 1024)
+str = string.rep('a', 37 * 1024)
  | ---
  | ...
 box.session.settings.sql_default_engine = str
  | ---
- | - error: Failed to allocate 20483 bytes in static_alloc for mp_value
+ | - error: Failed to allocate 37891 bytes in static_alloc for mp_value
  | ...
 
 box.execute([[set session "sql_def_engine" = true]])

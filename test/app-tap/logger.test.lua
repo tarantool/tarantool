@@ -3,7 +3,7 @@
 local log = require('log')
 
 local test = require('tap').test('log')
-test:plan(119)
+test:plan(121)
 
 local function test_invalid_cfg(cfg_method, cfg, name, expected)
     local _, err = pcall(cfg_method, cfg)
@@ -336,9 +336,13 @@ message = json.decode(line)
 test:is(message.message, "this is \"", "check message with escaped character")
 
 -- gh-3248 trash in log file with logging large objects
+-- gh-10918 json logger truncates large messages to 1024 bytes
 log.info(string.rep('a', 32000))
 line = file:read()
-test:ok(line:len() < 20000, "big line truncated")
+test:ok(line:len() < 16384, "big line truncated")
+test:ok(line:len() > 16000, "big line is not too small")
+message = json.decode(line)
+test:istable(message, "json is valid with big message")
 
 -- gh-3853 log.info spoils input (json format)
 local gh3853 = {file = 'c://autorun.bat'}
