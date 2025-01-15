@@ -274,33 +274,30 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 
-	/*
-	 * There's no allocation failure handling in the tree, so it's required
-	 * to reserve potentially big enough space prior to the operations.
-	 */
-	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	if (matras_allocator_reserve(&memtx->index_extent_allocator,
-				     new_tuple != NULL ?
-				     RESERVE_EXTENTS_BEFORE_REPLACE :
-				     RESERVE_EXTENTS_BEFORE_DELETE) != 0)
-		return -1;
-
 	/* RTREE index doesn't support ordering. */
 	*successor = NULL;
 
-	struct rtree_rect rect;
+	struct rtree_rect old_rect;
+	struct rtree_rect new_rect;
+	struct rtree_rect *old_rect_ptr = NULL;
+	struct rtree_rect *new_rect_ptr = NULL;
+
 	if (new_tuple) {
-		if (extract_rectangle(&rect, new_tuple, base->def) != 0)
+		if (extract_rectangle(&new_rect, new_tuple, base->def) != 0)
 			return -1;
-		rtree_insert(&index->tree, &rect, new_tuple);
+		new_rect_ptr = &new_rect;
 	}
 	if (old_tuple) {
-		if (extract_rectangle(&rect, old_tuple, base->def) != 0)
+		if (extract_rectangle(&old_rect, old_tuple, base->def) != 0)
 			return -1;
-		if (!rtree_remove(&index->tree, &rect, old_tuple))
-			old_tuple = NULL;
+		old_rect_ptr = &old_rect;
 	}
-	*result = old_tuple;
+
+	bool removed;
+	if (rtree_replace(&index->tree, old_rect_ptr, old_tuple,
+			  new_rect_ptr, new_tuple, &removed) != 0)
+		return -1;
+	*result = removed ? old_tuple : NULL;
 	return 0;
 }
 
