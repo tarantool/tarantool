@@ -88,6 +88,9 @@ g.test_box_begin_commit_is_sync = function(cg)
     end), {{1, 'is_sync = false'}, {2, 'is_sync = true'},
            {3, 'is_sync = true'}, {4, 'is_sync = true'}})
 
+    -- Since replica has MVCC enabled, synchronous transactions won't be visible
+    -- until CONFIRM from master reaches the replica.
+    cg.replica:wait_for_vclock_of(cg.master)
     t.assert_equals(cg.replica:exec(function()
         return box.space.test:select()
     end), {{1, 'is_sync = false'}, {2, 'is_sync = true'},
@@ -162,6 +165,9 @@ g.test_box_atomic_is_sync = function(cg)
     end), {{1, 'is_sync = false'}, {2, 'is_sync = false'},
            {3, 'is_sync = true'}, {4, 'is_sync = true'}})
 
+    -- Since replica has MVCC enabled, synchronous transactions won't be visible
+    -- until CONFIRM from master reaches the replica.
+    cg.replica:wait_for_vclock_of(cg.master)
     t.assert_equals(cg.replica:exec(function()
         return box.space.test:select()
     end), {{1, 'is_sync = false'}, {2, 'is_sync = false'},
