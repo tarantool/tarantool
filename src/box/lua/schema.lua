@@ -1733,7 +1733,8 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, iid,
                                                         space.name, name, 2)
-    _index:insert{space_id, iid, name, options.type, index_opts, parts}
+    call_at(2, _index.insert, _index,
+            {space_id, iid, name, options.type, index_opts, parts})
     space_sequence_alter_commit(sequence_proxy)
     if index_opts.func ~= nil then
         local _func_index = box.space[box.schema.FUNC_INDEX_ID]
