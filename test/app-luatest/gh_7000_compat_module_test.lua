@@ -39,13 +39,16 @@ local definitions = {
   },
 }
 
+g.before_each(function()
+    option_1_called = false
+    option_2_called = false
+end)
+
 g.before_all(function()
     reset(compat)
     for _, option_def in pairs(definitions) do
         compat.add_option(option_def)
     end
-    option_1_called = false
-    option_2_called = false
 end)
 g.after_all( function() reset(compat) end)
 
@@ -55,7 +58,7 @@ local obsolete_option_def = {
     default = 'new',
     brief = 'obsolete_option',
     obsolete = '5.0'
-  }
+}
 
 local test_options_calls = function()
     t.assert(option_1_called)
@@ -172,7 +175,6 @@ g.test_call = function()
     for _, option_def in pairs(definitions) do
         t.assert_equals(compat[option_def.name].current, OLD)
     end
-    test_options_calls()
 end
 
 g.test_serialize = function()
