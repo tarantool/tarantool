@@ -67,3 +67,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
     PROPERTIES DISABLED TRUE
   )
 endif()
+
+set_tests_properties(
+  # FIXME: Broken TT_WORK_DIR.
+  test/box-tap/gh-4562-errno-at-xdir_scan.test.lua
+  test/box-tap/cfg.test.lua
+  PROPERTIES DISABLED TRUE
+)

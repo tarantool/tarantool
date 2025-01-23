@@ -85,3 +85,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
     PROPERTIES DISABLED TRUE
   )
 endif()
+
+set_tests_properties(
+  # FIXME: Broken TT_WORK_DIR.
+  test/app-tap/logger.test.lua
+  PROPERTIES DISABLED TRUE
+)
