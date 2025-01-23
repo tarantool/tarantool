@@ -84,6 +84,29 @@
 #undef bps_tree_key_t
 #undef BPS_INNER_CARD
 
+/* Ttree with time series optimized. */
+#define BPS_TREE_TIME_SERIES_OPTIMIZED
+#define treets_i64_EXTENT_SIZE 8192
+#define treets_i64_elem_t int64_t
+#define treets_i64_key_t int64_t
+#define BPS_TREE_NAME treets_i64_t
+#define BPS_TREE_BLOCK_SIZE 512
+#define BPS_TREE_EXTENT_SIZE treets_i64_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
+#define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
+#define bps_tree_elem_t treets_i64_elem_t
+#define bps_tree_key_t treets_i64_key_t
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+
 /**
  * Generate the benchmark variations required.
  */
@@ -114,7 +137,8 @@
 #define generate_benchmarks(generator, func, arg) \
 	generator(tree_i64, func, arg); \
 	generator(treecc_i64, func, arg); \
-	generator(treeic_i64, func, arg)
+	generator(treeic_i64, func, arg); \
+	generator(treets_i64, func, arg)
 
 /* Create size-based benchmarks for all trees. */
 #define generate_benchmarks_size(func, size) \
@@ -230,6 +254,7 @@ public: \
 CREATE_TREE_CLASS(tree_i64);
 CREATE_TREE_CLASS(treecc_i64);
 CREATE_TREE_CLASS(treeic_i64);
+CREATE_TREE_CLASS(treets_i64);
 
 /**
  * Value generators to make key-independent benchmarks.

@@ -335,6 +335,12 @@
 #endif
 
 /**
+ * A switch to make the tree introduce the time series optimization.
+ *
+ * #define BPS_TIME_SERIES_OPTIMIZED
+ */
+
+/**
  * A switch that enables collection of executions of different
  * branches of code. Used only for debug purposes, I hope you
  * will not use it. Nevertheless, to turn it on,
@@ -486,6 +492,10 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_max_sizes _bps_tree(max_sizes)
 #define BPS_TREE_MAX_COUNT_IN_LEAF _BPS_TREE(MAX_COUNT_IN_LEAF)
 #define BPS_TREE_MAX_COUNT_IN_INNER _BPS_TREE(MAX_COUNT_IN_INNER)
+#define BPS_TREE_MIN_COUNT_IN_LEAF _BPS_TREE(MIN_COUNT_IN_LEAF)
+#define BPS_TREE_MIN_COUNT_IN_INNER _BPS_TREE(MIN_COUNT_IN_INNER)
+#define BPS_TREE_MAX_FREE_LEAF _BPS_TREE(MAX_FREE_LEAF)
+#define BPS_TREE_MAX_FREE_INNER _BPS_TREE(MAX_FREE_INNER)
 #define BPS_TREE_MAX_DEPTH _BPS_TREE(MAX_DEPTH)
 #define bps_block_info _bps(block_info)
 #define bps_block_type _bps(block_type)
@@ -1415,6 +1425,12 @@ enum bps_tree_max_sizes {
 		   + sizeof(bps_tree_block_card_t)
 #endif
 		),
+	BPS_TREE_MIN_COUNT_IN_LEAF = (BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3),
+	BPS_TREE_MIN_COUNT_IN_INNER = (BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3),
+	BPS_TREE_MAX_FREE_LEAF = BPS_TREE_MAX_COUNT_IN_LEAF -
+				 BPS_TREE_MIN_COUNT_IN_LEAF,
+	BPS_TREE_MAX_FREE_INNER = BPS_TREE_MAX_COUNT_IN_INNER -
+				  BPS_TREE_MIN_COUNT_IN_INNER,
 	BPS_TREE_MAX_DEPTH = 16
 };
 
@@ -3665,7 +3681,11 @@ bps_tree_insert_into_leaf(struct bps_tree_common *tree,
 			  struct bps_leaf_path_elem *leaf_path_elem,
 			  bps_tree_elem_t new_elem)
 {
-	/* The block is touched in the bps_tree_collect_path.  */
+	/*
+	 * The block is touched in the bps_tree_collect_path
+	 * or newly created and it's `block` is initialized
+	 * (see BPS_TIME_SERIES_OPTIMIZED).
+	 */
 	struct bps_leaf *leaf = leaf_path_elem->block;
 	bps_tree_pos_t pos = leaf_path_elem->insertion_point;
 
@@ -3798,6 +3818,9 @@ bps_tree_move_elems_to_right_leaf(struct bps_tree_common *tree,
 				  struct bps_leaf_path_elem *b_leaf_path_elem,
 				  bps_tree_pos_t num)
 {
+	if (num == 0)
+		return;
+
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
 		bps_tree_touch_leaf(tree, a_leaf_path_elem);
@@ -3807,7 +3830,6 @@ bps_tree_move_elems_to_right_leaf(struct bps_tree_common *tree,
 	struct bps_leaf *b = b_leaf_path_elem->block;
 	bool move_all = a->header.size == num;
 
-	assert(num > 0);
 	assert(a->header.size >= num);
 	assert(b->header.size + num <= BPS_TREE_MAX_COUNT_IN_LEAF);
 
@@ -3883,6 +3905,9 @@ bps_tree_move_elems_to_left_leaf(struct bps_tree_common *tree,
 				 struct bps_leaf_path_elem *b_leaf_path_elem,
 				 bps_tree_pos_t num)
 {
+	if (num == 0)
+		return;
+
 	/* exclusive behaviuor for debug checks */
 	if (tree->root_id != (bps_tree_block_id_t) -1) {
 		bps_tree_touch_leaf(tree, a_leaf_path_elem);
@@ -3891,7 +3916,6 @@ bps_tree_move_elems_to_left_leaf(struct bps_tree_common *tree,
 	struct bps_leaf *a = a_leaf_path_elem->block;
 	struct bps_leaf *b = b_leaf_path_elem->block;
 
-	assert(num > 0);
 	assert(b->header.size >= num);
 	assert(a->header.size + num <= BPS_TREE_MAX_COUNT_IN_LEAF);
 
@@ -4419,7 +4443,14 @@ bps_tree_inner_free_size(struct bps_inner *inner)
 static inline bps_tree_pos_t
 bps_tree_leaf_overmin_size(struct bps_leaf *leaf)
 {
-	return leaf->header.size - BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3;
+	/*
+	 * The block size may be less than BPS_TREE_MIN_COUNT_IN_LEAF if the
+	 * block is the last one. So in this case the function must return 0.
+	 * The multiplication allows the compiler generate cmov instruction.
+	 */
+	return (leaf->header.size - BPS_TREE_MIN_COUNT_IN_LEAF) *
+	       leaf->header.size >= BPS_TREE_MIN_COUNT_IN_LEAF;
+	return 0;
 }
 /**
  * @brieaf Difference between current size of the inner and minumum allowed
@@ -4428,7 +4459,7 @@ bps_tree_leaf_overmin_size(struct bps_leaf *leaf)
 static inline bps_tree_pos_t
 bps_tree_inner_overmin_size(struct bps_inner *inner)
 {
-	return inner->header.size - BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3;
+	return inner->header.size - BPS_TREE_MIN_COUNT_IN_INNER;
 }
 
 /**
@@ -4678,6 +4709,11 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 		} else if (bps_tree_leaf_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(right_ext.block) / 2;
+#ifdef BPS_TIME_SERIES_OPTIMIZED
+			/* The right leaf can be the last and not filled. */
+			move_count =
+				MIN(move_count, 1 + BPS_TREE_MAX_FREE_LEAF);
+#endif
 			inserted_ext =
 				bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
@@ -4723,6 +4759,11 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 		if (bps_tree_leaf_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_free_size(right_ext.block) / 2;
+#ifdef BPS_TIME_SERIES_OPTIMIZED
+			/* The right leaf can be the last and not filled. */
+			move_count =
+				MIN(move_count, 1 + BPS_TREE_MAX_FREE_LEAF);
+#endif
 			inserted_ext =
 				bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
@@ -4739,6 +4780,10 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 			bps_tree_pos_t move_count = 1 + (2 *
 				bps_tree_leaf_free_size(right_right_ext.block)
 				- 1) / 3;
+#ifdef BPS_TIME_SERIES_OPTIMIZED
+			/* The right-right can be the last and not filled. */
+			move_count = MIN(move_count, +BPS_TREE_MAX_FREE_LEAF);
+#endif
 			bps_tree_move_elems_to_right_leaf(tree, &right_ext,
 					&right_right_ext, move_count);
 			move_count = 1 + move_count / 2;
@@ -4829,6 +4874,25 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 				&new_path_elem, &right_ext, mc3);
 
 		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x7);
+#ifdef BPS_TIME_SERIES_OPTIMIZED
+	} else if (has_left_ext && has_left_left_ext &&
+		 leaf_path_elem->insertion_point ==
+		 BPS_TREE_MAX_COUNT_IN_LEAF) {
+		/*
+		 * We have three fully filled blocks and going to insert into
+		 * the end of the last block. Let's consider we're going to
+		 * insert more element at the end in the future, so do not
+		 * overrebalance the tree in the way. So now the last block
+		 * is allowed to have less than BPS_TREE_MIN_COUNT_IN_LEAF
+		 * elements.
+		 */
+		new_path_elem.insertion_point = 0;
+		new_path_elem.max_elem_path = NULL;
+		bps_tree_insert_into_leaf(tree, &new_path_elem, new_elem);
+		inserted_ext = &new_path_elem;
+		/* TODO: new branch. */
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x8);
+#endif
 	} else if (has_left_ext && has_left_left_ext) {
 		/*
 		 * The block has MAX elems and +1 elem is inserted,
@@ -5413,8 +5477,7 @@ bps_tree_process_delete_leaf(struct bps_tree_common *tree,
 
 	bps_tree_delete_from_leaf(tree, leaf_path_elem);
 
-	if (leaf_path_elem->block->header.size >=
-	    BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3) {
+	if (leaf_path_elem->block->header.size >= BPS_TREE_MIN_COUNT_IN_LEAF) {
 		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x0);
 		return;
 	}
@@ -5611,7 +5674,7 @@ bps_tree_process_delete_inner(struct bps_tree_common *tree,
 	bps_tree_delete_from_inner(tree, inner_path_elem);
 
 	if (inner_path_elem->block->header.size >=
-	    BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3) {
+	    BPS_TREE_MIN_COUNT_IN_INNER) {
 		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x0);
 		return;
 	}
@@ -6023,9 +6086,14 @@ bps_tree_debug_check_block(const struct bps_tree_common *tree,
 	if (block->type == BPS_TREE_BT_LEAF) {
 		struct bps_leaf *leaf = (struct bps_leaf *)(block);
 		int result = 0;
-		if (check_fullness)
-			if (block->size < BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3)
+#ifdef BPS_TIME_SERIES_OPTIMIZED
+		check_fullness = check_fullness &&
+				 leaf->next_id != (bps_tree_block_id_t)(-1);
+#endif
+		if (check_fullness) {
+			if (block->size < BPS_TREE_MIN_COUNT_IN_LEAF)
 				result |= 0x1000000;
+		}
 		*calc_count += block->size;
 		if (id != *expected_this_id)
 			result |= 0x10000;
@@ -6049,7 +6117,7 @@ bps_tree_debug_check_block(const struct bps_tree_common *tree,
 		struct bps_inner *inner = (struct bps_inner *)(block);
 		int result = 0;
 		if (check_fullness)
-			if (block->size < BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3)
+			if (block->size < BPS_TREE_MIN_COUNT_IN_INNER)
 				result |= 0x2000000;
 		if (block->size < 2)
 			result |= 0x1000;
@@ -7699,6 +7767,10 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_max_sizes
 #undef BPS_TREE_MAX_COUNT_IN_LEAF
 #undef BPS_TREE_MAX_COUNT_IN_INNER
+#undef BPS_TREE_MIN_COUNT_IN_LEAF
+#undef BPS_TREE_MIN_COUNT_IN_INNER
+#undef BPS_TREE_MAX_FREE_LEAF
+#undef BPS_TREE_MAX_FREE_INNER
 #undef BPS_TREE_MAX_DEPTH
 #undef bps_block_info
 #undef bps_block_type
