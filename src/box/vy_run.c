@@ -2647,8 +2647,11 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 	bool unused;
 	if (vy_page_find_key(stream->page, stream->slice->begin,
 			     stream->cmp_def, stream->format, ITER_GE,
-			     &stream->pos_in_page, &unused) != 0)
+			     &stream->pos_in_page, &unused) != 0) {
+		vy_page_delete(stream->page);
+		stream->page = NULL;
 		return -1;
+	}
 
 	if (stream->pos_in_page == stream->page->row_count) {
 		/* The first tuple is in the beginning of the next page */
