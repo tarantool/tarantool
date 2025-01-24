@@ -188,11 +188,6 @@ struct vy_tx {
 	 * intervals.
 	 */
 	vy_tx_read_set_t read_set;
-	/**
-	 * Prepare sequence number or -1 if the transaction
-	 * is not prepared.
-	 */
-	int64_t psn;
 	/* List of triggers invoked when this transaction ends. */
 	struct rlist on_destroy;
 };
@@ -229,13 +224,6 @@ struct vy_tx_manager {
 	 * vinyl. Updated in vy_commit().
 	 */
 	int64_t lsn;
-	/**
-	 * A global transaction prepare counter: a transaction
-	 * is assigned an id at the time of vy_prepare(). Is used
-	 * to order statements of prepared but not yet committed
-	 * transactions in vy_mem.
-	 */
-	int64_t psn;
 	/**
 	 * List of prepared (but not committed) transaction,
 	 * sorted by PSN ascending, linked by vy_tx::in_prepared.

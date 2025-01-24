@@ -170,7 +170,7 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn)
 	/* Look up the last prepared tx with lsn less than the given one. */
 	struct vy_tx *tx;
 	rlist_foreach_entry_reverse(tx, &xm->prepared, in_prepared) {
-		if (plsn > MAX_LSN + tx->psn)
+		if (plsn > MAX_LSN + tx->txn->psn)
 			break;
 	}
 	bool tx_exists = !rlist_entry_is_head(tx, &xm->prepared, in_prepared);
@@ -180,7 +180,7 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn)
 	 */
 	if (rv_exists) {
 		if ((!tx_exists && rv->vlsn == xm->lsn) ||
-		    (tx_exists && rv->vlsn == MAX_LSN + tx->psn)) {
+		    (tx_exists && rv->vlsn == MAX_LSN + tx->txn->psn)) {
 			rv->refs++;
 			return rv;
 		}
@@ -197,7 +197,7 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn)
 		return NULL;
 	}
 	if (tx_exists) {
-		rv->vlsn = MAX_LSN + tx->psn;
+		rv->vlsn = MAX_LSN + tx->txn->psn;
 		tx->read_view = rv;
 		rv->refs = 2;
 	} else {
@@ -343,7 +343,6 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 	tx->is_applier_session = false;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
 	vy_tx_read_set_new(&tx->read_set);
-	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
 	rlist_create(&tx->in_prepared);
 }
@@ -634,7 +633,6 @@ vy_tx_prepare(struct vy_tx *tx)
 		return 0;
 	assert(!vy_tx_is_in_read_view(tx));
 	assert(tx->read_view == &xm->global_read_view);
-	tx->psn = ++xm->psn;
 
 	/** Send to read view read intersection and abort write intersection. */
 	struct txv *v;
@@ -729,7 +727,7 @@ vy_tx_prepare(struct vy_tx *tx)
 			return -1;
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
-		vy_stmt_set_lsn(v->entry.stmt, MAX_LSN + tx->psn);
+		vy_stmt_set_lsn(v->entry.stmt, MAX_LSN + tx->txn->psn);
 		struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
 		if (vy_lsm_set(lsm, v->mem, v->entry, region_stmt) != 0)
