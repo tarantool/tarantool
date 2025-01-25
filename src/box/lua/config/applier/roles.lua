@@ -16,8 +16,9 @@ local roles_state = {
     -- Last values received from box.status watcher.
     last_box_status_value = nil,
 
-    -- Last applied config.
-    last_config = nil,
+    -- Table with the last applied roles configs, where the key is the role name
+    -- and the value is the config for the role.
+    last_roles_cfg = nil,
 }
 
 -- Function decorator that is used to prevent call_on_event_callbacks() from
@@ -35,7 +36,7 @@ local function locked(f)
 end
 
 -- Call all the on_event callbacks from roles in order.
-local call_on_event_callbacks = locked(function(config, key, value)
+local call_on_event_callbacks = locked(function(roles_cfg, key, value)
     local roles_ordered = roles_state.last_roles_ordered
     local roles = roles_state.last_loaded
     for _, role_name in ipairs(roles_ordered) do
@@ -44,7 +45,7 @@ local call_on_event_callbacks = locked(function(config, key, value)
             log.verbose(('roles.on_event: calling callback for role ' ..
                          '"%s"'):format(role_name))
             local ok, err = pcall(role.on_event,
-                                  config, key, value)
+                                  roles_cfg[role_name], key, value)
             if not ok then
                 log.error(('roles.on_event: callback for role ' ..
                            '"%s" failed: %s'):format(role_name, err))
@@ -63,11 +64,11 @@ local function box_status_watcher()
 
         -- Config is not fully applied yet, don't call on_event callbacks.
         -- We will call them later in post_apply.
-        if roles_state.last_config == nil then
+        if roles_state.last_roles_cfg == nil then
             return
         end
 
-        call_on_event_callbacks(roles_state.last_config, 'box.status', value)
+        call_on_event_callbacks(roles_state.last_roles_cfg, 'box.status', value)
     end)
 end
 
@@ -260,14 +261,14 @@ local function post_apply(config)
 
     roles_state.last_loaded = loaded
     roles_state.last_roles_ordered = roles_ordered
-    roles_state.last_config = table.deepcopy(config)
+    roles_state.last_roles_cfg = table.deepcopy(roles_cfg)
 
     -- box.status watcher values should be already set, because the watcher
     -- has been registered during apply.
     assert(roles_state.last_box_status_value ~= nil)
 
     -- Call on_event callbacks after the config is fully applied.
-    call_on_event_callbacks(config, 'config.apply',
+    call_on_event_callbacks(roles_state.last_roles_cfg, 'config.apply',
                             roles_state.last_box_status_value)
 end
 

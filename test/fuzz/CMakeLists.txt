@@ -6,6 +6,8 @@ include_directories(${PROJECT_SOURCE_DIR}/src/box)
 # A special target with fuzzer and sanitizer flags.
 add_library(fuzzer_config INTERFACE)
 
+set(TEST_SUITE_NAME "fuzzing-c")
+
 target_compile_options(
     fuzzer_config
     INTERFACE
@@ -45,6 +47,24 @@ target_link_libraries(
 
 set(FUZZ_TEST_TARGETS "")
 
+set(DEFAULT_RUNS_NUMBER 10)
+
+list(APPEND LIBFUZZER_OPTS
+  -mutate_depth=20
+  -print_final_stats=1
+  -print_pcs=1
+  -reduce_inputs=1
+  -reload=1
+  -report_slow_units=5
+  -seed=${RANDOM_SEED}
+  -use_value_profile=1
+  -workers=${CMAKE_BUILD_PARALLEL_LEVEL}
+  # Shell parameter expansion,
+  # https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+  -runs=\${RUNS:-${DEFAULT_RUNS_NUMBER}}
+)
+
+message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 function(create_fuzz_test)
   cmake_parse_arguments(
     FUZZ
@@ -53,11 +73,35 @@ function(create_fuzz_test)
     "SOURCES;LIBRARIES"
     ${ARGN}
   )
-  message(STATUS "Creating fuzz test ${FUZZ_PREFIX}_fuzzer")
   add_executable(${FUZZ_PREFIX}_fuzzer ${FUZZ_SOURCES})
+  # XXX: The call produces both test and target
+  # <${FUZZ_PREFIX}-deps> as a side effect.
+  _add_test_suite_target(${FUZZ_PREFIX}
+    LABELS "${TEST_SUITE_NAME};fuzzing;"
+    DEPENDS ${FUZZ_LIBRARIES} ${FUZZ_PREFIX}_fuzzer
+  )
   # Use PUBLIC to force 'fuzzer_config' for all dependent targets.
   target_link_libraries(${FUZZ_PREFIX}_fuzzer PUBLIC ${FUZZ_LIBRARIES})
   set(FUZZ_TEST_TARGETS ${FUZZ_TEST_TARGETS} ${FUZZ_PREFIX}_fuzzer PARENT_SCOPE)
+  set(LIBFUZZER_OPTS_EFFECTIVE ${LIBFUZZER_OPTS})
+  set(dict_path ${PROJECT_SOURCE_DIR}/test/static/${FUZZ_PREFIX}.dict)
+  if(EXISTS ${dict_path})
+    list(APPEND LIBFUZZER_OPTS_EFFECTIVE "-dict=${dict_path}")
+  endif()
+  set(corpus_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${FUZZ_PREFIX})
+  if(EXISTS ${corpus_path})
+    list(APPEND LIBFUZZER_OPTS_EFFECTIVE "${corpus_path}")
+  endif()
+  set(test_title test/fuzz/${FUZZ_PREFIX}_test)
+  add_test(NAME ${test_title}
+           COMMAND $<TARGET_FILE:${FUZZ_PREFIX}_fuzzer>
+                   -artifact_prefix=${FUZZ_PREFIX}_
+                   ${LIBFUZZER_OPTS_EFFECTIVE}
+  )
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS "${TEST_SUITE_NAME};fuzzing;"
+    DEPENDS ${FUZZ_PREFIX}-deps
+  )
 endfunction()
 
 create_fuzz_test(PREFIX csv

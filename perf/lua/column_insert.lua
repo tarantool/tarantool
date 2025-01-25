@@ -18,8 +18,14 @@ local benchmark = require('benchmark')
 local USAGE = [[
    engine <string, 'memtx'>          - space engine to use for the test
    wal_mode <string, 'write'>        - write-ahead log mode to use for the test
+   sparse_mode <string, 'rand'>      -
+     * seq - the first 10% (column_count_batch / column_count_total) columns are
+             filled in sequential order;
+     * rand - sparse columns are randomly distributed:
+              in non-Arrow mode columns are randomly chosen for every row;
+              in Arrow mode columns are randomly chosen for every batch.
    column_count_total <number, 1000> - number of columns in the test space
-   column_count_batch <number, 10>   - number of columns in the record batch
+   column_count_batch <number, 100>  - number of columns in the record batch
    row_count_total <number, 1000000> - number of inserted rows
    row_count_batch <number, 1000>    - number of rows per record batch
    use_arrow_api <boolean, false>    - use the Arrow API for batch insertion
@@ -29,6 +35,7 @@ local USAGE = [[
 local params = benchmark.argparse(arg, {
     {'engine', 'string'},
     {'wal_mode', 'string'},
+    {'sparse_mode', 'string'},
     {'column_count_total', 'number'},
     {'column_count_batch', 'number'},
     {'row_count_total', 'number'},
@@ -38,13 +45,15 @@ local params = benchmark.argparse(arg, {
 
 local DEFAULT_ENGINE = 'memtx'
 local DEFAULT_WAL_MODE = 'write'
+local DEFAULT_SPARSE_MODE = 'rand'
 local DEFAULT_COLUMN_COUNT_TOTAL = 1000
-local DEFAULT_COLUMN_COUNT_BATCH = 10
+local DEFAULT_COLUMN_COUNT_BATCH = 100
 local DEFAULT_ROW_COUNT_TOTAL = 1000 * 1000
 local DEFAULT_ROW_COUNT_BATCH = 1000
 
 params.engine = params.engine or DEFAULT_ENGINE
 params.wal_mode = params.wal_mode or DEFAULT_WAL_MODE
+params.sparse_mode = params.sparse_mode or DEFAULT_SPARSE_MODE
 params.column_count_total = params.column_count_total or
                             DEFAULT_COLUMN_COUNT_TOTAL
 params.column_count_batch = params.column_count_batch or

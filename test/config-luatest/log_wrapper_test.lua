@@ -1,3 +1,5 @@
+-- tags: parallel
+
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')

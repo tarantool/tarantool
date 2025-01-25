@@ -1,6 +1,8 @@
 -- Disable strict for Tarantool.
 require("strict").off()
 
+local ffi = require('ffi')
+local alloc = require('internal.alloc')
 local loaders = require('internal.loaders')
 
 -- XXX: lua-Harness test suite uses it's own tap.lua module
@@ -136,6 +138,15 @@ assert(type(pairs) == 'function')
 -- test suite, but likely it would be more correct to discard the
 -- test case.
 loaders.override_builtin_disable()
+
+-- Increase the default Lua memory limit.
+--
+-- Some tests in the tarantool-tests suite of LuaJIT assume that
+-- for the GC64 build we have more than 4 GB of Lua memory.
+-- Increase the limit to 128 TiB (LuaJIT maximum for GC64 mode).
+if ffi.abi('gc64') then
+  alloc.setlimit(128 * 1024 * 1024 * 1024 * 1024)
+end
 
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058

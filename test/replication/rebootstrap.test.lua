@@ -18,4 +18,5 @@ test_run:cmd('switch rebootstrap1')
 box.info.status -- running
 
 test_run:cmd('switch default')
+test_run:wait_fullmesh(SERVERS)
 test_run:drop_cluster(SERVERS)

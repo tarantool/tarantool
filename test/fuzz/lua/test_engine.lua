@@ -30,6 +30,7 @@ local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
 
 local params = require('internal.argparse').parse(arg, {
     { 'engine', 'string' },
+    { 'fault_injection', 'boolean' },
     { 'h', 'boolean' },
     { 'seed', 'number' },
     { 'test_duration', 'number' },
@@ -60,6 +61,7 @@ if params.help or params.h then
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
    engine <string, 'vinyl'>              - engine ('vinyl', 'memtx')
+   fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
    help (same as -h)                     - print this message
@@ -80,6 +82,8 @@ local arg_test_dir = params.test_dir or DEFAULT_TEST_DIR
 local arg_engine = params.engine or 'vinyl'
 
 local arg_verbose = params.verbose or false
+
+local arg_fault_injection = params.fault_injection or false
 
 local seed = params.seed or os.time()
 math.randomseed(seed)
@@ -144,7 +148,7 @@ local function rand_char()
 end
 
 local function rand_string(length)
-    length = length or 10
+    length = length or math.random(8, 256)
     local res = ''
     for _ = 1, length do
         res = res .. rand_char()
@@ -426,6 +430,17 @@ local tarantool_indices = {
     },
 }
 
+-- Note that the linearizable isolation level can't be set as
+-- default and can be used for a specific transaction only.
+-- See https://www.tarantool.io/en/doc/latest/platform/atomic/txn_mode_mvcc/.
+-- Note that 'linearizable' makes sense when space is synchronous,
+-- the test uses only local spaces, so 'linearizable' is not used.
+local isolation_levels = {
+    'best-effort',
+    'read-committed',
+    'read-confirmed',
+}
+
 local function select_op(space, idx_type, key)
     local select_opts = {
         iterator = oneof(tarantool_indices[idx_type].iterator_type),
@@ -504,12 +519,12 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         slab_alloc_factor = math.random(1, 2),
         vinyl_bloom_fpr = math.random(50) / 100,
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
-        vinyl_max_tuple_size = math.random(0, 100000),
-        vinyl_memory = 800 * 1024 * 1024,
-        vinyl_page_size = math.random(1024, 2048),
-        vinyl_range_size = 128 * 1024,
+        vinyl_defer_deletes = oneof({true, false}),
+        vinyl_memory = oneof({8, 16, 32, 64, 128}) * 1024 * 1024,
+        vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024,
+        vinyl_range_size = oneof({0, 1, 4, 16, 128}) * 1024,
         vinyl_read_threads = math.random(2, 10),
-        vinyl_run_count_per_level = math.random(1, 10),
+        vinyl_run_count_per_level = oneof({1, 2, 4, 8, 16, 32}),
         vinyl_run_size_ratio = math.random(2, 5),
         vinyl_timeout = math.random(1, 5),
         vinyl_write_threads = math.random(2, 10),
@@ -521,6 +536,9 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         work_dir = test_dir,
         worker_pool_threads = math.random(1, 10),
     }
+    if box_cfg_options.memtx_use_mvcc_engine then
+        box_cfg_options.txn_isolation = oneof(isolation_levels)
+    end
     if verbose then
         box_cfg_options.log_level = 'verbose'
     end
@@ -573,12 +591,6 @@ local function index_opts(space, is_primary)
         -- TODO: support `sequence`,
         -- TODO: support functional indices.
     }
-
-    if space.engine == 'vinyl' then
-        opts.bloom_fpr = math.random(50) / 100
-        opts.page_size = math.random(10) * 1024
-        opts.range_size = 1073741824
-    end
 
     local indices = fun.iter(keys(tarantool_indices)):filter(
         function(x)
@@ -958,9 +970,14 @@ local ops = {
 
     TX_BEGIN = {
         func = function()
-            if not box.is_in_txn() then
-                box.begin()
+            if box.is_in_txn() then
+                return
             end
+            local txn_opts = {}
+            if box.cfg.memtx_use_mvcc_engine then
+               txn_opts.txn_isolation = oneof(isolation_levels)
+            end
+            box.begin(txn_opts)
         end,
         args = function(_) return end,
     },
@@ -1399,31 +1416,7 @@ local function process_errors(error_messages)
     return found_unexpected_errors
 end
 
-local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode)
-    if fio.path.exists(test_dir) then
-        cleanup_dir(test_dir)
-    else
-        fio.mkdir(test_dir)
-    end
-
-    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
-    console.listen(socket_path)
-    log.info('console listen on %s', socket_path)
-
-    local workers = {}
-    local space_id_func = counter()
-    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
-
-    local test_gen = fun.cycle(fun.iter(keys(ops)))
-    local f
-    for id = 1, num_workers do
-        f = fiber.new(worker_func, id, space, test_gen, test_duration)
-        f:set_joinable(true)
-        f:name('WRK #' .. id)
-        table.insert(workers, f)
-    end
-
+local function start_error_injections(space, test_duration)
     local errinj_f = fiber.new(function(test_duration)
         log.info('Fault injection fiber has started.')
         local max_errinj_in_parallel = 5
@@ -1434,23 +1427,49 @@ local function run_test(num_workers, test_duration, test_dir,
         end
         disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
-    end, arg_test_duration)
+    end, test_duration)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
 
-    -- Stop the fault injection fiber first so that worker fibers can exit
-    -- without getting stuck on some random timeout injection.
-    local ok, res = fiber.join(errinj_f)
-    if not ok then
-        log.info('ERROR: %s', json.encode(res))
+    return errinj_f
+end
+
+local function run_test(num_workers, test_duration, test_dir,
+                        engine_name, verbose_mode, fault_injection)
+    if fio.path.exists(test_dir) then
+        cleanup_dir(test_dir)
+    else
+        fio.mkdir(test_dir)
+    end
+
+    local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
+    console.listen(socket_path)
+    log.info('console listen on %s', socket_path)
+
+    local fibers = {}
+    local space_id_func = counter()
+    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+
+    local test_gen = fun.cycle(fun.iter(keys(ops)))
+    local f
+    for id = 1, num_workers do
+        f = fiber.new(worker_func, id, space, test_gen, test_duration)
+        f:set_joinable(true)
+        f:name('WRK #' .. id)
+        table.insert(fibers, f)
+    end
+
+    if fault_injection then
+        f = start_error_injections(space, test_duration)
+        table.insert(fibers, f)
     end
 
     local error_messages = {}
-    for _, fb in ipairs(workers) do
-        ok, res = fiber.join(fb)
+    for _, fb in ipairs(fibers) do
+        local ok, res = fiber.join(fb)
         if not ok then
             log.info('ERROR: %s', json.encode(res))
-        else
+        elseif res then
             for _, v in ipairs(res) do
                 local msg = tostring(v)
                 error_messages[msg] = error_messages[msg] or 1
@@ -1465,4 +1484,4 @@ local function run_test(num_workers, test_duration, test_dir,
 end
 
 run_test(arg_num_workers, arg_test_duration, arg_test_dir,
-         arg_engine, arg_verbose)
+         arg_engine, arg_verbose, arg_fault_injection)

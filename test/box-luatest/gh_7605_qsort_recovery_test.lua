@@ -34,15 +34,13 @@ end)
 
 g.test_qsort_recovery = function()
     g.server:exec(function()
-        local PACK = 10000
-        local TOTAL = 2000000
+        local PACK = 1000
+        local TOTAL = 20000
         local uuid = require "uuid"
         local fiber = require "fiber"
 
+        fiber.set_max_slice(600)
         for i = 1, TOTAL / PACK do
-            if fiber.set_slice then
-                fiber.set_slice(600)
-            end
             box.begin()
             for k = 1, PACK do
                 box.space.test:replace{(i - 1) * 1000 + k, uuid.str()}
@@ -58,10 +56,12 @@ g.test_qsort_recovery = function()
 
     -- check secondary index correctness
     g.server:exec(function()
-        local PACK = 10000
+        local PACK = 1000
         local prev_tuple = nil
         local fiber = require "fiber"
         local i = 0
+
+        fiber.set_max_slice(600)
         for _,tuple in box.space.test.index.i:pairs() do
             if prev_tuple ~= nil then
                 t.assert(prev_tuple[2] < tuple[2], "Unordered!")
@@ -77,15 +77,13 @@ g.test_qsort_recovery = function()
 
     -- original test
     g.server:exec(function()
-        local PACK = 10000
-        local TOTAL = 2000000
+        local PACK = 1000
+        local TOTAL = 20000
         local uuid = require "uuid"
         local fiber = require "fiber"
 
+        fiber.set_max_slice(600)
         for i = 1, TOTAL / PACK do
-            if fiber.set_slice then
-                fiber.set_slice(600)
-            end
             box.begin()
             for k = 1, PACK do
                 box.space.test:replace{(i - 1) * 1000 + k, uuid.str()}

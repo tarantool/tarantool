@@ -905,13 +905,36 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 
 	assert(vy_stmt_is_refable(entry.stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
+	assert(vy_stmt_is_key(entry.stmt) ||
+	       format_id == tuple_format_id(mem->format));
 
-	/* Abort transaction if format was changed by DDL */
-	if (!vy_stmt_is_key(entry.stmt) &&
-	    format_id != tuple_format_id(mem->format)) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
+	/* Invalidate cache element. */
+	struct vy_entry deleted = vy_entry_none();
+	vy_cache_on_write(&lsm->cache, entry, &deleted);
+
+	/*
+	 * The UPSERT statement can be applied to the cached statement,
+	 * because the cache always contains newest REPLACE statements.
+	 * In such a case the UPSERT, applied to the cached statement,
+	 * can be inserted instead of the original UPSERT.
+	 */
+	bool need_unref = false;
+	if (deleted.stmt != NULL &&
+	    vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
+		struct vy_entry applied = vy_entry_apply_upsert(
+				entry, deleted, mem->cmp_def, false);
+		/*
+		 * Ignore a memory error, because it is not critical
+		 * to apply the optimization.
+		 */
+		if (applied.stmt != NULL) {
+			entry = applied;
+			need_unref = true;
+		}
 	}
+	if (deleted.stmt != NULL)
+		tuple_unref(deleted.stmt);
+
 	/*
 	 * Allocate region_stmt on demand.
 	 *
@@ -924,11 +947,13 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 		*region_stmt = vy_stmt_dup_lsregion(entry.stmt,
 						    &mem->env->allocator,
 						    mem->generation);
-		if (*region_stmt == NULL)
-			return -1;
 	}
-	entry.stmt = *region_stmt;
+	if (need_unref)
+		tuple_unref(entry.stmt);
+	if (*region_stmt == NULL)
+		return -1;
 
+	entry.stmt = *region_stmt;
 	struct vy_stmt_counter *count = &lsm->stat.memory.count;
 	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
 		return vy_mem_insert(mem, entry, count);
@@ -1021,9 +1046,6 @@ vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		vy_lsm_commit_upsert(lsm, mem, entry);
 
 	vy_stmt_counter_acct_tuple(&lsm->stat.put, entry.stmt);
-
-	/* Invalidate cache element. */
-	vy_cache_on_write(&lsm->cache, entry, NULL);
 }
 
 void
@@ -1031,9 +1053,7 @@ vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		     struct vy_entry entry)
 {
 	vy_mem_rollback_stmt(mem, entry, &lsm->stat.memory.count);
-
-	/* Invalidate cache element. */
-	vy_cache_on_write(&lsm->cache, entry, NULL);
+	vy_cache_on_rollback(&lsm->cache, entry);
 }
 
 int

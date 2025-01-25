@@ -610,8 +610,6 @@ struct tx_manager
 	struct memtx_tx_stats retained_tuple_stats[MEMTX_TX_STORY_STATUS_MAX];
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
-	/** The list containing all transactions. */
-	struct rlist all_txs;
 	/** Accumulated number of GC steps that should be done. */
 	size_t must_do_gc_steps;
 };
@@ -659,7 +657,6 @@ memtx_tx_manager_init()
 				sizeof(struct full_scan_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
 	rlist_create(&txm.all_stories);
-	rlist_create(&txm.all_txs);
 	txm.traverse_all_stories = &txm.all_stories;
 	txm.must_do_gc_steps = 0;
 	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
@@ -687,12 +684,12 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 		stats->stories[i] = txm.story_stats[i];
 		stats->retained_tuples[i] = txm.retained_tuple_stats[i];
 	}
-	if (rlist_empty(&txm.all_txs)) {
+	if (rlist_empty(&txns)) {
 		return;
 	}
 	struct txn *txn;
 	size_t txn_count = 0;
-	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+	rlist_foreach_entry(txn, &txns, in_txns) {
 		txn_count++;
 		for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
 			size_t txn_stat = txn->memtx_tx_alloc_stats[i];
@@ -719,7 +716,6 @@ memtx_tx_register_txn(struct txn *tx)
 				    MEMTX_TX_ALLOC_TYPE_MAX);
 	memset(tx->memtx_tx_alloc_stats, 0,
 	       sizeof(*tx->memtx_tx_alloc_stats) * MEMTX_TX_ALLOC_TYPE_MAX);
-	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
 }
 
 void
@@ -3010,7 +3006,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 	 * 2. Abort all point hole readers.
 	 */
 	struct txn *txn;
-	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+	rlist_foreach_entry(txn, &txns, in_txns) {
 		if (txn->status != TXN_INPROGRESS &&
 		    txn->status != TXN_IN_READ_VIEW)
 			continue;
@@ -3142,7 +3138,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 	 * use-after-free.
 	 */
 	struct txn *txn;
-	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+	rlist_foreach_entry(txn, &txns, in_txns) {
 		if (txn->status != TXN_ABORTED || txn->psn != 0)
 			continue;
 		struct txn_stmt *stmt;
@@ -3623,8 +3619,6 @@ void
 memtx_tx_clean_txn(struct txn *txn)
 {
 	memtx_tx_clear_txn_read_lists(txn);
-
-	rlist_del(&txn->in_all_txs);
 
 	memtx_tx_story_gc();
 }

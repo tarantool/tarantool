@@ -7,7 +7,17 @@ on:
       - 'release/**'
     tags:
       - '**'
+    paths:
+      - '.github/workflows/perf_micro.yml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'patches/**'
+      - 'perf/**'
+      - 'src/**'
+      - 'third_party/**'
   pull_request:
+  pull_request_target:
+    types: [labeled]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -19,6 +29,8 @@ on:
         description: Git revision from submodule repository
         required: true
         type: string
+  schedule:
+    - cron: '0 0 * * *'  # Once a day at midnight.
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
@@ -42,11 +54,16 @@ concurrency:
 jobs:
   perf_micro:
     # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'notest' label is not set.
+    # or on pull request if the 'notest' label is not set
+    # or on pull request in the main repository if the
+    # 'performance' label is set.
     if: github.repository_owner == 'tarantool' &&
-        ( github.event_name != 'pull_request' ||
+        ( ( github.event_name != 'pull_request' &&
+            github.event_name != 'pull_request_target' ) ||
           ( github.event_name == 'pull_request' &&
-            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) ||
+          ( github.event_name == 'pull_request_target' &&
+            contains(github.event.pull_request.labels.*.name, 'performance') ) )
 
     # 'performance' label _must_ be set only for the single runner
     # to guarantee that results are not dependent on the machine.
@@ -63,8 +80,8 @@ jobs:
     timeout-minutes: 60
 
     env:
-        PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Prepare checkout
@@ -74,7 +91,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           repository: tarantool/tarantool
-          ref: ${{ inputs.submodule && 'master' || github.ref }}
+          ref: ${{ inputs.submodule && 'master' || env.PERF_COMMIT }}
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
@@ -85,6 +102,11 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: setup environment
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests. The script will fail on regular
+        # runners.
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
@@ -97,7 +119,9 @@ jobs:
           # sudo taskset 0xef chrt 50.
           # But this makes the process use non-standard, real-time
           # round-robin scheduling mechanism.
-          BENCH_CMD: "taskset 0xfe chrt 50"
+          # Hardware machine for benchmarking has a group of
+          # isolated CPUs 1-24.
+          BENCH_CMD: "taskset 0x01fffffe chrt 50"
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB

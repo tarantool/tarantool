@@ -641,6 +641,7 @@ end
 g.test_role_on_event = function(g)
     local one = [[
         _G.foo = -1
+        _G.bar = nil
         _G.is_ro = 'unknown'
 
         return {
@@ -650,10 +651,12 @@ g.test_role_on_event = function(g)
             end,
             stop = function()
                 _G.foo = -1
+                _G.bar = nil
             end,
-            on_event = function(_, key, value)
+            on_event = function(config, key, value)
                 assert(_G.foo >= 0)
 
+                assert(config == 12345)
                 if(_G.foo == 0) then
                     assert(key == 'config.apply')
                 else
@@ -662,23 +665,27 @@ g.test_role_on_event = function(g)
 
                 _G.is_ro = value.is_ro
                 _G.foo = _G.foo + 1
+                _G.bar = config
             end,
         }
     ]]
 
     local verify = function()
         t.assert_equals(_G.foo, 1)
+        t.assert_equals(_G.bar, 12345)
         t.assert_equals(_G.is_ro, false)
 
         box.cfg({read_only = true})
         t.helpers.retrying({}, function()
             t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.bar, 12345)
             t.assert_equals(_G.is_ro, true)
         end)
 
         box.cfg({read_only = false})
         t.helpers.retrying({}, function()
             t.assert_equals(_G.foo, 3)
+            t.assert_equals(_G.bar, 12345)
             t.assert_equals(_G.is_ro, false)
         end)
     end
@@ -686,6 +693,7 @@ g.test_role_on_event = function(g)
     helpers.success_case(g, {
         roles = {one = one},
         options = {
+            ['roles_cfg'] = {one = 12345},
             ['roles'] = {'one'}
         },
         verify = verify,
@@ -696,6 +704,7 @@ end
 g.test_role_on_event_reload = function(g)
     local one = [[
         _G.foo = -1
+        _G.bar = nil
         _G.is_ro = 'unknown'
 
         return {
@@ -705,33 +714,40 @@ g.test_role_on_event_reload = function(g)
             end,
             stop = function()
                 _G.foo = -1
+                _G.bar = nil
             end,
-            on_event = function(_, _, value)
+            on_event = function(config, _, value)
                 assert(_G.foo >= 0)
+                assert(config == 12345)
                 _G.is_ro = value.is_ro
                 _G.foo = _G.foo + 1
+                _G.bar = config
             end,
         }
     ]]
 
     local verify = function()
         t.assert_equals(rawget(_G, 'foo'), nil)
+        t.assert_equals(rawget(_G, 'bar'), nil)
         t.assert_equals(rawget(_G, 'is_ro'), nil)
     end
 
     local verify_2 = function()
         t.assert_equals(_G.foo, 1)
+        t.assert_equals(_G.bar, 12345)
         t.assert_equals(_G.is_ro, false)
 
         box.cfg({read_only = true})
         t.helpers.retrying({}, function()
             t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.bar, 12345)
             t.assert_equals(_G.is_ro, true)
         end)
 
         box.cfg({read_only = false})
         t.helpers.retrying({}, function()
             t.assert_equals(_G.foo, 3)
+            t.assert_equals(_G.bar, 12345)
             t.assert_equals(_G.is_ro, false)
         end)
     end
@@ -740,6 +756,76 @@ g.test_role_on_event_reload = function(g)
         roles = {one = one},
         options = {},
         options_2 = {
+            ['roles_cfg'] = {one = 12345},
+            ['roles'] = {'one'},
+        },
+        verify = verify,
+        verify_2 = verify_2,
+    })
+end
+
+-- Ensure that on_event callback receives new config on update.
+g.test_role_on_event_config_update = function(g)
+    local one = [[
+        _G.foo = -1
+        _G.bar = nil
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function()
+                _G.foo = -1
+                _G.bar = nil
+            end,
+            on_event = function(config, _, _)
+                _G.foo = _G.foo + 1
+                _G.bar = config
+            end,
+        }
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.foo, 0)
+        t.assert_equals(_G.bar, 12345)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 1)
+            t.assert_equals(_G.bar, 12345)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 2)
+            t.assert_equals(_G.bar, 12345)
+        end)
+    end
+
+    local verify_2 = function()
+        t.assert_equals(_G.foo, 3)
+        t.assert_equals(_G.bar, 54321)
+
+        box.cfg({read_only = true})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 4)
+            t.assert_equals(_G.bar, 54321)
+        end)
+
+        box.cfg({read_only = false})
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.foo, 5)
+            t.assert_equals(_G.bar, 54321)
+        end)
+    end
+
+    helpers.reload_success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles_cfg'] = {one = 12345},
+            ['roles'] = {'one'},
+        },
+        options_2 = {
+            ['roles_cfg'] = {one = 54321},
             ['roles'] = {'one'},
         },
         verify = verify,
@@ -881,4 +967,33 @@ g.test_role_on_event_error = function(g)
     t.assert(g.server:grep_log(
         'roles.on_event: callback for role "one" failed: ' ..
         '.* something wrong', 1024, {filename = g.server.chdir .. log_postfix}))
+end
+
+-- Verify that a role configuration is deeply merged for tables
+-- with string keys.
+--
+-- This is supported after gh-10450.
+g.test_roles_cfg_deep_merge = function(g)
+    local paths = {
+        global = 'roles_cfg',
+        group = 'groups.group-001.roles_cfg',
+        replicaset = 'groups.group-001.replicasets.replicaset-001.roles_cfg',
+        instance = 'groups.group-001.replicasets.replicaset-001.instances.' ..
+            'instance-001.roles_cfg'
+    }
+
+    helpers.success_case(g, {
+        options = {
+            [paths.global]     = {x = {y = {z = {a = 1}}}},
+            [paths.group]      = {x = {y = {z = {b = 2}}}},
+            [paths.replicaset] = {x = {y = {z = {c = 3}}}},
+            [paths.instance]   = {x = {y = {z = {d = 4}}}},
+        },
+        verify = function()
+            local config = require('config')
+
+            local res = config:get('roles_cfg.x.y.z')
+            t.assert_equals(res, {a = 1, b = 2, c = 3, d = 4})
+        end,
+    })
 end
