@@ -107,34 +107,6 @@ crash_functions.crash_simulation(
     crash_time
 )
 
---[[
-fiber.create(function()
-    while true do
-        fiber.sleep(crash_time) 
-        local type_of_crashing = math.random(1, 3)
-        if type_of_crashing == 1 then
-            local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-            if crash_node ~= -1 then
-                crash_functions.stop_node(crash_node[1], 1, crash_time)
-            end
-
-        elseif type_of_crashing == 2 then
-            local crash_node = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-            if crash_node ~= -1 then
-                crash_functions.create_delay_to_write_operations(crash_node[1], 1, crash_time)
-            end
-
-        else
-            local crash_nodes = crash_functions.get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
-            if crash_nodes ~= -1 then
-                crash_functions.break_connection_between_two_nodes(crash_nodes, initial_replication, 1, crash_time)
-            end
-        end
-
-    end
-end)
-]]--
-
 print("[REPLICATION MONITOR] Started")
 fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
 
