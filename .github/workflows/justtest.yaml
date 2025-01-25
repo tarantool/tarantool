@@ -22,6 +22,7 @@
 #
 # * Perform several builds in one workflow.
 # * Split testing to jobs per test suite.
+# * Cache submodules build.
 #
 # Let's look into these points.
 #
@@ -118,6 +119,12 @@
 # Next, it allows to achieve larger parallelization level and
 # the feedback from CI is faster this way.
 #
+# Cache submodules build
+# ----------------------
+#
+# It is too attractive to have such a fast build. We use the
+# submodule hash to don't rebuild it each time.
+#
 # TODO
 # ====
 #
@@ -186,73 +193,6 @@ jobs:
             cmake-build-type: RelWithDebInfo
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          # Tarantool build configuration script (CMakeLists.txt)
-          # uses $(git describe --long HEAD) to generate a version
-          # information and build it into the executable.
-          #
-          # This command leans on the commit history and the tags
-          # presence. This way we cannot perform a shallow clone.
-          #
-          # A blobless or a treeless clone would be faster, but it
-          # is known as poorly work with submodules, see the link
-          # below.
-          #
-          # https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/
-          fetch-depth: 0
-          # Tarantool can't build without its dependencies and
-          # some of them are in the submodules.
-          #
-          # It includes our own libraries and third party projects.
-          #
-          # Some of these dependencies are optional, but not all.
-          # We anyway have to deal with the submodules, so let's
-          # checkout them all.
-          submodules: recursive
-          # The repository and its submodules are public and
-          # accessible without authorization.
-          #
-          # We don't need to persist any tokens. Let's don't do
-          # that to reduce the security risk to accidentally share
-          # the token (for example, with actions/upload-artifact).
-          #
-          # https://github.com/actions/checkout/issues/485
-          persist-credentials: false
-
-      # actions/checkout problem: tag deannotation
-      # ------------------------------------------
-      #
-      # On the tag push event, if the tag is annotated,
-      # actions/checkout converts it to a lightweight tag in the
-      # cloned repository. It is a long standing bug and GitHub
-      # doesn't take any care to it.
-      #
-      # This way $(git describe --long HEAD) (without the --tags
-      # option) ignores this tag and takes the previous one to
-      # count commits from it. This way the build looks like a
-      # developer version (1.2.3-entrypoint-42-gXXXXXXXXXX).
-      #
-      # However, it doesn't seems to be a problem for testing the
-      # commit. So, just ignore this problem in this workflow.
-      #
-      # https://github.com/actions/checkout/issues/290
-      # https://github.com/actions/checkout/issues/882
-
-      # actions/checkout problem: tagged build on a commit push
-      # -------------------------------------------------------
-      #
-      # If a commit and a tag that points to this commit are
-      # pushed in a short time, commit push event may and may not
-      # see the new tag depending on the timings.
-      #
-      # This way the build may have a developer version
-      # (1.2.3-entrypoint-42-gXXXXXXXXXX) or a release version
-      # (1.2.3).
-      #
-      # Ignore this problem just like the previous one.
-
       - name: Install build dependencies
         run: sudo apt-get install libreadline-dev
 
@@ -264,6 +204,188 @@ jobs:
           sudo ./llvm.sh 19
           echo CC=clang-19 >> ${GITHUB_ENV}
           echo CXX=clang++-19 >> ${GITHUB_ENV}
+
+      - name: Checkout repository (shallow, no submodules)
+        uses: actions/checkout@v4
+        with:
+          # The repository and its submodules are public and
+          # accessible without authorization.
+          #
+          # We don't need to persist any tokens. Let's don't do
+          # that to reduce the security risk to accidentally share
+          # the token (for example, with actions/upload-artifact).
+          #
+          # https://github.com/actions/checkout/issues/485
+          persist-credentials: false
+
+      # Fetch submodules
+      # ----------------
+      #
+      # Tarantool can't build without its dependencies and
+      # some of them are in the submodules. It includes our own
+      # libraries and third party projects.
+      #
+      # There are several reasons to don't use the
+      # `submodules: recursive` option of actions/checkout.
+      #
+      # 1. Can't checkout only needed submodules (libunwind is
+      #    excluded if found in the cache).
+      #
+      # 2. Can't pass --jobs option to fetch the submodules in
+      #    parallel.
+      #
+      #    https://github.com/actions/checkout/issues/945
+      #    https://github.com/actions/checkout/pull/323
+      #    https://github.com/actions/checkout/pull/323
+      #
+      # 3. Can't control whether to do shallow or deep clone per
+      #    submodule separately and without affecting shallow/deep
+      #    clone of the main repository.
+      #
+      # Caching submodules
+      # ------------------
+      #
+      # The cache key is the submodule commit (plus the build type
+      # information). Also, it includes a cache key version. It
+      # is to be bumpled if something outside of the submodule
+      # that affects the build of the submodule is changed (say,
+      # a configuration option in the given build type or an
+      # option passed to ExternalProject_Add).
+      #
+      # The cache contains the sources, the object files and the
+      # libraries. It would be nice to cache just static libraries
+      # to reduce the cache file size, but I've met a couple of
+      # problems on this road:
+      #
+      # * The incremental build machinery needs all the
+      #   intermediate files (autotools generated files, object
+      #   files) to ensure that the libraries are built after the
+      #   given sources, at least for libunwind.
+      # * Even if all the intermediate files are here, the files
+      #   from the cache have the modification time in the past
+      #   (it is preserved by caching) and the freshly cloned
+      #   source files are newer than them.
+      #
+      # While the cache files are megabytes or tens of megabytes,
+      # it seems OK to just cache the sources, the object files
+      # and the resulting libraries all together.
+
+      - name: Get commit ID of submodules
+        id: submodule-commit-id
+        run: |
+          commit_id() { git ls-tree --object-only HEAD "$1"; }
+
+          printf "luajit=%s\n"    $(commit_id third_party/luajit)    >> $GITHUB_OUTPUT
+          printf "libyaml=%s\n"   $(commit_id third_party/libyaml)   >> $GITHUB_OUTPUT
+          printf "libunwind=%s\n" $(commit_id third_party/libunwind) >> $GITHUB_OUTPUT
+          printf "curl=%s\n"      $(commit_id third_party/curl)      >> $GITHUB_OUTPUT
+          printf "c-ares=%s\n"    $(commit_id third_party/c-ares)    >> $GITHUB_OUTPUT
+          printf "nghttp2=%s\n"   $(commit_id third_party/nghttp2)   >> $GITHUB_OUTPUT
+
+      - name: Restore luajit from cache
+        id: restore-luajit-from-cache
+        uses: actions/cache@v4
+        with:
+          key: luajit-${{ steps.submodule-commit-id.outputs.luajit }}-${{ matrix.build-conf }}-v1
+          path: third_party/luajit
+
+      - name: Restore libyaml from cache
+        id: restore-libyaml-from-cache
+        uses: actions/cache@v4
+        with:
+          key: libyaml-${{ steps.submodule-commit-id.outputs.libyaml }}-${{ matrix.build-conf }}-v1
+          path: |
+            third_party/libyaml
+            build/libyaml
+
+      - name: Restore libunwind from cache
+        id: restore-libunwind-from-cache
+        uses: actions/cache@v4
+        with:
+          key: libunwind-${{ steps.submodule-commit-id.outputs.libunwind }}-${{ matrix.build-conf }}-v1
+          path: third_party/libunwind
+
+      - name: Restore curl from cache
+        id: restore-curl-from-cache
+        uses: actions/cache@v4
+        with:
+          key: curl-${{ steps.submodule-commit-id.outputs.curl }}-${{ matrix.build-conf }}-v1
+          path: |
+            third_party/curl
+            build/curl
+
+      - name: Restore c-ares from cache
+        id: restore-c-ares-from-cache
+        uses: actions/cache@v4
+        with:
+          key: c-ares-${{ steps.submodule-commit-id.outputs.c-ares }}-${{ matrix.build-conf }}-v1
+          path: |
+            third_party/c-ares
+            build/ares
+
+      - name: Restore nghttp2 from cache
+        id: restore-nghttp2-from-cache
+        uses: actions/cache@v4
+        with:
+          key: nghttp2-${{ steps.submodule-commit-id.outputs.nghttp2 }}-${{ matrix.build-conf }}-v1
+          path: |
+            third_party/nghttp2
+            build/nghttp2
+
+      - name: Checkout LuaJIT submodule (shallow clone)
+        if: steps.restore-luajit-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/luajit
+
+      - name: Strip $(git describe) call from LuaJIT build script
+        if: steps.restore-luajit-from-cache.outputs.cache-hit != 'true'
+        run: |
+          rm third_party/luajit/.git
+          sed -i -e 's/CMAKE_SOURCE_DIR/PROJECT_SOURCE_DIR/' third_party/luajit/cmake/SetVersion.cmake
+
+      - name: Checkout libyaml submodule (shallow clone)
+        if: steps.restore-libyaml-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/libyaml
+
+      - name: Checkout libunwind submodule (shallow clone)
+        if: steps.restore-libunwind-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/libunwind
+
+      - name: Checkout curl submodule (shallow clone)
+        if: steps.restore-curl-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/curl
+
+      - name: Checkout c-ares submodule (shallow clone)
+        if: steps.restore-c-ares-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/c-ares
+
+      - name: Checkout nghttp2 submodule (shallow clone)
+        if: steps.restore-nghttp2-from-cache.outputs.cache-hit != 'true'
+        run: git submodule update --init --recursive --depth 1 third_party/nghttp2
+
+      # These submodules don't require $(git describe) information,
+      # so it is OK to perform a shallow clone. It should be faster.
+      - name: Checkout the remaining submodules (shallow clone)
+        run: |
+          git submodule update --init --recursive --depth 1 --jobs 8 \
+            src/lib/msgpuck                                          \
+            third_party/luafun                                       \
+            test-run                                                 \
+            src/lib/small                                            \
+            third_party/zstd                                         \
+            third_party/decNumber                                    \
+            third_party/xxHash                                       \
+            third_party/c-dt                                         \
+            third_party/lua-zlib                                     \
+            third_party/luazip                                       \
+            third_party/tz                                           \
+            third_party/checks                                       \
+            third_party/metrics                                      \
+            third_party/arrow/nanoarrow
+
+      - name: Strip $(git describe) call from the build script
+        run: |
+          echo "3.9.9-entrypoint-9-g$(git rev-parse --short HEAD)" > VERSION
+          rm -r .git
 
       # -DCMAKE_BUILD_TYPE=<...>
       # ------------------------
