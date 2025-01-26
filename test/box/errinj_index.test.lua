@@ -33,11 +33,11 @@ for i = 501,2500 do table.insert(res, (s:get{i})) end
 #res -- only could insert some of entries with the extents reserved previously
 
 function check_iter_and_size(num) local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count == num and "ok" or "fail" end
-check_iter_and_size(621)
+check_iter_and_size(775)
 
 for i = 2501,3500 do s:insert{i, i} end
 s:delete{2} -- still can delete, it does not require extents if no read view
-check_iter_and_size(620)
+check_iter_and_size(774)
 res = {}
 for i = 1,10 do table.insert(res, (s:get{i})) end
 res
