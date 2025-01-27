@@ -123,35 +123,10 @@ key_def_set_hash_func(struct key_def *key_def) {
 
 uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		 enum field_type type, struct coll *coll)
+		 struct coll *coll)
 {
 	const char *f = *field;
 	uint32_t size;
-
-	/*
-	 * MsgPack values of double key field are casted to double, encoded
-	 * as msgpack double and hashed. This assures the same value being
-	 * written as int, uint, float or double has the same hash for this
-	 * type of key.
-	 *
-	 * We create and hash msgpack instead of just hashing the double itself
-	 * for backward compatibility: so a user having a vinyl database with
-	 * double-key index won't have to rebuild it after tarantool update.
-	 *
-	 * XXX: It looks like something like this should also be done for
-	 * number key fields so that e. g. zero given as int, uint, float,
-	 * double and decimal have the same hash.
-	 */
-	if (type == FIELD_TYPE_DOUBLE) {
-		double value = 0;
-		/*
-		 * This will only fail if the mp_type is not numeric, which is
-		 * impossible here (see field_mp_plain_type_is_compatible).
-		 */
-		VERIFY(mp_read_double_lossy(field, &value) == 0);
-		return hash_mp_double(ph1, pcarry, value);
-	}
-
 	switch (mp_typeof(**field)) {
 	case MP_UINT:
 		return hash_mp_uint(ph1, pcarry, mp_decode_uint(field));
@@ -221,7 +196,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 	const char *field = tuple_field_by_part(tuple, part, multikey_idx);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
-	return tuple_hash_field(ph1, pcarry, &field, part->type, part->coll);
+	return tuple_hash_field(ph1, pcarry, &field, part->coll);
 }
 
 template <bool has_optional_parts, bool has_json_paths>
@@ -252,7 +227,6 @@ tuple_hash_impl(struct tuple *tuple, struct key_def *key_def)
 		total_size += tuple_hash_null(&h, &carry);
 	} else {
 		total_size += tuple_hash_field(&h, &carry, &field,
-					       key_def->parts[0].type,
 					       key_def->parts[0].coll);
 	}
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
@@ -276,7 +250,6 @@ tuple_hash_impl(struct tuple *tuple, struct key_def *key_def)
 		} else {
 			total_size +=
 				tuple_hash_field(&h, &carry, &field,
-						 key_def->parts[part_id].type,
 						 key_def->parts[part_id].coll);
 		}
 		prev_fieldno = key_def->parts[part_id].fieldno;
@@ -293,10 +266,8 @@ key_hash(const char *key, struct key_def *key_def)
 	uint32_t total_size = 0;
 
 	for (struct key_part *part = key_def->parts;
-	     part < key_def->parts + key_def->part_count; part++) {
-		total_size += tuple_hash_field(&h, &carry, &key, part->type,
-					       part->coll);
-	}
+	     part < key_def->parts + key_def->part_count; part++)
+		total_size += tuple_hash_field(&h, &carry, &key, part->coll);
 
 	return PMurHash32_Result(h, carry, total_size);
 }
