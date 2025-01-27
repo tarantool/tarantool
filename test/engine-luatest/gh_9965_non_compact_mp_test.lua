@@ -612,3 +612,19 @@ g.test_hash = function(cg)
         t.assert_error_msg_contains('Duplicate key', s.insert, s, {3, mp2})
     end)
 end
+
+g.test_alter_hash_algo_bug = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        local sk = s:create_index('sk',  {parts = {2, 'unsigned'}, type = 'hash'})
+        local tuple = {2, 16}
+        s:replace(tuple)
+        -- Single-field-unsigned index used to have its own special algo for hashing. On
+        -- alter it would start using another algo without rebuilding the index, and the
+        -- search would stop working.
+        t.assert_equals(sk:get{16}, tuple)
+        sk:alter({parts = {2, 'number'}})
+        t.assert_equals(sk:get{16}, tuple)
+    end)
+end
