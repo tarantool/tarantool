@@ -3272,7 +3272,7 @@ point_hole_storage_new(struct index *index, const char *key,
 	object->is_head = true;
 
 	struct key_def *def = index->def->key_def;
-	object->hash = object->index_unique_id ^ def->key_hash(key, def);
+	object->hash = object->index_unique_id ^ key_hash(key, def);
 
 	const struct point_hole_item **put =
 		(const struct point_hole_item **) &object;

@@ -168,9 +168,6 @@ typedef char *(*tuple_extract_key_raw_t)(const char *data,
 /** @copydoc tuple_hash() */
 typedef uint32_t (*tuple_hash_t)(struct tuple *tuple,
 				 struct key_def *key_def);
-/** @copydoc key_hash() */
-typedef uint32_t (*key_hash_t)(const char *key,
-				struct key_def *key_def);
 /** @copydoc tuple_hint() */
 typedef hint_t (*tuple_hint_t)(struct tuple *tuple,
 			       struct key_def *key_def);
@@ -190,8 +187,6 @@ struct key_def {
 	tuple_extract_key_raw_t tuple_extract_key_raw;
 	/** @see tuple_hash() */
 	tuple_hash_t tuple_hash;
-	/** @see key_hash() */
-	key_hash_t key_hash;
 	/** @see tuple_hint() */
 	tuple_hint_t tuple_hint;
 	/** @see key_hint() */
@@ -1159,11 +1154,8 @@ tuple_hash(struct tuple *tuple, struct key_def *key_def)
  * @param key_def - key_def for field description
  * @return - hash value
  */
-static inline uint32_t
-key_hash(const char *key, struct key_def *key_def)
-{
-	return key_def->key_hash(key, key_def);
-}
+uint32_t
+key_hash(const char *key, struct key_def *key_def);
 
  /*
  * Get comparison hint for a tuple.
