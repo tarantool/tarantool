@@ -903,7 +903,7 @@ s:insert{2, 1}
 s.index.secondary:alter{ unique = true }
 ---
 - error: Duplicate key exists in unique index "secondary" in space "test" with old
-    tuple - [1, 1] and new tuple - [2, 1]
+    tuple - [2, 1] and new tuple - [1, 1]
 ...
 s:delete{2}
 ---
