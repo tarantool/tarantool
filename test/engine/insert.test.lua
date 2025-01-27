@@ -158,7 +158,7 @@ s:insert({12, ffi.cast('double', -3.0009)})
 
 s:select()
 
--- The same rules apply to the key of this field:
+-- The keys are compared without loss, precisely (gh-9965):
 dd = s:create_index('dd', {unique = false, parts = {{2, 'double'}}})
 dd:select(1.1)
 dd:select(-9223372036854775800LL)
