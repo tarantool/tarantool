@@ -36,7 +36,7 @@ set_tests_properties(
   ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl
   ${test_path}/test_engine.lua${TEST_PARAM_DELIM}memtx
   PROPERTIES
-    ENVIRONMENT "LUA_PATH=${LUA_PATH}"
+    ENVIRONMENT "LUA_PATH=${LUA_PATH} ${TARANTOOL_ASAN_OPTIONS}"
     LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${TEST_SUITE_NAME}-deps
 )
