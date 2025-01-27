@@ -251,7 +251,6 @@ tuple_bloom_builder_add_key(struct tuple_bloom_builder *builder,
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		total_size += tuple_hash_field(&h, &carry, &key,
-					       key_def->parts[i].type,
 					       key_def->parts[i].coll);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
 		if (tuple_hash_array_add(&builder->parts[i], hash) != 0)
@@ -382,7 +381,6 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 	assert(bloom->version == TUPLE_BLOOM_VERSION_V3);
 	for (uint32_t i = 0; i < part_count; i++) {
 		total_size += tuple_hash_field(&h, &carry, &key,
-					       key_def->parts[i].type,
 					       key_def->parts[i].coll);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
 		if (!bloom_maybe_has(&bloom->parts[i], hash))
