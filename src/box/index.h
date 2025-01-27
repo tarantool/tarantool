@@ -607,6 +607,7 @@ struct index_vtab {
 	int (*reserve)(struct index *index, uint32_t size_hint);
 	int (*build_next)(struct index *index, struct tuple *tuple);
 	void (*end_build)(struct index *index);
+	void (*build_presorted)(struct index *index, void *map);
 };
 
 struct index {
@@ -634,6 +635,9 @@ struct index {
 	 * @sa struct gap_item_base.
 	 */
 	struct rlist read_gaps;
+	bool built_presorted;
+	void *old2new;
+	FILE *sort_data_file;
 };
 
 /**
@@ -650,6 +654,7 @@ struct read_view_tuple {
 	const char *data;
 	/** Size of tuple data. */
 	uint32_t size;
+	struct tuple *ptr;
 };
 
 /** Object returned if there's no more tuples matching the search criteria. */
@@ -660,6 +665,7 @@ read_view_tuple_none(void)
 	tuple.needs_upgrade = false;
 	tuple.data = NULL;
 	tuple.size = 0;
+	tuple.ptr = NULL;
 	return tuple;
 }
 
@@ -704,6 +710,8 @@ struct index_read_view_vtab {
 				       const char *key, uint32_t part_count,
 				       const char *pos, uint32_t offset,
 				       struct index_read_view_iterator *it);
+	bool
+	(*dump_sort_data)(struct index_read_view *rv, ssize_t tuple_count);
 };
 
 /**
@@ -1010,6 +1018,12 @@ index_end_build(struct index *index)
 	index->vtab->end_build(index);
 }
 
+static inline void
+index_build_presorted(struct index *index, void *map)
+{
+	index->vtab->build_presorted(index, map);
+}
+
 /**
  * Initialize an index read view instance.
  * Note, this function copies the given index definition.
@@ -1067,6 +1081,12 @@ index_read_view_create_iterator(struct index_read_view *rv,
 				struct index_read_view_iterator *it)
 {
 	return rv->vtab->create_iterator(rv, type, key, part_count, NULL, it);
+}
+
+static inline int
+index_read_view_dump_sort_data(struct index_read_view *rv, ssize_t tuple_count)
+{
+	return rv->vtab->dump_sort_data(rv, tuple_count);
 }
 
 static inline void
@@ -1141,8 +1161,11 @@ generic_index_read_view_create_iterator_with_offset(
 	const char *key, uint32_t part_count,
 	const char *pos, uint32_t offset,
 	struct index_read_view_iterator *it);
+bool generic_index_read_view_dump_sort_data(struct index_read_view *base,
+					    ssize_t tuple_count);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
+void generic_index_build_presorted(struct index *, void *);
 int
 disabled_index_build_next(struct index *index, struct tuple *tuple);
 int

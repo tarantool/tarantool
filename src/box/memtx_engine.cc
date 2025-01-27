@@ -189,6 +189,8 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++) {
+			if (space->index[j]->built_presorted)
+				continue;
 			if (memtx_build_secondary_index(space->index[j],
 							pk) < 0)
 				return -1;
@@ -199,6 +201,38 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 	}
 	memtx_space->replace = memtx_space_replace_all_keys;
+	return 0;
+}
+
+/**
+ * TODO.
+ */
+static int
+memtx_build_presorted_secondary_keys(struct space *space, void *param)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	if (space->engine != param || space_index(space, 0) == NULL ||
+	    memtx_space->replace == memtx_space_replace_all_keys)
+		return 0;
+
+	if (space->index_id_max > 0) {
+		struct index *pk = space->index[0];
+		ssize_t n_tuples = index_size(pk);
+		assert(n_tuples >= 0);
+
+		if (n_tuples > 0) {
+			say_info("Building presorted secondary indexes in space '%s'...",
+				 space_name(space));
+		}
+
+		for (uint32_t j = 1; j < space->index_count; j++) {
+			index_build_presorted(space->index[j], pk->old2new);
+		}
+
+		if (n_tuples > 0) {
+			say_info("Space '%s' presorted indexes: done", space_name(space));
+		}
+	}
 	return 0;
 }
 
@@ -501,6 +535,8 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		 * then bulk-build all secondary keys.
 		 */
 		memtx->state = MEMTX_FINAL_RECOVERY;
+		if (space_foreach(memtx_build_presorted_secondary_keys, memtx) != 0)
+			return -1;
 	} else {
 		/*
 		 * If force_recovery = true, it's
@@ -843,6 +879,12 @@ primary_index_filter(struct space *space, struct index *index, void *arg)
 	return index->def->iid == 0;
 }
 
+static bool
+checkpoint_index_filter(struct space *, struct index *, void *)
+{
+	return true;
+}
+
 /*
  * Return true if tuple @a data represents temporary space's metadata.
  * @a space_id is used to determine the tuple's format.
@@ -897,7 +939,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	rv_opts.name = "checkpoint";
 	rv_opts.is_system = true;
 	rv_opts.filter_space = checkpoint_space_filter;
-	rv_opts.filter_index = primary_index_filter;
+	rv_opts.filter_index = checkpoint_index_filter; /* Need secondary keys to save order in file. */
 	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
 		free(ckpt);
 		return NULL;
@@ -1092,6 +1134,9 @@ checkpoint_f(va_list ap)
 				break;
 			is_synchro_written = true;
 		}
+		FILE *pk_sort_data_file = NULL;
+		if (space_rv->id == 512)
+			pk_sort_data_file = fopen(tt_sprintf("%u_%u.bin", space_rv->id, 0), "wb");
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1117,6 +1162,9 @@ checkpoint_f(va_list ap)
 						    result.data, result.size);
 			if (rc != 0)
 				break;
+			/* PK sort data. */
+			if (space_rv->id == 512)
+				fwrite(&result.ptr, sizeof(result.ptr), 1, pk_sort_data_file);
 			/* Yield to make thread cancellable. */
 			if (++loops % YIELD_LOOPS == 0)
 				fiber_sleep(0);
@@ -1129,6 +1177,16 @@ checkpoint_f(va_list ap)
 		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
 			break;
+		if (space_rv->id == 512) {
+			for (uint32_t i = 1; i <= space_rv->index_id_max; i++) {
+				if (space_rv->index_map[i] == NULL)
+					continue;
+				if (space_rv->index_map[i]->def->type != TREE)
+					continue;
+				while (index_read_view_dump_sort_data(space_rv->index_map[i], YIELD_LOOPS))
+					fiber_sleep(0);
+			}
+		}
 	}
 	mh_i32_delete(temp_space_ids);
 	if (rc != 0)

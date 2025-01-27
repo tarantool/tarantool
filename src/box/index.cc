@@ -789,6 +789,9 @@ index_create(struct index *index, struct engine *engine,
 	/* Unusable until set to proper value during space creation. */
 	index->dense_id = UINT32_MAX;
 	rlist_create(&index->read_gaps);
+	index->built_presorted = false;
+	index->old2new = NULL;
+	index->sort_data_file = NULL;
 }
 
 void
@@ -1121,6 +1124,17 @@ generic_index_build_next(struct index *index, struct tuple *tuple)
 void
 generic_index_end_build(struct index *)
 {
+}
+
+void
+generic_index_build_presorted(struct index *, void *)
+{
+}
+
+bool
+generic_index_read_view_dump_sort_data(struct index_read_view *, ssize_t)
+{
+	return false;
 }
 
 int

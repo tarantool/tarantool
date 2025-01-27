@@ -196,11 +196,40 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 	if (index_replace(space->index[0], old_tuple,
 			  new_tuple, mode, &old_tuple, &successor) != 0)
 		return -1;
+
+	/* Update presorted secondary keys. */
+	uint32_t i = 1;
+	for (; i < space->index_count; i++) {
+		struct tuple *unused;
+		struct index *index = space->index[i];
+		if (!index->built_presorted)
+			continue;
+		if (index_replace(index, old_tuple, new_tuple,
+				  DUP_INSERT, &unused, &unused) != 0)
+			goto rollback;
+	}
+
 	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
 	return 0;
+
+rollback:
+	for (; i > 0; i--) {
+		struct tuple *unused;
+		struct index *index = space->index[i - 1];
+		if (!index->built_presorted)
+			continue;
+		/* Rollback must not fail. */
+		if (index_replace(index, new_tuple, old_tuple,
+				  DUP_INSERT, &unused, &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+	}
+	return -1;
 }
 
 /**

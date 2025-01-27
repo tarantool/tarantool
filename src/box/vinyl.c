@@ -4712,4 +4712,5 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .reserve = */ generic_index_reserve,
 	/* .build_next = */ generic_index_build_next,
 	/* .end_build = */ generic_index_end_build,
+	/* .build_presorted = */ generic_index_build_presorted,
 };
