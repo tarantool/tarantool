@@ -32,9 +32,9 @@ box.space._sequence:select{}
  | ...
 box.space._sequence_data:select{}
  | ---
- | - - [1, 1]
+ | - - [3, 1]
  |   - [2, 1]
- |   - [3, 1]
+ |   - [1, 1]
  | ...
 box.space._space_sequence:select{}
  | ---
