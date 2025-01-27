@@ -91,6 +91,7 @@ function(create_unit_test)
   add_test(NAME ${test_title}
            COMMAND ${test_command})
   set_tests_properties(${test_title} PROPERTIES
+    ENVIRONMENT "${TARANTOOL_ASAN_OPTIONS}"
     LABELS ${TEST_SUITE_NAME}
     DEPENDS ${TEST_SUITE_NAME}-deps
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"

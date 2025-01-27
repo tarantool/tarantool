@@ -118,4 +118,24 @@ if (ENABLE_ASAN)
     endif()
 
     add_compile_flags("C;CXX" ${ASAN_FLAGS})
+
+    # See AddressSanitizer flags in [1] and LeakSanitizer flags
+    # in [2].
+    # 1. https://github.com/google/sanitizers/wiki/addresssanitizerflags
+    # 1. https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer
+    string(JOIN ":" ASAN_OPTIONS
+        heap_profile=0
+        unmap_shadow_on_exit=1
+        detect_invalid_pointer_pairs=1
+        symbolize=1
+        detect_leaks=1
+        dump_instruction_bytes=1
+        print_suppressions=0
+    )
+    list(APPEND TARANTOOL_ASAN_OPTIONS
+        ASAN=ON
+        ASAN_OPTIONS=${ASAN_OPTIONS}
+        LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/asan/lsan.supp
+    )
+    set(TARANTOOL_ASAN_OPTIONS ${TARANTOOL_ASAN_OPTIONS} PARENT_SCOPE)
 endif()
