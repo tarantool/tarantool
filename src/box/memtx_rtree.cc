@@ -165,17 +165,42 @@ index_rtree_iterator_free(struct iterator *i)
 	mempool_free(itr->pool, itr);
 }
 
-/* set position to the iterator */
-sq_coord_t rtree_iterator_set_position(struct rtree_iterator *iterator, const char *pos) 
+/* Euclid distance, squared */
+static sq_coord_t
+rtree_rect_neigh_distance2(const struct rtree_rect *rect,  // [5]
+			   const struct rtree_rect *neigh_rect,
+			   unsigned dimension)
 {
-	// (tuple*)pos
+	sq_coord_t result = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		if (neigh_coord < coords[0]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
+			result += diff * diff;
+		} else if (neigh_coord > coords[1]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[1]);
+			result += diff * diff;
+		}
+	}
+	return result;
+}
+
+/* set position to the iterator */
+sq_coord_t rtree_iterator_set_position(struct index_rtree_iterator *iterator, const char *pos, 
+							struct memtx_rtree_index *index, uint32_t part_count, rtree_rect *rect_dim) 
+{
 	// [  x0, y0, x1, y1 ... ]
-   	sq_coord_t dinstance_pos = 0;
+   	sq_coord_t distance_pos = 0;
+	struct rtree_rect rect;
+	//key_def_decode_parts(iterator->base.); // ?
+	mp_decode_rect_from_key(&rect, index->dimension, pos, part_count);
+	distance_pos = rtree_rect_neigh_distance2(&rect, rect_dim, index->dimension);
 	// dinstance_pos = rtree_rect_neigh_distance_max();
 	// dinstance_pos = *(const double *)pos;
-	printf ("value of dinstance_pos is %lg\n", dinstance_pos);
+	printf ("value of dinstance_pos is %lg\n", distance_pos);
     
-	return dinstance_pos;
+	return distance_pos;
 }
 
 static int
@@ -451,7 +476,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 			// это происходит на уровне box_select
 			// it->after_data.key = pos;
 			// it->after_data.part_count = cmp_def->part_count;
-			it->impl.current_pos_distance = rtree_iterator_set_position(&it->impl, pos); // char* -> double 
+			it->impl.current_pos_distance = rtree_iterator_set_position(it, pos, index, part_count, rect); // char* -> double 
 			it->base.position = rtree_iterator_position;
 		} else {
 			diag_set(UnsupportedIndexFeature, base->def,
