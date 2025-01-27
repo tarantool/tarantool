@@ -267,16 +267,16 @@ for _, t in s.index[0]:pairs() do table.insert(res, t) end
 ...
 res
 ---
-- - [1, 1, 'test1']
-  - [2, 2, 'test2']
-  - [3, 3, 'test3']
-  - [4, 4, 'test4']
-  - [5, 5, 'test5']
-  - [6, 6, 'test6']
+- - [3, 3, 'test3']
   - [7, 7, 'test7']
-  - [8, 8, 'test8']
-  - [9, 9, 'test9']
+  - [1, 1, 'test1']
   - [10, 10, 'test10']
+  - [9, 9, 'test9']
+  - [2, 2, 'test2']
+  - [5, 5, 'test5']
+  - [8, 8, 'test8']
+  - [6, 6, 'test6']
+  - [4, 4, 'test4']
 ...
 errinj.set("ERRINJ_INDEX_ALLOC", true)
 ---
@@ -309,16 +309,16 @@ for _, t in s.index[0]:pairs() do table.insert(res, t) end
 ...
 res
 ---
-- - [1, 1, 'test1']
-  - [2, 2, 'test2']
-  - [3, 3, 'test3']
-  - [4, 4, 'test4']
-  - [5, 5, 'test5']
-  - [6, 6, 'test6']
+- - [3, 3, 'test3']
   - [7, 7, 'test7']
-  - [8, 8, 'test8']
-  - [9, 9, 'test9']
+  - [1, 1, 'test1']
   - [10, 10, 'test10']
+  - [9, 9, 'test9']
+  - [2, 2, 'test2']
+  - [5, 5, 'test5']
+  - [8, 8, 'test8']
+  - [6, 6, 'test6']
+  - [4, 4, 'test4']
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
