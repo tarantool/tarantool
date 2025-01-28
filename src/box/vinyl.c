@@ -1388,11 +1388,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * the DELETE statement is not written to secondary indexes
 	 * immediately.
 	 */
-	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, pk_entry) != 0) {
-		tuple_unref(pk_entry.stmt);
-		rc = -1;
-		goto out;
-	}
+	if (tx != NULL)
+		vy_tx_track_point(tx, lsm->pk, pk_entry);
 
 	if ((*rv)->vlsn == INT64_MAX)
 		vy_cache_add_point(&lsm->pk->cache, pk_entry, key);
@@ -1446,8 +1443,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		/*
 		 * Use point lookup for a full key.
 		 */
-		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
-			goto fail;
+		if (tx != NULL)
+			vy_tx_track_point(tx, lsm, key);
 		if (vy_point_lookup(lsm, tx, rv, key, &partial) != 0)
 			goto fail;
 		if (lsm->index_id > 0 && partial.stmt != NULL) {
@@ -2436,8 +2433,6 @@ vinyl_engine_begin(struct engine *engine, struct txn *txn)
 	struct vy_env *env = vy_env(engine);
 	assert(txn->engines_tx[engine->id] == NULL);
 	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn);
-	if (txn->engines_tx[engine->id] == NULL)
-		return -1;
 	return 0;
 }
 
@@ -3102,10 +3097,6 @@ vinyl_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 	}
 	rlist_create(&ctx->entries);
 	ctx->rv = vy_tx_manager_read_view(env->xm, /*plsn=*/INT64_MAX);
-	if (ctx->rv == NULL) {
-		free(ctx);
-		return -1;
-	}
 	arg->data[engine->id] = ctx;
 	return space_foreach(vy_join_add_space, ctx);
 }
