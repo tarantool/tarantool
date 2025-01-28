@@ -289,7 +289,7 @@ vy_tx_manager_mem_used(struct vy_tx_manager *xm);
 
 /**
  * Create or reuse an instance of a read view whose vlsn is less than the given
- * prepared statement LSN. Returns NULL on memory allocation error.
+ * prepared statement LSN. Never fails (never returns NULL).
  */
 struct vy_read_view *
 vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn);
@@ -326,7 +326,7 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx);
 void
 vy_tx_destroy(struct vy_tx *tx);
 
-/** Begin a new transaction. */
+/** Begin a new transaction. Never fails (never returns NULL). */
 struct vy_tx *
 vy_tx_begin(struct vy_tx_manager *xm, struct txn *txn);
 
@@ -381,11 +381,8 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp);
  * @param right         Right boundary of the read interval.
  * @param right_belongs Set if the right boundary belongs to
  *                      the interval.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
  */
-int
+void
 vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 	    struct vy_entry left, bool left_belongs,
 	    struct vy_entry right, bool right_belongs);
@@ -397,16 +394,13 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
  * @param lsm   LSM tree that was read from.
  * @param entry Key that was read.
  *
- * @retval  0 Success.
- * @retval -1 Memory error.
- *
  * Note, this function isn't just a shortcut to vy_tx_track().
  * Before adding the key to the conflict manager index, it checks
  * if the key was overwritten by the transaction itself. If this
  * is the case, there is no point in tracking the key, because the
  * transaction read it from its own write set.
  */
-int
+void
 vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry);
 
 /**
@@ -423,11 +417,10 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
 
 /**
  * Send an active transaction to a read view such that its vlsn is less than
- * the given prepared statement LSN. Returns 0 on success, -1 on memory
- * allocation error. The transaction is aborted immediately if it has any
- * write statements.
+ * the given prepared statement LSN. The transaction is aborted immediately
+ * if it has any write statements.
  */
-int
+void
 vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn);
 
 /**

@@ -190,12 +190,7 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn)
 	 * preserving the order.
 	 */
 	struct vy_read_view *prev_rv = rv;
-	rv = mempool_alloc(&xm->read_view_mempool);
-	if (rv == NULL) {
-		diag_set(OutOfMemory, sizeof(*rv),
-			 "mempool", "read view");
-		return NULL;
-	}
+	rv = xmempool_alloc(&xm->read_view_mempool);
 	if (tx_exists) {
 		rv->vlsn = MAX_LSN + tx->txn->psn;
 		tx->read_view = rv;
@@ -225,11 +220,7 @@ static struct txv *
 txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
 	struct vy_tx_manager *xm = tx->xm;
-	struct txv *v = mempool_alloc(&xm->txv_mempool);
-	if (v == NULL) {
-		diag_set(OutOfMemory, sizeof(*v), "mempool", "struct txv");
-		return NULL;
-	}
+	struct txv *v = xmempool_alloc(&xm->txv_mempool);
 	v->lsm = lsm;
 	vy_lsm_ref(v->lsm);
 	v->mem = NULL;
@@ -288,12 +279,7 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 {
 	struct vy_tx_manager *xm = tx->xm;
 	struct vy_read_interval *interval;
-	interval = mempool_alloc(&xm->read_interval_mempool);
-	if (interval == NULL) {
-		diag_set(OutOfMemory, sizeof(*interval),
-			 "mempool", "struct vy_read_interval");
-		return NULL;
-	}
+	interval = xmempool_alloc(&xm->read_interval_mempool);
 	interval->tx = tx;
 	vy_lsm_ref(lsm);
 	interval->lsm = lsm;
@@ -387,31 +373,28 @@ vy_tx_is_in_read_view(struct vy_tx *tx)
 	return tx->read_view->vlsn != INT64_MAX;
 }
 
-int
+void
 vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn)
 {
 	assert(plsn >= MAX_LSN);
 	assert(tx->state == VINYL_TX_READY);
 	if (tx->read_view->vlsn < plsn)
-		return 0;
+		return;
 	if (!vy_tx_is_ro(tx)) {
 		vy_tx_abort(tx);
-		return 0;
+		return;
 	}
 	struct vy_tx_manager *xm = tx->xm;
 	struct vy_read_view *rv = vy_tx_manager_read_view(xm, plsn);
-	if (rv == NULL)
-		return -1;
 	vy_tx_manager_destroy_read_view(xm, tx->read_view);
 	tx->read_view = rv;
-	return 0;
 }
 
 /**
  * Send to read view all transactions that are reading key @v
  * modified by transaction @tx and abort all transactions that are modifying it.
  */
-static int
+static void
 vy_tx_send_readers_to_read_view(struct vy_tx *tx, struct txv *v)
 {
 	struct vy_tx_conflict_iterator it;
@@ -424,10 +407,8 @@ vy_tx_send_readers_to_read_view(struct vy_tx *tx, struct txv *v)
 		/* Abort only active TXs */
 		if (abort->state != VINYL_TX_READY)
 			continue;
-		if (vy_tx_send_to_read_view(abort, INT64_MAX) != 0)
-			return -1;
+		vy_tx_send_to_read_view(abort, INT64_MAX);
 	}
-	return 0;
 }
 
 /**
@@ -454,11 +435,7 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 struct vy_tx *
 vy_tx_begin(struct vy_tx_manager *xm, struct txn *txn)
 {
-	struct vy_tx *tx = mempool_alloc(&xm->tx_mempool);
-	if (unlikely(tx == NULL)) {
-		diag_set(OutOfMemory, sizeof(*tx), "mempool", "struct vy_tx");
-		return NULL;
-	}
+	struct vy_tx *tx = xmempool_alloc(&xm->tx_mempool);
 	vy_tx_create(xm, tx);
 
 	struct session *session = fiber_get_session(fiber());
@@ -564,7 +541,6 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	 * Make DELETE statements for secondary indexes and
 	 * insert them into the transaction log.
 	 */
-	int rc = 0;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		struct vy_entry entry;
@@ -602,18 +578,12 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 				}
 			}
 			struct txv *delete_txv = txv_new(tx, lsm, entry);
-			if (delete_txv == NULL) {
-				rc = -1;
-				break;
-			}
 			stailq_insert_entry(&tx->log, delete_txv, v,
 					    next_in_log);
 		}
-		if (rc != 0)
-			break;
 	}
 	tuple_unref(delete_stmt);
-	return rc;
+	return 0;
 }
 
 int
@@ -638,10 +608,8 @@ vy_tx_prepare(struct vy_tx *tx)
 	struct txv *v;
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&it)) != NULL) {
-		if (vy_tx_send_readers_to_read_view(tx, v))
-			return -1;
-	}
+	while ((v = write_set_inext(&it)) != NULL)
+		vy_tx_send_readers_to_read_view(tx, v);
 
 	/*
 	 * Flush transactional changes to the LSM tree.
@@ -868,21 +836,19 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 	}
 }
 
-int
+void
 vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 	    struct vy_entry left, bool left_belongs,
 	    struct vy_entry right, bool right_belongs)
 {
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
-		return 0;
+		return;
 	}
 
 	struct vy_read_interval *new_interval;
 	new_interval = vy_read_interval_new(tx, lsm, left, left_belongs,
 					    right, right_belongs);
-	if (new_interval == NULL)
-		return -1;
 
 	/*
 	 * Search for intersections in the transaction read set.
@@ -902,7 +868,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 			 * the new interval. Nothing to do.
 			 */
 			vy_read_interval_delete(new_interval);
-			return 0;
+			return;
 		}
 		if (vy_read_interval_should_merge(interval, new_interval))
 			stailq_add_tail_entry(&merge, interval, in_merge);
@@ -950,26 +916,25 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 
 	vy_tx_read_set_insert(&tx->read_set, new_interval);
 	vy_lsm_read_set_insert(&lsm->read_set, new_interval);
-	return 0;
 }
 
-int
+void
 vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
 	assert(vy_stmt_is_full_key(entry.stmt, lsm->cmp_def));
 
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
-		return 0;
+		return;
 	}
 
 	struct txv *v = write_set_search_key(&tx->write_set, lsm, entry);
 	if (v != NULL && vy_stmt_type(v->entry.stmt) != IPROTO_UPSERT) {
 		/* Reading from own write set is serializable. */
-		return 0;
+		return;
 	}
 
-	return vy_tx_track(tx, lsm, entry, true, entry, true);
+	vy_tx_track(tx, lsm, entry, true, entry, true);
 }
 
 /**
@@ -1029,8 +994,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	struct txv *v = txv_new(tx, lsm, entry);
 	if (applied.stmt != NULL)
 		tuple_unref(applied.stmt);
-	if (v == NULL)
-		return -1;
 
 	if (old != NULL) {
 		/* Leave the old txv in TX log but remove it from write set */
