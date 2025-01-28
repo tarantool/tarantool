@@ -600,8 +600,7 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 			return -1;
 		}
 	}
-	if (engine_begin(engine, txn) != 0)
-		return -1;
+	engine_begin(engine, txn);
 	txn->engines[engine->id] = engine;
 	txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
 	if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0)

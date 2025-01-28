@@ -2415,13 +2415,12 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 	return vy_upsert(env, tx, stmt, space, request);
 }
 
-static int
+static void
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
 	assert(txn->engines_tx[engine->id] == NULL);
 	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn);
-	return 0;
 }
 
 static int

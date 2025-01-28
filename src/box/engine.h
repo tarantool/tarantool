@@ -156,7 +156,7 @@ struct engine_vtab {
 	 * transaction in the engine begins with the first
 	 * statement.
 	 */
-	int (*begin)(struct engine *, struct txn *);
+	void (*begin)(struct engine *engine, struct txn *txn);
 	/**
 	 * Begine one statement in existing transaction.
 	 */
@@ -390,10 +390,10 @@ engine_create_read_view(struct engine *engine,
 	return engine->vtab->create_read_view(engine, opts);
 }
 
-static inline int
+static inline void
 engine_begin(struct engine *engine, struct txn *txn)
 {
-	return engine->vtab->begin(engine, txn);
+	engine->vtab->begin(engine, txn);
 }
 
 static inline int
@@ -532,7 +532,7 @@ int generic_engine_prepare_join(struct engine *, struct engine_join_ctx *);
 int generic_engine_join(struct engine *, struct engine_join_ctx *,
 			struct xstream *);
 void generic_engine_complete_join(struct engine *, struct engine_join_ctx *);
-int generic_engine_begin(struct engine *, struct txn *);
+void generic_engine_begin(struct engine *, struct txn *);
 int generic_engine_begin_statement(struct engine *, struct txn *);
 int generic_engine_prepare(struct engine *, struct txn *);
 void generic_engine_commit(struct engine *, struct txn *);
@@ -560,53 +560,6 @@ void generic_engine_shutdown(struct engine *engine);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-static inline struct engine *
-engine_find_xc(const char *name)
-{
-	struct engine *engine = engine_find(name);
-	if (engine == NULL)
-		diag_raise();
-	return engine;
-}
-
-static inline struct space *
-engine_create_space_xc(struct engine *engine, struct space_def *def,
-		    struct rlist *key_list)
-{
-	struct space *space = engine_create_space(engine, def, key_list);
-	if (space == NULL)
-		diag_raise();
-	return space;
-}
-
-static inline void
-engine_begin_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_begin(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_begin_statement_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_begin_statement(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_prepare_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_prepare(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_check_space_def_xc(struct engine *engine, struct space_def *def)
-{
-	if (engine_check_space_def(engine, def) != 0)
-		diag_raise();
-}
 
 static inline void
 engine_bootstrap_xc(void)
