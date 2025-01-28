@@ -2372,7 +2372,7 @@ applier_subscribe(struct applier *applier)
 	 * Stop accepting local rows coming from a remote
 	 * instance as soon as local WAL starts accepting writes.
 	 */
-	req.id_filter = box_is_orphan() ? 0 : 1 << instance_id;
+	req.id_filter = box_is_waiting_for_own_rows() ? 0 : 1 << instance_id;
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_subscribe(&row, &req);
 	coio_write_xrow(io, &row);

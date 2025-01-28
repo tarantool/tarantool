@@ -556,7 +556,14 @@ replica_on_applier_connect(struct replica *replica)
 {
 	if (replica->applier_sync_state == APPLIER_CONNECTED)
 		return;
+
 	struct applier *applier = replica->applier;
+	if (box_is_waiting_for_own_rows()) {
+		auto &t = box_check_waiting_for_own_rows_trigger;
+		int64_t remote_lsn =
+			vclock_get(&applier->ballot.vclock, instance_id);
+		t.target_lsn = MAX(t.target_lsn, remote_lsn);
+	}
 
 	assert(tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
@@ -1323,6 +1330,19 @@ replicaset_check_quorum(void)
 {
 	if (replicaset.applier.synced >= replicaset_sync_quorum())
 		box_set_orphan(false);
+}
+
+int64_t
+replicaset_max_instance_lsn(void)
+{
+	int64_t max_lsn = 0;
+	replicaset_foreach(replica) {
+		if (replica->applier == NULL)
+			continue;
+		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
+		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));
+	}
+	return max_lsn;
 }
 
 /** A helper to update relay health on its start/stop. */
