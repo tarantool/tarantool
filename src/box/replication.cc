@@ -1559,6 +1559,19 @@ replicaset_check_quorum(void)
 		box_set_orphan(false);
 }
 
+int64_t
+replicaset_max_instance_lsn(void)
+{
+	int64_t max_lsn = 0;
+	replicaset_foreach(replica) {
+		if (replica->applier == NULL)
+			continue;
+		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
+		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));
+	}
+	return max_lsn;
+}
+
 /** A helper to update relay health on its start/stop. */
 static void
 replica_update_relay_health(struct replica *replica)

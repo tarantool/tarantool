@@ -201,6 +201,13 @@ box_is_ro(void);
 
 /** \endcond public */
 
+/**
+ * Check if the instance is waiting for some of its own transactions
+ * that it lost to be replicated to it.
+ */
+bool
+box_is_waiting_for_own_rows(void);
+
 bool
 box_is_orphan(void);
 

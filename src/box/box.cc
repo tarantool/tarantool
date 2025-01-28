@@ -177,6 +177,12 @@ static fiber_cond ro_cond;
 static bool is_orphan;
 
 /**
+ * The following flag is set if the instance is waiting for some
+ * of its own transactions that it lost to be replicated to it.
+ */
+static bool is_waiting_for_own_rows = false;
+
+/**
  * Summary flag incorporating all the instance attributes,
  * affecting ability to write. Currently these are:
  * - is_ro;
@@ -396,6 +402,11 @@ box_ro_state_msg(char *buf, int size)
 		if (is_ro)
 			SNPRINT(total, snprintf, buf, size,
 				"box.cfg.read_only is true");
+		else if (is_waiting_for_own_rows)
+			SNPRINT(total, snprintf, buf, size,
+				"it has lost some of its own transactions "
+				"and is waiting to receive them back from "
+				"the replicaset");
 		else if (is_orphan)
 			SNPRINT(total, snprintf, buf, size, "it is an orphan");
 		else
@@ -409,8 +420,8 @@ void
 box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
-	is_ro_summary = is_ro || is_orphan || raft_is_ro(box_raft()) ||
-			txn_limbo_is_ro(&txn_limbo);
+	is_ro_summary = is_ro || is_orphan || is_waiting_for_own_rows ||
+			raft_is_ro(box_raft()) || txn_limbo_is_ro(&txn_limbo);
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -445,6 +456,9 @@ box_ro_reason(void)
 		return "synchro";
 	if (is_ro)
 		return "config";
+	if (is_waiting_for_own_rows)
+		return "waiting to receive its own transactions "
+			"back from the replicaset";
 	if (is_orphan)
 		return "orphan";
 	return NULL;
@@ -598,6 +612,12 @@ box_is_orphan(void)
 }
 
 bool
+box_is_waiting_for_own_rows(void)
+{
+	return is_waiting_for_own_rows;
+}
+
+bool
 box_is_anon(void)
 {
 	return instance_id == REPLICA_ID_NIL;
@@ -626,17 +646,39 @@ box_do_set_orphan(bool orphan)
 }
 
 void
+box_update_title()
+{
+	if (is_waiting_for_own_rows)
+		title("waiting_for_own_rows");
+	else if (is_orphan)
+		title("orphan");
+	else
+		title("running");
+}
+
+void
 box_set_orphan(bool orphan)
 {
 	box_do_set_orphan(orphan);
 	/* Update the title to reflect the new status. */
-	if (is_orphan) {
+	if (is_orphan)
 		say_info("entering orphan mode");
-		title("orphan");
-	} else {
+	else
 		say_info("leaving orphan mode");
-		title("running");
-	}
+	box_update_title();
+}
+
+void
+box_set_waiting_for_own_rows(bool waiting_for_own_rows)
+{
+	is_waiting_for_own_rows = waiting_for_own_rows;
+	box_update_ro_summary();
+	/* Update the title to reflect the new status. */
+	if (is_waiting_for_own_rows)
+		say_info("entering waiting_for_own_rows mode");
+	else
+		say_info("leaving waiting_for_own_rows mode");
+	box_update_title();
 }
 
 struct wal_stream {
@@ -2704,6 +2746,48 @@ box_quorum_on_ack_f(struct trigger *trigger, void *event)
 		trigger_clear(trigger);
 	}
 	return 0;
+}
+
+/**
+ * A trigger that is set on the wal_on_write event to track the moment when the
+ * instance receives from the replicaset all of its transactions that it lost.
+ */
+struct {
+	/** Inherit trigger. */
+	struct trigger base;
+	/** Target LSN to wait for. */
+	int64_t target_lsn;
+} box_check_waiting_for_own_rows_trigger;
+
+static int
+box_check_waiting_for_own_rows_f(struct trigger *trigger, void *event)
+{
+	(void)event;
+	auto &t = box_check_waiting_for_own_rows_trigger;
+	assert((struct trigger *)&t == trigger);
+	int64_t local_lsn = vclock_get(instance_vclock, instance_id);
+	if (local_lsn >= t.target_lsn) {
+		box_set_waiting_for_own_rows(false);
+		trigger_clear(trigger);
+	}
+	return 0;
+}
+
+void
+box_check_waiting_for_own_rows(void)
+{
+	auto &t = box_check_waiting_for_own_rows_trigger;
+	t.target_lsn = replicaset_max_instance_lsn();
+	int64_t local_lsn = vclock_get(instance_vclock, instance_id);
+
+	if (local_lsn < t.target_lsn) {
+		box_set_waiting_for_own_rows(true);
+		trigger_create(&t.base, box_check_waiting_for_own_rows_f,
+			       NULL, NULL);
+		trigger_add(&wal_on_write, &t.base);
+	} else {
+		box_set_waiting_for_own_rows(false);
+	}
 }
 
 /**
@@ -6122,6 +6206,16 @@ box_cfg_xc(void)
 	}
 
 	rmean_cleanup(rmean_box);
+
+	/**
+	 * All the applier are stopped now on point before subscribing. They are
+	 * stopped at the moment they got the CONNECTED status. Now it need to
+	 * make sure that the current instance is aware of all its own
+	 * transactions. This needs to be done before subscribing, in order to
+	 * correctly determine the id_filter value in the subscribe request.
+	 * The appliers will continue after calling replicaset_follow.
+	 */
+	box_check_waiting_for_own_rows();
 
 	/* Follow replica */
 	replicaset_follow();

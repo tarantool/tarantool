@@ -766,6 +766,16 @@ replicaset_sync(void);
 void
 replicaset_check_quorum(void);
 
+/**
+ * Find the maximum lsn of a transaction created by the current instance in a
+ * replicaset. There may be situations when a transaction created at some
+ * point on the current instance is no longer present on this instance, but is
+ * present on some node in the replicaset. This may happen as a result of a
+ * crash and loss of logs.
+ */
+int64_t
+replicaset_max_instance_lsn(void);
+
 #endif /* defined(__cplusplus) */
 
 #endif
