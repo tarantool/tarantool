@@ -120,7 +120,7 @@ enum bootstrap_strategy {
 };
 
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */
-extern enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
+extern enum bootstrap_strategy bootstrap_strategy;
 
 enum replicaset_state {
 	REPLICASET_BOOTSTRAP,

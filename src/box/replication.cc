@@ -1472,7 +1472,7 @@ replicaset_follow(void)
 void
 replicaset_sync(void)
 {
-	if (box_is_anon())
+	if (cfg_replication_anon)
 		return;
 
 	replicaset_sync_quorum_auto_init();
