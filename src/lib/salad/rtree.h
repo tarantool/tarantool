@@ -285,6 +285,20 @@ bool
 rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj);
 
 /**
+ * @brief Insert, replace or delete a record in the tree
+ * @return 0 on success, -1 on memory error
+ * @param tree - pointer to a tree
+ * @param old_rect - rectangle of the record to delete
+ * @param old_obj - record to delete
+ * @param new_rect - rectangle to insert
+ * @param new_obj - record to insert
+ * @param removed - set to true if the old_obj is removed
+ */
+int
+rtree_replace(struct rtree *tree, struct rtree_rect *old_rect, record_t old_obj,
+	      struct rtree_rect *new_rect, record_t new_obj, bool *removed);
+
+/**
  * @brief Size of memory used by tree
  * @param tree - pointer to a tree
  **/
