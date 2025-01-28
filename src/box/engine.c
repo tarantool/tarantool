@@ -296,12 +296,11 @@ generic_engine_complete_join(struct engine *engine, struct engine_join_ctx *ctx)
 	(void)ctx;
 }
 
-int
+void
 generic_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
-	return 0;
 }
 
 int

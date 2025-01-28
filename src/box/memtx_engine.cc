@@ -607,12 +607,11 @@ memtx_engine_create_read_view(struct engine *engine,
 	return (struct engine_read_view *)rv;
 }
 
-static int
+static void
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	txn_can_yield(txn, memtx_tx_manager_use_mvcc_engine);
-	return 0;
 }
 
 static int
