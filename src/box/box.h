@@ -195,6 +195,10 @@ box_is_ro(void);
 
 /** \endcond public */
 
+/** TODO: add an appropriate comment */
+bool
+box_is_waiting_for_own_rows(void);
+
 bool
 box_is_orphan(void);
 

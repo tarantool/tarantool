@@ -759,6 +759,10 @@ replicaset_sync(void);
 void
 replicaset_check_quorum(void);
 
+/** TODO: add an appropriate comment */
+int64_t
+replicaset_max_instance_lsn(void);
+
 #endif /* defined(__cplusplus) */
 
 #endif
