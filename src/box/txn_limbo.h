@@ -269,6 +269,12 @@ struct txn_limbo {
 	 * `confirmed_lsn`.
 	 */
 	struct fiber *worker;
+	/**
+	 * Event that occurs when an asynchronously committed synchronous
+	 * transaction gets rolled back by a PROMOTE request to prevent a split
+	 * brain.
+	 */
+	struct event *on_split_brain_rollback;
 };
 
 /**

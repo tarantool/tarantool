@@ -487,15 +487,6 @@ luamp_encode_tuple_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 	return 0;
 }
 
-void
-tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream)
-{
-	size_t bsize = box_tuple_bsize(tuple);
-	char *ptr = mpstream_reserve(stream, bsize);
-	box_tuple_to_buf(tuple, ptr, bsize);
-	mpstream_advance(stream, bsize);
-}
-
 /**
  * Convert a tuple into lua table. Named fields are stored as
  * {name = value} pairs. Not named fields are stored as
