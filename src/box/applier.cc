@@ -2350,6 +2350,7 @@ applier_subscribe(struct applier *applier)
 	 * needed only during bootstrap or join.
 	 */
 	applier_unwatch_ballot(applier);
+
 	/* Send SUBSCRIBE request */
 	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
@@ -2371,7 +2372,7 @@ applier_subscribe(struct applier *applier)
 	 * Stop accepting local rows coming from a remote
 	 * instance as soon as local WAL starts accepting writes.
 	 */
-	req.id_filter = box_is_orphan() ? 0 : 1 << instance_id;
+	req.id_filter = box_is_waiting_own_rows() ? 0 : 1 << instance_id;
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_subscribe(&row, &req);
 	coio_write_xrow(io, &row);
@@ -2584,6 +2585,10 @@ applier_f(va_list ap)
 				strcmp(INSTANCE_NAME, cfg_instance_name) != 0;
 			if (need_id || need_name)
 				applier_register(applier, was_anon);
+
+			while (replicaset.applier.pause_before_subscribe && !fiber_is_cancelled())
+				fiber_cond_wait(&replicaset.applier.subscribe_cond);
+
 			applier_subscribe(applier);
 			/*
 			 * subscribe() has an infinite loop which

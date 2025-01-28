@@ -175,6 +175,11 @@ static fiber_cond ro_cond;
 static bool is_orphan;
 
 /**
+ * The following flag is set if the instance //TODO
+ */
+static bool is_waiting_own_rows;
+
+/**
  * Summary flag incorporating all the instance attributes,
  * affecting ability to write. Currently these are:
  * - is_ro;
@@ -277,6 +282,14 @@ TWEAK_DOUBLE(box_shutdown_timeout);
 static double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
 
+/** TODO */
+struct box_wait_own_rows_trigger {
+	/** Inherit trigger. */
+	struct trigger base;
+	/** Target LSN to wait for. */
+	int64_t target_lsn;
+} box_wait_own_rows_trigger_;
+
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
 {
@@ -349,8 +362,8 @@ void
 box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
-	is_ro_summary = is_ro || is_orphan || raft_is_ro(box_raft()) ||
-			txn_limbo_is_ro(&txn_limbo);
+	is_ro_summary = is_ro || is_waiting_own_rows || is_orphan ||
+					raft_is_ro(box_raft()) || txn_limbo_is_ro(&txn_limbo);
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -374,6 +387,8 @@ box_ro_reason(void)
 		return "config";
 	if (is_orphan)
 		return "orphan";
+	if (is_waiting_own_rows)
+		return "waiting own rows";
 	return NULL;
 }
 
@@ -544,6 +559,12 @@ box_is_ro(void)
 }
 
 bool
+box_is_waiting_own_rows(void)
+{
+	return is_waiting_own_rows;
+}
+
+bool
 box_is_orphan(void)
 {
 	return is_orphan;
@@ -567,6 +588,27 @@ box_wait_ro(bool ro, double timeout)
 }
 
 void
+box_set_waiting_own_rows(bool waiting_own_rows_)
+{
+	is_waiting_own_rows = waiting_own_rows_;
+	box_update_ro_summary();
+
+	/* Update the title to reflect the new status. */
+	if (is_waiting_own_rows) {
+		say_info("entering waiting own rows mode");
+		title("waiting own rows");
+	} else {
+		say_info("leaving waiting own rows mode");
+		if (box_is_orphan()) {
+			say_info("entering orphan mode");
+			title("orphan");
+		} else {
+			title("running");
+		}
+	}
+}
+
+void
 box_do_set_orphan(bool orphan)
 {
 	is_orphan = orphan;
@@ -582,6 +624,10 @@ box_set_orphan(bool orphan)
 {
 	box_do_set_orphan(orphan);
 	/* Update the title to reflect the new status. */
+
+	if (box_is_waiting_own_rows())
+		return;
+
 	if (is_orphan) {
 		say_info("entering orphan mode");
 		title("orphan");
@@ -2637,6 +2683,68 @@ box_quorum_on_ack_f(struct trigger *trigger, void *event)
 		trigger_clear(trigger);
 	}
 	return 0;
+}
+
+static int
+box_wait_own_rows_f(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct box_wait_own_rows_trigger *t =
+		(struct box_wait_own_rows_trigger *)trigger;
+	int64_t local_lsn = vclock_get(instance_vclock, instance_id);
+	if (local_lsn >= t->target_lsn) {
+		box_set_waiting_own_rows(false);
+		trigger_clear(trigger);
+	}
+	return 0;
+}
+
+int64_t
+box_check_own_rows_lsn(void)
+{
+	int64_t max_lsn = 0;
+	replicaset_foreach(replica) {
+		if (replica->applier == nullptr) continue;
+		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
+		//fprintf(stderr, "remote_lsn: %ld\n", vclock_get(remote_vclock, instance_id));
+		//fflush(stderr);
+		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));
+	}
+	struct replica *replica;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
+		if (replica->applier == nullptr) continue;
+		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
+		//fprintf(stderr, "remote_lsn: %ld\n", vclock_get(remote_vclock, instance_id));
+		//fflush(stderr);
+		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));
+	}
+	return max_lsn;
+}
+
+void
+box_wait_own_rows(void)
+{
+	struct box_wait_own_rows_trigger &t =
+		box_wait_own_rows_trigger_;
+
+	t.target_lsn = box_check_own_rows_lsn();
+
+	int64_t local_lsn = vclock_get(instance_vclock, instance_id);
+	fprintf(stderr, "local lsn: %ld; target lsn: %ld\n", local_lsn, t.target_lsn);
+	fprintf(stderr, "instance id: %d\n", instance_id);
+	fflush(stderr);
+
+	if (local_lsn < t.target_lsn) {
+		box_set_waiting_own_rows(true);
+		trigger_create(&t.base, box_wait_own_rows_f, NULL, NULL);
+		trigger_add(&wal_on_write, &t.base);
+	} else {
+		box_set_waiting_own_rows(false);
+	}
+
+	/** proceed to subscribe */
+	replicaset.applier.pause_before_subscribe = false;
+	fiber_cond_broadcast(&replicaset.applier.subscribe_cond);
 }
 
 /**
@@ -5657,6 +5765,8 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		diag_raise();
 
 	replicaset_state = REPLICASET_RECOVERY;
+	replicaset.applier.pause_before_subscribe = true;
+
 	if (!tt_uuid_is_nil(&instance_uuid) &&
 	    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
 		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
@@ -5749,6 +5859,9 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * other engines.
 	 */
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
+
+	box_wait_own_rows();
+
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 	/*
 	 * Xlog starts after snapshot. Hence recovery vclock must point at the
@@ -5803,6 +5916,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		if (box_listen() != 0)
 			diag_raise();
 		box_update_replication();
+		box_wait_own_rows();
 	} else if (vclock_compare(instance_vclock, &recovery->vclock) != 0) {
 		/*
 		 * There are several reasons for a node to recover a vclock not
@@ -5946,6 +6060,9 @@ box_cfg_xc(void)
 		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
 	box_broadcast_ballot();
+
+	if (!cfg_replication_anon)
+		box_set_orphan(true);
 	/*
 	 * Must be set before opening the server port, because it may be
 	 * requested by a client before the configuration is completed.
@@ -6081,32 +6198,41 @@ box_cfg_xc(void)
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
 
-	title("running");
-	say_info("ready to accept requests");
+	//assert(!box_is_orphan());
+	if (!box_is_waiting_own_rows()) {
+		title("running");
+		say_info("ready to accept requests");
+	}
 
 	if (!is_bootstrap_leader) {
 		replicaset_sync();
-	} else if (box_election_mode == ELECTION_MODE_CANDIDATE ||
-		   box_election_mode == ELECTION_MODE_MANUAL) {
-		/*
-		 * When the cluster is just bootstrapped and this instance is a
-		 * leader, it makes no sense to wait for a leader appearance.
-		 * There is no one. Moreover this node *is* a leader, so it
-		 * should take the control over the situation and start a new
-		 * term immediately.
-		 */
-		int rc = box_raft_try_promote();
-		if (raft->leader != instance_id && raft->leader != 0) {
+	} else {
+		box_set_orphan(false);
+
+		if (box_election_mode == ELECTION_MODE_CANDIDATE ||
+		    box_election_mode == ELECTION_MODE_MANUAL) {
 			/*
-			 * It was promoted and is a single registered node -
-			 * there can't be another leader or a new term bump.
+			 * When the cluster is just bootstrapped and this
+			 * instance is a leader, it makes no sense to wait for
+			 * a leader appearance. There is no one. Moreover, this
+			 * node *is* a leader, so it should take the control
+			 * over the situation and start a new term immediately.
 			 */
-			panic("Bootstrap master couldn't elect self as a "
-			      "leader. Leader is %u, term is %llu",
-			      raft->leader, (long long)raft->volatile_term);
+			int rc = box_raft_try_promote();
+			if (raft->leader != instance_id && raft->leader != 0) {
+				/*
+				 * It was promoted and is a single registered
+				 * node - there can't be another leader
+				 * or a new term bump.
+				 */
+				panic("Bootstrap master couldn't elect self as a "
+				      "leader. Leader is %u, term is %llu",
+				      raft->leader,
+				      (long long)raft->volatile_term);
+			}
+			assert(rc == 0);
+			(void)rc;
 		}
-		assert(rc == 0);
-		(void)rc;
 	}
 
 	/* box.cfg.read_only is not read yet. */

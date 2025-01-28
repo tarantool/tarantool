@@ -397,6 +397,8 @@ struct replicaset {
 		 * state.
 		 */
 		struct fiber_cond cond;
+		bool pause_before_subscribe;
+		struct fiber_cond subscribe_cond;
 		/*
 		 * The latch is used to order replication requests
 		 * running on behalf of all dead replicas

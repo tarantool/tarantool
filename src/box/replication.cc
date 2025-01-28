@@ -357,6 +357,8 @@ replication_init(int num_threads)
 	replica_hash_new(&replicaset.hash);
 	rlist_create(&replicaset.anon);
 	fiber_cond_create(&replicaset.applier.cond);
+	replicaset.applier.pause_before_subscribe = false;
+	fiber_cond_create(&replicaset.applier.subscribe_cond);
 	latch_create(&replicaset.applier.order_latch);
 
 	vclock_create(&replicaset.applier.vclock);
@@ -1634,6 +1636,7 @@ replicaset_find_join_master_auto(void)
 	struct replica *leader = NULL;
 	int leader_score = -1;
 	replicaset_foreach(replica) {
+		vclock_get(&replica->applier->ballot.vclock, instance_id);
 		struct applier *applier = replica->applier;
 		if (applier == NULL)
 			continue;
