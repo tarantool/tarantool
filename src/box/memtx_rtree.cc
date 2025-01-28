@@ -46,7 +46,7 @@
 #include "schema.h"
 #include "memtx_engine.h"
 
-struct memtx_rtree_index {
+struct memtx_rtree_index { 
 	struct index base;
 	unsigned dimension;
 	struct rtree tree;
@@ -60,7 +60,7 @@ enum memtx_rtree_reserve_extents_num {
 	 * can lead to, and, as a result, the max
 	 * number of new block allocations.
 	 */
-	RESERVE_EXTENTS_BEFORE_DELETE = 8,
+	RESERVE_EXTENTS_BEFORE_DELETE  = 8,
 	RESERVE_EXTENTS_BEFORE_REPLACE = 16
 };
 
@@ -146,10 +146,11 @@ extract_rectangle(struct rtree_rect *rect, struct tuple *tuple,
 /* {{{ MemtxRTree Iterators ****************************************/
 
 struct index_rtree_iterator {
-        struct iterator base;
-        struct rtree_iterator impl;
+    struct iterator base;
+    struct rtree_iterator impl;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
+	tuple* last; 	// добавление текущей позиции в индексе [верно]
 };
 
 static void
@@ -157,11 +158,53 @@ index_rtree_iterator_free(struct iterator *i)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
+	if (itr->last != NULL) {
+		free(itr->last);
+		itr->last = NULL;
+	}
 	mempool_free(itr->pool, itr);
 }
 
+/* Euclid distance, squared */
+static sq_coord_t
+rtree_rect_neigh_distance2(const struct rtree_rect *rect,  // [5]
+			   const struct rtree_rect *neigh_rect,
+			   unsigned dimension)
+{
+	sq_coord_t result = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		if (neigh_coord < coords[0]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
+			result += diff * diff;
+		} else if (neigh_coord > coords[1]) {
+			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[1]);
+			result += diff * diff;
+		}
+	}
+	return result;
+}
+
+/* set position to the iterator */
+sq_coord_t rtree_iterator_set_position(struct index_rtree_iterator *iterator, const char *pos, 
+							struct memtx_rtree_index *index, uint32_t part_count, rtree_rect *rect_dim) 
+{
+	// [  x0, y0, x1, y1 ... ]
+   	sq_coord_t distance_pos = 0;
+	struct rtree_rect rect;
+	//key_def_decode_parts(iterator->base.); // ?
+	mp_decode_rect_from_key(&rect, index->dimension, pos, part_count);
+	distance_pos = rtree_rect_neigh_distance2(&rect, rect_dim, index->dimension);
+	// dinstance_pos = rtree_rect_neigh_distance_max();
+	// dinstance_pos = *(const double *)pos;
+	printf ("value of dinstance_pos is %lg\n", distance_pos);
+    
+	return distance_pos;
+}
+
 static int
-index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
+index_rtree_iterator_next(struct iterator *i, struct tuple **ret) 
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	struct space *space;
@@ -176,6 +219,13 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+ 
+		if (itr->impl.op == SOP_NEIGHBOR) {
+			struct rtree_iterator *rtree_it = (struct rtree_iterator *) i;
+			itr->last = *ret; 	// сделать сохранение позиции про итерировании [верно] 
+			rtree_it->last = *(record_t*)*ret; 
+		}
+
 	} while (*ret == NULL);
 	return 0;
 }
@@ -202,7 +252,6 @@ memtx_rtree_index_def_change_requires_rebuild(struct index *index,
 	    index->def->opts.dimension != new_def->opts.dimension)
 		return true;
 	return false;
-
 }
 
 static ssize_t
@@ -304,15 +353,52 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+/**
+ * Implementation of iterator position for general and multikey indexes.
+ */
+static inline int
+rtree_iterator_position_impl(struct tuple *last,
+			    struct index_def *def,
+			    const char **pos, uint32_t *size)
+{
+	struct tuple *tuple = last;
+	if (tuple == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	int mk_idx = MULTIKEY_NONE;
+	
+	const char *key = tuple_extract_key(tuple, def->cmp_def, mk_idx, size);
+	if (key == NULL)
+		return -1;
+	*pos = key;
+	return 0;
+}
+
+/**
+ * Implementation of iterator position for general and multikey indexes.
+ */
+static int
+rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)  // [верно]
+{
+	struct memtx_rtree_index *index =
+		(struct memtx_rtree_index *)
+		index_weak_ref_get_index_checked(&it->index_ref);
+	struct rtree_iterator *rtree_it = (struct rtree_iterator *) it;
+	return rtree_iterator_position_impl(
+		(tuple*) &rtree_it->last, index->base.def, pos, size);
+}
+
 static int
 memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 {
 	/*
-         * In case of rtree we use reserve to make sure that
-         * memory allocation will not fail during any operation
-         * on rtree, because there is no error handling in the
-         * rtree lib.
-         */
+    * In case of rtree we use reserve to make sure that
+    * memory allocation will not fail during any operation
+    * on rtree, because there is no error handling in the
+    * rtree lib.
+    */
 	(void)size_hint;
 	ERROR_INJECT(ERRINJ_INDEX_RESERVE, {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "mempool", "new slab");
@@ -331,12 +417,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-
-	if (pos != NULL) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
-		return NULL;
-	}
-
+	
 	struct rtree_rect rect;
 	if (part_count == 0) {
 		if (type != ITER_ALL) {
@@ -373,7 +454,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 		op = SOP_OVERLAPS;
 		break;
 	case ITER_NEIGHBOR:
-		op = SOP_NEIGHBOR;
+		op = SOP_NEIGHBOR;  
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
@@ -388,11 +469,28 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "memtx_rtree_index", "iterator");
 		return NULL;
 	}
+
+	if (pos != NULL) { 	
+		if (op == SOP_NEIGHBOR) {
+		
+			// это происходит на уровне box_select
+			// it->after_data.key = pos;
+			// it->after_data.part_count = cmp_def->part_count;
+			it->impl.current_pos_distance = rtree_iterator_set_position(it, pos, index, part_count, rect); // char* -> double 
+			it->base.position = rtree_iterator_position;
+		} else {
+			diag_set(UnsupportedIndexFeature, base->def,
+				 "pagination with wrong iterator type");
+		}
+	} else {
+		it->last = NULL;
+		it->impl.current_pos_distance = 0;
+	}
+
 	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next_internal = index_rtree_iterator_next;
 	it->base.next = memtx_iterator_next;
-	it->base.position = generic_iterator_position;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
@@ -402,7 +500,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 	 * returns NULL should be processed in the correct way on the
 	 * caller's side.
 	 */
-	rtree_search(&index->tree, &rect, op, &it->impl);
+	rtree_search(&index->tree, &rect, op, &it->impl);   // serach for tuples in rtree
 	return (struct iterator *)it;
 }
 
