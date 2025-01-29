@@ -289,10 +289,10 @@ local tarantool_type = {
         end,
         operations = {'+', '-'},
     },
-    ['integer'] = {
-        generator = random_int,
-        operations = {'+', '-'},
-    },
+    -- ['integer'] = {
+    --     generator = random_int,
+    --     operations = {'+', '-'},
+    -- },
     ['map'] = {
         generator = random_map,
         operations = {'=', '!'},
