@@ -36,21 +36,19 @@
 
 #include "errinj.h"
 #include "fiber.h"
-#include "small/rlist.h"
 
-RLIST_HEAD(engines);
-
+int engine_count;
+struct engine *engines[MAX_ENGINE_COUNT];
 enum recovery_state recovery_state = RECOVERY_NOT_STARTED;
 
-/** Register engine instance. */
-void engine_register(struct engine *engine)
+void
+engine_register(struct engine *engine)
 {
-	static int n_engines;
-	rlist_add_tail_entry(&engines, engine, link);
-	engine->id = n_engines++;
+	assert(engine_count < MAX_ENGINE_COUNT);
+	engine->id = engine_count++;
+	engines[engine->id] = engine;
 }
 
-/** Find engine by name. */
 struct engine *
 engine_by_name(const char *name)
 {
@@ -65,19 +63,20 @@ engine_by_name(const char *name)
 void
 engine_shutdown(void)
 {
-	struct engine *engine, *tmp;
-	rlist_foreach_entry_safe(engine, &engines, link, tmp) {
+	struct engine *engine;
+	engine_foreach(engine)
 		engine->vtab->shutdown(engine);
-	}
 }
 
 void
 engine_free(void)
 {
-	struct engine *engine, *tmp;
-	rlist_foreach_entry_safe(engine, &engines, link, tmp) {
+	struct engine *engine;
+	for (int i = 0; i < engine_count; i++) {
+		engine = engines[i];
 		engine->vtab->free(engine);
 	}
+	engine_count = 0;
 }
 
 void

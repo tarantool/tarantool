@@ -65,7 +65,11 @@ struct vclock;
 struct xstream;
 struct engine_join_ctx;
 
-extern struct rlist engines;
+/** Number of registered engines. */
+extern int engine_count;
+
+/** All registered engines stored in an array indexed by the engine id. */
+extern struct engine *engines[];
 
 /**
  * Recovery state of entire tarantool. Apart from memtx recovery state,
@@ -307,11 +311,9 @@ struct engine {
 	/** Engine name. */
 	const char *name;
 	/** Engine id. */
-	uint32_t id;
+	int id;
 	/** Engine flags. */
 	uint32_t flags;
-	/** Used for search for engine by name. */
-	struct rlist link;
 };
 
 /** Engine read view virtual function table. */
@@ -357,10 +359,15 @@ struct engine_join_ctx {
 };
 
 /** Register engine instance. */
-void engine_register(struct engine *engine);
+void
+engine_register(struct engine *engine);
 
-/** Call a visitor function on every registered engine. */
-#define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
+/** Loop over all registered engines. */
+#define engine_foreach(engine) \
+	for (engine = engine_count > 0 ? engines[0] : NULL; \
+	     engine != NULL; \
+	     engine = engine->id < engine_count - 1 ? \
+		      engines[engine->id + 1] : NULL)
 
 /** Find engine engine by name. */
 struct engine *
