@@ -23,6 +23,7 @@
 # * Perform several builds in one workflow.
 # * Split testing to jobs per test suite.
 # * Cache submodules build.
+# * Cache installed Debian packages.
 #
 # Let's look into these points.
 #
@@ -125,6 +126,14 @@
 # It is too attractive to have such a fast build. We use the
 # submodule hash to don't rebuild it each time.
 #
+# Cache installed Debian packages
+# -------------------------------
+#
+# This way replace downloading the packages from the repository
+# with downloading them from the cache that seems faster
+# (especially when the repository is outside of the Azure
+# infrastructure: it is the LLVM repository in our case).
+#
 # TODO
 # ====
 #
@@ -193,15 +202,171 @@ jobs:
             cmake-build-type: RelWithDebInfo
 
     steps:
+      # The next steps perform the following:
+      #
+      # | sudo apt-get install libreadline-dev
+      # | if [ "${{ matrix.build-type }}" = "clang" ]; then
+      # |     wget https://apt.llvm.org/llvm.sh
+      # |     chmod +x llvm.sh
+      # |     sudo ./llvm.sh 19
+      # | fi
+      #
+      # The rest fo the code is about caching.
+      #
+      # LLVM packages take almost 0.5 GiB of cache. That's very
+      # large and possibly can be reduced a lot.
+      #
+      # Anyway, fetching and unpacking the cache to the system is
+      # about 20 seconds, while downloading LLVM packages from the
+      # llvm.org repository consumes from 20 to 90 seconds.
+
+      # {{{ Install required Debian packages (with caching)
+      #
+      # Surprisingly, caching of installed Debian package is a bit
+      # non-trivial with GitHub Actions.
+      #
+      # (It would be nice to wrap these steps to a separate
+      # TypeScript action.)
+      #
+      # The following steps are performed:
+      #
+      # * Save cache
+      #
+      #   (1) Collect list of installed packages.
+      #   (2) <..run job steps that install needed packages..>
+      #   (3) Collect list of installed packages again.
+      #   (4) Calculate the difference[^1].
+      #   (5) Collect list of files installed by the new packages.
+      #   (6) Copy these files to a separate directory[^1].
+      #   (7) Let post-job actions/cache step perform archiving
+      #       and uploading this directory to the GitHub caching
+      #       infrastructure.
+      #
+      # * Restore cache
+      #
+      #   (8) Call actions/cache to download the cache and unpack
+      #       it to an intermediate directory[^2].
+      #   (9) Copy the files to the system directories.
+      #
+      # Ideas and code of these steps are taken from the following
+      # sources:
+      #
+      # https://stackoverflow.com/a/59277514/1598057
+      # https://github.com/tarantool/setup-tarantool/blob/v3.0.0/src/main.ts#L89
+      # https://github.com/tarantool/setup-tarantool/blob/v3.0.0/src/main.ts#L379
+      #
+      # [^1]: We can't just pass packages from $(apt-get install
+      #       <...>) to $(dpkg -L <...>), because in the general
+      #       case they depend of other packages, and we need to
+      #       cache these dependencies too.
+      #
+      #       So, we list packages before and after the $(apt-get
+      #       install <...>) calls and calculate the difference.
+      #
+      # [^2]: This step looks as unneeded on the first glance, but
+      #       it is necessary due to peculiars of actions/cache.
+      #
+      #       First, it requires the `path` option on the cache
+      #       restore and it requires it to be the same as on
+      #       saving the cache.
+      #
+      #       We have the list of files to save on saving the
+      #       cache, but we have no such a list before restoring
+      #       it.
+      #
+      #       So, we copy the files into a new directory and pass
+      #       it as the cache path.
+      #
+      #       https://github.com/actions/toolkit/issues/1433
+      #
+      # [^3]: It is possible to save and restore a system
+      #       directory such as /usr/include/foo without copying
+      #       to/from an intermediate directory.
+      #
+      #       The cache restoring doesn't work this way out of the
+      #       box, because it is executed under a regular user,
+      #       which can't write system files. However, it is easy
+      #       to workaround by setting the SUID flag on the `tar`
+      #       executable.
+      #
+      #       https://github.com/actions/toolkit/issues/946
+      #
+      #       While this particular problem can be worked around,
+      #       the other one (described in the second footnote)
+      #       exists. So, we can't eliminate the intermediate
+      #       directory.
+
+      # We have two possible setups: with and without clang.
+      - name: Define *.deb package cache key
+        id: define-deb-cache-key
+        env:
+          BUILD_CONF: ${{ matrix.build-conf }}
+        run: |
+          if [ "$BUILD_CONF" = "clang" ]; then
+            printf "cache-key=%s\n" "deb-cache-libreadline-and-clang-v1" >> $GITHUB_OUTPUT
+          else
+            printf "cache-key=%s\n" "deb-cache-libreadline-v1" >> $GITHUB_OUTPUT
+          fi
+
+      # Step (8) is performed by this job step. Step (7) is
+      # performed by it when the job is completed.
+      - name: Fetch *.deb package cache
+        id: restore-deb
+        uses: actions/cache@v4
+        with:
+          path: .deb-cache
+          key: ${{ steps.define-deb-cache-key.outputs.cache-key }}
+
+      # Step (9) (see packages caching explanation above).
+      - name: Unpack *.deb package cache to the system
+        if: steps.restore-deb.outputs.cache-hit
+        run: sudo rsync -aK .deb-cache/ /
+
+      # Step (1) (see packages caching explanation above).
+      - name: Collect list of installed *.deb packages
+        if: steps.restore-deb.outputs.cache-hit != 'true'
+        run: sudo dpkg-query -W -f '${binary:Package}\n' > deb-list-base.txt
+
+      # Step (2) (see packages caching explanation above).
       - name: Install build dependencies
+        if: steps.restore-deb.outputs.cache-hit != 'true'
         run: sudo apt-get install libreadline-dev
 
-      - name: Setup clang
-        if: ${{ matrix.build-conf == 'clang' }}
+      # Step (2) (see packages caching explanation above).
+      - name: Install clang
+        if: ${{ matrix.build-conf == 'clang' && steps.restore-deb.outputs.cache-hit != 'true' }}
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 19
+
+      # Steps (3) - (6) (see packages caching explanation above).
+      - name: Save newly installed *.deb packages to cache
+        if: steps.restore-deb.outputs.cache-hit != 'true'
+        run: |
+          print_added() { diff -u "$1" "$2" | sed -n 's/^+\([^+]\+\)$/\1/p'; }
+
+          sudo dpkg-query -W -f '${binary:Package}\n' > deb-list.txt
+          echo "Packages to cache are listed below"
+          print_added deb-list{-base,}.txt | tee deb-list-to-save.txt
+          while IFS= read -r f; do
+            sudo dpkg -L "$f"
+          done < deb-list-to-save.txt > files-to-save.txt
+
+          echo "Copy files to the cache directory"
+          mkdir -p .deb-cache
+          while IFS= read -r f; do
+            if [ -f "$f" ]; then
+              echo "Copying $f to .deb-cache..."
+              cp --parents --target-directory .deb-cache "$f"
+            fi
+          done < files-to-save.txt
+
+      # }}} Install required Debian packages (with caching)
+
+      - name: Setup clang (env)
+        if: ${{ matrix.build-conf == 'clang' }}
+        run: |
           echo CC=clang-19 >> ${GITHUB_ENV}
           echo CXX=clang++-19 >> ${GITHUB_ENV}
 
