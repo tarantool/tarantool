@@ -929,7 +929,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	 * the buffer.
 	 * Currently our buffer looks like this:
 	 * | head \0| garbage |
-	 *         ^ buf     ^ buf_end
+	 *         ^ buf       ^ buf_end
 	 */
 	char *msg_ptr = buf;
 	const int head_len = total;
@@ -973,7 +973,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	 * end of the buffer.
 	 * The buffer looks like this:
 	 * | head |   tail  \0| garbage |
-	 *         ^ msg_ptr ^ buf     ^ buf_end
+	 *         ^ msg_ptr ^ buf       ^ buf_end
 	 */
 
 	const int tail_len = total - head_len;
@@ -986,7 +986,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 
 	/* After moving the tail, the buffer looks like this:
 	 * | head |   garbage   |   tail   \0|
-	 *         ^ msg_ptr     ^ tail_ptr ^ buf_end
+	 *         ^ msg_ptr     ^ tail_ptr   ^ buf_end
 	 */
 
 	/* Write the message. */
@@ -1029,7 +1029,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	 * We now will move the tail with '\0' to the end of the message.
 	 * After escaping the message, the buffer looks like this:
 	 * | head | message \0| garbage |   tail   \0|
-	 *                   ^ msg_ptr   ^ tail_ptr ^ buf_end
+	 *                   ^ msg_ptr   ^ tail_ptr   ^ buf_end
 	 */
 	memmove(msg_ptr, tail_ptr, tail_len + 1);
 
