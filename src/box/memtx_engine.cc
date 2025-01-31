@@ -1684,7 +1684,18 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	for (struct vclock *vclock = vclockset_first(&memtx->snap_dir.index);
 	     vclock != NULL;
 	     vclock = vclockset_next(&memtx->snap_dir.index, vclock)) {
-		gc_add_checkpoint(vclock);
+		const char *name = xdir_format_filename(&memtx->snap_dir,
+							vclock_sum(vclock),
+							NONE);
+		struct stat attr;
+		if (stat(name, &attr) == -1) {
+			diag_set(SystemError,
+				 "failed to get modification time of %s",
+				 name);
+			goto fail;
+		}
+		double timestamp = (double)attr.st_mtime;
+		gc_add_checkpoint(vclock, timestamp);
 	}
 
 	stailq_create(&memtx->gc_queue);
