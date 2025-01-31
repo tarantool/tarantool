@@ -62,6 +62,11 @@ struct gc_checkpoint {
 	/** VClock of the checkpoint. */
 	struct vclock vclock;
 	/**
+	 * Timestamp of the checkpoint as it is
+	 * in the libev realtime clock
+	 */
+	double timestamp;
+	/**
 	 * List of checkpoint references, linked by
 	 * gc_checkpoint_ref::in_refs.
 	 *
@@ -329,7 +334,7 @@ gc_set_checkpoint_interval(double interval);
  * old checkpoints.
  */
 void
-gc_add_checkpoint(const struct vclock *vclock);
+gc_add_checkpoint(const struct vclock *vclock, double timestamp);
 
 /**
  * Make a *manual* checkpoint.
