@@ -8,7 +8,17 @@ local netbox = require('net.box')
 local WATCHER_DELAY = 0.1
 local WATCHER_TIMEOUT = 10
 
-local connections = {}
+-- {{{ Basic instance connection pool
+
+local pool_methods = {}
+local pool_mt = {
+    __index = function(self, key)
+        if self._connections[key] ~= nil then
+            return self._connections[key]
+        end
+        return pool_methods[key]
+    end
+}
 
 local function is_connection_valid(conn, opts)
     if conn == nil or conn.state == 'error' or conn.state == 'closed' then
@@ -22,52 +32,53 @@ local function is_connection_valid(conn, opts)
     return true
 end
 
-local connection_mode_update_cond = nil
-local function connect(instance_name, opts)
-    if not connection_mode_update_cond then
-        connection_mode_update_cond = fiber.cond()
-    end
-
-    checks('string', {
+function pool_methods.connect(self, instance_name, opts)
+    checks('table', 'string', {
         connect_timeout = '?number',
         wait_connected = '?boolean',
         fetch_schema = '?boolean',
     })
+
     opts = opts or {}
 
-    local conn = connections[instance_name]
-    if not is_connection_valid(conn, opts) then
-        local uri = config:instance_uri('peer', {instance = instance_name})
-        if uri == nil then
-            local err = 'No suitable URI provided for instance %q'
-            error(err:format(instance_name), 0)
-        end
-
-        local conn_opts = {
-            connect_timeout = opts.connect_timeout,
-            wait_connected = false,
-            fetch_schema = opts.fetch_schema,
-        }
-        local ok, res = pcall(netbox.connect, uri, conn_opts)
-        if not ok then
-            local msg = 'Unable to connect to instance %q: %s'
-            error(msg:format(instance_name, res.message), 0)
-        end
-        conn = res
-        connections[instance_name] = conn
-        local function mode(conn)
-            if conn.state == 'active' then
-                return conn._mode
-            end
-            return nil
-        end
-        conn.mode = mode
-        local function watch_status(_key, value)
-            conn._mode = value.is_ro and 'ro' or 'rw'
-            connection_mode_update_cond:broadcast()
-        end
-        conn:watch('box.status', watch_status)
+    local conn = self._connections[instance_name]
+    if is_connection_valid(conn, opts) then
+        return conn
     end
+
+    local uri = config:instance_uri('peer', {instance = instance_name})
+    if uri == nil then
+        local err = 'No suitable URI provided for instance %q'
+        error(err:format(instance_name), 0)
+    end
+
+    local conn_opts = {
+        connect_timeout = opts.connect_timeout,
+        wait_connected = false,
+        fetch_schema = opts.fetch_schema,
+    }
+
+    local ok, res = pcall(netbox.connect, uri, conn_opts)
+    if not ok then
+        local msg = 'Unable to connect to instance %q: %s'
+        error(msg:format(instance_name, res.message), 0)
+    end
+
+    conn = res
+    self._connections[instance_name] = conn
+    require('log').info('connected to %s', instance_name)
+    local function mode(conn)
+        if conn.state == 'active' then
+            return conn._mode
+        end
+        return nil
+    end
+    conn.mode = mode
+    local function watch_status(_key, value)
+        conn._mode = value.is_ro and 'ro' or 'rw'
+        self._connection_mode_update_cond:broadcast()
+    end
+    conn:watch('box.status', watch_status)
 
     -- If opts.wait_connected is not false we wait until the connection is
     -- established or an error occurs (including a timeout error).
@@ -75,13 +86,39 @@ local function connect(instance_name, opts)
         local msg = 'Unable to connect to instance %q: %s'
         error(msg:format(instance_name, conn.error), 0)
     end
+
     return conn
+end
+
+function pool_methods._wait_connection_status_update(self, timeout)
+    self._connection_mode_update_cond:wait(timeout)
+end
+
+local function create_pool()
+    return setmetatable({
+        _connections = {},
+        _connection_mode_update_cond = fiber.cond(),
+    }, pool_mt)
+end
+
+-- }}} Basic instance connection pool
+
+local connections = create_pool()
+
+local function connect(instance_name, opts)
+    checks('string', {
+        connect_timeout = '?number',
+        wait_connected = '?boolean',
+        fetch_schema = '?boolean',
+    })
+
+    return connections:connect(instance_name, opts)
 end
 
 -- Run connecting to the instance, which if it is not already
 -- connected or in process of connecting.
 local function connect_in_background(instance_name)
-    pcall(connect, instance_name, {
+    pcall(connections.connect, connections, instance_name, {
         wait_connected = false,
         connect_timeout = WATCHER_TIMEOUT
     })
@@ -115,13 +152,8 @@ local function connect_to_candidates(candidates, opts)
     local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
 
     for _, instance_name in pairs(candidates) do
-        pcall(connect, instance_name, {
-            wait_connected = false,
-            connect_timeout = WATCHER_TIMEOUT
-        })
+        connect_in_background(instance_name)
     end
-
-    assert(connection_mode_update_cond ~= nil)
 
     local connected_candidates = {}
     while clock.monotonic() < connect_deadline do
@@ -141,7 +173,7 @@ local function connect_to_candidates(candidates, opts)
             break
         end
 
-        connection_mode_update_cond:wait(delay)
+        connections:_wait_connection_status_update(delay)
     end
     return connected_candidates
 end
@@ -456,7 +488,8 @@ local function get_connection(opts)
         while #preferred_candidates > 0 do
             local n = math.random(#preferred_candidates)
             local instance_name = table.remove(preferred_candidates, n)
-            local conn = connect(instance_name, {wait_connected = false})
+            local conn = connections:connect(instance_name,
+                                             {wait_connected = false})
             if conn:wait_connected() then
                 return conn
             end
