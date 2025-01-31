@@ -2942,21 +2942,28 @@ netbox_transport_fetch_schema(struct netbox_transport *transport,
 restart:
 	lua_newtable(L);
 	int schema_table_idx = lua_gettop(L);
+	int inprogress_request_count = 0;
 	uint64_t vspace_sync = transport->next_sync++;
 	netbox_encode_select_all(L, &transport->send_buf, vspace_sync,
 				 BOX_VSPACE_ID);
+	inprogress_request_count++;
 	uint64_t vindex_sync = transport->next_sync++;
 	netbox_encode_select_all(L, &transport->send_buf, vindex_sync,
 				 BOX_VINDEX_ID);
+	inprogress_request_count++;
 	uint64_t vcollation_sync = transport->next_sync++;
-	if (peer_has_vcollation)
+	if (peer_has_vcollation) {
 		netbox_encode_select_all(L, &transport->send_buf,
 					 vcollation_sync, BOX_VCOLLATION_ID);
+		inprogress_request_count++;
+	}
 	uint64_t vspace_sequence_sync = transport->next_sync++;
-	if (peer_has_vspace_sequence)
+	if (peer_has_vspace_sequence) {
 		netbox_encode_select_all(L, &transport->send_buf,
 					 vspace_sequence_sync,
 					 BOX_VSPACE_SEQUENCE_ID);
+		inprogress_request_count++;
+	}
 	bool got_vspace = false;
 	bool got_vindex = false;
 	bool got_vcollation = false;
@@ -2973,6 +2980,8 @@ restart:
 			netbox_transport_dispatch_response(transport, L, &hdr);
 			continue;
 		}
+		assert(inprogress_request_count > 0);
+		inprogress_request_count--;
 		if (iproto_type_is_error(hdr.type)) {
 			uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 			if (errcode == ER_NO_SUCH_SPACE) {
@@ -2996,6 +3005,13 @@ restart:
 			 * Restart loader.
 			 */
 			lua_pop(L, 1);
+			/*
+			 * Account the pending requests so that the in-progress
+			 * request counter doesn't go negative when we finally
+			 * get the replies.
+			 */
+			transport->inprogress_request_count +=
+					inprogress_request_count;
 			goto restart;
 		}
 		const char *data = hdr.body[0].iov_base;
@@ -3022,6 +3038,7 @@ restart:
 	} while (!(got_vspace && got_vindex &&
 		   (got_vcollation || !peer_has_vcollation) &&
 		   (got_vspace_sequence || !peer_has_vspace_sequence)));
+	assert(inprogress_request_count == 0);
 	/* Invoke the 'did_fetch_schema' callback. */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
 	lua_pushliteral(L, "did_fetch_schema");
