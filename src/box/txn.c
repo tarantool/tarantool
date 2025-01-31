@@ -1069,6 +1069,12 @@ txn_prepare(struct txn *txn)
 			return -1;
 		}
 	}
+	/*
+	 * Non-memtx transactions can use memtx MVCC (for example, transactions
+	 * reading from sysview), so we need to finalize prepare of all
+	 * transactions, not only memtx ones.
+	 */
+	memtx_tx_prepare_finalize(txn);
 
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
