@@ -354,6 +354,9 @@ if(ENABLE_MEMCS_ENGINE)
 endif()
 
 add_library(box STATIC ${box_sources})
+if(OSS_FUZZ)
+  target_link_options(box PUBLIC "-stdlib=libstdc++")
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQL_DEBUG=1)
