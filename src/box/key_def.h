@@ -1110,9 +1110,11 @@ tuple_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 					       part_count, key_hint, key_def);
 }
 
+uint32_t
+tuple_hash_null(uint32_t *ph1, uint32_t *pcarry);
+
 /**
  * Compute hash of a tuple field.
- * @param type - type of the field key part
  * @param ph1 - pointer to running hash
  * @param pcarry - pointer to carry
  * @param field - pointer to field data
@@ -1124,7 +1126,7 @@ tuple_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
  */
 uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		 enum field_type type, struct coll *coll);
+		 struct coll *coll);
 
 /**
  * Compute hash of a key part.
