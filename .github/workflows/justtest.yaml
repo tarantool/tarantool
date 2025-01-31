@@ -421,15 +421,27 @@ jobs:
       # -DTEST_BUILD=ON
       # ---------------
       #
-      # TODO: It is disabled for now. it is unclear, what it is
-      # and whether we need it.
+      # Shouldn't be used in any builds deployed to the outside.
+      # Simplifies detecting various incorrect situations in
+      # testing. Enables a few additional tests. Doesn't depend
+      # from the build type option.
+      #
+      # * Set default timeout of iproto graceful shutdown to
+      #   infinity (see box.cc for details).
+      # * Abort on a memory leak detected on the fiber GC region.
+      # * Set 0.01 seconds sleep in the synchronous queue worker
+      #   fiber instead of 1 second.
+      # * Set `require('tarantool').build.test_build` to `true`.
+      # * Add ER_TEST_* error codes to box error and corresponding
+      #   test cases.
       - name: Configure tarantool build
         run: |
           COMMIT_ID=$(git rev-parse --short HEAD)
           cmake                                                     \
-            -DTARANTOOL_VERSION=3.9.9-entrypoint-9-g${COMMIT_ID} \
+            -DTARANTOOL_VERSION=3.9.9-entrypoint-9-g${COMMIT_ID}    \
             -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}       \
-            -DENABLE_WERROR=ON
+            -DENABLE_WERROR=ON                                      \
+            -DTEST_BUILD=ON
 
       - name: Build tarantool and test files
         run: make -j $(nproc)
