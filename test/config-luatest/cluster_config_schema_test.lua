@@ -792,6 +792,20 @@ g.test_scope = function()
             replicaset = true,
             instance = false,
         },
+        {
+            name = 'failover',
+            data = {
+                failover = {
+                    stateboard = {
+                        enabled = true,
+                    },
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
+            instance = false,
+        },
     }
 
     for _, case in ipairs(cases) do
