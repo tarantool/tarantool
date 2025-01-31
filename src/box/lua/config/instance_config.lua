@@ -1942,8 +1942,6 @@ return schema.new('instance_config', schema.record({
         items = schema.scalar({type = 'string'})
     }),
     -- Options of the failover coordinator service.
-    --
-    -- TODO: Allow only in the global scope.
     failover = schema.record({
         probe_interval = schema.scalar({
             type = 'number',
@@ -2045,6 +2043,8 @@ return schema.new('instance_config', schema.record({
         }, {
             validate = validators['failover.log'],
         }),
+    }, {
+        validate = validators['failover'],
     }),
     -- Compatibility options.
     compat = schema.record({
