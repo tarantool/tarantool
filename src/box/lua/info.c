@@ -550,6 +550,10 @@ lbox_info_gc_call(struct lua_State *L)
 		}
 		lua_settable(L, -3);
 
+		lua_pushstring(L, "timestamp");
+		lua_pushnumber(L, checkpoint->timestamp);
+		lua_settable(L, -3);
+
 		lua_rawseti(L, -2, ++count);
 	}
 	lua_settable(L, -3);

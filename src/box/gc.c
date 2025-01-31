@@ -466,6 +466,33 @@ gc_set_min_checkpoint_count(int min_checkpoint_count)
 	gc.min_checkpoint_count = min_checkpoint_count;
 }
 
+static void
+gc_reconfigure_checkpoint_schedule(double interval)
+{
+	struct gc_checkpoint *last = gc_last_checkpoint();
+	if (last != NULL &&
+	    !gc.checkpoint_is_in_progress) {
+		/*
+		 * If the last checkpoint was long enough ago, we
+		 * should schedule our checkpoint in the next interval
+		 * seconds so possible parallel snapshots on
+		 * instances will not produce too much writes at once.
+		 * If this is not the case, just schedule the next checkpoint
+		 * as usual.
+		 */
+		double time_after_snapshot = ev_time() - last->timestamp;
+		double start = ev_monotonic_now(loop())
+			       - MIN(time_after_snapshot, interval);
+		checkpoint_schedule_cfg(&gc.checkpoint_schedule,
+					start,
+					interval);
+	} else {
+		checkpoint_schedule_cfg(&gc.checkpoint_schedule,
+					ev_monotonic_now(loop()),
+					interval);
+	}
+}
+
 void
 gc_set_checkpoint_interval(double interval)
 {
@@ -477,14 +504,13 @@ gc_set_checkpoint_interval(double interval)
 	 * if it's waiting for checkpointing to complete, because
 	 * checkpointing code doesn't tolerate spurious wakeups.
 	 */
-	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
-				ev_monotonic_now(loop()), interval);
+	gc_reconfigure_checkpoint_schedule(interval);
 	if (!gc.checkpoint_is_in_progress)
 		fiber_wakeup(gc.checkpoint_fiber);
 }
 
 void
-gc_add_checkpoint(const struct vclock *vclock)
+gc_add_checkpoint(const struct vclock *vclock, double timestamp)
 {
 	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
 	if (last_checkpoint != NULL &&
@@ -511,6 +537,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 
 	rlist_create(&checkpoint->refs);
 	vclock_copy(&checkpoint->vclock, vclock);
+	checkpoint->timestamp = timestamp;
 	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
 	gc.checkpoint_count++;
 
@@ -564,7 +591,7 @@ gc_do_checkpoint(bool is_scheduled)
 	 * Finally, track the newly created checkpoint in the garbage
 	 * collector state.
 	 */
-	gc_add_checkpoint(&checkpoint.vclock);
+	gc_add_checkpoint(&checkpoint.vclock, ev_time());
 out:
 	if (rc != 0)
 		engine_abort_checkpoint();

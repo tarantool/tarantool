@@ -1638,6 +1638,17 @@ memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
 	return rc;
 }
 
+/** Helper function for getting the last modified time of a file. */
+static int
+file_last_modified(double *last_modified, const char *filename)
+{
+	struct stat attr;
+	if (stat(filename, &attr) == -1)
+		return -1;
+	*last_modified = (double)attr.st_mtime;
+	return 0;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
@@ -1685,7 +1696,13 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	for (struct vclock *vclock = vclockset_first(&memtx->snap_dir.index);
 	     vclock != NULL;
 	     vclock = vclockset_next(&memtx->snap_dir.index, vclock)) {
-		gc_add_checkpoint(vclock);
+		double timestamp;
+		const char *name = xdir_format_filename(&memtx->snap_dir,
+							vclock_sum(vclock),
+							NONE);
+		if (file_last_modified(&timestamp, name) != 0)
+			goto fail;
+		gc_add_checkpoint(vclock, timestamp);
 	}
 
 	stailq_create(&memtx->gc_queue);
