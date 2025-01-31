@@ -259,3 +259,40 @@ g.after_test('test_only_user_space_request', function(cg)
     cg.server:drop()
     cg.server = nil
 end)
+
+--
+-- Checks that force recovery works with snapshot containing a request
+-- for an alien space engine.
+--
+g.before_test('test_alien_space_engine_request', function(cg)
+    cg.server = server:new({alias = 'gh_7974_8'})
+    cg.server:start()
+    cg.server:exec(function()
+        box.schema.space.create('test', {id = 777, engine = 'vinyl'})
+        box.space.test:create_index('primary')
+        box.error.injection.set('ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW', true)
+        box.snapshot()
+    end)
+    cg.server:stop()
+end)
+
+g.test_alien_space_engine_request = function(cg)
+    local s = cg.server
+    s:start{wait_until_ready = false}
+    local log = fio.pathjoin(s.workdir, s.alias .. '.log')
+    -- NB: See a comment in test_unknown_request_type.
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert_not_equals(s:grep_log(
+            "can't initialize storage: Snapshot contains alien space engine row",
+            nil, {filename = log}), nil)
+        t.assert_not(s.process:is_alive())
+    end)
+    s:stop()
+    s.box_cfg = {force_recovery = true}
+    t.assert(pcall(s.start, s))
+end
+
+g.after_test('test_alien_space_engine_request', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
