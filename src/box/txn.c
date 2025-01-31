@@ -637,9 +637,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	stmt->engine = engine;
 	stmt->space = space;
 	stmt->type = type;
-	if (engine_begin_statement(engine, txn) != 0)
-		goto fail;
-
+	engine_begin_statement(engine, txn);
 	return 0;
 fail:
 	txn_rollback_stmt(txn);

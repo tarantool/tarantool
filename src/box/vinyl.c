@@ -2503,14 +2503,13 @@ vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 	txn->engines_tx[engine->id] = NULL;
 }
 
-static int
+static void
 vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
 	vy_tx_begin_statement(tx, &stmt->engine_savepoint);
-	return 0;
 }
 
 static void

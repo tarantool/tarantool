@@ -302,12 +302,11 @@ generic_engine_begin(struct engine *engine, struct txn *txn)
 	(void)txn;
 }
 
-int
+void
 generic_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
-	return 0;
 }
 
 int

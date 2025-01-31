@@ -164,7 +164,7 @@ struct engine_vtab {
 	/**
 	 * Begine one statement in existing transaction.
 	 */
-	int (*begin_statement)(struct engine *, struct txn *);
+	void (*begin_statement)(struct engine *engine, struct txn *txn);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
@@ -414,10 +414,10 @@ engine_begin(struct engine *engine, struct txn *txn)
 	engine->vtab->begin(engine, txn);
 }
 
-static inline int
+static inline void
 engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	return engine->vtab->begin_statement(engine, txn);
+	engine->vtab->begin_statement(engine, txn);
 }
 
 static inline int
@@ -563,7 +563,7 @@ int generic_engine_join(struct engine *, struct engine_join_ctx *,
 			struct xstream *);
 void generic_engine_complete_join(struct engine *, struct engine_join_ctx *);
 void generic_engine_begin(struct engine *, struct txn *);
-int generic_engine_begin_statement(struct engine *, struct txn *);
+void generic_engine_begin_statement(struct engine *, struct txn *);
 int generic_engine_prepare(struct engine *, struct txn *);
 void generic_engine_commit(struct engine *, struct txn *);
 void generic_engine_rollback_statement(struct engine *, struct txn *,
