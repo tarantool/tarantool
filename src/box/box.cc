@@ -581,11 +581,13 @@ box_set_orphan(bool orphan)
 {
 	box_do_set_orphan(orphan);
 	/* Update the title to reflect the new status. */
+	const char *orphan_title = "orphan";
 	if (is_orphan) {
 		say_info("entering orphan mode");
-		title("orphan");
+		title(orphan_title);
 	} else {
-		say_info("leaving orphan mode");
+		if (strcmp(title_get_status(), orphan_title) == 0)
+			say_info("leaving orphan mode");
 		title("running");
 	}
 }

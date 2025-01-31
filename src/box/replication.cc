@@ -718,7 +718,8 @@ replica_on_applier_sync(struct replica *replica)
 		return;
 
 	replica->applier_sync_state = APPLIER_SYNC;
-	replicaset.applier.synced++;
+	if (replica->applier->ballot.is_booted)
+		replicaset.applier.synced++;
 
 	replicaset_check_quorum();
 }
@@ -826,7 +827,8 @@ replica_on_applier_disconnect(struct replica *replica)
 	switch (replica->applier_sync_state) {
 	case APPLIER_SYNC:
 		assert(replicaset.applier.synced > 0);
-		replicaset.applier.synced--;
+		if (replica->applier->ballot.is_booted)
+			replicaset.applier.synced--;
 		FALLTHROUGH;
 	case APPLIER_CONNECTED:
 		assert(replicaset.applier.connected > 0);
@@ -1247,17 +1249,7 @@ replicaset_connect(const struct uri_set *uris,
 
 	say_info("connecting to %d replicas", count);
 
-	if (!connect_quorum) {
-		/*
-		 * Enter orphan mode on configuration change and
-		 *
-		 * only leave it when we manage to sync with
-		 * replicaset_quorum instances. Don't change
-		 * title though, it should be 'loading' during
-		 * local recovery.
-		 */
-		box_do_set_orphan(true);
-	}
+	box_do_set_orphan(true);
 
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
