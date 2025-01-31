@@ -393,11 +393,18 @@ jobs:
             third_party/metrics                                      \
             third_party/arrow/nanoarrow
 
-      - name: Strip $(git describe) call from the build script
-        run: |
-          echo "3.9.9-entrypoint-9-g$(git rev-parse --short HEAD)" > VERSION
-          rm -r .git
-
+      # -DTARANTOOL_VERSION=<...>
+      #
+      # Hardcode a fake tarantool version (but with the real git
+      # commit hash).
+      #
+      # The $(git describe --long HEAD) information is not
+      # available, because a shallow clone is performed above. It
+      # is to speed up the job.
+      #
+      # We anyway don't deploy this build to anywhere, it is
+      # needed only to run tests.
+      #
       # -DCMAKE_BUILD_TYPE=<...>
       # ------------------------
       #
@@ -418,8 +425,10 @@ jobs:
       # and whether we need it.
       - name: Configure tarantool build
         run: |
-          cmake                                               \
-            -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }} \
+          COMMIT_ID=$(git rev-parse --short HEAD)
+          cmake                                                     \
+            -DTARANTOOL_VERSION=3.9.9-entrypoint-9-g${COMMIT_ID} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}       \
             -DENABLE_WERROR=ON
 
       - name: Build tarantool and test files
