@@ -423,7 +423,7 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 		goto log_request;
 	/* memtx snapshot must contain only memtx spaces */
 	if ((space->engine->flags & ENGINE_CHECKPOINT_BY_MEMTX) == 0) {
-		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+		diag_set(ClientError, ER_ALIEN_ENGINE, space->engine->name);
 		goto log_request;
 	}
 	struct txn *txn;
