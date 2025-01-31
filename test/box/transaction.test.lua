@@ -297,16 +297,13 @@ box.space.test:truncate()
 box.space.memtx:select{}
 box.commit();
 
--- DDL and select from a vinyl space. Multi-engine transaction
--- is not allowed.
+-- DDL and select from a vinyl space.
 box.begin()
 box.space.test:truncate()
-box.space.vinyl:select{};
+box.space.vinyl:select{}
+box.commit();
 
--- A transaction is left open due to an exception in the Lua fragment
-box.rollback();
-
--- DDL as a second statement - works if the egine is the same
+-- DDL as a second statement with the same engine.
 box.begin()
 box.space.memtx:insert{2, 'truncate'}
 box.space.test:truncate()
@@ -314,7 +311,7 @@ box.commit();
 
 box.space.memtx:select{};
 
--- DML as a second statement - works if the engine is the same
+-- DML as a second statement with the same engine.
 box.begin()
 box.space.test:truncate()
 box.space.memtx:insert{3, 'truncate'}
@@ -322,13 +319,11 @@ box.commit();
 
 box.space.memtx:select{};
 
--- DML as a second statement. Multi-engine transaction is not allowed.
+-- DML as a second statement with a different engine.
 box.begin()
 box.space.test:truncate()
-box.space.vinyl:insert{2, 'truncate'};
-
--- A transaction is left open due to an exception in the above fragment
-box.rollback();
+box.space.vinyl:insert{2, 'truncate'}
+box.commit();
 
 box.space.vinyl:select{};
 

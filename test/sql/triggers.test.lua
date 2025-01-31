@@ -117,12 +117,14 @@ box.execute("DROP TABLE t1;")
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
 box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
-box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 42; END;")
 box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 box.execute("INSERT INTO m VALUES (0, '0');")
 box.execute("INSERT INTO n VALUES (0, '',null);")
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+box.execute("SELECT * FROM m")
+box.execute("SELECT * FROM n")
 
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE m;")
@@ -133,12 +135,14 @@ box.execute("DROP TABLE n;")
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
 box.space._session_settings:update('sql_default_engine', {{'=', 2, 'memtx'}})
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
-box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 42; END;")
 box.space._session_settings:update('sql_default_engine', {{'=', 2, 'vinyl'}})
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 NUMBER);")
 box.execute("INSERT INTO m VALUES (0, '0');")
 box.execute("INSERT INTO n VALUES (0, '',null);")
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+box.execute("SELECT * FROM m")
+box.execute("SELECT * FROM n")
 
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE n;")

@@ -2509,7 +2509,8 @@ vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	return vy_tx_begin_statement(tx, &stmt->engine_savepoint);
+	vy_tx_begin_statement(tx, &stmt->engine_savepoint);
+	return 0;
 }
 
 static void
@@ -2519,6 +2520,23 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 	vy_tx_rollback_statement(tx, stmt->engine_savepoint);
+}
+
+static void
+vinyl_engine_send_to_read_view(struct engine *engine, struct txn *txn,
+			       int64_t psn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_send_to_read_view_impl(tx, psn);
+}
+
+void
+vinyl_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_abort_with_conflict_impl(tx);
 }
 
 static void
@@ -2706,6 +2724,7 @@ vinyl_engine_new(const char *dir, size_t memory,
 
 	env->base.vtab = &vinyl_engine_vtab;
 	env->base.name = "vinyl";
+	env->base.flags = ENGINE_SUPPORTS_MVCC;
 	return &env->base;
 }
 
@@ -4629,6 +4648,8 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .commit = */ vinyl_engine_commit,
 	/* .rollback_statement = */ vinyl_engine_rollback_statement,
 	/* .rollback = */ vinyl_engine_rollback,
+	/* .send_to_read_view = */ vinyl_engine_send_to_read_view,
+	/* .abort_with_conflict = */ vinyl_engine_abort_with_conflict,
 	/* .switch_to_ro = */ vinyl_engine_switch_to_ro,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,

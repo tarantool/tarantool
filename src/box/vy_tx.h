@@ -353,7 +353,7 @@ vy_tx_rollback(struct vy_tx *tx);
  * transaction state. The transaction can be rolled back
  * to a save point with vy_tx_rollback_statement().
  */
-int
+void
 vy_tx_begin_statement(struct vy_tx *tx, void **savepoint);
 
 /**
@@ -422,6 +422,20 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
  */
 void
 vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn);
+
+/**
+ * Implementation of engine_send_to_read_view callback.
+ * Do not use directly.
+ */
+void
+vy_tx_send_to_read_view_impl(struct vy_tx *tx, int64_t psn);
+
+/**
+ * Implementation of engine_abort_with_conflict callback.
+ * Do not use directly.
+ */
+void
+vy_tx_abort_with_conflict_impl(struct vy_tx *tx);
 
 /**
  * Iterator over the write set of a transaction.
