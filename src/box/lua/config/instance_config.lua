@@ -2263,8 +2263,6 @@ return schema.new('instance_config', schema.record({
         items = schema.scalar({type = 'string'})
     }),
     -- Options of the failover coordinator service.
-    --
-    -- TODO: Allow only in the global scope.
     failover = schema.record({
         probe_interval = schema.scalar({
             type = 'number',
@@ -2312,7 +2310,18 @@ return schema.new('instance_config', schema.record({
                 type = 'number',
                 default = 10,
             }),
-        })
+        }),
+    }, {
+        validate = function(data, w)
+            local scope = w.schema.computed.annotations.scope
+            if data == nil or scope == nil then
+                return
+            end
+            if scope ~= 'global' then
+                w.error(('The option must not be present in the %s scope')
+                        :format(scope))
+            end
+        end,
     }),
     -- Compatibility options.
     compat = schema.record({
