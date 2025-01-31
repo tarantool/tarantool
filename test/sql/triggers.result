@@ -317,7 +317,7 @@ box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 42; END;")
 ---
 - row_count: 1
 ...
@@ -339,8 +339,29 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
-- null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- row_count: 1
+...
+box.execute("SELECT * FROM m")
+---
+- metadata:
+  - name: s0
+    type: integer
+  - name: s1
+    type: string
+  rows:
+  - [0, 'The Rain In Spain']
+...
+box.execute("SELECT * FROM n")
+---
+- metadata:
+  - name: s0
+    type: integer
+  - name: s1
+    type: string
+  - name: s2
+    type: number
+  rows:
+  - [0, '', 42]
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE m;")
@@ -361,7 +382,7 @@ box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 42; END;")
 ---
 - row_count: 1
 ...
@@ -383,8 +404,29 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
-- null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- row_count: 1
+...
+box.execute("SELECT * FROM m")
+---
+- metadata:
+  - name: s0
+    type: integer
+  - name: s1
+    type: string
+  rows:
+  - [0, 'The Rain In Spain']
+...
+box.execute("SELECT * FROM n")
+---
+- metadata:
+  - name: s0
+    type: integer
+  - name: s1
+    type: string
+  - name: s2
+    type: number
+  rows:
+  - [0, '', 42]
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE n;")
@@ -427,8 +469,11 @@ box.execute("INSERT INTO test2 VALUES (1)")
 ...
 box.execute("SELECT * FROM test")
 ---
-- null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- metadata:
+  - name: id
+    type: integer
+  rows:
+  - [2]
 ...
 box.execute("ROLLBACK;")
 ---

@@ -419,9 +419,7 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
 	 * Switch to read view if we skipped a prepared statement.
 	 */
 	if (itr->tx != NULL && src_itr->min_skipped_plsn != INT64_MAX) {
-		if (vy_tx_send_to_read_view(
-				itr->tx, src_itr->min_skipped_plsn) != 0)
-			return -1;
+		vy_tx_send_to_read_view(itr->tx, src_itr->min_skipped_plsn);
 		if (itr->tx->state == VINYL_TX_ABORT) {
 			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 			return -1;
@@ -533,9 +531,7 @@ out:
 	 * Switch to read view if we skipped a prepared statement.
 	 */
 	if (itr->tx != NULL && src_itr->min_skipped_plsn != INT64_MAX) {
-		if (vy_tx_send_to_read_view(
-				itr->tx, src_itr->min_skipped_plsn) != 0)
-			return -1;
+		vy_tx_send_to_read_view(itr->tx, src_itr->min_skipped_plsn);
 		if (itr->tx->state == VINYL_TX_ABORT) {
 			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 			return -1;
@@ -949,11 +945,11 @@ vy_read_iterator_apply_history(struct vy_read_iterator *itr,
 /**
  * Track a read in the conflict manager.
  */
-static int
+static void
 vy_read_iterator_track_read(struct vy_read_iterator *itr, struct vy_entry entry)
 {
 	if (itr->tx == NULL)
-		return 0;
+		return;
 
 	if (entry.stmt == NULL) {
 		entry = (itr->iterator_type == ITER_EQ ||
@@ -961,16 +957,13 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct vy_entry entry)
 			 itr->key : itr->lsm->env->empty_key);
 	}
 
-	int rc;
 	if (iterator_direction(itr->iterator_type) >= 0) {
-		rc = vy_tx_track(itr->tx, itr->lsm, itr->key,
-				 itr->iterator_type != ITER_GT,
-				 entry, true);
+		vy_tx_track(itr->tx, itr->lsm, itr->key,
+			    itr->iterator_type != ITER_GT, entry, true);
 	} else {
-		rc = vy_tx_track(itr->tx, itr->lsm, entry, true,
-				 itr->key, itr->iterator_type != ITER_LT);
+		vy_tx_track(itr->tx, itr->lsm, entry, true,
+			    itr->key, itr->iterator_type != ITER_LT);
 	}
-	return rc;
 }
 
 NODISCARD int
@@ -984,8 +977,7 @@ next_key:
 		return -1;
 	if (vy_read_iterator_apply_history(itr, &entry) != 0)
 		return -1;
-	if (vy_read_iterator_track_read(itr, entry) != 0)
-		return -1;
+	vy_read_iterator_track_read(itr, entry);
 
 	if (itr->last.stmt != NULL)
 		tuple_unref(itr->last.stmt);

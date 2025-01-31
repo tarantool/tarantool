@@ -558,54 +558,45 @@ txn_begin(void)
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
-	/*
-	 * By default, all transactions support multiple engines. Any engine
-	 * without ENGINE_SUPPORTS_CROSS_ENGINE_TX will unset this flag.
-	 */
-	txn_set_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
 }
 
-int
+/*
+ * Start a transaction in an engine.
+ *
+ * Does nothing if the transaction is already started or if the engine
+ * bypasses transaction management.
+ */
+static void
 txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
 	if (engine->flags & ENGINE_BYPASS_TX)
-		return 0;
+		return;
+	assert(engine->id < MAX_TX_ENGINE_COUNT);
 	if (txn->engines[engine->id] != NULL) {
-		assert(txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE));
 		assert(txn->engines[engine->id] == engine);
-		return 0;
+		return;
 	}
-	if (txn_has_flag(txn, TXN_IS_STARTED_IN_ENGINE)) {
-		if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0) {
-			diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION,
-				 engine->name);
-			return -1;
-		}
-		if (!txn_has_flag(txn, TXN_SUPPORTS_MULTI_ENGINE)) {
-			const char *name = NULL;
-			for (size_t i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
-				if (txn->engines[i] != NULL &&
-				    (txn->engines[i]->flags &
-				     ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0) {
-					name = txn->engines[i]->name;
-					break;
-				}
-			}
-			assert(name != NULL);
-			diag_set(ClientError,
-				 ER_CROSS_ENGINE_TRANSACTION, name);
-			return -1;
-		}
-	}
-	if (engine_begin(engine, txn) != 0)
-		return -1;
+	engine_begin(engine, txn);
 	txn->engines[engine->id] = engine;
-	txn_set_flags(txn, TXN_IS_STARTED_IN_ENGINE);
-	if ((engine->flags & ENGINE_SUPPORTS_CROSS_ENGINE_TX) == 0)
-		txn_clear_flags(txn, TXN_SUPPORTS_MULTI_ENGINE);
+}
+
+int
+txn_begin_ro_stmt_impl(struct txn *txn, struct space *space)
+{
+	assert(txn == in_txn());
+	assert(txn != NULL);
+	struct engine *engine = space->engine;
+	if (txn->status == TXN_IN_READ_VIEW &&
+	    !(engine->flags & ENGINE_SUPPORTS_MVCC))
+		txn_abort_with_conflict(txn);
+	if (txn_check_can_continue(txn) != 0)
+		return -1;
+	if (txn_check_space(txn, space) != 0)
+		return -1;
+	txn_begin_in_engine(engine, txn);
 	return 0;
 }
 
@@ -619,11 +610,8 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 		return -1;
 	}
 
-	if (txn->status == TXN_IN_READ_VIEW) {
-		rlist_del(&txn->in_read_view_txs);
-		txn->status = TXN_ABORTED;
-		txn_set_flags(txn, TXN_IS_CONFLICTED);
-	}
+	if (txn->status == TXN_IN_READ_VIEW)
+		txn_abort_with_conflict(txn);
 
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
@@ -644,15 +632,12 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 		goto fail;
 
 	struct engine *engine = space->engine;
-	if (txn_begin_in_engine(engine, txn) != 0)
-		goto fail;
+	txn_begin_in_engine(engine, txn);
 
 	stmt->engine = engine;
 	stmt->space = space;
 	stmt->type = type;
-	if (engine_begin_statement(engine, txn) != 0)
-		goto fail;
-
+	engine_begin_statement(engine, txn);
 	return 0;
 fail:
 	txn_rollback_stmt(txn);
@@ -1060,12 +1045,6 @@ txn_prepare(struct txn *txn)
 		if (txn->engines[i] != NULL &&
 		    engine_prepare(txn->engines[i], txn) != 0) {
 			txn->psn = 0;
-			/*
-			 * TODO(gh-1803): Call engine_rollback() here when
-			 * cross-engine support for Vinyl is implemented.
-			 */
-			for (size_t j = 0; j < i; j++)
-				assert(txn->engines[j] == NULL);
 			return -1;
 		}
 	}
@@ -1270,6 +1249,63 @@ txn_abort(struct txn *txn)
 	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	txn->signature = TXN_SIGNATURE_ABORT;
 	txn_rollback(txn);
+}
+
+void
+txn_send_to_read_view(struct txn *txn, int64_t psn)
+{
+	assert(psn >= TXN_MIN_PSN);
+	if (txn->status == TXN_ABORTED)
+		return;
+	assert(txn->status == TXN_INPROGRESS ||
+	       txn->status == TXN_IN_READ_VIEW);
+	if (!stailq_empty(&txn->stmts)) {
+		/*
+		 * If a transaction intends to write, abort it now because it
+		 * won't be able to commit once sent to a read view anyway.
+		 */
+		assert(txn->status == TXN_INPROGRESS);
+		txn_abort_with_conflict(txn);
+		return;
+	}
+	for (int i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+		struct engine *engine = engines[i];
+		if (engine->flags & ENGINE_SUPPORTS_MVCC) {
+			/*
+			 * We must create a read view in all engines that
+			 * support MVCC, even those that haven't been used in
+			 * this transaction so far, because they may be enabled
+			 * in future statements. To do that, we need to start
+			 * this transaction in those engines first.
+			 */
+			txn_begin_in_engine(engine, txn);
+			engine_send_to_read_view(engine, txn, psn);
+		} else if (txn->engines[i] != NULL) {
+			/*
+			 * Can't continue if this transaction uses an engine
+			 * that can't be sent to a read view.
+			 */
+			txn_abort_with_conflict(txn);
+			return;
+		}
+	}
+	txn->status = TXN_IN_READ_VIEW;
+}
+
+void
+txn_abort_with_conflict(struct txn *txn)
+{
+	if (txn->status == TXN_ABORTED)
+		return;
+	assert(txn->status == TXN_INPROGRESS ||
+	       txn->status == TXN_IN_READ_VIEW);
+	for (int i = 0; i < MAX_TX_ENGINE_COUNT; i++) {
+		struct engine *engine = txn->engines[i];
+		if (engine != NULL)
+			engine_abort_with_conflict(engine, txn);
+	}
+	txn->status = TXN_ABORTED;
+	txn_set_flags(txn, TXN_IS_CONFLICTED);
 }
 
 int

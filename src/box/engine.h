@@ -65,7 +65,11 @@ struct vclock;
 struct xstream;
 struct engine_join_ctx;
 
-extern struct rlist engines;
+/** Number of registered engines. */
+extern int engine_count;
+
+/** All registered engines stored in an array indexed by the engine id. */
+extern struct engine *engines[];
 
 /**
  * Recovery state of entire tarantool. Apart from memtx recovery state,
@@ -156,11 +160,11 @@ struct engine_vtab {
 	 * transaction in the engine begins with the first
 	 * statement.
 	 */
-	int (*begin)(struct engine *, struct txn *);
+	void (*begin)(struct engine *engine, struct txn *txn);
 	/**
 	 * Begine one statement in existing transaction.
 	 */
-	int (*begin_statement)(struct engine *, struct txn *);
+	void (*begin_statement)(struct engine *engine, struct txn *txn);
 	/**
 	 * Called before a WAL write is made to prepare
 	 * a transaction for commit in the engine.
@@ -183,6 +187,16 @@ struct engine_vtab {
 	 * Roll back and end the transaction in the engine.
 	 */
 	void (*rollback)(struct engine *, struct txn *);
+	/**
+	 * Send the transaction to a read view in which it can't see changes
+	 * done with the given PSN or newer.
+	 */
+	void (*send_to_read_view)(struct engine *engine, struct txn *txn,
+				  int64_t psn);
+	/**
+	 * Abort the transaction as conflicted.
+	 */
+	void (*abort_with_conflict)(struct engine *engine, struct txn *txn);
 	/**
 	 * Notify the engine that the instance is about to switch
 	 * to read-only mode. The engine is supposed to abort all
@@ -276,9 +290,7 @@ struct engine_vtab {
 enum {
 	/**
 	 * If set, the engine will not participate in transaction
-	 * control. In particular, this means that any operations
-	 * done on this engine's spaces can mix in other engine's
-	 * transactions w/o throwing ER_CROSS_ENGINE_TRANSACTION.
+	 * control.
 	 */
 	ENGINE_BYPASS_TX = 1 << 0,
 	/**
@@ -296,9 +308,12 @@ enum {
 	 */
 	ENGINE_JOIN_BY_MEMTX = 1 << 3,
 	/**
-	 * Set if the engine supports cross-engine transactions.
+	 * Set if the engine supports multiversion concurrency control,
+	 * i.e. it can send a transaction to a consistent read view.
+	 * Engines that set this flag must implement send_to_read_view
+	 * callback.
 	 */
-	ENGINE_SUPPORTS_CROSS_ENGINE_TX = 1 << 4,
+	ENGINE_SUPPORTS_MVCC = 1 << 4,
 };
 
 struct engine {
@@ -307,11 +322,9 @@ struct engine {
 	/** Engine name. */
 	const char *name;
 	/** Engine id. */
-	uint32_t id;
+	int id;
 	/** Engine flags. */
 	uint32_t flags;
-	/** Used for search for engine by name. */
-	struct rlist link;
 };
 
 /** Engine read view virtual function table. */
@@ -357,10 +370,15 @@ struct engine_join_ctx {
 };
 
 /** Register engine instance. */
-void engine_register(struct engine *engine);
+void
+engine_register(struct engine *engine);
 
-/** Call a visitor function on every registered engine. */
-#define engine_foreach(engine) rlist_foreach_entry(engine, &engines, link)
+/** Loop over all registered engines. */
+#define engine_foreach(engine) \
+	for (engine = engine_count > 0 ? engines[0] : NULL; \
+	     engine != NULL; \
+	     engine = engine->id < engine_count - 1 ? \
+		      engines[engine->id + 1] : NULL)
 
 /** Find engine engine by name. */
 struct engine *
@@ -390,16 +408,16 @@ engine_create_read_view(struct engine *engine,
 	return engine->vtab->create_read_view(engine, opts);
 }
 
-static inline int
+static inline void
 engine_begin(struct engine *engine, struct txn *txn)
 {
-	return engine->vtab->begin(engine, txn);
+	engine->vtab->begin(engine, txn);
 }
 
-static inline int
+static inline void
 engine_begin_statement(struct engine *engine, struct txn *txn)
 {
-	return engine->vtab->begin_statement(engine, txn);
+	engine->vtab->begin_statement(engine, txn);
 }
 
 static inline int
@@ -425,6 +443,18 @@ static inline void
 engine_rollback(struct engine *engine, struct txn *txn)
 {
 	engine->vtab->rollback(engine, txn);
+}
+
+static inline void
+engine_send_to_read_view(struct engine *engine, struct txn *txn, int64_t psn)
+{
+	engine->vtab->send_to_read_view(engine, txn, psn);
+}
+
+static inline void
+engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	engine->vtab->abort_with_conflict(engine, txn);
 }
 
 static inline int
@@ -532,13 +562,15 @@ int generic_engine_prepare_join(struct engine *, struct engine_join_ctx *);
 int generic_engine_join(struct engine *, struct engine_join_ctx *,
 			struct xstream *);
 void generic_engine_complete_join(struct engine *, struct engine_join_ctx *);
-int generic_engine_begin(struct engine *, struct txn *);
-int generic_engine_begin_statement(struct engine *, struct txn *);
+void generic_engine_begin(struct engine *, struct txn *);
+void generic_engine_begin_statement(struct engine *, struct txn *);
 int generic_engine_prepare(struct engine *, struct txn *);
 void generic_engine_commit(struct engine *, struct txn *);
 void generic_engine_rollback_statement(struct engine *, struct txn *,
 				       struct txn_stmt *);
 void generic_engine_rollback(struct engine *, struct txn *);
+void generic_engine_send_to_read_view(struct engine *, struct txn *, int64_t);
+void generic_engine_abort_with_conflict(struct engine *, struct txn *);
 void generic_engine_switch_to_ro(struct engine *);
 int generic_engine_bootstrap(struct engine *);
 int generic_engine_begin_initial_recovery(struct engine *,
@@ -560,53 +592,6 @@ void generic_engine_shutdown(struct engine *engine);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-static inline struct engine *
-engine_find_xc(const char *name)
-{
-	struct engine *engine = engine_find(name);
-	if (engine == NULL)
-		diag_raise();
-	return engine;
-}
-
-static inline struct space *
-engine_create_space_xc(struct engine *engine, struct space_def *def,
-		    struct rlist *key_list)
-{
-	struct space *space = engine_create_space(engine, def, key_list);
-	if (space == NULL)
-		diag_raise();
-	return space;
-}
-
-static inline void
-engine_begin_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_begin(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_begin_statement_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_begin_statement(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_prepare_xc(struct engine *engine, struct txn *txn)
-{
-	if (engine_prepare(engine, txn) != 0)
-		diag_raise();
-}
-
-static inline void
-engine_check_space_def_xc(struct engine *engine, struct space_def *def)
-{
-	if (engine_check_space_def(engine, def) != 0)
-		diag_raise();
-}
 
 static inline void
 engine_bootstrap_xc(void)

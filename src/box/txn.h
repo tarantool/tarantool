@@ -113,10 +113,6 @@ enum txn_flag {
 	 * Transaction has been rolled back so it cannot be continued.
 	 */
 	TXN_IS_ROLLED_BACK = 0x200,
-	/** Transaction has been started in at least one engine. */
-	TXN_IS_STARTED_IN_ENGINE = 0x400,
-	/** Transaction supports multiple engines. */
-	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
 };
 
 enum {
@@ -722,6 +718,21 @@ void
 txn_abort(struct txn *txn);
 
 /**
+ * If the given transaction is read-only, send it to a read view in which it
+ * can't see changes done with the given PSN or newer, otherwise abort it as
+ * conflicted immediately.
+ */
+void
+txn_send_to_read_view(struct txn *txn, int64_t psn);
+
+/**
+ * Mark a transaction as conflicted and abort it.
+ * Does nothing if the transaction is already aborted.
+ */
+void
+txn_abort_with_conflict(struct txn *txn);
+
+/**
  * Submit a transaction to the journal.
  * @pre txn == in_txn()
  *
@@ -830,9 +841,6 @@ txn_n_rows(struct txn *txn)
 int
 txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type);
 
-int
-txn_begin_in_engine(struct engine *engine, struct txn *txn);
-
 /**
  * Check if a space supports linearizable access, i.e. it is either synchronous
  * or not replicated at all, and its engine prevents dirty reads.
@@ -850,6 +858,9 @@ txn_check_space(const struct txn *txn,
 	return 0;
 }
 
+int
+txn_begin_ro_stmt_impl(struct txn *txn, struct space *space);
+
 /**
  * This is an optimization, which exists to speed up selects
  * in autocommit mode. For such selects, we only need to
@@ -864,14 +875,8 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 	svp->region = &fiber()->gc;
 	svp->region_used = region_used(svp->region);
 	*txn = in_txn();
-	if (*txn != NULL) {
-		if (txn_check_can_continue(*txn) != 0)
-			return -1;
-		if (txn_check_space(*txn, space) != 0)
-			return -1;
-		struct engine *engine = space->engine;
-		return txn_begin_in_engine(engine, *txn);
-	}
+	if (*txn != NULL)
+		return txn_begin_ro_stmt_impl(*txn, space);
 	return 0;
 }
 

@@ -1388,11 +1388,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * the DELETE statement is not written to secondary indexes
 	 * immediately.
 	 */
-	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, pk_entry) != 0) {
-		tuple_unref(pk_entry.stmt);
-		rc = -1;
-		goto out;
-	}
+	if (tx != NULL)
+		vy_tx_track_point(tx, lsm->pk, pk_entry);
 
 	if ((*rv)->vlsn == INT64_MAX)
 		vy_cache_add_point(&lsm->pk->cache, pk_entry, key);
@@ -1446,8 +1443,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		/*
 		 * Use point lookup for a full key.
 		 */
-		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
-			goto fail;
+		if (tx != NULL)
+			vy_tx_track_point(tx, lsm, key);
 		if (vy_point_lookup(lsm, tx, rv, key, &partial) != 0)
 			goto fail;
 		if (lsm->index_id > 0 && partial.stmt != NULL) {
@@ -2418,15 +2415,12 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 	return vy_upsert(env, tx, stmt, space, request);
 }
 
-static int
+static void
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
 	assert(txn->engines_tx[engine->id] == NULL);
 	txn->engines_tx[engine->id] = vy_tx_begin(env->xm, txn);
-	if (txn->engines_tx[engine->id] == NULL)
-		return -1;
-	return 0;
 }
 
 static int
@@ -2509,13 +2503,13 @@ vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 	txn->engines_tx[engine->id] = NULL;
 }
 
-static int
+static void
 vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	return vy_tx_begin_statement(tx, &stmt->engine_savepoint);
+	vy_tx_begin_statement(tx, &stmt->engine_savepoint);
 }
 
 static void
@@ -2525,6 +2519,23 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 	vy_tx_rollback_statement(tx, stmt->engine_savepoint);
+}
+
+static void
+vinyl_engine_send_to_read_view(struct engine *engine, struct txn *txn,
+			       int64_t psn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_send_to_read_view_impl(tx, psn);
+}
+
+void
+vinyl_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_abort_with_conflict_impl(tx);
 }
 
 static void
@@ -2712,6 +2723,7 @@ vinyl_engine_new(const char *dir, size_t memory,
 
 	env->base.vtab = &vinyl_engine_vtab;
 	env->base.name = "vinyl";
+	env->base.flags = ENGINE_SUPPORTS_MVCC;
 	return &env->base;
 }
 
@@ -3090,10 +3102,6 @@ vinyl_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 	}
 	rlist_create(&ctx->entries);
 	ctx->rv = vy_tx_manager_read_view(env->xm, /*plsn=*/INT64_MAX);
-	if (ctx->rv == NULL) {
-		free(ctx);
-		return -1;
-	}
 	arg->data[engine->id] = ctx;
 	return space_foreach(vy_join_add_space, ctx);
 }
@@ -4639,6 +4647,8 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .commit = */ vinyl_engine_commit,
 	/* .rollback_statement = */ vinyl_engine_rollback_statement,
 	/* .rollback = */ vinyl_engine_rollback,
+	/* .send_to_read_view = */ vinyl_engine_send_to_read_view,
+	/* .abort_with_conflict = */ vinyl_engine_abort_with_conflict,
 	/* .switch_to_ro = */ vinyl_engine_switch_to_ro,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
