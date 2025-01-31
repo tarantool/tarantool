@@ -25,7 +25,7 @@ main()
 	double now = rand();
 
 	struct checkpoint_schedule sched;
-	checkpoint_schedule_cfg(&sched, now, 0);
+	checkpoint_schedule_cfg(&sched, now, 0, 0);
 
 	is(checkpoint_schedule_timeout(&sched, now), 0,
 	   "checkpointing disabled - timeout after configuration");
@@ -43,7 +43,7 @@ main()
 	for (int i = 0; i < intervals_len; i++) {
 		double interval = intervals[i];
 
-		checkpoint_schedule_cfg(&sched, now, interval);
+		checkpoint_schedule_cfg(&sched, now, interval, 0);
 		double t = checkpoint_schedule_timeout(&sched, now);
 		ok(t >= interval && t <= interval * 2,
 		   "checkpoint interval %.0lf - timeout after configuration",
@@ -51,7 +51,7 @@ main()
 
 		double t0;
 		for (int j = 0; j < 100; j++) {
-			checkpoint_schedule_cfg(&sched, now, interval);
+			checkpoint_schedule_cfg(&sched, now, interval, 0);
 			t0 = checkpoint_schedule_timeout(&sched, now);
 			if (fabs(t - t0) > interval / 4)
 				break;
