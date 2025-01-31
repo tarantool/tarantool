@@ -216,6 +216,10 @@ M['database.replicaset_uuid'] = validate_uuid_str
 
 -- {{{ failover
 
+M['failover'] = function(_data, w)
+    validate_scope(w, {'global'})
+end
+
 M['failover.log'] = function(data, w)
     if data.to == 'file' and data.file == nil then
         w.error('log.file must be specified when log.to is "file"')
