@@ -99,6 +99,7 @@ function(create_fuzz_test)
                    ${LIBFUZZER_OPTS_EFFECTIVE}
   )
   set_tests_properties(${test_title} PROPERTIES
+    ENVIRONMENT "${TARANTOOL_ASAN_OPTIONS}"
     LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${FUZZ_PREFIX}-deps
   )
