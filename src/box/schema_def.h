@@ -133,6 +133,8 @@ static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 	_(SESSION_SETTINGS, 380, true) \
 	/** Space id of _gc_consumers. */ \
 	_(GC_CONSUMERS, 388, false) \
+	/** Space id of _replication_async_repair_queue. Local space. */ \
+	_(REPLICATION_ASYNC_REPAIR_QUEUE, 394, false) \
 
 /** System space identifier definition. */
 #define SYSTEM_SPACE_MEMBER(name, id, ...) BOX_ ## name ## _ID = id,
