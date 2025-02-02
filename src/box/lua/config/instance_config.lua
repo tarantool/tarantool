@@ -1361,6 +1361,11 @@ return schema.new('instance_config', schema.record({
         }, {
             validate = validators['replication.autoexpel'],
         }),
+        async_repair_queue_enabled = enterprise_edition(schema.scalar({
+            type = 'boolean',
+            box_cfg = 'replication_async_repair_queue_enabled',
+            default = false,
+        })),
     }),
     -- Unlike other sections, credentials contains the append-only
     -- parameters. It means that deletion of a value from the
