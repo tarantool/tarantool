@@ -272,9 +272,16 @@ static inline int
 journal_write_submit(struct journal_entry *entry)
 {
 	journal_queue_wait();
+	/*
+	 * We cannot account entry after write. If journal is synchronous
+	 * the journal_queue_on_complete() is called in write_async().
+	 */
 	journal_queue_on_append(entry);
-
-	return current_journal->write_async(current_journal, entry);
+	if (current_journal->write_async(current_journal, entry) != 0) {
+		journal_queue_on_complete(entry);
+		return -1;
+	}
+	return 0;
 }
 
 /** Write a single entry to the journal in synchronous way. */
