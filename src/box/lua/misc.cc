@@ -40,6 +40,7 @@
 #include "box/box.h"
 #include "box/errcode.h"
 #include "box/lua/tuple.h"
+#include "box/memtx_tx.h"
 #include "box/port.h"
 #include "box/read_view.h"
 #include "box/space_cache.h"
@@ -485,6 +486,25 @@ lbox_txn_set_isolation(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Lua/C helper that allows to run several rounds of memtmx MVCC GC.
+ */
+static int
+lbox_memtx_tx_gc(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1) ||
+	    lua_tonumber(L, 1) < 1) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "step_num must be a number not less than 1");
+		return luaT_error(L);
+	}
+
+	int step_num = lua_tonumber(L, 1);
+	for (int i = 0; i < step_num; i++)
+		memtx_tx_story_gc_step();
+	return 0;
+}
+
 /** {{{ Read view utils. **/
 
 void
@@ -557,6 +577,7 @@ box_lua_misc_init(struct lua_State *L)
 		{"read_view_list", lbox_read_view_list},
 		{"read_view_status", lbox_read_view_status},
 		{"generate_space_id", lbox_generate_space_id},
+		{"memtx_tx_gc", lbox_memtx_tx_gc},
 		{NULL, NULL}
 	};
 

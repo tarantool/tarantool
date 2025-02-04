@@ -102,8 +102,6 @@ ffi.cdef[[
     box_txn_set_timeout(double timeout);
     void
     box_txn_make_sync();
-    void
-    memtx_tx_story_gc_step();
     int
     box_sequence_current(uint32_t seq_id, int64_t *result);
     typedef struct txn_savepoint box_txn_savepoint_t;
@@ -402,16 +400,6 @@ box.begin = function(options)
 end
 
 box.is_in_txn = builtin.box_txn
-
-box.internal.memtx_tx_gc = function(step_num)
-    if type(step_num) ~= 'number' or step_num < 1 then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  "step_num must be a number not less than 1")
-    end
-    for _ = 1, step_num do
-        builtin.memtx_tx_story_gc_step()
-    end
-end
 
 box.txn_id = function()
     local id = builtin.box_txn_id()
