@@ -2563,6 +2563,23 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 }
 
 static void
+vinyl_engine_send_to_read_view(struct engine *engine, struct txn *txn,
+			       int64_t psn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_send_to_read_view_impl(tx, psn);
+}
+
+void
+vinyl_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	struct vy_tx *tx = txn->engines_tx[engine->id];
+	assert(tx != NULL);
+	vy_tx_abort_with_conflict_impl(tx);
+}
+
+static void
 vinyl_engine_switch_to_ro(struct engine *engine)
 {
 	vy_tx_manager_abort_writers_for_ro(engine);
@@ -2747,6 +2764,7 @@ vinyl_engine_new(const char *dir, size_t memory,
 
 	env->base.vtab = &vinyl_engine_vtab;
 	env->base.name = "vinyl";
+	env->base.flags = ENGINE_SUPPORTS_MVCC;
 	return &env->base;
 }
 
@@ -3678,6 +3696,8 @@ vinyl_iterator_check_tx(struct vinyl_iterator *it)
 		diag_set(ClientError, ER_READ_VIEW_ABORTED);
 		return -1;
 	}
+	if (vy_tx_check_can_yield(it->tx) != 0)
+		return -1;
 	return 0;
 }
 
@@ -3943,6 +3963,8 @@ vinyl_index_get(struct index *index, const char *key,
 		tx = &tx_autocommit;
 		vy_tx_create(env->xm, tx);
 	}
+	if (vy_tx_check_can_yield(tx) != 0)
+		return -1;
 	int rc = vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
 				   key, part_count, ret);
 	if (tx == &tx_autocommit)
@@ -4670,6 +4692,8 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .commit = */ vinyl_engine_commit,
 	/* .rollback_statement = */ vinyl_engine_rollback_statement,
 	/* .rollback = */ vinyl_engine_rollback,
+	/* .send_to_read_view = */ vinyl_engine_send_to_read_view,
+	/* .abort_with_conflict = */ vinyl_engine_abort_with_conflict,
 	/* .switch_to_ro = */ vinyl_engine_switch_to_ro,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,

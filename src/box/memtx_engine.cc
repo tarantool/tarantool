@@ -611,17 +611,18 @@ static void
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	txn_can_yield(txn, memtx_tx_manager_use_mvcc_engine);
+	if (!memtx_tx_manager_use_mvcc_engine)
+		txn_can_yield(txn, false);
 }
 
 static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
 	if (memtx_tx_manager_use_mvcc_engine) {
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
-			assert(stmt->engine == engine);
+			if (stmt->engine != engine)
+				continue;
 			assert(stmt->space->engine == engine);
 			memtx_tx_history_prepare_stmt(stmt);
 		}
@@ -632,15 +633,15 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 static void
 memtx_engine_commit(struct engine *engine, struct txn *txn)
 {
-	(void)engine;
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->engine != engine)
+			continue;
 		if (memtx_tx_manager_use_mvcc_engine) {
-			assert(stmt->engine == engine);
 			assert(stmt->space->engine == engine);
 			memtx_tx_history_commit_stmt(stmt);
 		}
-		if (stmt->engine == engine && stmt->engine_savepoint != NULL) {
+		if (stmt->engine_savepoint != NULL) {
 			struct space *space = stmt->space;
 			struct tuple *old_tuple = stmt->rollback_info.old_tuple;
 			if (space->upgrade != NULL && old_tuple != NULL)
@@ -702,6 +703,23 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		tuple_ref(old_tuple);
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
+}
+
+static void
+memtx_engine_send_to_read_view(struct engine *engine, struct txn *txn,
+			       int64_t psn)
+{
+	(void)engine;
+	assert(memtx_tx_manager_use_mvcc_engine);
+	memtx_tx_send_to_read_view(txn, psn);
+}
+
+void
+memtx_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	assert(memtx_tx_manager_use_mvcc_engine);
+	memtx_tx_abort_with_conflict(txn);
 }
 
 static int
@@ -1548,6 +1566,8 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .commit = */ memtx_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
 	/* .rollback = */ generic_engine_rollback,
+	/* .send_to_read_view = */ memtx_engine_send_to_read_view,
+	/* .abort_with_conflict = */ memtx_engine_abort_with_conflict,
 	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
@@ -1793,8 +1813,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	memtx->base.flags = (ENGINE_SUPPORTS_READ_VIEW |
 			     ENGINE_CHECKPOINT_BY_MEMTX |
 			     ENGINE_JOIN_BY_MEMTX);
-	if (!memtx_tx_manager_use_mvcc_engine)
-		memtx->base.flags |= ENGINE_SUPPORTS_CROSS_ENGINE_TX;
+	if (memtx_tx_manager_use_mvcc_engine)
+		memtx->base.flags |= ENGINE_SUPPORTS_MVCC;
 
 	memtx->func_key_format = simple_tuple_format_new(
 		&memtx_tuple_format_vtab, &memtx->base, NULL, 0);

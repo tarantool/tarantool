@@ -762,74 +762,32 @@ memtx_tx_adjust_position_in_read_view_list(struct txn *txn)
 	rlist_add_tail(&prev_txn->in_read_view_txs, &txn->in_read_view_txs);
 }
 
-/**
- * Mark @a victim as conflicted and abort it.
- * Does nothing if the transaction is already aborted.
- */
-static void
-memtx_tx_abort_with_conflict(struct txn *victim)
+void
+memtx_tx_abort_with_conflict(struct txn *txn)
 {
-	assert(victim->psn == 0);
-	if (victim->status == TXN_ABORTED)
-		return;
-	if (victim->status == TXN_IN_READ_VIEW)
-		rlist_del(&victim->in_read_view_txs);
-	victim->status = TXN_ABORTED;
-	txn_set_flags(victim, TXN_IS_CONFLICTED);
+	if (txn->status == TXN_IN_READ_VIEW)
+		rlist_del(&txn->in_read_view_txs);
 }
 
-/**
- * Handle conflict when @a victim has read and @a breaker has written the same
- * key, and @a breaker is prepared. The functions must be called in two cases:
- * 1. @a breaker becomes prepared for every victim with non-empty intersection
- * of victim read set / breaker write set.
- * 2. @a victim has to read confirmed value and skips the value that prepared
- * @a breaker wrote.
- * If @a victim is read-only or hasn't made any changes, it should be sent
- * to read view, in which is will not see @a breaker's changes. If @a victim
- * is already in a read view - a read view that does not see every breaker
- * changes is chosen.
- * Otherwise @a victim must be marked as conflicted and aborted on occasion.
- *
- * NB: can trigger story garbage collection.
- */
-static void
-memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
+void
+memtx_tx_send_to_read_view(struct txn *txn, int64_t psn)
 {
-	assert(breaker != victim);
-	assert(breaker->psn != 0);
-	assert(victim->psn == 0);
-	if (victim->status != TXN_INPROGRESS &&
-	    victim->status != TXN_IN_READ_VIEW) {
-		/* Was conflicted by somebody else. */
-		return;
+	assert((txn->status == TXN_IN_READ_VIEW) == (txn->rv_psn != 0));
+	if (txn->status != TXN_IN_READ_VIEW) {
+		txn->rv_psn = psn;
+		rlist_add_tail(&txm.read_view_txs, &txn->in_read_view_txs);
+	} else if (txn->rv_psn > psn) {
+		/*
+		 * Note that in every case for every key we may choose
+		 * any read view psn between confirmed level and the
+		 * oldest prepared transaction that changes that key.
+		 * But we choose the latest level because it generally
+		 * costs less, and if there are several breakers - we
+		 * must sequentially decrease read view level.
+		 */
+		txn->rv_psn = psn;
 	}
-	if (stailq_empty(&victim->stmts)) {
-		assert((victim->status == TXN_IN_READ_VIEW) ==
-		       (victim->rv_psn != 0));
-		/* Send to read view, perhaps a deeper one. */
-		if (victim->status != TXN_IN_READ_VIEW) {
-			victim->status = TXN_IN_READ_VIEW;
-			victim->rv_psn = breaker->psn;
-			rlist_add_tail(&txm.read_view_txs,
-				       &victim->in_read_view_txs);
-		} else if (victim->rv_psn > breaker->psn) {
-			/*
-			 * Note that in every case for every key we may choose
-			 * any read view psn between confirmed level and the
-			 * oldest prepared transaction that changes that key.
-			 * But we choose the latest level because it generally
-			 * costs less, and if there are several breakers - we
-			 * must sequentially decrease read view level.
-			 */
-			victim->rv_psn = breaker->psn;
-			assert(victim->rv_psn != 0);
-		}
-		memtx_tx_adjust_position_in_read_view_list(victim);
-	} else {
-		/* Mark as conflicted. */
-		memtx_tx_abort_with_conflict(victim);
-	}
+	memtx_tx_adjust_position_in_read_view_list(txn);
 }
 
 /**
@@ -2169,7 +2127,7 @@ memtx_tx_abort_story_readers(struct memtx_story *story)
 	struct tx_read_tracker *tracker, *tmp;
 	rlist_foreach_entry_safe(tracker, &story->reader_list,
 				 in_reader_list, tmp)
-		memtx_tx_abort_with_conflict(tracker->reader);
+		txn_abort_with_conflict(tracker->reader);
 }
 
 /*
@@ -2272,7 +2230,7 @@ memtx_tx_abort_gap_readers(struct memtx_story *story)
 					 in_read_gaps, tmp) {
 			if (item->type != GAP_INPLACE)
 				continue;
-			memtx_tx_abort_with_conflict(item->txn);
+			txn_abort_with_conflict(item->txn);
 		}
 	}
 }
@@ -2412,7 +2370,7 @@ memtx_tx_handle_conflict_story_readers(struct memtx_story *story,
 				 in_reader_list, tmp) {
 		if (tracker->reader == writer)
 			continue;
-		memtx_tx_handle_conflict(writer, tracker->reader);
+		txn_send_to_read_view(tracker->reader, writer->psn);
 	}
 }
 
@@ -2430,7 +2388,7 @@ memtx_tx_handle_conflict_gap_readers(struct memtx_story *top_story,
 				 in_read_gaps, tmp) {
 		if (item->txn == writer || item->type != GAP_INPLACE)
 			continue;
-		memtx_tx_handle_conflict(writer, item->txn);
+		txn_send_to_read_view(item->txn, writer->psn);
 	}
 }
 
@@ -2600,7 +2558,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 */
 			if (test_stmt->del_story == story)
 				continue;
-			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
+			txn_send_to_read_view(test_stmt->txn, stmt->txn->psn);
 		}
 		/*
 		 * We have already checked gap readers before for the case
@@ -2740,7 +2698,7 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			memtx_tx_handle_conflict(story->del_stmt->txn, txn);
+			txn_send_to_read_view(txn, story->del_stmt->txn->psn);
 		}
 
 		if (memtx_tx_story_insert_is_visible(story, txn, is_prepared_ok,
@@ -2757,7 +2715,7 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			memtx_tx_handle_conflict(story->add_stmt->txn, txn);
+			txn_send_to_read_view(txn, story->add_stmt->txn->psn);
 		}
 
 		if (story->link[index->dense_id].older_story == NULL)
@@ -2973,7 +2931,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		rlist_foreach_entry_safe(tracker, &story->reader_list,
 					 in_reader_list, tmp) {
 			if (tracker->reader != ddl_owner)
-				memtx_tx_abort_with_conflict(tracker->reader);
+				txn_abort_with_conflict(tracker->reader);
 		}
 
 		for (uint32_t i = 0; i < story->index_count; i++) {
@@ -2984,7 +2942,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 						 &story->link[i].read_gaps,
 						 in_read_gaps, tmp) {
 				if (item->txn != ddl_owner)
-					memtx_tx_abort_with_conflict(item->txn);
+					txn_abort_with_conflict(item->txn);
 			}
 		}
 	}
@@ -2996,7 +2954,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		rlist_foreach_entry_safe(item, &index->read_gaps,
 					 in_read_gaps, tmp) {
 			if (item->txn != ddl_owner)
-				memtx_tx_abort_with_conflict(item->txn);
+				txn_abort_with_conflict(item->txn);
 		}
 	}
 
@@ -3015,7 +2973,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
 			if (stmt->space == space) {
-				memtx_tx_abort_with_conflict(txn);
+				txn_abort_with_conflict(txn);
 				break;
 			}
 		}
@@ -3023,7 +2981,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		rlist_foreach_entry(hole_item, &txn->point_holes_list,
 				    in_point_holes_list) {
 			if (space->def->id == hole_item->space_id) {
-				memtx_tx_abort_with_conflict(txn);
+				txn_abort_with_conflict(txn);
 				break;
 			}
 		}

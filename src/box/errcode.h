@@ -221,7 +221,7 @@ struct errcode_record {
 	_(ER_TIMEOUT, 78,			"Timeout exceeded") \
 	_(ER_ACTIVE_TRANSACTION, 79,		"Operation is not permitted when there is an active transaction ") \
 	_(ER_CURSOR_NO_TRANSACTION, 80,		"The transaction the cursor belongs to has ended") \
-	_(ER_CROSS_ENGINE_TRANSACTION, 81,	"Storage engine '%s' does not support cross-engine transactions", "engine", STRING) \
+	/* ER_CROSS_ENGINE_TRANSACTION, 81, Unused */ \
 	_(ER_NO_SUCH_ROLE, 82,			"Role '%s' is not found", "role", STRING) \
 	_(ER_ROLE_EXISTS, 83,			"Role '%s' already exists", "role", STRING) \
 	_(ER_CREATE_ROLE, 84,			"Failed to create role '%s': %s", "role", STRING, "details", STRING) \
@@ -437,6 +437,7 @@ struct errcode_record {
 	_(ER_KEY_PART_VALUE_OUT_OF_RANGE, 290,	"The value of key part exceeds the supported range for type", "partno", UINT, "field_type", STRING, "value", MSGPACK, "min", MSGPACK, "max", MSGPACK) \
 	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
 	_(ER_ALIEN_ENGINE, 292,			"Snapshot contains alien space engine row", "engine", STRING) \
+	_(ER_MVCC_UNAVAILABLE, 293,		"MVCC is unavailable for storage engine '%s' so it cannot be used in the same transaction with '%s', which supports MVCC", "engine_without_mvcc", STRING, "engine_with_mvcc", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

@@ -115,8 +115,8 @@ enum txn_flag {
 	TXN_IS_ROLLED_BACK = 0x200,
 	/** Transaction has been started in at least one engine. */
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
-	/** Transaction supports multiple engines. */
-	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
+	/** Transaction supports multiversion concurrency control. */
+	TXN_SUPPORTS_MVCC = 0x800,
 };
 
 enum {
@@ -720,6 +720,21 @@ txn_rollback(struct txn *txn);
  */
 void
 txn_abort(struct txn *txn);
+
+/**
+ * If the given transaction is read-only, send it to a read view in which it
+ * can't see changes done with the given PSN or newer, otherwise abort it as
+ * conflicted immediately.
+ */
+void
+txn_send_to_read_view(struct txn *txn, int64_t psn);
+
+/**
+ * Mark a transaction as conflicted and abort it.
+ * Does nothing if the transaction is already aborted.
+ */
+void
+txn_abort_with_conflict(struct txn *txn);
 
 /**
  * Submit a transaction to the journal.

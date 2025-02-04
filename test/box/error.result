@@ -300,7 +300,6 @@ t;
  |   78: box.error.TIMEOUT
  |   79: box.error.ACTIVE_TRANSACTION
  |   80: box.error.CURSOR_NO_TRANSACTION
- |   81: box.error.CROSS_ENGINE_TRANSACTION
  |   82: box.error.NO_SUCH_ROLE
  |   83: box.error.ROLE_EXISTS
  |   84: box.error.CREATE_ROLE
@@ -503,6 +502,7 @@ t;
  |   290: box.error.KEY_PART_VALUE_OUT_OF_RANGE
  |   291: box.error.REPLICA_GC
  |   292: box.error.ALIEN_ENGINE
+ |   293: box.error.MVCC_UNAVAILABLE
  | ...
 
 test_run:cmd("setopt delimiter ''");

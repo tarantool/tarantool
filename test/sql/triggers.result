@@ -340,7 +340,8 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- MVCC is unavailable for storage engine 'memtx' so it cannot be used in the same
+  transaction with 'vinyl', which supports MVCC
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE m;")
@@ -384,7 +385,8 @@ box.execute("INSERT INTO n VALUES (0, '',null);")
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- MVCC is unavailable for storage engine 'memtx' so it cannot be used in the same
+  transaction with 'vinyl', which supports MVCC
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE n;")
@@ -428,7 +430,8 @@ box.execute("INSERT INTO test2 VALUES (1)")
 box.execute("SELECT * FROM test")
 ---
 - null
-- Storage engine 'vinyl' does not support cross-engine transactions
+- MVCC is unavailable for storage engine 'memtx' so it cannot be used in the same
+  transaction with 'vinyl', which supports MVCC
 ...
 box.execute("ROLLBACK;")
 ---
