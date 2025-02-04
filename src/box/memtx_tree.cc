@@ -474,7 +474,6 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
 					      index_base, mk_index);
 	}
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
@@ -482,7 +481,6 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 	struct tuple *successor = res != NULL ? res->tuple : NULL;
 	memtx_tx_track_gap(in_txn(), space, index_base, successor, ITER_GE,
 			   NULL, 0);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	return 0;
 }
@@ -522,14 +520,12 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
 					      index_base, mk_index);
 	}
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
 	memtx_tx_track_gap(in_txn(), space, index_base, successor, ITER_LE,
 			   NULL, 0);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	tuple_unref(successor);
 	return 0;
@@ -571,11 +567,9 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		 */
 		struct tuple *nearby_tuple = res == NULL ? NULL : res->tuple;
 
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_gap(in_txn(), space, index_base, nearby_tuple,
 				   ITER_EQ, it->key_data.key,
 				   it->key_data.part_count);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
@@ -583,14 +577,12 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
 					      index_base, mk_index);
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
 		memtx_tx_track_gap(in_txn(), space, index_base, res->tuple,
 				   ITER_GE, NULL, 0);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	}
 
 	return 0;
@@ -626,7 +618,6 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		iterator->next_internal = exhausted_iterator_next;
 		*ret = NULL;
 
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Got end of key. Store gap from the key boundary to the
 		 * previous tuple in nearby tuple.
@@ -634,7 +625,6 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(in_txn(), space, index_base, successor,
 				   ITER_REQ, it->key_data.key,
 				   it->key_data.part_count);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
@@ -646,14 +636,12 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		 */
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
 					      index_base, mk_index);
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
 		memtx_tx_track_gap(in_txn(), space, index_base, successor,
 				   ITER_LE, NULL, 0);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	}
 	tuple_unref(successor);
 	return 0;
@@ -1010,7 +998,6 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 					      index_base, mk_index);
 	}
 
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * If the key is full then all parts present, so EQ and REQ iterators
 	 * can return no more than one tuple.
@@ -1069,8 +1056,6 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 				   index_base->def->key_def->part_count));
 
 end:
-	memtx_tx_story_gc();
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	return res == NULL || !eq_match || *ret != NULL ? 0 :
 	       iterator->next_internal(iterator, ret);
@@ -1208,7 +1193,6 @@ memtx_tree_index_size(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct space *space = space_by_id(base->def->space_id);
-	memtx_tx_story_gc();
 	/* Substract invisible count. */
 	return memtx_tree_size(&index->tree) -
 	       memtx_tx_index_invisible_count(in_txn(), space, base);
@@ -1245,9 +1229,6 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 		*result = memtx_tx_tuple_clarify(txn, space, res->tuple,
 						 base, mk_index);
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-		memtx_tx_story_gc();
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -1293,14 +1274,12 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	/* Fast path: not found equal with full key. */
 	if (start_data.part_count == cmp_def->part_count &&
 	    !equals && (type == ITER_EQ || type == ITER_REQ)) {
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Inform MVCC like we have attempted to read a full key and
 		 * found nothing. Insertion of this exact key into the tree
 		 * will conflict with us.
 		 */
 		memtx_tx_track_point(txn, space, base, start_data.key);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuple matching the full key. */
 	}
 
@@ -1309,7 +1288,6 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		assert(iterator_type_is_reverse(type));
 		struct tuple *successor =
 			initial_elem ? initial_elem->tuple : NULL;
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Inform MVCC that we have attempted to read a tuple prior
 		 * to the successor (the first tuple in the tree or NULL if
@@ -1319,14 +1297,12 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 */
 		memtx_tx_track_gap(txn, space, base, successor, type,
 				   start_data.key, start_data.part_count);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuples prior to the first one. */
 	}
 
 	/* Fast path: not found with forward iterator. */
 	if (begin_offset == full_size) {
 		assert(!iterator_type_is_reverse(type));
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Inform MVCC that we have attempted to read a tuple right to
 		 * the rightest one in the tree (NULL successor) and thus, got
@@ -1336,7 +1312,6 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 */
 		memtx_tx_track_gap(txn, space, base, NULL, type, start_data.key,
 				   start_data.part_count);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0; /* No tuples beyond the last one. */
 	}
 
@@ -1358,7 +1333,6 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	size_t full_count = ((ssize_t)end_offset - begin_offset) *
 			    iterator_direction(type);
 
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * Inform MVCC that we have counted tuples in the index by our key and
 	 * iterator. Insertion or deletion of any matching tuple anywhere in the
@@ -1368,7 +1342,6 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	 */
 	size_t invisible_count = memtx_tx_track_count(
 		txn, space, base, type, start_data.key, start_data.part_count);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	return full_count - invisible_count;
 }
@@ -1395,18 +1368,13 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	if (res == NULL) {
 		*result = NULL;
 		assert(part_count == cmp_def->unique_part_count);
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_point(txn, space, base, key);
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0;
 	}
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index);
-/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-	memtx_tx_story_gc();
-/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return 0;
 }
 
