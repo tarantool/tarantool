@@ -313,3 +313,189 @@ g.test_func_gap_tracking_with_successor = function(cg)
         box.rollback()
     end)
 end
+
+-- Reproducer from the issue.
+-- See https://github.com/tarantool/tarantool/issues/10775.
+g.test_crash_on_ffi_sandwich = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[1]}
+            end]]
+        })
+
+        -- Simple space for which trace is recorded.
+        local simple = box.schema.space.create('simple')
+        simple:create_index('primary', {type = 'hash'})
+
+        simple:replace{1}
+        simple:replace{2}
+
+        local s = box.schema.space.create('test', {
+            format = {{'key', 'unsigned'}}
+        })
+        s:create_index('primary')
+
+        local function pairs_loop(space)
+            -- Big table with content of pairs, preallocated to avoid
+            -- aborting of the trace.
+            local tab = table.new(1024, 0)
+            for _ = 1, 100 do
+                for _, i in space:pairs(nil, {fullscan = true}) do
+                    table.insert(tab, i)
+                end
+            end
+            return tab
+        end
+
+        -- Setup VM state.
+        collectgarbage()
+        collectgarbage()
+        jit.flush()
+        jit.opt.start('hotloop=1')
+
+        -- Stop LuaJIT GC to record trace properly.
+        collectgarbage('stop')
+        pairs_loop(simple)
+        -- No need for future recording.
+        jit.off()
+        -- Restart LuaJIT GC to avoid OOM.
+        collectgarbage('restart')
+
+        s:create_index('value', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        -- Trigger memtx GC.
+
+        s:replace{1}
+        s:replace{2}
+
+        local reader = fiber.create(function()
+            box.begin()
+            -- Select from the space with findex.
+            s:select(nil, {fullscan = true})
+            fiber.sleep(1)
+            box.commit()
+        end)
+        reader:set_joinable(true)
+
+        box.begin()
+        s:delete(1)
+        box.commit()
+
+        reader:join()
+
+        box.begin()
+        -- Do select for the simple space again.
+        pairs_loop(simple)
+        box.commit()
+    end)
+end
+
+-- The case checks if the function of func index is not called
+-- when reading from another index. It is dangerous because we
+-- are not allowed to call Lua function under FFI. For details,
+-- see https://github.com/tarantool/tarantool/issues/10775.
+g.test_no_function_call_on_non_func_read = function(cg)
+    cg.server:exec(function()
+        local mvcc_check_has_tuple_stories =
+            rawget(_G, 'mvcc_check_has_tuple_stories')
+
+        rawset(_G, 'counter', 0)
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                counter = counter + 1
+                return {tuple[1]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        box.begin()
+        -- Create dataset with gaps.
+        for i = 1, 1000, 2 do
+            s:replace{i}
+            s:delete(i)
+        end
+        box.commit()
+        mvcc_check_has_tuple_stories()
+
+        rawset(_G, 'counter', 0)
+        -- Many iterations to be more sure about covering the problem.
+        for i = 1, 100 do
+            -- Cover all methods with FFI implementation in the following way:
+            -- 1. Open transaction so that GC won't be triggered on auto-commit.
+            -- 2. Insert a new tuple to create a story and accumulate GC steps.
+            -- 3. Call tested method with GC steps accumulated.
+            -- 4. Rollback to revert changes.
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s:select(i, {iterator = 'GT'})
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s:pairs(i, {iterator = 'GT'}):totable()
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            box.begin()
+            s:replace{100 + i}
+            rawset(_G, 'counter', 0)
+            s:count(i, {iterator = 'GT'})
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s.index.pk:random()
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            box.begin()
+            rawset(_G, 'counter', 0)
+            s.index.pk:min()
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s.index.pk:max()
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            -- Point read of existing tuple.
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s:get{1000 + i}
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+
+            -- Point read of non-existing tuple.
+            box.begin()
+            s:replace{1000 + i}
+            rawset(_G, 'counter', 0)
+            s:get{2000 + i}
+            t.assert_equals(rawget(_G, 'counter'), 0)
+            box.rollback()
+        end
+    end)
+end
