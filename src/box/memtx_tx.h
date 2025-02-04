@@ -413,12 +413,6 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 }
 
 /**
- * Run several rounds of memtx_tx_story_gc_step()
- */
-void
-memtx_tx_story_gc();
-
-/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  *
  * @param txn - current transactions.
