@@ -534,7 +534,7 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 /**
  * Export step of garbage collector for internal purposes.
  */
-API_EXPORT void
+void
 memtx_tx_story_gc_step(void);
 
 #if defined(ENABLE_READ_VIEW)
