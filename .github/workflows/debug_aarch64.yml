@@ -44,9 +44,7 @@ jobs:
   debug_aarch64:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
-    if: github.repository_owner == 'tarantool' &&
-        ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+    if: github.repository_owner == 'tarantool'
 
     runs-on: graviton
 
