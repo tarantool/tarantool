@@ -1657,6 +1657,9 @@ memtx_tx_story_gc_step()
 	memtx_tx_story_delete(story);
 }
 
+/**
+ * Run several rounds of story garbage collection process.
+ */
 void
 memtx_tx_story_gc()
 {
@@ -3530,7 +3533,6 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 	for (uint32_t i = 0; i < def->part_count; i++)
 		mp_next(&tmp);
 	size_t key_len = tmp - key;
-	memtx_tx_story_gc();
 	point_hole_storage_new(index, key, key_len, txn);
 }
 
@@ -3665,7 +3667,6 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	} else {
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
-	memtx_tx_story_gc();
 }
 
 /**
@@ -3739,7 +3740,6 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 			invisible_count++;
 	});
 
-	memtx_tx_story_gc();
 	return invisible_count;
 }
 
@@ -3756,7 +3756,6 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
 	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
-	memtx_tx_story_gc();
 }
 
 /**
