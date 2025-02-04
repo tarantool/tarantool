@@ -169,6 +169,20 @@ void
 memtx_tx_acquire_ddl(struct txn *tx);
 
 /**
+ * Implementation of engine_send_to_read_view callback.
+ * Do not use directly.
+ */
+void
+memtx_tx_abort_with_conflict(struct txn *txn);
+
+/**
+ * Implementation of engine_abort_with_conflict callback.
+ * Do not use directly.
+ */
+void
+memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
+
+/**
  * @brief Add a statement to transaction manager's history.
  * Until unlinking or releasing the space could internally contain
  * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.

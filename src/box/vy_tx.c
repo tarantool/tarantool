@@ -352,7 +352,18 @@ vy_tx_destroy(struct vy_tx *tx)
 
 /** Mark a transaction as aborted and account it in stats. */
 static void
-vy_tx_abort(struct vy_tx *tx)
+vy_tx_abort_with_conflict(struct vy_tx *tx)
+{
+	if (tx->txn != NULL) {
+		txn_abort_with_conflict(tx->txn);
+	} else {
+		/* Read-only autocommit statement. */
+		vy_tx_abort_with_conflict_impl(tx);
+	}
+}
+
+void
+vy_tx_abort_with_conflict_impl(struct vy_tx *tx)
 {
 	assert(tx->state == VINYL_TX_READY);
 	tx->state = VINYL_TX_ABORT;
@@ -377,13 +388,23 @@ void
 vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn)
 {
 	assert(plsn >= MAX_LSN);
+	int64_t psn = plsn - MAX_LSN;
+	if (tx->txn != NULL) {
+		txn_send_to_read_view(tx->txn, psn);
+	} else {
+		/* Read-only autocommit statement. */
+		vy_tx_send_to_read_view_impl(tx, psn);
+	}
+}
+
+void
+vy_tx_send_to_read_view_impl(struct vy_tx *tx, int64_t psn)
+{
 	assert(tx->state == VINYL_TX_READY);
+	assert(vy_tx_is_ro(tx));
+	int64_t plsn = MAX_LSN + psn;
 	if (tx->read_view->vlsn < plsn)
 		return;
-	if (!vy_tx_is_ro(tx)) {
-		vy_tx_abort(tx);
-		return;
-	}
 	struct vy_tx_manager *xm = tx->xm;
 	struct vy_read_view *rv = vy_tx_manager_read_view(xm, plsn);
 	vy_tx_manager_destroy_read_view(xm, tx->read_view);
@@ -407,7 +428,7 @@ vy_tx_send_readers_to_read_view(struct vy_tx *tx, struct txv *v)
 		/* Abort only active TXs */
 		if (abort->state != VINYL_TX_READY)
 			continue;
-		vy_tx_send_to_read_view(abort, INT64_MAX);
+		vy_tx_send_to_read_view(abort, MAX_LSN + tx->txn->psn);
 	}
 }
 
@@ -428,7 +449,7 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 		/* Abort only active TXs */
 		if (abort->state != VINYL_TX_READY)
 			continue;
-		vy_tx_abort(abort);
+		vy_tx_abort_with_conflict(abort);
 	}
 }
 
@@ -590,12 +611,6 @@ int
 vy_tx_prepare(struct vy_tx *tx)
 {
 	struct vy_tx_manager *xm = tx->xm;
-
-	if (tx->state == VINYL_TX_ABORT) {
-		/* Conflict is already accounted - see vy_tx_abort(). */
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
 
 	assert(tx->state == VINYL_TX_READY);
 	tx->state = VINYL_TX_COMMIT;
@@ -799,13 +814,10 @@ vy_tx_rollback(struct vy_tx *tx)
 int
 vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
 {
-	if (tx->state == VINYL_TX_READY && vy_tx_is_in_read_view(tx))
-		vy_tx_abort(tx);
-	if (tx->state == VINYL_TX_ABORT) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
 	assert(tx->state == VINYL_TX_READY);
+	assert(!vy_tx_is_in_read_view(tx));
+	if (vy_tx_check_can_yield(tx) != 0)
+		return -1;
 	*savepoint = stailq_last(&tx->log);
 	return 0;
 }
@@ -1055,20 +1067,7 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 int
 vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 {
-	if (vy_tx_is_in_read_view(tx)) {
-		/*
-		 * If a conflict occurs while the first DML statement in
-		 * a transaction is waiting for a disk read to check key
-		 * uniqueness, the transaction will not be aborted by
-		 * vy_tx_send_to_read_view, because technically it is still
-		 * read-only. So in addition to vy_tx_begin_statement we
-		 * need to abort transactions sent to read view when we
-		 * add a new statement to the write set.
-		 */
-		assert(vy_tx_is_ro(tx));
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
+	assert(!vy_tx_is_in_read_view(tx));
 	struct vy_entry entry;
 	vy_stmt_foreach_entry(entry, stmt, lsm->cmp_def) {
 		if (vy_tx_set_entry(tx, lsm, entry) != 0)
@@ -1100,7 +1099,7 @@ vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
 			if (stmt->space == space) {
-				vy_tx_abort(tx);
+				vy_tx_abort_with_conflict(tx);
 				break;
 			}
 		}
@@ -1117,7 +1116,7 @@ vy_tx_manager_abort_writers_for_ro(struct engine *engine)
 			continue;
 		/* Applier ignores ro flag. */
 		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
-			vy_tx_abort(tx);
+			vy_tx_abort_with_conflict(tx);
 	}
 }
 

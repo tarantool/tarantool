@@ -219,6 +219,25 @@ vy_tx_is_prepared_ok(struct vy_tx *tx)
 	}
 }
 
+/** Check if the transaction is allowed to yield. */
+static inline int
+vy_tx_check_can_yield(struct vy_tx *tx)
+{
+	/*
+	 * Any vinyl statement can yield (to read disk or wait for quota).
+	 * If yields are disallowed in this transaction, it would result
+	 * in rolling back the current statement while it's being executed,
+	 * which is not expected by the transaction manager.
+	 */
+	if (tx->txn != NULL && !txn_has_flag(tx->txn, TXN_CAN_YIELD)) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "executing a statement in a transaction "
+			 "that is not allowed to yield");
+		return -1;
+	}
+	return 0;
+}
+
 /** Transaction manager object. */
 struct vy_tx_manager {
 	/**
@@ -424,6 +443,20 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
  */
 void
 vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn);
+
+/**
+ * Implementation of engine_send_to_read_view callback.
+ * Do not use directly.
+ */
+void
+vy_tx_send_to_read_view_impl(struct vy_tx *tx, int64_t psn);
+
+/**
+ * Implementation of engine_abort_with_conflict callback.
+ * Do not use directly.
+ */
+void
+vy_tx_abort_with_conflict_impl(struct vy_tx *tx);
 
 /**
  * Iterator over the write set of a transaction.

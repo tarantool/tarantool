@@ -345,6 +345,24 @@ generic_engine_rollback(struct engine *engine, struct txn *txn)
 }
 
 void
+generic_engine_send_to_read_view(struct engine *engine, struct txn *txn,
+				 int64_t psn)
+{
+	(void)engine;
+	(void)txn;
+	(void)psn;
+	unreachable();
+}
+
+void
+generic_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+	unreachable();
+}
+
+void
 generic_engine_switch_to_ro(struct engine *engine)
 {
 	(void)engine;
