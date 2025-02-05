@@ -1,11 +1,21 @@
 #include "m-dict.h"
 
+static inline bool oor_equal_p(void *k, int n)
+{
+  return k == (NULL + n);
+}
+
+static inline void *oor_set(int n)
+{
+  return NULL + n;
+}
+
 static inline size_t tuple_ptr_hash(void *n)
 {
   return (uintptr_t)n >> 3;
 }
 
-DICT_DEF2(m_dict_ptrptr, void *, M_OPEXTEND(M_PTR_OPLIST, HASH(tuple_ptr_hash)), void *, M_PTR_OPLIST)
+DICT_OA_DEF2(m_dict_ptrptr, void *, M_OPEXTEND(M_PTR_OPLIST, OOR_EQUAL(oor_equal_p), OOR_SET(API_4(oor_set)), HASH(tuple_ptr_hash)), void *, M_PTR_OPLIST)
 
 void *
 ht_ptrptr_new() {
