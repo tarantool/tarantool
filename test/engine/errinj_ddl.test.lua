@@ -17,9 +17,10 @@ pad = string.rep('x', 16)
 for i = 101, 200 do s:replace{i, pad} end
 
 ch = fiber.channel(1)
+ch1 = fiber.channel(1)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
-    fiber.sleep(0.01)
+    ch1:get()
     for i = 1, 100 do
         s:replace{i, box.NULL}
     end
@@ -30,6 +31,7 @@ test_run:cmd("setopt delimiter ''");
 
 format[2].is_nullable = false
 errinj.set("ERRINJ_CHECK_FORMAT_DELAY", true)
+ch1:put(true)
 s:format(format) -- must fail
 ch:get()
 
@@ -116,9 +118,10 @@ pad = string.rep('x', 16)
 for i = 101, 200 do s:replace{i, i, pad} end
 
 ch = fiber.channel(1)
+ch1 = fiber.channel(1)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
-    fiber.sleep(0.01)
+    ch1:get()
     for i = 1, 100 do
         s:replace{i}
     end
@@ -128,6 +131,7 @@ end);
 test_run:cmd("setopt delimiter ''");
 
 errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
+ch1:put(true)
 s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
 
 ch:get()
@@ -146,9 +150,10 @@ pad = string.rep('x', 16)
 for i = 101, 200 do s:replace{i, i, pad} end
 
 ch = fiber.channel(1)
+ch1 = fiber.channel(1)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
-    fiber.sleep(0.01)
+    ch1:get()
     for i = 1, 100 do
         s:replace{i, i + 1}
     end
@@ -158,6 +163,7 @@ end);
 test_run:cmd("setopt delimiter ''");
 
 errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
+ch1:put(true)
 ok, err = pcall(s.create_index, s, 'sk', {parts = {2, 'unsigned'}})
 assert(not ok)
 assert(tostring(err):find('Duplicate key') ~= nil)
