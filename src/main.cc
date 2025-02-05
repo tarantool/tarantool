@@ -561,6 +561,9 @@ tarantool_free(void)
 	box_lua_free();
 	/* Lua may have reference to engine tuples. */
 	tarantool_lua_free();
+	/* Free and disable memtx tx manager first - box shouldn't use it. */
+	memtx_tx_manager_free();
+	memtx_tx_manager_use_mvcc_engine = false;
 	box_free();
 
 	title_free(main_argc, main_argv);
@@ -587,7 +590,6 @@ tarantool_free(void)
 #endif
 	event_free();
 	ssl_free();
-	memtx_tx_manager_free();
 	coll_free();
 	systemd_free();
 	say_logger_free();
