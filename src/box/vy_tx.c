@@ -322,7 +322,7 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
-	tx->write_size = 0;
+	tx->quota_reserved = 0;
 	tx->xm = xm;
 	tx->txn = NULL;
 	tx->state = VINYL_TX_READY;
@@ -997,8 +997,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 
 	if (old != NULL) {
 		/* Leave the old txv in TX log but remove it from write set */
-		assert(tx->write_size >= tuple_size(old->entry.stmt));
-		tx->write_size -= tuple_size(old->entry.stmt);
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
 		v->is_first_insert = old->is_first_insert;
@@ -1050,7 +1048,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
-	tx->write_size += tuple_size(entry.stmt);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);
 	return 0;
 }

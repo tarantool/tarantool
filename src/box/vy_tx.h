@@ -163,10 +163,12 @@ struct vy_tx {
 	 */
 	uint32_t write_set_version;
 	/**
-	 * Total size of memory occupied by statements of
-	 * the write set.
+	 * Size of memory quota reserved for this transaction.
+	 * Doesn't have to be equal to the size of memory that
+	 * will actually be consumed when the transaction is
+	 * committed.
 	 */
-	size_t write_size;
+	size_t quota_reserved;
 	/** Current state of the transaction.*/
 	enum tx_state state;
 	/** Set if the transaction was started by an applier. */
