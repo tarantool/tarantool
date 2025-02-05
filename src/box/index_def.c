@@ -164,21 +164,21 @@ index_def_delete(struct index_def *index_def)
 	free(index_def);
 }
 
-int
-index_def_cmp(const struct index_def *key1, const struct index_def *key2)
+bool
+index_def_is_equal(const struct index_def *def1, const struct index_def *def2)
 {
-	assert(key1->space_id == key2->space_id);
-	if (key1->iid != key2->iid)
-		return key1->iid < key2->iid ? -1 : 1;
-	if (strcmp(key1->name, key2->name))
-		return strcmp(key1->name, key2->name);
-	if (key1->type != key2->type)
-		return (int) key1->type < (int) key2->type ? -1 : 1;
-	if (index_opts_cmp(&key1->opts, &key2->opts))
-		return index_opts_cmp(&key1->opts, &key2->opts);
-
-	return key_part_cmp(key1->key_def->parts, key1->key_def->part_count,
-			    key2->key_def->parts, key2->key_def->part_count);
+	assert(def1->space_id == def2->space_id);
+	if (def1->iid != def2->iid)
+		return false;
+	if (strcmp(def1->name, def2->name) != 0)
+		return false;
+	if (def1->type != def2->type)
+		return false;
+	if (!index_opts_is_equal(&def1->opts, &def2->opts))
+		return false;
+	return key_part_cmp(
+			def1->key_def->parts, def1->key_def->part_count,
+			def2->key_def->parts, def2->key_def->part_count) == 0;
 }
 
 struct key_def **
