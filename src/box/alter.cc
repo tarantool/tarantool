@@ -401,7 +401,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		return NULL;
 	/*
 	 * Set opts.hint to the unambiguous ON or OFF value. This
-	 * allows to compare opts.hint like in index_opts_cmp()
+	 * allows to compare opts.hint like in index_opts_is_equal()
 	 * or memtx_index_def_change_requires_rebuild().
 	 */
 	if (index_def->opts.hint == INDEX_HINT_DEFAULT) {
@@ -2673,7 +2673,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 					     alter->new_min_field_count);
 		if (alter_space_move_indexes(alter, 0, iid))
 			return -1;
-		if (index_def_cmp(index_def, old_index->def) == 0) {
+		if (index_def_is_equal(index_def, old_index->def)) {
 			/* Index is not changed so just move it. */
 			try {
 				(void) new MoveIndex(alter, old_index->def->iid);
