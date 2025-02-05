@@ -2368,6 +2368,41 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	return rc;
 }
 
+/** Reserves memory quota for a transaction statement. May yield. */
+static int
+vy_reserve(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt)
+{
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
+	size_t size = 0;
+	if (stmt->old_tuple != NULL)
+		size += tuple_size(stmt->old_tuple);
+	if (stmt->new_tuple != NULL)
+		size += tuple_size(stmt->new_tuple);
+	/*
+	 * Do not abort join/subscribe on quota timeout - replication is
+	 * asynchronous anyway and there's box.info.replication available
+	 * for the admin to track the lag so let the applier wait as long
+	 * as necessary for memory dump to complete.
+	 */
+	double timeout = (tx->is_applier_session ?
+			  TIMEOUT_INFINITY : env->timeout);
+	if (vy_quota_use(&env->quota, VY_QUOTA_CONSUMER_TX, size, timeout) != 0)
+		return -1;
+	tx->quota_reserved += size;
+	if (tx->state == VINYL_TX_ABORT) {
+		/*
+		 * The transaction was aborted while we were waiting for quota.
+		 * We must not proceed because the target space could have been
+		 * dropped, in which case an attempt to commit this statement
+		 * would result in a use-after-free bug while trying to access
+		 * the stale space pointer.
+		 */
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+	return 0;
+}
+
 static int
 vinyl_space_execute_replace(struct space *space, struct txn *txn,
 			    struct request *request, struct tuple **result)
@@ -2383,6 +2418,8 @@ vinyl_space_execute_replace(struct space *space, struct txn *txn,
 		rc = vy_replace(env, tx, stmt, space, request);
 	if (rc != 0)
 		return -1;
+	if (vy_reserve(env, tx, stmt) != 0)
+		return -1;
 	*result = stmt->new_tuple;
 	return 0;
 }
@@ -2395,6 +2432,8 @@ vinyl_space_execute_delete(struct space *space, struct txn *txn,
 	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_delete(env, tx, stmt, space, request))
+		return -1;
+	if (vy_reserve(env, tx, stmt) != 0)
 		return -1;
 	/*
 	 * Delete may or may not set stmt->old_tuple,
@@ -2413,6 +2452,8 @@ vinyl_space_execute_update(struct space *space, struct txn *txn,
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (vy_update(env, tx, stmt, space, request) != 0)
 		return -1;
+	if (vy_reserve(env, tx, stmt) != 0)
+		return -1;
 	*result = stmt->new_tuple;
 	return 0;
 }
@@ -2424,7 +2465,11 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 	struct vy_env *env = vy_env(space->engine);
 	struct vy_tx *tx = txn->engines_tx[space->engine->id];
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	return vy_upsert(env, tx, stmt, space, request);
+	if (vy_upsert(env, tx, stmt, space, request) != 0)
+		return -1;
+	if (vy_reserve(env, tx, stmt) != 0)
+		return -1;
+	return 0;
 }
 
 static int
@@ -2443,26 +2488,7 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	assert(tx != NULL);
 
-	if (tx->write_size > 0 &&
-	    vinyl_check_wal(env, "DML") != 0)
-		return -1;
-
-	/*
-	 * Do not abort join/subscribe on quota timeout - replication
-	 * is asynchronous anyway and there's box.info.replication
-	 * available for the admin to track the lag so let the applier
-	 * wait as long as necessary for memory dump to complete.
-	 */
-	double timeout = (tx->is_applier_session ?
-			  TIMEOUT_INFINITY : env->timeout);
-	/*
-	 * Reserve quota needed by the transaction before allocating
-	 * memory. Since this may yield, which opens a time window for
-	 * the transaction to be sent to read view or aborted, we call
-	 * it before checking for conflicts.
-	 */
-	if (vy_quota_use(&env->quota, VY_QUOTA_CONSUMER_TX,
-			 tx->write_size, timeout) != 0)
+	if (!stailq_empty(&tx->log) && vinyl_check_wal(env, "DML") != 0)
 		return -1;
 
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
@@ -2472,7 +2498,8 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	vy_quota_adjust(&env->quota, VY_QUOTA_CONSUMER_TX,
-			tx->write_size, mem_used_after - mem_used_before);
+			tx->quota_reserved, mem_used_after - mem_used_before);
+	tx->quota_reserved = 0;
 	vy_regulator_check_dump_watermark(&env->regulator);
 	return rc;
 }
@@ -2507,10 +2534,12 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 static void
 vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 {
+	struct vy_env *env = vy_env(engine);
 	struct vy_tx *tx = txn->engines_tx[engine->id];
 	if (tx == NULL)
 		return;
 
+	vy_quota_release(&env->quota, tx->quota_reserved);
 	vy_tx_rollback(tx);
 
 	txn->engines_tx[engine->id] = NULL;
