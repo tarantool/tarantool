@@ -478,11 +478,44 @@ wal_open_f(struct cbus_call_msg *msg)
 	const char *path = xdir_format_filename(&writer->wal_dir,
 				vclock_sum(&writer->vclock), NONE);
 	assert(!xlog_is_open(&writer->current_wal));
+
+	uint64_t sum_already_on_disk = 0;
+	for (struct vclock *vclock = vclockset_first(&writer->wal_dir.index);
+	     vclock != NULL;
+	     vclock = vclockset_next(&writer->wal_dir.index, vclock)) {
+		if (vclock_compare(&writer->checkpoint_vclock, vclock) >= 0)
+			continue;
+		const char *name = xdir_format_filename(&writer->wal_dir,
+							vclock_sum(vclock),
+							NONE);
+		struct stat attr;
+		if (stat(name, &attr) == -1) {
+			diag_set(SystemError,
+				 "failed to get file size %s",
+				 name);
+			return -1;
+		}
+		uint64_t wal_size = (uint64_t)attr.st_size;
+		sum_already_on_disk += wal_size;
+	}
+	writer->checkpoint_wal_size += sum_already_on_disk;
+	if (!writer->checkpoint_triggered &&
+	    writer->checkpoint_wal_size > writer->checkpoint_threshold) {
+		static struct cmsg_hop route[] = {
+			{ tx_notify_checkpoint, NULL },
+		};
+		struct cmsg *msg = xmalloc(sizeof(*msg));
+		cmsg_init(msg, route);
+		cpipe_push(&writer->tx_prio_pipe, msg);
+		writer->checkpoint_triggered = true;
+	}
+
 	return xlog_open(&writer->current_wal, path, &writer->wal_dir.opts);
 }
 
 /**
- * Try to open the current WAL file for appending if it exists.
+ * Try to open the current WAL file for appending if it exists
+ * and scan writer->wal_dir to set writer->checkpoint_wal_size.
  */
 static int
 wal_open(struct wal_writer *writer)
@@ -579,7 +612,10 @@ wal_enable(void)
 	if (xdir_scan(&writer->wal_dir, true))
 		return -1;
 
-	/* Open the most recent WAL file. */
+	/*
+	 * Open the most recent WAL file and set
+	 * writer->checkpoint_wal_size.
+	 */
 	if (wal_open(writer) != 0)
 		return -1;
 
