@@ -6195,9 +6195,14 @@ box_storage_init(void)
 		cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	double wal_retention_period = box_check_wal_retention_period_xc();
+	struct vclock *checkpoint_vclock = NULL;
+	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
+	if (last_checkpoint != NULL)
+		checkpoint_vclock = &last_checkpoint->vclock;
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
 		     wal_retention_period, &INSTANCE_UUID,
-		     &instance_vclock_storage, on_wal_garbage_collection,
+		     &instance_vclock_storage, checkpoint_vclock,
+		     on_wal_garbage_collection,
 		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
 	}
