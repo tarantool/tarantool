@@ -45,7 +45,7 @@ g.after_each(function(cg)
     end)
 end)
 
-g.test_master_synchro_queue_limited = function(cg)
+local function test_master_synchro_queue_limited(cg)
     cg.master:exec(function()
         box.cfg{ replication_synchro_quorum = 2, }
         rawset(_G, "f", require('fiber')
@@ -65,6 +65,8 @@ g.test_master_synchro_queue_limited = function(cg)
         t.assert(ok)
     end, {wait_timeout})
 end
+
+g.test_master_synchro_queue_limited = test_master_synchro_queue_limited
 
 g.test_max_size_update_dynamically = function(cg)
     cg.master:exec(function()
@@ -134,7 +136,15 @@ g.test_recovery_with_small_max_size = function(cg)
         box.ctl.promote()
         t.assert_equals(box.space.test:len(), 1000)
         box.cfg{replication_synchro_timeout = 100000}
+        -- wait = 'complete' by default, so after truncate completes,
+        -- the synchronous queue is guaranteed to be empty
+        box.space.test:truncate()
+        t.assert_equals(box.info.synchro.queue.len, 0)
     end)
+    -- synchro queue is empty now, 'test' space truncated,
+    -- so all invariants for test_master_synchro_queue_limited
+    -- are satisfied
+    test_master_synchro_queue_limited(cg)
 end
 
 g.test_size_is_updated_correctly_after_commit = function(cg)
