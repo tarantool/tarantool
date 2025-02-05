@@ -343,6 +343,12 @@ memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    struct tuple *until, hint_t until_hint);
 
 /**
+ * Destroy and free any kind of gap item.
+ */
+static void
+memtx_tx_delete_gap(struct gap_item_base *item);
+
+/**
  * Helper structure for searching for point_hole_item in the hash table,
  * @sa point_hole_item_pool.
  */
@@ -1226,11 +1232,13 @@ memtx_tx_story_reorder(struct memtx_story *story,
 }
 
 /**
- * Unlink @a story from all chains, must be already removed from the index.
+ * Fully unlinks @a story - unlinks it from all story chains, unlinks
+ * all transaction statements and deletes all associated trackers.
  */
 static void
 memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 {
+	/* Unlink from all story chains. */
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
@@ -1245,6 +1253,38 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 			link->older_story = NULL;
 			link->newer_story = NULL;
 		}
+	}
+
+	/* Unlink all transaction statements. */
+	if (story->add_stmt != NULL)
+		memtx_tx_story_unlink_added_by(story, story->add_stmt);
+	while (story->del_stmt != NULL)
+		memtx_tx_story_unlink_deleted_by(story, story->del_stmt);
+	/*
+	 * Unlink and delete all gaps since they belong to the story that
+	 * is going to be deleted.
+	 */
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		struct rlist *read_gaps = &story->link[i].read_gaps;
+		while (!rlist_empty(&story->link[i].read_gaps)) {
+			struct gap_item_base *item =
+				rlist_first_entry(read_gaps,
+						  struct gap_item_base,
+						  in_read_gaps);
+			memtx_tx_delete_gap(item);
+		}
+	}
+	/*
+	 * Remove all read trackers since they point to the story that
+	 * is going to be deleted.
+	 */
+	while (!rlist_empty(&story->reader_list)) {
+		struct tx_read_tracker *tracker =
+			rlist_first_entry(&story->reader_list,
+					  struct tx_read_tracker,
+					  in_reader_list);
+		rlist_del(&tracker->in_reader_list);
+		rlist_del(&tracker->in_read_set);
 	}
 }
 
@@ -1264,6 +1304,10 @@ memtx_tx_story_find_top(struct memtx_story *story, uint32_t ind)
  * indexes if necessary: used in garbage collection step and preserves the top
  * of the history chain invariant (as opposed to
  * `memtx_tx_story_full_unlink_on_space_delete`).
+ *
+ * Note that it doesn't unlink transaction statements and trackers - they
+ * are expected to be absent, otherwise garbage collector wouldn't unlink
+ * the story.
  */
 static void
 memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
@@ -2891,9 +2935,6 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
 	return visible != NULL;
 }
 
-/**
- * Destroy and free any kind of gap item.
- */
 static void
 memtx_tx_delete_gap(struct gap_item_base *item)
 {
@@ -3061,34 +3102,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 		story = rlist_first_entry(&space->memtx_stories,
 					  struct memtx_story,
 					  in_space_stories);
-		if (story->add_stmt != NULL)
-			memtx_tx_story_unlink_added_by(story, story->add_stmt);
-		while (story->del_stmt != NULL)
-			memtx_tx_story_unlink_deleted_by(story,
-							 story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
-		for (uint32_t i = 0; i < story->index_count; i++) {
-			struct rlist *read_gaps = &story->link[i].read_gaps;
-			while (!rlist_empty(&story->link[i].read_gaps)) {
-				struct gap_item_base *item =
-					rlist_first_entry(read_gaps,
-							  struct gap_item_base,
-							  in_read_gaps);
-				memtx_tx_delete_gap(item);
-			}
-		}
-		/*
-		 * Remove all read trackers since they point to the story that
-		 * is going to be deleted.
-		 */
-		while (!rlist_empty(&story->reader_list)) {
-			struct tx_read_tracker *tracker =
-				rlist_first_entry(&story->reader_list,
-						  struct tx_read_tracker,
-						  in_reader_list);
-			rlist_del(&tracker->in_reader_list);
-			rlist_del(&tracker->in_read_set);
-		}
 		memtx_tx_story_delete(story);
 	}
 
