@@ -45,6 +45,7 @@
 #include "tt_sort.h"
 #include "assoc.h"
 #include <small/mempool.h>
+#include "mlib.h"
 
 /**
  * Struct that is used as a key in BPS tree definition.
@@ -2047,8 +2048,8 @@ memtx_tree_index_begin_build(struct index *base)
 			fseek(base->sort_data_file, 0, SEEK_END);
 			size_t tuple_count = ftell(base->sort_data_file) / sizeof(struct tuple *);
 			rewind(base->sort_data_file);
-			base->old2new = mh_ptrptr_new();
-			mh_ptrptr_reserve((struct mh_ptrptr_t *)base->old2new, tuple_count, NULL);
+			base->old2new = ht_ptrptr_new();
+			ht_ptrptr_reserve(base->old2new, tuple_count);
 		}
 	}
 }
@@ -2124,11 +2125,10 @@ memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 
 	/* The old2new tuple address map. */
 	if (base->old2new != NULL) {
-		struct mh_ptrptr_node_t node;
-		if (fread(&node.key, sizeof(node.key), 1, base->sort_data_file) != 1)
+		void *key;
+		if (fread(&key, sizeof(key), 1, base->sort_data_file) != 1)
 			panic("Expected yet another tuple in the sort data.");
-		node.val = tuple;
-		mh_ptrptr_put((struct mh_ptrptr_t *)base->old2new, &node, NULL, NULL);
+		ht_ptrptr_put(base->old2new, key, tuple);
 	}
 
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
@@ -2275,10 +2275,8 @@ memtx_tree_index_end_build(struct index *base)
 
 template <bool USE_HINT>
 static void
-memtx_tree_index_build_presorted(struct index *base, void *arg)
+memtx_tree_index_build_presorted(struct index *base, void *old2new)
 {
-	struct mh_ptrptr_t *old2new = (struct mh_ptrptr_t *)arg;
-
 	/* Check if can use the sort data. */
 	const char *sort_data_path = tt_sprintf("%u_%u.bin", base->def->space_id, base->def->iid);
 	FILE *fp = fopen(sort_data_path, "rb");
@@ -2299,13 +2297,14 @@ memtx_tree_index_build_presorted(struct index *base, void *arg)
 	index->build_array = (struct memtx_tree_data<USE_HINT> *)xmalloc(index->build_array_alloc_size);
 	index->build_array_size = index->build_array_alloc_size / sizeof(struct memtx_tree_data<USE_HINT>);
 	rewind(fp);
-	fread(index->build_array, index->build_array_alloc_size, 1, fp);
+	if (fread(index->build_array, index->build_array_alloc_size, 1, fp) != 1)
+		panic("Didn't read the whole sort data file.");
 	fclose(fp);
 
 	/* Fix the tuple pointers. */
 	for (size_t i = 0; i < index->build_array_size; i++) {
 		void *old_ptr = index->build_array[i].tuple;
-		void *new_ptr = mh_ptrptr_node(old2new, mh_ptrptr_find(old2new, old_ptr, NULL))->val;
+		void *new_ptr = ht_ptrptr_get(old2new, old_ptr);
 		index->build_array[i].tuple = (struct tuple *)new_ptr;
 	}
 

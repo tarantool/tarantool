@@ -67,3 +67,6 @@
 [submodule "third_party/arrow/nanoarrow"]
 	path = third_party/arrow/nanoarrow
 	url = https://github.com/apache/arrow-nanoarrow.git
+[submodule "third_party/mlib"]
+	path = third_party/mlib
+	url = https://github.com/P-p-H-d/mlib
