@@ -5711,6 +5711,9 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		diag_raise();
 
 	engine_end_recovery_xc();
+	if (box_set_replication_synchro_queue_max_size() != 0)
+		diag_raise();
+
 	if (check_global_ids_integrity() != 0)
 		diag_raise();
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
