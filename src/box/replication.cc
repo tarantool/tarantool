@@ -1158,6 +1158,22 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			struct applier **appliers, int count,
 			bool wait_all)
 {
+	/* Update connected and failed counters. */
+	state->connected = 0;
+	state->booting = 0;
+	state->failed = 0;
+	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		if (applier->state == APPLIER_CONNECTED) {
+			state->connected++;
+			if (!applier->ballot.is_booted)
+				state->booting++;
+		} else if (applier->state == APPLIER_STOPPED ||
+				   applier->state == APPLIER_OFF) {
+			state->failed++;
+		}
+	}
+
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
 		/*
@@ -1177,23 +1193,10 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			return true;
 		}
 	}
-	/* Update connected and failed counters. */
-	state->connected = 0;
-	state->booting = 0;
-	state->failed = 0;
-	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
-		if (applier->state == APPLIER_CONNECTED) {
-			state->connected++;
-			if (!applier->ballot.is_booted)
-				state->booting++;
-		} else if (applier->state == APPLIER_STOPPED ||
-			   applier->state == APPLIER_OFF) {
-			state->failed++;
-		}
-	}
+
 	if (state->connected == count)
 		return true;
+
 	/*
 	 * After a quorum is reached, it is considered enough to proceed. Except
 	 * if a connection is critical. Connection *is* critical even with 0
