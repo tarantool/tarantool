@@ -52,6 +52,8 @@ const struct index_opts index_opts_default = {
 	/* .lsn                 = */ 0,
 	/* .func                = */ 0,
 	/* .hint                = */ INDEX_HINT_DEFAULT,
+	/* .covered_fields      = */ NULL,
+	/* .covered_field_count = */ 0,
 };
 
 /**
@@ -75,6 +77,42 @@ index_opts_parse_hint(const char **data, void *opts, struct region *region)
 	return 0;
 }
 
+/**
+ * Parse index covers options given as MsgPack in `data' into `opts'. Covered
+ * fields array is allocated on `region'.
+ */
+static int
+index_opts_parse_covered_fields(const char **data, void *opts,
+				struct region *region)
+{
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	if (mp_typeof(**data) != MP_ARRAY) {
+		diag_set(IllegalParams, "'covers' must be array");
+		return -1;
+	}
+	index_opts->covered_field_count = mp_decode_array(data);
+	if (index_opts->covered_field_count != 0)
+		index_opts->covered_fields =
+			xregion_alloc_array(region,
+					    typeof(*index_opts->covered_fields),
+					    index_opts->covered_field_count);
+	for (uint32_t i = 0; i < index_opts->covered_field_count; i++) {
+		if (mp_typeof(**data) != MP_UINT) {
+			diag_set(IllegalParams,
+				 "'covers' elements must be unsigned");
+			return -1;
+		}
+		uint64_t fieldno = mp_decode_uint(data);
+		if (fieldno > UINT32_MAX) {
+			diag_set(IllegalParams,
+				 "'covers' elements must be unsigned");
+			return -1;
+		}
+		index_opts->covered_fields[i] = fieldno;
+	}
+	return 0;
+}
+
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
@@ -89,8 +127,41 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("func", OPT_UINT32, struct index_opts, func_id),
 	OPT_DEF_LEGACY("sql"),
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
+	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
 	OPT_END,
 };
+
+/**
+ * Normalize index options:
+ *
+ * - remove implicitly covered fields.
+ * - sort covered fields in ascending order.
+ *
+ * The implicitly covered fields are the fields of index key and pk index key.
+ *
+ * The result is allocated with malloc.
+ */
+static void
+index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
+{
+	if (opts->covered_field_count == 0)
+		return;
+	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
+	uint32_t j = 0;
+	for (uint32_t i = 0; i < opts->covered_field_count; i++) {
+		if (key_def_find_by_fieldno(
+				cmp_def, opts->covered_fields[i]) == NULL)
+			fields[j++] = opts->covered_fields[i];
+	}
+	qsort(fields, j, sizeof(*fields), cmp_u32);
+	opts->covered_field_count = j;
+	if (opts->covered_field_count != 0) {
+		opts->covered_fields = fields;
+	} else {
+		opts->covered_fields = NULL;
+		free(fields);
+	}
+}
 
 struct index_def *
 index_def_new(uint32_t space_id, uint32_t iid, const char *name,
@@ -124,7 +195,24 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
+	index_opts_normalize(&def->opts, def->cmp_def);
 	return def;
+}
+
+/** Duplicate index options. */
+static void
+index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
+{
+	*dup = *opts;
+	if (dup->covered_fields != NULL) {
+		uint32_t *fields = dup->covered_fields;
+		dup->covered_fields =
+			xmalloc(dup->covered_field_count *
+				sizeof(*dup->covered_fields));
+		memcpy(dup->covered_fields, fields,
+		       dup->covered_field_count *
+		       sizeof(*dup->covered_fields));
+	}
 }
 
 struct index_def *
@@ -140,13 +228,14 @@ index_def_dup(const struct index_def *def)
 	dup->cmp_def = key_def_dup(def->cmp_def);
 	dup->pk_def = key_def_dup(def->pk_def);
 	rlist_create(&dup->link);
-	dup->opts = def->opts;
+	index_opts_dup(&def->opts, &dup->opts);
 	return dup;
 }
 
 void
 index_def_delete(struct index_def *index_def)
 {
+	free(index_def->opts.covered_fields);
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
 	free(index_def->space_name);
