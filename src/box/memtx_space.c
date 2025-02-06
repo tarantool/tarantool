@@ -888,6 +888,23 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "'layout' option");
 		return -1;
 	}
+
+	/* Checks for memtx MVCC unsupported features. */
+	if (memtx_tx_manager_use_mvcc_engine) {
+		if (key_def->is_multikey) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Memtx MVCC engine", "multikey indexes");
+			return -1;
+		}
+		/*
+		 * Also, functional multikey indexes are not supported,
+		 * corresponding check can be found in a routine checking
+		 * functions for functional indexes - we can't do the check
+		 * here, see descriptions of `key_def::is_multikey` and
+		 * `key_def::func_index_func` for details.
+		 */
+	}
+
 	return 0;
 }
 
