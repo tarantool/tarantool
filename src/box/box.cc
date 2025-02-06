@@ -2069,11 +2069,10 @@ box_set_election_fencing_mode(void)
 }
 
 /*
- * Sync box.cfg.replication with the cluster registry, but
- * don't start appliers.
+ * Sync box.cfg.replication with the cluster registry.
  */
 static void
-box_sync_replication(bool do_quorum, bool do_reuse)
+box_sync_replication(bool demand_quorum, bool keep_connect, bool wait_all)
 {
 	struct uri_set uri_set;
 	int rc = cfg_get_uri_set("replication", &uri_set);
@@ -2082,15 +2081,16 @@ box_sync_replication(bool do_quorum, bool do_reuse)
 	auto uri_set_guard = make_scoped_guard([&]{
 		uri_set_destroy(&uri_set);
 	});
-	replicaset_connect(&uri_set, do_quorum, do_reuse);
+	replicaset_connect(&uri_set, demand_quorum, keep_connect, wait_all);
 }
 
 static inline void
 box_restart_replication(void)
 {
-	const bool do_quorum = true;
-	const bool do_reuse = false;
-	box_sync_replication(do_quorum, do_reuse);
+	const bool demand_quorum = true;
+	const bool keep_connect = false;
+	const bool wait_all = true;
+	box_sync_replication(demand_quorum, keep_connect, wait_all);
 }
 
 static inline void
@@ -2102,9 +2102,11 @@ box_update_replication(void)
 	 * In every other mode, try to connect to everyone during the given time
 	 * period, but do not fail even if no connections were established.
 	 */
-	const bool do_quorum = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
-	const bool do_reuse = true;
-	box_sync_replication(do_quorum, do_reuse);
+	const bool demand_quorum =
+		bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
+	const bool keep_connect = true;
+	const bool wait_all = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
+	box_sync_replication(demand_quorum, keep_connect, wait_all);
 }
 
 void
