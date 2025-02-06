@@ -56,6 +56,7 @@ g.test_metrics = function()
         end
         m._VERSION = "0.16.0"
         package.loaded["metrics"] = m
+        local start = fiber.time()
         fiber.sleep(0.5)
         local daemon = box.internal.feedback_daemon
         local fb = daemon.generate_feedback()
@@ -66,7 +67,9 @@ g.test_metrics = function()
         -- timings, which is nearly impossible in the general case, when many
         -- processes performs its own workloads in parallel.
         t.assert_gt(#fb.metrics, 0)
-        t.assert_lt(#fb.metrics, 60)
+        local elapsed = fiber.time() - start
+        t.assert_lt(#fb.metrics,
+                    1.1 * elapsed / box.cfg.feedback_metrics_collect_interval)
 
         fb = daemon.generate_feedback()
         -- Check is metrics were reset. Fiber yields on feedback generation, so
@@ -95,8 +98,10 @@ g.test_metrics_no_collect = function()
         local m = {}
         m._VERSION = "0.16.0"
         package.loaded["metrics"] = m
-        fiber.sleep(0.1)
         local daemon = box.internal.feedback_daemon
+        -- Dump leftover metrics from previous tests, if any.
+        daemon.generate_feedback()
+        fiber.sleep(0.1)
         local fb = daemon.generate_feedback()
         t.assert_equals(fb.metrics, nil)
     end)
