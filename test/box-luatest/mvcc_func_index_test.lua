@@ -249,3 +249,33 @@ g.test_one_func_call_per_replace = function(cg)
         end
     end)
 end
+
+-- The case covers an assertion failure when MVCC deleted a tuple from func
+-- index and checked result of the deletion but the index didn't set the result.
+g.test_crash_on_deletion = function(cg)
+    cg.server:exec(function()
+        local mvcc_clear_stories = rawget(_G, 'mvcc_clear_stories')
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[1]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        -- A bunch of simple replaces and deletions.
+        for i = 1, 10 do
+            s:replace{i}
+            s:delete{i}
+        end
+        -- Clear all stories to check if they were deleted successfully.
+        mvcc_clear_stories()
+    end)
+end
