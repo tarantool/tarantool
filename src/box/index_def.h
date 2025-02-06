@@ -109,6 +109,17 @@ struct index_opts {
 	 * Use hint optimization for tree index.
 	 */
 	enum index_hint_cfg hint;
+	/**
+	 * Engine dependent. For engines supporting covering indexes means
+	 * explicitly covered fields. That is fields other then fields of
+	 * index key and primary index key. The latter fields are always
+	 * covered. Sorted in ascending order.
+	 */
+	uint32_t *covered_fields;
+	/**
+	 * Number of covered fields.
+	 */
+	uint32_t covered_field_count;
 };
 
 extern const struct index_opts index_opts_default;
@@ -155,6 +166,12 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 		return false;
 	if (o1->hint != o2->hint)
 		return false;
+	if (o1->covered_field_count != o2->covered_field_count)
+		return false;
+	for (uint32_t i = 0; i < o1->covered_field_count; i++) {
+		if (o1->covered_fields[i] != o2->covered_fields[i])
+			return false;
+	}
 	return true;
 }
 
@@ -174,8 +191,8 @@ struct index_def {
 	char *name;
 	/** Index type. */
 	enum index_type type;
+	/** Index options. */
 	struct index_opts opts;
-
 	/** Index key definition. */
 	struct key_def *key_def;
 	/**

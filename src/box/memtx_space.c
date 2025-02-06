@@ -878,6 +878,11 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	/* Only HASH and TREE indexes check parts there. */
 	if (index_def_check_field_types(index_def, space_name(space)) != 0)
 		return -1;
+	if (index_def->opts.covered_field_count != 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "memtx",
+			 "covering index");
+		return -1;
+	}
 	return 0;
 }
 
