@@ -663,16 +663,22 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  *
  * \param uris           remote peer URIs
  * \param timeout        connection timeout
- * \param connect_quorum if this flag is set, fail unless at
- *                       least replication_connect_quorum
- *                       appliers have successfully connected.
- * \param keep_connect   if this flag is set do not force a reconnect if the
+ * \param demand_quorum  whether it should fail in case it can't connect
+ *                       to a quorum.
+ * \param keep_connect   whether it shouldn't force a reconnect if the
  *                       old connection to the replica is fine.
+ * \param wait_all       whether it should wait for all connections to be
+ *                       established for a full replication_connect_timeout,
+ *                       or it may exit as soon as a quorum is gathered. Even
+ *                       if wait_all = true, and during the timeout it failed
+ *                       to connect to everyone, but enough connections were
+ *                       established to gather a quorum, it does not throw
+ *                       anything. More connections are better, but it doesn't
+ *                       matter if you can't connect to everyone.
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Reload replica URIs.
  *
