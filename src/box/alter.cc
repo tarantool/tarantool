@@ -212,19 +212,11 @@ err:
 }
 
 /**
- * Fill index_opts structure from opts field in tuple of space _index
- * Return an error if option is unrecognized.
+ * Validates index options.
  */
 static int
-index_opts_decode(struct index_opts *opts, const char *map,
-		  struct region *region)
+index_opts_validate(struct index_opts *opts)
 {
-	index_opts_create(opts);
-	if (opts_decode(opts, index_opts_reg, &map, region) != 0) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 diag_last_error(diag_get())->errmsg);
-		return -1;
-	}
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 			 "distance must be either 'euclid' or 'manhattan'");
@@ -253,7 +245,59 @@ index_opts_decode(struct index_opts *opts, const char *map,
 			 "less than or equal to 1");
 		return -1;
 	}
-	return 0;
+	int rc = -1;
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	if (opts->covered_field_count != 0) {
+		uint32_t *fields = xregion_alloc_array(
+						gc, typeof(*fields),
+						opts->covered_field_count);
+		memcpy(fields, opts->covered_fields,
+		       opts->covered_field_count * sizeof(*fields));
+		qsort(fields, opts->covered_field_count, sizeof(*fields),
+		      cmp_u32);
+		for (uint32_t i = 0; i < opts->covered_field_count; i++) {
+			if (i > 0 && fields[i] == fields[i - 1]) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 "'covers' has duplicates");
+				goto out;
+			}
+		}
+	}
+	rc = 0;
+out:
+	region_truncate(gc, gc_svp);
+	return rc;
+}
+
+/**
+ * Normalize covered fields:
+ * - remove implicitly covered fields.
+ * - sort fields in ascending order.
+ *
+ * The implicitly covered fields are the fields of index key and pk index key.
+ * The new covered fields array is allocated on fiber region.
+ */
+static void
+index_opts_normalize(struct index_opts *opts, const struct key_def *key_def,
+		     const struct key_def *pk_key_def)
+{
+	/* pk_key_def is NULL for the primary index. */
+	if (pk_key_def == NULL || opts->covered_field_count == 0)
+		return;
+	uint32_t *fields = xregion_alloc_array(&fiber()->gc, typeof(*fields),
+					       opts->covered_field_count);
+	uint32_t j = 0;
+	for (uint32_t i = 0; i < opts->covered_field_count; i++) {
+		if (key_def_find_by_fieldno(
+				key_def, opts->covered_fields[i]) == NULL &&
+		    key_def_find_by_fieldno(
+				pk_key_def, opts->covered_fields[i]) == NULL)
+			fields[j++] = opts->covered_fields[i];
+	}
+	qsort(fields, j, sizeof(*fields), cmp_u32);
+	opts->covered_field_count = j;
+	opts->covered_fields = j != 0 ? fields : NULL;
 }
 
 /** Decode an optional node name field from the tuple. */
@@ -343,8 +387,20 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 BOX_INDEX_FIELD_OPTS, MP_MAP);
 	if (opts_field == NULL)
 		return NULL;
-	if (index_opts_decode(&opts, opts_field, &fiber()->gc) != 0)
+	index_opts_create(&opts);
+	if (opts_decode(&opts, index_opts_reg, &opts_field,
+			&fiber()->gc) != 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
 		return NULL;
+	}
+	if (index_opts_validate(&opts) != 0)
+		return NULL;
+	if (opts.covered_field_count != 0 && index_id == 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 "covers is allowed only for secondary index");
+		return NULL;
+	}
 	if (name_len > BOX_NAME_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
@@ -390,10 +446,12 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			      (for_func_index ? KEY_DEF_FOR_FUNC_INDEX : 0));
 	if (key_def == NULL)
 		return NULL;
+	struct key_def *pk_key_def = space_index_key_def(space, 0);
+	index_opts_normalize(&opts, key_def, pk_key_def);
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, space->def->name,
 			      space->def->engine_name, type, &opts, key_def,
-			      space_index_key_def(space, 0));
+			      pk_key_def);
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
