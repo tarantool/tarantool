@@ -63,6 +63,7 @@
 #include "core/func_adapter.h"
 #include "relay.h"
 #include "gc.h"
+#include "memtx_tx.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -302,11 +303,19 @@ error:
 /**
  * Helper routine for functional index function verification:
  * only a deterministic persistent Lua function may be used in
- * functional index for now.
+ * functional index for now; memtx MVCC does not support functional
+ * multikey indexes.
  */
 static int
 func_index_check_func(struct func *func) {
 	assert(func != NULL);
+
+	if (memtx_tx_manager_use_mvcc_engine && func->def->opts.is_multikey) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Memtx MVCC engine",
+			 "functional multikey indexes");
+		return -1;
+	}
+
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
 	    func->def->body == NULL || !func->def->is_deterministic) {
 		const char *errmsg = tt_sprintf(
