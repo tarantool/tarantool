@@ -249,32 +249,9 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
+box.error.injection.set('ERRINJ_RELAY_EXIT_DELAY', 5)
 ---
 - ok
-...
-box.error.injection.set('ERRINJ_WAL_DELAY', true)
----
-- ok
-...
-test_run:cmd("setopt delimiter ';'")
----
-- true
-...
-_ = fiber.create(function()
-    box.space.test:replace{123456789}
-end);
----
-...
-_ = fiber.create(function()
-    fiber.sleep(0.1)
-    box.error.injection.set('ERRINJ_WAL_DELAY', false)
-end);
----
-...
-test_run:cmd("setopt delimiter ''");
----
-- true
 ...
 test_run:cmd("switch replica")
 ---
@@ -309,6 +286,10 @@ test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 test_run:cmd("switch default")
 ---
 - true
+...
+box.error.injection.set('ERRINJ_RELAY_EXIT_DELAY', 0)
+---
+- ok
 ...
 test_run:cmd("stop server replica")
 ---
