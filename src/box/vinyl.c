@@ -694,6 +694,11 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "functional index");
 		return -1;
 	}
+	if (index_def->opts.covered_field_count != 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "vinyl",
+			 "covering index");
+		return -1;
+	}
 	return 0;
 }
 

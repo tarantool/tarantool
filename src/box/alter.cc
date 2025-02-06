@@ -212,19 +212,11 @@ err:
 }
 
 /**
- * Fill index_opts structure from opts field in tuple of space _index
- * Return an error if option is unrecognized.
+ * Validates index options.
  */
 static int
-index_opts_decode(struct index_opts *opts, const char *map,
-		  struct region *region)
+index_opts_validate(struct index_opts *opts)
 {
-	index_opts_create(opts);
-	if (opts_decode(opts, index_opts_reg, &map, region) != 0) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 diag_last_error(diag_get())->errmsg);
-		return -1;
-	}
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 			 "distance must be either 'euclid' or 'manhattan'");
@@ -253,7 +245,29 @@ index_opts_decode(struct index_opts *opts, const char *map,
 			 "less than or equal to 1");
 		return -1;
 	}
-	return 0;
+	int rc = -1;
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	if (opts->covered_field_count != 0) {
+		uint32_t *fields = xregion_alloc_array(
+						gc, typeof(*fields),
+						opts->covered_field_count);
+		memcpy(fields, opts->covered_fields,
+		       opts->covered_field_count * sizeof(*fields));
+		qsort(fields, opts->covered_field_count, sizeof(*fields),
+		      cmp_u32);
+		for (uint32_t i = 0; i < opts->covered_field_count; i++) {
+			if (i > 0 && fields[i] == fields[i - 1]) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 "'covers' has duplicates");
+				goto out;
+			}
+		}
+	}
+	rc = 0;
+out:
+	region_truncate(gc, gc_svp);
+	return rc;
 }
 
 /** Decode an optional node name field from the tuple. */
@@ -343,8 +357,21 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 BOX_INDEX_FIELD_OPTS, MP_MAP);
 	if (opts_field == NULL)
 		return NULL;
-	if (index_opts_decode(&opts, opts_field, &fiber()->gc) != 0)
+	index_opts_create(&opts);
+	struct region *gc = &fiber()->gc;
+	RegionGuard region_guard(gc);
+	if (opts_decode(&opts, index_opts_reg, &opts_field, gc) != 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
 		return NULL;
+	}
+	if (index_opts_validate(&opts) != 0)
+		return NULL;
+	if (opts.covered_field_count != 0 && index_id == 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 "covers is allowed only for secondary index");
+		return NULL;
+	}
 	if (name_len > BOX_NAME_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
@@ -379,7 +406,6 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		if (key_def != NULL)
 			key_def_delete(key_def);
 	});
-	RegionGuard region_guard(&fiber()->gc);
 	if (key_def_decode_parts(part_def, part_count, &parts,
 				 space->def->fields,
 				 space->def->field_count, &fiber()->gc) != 0)
