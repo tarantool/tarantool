@@ -138,18 +138,7 @@ box.cfg{replication_sync_lag = 1}
 box.cfg{replication_sync_timeout = 10}
 
 test_run:cmd("switch default")
-box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
-tweaks.xrow_stream_flush_size = tweaks_xrow_stream_flush_size_default
-box.error.injection.set('ERRINJ_WAL_DELAY', true)
-test_run:cmd("setopt delimiter ';'")
-_ = fiber.create(function()
-    box.space.test:replace{123456789}
-end);
-_ = fiber.create(function()
-    fiber.sleep(0.1)
-    box.error.injection.set('ERRINJ_WAL_DELAY', false)
-end);
-test_run:cmd("setopt delimiter ''");
+box.error.injection.set('ERRINJ_RELAY_EXIT_DELAY', 5)
 test_run:cmd("switch replica")
 
 replication = box.cfg.replication
@@ -161,6 +150,7 @@ box.info.replication[1].upstream.status -- follow
 test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 
 test_run:cmd("switch default")
+box.error.injection.set('ERRINJ_RELAY_EXIT_DELAY', 0)
 test_run:cmd("stop server replica")
 
 -- gh-3830: Sync fails if there's a gap at the end of the master's WAL.
