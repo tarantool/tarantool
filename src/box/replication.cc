@@ -1156,7 +1156,7 @@ bootstrap_leader_is_connected(struct applier **appliers, int count)
 static bool
 replicaset_is_connected(struct replicaset_connect_state *state,
 			struct applier **appliers, int count,
-			bool connect_quorum)
+			bool wait_all)
 {
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
@@ -1204,7 +1204,7 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 	 * different cluster UUIDs.
 	 */
 	if (state->connected >= replicaset_connect_quorum(count) &&
-	    !connect_quorum) {
+	    !wait_all) {
 		return true;
 	}
 	if (count - state->failed < replicaset_connect_quorum(count))
@@ -1214,7 +1214,7 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect)
+		   bool demand_quorum, bool keep_connect, bool wait_all)
 {
 	struct replicaset_connect_state state;
 	memset(&state, 0, sizeof(state));
@@ -1247,7 +1247,7 @@ replicaset_connect(const struct uri_set *uris,
 
 	say_info("connecting to %d replicas", count);
 
-	if (!connect_quorum) {
+	if (!demand_quorum) {
 		/*
 		 * Enter orphan mode on configuration change and
 		 *
@@ -1302,8 +1302,7 @@ replicaset_connect(const struct uri_set *uris,
 			trigger_clear(&trigger->base);
 		}
 	});
-	while (!replicaset_is_connected(&state, appliers, count,
-					connect_quorum)) {
+	while (!replicaset_is_connected(&state, appliers, count, wait_all)) {
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0) {
 			fiber_testcancel();
@@ -1316,7 +1315,7 @@ replicaset_connect(const struct uri_set *uris,
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
 		if (state.connected < replicaset_connect_quorum(count) &&
-		    connect_quorum) {
+		    demand_quorum) {
 			tnt_raise(ClientError, ER_CFG, "replication",
 				  "failed to connect to one or more replicas");
 		}
