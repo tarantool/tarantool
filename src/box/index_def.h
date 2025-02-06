@@ -109,6 +109,15 @@ struct index_opts {
 	 * Use hint optimization for tree index.
 	 */
 	enum index_hint_cfg hint;
+	/**
+	 * Covered fields. Currently it is supported only by memcs engine. It
+	 * specifies the columns of the secondary index.
+	 */
+	uint32_t *covered;
+	/**
+	 * Number of covered fields.
+	 */
+	uint32_t covered_count;
 };
 
 extern const struct index_opts index_opts_default;
@@ -129,6 +138,7 @@ index_opts_create(struct index_opts *opts)
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
+	free(opts->covered);
 	TRASH(opts);
 }
 
@@ -155,7 +165,26 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 		return false;
 	if (o1->hint != o2->hint)
 		return false;
+	if (o1->covered_count != o2->covered_count)
+		return false;
+	for (uint32_t i = 0; i < o1->covered_count; i++) {
+		if (o1->covered[i] != o2->covered[i])
+			return false;
+	}
 	return 0;
+}
+
+/**
+ * Returns whether `fieldno` is one of the covered fields.
+ */
+static inline bool
+index_opts_is_covered(const struct index_opts *opts, uint32_t fieldno)
+{
+	for (uint32_t i = 0; i < opts->covered_count; i++) {
+		if (opts->covered[i] == fieldno)
+			return true;
+	}
+	return false;
 }
 
 /* Definition of an index. */
@@ -174,8 +203,8 @@ struct index_def {
 	char *name;
 	/** Index type. */
 	enum index_type type;
+	/** Index options. */
 	struct index_opts opts;
-
 	/** Index key definition. */
 	struct key_def *key_def;
 	/**

@@ -418,6 +418,38 @@ luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
 }
 
 /**
+ * Push array with covered fields on Lua stack. Implicitly covered fields are
+ * added, the array is sorted.
+ */
+static void
+luaT_index_push_covers(struct lua_State *L, struct index_def *def,
+		       struct tuple_format *format)
+{
+	assert(format->exact_field_count != 0);
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	size_t bitmap_size =
+		BITMAP_SIZE(format->exact_field_count);
+	void *bitmap = xregion_alloc(gc, bitmap_size);
+	memset(bitmap, 0, bitmap_size);
+	for (uint32_t i = 0; i < def->opts.covered_count; i++)
+		bit_set(bitmap, def->opts.covered[i]);
+	for (uint32_t i = 0; i < def->cmp_def->part_count; i++)
+		bit_set(bitmap, def->cmp_def->parts[i].fieldno);
+	lua_newtable(L);
+	struct bit_iterator it;
+	bit_iterator_init(&it, bitmap, bitmap_size, true);
+	size_t pos;
+	uint32_t i = 1;
+	while ((pos = bit_iterator_next(&it)) != SIZE_MAX) {
+		lua_pushnumber(L, i++);
+		lua_pushnumber(L, pos + 1);
+		lua_settable(L, -3);
+	}
+	region_truncate(gc, gc_svp);
+}
+
+/**
  * Make a single space available in Lua,
  * via box.space[] array.
  *
@@ -605,6 +637,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		luaT_push_key_def_parts(L, index_def->key_def);
 		luaT_add_index_parts_methods(L, index_def->key_def);
 		lua_settable(L, -3); /* space.index[k].parts */
+
+		if (index_def->opts.covered != NULL) {
+			luaT_index_push_covers(L, index_def, space->format);
+			lua_setfield(L, -2, "covers");
+		}
 
 		lua_pushstring(L, "sequence_id");
 		if (k == 0 && space->sequence != NULL) {
