@@ -1931,10 +1931,11 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 						&deleted_data);
 			if (deleted_data.tuple != NULL) {
 				/*
-				 * Release related hint on
+				 * Release related hint and set result on
 				 * successful node deletion.
 				 */
 				tuple_unref((struct tuple *)deleted_data.hint);
+				*result = old_tuple;
 			}
 		}
 		assert(key == NULL);
