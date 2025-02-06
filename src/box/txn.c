@@ -1635,12 +1635,11 @@ txn_on_stop(struct trigger *trigger, void *event)
 /**
  * Transaction rollback timer callback.
  *
- * If there are `on_rollback' triggers, the transaction can not be rolled back
- * completely here, because this callback is invoked outside of the transaction,
- * however triggers must be executed in the fiber with the active transaction.
- * Thus, the transaction is marked as aborted here, and rolled back at commit.
  * As opposed to abort-by-yield, it is OK to postpone the rollback, because in
  * memtx the transaction can be aborted by timeout only when MVCC is on.
+ * Moreover, rolling back the transaction here would actually be harmful for
+ * vinyl because it could delete the statement executed at this very moment
+ * if it yielded for too long while reading disk.
  */
 static void
 txn_on_timeout(ev_loop *loop, ev_timer *watcher, int revents)
@@ -1648,10 +1647,6 @@ txn_on_timeout(ev_loop *loop, ev_timer *watcher, int revents)
 	(void) loop;
 	(void) revents;
 	struct txn *txn = (struct txn *)watcher->data;
-	if (!txn_has_flag(txn, TXN_HAS_TRIGGERS) ||
-	    rlist_empty(&txn->on_rollback)) {
-		txn_rollback_to_svp(txn, NULL, false);
-	}
 	txn->status = TXN_ABORTED;
 	txn_set_flags(txn, TXN_IS_ABORTED_BY_TIMEOUT);
 }
