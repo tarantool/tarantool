@@ -343,6 +343,12 @@ memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    struct tuple *until, hint_t until_hint);
 
 /**
+ * Destroy and free any kind of gap item.
+ */
+static void
+memtx_tx_delete_gap(struct gap_item_base *item);
+
+/**
  * Helper structure for searching for point_hole_item in the hash table,
  * @sa point_hole_item_pool.
  */
@@ -628,53 +634,6 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
-
-void
-memtx_tx_manager_init()
-{
-	rlist_create(&txm.read_view_txs);
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
-		size_t item_size = sizeof(struct memtx_story) +
-				   i * sizeof(struct memtx_story_link);
-		mempool_create(&txm.memtx_tx_story_pool[i],
-			       cord_slab_cache(), item_size);
-	}
-	txm.history = mh_history_new();
-	memtx_tx_mempool_create(&txm.point_hole_item_pool,
-				sizeof(struct point_hole_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	txm.point_holes = mh_point_holes_new();
-	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
-				sizeof(struct inplace_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
-				sizeof(struct nearby_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
-				sizeof(struct count_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
-				sizeof(struct full_scan_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	rlist_create(&txm.all_stories);
-	txm.traverse_all_stories = &txm.all_stories;
-	txm.must_do_gc_steps = 0;
-	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
-}
-
-void
-memtx_tx_manager_free()
-{
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
-		mempool_destroy(&txm.memtx_tx_story_pool[i]);
-	mh_history_delete(txm.history);
-	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
-	mh_point_holes_delete(txm.point_holes);
-	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
-	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
-}
 
 void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
@@ -1268,11 +1227,13 @@ memtx_tx_story_reorder(struct memtx_story *story,
 }
 
 /**
- * Unlink @a story from all chains, must be already removed from the index.
+ * Fully unlinks @a story - unlinks it from all story chains, unlinks
+ * all transaction statements and deletes all associated trackers.
  */
 static void
 memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 {
+	/* Unlink from all story chains. */
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
@@ -1287,6 +1248,38 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 			link->older_story = NULL;
 			link->newer_story = NULL;
 		}
+	}
+
+	/* Unlink all transaction statements. */
+	if (story->add_stmt != NULL)
+		memtx_tx_story_unlink_added_by(story, story->add_stmt);
+	while (story->del_stmt != NULL)
+		memtx_tx_story_unlink_deleted_by(story, story->del_stmt);
+	/*
+	 * Unlink and delete all gaps since they belong to the story that
+	 * is going to be deleted.
+	 */
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		struct rlist *read_gaps = &story->link[i].read_gaps;
+		while (!rlist_empty(&story->link[i].read_gaps)) {
+			struct gap_item_base *item =
+				rlist_first_entry(read_gaps,
+						  struct gap_item_base,
+						  in_read_gaps);
+			memtx_tx_delete_gap(item);
+		}
+	}
+	/*
+	 * Remove all read trackers since they point to the story that
+	 * is going to be deleted.
+	 */
+	while (!rlist_empty(&story->reader_list)) {
+		struct tx_read_tracker *tracker =
+			rlist_first_entry(&story->reader_list,
+					  struct tx_read_tracker,
+					  in_reader_list);
+		rlist_del(&tracker->in_reader_list);
+		rlist_del(&tracker->in_read_set);
 	}
 }
 
@@ -1306,6 +1299,10 @@ memtx_tx_story_find_top(struct memtx_story *story, uint32_t ind)
  * indexes if necessary: used in garbage collection step and preserves the top
  * of the history chain invariant (as opposed to
  * `memtx_tx_story_full_unlink_on_space_delete`).
+ *
+ * Note that it doesn't unlink transaction statements and trackers - they
+ * are expected to be absent, otherwise garbage collector wouldn't unlink
+ * the story.
  */
 static void
 memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
@@ -1461,6 +1458,9 @@ memtx_tx_story_gc_step()
 	memtx_tx_story_delete(story);
 }
 
+/**
+ * Run several rounds of story garbage collection process.
+ */
 void
 memtx_tx_story_gc()
 {
@@ -2930,9 +2930,6 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
 	return visible != NULL;
 }
 
-/**
- * Destroy and free any kind of gap item.
- */
 static void
 memtx_tx_delete_gap(struct gap_item_base *item)
 {
@@ -3100,34 +3097,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 		story = rlist_first_entry(&space->memtx_stories,
 					  struct memtx_story,
 					  in_space_stories);
-		if (story->add_stmt != NULL)
-			memtx_tx_story_unlink_added_by(story, story->add_stmt);
-		while (story->del_stmt != NULL)
-			memtx_tx_story_unlink_deleted_by(story,
-							 story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
-		for (uint32_t i = 0; i < story->index_count; i++) {
-			struct rlist *read_gaps = &story->link[i].read_gaps;
-			while (!rlist_empty(&story->link[i].read_gaps)) {
-				struct gap_item_base *item =
-					rlist_first_entry(read_gaps,
-							  struct gap_item_base,
-							  in_read_gaps);
-				memtx_tx_delete_gap(item);
-			}
-		}
-		/*
-		 * Remove all read trackers since they point to the story that
-		 * is going to be deleted.
-		 */
-		while (!rlist_empty(&story->reader_list)) {
-			struct tx_read_tracker *tracker =
-				rlist_first_entry(&story->reader_list,
-						  struct tx_read_tracker,
-						  in_reader_list);
-			rlist_del(&tracker->in_reader_list);
-			rlist_del(&tracker->in_read_set);
-		}
 		memtx_tx_story_delete(story);
 	}
 
@@ -3354,7 +3324,6 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 	for (uint32_t i = 0; i < def->part_count; i++)
 		mp_next(&tmp);
 	size_t key_len = tmp - key;
-	memtx_tx_story_gc();
 	point_hole_storage_new(index, key, key_len, txn);
 }
 
@@ -3489,7 +3458,6 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	} else {
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
-	memtx_tx_story_gc();
 }
 
 /**
@@ -3560,7 +3528,6 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 			invisible_count++;
 	});
 
-	memtx_tx_story_gc();
 	return invisible_count;
 }
 
@@ -3577,7 +3544,6 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
 	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
-	memtx_tx_story_gc();
 }
 
 /**
@@ -3725,3 +3691,57 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 #if defined(ENABLE_READ_VIEW)
 # include "memtx_tx_read_view.c"
 #endif /* defined(ENABLE_READ_VIEW) */
+
+void
+memtx_tx_manager_init()
+{
+	rlist_create(&txm.read_view_txs);
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
+		size_t item_size = sizeof(struct memtx_story) +
+				   i * sizeof(struct memtx_story_link);
+		mempool_create(&txm.memtx_tx_story_pool[i],
+			       cord_slab_cache(), item_size);
+	}
+	txm.history = mh_history_new();
+	memtx_tx_mempool_create(&txm.point_hole_item_pool,
+				sizeof(struct point_hole_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	txm.point_holes = mh_point_holes_new();
+	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
+				sizeof(struct inplace_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
+				sizeof(struct nearby_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
+				sizeof(struct count_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
+				sizeof(struct full_scan_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	rlist_create(&txm.all_stories);
+	txm.traverse_all_stories = &txm.all_stories;
+	txm.must_do_gc_steps = 0;
+	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
+}
+
+void
+memtx_tx_manager_free()
+{
+	struct memtx_story *story, *tmp;
+	rlist_foreach_entry_safe(story, &txm.all_stories, in_all_stories, tmp) {
+		for (size_t i = 0; i < story->index_count; i++)
+			story->link[i].in_index = NULL;
+		memtx_tx_story_full_unlink_on_space_delete(story);
+		memtx_tx_story_delete(story);
+	}
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
+		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mh_history_delete(txm.history);
+	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
+	mh_point_holes_delete(txm.point_holes);
+	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
+	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
+}
