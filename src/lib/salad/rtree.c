@@ -35,6 +35,8 @@
 #include <stddef.h>
 #include <sys/types.h>
 
+#include <stdio.h> //
+
 /*------------------------------------------------------------------------- */
 /* R-tree internal structures definition */
 /*------------------------------------------------------------------------- */
@@ -161,8 +163,8 @@ rtree_rect_neigh_distance_max(const struct rtree_rect *rect,
 {
 	sq_coord_t result = 0;
 	for (int i = dimension; --i >= 0; ) {
-		const coord_t *coords = &rect->coords[2 * i + 1];
-		coord_t neigh_coord = neigh_rect->coords[2 * i + 1];
+		const coord_t *coords = &rect->coords[2 * (i + 1)];
+		coord_t neigh_coord = neigh_rect->coords[2 * (i + 1)];
 		if (neigh_coord < coords[0]) {
 			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
 			result += -diff;
@@ -202,9 +204,9 @@ rtree_rect_neigh_distance_max2(const struct rtree_rect *rect,
 			   unsigned dimension)
 {
 	sq_coord_t result = 0;
-	for (int i = dimension; --i >= 0; ) {
-		const coord_t *coords = &rect->coords[2 * i];
-		coord_t neigh_coord = neigh_rect->coords[2 * i];
+	for (int i = dimension; --i >= 0; ) {                 // ?
+		const coord_t *coords = &rect->coords[2 * (i + 1)];
+		coord_t neigh_coord = neigh_rect->coords[2 * (i + 1)];
 		if (neigh_coord < coords[0]) {
 			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
 			result += diff * diff;
@@ -1149,6 +1151,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		itr->leaf_cmp = rtree_rect_strict_holds_rect;
 		break;
 	case SOP_NEIGHBOR:  
+		printf("--- search nb ---\n");
 		if (tree->root) {
 
 			struct rtree_rect cover;
@@ -1161,6 +1164,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				distance_max = 
 					rtree_rect_neigh_distance_max2(&cover, rect,
 							   tree->dimension);
+				printf("--- distance 1 ---\n");
 			}
 			else {	/* RTREE_MANHATTAN */
 				distance =
@@ -1175,7 +1179,9 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				rtree_iterator_new_neighbor(itr, tree->root,
 							    distance, distance_max,
 							    tree->height); 
+			printf("--- rtree_iterator_new_neighbor ok ---\n");
 			rtnt_insert(&itr->neigh_tree, n);  // упорядочивает соседей по расстоянию (нужны только соседи с позиции pos) .
+			printf("--- rtnt_insert ok ---\n");
 			return true;
 		} else {
 			return false;
@@ -1223,7 +1229,7 @@ rtree_debug_print_page(const struct rtree *tree, const struct rtree_page *page,
 {
 	printf("%d:\n", path);
 	unsigned d = tree->dimension;
-	for (int i = 0; i < page->n; i++) {
+	for (unsigned i = 0; i < page->n; i++) {
 		struct rtree_page_branch *b;
 		b = rtree_branch_get(tree, page, i);
 		double v = 1;
@@ -1236,7 +1242,7 @@ rtree_debug_print_page(const struct rtree *tree, const struct rtree_page *page,
 		printf("%d\n", (int)(v * 100));
 	}
 	if (--level > 1) {
-		for (int i = 0; i < page->n; i++) {
+		for (unsigned i = 0; i < page->n; i++) {
 			struct rtree_page_branch *b;
 			b = rtree_branch_get(tree, page, i);
 			rtree_debug_print_page(tree, b->data.page, level,
