@@ -226,9 +226,8 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 	} while (*ret == NULL);
 	if (itr->impl.op == SOP_NEIGHBOR) {
 		printf("--- save last tuple ---\n");
-		struct rtree_iterator *rtree_it = (struct rtree_iterator *) i;
+		// struct rtree_iterator *rtree_it = (struct rtree_iterator *) i;
 		itr->last = *ret; 	// сделать сохранение позиции про итерировании [верно] 
-		rtree_it->last = *(record_t*)*ret; 
 	}
 	return 0;
 }
@@ -399,9 +398,9 @@ rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	struct memtx_rtree_index *index =
 		(struct memtx_rtree_index *)
 		index_weak_ref_get_index_checked(&it->index_ref);
-	struct rtree_iterator *rtree_it = (struct rtree_iterator *) it;
+	struct index_rtree_iterator *rtree_it = (struct index_rtree_iterator *) it;
 	return rtree_iterator_position_impl(
-		(tuple*) &rtree_it->last, index->base.def, pos, size);
+		rtree_it->last, index->base.def, pos, size);
 }
 
 static int
