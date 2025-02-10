@@ -84,6 +84,7 @@
 #include "box/lua/config/utils/expression_lexer.h"
 #include "box/lua/failover.h"
 #include "box/lua/integrity.h"
+#include "box/lua/config/extras.h"
 
 #include "mpstream/mpstream.h"
 
@@ -164,6 +165,7 @@ extern char session_lua[],
 	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
 	config_descriptions_lua[],
+	config_validators_lua[],
 	config_configdata_lua[],
 	config_init_lua[],
 	config_instance_config_lua[],
@@ -178,12 +180,8 @@ extern char session_lua[],
 	config_utils_snapshot_lua[],
 	config_utils_tabulate_lua[],
 	config_utils_textutils_lua[],
-#if ENABLE_CONFIG_EXTRAS
-	config_source_etcd_lua[],
-	config_storage_init_lua[],
-	config_source_storage_lua[],
-	config_extras_lua[],
-#endif
+	config_utils_funcutils_lua[],
+	config_utils_network_lua[],
 	/* }}} config */
 
 	connpool_lua[];
@@ -370,6 +368,10 @@ static const char *lua_sources[] = {
 	"internal.config.utils.aboard",
 	config_utils_aboard_lua,
 
+	"config/utils/funcutils",
+	"internal.config.utils.funcutils",
+	config_utils_funcutils_lua,
+
 	"config/utils/schema",
 	"experimental.config.utils.schema",
 	config_utils_schema_lua,
@@ -382,9 +384,17 @@ static const char *lua_sources[] = {
 	"internal.config.utils.textutils",
 	config_utils_textutils_lua,
 
+	"config/utils/network",
+	"internal.config.utils.network",
+	config_utils_network_lua,
+
 	"config/descriptions",
 	"internal.config.descriptions",
 	config_descriptions_lua,
+
+	"config/validators",
+	"internal.config.validators",
+	config_validators_lua,
 
 	"config/instance_config",
 	"internal.config.instance_config",
@@ -417,20 +427,6 @@ static const char *lua_sources[] = {
 	"config/applier/autoexpel",
 	"internal.config.applier.autoexpel",
 	config_applier_autoexpel_lua,
-
-#if ENABLE_CONFIG_EXTRAS
-	"config/source/etcd",
-	"internal.config.source.etcd",
-	config_source_etcd_lua,
-
-	"config/source/storage",
-	"internal.config.source.storage",
-	config_source_storage_lua,
-
-	"config/extras",
-	"internal.config.extras",
-	config_extras_lua,
-#endif
 
 	"config/applier/box_cfg",
 	"internal.config.applier.box_cfg",
@@ -480,11 +476,7 @@ static const char *lua_sources[] = {
 	"config",
 	config_init_lua,
 
-#if ENABLE_CONFIG_EXTRAS
-	"config/storage/init",
-	"config.storage",
-	config_storage_init_lua,
-#endif
+	CONFIG_EXTRAS_LUA_MODULES
 
 	/* }}} config */
 

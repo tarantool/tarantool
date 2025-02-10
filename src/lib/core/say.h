@@ -418,11 +418,13 @@ _say_strerror(int errnum);
 	lsan_turn_off(); \
 	exit(status); \
 })
-#define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ \
 	say(S_FATAL, tt_strerror(errno), __VA_ARGS__); \
 	exit(EXIT_FAILURE); \
 })
+
+NORETURN void
+panic(const char *format, ...);
 
 /**
  * Log a message once.
@@ -453,8 +455,8 @@ enum {
 	int suppressed = 0;						\
 	bool ret = ratelimit_check((rl), ev_monotonic_now(loop()),	\
 				   &suppressed);			\
-	if ((level) >= S_WARN && suppressed > 0)			\
-		say_warn("%d messages suppressed", suppressed);		\
+	if (suppressed > 0)			\
+		say(level, NULL, "%d messages suppressed", suppressed);	\
 	ret;								\
 })
 

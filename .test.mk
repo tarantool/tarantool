@@ -52,6 +52,10 @@ install-test-deps:
 run-test: install-test-deps
 	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
 
+.PHONY: run-test-ctest
+run-test-ctest:
+	cmake --build ${STATIC_BIN_DIR} --target test-force-ctest
+
 .PHONY: run-perf-test
 run-perf-test:
 	cmake --build ${BUILD_DIR} --parallel
@@ -167,9 +171,7 @@ test-static: build run-luajit-test run-test
 test-static-cmake: SRC_DIR = ${STATIC_DIR}
 test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
-test-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
-test-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
-test-static-cmake: build run-luajit-test run-test
+test-static-cmake: build run-test-ctest
 
 # Coverage build
 

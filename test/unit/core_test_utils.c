@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <small/rlist.h>
 
 /**
  * Mock function to resolve circular dependencies in unit tests
@@ -35,3 +36,5 @@
 void cord_on_yield(void)
 {
 }
+
+RLIST_HEAD(txns);

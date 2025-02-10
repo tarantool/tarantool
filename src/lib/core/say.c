@@ -73,6 +73,19 @@ void
 enum say_format log_format = SF_PLAIN;
 enum { SAY_SYSLOG_DEFAULT_PORT = 512 };
 
+NORETURN void
+panic(const char *format, ...)
+{
+	char buf[1024];
+	va_list args;
+
+	va_start(args, format);
+	vsnprintf(buf, sizeof(buf), format, args);
+	va_end(args);
+
+	panic_status(EXIT_FAILURE, "%s", buf);
+}
+
 /** List of logs to rotate */
 static RLIST_HEAD(log_rotate_list);
 

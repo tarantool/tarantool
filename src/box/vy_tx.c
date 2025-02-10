@@ -51,7 +51,6 @@
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tuple.h"
-#include "vy_cache.h"
 #include "vy_lsm.h"
 #include "vy_mem.h"
 #include "vy_stat.h"
@@ -108,7 +107,6 @@ vy_tx_manager_new(void)
 		return NULL;
 	}
 
-	rlist_create(&xm->writers);
 	rlist_create(&xm->prepared);
 	rlist_create(&xm->read_views);
 	vy_global_read_view_create((struct vy_read_view *)&xm->global_read_view,
@@ -335,20 +333,18 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 void
 vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 {
-	tx->last_stmt_space = NULL;
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
 	tx->write_size = 0;
 	tx->xm = xm;
-	tx->isolation = TXN_ISOLATION_READ_CONFIRMED;
+	tx->txn = NULL;
 	tx->state = VINYL_TX_READY;
 	tx->is_applier_session = false;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
 	vy_tx_read_set_new(&tx->read_set);
 	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
-	rlist_create(&tx->in_writers);
 	rlist_create(&tx->in_prepared);
 }
 
@@ -367,7 +363,6 @@ vy_tx_destroy(struct vy_tx *tx)
 		txv_delete(v);
 
 	vy_tx_read_set_iter(&tx->read_set, NULL, vy_tx_read_set_free_cb, NULL);
-	rlist_del_entry(tx, in_writers);
 }
 
 /** Mark a transaction as aborted and account it in stats. */
@@ -458,10 +453,8 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 }
 
 struct vy_tx *
-vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
+vy_tx_begin(struct vy_tx_manager *xm, struct txn *txn)
 {
-	assert(isolation < txn_isolation_level_MAX &&
-	       isolation != TXN_ISOLATION_DEFAULT);
 	struct vy_tx *tx = mempool_alloc(&xm->tx_mempool);
 	if (unlikely(tx == NULL)) {
 		diag_set(OutOfMemory, sizeof(*tx), "mempool", "struct vy_tx");
@@ -473,82 +466,8 @@ vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
 	if (session != NULL && session->type == SESSION_TYPE_APPLIER)
 		tx->is_applier_session = true;
 
-	tx->isolation = isolation;
+	tx->txn = txn;
 	return tx;
-}
-
-/**
- * Rotate the active in-memory tree if necessary and pin it to make
- * sure it is not dumped until the transaction is complete.
- */
-static int
-vy_tx_write_prepare(struct txv *v)
-{
-	struct vy_lsm *lsm = v->lsm;
-	if (vy_lsm_rotate_mem_if_required(lsm) != 0)
-		return -1;
-	vy_mem_pin(lsm->mem);
-	v->mem = lsm->mem;
-	return 0;
-}
-
-/**
- * Write a single statement into an LSM tree. If the statement has
- * an lsregion copy then use it, else create it.
- *
- * @param lsm         LSM tree to write to.
- * @param mem         In-memory tree to write to.
- * @param entry       Statement allocated with malloc().
- * @param region_stmt NULL or the same statement as stmt,
- *                    but allocated on lsregion.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static int
-vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
-	    struct vy_entry entry, struct tuple **region_stmt)
-{
-	assert(vy_stmt_is_refable(entry.stmt));
-	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
-
-	/*
-	 * The UPSERT statement can be applied to the cached
-	 * statement, because the cache always contains only
-	 * newest REPLACE statements. In such a case the UPSERT,
-	 * applied to the cached statement, can be inserted
-	 * instead of the original UPSERT.
-	 */
-	if (vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
-		struct vy_entry deleted = vy_entry_none();
-		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, entry, &deleted);
-		if (deleted.stmt != NULL) {
-			struct vy_entry applied;
-			applied = vy_entry_apply_upsert(entry, deleted,
-							mem->cmp_def, false);
-			tuple_unref(deleted.stmt);
-			if (applied.stmt != NULL) {
-				enum iproto_type applied_type =
-					vy_stmt_type(applied.stmt);
-				assert(applied_type == IPROTO_REPLACE ||
-				       applied_type == IPROTO_INSERT);
-				(void) applied_type;
-				int rc = vy_lsm_set(lsm, mem, applied,
-						    region_stmt);
-				tuple_unref(applied.stmt);
-				return rc;
-			}
-			/*
-			 * Ignore a memory error, because it is
-			 * not critical to apply the optimization.
-			 */
-		}
-	} else {
-		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, entry, NULL);
-	}
-	return vy_lsm_set(lsm, mem, entry, region_stmt);
 }
 
 /**
@@ -794,9 +713,15 @@ vy_tx_prepare(struct vy_tx *tx)
 			vy_stmt_set_type(v->entry.stmt, type);
 		}
 
-		if (vy_tx_write_prepare(v) != 0)
+		/*
+		 * Rotate the active in-memory tree if necessary and pin it
+		 * to make sure it is not dumped until the transaction is
+		 * complete.
+		 */
+		if (vy_lsm_rotate_mem_if_required(lsm) != 0)
 			return -1;
-		assert(v->mem != NULL);
+		vy_mem_pin(lsm->mem);
+		v->mem = lsm->mem;
 
 		if (lsm->index_id == 0 &&
 		    vy_stmt_flags(v->entry.stmt) & VY_STMT_DEFERRED_DELETE &&
@@ -807,7 +732,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		vy_stmt_set_lsn(v->entry.stmt, MAX_LSN + tx->psn);
 		struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
-		if (vy_tx_write(lsm, v->mem, v->entry, region_stmt) != 0)
+		if (vy_lsm_set(lsm, v->mem, v->entry, region_stmt) != 0)
 			return -1;
 		v->region_stmt = *region_stmt;
 	}
@@ -906,7 +831,7 @@ vy_tx_rollback(struct vy_tx *tx)
 }
 
 int
-vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
+vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
 {
 	if (tx->state == VINYL_TX_READY && vy_tx_is_in_read_view(tx))
 		vy_tx_abort(tx);
@@ -915,16 +840,6 @@ vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 		return -1;
 	}
 	assert(tx->state == VINYL_TX_READY);
-	tx->last_stmt_space = space;
-	/*
-	 * When want to add to the writer list, can't rely on the log emptiness.
-	 * During recovery it is empty always for the data stored both in runs
-	 * and xlogs. Must check the list member explicitly.
-	 */
-	if (rlist_empty(&tx->in_writers)) {
-		assert(stailq_empty(&tx->log));
-		rlist_add_entry(&tx->xm->writers, tx, in_writers);
-	}
 	*savepoint = stailq_last(&tx->log);
 	return 0;
 }
@@ -953,9 +868,6 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 		tx->write_set_version++;
 		txv_delete(v);
 	}
-	if (stailq_empty(&tx->log))
-		rlist_del_entry(tx, in_writers);
-	tx->last_stmt_space = NULL;
 }
 
 int
@@ -1071,6 +983,23 @@ static int
 vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
 	assert(vy_stmt_type(entry.stmt) != 0);
+
+	struct txv *old = write_set_search_key(&tx->write_set, lsm, entry);
+	if (old != NULL && old->entry.stmt == entry.stmt) {
+		/*
+		 * The inserted statement is already indexed in the write set.
+		 * This may happen only if this is a multikey index and the
+		 * indexed array has duplicate entries. Inserting a duplicate
+		 * into the write set is pointless. Moreover, it may break
+		 * assumptions taken by the optimizations applied below, like
+		 * REPLACE + DELETE = NOP. Let's skip it.
+		 */
+		assert(lsm->cmp_def->is_multikey);
+		assert(!old->is_overwritten);
+		assert(old->entry.hint != entry.hint);
+		return 0;
+	}
+
 	/**
 	 * A statement in write set must have and unique lsn
 	 * in order to differ it from cachable statements in mem and run.
@@ -1078,7 +1007,6 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	vy_stmt_set_lsn(entry.stmt, INT64_MAX);
 	struct vy_entry applied = vy_entry_none();
 
-	struct txv *old = write_set_search_key(&tx->write_set, lsm, entry);
 	/* Found a match of the previous action of this transaction */
 	if (old != NULL && vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
 		assert(lsm->index_id == 0);
@@ -1192,15 +1120,16 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 void
-vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
-				    struct space *space, bool *need_wal_sync)
+vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 {
 	*need_wal_sync = false;
 	if (space->index_count == 0)
 		return; /* no indexes, no conflicts */
-	struct vy_lsm *lsm = vy_lsm(space->index[0]);
-	struct vy_tx *tx;
-	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		struct vy_tx *tx = txn->engines_tx[space->engine->id];
+		if (tx == NULL || stailq_empty(&txn->stmts))
+			continue;
 		/*
 		 * We can't abort prepared transactions as they have
 		 * already reached WAL. The caller needs to sync WAL
@@ -1210,18 +1139,24 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 			*need_wal_sync = true;
 		if (tx->state != VINYL_TX_READY)
 			continue;
-		if (tx->last_stmt_space == space ||
-		    write_set_search_key(&tx->write_set, lsm,
-					 lsm->env->empty_key) != NULL)
-			vy_tx_abort(tx);
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
+			if (stmt->space == space) {
+				vy_tx_abort(tx);
+				break;
+			}
+		}
 	}
 }
 
 void
-vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm)
+vy_tx_manager_abort_writers_for_ro(struct engine *engine)
 {
-	struct vy_tx *tx;
-	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		struct vy_tx *tx = txn->engines_tx[engine->id];
+		if (tx == NULL || stailq_empty(&txn->stmts))
+			continue;
 		/* Applier ignores ro flag. */
 		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
 			vy_tx_abort(tx);

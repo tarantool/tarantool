@@ -1672,6 +1672,7 @@ class RlistLut(ListLut):
         ('session_on_connect', 'trigger::link'),
         ('session_on_disconnect', 'trigger::link'),
         ('shutdown_list', 'session::in_shutdown_list'),
+        ('txns', 'txn::in_txns'),
     )
     _containers = (
         ('alter_space::ops', 'AlterSpaceOp::link'),
@@ -1727,7 +1728,6 @@ class RlistLut(ListLut):
         ('tx_manager::read_view_txs', 'txn::in_read_view_txs'),
         ('tx_manager::all_stories', 'memtx_story::in_all_stories'),
         ('tx_manager::traverse_all_stories', 'memtx_story::in_all_stories'), # struct rlist*
-        ('tx_manager::all_txs', 'txn::in_all_txs'),
         ('txn::conflict_list', 'tx_conflict_tracker::in_conflict_list'),
         ('txn::conflicted_by_list', 'tx_conflict_tracker::in_conflicted_by_list'),
         ('txn::gap_list', 'gap_item::in_gap_list'),
@@ -1758,7 +1758,6 @@ class RlistLut(ListLut):
         ('vy_recovery::lsms', 'vy_lsm_recovery_info::in_recovery'),
         ('vy_tx::on_destroy', 'trigger::link'),
         ('vy_tx_manager::read_views', 'vy_read_view::in_read_views'),
-        ('vy_tx_manager::writers', 'vy_tx::in_writers'),
         ('vy_write_iterator::src_list', 'vy_write_src::in_src_list'),
         ('wal_writer::watchers', 'wal_watcher::next'),
         ('watchable::pending_watchers', 'watcher::in_idle_or_pending'),

@@ -19,6 +19,7 @@ include(FindOptionalPackage)
 include(FindPackageMessage)
 include(ExternalProject)
 include(CheckPatch)
+include(MakeLuaPath)
 
 find_program(ECHO echo)
 find_program(CAT cat)
@@ -27,6 +28,10 @@ find_program(GIT git)
 find_program(LD ld)
 find_program(CTAGS ctags)
 find_program(LUACHECK luacheck ENV PATH)
+find_program(PYTHON python)
+
+include (CTest)
+enable_testing()
 
 # Define PACKAGE macro in tarantool/config.h
 set(PACKAGE "Tarantool" CACHE STRING "Package name.")
@@ -40,6 +45,77 @@ if(NOT CMAKE_BUILD_TYPE)
         "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
         FORCE)
 endif()
+
+include(cmake/SetBuildParallelLevel.cmake)
+SetBuildParallelLevel(CMAKE_BUILD_PARALLEL_LEVEL)
+
+set(CTEST_OUTPUT_ON_FAILURE TRUE)
+math(EXPR CTEST_PARALLEL_LEVEL
+     "${CMAKE_BUILD_PARALLEL_LEVEL} * 2" OUTPUT_FORMAT DECIMAL)
+math(EXPR CTEST_CPU_THRESHOLD
+     "${CMAKE_BUILD_PARALLEL_LEVEL} * 3 / 2" OUTPUT_FORMAT DECIMAL)
+# TARANTOOL_CTEST_FLAGS is used by CMake targets.
+# XXX: CMake 3.17 introduces CMAKE_CTEST_ARGUMENTS that contains
+# CTest options and is used by `test` target.
+list(APPEND TARANTOOL_CTEST_FLAGS
+    --no-tests=error
+    --output-on-failure
+    --parallel ${CTEST_PARALLEL_LEVEL}
+    --repeat until-pass:3
+    --schedule-random
+    # CPU load threshold for starting new parallel tests.
+    # The option `--test-load` accepts a maximum number of
+    # tests that waiting CPU, upon reaching which the test will
+    # stop running new tests. This option may slowdown test
+    # running and increase a total test time, but it makes testing
+    # more stable than without option. It is recommended to set
+    # a value to $(nproc), see [1].
+    #
+    # 1. https://discourse.cmake.org/t/what-does-test-load-do/8610/3
+    --test-load ${CTEST_CPU_THRESHOLD}
+)
+if(CMAKE_VERBOSE_MAKEFILE)
+    list(APPEND TARANTOOL_CTEST_FLAGS --verbose)
+endif()
+
+# It is not possible to add dependencies to `add_test()`
+# in CMake, see [1]. CMake 3.7 introduces FIXTURES_REQUIRED [2]
+# and FIXTURES_SETUP [3], but these test properties cannot be
+# used - this feature is unsupported in the current CMake version.
+# To workaround this, the function `add_test_suite_target` is
+# introduced. It adds a CMake target that builds testsuite's
+# prerequisites and CMake test that executes that target.
+#
+# 1. https://gitlab.kitware.com/cmake/cmake/-/issues/8774
+# 2. https://cmake.org/cmake/help/latest/prop_test/FIXTURES_REQUIRED.html
+# 3. https://cmake.org/cmake/help/latest/prop_test/FIXTURES_SETUP.html
+function(_add_test_suite_target target)
+  set(prefix ARG)
+  set(noValues)
+  set(singleValues LABELS)
+  set(multiValues DEPENDS)
+
+  # FIXME: if we update to CMake >= 3.5, can remove this line.
+  include(CMakeParseArguments)
+  cmake_parse_arguments(${prefix}
+                        "${noValues}"
+                        "${singleValues}"
+                        "${multiValues}"
+                        ${ARGN})
+
+  set(_DEPS_TARGET ${target}-deps)
+
+  add_custom_target(${_DEPS_TARGET} DEPENDS ${ARG_DEPENDS})
+
+  add_test(NAME ${_DEPS_TARGET}
+    COMMAND ${CMAKE_COMMAND}
+            --build ${CMAKE_BINARY_DIR}
+            --target ${_DEPS_TARGET}
+  )
+  set_tests_properties(${_DEPS_TARGET} PROPERTIES
+    LABELS ${ARG_LABELS}
+  )
+endfunction()
 
 #
 # Check submodules
@@ -771,6 +847,8 @@ include (cmake/package.cmake)
 # so rpm.cmake depends on package.cmake.
 #
 include (cmake/rpm.cmake)
+
+set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
 add_subdirectory(extra)
 add_subdirectory(test)

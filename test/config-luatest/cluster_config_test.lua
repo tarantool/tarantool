@@ -311,3 +311,55 @@ g.test_misplace_option = function(g)
     cluster.startup_error(g, config, "replicaset \"sharding\" should " ..
                                      "include at least one instance.")
 end
+
+g.test_replicasets_with_same_name = function(g)
+    local config = cbuilder:new()
+        :use_group('g-001')
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+
+        :use_group('g-002')
+        :use_replicaset('r-001')
+        :add_instance('i-002', {})
+
+        :config()
+
+
+    cluster.startup_error(g, config, 'found replicasets with the same ' ..
+                                     'name "r-001" in the groups ' ..
+                                     '"g-001" and "g-002".')
+end
+
+g.test_instances_with_same_name = function(g)
+    local config = cbuilder:new()
+        :use_group('g-001')
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+
+        :use_replicaset('r-002')
+        :add_instance('i-001', {})
+
+        :config()
+
+    cluster.startup_error(g, config, 'found instances with the same ' ..
+                                     'name "i-001" in the replicasets ' ..
+                                     '"r-001" and "r-002" in the group ' ..
+                                     '"g-001".')
+
+    config = cbuilder:new()
+        :use_group('g-001')
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+
+        :use_group('g-002')
+        :use_replicaset('r-002')
+        :add_instance('i-001', {})
+
+        :config()
+
+    cluster.startup_error(g, config, 'found instances with the same ' ..
+                                     'name "i-001" in the replicaset ' ..
+                                     '"r-001" in the group "g-001" and ' ..
+                                     'in the replicaset "r-002" in the ' ..
+                                     'group "g-002".')
+end

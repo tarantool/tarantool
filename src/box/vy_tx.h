@@ -141,20 +141,12 @@ write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
 
 /** Transaction object. */
 struct vy_tx {
-	/** Link in vy_tx_manager::writers. */
-	struct rlist in_writers;
 	/** Link in vy_tx_manager::prepared. */
 	struct rlist in_prepared;
 	/** Transaction manager. */
 	struct vy_tx_manager *xm;
-	/**
-	 * Pointer to the space affected by the last prepared statement.
-	 * We need it so that we can abort a transaction on DDL even
-	 * if it hasn't inserted anything into the write set yet (e.g.
-	 * yielded on unique check) and therefore would otherwise be
-	 * ignored by vy_tx_manager_abort_writers_for_ddl().
-	 */
-	struct space *last_stmt_space;
+	/** Base transaction or NULL for a single read-only statement. */
+	struct txn *txn;
 	/**
 	 * In memory transaction log. Contains both reads
 	 * and writes.
@@ -175,8 +167,6 @@ struct vy_tx {
 	 * the write set.
 	 */
 	size_t write_size;
-	/** Transaction isolation level. */
-	enum txn_isolation_level isolation;
 	/** Current state of the transaction.*/
 	enum tx_state state;
 	/** Set if the transaction was started by an applier. */
@@ -217,14 +207,16 @@ vy_tx_read_view(struct vy_tx *tx)
 static inline bool
 vy_tx_is_prepared_ok(struct vy_tx *tx)
 {
-	switch (tx->isolation) {
+	enum txn_isolation_level isolation = tx->txn != NULL ?
+		tx->txn->isolation : TXN_ISOLATION_READ_CONFIRMED;
+	switch (isolation) {
 	case TXN_ISOLATION_READ_COMMITTED:
 		return true;
 	case TXN_ISOLATION_READ_CONFIRMED:
 	case TXN_ISOLATION_LINEARIZABLE:
 		return false;
 	case TXN_ISOLATION_BEST_EFFORT:
-		return !rlist_empty(&tx->in_writers);
+		return !stailq_empty(&tx->txn->stmts);
 	default:
 		unreachable();
 	}
@@ -244,10 +236,6 @@ struct vy_tx_manager {
 	 * transactions in vy_mem.
 	 */
 	int64_t psn;
-	/**
-	 * List of rw transactions, linked by vy_tx::in_writers.
-	 */
-	struct rlist writers;
 	/**
 	 * List of prepared (but not committed) transaction,
 	 * sorted by PSN ascending, linked by vy_tx::in_prepared.
@@ -333,15 +321,14 @@ vy_tx_manager_destroy_read_view(struct vy_tx_manager *xm,
  * to call wal_sync() to flush them.
  */
 void
-vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
-                                    struct space *space, bool *need_wal_sync);
+vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync);
 
 /**
  * Abort all local rw transactions that haven't reached WAL yet.
  * Called before switching to read-only mode.
  */
 void
-vy_tx_manager_abort_writers_for_ro(struct vy_tx_manager *xm);
+vy_tx_manager_abort_writers_for_ro(struct engine *engine);
 
 /** Initialize a tx object. */
 void
@@ -353,7 +340,7 @@ vy_tx_destroy(struct vy_tx *tx);
 
 /** Begin a new transaction. */
 struct vy_tx *
-vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation);
+vy_tx_begin(struct vy_tx_manager *xm, struct txn *txn);
 
 /** Prepare a transaction to be committed. */
 int
@@ -379,7 +366,7 @@ vy_tx_rollback(struct vy_tx *tx);
  * to a save point with vy_tx_rollback_statement().
  */
 int
-vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint);
+vy_tx_begin_statement(struct vy_tx *tx, void **savepoint);
 
 /**
  * Rollback a transaction statement.
