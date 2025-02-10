@@ -657,7 +657,9 @@ iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	assert(it->position != NULL);
 	assert(pos != NULL);
 	assert(size != NULL);
+	printf("--- iterator_position ---\n");
 	if (!index_weak_ref_check(&it->index_ref)) {
+		printf("--- iterator_position index_weak_ref_check ---\n");
 		*pos = NULL;
 		*size = 0;
 		return 0;
@@ -744,11 +746,15 @@ iterator_position_validate(const char *pos, uint32_t pos_part_count,
 {
 	int cmp;
 	/* Position must be compatible with the index. */
+	printf ("--- type = %d ---\n", type);
 	if (cmp_def->part_count != pos_part_count)
 		goto fail;
 	const char *pos_end;
 	if (key_validate_parts(cmp_def, pos, pos_part_count, true, &pos_end) != 0)
 		goto fail;
+	// если это rtree return 0;
+	if (type == ITER_NEIGHBOR) 
+		return 0;
 	/* Position msut meet the search criteria. */
 	cmp = key_compare(pos, pos_part_count, HINT_NONE,
 			  key, key_part_count, HINT_NONE, cmp_def);
