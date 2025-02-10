@@ -1003,6 +1003,7 @@ next_key:
 			if (itr->last_cached.stmt != NULL)
 				tuple_unref(itr->last_cached.stmt);
 			itr->last_cached = vy_entry_none();
+			itr->is_first_cached = false;
 		}
 		goto next_key;
 	}
