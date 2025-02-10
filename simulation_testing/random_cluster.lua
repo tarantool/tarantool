@@ -8,6 +8,7 @@ local fio = require('fio')
 math.randomseed(os.clock())
 
 
+
 --- Utils functions for debugging
 local function ensure_replica_dirs_exist()
     local replica_dirs_path = fio.abspath('./replicas_dirs')
@@ -63,7 +64,7 @@ local function rand_cfg(cg, replica_count, replica_id)
 
     local box_cfg = {
         replication = uri_set,
-        replication_synchro_quorum = math.random(1, math.ceil(replica_count / 2)),
+        replication_synchro_quorum = math.random(math.floor(replica_count / 2) + 1, replica_count),
         replication_timeout = math.random(1, 10),
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
@@ -98,7 +99,7 @@ local function rand_cluster(max_number_replicas)
     clear_cluster(cg)
     cg.cluster = cluster:new{}
     local replica_count = math.random(3, max_number_replicas)
-
+    local candidates_count=0
     for i = 1, replica_count do
         create_dirs_for_replica(i)
         -- Генерация конфигурации для каждой реплики
@@ -107,17 +108,23 @@ local function rand_cluster(max_number_replicas)
         -- Случайный выбор election_mode
         if math.random() > 0.5 then
             box_cfg.election_mode = 'candidate'
+            candidates_count = candidates_count + 1
         else
             box_cfg.election_mode = 'voter'
         end
 
+        if i == replica_count and candidates_count == 0 then
+            box_cfg.election_mode = 'candidate'
+        end
         -- Создание и добавление реплики в кластер
         cg.replicas[i] = cg.cluster:build_and_add_server{
             alias = 'replica_'..tostring(i),
             box_cfg = box_cfg,
         }
+        
         print("replica_"..tostring(i).." added to cluster as ", box_cfg.election_mode)
     end
+
 
     -- Start the cluster
     cg.cluster:start()
@@ -133,29 +140,7 @@ local function rand_cluster(max_number_replicas)
 end
 
 
--- ---  TODO: must add checking not dropped nodes
--- --- Random Server Drop
--- ---
--- local function rand_server_drop()
---     local idx = math.random(1, #cg.cluster.servers)
---     local selected_server = cg.cluster.servers[idx]
 
---     print("Dropping server:", selected_server.alias)
-
---     -- Check if the server is the leader
---     local is_leader = selected_server:exec(function()
---         return box.info.election.state == 'leader'
---     end)
-
---     -- Drop server and handle leadership re-election if needed
---     if is_leader then
---         print("Server is leader. Waiting for new leader...")
---         cg.cluster:wait_until_election_leader_found()
---     else
---         selected_server:drop()
---         print("Dropped server:", selected_server.alias)
---     end
--- end
 
 
 return {

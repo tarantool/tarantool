@@ -6,191 +6,126 @@ local net_box = require('net.box')
 local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 
--- todo: operations with transactions
--- todo: accounting for space parameters
-local function generate_random_operation(space, max_key, is_read_only)
-
-    local rnd_key
-    local rnd_value
-    local operations
-    if is_read_only then
-        operations = {"select", "get"}
-        rnd_key = math.random(1, max_key) 
-    else
-        operations = {"select", "insert", "replace", "update", "upsert", "delete", "get", "put"}
-        rnd_key = math.random(1, max_key) 
-        rnd_value = "Value_" .. rnd_key  
-    end
-    local operation = operations[math.random(#operations)]
 
 
-    local tuple
-    if my_functions.contains({"insert", "replace", "upsert", "put"}, operation) then
-        tuple = {rnd_key, rnd_value} 
-    elseif my_functions.contains({"select", "get","delete"}, operation) then
-        tuple = {rnd_key}
-    elseif my_functions.contains({"update"}, operation) then
-        tuple = {rnd_key, operations_list}
-    end
+local function generate_random_read_operation(max_key)
+    local operation_types = {"select", "get"}
+    local rnd_key = math.random(1, max_key)
 
-    return {operation, tuple}
+    local operation_type = operation_types[math.random(#operation_types)]
+    local operation_args = {rnd_key}
+
+    return {operation_type, operation_args}
 end
 
+local function generate_random_write_operation(max_key)
+    local operation_types = {"insert", "replace", "update", "upsert", "delete", "put"}
+    local rnd_key = math.random(1, max_key)
+    local rnd_value = "Value for key " .. rnd_key
 
-local function do_random_operation(node, space, max_key)
+    local operation_type = operation_types[math.random(#operation_types)]
+    local operation_args
 
+    if my_functions.contains({"insert", "replace", "upsert", "put"}, operation_type) then
+        operation_args = {rnd_key, rnd_value}
+    elseif my_functions.contains({"delete"}, operation_type) then
+        operation_args = {rnd_key} 
+    elseif my_functions.contains({"update"}, operation_type) then
+        operation_args = {rnd_key, rnd_value}
+    end
+
+    return {operation_type, operation_args}
+end
+
+local function execute_db_operation(node, space_name, operation)
     my_functions.check_node(node)
 
     fiber.create(function()
-        local uri = node.net_box_uri
-        print(string.format("Подключение к ноде: %s", uri))
-        
-        local conn = require('net.box').connect(uri)
-        if not conn then
-            print("Ошибка подключения к ноде:", uri)
-            return
-        end
-    
-        local space = conn.space.test
-        if not space then
-            print("Ошибка: space не найден на ноде:", uri)
-            conn:close()
-            return
-        end
-
-        generated = generate_random_operation(space, max_key, my_functions.is_follower(conn))
-        local operation = generated[1]
-        local tuple = generated[2]
+        local operation_type = operation[1]
+        local operation_args = operation[2]
         local message = ""
+        local node_name = node.alias
 
-        if operation == "select" then
-            
-            local success, result = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                local res = space:select(tuple[1])
-                box.commit()  
-                return res
-            end)
-            if success then
-                if #result == 0 then
-                    message = "Записи не найдены для ключа " .. tostring(tuple[1])
-                else
-                    message = "Результаты select для ключа " .. tostring(tuple[1]) .. ":\n"
-                    for _, row in ipairs(result) do
-                        message = message .. " " .. tostring(row)
-                    end
+        local success, result = pcall(function()
+            return node:exec(function(operation_type, operation_args, space_name)
+                
+                local space = box.space[space_name]
+                local res
+
+                box.begin({txn_isolation = 'linearizable'})
+                if operation_type == "select" then
+                    res = space:select(operation_args[1])
+                elseif operation_type == "insert" then
+                    space:insert(operation_args)
+                elseif operation_type == "replace" then
+                    space:replace(operation_args)
+                elseif operation_type == "update" then
+                    local update_op = {{'=', 2, operation_args[2]}} -- mock operation
+                    space:update(operation_args[1], update_op)
+                elseif operation_type == "upsert" then
+                    local update_op = {{'=', #operation_args, operation_args[2]}} -- mock operation
+                    space:upsert(operation_args, update_op)
+                elseif operation_type == "delete" then
+                    space:delete(operation_args[1])
+                elseif operation_type == "get" then
+                    res = space:get(operation_args[1])
+                elseif operation_type == "put" then
+                    space:replace(operation_args)
                 end
-            else
-                message = "Ошибка при выполнении select: " .. tostring(result)
-            end
 
-        elseif operation == "insert" then
-            
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:insert(tuple)
                 box.commit()
-            end)
-            if success then
-                message = "Запись успешно вставлена: " .. my_functions.table_to_string(tuple)
-            else
-                message = "Ошибка при выполнении insert: " .. tostring(err)
-            end
-
-        elseif operation == "replace" then
-            
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:replace(tuple)
-                box.commit()
-            end)
-            if success then
-                message = "Запись успешно заменена: " .. my_functions.table_to_string(tuple)
-            else
-                message = "Ошибка при выполнении replace: " .. tostring(err)
-            end
-
-        elseif operation == "update" then
-            
-            local update_op = {{'=', 2, tuple[2]}}  -- mock operation
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:update(tuple[1], update_op)
-                box.commit()
-            end)
-            if success then
-                message = "Запись успешно обновлена " .. my_functions.table_to_string(tuple)
-            else
-                message = "Ошибка при выполнении update: " .. tostring(err)
-            end
-
-        elseif operation == "upsert" then
-            
-            local update_op = {{'=', #tuple, tuple[2]}}  -- mock operation
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:upsert(tuple, update_op)  
-                box.commit()
-            end)
-            if success then
-                message = "Запись успешно вставлена или обновлена: " .. my_functions.table_to_string(tuple)
-            else
-                message = "Ошибка при выполнении upsert: " .. tostring(err)
-            end
-
-        elseif operation == "delete" then
-            
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:delete(tuple[1])
-                box.commit()
-            end)
-            if success then
-                message = "Запись успешно удалена для ключа " .. tostring(tuple[1])
-            else
-                message = "Ошибка при выполнении delete: " .. tostring(err)
-            end
-
-        elseif operation == "get" then
-            
-            local success, result = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                local res = space:get(tuple[1])
-                box.commit()  
                 return res
-            end)
-            if success then
+            end, {operation_type, operation_args, space_name})
+        end)
+
+        if success then
+            if operation_type == "select" or operation_type == "get" then
                 if result then
-                    message = "Результат get для ключа " .. tostring(tuple[1]) .. ": " .. tostring(result)
+                    message = string.format(
+                        "Operation: %s, Args: %s, Result: %s, Node: %s, Space: %s",
+                        operation_type,
+                        tostring(operation_args[1]),
+                        my_functions.table_to_string(result), 
+                        node_name, 
+                        space_name
+                )
                 else
-                    message = "Запись не найдена для ключа " .. tostring(tuple[1])
+                    message = string.format(
+                        "Operation: %s, Args: %s, Result: No entries found, Node: %s, Space: %s",
+                        operation_type,
+                        tostring(operation_args[1]),
+                        node_name, 
+                        space_name
+                    )
                 end
             else
-                message = "Ошибка при выполнении get:" .. tostring(result)
+                message = string.format(
+                    "Operation: %s, Args: %s, Result: Completed successfully, Node: %s, Space: %s",
+                    operation_type,
+                    my_functions.table_to_string(operation_args),
+                    node_name, 
+                    space_name
+                )
             end
-
-        elseif operation == "put" then
-            
-            local success, err = pcall(function()
-                box.begin({txn_isolation  = 'linearizable'})
-                space:replace(tuple)
-                box.commit()
-            end)
-            if success then
-                message = "Запись " .. my_functions.table_to_string(tuple) .. " успешно вставлена или обновлена для ключа " .. tostring(tuple[1])
-            else
-                message = "Ошибка при выполнении put:" .. tostring(err)
-            end
+        else
+            message = string.format(
+                "Error while executing the DB operation. Operation: %s, Args: %s, Node: %s, Space: %s, Error(result): %s",
+                operation_type,
+                my_functions.table_to_string(operation_args),
+                node_name,
+                space_name,
+                my_functions.table_to_string(result) 
+            )
         end
 
-        conn:close()
         print(message)
     end)
 end
 
 return {
-    generate_random_operation = generate_random_operation,
-    do_random_operation = do_random_operation
+    generate_random_read_operation = generate_random_read_operation,
+    generate_random_write_operation = generate_random_write_operation,
+    execute_db_operation = execute_db_operation
 
 }
 

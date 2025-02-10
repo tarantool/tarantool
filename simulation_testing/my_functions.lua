@@ -1,3 +1,5 @@
+local net_box = require('net.box')
+
 -- Check including
 local function print_hello()
     print("Hello from my_functions.lua")
@@ -60,13 +62,24 @@ local function get_initial_replication(nodes)
     return initial_replication
 end
 
-local function get_random_node(nodes)
+local function get_random_node(nodes, timeout)
     if not nodes or #nodes == 0 then
         error("Node list is empty or nil")
     end
-    local index = math.random(#nodes)
-    return nodes[index]
+
+    for _, node in ipairs(nodes) do
+        local ok, result = pcall(function()
+            return node:eval("return true", {}, {timeout = timeout})
+        end)
+
+        if ok and result then
+            return node
+        end
+    end
+
+    error("No connected nodes available")
 end
+
 
 return {
     print_hello = print_hello,
@@ -76,6 +89,6 @@ return {
     calculate_delay = calculate_delay,
     check_node = check_node,
     get_initial_replication = get_initial_replication,
-    get_random_node = get_random_node
+    get_random_node = get_random_node,
 
 }

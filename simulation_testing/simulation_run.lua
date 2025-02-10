@@ -7,11 +7,25 @@ local my_functions = require("my_functions")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
+local log_handling = require('log_handling')
 local fio = require('fio')
+local replication_errors = require("replication_errors")
+
+
+io.output(assert(io.open("wroking_log.log", "w")))
+
+function print(...)
+    local t = {}
+    for i = 1, select("#", ...) do
+        t[i] = tostring(select(i, ...))
+    end
+    io.write(table.concat(t, "\t"), "\n")
+end
+
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(5)
+local cg = random_cluster.rand_cluster(3)
 
 box.cfg {
     checkpoint_count = 2, 
@@ -27,7 +41,9 @@ for _, node in ipairs(cg.replicas) do
         return box.info.election.state
     end)
     print(string.format("Node %s is %s", node.alias, tostring(node_state)))
+    crash_functions.update_node_state(node, "active")
 end
+
 
 -- Finding the leader node
 local leader_node = cg.cluster:get_leader()
@@ -62,29 +78,35 @@ end)
 
 print(result)
 
-print("WAL directory:", fio.cwd())
+print("[[PERIODIC INSERT] Started")
+log_handling.periodic_insert(
+    cg,
+    "test",
+    1,
+    1,
+    0.01
+)
 
--- The main cycle
-fiber.create(function()
-    while true do
-        local random_action = math.random(1, 10)
+print("[DIVERGENCE MONITOR] Started")
+log_handling.divergence_monitor(
+    cg,
+    "test",
+    100,
+    1,
+    2
+)
 
-        if random_action < 8 then
-            randomized_operations.do_random_operation(my_functions.get_random_node(cg.replicas), "test", 10)
-        else 
-            local type_of_crashing = math.random(1, 3)
-            if type_of_crashing == 1 then
-                crash_functions.stop_node(my_functions.get_random_node(cg.replicas), 5, 10)
+print("[CRASH SIMULATION] Started")
+local crash_time = 5 -- Crash-specific time, which sets the increased frequency of crashes
+crash_functions.crash_simulation(
+    cg,
+    nodes_activity_states,
+    initial_replication,
+    1,
+    crash_time,
+    crash_time
+)
 
-            elseif type_of_crashing == 2 then
-                crash_functions.create_delay_to_write_operations(my_functions.get_random_node(cg.replicas), "test", 5, 10)
+print("[REPLICATION MONITOR] Started")
+fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
 
-            else 
-                crash_functions.break_connection_between_random_nodes(cg.replicas, initial_replication, 5, 10)
-    
-            end
-        end
-
-        fiber.sleep(math.random(1, 2)) 
-    end
-end)
