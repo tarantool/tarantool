@@ -150,7 +150,7 @@ struct index_rtree_iterator {
     struct rtree_iterator impl;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
-	tuple* last; 	// добавление текущей позиции в индексе [верно]
+	tuple* last; 	// добавление текущей позиции (last tuple) [верно]
 };
 
 static void
@@ -159,9 +159,10 @@ index_rtree_iterator_free(struct iterator *i)
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	rtree_iterator_destroy(&itr->impl);
 	if (itr->last != NULL) {
-		free(itr->last);
+		//free(itr->last);
 		itr->last = NULL;
 	}
+	printf("--- free memory ---\n");
 	mempool_free(itr->pool, itr);
 }
 
@@ -171,6 +172,7 @@ rtree_rect_neigh_distance2(const struct rtree_rect *rect,  // [5]
 			   const struct rtree_rect *neigh_rect,
 			   unsigned dimension)
 {
+	printf("--- distance memtx ---\n");
 	sq_coord_t result = 0;
 	for (int i = dimension; --i >= 0; ) {
 		const coord_t *coords = &rect->coords[2 * i];
@@ -187,9 +189,10 @@ rtree_rect_neigh_distance2(const struct rtree_rect *rect,  // [5]
 }
 
 /* set position to the iterator */
-sq_coord_t rtree_iterator_set_position(struct index_rtree_iterator *iterator, const char *pos, 
+sq_coord_t rtree_iterator_set_position(const char *pos, 
 							struct memtx_rtree_index *index, uint32_t part_count, rtree_rect *rect_dim) 
 {
+	printf ("--- try to get pos ---\n");
 	// [  x0, y0, x1, y1 ... ]
    	sq_coord_t distance_pos = 0;
 	struct rtree_rect rect;
@@ -197,7 +200,7 @@ sq_coord_t rtree_iterator_set_position(struct index_rtree_iterator *iterator, co
 	mp_decode_rect_from_key(&rect, index->dimension, pos, part_count);
 	distance_pos = rtree_rect_neigh_distance2(&rect, rect_dim, index->dimension);
 	// dinstance_pos = rtree_rect_neigh_distance_max();
-	// dinstance_pos = *(const double *)pos;
+
 	printf ("value of dinstance_pos is %lg\n", distance_pos);
     
 	return distance_pos;
@@ -219,14 +222,13 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
- 
-		if (itr->impl.op == SOP_NEIGHBOR) {
-			struct rtree_iterator *rtree_it = (struct rtree_iterator *) i;
-			itr->last = *ret; 	// сделать сохранение позиции про итерировании [верно] 
-			rtree_it->last = *(record_t*)*ret; 
-		}
 
 	} while (*ret == NULL);
+	if (itr->impl.op == SOP_NEIGHBOR) {
+		printf("--- save last tuple ---\n");
+		// struct rtree_iterator *rtree_it = (struct rtree_iterator *) i;
+		itr->last = *ret; 	// сделать сохранение позиции про итерировании [верно] 
+	}
 	return 0;
 }
 
@@ -361,17 +363,27 @@ rtree_iterator_position_impl(struct tuple *last,
 			    struct index_def *def,
 			    const char **pos, uint32_t *size)
 {
+	assert(last != NULL);
+	assert(def 	!= NULL);
+	assert(pos 	!= NULL);
+
+	printf("--- position impl ---\n");
 	struct tuple *tuple = last;
 	if (tuple == NULL) {
+		printf ("--- tuple == NULL ---\n");
 		*pos = NULL;
 		*size = 0;
 		return 0;
 	}
 	int mk_idx = MULTIKEY_NONE;
-	
-	const char *key = tuple_extract_key(tuple, def->cmp_def, mk_idx, size);
-	if (key == NULL)
+	printf("--- tuple_extract_key ---\n");
+	printf("--- tuple ptr [%p] ---\n", tuple);
+	const char *key = tuple_extract_key(tuple, def->cmp_def, mk_idx, size); // тут проблема segfault 
+	printf("--- ok extract ---\n");
+	if (key == NULL) {
+		printf ("--- key == NULL ---\n");
 		return -1;
+	}
 	*pos = key;
 	return 0;
 }
@@ -380,14 +392,15 @@ rtree_iterator_position_impl(struct tuple *last,
  * Implementation of iterator position for general and multikey indexes.
  */
 static int
-rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)  // [верно]
+rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)  
 {
+	printf("--- rtree_position ---\n");
 	struct memtx_rtree_index *index =
 		(struct memtx_rtree_index *)
 		index_weak_ref_get_index_checked(&it->index_ref);
-	struct rtree_iterator *rtree_it = (struct rtree_iterator *) it;
+	struct index_rtree_iterator *rtree_it = (struct index_rtree_iterator *) it;
 	return rtree_iterator_position_impl(
-		(tuple*) &rtree_it->last, index->base.def, pos, size);
+		rtree_it->last, index->base.def, pos, size);
 }
 
 static int
@@ -470,19 +483,23 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 
+	if (op == SOP_NEIGHBOR) {
+		it->base.position = rtree_iterator_position;
+	}
 	if (pos != NULL) { 	
 		if (op == SOP_NEIGHBOR) {
-		
-			// это происходит на уровне box_select
+			printf("--- neighbor and pos ---\n");
 			// it->after_data.key = pos;
 			// it->after_data.part_count = cmp_def->part_count;
-			it->impl.current_pos_distance = rtree_iterator_set_position(it, pos, index, part_count, rect); // char* -> double 
-			it->base.position = rtree_iterator_position;
+			it->impl.current_pos_distance = rtree_iterator_set_position(pos, 
+														index, part_count, &rect); 
+			// it->base.position = rtree_iterator_position;
 		} else {
 			diag_set(UnsupportedIndexFeature, base->def,
 				 "pagination with wrong iterator type");
 		}
 	} else {
+		printf("--- pos == null ---\n");
 		it->last = NULL;
 		it->impl.current_pos_distance = 0;
 	}
