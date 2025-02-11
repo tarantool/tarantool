@@ -12,7 +12,7 @@ local fio = require('fio')
 local replication_errors = require("replication_errors")
 
 
-io.output(assert(io.open("wroking_log.log", "w")))
+io.output(assert(io.open("working_log.log", "w")))
 
 function print(...)
     local t = {}

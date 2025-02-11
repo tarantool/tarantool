@@ -3,6 +3,7 @@ local fio = require('fio')
 local fiber = require('fiber')
 local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
+local json = require("json")
 
 -- Function for reading the xlog
 local function read_xlog(file_path)
@@ -175,45 +176,54 @@ end
 local function divergence_monitor(cg, space_name, n, step, interval)
     fiber.create(function()
         while true do
+            local valid_nodes = {}
+            -- Wrapped the entire cycle in pcall for safe execution
+            local success, err = pcall(function()
 
-            valid_nodes = crash_functions.get_non_crashed_nodes( 
-                cg.replicas,
-                nodes_activity_states
-            )
+                valid_nodes = crash_functions.get_non_crashed_nodes( 
+                    cg.replicas,
+                    nodes_activity_states
+                )
 
-            if valid_nodes ~= -1 then
+                if valid_nodes ~= -1 then
 
-                local entries_by_node = {}
-                local all_entries_recieved = true
+                    local entries_by_node = {}
+                    local all_entries_recieved = true
 
-                for _, node in ipairs(valid_nodes) do
-                    local success, result = pcall(function()
-                        return get_last_n_entries(node, space_name, n)
-                    end)
+                    for _, node in ipairs(valid_nodes) do
+                        local success, result = pcall(function()
+                            return get_last_n_entries(node, space_name, n)
+                        end)
 
-                    if success then
-                        if result then
-                            entries_by_node[node.alias] = result
+                        if success then
+                            if result then
+                                entries_by_node[node.alias] = result
+                            else
+                                print(string.format("[DIVERGENCE MONITOR] No entries found for node '%s'.", node.alias))
+                                all_entries_recieved = false
+                            end
                         else
-                            print(string.format("[DIVERGENCE MONITOR] No entries found for node '%s'.", node.alias))
+                            print(string.format("[DIVERGENCE MONITOR] Error fetching entries from node '%s': %s", node.alias, result))
                             all_entries_recieved = false
                         end
-                    else
-                        print(string.format("[DIVERGENCE MONITOR] Error fetching entries from node '%s': %s", node.alias, result))
-                        all_entries_recieved = false
                     end
-                end
 
-                if all_entries_recieved then
-                    local common_length = find_max_common_length(entries_by_node, step)
-                    local divergence = n - common_length
-                    print(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                    if all_entries_recieved then
+                        local common_length = find_max_common_length(entries_by_node, step)
+                        local divergence = n - common_length
+                        print(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                    else
+                        print("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
+                    end
                 else
-                    print("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
+                    print("[DIVERGENCE MONITOR] No valid nodes available. Retrying...")
                 end
-            else
-                print("[DIVERGENCE MONITOR] No valid nodes available. Retrying...")
+            end)
+
+            if not success then
+                print("[DIVERGENCE MONITOR] Error in divergence_monitor get_last_n_entries: " .. json.encode(err))
             end
+
 
             fiber.sleep(interval)
         end
