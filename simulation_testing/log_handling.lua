@@ -5,6 +5,7 @@ local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
 local json = require("json")
 
+
 -- Function for reading the xlog
 local function read_xlog(file_path)
 
@@ -46,47 +47,64 @@ local function get_latest_xlog(wal_dir)
 end
 
 -- Function of inserting a monotonously increasing key into a space
+
 local function periodic_insert(cg, space_name, i_0, step, interval)
     fiber.create(function(cg, space_name, i_0, step, interval)
         local key = i_0
         while true do
-            local leader_node = cg.cluster:get_leader()
+            -- Заворачиваем всё, что внутри цикла, в pcall
+            local ok, err = pcall(function()
+                local leader_node = cg.cluster:get_leader()
 
-            if not leader_node then
-                local leader_waiting_interval = 1 -- replication monitor's check_interval 50%
-                print("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
-                fiber.sleep(leader_waiting_interval)
-            else
-                local value = "Value for key " .. key
-                local operation_args = {key, value}
-                local success = false
-                repeat
-                    local status, err = pcall(function()
-                        leader_node:exec(function(operation_args, space_name) -- writing operations are always performed from the leader node
-                          
-                            box.begin({txn_isolation = 'linearizable'})
-                            box.space[space_name]:insert(operation_args)
-                            box.commit()
-                            
-                        end, {operation_args, space_name})
-                    end)
+                if not leader_node then
+                    local leader_waiting_interval = 1
+                    print("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
+                    fiber.sleep(leader_waiting_interval)
+                else
+                    local value = "Value for key " .. key
+                    local operation_args = {key, value}
+                    local success = false
 
-                    if status then
-                        success = true
-                        print("[PERIODIC INSERT] Successfully inserted key: " .. key .. ", value: " .. value .. ", into space: " .. "'" .. space_name .. "'")
-                    else
-                        print("[PERIODIC INSERT] Failed to execute insert operation for key: " .. key .. ", value: " .. value .. ", into space: " .. "'" .. space_name .. "'. Retrying in " .. interval .. " seconds...")
-                        fiber.sleep(interval)
-                    end
-                until success
+                    repeat
+                        local status, exec_err = pcall(function()
+                            leader_node:exec(function(operation_args, space_name)
+                                box.begin({txn_isolation = 'linearizable'})
+                                box.space[space_name]:insert(operation_args)
+                                box.commit()
+                            end, {operation_args, space_name})
+                        end)
 
-                key = key + step
+                        if status then
+                            success = true
+                            print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
+                                  ", value: " .. value ..
+                                  ", into space: '" .. space_name .. "'")
+                        else
+                            print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
+                                  key .. ", value: " .. value ..
+                                  ", into space: '" .. space_name ..
+                                  "'. Retrying in " .. interval .. " seconds...")
+                            print("[PERIODIC INSERT][Error] " .. json.encode(exec_err))
+                            fiber.sleep(interval)
+                        end
+                    until success
+
+                    key = key + step
+                end
+            end)  -- конец pcall
+
+            -- Если что-то пошло не так внутри тела цикла
+            if not ok then
+                print("[PERIODIC INSERT][Error] " .. json.encode(err))
+                -- Здесь можно добавить логику уведомления или другие действия при ошибке
             end
 
+            -- Делаем паузу перед следующей итерацией цикла
             fiber.sleep(interval)
         end
     end, cg, space_name, i_0, step, interval)
 end
+
 
 -- Function of getting the last n entries for a space from a node
 local function get_last_n_entries(node, space_name, n)
@@ -103,6 +121,7 @@ local function get_last_n_entries(node, space_name, n)
     end)
 
     if not success then
+        print("[PERIODIC INSERT][Error]" .. json.encode(result))
         return nil, result
     end
 
@@ -221,10 +240,8 @@ local function divergence_monitor(cg, space_name, n, step, interval)
             end)
 
             if not success then
-                print("[DIVERGENCE MONITOR] Error in divergence_monitor get_last_n_entries: " .. json.encode(err))
+                print("[DIVERGENCE MONITOR][Error]" .. json.encode(err))
             end
-
-
             fiber.sleep(interval)
         end
     end)
