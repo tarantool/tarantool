@@ -240,7 +240,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac4c2c8fe486838aee543ee531df62f60" kind="enumvalue"><name>ER_TIMEOUT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea374a879f5062c4e25b06129a2c9030b6" kind="enumvalue"><name>ER_ACTIVE_TRANSACTION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea18d9dbea9dc137920bb2b57ec48b32d5" kind="enumvalue"><name>ER_CURSOR_NO_TRANSACTION</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea62de48ef00c6ebd24f8fd6ebe2bfc248" kind="enumvalue"><name>ER_CROSS_ENGINE_TRANSACTION</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6e40f96042f5e46b51024400d9e0e58c" kind="enumvalue"><name>ER_NO_SUCH_ROLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4a11282742a05bf1e57529b2189f1eb4" kind="enumvalue"><name>ER_ROLE_EXISTS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaea89ae2d186ceba5790899969558d940" kind="enumvalue"><name>ER_CREATE_ROLE</name></member>
@@ -442,6 +441,8 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea642e45503192f20fcf5618c9004efedc" kind="enumvalue"><name>ER_SYNC_QUEUE_FULL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf35f9f4ea45049b759987ea49768fe46" kind="enumvalue"><name>ER_KEY_PART_VALUE_OUT_OF_RANGE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8430ac7a529aca65985ffded8d443ecf" kind="enumvalue"><name>ER_REPLICA_GC</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceafcf057af6fcd16f6416b4a7f25d38d09" kind="enumvalue"><name>ER_ALIEN_ENGINE</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea13c39fded19c7143e232ad6630746562" kind="enumvalue"><name>ER_MVCC_UNAVAILABLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
