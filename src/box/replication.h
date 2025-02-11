@@ -360,6 +360,7 @@ struct replicaset {
 		 * quorum.
 		 */
 		int synced;
+		int synced_and_part_of_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
