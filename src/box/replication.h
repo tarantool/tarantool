@@ -356,10 +356,15 @@ struct replicaset {
 		int loading;
 		/**
 		 * Number of appliers that have successfully
+		 * synchronized.
+		 */
+		int synced;
+		/**
+		 * Number of appliers that have successfully
 		 * synchronized and hence contribute to the
 		 * quorum.
 		 */
-		int synced;
+		int synced_and_part_of_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
