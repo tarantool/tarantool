@@ -32,6 +32,7 @@
  */
 #include <stddef.h>
 #include <stdbool.h>
+#include "box/index.h"
 #include "small/matras.h"
 
 #define RB_COMPACT 1
@@ -53,16 +54,7 @@ typedef double area_t;
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-struct rtree_neighbor {
-	rb_node(struct rtree_neighbor) link;
-	struct rtree_neighbor *next;
-	void *child;
-	int level;
-	sq_coord_t distance;
-};
-
-typedef rb_tree(struct rtree_neighbor) rtnt_t;
+/* A box in RTREE_DIMENSION space */
 
 enum {
 	/** Maximal possible R-tree height */
@@ -70,6 +62,24 @@ enum {
 	/** Maximal possible R-tree dimension */
 	RTREE_MAX_DIMENSION = 20
 };
+
+/* Coords */
+struct rtree_rect {
+	/* coords: { low X, upper X, low Y, upper Y, etc } */
+	coord_t coords[RTREE_MAX_DIMENSION * 2];
+};
+
+struct rtree_neighbor {
+	rb_node(struct rtree_neighbor) link;
+	struct rtree_neighbor *next;
+	void *child;
+	int level;
+	sq_coord_t distance;
+	/* Index. Is used for sorting neighbors with same distence */
+	struct index *index;
+};
+
+typedef rb_tree(struct rtree_neighbor) rtnt_t;
 
 /**
  * Rtree search operations. Used for searching and iterations.
@@ -98,13 +108,6 @@ enum spatial_search_op
 	SOP_NEIGHBOR
 };
 
-/* A box in RTREE_DIMENSION space */
-struct rtree_rect
-{
-	/* coords: { low X, upper X, low Y, upper Y, etc } */
-	coord_t coords[RTREE_MAX_DIMENSION * 2];
-};
-
 /* Type of function, comparing two rectangles */
 typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 				   const struct rtree_rect *rt2,
@@ -114,6 +117,13 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 enum rtree_distance_type {
 	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
 	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+};
+
+/* Neighbor pagination mode */
+enum position_type {
+	NO_PAGINATION = 0, /* No rtree pagination */
+	SET_POS = 1, /* new position set */
+	FIND_POS = 2 /* find pos tuple in rtree */
 };
 
 /* Main rtree struct */
@@ -177,6 +187,9 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+
+	/* Index. Is used for sorting neighbors with same distance */
+	struct index *index;
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
@@ -264,6 +277,22 @@ rtree_purge(struct rtree *tree);
 bool
 rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 	     enum spatial_search_op op, struct rtree_iterator *itr);
+
+/**
+ * @brief Skip neighbors for neighbor pagination
+ * @param itr - pointer to iterator (must be initialized earlier),
+ *  iterator itr should be used for accessing found record
+ * @param pos_distance min distance of last fetched rect
+ * @param pr_key_pos primary key of the position
+ * @param part_count_pos part count of the position
+ * @param index rtree index for getting key_def
+ */
+void
+rtree_skip_neighbors(struct rtree_iterator *itr,
+		     sq_coord_t pos_distance,
+		     const char *pr_key_pos,
+		     uint32_t part_count_pos,
+		     struct index *index);
 
 /**
  * @brief Insert a record to the tree
