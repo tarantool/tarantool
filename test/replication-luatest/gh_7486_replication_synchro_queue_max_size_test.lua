@@ -134,7 +134,15 @@ g.test_recovery_with_small_max_size = function(cg)
         box.ctl.promote()
         t.assert_equals(box.space.test:len(), 1000)
         box.cfg{replication_synchro_timeout = 100000}
+        -- wait = 'complete' by default, so after truncate completes,
+        -- the synchronous queue is guaranteed to be empty
+        box.space.test:truncate()
+        t.assert_equals(box.info.synchro.queue.len, 0)
     end)
+    -- synchro queue is empty now, 'test' space truncated,
+    -- so all invariants for test_master_synchro_queue_limited
+    -- are satisfied
+    g.test_master_synchro_queue_limited(cg)
 end
 
 g.test_size_is_updated_correctly_after_commit = function(cg)
