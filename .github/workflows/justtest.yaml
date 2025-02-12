@@ -141,7 +141,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
 
     # {{{ Build configurations
 
@@ -469,7 +469,7 @@ jobs:
   # {{{ Run tarantool testing (in separate jobs)
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: build
 
     strategy:
@@ -593,7 +593,7 @@ jobs:
   # {{{ Run LuaJIT testing (in separate jobs)
 
   luajit-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: build
 
     strategy:
