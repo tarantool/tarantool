@@ -53,16 +53,7 @@ typedef double area_t;
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-struct rtree_neighbor {
-	rb_node(struct rtree_neighbor) link;
-	struct rtree_neighbor *next;
-	void *child;
-	int level;
-	sq_coord_t distance;
-};
-
-typedef rb_tree(struct rtree_neighbor) rtnt_t;
+/* A box in RTREE_DIMENSION space */
 
 enum {
 	/** Maximal possible R-tree height */
@@ -70,6 +61,26 @@ enum {
 	/** Maximal possible R-tree dimension */
 	RTREE_MAX_DIMENSION = 20
 };
+
+/* coords */
+struct rtree_rect {
+	/* coords: { low X, upper X, low Y, upper Y, etc } */
+	coord_t coords[RTREE_MAX_DIMENSION * 2];
+};
+
+struct rtree_neighbor {
+	rb_node(struct rtree_neighbor) link;
+	struct rtree_neighbor *next;
+	void *child;
+	int level;
+	sq_coord_t distance;
+	/* for pagination optimisation */
+	sq_coord_t distance_max;
+	/* coords of neighbor */
+	struct rtree_rect rect;
+};
+
+typedef rb_tree(struct rtree_neighbor) rtnt_t;
 
 /**
  * Rtree search operations. Used for searching and iterations.
@@ -96,13 +107,6 @@ enum spatial_search_op
 	 * acluattly lowest_point of given rectangle). Records are iterated in
 	 * order of distance to given point. Yes, it is KNN iterator */
 	SOP_NEIGHBOR
-};
-
-/* A box in RTREE_DIMENSION space */
-struct rtree_rect
-{
-	/* coords: { low X, upper X, low Y, upper Y, etc } */
-	coord_t coords[RTREE_MAX_DIMENSION * 2];
 };
 
 /* Type of function, comparing two rectangles */
@@ -177,6 +181,13 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+
+	/* Position of pagination */
+	sq_coord_t current_pos_distance;
+	/* last fetched rect (position) */
+	struct rtree_rect current_pos_rect;
+	/* Flag that detects changing of the current position */
+	bool set_position;
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
