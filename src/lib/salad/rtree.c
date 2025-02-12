@@ -35,8 +35,6 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-#include <stdio.h> //
-
 /*------------------------------------------------------------------------- */
 /* R-tree internal structures definition */
 /*------------------------------------------------------------------------- */
@@ -155,7 +153,7 @@ rtree_rect_neigh_distance(const struct rtree_rect *rect,
 	return result;
 }
 
-/* Manhattan distance max */
+/* Manhattan distance max. Is used for pagination */
 static sq_coord_t
 rtree_rect_neigh_distance_max(const struct rtree_rect *rect,
 			   const struct rtree_rect *neigh_rect,
@@ -163,8 +161,8 @@ rtree_rect_neigh_distance_max(const struct rtree_rect *rect,
 {
 	sq_coord_t result = 0;
 	for (int i = dimension; --i >= 0; ) {
-		const coord_t *coords = &rect->coords[2 * (i + 1)];
-		coord_t neigh_coord = neigh_rect->coords[2 * (i + 1)];
+		const coord_t *coords = &rect->coords[2 * i + 1];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
 		if (neigh_coord < coords[0]) {
 			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
 			result += -diff;
@@ -197,16 +195,16 @@ rtree_rect_neigh_distance2(const struct rtree_rect *rect,
 	return result;
 }
 
-/* Euclid distance max, squared */
+/* Euclid distance max, squared. Is used for pagination */
 static sq_coord_t
 rtree_rect_neigh_distance_max2(const struct rtree_rect *rect,
 			   const struct rtree_rect *neigh_rect,
 			   unsigned dimension)
 {
 	sq_coord_t result = 0;
-	for (int i = dimension; --i >= 0; ) {                 // ?
-		const coord_t *coords = &rect->coords[2 * (i + 1)];
-		coord_t neigh_coord = neigh_rect->coords[2 * (i + 1)];
+	for (int i = dimension; --i >= 0; ) {                
+		const coord_t *coords = &rect->coords[2 * i + 1];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
 		if (neigh_coord < coords[0]) {
 			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[0]);
 			result += diff * diff;
@@ -874,7 +872,7 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 }
 
 static struct rtree_neighbor *
-rtree_iterator_new_neighbor(struct rtree_iterator *itr,
+rtree_iterator_new_neighbor(struct rtree_iterator *itr, struct rtree_rect* rect,
 			    void *child, sq_coord_t distance, sq_coord_t distance_max, int level)
 {
 	struct rtree_neighbor *n = itr->neigh_free_list;
@@ -884,8 +882,9 @@ rtree_iterator_new_neighbor(struct rtree_iterator *itr,
 		itr->neigh_free_list = n->next;
 	n->child = child;
 	n->distance = distance;
-	n->distance_max = distance_max; // [3]
+	n->distance_max = distance_max; 
 	n->level = level;
+	n->rect = *rect;
 	return n;
 }
 
@@ -924,7 +923,7 @@ rtree_iterator_process_neigh(struct rtree_iterator *itr,
 		{
 			distance = rtree_rect_neigh_distance2(&b->rect,
 							      &itr->rect, d);
-			distance_max = rtree_rect_neigh_distance_max2(&b->rect, // [4]
+			distance_max = rtree_rect_neigh_distance_max2(&b->rect, 
 							      &itr->rect, d);
 		}
 		else /* RTREE_MANHATTAN */
@@ -935,16 +934,21 @@ rtree_iterator_process_neigh(struct rtree_iterator *itr,
 							     &itr->rect, d);
 		}
 		struct rtree_neighbor *neigh =
-			rtree_iterator_new_neighbor(itr, b->data.page,
+			rtree_iterator_new_neighbor(itr, &b->rect, b->data.page,
 						    distance, distance_max,level - 1);
 		rtnt_insert(&itr->neigh_tree, neigh);
 	}
 }
 
-
 record_t
 rtree_iterator_next(struct rtree_iterator *itr)
 {
+	/* Is used for pagination */
+	static bool flag_find_pos = false;
+	if (itr->current_pos_distance > 0.0000001f) {
+		if (flag_find_pos == true && itr->set_position == false) 
+			flag_find_pos = false;
+	}
 	if (itr->version != itr->tree->version) {
 		/* Index was updated since cursor initialziation */
 		return NULL;
@@ -971,11 +975,25 @@ rtree_iterator_next(struct rtree_iterator *itr)
 				return NULL;
 			rtnt_remove(&itr->neigh_tree, neighbor);
 			
-			// если дальняя точка блока ближе нужной позиции, то мы пропускаем этот блок 
-			if (neighbor->distance_max < itr->current_pos_distance) // [верно]
+			/* Pagination optimisaion */
+			if (itr->current_pos_distance > 0.0000001f &&
+				neighbor->distance_max < itr->current_pos_distance) 
 				continue;
 
 			if (neighbor->level == 0) {
+				/* Pagination implementation */
+				if (itr->current_pos_distance > 0.0000001f) {
+					if (neighbor->distance < itr->current_pos_distance)
+						continue;
+					if (flag_find_pos == false) {
+						if (rtree_rect_equal_to_rect(&neighbor->rect, 
+							&itr->current_pos_rect, itr->tree->dimension)) {
+								flag_find_pos     = true;
+								itr->set_position = true;
+						}
+						continue;
+					}
+				}
 				void *child = neighbor->child;
 				rtree_iterator_free_neighbor(itr, neighbor);
 				return (record_t)child;
@@ -1151,9 +1169,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		itr->leaf_cmp = rtree_rect_strict_holds_rect;
 		break;
 	case SOP_NEIGHBOR:  
-		printf("--- search nb ---\n");
 		if (tree->root) {
-
 			struct rtree_rect cover;
 			rtree_page_cover(tree, tree->root, &cover);
 			sq_coord_t distance, distance_max;
@@ -1164,7 +1180,6 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				distance_max = 
 					rtree_rect_neigh_distance_max2(&cover, rect,
 							   tree->dimension);
-				printf("--- distance 1 ---\n");
 			}
 			else {	/* RTREE_MANHATTAN */
 				distance =
@@ -1174,14 +1189,11 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				rtree_rect_neigh_distance_max(&cover, rect,
 							  tree->dimension);
 			}
-
 			struct rtree_neighbor *n =
-				rtree_iterator_new_neighbor(itr, tree->root,
+				rtree_iterator_new_neighbor(itr, &cover, tree->root,
 							    distance, distance_max,
 							    tree->height); 
-			printf("--- rtree_iterator_new_neighbor ok ---\n");
-			rtnt_insert(&itr->neigh_tree, n);  // упорядочивает соседей по расстоянию (нужны только соседи с позиции pos) .
-			printf("--- rtnt_insert ok ---\n");
+			rtnt_insert(&itr->neigh_tree, n);  
 			return true;
 		} else {
 			return false;
