@@ -202,6 +202,7 @@ rtree_rect_neigh_distance_max2(const struct rtree_rect *rect,
 			   unsigned dimension)
 {
 	sq_coord_t result = 0;
+
 	for (int i = dimension; --i >= 0; ) {                
 		const coord_t *coords = &rect->coords[2 * i + 1];
 		coord_t neigh_coord = neigh_rect->coords[2 * i];
@@ -1169,6 +1170,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		itr->leaf_cmp = rtree_rect_strict_holds_rect;
 		break;
 	case SOP_NEIGHBOR:  
+		printf("--- search nb ---\n");
 		if (tree->root) {
 			struct rtree_rect cover;
 			rtree_page_cover(tree, tree->root, &cover);
@@ -1180,6 +1182,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				distance_max = 
 					rtree_rect_neigh_distance_max2(&cover, rect,
 							   tree->dimension);
+				printf("--- distance 1 ---\n");
 			}
 			else {	/* RTREE_MANHATTAN */
 				distance =
@@ -1193,6 +1196,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				rtree_iterator_new_neighbor(itr, &cover, tree->root,
 							    distance, distance_max,
 							    tree->height); 
+
 			rtnt_insert(&itr->neigh_tree, n);  
 			return true;
 		} else {

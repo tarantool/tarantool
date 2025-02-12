@@ -749,7 +749,7 @@ iterator_position_validate(const char *pos, uint32_t pos_part_count,
 	const char *pos_end;
 	if (key_validate_parts(cmp_def, pos, pos_part_count, true, &pos_end) != 0)
 		goto fail;
-	/* Can skip, if it is rtree index */
+	/* Can skip, if it is rtree index. Is used for rtree pagination */
 	if (type == ITER_NEIGHBOR) 
 		return 0;
 	/* Position msut meet the search criteria. */

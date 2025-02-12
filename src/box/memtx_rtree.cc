@@ -388,7 +388,7 @@ rtree_iterator_position_impl(struct tuple *last,
 
 /**
  * Implementation of iterator position for general and multikey indexes.
- * Is used for pagination
+ * Is used for pagination.
  */
 static int
 rtree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)  
