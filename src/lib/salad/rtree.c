@@ -195,7 +195,7 @@ rtree_rect_neigh_distance2(const struct rtree_rect *rect,
 	return result;
 }
 
-/* Euclid distance max, squared. Is used for pagination */
+/* Euclid distance max, squared. Is used for pagination. */
 static sq_coord_t
 rtree_rect_neigh_distance_max2(const struct rtree_rect *rect,
 			   const struct rtree_rect *neigh_rect,
