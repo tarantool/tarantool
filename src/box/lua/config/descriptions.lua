@@ -532,7 +532,8 @@ I['config.etcd.watchers.reconnect_max_attempts'] = format_text([[
 
 I['config.etcd.watchers.reconnect_timeout'] = format_text([[
     The timeout (in seconds) between attempts to reconnect to an etcd
-    server in case of connection failure.
+    server in case of connection failure. Default is 0. If the option is
+    omitted or set to 0, then it equals to reconnect_timeout.
 ]])
 
 -- }}} config.etcd configuration
@@ -2014,6 +2015,12 @@ I['replication.timeout'] = format_text([[
     If a master or replica gets no heartbeat message for
     `4 * replication.timeout` seconds, a connection is dropped and a replica
     tries to reconnect to the master.
+]])
+
+
+I['replication.reconnect_timeout'] = format_text([[
+    The timeout (in seconds) between attempts to reconnect to a master
+    in case of connection failure.
 ]])
 
 -- }}} replication configuration

@@ -96,6 +96,8 @@ cfg_filter(box.cfg)
  |     - 3600
  |   - - replication_connect_timeout
  |     - 30
+ |   - - replication_reconnect_timeout
+ |     - 0
  |   - - replication_skip_conflict
  |     - false
  |   - - replication_sync_lag
@@ -250,6 +252,8 @@ cfg_filter(box.cfg)
  |     - 3600
  |   - - replication_connect_timeout
  |     - 30
+ |   - - replication_reconnect_timeout
+ |     - 0
  |   - - replication_skip_conflict
  |     - false
  |   - - replication_sync_lag

@@ -1339,6 +1339,17 @@ box_check_replication_timeout(void)
 }
 
 static double
+box_check_replication_reconnect_timeout(void)
+{
+	double timeout = cfg_getd("replication_reconnect_timeout");
+	if (timeout < 0) {
+		diag_set(ClientError, ER_CFG, "replication_reconnect_timeout",
+			 "the value must be greater or equal to 0");
+	}
+	return timeout;
+}
+
+static double
 box_check_replication_connect_timeout(void)
 {
 	double timeout = cfg_getd("replication_connect_timeout");
@@ -2004,6 +2015,8 @@ box_check_config(void)
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
+	if (box_check_replication_reconnect_timeout() < 0)
+		diag_raise();
 	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_check_replication_synchro_timeout() < 0)
@@ -2173,6 +2186,16 @@ box_set_replication_timeout(void)
 	replication_timeout = box_check_replication_timeout();
 	raft_cfg_death_timeout(box_raft(), replication_disconnect_timeout());
 	box_update_broadcast_ballot_interval(replication_timeout);
+}
+
+int
+box_set_replication_reconnect_timeout(void)
+{
+	double timeout = box_check_replication_reconnect_timeout();
+	if (timeout < 0)
+		return -1;
+	replication_reconnect_timeout = timeout;
+	return 0;
 }
 
 void
@@ -5808,6 +5831,8 @@ box_cfg_xc(void)
 	box_set_readahead();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	if (box_set_replication_reconnect_timeout() != 0)
+		diag_raise();
 	if (box_set_bootstrap_strategy() != 0)
 		diag_raise();
 	if (box_set_bootstrap_leader() != 0)
