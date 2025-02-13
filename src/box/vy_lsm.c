@@ -1051,6 +1051,15 @@ vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		vy_lsm_commit_upsert(lsm, mem, entry);
 
 	vy_stmt_counter_acct_tuple(&lsm->stat.put, entry.stmt);
+
+	/*
+	 * If a cache chain covering a prepared DELETE statement is added
+	 * to the cache, it will be invisible to any transaction operating in
+	 * the 'read-confirmed' isolation level. To avoid that, we invalidate
+	 * the cache when a statement is confirmed so that the chain can be
+	 * re-created on the next read with its final LSN.
+	 */
+	vy_cache_on_write(&lsm->cache, entry, NULL);
 }
 
 void

@@ -123,6 +123,8 @@ vy_cache_node_new(struct vy_cache_env *env, struct vy_cache *cache,
 	node->flags = 0;
 	node->left_boundary_level = cache->cmp_def->part_count;
 	node->right_boundary_level = cache->cmp_def->part_count;
+	node->left_lsn = 0;
+	node->right_lsn = 0;
 	rlist_add(&env->cache_lru, &node->in_lru);
 	env->mem_used += vy_cache_node_size(node);
 	vy_stmt_counter_acct_tuple(&cache->stat.count, entry.stmt);
@@ -232,7 +234,7 @@ vy_cache_env_set_quota(struct vy_cache_env *env, size_t quota)
 
 void
 vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
-	     struct vy_entry prev, bool is_first,
+	     struct vy_entry prev, bool is_first, int64_t link_lsn,
 	     struct vy_entry key, enum iterator_type order)
 {
 	assert(!is_first || prev.stmt == NULL);
@@ -325,12 +327,19 @@ vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
 		node->flags = replaced->flags;
 		node->left_boundary_level = replaced->left_boundary_level;
 		node->right_boundary_level = replaced->right_boundary_level;
+		node->left_lsn = replaced->left_lsn;
+		node->right_lsn = replaced->right_lsn;
 		vy_cache_node_delete(cache->env, replaced);
 	}
-	if (direction > 0 && boundary_level < node->left_boundary_level)
+	if (direction > 0 &&
+	    boundary_level < node->left_boundary_level) {
 		node->left_boundary_level = boundary_level;
-	else if (direction < 0 && boundary_level < node->right_boundary_level)
+		node->left_lsn = link_lsn;
+	} else if (direction < 0 &&
+		   boundary_level < node->right_boundary_level) {
 		node->right_boundary_level = boundary_level;
+		node->right_lsn = link_lsn;
+	}
 
 	vy_stmt_counter_acct_tuple(&cache->stat.put, curr.stmt);
 
@@ -411,6 +420,8 @@ vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
 		prev_node->flags = replaced->flags;
 		prev_node->left_boundary_level = replaced->left_boundary_level;
 		prev_node->right_boundary_level = replaced->right_boundary_level;
+		prev_node->left_lsn = replaced->left_lsn;
+		prev_node->right_lsn = replaced->right_lsn;
 		vy_cache_node_delete(cache->env, replaced);
 	}
 
@@ -419,6 +430,14 @@ vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
 	/* Set inverted flag in the previous node */
 	prev_node->flags |= (VY_CACHE_LEFT_LINKED |
 			     VY_CACHE_RIGHT_LINKED) ^ flag;
+	/* Set chain link LSN when two nodes are linked */
+	if (direction > 0) {
+		node->left_lsn = link_lsn;
+		prev_node->right_lsn = link_lsn;
+	} else {
+		node->right_lsn = link_lsn;
+		prev_node->left_lsn = link_lsn;
+	}
 }
 
 struct vy_entry
@@ -537,6 +556,29 @@ vy_cache_iterator_curr(struct vy_cache_iterator *itr)
 }
 
 /**
+ * Return true if the given LSN is visible from the iterator read view.
+ */
+static bool
+vy_cache_iterator_lsn_is_visible(struct vy_cache_iterator *itr, int64_t lsn)
+{
+	if (lsn > (**itr->read_view).vlsn)
+		return false;
+	if (!itr->is_prepared_ok && vy_lsn_is_prepared(lsn))
+		return false;
+	return true;
+}
+
+/**
+ * Return true if the given statement is visible from the iterator read view.
+ */
+static bool
+vy_cache_iterator_stmt_is_visible(struct vy_cache_iterator *itr,
+				  struct tuple *stmt)
+{
+	return vy_cache_iterator_lsn_is_visible(itr, vy_stmt_lsn(stmt));
+}
+
+/**
  * Determine whether the merge iterator must be stopped or not.
  * That is made by examining flags of a cache record.
  *
@@ -552,15 +594,15 @@ vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
-		if (node->flags & VY_CACHE_LEFT_LINKED)
-			return true;
-		if (iter_is_eq && node->left_boundary_level <= key_level)
-			return true;
+		if ((node->flags & VY_CACHE_LEFT_LINKED) ||
+		    (iter_is_eq && node->left_boundary_level <= key_level))
+			return vy_cache_iterator_lsn_is_visible(
+						itr, node->left_lsn);
 	} else {
-		if (node->flags & VY_CACHE_RIGHT_LINKED)
-			return true;
-		if (iter_is_eq && node->right_boundary_level <= key_level)
-			return true;
+		if ((node->flags & VY_CACHE_RIGHT_LINKED) ||
+		    (iter_is_eq && node->right_boundary_level <= key_level))
+			return vy_cache_iterator_lsn_is_visible(
+						itr, node->right_lsn);
 	}
 	return false;
 }
@@ -582,15 +624,17 @@ vy_cache_iterator_is_end_stop(struct vy_cache_iterator *itr,
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
-		if (last_node->flags & VY_CACHE_RIGHT_LINKED)
-			return true;
-		if (iter_is_eq && last_node->right_boundary_level <= key_level)
-			return true;
+		if ((last_node->flags & VY_CACHE_RIGHT_LINKED) ||
+		    (iter_is_eq &&
+		     last_node->right_boundary_level <= key_level))
+			return vy_cache_iterator_lsn_is_visible(
+						itr, last_node->right_lsn);
 	} else {
-		if (last_node->flags & VY_CACHE_LEFT_LINKED)
-			return true;
-		if (iter_is_eq && last_node->left_boundary_level <= key_level)
-			return true;
+		if ((last_node->flags & VY_CACHE_LEFT_LINKED) ||
+		    (iter_is_eq &&
+		     last_node->left_boundary_level <= key_level))
+			return vy_cache_iterator_lsn_is_visible(
+						itr, last_node->left_lsn);
 	}
 	return false;
 }
@@ -634,21 +678,6 @@ vy_cache_iterator_step(struct vy_cache_iterator *itr)
 	itr->curr = node->entry;
 	tuple_ref(itr->curr.stmt);
 	return vy_cache_iterator_is_stop(itr, node);
-}
-
-/**
- * Return true if the given statement is visible from the iterator
- * read view.
- */
-static inline bool
-vy_cache_iterator_stmt_is_visible(struct vy_cache_iterator *itr,
-				  struct tuple *stmt)
-{
-	if (vy_stmt_lsn(stmt) > (**itr->read_view).vlsn)
-		return false;
-	if (!itr->is_prepared_ok && vy_stmt_is_prepared(stmt))
-		return false;
-	return true;
 }
 
 /**

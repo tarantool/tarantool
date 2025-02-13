@@ -1004,6 +1004,10 @@ next_key:
 				tuple_unref(itr->last_cached.stmt);
 			itr->last_cached = vy_entry_none();
 			itr->is_first_cached = false;
+			itr->cache_link_lsn = 0;
+		} else {
+			itr->cache_link_lsn = MAX(itr->cache_link_lsn,
+						  vy_stmt_lsn(entry.stmt));
 		}
 		goto next_key;
 	}
@@ -1026,13 +1030,15 @@ vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry)
 		return;
 	}
 	vy_cache_add(&itr->lsm->cache, entry, itr->last_cached,
-		     itr->is_first_cached, itr->key, itr->iterator_type);
+		     itr->is_first_cached, itr->cache_link_lsn,
+		     itr->key, itr->iterator_type);
 	if (entry.stmt != NULL)
 		tuple_ref(entry.stmt);
 	if (itr->last_cached.stmt != NULL)
 		tuple_unref(itr->last_cached.stmt);
 	itr->last_cached = entry;
 	itr->is_first_cached = false;
+	itr->cache_link_lsn = 0;
 }
 
 /**
