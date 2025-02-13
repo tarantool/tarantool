@@ -12,7 +12,7 @@ test_run:cmd("push filter 'error: Failed to allocate [0-9]+ ' to 'error: Failed 
 space = box.schema.space.create('tweedledum')
 ---
 ...
-index = space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary')
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -245,7 +245,7 @@ str = string.rep('a', 15000) -- about size of index memory block
 space = box.schema.space.create('tweedledum')
 ---
 ...
-index = space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary')
 ---
 ...
 collectgarbage('collect')

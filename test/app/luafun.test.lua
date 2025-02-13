@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 
 space = box.schema.space.create('tweedledum')
-index = space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary')
 for i = 1,5,1 do space:replace({i, i}) end
 
 fun = require('fun')
