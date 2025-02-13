@@ -33,11 +33,21 @@ g.test_memtx_hash_idx_gt_iterator_dirty_reads = function(cg)
     stream3:begin()
     stream4:begin()
 
-    stream1.space.s:insert{4}
-    stream2.space.s:insert{8}
-
-    stream3.space.s:insert{2}
+    for i = 1, 100 do
+        stream1.space.s:insert{i}
+    end
+    for i = 101, 200 do
+        stream2.space.s:insert{i}
+    end
+    for i = 201, 300 do
+        stream3.space.s:insert{i}
+    end
     stream3:commit()
 
-    t.assert_equals(stream4.space.s:select({8}, {iterator = 'GT'}), {{2}})
+    local res = stream4.space.s:select({1}, {iterator = 'GT'})
+    t.assert((next(res)))
+    for _, tuple in pairs(res) do
+        t.assert_ge(tuple[1], 201)
+        t.assert_le(tuple[1], 300)
+    end
 end
