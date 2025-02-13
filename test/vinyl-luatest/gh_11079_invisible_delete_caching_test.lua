@@ -150,3 +150,52 @@ g.test_confirmed_delete = function(cg)
         t.assert_equals(s:select({}, {iterator = 'lt'}), {{40}, {20}})
     end)
 end
+
+g.test_deferred_delete = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.space.create('test', {
+            engine = 'vinyl', defer_deletes = true,
+        })
+        s:create_index('primary')
+        s:create_index('secondary', {unique = false, parts = {2, 'unsigned'}})
+        for i = 10, 70, 10 do
+            s:insert({i, i * 10})
+        end
+        box.snapshot()
+
+        box.begin()
+        t.assert_equals(s:get(30), {30, 300})
+
+        local f = fiber.new(function()
+            box.begin()
+            s:delete({10})
+            s:delete({30})
+            s:delete({50})
+            s:delete({70})
+            box.commit()
+            s.index.secondary:select()
+            s.index.secondary:select({}, {iterator = 'lt'})
+        end)
+        f:set_joinable(true)
+        t.assert_equals({f:join(5)}, {true})
+
+        -- The transaction must be able to see the deleted tuples because
+        -- it was sent to a read view on deletion.
+        t.assert_equals(s.index.secondary:select(), {
+            {10, 100}, {20, 200}, {30, 300}, {40, 400}, {50, 500},
+            {60, 600}, {70, 700},
+        })
+        t.assert_equals(s.index.secondary:select({}, {iterator = 'lt'}), {
+            {70, 700}, {60, 600}, {50, 500}, {40, 400}, {30, 300},
+            {20, 200}, {10, 100},
+        })
+        box.commit()
+
+        t.assert_equals(s.index.secondary:select(),
+                        {{20, 200}, {40, 400}, {60, 600}})
+        t.assert_equals(s.index.secondary:select({}, {iterator = 'lt'}),
+                        {{60, 600}, {40, 400}, {20, 200}})
+    end)
+end
