@@ -138,7 +138,7 @@
  */
 template<int EXTENT_SIZE>
 struct DummyAllocator {
-	std::unique_ptr<char[]> m_buf;
+	char *m_buf;
 	size_t m_buf_size;
 	size_t m_pos = 0;
 	struct matras_allocator matras_allocator;
@@ -152,12 +152,13 @@ struct DummyAllocator {
 		/* The calculated size is incorrect for small trees. */
 		if (m_buf_size < EXTENT_SIZE * 10)
 			m_buf_size = EXTENT_SIZE * 10;
-		m_buf = std::unique_ptr<char[]>(new char[m_buf_size]);
+		m_buf = new char[m_buf_size];
 	}
 
 	~DummyAllocator()
 	{
 		matras_allocator_destroy(&matras_allocator);
+		delete[] m_buf;
 	}
 
 	void
