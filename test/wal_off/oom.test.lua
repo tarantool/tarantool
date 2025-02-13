@@ -4,7 +4,7 @@ test_run:cmd('restart server default with cleanup=1')
 test_run:cmd("push filter 'error: Failed to allocate [0-9]+ ' to 'error: Failed to allocate <NUM> '")
 
 space = box.schema.space.create('tweedledum')
-index = space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary')
 test_run:cmd("setopt delimiter ';'")
 i = 1;
 while true do
@@ -88,7 +88,7 @@ arena_bytes = box.cfg.memtx_memory
 str = string.rep('a', 15000) -- about size of index memory block
 
 space = box.schema.space.create('tweedledum')
-index = space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary')
 
 collectgarbage('collect')
 for i=1,10492 do space:insert{i, str} end

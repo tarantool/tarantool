@@ -311,31 +311,33 @@ space:select(nil, {iterator="GE"})
 ...
 space:select(5, {iterator="GT"})
 ---
-- []
+- - [0]
+  - [1]
+  - [4]
 ...
 l = space:select(nil, {limit=2, iterator="GT"})
 ---
 ...
 l
 ---
-- - [0]
-  - [1]
+- - [3]
+  - [2]
 ...
 l = space:select(l[#l][1], {limit=2, iterator="GT"})
 ---
 ...
 l
 ---
-- - [2]
-  - [3]
+- - [5]
+  - [0]
 ...
 l = space:select(l[#l][1], {limit=2, iterator="GT"})
 ---
 ...
 l
 ---
-- - [4]
-  - [5]
+- - [1]
+  - [4]
 ...
 l = space:select(l[#l][1], {limit=2, iterator="GT"})
 ---
