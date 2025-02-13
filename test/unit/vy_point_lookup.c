@@ -279,7 +279,8 @@ test_basic()
 			struct vy_entry key = vy_new_simple_stmt(format, key_def,
 								 &tmpl_key);
 			struct vy_entry res;
-			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
+			rc = vy_point_lookup(pk, /*tx=*/NULL, &prv, key,
+					     /*keep_delete=*/false, &res);
 			tuple_unref(key.stmt);
 			if (rc != 0) {
 				has_errors = true;
