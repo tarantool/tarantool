@@ -114,6 +114,8 @@ struct memtx_engine {
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Save and load the sort data. */
+	bool enable_sort_data;
 	/**
 	 * A callback run once memtx engine builds secondary indexes for the
 	 * data.
@@ -204,7 +206,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor, int threads_num,
+		 const char *allocator, float alloc_factor,
+		 int threads_num, bool enable_sort_data,
 		 memtx_on_indexes_built_cb on_indexes_built);
 
 /**
@@ -225,6 +228,8 @@ memtx_engine_set_memory(struct memtx_engine *memtx, size_t size);
 
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
+
+extern bool memtx_engine_enable_sort_data;
 
 /** Tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;
@@ -324,14 +329,15 @@ memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		    bool dontdump, unsigned granularity,
 		    const char *allocator, float alloc_factor,
-		    int sort_threads,
+		    int sort_threads, bool enable_sort_data,
 		    memtx_on_indexes_built_cb on_indexes_built)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
 				 tuple_arena_max_size, objsize_min, dontdump,
 				 granularity, allocator, alloc_factor,
-				 sort_threads, on_indexes_built);
+				 sort_threads, enable_sort_data,
+				 on_indexes_built);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;

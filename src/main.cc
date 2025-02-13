@@ -78,6 +78,7 @@
 #include "box/lua/console.h"
 #include "box/session.h"
 #include "box/memtx_tx.h"
+#include "box/memtx_engine.h"
 #include "box/module_cache.h"
 #include "box/watcher.h"
 #include "systemd.h"
@@ -485,6 +486,7 @@ load_cfg(void)
 	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
+	memtx_engine_enable_sort_data = cfg_getb("memtx_enable_sort_data");
 
 	if (background)
 		daemonize();

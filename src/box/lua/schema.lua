@@ -1018,6 +1018,7 @@ local alter_space_template = {
     temporary = 'boolean',
     is_sync = 'boolean',
     defer_deletes = 'boolean',
+    enable_space_data = 'boolean',
     name = 'string',
     constraint = 'string, table',
     foreign_key = 'table',

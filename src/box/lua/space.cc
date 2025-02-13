@@ -494,6 +494,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_settable(L, i);
 	}
 
+	/* TODO */
+
 	lua_getfield(L, i, "index");
 	if (lua_isnil(L, -1)) {
 		lua_pop(L, 1);
