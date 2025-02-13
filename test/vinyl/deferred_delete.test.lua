@@ -37,13 +37,13 @@ i1:stat().get.rows -- 5
 i1:stat().skip.rows -- 10
 pk:stat().lookup -- 15
 pk:stat().get.rows -- 5
-pk:stat().skip.rows -- 5
+pk:stat().skip.rows -- 10
 i2:select()
 i2:stat().get.rows -- 5
 i2:stat().skip.rows -- 10
 pk:stat().lookup -- 30
 pk:stat().get.rows -- 10
-pk:stat().skip.rows -- 10
+pk:stat().skip.rows -- 20
 
 -- Overwritten/deleted tuples are not stored in the cache so calling
 -- SELECT for a second time does only 5 lookups.
