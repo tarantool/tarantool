@@ -215,7 +215,8 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 int
 vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		const struct vy_read_view **rv,
-		struct vy_entry key, struct vy_entry *ret)
+		struct vy_entry key, bool keep_delete,
+		struct vy_entry *ret)
 {
 	/* All key parts must be set for a point lookup. */
 	assert(vy_stmt_is_full_key(key.stmt, lsm->cmp_def));
@@ -301,7 +302,7 @@ done:
 	if (rc == 0) {
 		int upserts_applied;
 		rc = vy_history_apply(&history, lsm->cmp_def,
-				      false, &upserts_applied, ret);
+				      keep_delete, &upserts_applied, ret);
 		lsm->stat.upsert.applied += upserts_applied;
 	}
 	vy_history_cleanup(&history);

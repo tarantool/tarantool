@@ -61,6 +61,9 @@ struct vy_read_view;
  * tuple in the LSM tree. The tuple is returned in @ret with its
  * reference counter elevated.
  *
+ * If @keep_delete flag is set, the function will return the latest
+ * DELETE statement instead of NULL if it exists.
+ *
  * Note, this function doesn't track the result in the transaction
  * read set, i.e. it is up to the caller to call vy_tx_track() if
  * necessary.
@@ -68,7 +71,8 @@ struct vy_read_view;
 int
 vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		const struct vy_read_view **rv,
-		struct vy_entry key, struct vy_entry *ret);
+		struct vy_entry key, bool keep_delete,
+		struct vy_entry *ret);
 
 /**
  * Look up a tuple by key in memory.
