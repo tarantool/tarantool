@@ -1298,6 +1298,11 @@ vy_is_committed(struct vy_env *env, struct vy_lsm *lsm)
  * @param entry       Tuple read from a secondary index.
  * @param[out] result The found tuple is stored here. Must be
  *                    unreferenced after usage.
+ * @param[in,out] skipped_lsn If the result is NULL and the input value
+ *                            is less, set to the LSN of the statement
+ *                            that was skipped because it didn't match
+ *                            the partial tuple key. In other words, it's
+ *                            the LSN of the deferred DELETE statement.
  *
  * @param  0 Success.
  * @param -1 Memory error or read error.
@@ -1305,7 +1310,8 @@ vy_is_committed(struct vy_env *env, struct vy_lsm *lsm)
 static int
 vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 			  const struct vy_read_view **rv,
-			  struct vy_entry entry, struct vy_entry *result)
+			  struct vy_entry entry, struct vy_entry *result,
+			  int64_t *skipped_lsn)
 {
 	int rc = 0;
 	assert(lsm->index_id > 0);
@@ -1335,14 +1341,16 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	lsm->pk->stat.lookup++;
 
 	struct vy_entry pk_entry;
-	if (vy_point_lookup(lsm->pk, tx, rv, key, &pk_entry) != 0) {
+	if (vy_point_lookup(lsm->pk, tx, rv, key, /*keep_delete=*/true,
+			    &pk_entry) != 0) {
 		rc = -1;
 		goto out;
 	}
 
 	bool match = false;
 	struct vy_entry full_entry;
-	if (pk_entry.stmt != NULL) {
+	if (pk_entry.stmt != NULL &&
+	    vy_stmt_type(pk_entry.stmt) != IPROTO_DELETE) {
 		vy_stmt_foreach_entry(full_entry, pk_entry.stmt, lsm->cmp_def) {
 			if (vy_entry_compare(full_entry, entry,
 					     lsm->cmp_def) == 0) {
@@ -1364,6 +1372,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		if (pk_entry.stmt != NULL) {
 			vy_stmt_counter_acct_tuple(&lsm->pk->stat.skip,
 						   pk_entry.stmt);
+			*skipped_lsn = MAX(*skipped_lsn,
+					   vy_stmt_lsn(pk_entry.stmt));
 			tuple_unref(pk_entry.stmt);
 		}
 		/*
@@ -1432,6 +1442,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 
 	int rc;
 	struct vy_entry partial, entry;
+	int64_t skipped_lsn = 0;
 
 	struct vy_entry key;
 	key.stmt = key_stmt;
@@ -1445,11 +1456,12 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		 */
 		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
 			goto fail;
-		if (vy_point_lookup(lsm, tx, rv, key, &partial) != 0)
+		if (vy_point_lookup(lsm, tx, rv, key, /*keep_delete=*/false,
+				    &partial) != 0)
 			goto fail;
 		if (lsm->index_id > 0 && partial.stmt != NULL) {
-			rc = vy_get_by_secondary_tuple(lsm, tx, rv,
-						       partial, &entry);
+			rc = vy_get_by_secondary_tuple(lsm, tx, rv, partial,
+						       &entry, &skipped_lsn);
 			tuple_unref(partial.stmt);
 			if (rc != 0)
 				goto fail;
@@ -1470,12 +1482,13 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 				tuple_ref(entry.stmt);
 			break;
 		}
-		rc = vy_get_by_secondary_tuple(lsm, tx, rv, partial, &entry);
+		rc = vy_get_by_secondary_tuple(lsm, tx, rv, partial, &entry,
+					       &skipped_lsn);
 		if (rc != 0 || entry.stmt != NULL)
 			break;
 	}
 	if (rc == 0)
-		vy_read_iterator_cache_add(&itr, entry);
+		vy_read_iterator_cache_add(&itr, entry, skipped_lsn);
 	vy_read_iterator_close(&itr);
 	if (rc != 0)
 		goto fail;
@@ -3456,7 +3469,8 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	struct vy_entry result;
 	if (vy_point_lookup(lsm, NULL, &env->xm->p_committed_read_view,
-			    squash->entry, &result) != 0)
+			    squash->entry, /*keep_delete=*/false,
+			    &result) != 0)
 		return -1;
 	if (result.stmt == NULL)
 		return 0;
@@ -3730,7 +3744,8 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 	struct vy_entry entry;
 	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
 		goto fail;
-	vy_read_iterator_cache_add(&it->iterator, entry);
+	vy_read_iterator_cache_add(&it->iterator, entry,
+				   /*skipped_lsn=*/0);
 	vinyl_iterator_account_read(it, start_time, entry.stmt);
 	if (entry.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
@@ -3764,6 +3779,7 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	vy_lsm_ref(lsm);
 
 	struct vy_entry partial, entry;
+	int64_t skipped_lsn = 0;
 next:
 	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
@@ -3773,7 +3789,8 @@ next:
 
 	if (partial.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
-		vy_read_iterator_cache_add(&it->iterator, vy_entry_none());
+		vy_read_iterator_cache_add(&it->iterator, vy_entry_none(),
+					   skipped_lsn);
 		vinyl_iterator_account_read(it, start_time, NULL);
 		vinyl_iterator_close(it);
 		*ret = NULL;
@@ -3781,11 +3798,11 @@ next:
 	}
 	/* Get the full tuple from the primary index. */
 	if (vy_get_by_secondary_tuple(lsm, it->tx, vy_tx_read_view(it->tx),
-				      partial, &entry) != 0)
+				      partial, &entry, &skipped_lsn) != 0)
 		goto fail;
 	if (entry.stmt == NULL)
 		goto next;
-	vy_read_iterator_cache_add(&it->iterator, entry);
+	vy_read_iterator_cache_add(&it->iterator, entry, skipped_lsn);
 	vinyl_iterator_account_read(it, start_time, entry.stmt);
 	vinyl_iterator_update_pos(it, entry);
 	*ret = entry.stmt;
@@ -4159,7 +4176,8 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	const struct vy_read_view rv = { .vlsn = lsn - 1 };
 	const struct vy_read_view *p_rv = &rv;
 	struct vy_entry old;
-	if (vy_point_lookup(pk, NULL, &p_rv, mem_entry, &old) != 0)
+	if (vy_point_lookup(pk, /*tx=*/NULL, &p_rv, mem_entry,
+			    /*keep_delete=*/false, &old) != 0)
 		return -1;
 	/*
 	 * Create DELETE + INSERT statements corresponding to

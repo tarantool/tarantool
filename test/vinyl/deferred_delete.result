@@ -87,9 +87,9 @@ pk:stat().get.rows -- 5
 ---
 - 5
 ...
-pk:stat().skip.rows -- 5
+pk:stat().skip.rows -- 10
 ---
-- 5
+- 10
 ...
 i2:select()
 ---
@@ -115,9 +115,9 @@ pk:stat().get.rows -- 10
 ---
 - 10
 ...
-pk:stat().skip.rows -- 10
+pk:stat().skip.rows -- 20
 ---
-- 10
+- 20
 ...
 -- Overwritten/deleted tuples are not stored in the cache so calling
 -- SELECT for a second time does only 5 lookups.

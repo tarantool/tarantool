@@ -1021,7 +1021,8 @@ next_key:
 }
 
 void
-vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry)
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry,
+			   int64_t skipped_lsn)
 {
 	if ((**itr->read_view).vlsn != INT64_MAX) {
 		if (itr->last_cached.stmt != NULL)
@@ -1030,7 +1031,8 @@ vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry)
 		return;
 	}
 	vy_cache_add(&itr->lsm->cache, entry, itr->last_cached,
-		     itr->is_first_cached, itr->cache_link_lsn,
+		     itr->is_first_cached,
+		     MAX(itr->cache_link_lsn, skipped_lsn),
 		     itr->key, itr->iterator_type);
 	if (entry.stmt != NULL)
 		tuple_ref(entry.stmt);
