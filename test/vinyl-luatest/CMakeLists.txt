@@ -40,8 +40,3 @@ foreach(test_path ${tests})
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
   )
 endforeach()
-
-set_tests_properties(
-  test/vinyl-luatest/select_consistency_test.lua
-  PROPERTIES LABELS "long"
-)
