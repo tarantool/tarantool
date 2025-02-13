@@ -223,6 +223,7 @@ struct applier {
 	bool is_ack_sent;
 	/** True if ACK was signalled in tx while ack_msg was en route. */
 	bool is_ack_pending;
+	bool is_part_of_sync_quorum;
 	/** Fields used only by applier thread. */
 	struct {
 		alignas(CACHELINE_SIZE)

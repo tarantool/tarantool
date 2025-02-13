@@ -360,6 +360,7 @@ struct replicaset {
 		 * quorum.
 		 */
 		int synced;
+		int synced_and_part_of_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
@@ -671,8 +672,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Reload replica URIs.
  *
