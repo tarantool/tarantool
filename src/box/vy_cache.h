@@ -65,6 +65,24 @@ struct vy_cache_node {
 	uint8_t left_boundary_level;
 	/* Number of parts in key when the value was the last in EQ search */
 	uint8_t right_boundary_level;
+	/*
+	 * LSN of the left chain link.
+	 *
+	 * A cache node may be a part of a chain. If a read iterator encounters
+	 * a chain, it may skip deeper sources for all keys lying in the chain,
+	 * assuming there's nothing there. Like a single statement, a chain
+	 * may be invisible from the iterator read view, in which case it must
+	 * be ignored. We store the LSNs of the left and right chain links
+	 * in the left_lsn and right_lsn fields of the node, respectively,
+	 * provided they exist. The read iterator must ignore a link if its
+	 * VLSN is less than the LSN of the link. Basically, the LSN of a link
+	 * is initialized as the LSN of the oldest DELETE statement that fell
+	 * between the two linked nodes and hasn't been purged yet, or 0 if
+	 * there's none.
+	 */
+	int64_t left_lsn;
+	/* LSN of the right chain link. See left_lsn for details. */
+	int64_t right_lsn;
 };
 
 /**
@@ -198,15 +216,17 @@ vy_cache_destroy(struct vy_cache *cache);
  * @param curr - statement that was recently read and should be added to the
  * cache.
  * @param prev - previous statement that was added to the cache
+ * sequence (by one iterator).
  * @param is_first - if set, this is the first statement matching the iteration
  * criteria.
- * sequence (by one iterator).
- * @param direction - direction in which the reader (iterator) observes data,
- *  +1 - forward, -1 - backward.
+ * @param link_lsn - LSN of the inserted cache chain link; for details, see
+ * the comment to vy_cache_node::left_lsn.
+ * @param key - iterator key.
+ * @param order - iterator type.
  */
 void
 vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
-	     struct vy_entry prev, bool is_first,
+	     struct vy_entry prev, bool is_first, int64_t link_lsn,
 	     struct vy_entry key, enum iterator_type order);
 
 static inline void
@@ -214,7 +234,7 @@ vy_cache_add_point(struct vy_cache *cache, struct vy_entry entry,
 		   struct vy_entry key)
 {
 	vy_cache_add(cache, entry, /*prev=*/vy_entry_none(),
-		     /*is_first=*/true, key, ITER_EQ);
+		     /*is_first=*/true, /*link_lsn=*/0, key, ITER_EQ);
 }
 
 /**
