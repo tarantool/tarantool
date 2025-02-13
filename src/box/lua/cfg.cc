@@ -350,6 +350,14 @@ lbox_cfg_set_replication_timeout(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_replication_reconnect_timeout(struct lua_State *L)
+{
+	if (box_set_replication_reconnect_timeout() != 0)
+		luaT_error(L);
+	return 0;
+}
+
+static int
 lbox_cfg_set_replication_connect_timeout(struct lua_State *L)
 {
 	try {
@@ -544,6 +552,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_election_timeout", lbox_cfg_set_election_timeout},
 		{"cfg_set_election_fencing_mode", lbox_cfg_set_election_fencing_mode},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
+		{"cfg_set_replication_reconnect_timeout", lbox_cfg_set_replication_reconnect_timeout},
 		{"cfg_set_replication_connect_quorum", lbox_cfg_set_replication_connect_quorum},
 		{"cfg_set_replication_connect_timeout", lbox_cfg_set_replication_connect_timeout},
 		{"cfg_set_replication_sync_lag", lbox_cfg_set_replication_sync_lag},
