@@ -995,6 +995,11 @@ next_key:
 			if (itr->last_cached.stmt != NULL)
 				tuple_unref(itr->last_cached.stmt);
 			itr->last_cached = vy_entry_none();
+			itr->is_first_cached = false;
+			itr->cache_chain_lsn = 0;
+		} else {
+			itr->cache_chain_lsn = MAX(itr->cache_chain_lsn,
+						   vy_stmt_lsn(entry.stmt));
 		}
 		goto next_key;
 	}
@@ -1008,7 +1013,8 @@ next_key:
 }
 
 void
-vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry)
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry,
+			   int64_t skipped_lsn)
 {
 	if ((**itr->read_view).vlsn != INT64_MAX) {
 		if (itr->last_cached.stmt != NULL)
@@ -1017,13 +1023,16 @@ vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry)
 		return;
 	}
 	vy_cache_add(&itr->lsm->cache, entry, itr->last_cached,
-		     itr->is_first_cached, itr->key, itr->iterator_type);
+		     itr->is_first_cached,
+		     MAX(itr->cache_chain_lsn, skipped_lsn),
+		     itr->key, itr->iterator_type);
 	if (entry.stmt != NULL)
 		tuple_ref(entry.stmt);
 	if (itr->last_cached.stmt != NULL)
 		tuple_unref(itr->last_cached.stmt);
 	itr->last_cached = entry;
 	itr->is_first_cached = false;
+	itr->cache_chain_lsn = 0;
 }
 
 /**

@@ -79,6 +79,11 @@ struct vy_read_iterator {
 	 * See vy_read_iterator_cache_add().
 	 */
 	bool is_first_cached;
+	/**
+	 * LSN of the chain following the last cached statement.
+	 * Used by vy_read_iterator_cache_add().
+	 */
+	int64_t cache_chain_lsn;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct vy_entry last;
 	/**
@@ -180,6 +185,8 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_entry *result);
  * Add the last tuple returned by the read iterator to the cache.
  * @param itr   Read iterator
  * @param entry Last tuple returned by the iterator.
+ * @param skipped_lsn Max LSN among all full statements skipped because
+ *                    they didn't match the partial tuple key.
  *
  * We use a separate function for populating the cache rather than
  * doing that right in vy_read_iterator_next() so that we can store
@@ -191,9 +198,13 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_entry *result);
  *   to the partial tuple returned by the iterator.
  * - Call vy_read_iterator_cache_add() on the full tuple to add
  *   the result to the cache.
+ *
+ * The skipped_lsn is used for the cache chain. Basically, it's the max
+ * LSN over all deferred DELETE statements that fall in the chain.
  */
 void
-vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry);
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry,
+			   int64_t skipped_lsn);
 
 /**
  * Close the iterator and free resources.

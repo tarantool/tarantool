@@ -208,11 +208,21 @@ vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 	((struct vy_stmt *) stmt)->lsn = lsn;
 }
 
+/**
+ * Return true if the given LSN is a PLSN, i.e. an LSN used for a prepared
+ * (not yet written to WAL) statement.
+ */
+static inline bool
+vy_lsn_is_prepared(int64_t lsn)
+{
+	return lsn >= MAX_LSN;
+}
+
 /** Return true if the statement was prepared, but not yet written to WAL. */
 static inline bool
 vy_stmt_is_prepared(struct tuple *stmt)
 {
-	return vy_stmt_lsn(stmt) >= MAX_LSN;
+	return vy_lsn_is_prepared(vy_stmt_lsn(stmt));
 }
 
 /** Get type of the vinyl statement. */
