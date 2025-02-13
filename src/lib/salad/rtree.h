@@ -53,16 +53,7 @@ typedef double area_t;
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-struct rtree_neighbor {
-	rb_node(struct rtree_neighbor) link;
-	struct rtree_neighbor *next;
-	void *child;
-	int level;
-	sq_coord_t distance;
-};
-
-typedef rb_tree(struct rtree_neighbor) rtnt_t;
+/* A box in RTREE_DIMENSION space */
 
 enum {
 	/** Maximal possible R-tree height */
@@ -70,6 +61,25 @@ enum {
 	/** Maximal possible R-tree dimension */
 	RTREE_MAX_DIMENSION = 20
 };
+
+struct rtree_rect
+{
+	/* coords: { low X, upper X, low Y, upper Y, etc } */
+	coord_t coords[RTREE_MAX_DIMENSION * 2];
+};
+
+struct rtree_neighbor {
+	rb_node(struct rtree_neighbor) link;
+	struct rtree_neighbor *next;
+	void *child;
+	int level;
+	sq_coord_t distance;
+	/* for pagination optimisation */
+	sq_coord_t distance_max;  
+	struct rtree_rect rect; // ?
+};
+
+typedef rb_tree(struct rtree_neighbor) rtnt_t;
 
 /**
  * Rtree search operations. Used for searching and iterations.
@@ -98,13 +108,6 @@ enum spatial_search_op
 	SOP_NEIGHBOR
 };
 
-/* A box in RTREE_DIMENSION space */
-struct rtree_rect
-{
-	/* coords: { low X, upper X, low Y, upper Y, etc } */
-	coord_t coords[RTREE_MAX_DIMENSION * 2];
-};
-
 /* Type of function, comparing two rectangles */
 typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 				   const struct rtree_rect *rt2,
@@ -112,8 +115,8 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 
 /* Type distance comparison */
 enum rtree_distance_type {
-	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
-	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+	RTREE_EUCLID    = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
+	RTREE_MANHATTAN = 1  /* Manhattan distance, fabs(dx) + fabs(dy) */
 };
 
 /* Main rtree struct */
@@ -178,6 +181,12 @@ struct rtree_iterator
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
 
+	/* Position of pagination */
+	sq_coord_t current_pos_distance;       
+	struct rtree_rect current_pos_rect;
+	/* Flag that detects changing of the current position */
+	bool set_position;
+
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
 	 * the node is accepted; if false - skipped.
@@ -192,6 +201,8 @@ struct rtree_iterator
 		struct rtree_page *page;
 		int pos;
 	} stack[RTREE_MAX_HEIGHT];
+
+	// add pos
 };
 
 /**
