@@ -789,7 +789,7 @@ _ = s:get(1)
 ...
 stat_diff(gstat(), st, 'memory.tuple_cache')
 ---
-- 1101
+- 1117
 ...
 s:delete(1)
 ---
@@ -1152,7 +1152,7 @@ gstat()
     gap_locks: 0
     read_views: 0
   memory:
-    tuple_cache: 14313
+    tuple_cache: 14521
     tx: 0
     bloom_filter: 140
     page_index: 1250
