@@ -302,6 +302,7 @@ say_logger_initialized
 say_logrotate
 say_set_log_format
 say_set_log_level
+schema_check_feature
 space_bsize
 space_by_id
 space_run_triggers

@@ -77,6 +77,7 @@ extern struct rlist on_schema_init;
 	_(SCHEMA_FEATURE_DDL_BEFORE_UPGRADE, 0, 2, 11, 1) \
 	_(SCHEMA_FEATURE_PERSISTENT_NAMES, 1, 2, 11, 5) \
 	_(SCHEMA_FEATURE_PERSISTENT_TRIGGERS, 2, 3, 1, 0) \
+	_(SCHEMA_FEATURE_REPLICATION_ASYNC_REPAIR_QUEUE, 3, 3, 4, 0) \
 
 ENUM(schema_feature, SCHEMA_FEATURES);
 extern const char *schema_feature_strs[];

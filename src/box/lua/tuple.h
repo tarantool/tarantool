@@ -152,9 +152,6 @@ luamp_encode_tuple(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 void
-tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream);
-
-void
 box_lua_tuple_init(struct lua_State *L);
 
 #if defined(__cplusplus)

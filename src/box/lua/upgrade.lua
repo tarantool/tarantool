@@ -1504,6 +1504,53 @@ local function upgrade_to_3_3_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.4.0
+--------------------------------------------------------------------------------
+
+local function create_replication_async_repair_queue()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.REPLICATION_ASYNC_REPAIR_QUEUE_ID
+    local opts = {group_id = 1}
+
+    log.info("create space _replication_async_repair_queue")
+    local format = {{name = 'transaction_id', type = 'unsigned'},
+                    {name = 'meta', type = 'map'},
+                    {name = 'statement', type = 'map'}}
+    _space:insert{space_id, ADMIN, '_replication_async_repair_queue', 'memtx',
+                  0, opts, format}
+
+    -- replication can write to the asynchronous replication repair queue.
+    log.info("grant write on space _replication_async_repair_queue to " ..
+             "replication")
+    _priv:replace{ADMIN, REPLICATION, 'space', space_id, box.priv.W}
+
+    log.info("create primary index for space _replication_async_repair_queue")
+    _index:insert{space_id, 0, 'primary', 'tree', { unique = true },
+                  {{field = 1, type = 'unsigned', path = '.replica_id'},
+                   {field = 1, type = 'unsigned', path = '.lsn'}}}
+
+    log.info("create secondary index on meta.term field for space " ..
+             "_replication_async_repair_queue")
+    _index:insert{space_id, 1, 'term', 'tree', { unique = false },
+                  {{field = 1, type = 'unsigned', path = '.term'}}}
+
+    log.info("create secondary index on transaction_id field for space " ..
+             "_replication_async_repair_queue")
+    _index:insert{space_id, 2, 'transaction_id', 'tree', { unique = false },
+                  {{field = 0, type = 'unsigned'}}}
+
+    log.info("create secondary index on statement.space_id field for space " ..
+             "_replication_async_repair_queue")
+    _index:insert{space_id, 3, 'space_id', 'tree', { unique = false },
+                  {{field = 2, type = 'unsigned', path = '.space_id'}}}
+end
+local function upgrade_to_3_4_0()
+    create_replication_async_repair_queue()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion.new(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1528,6 +1575,7 @@ local handlers = {
     {version = mkversion.new(3, 0, 0), func = upgrade_to_3_0_0},
     {version = mkversion.new(3, 1, 0), func = upgrade_to_3_1_0},
     {version = mkversion.new(3, 3, 0), func = upgrade_to_3_3_0},
+    {version = mkversion.new(3, 4, 0), func = upgrade_to_3_4_0},
 }
 builtin.box_init_latest_dd_version_id(
     box.internal.version_to_id(handlers[#handlers].version))
@@ -2106,6 +2154,49 @@ local function downgrade_from_3_3_0(issue_handler)
     drop_gc_consumers(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.4.0
+--------------------------------------------------------------------------------
+
+local function drop_replication_async_repair_queue(issue_handler)
+    -- The asynchronous replication repair queue space records are created by
+    -- Tarantool, not users, so the space can be dropped even if some records
+    -- are left.
+    if issue_handler.dry_run then
+        return
+    end
+
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
+    local space_id = box.schema.REPLICATION_ASYNC_REPAIR_QUEUE_ID
+
+    log.info("drop non-unique secondary index on statement.space_id field " ..
+             "of _replication_async_repair_queue")
+    _index:delete{space_id, 3}
+
+    log.info("drop non-unique secondary index on transaction_id field of " ..
+             "_replication_async_repair_queue")
+    _index:delete{space_id, 2}
+
+    log.info("drop unique secondary index on meta.term field of " ..
+             "_replication_async_repair_queue")
+    _index:delete{space_id, 1}
+
+    log.info("drop primary index of _replication_async_repair_queue")
+    _index:delete{space_id, 0}
+
+    log.info("drop replication privilege for _replication_async_repair_queue")
+    _priv:delete{REPLICATION, 'space', space_id}
+
+    log.info("drop space _replication_async_repair_queue")
+    _space:delete{space_id}
+end
+
+local function downgrade_from_3_4_0(issue_handler)
+    drop_replication_async_repair_queue(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -2123,6 +2214,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion.new(3, 4, 0), func = downgrade_from_3_4_0},
     {version = mkversion.new(3, 3, 0), func = downgrade_from_3_3_0},
     {version = mkversion.new(3, 1, 0), func = downgrade_from_3_1_0},
     {version = mkversion.new(3, 0, 0), func = downgrade_from_3_0_0},
@@ -2225,6 +2317,7 @@ local downgrade_versions = {
     "3.2.1",
     "3.3.0",
     "3.3.1",
+    "3.4.0",
     -- DOWNGRADE VERSIONS END
 }
 

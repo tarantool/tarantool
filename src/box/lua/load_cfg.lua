@@ -83,6 +83,13 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+-- Asynchronous replication repair queue space.
+local function ifdef_replication_async_repair_queue(value)
+    if private.cfg_set_replication_async_repair_queue_enabled ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -193,6 +200,8 @@ local default_cfg = {
     replication_anon      = false,
     replication_anon_ttl  = 60 * 60,
     replication_threads   = 1,
+    replication_async_repair_queue_enabled =
+        ifdef_replication_async_repair_queue(false),
     bootstrap_strategy    = "auto",
     bootstrap_leader      = nil,
     feedback_enabled      = ifdef_feedback(true),
@@ -396,6 +405,8 @@ local template_cfg = {
     replication_anon      = 'boolean',
     replication_anon_ttl  = 'number',
     replication_threads   = 'number',
+    replication_async_repair_queue_enabled =
+        ifdef_replication_async_repair_queue('boolean'),
     bootstrap_strategy    = 'string',
     bootstrap_leader      = 'string, number',
     feedback_enabled      = ifdef_feedback('boolean'),
@@ -536,6 +547,8 @@ local dynamic_cfg = {
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
     replication_anon_ttl    = private.cfg_set_replication_anon_ttl,
+    replication_async_repair_queue_enabled =
+        private.cfg_set_replication_async_repair_queue_enabled,
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     bootstrap_leader        = private.cfg_set_bootstrap_leader,
     instance_uuid           = check_instance_uuid,

@@ -49,6 +49,7 @@ local _enterprise_keys = {
     password_history_length = true,
     wal_ext = true,
     wal_retention_period = true,
+    replication_async_repair_queue_enabled = true,
 }
 
 function cfg_filter(data)

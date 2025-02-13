@@ -442,6 +442,9 @@ g.test_defaults = function()
         },
         isolated = false,
     }
+    if is_enterprise then
+        exp.replication.async_repair_queue_enabled = false
+    end
 
     -- Global defaults.
     --
