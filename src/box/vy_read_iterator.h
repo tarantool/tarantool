@@ -79,6 +79,11 @@ struct vy_read_iterator {
 	 * See vy_read_iterator_cache_add().
 	 */
 	bool is_first_cached;
+	/**
+	 * LSN of the chain following the last cached statement.
+	 * Used by vy_read_iterator_cache_add().
+	 */
+	int64_t cache_chain_lsn;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct vy_entry last;
 	/**
