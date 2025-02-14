@@ -408,180 +408,7 @@ end
 
 -- }}} Revert changes in non-dynamic options
 
--- Modify box-level configuration values and perform other actions
--- to enable the isolated mode (if configured).
-local function switch_isolated_mode_before_box_cfg(config, box_cfg)
-    local configdata = config._configdata
-
-    -- If the isolated mode is not enabled, there is nothing to do.
-    if not configdata:get('isolated', {use_default = true}) then
-        return
-    end
-
-    -- Issue a warning to highlight the unusual instance status to
-    -- the administrator.
-    local key = 'isolated_mode_enabled'
-    local message = ('The isolated mode is set for the instance %q'):format(
-        config._instance_name)
-    config._aboard:set({
-        type = 'warn',
-        message = message,
-    }, {
-        key = key,
-    })
-
-    -- An application or a role may perform background database
-    -- modification if the instance is in the RW mode: for
-    -- example, a role may perform eviction of stale records.
-    -- If the instance is in the isolated mode, it should be in RO
-    -- to don't produce any new transactions.
-    --
-    -- The reason is that these transactions will be sent to other
-    -- replicaset members and applied on them, when the instance
-    -- goes from the isolated mode. At the same time, the
-    -- non-isolated part of the replicaset may serve requests and
-    -- perform data modifications. An attempt to modify the same
-    -- data from two instances may break data integrity[^1].
-    --
-    -- It is recommended to extract all the needed data from the
-    -- isolated instance and perform the modifications on the
-    -- current leader (in the non-isolated part of the
-    -- replicaset).
-    --
-    -- [^1]: Unless the data operations are carefully designed to
-    --       be idempotent to use in the master-master mode.
-    --
-    -- TODO(gh-10404): Set ro_reason=isolated.
-    box_cfg.read_only = true
-
-    -- Don't accept new iproto connections.
-    --
-    -- An instance in the isolated mode shouldn't process a
-    -- traffic from a user.
-    box_cfg.listen = box.NULL
-
-    -- Don't replicate data from other replicaset members.
-    --
-    -- The isolated mode can be enabled to stop data modifications
-    -- on the given instance, including ones from the replication.
-    -- It may help to debug a problem or extract some needed data.
-    box_cfg.replication = box.NULL
-end
-
--- Perform post-box-cfg actions to enable the isolated mode (if
--- configured).
-local function switch_isolated_mode_after_box_cfg(config)
-    local configdata = config._configdata
-
-    -- If the isolated mode is not enabled, there is nothing to do.
-    if not configdata:get('isolated', {use_default = true}) then
-        return
-    end
-
-    -- Drop existing iproto connections.
-    --
-    -- An instance in the isolated mode shouldn't process a
-    -- traffic from a user.
-    --
-    -- Here we assume that when box.cfg() is finished, iproto
-    -- listening sockets are already closed and no new connections
-    -- may be created. So, the only thing to do is to close the
-    -- existing connections.
-    --
-    -- NB: It seems safe to start this fiber several times in
-    -- parallel, so there are no checks, whether such a fiber
-    -- already exists.
-    fiber.new(function()
-        local name = 'isolated_mode_drop_iproto_connections'
-        fiber.self():name(name, {truncate = true})
-
-        -- A note regarding box.iproto.internal.drop_connections.
-        --
-        -- It seems, the current behavior if connections are not
-        -- closed in time is to report the timeout error and
-        -- continue closing connection from the given generation
-        -- in background.
-        --
-        -- It means that the passed timeout doesn't affect the
-        -- behavior of the process of closing connections itself
-        -- and can be only used to let the caller know whether
-        -- and when the connections (existed at the moment of the
-        -- invocation) are closed.
-        --
-        -- Taking it into account, the timeout in this code is
-        -- not configurable and chosen more or less arbitrarily.
-        -- It only affects whether and when an alert is issued.
-        --
-        -- If we find a need in a future, we can make it
-        -- configurable.
-        local timeout = 10
-
-        -- Testing requires to redefine the timeout. Use an
-        -- environment variable for that.
-        local env_var_name = 'TT_CONFIG_DROP_CONNECTION_TIMEOUT'
-        local redefined_timeout = tonumber(os.getenv(env_var_name))
-        if redefined_timeout ~= nil then
-            log.warn('isolated mode: %s redefines the iproto connections ' ..
-                'drop timeout: %d', env_var_name, redefined_timeout)
-            timeout = redefined_timeout
-        end
-
-        local start_time = clock.monotonic()
-        local ok, err = pcall(box.iproto.internal.drop_connections, timeout)
-
-        -- An unique key is set here to don't duplicate the alert
-        -- if the box_cfg.apply function is called twice within
-        -- the same startup/reconfiguration process.
-        --
-        -- Currently, it is possible on startup due to the safe
-        -- startup process. See c80b121544f6 ("config: add safe
-        -- startup mode") for details.
-        --
-        -- Also, this key is used to drop the alert (if any) after
-        -- a successful `drop_connections` call.
-        local alert_key = 'isolated_mode_drop_iproto_connections_timeout'
-
-        if not ok then
-           local message = ('isolated mode: can\'t drop iproto connections ' ..
-                'during %d seconds (continued in background): %s'):format(
-                timeout, err)
-
-            -- There is no clear point, when to drop this alert.
-            --
-            -- Once appeared, it exists till the next
-            -- reconfiguration, because all the alerts are dropped
-            -- before applying the new configuration.
-            --
-            -- Also, dropped on a successful attempt to drop
-            -- connections.
-            config._aboard:set({
-                type = 'warn',
-                message = message,
-            }, {
-                key = alert_key,
-            })
-            return
-        end
-
-        -- If it appears that there were several reconfigurations
-        -- in row, each schedules a fiber to drop the connections,
-        -- but the fibers are executed after the reconfigurations,
-        -- and the first issued an alert, but the next
-        -- successfully dropped the connections, let's drop this
-        -- alert.
-        --
-        -- No-op if there is no alert with the given key.
-        config._aboard:drop(alert_key)
-
-        local duration = clock.monotonic() - start_time
-        log.info('isolated mode: successfully dropped iproto connections ' ..
-            '(took %d seconds)', duration)
-    end)
-end
-
---------------------------------------------------------------------------------
---  Instance/replicaset names
---------------------------------------------------------------------------------
+-- {{{ Instance/replicaset names
 
 local names_state = {
     -- Used to access confidata and drop alerts.
@@ -821,6 +648,229 @@ local function get_schema_version_before_cfg(config)
     return nil
 end
 
+local function set_names_in_background(config, box_cfg)
+    local configdata = config._configdata
+
+    -- Persist an instance name to protect a user from accidental
+    -- attempt to run an instance from a snapshot left by another
+    -- instance.
+    --
+    -- Persist a replicaset name to protect a user from attempt to
+    -- mix instances with data from different replicasets into one
+    -- replicaset.
+    local names = configdata:names()
+    box_cfg.instance_uuid = names.instance_uuid
+    box_cfg.replicaset_uuid = names.replicaset_uuid
+
+    local is_startup = type(box.cfg) == 'function'
+    local is_anon = configdata:get('replication.anon', {use_default = true})
+
+    -- Names are applied only if they're already in snap file.
+    -- Otherwise, master must apply names after box.cfg asynchronously.
+    --
+    -- Note: an anonymous replica has no an entry in the _cluster
+    -- system space, so it can't have a persistent instance name.
+    -- It is never returned by :missing_names().
+    local missing_names = configdata:missing_names()
+    if not is_anon and not missing_names._peers[names.instance_name] then
+        box_cfg.instance_name = names.instance_name
+    end
+    if not missing_names[names.replicaset_name] then
+        box_cfg.replicaset_name = names.replicaset_name
+    end
+    if not missing_names_is_empty(missing_names, names.replicaset_name) then
+        if is_startup then
+            local on_schema_init
+            -- schema version may be nil, if bootstrap is done.
+            local version = get_schema_version_before_cfg(config)
+            -- on_schema init trigger isn't deleted, as it's executed only once.
+            on_schema_init = box.ctl.on_schema_init(function()
+                -- missing_names cannot be gathered inside on_schema_init
+                -- trigger, as box.cfg is already considered configured but
+                -- box.info is still not properly initialized.
+                names_apply(config, missing_names, version)
+                box.ctl.on_schema_init(nil, on_schema_init)
+            end)
+        else
+            -- Note, that we try to find new missing names on every reload.
+            names_apply(config, missing_names, box.internal.dd_version())
+        end
+    end
+end
+
+-- }}} Instance/replicaset names
+
+-- Modify box-level configuration values and perform other actions
+-- to enable the isolated mode (if configured).
+local function switch_isolated_mode_before_box_cfg(config, box_cfg)
+    local configdata = config._configdata
+
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- Issue a warning to highlight the unusual instance status to
+    -- the administrator.
+    local key = 'isolated_mode_enabled'
+    local message = ('The isolated mode is set for the instance %q'):format(
+        config._instance_name)
+    config._aboard:set({
+        type = 'warn',
+        message = message,
+    }, {
+        key = key,
+    })
+
+    -- An application or a role may perform background database
+    -- modification if the instance is in the RW mode: for
+    -- example, a role may perform eviction of stale records.
+    -- If the instance is in the isolated mode, it should be in RO
+    -- to don't produce any new transactions.
+    --
+    -- The reason is that these transactions will be sent to other
+    -- replicaset members and applied on them, when the instance
+    -- goes from the isolated mode. At the same time, the
+    -- non-isolated part of the replicaset may serve requests and
+    -- perform data modifications. An attempt to modify the same
+    -- data from two instances may break data integrity[^1].
+    --
+    -- It is recommended to extract all the needed data from the
+    -- isolated instance and perform the modifications on the
+    -- current leader (in the non-isolated part of the
+    -- replicaset).
+    --
+    -- [^1]: Unless the data operations are carefully designed to
+    --       be idempotent to use in the master-master mode.
+    --
+    -- TODO(gh-10404): Set ro_reason=isolated.
+    box_cfg.read_only = true
+
+    -- Don't accept new iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    box_cfg.listen = box.NULL
+
+    -- Don't replicate data from other replicaset members.
+    --
+    -- The isolated mode can be enabled to stop data modifications
+    -- on the given instance, including ones from the replication.
+    -- It may help to debug a problem or extract some needed data.
+    box_cfg.replication = box.NULL
+end
+
+-- Perform post-box-cfg actions to enable the isolated mode (if
+-- configured).
+local function switch_isolated_mode_after_box_cfg(config)
+    local configdata = config._configdata
+
+    -- If the isolated mode is not enabled, there is nothing to do.
+    if not configdata:get('isolated', {use_default = true}) then
+        return
+    end
+
+    -- Drop existing iproto connections.
+    --
+    -- An instance in the isolated mode shouldn't process a
+    -- traffic from a user.
+    --
+    -- Here we assume that when box.cfg() is finished, iproto
+    -- listening sockets are already closed and no new connections
+    -- may be created. So, the only thing to do is to close the
+    -- existing connections.
+    --
+    -- NB: It seems safe to start this fiber several times in
+    -- parallel, so there are no checks, whether such a fiber
+    -- already exists.
+    fiber.new(function()
+        local name = 'isolated_mode_drop_iproto_connections'
+        fiber.self():name(name, {truncate = true})
+
+        -- A note regarding box.iproto.internal.drop_connections.
+        --
+        -- It seems, the current behavior if connections are not
+        -- closed in time is to report the timeout error and
+        -- continue closing connection from the given generation
+        -- in background.
+        --
+        -- It means that the passed timeout doesn't affect the
+        -- behavior of the process of closing connections itself
+        -- and can be only used to let the caller know whether
+        -- and when the connections (existed at the moment of the
+        -- invocation) are closed.
+        --
+        -- Taking it into account, the timeout in this code is
+        -- not configurable and chosen more or less arbitrarily.
+        -- It only affects whether and when an alert is issued.
+        --
+        -- If we find a need in a future, we can make it
+        -- configurable.
+        local timeout = 10
+
+        -- Testing requires to redefine the timeout. Use an
+        -- environment variable for that.
+        local env_var_name = 'TT_CONFIG_DROP_CONNECTION_TIMEOUT'
+        local redefined_timeout = tonumber(os.getenv(env_var_name))
+        if redefined_timeout ~= nil then
+            log.warn('isolated mode: %s redefines the iproto connections ' ..
+                'drop timeout: %d', env_var_name, redefined_timeout)
+            timeout = redefined_timeout
+        end
+
+        local start_time = clock.monotonic()
+        local ok, err = pcall(box.iproto.internal.drop_connections, timeout)
+
+        -- An unique key is set here to don't duplicate the alert
+        -- if the box_cfg.apply function is called twice within
+        -- the same startup/reconfiguration process.
+        --
+        -- Currently, it is possible on startup due to the safe
+        -- startup process. See c80b121544f6 ("config: add safe
+        -- startup mode") for details.
+        --
+        -- Also, this key is used to drop the alert (if any) after
+        -- a successful `drop_connections` call.
+        local alert_key = 'isolated_mode_drop_iproto_connections_timeout'
+
+        if not ok then
+           local message = ('isolated mode: can\'t drop iproto connections ' ..
+                'during %d seconds (continued in background): %s'):format(
+                timeout, err)
+
+            -- There is no clear point, when to drop this alert.
+            --
+            -- Once appeared, it exists till the next
+            -- reconfiguration, because all the alerts are dropped
+            -- before applying the new configuration.
+            --
+            -- Also, dropped on a successful attempt to drop
+            -- connections.
+            config._aboard:set({
+                type = 'warn',
+                message = message,
+            }, {
+                key = alert_key,
+            })
+            return
+        end
+
+        -- If it appears that there were several reconfigurations
+        -- in row, each schedules a fiber to drop the connections,
+        -- but the fibers are executed after the reconfigurations,
+        -- and the first issued an alert, but the next
+        -- successfully dropped the connections, let's drop this
+        -- alert.
+        --
+        -- No-op if there is no alert with the given key.
+        config._aboard:drop(alert_key)
+
+        local duration = clock.monotonic() - start_time
+        log.info('isolated mode: successfully dropped iproto connections ' ..
+            '(took %d seconds)', duration)
+    end)
+end
+
 -- See hooks_new().
 local hooks_mt = {
     __index = {
@@ -877,55 +927,12 @@ local function apply(config)
     set_wal_ext(configdata, box_cfg)
     set_ro_rw(configdata, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
-
-    -- Persist an instance name to protect a user from accidental
-    -- attempt to run an instance from a snapshot left by another
-    -- instance.
-    --
-    -- Persist a replicaset name to protect a user from attempt to
-    -- mix instances with data from different replicasets into one
-    -- replicaset.
-    local names = configdata:names()
-    box_cfg.instance_uuid = names.instance_uuid
-    box_cfg.replicaset_uuid = names.replicaset_uuid
-
-    local is_startup = type(box.cfg) == 'function'
-    local is_anon = configdata:get('replication.anon', {use_default = true})
-
-    -- Names are applied only if they're already in snap file.
-    -- Otherwise, master must apply names after box.cfg asynchronously.
-    --
-    -- Note: an anonymous replica has no an entry in the _cluster
-    -- system space, so it can't have a persistent instance name.
-    -- It is never returned by :missing_names().
-    local missing_names = configdata:missing_names()
-    if not is_anon and not missing_names._peers[names.instance_name] then
-        box_cfg.instance_name = names.instance_name
-    end
-    if not missing_names[names.replicaset_name] then
-        box_cfg.replicaset_name = names.replicaset_name
-    end
-    if not missing_names_is_empty(missing_names, names.replicaset_name) then
-        if is_startup then
-            local on_schema_init
-            -- schema version may be nil, if bootstrap is done.
-            local version = get_schema_version_before_cfg(config)
-            -- on_schema init trigger isn't deleted, as it's executed only once.
-            on_schema_init = box.ctl.on_schema_init(function()
-                -- missing_names cannot be gathered inside on_schema_init
-                -- trigger, as box.cfg is already considered configured but
-                -- box.info is still not properly initialized.
-                names_apply(config, missing_names, version)
-                box.ctl.on_schema_init(nil, on_schema_init)
-            end)
-        else
-            -- Note, that we try to find new missing names on every reload.
-            names_apply(config, missing_names, box.internal.dd_version())
-        end
-    end
+    set_names_in_background(config, box_cfg)
 
     -- Set bootstrap_leader option.
     box_cfg.bootstrap_leader = configdata:bootstrap_leader()
+
+    local names = configdata:names()
 
     -- Set metrics option.
     local include = configdata:get('metrics.include', {use_default = true})
@@ -943,6 +950,8 @@ local function apply(config)
     switch_isolated_mode_before_box_cfg(config, box_cfg)
     post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
 
+    local is_startup = type(box.cfg) == 'function'
+    local is_anon = configdata:get('replication.anon', {use_default = true})
     local failover = configdata:get('replication.failover',
         {use_default = true})
 
