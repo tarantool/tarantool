@@ -708,6 +708,24 @@ end
 
 -- }}} <replicaset>.bootstrap_leader
 
+-- {{{ metrics
+
+local function set_metrics(configdata, box_cfg)
+    local names = configdata:names()
+
+    local include = configdata:get('metrics.include', {use_default = true})
+    local exclude = configdata:get('metrics.exclude', {use_default = true})
+    local labels = configdata:get('metrics.labels', {use_default = true})
+
+    box_cfg.metrics = {
+        include = include or { 'all' },
+        exclude = exclude or { },
+        labels = labels or { alias = names.instance_name },
+    }
+end
+
+-- }}} metrics
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -937,19 +955,7 @@ local function apply(config)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
     set_bootstrap_leader(configdata, box_cfg)
-
-    local names = configdata:names()
-
-    -- Set metrics option.
-    local include = configdata:get('metrics.include', {use_default = true})
-    local exclude = configdata:get('metrics.exclude', {use_default = true})
-    local labels = configdata:get('metrics.labels', {use_default = true})
-
-    box_cfg.metrics = {
-        include = include or { 'all' },
-        exclude = exclude or { },
-        labels = labels or { alias = names.instance_name },
-    }
+    set_metrics(configdata, box_cfg)
 
     -- RO may be enforced by the isolated mode, so we call the
     -- function after all the other logic that may set RW.
@@ -957,6 +963,7 @@ local function apply(config)
     post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
 
     local is_startup = type(box.cfg) == 'function'
+    local names = configdata:names()
     local is_anon = configdata:get('replication.anon', {use_default = true})
     local failover = configdata:get('replication.failover',
         {use_default = true})
