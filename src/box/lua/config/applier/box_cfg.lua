@@ -183,6 +183,19 @@ end
 
 -- }}} audit_log
 
+-- {{{ wal.ext
+
+local function set_wal_ext(_configdata, box_cfg)
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if tarantool.package == 'Tarantool Enterprise' and
+       type(box_cfg.wal_ext) == 'nil' then
+        box_cfg.wal_ext = box.NULL
+    end
+end
+
+-- }}} wal.ext
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -649,13 +662,7 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if tarantool.package == 'Tarantool Enterprise' and
-       type(box_cfg.wal_ext) == 'nil' then
-        box_cfg.wal_ext = box.NULL
-    end
+    set_wal_ext(configdata, box_cfg)
 
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
