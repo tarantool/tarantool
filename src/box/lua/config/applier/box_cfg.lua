@@ -7,6 +7,18 @@ local version = require('version')
 local tarantool = require('tarantool')
 local clock = require('clock')
 
+-- {{{ Collect options with the box_cfg annotation
+
+local function collect_by_box_cfg_annotation(configdata)
+    return configdata:filter(function(w)
+        return w.schema.box_cfg ~= nil
+    end, {use_default = true}):map(function(w)
+        return w.schema.box_cfg, w.data
+    end):tomap()
+end
+
+-- }}} Collect options with the box_cfg annotation
+
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
@@ -554,11 +566,8 @@ local function apply(config)
     local post_box_cfg_hooks = hooks_new()
 
     local configdata = config._configdata
-    local box_cfg = configdata:filter(function(w)
-        return w.schema.box_cfg ~= nil
-    end, {use_default = true}):map(function(w)
-        return w.schema.box_cfg, w.data
-    end):tomap()
+
+    local box_cfg = collect_by_box_cfg_annotation(configdata)
 
     -- Explicitly set box_cfg.listen to box.NULL if iproto.listen is not
     -- provided.
