@@ -906,6 +906,144 @@ end
 
 -- }}} isolated
 
+-- {{{ Force RO on startup
+
+local function force_ro_on_startup(configdata, box_cfg)
+    local is_startup = type(box.cfg) == 'function'
+    local names = configdata:names()
+    local is_anon = configdata:get('replication.anon', {use_default = true})
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+
+    -- First box.cfg() call.
+    --
+    -- Force the read-only mode if:
+    --
+    -- * the startup may take a long time, and
+    -- * the instance is not the only one in its replicaset, and
+    -- * there is an existing snapshot (otherwise we wouldn't able
+    --   to assign a bootstrap leader).
+    --
+    -- NB: The read-only mode may be enforced due to other reasons
+    -- (such as enabled isolated mode) that are not specific to
+    -- the startup flow.
+    --
+    -- The reason is that the configured master may be switched
+    -- while it is starting. In this case it is undesirable to set
+    -- RW mode if the actual configuration marks the instance as
+    -- RO.
+    --
+    -- The main startup code calls this applier second time if
+    -- {needs_retry = true} is returned after re-reading of the
+    -- configuration.
+    --
+    -- Automatic reapplying of the post-startup configuration is
+    -- performed for all the cases, when the startup may take a
+    -- long time.
+    if not is_startup then
+        return
+    end
+
+    -- This logic is disabled if the automatic leader election is
+    -- in effect. The configuration has no leadership information,
+    -- in this case, so there is no much sense to re-read it after
+    -- startup.
+    --
+    -- The same for the supervised failover mode.
+    if failover == 'election' or failover == 'supervised' then
+        return
+    end
+
+    local configured_as_rw = not box_cfg.read_only
+    local in_replicaset = #configdata:peers() > 1
+    local has_snap = snapshot.get_path(configdata._iconfig_def) ~= nil
+
+    -- Require at least one writable instance in the
+    -- replicaset if the instance is to be bootstrapped (has
+    -- no existing snapshot). Otherwise there is no one who
+    -- would register the instance in the _cluster system
+    -- space.
+    --
+    -- TODO: If an instance is configured with known
+    -- instance_uuid that is already in _cluster, it may be
+    -- re-bootstrapped. But we don't know from the
+    -- configuration whether the given instance_uuid is
+    -- already registered. We should decide what to do in the
+    -- case.
+    --
+    -- Note: an anonymous replica is not to be registered in
+    -- _cluster. So, it can subscribe to such a replicaset.
+    if in_replicaset and not has_snap and not is_anon then
+        local has_rw = false
+        if failover == 'off' then
+            for _, peer_name in ipairs(configdata:peers()) do
+                local opts = {instance = peer_name, use_default = true}
+                local mode = configdata:get('database.mode', opts)
+                -- NB: The default is box.NULL that is
+                -- interpreted as 'ro' for a replicaset with
+                -- more than one instance.
+                if mode == 'rw' then
+                    has_rw = true
+                    break
+                end
+            end
+        elseif failover == 'manual' then
+            has_rw = configdata:leader() ~= nil
+        else
+            assert(false)
+        end
+        if not has_rw then
+            error(('Startup failure.\nNo leader to register new ' ..
+                'instance %q. All the instances in replicaset %q of ' ..
+                'group %q are configured to the read-only mode.'):format(
+                names.instance_name, names.replicaset_name,
+                names.group_name), 0)
+        end
+    end
+
+    -- Reading a snapshot may take a long time, fetching it
+    -- from a remote master is even longer.
+    local startup_may_be_long = has_snap or
+        (not has_snap and in_replicaset)
+
+    -- Start to construct the force read-only mode condition.
+    local force_read_only = configured_as_rw
+
+    -- It only has sense to force RO if we expect that the
+    -- configured RO/RW mode has a good chance to change
+    -- during the startup.
+    force_read_only = force_read_only and startup_may_be_long
+
+    -- If the instance is the only one in its replicaset,
+    -- there is no another one that would take the leadership.
+    --
+    -- It is OK to just start in RW.
+    force_read_only = force_read_only and in_replicaset
+
+    -- Can't set RO for an instance in a replicaset without an
+    -- existing snapshot, because one of the cases is when the
+    -- replicaset is to be created from scratch. There should
+    -- be at least one RW instance to act as a bootstrap
+    -- leader.
+    --
+    -- We don't know, whether other instances have snapshots,
+    -- so the best that we can do is to lean on the user
+    -- provided configuration regarding RO/RW.
+    force_read_only = force_read_only and has_snap
+
+    if force_read_only then
+        box_cfg.read_only = true
+    end
+
+    -- NB: needs_retry should be true when force_read_only is
+    -- true. It is so by construction.
+    return startup_may_be_long
+end
+
+-- }}} Force RO on startup
+
+-- {{{ Hooks (utility function)
+
 -- See hooks_new().
 local hooks_mt = {
     __index = {
@@ -945,7 +1083,9 @@ local function hooks_new()
     }, hooks_mt)
 end
 
--- Returns nothing or {needs_retry = true}.
+-- }}} Hooks (utility function)
+
+-- Returns {needs_retry = false/true}.
 local function apply(config)
     -- There are some actions that logically correspond to some
     -- logic written before the box.cfg() call, but technically
@@ -970,139 +1110,18 @@ local function apply(config)
     -- function after all the other logic that may set RW.
     set_isolated(config, box_cfg, post_box_cfg_hooks)
 
+    -- Safe startup mode. May enforce RO.
+    local needs_retry = force_ro_on_startup(configdata, box_cfg)
+
+    -- Finally, run box.cfg().
     local is_startup = type(box.cfg) == 'function'
-    local names = configdata:names()
-    local is_anon = configdata:get('replication.anon', {use_default = true})
-    local failover = configdata:get('replication.failover',
-        {use_default = true})
-
-    -- First box.cfg() call.
-    --
-    -- Force the read-only mode if:
-    --
-    -- * the startup may take a long time, and
-    -- * the instance is not the only one in its replicaset, and
-    -- * there is an existing snapshot (otherwise we wouldn't able
-    --   to assign a bootstrap leader).
-    --
-    -- NB: The read-only mode may be enforced due to other reasons
-    -- (such as enabled isolated mode) that are not specific to
-    -- the startup flow.
-    --
-    -- The reason is that the configured master may be switched
-    -- while it is starting. In this case it is undesirable to set
-    -- RW mode if the actual configuration marks the instance as
-    -- RO.
-    --
-    -- The main startup code calls this applier second time if
-    -- {needs_retry = true} is returned after re-reading of the
-    -- configuration.
-    --
-    -- Automatic reapplying of the post-startup configuration is
-    -- performed for all the cases, when the startup may take a
-    -- long time.
-    --
-    -- This logic is disabled if the automatic leader election is
-    -- in effect. The configuration has no leadership information,
-    -- in this case, so there is no much sense to re-read it after
-    -- startup.
-    --
-    -- The same for the supervised failover mode.
-    if is_startup and failover ~= 'election' and failover ~= 'supervised' then
-        local configured_as_rw = not box_cfg.read_only
-        local in_replicaset = #configdata:peers() > 1
-        local has_snap = snapshot.get_path(configdata._iconfig_def) ~= nil
-
-        -- Require at least one writable instance in the
-        -- replicaset if the instance is to be bootstrapped (has
-        -- no existing snapshot). Otherwise there is no one who
-        -- would register the instance in the _cluster system
-        -- space.
-        --
-        -- TODO: If an instance is configured with known
-        -- instance_uuid that is already in _cluster, it may be
-        -- re-bootstrapped. But we don't know from the
-        -- configuration whether the given instance_uuid is
-        -- already registered. We should decide what to do in the
-        -- case.
-        --
-        -- Note: an anonymous replica is not to be registered in
-        -- _cluster. So, it can subscribe to such a replicaset.
-        if in_replicaset and not has_snap and not is_anon then
-            local has_rw = false
-            if failover == 'off' then
-                for _, peer_name in ipairs(configdata:peers()) do
-                    local opts = {instance = peer_name, use_default = true}
-                    local mode = configdata:get('database.mode', opts)
-                    -- NB: The default is box.NULL that is
-                    -- interpreted as 'ro' for a replicaset with
-                    -- more than one instance.
-                    if mode == 'rw' then
-                        has_rw = true
-                        break
-                    end
-                end
-            elseif failover == 'manual' then
-                has_rw = configdata:leader() ~= nil
-            else
-                assert(false)
-            end
-            if not has_rw then
-                error(('Startup failure.\nNo leader to register new ' ..
-                    'instance %q. All the instances in replicaset %q of ' ..
-                    'group %q are configured to the read-only mode.'):format(
-                    names.instance_name, names.replicaset_name,
-                    names.group_name), 0)
-            end
-        end
-
-        -- Reading a snapshot may take a long time, fetching it
-        -- from a remote master is even longer.
-        local startup_may_be_long = has_snap or
-            (not has_snap and in_replicaset)
-
-        -- Start to construct the force read-only mode condition.
-        local force_read_only = configured_as_rw
-
-        -- It only has sense to force RO if we expect that the
-        -- configured RO/RW mode has a good chance to change
-        -- during the startup.
-        force_read_only = force_read_only and startup_may_be_long
-
-        -- If the instance is the only one in its replicaset,
-        -- there is no another one that would take the leadership.
-        --
-        -- It is OK to just start in RW.
-        force_read_only = force_read_only and in_replicaset
-
-        -- Can't set RO for an instance in a replicaset without an
-        -- existing snapshot, because one of the cases is when the
-        -- replicaset is to be created from scratch. There should
-        -- be at least one RW instance to act as a bootstrap
-        -- leader.
-        --
-        -- We don't know, whether other instances have snapshots,
-        -- so the best that we can do is to lean on the user
-        -- provided configuration regarding RO/RW.
-        force_read_only = force_read_only and has_snap
-
-        if force_read_only then
-            box_cfg.read_only = true
-        end
-
-        log.debug('box_cfg.apply (startup)')
-        box.cfg(box_cfg)
-        post_box_cfg_hooks:run()
-
-        -- NB: needs_retry should be true when force_read_only is
-        -- true. It is so by construction.
-        return {needs_retry = startup_may_be_long}
-    end
-
-    -- If it is reload, just apply the new configuration.
-    log.debug('box_cfg.apply')
+    log.debug('box_cfg.apply (is_startup = %s)', is_startup)
     box.cfg(box_cfg)
     post_box_cfg_hooks:run()
+
+    -- Ask for reapply with the new configuration if the startup
+    -- may be long and the new configuration may appear during it.
+    return {needs_retry = needs_retry}
 end
 
 return {
