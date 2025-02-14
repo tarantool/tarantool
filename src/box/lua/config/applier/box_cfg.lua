@@ -105,6 +105,55 @@ end
 
 -- }}} replication.peers
 
+-- {{{ log/audit_log helpers
+
+local function log_destination(log)
+    if log.to == 'stderr' or log.to == 'devnull' then
+        return box.NULL
+    elseif log.to == 'file' then
+        return ('file:%s'):format(log.file)
+    elseif log.to == 'pipe' then
+        return ('pipe:%s'):format(log.pipe)
+    elseif log.to == 'syslog' then
+        local res = ('syslog:identity=%s,facility=%s'):format(
+            log.syslog.identity,
+            log.syslog.facility)
+        -- TODO: Syslog's URI format is different from tarantool's
+        -- one for Unix domain sockets: `unix:/path/to/socket` vs
+        -- `unix/:/path/to/socket`. We expect syslog's format
+        -- here, but maybe it worth to accept our own one (or even
+        -- just path) and transform under hood.
+        if log.syslog.server ~= nil then
+            res = res .. (',server=%s'):format(log.syslog.server)
+        end
+        return res
+    else
+        assert(false)
+    end
+end
+
+-- }}} log/audit_log helpers
+
+-- {{{ log
+
+local function set_log(configdata, box_cfg)
+    -- Construct logger destination (box_cfg.log) and log modules.
+    --
+    -- `log.nonblock`, `log.level`, `log.format`, 'log.modules'
+    -- options are marked with the `box_cfg` annotations and so
+    -- they're already added to `box_cfg`.
+    local cfg_log = configdata:get('log', {use_default = true})
+    box_cfg.log = log_destination(cfg_log)
+
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if type(box_cfg.log_modules) == 'nil' then
+        box_cfg.log_modules = box.NULL
+    end
+end
+
+-- }}} log
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -274,31 +323,6 @@ local function switch_isolated_mode_after_box_cfg(config)
         log.info('isolated mode: successfully dropped iproto connections ' ..
             '(took %d seconds)', duration)
     end)
-end
-
-local function log_destination(log)
-    if log.to == 'stderr' or log.to == 'devnull' then
-        return box.NULL
-    elseif log.to == 'file' then
-        return ('file:%s'):format(log.file)
-    elseif log.to == 'pipe' then
-        return ('pipe:%s'):format(log.pipe)
-    elseif log.to == 'syslog' then
-        local res = ('syslog:identity=%s,facility=%s'):format(
-            log.syslog.identity,
-            log.syslog.facility)
-        -- TODO: Syslog's URI format is different from tarantool's
-        -- one for Unix domain sockets: `unix:/path/to/socket` vs
-        -- `unix/:/path/to/socket`. We expect syslog's format
-        -- here, but maybe it worth to accept our own one (or even
-        -- just path) and transform under hood.
-        if log.syslog.server ~= nil then
-            res = res .. (',server=%s'):format(log.syslog.server)
-        end
-        return res
-    else
-        assert(false)
-    end
 end
 
 --------------------------------------------------------------------------------
@@ -594,20 +618,7 @@ local function apply(config)
     local box_cfg = collect_by_box_cfg_annotation(configdata)
     set_iproto_listen(configdata, box_cfg)
     set_replication_peers(configdata, box_cfg)
-
-    -- Construct logger destination (box_cfg.log) and log modules.
-    --
-    -- `log.nonblock`, `log.level`, `log.format`, 'log.modules'
-    -- options are marked with the `box_cfg` annotations and so
-    -- they're already added to `box_cfg`.
-    local cfg_log = configdata:get('log', {use_default = true})
-    box_cfg.log = log_destination(cfg_log)
-
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if type(box_cfg.log_modules) == 'nil' then
-        box_cfg.log_modules = box.NULL
-    end
+    set_log(configdata, box_cfg)
 
     -- Construct audit logger destination and audit filter (box_cfg.audit_log
     -- and audit_filter).
