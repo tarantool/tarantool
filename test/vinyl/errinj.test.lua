@@ -250,8 +250,7 @@ f = fiber.new(function()
         errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i2:select{i + 1}
     end
-end);
-f:set_joinable(true);
+end) f:set_joinable(true);
 ok, err = nil;
 repeat
     box.snapshot()

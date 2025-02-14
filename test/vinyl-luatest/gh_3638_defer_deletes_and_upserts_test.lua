@@ -41,12 +41,22 @@ g.test_defer_deletes_and_upserts = function(cg)
         box.snapshot()
         -- Check that no compaction is in progress and the primary index
         -- have three runs with REPLACE, UPSERT, and DELETE.
-        t.assert_covers(box.stat.vinyl().scheduler, {
-            tasks_inprogress = 0, compaction_queue = 0,
-        })
-        t.assert_equals(s.index.pk:stat().run_count, 3)
-        t.assert_equals(s.index.pk:stat().disk.statement, {
-            inserts = 0, replaces = 1, deletes = 1, upserts = 1,
+        t.assert_covers(s.index.pk:stat(), {
+            run_count = 3,
+            disk = {
+                compaction = {
+                    count = 0,
+                    input = {rows = 0},
+                    output = {rows = 0},
+                    queue = {rows = 0},
+                },
+                statement = {
+                    inserts = 0,
+                    replaces = 1,
+                    deletes = 1,
+                    upserts = 1,
+                },
+            },
         })
         -- Compact the primary index, then the secondary index.
         -- Check that all runs are deleted.
