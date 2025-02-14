@@ -196,6 +196,182 @@ end
 
 -- }}} wal.ext
 
+-- {{{ Set RO/RW
+
+local function set_ro_rw(configdata, box_cfg)
+    -- The startup process may need a special handling and differs
+    -- from the configuration reloading process.
+    local is_startup = type(box.cfg) == 'function'
+
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    local is_anon = configdata:get('replication.anon', {use_default = true})
+
+    -- Read-only or read-write?
+    if failover == 'off' then
+        -- 'rw' and 'ro' mean itself.
+        --
+        -- The default is determined depending of amount of
+        -- instances in the given replicaset.
+        --
+        -- * 1 instance: read-write.
+        -- * >1 instances: read-only.
+        --
+        -- NB: configdata.lua verifies that there is at least one
+        -- non-anonymous instance. So, an anonymous replica is
+        -- read-only by default.
+        --
+        -- NB: configdata.lua also verifies that read-write mode
+        -- is not enabled for an anonymous replica in the config.
+        local mode = configdata:get('database.mode', {use_default = true})
+        if mode == 'ro' then
+            box_cfg.read_only = true
+        elseif mode == 'rw' then
+            box_cfg.read_only = false
+        elseif #configdata:peers() == 1 then
+            assert(mode == nil)
+            box_cfg.read_only = false
+        elseif #configdata:peers() > 1 then
+            assert(mode == nil)
+            box_cfg.read_only = true
+        else
+            assert(false)
+        end
+    elseif failover == 'manual' then
+        -- Set RO/RW based on the 'leader' replicaset option.
+        --
+        -- NB: If there is no configured leader, all the instances
+        -- of the given replicaset are configured as read-only.
+        --
+        -- NB: configdata.lua verifies that an anonymous replica
+        -- is not set as a leader.
+        box_cfg.read_only = not configdata:is_leader()
+    elseif failover == 'election' then
+        -- Enable leader election on non-anonymous instances.
+        if box_cfg.election_mode == nil then
+            box_cfg.election_mode = is_anon and 'off' or 'candidate'
+        end
+
+        -- An anonymous replica can be configured with
+        -- `election_mode: off`, but not other modes.
+        --
+        -- The validation is performed in configdata.lua for all
+        -- the peers of the given replicaset.
+        if is_anon then
+            assert(box_cfg.election_mode == 'off')
+        end
+
+        -- A particular instance may participate in the replicaset
+        -- in different roles.
+        --
+        -- The default role is 'candidate' -- it votes and may be
+        -- elected as a leader. The RO/RW mode is determined by
+        -- the election results. box.cfg({read_only = false})
+        -- means that we don't impose any extra restrictions.
+        --
+        -- 'voter' only votes for a new leader, but can't be
+        -- elected. The actual database mode is RO (it is
+        -- controlled by the underneath logic, so we pass
+        -- read_only = false here).
+        --
+        -- An instance in the 'off' election mode neither votes,
+        -- nor can be elected. It just fetches all the data.
+        -- This is the only election mode, where the read-only
+        -- database mode is forced by the configuration applying
+        -- code.
+        --
+        -- An instance in the 'manual' election mode acts as a
+        -- voter until box.ctl.promote() is called on it. After
+        -- that it starts a new election round and acts as a
+        -- candidate during this (and only this) round. No extra
+        -- RO/RW restriction is performed there (controlled by the
+        -- underneath logic).
+        if box_cfg.election_mode == 'off' then
+            box_cfg.read_only = true  -- forced RO
+        elseif box_cfg.election_mode == 'voter' then
+            box_cfg.read_only = false -- means no restrictions
+        elseif box_cfg.election_mode == 'manual' then
+            box_cfg.read_only = false -- means no restrictions
+        elseif box_cfg.election_mode == 'candidate' then
+            box_cfg.read_only = false -- means no restrictions
+        else
+            assert(false)
+        end
+    elseif failover == 'supervised' then
+        -- The startup flow in the 'supervised' failover mode is
+        -- the following.
+        --
+        -- * Look over the peer names of the replicaset and choose
+        --   the minimal name across all non-anonymous instances
+        --   (compare them lexicographically).
+        -- * The instance with the minimal name starts in the RW
+        --   mode to be able to bootstrap the replicaset if there
+        --   is no local snapshot. Otherwise, it starts as usual,
+        --   in RO.
+        -- * All the other instances are started in RO.
+        -- * The instance that is started in RW re-checks, whether
+        --   it was a bootstrap leader (box.info.id == 1) and, if
+        --   not, goes to RO.
+        --
+        -- The algorithm leans on the replicaset bootstrap process
+        -- that chooses an RW instance as the bootstrap leader.
+        -- bootstrap_strategy 'auto' fits this criteria.
+        --
+        -- As result, all the instances are in RO or one is in RW.
+        -- The supervisor (failover agent) manages the RO/RW mode
+        -- during the lifetime of the replicaset.
+        --
+        -- The 'minimal name' criteria is chosen with idea that
+        -- instances are often names like 'storage-001',
+        -- 'storage-002' and so on, so a probability that a newly
+        -- added instance has the minimal name is low.
+        --
+        -- The RO/RW mode remains unchanged on reload.
+        local am_i_bootstrap_leader = false
+        if is_startup then
+            local instance_name = configdata:names().instance_name
+            am_i_bootstrap_leader =
+                snapshot.get_path(configdata._iconfig_def) == nil and
+                instance_name == configdata:bootstrap_leader_name()
+            box_cfg.read_only = not am_i_bootstrap_leader
+        end
+
+        -- It is possible that an instance with the minimal
+        -- name (configdata:bootstrap_leader_name()) is added to
+        -- the configuration, when the replicaset is already
+        -- bootstrapped.
+        --
+        -- Ideally, we shouldn't make this instance RW. However,
+        -- we can't differentiate this situation from one, when
+        -- the replicaset bootstrap is needed, before a first
+        -- box.cfg().
+        --
+        -- However, after leaving box.cfg() or from a background
+        -- fiber after box.ctl.wait_rw() we can check that the
+        -- instance was a bootstrap leader using the
+        -- box.info.id == 1 condition.
+        --
+        -- If box.info.id != 1, then the replicaset was already
+        -- bootstrapped and so we should go to RO.
+        if am_i_bootstrap_leader then
+            fiber.new(function()
+                local name = 'config_set_read_only_if_not_bootstrap_leader'
+                fiber.self():name(name, {truncate = true})
+                box.ctl.wait_rw()
+                if box.info.id ~= 1 then
+                    -- Not really a bootstrap leader, just a
+                    -- replica. Go to RO.
+                    box.cfg({read_only = true})
+                end
+            end)
+        end
+    else
+        assert(false)
+    end
+end
+
+-- }}} Set RO/RW
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -663,176 +839,7 @@ local function apply(config)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
     set_wal_ext(configdata, box_cfg)
-
-    -- The startup process may need a special handling and differs
-    -- from the configuration reloading process.
-    local is_startup = type(box.cfg) == 'function'
-
-    local failover = configdata:get('replication.failover',
-        {use_default = true})
-    local is_anon = configdata:get('replication.anon', {use_default = true})
-
-    -- Read-only or read-write?
-    if failover == 'off' then
-        -- 'rw' and 'ro' mean itself.
-        --
-        -- The default is determined depending of amount of
-        -- instances in the given replicaset.
-        --
-        -- * 1 instance: read-write.
-        -- * >1 instances: read-only.
-        --
-        -- NB: configdata.lua verifies that there is at least one
-        -- non-anonymous instance. So, an anonymous replica is
-        -- read-only by default.
-        --
-        -- NB: configdata.lua also verifies that read-write mode
-        -- is not enabled for an anonymous replica in the config.
-        local mode = configdata:get('database.mode', {use_default = true})
-        if mode == 'ro' then
-            box_cfg.read_only = true
-        elseif mode == 'rw' then
-            box_cfg.read_only = false
-        elseif #configdata:peers() == 1 then
-            assert(mode == nil)
-            box_cfg.read_only = false
-        elseif #configdata:peers() > 1 then
-            assert(mode == nil)
-            box_cfg.read_only = true
-        else
-            assert(false)
-        end
-    elseif failover == 'manual' then
-        -- Set RO/RW based on the 'leader' replicaset option.
-        --
-        -- NB: If there is no configured leader, all the instances
-        -- of the given replicaset are configured as read-only.
-        --
-        -- NB: configdata.lua verifies that an anonymous replica
-        -- is not set as a leader.
-        box_cfg.read_only = not configdata:is_leader()
-    elseif failover == 'election' then
-        -- Enable leader election on non-anonymous instances.
-        if box_cfg.election_mode == nil then
-            box_cfg.election_mode = is_anon and 'off' or 'candidate'
-        end
-
-        -- An anonymous replica can be configured with
-        -- `election_mode: off`, but not other modes.
-        --
-        -- The validation is performed in configdata.lua for all
-        -- the peers of the given replicaset.
-        if is_anon then
-            assert(box_cfg.election_mode == 'off')
-        end
-
-        -- A particular instance may participate in the replicaset
-        -- in different roles.
-        --
-        -- The default role is 'candidate' -- it votes and may be
-        -- elected as a leader. The RO/RW mode is determined by
-        -- the election results. box.cfg({read_only = false})
-        -- means that we don't impose any extra restrictions.
-        --
-        -- 'voter' only votes for a new leader, but can't be
-        -- elected. The actual database mode is RO (it is
-        -- controlled by the underneath logic, so we pass
-        -- read_only = false here).
-        --
-        -- An instance in the 'off' election mode neither votes,
-        -- nor can be elected. It just fetches all the data.
-        -- This is the only election mode, where the read-only
-        -- database mode is forced by the configuration applying
-        -- code.
-        --
-        -- An instance in the 'manual' election mode acts as a
-        -- voter until box.ctl.promote() is called on it. After
-        -- that it starts a new election round and acts as a
-        -- candidate during this (and only this) round. No extra
-        -- RO/RW restriction is performed there (controlled by the
-        -- underneath logic).
-        if box_cfg.election_mode == 'off' then
-            box_cfg.read_only = true  -- forced RO
-        elseif box_cfg.election_mode == 'voter' then
-            box_cfg.read_only = false -- means no restrictions
-        elseif box_cfg.election_mode == 'manual' then
-            box_cfg.read_only = false -- means no restrictions
-        elseif box_cfg.election_mode == 'candidate' then
-            box_cfg.read_only = false -- means no restrictions
-        else
-            assert(false)
-        end
-    elseif failover == 'supervised' then
-        -- The startup flow in the 'supervised' failover mode is
-        -- the following.
-        --
-        -- * Look over the peer names of the replicaset and choose
-        --   the minimal name across all non-anonymous instances
-        --   (compare them lexicographically).
-        -- * The instance with the minimal name starts in the RW
-        --   mode to be able to bootstrap the replicaset if there
-        --   is no local snapshot. Otherwise, it starts as usual,
-        --   in RO.
-        -- * All the other instances are started in RO.
-        -- * The instance that is started in RW re-checks, whether
-        --   it was a bootstrap leader (box.info.id == 1) and, if
-        --   not, goes to RO.
-        --
-        -- The algorithm leans on the replicaset bootstrap process
-        -- that chooses an RW instance as the bootstrap leader.
-        -- bootstrap_strategy 'auto' fits this criteria.
-        --
-        -- As result, all the instances are in RO or one is in RW.
-        -- The supervisor (failover agent) manages the RO/RW mode
-        -- during the lifetime of the replicaset.
-        --
-        -- The 'minimal name' criteria is chosen with idea that
-        -- instances are often names like 'storage-001',
-        -- 'storage-002' and so on, so a probability that a newly
-        -- added instance has the minimal name is low.
-        --
-        -- The RO/RW mode remains unchanged on reload.
-        local am_i_bootstrap_leader = false
-        if is_startup then
-            local instance_name = configdata:names().instance_name
-            am_i_bootstrap_leader =
-                snapshot.get_path(configdata._iconfig_def) == nil and
-                instance_name == configdata:bootstrap_leader_name()
-            box_cfg.read_only = not am_i_bootstrap_leader
-        end
-
-        -- It is possible that an instance with the minimal
-        -- name (configdata:bootstrap_leader_name()) is added to
-        -- the configuration, when the replicaset is already
-        -- bootstrapped.
-        --
-        -- Ideally, we shouldn't make this instance RW. However,
-        -- we can't differentiate this situation from one, when
-        -- the replicaset bootstrap is needed, before a first
-        -- box.cfg().
-        --
-        -- However, after leaving box.cfg() or from a background
-        -- fiber after box.ctl.wait_rw() we can check that the
-        -- instance was a bootstrap leader using the
-        -- box.info.id == 1 condition.
-        --
-        -- If box.info.id != 1, then the replicaset was already
-        -- bootstrapped and so we should go to RO.
-        if am_i_bootstrap_leader then
-            fiber.new(function()
-                local name = 'config_set_read_only_if_not_bootstrap_leader'
-                fiber.self():name(name, {truncate = true})
-                box.ctl.wait_rw()
-                if box.info.id ~= 1 then
-                    -- Not really a bootstrap leader, just a
-                    -- replica. Go to RO.
-                    box.cfg({read_only = true})
-                end
-            end)
-        end
-    else
-        assert(false)
-    end
+    set_ro_rw(configdata, box_cfg)
 
     assert(type(box.cfg) == 'function' or type(box.cfg) == 'table')
     if type(box.cfg) == 'table' then
@@ -870,6 +877,9 @@ local function apply(config)
     local names = configdata:names()
     box_cfg.instance_uuid = names.instance_uuid
     box_cfg.replicaset_uuid = names.replicaset_uuid
+
+    local is_startup = type(box.cfg) == 'function'
+    local is_anon = configdata:get('replication.anon', {use_default = true})
 
     -- Names are applied only if they're already in snap file.
     -- Otherwise, master must apply names after box.cfg asynchronously.
@@ -921,6 +931,9 @@ local function apply(config)
     -- function after all the other logic that may set RW.
     switch_isolated_mode_before_box_cfg(config, box_cfg)
     post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
+
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
 
     -- First box.cfg() call.
     --
