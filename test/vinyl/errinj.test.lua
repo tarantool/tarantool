@@ -68,32 +68,34 @@ s:select()
 errinj.set("ERRINJ_VY_READ_PAGE", false)
 s:select()
 
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
-function test_cancel_read () k = s:select() return #k end
-f1 = fiber.create(test_cancel_read)
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
+function test_cancel_read() k = s:select() return #k end
+f1 = fiber.new(test_cancel_read) f1:set_joinable(true)
+fiber.yield()
 fiber.cancel(f1)
--- task should be done
-fiber.sleep(0.1)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", false);
+f1:join(60)
 s:select()
 
 -- error after timeout for canceled fiber
 errinj.set("ERRINJ_VY_READ_PAGE", true)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
-f1 = fiber.create(test_cancel_read)
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
+f1 = fiber.new(test_cancel_read) f1:set_joinable(true)
+fiber.yield()
 fiber.cancel(f1)
-fiber.sleep(0.1)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", false);
+f1:join(60)
 errinj.set("ERRINJ_VY_READ_PAGE", false);
 s:select()
 
 -- index is dropped while a read task is in progress
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
-f1 = fiber.create(test_cancel_read)
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
+f1 = fiber.new(test_cancel_read) f1:set_joinable(true)
+fiber.yield()
 fiber.cancel(f1)
 s:drop()
-fiber.sleep(0.1)
-errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
+errinj.set("ERRINJ_VY_READ_PAGE_DELAY", false);
+f1:join(60)
 
 box.cfg{vinyl_cache = vinyl_cache}
 
@@ -250,8 +252,7 @@ f = fiber.new(function()
         errinj.set("ERRINJ_VY_POINT_LOOKUP_DELAY", true)
         i2:select{i + 1}
     end
-end);
-f:set_joinable(true);
+end) f:set_joinable(true);
 ok, err = nil;
 repeat
     box.snapshot()
