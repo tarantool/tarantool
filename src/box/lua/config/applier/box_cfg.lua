@@ -154,6 +154,35 @@ end
 
 -- }}} log
 
+-- {{{ audit_log
+
+local function set_audit_log(configdata, box_cfg)
+    -- Construct audit logger destination and audit filter (box_cfg.audit_log
+    -- and audit_filter).
+    --
+    -- `audit_log.nonblock` and 'audit_log.filter' options are marked with the
+    -- `box_cfg` annotations and so they're already added to `box_cfg`.
+    local audit_log = configdata:get('audit_log', {use_default = true})
+    if audit_log ~= nil and next(audit_log) ~= nil then
+        box_cfg.audit_log = log_destination(audit_log)
+        if audit_log.filter ~= nil then
+            assert(type(audit_log.filter) == 'table')
+            box_cfg.audit_filter = table.concat(audit_log.filter, ',')
+        else
+            box_cfg.audit_filter = 'compatibility'
+        end
+    end
+
+    -- TODO(gh-10756): This is not needed when :apply_default()
+    -- supports default values for composite types.
+    if tarantool.package == 'Tarantool Enterprise' and
+       type(box_cfg.audit_spaces) == 'nil' then
+        box_cfg.audit_spaces = box.NULL
+    end
+end
+
+-- }}} audit_log
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -619,35 +648,13 @@ local function apply(config)
     set_iproto_listen(configdata, box_cfg)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
-
-    -- Construct audit logger destination and audit filter (box_cfg.audit_log
-    -- and audit_filter).
-    --
-    -- `audit_log.nonblock` and 'audit_log.filter' options are marked with the
-    -- `box_cfg` annotations and so they're already added to `box_cfg`.
-    local audit_log = configdata:get('audit_log', {use_default = true})
-    if audit_log ~= nil and next(audit_log) ~= nil then
-        box_cfg.audit_log = log_destination(audit_log)
-        if audit_log.filter ~= nil then
-            assert(type(audit_log.filter) == 'table')
-            box_cfg.audit_filter = table.concat(audit_log.filter, ',')
-        else
-            box_cfg.audit_filter = 'compatibility'
-        end
-    end
+    set_audit_log(configdata, box_cfg)
 
     -- TODO(gh-10756): This is not needed when :apply_default()
     -- supports default values for composite types.
     if tarantool.package == 'Tarantool Enterprise' and
        type(box_cfg.wal_ext) == 'nil' then
         box_cfg.wal_ext = box.NULL
-    end
-
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if tarantool.package == 'Tarantool Enterprise' and
-       type(box_cfg.audit_spaces) == 'nil' then
-        box_cfg.audit_spaces = box.NULL
     end
 
     -- The startup process may need a special handling and differs
