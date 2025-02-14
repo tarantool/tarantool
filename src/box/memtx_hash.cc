@@ -635,6 +635,7 @@ memtx_hash_index_create_read_view(struct index *base)
 		.create_iterator = hash_read_view_create_iterator,
 		.create_iterator_with_offset =
 			generic_index_read_view_create_iterator_with_offset,
+		.dump_sort_data = generic_index_read_view_dump_sort_data,
 	};
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
@@ -680,6 +681,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .reserve = */ generic_index_reserve,
 	/* .build_next = */ generic_index_build_next,
 	/* .end_build = */ generic_index_end_build,
+	/* .build_presorted = */ generic_index_build_presorted,
 };
 
 struct index *
