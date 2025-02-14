@@ -372,6 +372,42 @@ end
 
 -- }}} Set RO/RW
 
+-- {{{ Revert changes in non-dynamic options
+
+local function revert_non_dynamic_options(config, box_cfg)
+    local configdata = config._configdata
+    local is_startup = type(box.cfg) == 'function'
+
+    if is_startup then
+        return
+    end
+
+    -- Collect non-dynamic option values based on the
+    -- box_cfg_nondynamic annotation.
+    local box_cfg_nondynamic = configdata:filter(function(w)
+        return w.schema.box_cfg ~= nil and w.schema.box_cfg_nondynamic
+    end, {use_default = true}):map(function(w)
+        return w.schema.box_cfg, w.data
+    end):tomap()
+    -- Some of the options are transformed before assigning to
+    -- the box_cfg table. Use the transformed value for the
+    -- comparison below.
+    box_cfg_nondynamic.log = box_cfg.log
+    box_cfg_nondynamic.audit_log = box_cfg.audit_log
+    box_cfg_nondynamic.audit_filter = box_cfg.audit_filter
+    box_cfg_nondynamic.audit_spaces = box_cfg.audit_spaces
+    for k, v in pairs(box_cfg_nondynamic) do
+        if v ~= box.cfg[k] then
+            local warning = 'box_cfg.apply: non-dynamic option '..k..
+                ' will not be set until the instance is restarted'
+            config._aboard:set({type = 'warn', message = warning})
+            box_cfg[k] = nil
+        end
+    end
+end
+
+-- }}} Revert changes in non-dynamic options
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -840,32 +876,7 @@ local function apply(config)
     set_audit_log(configdata, box_cfg)
     set_wal_ext(configdata, box_cfg)
     set_ro_rw(configdata, box_cfg)
-
-    assert(type(box.cfg) == 'function' or type(box.cfg) == 'table')
-    if type(box.cfg) == 'table' then
-        -- Collect non-dynamic option values based on the
-        -- box_cfg_nondynamic annotation.
-        local box_cfg_nondynamic = configdata:filter(function(w)
-            return w.schema.box_cfg ~= nil and w.schema.box_cfg_nondynamic
-        end, {use_default = true}):map(function(w)
-            return w.schema.box_cfg, w.data
-        end):tomap()
-        -- Some of the options are transformed before assigning to
-        -- the box_cfg table. Use the transformed value for the
-        -- comparison below.
-        box_cfg_nondynamic.log = box_cfg.log
-        box_cfg_nondynamic.audit_log = box_cfg.audit_log
-        box_cfg_nondynamic.audit_filter = box_cfg.audit_filter
-        box_cfg_nondynamic.audit_spaces = box_cfg.audit_spaces
-        for k, v in pairs(box_cfg_nondynamic) do
-            if v ~= box.cfg[k] then
-                local warning = 'box_cfg.apply: non-dynamic option '..k..
-                    ' will not be set until the instance is restarted'
-                config._aboard:set({type = 'warn', message = warning})
-                box_cfg[k] = nil
-            end
-        end
-    end
+    revert_non_dynamic_options(config, box_cfg)
 
     -- Persist an instance name to protect a user from accidental
     -- attempt to run an instance from a snapshot left by another
