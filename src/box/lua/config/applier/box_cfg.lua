@@ -700,6 +700,14 @@ end
 
 -- }}} Instance/replicaset names
 
+-- {{{ <replicaset>.bootstrap_leader
+
+local function set_bootstrap_leader(configdata, box_cfg)
+    box_cfg.bootstrap_leader = configdata:bootstrap_leader()
+end
+
+-- }}} <replicaset>.bootstrap_leader
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -928,9 +936,7 @@ local function apply(config)
     set_ro_rw(configdata, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
-
-    -- Set bootstrap_leader option.
-    box_cfg.bootstrap_leader = configdata:bootstrap_leader()
+    set_bootstrap_leader(configdata, box_cfg)
 
     local names = configdata:names()
 
