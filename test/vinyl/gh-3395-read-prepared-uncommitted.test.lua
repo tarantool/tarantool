@@ -12,26 +12,22 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 errinj = box.error.injection
 
-s = box.schema.create_space('test', {engine = 'vinyl'})
+-- Defer DELETEs to make sure REPLACE doesn't read disk.
+s = box.schema.create_space('test', {engine = 'vinyl', defer_deletes = true})
 pk = s:create_index('pk')
 sk = s:create_index('sk', {parts = {{2, 'unsigned'}}, unique = false})
 s:replace{3, 2}
 s:replace{2, 2}
 box.snapshot()
 
-c1 = fiber.channel(1)
-c2 = fiber.channel(1)
-
 function do_write() s:replace{1, 2} end
 
 test_run:cmd("setopt delimiter ';'")
 function do_read()
-    c1:get()
-    c2:put(true)
     box.begin({txn_isolation = 'read-committed'})
     local ret = sk:select{2}
     box.commit()
-    c2:put(ret)
+    return ret
 end;
 
 -- Since we have tuples stored on disk, read procedure may
@@ -53,24 +49,26 @@ end;
 -- statement is rolled back.
 --
 function read_prepared_with_delay(is_tx_faster_than_wal)
-    errinj.set("ERRINJ_WAL_DELAY", true)
-    fiber.create(do_write)
-    fiber.create(do_read)
-    errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
-    c1:put(true)
-    c2:get()
     errinj.set("ERRINJ_WAL_WRITE", true)
-    if is_tx_faster_than_wal then
-        errinj.set("ERRINJ_RELAY_FASTER_THAN_TX", true)
+    errinj.set("ERRINJ_WAL_DELAY", true)
+    errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
+    local writer = fiber.new(do_write)
+    writer:set_joinable(true)
+    fiber.yield()
+    local reader = fiber.new(do_read)
+    reader:set_joinable(true)
+    fiber.yield()
+    if not is_tx_faster_than_wal then
+        errinj.set("ERRINJ_WAL_DELAY", false)
+        writer:join()
     end
-    errinj.set("ERRINJ_WAL_DELAY", false)
-    fiber.sleep(0.1)
     errinj.set("ERRINJ_VY_READ_PAGE_DELAY", false)
-    local res = c2:get()
-    errinj.set("ERRINJ_WAL_WRITE", false)
+    local _, res = reader:join()
     if is_tx_faster_than_wal then
-        errinj.set("ERRINJ_RELAY_FASTER_THAN_TX", false)
+        errinj.set("ERRINJ_WAL_DELAY", false)
+        writer:join()
     end
+    errinj.set("ERRINJ_WAL_WRITE", false)
     return res
 end;
 
@@ -118,12 +116,10 @@ test_run:cmd("setopt delimiter ';'")
 function do_read()
     box.begin({txn_isolation = 'read-committed'})
     gen, param, state = sk:pairs({20}, {iterator = box.index.EQ})
-    c1:get()
-    c2:put(true)
     gen(param, state)
     local _, ret = gen(param, state)
     box.commit()
-    c2:put(ret)
+    return ret
 end;
 test_run:cmd("setopt delimiter ''");
 
