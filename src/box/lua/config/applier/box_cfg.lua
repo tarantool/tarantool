@@ -19,6 +19,19 @@ end
 
 -- }}} Collect options with the box_cfg annotation
 
+-- {{{ iproto.listen
+
+local function set_iproto_listen(configdata, box_cfg)
+    -- Explicitly set box_cfg.listen to box.NULL if iproto.listen is not
+    -- provided.
+    -- TODO: drop this when default for array value will be supported.
+    if configdata:get('iproto.listen') == nil then
+        box_cfg.listen = box.NULL
+    end
+end
+
+-- }}} iproto.listen
+
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
@@ -568,13 +581,7 @@ local function apply(config)
     local configdata = config._configdata
 
     local box_cfg = collect_by_box_cfg_annotation(configdata)
-
-    -- Explicitly set box_cfg.listen to box.NULL if iproto.listen is not
-    -- provided.
-    -- TODO: drop this when default for array value will be supported.
-    if configdata:get('iproto.listen') == nil then
-        box_cfg.listen = box.NULL
-    end
+    set_iproto_listen(configdata, box_cfg)
 
     -- Construct box_cfg.replication.
     if box_cfg.replication == nil then
