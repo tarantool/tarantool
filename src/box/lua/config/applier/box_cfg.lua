@@ -32,6 +32,8 @@ end
 
 -- }}} iproto.listen
 
+-- {{{ replication.peers
+
 local function peer_uris(configdata)
     local peers = configdata:peers()
     if #peers <= 1 then
@@ -93,6 +95,15 @@ local function peer_uris(configdata)
 
     return uris
 end
+
+local function set_replication_peers(configdata, box_cfg)
+    -- Construct box_cfg.replication.
+    if box_cfg.replication == nil then
+        box_cfg.replication = peer_uris(configdata)
+    end
+end
+
+-- }}} replication.peers
 
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
@@ -582,11 +593,7 @@ local function apply(config)
 
     local box_cfg = collect_by_box_cfg_annotation(configdata)
     set_iproto_listen(configdata, box_cfg)
-
-    -- Construct box_cfg.replication.
-    if box_cfg.replication == nil then
-        box_cfg.replication = peer_uris(configdata)
-    end
+    set_replication_peers(configdata, box_cfg)
 
     -- Construct logger destination (box_cfg.log) and log modules.
     --
