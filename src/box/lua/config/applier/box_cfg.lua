@@ -726,6 +726,8 @@ end
 
 -- }}} metrics
 
+-- {{{ isolated
+
 -- Modify box-level configuration values and perform other actions
 -- to enable the isolated mode (if configured).
 local function switch_isolated_mode_before_box_cfg(config, box_cfg)
@@ -897,6 +899,13 @@ local function switch_isolated_mode_after_box_cfg(config)
     end)
 end
 
+local function set_isolated(config, box_cfg, post_box_cfg_hooks)
+    switch_isolated_mode_before_box_cfg(config, box_cfg)
+    post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
+end
+
+-- }}} isolated
+
 -- See hooks_new().
 local hooks_mt = {
     __index = {
@@ -959,8 +968,7 @@ local function apply(config)
 
     -- RO may be enforced by the isolated mode, so we call the
     -- function after all the other logic that may set RW.
-    switch_isolated_mode_before_box_cfg(config, box_cfg)
-    post_box_cfg_hooks:add(switch_isolated_mode_after_box_cfg, config)
+    set_isolated(config, box_cfg, post_box_cfg_hooks)
 
     local is_startup = type(box.cfg) == 'function'
     local names = configdata:names()
