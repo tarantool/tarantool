@@ -9,12 +9,13 @@ g.before_all(function(cg)
     cg.server = server:new({
         alias = 'master',
         box_cfg = {
-            vinyl_memory = 2 * 1024 * 1024,
-            vinyl_cache = 2 * 1024 * 1024,
+            log_level = 'verbose',
+            vinyl_memory = 1024 * 1024,
+            vinyl_cache = 512 * 1024,
             vinyl_run_count_per_level = 1,
             vinyl_run_size_ratio = 4,
             vinyl_page_size = 1024,
-            vinyl_range_size = 128 * 1024,
+            vinyl_range_size = 64 * 1024,
             vinyl_bloom_fpr = 0.1,
             vinyl_read_threads = 2,
             vinyl_write_threads = 4,
@@ -66,18 +67,21 @@ g.test_select_consistency = function(cg)
         cg.server:exec(function()
             local digest = require('digest')
             local fiber = require('fiber')
+            local json = require('json')
+            local log = require('log')
 
             math.randomseed(os.time())
             box.stat.reset()
 
+            local YIELD_PROBABILITY = 0.2
             local WRITE_FIBERS = 20
             local READ_FIBERS = 5
             local MAX_TX_STMTS = 10
-            local MAX_KEY = 100 * 1000
-            local MAX_VAL = 1000
+            local MAX_KEY = 1000
+            local MAX_VAL = 10
             local MAX_MULTIKEY_COUNT = 10
-            local PADDING_SIZE = 100
-            local DUMP_COUNT = 5
+            local MAX_PADDING_SIZE = 1000
+            local TEST_TIME = 5
 
             local s = box.space.test
 
@@ -89,20 +93,58 @@ g.test_select_consistency = function(cg)
                 return {
                     math.random(MAX_KEY), math.random(MAX_VAL),
                     math.random(MAX_VAL), math.random(MAX_VAL),
-                    multikey, digest.urandom(PADDING_SIZE),
+                    multikey, digest.urandom(math.random(MAX_PADDING_SIZE)),
                 }
             end
 
+            local function str_tuple(tuple)
+                -- Remove padding (6th field).
+                return json.encode({unpack(tuple, 1, 5)})
+            end
+
+            local function pick_txn_isolation()
+                local variants = {
+                    'best-effort',
+                    'read-committed',
+                    'read-confirmed',
+                }
+                return variants[math.random(#variants)]
+            end
+
+            local function inject_yield()
+                if math.random(100) / 100 < YIELD_PROBABILITY then
+                    fiber.yield()
+                end
+            end
+
             local function do_write()
-                box.atomic(function()
+                local ok, err = pcall(function()
+                    local txn_isolation = pick_txn_isolation()
+                    log.info('begin %s', txn_isolation)
+                    box.begin{txn_isolation = txn_isolation}
+                    inject_yield()
                     for _ = 1, math.random(MAX_TX_STMTS) do
-                        local op = math.random(3)
+                        local op = math.random(4)
                         if op == 1 then
-                            s:replace(make_tuple())
+                            local tuple = make_tuple()
+                            log.info('replace %s', str_tuple(tuple))
+                            s:replace(tuple)
                         elseif op == 2 then
-                            s:delete({math.random(MAX_KEY)})
+                            local key = math.random(MAX_KEY)
+                            log.info('delete %s', key)
+                            s:delete(key)
+                        elseif op == 3 then
+                            local tuple = make_tuple()
+                            log.info('update %s', str_tuple(tuple))
+                            s:update(tuple[1], {
+                                {'=', 2, tuple[2]},
+                                {'=', 3, tuple[3]},
+                                {'=', 4, tuple[4]},
+                                {'=', 5, tuple[5]},
+                            })
                         else
                             local tuple = make_tuple()
+                            log.info('upsert %s', str_tuple(tuple))
                             s:upsert(tuple, {
                                 {'=', 2, tuple[2]},
                                 {'=', 3, tuple[3]},
@@ -110,25 +152,56 @@ g.test_select_consistency = function(cg)
                                 {'=', 5, tuple[5]},
                             })
                         end
+                        inject_yield()
                     end
+                    log.info('commit')
+                    box.commit()
+                    log.info('confirm')
                 end)
+                if not ok then
+                    box.rollback()
+                    if err.type == 'ClientError' and
+                            err.code == box.error.TRANSACTION_CONFLICT then
+                        log.info('rollback with conflict')
+                    else
+                        log.error('unexpected error: %s', err)
+                        error(err)
+                    end
+                end
             end
 
-            local failed = {}
             local function check_select(idx1, idx2, iterator)
-                local key = {math.random(MAX_VAL)}
+                local key = math.random(MAX_VAL)
                 local opts = {iterator = iterator}
                 local res1 = {}
                 local res2 = {}
-                box.atomic(function()
+                local ok, err = pcall(function()
+                    local txn_isolation = pick_txn_isolation()
+                    log.info('begin %s', txn_isolation)
+                    box.begin{txn_isolation = txn_isolation}
+                    inject_yield()
+                    log.info('select %s %s from %s', iterator, key, idx1)
                     for _, tuple in s.index[idx1]:pairs(key, opts) do
-                        table.insert(res1, tuple:totable())
+                        tuple = tuple:totable()
+                        log.info('read %s', str_tuple(tuple))
+                        table.insert(res1, tuple)
+                        inject_yield()
                     end
+                    log.info('select %s %s from %s', iterator, key, idx2)
                     for _, tuple in s.index[idx2]:pairs(key, opts) do
-                        table.insert(res2, tuple:totable())
+                        tuple = tuple:totable()
+                        log.info('read %s', str_tuple(tuple))
+                        table.insert(res2, tuple)
+                        inject_yield()
                     end
+                    log.info('commit')
+                    box.commit()
                 end)
-                local ok = true
+                if not ok then
+                    box.rollback()
+                    log.error('unexpected error: %s', err)
+                    error(err)
+                end
                 for _, t1 in ipairs(res1) do
                     local found = false
                     for _, t2 in ipairs(res2) do
@@ -139,79 +212,62 @@ g.test_select_consistency = function(cg)
                     end
                     if not found then
                         ok = false
+                        err = string.format('consistency check failed: ' ..
+                                            'key %s from %s not found in %s',
+                                            t1[1], idx1, idx2)
                         break
                     end
                 end
                 if not ok then
-                    table.insert(failed, {
-                        iterator = iterator,
-                        idx1 = idx1,
-                        idx2 = idx2,
-                        res1 = res1,
-                        res2 = res2,
-                    })
-                    error('consistency check failed')
+                    log.error(err)
+                    error(err)
                 end
             end
 
             local function do_read()
-                check_select('i2', 'i3', 'eq')
-                check_select('i2', 'i3', 'req')
-                check_select('i4', 'i5', 'eq')
-                check_select('i4', 'i5', 'req')
+                local variants = {
+                    {'i2', 'i3', 'eq'},
+                    {'i2', 'i3', 'req'},
+                    {'i4', 'i5', 'eq'},
+                    {'i4', 'i5', 'req'},
+                }
+                return check_select(unpack(variants[math.random(#variants)]))
             end
 
             local stop = false
 
-            local read_fiber_ch = fiber.channel(1)
             local function read_fiber_f()
                 while not stop do
-                    local status, err = pcall(do_read)
-                    if not status then
-                        read_fiber_ch:put(err)
-                        return
-                    end
+                    do_read()
                     fiber.yield()
                 end
-                read_fiber_ch:put(true)
             end
 
-            local write_fiber_ch = fiber.channel(1)
             local function write_fiber_f()
                 while not stop do
-                    local status, err = pcall(do_write)
-                    if not status and
-                       err.code ~= box.error.TRANSACTION_CONFLICT then
-                        write_fiber_ch:put(err)
-                        return
-                    end
+                    do_write()
                     fiber.yield()
                 end
-                write_fiber_ch:put(true)
             end
 
+            local fibers = {}
             for _ = 1, READ_FIBERS do
-                fiber.create(read_fiber_f)
+                local f = fiber.new(read_fiber_f)
+                f:set_joinable(true)
+                table.insert(fibers, f)
             end
             for _ = 1, WRITE_FIBERS do
-                fiber.create(write_fiber_f)
+                local f = fiber.new(write_fiber_f)
+                f:set_joinable(true)
+                table.insert(fibers, f)
             end
-            t.helpers.retrying({timeout = 60}, function()
-                t.assert_ge(box.stat.vinyl().scheduler.dump_count, DUMP_COUNT)
-            end)
+            fiber.sleep(TEST_TIME)
             stop = true
-            for _ = 1, READ_FIBERS do
-                t.assert_equals(read_fiber_ch:get(5), true)
+            for _, f in ipairs(fibers) do
+                t.assert_equals({f:join(5)}, {true})
             end
-            for _ = 1, WRITE_FIBERS do
-                t.assert_equals(write_fiber_ch:get(5), true)
-            end
-            t.assert_equals(failed, {})
         end)
     end
-    run_test()
-    -- Restart and try again.
-    cg.server:restart()
     run_test()
     -- Peform major compaction and check that there is no garbage statements.
     cg.server:exec(function()
