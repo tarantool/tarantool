@@ -44,6 +44,7 @@
 #include "space.h"
 #include "index.h"
 #include "engine.h"
+#include "user.h"
 #include "func.h"
 #include "tuple.h"
 #include "session.h"
@@ -317,8 +318,26 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	uint32_t owner_id;
 	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &owner_id) != 0)
 		return false;
+
 	/* Allow access for self, childs or public user. */
-	return uid == cr->uid || owner_id == cr->uid || uid == PUBLIC;
+	if (uid == cr->uid || owner_id == cr->uid || uid == PUBLIC)
+		return true;
+
+	uint32_t type_str_len;
+	const char *type_str =
+		tuple_field_str(tuple, BOX_USER_FIELD_TYPE, &type_str_len);
+	if (type_str == NULL)
+		return false;
+
+	/* Allow access to a role granted to the effective user. */
+	if (type_str_len == strlen("role") &&
+	    !strncmp(type_str, "role", type_str_len)) {
+		struct user *role = user_by_id(uid);
+		if (role_is_granted(role, cr->auth_token))
+			return true;
+	}
+
+	return false;
 }
 
 static bool
