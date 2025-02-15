@@ -163,6 +163,18 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 struct log {
 	/** The current file descriptor. */
 	int fd;
+	/**
+	 * Indicates whether the current file is a terminal (tty).
+	 * This field is non-zero if the file descriptor refers to a terminal.
+	 */
+	int isatty;
+	/** This field is non-zero if STDERR_FILENO is a terminal (tty)*/
+	int isatty_stdin;
+	/**
+	 * Enable color output to tty.
+	 * To disable ANSI color support set the `NO_COLOR=1`.
+	 */
+	int color;
 	/** The current log level. */
 	int level;
 	enum say_logger_type type;
