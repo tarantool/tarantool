@@ -338,6 +338,15 @@ I['compat.console_session_scope_vars'] = format_text([[
       from the console are written to globals
 ]])
 
+I['compat.datetime_apply_timezone_action'] = format_text([[
+    Controls the behavior of applying timezone to datetime objects:
+
+    - `new` (4.x default): applying a timezone doesn't affect the timestamp but
+      changes the represented time of day
+    - `old` (3.x default): applying a timezone alters the represented timestamp
+      but preserves the time of day
+]])
+
 I['compat.fiber_channel_close_mode'] = format_text([[
     Define the behavior of fiber channels after closing:
 
