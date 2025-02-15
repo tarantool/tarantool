@@ -41,6 +41,8 @@ extern "C" {
 
 struct region;
 struct field_map_builder_slot;
+struct tuple_format;
+typedef uint16_t field_map_format_id_t;
 
 /**
  * A special value of multikey index that means that the key
@@ -101,6 +103,10 @@ struct field_map_builder {
 	 * extents.
 	 */
 	uint32_t extents_size;
+	/**
+	 * Binary ORed all stored offsets.
+	 */
+	uint32_t offsets_binary_or;
 };
 
 /**
@@ -153,9 +159,17 @@ struct field_map_builder_slot {
  * When a field is not in the data tuple, its offset is 0.
  */
 static inline uint32_t
-field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
+field_map_get_offset(const char *field_map_ptr, int32_t offset_slot,
 		     int multikey_idx)
 {
+	field_map_ptr -= sizeof(field_map_format_id_t);
+	if (((intptr_t)field_map_ptr & 1) != 0) {
+		/* Compact field map. */
+		const uint8_t *field_map = (const uint8_t *)field_map_ptr;
+		return field_map[offset_slot];
+	}
+
+	const uint32_t *field_map = (const uint32_t *)field_map_ptr;
 	/*
 	 * Can not access field_map as a normal uint32 array
 	 * because its alignment may be < 4 bytes. Need to use
@@ -216,6 +230,7 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 			   int32_t multikey_idx, uint32_t multikey_count,
 			   struct region *region)
 {
+	builder->offsets_binary_or |= offset;
 	assert(offset_slot < 0);
 	assert((uint32_t)-offset_slot <= builder->slot_count);
 	assert(offset > 0);
@@ -238,22 +253,70 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 }
 
 /**
+ * Size of tuple field_map not including field map format id.
+ */
+static inline uint32_t
+field_map_base_size8(struct field_map_builder *builder)
+{
+	return builder->slot_count + builder->extents_size / 4;
+}
+
+/**
+ * Size of tuple field_map not including field map format id.
+ */
+static inline uint32_t
+field_map_base_size32(struct field_map_builder *builder)
+{
+	return builder->slot_count * 4 + builder->extents_size;
+}
+
+/**
+ * Check whether field map will be build as compact.
+ */
+static inline bool
+field_map_is_compact(struct field_map_builder *builder)
+{
+	return builder->offsets_binary_or <= UINT8_MAX &&
+	       builder->extents_size == 0;
+}
+
+/**
  * Calculate the size of tuple field_map to be built.
  */
 static inline uint32_t
 field_map_build_size(struct field_map_builder *builder)
 {
-	return builder->slot_count * sizeof(uint32_t) +
-	       builder->extents_size;
+	if (builder->slot_count == 0 && builder->extents_size == 0) {
+		/* No field map. */
+		return 0;
+	} else if (field_map_is_compact(builder)) {
+		/*
+		 * Compact field map. Make sure that the field map size is
+		 * odd to distinguish it from normal field map.
+		 */
+		return (field_map_base_size8(builder) | 1) +
+		       sizeof(field_map_format_id_t);
+	} else {
+		/* Normal field map. */
+		return field_map_base_size32(builder) +
+		       sizeof(field_map_format_id_t);
+	}
 }
 
 /**
  * Write constructed field_map to the destination buffer field_map.
  *
  * The buffer must have at least field_map_build_size(builder) bytes.
+ *
+ * If field map in non-empty then it stores field map format id (taken
+ * from @a format), and also if @a ref_format is true then the format is
+ * referenced.
+ * So if ref_format is true then tuple_field_map_destroy must be called
+ * before the tuple is finally freed.
  */
 void
-field_map_build(struct field_map_builder *builder, char *buffer);
+field_map_build(struct field_map_builder *builder, char *field_map_ptr,
+		struct tuple_format *format, bool ref_format);
 
 #endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
 

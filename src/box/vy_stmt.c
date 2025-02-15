@@ -208,8 +208,6 @@ vy_stmt_is_exact_key(struct tuple *stmt, struct key_def *cmp_def,
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 {
-	assert(data_offset >= sizeof(struct vy_stmt) + format->field_map_size);
-
 	if (tuple_check_data_offset(data_offset) != 0)
 		return NULL;
 
@@ -271,7 +269,7 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 {
 	size_t size = tuple_size(stmt);
 	struct tuple *mem_stmt;
-	const size_t align = alignof(struct vy_stmt);
+	const size_t align = MAX(alignof(struct vy_stmt), TUPLE_ALIGN);
 	mem_stmt = lsregion_aligned_alloc(lsregion, size, align, alloc_id);
 	if (mem_stmt == NULL) {
 		diag_set(OutOfMemory, size, "lsregion_aligned_alloc",
@@ -393,8 +391,8 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 		goto end;
 	/* Copy MsgPack data */
 	char *raw = (char *) tuple_data(stmt);
+	field_map_build(&builder, raw, format, false);
 	char *wpos = raw;
-	field_map_build(&builder, wpos - field_map_size);
 	memcpy(wpos, tuple_begin, mpsize);
 	wpos += mpsize;
 	for (struct iovec *op = ops, *end = ops + op_count;
@@ -540,9 +538,8 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 	if (stmt == NULL)
 		goto out;
 	char *stmt_data = (char *) tuple_data(stmt);
-	char *stmt_field_map_begin = stmt_data - field_map_size;
 	memcpy(stmt_data, data, bsize);
-	field_map_build(&builder, stmt_field_map_begin);
+	field_map_build(&builder, stmt_data, format, false);
 	vy_stmt_set_type(stmt, IPROTO_DELETE);
 	mp_tuple_assert(stmt_data, stmt_data + bsize);
 out:
