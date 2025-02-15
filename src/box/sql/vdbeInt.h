@@ -97,7 +97,6 @@ struct VdbeCursor {
 	 */
 	union {
 		BtCursor *pCursor;	/* CURTYPE_TARANTOOL */
-		int pseudoTableReg;	/* CURTYPE_PSEUDO. Reg holding content. */
 		VdbeSorter *pSorter;	/* CURTYPE_SORTER. Sorter object */
 	} uc;
 	/** Info about keys needed by index cursors. */
@@ -368,7 +367,9 @@ sqlVdbeSorterReset(struct VdbeSorter *pSorter);
 void
 sqlVdbeSorterClose(struct VdbeCursor *pCsr);
 
-int sqlVdbeSorterRowkey(const VdbeCursor *, Mem *);
+/** Prepare the current sorter key. */
+void
+sqlVdbeSorterRowkey(struct VdbeCursor *pCsr);
 
 /** Advance to the next element in the sorter. */
 int
