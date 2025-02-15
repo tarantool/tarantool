@@ -406,6 +406,11 @@ enum tuple_flag {
 	tuple_flag_MAX,
 };
 
+enum {
+	/* Align that is required for tuples. */
+	TUPLE_ALIGN = 4,
+};
+
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
@@ -417,6 +422,8 @@ enum tuple_flag {
  * +---------------------------------------data_offset
  *
  * Each 'off_i' is the offset to the i-th indexed field.
+ *
+ * Despite of being PACKED every tuple is required to have TUPLE_ALIGN align.
  */
 struct PACKED tuple
 {
@@ -458,6 +465,7 @@ struct PACKED tuple
 };
 
 static_assert(sizeof(struct tuple) == 10, "Just to be sure");
+static_assert(sizeof(struct tuple) % 4 == 2, "required for tuple_has_extra");
 
 /** Type of the arena where the tuple is allocated. */
 enum tuple_arena_type {
@@ -531,6 +539,9 @@ enum {
 	/** The size that is unused in struct tuple in compact mode. */
 	TUPLE_COMPACT_SAVINGS = sizeof(((struct tuple *)(NULL))->bsize_bulky),
 };
+
+static_assert((sizeof(struct tuple) - TUPLE_COMPACT_SAVINGS) % 4 == 2,
+	      "required for tuple_has_extra");
 
 /**
  * Check that data_offset is valid and can be stored in tuple.
@@ -650,6 +661,7 @@ tuple_is_compact(struct tuple *tuple)
 static inline uint16_t
 tuple_data_offset(struct tuple *tuple)
 {
+	assert((intptr_t)tuple % TUPLE_ALIGN == 0);
 	uint16_t res = tuple->data_offset_bsize_raw;
 	/*
 	 * We have two variants depending on high bit of res (res & 0x8000):
@@ -777,6 +789,29 @@ tuple_format(struct tuple *tuple)
 	return format;
 }
 
+static inline struct tuple_format *
+tuple_field_map_format(const char *tuple_data)
+{
+	field_map_format_id_t fmf_id;
+	if ((intptr_t)tuple_data % 4 == 2)
+		fmf_id = FORMAT_ID_RUNTIME;
+	else
+		memcpy(&fmf_id, tuple_data - sizeof(fmf_id), sizeof(fmf_id));
+	return tuple_format_by_id(fmf_id);
+}
+
+static inline void
+tuple_field_map_destroy(struct tuple *tuple)
+{
+	uint16_t offset = tuple_data_offset(tuple);
+	if (offset % 4 == 2)
+		return;
+	const char *data = (const char *)tuple + offset;
+	field_map_format_id_t fmf_id;
+	memcpy(&fmf_id, data - sizeof(fmf_id), sizeof(fmf_id));
+	tuple_format_unref(tuple_format_by_id(fmf_id));
+}
+
 /** Check that some fields in tuple are compressed */
 static inline bool
 tuple_is_compressed(struct tuple *tuple)
@@ -849,10 +884,10 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @returns a field map for the tuple.
  * @sa tuple_field_map_create()
  */
-static inline const uint32_t *
+static inline const char *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) tuple_data(tuple);
+	return tuple_data(tuple);
 }
 
 /**
@@ -936,7 +971,7 @@ tuple_field_go_to_key(const char **field, const char *key, int len);
  */
 static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-			const uint32_t *field_map, uint32_t fieldno,
+			const char *field_map, uint32_t fieldno,
 			const char *path, uint32_t path_len,
 			int index_base, int32_t *offset_slot_hint,
 			int multikey_idx)
@@ -1020,7 +1055,7 @@ parse:
  */
 static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
-		const uint32_t *field_map, uint32_t field_no)
+		const char *field_map, uint32_t field_no)
 {
 	if (likely(field_no < format->index_field_count)) {
 		int32_t offset_slot;
@@ -1063,7 +1098,8 @@ parse:
 static inline const char *
 tuple_field(struct tuple *tuple, uint32_t fieldno)
 {
-	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_field_raw(tuple_field_map_format(data), data,
 			       tuple_field_map(tuple), fieldno);
 }
 
@@ -1087,7 +1123,7 @@ tuple_field(struct tuple *tuple, uint32_t fieldno)
  */
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
-			     const uint32_t *field_map, const char *path,
+			     const char *field_map, const char *path,
 			     uint32_t path_len, uint32_t path_hash,
 			     int index_base);
 
@@ -1103,7 +1139,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  */
 static inline const char *
 tuple_field_raw_by_part(struct tuple_format *format, const char *data,
-			const uint32_t *field_map,
+			const char *field_map,
 			struct key_part *part, int multikey_idx)
 {
 	int32_t *offset_slot_cache = NULL;
@@ -1136,7 +1172,8 @@ static inline const char *
 tuple_field_by_part(struct tuple *tuple, struct key_part *part,
 		    int multikey_idx)
 {
-	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_field_raw_by_part(tuple_field_map_format(data), data,
 				       tuple_field_map(tuple), part,
 				       multikey_idx);
 }
@@ -1152,7 +1189,7 @@ tuple_field_by_part(struct tuple *tuple, struct key_part *part,
  */
 uint32_t
 tuple_raw_multikey_count(struct tuple_format *format, const char *data,
-			 const uint32_t *field_map, struct key_def *key_def);
+			 const char *field_map, struct key_def *key_def);
 
 /**
  * Get count of multikey index keys in tuple by given multikey
@@ -1164,7 +1201,8 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 static inline uint32_t
 tuple_multikey_count(struct tuple *tuple, struct key_def *key_def)
 {
-	return tuple_raw_multikey_count(tuple_format(tuple), tuple_data(tuple),
+	const char *data = tuple_data(tuple);
+	return tuple_raw_multikey_count(tuple_field_map_format(data), data,
 					tuple_field_map(tuple), key_def);
 }
 
