@@ -1,6 +1,6 @@
 local fiber = require('fiber')
 local net_box = require('net.box')
-local my_functions = require("my_functions")
+local tools = require("tools")
 
 -- A table for tracking the status of nodes
 nodes_activity_states = {}
@@ -80,9 +80,9 @@ end
 local function stop_node(node, min_delay, max_delay)
     fiber.create(function()
 
-        my_functions.check_node(node)
+        tools.check_node(node)
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         node:stop()
         update_node_state(node, "crashed")
@@ -99,9 +99,9 @@ end
 local function create_delay_to_write_operations(node, min_delay, max_delay)
     fiber.create(function()
 
-        my_functions.check_node(node)
+        tools.check_node(node)
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         node:exec(function()
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
@@ -122,7 +122,7 @@ end
 local function break_connection_between_two_nodes(two_nodes, initial_replication, min_delay, max_delay)
     fiber.create(function()
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         local function is_node_ready(node)
             local replication_info = node:exec(function()

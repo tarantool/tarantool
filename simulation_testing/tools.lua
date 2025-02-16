@@ -1,10 +1,5 @@
 local net_box = require('net.box')
 
--- Check including
-local function print_hello()
-    print("Hello from my_functions.lua")
-end
-
 local function is_follower(conn)
     return conn:call('box.info').ro == true
 end

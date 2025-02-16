@@ -1,3 +1,5 @@
+
+
 local function monitor_replication(cg)
     local fiber = require('fiber')
 
@@ -22,7 +24,6 @@ local function monitor_replication(cg)
             local now = fiber.time()
 
             for id, node in ipairs(cg.replicas) do
-                -- Здесь уже есть pcall:
                 local ok_inner, replication_info, election_info = pcall(function()
                     return node:exec(function()
                         return box.info.replication, box.info.election
@@ -30,7 +31,6 @@ local function monitor_replication(cg)
                 end)
                 
                 if not ok_inner then
-                    -- Ошибка при выполнении node:exec(), пропускаем этот узел
                     goto continue
                 end
 
@@ -41,7 +41,7 @@ local function monitor_replication(cg)
                 ----------------------------------------------------------------------------
                 -- Работа с term_changes
                 local current_term = election_info.term
-                if current_term > state.last_leader_term then
+                if current_term ~= state.last_leader_term then
                     state.last_leader_term = current_term
                     table.insert(state.term_changes, now)
                 end
@@ -95,7 +95,7 @@ local function monitor_replication(cg)
 
             if #leaders == 0 then
                 if now - state.last_leader_check > monitor_config.leader_absent_time then
-                    table.insert(problems, '[CLUSTER] No leader detected for more than ' .. monitor_config.leader_absent_time .. ' rounds')
+                    table.insert(problems, '[CLUSTER] No leader detected for more than ' .. monitor_config.leader_absent_time .. ' seconds')
                 end
             else
                 state.last_leader_check = now
@@ -115,7 +115,7 @@ local function monitor_replication(cg)
         end)
 
         if not ok then
-            print('[REPLICATION MONITOR] Error during monitoring: ', err)
+            print('[REPLICATION MONITOR] [Error] ', json.encode(err))
         end
 
         fiber.sleep(monitor_config.check_interval)
