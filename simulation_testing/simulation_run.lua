@@ -53,10 +53,10 @@ end
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(31)
+local cg = random_cluster.rand_cluster(5)
 
 box.cfg {
-    checkpoint_count = 2, 
+    checkpoint_count = 2,
     memtx_use_mvcc_engine = true,
     memtx_dir = './memtx_dir',
     txn_isolation = 'best-effort' }

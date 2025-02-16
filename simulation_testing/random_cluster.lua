@@ -48,7 +48,7 @@ end
 local function clear_dirs_for_all_replicas()
     local base_dir = fio.abspath('./replicas_dirs')
     if fio.path.exists(base_dir) then
-        fio.rmtree(base_dir) 
+        fio.rmtree(base_dir)
     end
 end
 ---
@@ -71,9 +71,10 @@ local function rand_cfg(cg, replica_count, replica_id)
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
         memtx_dir = memtx_dir,
+        log = memtx_dir .. '/replica_'..replica_id..'.log',
         wal_dir = wal_dir,
         txn_isolation = 'best-effort',
-        wal_mode = 'write',
+        wal_mode = 'write'
     }
 
     print("Configured replicas:", replica_count,
