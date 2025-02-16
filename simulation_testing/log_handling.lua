@@ -96,6 +96,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                 print("[PERIODIC INSERT][Error] " .. json.encode(err))
             end
 
+            -- Делаем паузу перед следующей итерацией цикла
             fiber.sleep(interval)
         end
     end, cg, space_name, i_0, step, interval)

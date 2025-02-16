@@ -13,7 +13,9 @@ local replication_errors = require("replication_errors")
 local clock = require('clock')
 
 
+
 io.output(assert(io.open("working_log.log", "w")))
+
 
 function print(...)
     -- Returns one float, e.g. 1676141234.123456
@@ -49,13 +51,12 @@ function print(...)
 end
 
 
-
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(3)
+local cg = random_cluster.rand_cluster(5)
 
 box.cfg {
-    checkpoint_count = 2, 
+    checkpoint_count = 2,
     memtx_use_mvcc_engine = true,
     memtx_dir = './memtx_dir',
     txn_isolation = 'best-effort' }
@@ -111,7 +112,7 @@ log_handling.periodic_insert(
     "test",
     1,
     1,
-    0.01
+    0.1
 )
 
 print("[DIVERGENCE MONITOR] Started")

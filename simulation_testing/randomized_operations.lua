@@ -8,6 +8,8 @@ local crash_functions = require("crash_functions")
 
 
 
+
+
 local function generate_random_read_operation(max_key)
     local operation_types = {"select", "get"}
     local rnd_key = math.random(1, max_key)
@@ -114,7 +116,7 @@ local function execute_db_operation(node, space_name, operation)
                 tools.table_to_string(operation_args),
                 node_name,
                 space_name,
-                tools.table_to_string(result) 
+                tools.table_to_string(result)
             )
         end
 
