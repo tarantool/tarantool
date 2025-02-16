@@ -10,7 +10,6 @@ local random_cluster = require('random_cluster')
 local log_handling = require('log_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
-
 local clock = require('clock')
 
 
@@ -50,6 +49,7 @@ function print(...)
     -- Print to stdout with a newline
     io.write(string.format("%s %s\n", dt, msg))
 end
+
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
@@ -124,6 +124,7 @@ log_handling.divergence_monitor(
     2
 )
 
+
 print("[CRASH SIMULATION] Started")
 local crash_time = 5 -- Crash-specific time, which sets the increased frequency of crashes
 crash_functions.crash_simulation(
@@ -132,7 +133,7 @@ crash_functions.crash_simulation(
     initial_replication,
     1,
     crash_time,
-    crash_time
+    2 * crash_time
 )
 
 print("[REPLICATION MONITOR] Started")

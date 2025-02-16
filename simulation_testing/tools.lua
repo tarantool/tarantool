@@ -75,9 +75,23 @@ local function get_random_node(nodes, timeout)
     error("No connected nodes available")
 end
 
+-- The leader's getting function, which has been modified to take into account that some nodes may be unavailable
+local function get_leader(servers)
+    for _, server in ipairs(servers) do
+        local ok, is_ro = pcall(function()
+            return server:exec(function() return box.info.ro end)
+        end)
+
+        if ok and is_ro == false then
+            return server
+        end
+    end
+    return nil 
+end
+
+
 
 return {
-    print_hello = print_hello,
     contains = contains,
     is_follower = is_follower,
     table_to_string = table_to_string,
@@ -85,5 +99,6 @@ return {
     check_node = check_node,
     get_initial_replication = get_initial_replication,
     get_random_node = get_random_node,
+    get_leader = get_leader
 
 }

@@ -31,6 +31,7 @@ local function create_dirs_for_replica(replica_id)
     local base_dir = fio.abspath(string.format('./replicas_dirs/replica_%d', replica_id))
     local memtx_dir = fio.pathjoin(base_dir, 'memtx_dir')
     local wal_dir = fio.pathjoin(base_dir, 'wal_dir')
+    local log_dir = fio.pathjoin(base_dir, 'log_dir')
 
     if not fio.path.exists(base_dir) then
         fio.mkdir(base_dir)
@@ -41,8 +42,11 @@ local function create_dirs_for_replica(replica_id)
     if not fio.path.exists(wal_dir) then
         fio.mkdir(wal_dir)
     end
+    if not fio.path.exists(log_dir) then
+        fio.mkdir(log_dir)
+    end
 
-    return memtx_dir, wal_dir
+    return memtx_dir, wal_dir, log_dir
 end
 
 local function clear_dirs_for_all_replicas()
@@ -62,7 +66,9 @@ local function rand_cfg(cg, replica_count, replica_id)
         uri_set[i] = replica_uri
     end
 
-    local memtx_dir, wal_dir = create_dirs_for_replica(replica_id)
+    local memtx_dir, wal_dir, log_dir = create_dirs_for_replica(replica_id)
+
+    local log_file = fio.pathjoin(log_dir, 'replica_'..tostring(replica_id)..'.log')
 
     local box_cfg = {
         replication = uri_set,
@@ -73,6 +79,7 @@ local function rand_cfg(cg, replica_count, replica_id)
         memtx_dir = memtx_dir,
         log = memtx_dir .. '/replica_'..replica_id..'.log',
         wal_dir = wal_dir,
+        log = log_file,
         txn_isolation = 'best-effort',
         wal_mode = 'write'
     }
@@ -86,7 +93,6 @@ local function rand_cfg(cg, replica_count, replica_id)
 end
 
 --- Clear Cluster
----
 local function clear_cluster(cg)
     if cg.cluster then
         cg.cluster:drop()
@@ -150,6 +156,5 @@ return {
     rand_cluster = rand_cluster,
     clear_cluster = clear_cluster,
     rand_cfg = rand_cfg,
-    -- rand_server_drop = rand_server_drop,
     clear_dirs_for_all_replicas = clear_dirs_for_all_replicas
 }

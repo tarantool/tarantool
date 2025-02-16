@@ -3,6 +3,7 @@ local fio = require('fio')
 local fiber = require('fiber')
 local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
+local tools = require("tools")
 local json = require("json")
 
 
@@ -52,9 +53,9 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
     fiber.create(function(cg, space_name, i_0, step, interval)
         local key = i_0
         while true do
-            -- Заворачиваем всё, что внутри цикла, в pcall
             local ok, err = pcall(function()
-                local leader_node = cg.cluster:get_leader()
+                
+                local leader_node = tools.get_leader(cg.replicas)
 
                 if not leader_node then
                     local leader_waiting_interval = 1
@@ -65,38 +66,34 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                     local operation_args = {key, value}
                     local success = false
 
-                    repeat
-                        local status, exec_err = pcall(function()
-                            leader_node:exec(function(operation_args, space_name)
-                                box.begin({txn_isolation = 'linearizable'})
-                                box.space[space_name]:insert(operation_args)
-                                box.commit()
-                            end, {operation_args, space_name})
-                        end)
+                    local status, exec_err = pcall(function()
+                        leader_node:exec(function(operation_args, space_name)
+                            box.begin({txn_isolation = 'linearizable'})
+                            box.space[space_name]:insert(operation_args)
+                            box.commit()
+                        end, {operation_args, space_name})
+                    end)
 
-                        if status then
-                            success = true
-                            print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
-                                  ", value: " .. value ..
-                                  ", into space: '" .. space_name .. "'")
-                        else
-                            print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
-                                  key .. ", value: " .. value ..
-                                  ", into space: '" .. space_name ..
-                                  "'. Retrying in " .. interval .. " seconds...")
-                            print("[PERIODIC INSERT][Error] " .. json.encode(exec_err))
-                            fiber.sleep(interval)
-                        end
-                    until success
-
-                    key = key + step
+                    if status then
+                        success = true
+                        print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
+                                ", value: " .. value ..
+                                ", into space: '" .. space_name .. "'")
+                        key = key + step
+                    else
+                        print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
+                                key .. ", value: " .. value ..
+                                ", into space: '" .. space_name ..
+                                "'. Retrying in " .. interval .. " seconds...")
+                        print("[PERIODIC INSERT][Error] " .. json.encode(exec_err))
+                        fiber.sleep(interval)
+                    end
+                
                 end
-            end)  -- конец pcall
+            end) 
 
-            -- Если что-то пошло не так внутри тела цикла
             if not ok then
                 print("[PERIODIC INSERT][Error] " .. json.encode(err))
-                -- Здесь можно добавить логику уведомления или другие действия при ошибке
             end
 
             -- Делаем паузу перед следующей итерацией цикла
@@ -121,8 +118,19 @@ local function get_last_n_entries(node, space_name, n)
     end)
 
     if not success then
-        print("[PERIODIC INSERT][Error]" .. json.encode(result))
-        return nil, result
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] %s", node.alias, json.encode(result)))
+        return nil
+    end
+
+    if type(result) ~= "table" then
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] Unexpected result format", node.alias))
+        return nil
+    end
+
+    local count = #result
+    if count ~= n then
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] Expected %d entries, but got %d", node.alias, n, count))
+        return nil
     end
 
     return result
@@ -140,6 +148,12 @@ local function find_max_common_length(entries_by_node, step)
         if #entries > 0 then
             -- Check that the keys go in increments
             local valid = true
+            local keys_list = {}
+
+            for i = 1, #entries do
+                table.insert(keys_list, entries[i][1]) -- сохраняем весь список ключей
+            end
+
             for i = 2, #entries do
                 if entries[i][1] - entries[i-1][1] ~= step then
                     valid = false
@@ -153,8 +167,7 @@ local function find_max_common_length(entries_by_node, step)
                 local last_key = entries[#entries][1]
                 table.insert(intervals, {first_key, last_key})
             else
-                print("Error: the key is not monotonous")
-                return -1
+                print("[ERROR] The key sequence is not monotonous! Full sequence: " .. table.concat(keys_list, ", "))
             end
         end
     end
