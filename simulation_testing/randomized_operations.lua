@@ -3,7 +3,7 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local fiber = require('fiber')
 local net_box = require('net.box')
-local my_functions = require("my_functions")
+local tools = require("tools")
 local crash_functions = require("crash_functions")
 
 
@@ -26,11 +26,11 @@ local function generate_random_write_operation(max_key)
     local operation_type = operation_types[math.random(#operation_types)]
     local operation_args
 
-    if my_functions.contains({"insert", "replace", "upsert", "put"}, operation_type) then
+    if tools.contains({"insert", "replace", "upsert", "put"}, operation_type) then
         operation_args = {rnd_key, rnd_value}
-    elseif my_functions.contains({"delete"}, operation_type) then
+    elseif tools.contains({"delete"}, operation_type) then
         operation_args = {rnd_key} 
-    elseif my_functions.contains({"update"}, operation_type) then
+    elseif tools.contains({"update"}, operation_type) then
         operation_args = {rnd_key, rnd_value}
     end
 
@@ -38,7 +38,7 @@ local function generate_random_write_operation(max_key)
 end
 
 local function execute_db_operation(node, space_name, operation)
-    my_functions.check_node(node)
+    tools.check_node(node)
 
     fiber.create(function()
         local operation_type = operation[1]
@@ -85,7 +85,7 @@ local function execute_db_operation(node, space_name, operation)
                         "Operation: %s, Args: %s, Result: %s, Node: %s, Space: %s",
                         operation_type,
                         tostring(operation_args[1]),
-                        my_functions.table_to_string(result), 
+                        tools.table_to_string(result), 
                         node_name, 
                         space_name
                 )
@@ -102,7 +102,7 @@ local function execute_db_operation(node, space_name, operation)
                 message = string.format(
                     "Operation: %s, Args: %s, Result: Completed successfully, Node: %s, Space: %s",
                     operation_type,
-                    my_functions.table_to_string(operation_args),
+                    tools.table_to_string(operation_args),
                     node_name, 
                     space_name
                 )
@@ -111,10 +111,10 @@ local function execute_db_operation(node, space_name, operation)
             message = string.format(
                 "Error while executing the DB operation. Operation: %s, Args: %s, Node: %s, Space: %s, Error(result): %s",
                 operation_type,
-                my_functions.table_to_string(operation_args),
+                tools.table_to_string(operation_args),
                 node_name,
                 space_name,
-                my_functions.table_to_string(result) 
+                tools.table_to_string(result) 
             )
         end
 

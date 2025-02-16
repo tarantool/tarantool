@@ -3,7 +3,9 @@ local fio = require('fio')
 local fiber = require('fiber')
 local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
+local tools = require("tools")
 local json = require("json")
+
 
 -- Function for reading the xlog
 local function read_xlog(file_path)
@@ -46,47 +48,59 @@ local function get_latest_xlog(wal_dir)
 end
 
 -- Function of inserting a monotonously increasing key into a space
+
 local function periodic_insert(cg, space_name, i_0, step, interval)
     fiber.create(function(cg, space_name, i_0, step, interval)
         local key = i_0
         while true do
-            local leader_node = cg.cluster:get_leader()
+            local ok, err = pcall(function()
+                
+                local leader_node = tools.get_leader(cg.replicas)
 
-            if not leader_node then
-                local leader_waiting_interval = 1 -- replication monitor's check_interval 50%
-                print("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
-                fiber.sleep(leader_waiting_interval)
-            else
-                local value = "Value for key " .. key
-                local operation_args = {key, value}
-                local success = false
-                repeat
-                    local status, err = pcall(function()
-                        leader_node:exec(function(operation_args, space_name) -- writing operations are always performed from the leader node
-                          
+                if not leader_node then
+                    local leader_waiting_interval = 1
+                    print("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
+                    fiber.sleep(leader_waiting_interval)
+                else
+                    local value = "Value for key " .. key
+                    local operation_args = {key, value}
+                    local success = false
+
+                    local status, exec_err = pcall(function()
+                        leader_node:exec(function(operation_args, space_name)
                             box.begin({txn_isolation = 'linearizable'})
                             box.space[space_name]:insert(operation_args)
                             box.commit()
-                            
                         end, {operation_args, space_name})
                     end)
 
                     if status then
                         success = true
-                        print("[PERIODIC INSERT] Successfully inserted key: " .. key .. ", value: " .. value .. ", into space: " .. "'" .. space_name .. "'")
+                        print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
+                                ", value: " .. value ..
+                                ", into space: '" .. space_name .. "'")
+                        key = key + step
                     else
-                        print("[PERIODIC INSERT] Failed to execute insert operation for key: " .. key .. ", value: " .. value .. ", into space: " .. "'" .. space_name .. "'. Retrying in " .. interval .. " seconds...")
+                        print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
+                                key .. ", value: " .. value ..
+                                ", into space: '" .. space_name ..
+                                "'. Retrying in " .. interval .. " seconds...")
+                        print("[PERIODIC INSERT][Error] " .. json.encode(exec_err))
                         fiber.sleep(interval)
                     end
-                until success
+                
+                end
+            end) 
 
-                key = key + step
+            if not ok then
+                print("[PERIODIC INSERT][Error] " .. json.encode(err))
             end
 
             fiber.sleep(interval)
         end
     end, cg, space_name, i_0, step, interval)
 end
+
 
 -- Function of getting the last n entries for a space from a node
 local function get_last_n_entries(node, space_name, n)
@@ -103,7 +117,19 @@ local function get_last_n_entries(node, space_name, n)
     end)
 
     if not success then
-        return nil, result
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] %s", node.alias, json.encode(result)))
+        return nil
+    end
+
+    if type(result) ~= "table" then
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] Unexpected result format", node.alias))
+        return nil
+    end
+
+    local count = #result
+    if count ~= n then
+        print(string.format("[GET LAST ENTRIES][Error][Node %s] Expected %d entries, but got %d", node.alias, n, count))
+        return nil
     end
 
     return result
@@ -121,6 +147,12 @@ local function find_max_common_length(entries_by_node, step)
         if #entries > 0 then
             -- Check that the keys go in increments
             local valid = true
+            local keys_list = {}
+
+            for i = 1, #entries do
+                table.insert(keys_list, entries[i][1]) -- сохраняем весь список ключей
+            end
+
             for i = 2, #entries do
                 if entries[i][1] - entries[i-1][1] ~= step then
                     valid = false
@@ -134,8 +166,7 @@ local function find_max_common_length(entries_by_node, step)
                 local last_key = entries[#entries][1]
                 table.insert(intervals, {first_key, last_key})
             else
-                print("Error: the key is not monotonous")
-                return -1
+                print("[ERROR] The key sequence is not monotonous! Full sequence: " .. table.concat(keys_list, ", "))
             end
         end
     end
@@ -221,10 +252,8 @@ local function divergence_monitor(cg, space_name, n, step, interval)
             end)
 
             if not success then
-                print("[DIVERGENCE MONITOR] Error in divergence_monitor get_last_n_entries: " .. json.encode(err))
+                print("[DIVERGENCE MONITOR][Error]" .. json.encode(err))
             end
-
-
             fiber.sleep(interval)
         end
     end)

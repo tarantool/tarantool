@@ -1,13 +1,14 @@
 local fiber = require('fiber')
 local net_box = require('net.box')
-local my_functions = require("my_functions")
+local tools = require("tools")
 
--- A table for tracking the status of nodes
+-- Table for tracking the status of nodes
 nodes_activity_states = {}
 local function update_node_state(node, state)
     nodes_activity_states[node.alias] = state
 end
 
+-- The function of getting all workable nodes
 local function get_non_crashed_nodes(nodes, nodes_activity_states)
     local non_crashed_nodes = {}
 
@@ -37,28 +38,27 @@ local function count_crashed_nodes(nodes_activity_states)
     return crashed_count
 end
 
-local function is_cluster_healthy(nodes_activity_states, total_nodes)
-    local crashed_count = count_crashed_nodes(nodes_activity_states)
-    local min_num_active_nodes = math.floor(total_nodes / 2) + 1
-    return (total_nodes - crashed_count) >= min_num_active_nodes
+-- Checking the condition for a sufficient number of workable nodes
+--- N is the total number of nodes in the cluster
+--- num_crashed_nodes is the number of crashed nodes in the cluster
+local function is_cluster_healthy(N, num_crashed_nodes)
+    local min_num_non_crashed_nodes = math.floor(N / 2) + 1
+    return (N - num_crashed_nodes) >= min_num_non_crashed_nodes
 end
 
+-- Safe function for getting random crash nodes
 local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
 
     -- Checking that the limit on the number of active nodes in the cluster is not violated
-    local remaining_nodes = #nodes - num_to_select
-    if not is_cluster_healthy(nodes_activity_states, remaining_nodes) then
+    local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states)
+    local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
+    if not is_cluster_healthy(#nodes, new_num_crashed_nodes) then
         print("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
         return -1
     end
     
     -- Filtering nodes whose state is not equal to "crashed"
-    local available_nodes = {}
-    for _, node in ipairs(nodes) do
-        if nodes_activity_states[node.alias] ~= "crashed" then
-            table.insert(available_nodes, node)
-        end
-    end
+    local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states)
 
     if #available_nodes < num_to_select then
         print("[CRASH SIMULATION] Not enough healthy nodes to select")
@@ -76,38 +76,48 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     return selected_nodes
 end
 
+-- For the convenience of logging and debugging node states
+local function print_nodes_activity_states()
+    print("[NODES ACTIVITY STATES] Current states of nodes:")
+    for alias, state in pairs(nodes_activity_states) do
+        print(string.format("  - Node: %s, State: %s", alias, state))
+    end
+end
 
 local function stop_node(node, min_delay, max_delay)
     fiber.create(function()
 
-        my_functions.check_node(node)
+        tools.check_node(node)
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         node:stop()
         update_node_state(node, "crashed")
         print(string.format("[CRASH SIMULATION] Node %s is stopped for a time %s", node.alias, delay))
+        print_nodes_activity_states()
 
         fiber.sleep(delay)
 
         node:start()
         update_node_state(node, "restored")
         print(string.format("[CRASH SIMULATION] Node %s is started again", node.alias))
+        print_nodes_activity_states()
     end)
 end
 
 local function create_delay_to_write_operations(node, min_delay, max_delay)
     fiber.create(function()
 
-        my_functions.check_node(node)
+        tools.check_node(node)
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         node:exec(function()
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
         end)
         update_node_state(node, "crashed")
         print(string.format("[CRASH SIMULATION] The WAL write delay for node %s is set for the time %d", node.alias, delay))
+        print_nodes_activity_states()
 
         fiber.sleep(delay)
 
@@ -116,13 +126,14 @@ local function create_delay_to_write_operations(node, min_delay, max_delay)
         end)
         update_node_state(node, "restored")
         print(string.format("[CRASH SIMULATION] The WAL write delay for node %s has been removed", node.alias))
+        print_nodes_activity_states()
     end)
 end
 
 local function break_connection_between_two_nodes(two_nodes, initial_replication, min_delay, max_delay)
     fiber.create(function()
 
-        local delay = my_functions.calculate_delay(min_delay, max_delay)
+        local delay = tools.calculate_delay(min_delay, max_delay)
 
         local function is_node_ready(node)
             local replication_info = node:exec(function()
@@ -166,6 +177,7 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         update_node_state(node2, "crashed")
 
         print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
+        print_nodes_activity_states()
 
         fiber.sleep(delay)
 
@@ -181,6 +193,7 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         update_node_state(node2, "restored")
     
         print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
+        print_nodes_activity_states()
     end)
 end
 
@@ -221,6 +234,7 @@ return {
     stop_node = stop_node,
     create_delay_to_write_operations = create_delay_to_write_operations,
     break_connection_between_two_nodes = break_connection_between_two_nodes,
-    crash_simulation = crash_simulation
+    crash_simulation = crash_simulation,
+    print_nodes_activity_states = print_nodes_activity_states
 
 }

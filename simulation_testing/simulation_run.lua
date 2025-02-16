@@ -3,24 +3,51 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local fiber = require('fiber')
 local net_box = require('net.box')
-local my_functions = require("my_functions")
+local tools = require("tools")
 local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
 local log_handling = require('log_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
+local clock = require('clock')
 
 
 io.output(assert(io.open("working_log.log", "w")))
 
 function print(...)
+    -- Returns one float, e.g. 1676141234.123456
+    local now = clock.realtime()
+
+    -- Integer part = seconds since epoch
+    local sec = math.floor(now)
+
+    -- Fraction part = fractional seconds
+    local fraction = now - sec
+    
+    -- Convert fraction to integer nanoseconds
+    local nsec = math.floor(fraction * 1e9)
+
+    -- Format date string "[YYYY-MM-DD HH:MM:SS]"
+    local date_str = os.date("%Y-%m-%d %H:%M:%S", sec)
+
+    -- Format the nanoseconds as zero-padded 9 digits
+    local nsec_str = string.format("%09d", nsec)
+    
+    -- Final timestamp like: [2025-02-11 14:25:01.123456789]
+    local dt = string.format("[%s.%s]", date_str, nsec_str)
+
+    -- Concatenate all arguments
     local t = {}
     for i = 1, select("#", ...) do
         t[i] = tostring(select(i, ...))
     end
-    io.write(table.concat(t, "\t"), "\n")
+    local msg = table.concat(t, "\t")
+
+    -- Print to stdout with a newline
+    io.write(string.format("%s %s\n", dt, msg))
 end
+
 
 
 math.randomseed(os.time())
@@ -33,7 +60,7 @@ box.cfg {
     memtx_dir = './memtx_dir',
     txn_isolation = 'best-effort' }
 
-local initial_replication = my_functions.get_initial_replication(cg.replicas)
+local initial_replication = tools.get_initial_replication(cg.replicas)
 
 -- Checking the initial configuration
 for _, node in ipairs(cg.replicas) do
@@ -96,6 +123,7 @@ log_handling.divergence_monitor(
     2
 )
 
+
 print("[CRASH SIMULATION] Started")
 local crash_time = 5 -- Crash-specific time, which sets the increased frequency of crashes
 crash_functions.crash_simulation(
@@ -104,7 +132,7 @@ crash_functions.crash_simulation(
     initial_replication,
     1,
     crash_time,
-    crash_time
+    2 * crash_time
 )
 
 print("[REPLICATION MONITOR] Started")
