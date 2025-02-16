@@ -1,238 +1,1014 @@
-[2025-02-16 20:48:44.391953945] Directory '/home/edgar/my_tarantool_repo/tarantool/simulation_testing/replicas_dirs' successfully created.
-[2025-02-16 20:48:44.392273426] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
+[2025-02-17 01:31:15.591332435] Directory '/home/edgar/my_tarantool_repo/tarantool/simulation_testing/replicas_dirs' successfully created.
+[2025-02-17 01:31:15.592711210] Configured replicas:	4	
+Replication URIs:	/tmp/t/rs-zR2VVKMTmonK/replica_1.sock, /tmp/t/rs-zR2VVKMTmonK/replica_2.sock, /tmp/t/rs-zR2VVKMTmonK/replica_3.sock, /tmp/t/rs-zR2VVKMTmonK/replica_4.sock	
 Synchro quorum:	4	
+Replication timeout:	10
+[2025-02-17 01:31:15.598971366] replica_1 added to cluster as 	candidate
+[2025-02-17 01:31:15.600507259] Configured replicas:	4	
+Replication URIs:	/tmp/t/rs-zR2VVKMTmonK/replica_1.sock, /tmp/t/rs-zR2VVKMTmonK/replica_2.sock, /tmp/t/rs-zR2VVKMTmonK/replica_3.sock, /tmp/t/rs-zR2VVKMTmonK/replica_4.sock	
+Synchro quorum:	3	
 Replication timeout:	3
-[2025-02-16 20:48:44.394702196] replica_1 added to cluster as 	candidate
-[2025-02-16 20:48:44.395489454] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
+[2025-02-17 01:31:15.606921195] replica_2 added to cluster as 	candidate
+[2025-02-17 01:31:15.608623266] Configured replicas:	4	
+Replication URIs:	/tmp/t/rs-zR2VVKMTmonK/replica_1.sock, /tmp/t/rs-zR2VVKMTmonK/replica_2.sock, /tmp/t/rs-zR2VVKMTmonK/replica_3.sock, /tmp/t/rs-zR2VVKMTmonK/replica_4.sock	
+Synchro quorum:	4	
+Replication timeout:	9
+[2025-02-17 01:31:15.615120649] replica_3 added to cluster as 	voter
+[2025-02-17 01:31:15.616658926] Configured replicas:	4	
+Replication URIs:	/tmp/t/rs-zR2VVKMTmonK/replica_1.sock, /tmp/t/rs-zR2VVKMTmonK/replica_2.sock, /tmp/t/rs-zR2VVKMTmonK/replica_3.sock, /tmp/t/rs-zR2VVKMTmonK/replica_4.sock	
 Synchro quorum:	3	
 Replication timeout:	7
-[2025-02-16 20:48:44.398337125] replica_2 added to cluster as 	voter
-[2025-02-16 20:48:44.399401664] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	3	
-Replication timeout:	8
-[2025-02-16 20:48:44.401966094] replica_3 added to cluster as 	voter
-[2025-02-16 20:48:44.402534246] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	4	
-Replication timeout:	4
-[2025-02-16 20:48:44.404956340] replica_4 added to cluster as 	candidate
-[2025-02-16 20:49:00.552555799] Node replica_1 is follower
-[2025-02-16 20:49:00.552716970] Node replica_2 is follower
-[2025-02-16 20:49:00.552951335] Node replica_3 is follower
-[2025-02-16 20:49:00.553245544] Node replica_4 is leader
-[2025-02-16 20:49:00.555386304] The 'test' space is created and configured on the leader
-[2025-02-16 20:49:00.555397033] [[PERIODIC INSERT] Started
-[2025-02-16 20:49:00.555458545] [DIVERGENCE MONITOR] Started
-[2025-02-16 20:49:00.555498600] [CRASH SIMULATION] Started
-[2025-02-16 20:49:00.555518627] [REPLICATION MONITOR] Started
-[2025-02-16 20:49:00.563765525] No intervals found.
-[2025-02-16 20:49:00.563800334] [DIVERGENCE MONITOR] Divergence of entries: 100
-[2025-02-16 20:49:00.563816785] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:00.563819885] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:00.563842773] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:00.563844919] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:00.563847780] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:00.563869714] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:00.564545392] [PERIODIC INSERT] Successfully inserted key: 1, value: Value for key 1, into space: 'test'
-[2025-02-16 20:49:00.666534900] [PERIODIC INSERT] Successfully inserted key: 2, value: Value for key 2, into space: 'test'
-[2025-02-16 20:49:00.769205093] [PERIODIC INSERT] Successfully inserted key: 3, value: Value for key 3, into space: 'test'
-[2025-02-16 20:49:00.872451305] [PERIODIC INSERT] Successfully inserted key: 4, value: Value for key 4, into space: 'test'
-[2025-02-16 20:49:00.975149869] [PERIODIC INSERT] Successfully inserted key: 5, value: Value for key 5, into space: 'test'
-[2025-02-16 20:49:01.077749252] [PERIODIC INSERT] Successfully inserted key: 6, value: Value for key 6, into space: 'test'
-[2025-02-16 20:49:01.180952787] [PERIODIC INSERT] Successfully inserted key: 7, value: Value for key 7, into space: 'test'
-[2025-02-16 20:49:01.283597707] [PERIODIC INSERT] Successfully inserted key: 8, value: Value for key 8, into space: 'test'
-[2025-02-16 20:49:01.385771512] [PERIODIC INSERT] Successfully inserted key: 9, value: Value for key 9, into space: 'test'
-[2025-02-16 20:49:01.488099575] [PERIODIC INSERT] Successfully inserted key: 10, value: Value for key 10, into space: 'test'
-[2025-02-16 20:49:01.591040134] [PERIODIC INSERT] Successfully inserted key: 11, value: Value for key 11, into space: 'test'
-[2025-02-16 20:49:01.694041728] [PERIODIC INSERT] Successfully inserted key: 12, value: Value for key 12, into space: 'test'
-[2025-02-16 20:49:01.796692132] [PERIODIC INSERT] Successfully inserted key: 13, value: Value for key 13, into space: 'test'
-[2025-02-16 20:49:01.900078535] [PERIODIC INSERT] Successfully inserted key: 14, value: Value for key 14, into space: 'test'
-[2025-02-16 20:49:02.002310037] [PERIODIC INSERT] Successfully inserted key: 15, value: Value for key 15, into space: 'test'
-[2025-02-16 20:49:02.105143547] [PERIODIC INSERT] Successfully inserted key: 16, value: Value for key 16, into space: 'test'
-[2025-02-16 20:49:02.207823276] [PERIODIC INSERT] Successfully inserted key: 17, value: Value for key 17, into space: 'test'
-[2025-02-16 20:49:02.310543537] [PERIODIC INSERT] Successfully inserted key: 18, value: Value for key 18, into space: 'test'
-[2025-02-16 20:49:02.412749290] [PERIODIC INSERT] Successfully inserted key: 19, value: Value for key 19, into space: 'test'
-[2025-02-16 20:49:02.515519380] [PERIODIC INSERT] Successfully inserted key: 20, value: Value for key 20, into space: 'test'
-[2025-02-16 20:49:02.567213535] [DIVERGENCE MONITOR] Divergence of entries: 80
-[2025-02-16 20:49:02.567236661] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:02.567239284] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:02.567242383] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:02.567244529] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:02.567246437] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:02.567247867] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:02.617876529] [PERIODIC INSERT] Successfully inserted key: 21, value: Value for key 21, into space: 'test'
-[2025-02-16 20:49:02.720702886] [PERIODIC INSERT] Successfully inserted key: 22, value: Value for key 22, into space: 'test'
-[2025-02-16 20:49:02.823952913] [PERIODIC INSERT] Successfully inserted key: 23, value: Value for key 23, into space: 'test'
-[2025-02-16 20:49:02.926414489] [PERIODIC INSERT] Successfully inserted key: 24, value: Value for key 24, into space: 'test'
-[2025-02-16 20:49:03.028825283] [PERIODIC INSERT] Successfully inserted key: 25, value: Value for key 25, into space: 'test'
-[2025-02-16 20:49:03.131871938] [PERIODIC INSERT] Successfully inserted key: 26, value: Value for key 26, into space: 'test'
-[2025-02-16 20:49:03.234776496] [PERIODIC INSERT] Successfully inserted key: 27, value: Value for key 27, into space: 'test'
-[2025-02-16 20:49:03.338283777] [PERIODIC INSERT] Successfully inserted key: 28, value: Value for key 28, into space: 'test'
-[2025-02-16 20:49:03.441165208] [PERIODIC INSERT] Successfully inserted key: 29, value: Value for key 29, into space: 'test'
-[2025-02-16 20:49:03.544161081] [PERIODIC INSERT] Successfully inserted key: 30, value: Value for key 30, into space: 'test'
-[2025-02-16 20:49:03.646845102] [PERIODIC INSERT] Successfully inserted key: 31, value: Value for key 31, into space: 'test'
-[2025-02-16 20:49:03.749600410] [PERIODIC INSERT] Successfully inserted key: 32, value: Value for key 32, into space: 'test'
-[2025-02-16 20:49:03.851942777] [PERIODIC INSERT] Successfully inserted key: 33, value: Value for key 33, into space: 'test'
-[2025-02-16 20:49:03.954576015] [PERIODIC INSERT] Successfully inserted key: 34, value: Value for key 34, into space: 'test'
-[2025-02-16 20:49:04.056789875] [PERIODIC INSERT] Successfully inserted key: 35, value: Value for key 35, into space: 'test'
-[2025-02-16 20:49:04.159590482] [PERIODIC INSERT] Successfully inserted key: 36, value: Value for key 36, into space: 'test'
-[2025-02-16 20:49:04.261237144] [PERIODIC INSERT] Successfully inserted key: 37, value: Value for key 37, into space: 'test'
-[2025-02-16 20:49:04.364038228] [PERIODIC INSERT] Successfully inserted key: 38, value: Value for key 38, into space: 'test'
-[2025-02-16 20:49:04.467139482] [PERIODIC INSERT] Successfully inserted key: 39, value: Value for key 39, into space: 'test'
-[2025-02-16 20:49:04.570681571] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:04.570706367] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:04.570710182] [REPLICATION MONITOR][CLUSTER] Detected 2 Problems:
-[2025-02-16 20:49:04.570713281] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:04.570716142] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:04.570790052] [DIVERGENCE MONITOR] Divergence of entries: 61
-[2025-02-16 20:49:04.571606397] [PERIODIC INSERT] Successfully inserted key: 40, value: Value for key 40, into space: 'test'
-[2025-02-16 20:49:04.673943519] [PERIODIC INSERT] Successfully inserted key: 41, value: Value for key 41, into space: 'test'
-[2025-02-16 20:49:04.777059316] [PERIODIC INSERT] Successfully inserted key: 42, value: Value for key 42, into space: 'test'
-[2025-02-16 20:49:04.879570722] [PERIODIC INSERT] Successfully inserted key: 43, value: Value for key 43, into space: 'test'
-[2025-02-16 20:49:04.981548547] [PERIODIC INSERT] Successfully inserted key: 44, value: Value for key 44, into space: 'test'
-[2025-02-16 20:49:05.083252906] [PERIODIC INSERT] Successfully inserted key: 45, value: Value for key 45, into space: 'test'
-[2025-02-16 20:49:05.185509443] [PERIODIC INSERT] Successfully inserted key: 46, value: Value for key 46, into space: 'test'
-[2025-02-16 20:49:05.287601470] [PERIODIC INSERT] Successfully inserted key: 47, value: Value for key 47, into space: 'test'
-[2025-02-16 20:49:05.389722585] [PERIODIC INSERT] Successfully inserted key: 48, value: Value for key 48, into space: 'test'
-[2025-02-16 20:49:05.492715358] [PERIODIC INSERT] Successfully inserted key: 49, value: Value for key 49, into space: 'test'
-[2025-02-16 20:49:05.593844175] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.657695055] [CRASH SIMULATION] Node replica_1 is stopped for a time 4
-[2025-02-16 20:49:05.694716691] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.795745849] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.896643877] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.996638536] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.096642494] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.196641921] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.296676397] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.397763013] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.498749017] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.573058366] [DIVERGENCE MONITOR] Divergence of entries: 51
-[2025-02-16 20:49:06.573077440] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:06.573080301] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:06.573083162] [REPLICATION MONITOR][CLUSTER] Detected 6 Problems:
-[2025-02-16 20:49:06.573085069] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_4
-[2025-02-16 20:49:06.573086977] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:06.573088884] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:06.573129177] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:06.573131084] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:06.573132753] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:06.599762916] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.700758695] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.801772832] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.902711391] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.003718852] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.104783296] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.205765724] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.306663513] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.406677722] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.507779836] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.608775138] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.709715366] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.810751199] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.911735773] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.012762308] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.113723754] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.214712381] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.315707683] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.416683912] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.517730474] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.575242996] [DIVERGENCE MONITOR] Divergence of entries: 51
-[2025-02-16 20:49:08.575269460] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:08.575273036] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:08.575276851] [REPLICATION MONITOR][CLUSTER] Detected 4 Problems:
-[2025-02-16 20:49:08.575279951] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_4
-[2025-02-16 20:49:08.575282573] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:08.575284957] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:08.575306415] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:08.618759870] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.719753026] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.820738077] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.921720743] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.022772073] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.123742818] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.224777698] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.325843334] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.426648616] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.526722908] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.627712726] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.727771282] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.762593507] [CRASH SIMULATION] Node replica_1 is started again
-[2025-02-16 20:49:09.830697536] [PERIODIC INSERT] Successfully inserted key: 50, value: Value for key 50, into space: 'test'
-[2025-02-16 20:49:09.932611703] [PERIODIC INSERT] Successfully inserted key: 51, value: Value for key 51, into space: 'test'
-[2025-02-16 20:49:10.034550428] [PERIODIC INSERT] Successfully inserted key: 52, value: Value for key 52, into space: 'test'
-[2025-02-16 20:49:10.136941671] [PERIODIC INSERT] Successfully inserted key: 53, value: Value for key 53, into space: 'test'
-[2025-02-16 20:49:10.239941596] [PERIODIC INSERT] Successfully inserted key: 54, value: Value for key 54, into space: 'test'
-[2025-02-16 20:49:10.343356132] [PERIODIC INSERT] Successfully inserted key: 55, value: Value for key 55, into space: 'test'
-[2025-02-16 20:49:10.445588350] [PERIODIC INSERT] Successfully inserted key: 56, value: Value for key 56, into space: 'test'
-[2025-02-16 20:49:10.548282384] [PERIODIC INSERT] Successfully inserted key: 57, value: Value for key 57, into space: 'test'
-[2025-02-16 20:49:10.556859493] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 5
-[2025-02-16 20:49:10.577641963] [DIVERGENCE MONITOR] Divergence of entries: 43
-[2025-02-16 20:49:10.577905893] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:10.577913522] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:10.577918291] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:10.577920675] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:10.577944993] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:10.577947616] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:10.651074647] [PERIODIC INSERT] Successfully inserted key: 58, value: Value for key 58, into space: 'test'
-[2025-02-16 20:49:10.753442287] [PERIODIC INSERT] Successfully inserted key: 59, value: Value for key 59, into space: 'test'
-[2025-02-16 20:49:10.855648517] [PERIODIC INSERT] Successfully inserted key: 60, value: Value for key 60, into space: 'test'
-[2025-02-16 20:49:10.958579778] [PERIODIC INSERT] Successfully inserted key: 61, value: Value for key 61, into space: 'test'
-[2025-02-16 20:49:11.060791015] [PERIODIC INSERT] Successfully inserted key: 62, value: Value for key 62, into space: 'test'
-[2025-02-16 20:49:11.163947343] [PERIODIC INSERT] Successfully inserted key: 63, value: Value for key 63, into space: 'test'
-[2025-02-16 20:49:11.266816377] [PERIODIC INSERT] Successfully inserted key: 64, value: Value for key 64, into space: 'test'
-[2025-02-16 20:49:11.369842529] [PERIODIC INSERT] Successfully inserted key: 65, value: Value for key 65, into space: 'test'
-[2025-02-16 20:49:11.472872972] [PERIODIC INSERT] Successfully inserted key: 66, value: Value for key 66, into space: 'test'
-[2025-02-16 20:49:11.575841903] [PERIODIC INSERT] Successfully inserted key: 67, value: Value for key 67, into space: 'test'
-[2025-02-16 20:49:11.678188800] [PERIODIC INSERT] Successfully inserted key: 68, value: Value for key 68, into space: 'test'
-[2025-02-16 20:49:11.781071186] [PERIODIC INSERT] Successfully inserted key: 69, value: Value for key 69, into space: 'test'
-[2025-02-16 20:49:11.883551836] [PERIODIC INSERT] Successfully inserted key: 70, value: Value for key 70, into space: 'test'
-[2025-02-16 20:49:11.985673427] [PERIODIC INSERT] Successfully inserted key: 71, value: Value for key 71, into space: 'test'
-[2025-02-16 20:49:12.088519811] [PERIODIC INSERT] Successfully inserted key: 72, value: Value for key 72, into space: 'test'
-[2025-02-16 20:49:12.190344572] [PERIODIC INSERT] Successfully inserted key: 73, value: Value for key 73, into space: 'test'
-[2025-02-16 20:49:12.293651103] [PERIODIC INSERT] Successfully inserted key: 74, value: Value for key 74, into space: 'test'
-[2025-02-16 20:49:12.396035194] [PERIODIC INSERT] Successfully inserted key: 75, value: Value for key 75, into space: 'test'
-[2025-02-16 20:49:12.498643398] [PERIODIC INSERT] Successfully inserted key: 76, value: Value for key 76, into space: 'test'
-[2025-02-16 20:49:12.579076528] [DIVERGENCE MONITOR] Divergence of entries: 24
-[2025-02-16 20:49:12.579414129] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:12.579419612] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:12.579422712] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:12.579424858] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_2
-[2025-02-16 20:49:12.579426527] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:12.579427957] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:12.600934982] [PERIODIC INSERT] Successfully inserted key: 77, value: Value for key 77, into space: 'test'
-[2025-02-16 20:49:12.703944206] [PERIODIC INSERT] Successfully inserted key: 78, value: Value for key 78, into space: 'test'
-[2025-02-16 20:49:12.806933641] [PERIODIC INSERT] Successfully inserted key: 79, value: Value for key 79, into space: 'test'
-[2025-02-16 20:49:12.909716606] [PERIODIC INSERT] Successfully inserted key: 80, value: Value for key 80, into space: 'test'
-[2025-02-16 20:49:13.013105392] [PERIODIC INSERT] Successfully inserted key: 81, value: Value for key 81, into space: 'test'
-[2025-02-16 20:49:13.115631580] [PERIODIC INSERT] Successfully inserted key: 82, value: Value for key 82, into space: 'test'
-[2025-02-16 20:49:13.218971252] [PERIODIC INSERT] Successfully inserted key: 83, value: Value for key 83, into space: 'test'
-[2025-02-16 20:49:13.322017669] [PERIODIC INSERT] Successfully inserted key: 84, value: Value for key 84, into space: 'test'
-[2025-02-16 20:49:13.424244403] [PERIODIC INSERT] Successfully inserted key: 85, value: Value for key 85, into space: 'test'
-[2025-02-16 20:49:13.526169300] [PERIODIC INSERT] Successfully inserted key: 86, value: Value for key 86, into space: 'test'
-[2025-02-16 20:49:13.628962039] [PERIODIC INSERT] Successfully inserted key: 87, value: Value for key 87, into space: 'test'
-[2025-02-16 20:49:13.731771945] [PERIODIC INSERT] Successfully inserted key: 88, value: Value for key 88, into space: 'test'
-[2025-02-16 20:49:13.835278511] [PERIODIC INSERT] Successfully inserted key: 89, value: Value for key 89, into space: 'test'
-[2025-02-16 20:49:13.938326597] [PERIODIC INSERT] Successfully inserted key: 90, value: Value for key 90, into space: 'test'
-[2025-02-16 20:49:14.041024923] [PERIODIC INSERT] Successfully inserted key: 91, value: Value for key 91, into space: 'test'
-[2025-02-16 20:49:14.144281148] [PERIODIC INSERT] Successfully inserted key: 92, value: Value for key 92, into space: 'test'
-[2025-02-16 20:49:14.246663093] [PERIODIC INSERT] Successfully inserted key: 93, value: Value for key 93, into space: 'test'
-[2025-02-16 20:49:14.348598003] [PERIODIC INSERT] Successfully inserted key: 94, value: Value for key 94, into space: 'test'
-[2025-02-16 20:49:14.450576066] [PERIODIC INSERT] Successfully inserted key: 95, value: Value for key 95, into space: 'test'
-[2025-02-16 20:49:14.552995920] [PERIODIC INSERT] Successfully inserted key: 96, value: Value for key 96, into space: 'test'
-[2025-02-16 20:49:14.581353664] [DIVERGENCE MONITOR] Divergence of entries: 4
-[2025-02-16 20:49:14.581408500] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:14.581415891] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:14.581421136] [REPLICATION MONITOR][CLUSTER] Detected 1 Problems:
-[2025-02-16 20:49:14.581425428] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:14.655601501] [PERIODIC INSERT] Successfully inserted key: 97, value: Value for key 97, into space: 'test'
-[2025-02-16 20:49:14.757746219] [PERIODIC INSERT] Successfully inserted key: 98, value: Value for key 98, into space: 'test'
-[2025-02-16 20:49:14.860877990] [PERIODIC INSERT] Successfully inserted key: 99, value: Value for key 99, into space: 'test'
-[2025-02-16 20:49:14.963897228] [PERIODIC INSERT] Successfully inserted key: 100, value: Value for key 100, into space: 'test'
-[2025-02-16 20:49:15.066826581] [PERIODIC INSERT] Successfully inserted key: 101, value: Value for key 101, into space: 'test'
-[2025-02-16 20:49:15.169599294] [PERIODIC INSERT] Successfully inserted key: 102, value: Value for key 102, into space: 'test'
-[2025-02-16 20:49:15.271978616] [PERIODIC INSERT] Successfully inserted key: 103, value: Value for key 103, into space: 'test'
-[2025-02-16 20:49:15.374442338] [PERIODIC INSERT] Successfully inserted key: 104, value: Value for key 104, into space: 'test'
-[2025-02-16 20:49:15.476570367] [PERIODIC INSERT] Successfully inserted key: 105, value: Value for key 105, into space: 'test'
+[2025-02-17 01:31:15.622679948] replica_4 added to cluster as 	candidate
+[2025-02-17 01:31:36.023720741] Node replica_1 is follower
+[2025-02-17 01:31:36.024214744] Node replica_2 is follower
+[2025-02-17 01:31:36.024792909] Node replica_3 is follower
+[2025-02-17 01:31:36.025377273] Node replica_4 is leader
+[2025-02-17 01:31:36.033554315] The 'test' space is created and configured on the leader
+[2025-02-17 01:31:36.033626317] [[PERIODIC INSERT] Started
+[2025-02-17 01:31:36.033852577] [DIVERGENCE MONITOR] Started
+[2025-02-17 01:31:36.034034252] [CRASH SIMULATION] Started
+[2025-02-17 01:31:36.034129381] [REPLICATION MONITOR] Started
+[2025-02-17 01:31:36.051259756] No intervals found.
+[2025-02-17 01:31:36.051382541] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:36.051392555] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:38.055783510] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:38.055813074] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:40.059113502] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:40.059143304] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:42.063600301] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:42.063630580] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:44.067330121] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:44.067365646] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:46.069555282] [GET LAST ENTRIES][Error][Node replica_3] "net_box is not connected"
+[2025-02-17 01:31:46.069589138] [DIVERGENCE MONITOR] No entries found for node 'replica_3'.
+[2025-02-17 01:31:46.070986509] [DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.
+[2025-02-17 01:31:46.071045637] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:46.071054220] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:46.133505105] [CRASH SIMULATION] Node replica_3 is stopped for a time 3
+[2025-02-17 01:31:46.133517742] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:31:46.133526802]   - Node: replica_2, State: active
+[2025-02-17 01:31:46.133532285]   - Node: replica_4, State: active
+[2025-02-17 01:31:46.133537769]   - Node: replica_3, State: crashed
+[2025-02-17 01:31:46.133542537]   - Node: replica_1, State: active
+[2025-02-17 01:31:48.073731184] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:48.073762416] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:49.445746183] [CRASH SIMULATION] Node replica_3 is started again
+[2025-02-17 01:31:49.445764541] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:31:49.445773601]   - Node: replica_2, State: active
+[2025-02-17 01:31:49.445779085]   - Node: replica_4, State: active
+[2025-02-17 01:31:49.445823431]   - Node: replica_3, State: restored
+[2025-02-17 01:31:49.445829153]   - Node: replica_1, State: active
+[2025-02-17 01:31:50.076636314] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:50.076663732] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:52.081132411] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:52.081159114] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:54.085205316] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:54.085234403] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:56.032684564] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 4
+[2025-02-17 01:31:56.032719612] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:31:56.032729148]   - Node: replica_2, State: active
+[2025-02-17 01:31:56.032734870]   - Node: replica_4, State: active
+[2025-02-17 01:31:56.032738924]   - Node: replica_3, State: crashed
+[2025-02-17 01:31:56.032743215]   - Node: replica_1, State: active
+[2025-02-17 01:31:56.089698553] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:56.089730501] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:31:58.093442201] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:31:58.093473434] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:00.034618139] [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed
+[2025-02-17 01:32:00.034653902] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:00.034662961]   - Node: replica_2, State: active
+[2025-02-17 01:32:00.034669160]   - Node: replica_4, State: active
+[2025-02-17 01:32:00.034674167]   - Node: replica_3, State: restored
+[2025-02-17 01:32:00.034680604]   - Node: replica_1, State: active
+[2025-02-17 01:32:00.096837997] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:00.096866369] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:02.101626873] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:02.101657629] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:04.105184316] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:04.105214118] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:06.108123064] [GET LAST ENTRIES][Error][Node replica_3] "net_box is not connected"
+[2025-02-17 01:32:06.108176708] [DIVERGENCE MONITOR] No entries found for node 'replica_3'.
+[2025-02-17 01:32:06.108987808] [DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.
+[2025-02-17 01:32:06.109015703] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:06.109023571] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:06.132905721] [CRASH SIMULATION] Node replica_3 is stopped for a time 5
+[2025-02-17 01:32:06.132922410] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:06.132932186]   - Node: replica_2, State: active
+[2025-02-17 01:32:06.132938146]   - Node: replica_4, State: active
+[2025-02-17 01:32:06.132942676]   - Node: replica_3, State: crashed
+[2025-02-17 01:32:06.132947921]   - Node: replica_1, State: active
+[2025-02-17 01:32:08.112561225] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:08.112586021] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:10.115599155] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:10.115628480] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:11.446462154] [CRASH SIMULATION] Node replica_3 is started again
+[2025-02-17 01:32:11.446486949] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:11.446495532]   - Node: replica_2, State: active
+[2025-02-17 01:32:11.446509122]   - Node: replica_4, State: active
+[2025-02-17 01:32:11.446514129]   - Node: replica_3, State: restored
+[2025-02-17 01:32:11.446522474]   - Node: replica_1, State: active
+[2025-02-17 01:32:12.119176626] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:12.119218349] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:14.123791694] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:32:14.123821973] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:16.123934030] [GET LAST ENTRIES][Error][Node replica_1] "net_box is not connected"
+[2025-02-17 01:32:16.123964786] [DIVERGENCE MONITOR] No entries found for node 'replica_1'.
+[2025-02-17 01:32:16.125724792] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:16.125746250] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:16.125857114] [DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.
+[2025-02-17 01:32:16.135361909] [CRASH SIMULATION] Node replica_1 is stopped for a time 2
+[2025-02-17 01:32:16.135377168] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:16.135387420]   - Node: replica_2, State: active
+[2025-02-17 01:32:16.135394334]   - Node: replica_4, State: active
+[2025-02-17 01:32:16.135399103]   - Node: replica_3, State: restored
+[2025-02-17 01:32:16.135447025]   - Node: replica_1, State: crashed
+[2025-02-17 01:32:18.128701448] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:18.128747463] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:18.449288845] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:32:18.449308633] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:18.449320316]   - Node: replica_2, State: active
+[2025-02-17 01:32:18.449335098]   - Node: replica_4, State: active
+[2025-02-17 01:32:18.449340581]   - Node: replica_3, State: restored
+[2025-02-17 01:32:18.449356555]   - Node: replica_1, State: restored
+[2025-02-17 01:32:20.136160373] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:20.136213779] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:22.140454769] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:22.140493154] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:24.144062757] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:24.144094228] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:26.034534215] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 1
+[2025-02-17 01:32:26.034557819] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:26.034567356]   - Node: replica_2, State: active
+[2025-02-17 01:32:26.034573078]   - Node: replica_4, State: active
+[2025-02-17 01:32:26.034582138]   - Node: replica_3, State: crashed
+[2025-02-17 01:32:26.034587383]   - Node: replica_1, State: restored
+[2025-02-17 01:32:26.147627592] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:26.147659540] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:27.035980939] [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed
+[2025-02-17 01:32:27.036020994] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:27.036031246]   - Node: replica_2, State: active
+[2025-02-17 01:32:27.036038160]   - Node: replica_4, State: active
+[2025-02-17 01:32:27.036056995]   - Node: replica_3, State: restored
+[2025-02-17 01:32:27.036062955]   - Node: replica_1, State: restored
+[2025-02-17 01:32:28.152078866] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:28.152110338] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:30.154607772] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:30.154643535] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:32.158770799] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:32.158806562] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:34.163550138] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:34.163599014] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:36.034025669] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:32:36.168857574] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:36.168887853] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:38.173842191] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:38.173872232] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:40.181290388] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:40.181354761] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:42.187737703] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:42.187805175] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:44.192288160] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:44.192328453] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:46.035326719] [CRASH SIMULATION] The WAL write delay for node replica_2 is set for the time 2
+[2025-02-17 01:32:46.035363435] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:46.035374879]   - Node: replica_2, State: crashed
+[2025-02-17 01:32:46.035380840]   - Node: replica_4, State: active
+[2025-02-17 01:32:46.035390853]   - Node: replica_3, State: restored
+[2025-02-17 01:32:46.035396099]   - Node: replica_1, State: restored
+[2025-02-17 01:32:46.195019960] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:46.195052385] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:48.036343812] [CRASH SIMULATION] The WAL write delay for node replica_2 has been removed
+[2025-02-17 01:32:48.036381006] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:32:48.036391019]   - Node: replica_2, State: restored
+[2025-02-17 01:32:48.036397695]   - Node: replica_4, State: active
+[2025-02-17 01:32:48.036403656]   - Node: replica_3, State: restored
+[2025-02-17 01:32:48.036429882]   - Node: replica_1, State: restored
+[2025-02-17 01:32:48.199875116] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:48.199915170] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:50.203448772] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:50.203480005] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:52.207200765] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:52.207234621] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:54.210473775] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:54.210506916] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:56.034836053] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:32:56.214795112] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:56.214828252] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:32:58.219849109] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:32:58.219879627] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:00.223997116] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:00.224029302] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:02.228569030] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:02.228677749] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:04.232134103] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:04.232162714] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:06.034907102] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:33:06.236394643] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:06.236438989] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:08.240658998] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:08.240691900] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:10.244269371] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:10.244298934] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:12.248968601] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:12.249000072] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:14.253348112] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:14.253379821] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:16.035319805] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:33:16.257008790] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:16.257040739] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:18.261723279] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:18.261753559] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:20.266008138] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:20.266038656] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:22.271633863] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:22.271667242] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:24.276287078] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:24.276323080] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:26.136903285] [CRASH SIMULATION] Node replica_1 is stopped for a time 2
+[2025-02-17 01:33:26.136919260] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:26.136929273]   - Node: replica_2, State: restored
+[2025-02-17 01:33:26.136934995]   - Node: replica_4, State: active
+[2025-02-17 01:33:26.136940240]   - Node: replica_3, State: restored
+[2025-02-17 01:33:26.136945486]   - Node: replica_1, State: crashed
+[2025-02-17 01:33:26.279381036] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:26.279426336] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:28.283130645] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:28.283178329] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:28.450269699] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:33:28.450283288] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:28.450291633]   - Node: replica_2, State: restored
+[2025-02-17 01:33:28.450297594]   - Node: replica_4, State: active
+[2025-02-17 01:33:28.450302839]   - Node: replica_3, State: restored
+[2025-02-17 01:33:28.450307607]   - Node: replica_1, State: restored
+[2025-02-17 01:33:30.287439107] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:30.287472248] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:32.291383028] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:32.291435003] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:34.295966148] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:33:34.295996189] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:36.165859937] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:36.260294198] [CRASH SIMULATION] Node replica_2 is stopped for a time 3
+[2025-02-17 01:33:36.260307550] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:36.260316371]   - Node: replica_2, State: crashed
+[2025-02-17 01:33:36.260321855]   - Node: replica_4, State: active
+[2025-02-17 01:33:36.260328054]   - Node: replica_3, State: restored
+[2025-02-17 01:33:36.260337352]   - Node: replica_1, State: restored
+[2025-02-17 01:33:36.298936128] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:37.269202232] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:38.303250312] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:38.372390747] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:39.475998878] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:39.575757503] [CRASH SIMULATION] Node replica_2 is started again
+[2025-02-17 01:33:39.575780391] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:39.575795412]   - Node: replica_2, State: restored
+[2025-02-17 01:33:39.575807094]   - Node: replica_4, State: active
+[2025-02-17 01:33:39.575821161]   - Node: replica_3, State: restored
+[2025-02-17 01:33:39.575834989]   - Node: replica_1, State: restored
+[2025-02-17 01:33:40.308775663] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:40.579726219] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:41.683516263] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:42.313192844] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:42.786746740] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:33:44.315730571] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:44.315760850] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:46.159583091] [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 5
+[2025-02-17 01:33:46.159608125] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:46.159618854]   - Node: replica_2, State: restored
+[2025-02-17 01:33:46.159626483]   - Node: replica_4, State: active
+[2025-02-17 01:33:46.159632205]   - Node: replica_3, State: restored
+[2025-02-17 01:33:46.159641504]   - Node: replica_1, State: crashed
+[2025-02-17 01:33:46.319701671] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:46.319731950] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:48.322296380] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:48.322325229] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:50.325371026] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:50.325401306] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:51.160904407] [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed
+[2025-02-17 01:33:51.160940885] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:51.160955429]   - Node: replica_2, State: restored
+[2025-02-17 01:33:51.160962104]   - Node: replica_4, State: active
+[2025-02-17 01:33:51.160968065]   - Node: replica_3, State: restored
+[2025-02-17 01:33:51.160972356]   - Node: replica_1, State: restored
+[2025-02-17 01:33:52.329056262] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:52.329086780] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:54.334291458] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:54.334320068] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:56.160335540] [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 3
+[2025-02-17 01:33:56.160368919] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:56.160376787]   - Node: replica_2, State: restored
+[2025-02-17 01:33:56.160382032]   - Node: replica_4, State: active
+[2025-02-17 01:33:56.160486459]   - Node: replica_3, State: restored
+[2025-02-17 01:33:56.160492181]   - Node: replica_1, State: crashed
+[2025-02-17 01:33:56.337300777] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:56.337333917] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:58.341318845] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:33:58.341377019] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:33:59.161916255] [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed
+[2025-02-17 01:33:59.161952733] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:33:59.161962509]   - Node: replica_2, State: restored
+[2025-02-17 01:33:59.161968708]   - Node: replica_4, State: active
+[2025-02-17 01:33:59.162010431]   - Node: replica_3, State: restored
+[2025-02-17 01:33:59.162016391]   - Node: replica_1, State: restored
+[2025-02-17 01:34:00.351634740] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:00.351668357] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:02.354547977] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:02.354580163] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:04.357293367] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:04.357323884] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:06.160866022] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 5
+[2025-02-17 01:34:06.160904645] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:06.160916805]   - Node: replica_2, State: restored
+[2025-02-17 01:34:06.160924911]   - Node: replica_4, State: crashed
+[2025-02-17 01:34:06.160940170]   - Node: replica_3, State: restored
+[2025-02-17 01:34:06.160946607]   - Node: replica_1, State: restored
+[2025-02-17 01:34:06.361619472] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:06.361651182] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:08.364035367] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:08.364066123] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:10.368020296] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:10.368051767] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:11.162880182] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:34:11.162912607] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:11.162926197]   - Node: replica_2, State: restored
+[2025-02-17 01:34:11.162933111]   - Node: replica_4, State: restored
+[2025-02-17 01:34:11.162940979]   - Node: replica_3, State: restored
+[2025-02-17 01:34:11.162947893]   - Node: replica_1, State: restored
+[2025-02-17 01:34:12.371531724] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:12.371564149] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:14.376045703] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:14.376075744] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:16.160679340] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:34:16.380382299] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:16.380437612] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:18.384562253] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:18.384594678] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:20.388622999] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:20.388654708] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:22.392203092] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:22.392237186] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:24.396747350] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:24.396778821] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:26.191272258] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:26.263091564] [CRASH SIMULATION] Node replica_4 is stopped for a time 5
+[2025-02-17 01:34:26.263104915] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:26.263113737]   - Node: replica_2, State: restored
+[2025-02-17 01:34:26.263118743]   - Node: replica_4, State: crashed
+[2025-02-17 01:34:26.263124227]   - Node: replica_3, State: restored
+[2025-02-17 01:34:26.263128995]   - Node: replica_1, State: restored
+[2025-02-17 01:34:26.401538848] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:27.294293165] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:28.396859884] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:28.404525995] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:29.499318122] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:30.408138990] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:30.602538347] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:31.576755762] [CRASH SIMULATION] Node replica_4 is started again
+[2025-02-17 01:34:31.576774835] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:31.576782941]   - Node: replica_2, State: restored
+[2025-02-17 01:34:31.576787948]   - Node: replica_4, State: restored
+[2025-02-17 01:34:31.576792478]   - Node: replica_3, State: restored
+[2025-02-17 01:34:31.576797008]   - Node: replica_1, State: restored
+[2025-02-17 01:34:31.706393718] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:32.412600040] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:34:32.412640094] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:34.417624235] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:34:34.417654275] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:36.237380027] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:36.263134956] [CRASH SIMULATION] Node replica_2 is stopped for a time 3
+[2025-02-17 01:34:36.263154983] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:36.263165950]   - Node: replica_2, State: crashed
+[2025-02-17 01:34:36.263173103]   - Node: replica_4, State: restored
+[2025-02-17 01:34:36.263179779]   - Node: replica_3, State: restored
+[2025-02-17 01:34:36.263191223]   - Node: replica_1, State: restored
+[2025-02-17 01:34:36.419757604] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:37.340182065] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:38.422714948] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:38.442437171] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:39.521434068] [CRASH SIMULATION] Node replica_2 is started again
+[2025-02-17 01:34:39.521465539] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:39.521482944]   - Node: replica_2, State: restored
+[2025-02-17 01:34:39.521496057]   - Node: replica_4, State: restored
+[2025-02-17 01:34:39.521505117]   - Node: replica_3, State: restored
+[2025-02-17 01:34:39.521541357]   - Node: replica_1, State: restored
+[2025-02-17 01:34:39.545749902] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:40.427884578] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:40.648776054] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:41.752575397] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:42.432904958] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:42.855351686] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:34:44.437150001] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:44.437179565] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:46.162655591] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:34:46.442281246] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:46.442306280] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:48.447161436] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:48.447193145] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:50.451211929] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:50.451237440] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:52.457181215] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:52.457226276] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:54.462645053] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:54.462675094] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:56.164733409] [CRASH SIMULATION] The WAL write delay for node replica_2 is set for the time 5
+[2025-02-17 01:34:56.164767026] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:34:56.164775371]   - Node: replica_2, State: crashed
+[2025-02-17 01:34:56.164779901]   - Node: replica_4, State: restored
+[2025-02-17 01:34:56.164843320]   - Node: replica_3, State: restored
+[2025-02-17 01:34:56.164847612]   - Node: replica_1, State: restored
+[2025-02-17 01:34:56.467237234] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:56.467267990] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:34:58.473670244] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:34:58.473695993] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:00.477427482] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:00.477460145] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:01.166390895] [CRASH SIMULATION] The WAL write delay for node replica_2 has been removed
+[2025-02-17 01:35:01.166456222] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:01.166465759]   - Node: replica_2, State: restored
+[2025-02-17 01:35:01.166471242]   - Node: replica_4, State: restored
+[2025-02-17 01:35:01.166476726]   - Node: replica_3, State: restored
+[2025-02-17 01:35:01.166481733]   - Node: replica_1, State: restored
+[2025-02-17 01:35:02.480442523] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:02.480467557] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:04.483879327] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:04.483934164] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:06.165333986] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 5
+[2025-02-17 01:35:06.165355205] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:06.165363311]   - Node: replica_2, State: restored
+[2025-02-17 01:35:06.165367841]   - Node: replica_4, State: crashed
+[2025-02-17 01:35:06.165372610]   - Node: replica_3, State: restored
+[2025-02-17 01:35:06.165377378]   - Node: replica_1, State: restored
+[2025-02-17 01:35:06.488037824] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:06.488062620] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:08.490658998] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:08.490684270] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:10.493066310] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:10.493090629] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:11.166238307] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:35:11.166336059] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:11.166348695]   - Node: replica_2, State: restored
+[2025-02-17 01:35:11.166355133]   - Node: replica_4, State: restored
+[2025-02-17 01:35:11.166362047]   - Node: replica_3, State: restored
+[2025-02-17 01:35:11.166368007]   - Node: replica_1, State: restored
+[2025-02-17 01:35:12.496399402] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:12.496448278] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:14.499668836] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:14.499715805] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:16.267034769] [CRASH SIMULATION] Node replica_1 is stopped for a time 1
+[2025-02-17 01:35:16.267053127] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:16.267065048]   - Node: replica_2, State: restored
+[2025-02-17 01:35:16.267072200]   - Node: replica_4, State: restored
+[2025-02-17 01:35:16.267079591]   - Node: replica_3, State: restored
+[2025-02-17 01:35:16.267086982]   - Node: replica_1, State: crashed
+[2025-02-17 01:35:16.502330303] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:16.502357959] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:17.580147743] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:35:17.580165624] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:17.580183744]   - Node: replica_2, State: restored
+[2025-02-17 01:35:17.580188512]   - Node: replica_4, State: restored
+[2025-02-17 01:35:17.580192565]   - Node: replica_3, State: restored
+[2025-02-17 01:35:17.580196619]   - Node: replica_1, State: restored
+[2025-02-17 01:35:18.505618810] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:18.505647420] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:20.510851144] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:20.510881185] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:22.515354156] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:22.515391826] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:24.520725727] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:24.520764112] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:26.167341470] [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 1
+[2025-02-17 01:35:26.167375564] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:26.167385101]   - Node: replica_2, State: restored
+[2025-02-17 01:35:26.167391538]   - Node: replica_4, State: restored
+[2025-02-17 01:35:26.167396306]   - Node: replica_3, State: restored
+[2025-02-17 01:35:26.167431592]   - Node: replica_1, State: crashed
+[2025-02-17 01:35:26.523706197] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:26.523742914] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:27.168442249] [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed
+[2025-02-17 01:35:27.168467521] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:27.168477535]   - Node: replica_2, State: restored
+[2025-02-17 01:35:27.168483495]   - Node: replica_4, State: restored
+[2025-02-17 01:35:27.168488979]   - Node: replica_3, State: restored
+[2025-02-17 01:35:27.168498754]   - Node: replica_1, State: restored
+[2025-02-17 01:35:28.527676105] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:28.527706623] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:30.533104658] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:30.533129692] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:32.537808179] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:32.537889242] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:34.541170835] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:34.541194438] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:36.167593002] [CRASH SIMULATION] The WAL write delay for node replica_2 is set for the time 5
+[2025-02-17 01:35:36.167628526] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:36.167638063]   - Node: replica_2, State: crashed
+[2025-02-17 01:35:36.167643785]   - Node: replica_4, State: restored
+[2025-02-17 01:35:36.167652606]   - Node: replica_3, State: restored
+[2025-02-17 01:35:36.167657852]   - Node: replica_1, State: restored
+[2025-02-17 01:35:36.545382976] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:36.545439004] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:38.548143863] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:38.548180580] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:40.551429033] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:40.551458597] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:41.168174743] [CRASH SIMULATION] The WAL write delay for node replica_2 has been removed
+[2025-02-17 01:35:41.168201923] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:41.168220996]   - Node: replica_2, State: restored
+[2025-02-17 01:35:41.168226003]   - Node: replica_4, State: restored
+[2025-02-17 01:35:41.168232202]   - Node: replica_3, State: restored
+[2025-02-17 01:35:41.168236017]   - Node: replica_1, State: restored
+[2025-02-17 01:35:42.554842233] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:42.554870843] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:44.560428380] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:44.560457944] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:46.168077945] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 1
+[2025-02-17 01:35:46.168099403] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:46.168108701]   - Node: replica_2, State: restored
+[2025-02-17 01:35:46.168114662]   - Node: replica_4, State: crashed
+[2025-02-17 01:35:46.168134689]   - Node: replica_3, State: restored
+[2025-02-17 01:35:46.168139934]   - Node: replica_1, State: restored
+[2025-02-17 01:35:46.565872907] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:46.565904140] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:47.169461488] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:35:47.169535636] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:47.169545888]   - Node: replica_2, State: restored
+[2025-02-17 01:35:47.169551849]   - Node: replica_4, State: restored
+[2025-02-17 01:35:47.169557094]   - Node: replica_3, State: restored
+[2025-02-17 01:35:47.169563293]   - Node: replica_1, State: restored
+[2025-02-17 01:35:48.569975376] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:48.570005416] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:50.575116872] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:50.575146436] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:52.579203605] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:52.579233407] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:54.585071325] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:54.585102081] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:56.169433116] [CRASH SIMULATION] The WAL write delay for node replica_2 is set for the time 3
+[2025-02-17 01:35:56.169467926] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:56.169567346]   - Node: replica_2, State: crashed
+[2025-02-17 01:35:56.169573307]   - Node: replica_4, State: restored
+[2025-02-17 01:35:56.169591665]   - Node: replica_3, State: restored
+[2025-02-17 01:35:56.169596433]   - Node: replica_1, State: restored
+[2025-02-17 01:35:56.587867498] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:56.587898492] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:58.590677499] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:35:58.590703487] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:35:59.170527219] [CRASH SIMULATION] The WAL write delay for node replica_2 has been removed
+[2025-02-17 01:35:59.170547962] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:35:59.170556545]   - Node: replica_2, State: restored
+[2025-02-17 01:35:59.170561790]   - Node: replica_4, State: restored
+[2025-02-17 01:35:59.170566558]   - Node: replica_3, State: restored
+[2025-02-17 01:35:59.170571327]   - Node: replica_1, State: restored
+[2025-02-17 01:36:00.593553304] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:00.593578577] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:02.596432447] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:02.596457958] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:04.600789308] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:04.600832462] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:06.170375108] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 1
+[2025-02-17 01:36:06.170397758] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:06.170425891]   - Node: replica_2, State: restored
+[2025-02-17 01:36:06.170432567]   - Node: replica_4, State: crashed
+[2025-02-17 01:36:06.170437812]   - Node: replica_3, State: restored
+[2025-02-17 01:36:06.170442342]   - Node: replica_1, State: restored
+[2025-02-17 01:36:06.603440046] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:06.603466272] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:07.171287298] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:36:07.171308755] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:07.171317815]   - Node: replica_2, State: restored
+[2025-02-17 01:36:07.171322345]   - Node: replica_4, State: restored
+[2025-02-17 01:36:07.171326637]   - Node: replica_3, State: restored
+[2025-02-17 01:36:07.171331167]   - Node: replica_1, State: restored
+[2025-02-17 01:36:08.606247901] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:08.606274843] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:10.609604597] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:10.609630584] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:12.613532304] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:12.613558053] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:14.616097450] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:14.616123437] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:16.271952152] [CRASH SIMULATION] Node replica_2 is stopped for a time 2
+[2025-02-17 01:36:16.271964788] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:16.271972656]   - Node: replica_2, State: crashed
+[2025-02-17 01:36:16.271977663]   - Node: replica_4, State: restored
+[2025-02-17 01:36:16.271982431]   - Node: replica_3, State: restored
+[2025-02-17 01:36:16.271986246]   - Node: replica_1, State: restored
+[2025-02-17 01:36:16.619764566] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:16.619788408] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:18.587803125] [CRASH SIMULATION] Node replica_2 is started again
+[2025-02-17 01:36:18.587822437] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:18.587830305]   - Node: replica_2, State: restored
+[2025-02-17 01:36:18.587835311]   - Node: replica_4, State: restored
+[2025-02-17 01:36:18.587840795]   - Node: replica_3, State: restored
+[2025-02-17 01:36:18.587860822]   - Node: replica_1, State: restored
+[2025-02-17 01:36:18.625111818] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:18.625149726] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:20.630213975] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:20.630242586] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:22.633224964] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:22.633249759] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:24.638428926] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:24.638454437] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:26.175504446] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:26.273066997] [CRASH SIMULATION] Node replica_4 is stopped for a time 4
+[2025-02-17 01:36:26.273078680] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:26.273088693]   - Node: replica_2, State: restored
+[2025-02-17 01:36:26.273093461]   - Node: replica_4, State: crashed
+[2025-02-17 01:36:26.273101091]   - Node: replica_3, State: restored
+[2025-02-17 01:36:26.273106813]   - Node: replica_1, State: restored
+[2025-02-17 01:36:26.640590667] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:27.278077125] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:28.381297111] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:28.642592906] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:29.484150171] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:30.587857246] [CRASH SIMULATION] Node replica_4 is started again
+[2025-02-17 01:36:30.587883234] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:30.587897539]   - Node: replica_2, State: restored
+[2025-02-17 01:36:30.587919473]   - Node: replica_4, State: restored
+[2025-02-17 01:36:30.587931156]   - Node: replica_3, State: restored
+[2025-02-17 01:36:30.587973356]   - Node: replica_1, State: restored
+[2025-02-17 01:36:30.589534282] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:30.646926164] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:31.692687034] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:32.651890039] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:36:32.651929616] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:34.656342983] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:36:34.656368970] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:36.198213577] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:36.272888183] [CRASH SIMULATION] Node replica_2 is stopped for a time 4
+[2025-02-17 01:36:36.272901058] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:36.272913455]   - Node: replica_2, State: crashed
+[2025-02-17 01:36:36.272919416]   - Node: replica_4, State: restored
+[2025-02-17 01:36:36.272923946]   - Node: replica_3, State: restored
+[2025-02-17 01:36:36.272932767]   - Node: replica_1, State: restored
+[2025-02-17 01:36:36.660633802] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:37.301259040] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:38.404481172] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:38.664548635] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:39.506310462] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:40.546530485] [CRASH SIMULATION] Node replica_2 is started again
+[2025-02-17 01:36:40.546581029] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:40.546587705]   - Node: replica_2, State: restored
+[2025-02-17 01:36:40.546594858]   - Node: replica_4, State: restored
+[2025-02-17 01:36:40.546599626]   - Node: replica_3, State: restored
+[2025-02-17 01:36:40.546663522]   - Node: replica_1, State: restored
+[2025-02-17 01:36:40.609657526] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:40.667284965] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:41.713734388] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:42.670782804] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:42.817754030] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:36:44.674284696] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:44.674310445] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:46.173341035] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 5
+[2025-02-17 01:36:46.173365116] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:46.173375129]   - Node: replica_2, State: restored
+[2025-02-17 01:36:46.173380374]   - Node: replica_4, State: restored
+[2025-02-17 01:36:46.173398971]   - Node: replica_3, State: crashed
+[2025-02-17 01:36:46.173403739]   - Node: replica_1, State: restored
+[2025-02-17 01:36:46.677479743] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:46.677533149] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:48.679983377] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:48.680010557] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:50.683300733] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:50.683325767] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:51.174376964] [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed
+[2025-02-17 01:36:51.174400806] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:36:51.174433469]   - Node: replica_2, State: restored
+[2025-02-17 01:36:51.174448966]   - Node: replica_4, State: restored
+[2025-02-17 01:36:51.174454927]   - Node: replica_3, State: restored
+[2025-02-17 01:36:51.174461364]   - Node: replica_1, State: restored
+[2025-02-17 01:36:52.690632820] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:52.690664291] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:54.694340705] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:54.694367408] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:56.172886610] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:36:56.699167490] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:56.699192762] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:36:58.703831672] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:36:58.703862428] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:00.707302093] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:00.707332372] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:02.711064815] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:02.711090087] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:04.715861082] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:04.715885877] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:06.173654556] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:37:06.719224214] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:06.719315052] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:08.722916603] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:08.722942590] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:10.728266954] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:10.728292465] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:12.731381177] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:12.731434822] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:14.736299037] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:14.736330032] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:16.174688816] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:37:16.741592168] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:16.741620540] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:18.745879411] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:18.745912313] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:20.750979423] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:20.751012086] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:22.757971048] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:22.758010149] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:24.762846469] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:24.762877225] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:26.176450967] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 2
+[2025-02-17 01:37:26.176473855] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:26.176482439]   - Node: replica_2, State: restored
+[2025-02-17 01:37:26.176487684]   - Node: replica_4, State: restored
+[2025-02-17 01:37:26.176497220]   - Node: replica_3, State: crashed
+[2025-02-17 01:37:26.176502704]   - Node: replica_1, State: restored
+[2025-02-17 01:37:26.766467094] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:26.766496658] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:28.177551031] [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed
+[2025-02-17 01:37:28.177587270] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:28.177597761]   - Node: replica_2, State: restored
+[2025-02-17 01:37:28.177603483]   - Node: replica_4, State: restored
+[2025-02-17 01:37:28.177617311]   - Node: replica_3, State: restored
+[2025-02-17 01:37:28.177622079]   - Node: replica_1, State: restored
+[2025-02-17 01:37:28.769684076] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:28.769714117] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:30.776035308] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:30.776067018] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:32.779924869] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:32.779953002] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:34.784536838] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:34.784569501] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:36.176789522] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:37:36.790553331] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:36.790588855] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:38.794088840] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:38.794115543] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:40.798196077] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:40.798225641] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:42.802141189] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:42.802165985] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:44.805861473] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:44.805892467] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:46.178089857] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 1
+[2025-02-17 01:37:46.178109645] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:46.178117275]   - Node: replica_2, State: restored
+[2025-02-17 01:37:46.178122043]   - Node: replica_4, State: crashed
+[2025-02-17 01:37:46.178126573]   - Node: replica_3, State: restored
+[2025-02-17 01:37:46.178130626]   - Node: replica_1, State: restored
+[2025-02-17 01:37:46.808236837] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:46.808261871] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:47.179198265] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:37:47.179226398] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:47.179235696]   - Node: replica_2, State: restored
+[2025-02-17 01:37:47.179241180]   - Node: replica_4, State: restored
+[2025-02-17 01:37:47.179245948]   - Node: replica_3, State: restored
+[2025-02-17 01:37:47.179250001]   - Node: replica_1, State: restored
+[2025-02-17 01:37:48.810829639] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:48.810854196] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:50.814184427] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:50.814213752] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:52.818481206] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:52.818513870] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:54.824244499] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:54.824283838] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:56.278931140] [CRASH SIMULATION] Node replica_1 is stopped for a time 2
+[2025-02-17 01:37:56.278946161] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:56.278956890]   - Node: replica_2, State: restored
+[2025-02-17 01:37:56.278963088]   - Node: replica_4, State: restored
+[2025-02-17 01:37:56.278969049]   - Node: replica_3, State: restored
+[2025-02-17 01:37:56.278973817]   - Node: replica_1, State: crashed
+[2025-02-17 01:37:56.828058481] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:56.828095436] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:37:58.592035531] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:37:58.592053651] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:37:58.592061519]   - Node: replica_2, State: restored
+[2025-02-17 01:37:58.592066764]   - Node: replica_4, State: restored
+[2025-02-17 01:37:58.592070817]   - Node: replica_3, State: restored
+[2025-02-17 01:37:58.592075347]   - Node: replica_1, State: restored
+[2025-02-17 01:37:58.832916259] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:37:58.832955360] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:00.837782382] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:00.837808609] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:02.842645883] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:02.842677593] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:04.846805810] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:04.846827983] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:06.178636789] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:38:06.849650621] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:06.849668025] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:08.853882312] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:08.853912830] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:10.858751535] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:10.858783006] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:12.864447832] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:12.864491224] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:14.870892286] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:14.870918512] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:16.179682493] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:38:16.874525785] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:16.874552011] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:18.879314899] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:18.879340410] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:20.885035514] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:20.885061264] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:22.890231370] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:22.890256881] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:24.896528244] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:24.896554946] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:26.282026290] [CRASH SIMULATION] Node replica_1 is stopped for a time 2
+[2025-02-17 01:38:26.282048463] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:38:26.282059431]   - Node: replica_2, State: restored
+[2025-02-17 01:38:26.282065868]   - Node: replica_4, State: restored
+[2025-02-17 01:38:26.282117128]   - Node: replica_3, State: restored
+[2025-02-17 01:38:26.282122611]   - Node: replica_1, State: crashed
+[2025-02-17 01:38:26.898720741] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:26.898744821] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:28.548365592] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:38:28.548388957] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:38:28.548397302]   - Node: replica_2, State: restored
+[2025-02-17 01:38:28.548405647]   - Node: replica_4, State: restored
+[2025-02-17 01:38:28.548428058]   - Node: replica_3, State: restored
+[2025-02-17 01:38:28.548436641]   - Node: replica_1, State: restored
+[2025-02-17 01:38:28.903854131] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:28.903880119] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:30.907241106] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:30.907265663] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:32.912076473] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:32.912102222] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:34.916809558] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:34.916835069] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:36.181689500] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:38:36.921851634] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:36.921878337] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:38.926119804] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:38.926145553] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:40.931136846] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:40.931161880] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:42.935114860] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:42.935142040] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:44.938722610] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:44.938749551] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:46.183254480] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 5
+[2025-02-17 01:38:46.183282375] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:38:46.183293104]   - Node: replica_2, State: restored
+[2025-02-17 01:38:46.183299779]   - Node: replica_4, State: crashed
+[2025-02-17 01:38:46.183305978]   - Node: replica_3, State: restored
+[2025-02-17 01:38:46.183313369]   - Node: replica_1, State: restored
+[2025-02-17 01:38:46.942735195] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:46.942763090] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:48.946440935] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:48.946467876] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:50.949297428] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:50.949322938] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:51.184603691] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:38:51.184628963] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:38:51.184638261]   - Node: replica_2, State: restored
+[2025-02-17 01:38:51.184643983]   - Node: replica_4, State: restored
+[2025-02-17 01:38:51.184649229]   - Node: replica_3, State: restored
+[2025-02-17 01:38:51.184654235]   - Node: replica_1, State: restored
+[2025-02-17 01:38:52.952696800] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:52.952726125] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:54.956984519] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:54.957010507] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:56.283826351] [CRASH SIMULATION] Node replica_1 is stopped for a time 5
+[2025-02-17 01:38:56.283841609] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:38:56.283849716]   - Node: replica_2, State: restored
+[2025-02-17 01:38:56.283854246]   - Node: replica_4, State: restored
+[2025-02-17 01:38:56.283858776]   - Node: replica_3, State: restored
+[2025-02-17 01:38:56.283864736]   - Node: replica_1, State: crashed
+[2025-02-17 01:38:56.960175037] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:56.960201263] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:38:58.962945699] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:38:58.962971448] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:00.966377019] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:00.966401100] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:01.596140861] [CRASH SIMULATION] Node replica_1 is started again
+[2025-02-17 01:39:01.596164703] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:01.596172094]   - Node: replica_2, State: restored
+[2025-02-17 01:39:01.596177101]   - Node: replica_4, State: restored
+[2025-02-17 01:39:01.596181154]   - Node: replica_3, State: restored
+[2025-02-17 01:39:01.596195936]   - Node: replica_1, State: restored
+[2025-02-17 01:39:02.970593929] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:02.970624446] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:04.975030183] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:04.975055932] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:06.184269428] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 2
+[2025-02-17 01:39:06.184289216] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:06.184298038]   - Node: replica_2, State: restored
+[2025-02-17 01:39:06.184302330]   - Node: replica_4, State: restored
+[2025-02-17 01:39:06.184317827]   - Node: replica_3, State: crashed
+[2025-02-17 01:39:06.184322834]   - Node: replica_1, State: restored
+[2025-02-17 01:39:06.978355407] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:06.978380203] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:08.185228586] [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed
+[2025-02-17 01:39:08.185253620] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:08.185270786]   - Node: replica_2, State: restored
+[2025-02-17 01:39:08.185277462]   - Node: replica_4, State: restored
+[2025-02-17 01:39:08.185282945]   - Node: replica_3, State: restored
+[2025-02-17 01:39:08.185288667]   - Node: replica_1, State: restored
+[2025-02-17 01:39:08.982023954] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:08.982054948] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:10.985754728] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:10.985781669] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:12.990113019] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:12.990146875] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:14.994158506] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:14.994187593] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:16.286048173] [CRASH SIMULATION] Node replica_2 is stopped for a time 3
+[2025-02-17 01:39:16.286082267] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:16.286185741]   - Node: replica_2, State: crashed
+[2025-02-17 01:39:16.286193132]   - Node: replica_4, State: restored
+[2025-02-17 01:39:16.286200284]   - Node: replica_3, State: restored
+[2025-02-17 01:39:16.286207437]   - Node: replica_1, State: restored
+[2025-02-17 01:39:16.997339248] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:16.997364997] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:19.000236749] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:19.000262260] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:19.560736894] [CRASH SIMULATION] Node replica_2 is started again
+[2025-02-17 01:39:19.560758590] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:19.560765504]   - Node: replica_2, State: restored
+[2025-02-17 01:39:19.560774326]   - Node: replica_4, State: restored
+[2025-02-17 01:39:19.560779094]   - Node: replica_3, State: restored
+[2025-02-17 01:39:19.560790777]   - Node: replica_1, State: restored
+[2025-02-17 01:39:21.004209041] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:21.004234075] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:23.010788440] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:23.010814428] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:25.014242172] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:25.014267206] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:26.186355113] [CRASH SIMULATION] The WAL write delay for node replica_4 is set for the time 5
+[2025-02-17 01:39:26.186381101] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:26.186389684]   - Node: replica_2, State: restored
+[2025-02-17 01:39:26.186394691]   - Node: replica_4, State: crashed
+[2025-02-17 01:39:26.186485290]   - Node: replica_3, State: restored
+[2025-02-17 01:39:26.186490535]   - Node: replica_1, State: restored
+[2025-02-17 01:39:27.019798278] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:27.019842624] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:29.022885799] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:29.022910594] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:31.026216506] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:31.026246547] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:31.187173128] [CRASH SIMULATION] The WAL write delay for node replica_4 has been removed
+[2025-02-17 01:39:31.187197446] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:31.187206983]   - Node: replica_2, State: restored
+[2025-02-17 01:39:31.187212944]   - Node: replica_4, State: restored
+[2025-02-17 01:39:31.187222003]   - Node: replica_3, State: restored
+[2025-02-17 01:39:31.187227010]   - Node: replica_1, State: restored
+[2025-02-17 01:39:33.029257774] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:33.029282808] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:35.031780481] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:35.031809806] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:36.186640977] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:39:37.036721229] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:37.036748647] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:39.040176391] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:39.040214538] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:41.044486999] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:41.044512271] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:43.049104690] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:43.049130678] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:45.052508354] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-9ScmYe9QgYF6
+[2025-02-17 01:39:45.052538633] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:46.223009109] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:46.287802457] [CRASH SIMULATION] Node replica_4 is stopped for a time 4
+[2025-02-17 01:39:46.287818193] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:46.287839412]   - Node: replica_2, State: restored
+[2025-02-17 01:39:46.287844419]   - Node: replica_4, State: crashed
+[2025-02-17 01:39:46.287848711]   - Node: replica_3, State: restored
+[2025-02-17 01:39:46.287853240]   - Node: replica_1, State: restored
+[2025-02-17 01:39:47.056165456] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:47.326059818] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:48.429219245] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:49.059135198] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:49.532147884] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:50.554064750] [CRASH SIMULATION] Node replica_4 is started again
+[2025-02-17 01:39:50.554105043] [NODES ACTIVITY STATES] Current states of nodes:
+[2025-02-17 01:39:50.554117441]   - Node: replica_2, State: restored
+[2025-02-17 01:39:50.554126262]   - Node: replica_4, State: restored
+[2025-02-17 01:39:50.554131507]   - Node: replica_3, State: restored
+[2025-02-17 01:39:50.554157495]   - Node: replica_1, State: restored
+[2025-02-17 01:39:50.635614156] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:51.063605070] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:51.739343166] [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+[2025-02-17 01:39:53.067539453] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:39:53.067569732] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:55.073929071] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:39:55.073979854] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:56.187566518] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:39:57.077157258] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:39:57.077184438] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:39:59.080258131] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:39:59.080284118] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:01.084990501] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:01.085020065] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:03.089015722] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:03.089040994] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:05.093089580] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:05.093114376] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:06.187578439] [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy
+[2025-02-17 01:40:07.096545457] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:07.096575021] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:09.100420236] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:09.100449085] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:11.105057716] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:11.105086326] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:13.109622240] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:13.109647989] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+[2025-02-17 01:40:15.113321065] [REPLICATION MONITOR][CLUSTER] Leader: replica_2-wM7_wwhjrYOe
+[2025-02-17 01:40:15.113352060] [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:

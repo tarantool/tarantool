@@ -4,8 +4,31 @@ local tools = require("tools")
 
 -- Table for tracking the status of nodes
 nodes_activity_states = {}
-local function update_node_state(node, state)
-    nodes_activity_states[node.alias] = state
+
+nodes_connection_states = {}
+
+
+local function update_node_state(node, connected)
+    nodes_activity_states[node.alias] = connected
+end
+
+local function update_node_connection_state(node1,node2, state)
+    nodes_connection_states[node1.alias..node2.alias] = state
+    nodes_connection_states[node2.alias..node1.alias] = state
+end
+
+local function is_node_alive_by_id(replica_id)
+    return nodes_activity_states["replica_"..tostring(replica_id)] ~= 'crashed'
+end
+
+
+local function is_node_alive_by_alias(node)
+    return nodes_activity_states[node.alias] ~= 'crashed'
+end
+
+
+local function connection_exists(node1_id, node2_id)
+    return nodes_connection_states['replica_'..tostring(node1_id)..'replica_'..tostring(node2_id)] == true
 end
 
 -- The function of getting all workable nodes
@@ -163,7 +186,6 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
             end
             box.cfg{replication = new_replication}
         end, {node2.net_box_uri})
-        update_node_state(node1, "crashed")
 
         node2:exec(function(peer)
             local new_replication = {}
@@ -174,7 +196,7 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
             end
             box.cfg{replication = new_replication}
         end, {node1.net_box_uri})
-        update_node_state(node2, "crashed")
+        update_node_connection_state(node1, node2, false)
 
         print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
         print_nodes_activity_states()
@@ -190,7 +212,7 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         node2:exec(function(replication)
             box.cfg{replication = replication}
         end, {initial_replication})
-        update_node_state(node2, "restored")
+        update_node_connection_state(node1, node2, false)
     
         print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
         print_nodes_activity_states()
@@ -235,6 +257,8 @@ return {
     create_delay_to_write_operations = create_delay_to_write_operations,
     break_connection_between_two_nodes = break_connection_between_two_nodes,
     crash_simulation = crash_simulation,
-    print_nodes_activity_states = print_nodes_activity_states
-
+    print_nodes_activity_states = print_nodes_activity_states,
+    is_node_alive_by_id = is_node_alive_by_id,
+    connection_exists = connection_exists,
+    is_node_alive_by_alias = is_node_alive_by_alias
 }

@@ -1,4 +1,5 @@
-
+local is_node_alive_by_id = require("crash_functions").is_node_alive_by_id
+local connection_exists = require("crash_functions").connection_exists
 
 local function monitor_replication(cg)
     local fiber = require('fiber')
@@ -59,8 +60,12 @@ local function monitor_replication(cg)
                 ----------------------------------------------------------------------------
                 -- Проверка задержек
                 for replica_id, replica in pairs(replication_info) do
+                    if connection_exists(id, replica_id) == false then
+                        goto internal_continue -- skip
+                    end
                     if replica.upstream then
                         local lag = replica.upstream.lag or 0
+                        
                         if lag > 2 then 
                             table.insert(problems, '['..node.alias..'] High lag detected on upstream with replica_' .. replica_id)
                         end
@@ -71,24 +76,28 @@ local function monitor_replication(cg)
                             table.insert(problems, '['..node.alias..'] High lag detected on downstream replica_' .. replica_id)
                         end
                     end
+                    ::internal_continue::
                 end
 
                 ----------------------------------------------------------------------------
                 -- Проверка статуса соединений
                 for replica_id, replica in pairs(replication_info) do
+                    if is_node_alive_by_id(replica_id) == false or connection_exists(id, replica_id) == false then
+                        goto next_iteration
+                    end
                     if replica.upstream and replica.upstream.status == 'disconnected' then
                         table.insert(problems, '['..node.alias..'] Upstream disconnected for node ' .. replica_id)
                     end
                     if replica.downstream and replica.downstream.status == 'disconnected' then
                         table.insert(problems, '['..node.alias..'] Downstream disconnected for node ' .. replica_id)
                     end
+                    ::next_iteration::
                 end
 
                 ::continue::
             end
 
             ----------------------------------------------------------------------------
-            print("[REPLICATION MONITOR][CLUSTER] Detected "..tostring(#leaders).." Leaders:")
             for _, leader in ipairs(leaders) do
                 print("[REPLICATION MONITOR][CLUSTER] Leader: "..leader)
             end
@@ -115,7 +124,7 @@ local function monitor_replication(cg)
         end)
 
         if not ok then
-            print('[REPLICATION MONITOR] [Error] ', json.encode(err))
+            print('[REPLICATION MONITOR] [Error] ', err)
         end
 
         fiber.sleep(monitor_config.check_interval)

@@ -5,6 +5,8 @@ local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
 local tools = require("tools")
 local json = require("json")
+local is_node_alive_by_alias = require("crash_functions").is_node_alive_by_alias
+local SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
 
 
 -- Function for reading the xlog
@@ -76,9 +78,11 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
 
                     if status then
                         success = true
-                        print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
-                                ", value: " .. value ..
-                                ", into space: '" .. space_name .. "'")
+                        if SUCCESSFUL_LOGS then
+                            print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
+                                    ", value: " .. value ..
+                                    ", into space: '" .. space_name .. "'")
+                        end
                         key = key + step
                     else
                         print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
@@ -117,7 +121,7 @@ local function get_last_n_entries(node, space_name, n)
         end, {space_name, n})
     end)
 
-    if not success then
+    if not success and is_node_alive_by_alias(node) then
         print(string.format("[GET LAST ENTRIES][Error][Node %s] %s", node.alias, json.encode(result)))
         return nil
     end
@@ -207,6 +211,7 @@ end
 -- Function of monitoring the number of divergent entries in logs
 local function divergence_monitor(cg, space_name, n, step, interval)
     fiber.create(function()
+        count = 0
         while true do
             local valid_nodes = {}
             -- Wrapped the entire cycle in pcall for safe execution
@@ -224,7 +229,11 @@ local function divergence_monitor(cg, space_name, n, step, interval)
 
                     for _, node in ipairs(valid_nodes) do
                         local success, result = pcall(function()
-                            return get_last_n_entries(node, space_name, n)
+                            if  n < count  then
+                                return get_last_n_entries(node, space_name, n)
+                            else
+                                return  get_last_n_entries(node, space_name, count)
+                            end
                         end)
 
                         if success then
@@ -242,8 +251,10 @@ local function divergence_monitor(cg, space_name, n, step, interval)
 
                     if all_entries_recieved then
                         local common_length = find_max_common_length(entries_by_node, step)
-                        local divergence = n - common_length
-                        print(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        local divergence = n - common_length    
+                        if SUCCESSFUL_LOGS then
+                            print(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        end
                     else
                         print("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
                     end
@@ -256,6 +267,7 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                 print("[DIVERGENCE MONITOR][Error]" .. json.encode(err))
             end
             fiber.sleep(interval)
+            count = count + 1
         end
     end)
 end
