@@ -32,6 +32,7 @@
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
 #include <stddef.h>
 #include <sys/types.h>
 
@@ -364,7 +365,7 @@ rtree_rect_equal_to_rect(const struct rtree_rect *rt1,
 			 unsigned dimension)
 {
 	for (int i = dimension * 2; --i >= 0; )
-		if (rt1->coords[i] != rt2->coords[i])
+		if (fabs(rt1->coords[i] - rt2->coords[i]) > 0.000001f)
 			return false;
 	return true;
 }
@@ -946,7 +947,7 @@ rtree_iterator_next(struct rtree_iterator *itr)
 {
 	/* Is used for pagination */
 	static bool flag_find_pos = false;
-	if (itr->current_pos_distance > 0.0000001f) {
+	if (itr->current_pos_distance > 0.000001f) {
 		if (flag_find_pos == true && itr->set_position == false) 
 			flag_find_pos = false;
 	}
@@ -977,13 +978,13 @@ rtree_iterator_next(struct rtree_iterator *itr)
 			rtnt_remove(&itr->neigh_tree, neighbor);
 			
 			/* Pagination optimisaion */
-			if (itr->current_pos_distance > 0.0000001f &&
+			if (itr->current_pos_distance > 0.000001f &&
 				neighbor->distance_max < itr->current_pos_distance) 
 				continue;
 
 			if (neighbor->level == 0) {
 				/* Pagination implementation */
-				if (itr->current_pos_distance > 0.0000001f) {
+				if (itr->current_pos_distance > 0.000001f) {
 					if (neighbor->distance < itr->current_pos_distance)
 						continue;
 					if (flag_find_pos == false) {
@@ -1170,7 +1171,6 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		itr->leaf_cmp = rtree_rect_strict_holds_rect;
 		break;
 	case SOP_NEIGHBOR:  
-		printf("--- search nb ---\n");
 		if (tree->root) {
 			struct rtree_rect cover;
 			rtree_page_cover(tree, tree->root, &cover);
@@ -1182,7 +1182,6 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 				distance_max = 
 					rtree_rect_neigh_distance_max2(&cover, rect,
 							   tree->dimension);
-				printf("--- distance 1 ---\n");
 			}
 			else {	/* RTREE_MANHATTAN */
 				distance =
