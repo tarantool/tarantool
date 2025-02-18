@@ -11,34 +11,15 @@ local log_handling = require('log_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
 local clock = require('clock')
+logger = require('log')
+os.remove('working_log.log')
+logger.cfg { log = 'working_log.log' }
 
 
+-- io.output(assert(io.open("working_log.log", "w")))
 
-io.output(assert(io.open("working_log.log", "w")))
 
-
-function print(...)
-    -- Returns one float, e.g. 1676141234.123456
-    local now = clock.realtime()
-
-    -- Integer part = seconds since epoch
-    local sec = math.floor(now)
-
-    -- Fraction part = fractional seconds
-    local fraction = now - sec
-    
-    -- Convert fraction to integer nanoseconds
-    local nsec = math.floor(fraction * 1e9)
-
-    -- Format date string "[YYYY-MM-DD HH:MM:SS]"
-    local date_str = os.date("%Y-%m-%d %H:%M:%S", sec)
-
-    -- Format the nanoseconds as zero-padded 9 digits
-    local nsec_str = string.format("%09d", nsec)
-    
-    -- Final timestamp like: [2025-02-11 14:25:01.123456789]
-    local dt = string.format("[%s.%s]", date_str, nsec_str)
-
+function log_info(...)
     -- Concatenate all arguments
     local t = {}
     for i = 1, select("#", ...) do
@@ -46,14 +27,28 @@ function print(...)
     end
     local msg = table.concat(t, "\t")
 
-    -- Print to stdout with a newline
-    io.write(string.format("%s %s\n", dt, msg))
+    -- log_info to stdout with a newline
+    logger.info(string.format("%s %s\n", t, msg))
+end
+
+function log_error(...)
+    -- Concatenate all arguments
+    local t = {}
+    for i = 1, select("#", ...) do
+        t[i] = tostring(select(i, ...))
+    end
+    local msg = table.concat(t, "\t")
+
+    -- log_info to stdout with a newline
+    logger.error(string.format("%s %s\n", t, msg))
 end
 
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
 local cg = random_cluster.rand_cluster(5)
+fiber.sleep(20)
+
 
 box.cfg {
     checkpoint_count = 2,
@@ -68,14 +63,14 @@ for _, node in ipairs(cg.replicas) do
     local node_state = node:exec(function()
         return box.info.election.state
     end)
-    print(string.format("Node %s is %s", node.alias, tostring(node_state)))
+    log_info(string.format("Node %s is %s", node.alias, tostring(node_state)))
     crash_functions.update_node_state(node, "active")
 end
 
 
 -- Finding the leader node
-local leader_node = cg.cluster:get_leader()
-if not leader_node then
+local leader_node = tools.get_leader(cg.replicas)
+if leader_node == nil then
     error("The leader has not been found. Make sure that replication and elections are configured!!!")
 end
 
@@ -104,9 +99,9 @@ local result = leader_node:exec(function()
     return message
 end)
 
-print(result)
+log_info(result)
 
-print("[[PERIODIC INSERT] Started")
+log_info("[[PERIODIC INSERT] Started")
 log_handling.periodic_insert(
     cg,
     "test",
@@ -115,7 +110,7 @@ log_handling.periodic_insert(
     0.1
 )
 
-print("[DIVERGENCE MONITOR] Started")
+log_info("[DIVERGENCE MONITOR] Started")
 log_handling.divergence_monitor(
     cg,
     "test",
@@ -125,7 +120,7 @@ log_handling.divergence_monitor(
 )
 
 
-print("[CRASH SIMULATION] Started")
+log_info("[CRASH SIMULATION] Started")
 local crash_time = 5 -- Crash-specific time, which sets the increased frequency of crashes
 crash_functions.crash_simulation(
     cg,
@@ -136,6 +131,6 @@ crash_functions.crash_simulation(
     2 * crash_time
 )
 
-print("[REPLICATION MONITOR] Started")
+log_info("[REPLICATION MONITOR] Started")
 fiber.create(function(cg) replication_errors.run_replication_monitor(cg) end, cg)
 
