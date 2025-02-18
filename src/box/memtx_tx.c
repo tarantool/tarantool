@@ -1614,6 +1614,11 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 	if (pos == mh_end(ht))
 		return;
 	struct point_hole_item *item = *mh_point_holes_node(ht, pos);
+	/*
+	 * Remove from the storage before deleting the element because
+	 * it still can be used under the hood.
+	 */
+	mh_point_holes_del(ht, pos, 0);
 
 	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	bool has_more_items;
@@ -1631,8 +1636,6 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 
 		item = next_item;
 	} while (has_more_items);
-
-	mh_point_holes_del(ht, pos, 0);
 }
 
 static bool
@@ -3328,12 +3331,10 @@ point_hole_storage_delete(struct point_hole_item *object)
 		 * Hash table point to this item, and it's the last in the
 		 * list. We have to remove the item from the hash table.
 		 */
-		int exist = 0;
-		const struct point_hole_item **put =
-			(const struct point_hole_item **) &object;
-		mh_int_t pos = mh_point_holes_put_slot(txm.point_holes, put,
-						       &exist, 0);
-		assert(exist);
+		const struct point_hole_item **key =
+			(const struct point_hole_item **)&object;
+		mh_int_t pos = mh_point_holes_get(txm.point_holes, key, 0);
+		assert(pos != mh_end(txm.point_holes));
 		mh_point_holes_del(txm.point_holes, pos, 0);
 	}
 	rlist_del(&object->in_point_holes_list);
