@@ -1022,9 +1022,28 @@ vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry,
 		itr->last_cached = vy_entry_none();
 		return;
 	}
-	vy_cache_add(&itr->lsm->cache, entry, itr->last_cached,
-		     itr->is_first_cached,
-		     MAX(itr->cache_link_lsn, skipped_lsn),
+	struct vy_entry prev;
+	bool is_first;
+	int64_t link_lsn;
+	if (vy_lsn_is_prepared(skipped_lsn)) {
+		/*
+		 * Do not create a cache chain link if we skipped a tuple
+		 * overwritten by a prepared (not yet confirmed by WAL)
+		 * statement, because if the statement is rolled back due
+		 * to a WAL error, the secondary index cache won't be
+		 * invalidated (since the secondary index DELETE is deferred
+		 * hence not present in the transaction write set) therefore
+		 * the link wouldn't be deleted.
+		 */
+		prev = vy_entry_none();
+		is_first = false;
+		link_lsn = 0;
+	} else {
+		prev = itr->last_cached;
+		is_first = itr->is_first_cached;
+		link_lsn = MAX(itr->cache_link_lsn, skipped_lsn);
+	}
+	vy_cache_add(&itr->lsm->cache, entry, prev, is_first, link_lsn,
 		     itr->key, itr->iterator_type);
 	if (entry.stmt != NULL)
 		tuple_ref(entry.stmt);
