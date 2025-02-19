@@ -126,7 +126,7 @@ sysview_index_create_iterator(struct index *base, enum iterator_type type,
 	 * It is possible to change a source space without changing
 	 * the view.
 	 */
-	if (key_validate(pk->def, type, key, part_count))
+	if (iterator_validate(pk->def, type, key, part_count))
 		return NULL;
 
 	struct sysview_iterator *it = mempool_alloc(&sysview->iterator_pool);

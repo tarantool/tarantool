@@ -3886,7 +3886,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	struct vy_lsm *lsm = vy_lsm(base);
 	struct vy_env *env = vy_env(base->engine);
 
-	if (type > ITER_GT) {
+	if (type == ITER_NP || type == ITER_PP) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
 		return NULL;

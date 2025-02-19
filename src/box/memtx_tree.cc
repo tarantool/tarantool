@@ -222,33 +222,14 @@ struct memtx_tree_index {
 /* {{{ Utilities. *************************************************/
 
 /**
- * Verifies the lookup options, canonicalizes the iterator type and key.
- *
- * @retval 0 on success;
- * @retval -1 on verification failure.
+ * Canonicalizes the iterator type and key.
  */
-static int
-canonicalize_lookup(struct index_def *def, enum iterator_type *type,
+static void
+canonicalize_lookup(enum iterator_type *type,
 		    const char **key, uint32_t part_count)
 {
 	assert(part_count == 0 || *key != NULL);
 	assert(*type >= 0 && *type < iterator_type_MAX);
-
-	static_assert(iterator_type_MAX < 32, "Too big for bit logic");
-	const uint32_t supported_mask = ((1u << (ITER_GT + 1)) - 1) |
-		(1u << ITER_NP) | (1u << ITER_PP);
-	if (((1u << *type) & supported_mask) == 0) {
-		diag_set(UnsupportedIndexFeature, def,
-			 "requested iterator type");
-		return -1;
-	}
-
-	if ((*type == ITER_NP || *type == ITER_PP) && part_count > 0 &&
-	    def->key_def->parts[part_count - 1].coll != NULL) {
-		diag_set(UnsupportedIndexFeature, def,
-			 "requested iterator type along with collation");
-		return -1;
-	}
 
 	if (part_count == 0) {
 		/*
@@ -261,8 +242,6 @@ canonicalize_lookup(struct index_def *def, enum iterator_type *type,
 
 	if (*type == ITER_ALL)
 		*type = ITER_GE;
-
-	return 0;
 }
 
 template <class TREE>
@@ -1265,8 +1244,7 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 
-	if (canonicalize_lookup(base->def, &type, &key, part_count) == -1)
-		return -1;
+	canonicalize_lookup(&type, &key, part_count);
 
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
@@ -1969,8 +1947,7 @@ memtx_tree_index_create_iterator_with_offset(
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 
-	if (canonicalize_lookup(base->def, &type, &key, part_count) == -1)
-		return NULL;
+	canonicalize_lookup(&type, &key, part_count);
 
 	ERROR_INJECT(ERRINJ_INDEX_ITERATOR_NEW, {
 		diag_set(ClientError, ER_INJECTION, "iterator fail");

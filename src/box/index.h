@@ -435,20 +435,20 @@ void
 iterator_delete(struct iterator *it);
 
 /**
- * Check that the key has correct part count and correct part size
- * for use in an index iterator.
+ * Checks that the iteration parameters are consistent and compatible with
+ * the index type.
  *
  * @param index_def key definition
  * @param type iterator type (see enum iterator_type)
  * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
  *
- * @retval 0  The key is valid.
- * @retval -1 The key is invalid.
+ * @retval 0  The iterator is valid.
+ * @retval -1 The iterator is invalid.
  */
 int
-key_validate(const struct index_def *index_def, enum iterator_type type,
-	     const char *key, uint32_t part_count);
+iterator_validate(struct index_def *index_def, enum iterator_type type,
+		  const char *key, uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for a search in a unique
