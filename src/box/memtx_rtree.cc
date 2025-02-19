@@ -339,11 +339,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
-		if (type != ITER_ALL) {
-			diag_set(UnsupportedIndexFeature, base->def,
-				 "empty keys for requested iterator type");
-			return NULL;
-		}
+		assert(type == ITER_ALL);
 	} else if (mp_decode_rect_from_key(&rect, index->dimension,
 					   key, part_count)) {
 		return NULL;
@@ -376,9 +372,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 		op = SOP_NEIGHBOR;
 		break;
 	default:
-		diag_set(UnsupportedIndexFeature, base->def,
-			 "requested iterator type");
-		return NULL;
+		unreachable();
 	}
 
 	struct index_rtree_iterator *it = (struct index_rtree_iterator *)

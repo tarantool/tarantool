@@ -414,9 +414,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 						  bitset_key_size);
 		break;
 	default:
-		diag_set(UnsupportedIndexFeature, base->def,
-			 "requested iterator type");
-		goto fail;
+		unreachable();
 	}
 
 	if (rc != 0) {
@@ -449,7 +447,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	if (type == ITER_ALL)
 		return memtx_bitset_index_size(base);
 
-	assert(part_count == 1); /* checked by key_validate() */
+	assert(part_count == 1); /* checked by iterator_validate() */
 	uint32_t bitset_key_size = 0;
 	const void *bitset_key = make_key(key, &bitset_key_size);
 	struct bit_iterator bit_it;
