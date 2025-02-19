@@ -487,10 +487,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	default:
-		diag_set(UnsupportedIndexFeature, base->def,
-			 "requested iterator type");
-		mempool_free(&memtx->iterator_pool, it);
-		return NULL;
+		unreachable();
 	}
 	it->base.next = memtx_iterator_next;
 	it->base.position = generic_iterator_position;

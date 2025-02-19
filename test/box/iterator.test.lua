@@ -113,7 +113,7 @@ for i = 0,5 do space:insert{i} end
 
 space:select(2)
 space:select(5, {iterator="GE"})
-space:select(nil, {iterator="GE"})
+space:select(nil, {iterator="EQ"})
 space:select(5, {iterator="GT"})
 l = space:select(nil, {limit=2, iterator="GT"})
 l

@@ -304,7 +304,7 @@ space:select(5, {iterator="GE"})
 - error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested
     iterator type
 ...
-space:select(nil, {iterator="GE"})
+space:select(nil, {iterator="EQ"})
 ---
 - error: HASH index  does not support selects via a partial key (expected 1 parts,
     got 0). Please Consider changing index type to TREE.

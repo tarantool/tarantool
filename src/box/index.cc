@@ -99,9 +99,38 @@ error_set_index(struct error *error, const struct index_def *index_def)
 }
 
 int
-key_validate(const struct index_def *index_def, enum iterator_type type,
-	     const char *key, uint32_t part_count)
+iterator_validate(struct index_def *index_def, enum iterator_type type,
+		  const char *key, uint32_t part_count)
 {
+	static_assert(iterator_type_MAX < 32, "Too big for bit logic");
+	static uint32_t supported_types[index_type_MAX] = {
+		/* [HASH] = */ (1U << ITER_ALL) |
+			(1U << ITER_EQ) | (1U << ITER_GT),
+		/* [TREE] = */ (1U << ITER_ALL) |
+			(1U << ITER_EQ) | (1U << ITER_REQ) |
+			(1U << ITER_LT) | (1U << ITER_LE) |
+			(1U << ITER_GT) | (1U << ITER_GE) |
+			(1U << ITER_NP) | (1U << ITER_PP),
+		/* [BITSET] = */ (1U << ITER_ALL) | (1U << ITER_EQ) |
+			(1U << ITER_BITS_ALL_SET) | (1U << ITER_BITS_ANY_SET) |
+			(1U << ITER_BITS_ALL_NOT_SET),
+		/* [RTREE] = */ (1U << ITER_ALL) | (1U << ITER_EQ) |
+			(1U << ITER_LT) | (1U << ITER_LE) |
+			(1U << ITER_GT) | (1U << ITER_GE) |
+			(1U << ITER_OVERLAPS) | (1U << ITER_NEIGHBOR),
+	};
+	if (((1U << type) & supported_types[index_def->type]) == 0) {
+		diag_set(UnsupportedIndexFeature, index_def,
+			 "requested iterator type");
+		return -1;
+	}
+	if ((type == ITER_NP || type == ITER_PP) && part_count > 0 &&
+	    index_def->key_def->parts[part_count - 1].coll != NULL) {
+		diag_set(UnsupportedIndexFeature, index_def,
+			 "requested iterator type along with collation");
+		return -1;
+	}
+
 	const char *key_begin = key;
 	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
@@ -409,7 +438,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	}
 	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, ITER_GE, key, part_count))
+	if (iterator_validate(index->def, ITER_GE, key, part_count))
 		return -1;
 	box_run_on_select(space, index, ITER_GE, key_array);
 	/* Start transaction in the engine. */
@@ -443,7 +472,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	}
 	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, ITER_LE, key, part_count))
+	if (iterator_validate(index->def, ITER_LE, key, part_count))
 		return -1;
 	box_run_on_select(space, index, ITER_LE, key_array);
 	/* Start transaction in the engine. */
@@ -476,7 +505,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, itype, key, part_count))
+	if (iterator_validate(index->def, itype, key, part_count))
 		return -1;
 	/* Start transaction in the engine. */
 	struct txn *txn;
@@ -514,7 +543,7 @@ box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
 	const char *key_array = key;
 	assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(index->def, itype, key, part_count))
+	if (iterator_validate(index->def, itype, key, part_count))
 		return NULL;
 	const char *pos, *pos_end;
 	char *pos_buf = NULL;
