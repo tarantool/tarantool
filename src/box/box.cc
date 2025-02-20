@@ -101,6 +101,7 @@
 #include "tt_sort.h"
 #include "event.h"
 #include "tweaks.h"
+#include "replication_async_repair_queue.h"
 
 static char status[64] = "unconfigured";
 
@@ -349,7 +350,8 @@ box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
 	is_ro_summary = is_ro || is_orphan || raft_is_ro(box_raft()) ||
-			txn_limbo_is_ro(&txn_limbo);
+			txn_limbo_is_ro(&txn_limbo) ||
+			replication_async_repair_queue_is_ro();
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -373,6 +375,8 @@ box_ro_reason(void)
 		return "config";
 	if (is_orphan)
 		return "orphan";
+	if (replication_async_repair_queue_is_ro())
+		return "asynchronous replication repair queue";
 	return NULL;
 }
 
@@ -450,6 +454,9 @@ box_check_writable(void)
 			error_append_msg(e, "box.cfg.read_only is true");
 		else if (is_orphan)
 			error_append_msg(e, "it is an orphan");
+		else if (replication_async_repair_queue_is_ro())
+			error_append_msg(e, "asynchronous replication repair "
+					 "queue is not empty");
 		else
 			assert(false);
 	}
@@ -831,8 +838,8 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 	assert(txn != NULL);
 	if (!row->is_commit)
 		return 0;
-	if (row->wait_ack)
-		box_txn_make_sync();
+	txn_set_xrow_flags(row->flags);
+	txn_recovery_set_limbo_policy();
 	/*
 	 * For fully local transactions the TSN check won't work like for global
 	 * transactions, because it is not known if there are global rows until

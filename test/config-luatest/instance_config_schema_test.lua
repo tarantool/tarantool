@@ -1116,6 +1116,7 @@ g.test_snapshot = function()
 end
 
 g.test_replication = function()
+    t.tarantool.skip_if_enterprise()
     local iconfig = {
         replication = {
             failover = 'off',
@@ -1166,6 +1167,65 @@ g.test_replication = function()
         autoexpel = {
             enabled = false,
         },
+    }
+    local res = instance_config:apply_default({}).replication
+    t.assert_equals(res, exp)
+end
+
+g.test_replication_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        replication = {
+            failover = 'off',
+            peers = {'one', 'two'},
+            anon = true,
+            anon_ttl = 1,
+            threads = 1,
+            timeout = 1,
+            synchro_timeout = 1,
+            synchro_queue_max_size = 1,
+            connect_timeout = 1,
+            sync_timeout = 1,
+            sync_lag = 1,
+            synchro_quorum = 1,
+            skip_conflict = true,
+            election_mode = 'off',
+            election_timeout = 1,
+            election_fencing_mode = 'off',
+            bootstrap_strategy = 'auto',
+            autoexpel = {
+                enabled = true,
+                by = 'prefix',
+                prefix = 'i-',
+            },
+            async_repair_queue_enabled = false,
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.replication,
+                    instance_config.schema.fields.replication)
+
+    local exp = {
+        failover = 'off',
+        anon = false,
+        anon_ttl = 60 * 60,
+        threads = 1,
+        timeout = 1,
+        synchro_timeout = 5,
+        synchro_queue_max_size = 16777216,
+        connect_timeout = 30,
+        sync_timeout = box.NULL,
+        sync_lag = 10,
+        synchro_quorum = 'N / 2 + 1',
+        skip_conflict = false,
+        election_mode = box.NULL,
+        election_timeout = 5,
+        election_fencing_mode = 'soft',
+        bootstrap_strategy = 'auto',
+        autoexpel = {
+            enabled = false,
+        },
+        async_repair_queue_enabled = false,
     }
     local res = instance_config:apply_default({}).replication
     t.assert_equals(res, exp)

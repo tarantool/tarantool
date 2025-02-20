@@ -52,6 +52,7 @@
 #include "box/session.h"
 #include "box/iproto_features.h"
 #include "core/mp_ctx.h"
+#include "box/tuple.h"
 
 /**
  * Handlers identifiers to obtain lua_Cfunction reference from

@@ -85,6 +85,7 @@
 #include "box/lua/failover.h"
 #include "box/lua/integrity.h"
 #include "box/lua/config/extras.h"
+#include "box/lua/replication_async_repair_queue.h"
 
 #include "mpstream/mpstream.h"
 
@@ -227,6 +228,7 @@ static const char *lua_sources[] = {
 	READ_VIEW_BOX_LUA_MODULES
 	SECURITY_BOX_LUA_MODULES
 	INTEGRITY_BOX_LUA_MODULES
+	REPLICATION_ASYNC_REPAIR_QUEUE_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,

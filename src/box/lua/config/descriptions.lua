@@ -2016,6 +2016,18 @@ I['replication.timeout'] = format_text([[
     tries to reconnect to the master.
 ]])
 
+I['replication.async_repair_queue_enabled'] = format_text([[
+    Enables the asynchronous replication repair queue (EE only).
+
+    If an asynchronously committed transaction stored in the synchronous queue
+    gets rolled back to prevent a split brain, its statements are stored in the
+    _replication_async_repair_queue space. When this space is not empty and the
+    feature is enabled, an alert is shown in box.info.cfg.alerts, and the node
+    becomes read-only. The alert is removed and the node stops being read-only
+    when the space becomes empty (modification of local spaces is allowed in
+    read-only mode).
+]])
+
 -- }}} replication configuration
 
 -- {{{ roles configuration

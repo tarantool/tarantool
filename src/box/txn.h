@@ -96,7 +96,9 @@ enum txn_flag {
 	 * A transaction may be forced to be asynchronous, not
 	 * wait for any ACKs, and not depend on prepending sync
 	 * transactions. This happens in a few special cases. For
-	 * example, when applier receives snapshot from master.
+	 * example, when applier receives snapshot from master. This also
+	 * happens during recovery of all transactions that did not go through
+	 * the limbo at commit time.
 	 */
 	TXN_FORCE_ASYNC = 0x40,
 	/**
@@ -566,6 +568,18 @@ txn_set_flags(struct txn *txn, unsigned int flags)
 {
 	txn->flags |= flags;
 }
+
+/**
+ * Set flags from xrow on the transaction.
+ */
+void
+txn_set_xrow_flags(uint8_t xrow_flags);
+
+/**
+ * Set the limbo policy for recovering the transaction.
+ */
+void
+txn_recovery_set_limbo_policy(void);
 
 static inline void
 txn_clear_flags(struct txn *txn, unsigned int flags)
