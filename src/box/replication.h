@@ -356,10 +356,15 @@ struct replicaset {
 		int loading;
 		/**
 		 * Number of appliers that have successfully
+		 * synchronized.
+		 */
+		int synced;
+		/**
+		 * Number of appliers that have successfully
 		 * synchronized and hence contribute to the
 		 * quorum.
 		 */
-		int synced;
+		int synced_and_part_of_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
@@ -671,8 +676,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Reload replica URIs.
  *

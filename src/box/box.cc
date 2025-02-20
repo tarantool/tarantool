@@ -2095,7 +2095,7 @@ box_set_election_fencing_mode(void)
  * don't start appliers.
  */
 static void
-box_sync_replication(bool do_quorum, bool do_reuse)
+box_sync_replication(bool demand_quorum, bool keep_connect, bool wait_all)
 {
 	struct uri_set uri_set;
 	int rc = cfg_get_uri_set("replication", &uri_set);
@@ -2104,15 +2104,16 @@ box_sync_replication(bool do_quorum, bool do_reuse)
 	auto uri_set_guard = make_scoped_guard([&]{
 		uri_set_destroy(&uri_set);
 	});
-	replicaset_connect(&uri_set, do_quorum, do_reuse);
+	replicaset_connect(&uri_set, demand_quorum, keep_connect, wait_all);
 }
 
 static inline void
 box_restart_replication(void)
 {
-	const bool do_quorum = true;
-	const bool do_reuse = false;
-	box_sync_replication(do_quorum, do_reuse);
+	const bool demand_quorum = true;
+	const bool keep_connect = false;
+	const bool wait_all = true;
+	box_sync_replication(demand_quorum, keep_connect, wait_all);
 }
 
 static inline void
@@ -2124,9 +2125,11 @@ box_update_replication(void)
 	 * In every other mode, try to connect to everyone during the given time
 	 * period, but do not fail even if no connections were established.
 	 */
-	const bool do_quorum = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
-	const bool do_reuse = true;
-	box_sync_replication(do_quorum, do_reuse);
+	const bool demand_quorum =
+		bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
+	const bool keep_connect = true;
+	const bool wait_all = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
+	box_sync_replication(demand_quorum, keep_connect, wait_all);
 }
 
 void
@@ -5832,6 +5835,8 @@ box_cfg_xc(void)
 		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
 	box_broadcast_ballot();
+
+	box_set_orphan(true);
 	/*
 	 * Must be set before opening the server port, because it may be
 	 * requested by a client before the configuration is completed.
@@ -5970,27 +5975,33 @@ box_cfg_xc(void)
 
 	if (!is_bootstrap_leader) {
 		replicaset_sync();
-	} else if (box_election_mode == ELECTION_MODE_CANDIDATE ||
-		   box_election_mode == ELECTION_MODE_MANUAL) {
-		/*
-		 * When the cluster is just bootstrapped and this instance is a
-		 * leader, it makes no sense to wait for a leader appearance.
-		 * There is no one. Moreover this node *is* a leader, so it
-		 * should take the control over the situation and start a new
-		 * term immediately.
-		 */
-		int rc = box_raft_try_promote();
-		if (raft->leader != instance_id && raft->leader != 0) {
+	} else {
+		box_set_orphan(false);
+
+		if (box_election_mode == ELECTION_MODE_CANDIDATE ||
+		    box_election_mode == ELECTION_MODE_MANUAL) {
 			/*
-			 * It was promoted and is a single registered node -
-			 * there can't be another leader or a new term bump.
+			 * When the cluster is just bootstrapped and this
+			 * instance is a leader, it makes no sense to wait for
+			 * a leader appearance. There is no one. Moreover, this
+			 * node *is* a leader, so it should take the control
+			 * over the situation and start a new term immediately.
 			 */
-			panic("Bootstrap master couldn't elect self as a "
-			      "leader. Leader is %u, term is %llu",
-			      raft->leader, (long long)raft->volatile_term);
+			int rc = box_raft_try_promote();
+			if (raft->leader != instance_id && raft->leader != 0) {
+				/*
+				 * It was promoted and is a single registered
+				 * node - there can't be another leader
+				 * or a new term bump.
+				 */
+				panic("Bootstrap master couldn't elect self as a "
+				      "leader. Leader is %u, term is %llu",
+				      raft->leader,
+				      (long long)raft->volatile_term);
+			}
+			assert(rc == 0);
+			(void)rc;
 		}
-		assert(rc == 0);
-		(void)rc;
 	}
 
 	/* box.cfg.read_only is not read yet. */
