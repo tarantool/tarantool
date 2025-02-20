@@ -661,38 +661,6 @@ cleanup:
 	return 1;
 }
 
-/**
- * Find a tuple field by JSON path. If a field was not found and a
- * path contains JSON syntax errors, then an exception is raised.
- * @param L Lua state.
- * @param tuple 1-th argument on a lua stack, tuple to get field
- *        from.
- * @param path 2-th argument on lua stack. Can be field name or a
- *        JSON path to a field.
- *
- * @retval not nil Found field value.
- * @retval     nil A field is NULL or does not exist.
- */
-static int
-lbox_tuple_field_by_path(struct lua_State *L)
-{
-	struct tuple *tuple = luaT_checktuple(L, 1);
-	size_t len;
-	const char *path = luaL_checklstring(L, 2, &len);
-	if (len == 0)
-		return 0;
-	const char *field = tuple_field_raw_by_full_path(tuple_format(tuple),
-							 tuple_data(tuple),
-							 tuple_field_map(tuple),
-							 path, (uint32_t)len,
-							 lua_hashstring(L, 2),
-							 TUPLE_INDEX_BASE);
-	if (field == NULL)
-		return 0;
-	luamp_decode(L, luaL_msgpack_default, &field);
-	return 1;
-}
-
 static int
 lbox_tuple_to_string(struct lua_State *L)
 {
@@ -780,7 +748,6 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{"tuple_to_map", lbox_tuple_to_map},
-	{"tuple_field_by_path", lbox_tuple_field_by_path},
 	{"new", lbox_tuple_new},
 	{"info", lbox_tuple_info},
 	{"tuple_get_format", lbox_tuple_get_format},
