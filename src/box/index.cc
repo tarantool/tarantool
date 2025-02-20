@@ -229,6 +229,57 @@ error:
 	return -1;
 }
 
+bool
+prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
+			      uint32_t part_count, struct key_def *cmp_def,
+			      struct region *region)
+{
+	assert(part_count > 0);
+	assert(*type == ITER_NP || *type == ITER_PP);
+	*type = (*type == ITER_NP) ? ITER_GT : ITER_LT;
+
+	/* PP with ASC and NP with DESC works exactly as LT and GT. */
+	bool part_order = cmp_def->parts[part_count - 1].sort_order;
+	if ((*type == ITER_LT) == (part_order == SORT_ORDER_ASC))
+		return true;
+
+	/* Find the last part of given key. */
+	const char *c = *key;
+	for (uint32_t i = 1; i < part_count; i++)
+		mp_next(&c);
+	/* If the last part is not a string the iterator degrades to GT/LT. */
+	if (mp_typeof(*c) != MP_STR)
+		return true;
+
+	uint32_t str_size = mp_decode_strl(&c);
+	/* Any string logically starts with empty string; iteration is over. */
+	if (str_size == 0)
+		return false;
+	size_t prefix_size = c - *key;
+	size_t total_size = prefix_size + str_size;
+
+	unsigned char *p = (unsigned char *)xregion_alloc(region, total_size);
+	memcpy(p, *key, total_size);
+
+	/* Increase the key to the least greater value. */
+	unsigned char *str = p + prefix_size;
+	for (uint32_t i = str_size - 1; ; i--) {
+		if (str[i] != UCHAR_MAX) {
+			str[i]++;
+			break;
+		} else if (i == 0) {
+			/* If prefix consists of CHAR_MAX, there's no next. */
+			return false;
+		}
+		str[i] = 0;
+	}
+
+	/* With increased key we can continue the GE/LE search. */
+	*type = (*type == ITER_GT) ? ITER_GE : ITER_LE;
+	*key = (char *)p;
+	return true;
+}
+
 int
 index_check_dup(struct index *index, struct tuple *old_tuple,
 		struct tuple *new_tuple, struct tuple *dup_tuple,
