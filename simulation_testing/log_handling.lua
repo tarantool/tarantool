@@ -109,16 +109,19 @@ end
 
 -- Function of getting the last n entries for a space from a node
 local function get_last_n_entries(node, space_name, n)
+    
     local success, result = pcall(function()
-        return node:exec(function(space_name, n)
-            local space = box.space[space_name]
-            if not space then
-                error(string.format("Space '%s' does not exist.", space_name))
-            end
+        if is_node_alive_by_alias(node) then
+            return node:exec(function(space_name, n)
+                local space = box.space[space_name]
+                if not space then
+                    error(string.format("Space '%s' does not exist.", space_name))
+                end
 
-            local entries = space:select(nil, {iterator = 'REQ', limit = n})
-            return entries
-        end, {space_name, n})
+                local entries = space:select(nil, {iterator = 'REQ', limit = n})
+                return entries
+            end, {space_name, n})
+        end
     end)
 
     if not success and is_node_alive_by_alias(node) then
@@ -222,16 +225,18 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                     nodes_activity_states
                 )
 
-                if valid_nodes ~= -1 then
+                if #valid_nodes > 0 then
 
                     local entries_by_node = {}
                     local all_entries_recieved = true
 
                     for _, node in ipairs(valid_nodes) do
+            
                         local success, result = pcall(function()
-                            if  n < count  then
-                                return get_last_n_entries(node, space_name, n)
-                            else
+                            if is_node_alive_by_alias(node) then
+                                if  n < count  then
+                                    return get_last_n_entries(node, space_name, n)
+                                end
                                 return  get_last_n_entries(node, space_name, count)
                             end
                         end)

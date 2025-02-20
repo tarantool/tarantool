@@ -46,7 +46,7 @@ end
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(5)
+local cg = random_cluster.rand_cluster(4)
 fiber.sleep(20)
 
 
