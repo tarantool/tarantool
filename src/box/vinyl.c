@@ -1135,7 +1135,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
+	vy_read_iterator_open(&itr, pk, NULL, ITER_GE, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
 	int loops = 0;
 	struct vy_entry entry;
@@ -3128,7 +3128,7 @@ vy_join_add_space(struct space *space, void *arg)
 			 "malloc", "struct vy_join_entry");
 		return -1;
 	}
-	vy_read_iterator_open(&entry->iterator, lsm, NULL, ITER_ALL,
+	vy_read_iterator_open(&entry->iterator, lsm, NULL, ITER_GE,
 			      lsm->env->empty_key,
 			      (const struct vy_read_view **)&ctx->rv);
 	/*
@@ -3886,12 +3886,6 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	struct vy_lsm *lsm = vy_lsm(base);
 	struct vy_env *env = vy_env(base->engine);
 
-	if (type == ITER_NP || type == ITER_PP) {
-		diag_set(UnsupportedIndexFeature, base->def,
-			 "requested iterator type");
-		return NULL;
-	}
-
 	struct vy_tx *tx = in_txn() ?
 			   in_txn()->engines_tx[base->engine->id] : NULL;
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
@@ -3904,12 +3898,35 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	});
 
-	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
-	if (it == NULL) {
-	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
-			 "mempool", "struct vinyl_iterator");
-		return NULL;
+	struct vinyl_iterator *it = xmempool_alloc(&env->iterator_pool);
+	iterator_create(&it->base, base);
+	it->base.next = exhausted_iterator_next;
+	it->base.position = vinyl_iterator_position;
+	it->base.free = vinyl_iterator_free;
+	it->pool = &env->iterator_pool;
+	it->pos = vy_entry_none();
+
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+
+	/* Normalize the search parameters. */
+	if (part_count == 0) {
+		/*
+		 * Strictly speaking, a GT/LT iterator should return
+		 * nothing if the key is empty, because every key is
+		 * equal to the empty key, but historically we return
+		 * all keys instead. So use GE/LE instead of GT/LT
+		 * in this case.
+		 */
+		type = iterator_direction(type) > 0 ? ITER_GE : ITER_LE;
+	} else if (type == ITER_ALL) {
+		type = ITER_GE;
+	} else if (type == ITER_NP || type == ITER_PP) {
+		if (!prepare_start_prefix_iterator(&type, &key, part_count,
+						   lsm->cmp_def, region))
+			goto out;
 	}
+
 	it->key = vy_entry_key_new(lsm->env->key_format, lsm->cmp_def,
 				   key, part_count);
 	if (it->key.stmt == NULL)
@@ -3924,15 +3941,10 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		last = vy_entry_none();
 	}
 
-	iterator_create(&it->base, base);
 	if (lsm->index_id == 0)
 		it->base.next = vinyl_iterator_primary_next;
 	else
 		it->base.next = vinyl_iterator_secondary_next;
-	it->base.position = vinyl_iterator_position;
-	it->base.free = vinyl_iterator_free;
-	it->pool = &env->iterator_pool;
-	it->pos = vy_entry_none();
 
 	if (tx != NULL) {
 		/*
@@ -3952,12 +3964,15 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	vy_read_iterator_open_after(
 		&it->iterator, lsm, tx, type, it->key, last,
 		(const struct vy_read_view **)&tx->read_view);
+out:
+	region_truncate(region, region_svp);
 	return (struct iterator *)it;
 err_pos:
 	tuple_unref(it->key.stmt);
 err_key:
 	mempool_free(&env->iterator_pool, it);
-	return NULL;
+	it = NULL;
+	goto out;
 }
 
 static int
@@ -4417,7 +4432,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	}
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
+	vy_read_iterator_open(&itr, pk, NULL, ITER_GE, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
 	int loops = 0;
 	struct vy_entry entry;

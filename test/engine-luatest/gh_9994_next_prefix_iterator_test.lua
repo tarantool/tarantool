@@ -1,7 +1,9 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
-local g = t.group()
+local g = t.group('next_prefix_iterator', t.helpers.matrix({
+    engine = {'memtx', 'vinyl'},
+}))
 
 g.before_all(function(cg)
     cg.server = server:new()
@@ -10,6 +12,12 @@ end)
 
 g.after_all(function(cg)
     cg.server:drop()
+end)
+
+g.before_each(function(cg)
+    cg.server:exec(function(params)
+        box.schema.space.create('test', {engine = params.engine})
+    end, {cg.params})
 end)
 
 g.after_each(function(cg)
@@ -23,38 +31,46 @@ g.after_each(function(cg)
     end)
 end)
 
--- Check some cases when NP and PP iterators are unsupported..
-g.test_next_prefix_unsupported = function(cg)
+g.test_next_prefix_hash_unsupported = function(cg)
+    t.skip_if(cg.params.engine == 'vinyl',
+              'vinyl does not support hash index')
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {type = 'hash', parts = {{1, 'string'}}})
-        local m = "Index 'pk' (HASH) of space 'test' (memtx) " ..
-                  "does not support requested iterator type"
-        t.assert_error_msg_content_equals(m, s.select, s, '', {iterator = 'np'})
-        t.assert_error_msg_content_equals(m, s.select, s, '', {iterator = 'pp'})
+        local err = {
+            type = 'ClientError',
+            code = box.error.UNSUPPORTED_INDEX_FEATURE,
+            space = 'test',
+            index = 'pk',
+            index_type = 'HASH',
+            feature = 'requested iterator type',
+        }
+        t.assert_error_covers(err, s.select, s, '', {iterator = 'np'})
+        t.assert_error_covers(err, s.select, s, '', {iterator = 'pp'})
+    end)
+end
 
-        s:create_index('sk', {parts = {{1, 'str', collation = 'unicode_ci'}}})
-        local i = s.index.sk
-        m = "Index 'sk' (TREE) of space 'test' (memtx) " ..
-            "does not support requested iterator type along with collation"
-        t.assert_error_msg_content_equals(m, i.select, i, '', {iterator = 'np'})
-        t.assert_error_msg_content_equals(m, i.select, i, '', {iterator = 'pp'})
-
-        s:drop()
-        s = box.schema.space.create('test', {engine = 'vinyl'})
-        s:create_index('pk', {parts = {{1, 'string'}}})
-        m = "Index 'pk' (TREE) of space 'test' (vinyl) " ..
-            "does not support requested iterator type"
-        t.assert_error_msg_content_equals(m, s.select, s, '', {iterator = 'np'})
-        t.assert_error_msg_content_equals(m, s.select, s, '', {iterator = 'pp'})
-        s:drop()
+g.test_next_prefix_collation_unsupported = function(cg)
+    cg.server:exec(function()
+        local s = box.space.test
+        s:create_index('pk', {parts = {{1, 'str', collation = 'unicode_ci'}}})
+        local err = {
+            type = 'ClientError',
+            code = box.error.UNSUPPORTED_INDEX_FEATURE,
+            space = 'test',
+            index = 'pk',
+            index_type = 'TREE',
+            feature = 'requested iterator type along with collation',
+        }
+        t.assert_error_covers(err, s.select, s, '', {iterator = 'np'})
+        t.assert_error_covers(err, s.select, s, '', {iterator = 'pp'})
     end)
 end
 
 -- Simple test of next prefix and previous prefix iterators.
 g.test_next_prefix_simple = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {parts = {{1, 'string'}}})
         s:replace{'a'}
         s:replace{'aa'}
@@ -115,7 +131,7 @@ end
 -- Simple test of next prefix and previous prefix iterators with desc order.
 g.test_next_prefix_simple_reverse = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {parts = {{1, 'string', sort_order = 'desc'}}})
         s:replace{'a'}
         s:replace{'aa'}
@@ -176,7 +192,7 @@ end
 -- Next prefix in scalar index.
 g.test_next_prefix_scalar = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {parts = {{1, 'scalar'}}})
         s:replace{1}
         s:replace{2}
@@ -197,8 +213,10 @@ end
 
 -- Next prefix in functional index.
 g.test_next_prefix_func = function(cg)
+    t.skip_if(cg.params.engine == 'vinyl',
+              'vinyl does not support functional index')
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk')
         local body = [[
             function(tuple)
@@ -237,7 +255,7 @@ end
 -- Next prefix in json index.
 g.test_next_prefix_json = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {parts = {{1, 'string', path = 'data'}}})
         s:replace{{data = 'a'}}
         s:replace{{data = 'ab'}}
@@ -256,7 +274,7 @@ end
 -- Strange but valid cases.
 g.test_next_prefix_strange = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:create_index('pk', {parts = {{1, 'unsigned'}, {2, 'string'},
                                        {3, 'unsigned'}}})
         local sk = s:create_index('sk', {parts = {{1, 'unsigned'}}})
@@ -283,9 +301,8 @@ g.test_next_prefix_strange = function(cg)
         -- Previous prefix takes all tuples with string.sub('', 1, 3) < 'a'
         t.assert_equals(s:select({1, 'aaa'}, {iterator = 'pp'}),
                         {{1, 'aa', 1}, {1, 'a', 1}, {1, '', 1}})
-        s:drop()
+        s.index.pk:drop()
 
-        s = box.schema.space.create('test')
         s:create_index('pk', {parts = {{1, 'string'}}})
         s:replace{'\x00'}
         s:replace{'\x00\x00'}
@@ -329,7 +346,7 @@ end
 -- Practical case. List all files and directories in given directory.
 g.test_directory_list = function(cg)
     cg.server:exec(function()
-        local s = box.schema.space.create('test')
+        local s = box.space.test
         s:format{{'division', 'unsigned'},
                  {'path', 'string'},
                  {'version', 'unsigned'}}
