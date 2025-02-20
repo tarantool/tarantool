@@ -2330,7 +2330,7 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 				uint64_t val = mp_decode_uint(&d);
 				if (val >= VCLOCK_MAX)
 					goto id_filter_decode_err;
-				*req->id_filter |= 1 << val;
+				*req->id_filter |= 1ULL << val;
 			}
 			break;
 		case IPROTO_IS_CHECKPOINT_JOIN:
