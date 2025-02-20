@@ -4,8 +4,31 @@ local tools = require("tools")
 
 -- Table for tracking the status of nodes
 nodes_activity_states = {}
-local function update_node_state(node, state)
-    nodes_activity_states[node.alias] = state
+
+nodes_connection_states = {}
+
+
+local function update_node_state(node, connected)
+    nodes_activity_states[node.alias] = connected
+end
+
+local function update_node_connection_state(node1,node2, state)
+    nodes_connection_states[node1.alias..node2.alias] = state
+    nodes_connection_states[node2.alias..node1.alias] = state
+end
+
+local function is_node_alive_by_id(replica_id)
+    return nodes_activity_states["replica_"..tostring(replica_id)] ~= 'crashed'
+end
+
+
+local function is_node_alive_by_alias(node)
+    return nodes_activity_states[node.alias] ~= 'crashed'
+end
+
+
+local function connection_exists(node1_id, node2_id)
+    return nodes_connection_states['replica_'..tostring(node1_id)..'replica_'..tostring(node2_id)] == true
 end
 
 -- The function of getting all workable nodes
@@ -19,8 +42,8 @@ local function get_non_crashed_nodes(nodes, nodes_activity_states)
     end
 
     if #non_crashed_nodes == 0 then
-        print("[NODE FILTER] No non-crashed nodes available.")
-        return -1
+        log_info("[NODE FILTER] No non-crashed nodes available.")
+        return {}
     end
 
     return non_crashed_nodes
@@ -53,16 +76,16 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states)
     local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
     if not is_cluster_healthy(#nodes, new_num_crashed_nodes) then
-        print("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
-        return -1
+        log_info("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
+        return {}
     end
     
     -- Filtering nodes whose state is not equal to "crashed"
     local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states)
 
     if #available_nodes < num_to_select then
-        print("[CRASH SIMULATION] Not enough healthy nodes to select")
-        return -1
+        log_info("[CRASH SIMULATION] Not enough healthy nodes to select")
+        return {}
     end
 
     -- Randomly select nodes
@@ -77,10 +100,10 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
 end
 
 -- For the convenience of logging and debugging node states
-local function print_nodes_activity_states()
-    print("[NODES ACTIVITY STATES] Current states of nodes:")
+local function log_info_nodes_activity_states()
+    log_info("[NODES ACTIVITY STATES] Current states of nodes:")
     for alias, state in pairs(nodes_activity_states) do
-        print(string.format("  - Node: %s, State: %s", alias, state))
+        log_info(string.format("  - Node: %s, State: %s", alias, state))
     end
 end
 
@@ -93,15 +116,15 @@ local function stop_node(node, min_delay, max_delay)
 
         node:stop()
         update_node_state(node, "crashed")
-        print(string.format("[CRASH SIMULATION] Node %s is stopped for a time %s", node.alias, delay))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] Node %s is stopped for a time %s", node.alias, delay))
+        log_info_nodes_activity_states()
 
         fiber.sleep(delay)
 
         node:start()
         update_node_state(node, "restored")
-        print(string.format("[CRASH SIMULATION] Node %s is started again", node.alias))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] Node %s is started again", node.alias))
+        log_info_nodes_activity_states()
     end)
 end
 
@@ -116,8 +139,8 @@ local function create_delay_to_write_operations(node, min_delay, max_delay)
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
         end)
         update_node_state(node, "crashed")
-        print(string.format("[CRASH SIMULATION] The WAL write delay for node %s is set for the time %d", node.alias, delay))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] The WAL write delay for node %s is set for the time %d", node.alias, delay))
+        log_info_nodes_activity_states()
 
         fiber.sleep(delay)
 
@@ -125,8 +148,8 @@ local function create_delay_to_write_operations(node, min_delay, max_delay)
             box.error.injection.set('ERRINJ_WAL_DELAY', false)
         end)
         update_node_state(node, "restored")
-        print(string.format("[CRASH SIMULATION] The WAL write delay for node %s has been removed", node.alias))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] The WAL write delay for node %s has been removed", node.alias))
+        log_info_nodes_activity_states()
     end)
 end
 
@@ -163,7 +186,6 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
             end
             box.cfg{replication = new_replication}
         end, {node2.net_box_uri})
-        update_node_state(node1, "crashed")
 
         node2:exec(function(peer)
             local new_replication = {}
@@ -174,10 +196,10 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
             end
             box.cfg{replication = new_replication}
         end, {node1.net_box_uri})
-        update_node_state(node2, "crashed")
+        update_node_connection_state(node1, node2, false)
 
-        print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] The connection between nodes %s and %s is broken for %d seconds", node1.alias, node2.alias, delay))
+        log_info_nodes_activity_states()
 
         fiber.sleep(delay)
 
@@ -190,10 +212,10 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
         node2:exec(function(replication)
             box.cfg{replication = replication}
         end, {initial_replication})
-        update_node_state(node2, "restored")
+        update_node_connection_state(node1, node2, false)
     
-        print(string.format("[CRASH SIMULATION] The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
-        print_nodes_activity_states()
+        log_info(string.format("[CRASH SIMULATION] The connection between nodes %s and %s has been restored", node1.alias, node2.alias))
+        log_info_nodes_activity_states()
     end)
 end
 
@@ -204,19 +226,19 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             local type_of_crashing = math.random(1, 3)
             if type_of_crashing == 1 then
                 local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-                if crash_node ~= -1 then
+                if #crash_node > 0 then
                     stop_node(crash_node[1], lower_crash_time_bound, upper_crash_time_bound)
                 end
 
             elseif type_of_crashing == 2 then
                 local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-                if crash_node ~= -1 then
+                if #crash_node > 0 then
                     create_delay_to_write_operations(crash_node[1], lower_crash_time_bound, upper_crash_time_bound)
                 end
 
             else
                 local crash_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
-                if crash_nodes ~= -1 then
+                if #crash_nodes > 0 then
                     break_connection_between_two_nodes(crash_nodes, initial_replication, lower_crash_time_bound, upper_crash_time_bound)
                 end
             end
@@ -235,6 +257,8 @@ return {
     create_delay_to_write_operations = create_delay_to_write_operations,
     break_connection_between_two_nodes = break_connection_between_two_nodes,
     crash_simulation = crash_simulation,
-    print_nodes_activity_states = print_nodes_activity_states
-
+    log_info_nodes_activity_states = log_info_nodes_activity_states,
+    is_node_alive_by_id = is_node_alive_by_id,
+    connection_exists = connection_exists,
+    is_node_alive_by_alias = is_node_alive_by_alias
 }

@@ -5,6 +5,8 @@ local randomized_operations = require("randomized_operations")
 local crash_functions = require("crash_functions")
 local tools = require("tools")
 local json = require("json")
+local is_node_alive_by_alias = require("crash_functions").is_node_alive_by_alias
+local SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
 
 
 -- Function for reading the xlog
@@ -57,9 +59,9 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                 
                 local leader_node = tools.get_leader(cg.replicas)
 
-                if not leader_node then
+                if leader_node == nil then
                     local leader_waiting_interval = 1
-                    print("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
+                    log_info("[PERIODIC INSERT] No leader found. Retrying in " .. leader_waiting_interval .. " seconds...")
                     fiber.sleep(leader_waiting_interval)
                 else
                     local value = "Value for key " .. key
@@ -76,16 +78,18 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
 
                     if status then
                         success = true
-                        print("[PERIODIC INSERT] Successfully inserted key: " .. key ..
-                                ", value: " .. value ..
-                                ", into space: '" .. space_name .. "'")
+                        if SUCCESSFUL_LOGS then
+                            log_info("[PERIODIC INSERT] Successfully inserted key: " .. key ..
+                                    ", value: " .. value ..
+                                    ", into space: '" .. space_name .. "'")
+                        end
                         key = key + step
                     else
-                        print("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
+                        log_info("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
                                 key .. ", value: " .. value ..
                                 ", into space: '" .. space_name ..
                                 "'. Retrying in " .. interval .. " seconds...")
-                        print("[PERIODIC INSERT][Error] " .. json.encode(exec_err))
+                        log_error("[PERIODIC INSERT] " .. json.encode(exec_err))
                         fiber.sleep(interval)
                     end
                 
@@ -93,7 +97,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
             end) 
 
             if not ok then
-                print("[PERIODIC INSERT][Error] " .. json.encode(err))
+                log_error("[PERIODIC INSERT] " .. json.encode(err))
             end
 
             -- Делаем паузу перед следующей итерацией цикла
@@ -105,31 +109,34 @@ end
 
 -- Function of getting the last n entries for a space from a node
 local function get_last_n_entries(node, space_name, n)
+    
     local success, result = pcall(function()
-        return node:exec(function(space_name, n)
-            local space = box.space[space_name]
-            if not space then
-                error(string.format("Space '%s' does not exist.", space_name))
-            end
+        if is_node_alive_by_alias(node) then
+            return node:exec(function(space_name, n)
+                local space = box.space[space_name]
+                if not space then
+                    error(string.format("Space '%s' does not exist.", space_name))
+                end
 
-            local entries = space:select(nil, {iterator = 'REQ', limit = n})
-            return entries
-        end, {space_name, n})
+                local entries = space:select(nil, {iterator = 'REQ', limit = n})
+                return entries
+            end, {space_name, n})
+        end
     end)
 
-    if not success then
-        print(string.format("[GET LAST ENTRIES][Error][Node %s] %s", node.alias, json.encode(result)))
+    if not success and is_node_alive_by_alias(node) then
+        log_error(string.format("[GET LAST ENTRIES][Node %s] %s", node.alias, json.encode(result)))
         return nil
     end
 
     if type(result) ~= "table" then
-        print(string.format("[GET LAST ENTRIES][Error][Node %s] Unexpected result format", node.alias))
+        log_error(string.format("[GET LAST ENTRIES][Node %s] Unexpected result format", node.alias))
         return nil
     end
 
     local count = #result
     if count ~= n then
-        print(string.format("[GET LAST ENTRIES][Error][Node %s] Expected %d entries, but got %d", node.alias, n, count))
+        log_error(string.format("[GET LAST ENTRIES][Node %s] Expected %d entries, but got %d", node.alias, n, count))
         return nil
     end
 
@@ -167,13 +174,13 @@ local function find_max_common_length(entries_by_node, step)
                 local last_key = entries[#entries][1]
                 table.insert(intervals, {first_key, last_key})
             else
-                print("[ERROR] The key sequence is not monotonous! Full sequence: " .. table.concat(keys_list, ", "))
+                log_error("[DIVERGENCE MONITOR] The key sequence is not monotonous! Full sequence: " .. table.concat(keys_list, ", "))
             end
         end
     end
 
     if #intervals == 0 then
-        print("No intervals found.")
+        log_info("No intervals found.")
         return 0
     end
 
@@ -207,6 +214,7 @@ end
 -- Function of monitoring the number of divergent entries in logs
 local function divergence_monitor(cg, space_name, n, step, interval)
     fiber.create(function()
+        count = 0
         while true do
             local valid_nodes = {}
             -- Wrapped the entire cycle in pcall for safe execution
@@ -217,45 +225,54 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                     nodes_activity_states
                 )
 
-                if valid_nodes ~= -1 then
+                if #valid_nodes > 0 then
 
                     local entries_by_node = {}
                     local all_entries_recieved = true
 
                     for _, node in ipairs(valid_nodes) do
+            
                         local success, result = pcall(function()
-                            return get_last_n_entries(node, space_name, n)
+                            if is_node_alive_by_alias(node) then
+                                if  n < count  then
+                                    return get_last_n_entries(node, space_name, n)
+                                end
+                                return  get_last_n_entries(node, space_name, count)
+                            end
                         end)
 
                         if success then
                             if result then
                                 entries_by_node[node.alias] = result
                             else
-                                print(string.format("[DIVERGENCE MONITOR] No entries found for node '%s'.", node.alias))
+                                log_info(string.format("[DIVERGENCE MONITOR] No entries found for node '%s'.", node.alias))
                                 all_entries_recieved = false
                             end
                         else
-                            print(string.format("[DIVERGENCE MONITOR] Error fetching entries from node '%s': %s", node.alias, result))
+                            log_info(string.format("[DIVERGENCE MONITOR] Error fetching entries from node '%s': %s", node.alias, result))
                             all_entries_recieved = false
                         end
                     end
 
                     if all_entries_recieved then
                         local common_length = find_max_common_length(entries_by_node, step)
-                        local divergence = n - common_length
-                        print(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        local divergence = n - common_length    
+                        if SUCCESSFUL_LOGS then
+                            log_info(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        end
                     else
-                        print("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
+                        log_info("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
                     end
                 else
-                    print("[DIVERGENCE MONITOR] No valid nodes available. Retrying...")
+                    log_info("[DIVERGENCE MONITOR] No valid nodes available. Retrying...")
                 end
             end)
 
             if not success then
-                print("[DIVERGENCE MONITOR][Error]" .. json.encode(err))
+                log_error("[DIVERGENCE MONITOR]" .. json.encode(err))
             end
             fiber.sleep(interval)
+            count = count + 1
         end
     end)
 end

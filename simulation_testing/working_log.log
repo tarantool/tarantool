@@ -1,238 +1,146 @@
-[2025-02-16 20:48:44.391953945] Directory '/home/edgar/my_tarantool_repo/tarantool/simulation_testing/replicas_dirs' successfully created.
-[2025-02-16 20:48:44.392273426] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	4	
-Replication timeout:	3
-[2025-02-16 20:48:44.394702196] replica_1 added to cluster as 	candidate
-[2025-02-16 20:48:44.395489454] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	3	
-Replication timeout:	7
-[2025-02-16 20:48:44.398337125] replica_2 added to cluster as 	voter
-[2025-02-16 20:48:44.399401664] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	3	
-Replication timeout:	8
-[2025-02-16 20:48:44.401966094] replica_3 added to cluster as 	voter
-[2025-02-16 20:48:44.402534246] Configured replicas:	4	
-Replication URIs:	/tmp/t/rs-J8wFaVcFYT0r/replica_1.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_2.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_3.sock, /tmp/t/rs-J8wFaVcFYT0r/replica_4.sock	
-Synchro quorum:	4	
-Replication timeout:	4
-[2025-02-16 20:48:44.404956340] replica_4 added to cluster as 	candidate
-[2025-02-16 20:49:00.552555799] Node replica_1 is follower
-[2025-02-16 20:49:00.552716970] Node replica_2 is follower
-[2025-02-16 20:49:00.552951335] Node replica_3 is follower
-[2025-02-16 20:49:00.553245544] Node replica_4 is leader
-[2025-02-16 20:49:00.555386304] The 'test' space is created and configured on the leader
-[2025-02-16 20:49:00.555397033] [[PERIODIC INSERT] Started
-[2025-02-16 20:49:00.555458545] [DIVERGENCE MONITOR] Started
-[2025-02-16 20:49:00.555498600] [CRASH SIMULATION] Started
-[2025-02-16 20:49:00.555518627] [REPLICATION MONITOR] Started
-[2025-02-16 20:49:00.563765525] No intervals found.
-[2025-02-16 20:49:00.563800334] [DIVERGENCE MONITOR] Divergence of entries: 100
-[2025-02-16 20:49:00.563816785] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:00.563819885] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:00.563842773] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:00.563844919] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:00.563847780] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:00.563869714] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:00.564545392] [PERIODIC INSERT] Successfully inserted key: 1, value: Value for key 1, into space: 'test'
-[2025-02-16 20:49:00.666534900] [PERIODIC INSERT] Successfully inserted key: 2, value: Value for key 2, into space: 'test'
-[2025-02-16 20:49:00.769205093] [PERIODIC INSERT] Successfully inserted key: 3, value: Value for key 3, into space: 'test'
-[2025-02-16 20:49:00.872451305] [PERIODIC INSERT] Successfully inserted key: 4, value: Value for key 4, into space: 'test'
-[2025-02-16 20:49:00.975149869] [PERIODIC INSERT] Successfully inserted key: 5, value: Value for key 5, into space: 'test'
-[2025-02-16 20:49:01.077749252] [PERIODIC INSERT] Successfully inserted key: 6, value: Value for key 6, into space: 'test'
-[2025-02-16 20:49:01.180952787] [PERIODIC INSERT] Successfully inserted key: 7, value: Value for key 7, into space: 'test'
-[2025-02-16 20:49:01.283597707] [PERIODIC INSERT] Successfully inserted key: 8, value: Value for key 8, into space: 'test'
-[2025-02-16 20:49:01.385771512] [PERIODIC INSERT] Successfully inserted key: 9, value: Value for key 9, into space: 'test'
-[2025-02-16 20:49:01.488099575] [PERIODIC INSERT] Successfully inserted key: 10, value: Value for key 10, into space: 'test'
-[2025-02-16 20:49:01.591040134] [PERIODIC INSERT] Successfully inserted key: 11, value: Value for key 11, into space: 'test'
-[2025-02-16 20:49:01.694041728] [PERIODIC INSERT] Successfully inserted key: 12, value: Value for key 12, into space: 'test'
-[2025-02-16 20:49:01.796692132] [PERIODIC INSERT] Successfully inserted key: 13, value: Value for key 13, into space: 'test'
-[2025-02-16 20:49:01.900078535] [PERIODIC INSERT] Successfully inserted key: 14, value: Value for key 14, into space: 'test'
-[2025-02-16 20:49:02.002310037] [PERIODIC INSERT] Successfully inserted key: 15, value: Value for key 15, into space: 'test'
-[2025-02-16 20:49:02.105143547] [PERIODIC INSERT] Successfully inserted key: 16, value: Value for key 16, into space: 'test'
-[2025-02-16 20:49:02.207823276] [PERIODIC INSERT] Successfully inserted key: 17, value: Value for key 17, into space: 'test'
-[2025-02-16 20:49:02.310543537] [PERIODIC INSERT] Successfully inserted key: 18, value: Value for key 18, into space: 'test'
-[2025-02-16 20:49:02.412749290] [PERIODIC INSERT] Successfully inserted key: 19, value: Value for key 19, into space: 'test'
-[2025-02-16 20:49:02.515519380] [PERIODIC INSERT] Successfully inserted key: 20, value: Value for key 20, into space: 'test'
-[2025-02-16 20:49:02.567213535] [DIVERGENCE MONITOR] Divergence of entries: 80
-[2025-02-16 20:49:02.567236661] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:02.567239284] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:02.567242383] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:02.567244529] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:02.567246437] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:02.567247867] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:02.617876529] [PERIODIC INSERT] Successfully inserted key: 21, value: Value for key 21, into space: 'test'
-[2025-02-16 20:49:02.720702886] [PERIODIC INSERT] Successfully inserted key: 22, value: Value for key 22, into space: 'test'
-[2025-02-16 20:49:02.823952913] [PERIODIC INSERT] Successfully inserted key: 23, value: Value for key 23, into space: 'test'
-[2025-02-16 20:49:02.926414489] [PERIODIC INSERT] Successfully inserted key: 24, value: Value for key 24, into space: 'test'
-[2025-02-16 20:49:03.028825283] [PERIODIC INSERT] Successfully inserted key: 25, value: Value for key 25, into space: 'test'
-[2025-02-16 20:49:03.131871938] [PERIODIC INSERT] Successfully inserted key: 26, value: Value for key 26, into space: 'test'
-[2025-02-16 20:49:03.234776496] [PERIODIC INSERT] Successfully inserted key: 27, value: Value for key 27, into space: 'test'
-[2025-02-16 20:49:03.338283777] [PERIODIC INSERT] Successfully inserted key: 28, value: Value for key 28, into space: 'test'
-[2025-02-16 20:49:03.441165208] [PERIODIC INSERT] Successfully inserted key: 29, value: Value for key 29, into space: 'test'
-[2025-02-16 20:49:03.544161081] [PERIODIC INSERT] Successfully inserted key: 30, value: Value for key 30, into space: 'test'
-[2025-02-16 20:49:03.646845102] [PERIODIC INSERT] Successfully inserted key: 31, value: Value for key 31, into space: 'test'
-[2025-02-16 20:49:03.749600410] [PERIODIC INSERT] Successfully inserted key: 32, value: Value for key 32, into space: 'test'
-[2025-02-16 20:49:03.851942777] [PERIODIC INSERT] Successfully inserted key: 33, value: Value for key 33, into space: 'test'
-[2025-02-16 20:49:03.954576015] [PERIODIC INSERT] Successfully inserted key: 34, value: Value for key 34, into space: 'test'
-[2025-02-16 20:49:04.056789875] [PERIODIC INSERT] Successfully inserted key: 35, value: Value for key 35, into space: 'test'
-[2025-02-16 20:49:04.159590482] [PERIODIC INSERT] Successfully inserted key: 36, value: Value for key 36, into space: 'test'
-[2025-02-16 20:49:04.261237144] [PERIODIC INSERT] Successfully inserted key: 37, value: Value for key 37, into space: 'test'
-[2025-02-16 20:49:04.364038228] [PERIODIC INSERT] Successfully inserted key: 38, value: Value for key 38, into space: 'test'
-[2025-02-16 20:49:04.467139482] [PERIODIC INSERT] Successfully inserted key: 39, value: Value for key 39, into space: 'test'
-[2025-02-16 20:49:04.570681571] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:04.570706367] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:04.570710182] [REPLICATION MONITOR][CLUSTER] Detected 2 Problems:
-[2025-02-16 20:49:04.570713281] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:04.570716142] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:04.570790052] [DIVERGENCE MONITOR] Divergence of entries: 61
-[2025-02-16 20:49:04.571606397] [PERIODIC INSERT] Successfully inserted key: 40, value: Value for key 40, into space: 'test'
-[2025-02-16 20:49:04.673943519] [PERIODIC INSERT] Successfully inserted key: 41, value: Value for key 41, into space: 'test'
-[2025-02-16 20:49:04.777059316] [PERIODIC INSERT] Successfully inserted key: 42, value: Value for key 42, into space: 'test'
-[2025-02-16 20:49:04.879570722] [PERIODIC INSERT] Successfully inserted key: 43, value: Value for key 43, into space: 'test'
-[2025-02-16 20:49:04.981548547] [PERIODIC INSERT] Successfully inserted key: 44, value: Value for key 44, into space: 'test'
-[2025-02-16 20:49:05.083252906] [PERIODIC INSERT] Successfully inserted key: 45, value: Value for key 45, into space: 'test'
-[2025-02-16 20:49:05.185509443] [PERIODIC INSERT] Successfully inserted key: 46, value: Value for key 46, into space: 'test'
-[2025-02-16 20:49:05.287601470] [PERIODIC INSERT] Successfully inserted key: 47, value: Value for key 47, into space: 'test'
-[2025-02-16 20:49:05.389722585] [PERIODIC INSERT] Successfully inserted key: 48, value: Value for key 48, into space: 'test'
-[2025-02-16 20:49:05.492715358] [PERIODIC INSERT] Successfully inserted key: 49, value: Value for key 49, into space: 'test'
-[2025-02-16 20:49:05.593844175] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.657695055] [CRASH SIMULATION] Node replica_1 is stopped for a time 4
-[2025-02-16 20:49:05.694716691] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.795745849] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.896643877] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:05.996638536] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.096642494] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.196641921] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.296676397] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.397763013] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.498749017] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.573058366] [DIVERGENCE MONITOR] Divergence of entries: 51
-[2025-02-16 20:49:06.573077440] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:06.573080301] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:06.573083162] [REPLICATION MONITOR][CLUSTER] Detected 6 Problems:
-[2025-02-16 20:49:06.573085069] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_4
-[2025-02-16 20:49:06.573086977] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:06.573088884] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:06.573129177] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_4
-[2025-02-16 20:49:06.573131084] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_3
-[2025-02-16 20:49:06.573132753] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:06.599762916] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.700758695] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.801772832] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:06.902711391] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.003718852] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.104783296] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.205765724] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.306663513] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.406677722] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.507779836] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.608775138] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.709715366] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.810751199] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:07.911735773] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.012762308] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.113723754] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.214712381] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.315707683] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.416683912] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.517730474] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.575242996] [DIVERGENCE MONITOR] Divergence of entries: 51
-[2025-02-16 20:49:08.575269460] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:08.575273036] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:08.575276851] [REPLICATION MONITOR][CLUSTER] Detected 4 Problems:
-[2025-02-16 20:49:08.575279951] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_4
-[2025-02-16 20:49:08.575282573] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:08.575284957] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:08.575306415] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:08.618759870] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.719753026] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.820738077] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:08.921720743] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.022772073] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.123742818] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.224777698] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.325843334] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.426648616] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.526722908] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.627712726] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.727771282] [PERIODIC INSERT][Error] "/home/edgar/.rocks/share/tarantool/luatest/replica_set.lua:204: net_box is not connected"
-[2025-02-16 20:49:09.762593507] [CRASH SIMULATION] Node replica_1 is started again
-[2025-02-16 20:49:09.830697536] [PERIODIC INSERT] Successfully inserted key: 50, value: Value for key 50, into space: 'test'
-[2025-02-16 20:49:09.932611703] [PERIODIC INSERT] Successfully inserted key: 51, value: Value for key 51, into space: 'test'
-[2025-02-16 20:49:10.034550428] [PERIODIC INSERT] Successfully inserted key: 52, value: Value for key 52, into space: 'test'
-[2025-02-16 20:49:10.136941671] [PERIODIC INSERT] Successfully inserted key: 53, value: Value for key 53, into space: 'test'
-[2025-02-16 20:49:10.239941596] [PERIODIC INSERT] Successfully inserted key: 54, value: Value for key 54, into space: 'test'
-[2025-02-16 20:49:10.343356132] [PERIODIC INSERT] Successfully inserted key: 55, value: Value for key 55, into space: 'test'
-[2025-02-16 20:49:10.445588350] [PERIODIC INSERT] Successfully inserted key: 56, value: Value for key 56, into space: 'test'
-[2025-02-16 20:49:10.548282384] [PERIODIC INSERT] Successfully inserted key: 57, value: Value for key 57, into space: 'test'
-[2025-02-16 20:49:10.556859493] [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 5
-[2025-02-16 20:49:10.577641963] [DIVERGENCE MONITOR] Divergence of entries: 43
-[2025-02-16 20:49:10.577905893] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:10.577913522] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:10.577918291] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:10.577920675] [REPLICATION MONITOR] [replica_2] Upstream disconnected for node 2
-[2025-02-16 20:49:10.577944993] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:10.577947616] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:10.651074647] [PERIODIC INSERT] Successfully inserted key: 58, value: Value for key 58, into space: 'test'
-[2025-02-16 20:49:10.753442287] [PERIODIC INSERT] Successfully inserted key: 59, value: Value for key 59, into space: 'test'
-[2025-02-16 20:49:10.855648517] [PERIODIC INSERT] Successfully inserted key: 60, value: Value for key 60, into space: 'test'
-[2025-02-16 20:49:10.958579778] [PERIODIC INSERT] Successfully inserted key: 61, value: Value for key 61, into space: 'test'
-[2025-02-16 20:49:11.060791015] [PERIODIC INSERT] Successfully inserted key: 62, value: Value for key 62, into space: 'test'
-[2025-02-16 20:49:11.163947343] [PERIODIC INSERT] Successfully inserted key: 63, value: Value for key 63, into space: 'test'
-[2025-02-16 20:49:11.266816377] [PERIODIC INSERT] Successfully inserted key: 64, value: Value for key 64, into space: 'test'
-[2025-02-16 20:49:11.369842529] [PERIODIC INSERT] Successfully inserted key: 65, value: Value for key 65, into space: 'test'
-[2025-02-16 20:49:11.472872972] [PERIODIC INSERT] Successfully inserted key: 66, value: Value for key 66, into space: 'test'
-[2025-02-16 20:49:11.575841903] [PERIODIC INSERT] Successfully inserted key: 67, value: Value for key 67, into space: 'test'
-[2025-02-16 20:49:11.678188800] [PERIODIC INSERT] Successfully inserted key: 68, value: Value for key 68, into space: 'test'
-[2025-02-16 20:49:11.781071186] [PERIODIC INSERT] Successfully inserted key: 69, value: Value for key 69, into space: 'test'
-[2025-02-16 20:49:11.883551836] [PERIODIC INSERT] Successfully inserted key: 70, value: Value for key 70, into space: 'test'
-[2025-02-16 20:49:11.985673427] [PERIODIC INSERT] Successfully inserted key: 71, value: Value for key 71, into space: 'test'
-[2025-02-16 20:49:12.088519811] [PERIODIC INSERT] Successfully inserted key: 72, value: Value for key 72, into space: 'test'
-[2025-02-16 20:49:12.190344572] [PERIODIC INSERT] Successfully inserted key: 73, value: Value for key 73, into space: 'test'
-[2025-02-16 20:49:12.293651103] [PERIODIC INSERT] Successfully inserted key: 74, value: Value for key 74, into space: 'test'
-[2025-02-16 20:49:12.396035194] [PERIODIC INSERT] Successfully inserted key: 75, value: Value for key 75, into space: 'test'
-[2025-02-16 20:49:12.498643398] [PERIODIC INSERT] Successfully inserted key: 76, value: Value for key 76, into space: 'test'
-[2025-02-16 20:49:12.579076528] [DIVERGENCE MONITOR] Divergence of entries: 24
-[2025-02-16 20:49:12.579414129] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:12.579419612] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:12.579422712] [REPLICATION MONITOR][CLUSTER] Detected 3 Problems:
-[2025-02-16 20:49:12.579424858] [REPLICATION MONITOR] [replica_2] High lag detected on upstream with replica_2
-[2025-02-16 20:49:12.579426527] [REPLICATION MONITOR] [replica_3] Upstream disconnected for node 2
-[2025-02-16 20:49:12.579427957] [REPLICATION MONITOR] [replica_4] Upstream disconnected for node 2
-[2025-02-16 20:49:12.600934982] [PERIODIC INSERT] Successfully inserted key: 77, value: Value for key 77, into space: 'test'
-[2025-02-16 20:49:12.703944206] [PERIODIC INSERT] Successfully inserted key: 78, value: Value for key 78, into space: 'test'
-[2025-02-16 20:49:12.806933641] [PERIODIC INSERT] Successfully inserted key: 79, value: Value for key 79, into space: 'test'
-[2025-02-16 20:49:12.909716606] [PERIODIC INSERT] Successfully inserted key: 80, value: Value for key 80, into space: 'test'
-[2025-02-16 20:49:13.013105392] [PERIODIC INSERT] Successfully inserted key: 81, value: Value for key 81, into space: 'test'
-[2025-02-16 20:49:13.115631580] [PERIODIC INSERT] Successfully inserted key: 82, value: Value for key 82, into space: 'test'
-[2025-02-16 20:49:13.218971252] [PERIODIC INSERT] Successfully inserted key: 83, value: Value for key 83, into space: 'test'
-[2025-02-16 20:49:13.322017669] [PERIODIC INSERT] Successfully inserted key: 84, value: Value for key 84, into space: 'test'
-[2025-02-16 20:49:13.424244403] [PERIODIC INSERT] Successfully inserted key: 85, value: Value for key 85, into space: 'test'
-[2025-02-16 20:49:13.526169300] [PERIODIC INSERT] Successfully inserted key: 86, value: Value for key 86, into space: 'test'
-[2025-02-16 20:49:13.628962039] [PERIODIC INSERT] Successfully inserted key: 87, value: Value for key 87, into space: 'test'
-[2025-02-16 20:49:13.731771945] [PERIODIC INSERT] Successfully inserted key: 88, value: Value for key 88, into space: 'test'
-[2025-02-16 20:49:13.835278511] [PERIODIC INSERT] Successfully inserted key: 89, value: Value for key 89, into space: 'test'
-[2025-02-16 20:49:13.938326597] [PERIODIC INSERT] Successfully inserted key: 90, value: Value for key 90, into space: 'test'
-[2025-02-16 20:49:14.041024923] [PERIODIC INSERT] Successfully inserted key: 91, value: Value for key 91, into space: 'test'
-[2025-02-16 20:49:14.144281148] [PERIODIC INSERT] Successfully inserted key: 92, value: Value for key 92, into space: 'test'
-[2025-02-16 20:49:14.246663093] [PERIODIC INSERT] Successfully inserted key: 93, value: Value for key 93, into space: 'test'
-[2025-02-16 20:49:14.348598003] [PERIODIC INSERT] Successfully inserted key: 94, value: Value for key 94, into space: 'test'
-[2025-02-16 20:49:14.450576066] [PERIODIC INSERT] Successfully inserted key: 95, value: Value for key 95, into space: 'test'
-[2025-02-16 20:49:14.552995920] [PERIODIC INSERT] Successfully inserted key: 96, value: Value for key 96, into space: 'test'
-[2025-02-16 20:49:14.581353664] [DIVERGENCE MONITOR] Divergence of entries: 4
-[2025-02-16 20:49:14.581408500] [REPLICATION MONITOR][CLUSTER] Detected 1 Leaders:
-[2025-02-16 20:49:14.581415891] [REPLICATION MONITOR][CLUSTER] Leader: replica_4-nlQBUjSzQDLZ
-[2025-02-16 20:49:14.581421136] [REPLICATION MONITOR][CLUSTER] Detected 1 Problems:
-[2025-02-16 20:49:14.581425428] [REPLICATION MONITOR] [replica_4] High lag detected on upstream with replica_2
-[2025-02-16 20:49:14.655601501] [PERIODIC INSERT] Successfully inserted key: 97, value: Value for key 97, into space: 'test'
-[2025-02-16 20:49:14.757746219] [PERIODIC INSERT] Successfully inserted key: 98, value: Value for key 98, into space: 'test'
-[2025-02-16 20:49:14.860877990] [PERIODIC INSERT] Successfully inserted key: 99, value: Value for key 99, into space: 'test'
-[2025-02-16 20:49:14.963897228] [PERIODIC INSERT] Successfully inserted key: 100, value: Value for key 100, into space: 'test'
-[2025-02-16 20:49:15.066826581] [PERIODIC INSERT] Successfully inserted key: 101, value: Value for key 101, into space: 'test'
-[2025-02-16 20:49:15.169599294] [PERIODIC INSERT] Successfully inserted key: 102, value: Value for key 102, into space: 'test'
-[2025-02-16 20:49:15.271978616] [PERIODIC INSERT] Successfully inserted key: 103, value: Value for key 103, into space: 'test'
-[2025-02-16 20:49:15.374442338] [PERIODIC INSERT] Successfully inserted key: 104, value: Value for key 104, into space: 'test'
-[2025-02-16 20:49:15.476570367] [PERIODIC INSERT] Successfully inserted key: 105, value: Value for key 105, into space: 'test'
+2025-02-19 00:23:30.255 [95737] main/104/simulation_run.lua/luatest.log replica_set.lua:75 I> Replica set "rs-XVFPK9ltBxEb" initialized
+2025-02-19 00:23:30.292 [95737] main/104/simulation_run.lua/luatest.log server.lua:464 I> Server "replica_1" (pid: 95766) started
+2025-02-19 00:23:30.300 [95737] main/104/simulation_run.lua/luatest.log server.lua:464 I> Server "replica_2" (pid: 95779) started
+2025-02-19 00:23:30.307 [95737] main/104/simulation_run.lua/luatest.log server.lua:464 I> Server "replica_3" (pid: 95783) started
+2025-02-19 00:23:30.315 [95737] main/104/simulation_run.lua/luatest.log server.lua:464 I> Server "replica_4" (pid: 95788) started
+2025-02-19 00:23:30.324 [95737] main/104/simulation_run.lua/luatest.log server.lua:464 I> Server "replica_5" (pid: 95793) started
+2025-02-19 00:23:30.324 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 95766) within 60 sec
+2025-02-19 00:23:42.640 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_2" (pid: 95779) within 60 sec
+2025-02-19 00:23:50.498 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 95783) within 60 sec
+2025-02-19 00:23:50.501 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_4" (pid: 95788) within 60 sec
+2025-02-19 00:23:50.505 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_5" (pid: 95793) within 60 sec
+2025-02-19 00:23:50.508 [95737] main/104/simulation_run.lua/luatest.log replica_set.lua:177 I> All servers started in replica set "rs-XVFPK9ltBxEb"
+2025-02-19 00:23:50.508 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 95766) within 60 sec
+2025-02-19 00:23:50.509 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "election leader is found" condition for server "replica_1" (pid: 95766) within 60 sec
+2025-02-19 00:23:50.509 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_2" (pid: 95779) within 60 sec
+2025-02-19 00:23:50.510 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "election leader is found" condition for server "replica_2" (pid: 95779) within 60 sec
+2025-02-19 00:23:50.510 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 95783) within 60 sec
+2025-02-19 00:23:50.511 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "election leader is found" condition for server "replica_3" (pid: 95783) within 60 sec
+2025-02-19 00:23:50.511 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_4" (pid: 95788) within 60 sec
+2025-02-19 00:23:50.512 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "election leader is found" condition for server "replica_4" (pid: 95788) within 60 sec
+2025-02-19 00:23:50.512 [95737] main/104/simulation_run.lua/luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_5" (pid: 95793) within 60 sec
+2025-02-19 00:24:10.516 [95737] main/104/simulation_run.lua main.cc:495 I> Tarantool 3.3.0-entrypoint-187-g0afc7e0b8a Linux-x86_64-RelWithDebInfo
+2025-02-19 00:24:10.516 [95737] main/104/simulation_run.lua main.cc:498 I> log level 5 (INFO)
+2025-02-19 00:24:10.516 [95737] main/104/simulation_run.lua gc.c:131 I> wal/engine cleanup is paused
+2025-02-19 00:24:10.517 [95737] main/104/simulation_run.lua tuple.c:410 I> mapping 268435456 bytes for memtx tuple arena...
+2025-02-19 00:24:10.517 [95737] main/104/simulation_run.lua memtx_engine.cc:1764 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2025-02-19 00:24:10.517 [95737] main/104/simulation_run.lua tuple.c:410 I> mapping 134217728 bytes for vinyl tuple arena...
+2025-02-19 00:24:10.518 [95737] main/104/simulation_run.lua/box.upgrade upgrade.lua:1535 I> Recovering snapshot with schema version 3.3.0
+2025-02-19 00:24:10.522 [95737] main/104/simulation_run.lua box.cc:2235 I> update replication_synchro_quorum = 1
+2025-02-19 00:24:10.522 [95737] main/104/simulation_run.lua box.cc:3267 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2025-02-19 00:24:10.522 [95737] main/104/simulation_run.lua box.cc:5430 I> instance uuid e384aba6-d1fc-4efd-aa42-5f057b769af8
+2025-02-19 00:24:10.522 [95737] main/104/simulation_run.lua box.cc:5459 I> instance vclock {}
+2025-02-19 00:24:10.523 [95737] main/104/simulation_run.lua memtx_engine.cc:284 I> recovery start
+2025-02-19 00:24:10.523 [95737] main/104/simulation_run.lua memtx_engine.cc:289 I> recovering from `./memtx_dir/00000000000000000000.snap'
+2025-02-19 00:24:10.523 [95737] main/104/simulation_run.lua alter.cc:4163 I> replicaset uuid 4a57dfa7-0fa8-4957-809d-514201d06551
+2025-02-19 00:24:10.564 [95737] main/104/simulation_run.lua replication.cc:390 I> assigned id 1 to replica e384aba6-d1fc-4efd-aa42-5f057b769af8
+2025-02-19 00:24:10.564 [95737] main/104/simulation_run.lua box.cc:2235 I> update replication_synchro_quorum = 1
+2025-02-19 00:24:10.565 [95737] main/104/simulation_run.lua box.cc:5837 I> ready to accept requests
+2025-02-19 00:24:10.565 [95737] main/104/simulation_run.lua box.cc:592 I> leaving orphan mode
+2025-02-19 00:24:10.565 [95737] main/327/gc gc.c:319 I> wal/engine cleanup is resumed
+2025-02-19 00:24:10.565 [95737] main/104/simulation_run.lua/box.load_cfg load_cfg.lua:937 I> set 'log' configuration option to "working_log.log"
+2025-02-19 00:24:10.565 [95737] main/328/checkpoint_daemon gc.c:643 I> scheduled next checkpoint for Wed Feb 19 01:27:32 2025
+2025-02-19 00:24:10.569 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x41525860 Node replica_1 is follower
+
+2025-02-19 00:24:10.569 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x41524618 Node replica_2 is follower
+
+2025-02-19 00:24:10.570 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x40ee9070 Node replica_3 is follower
+
+2025-02-19 00:24:10.570 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x40424c68 Node replica_4 is follower
+
+2025-02-19 00:24:10.571 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x410291a8 Node replica_5 is leader
+
+2025-02-19 00:24:10.578 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x404207c0 The 'test' space is created and configured on the leader
+
+2025-02-19 00:24:10.578 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x40417260 [[PERIODIC INSERT] Started
+
+2025-02-19 00:24:10.579 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x41db22b0 [DIVERGENCE MONITOR] Started
+
+2025-02-19 00:24:10.579 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x414388c0 [CRASH SIMULATION] Started
+
+2025-02-19 00:24:10.579 [95737] main/104/simulation_run.lua/simulation_run simulation_run.lua:31 E> table: 0x40162020 [REPLICATION MONITOR] Started
+
+2025-02-19 00:24:10.579 [95737] main main.cc:1071 I> entering the event loop
+2025-02-19 00:24:10.591 [95737] main/338/lua/simulation_run simulation_run.lua:31 E> table: 0x40791960 No intervals found.
+
+2025-02-19 00:24:10.591 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x415b83d8 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:10.591 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x401ffa08 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:12.595 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x41be87f8 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:12.595 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x41be8908 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:14.600 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x4159dc88 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:14.600 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x4159df20 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:16.605 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x410b9e00 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:16.605 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x410b9f10 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:18.610 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x4086cb70 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:18.610 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x4086ce60 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x4093eaa0 [CRASH SIMULATION] The connection between nodes replica_1 and replica_3 is broken for 5 seconds
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc75d8 [NODES ACTIVITY STATES] Current states of nodes:
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc7718   - Node: replica_2, State: active
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc3b28   - Node: replica_1, State: active
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc3de0   - Node: replica_4, State: active
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc4098   - Node: replica_3, State: active
+
+2025-02-19 00:24:20.583 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40bc0320   - Node: replica_5, State: active
+
+2025-02-19 00:24:20.616 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x415b4c00 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:20.616 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x415b4d10 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:22.621 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x40e6a768 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:22.621 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x40e6a678 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:24.626 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x419d1e40 [REPLICATION MONITOR][CLUSTER] Leader: replica_5-jxZFA-hQV4ak
+
+2025-02-19 00:24:24.626 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x419d20d8 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:25.586 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x406891e8 [CRASH SIMULATION] The connection between nodes replica_1 and replica_3 has been restored
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40689498 [NODES ACTIVITY STATES] Current states of nodes:
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40689720   - Node: replica_2, State: active
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x406899d8   - Node: replica_1, State: restored
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40689c50   - Node: replica_4, State: active
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x40689ec8   - Node: replica_3, State: active
+
+2025-02-19 00:24:25.587 [95737] main/341/lua/simulation_run simulation_run.lua:31 E> table: 0x4068a140   - Node: replica_5, State: active
+
+2025-02-19 00:24:25.593 [95737] main/337/lua/simulation_run simulation_run.lua:31 E> table: 0x417541a0 [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+
+2025-02-19 00:24:26.630 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x4001c3e8 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:26.697 [95737] main/337/lua/simulation_run simulation_run.lua:31 E> table: 0x40a873f8 [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+
+2025-02-19 00:24:27.801 [95737] main/337/lua/simulation_run simulation_run.lua:31 E> table: 0x40ac1180 [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+
+2025-02-19 00:24:28.635 [95737] main/340/lua/simulation_run simulation_run.lua:31 E> table: 0x417622a8 [REPLICATION MONITOR][CLUSTER] Detected 0 Problems:
+
+2025-02-19 00:24:28.905 [95737] main/337/lua/simulation_run simulation_run.lua:31 E> table: 0x4070e7a0 [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+
+2025-02-19 00:24:30.009 [95737] main/337/lua/simulation_run simulation_run.lua:31 E> table: 0x4110e408 [PERIODIC INSERT] No leader found. Retrying in 1 seconds...
+
+2025-02-19 00:24:30.407 [95737] main/337/lua/simulation_run simulation_run.lua:43 E> table: 0x406f1428 [PERIODIC INSERT] "fiber is cancelled"
+
+2025-02-19 00:24:30.508 [95737] main/luatest.log process.lua:80 I> Killing GC'ed process 95783
+2025-02-19 00:24:30.510 [95737] main/luatest.log process.lua:80 I> Killing GC'ed process 95779
+2025-02-19 00:24:30.512 [95737] main/luatest.log process.lua:80 I> Killing GC'ed process 95788
+2025-02-19 00:24:30.514 [95737] main/luatest.log process.lua:80 I> Killing GC'ed process 95793
+2025-02-19 00:24:30.516 [95737] main/luatest.log process.lua:80 I> Killing GC'ed process 95766
