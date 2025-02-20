@@ -463,6 +463,21 @@ exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
 
 /**
+ * Having iterator @a type as ITER_NP or ITER_PP, transform initial search key
+ * @a key and the @a type so that normal initial search in iterator would
+ * find exactly what needed for next prefix or previous prefix iterator.
+ * The resulting type is one of ITER_GT/ITER_LT/ITER_GE/ITER_LE.
+ * In the most common case a new search key is allocated on @a region, so
+ * region cleanup is needed after the key is no more needed.
+ * @retval true if @a key and @a type are ready for search.
+ * @retval false if the iteration must be stopped without an error.
+ */
+bool
+prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
+			      uint32_t part_count, struct key_def *cmp_def,
+			      struct region *region);
+
+/**
  * The manner in which replace in a unique index must treat
  * duplicates (tuples with the same value of indexed key),
  * possibly present in the index.
