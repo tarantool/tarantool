@@ -12,7 +12,7 @@ g.after_all(function()
     g.server:stop()
 end)
 
-g.test_zeroblob = function()
+g.test_randomblob = function()
     g.server:exec(function()
         local ret, err = box.execute([[SELECT randomblob(0x80000010);]])
         t.assert(ret == nil)
@@ -21,7 +21,7 @@ g.test_zeroblob = function()
     end)
 end
 
-g.test_randomblob = function()
+g.test_zeroblob = function()
     g.server:exec(function()
         local ret, err = box.execute([[SELECT zeroblob(0x80000010);]])
         t.assert(ret == nil)
