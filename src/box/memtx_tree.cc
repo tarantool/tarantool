@@ -690,71 +690,6 @@ tree_iterator_set_next_method(struct tree_iterator<USE_HINT> *it)
 }
 
 /**
- * Having iterator @a type as ITER_NP or ITER_PP, transform initial search key
- * @a start_data and the @a type so that normal initial search in iterator would
- * find exactly what needed for next prefix or previous prefix iterator.
- * The resulting type is one of ITER_GT/ITER_LT/ITER_GE/ITER_LE.
- * In the most common case a new search key is allocated on @a region, so
- * region cleanup is needed after the key is no more needed.
- * @retval true if @a start_data and @a type are ready for search.
- * @retval false if the iteration must be stopped without an error.
- */
-template <bool USE_HINT>
-static bool
-prepare_start_prefix_iterator(struct memtx_tree_key_data<USE_HINT> *start_data,
-			      enum iterator_type *type, struct key_def *cmp_def,
-			      struct region *region)
-{
-	assert(*type == ITER_NP || *type == ITER_PP);
-	assert(start_data->part_count > 0);
-	*type = (*type == ITER_NP) ? ITER_GT : ITER_LT;
-
-	/* PP with ASC and NP with DESC works exactly as LT and GT. */
-	bool part_order = cmp_def->parts[start_data->part_count - 1].sort_order;
-	if ((*type == ITER_LT) == (part_order == SORT_ORDER_ASC))
-		return true;
-
-	/* Find the last part of given key. */
-	const char *c = start_data->key;
-	for (uint32_t i = 1; i < start_data->part_count; i++)
-		mp_next(&c);
-	/* If the last part is not a string the iterator degrades to GT/LT. */
-	if (mp_typeof(*c) != MP_STR)
-		return true;
-
-	uint32_t str_size = mp_decode_strl(&c);
-	/* Any string logically starts with empty string; iteration is over. */
-	if (str_size == 0)
-		return false;
-	size_t prefix_size = c - start_data->key;
-	size_t total_size = prefix_size + str_size;
-
-	unsigned char *p = (unsigned char *)xregion_alloc(region, total_size);
-	memcpy(p, start_data->key, total_size);
-
-	/* Increase the key to the least greater value. */
-	unsigned char *str = p + prefix_size;
-	for (uint32_t i = str_size - 1; ; i--) {
-		if (str[i] != UCHAR_MAX) {
-			str[i]++;
-			break;
-		} else if (i == 0) {
-			/* If prefix consists of CHAR_MAX, there's no next. */
-			return false;
-		}
-		str[i] = 0;
-	}
-
-	/* With increased key we can continue the GE/LE search. */
-	*type = (*type == ITER_GT) ? ITER_GE : ITER_LE;
-	start_data->key = (char *)p;
-	if (USE_HINT)
-		start_data->set_hint(key_hint(start_data->key,
-					      start_data->part_count, cmp_def));
-	return true;
-}
-
-/**
  * Creates an iterator based on the given key, after data and iterator type.
  * Also updates @a start_data and iterator @a type as required.
  *
@@ -787,9 +722,15 @@ memtx_tree_lookup(memtx_tree_t<USE_HINT> *tree,
 
 	if ((*type == ITER_NP || *type == ITER_PP) &&
 	    after_data.key == NULL) {
-		if (!prepare_start_prefix_iterator(start_data, type,
+		if (!prepare_start_prefix_iterator(type, &start_data->key,
+						   start_data->part_count,
 						   cmp_def, region))
 			return false;
+		if (USE_HINT) {
+			hint_t hint = key_hint(start_data->key,
+					       start_data->part_count, cmp_def);
+			start_data->set_hint(hint);
+		}
 	}
 
 	/*
