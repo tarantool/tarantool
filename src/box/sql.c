@@ -881,7 +881,8 @@ cursor_seek(BtCursor *pCur, int *pRes)
 	}
 	const char *key = (const char *)pCur->key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (key_validate(pCur->index->def, pCur->iter_type, key, part_count)) {
+	if (iterator_validate(pCur->index->def, pCur->iter_type, key,
+			      part_count)) {
 		diag_log();
 		return -1;
 	}

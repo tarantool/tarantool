@@ -3928,7 +3928,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 	enum iterator_type type = (enum iterator_type) iterator;
 	const char *key_array = key;
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
-	if (key_validate(index->def, type, key, part_count))
+	if (iterator_validate(index->def, type, key, part_count))
 		return -1;
 	const char *pos, *pos_end;
 	if (box_iterator_position_unpack(*packed_pos, *packed_pos_end,

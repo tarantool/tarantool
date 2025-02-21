@@ -787,6 +787,10 @@ vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 			    struct vy_entry key, struct vy_entry last,
 			    const struct vy_read_view **rv)
 {
+	assert(iterator_type == ITER_EQ || iterator_type == ITER_REQ ||
+	       iterator_type == ITER_GE || iterator_type == ITER_LE ||
+	       iterator_type == ITER_GT || iterator_type == ITER_LT);
+
 	memset(itr, 0, sizeof(*itr));
 
 	itr->lsm = lsm;
@@ -797,21 +801,6 @@ vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 	itr->last = last;
 	itr->last_cached = vy_entry_none();
 	itr->is_first_cached = (itr->last.stmt == NULL);
-
-	if (vy_stmt_is_empty_key(key.stmt)) {
-		/*
-		 * Strictly speaking, a GT/LT iterator should return
-		 * nothing if the key is empty, because every key is
-		 * equal to the empty key, but historically we return
-		 * all keys instead. So use GE/LE instead of GT/LT
-		 * in this case.
-		 */
-		itr->iterator_type = iterator_direction(iterator_type) > 0 ?
-				     ITER_GE : ITER_LE;
-	}
-
-	if (iterator_type == ITER_ALL)
-		itr->iterator_type = ITER_GE;
 
 	if (iterator_type == ITER_REQ) {
 		/*

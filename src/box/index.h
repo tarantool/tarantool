@@ -435,20 +435,20 @@ void
 iterator_delete(struct iterator *it);
 
 /**
- * Check that the key has correct part count and correct part size
- * for use in an index iterator.
+ * Checks that the iteration parameters are consistent and compatible with
+ * the index type.
  *
  * @param index_def key definition
  * @param type iterator type (see enum iterator_type)
  * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
  *
- * @retval 0  The key is valid.
- * @retval -1 The key is invalid.
+ * @retval 0  The iterator is valid.
+ * @retval -1 The iterator is invalid.
  */
 int
-key_validate(const struct index_def *index_def, enum iterator_type type,
-	     const char *key, uint32_t part_count);
+iterator_validate(struct index_def *index_def, enum iterator_type type,
+		  const char *key, uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for a search in a unique
@@ -461,6 +461,21 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 int
 exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
+
+/**
+ * Having iterator @a type as ITER_NP or ITER_PP, transform initial search key
+ * @a key and the @a type so that normal initial search in iterator would
+ * find exactly what needed for next prefix or previous prefix iterator.
+ * The resulting type is one of ITER_GT/ITER_LT/ITER_GE/ITER_LE.
+ * In the most common case a new search key is allocated on @a region, so
+ * region cleanup is needed after the key is no more needed.
+ * @retval true if @a key and @a type are ready for search.
+ * @retval false if the iteration must be stopped without an error.
+ */
+bool
+prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
+			      uint32_t part_count, struct key_def *cmp_def,
+			      struct region *region);
 
 /**
  * The manner in which replace in a unique index must treat
