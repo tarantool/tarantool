@@ -1146,9 +1146,6 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 			if (new_slice != NULL)
 				vy_range_add_slice(part, new_slice);
 		}
-		part->needs_compaction = range->needs_compaction;
-		vy_range_update_compaction_priority(part, &lsm->opts);
-		vy_range_update_dumps_per_compaction(part);
 	}
 
 	/*
@@ -1179,6 +1176,9 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
+		part->needs_compaction = range->needs_compaction;
+		vy_range_update_compaction_priority(part, &lsm->opts);
+		vy_range_update_dumps_per_compaction(part);
 		vy_lsm_add_range(lsm, part);
 		vy_lsm_acct_range(lsm, part);
 	}
