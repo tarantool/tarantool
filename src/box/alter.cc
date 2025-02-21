@@ -212,19 +212,11 @@ err:
 }
 
 /**
- * Fill index_opts structure from opts field in tuple of space _index
- * Return an error if option is unrecognized.
+ * Validates index options.
  */
 static int
-index_opts_decode(struct index_opts *opts, const char *map,
-		  struct region *region)
+index_opts_validate(struct index_opts *opts, struct tuple_format *format)
 {
-	index_opts_create(opts);
-	if (opts_decode(opts, index_opts_reg, &map, region) != 0) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 diag_last_error(diag_get())->errmsg);
-		return -1;
-	}
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 			 "distance must be either 'euclid' or 'manhattan'");
@@ -253,7 +245,71 @@ index_opts_decode(struct index_opts *opts, const char *map,
 			 "less than or equal to 1");
 		return -1;
 	}
-	return 0;
+	int rc = -1;
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	if (opts->covered_count != 0) {
+		uint32_t field_count = tuple_format_field_count(format);
+		void *bitmap = xregion_alloc(gc, BITMAP_SIZE(field_count));
+		for (uint32_t i = 0; i < opts->covered_count; i++) {
+			if (opts->covered[i] >= field_count) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 "'covers' field is larger that number"
+					 " of fields");
+				goto out;
+			}
+			if (bit_test(bitmap, opts->covered[i])) {
+				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+					 "'covers' has duplicates");
+				goto out;
+			}
+			bit_set(bitmap, opts->covered[i]);
+		}
+	}
+	rc = 0;
+out:
+	region_truncate(gc, gc_svp);
+	return rc;
+}
+
+/**
+ * Normalize covered fields:
+ * - remove implicitly covered fields.
+ * - sort fields in descending order.
+ *
+ * The implicitly covered fields are the fields of index key and pk index key.
+ * The new covered fields array is allocated on fiber region.
+ */
+static void
+index_opts_normalize(struct index_opts *opts, const struct tuple_format *format,
+		     const struct key_def *key_def,
+		     const struct key_def *pk_key_def)
+{
+	/* pk_key_def is NULL for primary index. */
+	if (pk_key_def == NULL || opts->covered_count == 0 ||
+	    format->exact_field_count == 0)
+		return;
+	struct region *gc = &fiber()->gc;
+	size_t bitmap_size =
+		BITMAP_SIZE(format->exact_field_count);
+	void *bitmap = xregion_alloc(gc, bitmap_size);
+	memset(bitmap, 0, bitmap_size);
+	for (uint32_t i = 0; i < opts->covered_count; i++)
+		bit_set(bitmap, opts->covered[i]);
+	for (uint32_t i = 0; i < key_def->part_count; i++)
+		bit_clear(bitmap, key_def->parts[i].fieldno);
+	for (uint32_t i = 0; i < pk_key_def->part_count; i++)
+		bit_clear(bitmap, pk_key_def->parts[i].fieldno);
+	uint32_t *covered = xregion_alloc_array(
+				gc, typeof(*covered), opts->covered_count);
+	struct bit_iterator it;
+	bit_iterator_init(&it, bitmap, bitmap_size, true);
+	size_t pos;
+	uint32_t i = 0;
+	while ((pos = bit_iterator_next(&it)) != SIZE_MAX)
+		covered[i++] = pos;
+	opts->covered_count = i;
+	opts->covered = i != 0 ? covered : NULL;
 }
 
 /** Decode an optional node name field from the tuple. */
@@ -343,8 +399,20 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 				 BOX_INDEX_FIELD_OPTS, MP_MAP);
 	if (opts_field == NULL)
 		return NULL;
-	if (index_opts_decode(&opts, opts_field, &fiber()->gc) != 0)
+	index_opts_create(&opts);
+	if (opts_decode(&opts, index_opts_reg, &opts_field,
+			&fiber()->gc) != 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
 		return NULL;
+	}
+	if (index_opts_validate(&opts, space->format) != 0)
+		return NULL;
+	if (opts.covered_count != 0 && index_id == 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 "covers is allowed only for secondary index");
+		return NULL;
+	}
 	if (name_len > BOX_NAME_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX,
 			  tt_cstr(name, BOX_INVALID_NAME_MAX),
@@ -390,10 +458,12 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 			      (for_func_index ? KEY_DEF_FOR_FUNC_INDEX : 0));
 	if (key_def == NULL)
 		return NULL;
+	struct key_def *pk_key_def = space_index_key_def(space, 0);
+	index_opts_normalize(&opts, space->format, key_def, pk_key_def);
 	struct index_def *index_def =
 		index_def_new(id, index_id, name, name_len, space->def->name,
 			      space->def->engine_name, type, &opts, key_def,
-			      space_index_key_def(space, 0));
+			      pk_key_def);
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
@@ -401,7 +471,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		return NULL;
 	/*
 	 * Set opts.hint to the unambiguous ON or OFF value. This
-	 * allows to compare opts.hint like in index_opts_cmp()
+	 * allows to compare opts.hint like in index_opts_is_equal()
 	 * or memtx_index_def_change_requires_rebuild().
 	 */
 	if (index_def->opts.hint == INDEX_HINT_DEFAULT) {
@@ -2673,7 +2743,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 					     alter->new_min_field_count);
 		if (alter_space_move_indexes(alter, 0, iid))
 			return -1;
-		if (index_def_cmp(index_def, old_index->def) == 0) {
+		if (index_def_is_equal(index_def, old_index->def)) {
 			/* Index is not changed so just move it. */
 			try {
 				(void) new MoveIndex(alter, old_index->def->iid);

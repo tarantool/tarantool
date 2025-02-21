@@ -109,6 +109,15 @@ struct index_opts {
 	 * Use hint optimization for tree index.
 	 */
 	enum index_hint_cfg hint;
+	/**
+	 * Covered fields. Currently it is supported only by memcs engine. It
+	 * specifies the columns of the secondary index.
+	 */
+	uint32_t *covered;
+	/**
+	 * Number of covered fields.
+	 */
+	uint32_t covered_count;
 };
 
 extern const struct index_opts index_opts_default;
@@ -129,34 +138,53 @@ index_opts_create(struct index_opts *opts)
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
+	free(opts->covered);
 	TRASH(opts);
 }
 
-static inline int
-index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
+static inline bool
+index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 {
 	if (o1->is_unique != o2->is_unique)
-		return o1->is_unique < o2->is_unique ? -1 : 1;
+		return false;
 	if (o1->dimension != o2->dimension)
-		return o1->dimension < o2->dimension ? -1 : 1;
+		return false;
 	if (o1->distance != o2->distance)
-		return o1->distance < o2->distance ? -1 : 1;
+		return false;
 	if (o1->range_size != o2->range_size)
-		return o1->range_size < o2->range_size ? -1 : 1;
+		return false;
 	if (o1->page_size != o2->page_size)
-		return o1->page_size < o2->page_size ? -1 : 1;
+		return false;
 	if (o1->run_count_per_level != o2->run_count_per_level)
-		return o1->run_count_per_level < o2->run_count_per_level ?
-		       -1 : 1;
+		return false;
 	if (o1->run_size_ratio != o2->run_size_ratio)
-		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
+		return false;
 	if (o1->bloom_fpr != o2->bloom_fpr)
-		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
+		return false;
 	if (o1->func_id != o2->func_id)
-		return o1->func_id - o2->func_id;
+		return false;
 	if (o1->hint != o2->hint)
-		return o1->hint - o2->hint;
+		return false;
+	if (o1->covered_count != o2->covered_count)
+		return false;
+	for (uint32_t i = 0; i < o1->covered_count; i++) {
+		if (o1->covered[i] != o2->covered[i])
+			return false;
+	}
 	return 0;
+}
+
+/**
+ * Returns whether `fieldno` is one of the covered fields.
+ */
+static inline bool
+index_opts_is_covered(const struct index_opts *opts, uint32_t fieldno)
+{
+	for (uint32_t i = 0; i < opts->covered_count; i++) {
+		if (opts->covered[i] == fieldno)
+			return true;
+	}
+	return false;
 }
 
 /* Definition of an index. */
@@ -175,8 +203,8 @@ struct index_def {
 	char *name;
 	/** Index type. */
 	enum index_type type;
+	/** Index options. */
 	struct index_opts opts;
-
 	/** Index key definition. */
 	struct key_def *key_def;
 	/**
@@ -297,12 +325,14 @@ struct key_def **
 index_def_to_key_def(struct rlist *index_defs, int *size);
 
 /**
- * One key definition is greater than the other if it's id is
- * greater, it's name is greater,  it's index type is greater
- * (HASH < TREE < BITSET) or its key part array is greater.
+ * Check whether index definitions def1 and def2 are equals.
+ *
+ * @param def1 index definition 1.
+ * @param def2 index definition 2.
+ * @retval true if definitions are equal, false if not.
  */
-int
-index_def_cmp(const struct index_def *key1, const struct index_def *key2);
+bool
+index_def_is_equal(const struct index_def *def1, const struct index_def *def2);
 
 /**
  * Check a key definition for violation of various limits.
