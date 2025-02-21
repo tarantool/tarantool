@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "checkpoint_schedule.h"
+#include "trivia/util.h"
 
 #include <assert.h>
 #include <math.h>
@@ -36,10 +37,20 @@
 
 void
 checkpoint_schedule_cfg(struct checkpoint_schedule *sched,
-			double now, double interval)
+			double now, double interval,
+			double time_since_checkpoint)
 {
+	/*
+	 * If the last checkpoint was long enough ago, we
+	 * should schedule our checkpoint in the next interval
+	 * seconds so possible parallel snapshots on
+	 * instances will not produce too much writes at once.
+	 * If this is not the case, just schedule the next checkpoint
+	 * as usual.
+	 */
 	sched->interval = interval;
-	sched->start_time = now + interval;
+	sched->start_time = (now + interval -
+			     MIN(time_since_checkpoint, interval));
 
 	/*
 	 * Add a random offset to the start time so as to avoid
