@@ -130,7 +130,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_SYNC_QUORUM_TIMEOUT:
 	case ER_SYNC_ROLLBACK:
 		say_info("will retry every %.2lf second",
-			 replication_reconnect_interval());
+			 replication_effective_reconnect_timeout());
 		break;
 	default:
 		break;
@@ -513,7 +513,7 @@ applier_ballot_watcher_f(va_list ap)
 			applier_watch_ballot(applier);
 			break;
 		} catch (TimedOut *) {
-			fiber_sleep(replication_reconnect_interval());
+			fiber_sleep(replication_effective_reconnect_timeout());
 			diag_clear(diag_get());
 		} catch (FiberIsCancelled *) {
 			diag_clear(diag_get());
@@ -2731,7 +2731,7 @@ applier_f(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 reconnect:
-		fiber_sleep(replication_reconnect_interval());
+		fiber_sleep(replication_effective_reconnect_timeout());
 	}
 	return 0;
 }
