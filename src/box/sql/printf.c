@@ -829,7 +829,7 @@ sqlStrAccumEnlarge(StrAccum * p, int N)
 		i64 szNew = p->nChar;
 		assert((p->zText == 0
 			|| p->zText == p->zBase) == !isMalloced(p));
-		szNew += N + 1;
+		szNew += (i64)N + 1;
 		if (szNew + p->nChar <= p->mxAlloc) {
 			/* Force exponential buffer size growth as long as it does not overflow,
 			 ** to avoid having to call this routine too often */
