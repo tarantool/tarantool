@@ -370,6 +370,7 @@ int box_set_election_mode(void);
 int box_set_election_timeout(void);
 int box_set_election_fencing_mode(void);
 void box_set_replication_timeout(void);
+void box_set_replication_reconnect_timeout(void);
 void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
 void box_set_replication_sync_lag(void);

@@ -1264,6 +1264,12 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_timeout',
             default = 1,
         }),
+        reconnect_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'replication_reconnect_timeout',
+            -- The effective default is replication_timeout.
+            default = box.NULL,
+        }),
         synchro_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_synchro_timeout',

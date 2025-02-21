@@ -174,6 +174,12 @@ extern struct uri_set replication_uris;
 extern double replication_timeout;
 
 /**
+ * Wait for the given period of time before trying to reconnect
+ * to a master.
+ */
+extern double replication_reconnect_timeout;
+
+/**
  * Maximal time box.cfg() may wait for connections to all configured
  * replicas to be established. If box.cfg() fails to connect to all
  * replicas within the timeout, it will either leave the instance in
@@ -244,9 +250,14 @@ extern struct rlist replicaset_on_quorum_loss;
  * to a master.
  */
 static inline double
-replication_reconnect_interval(void)
+replication_effective_reconnect_timeout(void)
 {
-	return replication_timeout;
+	/**
+	 * By default replication_reconnect_timeout mirrors
+	 * replication_timeout's value.
+	 */
+	return replication_reconnect_timeout < 0 ?
+		replication_timeout : replication_reconnect_timeout;
 }
 
 /**
