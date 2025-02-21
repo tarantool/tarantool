@@ -1339,6 +1339,25 @@ box_check_replication_timeout(void)
 }
 
 static double
+box_check_replication_reconnect_timeout(void)
+{
+	if (!cfg_isnumber("replication_reconnect_timeout")) {
+		/*
+		 * By default equals to box.NULL. In such case
+		 * replication_timeout is used instead.
+		 */
+		return -1;
+	}
+
+	double timeout = cfg_getd("replication_reconnect_timeout");
+	if (timeout < 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_reconnect_timeout",
+			  "the value must be box.NULL or greater/equal to 0");
+	}
+	return timeout;
+}
+
+static double
 box_check_replication_connect_timeout(void)
 {
 	double timeout = cfg_getd("replication_connect_timeout");
@@ -2004,6 +2023,7 @@ box_check_config(void)
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
+	box_check_replication_reconnect_timeout();
 	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_check_replication_synchro_timeout() < 0)
@@ -2173,6 +2193,13 @@ box_set_replication_timeout(void)
 	replication_timeout = box_check_replication_timeout();
 	raft_cfg_death_timeout(box_raft(), replication_disconnect_timeout());
 	box_update_broadcast_ballot_interval(replication_timeout);
+}
+
+void
+box_set_replication_reconnect_timeout(void)
+{
+	replication_reconnect_timeout =
+		box_check_replication_reconnect_timeout();
 }
 
 void
@@ -5808,6 +5835,7 @@ box_cfg_xc(void)
 	box_set_readahead();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	box_set_replication_reconnect_timeout();
 	if (box_set_bootstrap_strategy() != 0)
 		diag_raise();
 	if (box_set_bootstrap_leader() != 0)

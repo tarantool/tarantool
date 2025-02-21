@@ -306,6 +306,7 @@ g.test_defaults = function()
             anon_ttl = 60 * 60,
             threads = 1,
             timeout = 1,
+            reconnect_timeout = box.NULL,
             synchro_timeout = 5,
             synchro_queue_max_size = 16777216,
             connect_timeout = 30,
