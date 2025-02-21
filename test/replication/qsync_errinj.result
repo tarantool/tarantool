@@ -55,7 +55,10 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
-box.cfg{replication_timeout = 1000}
+old_timeout = box.cfg.replication_timeout
+ | ---
+ | ...
+box.cfg{replication_timeout = 1000, replication_reconnect_timeout = old_timeout}
  | ---
  | ...
 box.error.injection.set('ERRINJ_APPLIER_SLOW_ACK', true)
@@ -74,6 +77,9 @@ box.space.sync:count()
  | ---
  | - 10
  | ...
+box.cfg{replication_timeout = old_timeout}
+ | ---
+ | ...
 
 test_run:switch('replica')
  | ---
@@ -86,6 +92,10 @@ box.space.sync:count()
 box.error.injection.set('ERRINJ_APPLIER_SLOW_ACK', false)
  | ---
  | - ok
+ | ...
+box.cfg{replication_timeout = old_timeout,                                     \
+        replication_reconnect_timeout = box.NULL}
+ | ---
  | ...
 
 --
