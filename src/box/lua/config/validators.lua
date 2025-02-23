@@ -9,33 +9,6 @@ local network = require('internal.config.utils.network')
 -- function that validates the data for that field.
 local M = {}
 
--- Verify that replication.failover option is not present in the
--- instance scope of the cluster config.
-local function validate_replication_failover(data, w)
-    -- scope == nil means that it is the instance config.
-    local scope = w.schema.scope
-
-    -- There is no much sense to set the failover option for a
-    -- particular instance, not the whole replicaset. So, the
-    -- option is forbidden for the instance scope of the cluster
-    -- config.
-    --
-    -- However, it is allowed for the instance config to accept an
-    -- instantiated cluster config as valid.
-    if scope ~= 'instance' then
-        return
-    end
-
-    if data.replication ~= nil and data.replication.failover ~= nil then
-        w.error('replication.failover must not be present in the %s scope',
-            scope)
-    end
-end
-
-local function validate_outmost_record(data, w)
-    validate_replication_failover(data, w)
-end
-
 local function validate_uuid_str(data, w)
     if uuid.fromstr(data) == nil then
         w.error('Unable to parse the value as a UUID: %q', data)
@@ -118,18 +91,6 @@ local function validate_scope(w, allowed_scopes)
     w.error('The option must not be present in the %s scope', scope)
 end
 
--- This kind of validation cannot be implemented as the
--- 'validate' annotation of a particular schema node. There
--- are two reasons:
---
--- * Missed fields are not validated.
--- * The outmost instance config record is marked with the
---   'scope' annotation (when the instance config is part of
---   the cluster config), but this annotation is not easy to
---   reach from the 'validate' function of a nested schema
---   node.
-M[''] = validate_outmost_record
-
 -- {{{ app
 
 M['app'] = function(app, w)
@@ -192,8 +153,8 @@ end
 
 M['config.storage.endpoints'] = function(data, w)
     if #data == 0 then
-        w.error('At least one endpoint must be' ..
-            'specified in config.storage.endpoints')
+        w.error('At least one endpoint must be specified in ' ..
+            'config.storage.endpoints')
     end
 end
 
@@ -353,6 +314,13 @@ M['replication.autoexpel'] = function(data, w)
     end
 end
 
+M['replication.failover'] = function(_data, w)
+    -- Forbid in the instance scope, because it has no
+    -- sense to set the option for a part of a
+    -- replicaset.
+    validate_scope(w, {'global', 'group', 'replicaset'})
+end
+
 -- }}} replication
 
 -- {{{ security
@@ -393,158 +361,60 @@ M['sharding'] = function(data, w)
     end
 end
 
-M['sharding.bucket_count'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.bucket_count should be a defined in '..
-                'global scope')
-    end
+M['sharding.bucket_count'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.connection_outdate_delay'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.connection_outdate_delay should be a '..
-                'defined in global scope')
-    end
+M['sharding.connection_outdate_delay'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.discovery_mode'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.discovery_mode should be a defined in '..
-                'global scope')
-    end
+M['sharding.discovery_mode'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.failover_ping_timeout'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.failover_ping_timeout should be a '..
-                'defined in global scope')
-    end
+M['sharding.failover_ping_timeout'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.lock'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope == 'instance' then
-        w.error('sharding.lock cannot be defined in the instance '..
-                'scope')
-    end
+M['sharding.lock'] = function(_data, w)
+    validate_scope(w, {'global', 'group', 'replicaset'})
 end
 
-M['sharding.rebalancer_disbalance_threshold'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.rebalancer_disbalance_threshold should '..
-                'be a defined in global scope')
-    end
+M['sharding.rebalancer_disbalance_threshold'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.rebalancer_max_receiving'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.rebalancer_max_receiving should '..
-                'be a defined in global scope')
-    end
+M['sharding.rebalancer_max_receiving'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.rebalancer_max_sending'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.rebalancer_max_sending should '..
-                'be a defined in global scope')
-    end
+M['sharding.rebalancer_max_sending'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.rebalancer_mode'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.rebalancer_enabled must be defined in ' ..
-                'the global scope.')
-    end
+M['sharding.rebalancer_mode'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.sched_move_quota'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.sched_move_quota should be a defined ' ..
-                'in global scope')
-    end
+M['sharding.sched_move_quota'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.sched_ref_quota'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.sched_ref_quota should be a defined ' ..
-                'in global scope')
-    end
+M['sharding.sched_ref_quota'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.shard_index'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.shard_index should be a defined in '..
-                'global scope')
-    end
+M['sharding.shard_index'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.sync_timeout'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope ~= 'global' then
-        w.error('sharding.sync_timeout should be a defined in '..
-                'global scope')
-    end
+M['sharding.sync_timeout'] = function(_data, w)
+    validate_scope(w, {'global'})
 end
 
-M['sharding.weight'] = function(data, w)
-    local scope = w.schema.computed.annotations.scope
-    if data == nil or scope == nil then
-        return
-    end
-    if scope == 'instance' then
-        w.error('sharding.weight cannot be defined in the ' ..
-                'instance scope')
-    end
+M['sharding.weight'] = function(_data, w)
+    validate_scope(w, {'global', 'group', 'replicaset'})
 end
 
 -- }}} sharding
