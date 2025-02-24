@@ -1189,12 +1189,12 @@ vy_task_dump_complete(struct vy_task *task)
 
 	/*
 	 * The LSM tree could have been dropped while we were writing the new
-	 * run. In this case we should discard the run without committing to
-	 * vylog, because all the information about the LSM tree and its runs
-	 * could have already been garbage collected from vylog.
+	 * run. In this case all the information about the LSM tree ranges
+	 * could have already been garbage collected from vylog so we can't
+	 * commit the new slice. Discard the run and exit.
 	 */
 	if (lsm->is_dropped) {
-		vy_run_unref(new_run);
+		vy_run_discard(new_run);
 		goto delete_mems;
 	}
 
@@ -1352,16 +1352,7 @@ vy_task_dump_abort(struct vy_task *task)
 	error_log(e);
 	say_error("%s: dump failed", vy_lsm_name(lsm));
 
-	/*
-	 * The LSM tree could have been dropped while we were writing the new
-	 * run. In this case we should discard the run without committing to
-	 * vylog, because all the information about the LSM tree and its runs
-	 * could have already been garbage collected from vylog.
-	 */
-	if (lsm->is_dropped)
-		vy_run_unref(task->new_run);
-	else
-		vy_run_discard(task->new_run);
+	vy_run_discard(task->new_run);
 
 	lsm->is_dumping = false;
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1524,12 +1515,12 @@ vy_task_compaction_complete(struct vy_task *task)
 
 	/*
 	 * The LSM tree could have been dropped while we were writing the new
-	 * run. In this case we should discard the run without committing to
-	 * vylog, because all the information about the LSM tree and its runs
-	 * could have already been garbage collected from vylog.
+	 * run. In this case all the information about the LSM tree ranges
+	 * could have already been garbage collected from vylog so we can't
+	 * commit the new slice. Discard the run and exit.
 	 */
 	if (lsm->is_dropped) {
-		vy_run_unref(new_run);
+		vy_run_discard(new_run);
 		goto out;
 	}
 
@@ -1689,16 +1680,7 @@ vy_task_compaction_abort(struct vy_task *task)
 	say_error("%s: failed to compact range %s",
 		  vy_lsm_name(lsm), vy_range_str(range));
 
-	/*
-	 * The LSM tree could have been dropped while we were writing the new
-	 * run. In this case we should discard the run without committing to
-	 * vylog, because all the information about the LSM tree and its runs
-	 * could have already been garbage collected from vylog.
-	 */
-	if (lsm->is_dropped)
-		vy_run_unref(task->new_run);
-	else
-		vy_run_discard(task->new_run);
+	vy_run_discard(task->new_run);
 
 	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
