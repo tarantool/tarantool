@@ -137,7 +137,20 @@
 # tarantool/luajit uses the existing workflows as reusable ones.
 
 name: justtest
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_call:
+    inputs:
+      submodule:
+        description: Name of submodule to bump.
+        required: true
+        type: string
+      revision:
+        description: Git revision from submodule repository
+        required: true
+        type: string
+
 
 jobs:
   build:
@@ -244,6 +257,19 @@ jobs:
           #
           # https://github.com/actions/checkout/issues/485
           persist-credentials: false
+          repository: tarantool/tarantool
+          # XXX: Must run the workflow against the current master,
+          # but unless it is merged use this branch as the
+          # default.
+          # ref: ${{ inputs.submodule && 'master' || github.ref }}
+          ref: ${{ inputs.submodule && 'skaplun/simple-ci-workflow-with-integration' || github.ref }}
+
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
 
       # Collect submodules information before fetching them.
       #
@@ -523,6 +549,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           # See actions/checkout step in the build job above.
+          repository: tarantool/tarantool
+          # XXX: Must run the workflow against the current master,
+          # but unless it is merged use this branch as the
+          # default.
+          # ref: ${{ inputs.submodule && 'master' || github.ref }}
+          ref: ${{ inputs.submodule && 'skaplun/simple-ci-workflow-with-integration' || github.ref }}
           persist-credentials: false
 
       # test-run is needed, because it is the test runner we're
@@ -624,8 +656,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           # See actions/checkout step in the build job above.
+          repository: tarantool/tarantool
+          # XXX: Must run the workflow against the current master,
+          # but unless it is merged use this branch as the
+          # default.
+          # ref: ${{ inputs.submodule && 'master' || github.ref }}
+          ref: ${{ inputs.submodule && 'skaplun/simple-ci-workflow-with-integration' || github.ref }}
           persist-credentials: false
 
+      # FIXME: Looks like we need this step only for the LuaJIT
+      # submodule bump -- all other submodules are irrelevant.
+      - name: Optional submodule bump
+        if: ${{ inputs.submodule }}
+        uses: ./.github/actions/bump-submodule
+        with:
+          submodule: ${{ inputs.submodule }}
+          revision: ${{ inputs.revision }}
+
+      # FIXME: Don't need to run in case of LuaJIT submodule bump,
+      # I suppose.
       - name: Checkout luajit submodule
         run: git submodule update --init --recursive third_party/luajit
 

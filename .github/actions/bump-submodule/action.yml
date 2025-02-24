@@ -17,6 +17,7 @@ runs:
     - name: Bump ${{ inputs.submodule }} submodule
       shell: bash
       run: |
+        git submodule update --init third_party/${{ inputs.submodule }}
         pushd third_party/${{ inputs.submodule }}
         git fetch origin
         git checkout ${{ inputs.revision }}
