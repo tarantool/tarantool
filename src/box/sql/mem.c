@@ -304,7 +304,7 @@ mem_set_null(struct Mem *mem)
 }
 
 void
-mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
+mem_set_int_with_sign(struct Mem *mem, int64_t value, bool is_neg)
 {
 	mem_clear(mem);
 	mem->u.i = value;
@@ -817,7 +817,7 @@ str_to_int(struct Mem *mem)
 	int64_t i;
 	if (sql_atoi64(mem->z, &i, &is_neg, mem->n) != 0)
 		return -1;
-	mem_set_int(mem, i, is_neg);
+	mem_set_int_with_sign(mem, i, is_neg);
 	return 0;
 }
 
@@ -1739,88 +1739,38 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 	return 0;
 }
 
-int
-mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg)
+int64_t
+mem_get_int_unsafe(const struct Mem *mem)
 {
-	if (mem->type == MEM_TYPE_INT) {
-		*i = mem->u.i;
-		*is_neg = true;
-		return 0;
-	}
-	if (mem->type == MEM_TYPE_UINT) {
-		*i = mem->u.i;
-		*is_neg = false;
-		return 0;
-	}
-	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0)
-		return sql_atoi64(mem->z, i, is_neg, mem->n);
-	if (mem->type == MEM_TYPE_DOUBLE) {
-		double d = mem->u.r;
-		if (d <= -1.0 && d >= (double)INT64_MIN) {
-			*i = (int64_t)d;
-			*is_neg = true;
-			return 0;
-		}
-		if (d > -1.0 && d < (double)UINT64_MAX) {
-			*i = (int64_t)(uint64_t)d;
-			*is_neg = false;
-			return 0;
-		}
-		return -1;
-	}
-	if (mem->type == MEM_TYPE_DEC) {
-		if (decimal_is_neg(&mem->u.d)) {
-			if (decimal_to_int64(&mem->u.d, i) == NULL)
-				return -1;
-			*is_neg = *i < 0;
-			return 0;
-		}
-		if (decimal_to_uint64(&mem->u.d, (uint64_t *)i) == NULL)
-			return -1;
-		*is_neg = false;
-		return 0;
-	}
-	return -1;
-}
-
-int
-mem_get_uint(const struct Mem *mem, uint64_t *u)
-{
-	if (mem->type == MEM_TYPE_INT)
-		return -1;
-	if (mem->type == MEM_TYPE_UINT) {
-		*u = mem->u.u;
-		return 0;
-	}
+	/* Yes, several places here can return values > INT64_MAX. */
+	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
+		return mem->u.i;
 	if ((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0) {
-		bool is_neg;
-		if (sql_atoi64(mem->z, (int64_t *)u, &is_neg, mem->n) != 0 ||
-		    is_neg)
-			return -1;
-		return 0;
+		bool is_neg = false;
+		int64_t val = 0;
+		return sql_atoi64(mem->z, &val, &is_neg, mem->n) != 0 ? 0 : val;
 	}
 	if (mem->type == MEM_TYPE_DOUBLE) {
 		double d = mem->u.r;
-		if (d > -1.0 && d < (double)UINT64_MAX) {
-			*u = (uint64_t)d;
-			return 0;
-		}
-		return -1;
+		if (d <= -1.0 && d >= (double)INT64_MIN)
+			return (int64_t)d;
+		if (d > -1.0 && d < (double)UINT64_MAX)
+			return (int64_t)(uint64_t)d;
+		return 0;
 	}
 	if (mem->type == MEM_TYPE_DEC) {
 		if (decimal_is_neg(&mem->u.d)) {
-			int64_t i;
-			if (decimal_to_int64(&mem->u.d, &i) == NULL || i < 0)
-				return -1;
-			assert(i == 0);
-			*u = 0;
-			return 0;
+			int64_t val = 0;
+			if (decimal_to_int64(&mem->u.d, &val) == NULL)
+				return 0;
+			return val;
 		}
-		if (decimal_to_uint64(&mem->u.d, u) == NULL)
-			return -1;
-		return 0;
+		uint64_t val = 0;
+		if (decimal_to_uint64(&mem->u.d, &val) == NULL)
+			return 0;
+		return val;
 	}
-	return -1;
+	return 0;
 }
 
 int
@@ -1876,38 +1826,6 @@ mem_get_dec(const struct Mem *mem, decimal_t *d)
 		return 0;
 	}
 	return -1;
-}
-
-int
-mem_get_bool(const struct Mem *mem, bool *b)
-{
-	if (mem->type == MEM_TYPE_BOOL) {
-		*b = mem->u.b;
-		return 0;
-	}
-	return -1;
-}
-
-int
-mem_get_bin(const struct Mem *mem, const char **s)
-{
-	if (mem->type == MEM_TYPE_STR) {
-		*s = mem->n > 0 ? mem->z : NULL;
-		return 0;
-	}
-	if (mem->type != MEM_TYPE_BIN)
-		return -1;
-	*s = mem->z;
-	return 0;
-}
-
-int
-mem_len(const struct Mem *mem, size_t *len)
-{
-	if (!mem_is_bytes(mem))
-		return -1;
-	*len = mem->n;
-	return 0;
 }
 
 int
@@ -2086,7 +2004,7 @@ mem_add_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2192,7 +2110,7 @@ mem_sub_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2300,7 +2218,7 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2358,7 +2276,7 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2390,7 +2308,7 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 		return -1;
 	}
-	mem_set_int(result, res, is_neg);
+	mem_set_int_with_sign(result, res, is_neg);
 	return 0;
 }
 
@@ -2682,8 +2600,8 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		mem.u.u = mp_decode_uint(b);
 		break;
 	case MP_INT:
-		mem.type = MEM_TYPE_INT;
 		mem.u.i = mp_decode_int(b);
+		mem.type = mem.u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
 		break;
 	case MP_FLOAT:
 		mem.type = MEM_TYPE_DOUBLE;
@@ -3109,7 +3027,7 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 	}
 	case MP_INT: {
 		mem->u.i = mp_decode_int(&buf);
-		mem->type = MEM_TYPE_INT;
+		mem->type = mem->u.i < 0 ? MEM_TYPE_INT : MEM_TYPE_UINT;
 		mem->flags = 0;
 		break;
 	}
@@ -3663,9 +3581,10 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 			val[i].u.r = d;
 			break;
 		case MP_INT:
-			val[i].type = MEM_TYPE_INT;
 			assert(val[i].flags == 0);
 			val[i].u.i = mp_decode_int(&data);
+			val[i].type = val[i].u.i < 0 ?
+				MEM_TYPE_INT : MEM_TYPE_UINT;
 			break;
 		case MP_UINT:
 			val[i].type = MEM_TYPE_UINT;
