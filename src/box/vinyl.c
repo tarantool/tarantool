@@ -3267,9 +3267,13 @@ vy_gc_lsm(struct vy_lsm_recovery_info *lsm_info)
 	}
 	struct vy_run_recovery_info *run_info;
 	rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
-		if (lsm_info->create_lsn < 0)
-			run_info->is_incomplete = true;
-		if (!run_info->is_dropped) {
+		/*
+		 * Drop all runs that belong to the dropped LSM tree except
+		 * incomplete ones because the latter may still be written by
+		 * background tasks. They will be dropped on task completion,
+		 * see vy_run_discard().
+		 */
+		if (!run_info->is_dropped && !run_info->is_incomplete) {
 			run_info->is_dropped = true;
 			run_info->gc_lsn = lsm_info->drop_lsn;
 			vy_log_drop_run(run_info->id, run_info->gc_lsn);
@@ -3306,7 +3310,8 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 			if ((run_info->is_dropped &&
 			     run_info->gc_lsn < gc_lsn &&
 			     (gc_mask & VY_GC_DROPPED) != 0) ||
-			    (run_info->is_incomplete &&
+			    ((run_info->is_incomplete ||
+			      lsm_info->create_lsn < 0) &&
 			     (gc_mask & VY_GC_INCOMPLETE) != 0)) {
 				vy_gc_run(env, lsm_info, run_info);
 			}
