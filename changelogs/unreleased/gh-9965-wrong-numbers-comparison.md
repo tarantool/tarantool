@@ -15,7 +15,7 @@ drop-in replaceable by the `number` field type.
 The reason is that the sorting of `double` fields would always compare the field
 values as C-language doubles, even when actual integers are stored. This works
 fine for small numbers, but starting from 2^53 the double-style comparison
-looses precision. For example, 18446744073709551615 and 18446744073709551614
+loses precision. For example, 18446744073709551615 and 18446744073709551614
 would be considered the same values.
 
 Besides, point-lookups in such index are going to be broken by design too -
@@ -25,7 +25,7 @@ other integers around this point.
 Unfortunately, even if the user doesn't have the `double` type in any vinyl
 indexes, but **ever had it before**, it is still unsafe. A `double` index
 altered to `number` or `scalar` would remain broken. It is **very important that
-the users rebuild all the vinyl indexes that have or ever had the `double` field
+users rebuild all the vinyl indexes that have or ever had the `double` field
 type in them**. What is worse, just an alter `double` -> `number` **won't
 work**. The old index must be dropped and a new one must be created. In any
 order.
