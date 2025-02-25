@@ -1563,6 +1563,7 @@ local index_options = {
     bloom_fpr = 'number',
     func = 'number, string',
     hint = 'boolean',
+    covers = 'table',
 }
 
 local function jsonpaths_from_idx_parts(parts)
@@ -1618,6 +1619,42 @@ local function func_id_by_name(func_name, level)
     return func.id
 end
 box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
+
+-- Normalize array of fields `fields`:
+-- - fields referenced as name are resolved to 0-based field number.
+-- - fields referenced as 1-based field number are converted to 0-based.
+local function normalize_fields(fields, format, name, level)
+    -- Do not much care if opts.covers is something strange like
+    -- sparse array or map with keys.
+    local result = {}
+    for i, field in ipairs(fields or {}) do
+        local idx
+        local field_ref = name .. "[" .. i .. "]: "
+        if type(field) == 'string' then
+            idx = format_field_index_by_name(format, field)
+            if idx == nil then
+                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                          "field was not found by name '" .. field .. "'",
+                          level + 1)
+            end
+        elseif type(field) == 'number' then
+            if field <= 0 then
+                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                          "field (number) must be one-based", level + 1)
+            end
+            idx = field
+        else
+            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                      "field (name or number) is expected", level + 1)
+        end
+        result[i] = idx - 1
+    end
+    if #result ~= 0 then
+        return result
+    else
+        return nil
+    end
+end
 
 box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     check_param(space_id, 'space_id', 'number', 2)
@@ -1705,6 +1742,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             bloom_fpr = options.bloom_fpr,
             func = options.func,
             hint = options.hint,
+            covers = options.covers,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
@@ -1730,6 +1768,8 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
+    index_opts.covers = normalize_fields(index_opts.covers, format,
+                                         'options.covers', 2)
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, iid,
                                                         space.name, name, 2)
@@ -1871,6 +1911,8 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
+    index_opts.covers = normalize_fields(index_opts.covers, format,
+                                         'options.covers', 2)
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, index_id,
                                                         space.name,

@@ -751,6 +751,17 @@ double_compare_int64(double lhs, int64_t rhs, int k)
 }
 
 /**
+ * Compare two operands as unt32_t.
+ * Needed for qsort.
+ */
+static inline int
+cmp_u32(const void *_a, const void *_b)
+{
+	const uint32_t *a = (const uint32_t *)_a, *b = (const uint32_t *)_b;
+	return COMPARE_RESULT(*a, *b);
+}
+
+/**
  * Compare two operands as int64_t.
  * Needed for qsort.
  */
