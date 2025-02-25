@@ -50,7 +50,7 @@ foreach(test_path ${tests})
            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   )
   set_tests_properties(${test_title} PROPERTIES
-    ENVIRONMENT "${TEST_ENV}"
+    ENVIRONMENT "${TEST_ENV} ${TARANTOOL_ASAN_OPTIONS}"
     LABELS "${TEST_SUITE_NAME};regression;"
     DEPENDS ${TEST_SUITE_NAME}-deps
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
