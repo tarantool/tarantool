@@ -66,9 +66,8 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                 else
                     local value = "Value for key " .. key
                     local operation_args = {key, value}
-                    local success = false
 
-                    local status, exec_err = pcall(function()
+                    local insert_status, insert_result = pcall(function()
                         leader_node:exec(function(operation_args, space_name)
                             box.begin({txn_isolation = 'linearizable'})
                             box.space[space_name]:insert(operation_args)
@@ -76,8 +75,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end, {operation_args, space_name})
                     end)
 
-                    if status then
-                        success = true
+                    if insert_status then
                         if SUCCESSFUL_LOGS then
                             log_info("[PERIODIC INSERT] Successfully inserted key: " .. key ..
                                     ", value: " .. value ..
@@ -85,11 +83,27 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end
                         key = key + step
                     else
-                        log_info("[PERIODIC INSERT] Failed to execute insert operation for key: " ..
-                                key .. ", value: " .. value ..
-                                ", into space: '" .. space_name ..
-                                "'. Retrying in " .. interval .. " seconds...")
-                        log_error("[PERIODIC INSERT] " .. json.encode(exec_err))
+                        --- Belated key case
+                        local exists_status, exists_result = pcall(function()
+                            return leader_node:exec(function(k, space_name)
+                                return box.space[space_name]:get(k) ~= nil
+                            end, {key, space_name})
+                        end)
+
+                        if exists_status and exists_result then
+                            log_info("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
+                            key = key + step
+                        elseif not exists_status then
+                            log_error("[PERIODIC INSERT] Failed to check existence of key: " .. key .. ". Error: " .. json.encode(exists_result))
+                        ---
+                        else
+                            log_info("[PERIODIC INSERT] Failed to execute insert operation for key: " .. key .. 
+                                    ", value: " .. value ..
+                                    ", into space: '" .. space_name ..
+                                    "'. Retrying in " .. interval .. " seconds..." ..
+                                    " Error: " .. json.encode(insert_result))
+                        end
+
                         fiber.sleep(interval)
                     end
                 
@@ -100,7 +114,6 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                 log_error("[PERIODIC INSERT] " .. json.encode(err))
             end
 
-            -- Делаем паузу перед следующей итерацией цикла
             fiber.sleep(interval)
         end
     end, cg, space_name, i_0, step, interval)
@@ -214,7 +227,7 @@ end
 -- Function of monitoring the number of divergent entries in logs
 local function divergence_monitor(cg, space_name, n, step, interval)
     fiber.create(function()
-        count = 0
+        local count = 0
         while true do
             local valid_nodes = {}
             -- Wrapped the entire cycle in pcall for safe execution
@@ -259,6 +272,10 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                         local divergence = n - common_length    
                         if SUCCESSFUL_LOGS then
                             log_info(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        else
+                            if divergence ~= 0 then
+                                log_info(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                            end
                         end
                     else
                         log_info("[DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries.")
