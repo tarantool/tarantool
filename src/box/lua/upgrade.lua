@@ -2096,6 +2096,7 @@ local downgrade_versions = {
     "2.11.3",
     "2.11.4",
     "2.11.5",
+    "2.11.6",
     -- DOWNGRADE VERSIONS END
 }
 
