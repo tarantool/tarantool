@@ -124,7 +124,7 @@ source: prepare
 	./packpack/packpack tarball
 
 source-deploy: source
-	aws --endpoint-url ${AWS_S3_ENDPOINT_URL} s3 cp build/*.tar.gz ${S3_SOURCE_REPO_URL}/ --acl public-read --dryrun
+	aws --endpoint-url ${AWS_S3_ENDPOINT_URL} s3 cp build/*.tar.gz ${S3_SOURCE_REPO_URL}/ --acl public-read
 
 schema-deploy:
 	if [ -n "${GIT_TAG}" ]; then \
