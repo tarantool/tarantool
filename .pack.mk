@@ -16,7 +16,7 @@ MINOR_VERSION = $(word 2, $(subst ., ,${GIT_DESCRIBE}))
 VERSION = ${MAJOR_VERSION}.${MINOR_VERSION}
 
 TARANTOOL_SERIES = series-${MAJOR_VERSION}
-S3_SOURCE_REPO_URL = s3://tarantool_repo/sources
+S3_SOURCE_REPO_URL = s3://tarantool-dev/sources
 S3_SCHEMA_REPO_URL = s3://tarantool_repo/schema
 
 prepare:

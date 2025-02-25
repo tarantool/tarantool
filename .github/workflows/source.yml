@@ -1,10 +1,6 @@
 name: source
 
-on:
-  push:
-    tags-ignore:
-      - '**-entrypoint'
-  workflow_dispatch:
+on: [push]
 
 env:
   CI_MAKE: make -f .pack.mk
