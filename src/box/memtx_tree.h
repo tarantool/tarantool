@@ -31,6 +31,10 @@
  * SUCH DAMAGE.
  */
 
+#include <unistd.h>
+
+#include "memtx_sort_data.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -41,6 +45,11 @@ struct memtx_engine;
 
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def);
+
+bool
+memtx_tree_index_read_view_dump_sort_data(struct index_read_view *base,
+					  ssize_t tuple_count,
+					  struct memtx_sort_data *msd);
 
 #if defined(__cplusplus)
 } /* extern "C" */
