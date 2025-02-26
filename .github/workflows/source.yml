@@ -22,13 +22,36 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
       - uses: ./.github/actions/environment
+
+      # AWS CLI v2.23.0 enables an integrity protection mechanism
+      # by default. VK Cloud doesn't support it. Install the last
+      # AWS CLI version with the feature disabled by default.
+      #
+      # https://github.com/aws/aws-cli/issues/9214
+      - name: Setup AWS CLI
+        run: |
+          curl                    \
+            --location            \
+            --fail                \
+            --silent              \
+            --show-error          \
+            --retry 5             \
+            --retry-delay 5       \
+            --output awscliv2.zip \
+            https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.22.35.zip
+          unzip -o awscliv2.zip
+          sudo ./aws/install --update
+          aws --version
+
       - name: packaging
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_ENDPOINT_URL: ${{ secrets.AWS_S3_ENDPOINT_URL }}
         run: ${CI_MAKE} source-deploy
+
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
