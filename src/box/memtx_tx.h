@@ -413,12 +413,6 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 }
 
 /**
- * Run several rounds of memtx_tx_story_gc_step()
- */
-void
-memtx_tx_story_gc();
-
-/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  *
  * @param txn - current transactions.
@@ -562,9 +556,9 @@ void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 
 /**
- * Export step of garbage collector to builtin module
+ * Export step of garbage collector for internal purposes.
  */
-API_EXPORT void
+void
 memtx_tx_story_gc_step(void);
 
 #if defined(ENABLE_READ_VIEW)
