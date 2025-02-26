@@ -301,7 +301,7 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 
 /** Initialize a new stmt object within txn. */
 static struct txn_stmt *
-txn_stmt_new(struct txn *txn)
+txn_stmt_new(struct txn *txn, uint16_t type)
 {
 	size_t size;
 	struct txn_stmt *stmt;
@@ -326,6 +326,7 @@ txn_stmt_new(struct txn *txn)
 	stmt->row = NULL;
 	stmt->has_triggers = false;
 	stmt->is_own_change = false;
+	stmt->type = type;
 	return stmt;
 }
 
@@ -628,7 +629,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
 
-	struct txn_stmt *stmt = txn_stmt_new(txn);
+	struct txn_stmt *stmt = txn_stmt_new(txn, type);
 	if (stmt == NULL)
 		return -1;
 
@@ -647,12 +648,11 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn_begin_in_engine(engine, txn) != 0)
 		goto fail;
 
-	stmt->engine = engine;
-	stmt->space = space;
-	stmt->type = type;
 	if (engine_begin_statement(engine, txn) != 0)
 		goto fail;
 
+	stmt->engine = engine;
+	stmt->space = space;
 	return 0;
 fail:
 	txn_rollback_stmt(txn);
