@@ -2,8 +2,12 @@ name: downgrade_versions
 
 on:
   push:
+    branches:
+      - 'master'
+      - 'release/**'
     tags:
       - '**'
+  pull_request:
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
