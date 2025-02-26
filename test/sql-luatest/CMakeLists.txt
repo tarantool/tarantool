@@ -56,10 +56,3 @@ foreach(test_path ${tests})
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
   )
 endforeach()
-
-# See test/sql-luatest/suite.ini.
-set_tests_properties(
-  test/sql-luatest/ghs_119_too_long_mem_values_test.lua
-  test/sql-luatest/ghs_122_allocations_in_printf_test.lua
-  PROPERTIES LABELS "long"
-)
