@@ -51,13 +51,13 @@ BUGFIXES_ANCHOR = '{{BUGFIXES}}'
 OVERVIEW_TEMPLATE = """
 ## Overview
 
-// {{{ BETA X.Y.1
+// {{{ 3.x
 
-**TBD** is the [beta][release_policy] version of the **TBD** release series.
+Tarantool 3.x is the recommended release series. Users of Tarantool 2.11 are
+encouraged to update to the latest 3.x release.
 
-This release introduces {{FEATURES}} new features and resolves {{BUGFIXES}} bugs since
-the **TBD** version. There can be bugs in less common areas. If you find any,
-feel free to [report an issue][issues] on GitHub.
+This release introduces {{FEATURES}} improvements and resolves {{BUGFIXES}}
+bugs since **TBD**.
 
 Notable changes are:
 
@@ -65,70 +65,42 @@ Notable changes are:
 * **TBD**
 * **TBD**
 
-[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
-[issues]: https://github.com/tarantool/tarantool/issues
+// }}} 3.x
 
-// }}} BETA X.Y.1
+// {{{ 2.11
 
-// {{{ STABLE X.Y.{2,3}
+2.x is the old stable release series. Users are encouraged to update to the
+latest 3.x release.
 
-**TBD** is the **TBD**th [stable][release_policy] version of the **TBD** release
-series. It introduces {{FEATURES}} improvements and resolves {{BUGFIXES}} bugs since
-**TBD**.
+This is a bugfix release. It resolves {{BUGFIXES}} issues since the previous
+version.
 
-The "stable" label means that we have all planned features implemented and we
-see no high-impact issues. However, if you encounter an issue, feel free to
-[report it][issues] on GitHub.
+// }}} 2.11
 
-[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
-[issues]: https://github.com/tarantool/tarantool/issues
-
-// }}} STABLE X.Y.{2,3}
-
-// {{{ LTS 1.10.Z
-
-**TBD** is the next stable release in the [long-term support (LTS)
-version][release_policy][release_policy] 1.10.x release series.
-
-The label "stable" means there are 1.10.x-based applications running in
-production for quite a while without known crashes, incorrect results or
-other showstopper bugs.
-
-This release introduces {{FEATURES}} improvements and resolves roughly {{BUGFIXES}}
-issues since the **TBD** version.
-
-[release_policy]: https://www.tarantool.io/en/doc/1.10/dev_guide/release_management/#release-policy
-[issues]: https://github.com/tarantool/tarantool/issues
-
-// }}} LTS 1.10.Z
+Please, consider the full list of user-visible changes below.
 """.strip()  # noqa: E501 line too long
 
 COMPATIBILITY_TEMPLATE = """
 ## Compatibility
 
-// {{{ BETA / STABLE 2.Y.Z
+Tarantool 2.x and 3.x are compatible in the binary data layout, client-server
+protocol, and replication protocol. It means that the updating may be performed
+with zero downtime for read requests and the-order-of-network-lag downtime for
+write requests.
 
-Tarantool 2.x is backward compatible with Tarantool 1.10.x in the binary data
-layout, client-server protocol, and replication protocol.
+Please, follow the [upgrade procedure][upgrade] to plan your update actions.
 
-Please [upgrade][upgrade] using the `box.schema.upgrade()` procedure to unlock
-all the new features of the 2.x series.
+// {{{ 3.x
+
+Users of Tarantool 2.x may be interested in the [compat][compat] options that
+allow to imitate some 2.x behavior. This allows to perform application code
+update step-by-step, not all-at-once.
+
+[compat]: https://www.tarantool.io/en/doc/latest/reference/configuration/configuration_reference/#compat
+
+// }}} 3.x
 
 [upgrade]: https://www.tarantool.io/en/doc/latest/book/admin/upgrades/
-
-// }}} BETA / STABLE 2.Y.Z
-
-// {{{ LTS 1.10.Z
-
-Tarantool 1.10.x is backward compatible with Tarantool 1.9.x in binary data
-layout, client-server protocol and replication protocol.
-
-Please [upgrade][upgrade] using the `box.schema.upgrade()` procedure to unlock
-all the new features of the 1.10.x series.
-
-[upgrade]: https://www.tarantool.io/en/doc/1.10/book/admin/upgrades/
-
-// }}} LTS 1.10.Z
 """.strip()  # noqa: E501 line too long
 
 ENTERPRISE_TEMPLATE = """
