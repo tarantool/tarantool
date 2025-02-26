@@ -55,6 +55,7 @@ char CLUSTER_NAME[NODE_NAME_SIZE_MAX];
 
 struct uri_set replication_uris;
 double replication_timeout = 1.0; /* seconds */
+double replication_reconnect_timeout = -1.0; /* seconds */
 double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
