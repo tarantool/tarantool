@@ -8,11 +8,6 @@ STATIC_DIR = static-build
 STATIC_BIN_DIR = ${STATIC_DIR}/tarantool-prefix/src/tarantool-build
 LUAJIT_TEST_BUILD_DIR = ${BUILD_DIR}
 
-# `nproc`                   - for Linux
-# `sysctl -n hw.logicalcpu` - for OSX
-# `sysctl -n hw.ncpu`       - for FreeBSD (deprecated in OSX)
-NPROC ?= $(shell nproc || sysctl -n hw.logicalcpu || sysctl -n hw.ncpu)
-
 MAX_PROCS ?= 2048
 MAX_FILES ?= 4096
 
@@ -20,7 +15,7 @@ VARDIR ?= /tmp/t
 TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
 
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
-CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
+CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel
 
 .PHONY: configure
 configure:
@@ -42,7 +37,7 @@ build: configure
 
 .PHONY: run-luajit-test
 run-luajit-test:
-	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel ${NPROC} --target LuaJIT-test
+	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel --target LuaJIT-test
 
 .PHONY: install-test-deps
 install-test-deps:
