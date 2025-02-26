@@ -138,4 +138,9 @@ if (ENABLE_ASAN)
         LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/asan/lsan.supp
     )
     set(TARANTOOL_ASAN_OPTIONS ${TARANTOOL_ASAN_OPTIONS} PARENT_SCOPE)
+
+    # Write ASAN and LSAN options to an .envrc file.
+    foreach(ENV_VAR ${TARANTOOL_ASAN_OPTIONS})
+        file(APPEND ${ENVRC_FILENAME} "export ${ENV_VAR}\n")
+    endforeach()
 endif()
