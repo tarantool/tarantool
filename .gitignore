@@ -3,6 +3,7 @@ _CPack_Packages
 *.cbp
 *.d
 *.dylib
+*.envrc
 *.gcno
 *.gcda
 *.gcov
