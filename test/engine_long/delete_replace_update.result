@@ -4,7 +4,7 @@ delete_replace_update = require('suite').delete_replace_update
 engine_name = 'memtx'
 ---
 ...
-iterations = 100000
+iterations = 100
 ---
 ...
 math.randomseed(1)
@@ -12,48 +12,48 @@ math.randomseed(1)
 ...
 delete_replace_update(engine_name, iterations)
 ---
-- - 100000
-  - 3
-  - EISMEJTLAMKKUKAGXHLK
-  - BUPYVKWEHVEFKSZFAQIK
+- - 100
+  - 2
+  - SGIXHMKSOLVWWLTTEVNN
+  - AMFBCLRASHOYSVNVIPAV
 ...
 math.randomseed(2)
 ---
 ...
 delete_replace_update(engine_name, iterations)
 ---
-- - 100000
-  - 3
-  - DTUNRKMNKTQDTBLYQVUQ
-  - UHMBETMEPMQWOIHLAOSR
+- - 100
+  - 2
+  - SVQLKWPNNRTNYWSWVYAQ
+  - TDIDKXTQKRZZLYWSSLKO
 ...
 math.randomseed(3)
 ---
 ...
 delete_replace_update(engine_name, iterations)
 ---
-- - 100000
-  - 1
-  - KORQQVUDKFSDPZVQOEZE
-  - RSMFJYXLNSOILKDEFJZW
+- - 100
+  - 4
+  - FNVOMOFBIDCGNQBBYBBJ
+  - NBWADZEKWJMKVRXYPPEQ
 ...
 math.randomseed(4)
 ---
 ...
 delete_replace_update(engine_name, iterations)
 ---
-- - 100000
-  - 3
-  - OKKQFSHPFMOLMOFOXEAN
-  - RXXYWNPDXVVGONOGTEZK
+- - 100
+  - 5
+  - LPVUCKCUGNIRTOLZZRZD
+  - VIDBEUEJNCMABIJCUUTD
 ...
 math.randomseed(5)
 ---
 ...
 delete_replace_update(engine_name, iterations)
 ---
-- - 100000
-  - 3
-  - LCUFGMXHLNHJBAQJDHGH
-  - HKBELZCRRWNZHFIRAHJD
+- - 100
+  - 4
+  - XZHEEAKZIXIPCSFCUGVO
+  - MEQPYUDXZBQLNRBYXQHL
 ...

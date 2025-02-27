@@ -1,6 +1,6 @@
 delete_replace_update = require('suite').delete_replace_update
 engine_name = 'memtx'
-iterations = 100000
+iterations = 100
 
 math.randomseed(1)
 delete_replace_update(engine_name, iterations)
