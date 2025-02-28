@@ -1066,6 +1066,24 @@ lbox_fiber_set_max_slice(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_fiber_client_limit(struct lua_State *L)
+{
+	int old_limit = fiber_max_count;
+
+	if (lua_gettop(L) != 0) {
+		int new_limit = lua_tointeger(L, -1);
+		if (new_limit <= 0) {
+			diag_set(IllegalParams, "fiber limit must be > 0");
+			luaT_error(L);
+		}
+		fiber_max_count = new_limit;
+	}
+
+	lua_pushinteger(L, old_limit);
+	return 1;
+}
+
 static const struct luaL_Reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
@@ -1090,6 +1108,7 @@ static const struct luaL_Reg fiberlib[] = {
 	{"top_enable", lbox_fiber_top_enable},
 	{"top_disable", lbox_fiber_top_disable},
 	{"tx_user_pool_size", lbox_fiber_tx_user_pool_size},
+	{"client_fiber_limit", lbox_fiber_client_limit},
 #ifdef ENABLE_BACKTRACE
 	{"parent_backtrace_enable", lbox_fiber_parent_backtrace_enable},
 	{"parent_backtrace_disable", lbox_fiber_parent_backtrace_disable},
