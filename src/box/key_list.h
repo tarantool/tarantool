@@ -66,6 +66,11 @@ struct key_list_iterator {
 	const char *data_end;
 	/** Whether the iterator must validate processed keys. */
 	bool validate;
+	/**
+	 * Whether the underlying function is multikey. Note that the
+	 * iterator can return one value even if the flag is set.
+	 */
+	bool func_is_multikey;
 	/** Format used for allocating keys. Not referenced. */
 	struct tuple_format *format;
 };
