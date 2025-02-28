@@ -361,20 +361,20 @@ point_hole_storage_key_hash(struct point_hole_key *key)
 
 /** point_hole_item comparator. */
 static int
-point_hole_storage_equal(const struct point_hole_item *obj1,
-			 const struct point_hole_item *obj2)
+point_hole_storage_cmp(const struct point_hole_item *obj1,
+		       const struct point_hole_item *obj2)
 {
 	/* Canonical msgpack is comparable by memcmp. */
 	if (obj1->index_unique_id != obj2->index_unique_id ||
 	    obj1->key_len != obj2->key_len)
 		return 1;
-	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
+	return memcmp(obj1->key, obj2->key, obj1->key_len);
 }
 
 /** point_hole_item comparator with key. */
 static int
-point_hole_storage_key_equal(const struct point_hole_key *key,
-			     const struct point_hole_item *object)
+point_hole_storage_key_cmp(const struct point_hole_key *key,
+			   const struct point_hole_item *object)
 {
 	if (key->index->unique_id != object->index_unique_id)
 		return 1;
@@ -401,8 +401,8 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #define mh_arg_t int
 #define mh_hash(a, arg) ((*(a))->hash)
 #define mh_hash_key(a, arg) ( point_hole_storage_key_hash(a) )
-#define mh_cmp(a, b, arg) point_hole_storage_equal(*(a), *(b))
-#define mh_cmp_key(a, b, arg) point_hole_storage_key_equal((a), *(b))
+#define mh_cmp(a, b, arg) point_hole_storage_cmp(*(a), *(b))
+#define mh_cmp_key(a, b, arg) point_hole_storage_key_cmp((a), *(b))
 #define MH_SOURCE
 #include "salad/mhash.h"
 
