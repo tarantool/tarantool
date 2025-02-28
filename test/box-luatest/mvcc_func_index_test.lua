@@ -279,3 +279,37 @@ g.test_crash_on_deletion = function(cg)
         mvcc_clear_stories()
     end)
 end
+
+-- The case checks if gap tracking with successor works correctly.
+g.test_func_gap_tracking_with_successor = function(cg)
+    cg.server:exec(function()
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local txn = txn_proxy.new()
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[1]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        s:replace{1}
+        s:replace{10}
+
+        box.begin()
+        t.assert_equals(s.index.func:select(10, {iterator = 'LT'}), {{1}})
+        txn:begin()
+        txn('box.space.test:replace{5}')
+        txn:commit()
+        -- Check if gap read is repeatable.
+        t.assert_equals(s.index.func:select(10, {iterator = 'LT'}), {{1}})
+        box.rollback()
+    end)
+end
