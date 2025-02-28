@@ -511,6 +511,22 @@ lbox_cfg_get_force_recovery(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_cfg_set_fiber_limit(struct lua_State *L)
+{
+	int limit = lua_tointeger(L, 1);
+	fiber_set_client_limit(limit);
+	return 0;
+}
+
+static int
+lbox_cfg_set_read_max_map_count(struct lua_State *L)
+{
+	int max_map_count = read_max_map_count();
+	lua_pushinteger(L, max_map_count);
+	return 1;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -563,6 +579,8 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_txn_isolation", lbox_cfg_set_txn_isolation},
 		{"cfg_set_auth_type", lbox_cfg_set_auth_type},
 		{"cfg_get_force_recovery", lbox_cfg_get_force_recovery},
+		{"cfg_set_fiber_limit", lbox_cfg_set_fiber_limit},
+		{"cfg_set_read_max_map_count", lbox_cfg_set_read_max_map_count},
 		{NULL, NULL}
 	};
 

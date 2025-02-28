@@ -1180,6 +1180,16 @@ local function load_cfg(cfg)
         private.set_recovery_triggers(snap_version)
     end
 
+    if type(cfg.fiber_limit) == "number" then
+        private.cfg_set_fiber_limit(cfg.fiber_limit)
+    else
+        local max_map_count = private.cfg_set_read_max_map_count()
+        if max_map_count > 0 then
+            local computed_limit = math.floor((max_map_count / 2) * 0.9)
+            private.cfg_set_fiber_limit(computed_limit)
+        end
+    end
+
     -- This call either succeeds or calls panic() / exit().
     private.cfg_load()
 
