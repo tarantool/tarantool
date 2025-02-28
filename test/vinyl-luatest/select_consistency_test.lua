@@ -269,36 +269,48 @@ g.test_select_consistency = function(cg)
         end)
     end
     run_test()
-    -- Peform major compaction and check that there is no garbage statements.
+
+    -- Delete all tuples stored in the primary index, perform major compaction,
+    -- and check that there's no garbage statements left.
     cg.server:exec(function()
+        local function wait_compaction()
+            t.helpers.retrying({timeout = 60}, function()
+                t.assert_covers(box.stat.vinyl(), {
+                    scheduler = {compaction_queue = 0, tasks_inprogress = 0},
+                })
+            end)
+        end
+
+        -- Wait for all in-progress dump and compaction tasks to complete.
+        box.snapshot()
+        wait_compaction()
+
+        -- Delete all tuples stored in the primary index.
         local s = box.space.test
-        box.stat.reset()
+        for _, tuple in ipairs(s:select()) do
+            s:delete(tuple[1])
+        end
+
+        -- Compact the primary index first to generate deferred DELETEs.
         box.snapshot()
         s.index.i1:compact()
-        t.helpers.retrying({timeout = 60}, function()
-            t.assert_equals(box.stat.vinyl().scheduler.compaction_queue, 0)
-            t.assert_equals(box.stat.vinyl().scheduler.tasks_inprogress, 0)
-        end)
+        wait_compaction()
+
+        -- Compact the secondary indexes.
         box.snapshot()
-        s.index.i2:compact()
-        s.index.i3:compact()
-        s.index.i4:compact()
-        s.index.i5:compact()
-        t.helpers.retrying({timeout = 60}, function()
-            t.assert_equals(box.stat.vinyl().scheduler.compaction_queue, 0)
-            t.assert_equals(box.stat.vinyl().scheduler.tasks_inprogress, 0)
-        end)
-        local c1 = s.index.i1:count()
-        local c2 = s.index.i2:count()
-        local c3 = s.index.i3:count()
-        local c4 = s.index.i4:count()
-        local c5 = s.index.i5:count()
-        t.assert_equals(s.index.i1:len(), c1)
-        t.assert_equals(s.index.i2:len(), c2)
-        t.assert_equals(s.index.i3:len(), c3)
-        t.assert_equals(s.index.i4:len(), c4)
-        t.assert_equals(s.index.i5:len(), c5)
-        t.assert_equals(c2, c3)
-        t.assert_equals(c4, c5)
+        for i = 2, 5 do
+            s.index['i' .. i]:compact()
+        end
+        wait_compaction()
+
+        -- Check that there's no garbage statements left.
+        local actual = {}
+        local expected = {}
+        for i = 1, 5 do
+            local k = 'i' .. i
+            actual[k] = s.index[k]:stat()
+            expected[k] = {rows = 0}
+        end
+        t.assert_covers(actual, expected)
     end)
 end
