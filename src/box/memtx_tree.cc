@@ -1563,6 +1563,7 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 			struct tuple *old_tuple, struct tuple *new_tuple,
 			enum dup_replace_mode mode, hint_t hint,
 			struct memtx_tree_data<true> *replaced_data,
+			struct memtx_tree_data<true> *successor_data,
 			bool *is_multikey_conflict)
 {
 	struct memtx_tree_data<true> new_data, dup_data;
@@ -1570,7 +1571,8 @@ memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
 	new_data.hint = hint;
 	dup_data.tuple = NULL;
 	*is_multikey_conflict = false;
-	if (memtx_tree_insert(&index->tree, new_data, &dup_data, NULL) != 0) {
+	if (memtx_tree_insert(&index->tree, new_data, &dup_data,
+			      successor_data) != 0) {
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "memtx_tree_index",
 			 "replace");
 		return -1;
@@ -1712,7 +1714,7 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 			err = memtx_tree_index_replace_multikey_one(index,
 						old_tuple, new_tuple, mode,
 						multikey_idx, &replaced_data,
-						&is_multikey_conflict);
+						NULL, &is_multikey_conflict);
 			if (err != 0)
 				break;
 			if (replaced_data.tuple != NULL &&
@@ -1810,7 +1812,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			struct tuple *new_tuple, enum dup_replace_mode mode,
 			struct tuple **result, struct tuple **successor)
 {
-	/* FUNC doesn't support successor for now. */
+	/* The successor will be set only if the function is not multikey. */
 	*successor = NULL;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
@@ -1855,14 +1857,18 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			undo->key.hint = (hint_t)key;
 			rlist_add(&new_keys, &undo->link);
 			bool is_multikey_conflict;
-			struct memtx_tree_data<true> old_data;
+			struct memtx_tree_data<true> old_data, successor_data;
 			old_data.tuple = NULL;
+			successor_data.tuple = NULL;
 			err = memtx_tree_index_replace_multikey_one(index,
 						old_tuple, new_tuple,
 						mode, (hint_t)key, &old_data,
+						&successor_data,
 						&is_multikey_conflict);
 			if (err != 0)
 				break;
+			if (!it.func_is_multikey)
+				*successor = successor_data.tuple;
 			if (old_data.tuple != NULL && !is_multikey_conflict) {
 				undo = func_key_undo_new(region);
 				if (undo == NULL) {
