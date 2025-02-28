@@ -506,6 +506,12 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
            engine_name == 'vinyl')
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
+
+    local vinyl_range_size = oneof({1, 4, 16, 128}) * 1024
+    local vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024
+    -- vinyl_page_size must be in range (0, vinyl_range_size].
+    vinyl_page_size = math.min(vinyl_page_size, vinyl_range_size)
+
     local box_cfg_options = {
         checkpoint_count = math.random(5),
         checkpoint_interval = math.random(60),
@@ -521,8 +527,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
         vinyl_defer_deletes = oneof({true, false}),
         vinyl_memory = oneof({8, 16, 32, 64, 128}) * 1024 * 1024,
-        vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024,
-        vinyl_range_size = oneof({0, 1, 4, 16, 128}) * 1024,
+        vinyl_page_size = vinyl_page_size,
+        vinyl_range_size = vinyl_range_size,
         vinyl_read_threads = math.random(2, 10),
         vinyl_run_count_per_level = oneof({1, 2, 4, 8, 16, 32}),
         vinyl_run_size_ratio = math.random(2, 5),
