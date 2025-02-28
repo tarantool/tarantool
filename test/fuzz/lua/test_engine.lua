@@ -128,6 +128,15 @@ local function keys(t)
     return table_keys
 end
 
+local function contains(t, value)
+    for _, v in pairs(t) do
+        if value == v then
+            return true
+        end
+    end
+    return false
+end
+
 local function rmtree(path)
     log.info('CLEANUP %s', path)
     if (fio.path.is_file(path) or fio.path.is_link(path)) then
@@ -692,8 +701,7 @@ end
 
 local function index_random_op(_, idx)
     assert(idx)
-    if idx.type ~= 'TREE' and
-       idx.type ~= 'BITSET' and
+    if idx.type ~= 'BITSET' and
        idx.type ~= 'RTREE' then
         idx:random()
     end
@@ -811,6 +819,14 @@ local function box_snapshot()
     end
 end
 
+-- List of operations for fuzzer. Each operation is a key-value pair
+-- where key is a name of an operation and value is a table with
+-- following keys:
+-- func - function performing the operation.
+-- args - function generating arguments for the operation, accepts
+--        the space as the only argument.
+-- [optional] engines - list of supported engines. If set, all spaces
+--                      with unsupported engine will skip the operation.
 local ops = {
     -- DML.
     DELETE_OP = {
@@ -932,6 +948,7 @@ local ops = {
             local idx_n = oneof(keys(space.index))
             return space.index[idx_n]
         end,
+        engines = {'memtx'},
     },
     INDEX_COUNT_OP = {
         func = index_count_op,
@@ -1009,8 +1026,13 @@ local ops = {
 }
 
 local function apply_op(space, op_name)
-    local func = ops[op_name].func
-    local args = { ops[op_name].args(space) }
+    local op = ops[op_name]
+    if op.engines ~= nil and not contains(op.engines, space.engine) then
+        log.info('SKIP: %s does not support %s', space.engine, op_name)
+        return
+    end
+    local func = op.func
+    local args = { op.args(space) }
     log.info('%s %s', op_name, json.encode(args))
     local pcall_args = {func, space, unpack(args)}
     local ok, err = pcall(unpack(pcall_args))
