@@ -25,6 +25,56 @@ local function is_connection_valid(conn, opts)
     return true
 end
 
+function pool_methods._unused_connection_watchdog_step(self)
+    local now = clock.monotonic()
+    local until_next_deadline = math.huge
+    local conns_to_close = {}
+
+    for name, conn in pairs(self._connections) do
+        local until_deadline = conn._deadline - now
+
+        if until_deadline <= 0 then
+            table.insert(conns_to_close, conn)
+            self._connections[name] = nil
+        elseif until_deadline < until_next_deadline then
+            until_next_deadline = until_deadline
+        end
+    end
+
+    for _, conn in ipairs(conns_to_close) do
+        conn:close()
+    end
+
+    return until_next_deadline
+end
+
+function pool_methods._unused_connection_watchdog_loop(self)
+    while true do
+        local until_next_deadline = self:_unused_connection_watchdog_step()
+
+        if until_next_deadline == math.huge then
+            break
+        end
+
+        if not self._unused_connection_watchdog.fired then
+            self._unused_connection_watchdog.cond:wait(until_next_deadline)
+        end
+        self._unused_connection_watchdog.fired = false
+    end
+end
+
+function pool_methods._unused_connection_watchdog_wake(self)
+    local f = self._unused_connection_watchdog_fiber
+    if f ~= nil and f:status() ~= 'dead' then
+        self._unused_connection_watchdog.fired = true
+        self._unused_connection_watchdog.cond:signal()
+        return
+    end
+
+    f = fiber.new(self._unused_connection_watchdog_loop, self)
+    self._unused_connection_watchdog_fiber = f
+end
+
 --- Connect to an instance or receive a cached connection by
 --- name.
 ---
@@ -32,6 +82,7 @@ end
 --- and an error message as the second one.
 function pool_methods.connect(self, instance_name, opts)
     checks('table', 'string', {
+        ttl = '?number',
         connect_timeout = '?number',
         wait_connected = '?boolean',
         fetch_schema = '?boolean',
@@ -70,6 +121,15 @@ function pool_methods.connect(self, instance_name, opts)
             self._connection_mode_update_cond:broadcast()
         end
         conn:watch('box.status', watch_status)
+    end
+
+    local idle_timeout = opts.ttl or self._idle_timeout
+    local new_deadline = clock.monotonic() + idle_timeout
+    local old_deadline = conn._deadline or 0
+
+    if new_deadline > old_deadline then
+        conn._deadline = new_deadline
+        self:_unused_connection_watchdog_wake()
     end
 
     -- If opts.wait_connected is not false we wait until the connection is
@@ -145,10 +205,28 @@ function pool_methods.connect_to_multiple(self, instances, opts)
     return connected_instances
 end
 
+--- Set the default time in which instances now used within
+--- the `connect()` method would be closed.
+---
+--- Note that specifying a new timeout does not cause
+--- recalculation of the existing deadlines.
+function pool_methods.set_idle_timeout(self, idle_timeout)
+    self._idle_timeout = idle_timeout
+end
+
 local function create_pool()
     return setmetatable({
         _connections = {},
         _connection_mode_update_cond = fiber.cond(),
+
+        -- Unused connection management
+        _unused_connection_watchdog_fiber = nil,
+        _unused_connection_watchdog = {
+            fired = false,
+            cond = fiber.cond(),
+        },
+
+        _idle_timeout = 60,
     }, pool_mt)
 end
 
@@ -156,12 +234,19 @@ end
 
 local pool = create_pool()
 
+local function set_idle_timeout(idle_timeout)
+    pool:set_idle_timeout(idle_timeout)
+end
+
 local function connect(instance_name, opts)
     checks('string', {
         connect_timeout = '?number',
         wait_connected = '?boolean',
         fetch_schema = '?boolean',
     })
+
+    opts = opts and table.copy(opts) or {}
+    opts.ttl = math.huge
 
     local conn, err  = pool:connect(instance_name, opts)
     if err ~= nil then
@@ -540,4 +625,6 @@ return {
     connect = connect,
     filter = filter,
     call = call,
+
+    set_idle_timeout = set_idle_timeout,
 }
