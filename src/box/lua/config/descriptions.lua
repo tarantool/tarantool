@@ -375,6 +375,21 @@ I['compat.replication_synchro_timeout'] = format_text([[
       after a `replication.synchro_timeout`
 ]])
 
+I['compat.box_begin_timeout_meaning'] = format_text([[
+    The `compat.box_begin_timeout_meaning` option controls the behavior of
+    the timeout `box.begin{timeout=`.
+
+    - `new` (4.x default): timeout does not stop working after `box_commit()`
+       is called, it covers the entire process of committing the transaction:
+       - If the timeout expires before `box.commit()` is called or while
+         `before_commit` triggers are executing, the transaction is aborted.
+       - If the timeout expires later, the user receives an error but
+         transaction continues to commit, thus user's fiber is ready to execute
+         something else.
+    - `old` (3.x default): timeout can only abort the transaction until
+      `box_commit()` is called.
+]])
+
 I['compat.sql_priv'] = format_text([[
     Whether to enable access checks for SQL requests over iproto:
 
