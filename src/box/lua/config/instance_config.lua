@@ -2211,6 +2211,12 @@ return schema.new('instance_config', schema.record({
             default = 10,
         }),
     })),
+    connpool = schema.record({
+        idle_timeout = schema.scalar({
+            type = 'number',
+            default = 60,
+        }),
+    }),
 }), {
     methods = {
         instance_uri = instance_uri,
