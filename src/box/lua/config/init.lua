@@ -136,6 +136,7 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.fiber'))
     self:_register_applier(require('internal.config.applier.sharding'))
     self:_register_applier(require('internal.config.applier.autoexpel'))
+    self:_register_applier(require('internal.config.applier.connpool'))
     self:_register_applier(require('internal.config.applier.roles').stage_2)
     self:_register_applier(require('internal.config.applier.app').stage_2)
 
