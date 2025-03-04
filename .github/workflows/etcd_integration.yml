@@ -5,13 +5,13 @@ on:
     inputs:
       artifact_name:
         description: The name of the tarantool build artifact
-        default: ubuntu-focal
+        default: ubuntu-noble
         required: false
         type: string
 
 jobs:
   run_tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     timeout-minutes: 60
 
