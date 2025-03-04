@@ -92,7 +92,9 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 			 "to many values were returned");
 		return -1;
 	}
-	if (func->def->opts.is_multikey) {
+
+	it->func_is_multikey = func->def->opts.is_multikey;
+	if (it->func_is_multikey) {
 		if (mp_typeof(*key_data) != MP_ARRAY) {
 			/*
 			 * Multikey function must return an array
