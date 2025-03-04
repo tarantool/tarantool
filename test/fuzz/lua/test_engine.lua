@@ -12,9 +12,12 @@ testing if it exists.
 Usage: tarantool test_engine.lua
 ]]
 
+local arrow
+local column_scanner
 local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
+local ffi = require('ffi')
 local fun = require('fun')
 local json = require('json')
 local log = require('log')
@@ -23,6 +26,7 @@ local math = require('math')
 -- Tarantool datatypes.
 local datetime = require('datetime')
 local decimal = require('decimal')
+local msgpack = require('msgpack')
 local uuid = require('uuid')
 
 local test_dir_name = 'test_engine_dir'
@@ -60,7 +64,7 @@ if params.help or params.h then
    workers <number, 50>                  - number of fibers to run in parallel
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
-   engine <string, 'vinyl'>              - engine ('vinyl', 'memtx')
+   engine <string, 'vinyl'>              - engine ('vinyl', 'memtx', 'memcs')
    fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
@@ -89,6 +93,17 @@ local seed = params.seed or os.time()
 math.randomseed(seed)
 log.info('Random seed: %d', seed)
 
+-- MEMCS engine requires Tarantool Enterprise and two Lua C modules:
+-- `arrow_c_api_wrapper` and `scanner_c_api_wrapper`.
+if arg_engine == 'memcs' then
+    local tarantool = require('tarantool')
+    if tarantool.package ~= 'Tarantool Enterprise' then
+        error('Engine ' .. arg_engine .. ' requires Tarantool Enterprise')
+    end
+    arrow = require('arrow_c_api_wrapper')
+    column_scanner = require('scanner_c_api_wrapper')
+end
+
 -- The table contains a whitelist of errors that will be ignored
 -- by test. Each item is a Lua pattern, special characters
 -- should be escaped: ^ $ ( ) % . [ ] * + - ?
@@ -103,9 +118,12 @@ local err_pat_whitelist = {
     -- DDL on a space is locked until the end of the current DDL
     -- operation.
     "the space is already being modified",
+    -- The test actively uses error injections that can cause such errors.
+    "Error injection '[%w_ ]+'",
     -- The test actively uses transactions that concurrently
     -- changes a data in a space, this can lead to errors below.
     "Transaction has been aborted by conflict",
+    "Transaction has been aborted by fiber yield",
     "Vinyl does not support rebuilding the primary index of a non%-empty space",
     "fiber is cancelled",
     "fiber slice is exceeded",
@@ -114,11 +132,22 @@ local err_pat_whitelist = {
     "Can't create or modify index '[%w_]+' in space '[%w_]+': primary key must be unique",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': hint is only reasonable with memtx tree index",
     "Get%(%) doesn't support partial keys and non%-unique indexes",
-    "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support max%(%)",
-    "Index '[%w_]+' %(RTREE%) of space '[%w_]+' %(memtx%) does not support min%(%)",
-    "Failed to allocate %d+ bytes in [%w_]+ for [%w_]+",
-    "Storage engine 'memtx' does not support cross%-engine transactions",
-    "Storage engine 'vinyl' does not support cross%-engine transactions",
+    "Failed to allocate %d+ bytes in [%w_ ]+ for [%w_]+",
+    "Tuple field %d+ %([%w_]+%) type does not match one required by " ..
+        "operation: expected %w+, got nil",
+    "MVCC is unavailable for storage engine '[%w_]+' so it cannot be used " ..
+        "in the same transaction with '[%w_]+', which supports MVCC",
+    "Vinyl does not support executing a statement in a transaction that is " ..
+        "not allowed to yield",
+    "Can't modify space '[%d]+': the space was concurrently modified",
+    "Failed to write to disk",
+    "WAL has a rollback in progress",
+    -- MEMCS-specific errors.
+    "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
+    "Arrow stream does not support field type '[%w_]+'",
+    "box_insert_arrow: field [%d]+ has unsupported type",
+    "Engine 'memcs' does not support variable field count",
+    "Engine 'memcs' does not support primary index rebuild",
 }
 
 local function keys(t)
@@ -128,6 +157,15 @@ local function keys(t)
         table.insert(table_keys, k)
     end
     return table_keys
+end
+
+local function contains(t, value)
+    for _, v in pairs(t) do
+        if value == v then
+            return true
+        end
+    end
+    return false
 end
 
 local function rmtree(path)
@@ -212,6 +250,13 @@ local function random_map()
     return t
 end
 
+-- List of Tarantool types. Each type is a key-value pair where key is a name
+-- of an type and value is a table with following keys:
+-- generator - function generating a random value of the type.
+-- operations - list of tuple:update(...) operations supported by the type.
+-- [optional] engines - list of supported engines. If set, all spaces
+--                      with unsupported engine will not use the type.
+--
 -- '+' - Numeric.
 -- '-' - Numeric.
 -- '&' - Numeric.
@@ -255,11 +300,12 @@ local tarantool_type = {
         generator = function()
             return math.random() * 10^12
         end,
-        operations = {'-'},
+        operations = {'+', '-'},
     },
     ['integer'] = {
         generator = random_int,
         operations = {'+', '-'},
+        engines = {'memtx', 'vinyl'},
     },
     ['map'] = {
         generator = random_map,
@@ -283,7 +329,80 @@ local tarantool_type = {
         generator = uuid.new,
         operations = {'=', '!'},
     },
+    ['int8'] = {
+        generator = function()
+            return math.random(-2^7, 2^7 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint8'] = {
+        generator = function()
+            return math.random(0, 2^8 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int16'] = {
+        generator = function()
+            return math.random(-2^15, 2^15 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint16'] = {
+        generator = function()
+            return math.random(0, 2^16 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int32'] = {
+        generator = function()
+            return math.random(-2^31, 2^31 - 1)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint32'] = {
+        generator = function()
+            return math.random(0, 2^32 - 1)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['int64'] = {
+        generator = function()
+            local v = math.random(-2^63, 2^63 - 1)
+            return ffi.cast('int64_t', v)
+        end,
+        operations = {'+', '-'},
+    },
+    ['uint64'] = {
+        generator = function()
+            local v = math.random(0, 2^64 - 1)
+            return ffi.cast('uint64_t', v)
+        end,
+        operations = {'+', '-', '&', '|', '^'},
+    },
+    ['float32'] = {
+        generator = function()
+            local v = math.random() * 10^12
+            return ffi.cast('float', v)
+        end,
+        operations = {'+', '-'},
+    },
+    ['float64'] = {
+        generator = function()
+            local v = math.random() * 10^12
+            return ffi.cast('double', v)
+        end,
+        operations = {'+', '-'},
+    },
 }
+
+-- Returns Tarantool types (see the `tarantool_type` table above)
+-- supported by the given engine.
+local function supported_tarantool_types(engine)
+    local function filter(_name, data)
+        return data.engines == nil or contains(data.engines, engine)
+    end
+    return fun.iter(tarantool_type):filter(filter):tomap()
+end
 
 -- The name value may be any string, provided that two fields
 -- do not have the same name.
@@ -301,21 +420,25 @@ local tarantool_type = {
 -- for the field.
 --
 -- See https://www.tarantool.io/ru/doc/latest/reference/reference_lua/box_space/format/.
-local function random_space_format()
+local function random_space_format(engine)
+    assert(type(engine) == 'string')
+    local types = supported_tarantool_types(engine)
     local space_format = {}
-    local min_num_fields = table.getn(keys(tarantool_type))
+    local min_num_fields = table.getn(keys(types))
     local max_num_fields = min_num_fields + 10
     local num_fields = math.random(min_num_fields, max_num_fields)
-    for i, datatype in ipairs(keys(tarantool_type)) do
+    for i, datatype in ipairs(keys(types)) do
         table.insert(space_format, {
             name =('field_%d'):format(i),
             type = datatype,
+            is_nullable = oneof({true, false}),
         })
     end
     for i = min_num_fields - 1, num_fields - min_num_fields - 1 do
         table.insert(space_format, {
             name =('field_%d'):format(i),
-            type = oneof(keys(tarantool_type)),
+            type = oneof(keys(types)),
+            is_nullable = oneof({true, false}),
         })
     end
 
@@ -324,9 +447,9 @@ end
 
 -- Iterator types for indexes.
 -- See https://www.tarantool.io/en/doc/latest/reference/reference_lua/box_index/pairs/#box-index-iterator-types
--- TODO: support `is_nullable`.
+-- For information about nullable fields, see:
+-- https://www.tarantool.io/en/doc/latest/reference/reference_lua/box_space/create_index/#lua-data.key_part.is_nullable
 -- TODO: support `multikey`.
--- TODO: support `exclude_null`.
 -- TODO: support `pagination`.
 local tarantool_indices = {
     HASH = {
@@ -349,6 +472,7 @@ local tarantool_indices = {
         is_multipart = true,
         is_min_support = false,
         is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = true,
         is_non_unique_support = false,
         is_primary_key_support = true,
@@ -370,6 +494,7 @@ local tarantool_indices = {
         is_multipart = false,
         is_min_support = false,
         is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = false,
         is_non_unique_support = true,
         is_primary_key_support = false,
@@ -401,6 +526,7 @@ local tarantool_indices = {
         is_multipart = true,
         is_min_support = true,
         is_max_support = true,
+        is_nullable_support = true,
         is_unique_support = true,
         is_non_unique_support = true,
         is_primary_key_support = true,
@@ -421,8 +547,9 @@ local tarantool_indices = {
             ['array'] = true,
         },
         is_multipart = false,
-        is_min_support = true,
-        is_max_support = true,
+        is_min_support = false,
+        is_max_support = false,
+        is_nullable_support = false,
         is_unique_support = false,
         is_non_unique_support = true,
         is_primary_key_support = false,
@@ -500,12 +627,23 @@ local function format_op(space, space_format)
     space:format(space_format)
 end
 
+local function insert_arrow_op(space, batch)
+    arrow.box_insert_arrow(space.id, batch)
+end
+
 local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('SETUP')
     assert(engine_name == 'memtx' or
-           engine_name == 'vinyl')
+           engine_name == 'vinyl' or
+           engine_name == 'memcs')
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
+
+    local vinyl_range_size = oneof({1, 4, 16, 128}) * 1024
+    local vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024
+    -- vinyl_page_size must be in range (0, vinyl_range_size].
+    vinyl_page_size = math.min(vinyl_page_size, vinyl_range_size)
+
     local box_cfg_options = {
         checkpoint_count = math.random(5),
         checkpoint_interval = math.random(60),
@@ -521,8 +659,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_cache = oneof({0, 2}) * 1024 * 1024,
         vinyl_defer_deletes = oneof({true, false}),
         vinyl_memory = oneof({8, 16, 32, 64, 128}) * 1024 * 1024,
-        vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024,
-        vinyl_range_size = oneof({0, 1, 4, 16, 128}) * 1024,
+        vinyl_page_size = vinyl_page_size,
+        vinyl_range_size = vinyl_range_size,
         vinyl_read_threads = math.random(2, 10),
         vinyl_run_count_per_level = oneof({1, 2, 4, 8, 16, 32}),
         vinyl_run_size_ratio = math.random(2, 5),
@@ -546,7 +684,7 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('FINISH BOX.CFG')
 
     log.info('CREATE A SPACE')
-    local space_format = random_space_format()
+    local space_format = random_space_format(engine_name)
     -- TODO: support `constraint`.
     -- TODO: support `foreign_key`.
     local space_opts = {
@@ -556,7 +694,11 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         if_not_exists = oneof({true, false}),
         is_local = oneof({true, false}),
     }
-    if space_opts.engine ~= 'vinyl' then
+    -- Memcs does not support variable field count.
+    if space_opts.engine == 'memcs' then
+        space_opts.field_count = table.getn(space_format)
+    end
+    if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
     end
     local space_name = ('test_%d'):format(space_id_func())
@@ -599,7 +741,7 @@ local function index_opts(space, is_primary)
             end
         end):totable()
 
-    if space.engine == 'vinyl' then
+    if space.engine == 'vinyl' or space.engine == 'memcs' then
         indices = {'TREE'}
     end
 
@@ -625,16 +767,30 @@ local function index_opts(space, is_primary)
     local idx = opts.type
     local possible_fields = fun.iter(space_format):filter(
         function(x)
+            -- Primary index must be not nullable.
+            if is_primary and x.is_nullable then
+                return nil
+            end
             if tarantool_indices[idx].data_type[x.type] == true then
                 return x
             end
         end):totable()
     local n_parts = math.random(1, table.getn(possible_fields))
     local id = unique_ids(n_parts)
+    local is_nullable_support = not is_primary and
+        space.engine ~= 'memcs' and
+        tarantool_indices[opts.type].is_nullable_support
     for i = 1, n_parts do
         local field_id = id()
         local field = possible_fields[field_id]
-        table.insert(opts.parts, { field.name })
+        -- Randomly set is_nullable if it is supported.
+        local is_nullable =
+            oneof({false, field.is_nullable and is_nullable_support})
+        local exclude_null = oneof({false, is_nullable})
+        table.insert(opts.parts, {
+            field.name, is_nullable = is_nullable,
+            exclude_null = exclude_null,
+        })
         if not tarantool_indices[opts.type].is_multipart and
            i == 1 then
             break
@@ -688,8 +844,7 @@ end
 
 local function index_random_op(_, idx)
     assert(idx)
-    if idx.type ~= 'TREE' and
-       idx.type ~= 'BITSET' and
+    if idx.type ~= 'BITSET' and
        idx.type ~= 'RTREE' then
         idx:random()
     end
@@ -751,17 +906,96 @@ local function index_delete_op(_space, idx, key)
     idx:delete(key)
 end
 
-local function random_field_value(field_type)
-    local type_gen = tarantool_type[field_type].generator
-    assert(type(type_gen) == 'function', field_type)
-    return type_gen()
+local function index_scan_column_op(space, idx, fields, key)
+    local mpkey = msgpack.encode(key)
+    local scanner = column_scanner.box_index_scanner(space.id, idx.id, fields,
+                                                     mpkey)
+    while true do
+        -- We want to finish early with a very small probability.
+        if math.random(1, 20) == 1 then
+            log.info('SCAN_COLUMN: finish early')
+            break
+        end
+        local max_batch_size = oneof({10, 10^6})
+        local batch_size = math.random(1, max_batch_size)
+        log.info('SCAN_COLUMN: going to read batch of size ' .. batch_size)
+        local result = column_scanner.box_scanner_next(scanner, batch_size)
+        -- Print only small batches: huge ones would clutter up the logs.
+        if result.row_count <= 10 then
+            log.info('SCAN_COLUMN: has read batch ' .. json.encode(result))
+        else
+            log.info('SCAN_COLUMN: has read big batch of size ' ..
+                     result.row_count)
+        end
+        if oneof({true, false}) then
+            log.info('SCAN_COLUMN: yield after batch')
+            fiber.yield()
+        end
+        if result.row_count == 0 then
+            break
+        end
+    end
+    column_scanner.box_scanner_free(scanner)
 end
 
--- TODO: support `is_nullable`.
+local function index_arrow_stream_op(space, idx, fields, key)
+    local mpkey = msgpack.encode(key)
+    local batch_size
+    if oneof({true, false}) then
+        -- We want to read small batches often, so limit max batch size
+        -- with 50% probability.
+        local max_batch_size = oneof({10, 10^6})
+        batch_size = math.random(1, max_batch_size)
+        log.info('ARROW_STREAM: explicitly set batch size to ' .. batch_size)
+    end
+    local stream = arrow.box_index_arrow_stream(space.id, idx.id, fields, mpkey,
+                                                batch_size)
+    while true do
+        if math.random(1, 20) == 1 then
+            log.info('ARROW_STREAM: finish early')
+            break
+        end
+        log.info('ARROW_STREAM: stream next')
+        local result = arrow.arrow_stream_next(stream)
+        -- Print only small batches: huge ones would clutter up the logs.
+        if result.row_count <= 10 then
+            log.info('ARROW_STREAM: has read batch ' .. json.encode(result))
+        else
+            log.info('ARROW_STREAM: has read big batch of size ' ..
+                     result.row_count)
+        end
+        if oneof({true, false}) then
+            log.info('ARROW_STREAM: yield after batch')
+            fiber.yield()
+        end
+        if result.row_count == 0 then
+            break
+        end
+    end
+    arrow.arrow_stream_free(stream)
+end
+
+
+-- Generate random field value, `opts` is a map with options.
+-- Available options:
+-- - disallow_null (boolean) - do not return NULL even if the field is nullable.
+local function random_field_value(field, opts)
+    local field_type = field.type
+    local type_gen = tarantool_type[field_type].generator
+    assert(type(type_gen) == 'function', field_type)
+
+    local disallow_null = opts and opts.disallow_null
+    if field.is_nullable and not disallow_null then
+        return oneof({box.NULL, type_gen()})
+    else
+        return type_gen()
+    end
+end
+
 local function random_tuple(space_format)
     local tuple = {}
     for _, field in ipairs(space_format) do
-        table.insert(tuple, random_field_value(field.type))
+        table.insert(tuple, random_field_value(field))
     end
 
     return tuple
@@ -779,9 +1013,9 @@ local function random_tuple_operations(space)
     local id = unique_ids(num_fields)
     for _ = 1, math.random(num_fields) do
         local field_id = id()
-        local field_type = space_format[field_id].type
-        local operator = oneof(tarantool_type[field_type].operations)
-        local value = random_field_value(field_type)
+        local field = space_format[field_id]
+        local operator = oneof(tarantool_type[field.type].operations)
+        local value = random_field_value(field, {disallow_null = true})
         table.insert(tuple_ops, {operator, field_id, value})
     end
 
@@ -800,6 +1034,80 @@ local function random_key(space, idx)
     return key
 end
 
+-- Chooses random space fields and return their indexes,
+-- they are not ordered and may be repeated.
+-- NB: indexes are zero-based.
+local function random_space_field_ids(space)
+    local format_size = #space:format()
+    local fields = {}
+    local fields_num_max = format_size * 2
+    local fields_num = math.random(fields_num_max)
+    for _ = 1, fields_num do
+        table.insert(fields, math.random(0, format_size - 1))
+    end
+    return fields
+end
+
+-- Chooses random fields from index parts and return their
+-- indexes, they are not ordered and may be repeated.
+-- NB: indexes are zero-based.
+local function random_index_field_ids(index)
+    local parts = index.parts
+    local parts_size = #parts
+    local fields = {}
+    local fields_num_max = parts_size * 2
+    local fields_num = math.random(fields_num_max)
+    for _ = 1, fields_num do
+        local idx = math.random(parts_size)
+        local part = parts[idx]
+        local zero_based_fieldno = part.fieldno - 1
+        table.insert(fields, zero_based_fieldno)
+    end
+    return fields
+end
+
+-- Generates random arguments for space scanner
+-- (column_scanner/arrow_stream) - chooses random index,
+-- chooses fields covered by the index and generates a key.
+local function random_scanner_args(space)
+    local idx_n = oneof(keys(space.index))
+    local idx = space.index[idx_n]
+    local fields
+    -- Primary index covers all fields.
+    if idx == 0 then
+        fields = random_space_field_ids(space)
+    else
+        fields = random_index_field_ids(idx)
+    end
+    return idx, fields, oneof({{}, random_key(space, idx)})
+end
+
+-- Generates a batch as a Lua table in a format:
+-- {{field_name1, {<values>}}, {field_name2, {<values>}}, ...}.
+-- Fields are not repeated, nullable ones can be skipped.
+local function random_batch(space)
+    local format_size = #space:format()
+    local batch = {}
+    -- Randomly choose between small and big batch
+    local max_batch_size = oneof({10, 100})
+    local batch_size = math.random(1, max_batch_size)
+    local id = unique_ids(format_size)
+    for _ = 1, format_size do
+        local i = id()
+        local field = space:format()[i]
+        local values = {}
+        -- Skip the field only if it is nullable.
+        local skip_field = oneof({false, field.is_nullable})
+        if not skip_field then
+            for _ = 1, batch_size do
+                table.insert(values, random_field_value(field))
+            end
+            table.insert(batch, {field.name, values})
+        end
+    end
+    return batch
+end
+
 local function box_snapshot()
     local in_progress = box.info.gc().checkpoint_is_in_progress
     if not in_progress then
@@ -807,6 +1115,14 @@ local function box_snapshot()
     end
 end
 
+-- List of operations for fuzzer. Each operation is a key-value pair
+-- where key is a name of an operation and value is a table with
+-- following keys:
+-- func - function performing the operation.
+-- args - function generating arguments for the operation, accepts
+--        the space as the only argument.
+-- [optional] engines - list of supported engines. If set, all spaces
+--                      with unsupported engine will skip the operation.
 local ops = {
     -- DML.
     DELETE_OP = {
@@ -848,6 +1164,7 @@ local ops = {
         args = function(space)
             return random_tuple(space:format()), random_tuple_operations(space)
         end,
+        engines = {'memtx', 'vinyl'},
     },
     BSIZE_OP = {
         func = bsize_op,
@@ -859,7 +1176,7 @@ local ops = {
     },
     FORMAT_OP = {
         func = format_op,
-        args = function(_space) return random_space_format() end,
+        args = function(space) return random_space_format(space.engine) end,
     },
 
     -- DDL.
@@ -867,8 +1184,9 @@ local ops = {
         func = index_alter_op,
         args = function(space)
             local idx_n = oneof(keys(space.index))
-            local is_primary = idx_n == 0
-            return space.index[idx_n], index_opts(space, is_primary)
+            local index = space.index[idx_n]
+            local is_primary = index.id == 0
+            return index, index_opts(space, is_primary)
         end,
     },
     INDEX_COMPACT_OP = {
@@ -928,6 +1246,7 @@ local ops = {
             local idx_n = oneof(keys(space.index))
             return space.index[idx_n]
         end,
+        engines = {'memtx'},
     },
     INDEX_COUNT_OP = {
         func = index_count_op,
@@ -943,6 +1262,7 @@ local ops = {
             local idx = space.index[idx_n]
             return random_key(space, idx), idx, random_tuple_operations(space)
         end,
+        engines = {'memtx', 'vinyl'},
     },
     INDEX_DELETE_OP = {
         func = index_delete_op,
@@ -951,6 +1271,7 @@ local ops = {
             local idx = space.index[idx_n]
             return idx, random_key(space, idx)
         end,
+        engines = {'memtx', 'vinyl'},
     },
     INDEX_RENAME_OP = {
         func = index_rename_op,
@@ -1002,11 +1323,33 @@ local ops = {
         func = box_snapshot,
         args = function(_) return end,
     },
+
+    -- memcs-specific.
+    INDEX_SCAN_COLUMN_OP = {
+        func = index_scan_column_op,
+        args = random_scanner_args,
+        engines = {'memcs'},
+    },
+    INDEX_ARROW_STREAM_OP = {
+        func = index_arrow_stream_op,
+        args = random_scanner_args,
+        engines = {'memcs'},
+    },
+    INSERT_ARROW_OP = {
+        func = insert_arrow_op,
+        args = random_batch,
+        engines = {'memcs'},
+    },
 }
 
 local function apply_op(space, op_name)
-    local func = ops[op_name].func
-    local args = { ops[op_name].args(space) }
+    local op = ops[op_name]
+    if op.engines ~= nil and not contains(op.engines, space.engine) then
+        log.info('SKIP: %s does not support %s', space.engine, op_name)
+        return
+    end
+    local func = op.func
+    local args = { op.args(space) }
     log.info('%s %s', op_name, json.encode(args))
     local pcall_args = {func, space, unpack(args)}
     local ok, err = pcall(unpack(pcall_args))
@@ -1019,13 +1362,12 @@ end
 
 local shared_gen_state
 
-local function worker_func(id, space, test_gen, test_duration)
+local function worker_func(id, space, test_gen, deadline)
     log.info('Worker #%d has started.', id)
-    local start = os.clock()
     local gen, param, state = test_gen:unwrap()
     shared_gen_state = state
     local errors = {}
-    while os.clock() - start <= test_duration do
+    while os.clock() <= deadline do
         local operation_name
         state, operation_name = gen(param, shared_gen_state)
         if state == nil then
@@ -1416,18 +1758,17 @@ local function process_errors(error_messages)
     return found_unexpected_errors
 end
 
-local function start_error_injections(space, test_duration)
-    local errinj_f = fiber.new(function(test_duration)
+local function start_error_injections(space, deadline)
+    local errinj_f = fiber.new(function(deadline)
         log.info('Fault injection fiber has started.')
         local max_errinj_in_parallel = 5
-        local start = os.clock()
-        while os.clock() - start <= test_duration do
+        while os.clock() <= deadline do
             toggle_random_errinj(errinj_set, max_errinj_in_parallel, space)
             fiber.sleep(2)
         end
         disable_all_errinj(errinj_set, space)
         log.info('Fault injection fiber has finished.')
-    end, test_duration)
+    end, deadline)
     errinj_f:set_joinable(true)
     errinj_f:name('ERRINJ')
 
@@ -1449,18 +1790,19 @@ local function run_test(num_workers, test_duration, test_dir,
     local fibers = {}
     local space_id_func = counter()
     local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+    local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
     local f
     for id = 1, num_workers do
-        f = fiber.new(worker_func, id, space, test_gen, test_duration)
+        f = fiber.new(worker_func, id, space, test_gen, deadline)
         f:set_joinable(true)
         f:name('WRK #' .. id)
         table.insert(fibers, f)
     end
 
     if fault_injection then
-        f = start_error_injections(space, test_duration)
+        f = start_error_injections(space, deadline)
         table.insert(fibers, f)
     end
 
