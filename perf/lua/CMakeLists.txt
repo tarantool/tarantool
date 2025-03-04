@@ -73,7 +73,13 @@ function(create_perf_lua_test)
 endfunction()
 
 create_perf_lua_test(NAME 1mops_write)
+create_perf_lua_test(NAME 1mops_write SUBCASE tree
+                     OPTIONS --index=TREE)
+create_perf_lua_test(NAME 1mops_write SUBCASE mvcc_tree
+                     OPTIONS --index=TREE --memtx_use_mvcc)
 create_perf_lua_test(NAME box_select)
+create_perf_lua_test(NAME box_select SUBCASE mvcc
+                     OPTIONS --memtx_use_mvcc)
 create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME uri_escape_unescape)
 create_perf_lua_test(NAME luafun)
