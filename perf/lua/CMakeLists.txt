@@ -8,8 +8,8 @@ message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 function(create_perf_lua_test)
   set(prefix PERF)
   set(noValues)
-  set(singleValues NAME)
-  set(multiValues DEPENDS)
+  set(singleValues NAME SUBCASE)
+  set(multiValues DEPENDS OPTIONS)
 
   # FIXME: if we update to CMake >= 3.5, can remove this line.
   include(CMakeParseArguments)
@@ -19,7 +19,14 @@ function(create_perf_lua_test)
                         "${multiValues}"
                         ${ARGN})
 
-  set(TEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua)
+
+  set(PERF_FILENAME ${PERF_NAME})
+  if (DEFINED PERF_SUBCASE)
+    set(PERF_NAME ${PERF_NAME}_${PERF_SUBCASE})
+  endif()
+
+  set(TEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_FILENAME}.lua)
+  set(TEST_OPTIONS ${PERF_OPTIONS})
   set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_NAME}.json)
   set(BENCH_TARGET ${PERF_NAME}_perftest)
   set(BENCH_RESULT_TARGET ${BENCH_TARGET}_result)
@@ -38,6 +45,7 @@ function(create_perf_lua_test)
           ${BENCH_CMD_SEPARATE} ${TARANTOOL_BIN} ${TEST_PATH}
             --output="${BENCH_RESULT}"
             --output_format=json
+        OPTIONS ${TEST_OPTIONS}
         DEPENDS ${TEST_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
@@ -54,9 +62,9 @@ function(create_perf_lua_test)
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS}  PARENT_SCOPE)
   set(test_title "perf/lua/${PERF_NAME}.lua")
   add_test(NAME ${test_title}
-           COMMAND ${TARANTOOL_BIN}
-                   ${CMAKE_CURRENT_SOURCE_DIR}/${PERF_NAME}.lua
+           COMMAND ${TARANTOOL_BIN} ${TEST_PATH}
                    --output=${BENCH_RESULT} --output_format=json
+            OPTIONS ${TEST_OPTIONS}
   )
   set_tests_properties(${test_title} PROPERTIES
     ENVIRONMENT "LUA_PATH=${LUA_PATH}"
