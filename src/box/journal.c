@@ -39,8 +39,7 @@ struct journal *current_journal = NULL;
 struct journal_queue journal_queue = {
 	.max_size = 16 * 1024 * 1024, /* 16 megabytes */
 	.size = 0,
-	.waiters = RLIST_HEAD_INITIALIZER(journal_queue.waiters),
-	.waiter_count = 0,
+	.requests = STAILQ_INITIALIZER(journal_queue.requests),
 };
 
 void
@@ -89,36 +88,73 @@ journal_entry_fiber_wakeup_cb(struct journal_entry *entry)
 void
 journal_queue_wakeup(void)
 {
-	struct rlist *list = &journal_queue.waiters;
-	if (!rlist_empty(list) && !journal_queue_is_full())
-		fiber_wakeup(rlist_first_entry(list, struct fiber, state));
+	if (!stailq_empty(&journal_queue.requests) &&
+	    !journal_queue_is_full()) {
+		struct journal_entry *req =
+				stailq_first_entry(&journal_queue.requests,
+						   typeof(*req), fifo);
+		fiber_wakeup(req->fiber);
+	}
 }
 
-void
-journal_queue_wait(void)
+int
+journal_queue_wait(struct journal_entry *entry)
 {
-	if (!journal_queue_is_full() && !journal_queue_has_waiters())
-		return;
-	++journal_queue.waiter_count;
-	rlist_add_tail_entry(&journal_queue.waiters, fiber(), state);
-	/*
-	 * Is woken up when this position in the queue should go into the next
-	 * journal batch.
-	 */
+	if (!journal_queue_is_full() &&
+	    stailq_empty(&journal_queue.requests))
+		return 0;
+	int rc = -1;
+	struct journal_entry *prev_entry =
+			stailq_last_entry(&journal_queue.requests,
+					  typeof(*prev_entry), fifo);
+	stailq_add_tail_entry(&journal_queue.requests, entry, fifo);
+	assert(entry->fiber == NULL);
+	entry->fiber = fiber();
 	fiber_yield();
-	--journal_queue.waiter_count;
-	journal_queue_wakeup();
+	if (entry->is_complete) {
+		/* Already rolled back on cascade rollback. */
+		diag_set_journal_res(entry->res);
+	} else if (fiber_is_cancelled()) {
+		struct stailq rollback;
+		stailq_cut_tail(&journal_queue.requests, &prev_entry->fifo,
+				&rollback);
+		/* Pop this request. */
+		VERIFY(stailq_shift_entry(&rollback,
+					  typeof(*entry), fifo) == entry);
+		stailq_reverse(&rollback);
+		/* Cascade rollback of newer requests. */
+		struct journal_entry *req;
+		stailq_foreach_entry(req, &rollback, fifo) {
+			req->res = JOURNAL_ENTRY_ERR_CASCADE;
+			req->is_complete = true;
+			req->write_async_cb(req);
+		}
+		/* Rollback this request. */
+		entry->res = JOURNAL_ENTRY_ERR_CANCELLED;
+		entry->is_complete = true;
+		entry->write_async_cb(entry);
+		diag_set(FiberIsCancelled);
+	} else {
+		/* There is a space in queue to handle this request. */
+		VERIFY(stailq_shift_entry(&journal_queue.requests,
+					  typeof(*entry), fifo) == entry);
+		journal_queue_wakeup();
+		rc = 0;
+	}
+	entry->fiber = NULL;
+	return rc;
 }
 
 void
 journal_queue_flush(void)
 {
-	if (!journal_queue_has_waiters())
+	if (stailq_empty(&journal_queue.requests))
 		return;
-	struct rlist *list = &journal_queue.waiters;
-	while (!rlist_empty(list))
-		fiber_wakeup(rlist_first_entry(list, struct fiber, state));
-	journal_queue_wait();
+	struct journal_entry *req;
+	stailq_foreach_entry(req, &journal_queue.requests, fifo)
+		fiber_wakeup(req->fiber);
+	/* Schedule after all fibers waiting in journal queue. */
+	fiber_sleep(0);
 }
 
 int

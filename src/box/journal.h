@@ -54,6 +54,8 @@ enum {
 	 * entry.
 	 */
 	JOURNAL_ENTRY_ERR_CASCADE = -3,
+	/** Rollback due to fiber waiting for WAL is cancelled. */
+	JOURNAL_ENTRY_ERR_CANCELLED = -4,
 	/**
 	 * Anchor for the structs built on top of journal entry so as they
 	 * could introduce their own unique errors. Set to a big value in
@@ -107,6 +109,10 @@ struct journal_entry {
 	 */
 	bool is_complete;
 	/**
+	 * Fiber which put the request in journal queue.
+	 */
+	struct fiber *fiber;
+	/**
 	 * The number of rows in the request.
 	 */
 	int n_rows;
@@ -134,6 +140,7 @@ journal_entry_create(struct journal_entry *entry, size_t n_rows,
 	entry->res		= JOURNAL_ENTRY_ERR_UNKNOWN;
 	entry->flags		= 0;
 	entry->is_complete = false;
+	entry->fiber = NULL;
 }
 
 /**
@@ -158,14 +165,8 @@ struct journal_queue {
 	int64_t max_size;
 	/** Current approximate size of journal queue. */
 	int64_t size;
-	/**
-	 * The fibers waiting for some space to free in journal queue.
-	 * Once some space is freed they will be waken up in the same order they
-	 * entered the queue.
-	 */
-	struct rlist waiters;
-	/** How many waiters there are in a queue. */
-	int waiter_count;
+	/** The requests waiting in journal queue. */
+	struct stailq requests;
 };
 
 /** A single queue for all journal instances. */
@@ -187,16 +188,6 @@ void
 journal_queue_wakeup(void);
 
 /**
- * Check whether anyone is waiting for the journal queue to empty. If there are
- * other waiters we must go after them to preserve write order.
- */
-static inline bool
-journal_queue_has_waiters(void)
-{
-	return journal_queue.waiter_count != 0;
-}
-
-/**
  * Check whether any of the queue size limits is reached.
  * If the queue is full, we must wait for some of the entries to be written
  * before proceeding with a new asynchronous write request.
@@ -208,10 +199,10 @@ journal_queue_is_full(void)
 }
 
 /** Yield until there's some space in the journal queue. */
-void
-journal_queue_wait(void);
+int
+journal_queue_wait(struct journal_entry *entry);
 
-/** Empty the queue by waking everyone in it up and put self to queue tail. */
+/** Flush journal queue. Next wal_sync() will sync flushed requests. */
 void
 journal_queue_flush(void);
 
@@ -271,7 +262,8 @@ journal_write_row(struct xrow_header *row);
 static inline int
 journal_write_submit(struct journal_entry *entry)
 {
-	journal_queue_wait();
+	if (journal_queue_wait(entry) != 0)
+		return -1;
 	/*
 	 * We cannot account entry after write. If journal is synchronous
 	 * the journal_queue_on_complete() is called in write_async().
