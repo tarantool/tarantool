@@ -139,6 +139,7 @@ enum {
 	TXN_SIGNATURE_UNKNOWN = JOURNAL_ENTRY_ERR_UNKNOWN,
 	TXN_SIGNATURE_IO = JOURNAL_ENTRY_ERR_IO,
 	TXN_SIGNATURE_CASCADE = JOURNAL_ENTRY_ERR_CASCADE,
+	TXN_SIGNATURE_CANCELLED = JOURNAL_ENTRY_ERR_CANCELLED,
 	/**
 	 * The default signature value for failed transactions.
 	 * Indicates either write failure or any other failure
