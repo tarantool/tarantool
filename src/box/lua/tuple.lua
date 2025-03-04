@@ -62,6 +62,10 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 box_tuple_t *
 box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
+
+const char *
+box_tuple_field_by_path(box_tuple_t *tuple, const char *path, uint32_t path_len,
+                        int index_base);
 ]]
 
 local builtin = ffi.C
@@ -316,7 +320,23 @@ msgpackffi.on_encode(const_tuple_ref_t, tuple_to_msgpack)
 
 local function tuple_field_by_path(tuple, path)
     tuple_check(tuple, "tuple['field_name']");
-    return internal.tuple.tuple_field_by_path(tuple, path)
+    assert(type(path) == 'string', "Usage: tuple['field_name']")
+    local strlen = #path
+    if strlen == 0 then
+        return
+    end
+
+    -- XXX: Need to duplicate the definition of `TUPLE_INDEX_BASE`
+    -- from the C code.
+    local TUPLE_INDEX_BASE = 1
+    local field = builtin.box_tuple_field_by_path(tuple, path, strlen,
+                                                  TUPLE_INDEX_BASE)
+    -- `NULL` returned?
+    if field == nil then
+        return
+    end
+    -- Use `()` to shrink the stack to the first return value.
+    return (msgpackffi.decode_unchecked(field))
 end
 
 local methods = {
