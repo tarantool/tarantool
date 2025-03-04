@@ -1179,10 +1179,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		goto rollback_abort;
 	}
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write_submit(req) != 0) {
-		fiber_set_txn(fiber(), txn);
+	if (journal_write_submit(req) != 0)
 		goto rollback_io;
-	}
 	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
 		if (txn_has_flag(txn, TXN_IS_DONE))
 			goto finish_done;
