@@ -4792,6 +4792,7 @@ static const struct index_vtab vinyl_index_vtab = {
 		vinyl_index_def_change_requires_rebuild,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
+	/* .quantile = */ generic_index_quantile,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,

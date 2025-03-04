@@ -959,6 +959,23 @@ generic_index_bsize(struct index *)
 }
 
 int
+generic_index_quantile(struct index *index, double level,
+		       const char *begin_key, uint32_t begin_part_count,
+		       const char *end_key, uint32_t end_part_count,
+		       const char **quantile_key, uint32_t *quantile_key_size)
+{
+	(void)level;
+	(void)begin_key;
+	(void)begin_part_count;
+	(void)end_key;
+	(void)end_part_count;
+	(void)quantile_key;
+	(void)quantile_key_size;
+	diag_set(UnsupportedIndexFeature, index->def, "quantile()");
+	return -1;
+}
+
+int
 generic_index_min(struct index *index, const char *key,
 		  uint32_t part_count, struct tuple **result)
 {

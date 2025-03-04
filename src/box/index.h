@@ -553,6 +553,32 @@ struct index_vtab {
 
 	ssize_t (*size)(struct index *);
 	ssize_t (*bsize)(struct index *);
+	/**
+	 * Find a quantile point in a range.
+	 *
+	 * The quantile point is such a key that the ratio of tuples less than
+	 * the key in the target range approximately equals the given level.
+	 *
+	 * The target range is specified as the intersection of GE begin_key
+	 * and LT end_key read queries. The level must be greater than 0 and
+	 * less than 1.
+	 *
+	 * The quantile point is returned as a MsgPack array with a header.
+	 * It is allocated on the fiber region. There doesn't necessarily have
+	 * to be a tuple in the range matching the key.
+	 *
+	 * The function may return NULL without raising an error if the range
+	 * is too small to find the specified quantile point, in particular if
+	 * there are no tuples in it.
+	 *
+	 * The function doesn't participate in transactions.
+	 *
+	 * The function doesn't yield.
+	 */
+	int (*quantile)(struct index *index, double level,
+			const char *begin_key, uint32_t begin_part_count,
+			const char *end_key, uint32_t end_part_count,
+			const char **quantile_key, uint32_t *quantile_key_size);
 	int (*min)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	int (*max)(struct index *index, const char *key,
@@ -903,6 +929,17 @@ index_bsize(struct index *index)
 }
 
 static inline int
+index_quantile(struct index *index, double level,
+	       const char *begin_key, uint32_t begin_part_count,
+	       const char *end_key, uint32_t end_part_count,
+	       const char **quantile_key, uint32_t *quantile_key_size)
+{
+	return index->vtab->quantile(index, level, begin_key, begin_part_count,
+				     end_key, end_part_count,
+				     quantile_key, quantile_key_size);
+}
+
+static inline int
 index_min(struct index *index, const char *key,
 	  uint32_t part_count, struct tuple **result)
 {
@@ -1118,6 +1155,8 @@ bool generic_index_def_change_requires_rebuild(struct index *,
 					       const struct index_def *);
 ssize_t generic_index_bsize(struct index *);
 ssize_t generic_index_size(struct index *);
+int generic_index_quantile(struct index *, double, const char *, uint32_t,
+			   const char *, uint32_t, const char **, uint32_t *);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_random(struct index *, uint32_t, struct tuple **);
