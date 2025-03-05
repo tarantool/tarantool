@@ -49,12 +49,23 @@ random_cluster.clear_dirs_for_all_replicas()
 local cg = random_cluster.rand_cluster(4)
 fiber.sleep(20)
 
+--- Simulation run configuration
+
+local memtx_path = './memtx_dir'
+
+if fio.path.exists(memtx_path) then
+    fio.rmtree(memtx_path)
+end
+fio.mkdir(memtx_path)
 
 box.cfg {
     checkpoint_count = 2,
     memtx_use_mvcc_engine = true,
-    memtx_dir = './memtx_dir',
-    txn_isolation = 'best-effort' }
+    memtx_dir = memtx_path,
+    txn_isolation = 'best-effort'
+}
+
+---
 
 local initial_replication = tools.get_initial_replication(cg.replicas)
 
@@ -101,7 +112,7 @@ end)
 
 log_info(result)
 
-log_info("[[PERIODIC INSERT] Started")
+log_info("[PERIODIC INSERT] Started")
 log_handling.periodic_insert(
     cg,
     "test",
