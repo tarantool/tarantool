@@ -1143,6 +1143,72 @@ memtx_tree_index_bsize(struct index *base)
 	return memtx_tree_mem_used(&index->tree);
 }
 
+template<bool USE_HINT>
+static int
+memtx_tree_index_quantile(struct index *base, double level,
+			  const char *begin_key, uint32_t begin_part_count,
+			  const char *end_key, uint32_t end_part_count,
+			  const char **quantile_key,
+			  uint32_t *quantile_key_size)
+{
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+	memtx_tree_t<USE_HINT> *tree = &index->tree;
+	struct key_def *key_def = base->def->key_def;
+
+	struct memtx_tree_key_data<USE_HINT> begin_data;
+	begin_data.key = begin_key;
+	begin_data.part_count = begin_part_count;
+	if (USE_HINT)
+		begin_data.set_hint(
+			key_hint(begin_key, begin_part_count, key_def));
+
+	struct memtx_tree_key_data<USE_HINT> end_data;
+	end_data.key = end_key;
+	end_data.part_count = end_part_count;
+	if (USE_HINT)
+		end_data.set_hint(
+			key_hint(end_key, end_part_count, key_def));
+
+	size_t begin_offset;
+	memtx_tree_lower_bound_get_offset(tree, &begin_data, NULL,
+					  &begin_offset);
+	size_t end_offset;
+	if (end_data.part_count > 0) {
+		memtx_tree_lower_bound_get_offset(tree, &end_data, NULL,
+						  &end_offset);
+	} else {
+		end_offset = memtx_tree_size(tree);
+	}
+	if (end_offset <= begin_offset) {
+		*quantile_key = NULL;
+		*quantile_key_size = 0;
+		return 0;
+	}
+
+	assert(level > 0 && level < 1);
+	size_t offset = begin_offset + (end_offset - begin_offset) * level;
+	memtx_tree_iterator_t<USE_HINT> itr =
+		memtx_tree_iterator_at(tree, offset);
+	assert(!memtx_tree_iterator_is_invalid(&itr));
+	struct memtx_tree_data<USE_HINT> *data =
+		memtx_tree_iterator_get_elem(tree, &itr);
+	if (key_def->for_func_index) {
+		*quantile_key = tuple_data_range((struct tuple *)data->hint,
+						 quantile_key_size);
+		void *buf = xregion_alloc(&fiber()->gc, *quantile_key_size);
+		memcpy(buf, *quantile_key, *quantile_key_size);
+		*quantile_key = (const char *)buf;
+	} else {
+		int multikey_idx = key_def->is_multikey ?
+				   (int)data->hint : MULTIKEY_NONE;
+		*quantile_key = tuple_extract_key(data->tuple, key_def,
+						  multikey_idx,
+						  quantile_key_size);
+	}
+	return 0;
+}
+
 template <bool USE_HINT>
 static int
 memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
@@ -2486,7 +2552,7 @@ get_memtx_tree_index_vtab(void)
 			memtx_index_def_change_requires_rebuild,
 		/* .size = */ memtx_tree_index_size<USE_HINT>,
 		/* .bsize = */ memtx_tree_index_bsize<USE_HINT>,
-		/* .quantile = */ generic_index_quantile,
+		/* .quantile = */ memtx_tree_index_quantile<USE_HINT>,
 		/* .min = */ generic_index_min,
 		/* .max = */ generic_index_max,
 		/* .random = */ memtx_tree_index_random<USE_HINT>,

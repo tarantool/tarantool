@@ -18,6 +18,7 @@ g.after_each(function(cg)
             box.space.test:drop()
         end
         box.schema.user.drop('test', {if_exists = true})
+        box.schema.func.drop('test', {if_exists = true})
     end)
 end)
 
@@ -156,5 +157,117 @@ g.test_unsupported = function(cg)
             message = "Index 'i3' (BITSET) of space 'test' (memtx) " ..
                       "does not support quantile()",
         }, i3.quantile, i3, 0.5)
+    end)
+end
+
+g.test_tree_index = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('primary', {
+            parts = {
+                {1, 'unsigned'},
+                {3, 'unsigned'}
+            },
+        })
+        t.assert_equals(s:quantile(0.5), nil)
+        t.assert_equals(s:quantile(0.5, {}, {10}), nil)
+        t.assert_equals(s:quantile(0.5, {10}, {}), nil)
+        t.assert_equals(s:quantile(0.5, {10, 1}, {20, 2}), nil)
+
+        s:insert({10, 'x', 30, 'a'})
+        t.assert_equals(s:quantile(0.5), {10, 30})
+        t.assert_equals(s:quantile(0.5, {}, {10}), nil)
+        t.assert_equals(s:quantile(0.5, {}, {10, 30}), nil)
+        t.assert_equals(s:quantile(0.5, {10}, {}), {10, 30})
+
+        s:insert({10, 'y', 10, 'b'})
+        s:insert({10, 'z', 20, 'c'})
+        t.assert_equals(s:quantile(0.5), {10, 20})
+        t.assert_equals(s:quantile(0.5, {}, {10}), nil)
+        t.assert_equals(s:quantile(0.5, {}, {10, 20}), {10, 10})
+        t.assert_equals(s:quantile(0.5, {10}, {}), {10, 20})
+
+        s:insert({20, box.NULL, 20})
+        s:insert({30, box.NULL, 30})
+        s:insert({40, box.NULL, 40})
+
+        t.assert_equals(s:quantile(0.1), {10, 10})
+        t.assert_equals(s:quantile(0.5), {20, 20})
+        t.assert_equals(s:quantile(0.9), {40, 40})
+
+        t.assert_equals(s:quantile(0.5, {10}, {30}), {10, 30})
+        t.assert_equals(s:quantile(0.5, {10, 100}, {50}), {30, 30})
+    end)
+end
+
+g.test_multikey_index = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+        local i = s:create_index('multikey', {
+            unique = false,
+            parts = {{'[2][*]', 'string'}},
+        })
+
+        -- 1a 3b 5c 4d 2e
+        s:insert({1, {'a', 'b', 'c'}})
+        s:insert({2, {'b', 'b', 'c', 'c', 'd', 'd'}})
+        s:insert({3, {'c', 'd', 'e'}})
+        s:insert({4, {'c', 'd', 'e'}})
+
+        t.assert_equals(i:quantile(0.01), {'a'})
+        t.assert_equals(i:quantile(0.10), {'b'})
+        t.assert_equals(i:quantile(0.50), {'c'})
+        t.assert_equals(i:quantile(0.80), {'d'})
+        t.assert_equals(i:quantile(0.90), {'e'})
+
+        t.assert_equals(i:quantile(0.5, {}, {'c'}), {'b'})
+        t.assert_equals(i:quantile(0.5, {'c'}, {}), {'d'})
+        t.assert_equals(i:quantile(0.5, {'b'}, {'e'}), {'c'})
+
+        t.assert_equals(i:quantile(0.5, {}, {'a'}), nil)
+        t.assert_equals(i:quantile(0.5, {'ff'}, {}), nil)
+        t.assert_equals(i:quantile(0.5, {'aa'}, {'ab'}), nil)
+    end)
+end
+
+g.test_func_index = function(cg)
+    cg.server:exec(function()
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            is_multikey = true,
+            is_sandboxed = true,
+            body = [[function(tuple)
+                return {{tuple[2]}, {tuple[3]}}
+            end]]
+        })
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+        local i = s:create_index('func', {
+            unique = false,
+            func = 'test',
+            parts = {{1, 'string'}}
+        })
+
+        -- 2a 2b 2c 2d 2e
+        s:insert({1, 'a', 'b'})
+        s:insert({2, 'b', 'c'})
+        s:insert({3, 'c', 'd'})
+        s:insert({4, 'd', 'e'})
+        s:insert({5, 'e', 'a'})
+
+        t.assert_equals(i:quantile(0.1), {'a'})
+        t.assert_equals(i:quantile(0.3), {'b'})
+        t.assert_equals(i:quantile(0.5), {'c'})
+        t.assert_equals(i:quantile(0.7), {'d'})
+        t.assert_equals(i:quantile(0.9), {'e'})
+
+        t.assert_equals(i:quantile(0.5, {}, {'d'}), {'b'})
+        t.assert_equals(i:quantile(0.5, {'c'}, {}), {'d'})
+        t.assert_equals(i:quantile(0.5, {'b'}, {'e'}), {'c'})
+
+        t.assert_equals(i:quantile(0.5, {}, {'a'}), nil)
+        t.assert_equals(i:quantile(0.5, {'ff'}, {}), nil)
+        t.assert_equals(i:quantile(0.5, {'aa'}, {'ab'}), nil)
     end)
 end
