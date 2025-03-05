@@ -138,3 +138,67 @@ g.test_app_cfg_deep_merge = function(g)
         end,
     })
 end
+
+-- Verify that a script without 'preload' tag is executed after box.cfg.
+--
+-- This is the default behavior.
+g.test_app_without_preload_tag = function(g)
+    local script = [[
+        if (rawget(_G, 'on_load_status') == nil) then
+            _G.on_load_status = box.info.status
+        end
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.on_load_status, 'running')
+    end
+
+    helpers.success_case(g, {
+        script = script,
+        options = {
+            ['app.file'] = 'main.lua',
+        },
+        verify = verify,
+    })
+
+    helpers.success_case(g, {
+        script = script,
+        options = {
+            ['app.module'] = 'main',
+        },
+        verify = verify,
+    })
+end
+
+-- Verify that a script with 'preload' tag is executed before box.cfg.
+--
+-- This is supported after gh-10182.
+g.test_app_with_preload_tag = function(g)
+    local script = [[
+        -- tags: preload
+
+        if (rawget(_G, 'on_load_status') == nil) then
+            _G.on_load_status = box.info.status
+        end
+    ]]
+
+    local verify = function()
+        t.assert_equals(_G.on_load_status, 'unconfigured')
+    end
+
+    helpers.success_case(g, {
+        script = script,
+        options = {
+            ['app.file'] = 'main.lua',
+        },
+        verify = verify,
+    })
+
+    helpers.success_case(g, {
+        script = script,
+        options = {
+            ['app.module'] = 'main',
+        },
+        verify = verify,
+    })
+end
