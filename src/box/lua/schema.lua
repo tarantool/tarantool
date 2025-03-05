@@ -41,6 +41,7 @@ local INT64_MAX = tonumber64('9223372036854775807')
 
 ffi.cdef[[
     extern bool box_read_ffi_is_disabled;
+    extern bool memtx_tx_manager_use_mvcc_engine;
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
     size_t space_bsize(struct space *space);
@@ -94,8 +95,6 @@ ffi.cdef[[
     box_txn_set_timeout(double timeout);
     void
     box_txn_make_sync();
-    void
-    memtx_tx_story_gc_step();
     int
     box_sequence_current(uint32_t seq_id, int64_t *result);
     typedef struct txn_savepoint box_txn_savepoint_t;
@@ -394,16 +393,6 @@ box.begin = function(options)
 end
 
 box.is_in_txn = builtin.box_txn
-
-box.internal.memtx_tx_gc = function(step_num)
-    if type(step_num) ~= 'number' or step_num < 1 then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  "step_num must be a number not less than 1")
-    end
-    for _ = 1, step_num do
-        builtin.memtx_tx_story_gc_step()
-    end
-end
 
 box.txn_id = function()
     local id = builtin.box_txn_id()
@@ -2932,17 +2921,30 @@ end
 
 function box.schema.space.bless(space)
     utils.box_check_configured(2)
-    local index_mt_name
+    local base_index_mt_name
     if space.engine == 'vinyl' then
-        index_mt_name = 'vinyl_index_mt'
+        base_index_mt_name = 'vinyl_index_mt'
     else
-        index_mt_name = 'memtx_index_mt'
+        base_index_mt_name = 'memtx_index_mt'
     end
     local space_mt = wrap_schema_object_mt('space_mt')
+
+    local func_index_mt_name = base_index_mt_name
+    -- Functional index using memtx MVCC must use vinyl
+    -- metatable since the MVCC can call the function and
+    -- function call is not allowed during FFI call.
+    if builtin.memtx_tx_manager_use_mvcc_engine and
+       space.engine == 'memtx' then
+        func_index_mt_name = 'vinyl_index_mt'
+    end
 
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
+            local index_mt_name = base_index_mt_name
+            if index.func ~= nil then
+                index_mt_name = func_index_mt_name
+            end
             if type(j) == 'number' then
                 setmetatable(index, wrap_schema_object_mt(index_mt_name))
             end
