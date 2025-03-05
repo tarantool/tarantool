@@ -91,7 +91,9 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end)
 
                         if exists_status and exists_result then
-                            log_info("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
+                            if SUCCESSFUL_LOGS then
+                                log_info("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
+                            end
                             key = key + step
                         elseif not exists_status then
                             log_error("[PERIODIC INSERT] Failed to check existence of key: " .. key .. ". Error: " .. json.encode(exists_result))
