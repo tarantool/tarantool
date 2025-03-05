@@ -68,6 +68,7 @@ box_index_iterator_with_offset
 box_index_len
 box_index_max
 box_index_min
+box_index_quantile
 box_index_random
 box_index_tuple_position
 box_info_lsn

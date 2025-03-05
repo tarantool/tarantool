@@ -154,6 +154,38 @@ ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id);
 
 /**
+ * Return a quantile point in an indexed range.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param level quantile level
+ * \param begin_key beginning key of the target range
+ * \param begin_key_end end of \a begin_key
+ * \param end_key end key of the target range
+ * \param end_key_end end of \a end_key
+ * \param[out] quantile_key quantile point or NULL if the range is too small
+ * \param[out] quantile_key_end end of \a quantile_key
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ *
+ * The quantile point is such a key that the ratio of tuples less than
+ * the key in the target range approximately equals the given level.
+ *
+ * \a begin_key and \a end_key must be encoded in the MsgPack Array format.
+ * The target range is defined as the intersection of GE \a begin_key and
+ * LT \a end_key read queries.
+ *
+ * The quantile point is returned in the MsgPack Array format. It is allocated
+ * on the box region so the caller should use box_region_truncate() to clean up
+ * the region after calling this function.
+ */
+int
+box_index_quantile(uint32_t space_id, uint32_t index_id, double level,
+		   const char *begin_key, const char *begin_key_end,
+		   const char *end_key, const char *end_key_end,
+		   const char **quantile_key, const char **quantile_key_end);
+
+/**
  * Return a random tuple from the index (useful for statistical analysis).
  *
  * \param space_id space identifier
