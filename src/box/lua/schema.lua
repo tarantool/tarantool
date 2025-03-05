@@ -2,6 +2,7 @@
 --
 local ffi = require('ffi')
 local msgpack = require('msgpack')
+local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local log = require('log')
 local buffer = require('buffer')
@@ -63,6 +64,12 @@ ffi.cdef[[
     box_index_len(uint32_t space_id, uint32_t index_id);
     ssize_t
     box_index_bsize(uint32_t space_id, uint32_t index_id);
+    int
+    box_index_quantile(uint32_t space_id, uint32_t index_id, double level,
+                       const char *begin_key, const char *begin_key_end,
+                       const char *end_key, const char *end_key_end,
+                       const char **quantile_key,
+                       const char **quantile_key_end);
     int
     box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
                      box_tuple_t **result);
@@ -2173,6 +2180,51 @@ base_index_mt.bsize = function(index)
     end
     return tonumber(ret)
 end
+-- index.quantile
+base_index_mt.quantile = function(index, level, begin_key, end_key)
+    check_index_arg(index, 'quantile', 2)
+    if level == nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  'Usage: index:quantile(level[, begin_key, end_key])', 2)
+    end
+    if type(level) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS, 'level must be a number', 2)
+    end
+    -- Encode the keys on cord ibuf. Note, since the ibuf may be
+    -- reallocated when we encode end_key, we can't use the pointers
+    -- returned by tuple_encode(). Instead we remember the begin_key
+    -- size and set the pointers after all allocations are done.
+    local ibuf = cord_ibuf_take()
+    tuple_encode(ibuf, begin_key, 2)
+    local begin_key_size = ibuf:size()
+    tuple_encode(ibuf, end_key, 2)
+    local end_key_size = ibuf:size() - begin_key_size
+    begin_key = ibuf.rpos
+    end_key = ibuf.rpos + begin_key_size
+    -- Call the C API function.
+    local quantile_key = ffi.new('const char *[1]')
+    local quantile_key_end = ffi.new('const char *[1]')
+    local region_svp = builtin.box_region_used()
+    local ok = builtin.box_index_quantile(index.space_id, index.id, level,
+                                          begin_key, begin_key + begin_key_size,
+                                          end_key, end_key + end_key_size,
+                                          quantile_key, quantile_key_end) == 0
+    cord_ibuf_put(ibuf)
+    if not ok then
+        box.error(box.error.last(), 2)
+    end
+    -- Decode the result and clean up the region.
+    local result
+    if quantile_key[0] ~= nil then
+        local ptr
+        result, ptr = msgpackffi.decode_unchecked(quantile_key[0])
+        assert(ptr == quantile_key_end[0])
+    else
+        result = nil
+    end
+    builtin.box_region_truncate(region_svp)
+    return result
+end
 -- index.fselect - formatted select.
 -- Options can be passed through opts, fselect_opts and global variables.
 -- If an option is in opts table or set in global variable - it must have
@@ -2776,7 +2828,10 @@ space_mt.bsize = function(space)
     end
     return tonumber(builtin.space_bsize(s))
 end
-
+space_mt.quantile = function(space, level, begin_key, end_key)
+    check_space_arg(space, 'quantile', 2)
+    return check_primary_index(space, 2):quantile(level, begin_key, end_key)
+end
 space_mt.get = function(space, key)
     check_space_arg(space, 'get', 2)
     return check_primary_index(space, 2):get(key)

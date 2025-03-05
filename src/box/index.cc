@@ -423,6 +423,61 @@ box_index_bsize(uint32_t space_id, uint32_t index_id)
 }
 
 int
+box_index_quantile(uint32_t space_id, uint32_t index_id, double level,
+		   const char *begin_key, const char *begin_key_end,
+		   const char *end_key, const char *end_key_end,
+		   const char **quantile_key, const char **quantile_key_end)
+{
+	mp_tuple_assert(begin_key, begin_key_end);
+	mp_tuple_assert(end_key, end_key_end);
+	assert(quantile_key != NULL);
+	assert(quantile_key_end != NULL);
+
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+
+	if (index->def->type != TREE) {
+		diag_set(UnsupportedIndexFeature, index->def, "quantile()");
+		return -1;
+	}
+
+	uint32_t begin_part_count = mp_decode_array(&begin_key);
+	if (iterator_validate(index->def, ITER_GE,
+			      begin_key, begin_part_count) != 0)
+		return -1;
+
+	uint32_t end_part_count = mp_decode_array(&end_key);
+	if (iterator_validate(index->def, ITER_LT,
+			      end_key, end_part_count) != 0)
+		return -1;
+
+	int cmp = key_compare(begin_key, begin_part_count, HINT_NONE,
+			      end_key, end_part_count, HINT_NONE,
+			      index->def->key_def);
+	if (cmp > 0 || (cmp == 0 &&
+			begin_part_count != 0 && end_part_count != 0 &&
+			begin_part_count >= end_part_count)) {
+		diag_set(IllegalParams, "begin_key must be < end_key");
+		return -1;
+	}
+	if (level <= 0 || level >= 1) {
+		diag_set(IllegalParams, "level must be > 0 and < 1");
+		return -1;
+	}
+	uint32_t quantile_key_size;
+	if (index_quantile(index, level, begin_key, begin_part_count,
+			   end_key, end_part_count,
+			   quantile_key, &quantile_key_size) != 0)
+		return -1;
+
+	*quantile_key_end = *quantile_key != NULL ?
+			    *quantile_key + quantile_key_size : NULL;
+	return 0;
+}
+
+int
 box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 		box_tuple_t **result)
 {
