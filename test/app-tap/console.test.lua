@@ -11,10 +11,9 @@ local _
 
 -- Suppress console log messages
 log.level(4)
-local CONSOLE_SOCKET = fio.pathjoin(fio.cwd(), 'tarantool-test-console.sock')
-local IPROTO_SOCKET = fio.pathjoin(fio.cwd(), 'tarantool-test-iproto.sock')
-os.remove(CONSOLE_SOCKET)
-os.remove(IPROTO_SOCKET)
+local TMPDIR = fio.tempdir()
+local CONSOLE_SOCKET = fio.pathjoin(TMPDIR, 'tarantool-test-console.sock')
+local IPROTO_SOCKET = fio.pathjoin(TMPDIR, 'tarantool-test-iproto.sock')
 
 --
 local EOL = "\n...\n"
@@ -340,5 +339,6 @@ session_id = nil
 triggers_ran = nil
 os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
+fio.rmdir(TMPDIR)
 
 os.exit(test:check() and 0 or 1)
