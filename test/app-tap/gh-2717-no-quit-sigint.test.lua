@@ -136,7 +136,8 @@ local log_file = fio.abspath('tarantool.log')
 local pid_file = fio.abspath('tarantool.pid')
 local xlog_file = fio.abspath('00000000000000000000.xlog')
 local snap_file = fio.abspath('00000000000000000000.snap')
-local sock = fio.abspath('tarantool.soc')
+local tmpdir = fio.tempdir()
+local sock = fio.pathjoin(tmpdir, 'tarantool.soc')
 
 local user_grant = ' box.schema.user.grant(\'guest\', \'super\')'
 local arg = ' -e \"box.cfg{pid_file=\''
@@ -271,5 +272,7 @@ test:unlike(ph:info().status.state, popen.state.EXITED,
 
 ph:shutdown({stdin = true})
 ph:close()
+
+fio.rmdir(tmpdir)
 
 os.exit(test:check() and 0 or 1)
