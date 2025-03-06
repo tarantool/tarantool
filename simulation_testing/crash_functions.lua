@@ -8,8 +8,8 @@ nodes_activity_states = {}
 nodes_connection_states = {}
 
 
-local function update_node_state(node, connected)
-    nodes_activity_states[node.alias] = connected
+local function update_node_state(node_or_proxy, state_status)
+    nodes_activity_states[node_or_proxy.alias] = state_status
 end
 
 local function update_node_connection_state(node1,node2, state)
@@ -99,11 +99,82 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     return selected_nodes
 end
 
+-- Safe function for getting random crash proxies
+local function get_random_proxies_for_crash(proxies, nodes, nodes_activity_states, num_to_select)
+    if #proxies == 0 then
+        log_info("[CRASH SIMULATION] No proxies available to select")
+        return {}
+    end
+
+    local selected_nodes = get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
+
+    if #selected_nodes == 0 then
+        log_info("[CRASH SIMULATION] Could not select nodes for crash")
+        return {}
+    end
+
+    -- Collecting a list of available proxies corresponding to the selected nodes
+    local available_proxies = {}
+    for _, node in ipairs(selected_nodes) do
+        local node_number = node.alias:match("replica_(%d+)")
+        if node_number then
+            local proxy_name = "proxy_" .. node_number  -- The appropriate proxy
+            for _, proxy in ipairs(proxies) do
+                if proxy.alias == proxy_name and nodes_activity_states[proxy.alias] ~= "crashed" then
+                    table.insert(available_proxies, proxy)
+                    break
+                end
+            end
+        end
+    end
+
+    if #available_proxies < num_to_select then
+        log_info("[CRASH SIMULATION] Not enough healthy proxies to select")
+        return {}
+    end
+
+    local selected_proxies = {}
+    while #selected_proxies < num_to_select do
+        local index = math.random(#available_proxies)
+        local proxy = table.remove(available_proxies, index)
+        table.insert(selected_proxies, proxy)
+    end
+
+    return selected_proxies
+end
+
+
+
 -- For the convenience of logging and debugging node states
 local function log_info_nodes_activity_states()
-    log_info("[NODES ACTIVITY STATES] Current states of nodes:")
+    log_info("[NODES ACTIVITY STATES] Current states of nodes and proxies:")
+
+    local function extract_id(alias)
+        return tonumber(alias:match("%d+")) 
+    end
+
+    local nodes = {}
+    local proxies = {}
+
     for alias, state in pairs(nodes_activity_states) do
-        log_info(string.format("  - Node: %s, State: %s", alias, state))
+        if alias:startswith("replica_") then
+            table.insert(nodes, {alias = alias, state = state, id = extract_id(alias)})
+        elseif alias:startswith("proxy_") then
+            table.insert(proxies, {alias = alias, state = state, id = extract_id(alias)})
+        end
+    end
+
+    table.sort(nodes, function(a, b) return a.id < b.id end)
+    table.sort(proxies, function(a, b) return a.id < b.id end)
+
+    log_info("Nodes:")
+    for _, node in ipairs(nodes) do
+        log_info(string.format("  - Node: %s, State: %s", node.alias, node.state))
+    end
+
+    log_info("Proxies:")
+    for _, proxy in ipairs(proxies) do
+        log_info(string.format("  - Proxy: %s, State: %s", proxy.alias, proxy.state))
     end
 end
 
@@ -124,6 +195,25 @@ local function stop_node(node, min_delay, max_delay)
         node:start()
         update_node_state(node, "restored")
         log_info(string.format("[CRASH SIMULATION] Node %s is started again", node.alias))
+        log_info_nodes_activity_states()
+    end)
+end
+
+local function crash_proxy(proxy, min_delay, max_delay)
+    fiber.create(function()
+
+        local delay = tools.calculate_delay(min_delay, max_delay)
+
+        proxy:pause()
+        update_node_state(proxy, "crashed")
+        log_info(string.format("[CRASH SIMULATION] Proxy for node %s is paused for a time %s", proxy.alias, delay))
+        log_info_nodes_activity_states()
+
+        fiber.sleep(delay)
+
+        proxy:resume()
+        update_node_state(proxy, "restored")
+        log_info(string.format("[CRASH SIMULATION] Proxy for node %s is resumed", proxy.alias))
         log_info_nodes_activity_states()
     end)
 end
@@ -223,7 +313,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
     fiber.create(function()
         while true do
             fiber.sleep(crash_interval) 
-            local type_of_crashing = math.random(1, 3)
+            local type_of_crashing = math.random(1, 4)
             if type_of_crashing == 1 then
                 local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
                 if #crash_node > 0 then
@@ -236,10 +326,16 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
                     create_delay_to_write_operations(crash_node[1], lower_crash_time_bound, upper_crash_time_bound)
                 end
 
-            else
+            elseif type_of_crashing == 3 then
                 local crash_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
                 if #crash_nodes > 0 then
                     break_connection_between_two_nodes(crash_nodes, initial_replication, lower_crash_time_bound, upper_crash_time_bound)
+                end
+
+            elseif type_of_crashing == 4 then
+                local crash_proxy_node = get_random_proxies_for_crash(cg.proxies, cg.replicas, nodes_activity_states, 1)
+                if #crash_proxy_node > 0 then
+                    crash_proxy(crash_proxy_node[1], lower_crash_time_bound, upper_crash_time_bound)
                 end
             end
 

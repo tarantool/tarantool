@@ -4,6 +4,7 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
 local fio = require('fio')
+local Proxy = require('luatest.replica_proxy')
 
 
 
@@ -57,6 +58,15 @@ local function clear_dirs_for_all_replicas()
 end
 ---
 
+local function create_proxy_for_replica(replica_id, replica_uri)
+    local proxy_socket_path = fio.abspath(string.format('./replicas_dirs/replica_%d/proxy_%d.sock', replica_id, replica_id))
+    local proxy = Proxy:new({
+        client_socket_path = proxy_socket_path,
+        server_socket_path = replica_uri,
+    })
+    proxy.alias = "proxy_" .. replica_id
+    return proxy
+end
 
 --- Random Configuration Generator
 local function rand_cfg(cg, replica_count, replica_id)
@@ -67,7 +77,6 @@ local function rand_cfg(cg, replica_count, replica_id)
     end
 
     local memtx_dir, wal_dir, log_dir = create_dirs_for_replica(replica_id)
-
     local log_file = fio.pathjoin(log_dir, 'replica_'..tostring(replica_id)..'.log')
 
     local box_cfg = {
@@ -97,24 +106,31 @@ local function clear_cluster(cg)
     if cg.cluster then
         cg.cluster:drop()
     end
+    if cg.proxies then
+        for _, proxy in ipairs(cg.proxies) do
+            proxy:stop()
+        end
+    end
     cg = {}
     cg.replicas = {}
+    cg.proxies = {}
 end
 
 --- Random Cluster Generator
 local function rand_cluster(max_number_replicas)
     local cg = {}
     cg.replicas = {}
+    cg.proxies = {}
     clear_cluster(cg)
     cg.cluster = cluster:new{}
     local replica_count = math.random(3, max_number_replicas)
     local candidates_count=0
     for i = 1, replica_count do
         create_dirs_for_replica(i)
-        -- Генерация конфигурации для каждой реплики
+        -- Generating the configuration for each replica
         local _, box_cfg = rand_cfg(cg, replica_count, i)
 
-        -- Случайный выбор election_mode
+        -- Random selection of selection_mode
         if math.random() > 0.5 then
             box_cfg.election_mode = 'candidate'
             candidates_count = candidates_count + 1
@@ -125,13 +141,17 @@ local function rand_cluster(max_number_replicas)
         if i == replica_count and candidates_count == 0 then
             box_cfg.election_mode = 'candidate'
         end
-        -- Создание и добавление реплики в кластер
+        -- Creating and adding a replica to a cluster
         cg.replicas[i] = cg.cluster:build_and_add_server{
             alias = 'replica_'..tostring(i),
             box_cfg = box_cfg,
         }
-        
-        print("replica_"..tostring(i).." added to cluster as ", box_cfg.election_mode)
+
+        local replica_uri = server.build_listen_uri('replica_'..tostring(i), cg.cluster.id)
+        cg.proxies[i] = create_proxy_for_replica(i, replica_uri)
+        cg.proxies[i]:start({force = true})
+
+        print("Proxy for replica_"..tostring(i).." started.")
     end
 
 

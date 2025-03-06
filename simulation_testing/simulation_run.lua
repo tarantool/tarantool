@@ -78,6 +78,11 @@ for _, node in ipairs(cg.replicas) do
     crash_functions.update_node_state(node, "active")
 end
 
+-- Checking the initial configuration for proxies
+for _, proxy in ipairs(cg.proxies) do
+    log_info(string.format("Proxy %s is active", proxy.alias))
+    crash_functions.update_node_state(proxy, "active")
+end
 
 -- Finding the leader node
 local leader_node = tools.get_leader(cg.replicas)
