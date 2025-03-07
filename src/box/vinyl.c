@@ -1254,6 +1254,38 @@ vinyl_index_bsize(struct index *index)
 	return bsize;
 }
 
+static int
+vinyl_index_quantile(struct index *index, double level,
+		     const char *begin_key, uint32_t begin_part_count,
+		     const char *end_key, uint32_t end_part_count,
+		     const char **quantile_key,
+		     uint32_t *quantile_key_size)
+{
+	int rc = -1;
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_entry begin = vy_entry_none();
+	struct vy_entry end = vy_entry_none();
+
+	begin = vy_entry_key_new(lsm->env->key_format, lsm->key_def,
+				 begin_key, begin_part_count);
+	if (begin.stmt == NULL)
+		goto out;
+	end = vy_entry_key_new(lsm->env->key_format, lsm->key_def,
+			       end_key, end_part_count);
+	if (end.stmt == NULL)
+		goto out;
+	if (vy_lsm_quantile(lsm, level, begin, end,
+			    quantile_key, quantile_key_size) != 0)
+		goto out;
+	rc = 0;
+out:
+	if (begin.stmt != NULL)
+		tuple_unref(begin.stmt);
+	if (end.stmt != NULL)
+		tuple_unref(end.stmt);
+	return rc;
+}
+
 static void
 vinyl_index_compact(struct index *index)
 {
@@ -4792,7 +4824,7 @@ static const struct index_vtab vinyl_index_vtab = {
 		vinyl_index_def_change_requires_rebuild,
 	/* .size = */ vinyl_index_size,
 	/* .bsize = */ vinyl_index_bsize,
-	/* .quantile = */ generic_index_quantile,
+	/* .quantile = */ vinyl_index_quantile,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
