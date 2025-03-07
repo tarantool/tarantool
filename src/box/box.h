@@ -111,6 +111,9 @@ extern struct tt_uuid bootstrap_leader_uuid;
 /** box.cfg.force_recovery. */
 extern bool box_is_force_recovery;
 
+/** Whether box.begin timeout behaviour is new. */
+extern bool box_begin_timeout_new_meaning;
+
 /*
  * Initialize box library
  * @throws C++ exception

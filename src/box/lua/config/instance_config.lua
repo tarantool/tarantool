@@ -2181,6 +2181,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        box_begin_timeout_meaning = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
