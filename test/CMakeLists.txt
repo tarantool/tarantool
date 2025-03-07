@@ -51,6 +51,7 @@ list(APPEND CTEST_FAIL_REGEXP
 
 string(RANDOM LENGTH 9 ALPHABET 0123456789 RANDOM_SEED)
 message(STATUS "Random seed is ${RANDOM_SEED}")
+set(TEST_PARAM_DELIM ":")
 
 list(APPEND LUATEST_COMMAND_WITH_FLAGS
     ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/bin/luatest
@@ -79,6 +80,7 @@ add_subdirectory(box-tap)
 add_subdirectory(box-luatest)
 add_subdirectory(config-luatest)
 add_subdirectory(engine-luatest)
+add_subdirectory(engine-tap)
 add_subdirectory(metrics-luatest)
 add_subdirectory(replication-luatest)
 add_subdirectory(sql-tap)
@@ -166,12 +168,16 @@ add_custom_target(test-force-ctest
 
 list(APPEND EXECUTED_WITHOUT_TEST_RUN
     app-luatest
+    app-tap
     box-luatest
+    box-tap
     config-luatest
     engine-luatest
+    engine-tap
     metrics-luatest
     replication-luatest
     sql-luatest
+    sql-tap
     vinyl-luatest
 )
 
