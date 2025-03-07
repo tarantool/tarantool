@@ -413,12 +413,6 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 }
 
 /**
- * Run several rounds of memtx_tx_story_gc_step()
- */
-void
-memtx_tx_story_gc();
-
-/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  *
  * @param txn - current transactions.
@@ -506,6 +500,18 @@ memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
 }
 
 /**
+ * Save functional key of a tuple to memtx_tx. It is not mandatory to call
+ * this function outside memtx_tx - it is exported only for optimization.
+ * If the functional key is manually saved, memtx_tx won't need to call the
+ * index function again in order to obtain the key.
+ *
+ * Save to call when memtx_tx is disabled - in this case it's simply no-op.
+ */
+void
+memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
+		       struct tuple *func_key);
+
+/**
  * Clean memtx_tx part of @a txn.
  *
  * NB: can trigger story garbage collection.
@@ -562,9 +568,9 @@ void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 
 /**
- * Export step of garbage collector to builtin module
+ * Export step of garbage collector for internal purposes (tests, for example).
  */
-API_EXPORT void
+void
 memtx_tx_story_gc_step(void);
 
 #if defined(ENABLE_READ_VIEW)
