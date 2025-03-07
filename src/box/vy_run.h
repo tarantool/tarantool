@@ -376,6 +376,24 @@ vy_run_unref(struct vy_run *run)
 }
 
 /**
+ * With a reasonable degree of error, return the number of statements
+ * stored in the given range.
+ */
+int64_t
+vy_run_estimate_stmt_count(struct vy_run *run, struct key_def *cmp_def,
+			   struct vy_entry begin, struct vy_entry end);
+
+/**
+ * With a reasonable degree of error, return the key of the statement
+ * located at the given distance after 'begin' or NULL if not found.
+ *
+ * The returned key belongs to the run so it must not be modified or freed.
+ */
+const char *
+vy_run_estimate_key_at(struct vy_run *run, struct key_def *cmp_def,
+		       struct vy_entry begin, int64_t offset);
+
+/**
  * Load run from disk
  * @param run - run to laod
  * @param dir - path to the vinyl directory

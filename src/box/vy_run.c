@@ -1672,6 +1672,46 @@ vy_run_iterator_close(struct vy_run_iterator *itr)
 
 /* }}} vy_run_iterator API implementation */
 
+int64_t
+vy_run_estimate_stmt_count(struct vy_run *run, struct key_def *cmp_def,
+			   struct vy_entry begin, struct vy_entry end)
+{
+	bool unused;
+	uint32_t first_page_no = vy_page_index_find_page(run, begin, cmp_def,
+							 ITER_GE, &unused);
+	uint32_t last_page_no = vy_page_index_find_page(run, end, cmp_def,
+							ITER_LT, &unused);
+	assert(last_page_no >= first_page_no);
+	/*
+	 * Calculate the number of statements in the range assuming that
+	 * all pages store roughly the same number of statements.
+	 */
+	int64_t rows_per_page = run->count.rows / run->count.pages;
+	assert(rows_per_page > 0);
+	return rows_per_page * (last_page_no - first_page_no + 1);
+}
+
+const char *
+vy_run_estimate_key_at(struct vy_run *run, struct key_def *cmp_def,
+		       struct vy_entry begin, int64_t offset)
+{
+	assert(offset >= 0);
+	bool unused;
+	uint32_t first_page_no = vy_page_index_find_page(run, begin, cmp_def,
+							 ITER_GE, &unused);
+	/*
+	 * Find the target page assuming that all pages store roughly
+	 * the same number of statements.
+	 */
+	int64_t rows_per_page = run->count.rows / run->count.pages;
+	assert(rows_per_page > 0);
+	int64_t page_no = first_page_no + offset / rows_per_page;
+	if (page_no >= run->info.page_count)
+		return NULL;
+	struct vy_page_info *page_info = vy_run_page_info(run, page_no);
+	return page_info->min_key;
+}
+
 /** Account a page to run statistics. */
 static void
 vy_run_acct_page(struct vy_run *run, struct vy_page_info *page)
