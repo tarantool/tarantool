@@ -514,6 +514,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 		memtx_index_def_change_requires_rebuild,
 	/* .size = */ memtx_bitset_index_size,
 	/* .bsize = */ memtx_bitset_index_bsize,
+	/* .quantile = */ generic_index_quantile,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,

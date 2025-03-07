@@ -1296,3 +1296,101 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 
 	vy_range_heap_update_all(&lsm->range_heap);
 }
+
+int
+vy_lsm_quantile(struct vy_lsm *lsm, double level,
+		struct vy_entry begin, struct vy_entry end,
+		const char **quantile_key, uint32_t *quantile_key_size)
+{
+	struct key_def *key_def = lsm->key_def;
+	struct key_def *cmp_def = lsm->cmp_def;
+
+	struct vy_range *first_range = vy_range_tree_find_by_key(
+					&lsm->range_tree, ITER_GE, begin);
+	struct vy_range *last_range = vy_range_tree_find_by_key(
+					&lsm->range_tree, ITER_LT, end);
+
+	/*
+	 * Count the total number of tuples in the target range assuming that
+	 * the last layer stores all keys while more recent layers only contain
+	 * incremental updates.
+	 */
+	int64_t total = 0;
+	for (struct vy_range *range = first_range; true;
+	     range = vy_range_tree_next(&lsm->range_tree, range)) {
+		struct vy_entry range_begin =
+			range == first_range ? begin : range->begin;
+		struct vy_entry range_end =
+			range == last_range ? end : range->end;
+		if (!rlist_empty(&range->slices)) {
+			struct vy_slice *slice = rlist_last_entry(
+				&range->slices, struct vy_slice, in_range);
+			total += vy_run_estimate_stmt_count(
+				slice->run, cmp_def, range_begin, range_end);
+		}
+		if (range == last_range)
+			break;
+	}
+
+	*quantile_key = NULL;
+	*quantile_key_size = 0;
+
+	if (total == 0)
+		return 0;
+
+	/* Find the quantile key. */
+	assert(level > 0 && level < 1);
+	const char *key = NULL;
+	int64_t offset = total * level;
+	for (struct vy_range *range = first_range; true;
+	     range = vy_range_tree_next(&lsm->range_tree, range)) {
+		struct vy_entry range_begin =
+			range == first_range ? begin : range->begin;
+		struct vy_entry range_end =
+			range == last_range ? end : range->end;
+		if (rlist_empty(&range->slices))
+			continue;
+		struct vy_slice *slice = rlist_last_entry(
+			&range->slices, struct vy_slice, in_range);
+		int64_t count = vy_run_estimate_stmt_count(
+			slice->run, cmp_def, range_begin, range_end);
+		if (offset >= count) {
+			offset -= count;
+			continue;
+		}
+		key = vy_run_estimate_key_at(slice->run, cmp_def,
+					     range_begin, offset);
+		break;
+	}
+	if (key == NULL)
+		return 0;
+
+	/*
+	 * Since it is an estimate, the found key may be outside the target
+	 * range, in which case we ignore it.
+	 */
+	if (vy_entry_compare_with_raw_key(begin, key, HINT_NONE, cmp_def) > 0)
+		return 0;
+	if (vy_stmt_key_part_count(end.stmt, cmp_def) > 0 &&
+	    vy_entry_compare_with_raw_key(end, key, HINT_NONE, cmp_def) <= 0)
+		return 0;
+	/*
+	 * Keys stored in runs are extended with primary key parts so we
+	 * can't just return the found key to the user, at least, not if
+	 * it's a secondary index. Strip the key of extensions first.
+	 */
+	VERIFY(mp_decode_array(&key) == cmp_def->part_count);
+	uint32_t part_count = 0;
+	const char *key_end = key;
+	while (part_count < key_def->part_count) {
+		mp_next(&key_end);
+		part_count++;
+	}
+	size_t size = mp_sizeof_array(part_count) + (key_end - key);
+	char *buf = xregion_alloc(&fiber()->gc, size);
+	memcpy(mp_encode_array(buf, part_count),
+	       key, key_end - key);
+	*quantile_key = (const char *)buf;
+	*quantile_key_size = size;
+	return 0;
+}

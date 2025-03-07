@@ -412,6 +412,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 		memtx_rtree_index_def_change_requires_rebuild,
 	/* .size = */ memtx_rtree_index_size,
 	/* .bsize = */ memtx_rtree_index_bsize,
+	/* .quantile = */ generic_index_quantile,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,

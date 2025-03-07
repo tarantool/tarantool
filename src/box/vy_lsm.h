@@ -606,6 +606,14 @@ void
 vy_lsm_force_compaction(struct vy_lsm *lsm);
 
 /**
+ * Find a quantile in a range, see index_vtab::quantile().
+ */
+int
+vy_lsm_quantile(struct vy_lsm *lsm, double level,
+		struct vy_entry begin, struct vy_entry end,
+		const char **quantile_key, uint32_t *quantile_key_size);
+
+/**
  * Insert a statement into the in-memory index of an LSM tree. If
  * the region_stmt is NULL and the statement is successfully inserted
  * then the new lsregion statement is returned via @a region_stmt.

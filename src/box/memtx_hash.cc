@@ -659,6 +659,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 		memtx_index_def_change_requires_rebuild,
 	/* .size = */ memtx_hash_index_size,
 	/* .bsize = */ memtx_hash_index_bsize,
+	/* .quantile = */ generic_index_quantile,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,

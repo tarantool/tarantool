@@ -154,6 +154,38 @@ ssize_t
 box_index_bsize(uint32_t space_id, uint32_t index_id);
 
 /**
+ * Return a quantile point in an indexed range.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param level quantile level
+ * \param begin_key beginning key of the target range
+ * \param begin_key_end end of \a begin_key
+ * \param end_key end key of the target range
+ * \param end_key_end end of \a end_key
+ * \param[out] quantile_key quantile point or NULL if the range is too small
+ * \param[out] quantile_key_end end of \a quantile_key
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ *
+ * The quantile point is such a key that the ratio of tuples less than
+ * the key in the target range approximately equals the given level.
+ *
+ * \a begin_key and \a end_key must be encoded in the MsgPack Array format.
+ * The target range is defined as the intersection of GE \a begin_key and
+ * LT \a end_key read queries.
+ *
+ * The quantile point is returned in the MsgPack Array format. It is allocated
+ * on the box region so the caller should use box_region_truncate() to clean up
+ * the region after calling this function.
+ */
+int
+box_index_quantile(uint32_t space_id, uint32_t index_id, double level,
+		   const char *begin_key, const char *begin_key_end,
+		   const char *end_key, const char *end_key_end,
+		   const char **quantile_key, const char **quantile_key_end);
+
+/**
  * Return a random tuple from the index (useful for statistical analysis).
  *
  * \param space_id space identifier
@@ -553,6 +585,32 @@ struct index_vtab {
 
 	ssize_t (*size)(struct index *);
 	ssize_t (*bsize)(struct index *);
+	/**
+	 * Find a quantile point in a range.
+	 *
+	 * The quantile point is such a key that the ratio of tuples less than
+	 * the key in the target range approximately equals the given level.
+	 *
+	 * The target range is specified as the intersection of GE begin_key
+	 * and LT end_key read queries. The level must be greater than 0 and
+	 * less than 1.
+	 *
+	 * The quantile point is returned as a MsgPack array with a header.
+	 * It is allocated on the fiber region. There doesn't necessarily have
+	 * to be a tuple in the range matching the key.
+	 *
+	 * The function may return NULL without raising an error if the range
+	 * is too small to find the specified quantile point, in particular if
+	 * there are no tuples in it.
+	 *
+	 * The function doesn't participate in transactions.
+	 *
+	 * The function doesn't yield.
+	 */
+	int (*quantile)(struct index *index, double level,
+			const char *begin_key, uint32_t begin_part_count,
+			const char *end_key, uint32_t end_part_count,
+			const char **quantile_key, uint32_t *quantile_key_size);
 	int (*min)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	int (*max)(struct index *index, const char *key,
@@ -903,6 +961,17 @@ index_bsize(struct index *index)
 }
 
 static inline int
+index_quantile(struct index *index, double level,
+	       const char *begin_key, uint32_t begin_part_count,
+	       const char *end_key, uint32_t end_part_count,
+	       const char **quantile_key, uint32_t *quantile_key_size)
+{
+	return index->vtab->quantile(index, level, begin_key, begin_part_count,
+				     end_key, end_part_count,
+				     quantile_key, quantile_key_size);
+}
+
+static inline int
 index_min(struct index *index, const char *key,
 	  uint32_t part_count, struct tuple **result)
 {
@@ -1118,6 +1187,8 @@ bool generic_index_def_change_requires_rebuild(struct index *,
 					       const struct index_def *);
 ssize_t generic_index_bsize(struct index *);
 ssize_t generic_index_size(struct index *);
+int generic_index_quantile(struct index *, double, const char *, uint32_t,
+			   const char *, uint32_t, const char **, uint32_t *);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_random(struct index *, uint32_t, struct tuple **);
