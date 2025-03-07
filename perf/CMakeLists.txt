@@ -10,6 +10,15 @@ if (DEFINED ENV{BENCH_CMD})
     set(BENCH_CMD "$ENV{BENCH_CMD}")
 endif()
 
+# If the test output (stdout or stderr) matches these regular
+# expressions the test will fail, regardless of the process exit
+# code.
+list(APPEND CTEST_FAIL_REGEXP
+  # Google Benchmark will produce a warning below if it was linked
+  # with a library built with enabled debug.
+  "Library was built as DEBUG\\. Timings may be affected\\."
+)
+
 # Parse command-line arguments into a semicolon-separated list.
 separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
 
@@ -113,6 +122,7 @@ function(create_perf_test_target)
   set_tests_properties(${test_title} PROPERTIES
     LABELS "${TEST_SUITE_NAME};performance;"
     DEPENDS ${TEST_SUITE_NAME}-deps
+    FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
   )
 endfunction()
 
