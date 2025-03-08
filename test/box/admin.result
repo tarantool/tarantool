@@ -79,6 +79,8 @@ cfg_filter(box.cfg)
     - <hidden>
   - - memtx_dir
     - <hidden>
+  - - memtx_enable_sort_data
+    - false
   - - memtx_max_tuple_size
     - <hidden>
   - - memtx_memory
