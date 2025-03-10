@@ -615,6 +615,7 @@
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>
     <member refid="module_8h_1a698d8991fa015a4b490f078b29e8d929" kind="function"><name>box_index_len</name></member>
     <member refid="module_8h_1aaeda3d99d32c382bc5ac2bc8f0a09f48" kind="function"><name>box_index_bsize</name></member>
+    <member refid="module_8h_1a10baf3a63a95a208b5a5ee96afa66e4b" kind="function"><name>box_index_quantile</name></member>
     <member refid="module_8h_1aa56e2bf2a5720259ea3997149ae53ca9" kind="function"><name>box_index_random</name></member>
     <member refid="module_8h_1a5c9cedd4198d62ddfe6c77ef2bf89f56" kind="function"><name>box_index_get</name></member>
     <member refid="module_8h_1a4fbd278987613571a9d6475de6103a4f" kind="function"><name>box_index_min</name></member>

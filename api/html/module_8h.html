@@ -124,7 +124,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><b>PACKAGE_VERSION_PATCH</b>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0" id="r_aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.4.0-entrypoint-194-g7df5711849&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0" id="r_aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;3.4.0-entrypoint-199-ga8df9b577c&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad63a17703ee9303be2682b7bb08e7a9f" id="r_ad63a17703ee9303be2682b7bb08e7a9f"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ad63a17703ee9303be2682b7bb08e7a9f">TZDATA_VERSION</a>&#160;&#160;&#160;&quot;2022a&quot;</td></tr>
@@ -1613,6 +1613,9 @@ uint64_t&#160;</td><td class="memItemRight" valign="bottom"><b>box_slab_info</b>
 <tr class="memitem:aaeda3d99d32c382bc5ac2bc8f0a09f48" id="r_aaeda3d99d32c382bc5ac2bc8f0a09f48"><td class="memItemLeft" align="right" valign="top">ssize_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aaeda3d99d32c382bc5ac2bc8f0a09f48">box_index_bsize</a> (uint32_t space_id, uint32_t index_id)</td></tr>
 <tr class="memdesc:aaeda3d99d32c382bc5ac2bc8f0a09f48"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the number of bytes used in memory by the index.  <br /></td></tr>
 <tr class="separator:aaeda3d99d32c382bc5ac2bc8f0a09f48"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a10baf3a63a95a208b5a5ee96afa66e4b" id="r_a10baf3a63a95a208b5a5ee96afa66e4b"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a10baf3a63a95a208b5a5ee96afa66e4b">box_index_quantile</a> (uint32_t space_id, uint32_t index_id, double level, const char *begin_key, const char *begin_key_end, const char *end_key, const char *end_key_end, const char **quantile_key, const char **quantile_key_end)</td></tr>
+<tr class="memdesc:a10baf3a63a95a208b5a5ee96afa66e4b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a quantile point in an indexed range.  <br /></td></tr>
+<tr class="separator:a10baf3a63a95a208b5a5ee96afa66e4b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa56e2bf2a5720259ea3997149ae53ca9" id="r_aa56e2bf2a5720259ea3997149ae53ca9"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa56e2bf2a5720259ea3997149ae53ca9">box_index_random</a> (uint32_t space_id, uint32_t index_id, uint32_t rnd, <a class="el" href="module_8h.html#a880c3e1e8e63b9a12353853fb6aefa3f">box_tuple_t</a> **result)</td></tr>
 <tr class="memdesc:aa56e2bf2a5720259ea3997149ae53ca9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a random tuple from the index (useful for statistical analysis).  <br /></td></tr>
 <tr class="separator:aa56e2bf2a5720259ea3997149ae53ca9"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -2216,7 +2219,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><b>log_write_flightrec
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.4.0-entrypoint-194-g7df5711849&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;3.4.0-entrypoint-199-ga8df9b577c&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -5309,6 +5312,102 @@ decimal result (<em>res</em>) </dd></dl>
 </dl>
 <dl class="section see"><dt>See also</dt><dd><div class="fragment"><div class="line">box.space[space_id].index[index_id]:min(key) </div>
 </div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="a10baf3a63a95a208b5a5ee96afa66e4b" name="a10baf3a63a95a208b5a5ee96afa66e4b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a10baf3a63a95a208b5a5ee96afa66e4b">&#9670;&#160;</a></span>box_index_quantile()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_index_quantile </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>space_id</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>index_id</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">double&#160;</td>
+          <td class="paramname"><em>level</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>begin_key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>begin_key_end</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>end_key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>end_key_end</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char **&#160;</td>
+          <td class="paramname"><em>quantile_key</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char **&#160;</td>
+          <td class="paramname"><em>quantile_key_end</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Return a quantile point in an indexed range. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir"></td><td class="paramname">space_id</td><td>space identifier </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">index_id</td><td>index identifier </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">level</td><td>quantile level </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">begin_key</td><td>beginning key of the target range </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">begin_key_end</td><td>end of <em>begin_key</em> </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">end_key</td><td>end key of the target range </td></tr>
+    <tr><td class="paramdir"></td><td class="paramname">end_key_end</td><td>end of <em>end_key</em> </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">quantile_key</td><td>quantile point or NULL if the range is too small </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">quantile_key_end</td><td>end of <em>quantile_key</em> </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="retval"><dt>Return values</dt><dd>
+  <table class="retval">
+    <tr><td class="paramname">-1</td><td>on error (check <a class="el" href="module_8h.html#a29b4ebee3bb9402fb8621b4e96b93b5d" title="Get the information about the last API call error.">box_error_last()</a>) </td></tr>
+    <tr><td class="paramname">0</td><td>on success</td></tr>
+  </table>
+  </dd>
+</dl>
+<p>The quantile point is such a key that the ratio of tuples less than the key in the target range approximately equals the given level.</p>
+<p><em>begin_key</em> and <em>end_key</em> must be encoded in the MsgPack Array format. The target range is defined as the intersection of GE <em>begin_key</em> and LT <em>end_key</em> read queries.</p>
+<p>The quantile point is returned in the MsgPack Array format. It is allocated on the box region so the caller should use <a class="el" href="module_8h.html#a6575301cf1bd4df1bfad9a319b80a0b4" title="Truncate the box region to the given size.">box_region_truncate()</a> to clean up the region after calling this function. </p>
 
 </div>
 </div>
@@ -10697,7 +10796,7 @@ the fiber is not joined yet (panic if not).</dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Mar 6 2025 01:07:07 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
+Generated on Mon Mar 10 2025 15:28:58 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
 </small></address>
 </body>
 </html>
