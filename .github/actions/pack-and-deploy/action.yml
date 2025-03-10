@@ -12,6 +12,9 @@ runs:
         # Create packages.
         make -f .pack.mk package
 
+        # Verify package content.
+        make -f .pack.mk verify-package
+
         # Deploy pre-release (since 2.10) and release packages. It's expected
         # that no one will push tags are used for pre-releases and releases.
         if ${{ ( startsWith(github.ref, 'refs/tags/2.') ||

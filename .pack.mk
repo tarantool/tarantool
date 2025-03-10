@@ -47,6 +47,46 @@ package: prepare
 	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" \
 	./packpack/packpack
 
+# Verify that the systemd service files are included into the
+# Debian package. The check is motivated by gh-11234.
+#
+# Assumes that the package is in the build/ directory (it is where
+# the files reside after the `package` target).
+.PHONY: verify-package
+verify-package:
+	set -ex; \
+	case "${OS}:${DIST}" in \
+	ubuntu:noble) \
+		LIBDIR=/usr/lib; \
+		;; \
+	esac; \
+	case "${OS}:${DIST}" in \
+	debian:* | \
+	ubuntu:*) \
+		LIBDIR="$${LIBDIR:-/lib}"; \
+		TMP="$$(mktemp -d)"; \
+		CONTENT="$$TMP/content.txt"; \
+		dpkg -c build/tarantool-common_*.deb > "$${CONTENT}"; \
+		cat "$${CONTENT}"; \
+		grep "$${LIBDIR}/systemd/system/tarantool.service" "$${CONTENT}"; \
+		grep "$${LIBDIR}/systemd/system/tarantool@.service" "$${CONTENT}"; \
+		grep "$${LIBDIR}/systemd/system-generators/tarantool-generator" "$${CONTENT}"; \
+		rm "$${CONTENT}"; \
+		rmdir "$${TMP}"; \
+		;; \
+	centos:* | \
+	el:* | \
+	fedora:* | \
+	almalinux:* | \
+	redos:*) \
+		echo "No checks implemented yet"; \
+		;; \
+	*) \
+		echo "Unknown OS:DIST: $${OS}:$${DIST}"; \
+		exit 1 \
+		;; \
+	esac
+
 deploy:
 	if [ -z "${REPO_TYPE}" ]; then \
 		echo "Env variable 'REPO_TYPE' must be defined!"; \

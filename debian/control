@@ -34,6 +34,15 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
  tzdata,
 # For third-party subprojects that are built with autotools.
  autoconf, automake, libtool,
+# pkg-config is needed to determine a prefix to install systemd
+# service.
+ pkgconf,
+# systemd.pc is shipped within the systemd package until 253-1,
+# but starting from 253-2 the pkg-config file is moved to the
+# separate systemd-dev package.
+ systemd-dev | systemd (<< 253-2~),
+# dh-exec is needed to preprocess *.install files.
+ dh-exec,
 Section: database
 Standards-Version: 4.5.1
 Homepage: http://tarantool.org/
