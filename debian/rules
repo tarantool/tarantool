@@ -6,6 +6,8 @@ UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
 ifneq ($(wildcard /usr/bin/dh_systemd_start),)
 WITH_SYSTEMD:=ON
+export deb_systemdsystemunitdir = $(shell pkgconf --variable=systemdsystemunitdir systemd)
+export deb_systemdsystemgeneratordir = $(shell pkgconf --variable=systemdsystemgeneratordir systemd)
 else
 WITH_SYSTEMD:=OFF
 endif
