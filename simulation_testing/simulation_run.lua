@@ -8,6 +8,7 @@ local crash_functions = require("crash_functions")
 local randomized_operations = require("randomized_operations")
 local random_cluster = require('random_cluster')
 local log_handling = require('log_handling')
+local proxy_handling = require('proxy_handling')
 local fio = require('fio')
 local replication_errors = require("replication_errors")
 local clock = require('clock')
@@ -46,7 +47,7 @@ end
 
 math.randomseed(os.time())
 random_cluster.clear_dirs_for_all_replicas()
-local cg = random_cluster.rand_cluster(4)
+local cg = random_cluster.rand_cluster(3)
 fiber.sleep(20)
 
 --- Simulation run configuration
@@ -80,7 +81,8 @@ end
 
 -- Checking the initial configuration for proxies
 for _, proxy in ipairs(cg.proxies) do
-    log_info(string.format("Proxy %s is active", proxy.alias))
+    local proxy_state = proxy_handling.get_proxy_state(proxy) 
+    log_info(string.format("Proxy %s is %s", proxy.alias, tostring(proxy_state)))
     crash_functions.update_node_state(proxy, "active")
 end
 
