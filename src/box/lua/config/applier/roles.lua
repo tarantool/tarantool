@@ -1,4 +1,5 @@
 local log = require('internal.config.utils.log')
+local file = require('internal.config.utils.file')
 local fiber = require('fiber')
 
 local roles_state = {
@@ -10,6 +11,11 @@ local roles_state = {
     -- dependencies between roles.
     last_roles_ordered = {},
 
+    -- Map with the tags, where the key is the role name and the value is a map,
+    -- where key is the tag name and the value is `true`, if the role has the
+    -- tag.
+    tags = {},
+
     -- The box.status watcher, used to call on_event callbacks.
     box_status_watcher = nil,
 
@@ -20,6 +26,58 @@ local roles_state = {
     -- and the value is the config for the role.
     last_roles_cfg = nil,
 }
+
+-- Fill the roles_state.tags with the tags for the roles. If the tags cannot be
+-- obtained, then the tags for the role will be an empty table.
+local function update_roles_tags(role_names)
+    if role_names == nil or next(role_names) == nil then
+        return
+    end
+
+    for _, role_name in pairs(role_names) do
+        local ok, res = pcall(file.get_module_tags, role_name)
+        if not ok then
+            log.error(('Unable to get tags for role %q: %s'):format(
+                role_name, res))
+            roles_state.tags[role_name] = {}
+        else
+            roles_state.tags[role_name] = res
+        end
+    end
+end
+
+-- Load roles by their names. If the role is already loaded, then it will be
+-- used from the cache.
+local function load_roles(roles_names)
+    local loaded = {}
+    for _, role_name in ipairs(roles_names) do
+        local role = roles_state.last_loaded[role_name]
+        if not role then
+            log.verbose('roles.post_apply: load role ' .. role_name)
+            role = require(role_name)
+            if type(role) ~= 'table' then
+                local err = 'Unable to use module %s as a role: ' ..
+                    'expected table, got %s'
+                error(err:format(role_name, type(role)), 0)
+            end
+            local funcs = {'validate', 'apply', 'stop'}
+            for _, func_name in pairs(funcs) do
+                if type(role[func_name]) ~= 'function' then
+                    local err = 'Role %s does not contain function %s'
+                    error(err:format(role_name, func_name), 0)
+                end
+            end
+        end
+        loaded[role_name] = role
+        if role.dependencies ~= nil and type(role.dependencies) ~= 'table' then
+            local err = 'Role %q has field "dependencies" of type %s, '..
+                        'array-like table or nil expected'
+            error(err:format(role_name, type(role.dependencies)), 0)
+        end
+    end
+
+    return loaded
+end
 
 -- Function decorator that is used to prevent call_on_event_callbacks() from
 -- being called concurrently by watcher and post_apply().
@@ -72,7 +130,13 @@ local function box_status_watcher()
     end)
 end
 
-local function apply(_config)
+-- This apply function will be called before the box.cfg is applied.
+local function apply(config)
+    -- Get the list of roles from the config.
+    local configdata = config._configdata
+    local role_names = configdata:get('roles', {use_default = true})
+
+    -- Setup the box.status watcher.
     if roles_state.box_status_watcher == nil then
         roles_state.box_status_watcher = box_status_watcher()
 
@@ -83,6 +147,24 @@ local function apply(_config)
                 error('Timeout reached while waiting for box_status_watcher', 0)
             end
         end
+    end
+
+    -- Update the tags for the roles.
+    roles_state.tags = {}
+    update_roles_tags(role_names)
+
+    -- Get roles with the 'preload' tag.
+    local preload_roles = {}
+    for role_name, tags in pairs(roles_state.tags) do
+        if tags['preload'] then
+            table.insert(preload_roles, role_name)
+        end
+    end
+
+    -- Preload roles with the 'preload' tag.
+    local loaded = load_roles(preload_roles)
+    for role_name, role in pairs(loaded) do
+        roles_state.last_loaded[role_name] = role
     end
 end
 
@@ -189,6 +271,7 @@ local function resort_roles(original_order, roles)
     return ordered
 end
 
+-- This post_apply function will be called after the box.cfg is applied.
 local function post_apply(config)
     local configdata = config._configdata
     local role_names = configdata:get('roles', {use_default = true})
@@ -211,32 +294,7 @@ local function post_apply(config)
     stop_roles(roles)
 
     -- Load roles.
-    local loaded = {}
-    for _, role_name in ipairs(roles_ordered) do
-        local role = roles_state.last_loaded[role_name]
-        if not role then
-            log.verbose('roles.post_apply: load role ' .. role_name)
-            role = require(role_name)
-            if type(role) ~= 'table' then
-                local err = 'Unable to use module %s as a role: ' ..
-                    'expected table, got %s'
-                error(err:format(role_name, type(role)), 0)
-            end
-            local funcs = {'validate', 'apply', 'stop'}
-            for _, func_name in pairs(funcs) do
-                if type(role[func_name]) ~= 'function' then
-                    local err = 'Role %s does not contain function %s'
-                    error(err:format(role_name, func_name), 0)
-                end
-            end
-        end
-        loaded[role_name] = role
-        if role.dependencies ~= nil and type(role.dependencies) ~= 'table' then
-            local err = 'Role %q has field "dependencies" of type %s, '..
-                        'array-like table or nil expected'
-            error(err:format(role_name, type(role.dependencies)), 0)
-        end
-    end
+    local loaded = load_roles(roles_ordered)
 
     -- Re-sorting of roles taking into account dependencies between them.
     roles_ordered = resort_roles(roles_ordered, loaded)
@@ -273,7 +331,13 @@ local function post_apply(config)
 end
 
 return {
-    name = 'roles',
-    apply = apply,
-    post_apply = post_apply,
+    stage_1 = {
+        name = 'roles.stage_1',
+        apply = apply,
+    },
+    stage_2 = {
+        name = 'roles.stage_2',
+        apply = function() end,
+        post_apply = post_apply,
+    },
 }

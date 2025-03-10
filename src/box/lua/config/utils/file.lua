@@ -55,6 +55,58 @@ local function universal_read(file_name, file_kind)
     return data
 end
 
+local function get_file_tags(file_name)
+    -- Tags are only supported for Lua files.
+    if type(file_name) ~= 'string' or not file_name:endswith('.lua') then
+        error(('Invalid file name %q'):format(file_name), 0)
+    end
+
+    local file, err = io.open(file_name, "r")
+    if file == nil then
+        error(('Unable to open %q: %s'):format(file_name, err), 0)
+    end
+
+    local lines = file:lines()
+
+    local tags = {}
+    for line in lines do
+        -- Ignore shebang lines.
+        if line:startswith('#!') then
+            goto continue
+        end
+
+        -- Ignore spaces.
+        line = line:gsub("%s+", "")
+
+        -- @TODO: Add support for multi-line comments.
+        if line:startswith('--tags:') then
+            for _, tag in ipairs(line:sub(8):split(',')) do
+                tags[tag] = true
+            end
+        end
+
+        ::continue::
+    end
+
+    return tags
+
+end
+
+local function get_module_tags(module_name)
+    local ok, res = pcall(package.search, module_name)
+    if not ok then
+        error(('Unable to locate package %q: %s'):format(module_name, res), 0)
+    end
+
+    if res == nil then
+        error(('Unable to locate package %q'):format(module_name), 0)
+    end
+
+    return get_file_tags(res)
+end
+
 return {
     universal_read = universal_read,
+    get_file_tags = get_file_tags,
+    get_module_tags = get_module_tags,
 }
