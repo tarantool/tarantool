@@ -9,3 +9,4 @@ issues were fixed as part of this activity:
 * Fixed a crash when using a Lua C function as a vmevent handler for trace
   events.
 * Fixed the compilation of `...` in `select()`.
+* Fixed closing the report file without samples for `jit.p`.
