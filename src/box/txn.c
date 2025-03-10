@@ -335,6 +335,8 @@ txn_stmt_destroy(struct txn_stmt *stmt)
 {
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
 
+	if (stmt->has_triggers)
+		trigger_destroy(&stmt->on_rollback);
 	if (stmt->old_tuple != NULL)
 		tuple_unref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)
