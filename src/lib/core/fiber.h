@@ -276,6 +276,10 @@ fiber_new(const char *name, fiber_func f);
  */
 API_EXPORT struct fiber *
 fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr, fiber_func f);
+int
+read_max_map_count();
+void
+fiber_set_client_limit(int limit);
 
 /**
  * Return control to another fiber and wait until it'll be woken.
