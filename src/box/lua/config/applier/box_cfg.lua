@@ -4,7 +4,6 @@ local instance_config = require('internal.config.instance_config')
 local snapshot = require('internal.config.utils.snapshot')
 local schedule_task = fiber._internal.schedule_task
 local version = require('version')
-local tarantool = require('tarantool')
 local clock = require('clock')
 
 -- {{{ Collect options with the box_cfg annotation
@@ -18,19 +17,6 @@ local function collect_by_box_cfg_annotation(configdata)
 end
 
 -- }}} Collect options with the box_cfg annotation
-
--- {{{ iproto.listen
-
-local function set_iproto_listen(configdata, box_cfg)
-    -- Explicitly set box_cfg.listen to box.NULL if iproto.listen is not
-    -- provided.
-    -- TODO: drop this when default for array value will be supported.
-    if configdata:get('iproto.listen') == nil then
-        box_cfg.listen = box.NULL
-    end
-end
-
--- }}} iproto.listen
 
 -- {{{ replication.peers
 
@@ -144,12 +130,6 @@ local function set_log(configdata, box_cfg)
     -- they're already added to `box_cfg`.
     local cfg_log = configdata:get('log', {use_default = true})
     box_cfg.log = log_destination(cfg_log)
-
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if type(box_cfg.log_modules) == 'nil' then
-        box_cfg.log_modules = box.NULL
-    end
 end
 
 -- }}} log
@@ -172,29 +152,9 @@ local function set_audit_log(configdata, box_cfg)
             box_cfg.audit_filter = 'compatibility'
         end
     end
-
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if tarantool.package == 'Tarantool Enterprise' and
-       type(box_cfg.audit_spaces) == 'nil' then
-        box_cfg.audit_spaces = box.NULL
-    end
 end
 
 -- }}} audit_log
-
--- {{{ wal.ext
-
-local function set_wal_ext(_configdata, box_cfg)
-    -- TODO(gh-10756): This is not needed when :apply_default()
-    -- supports default values for composite types.
-    if tarantool.package == 'Tarantool Enterprise' and
-       type(box_cfg.wal_ext) == 'nil' then
-        box_cfg.wal_ext = box.NULL
-    end
-end
-
--- }}} wal.ext
 
 -- {{{ Set RO/RW
 
@@ -1095,11 +1055,9 @@ local function apply(config)
     local configdata = config._configdata
 
     local box_cfg = collect_by_box_cfg_annotation(configdata)
-    set_iproto_listen(configdata, box_cfg)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-    set_wal_ext(configdata, box_cfg)
     set_ro_rw(configdata, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
