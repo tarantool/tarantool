@@ -122,3 +122,54 @@ g.test_labels = function()
     uptime = utils.find_obs('tnt_info_uptime', {}, default_metrics)
     t.assert_equals(uptime.label_pairs, {})
 end
+
+local function assert_cpu_extended_presents(metrics)
+    local cpu_thread = utils.find_metric('tnt_cpu_thread', metrics)
+    t.assert_not_equals(cpu_thread, nil)
+
+    local cpu_number = utils.find_metric('tnt_cpu_number', metrics)
+    t.assert_not_equals(cpu_number, nil)
+
+    local cpu_time = utils.find_metric('tnt_cpu_time', metrics)
+    t.assert_not_equals(cpu_time, nil)
+end
+
+g.test_include_cpu_extended = function()
+    t.skip_if(jit.os ~= 'Linux', "Linux-specific")
+
+    local default_metrics = g.server:exec(function()
+        box.cfg{
+            metrics = {
+                include = {'cpu_extended'},
+            },
+        }
+
+        return require('metrics').collect{invoke_callbacks = true}
+    end)
+
+    assert_cpu_extended_presents(default_metrics)
+
+    -- Assert non-extended cpu metrics are not enabled.
+    local cpu_user_time = utils.find_metric('tnt_cpu_user_time',
+                                            default_metrics)
+    t.assert_equals(cpu_user_time, nil)
+    local cpu_system_time = utils.find_metric('tnt_cpu_system_time',
+                                              default_metrics)
+    t.assert_equals(cpu_system_time, nil)
+end
+
+g.test_include_all_has_cpu_extended = function()
+    t.skip_if(jit.os ~= 'Linux', "Linux-specific")
+
+    local default_metrics = g.server:exec(function()
+        box.cfg{
+            metrics = {
+                include = 'all',
+            },
+        }
+
+        return require('metrics').collect{invoke_callbacks = true}
+    end)
+
+    assert_cpu_extended_presents(default_metrics)
+end
