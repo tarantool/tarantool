@@ -2106,6 +2106,30 @@ local function downgrade_from_3_3_0(issue_handler)
     drop_gc_consumers(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.4.0
+--------------------------------------------------------------------------------
+
+local function disable_memcs_secondary_indexes(issue_handler)
+    for _, index in box.space._index:pairs() do
+        local space_id = index[1]
+        local index_id = index[2]
+        if index_id ~= 0 then
+            local space = box.space._space:get({space_id})
+            if space[4] == 'memcs' then
+                issue_handler(
+                    "Secondary index for 'memcs' space '%s' is found. " ..
+                    "It is supported starting from version 3.4.0.",
+                    space[3])
+            end
+        end
+    end
+end
+
+local function downgrade_from_3_4_0(issue_handler)
+    disable_memcs_secondary_indexes(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -2123,6 +2147,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion.new(3, 4, 0), func = downgrade_from_3_4_0},
     {version = mkversion.new(3, 3, 0), func = downgrade_from_3_3_0},
     {version = mkversion.new(3, 1, 0), func = downgrade_from_3_1_0},
     {version = mkversion.new(3, 0, 0), func = downgrade_from_3_0_0},
@@ -2226,6 +2251,7 @@ local downgrade_versions = {
     "3.2.1",
     "3.3.0",
     "3.3.1",
+    "3.4.0",
     -- DOWNGRADE VERSIONS END
 }
 

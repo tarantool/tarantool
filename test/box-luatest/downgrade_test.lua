@@ -1078,3 +1078,61 @@ g.test_downgrade_drop_gc_consumers = function(cg)
         end
     end)
 end
+
+-----------------------------
+-- Check downgrade from 3.4.0
+-----------------------------
+
+-- Test downrage is possible if secondary index in not in memcs engine.
+g.test_downgrade_memcs_secondary_indexes_1 = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        s:create_index('sk', {parts = {2}})
+        local prev_version = helper.prev_version('3.4.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        box.schema.downgrade(prev_version)
+    end)
+end
+
+-- Test downrage is possible if no secondary index in memcs engine.
+g.test_downgrade_memcs_secondary_indexes_2 = function(cg)
+    t.tarantool.skip_if_not_enterprise()
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local s = box.schema.create_space('test', {
+            engine = 'memcs', field_count = 2,
+            format = {{'a', 'unsigned'}, {'b', 'unsigned'}},
+        })
+        s:create_index('pk')
+        local prev_version = helper.prev_version('3.4.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        box.schema.downgrade(prev_version)
+    end)
+end
+
+-- Test downrage is not possible if secondary index is in memcs engine.
+g.test_downgrade_memcs_secondary_indexes_3 = function(cg)
+    t.tarantool.skip_if_not_enterprise()
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local s = box.schema.create_space('test', {
+            engine = 'memcs', field_count = 2,
+            format = {{'a', 'unsigned'}, {'b', 'unsigned'}},
+        })
+        s:create_index('pk')
+        s:create_index('sk', {parts = {2}})
+        t.assert_equals(box.schema.downgrade_issues('3.4.0'), {})
+        box.schema.downgrade('3.4.0')
+        local prev_version = helper.prev_version('3.4.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {
+            "Secondary index for 'memcs' space 'test' is found. " ..
+            "It is supported starting from version 3.4.0.",
+        })
+        t.assert_error_msg_contains(
+            "Secondary index for 'memcs' space 'test' is found. " ..
+            "It is supported starting from version 3.4.0.",
+        box.schema.downgrade, prev_version)
+    end)
+end
