@@ -680,9 +680,6 @@ return schema.new('instance_config', schema.record({
                 type = 'number, string',
             }),
             box_cfg = 'log_modules',
-            -- TODO(gh-10756): This default doesn't work now. It
-            -- needs support of non-scalar schema nodes in
-            -- <schema object>:map().
             default = box.NULL,
         }),
     }, {
@@ -725,6 +722,7 @@ return schema.new('instance_config', schema.record({
                 validate = validators['iproto.listen.*'],
             }),
             box_cfg = 'listen',
+            default = box.NULL,
         }),
         -- URIs for clients to let them know where to connect.
         --
@@ -1147,9 +1145,6 @@ return schema.new('instance_config', schema.record({
             }),
         }, {
             box_cfg = 'wal_ext',
-            -- TODO(gh-10756): This default doesn't work now. It
-            -- needs support of non-scalar schema nodes in
-            -- <schema object>:map().
             default = box.NULL,
         })),
     }),
@@ -1929,9 +1924,6 @@ return schema.new('instance_config', schema.record({
             }),
             box_cfg = 'audit_spaces',
             box_cfg_nondynamic = true,
-            -- TODO(gh-10756): This default doesn't work now. It
-            -- needs support of non-scalar schema nodes in
-            -- <schema object>:map().
             default = box.NULL,
         })),
         extract_key = enterprise_edition(schema.scalar({
