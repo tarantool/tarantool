@@ -10,7 +10,9 @@ local test = tap.test("errno")
 
 local ok, test_run = pcall(require, 'test_run')
 test_run = ok and test_run.new() or nil
-local engine = test_run ~= nil and test_run:get_cfg('engine') or 'memtx'
+local engine = test_run ~= nil and test_run:get_cfg('engine') or
+               os.getenv('TEST_ENGINE')
+engine = engine:gsub('"', '')
 
 function test.engine(self)
     return engine
