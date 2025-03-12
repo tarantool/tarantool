@@ -132,7 +132,13 @@ end
 
 local function load_average()
     local path = '/proc/loadavg'
-    local fh = assert(fio.open(path, {'O_RDONLY'}))
+    local fh, errmsg = fio.open(path, {'O_RDONLY'})
+    if not fh then
+        -- It is a different file layout on macOS, so there is no
+        -- </proc>. Just do not initialize that field.
+        io.stderr:write(("Can't open file '%s': %s\n"):format(path, errmsg))
+        return nil
+    end
     local loadavg_buf = fh:read(1024)
     fh:close()
     -- Format is '0.89 0.66 0.80 2/1576 1203510'.
