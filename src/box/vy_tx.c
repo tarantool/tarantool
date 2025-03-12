@@ -1142,6 +1142,18 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 		return; /* no indexes, no conflicts */
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+		if (tx->state == VINYL_TX_ABORT)
+			continue;
+		bool writes_to_space = false;
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
+			if (stmt->space == space) {
+				writes_to_space = true;
+				break;
+			}
+		}
+		if (!writes_to_space)
+			continue;
 		/*
 		 * We can't abort prepared transactions as they have
 		 * already reached WAL. The caller needs to sync WAL
@@ -1149,15 +1161,8 @@ vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
 		 */
 		if (tx->state == VINYL_TX_COMMIT)
 			*need_wal_sync = true;
-		if (tx->state != VINYL_TX_READY)
-			continue;
-		struct txn_stmt *stmt;
-		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
-			if (stmt->space == space) {
-				vy_tx_abort(tx);
-				break;
-			}
-		}
+		else
+			vy_tx_abort(tx);
 	}
 }
 
