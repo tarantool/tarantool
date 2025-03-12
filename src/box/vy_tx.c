@@ -1085,7 +1085,17 @@ vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 	struct txn *txn;
 	rlist_foreach_entry(txn, &txns, in_txns) {
 		struct vy_tx *tx = txn->engines_tx[space->engine->id];
-		if (tx == NULL || stailq_empty(&txn->stmts))
+		if (tx == NULL || tx->state == VINYL_TX_ABORT)
+			continue;
+		bool writes_to_space = false;
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
+			if (stmt->space == space) {
+				writes_to_space = true;
+				break;
+			}
+		}
+		if (!writes_to_space)
 			continue;
 		/*
 		 * We can't abort prepared transactions as they have
@@ -1094,15 +1104,8 @@ vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 		 */
 		if (tx->state == VINYL_TX_COMMIT)
 			*need_wal_sync = true;
-		if (tx->state != VINYL_TX_READY)
-			continue;
-		struct txn_stmt *stmt;
-		stailq_foreach_entry(stmt, &tx->txn->stmts, next) {
-			if (stmt->space == space) {
-				vy_tx_abort_with_conflict(tx);
-				break;
-			}
-		}
+		else
+			vy_tx_abort_with_conflict(tx);
 	}
 }
 
