@@ -7,3 +7,6 @@
  */
 int
 nondet_int(void);
+
+uint32_t
+nondet_uint32_t(void);

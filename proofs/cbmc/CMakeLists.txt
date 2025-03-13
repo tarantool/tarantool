@@ -118,6 +118,39 @@ foreach(proof_name ${STAILQ_FUNCTIONS})
   )
 endforeach()
 
+list(APPEND HEAP_FUNCTIONS
+  heap_create
+  heap_delete
+  heap_destroy
+  heap_insert
+  heap_iterator_init
+  heap_iterator_next
+  heap_pop
+  heap_top
+  heap_update_all
+  heap_update
+)
+
+# "Invariant check failed: src/util/lower_byte_operators.cpp:73 function: adjust_width",
+# https://github.com/diffblue/cbmc/issues/8475
+set(HEAP_SIFT_UP_UNWIND 5)
+set(HEAP_SIFT_DOWN_UNWIND 5)
+set(HEAP_CHECK_UNWIND 50)
+foreach(proof_name ${HEAP_FUNCTIONS})
+  create_proof(PREFIX ${proof_name}
+    SOURCES heap.c
+    CBMC_OPTS ${COMMON_CBMC_OPTIONS}
+              --unwindset test_heap_sift_up.0:${HEAP_SIFT_UP_UNWIND}
+              --unwindset test_heap_sift_down.0:${HEAP_SIFT_UP_UNWIND}
+              --unwindset test_heap_update_all.0:10
+              --unwindset test_heap_check.0:${HEAP_CHECK_UNWIND}
+  )
+  string(TOUPPER ${proof_name} proof_macro)
+  target_compile_definitions(${proof_name}.proof PRIVATE
+    ${proof_macro}=1
+  )
+endforeach()
+
 add_custom_target(proofs
   DEPENDS ${PROOF_TARGETS}
   COMMENT "Build proofs"
