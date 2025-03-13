@@ -69,6 +69,7 @@ bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
 char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
+bool is_supervised_bootstrap_leader = false;
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
@@ -1143,6 +1144,14 @@ applier_is_bootstrap_leader(const struct applier *applier)
 static bool
 bootstrap_leader_is_connected(struct applier **appliers, int count)
 {
+	/*
+	 * In the supervised strategy it is possible that we know
+	 * locally that the given instance is a bootstrap leader.
+	 */
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    is_supervised_bootstrap_leader)
+		return true;
+
 	for (int i = 0; i < count; i++) {
 		struct applier *applier = appliers[i];
 		if (applier->state == APPLIER_CONNECTED &&
@@ -1664,6 +1673,25 @@ replicaset_find_join_master_cfg(void)
 static struct replica *
 replicaset_find_join_master_supervised(void)
 {
+	/*
+	 * If we're known as a bootstrap leader, just bootstrap
+	 * the database.
+	 *
+	 * Unlike the 'auto' bootstrap strategy, the 'supervised'
+	 * one has no safety checks with waiting for ballots from
+	 * other replicaset members.
+	 *
+	 * NB: It is possible to run the cycle below first and
+	 * verify other members status known at this moment.
+	 * However, since we don't wait for connecting to all the
+	 * instances, it has a low chance to catch a problem.
+	 * As result, it would just make the result of calling
+	 * this function less predictable without visible gains
+	 * for a user.
+	 */
+	if (is_supervised_bootstrap_leader)
+		return NULL;
+
 	struct replica *leader = NULL;
 	replicaset_foreach(replica) {
 		struct applier *applier = replica->applier;
