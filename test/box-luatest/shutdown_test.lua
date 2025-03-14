@@ -102,6 +102,34 @@ g_crash.test_shutdown_during_new_connection = function(cg)
     t.assert_equals(result.exit_code, 0)
 end
 
+-- Test shutdown when there is an active transaction.
+local function test_shutdown_with_active_txn(cg, engine)
+    local script_base = [[
+        box.cfg{memtx_use_mvcc_engine = true}
+
+        box.schema.space.create('test', {engine = '%s'})
+        box.space.test:create_index('pk')
+        box.begin()
+        box.space.test:replace{5}
+        box.space.test:get(10)
+        box.space.test:select()
+        os.exit()
+    ]]
+    local script = script_base:format(engine)
+
+    local result = justrun.tarantool(cg.workdir, {}, {'-e', script},
+                                     {nojson = true, quote_args = true})
+    t.assert_equals(result.exit_code, 0)
+end
+
+g_crash.test_shutdown_with_active_txn_memtx = function(cg)
+    test_shutdown_with_active_txn(cg, 'memtx')
+end
+
+g_crash.test_shutdown_with_active_txn_vinyl = function(cg)
+    test_shutdown_with_active_txn(cg, 'vinyl')
+end
+
 local g = t.group()
 
 g.before_each(function(cg)
