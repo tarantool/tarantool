@@ -158,7 +158,8 @@ end
 
 -- {{{ Set RO/RW
 
-local function set_ro_rw(configdata, box_cfg)
+local function set_ro_rw(config, box_cfg)
+    local configdata = config._configdata
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
     local is_startup = type(box.cfg) == 'function'
@@ -258,6 +259,13 @@ local function set_ro_rw(configdata, box_cfg)
             assert(false)
         end
     elseif failover == 'supervised' then
+        if configdata:bootstrap_leader_name() == nil then
+            local warning = 'box_cfg.apply: cannot determine a bootstrap ' ..
+                'leader based on the configuration. Make sure learners are ' ..
+                'properly configured'
+            config._aboard:set({type = 'warn', message = warning})
+        end
+
         -- The startup flow in the 'supervised' failover mode is
         -- the following.
         --
@@ -1058,7 +1066,7 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-    set_ro_rw(configdata, box_cfg)
+    set_ro_rw(config, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
     set_bootstrap_leader(configdata, box_cfg)
