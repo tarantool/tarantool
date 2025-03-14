@@ -85,6 +85,12 @@ create_perf_lua_test(NAME column_insert
                      DEPENDS column_insert_module
 )
 
+build_module(column_update_module column_update_module.c)
+target_link_libraries(column_update_module msgpuck)
+create_perf_lua_test(NAME column_update
+                     DEPENDS column_update_module
+)
+
 add_custom_target(test-lua-perf
                   COMMAND ${CMAKE_CTEST_COMMAND}
                           ${TARANTOOL_PERF_CTEST_FLAGS}
