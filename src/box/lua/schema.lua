@@ -812,9 +812,120 @@ local function denormalize_foreign_key(fkey)
     return result
 end
 
--- Convert zero-based foreign key field numbers to one-based
+local function validate_format(format, tuple)
+    if not format then
+        return nil, "Format is not defined"
+    end
+
+    if tuple == nil then
+        return nil, "Input cannot be nil"
+    end
+
+    if box.tuple and box.tuple.is_tuple and box.tuple.is_tuple(tuple) then
+        local t = {}
+        for i = 1, tuple:len() do
+            t[i] = tuple[i]
+        end
+        tuple = t
+    end
+
+    for i, field_format in ipairs(format) do
+        local value = tuple[i]
+        local field_type = field_format.type
+
+        if value == nil then
+            if not field_format.is_nullable then
+                return nil, string.format("Field %d is not nullable, "..
+                                          "but value is nil", i)
+            end
+        end
+
+        if field_type == 'unsigned' then
+            if not (type(value) == 'number' and value >= 0 and
+                    math.floor(value) == value) then
+                return nil, string.format("Field %d expects type 'unsigned' "..
+                                          "but got type '%s' with value '%s'",
+                                          i, type(value), value)
+            end
+
+        elseif field_type == 'integer' then
+            if not (type(value) == 'number' and
+                    math.floor(value) == value) then
+            return nil, string.format("Field %d expects type 'integer' "..
+                                      "but got type '%s' with value '%s'",
+                                      i, type(value), value)
+            end
+
+        elseif field_type == 'number' then
+            if type(value) ~= 'number' then
+                return nil, string.format("Field %d expects type 'number' "..
+                                          "but got type '%s' with value '%s'",
+                                          i, type(value), value)
+            end
+
+        elseif field_type == 'string' then
+            if type(value) ~= 'string' then
+                return nil, string.format("Field %d expects type 'string' "..
+                                          "but got type '%s' with value '%s'",
+                                          i, type(value), value)
+            end
+
+        elseif field_type == 'boolean' then
+            if type(value) ~= 'boolean' then
+                return nil, string.format("Field %d expects type 'boolean' "..
+                                          "but got type '%s' with value '%s'",
+                                          i, type(value), value)
+            end
+
+        elseif field_type == 'scalar' then
+            if type(value) == 'table' or value == nil then
+                return nil, string.format("Field %d expects type 'scalar' "..
+                                          "but got type '%s' with value '%s'",
+                                          i, type(value), value)
+            end
+
+        elseif field_type == 'array' or field_type == 'map' then
+            if type(value) ~= 'table' then
+                return nil, string.format("Field %d expects type 'table' "..
+                                          "but got type '%s'",
+                                          i, type(value))
+            end
+
+        elseif field_type == 'tuple' then
+             if not (box.tuple and box.tuple.is_tuple and
+                     box.tuple.is_tuple(value)) then
+                return nil, string.format("Field %d expects type 'tuple' "..
+                                          "but got type '%s'",
+                                          i, type(value))
+            end
+
+        elseif field_type == 'varbinary' then
+            if type(value) ~= 'string' then
+                return nil, string.format("Field %d expects type "..
+                                          "'varbinary' but got type '%s'",
+                                          i, type(value))
+            end
+
+        elseif field_type == 'uuid' then
+            if type(value) ~= 'string' then
+                return nil, string.format("Field %d expects type 'uuid' "..
+                                          "but got type '%s'",
+                                          i, type(value))
+            end
+        end
+    end
+
+    if #tuple > #format then
+        return nil, string.format("The tuple has more fields (%d) "..
+                                  "than the schema format (%d)",
+                                  #tuple, #format)
+    end
+
+    return true
+end
+
 local function denormalize_format(format)
-    local result = setmetatable({}, { __serialize = 'seq' })
+    local result = {}
     for i, f in ipairs(format) do
         result[i] = f
         for k, v in pairs(f) do
@@ -823,6 +934,16 @@ local function denormalize_format(format)
             end
         end
     end
+
+    setmetatable(result, {
+        __serialize = 'seq',
+        __index = {
+            validate = function(self, tuple)
+                return validate_format(self, tuple)
+            end
+        }
+    })
+
     return result
 end
 
