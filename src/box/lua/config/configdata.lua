@@ -10,6 +10,19 @@ local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local snapshot = require('internal.config.utils.snapshot')
 
+-- {{{ General-purpose utils
+
+-- {'a', 'b', 'c'} => {a = true, b = true, c = true}
+local function array2set(t)
+    local res = {}
+    for _, v in ipairs(t) do
+        res[v] = true
+    end
+    return res
+end
+
+-- }}} General-purpose utils
+
 local function choose_iconfig(self, opts)
     if opts ~= nil and opts.instance ~= nil then
         local instances = self._instances
@@ -1044,6 +1057,22 @@ local function new(iconfig, cconfig, instance_name)
         end
         assert(bootstrap_leader == nil)
 
+        local failover_replicaset = instance_config:get(iconfig_def,
+            {'failover', 'replicasets', found.replicaset_name}) or {}
+
+        local failover_learners = array2set(failover_replicaset.learners or {})
+        local failover_priorities = failover_replicaset.priority or {}
+
+        -- Learner instances have the least priority to become a
+        -- bootstrap leader.
+        -- Calculate it from the specified priorities.
+        local learner_priority = -1
+        for _, v in pairs(failover_priorities) do
+            if v <= learner_priority then
+                learner_priority = v - 1
+            end
+        end
+
         -- Choose the first non-anonymous instance with the highest
         -- priority specified in the failover configuration
         -- section.
@@ -1052,13 +1081,11 @@ local function new(iconfig, cconfig, instance_name)
             assert(peers[peer_name] ~= nil)
             local iconfig_def = peers[peer_name].iconfig_def
             local is_anon = instance_config:get(iconfig_def, 'replication.anon')
-
-            local priority = instance_config:get(iconfig_def, {
-                'failover',
-                'replicasets',
-                found.replicaset_name,
-                'priority',
-                peer_name}) or 0
+            local is_learner = failover_learners[peer_name]
+            local priority = failover_priorities[peer_name] or 0
+            if is_learner then
+                priority = learner_priority
+            end
 
             if not is_anon and priority > max_priority then
                 bootstrap_leader_name = peer_name

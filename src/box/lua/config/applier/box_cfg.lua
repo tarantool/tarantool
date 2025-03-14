@@ -6,6 +6,19 @@ local schedule_task = fiber._internal.schedule_task
 local version = require('version')
 local clock = require('clock')
 
+-- {{{ General-purpose utils
+
+-- {'a', 'b', 'c'} => {a = true, b = true, c = true}
+local function array2set(t)
+    local res = {}
+    for _, v in ipairs(t) do
+        res[v] = true
+    end
+    return res
+end
+
+-- }}} General-purpose utils
+
 -- {{{ Collect options with the box_cfg annotation
 
 local function collect_by_box_cfg_annotation(configdata)
@@ -158,7 +171,9 @@ end
 
 -- {{{ Set RO/RW
 
-local function set_ro_rw(configdata, box_cfg)
+local function set_ro_rw(config, box_cfg)
+    local configdata = config._configdata
+
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
     local is_startup = type(box.cfg) == 'function'
@@ -288,8 +303,8 @@ local function set_ro_rw(configdata, box_cfg)
         --
         -- The RO/RW mode remains unchanged on reload.
         local am_i_bootstrap_leader = false
+        local instance_name = configdata:names().instance_name
         if is_startup then
-            local instance_name = configdata:names().instance_name
             am_i_bootstrap_leader =
                 snapshot.get_path(configdata._iconfig_def) == nil and
                 instance_name == configdata:bootstrap_leader_name()
@@ -314,6 +329,20 @@ local function set_ro_rw(configdata, box_cfg)
         -- If box.info.id != 1, then the replicaset was already
         -- bootstrapped and so we should go to RO.
         if am_i_bootstrap_leader then
+            local replicaset_name = configdata._replicaset_name
+            local learner_path =
+                {'failover', 'replicasets', replicaset_name, 'learners'}
+            local failover_learners =
+                array2set(configdata:get(learner_path) or {})
+
+            if failover_learners[instance_name] then
+                local warning = 'box_cfg.apply: the only available instance ' ..
+                    'for replicaset bootstrap is marked as a learner for ' ..
+                    'the failover. Nevertheless its learner status it is ' ..
+                    'started in RW mode to bootstrap the cluster'
+                config._aboard:set({type = 'warn', message = warning})
+            end
+
             fiber.new(function()
                 local name = 'config_set_read_only_if_not_bootstrap_leader'
                 fiber.self():name(name, {truncate = true})
@@ -1058,7 +1087,7 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-    set_ro_rw(configdata, box_cfg)
+    set_ro_rw(config, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
     set_bootstrap_leader(configdata, box_cfg)

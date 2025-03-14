@@ -960,6 +960,12 @@ I['failover.replicasets.*.learners'] = format_text([[
 
     Note: if a learner instance is in RW mode, the coordinator stops the
     failover process and waits until the instance transitions to RO mode.
+
+    Note: if `replication.bootstrap_strategy` is `auto` Tarantool needs to
+    choose an instance to start it in RW mode to bootstrap the replicaset.
+    Instances marked as learners have the least priority. If a learner instance
+    is still the only one that might be used to perform a bootstrap it starts in
+    RW mode to perform the bootstrap but issues the warning.
 ]])
 
 I['failover.replicasets.*.learners.*'] = format_text([[
