@@ -131,7 +131,7 @@ local function rand_cluster(max_number_replicas)
         local box_cfg = rand_cfg(cg, replica_count, i)
 
         -- Random selection of selection_mode
-        if math.random() > 0.5 then
+        if math.random() > 0 then
             box_cfg.election_mode = 'candidate'
             candidates_count = candidates_count + 1
         else
