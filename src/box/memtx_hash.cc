@@ -37,6 +37,8 @@
 #include "memtx_tx.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_index.h"
+#include "memtx_index_read_view.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -77,7 +79,7 @@ memtx_hash_equal_key(struct tuple *tuple, const char *key,
 #undef LIGHT_EQUAL_KEY
 
 struct memtx_hash_index {
-	struct index base;
+	struct memtx_index base;
 	struct light_index_core hash_table;
 	struct memtx_gc_task gc_task;
 	struct light_index_iterator gc_iterator;
@@ -268,7 +270,7 @@ static void
 memtx_hash_index_update_def(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	index->hash_table.common.arg = index->base.def->key_def;
+	index->hash_table.common.arg = index->base.base.def->key_def;
 }
 
 static ssize_t
@@ -464,7 +466,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		}
 		/* This iterator needs to be supported as a legacy. */
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-		memtx_tx_track_full_scan(in_txn(), space, &index->base);
+		memtx_tx_track_full_scan(in_txn(), space, &index->base.base);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	}
@@ -472,7 +474,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		light_index_iterator_begin(&index->hash_table, &it->iterator);
 		it->base.next_internal = hash_iterator_ge;
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-		memtx_tx_track_full_scan(in_txn(), space, &index->base);
+		memtx_tx_track_full_scan(in_txn(), space, &index->base.base);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	case ITER_EQ:
@@ -483,7 +485,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		if (it->iterator.slotpos == light_index_end)
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 			memtx_tx_track_point(in_txn(), space,
-					     &index->base, key);
+					     &index->base.base, key);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
 	default:
@@ -497,7 +499,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 /** Read view implementation. */
 struct hash_read_view {
 	/** Base class. */
-	struct index_read_view base;
+	struct memtx_index_read_view base;
 	/** Read view index. Ref counter incremented. */
 	struct memtx_hash_index *index;
 	/** Light read view. */
@@ -524,7 +526,7 @@ hash_read_view_free(struct index_read_view *base)
 {
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	light_index_view_destroy(&rv->view);
-	index_unref(&rv->index->base);
+	index_unref(&rv->index->base.base);
 	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
 	TRASH(rv);
 	free(rv);
@@ -563,7 +565,7 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 			*result = read_view_tuple_none();
 			return 0;
 		}
-		if (memtx_prepare_read_view_tuple(*res, &rv->base,
+		if (memtx_prepare_read_view_tuple(*res, &rv->base.base,
 						  &rv->cleaner, result) != 0)
 			return -1;
 		if (result->data != NULL)
@@ -636,7 +638,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
 		(struct hash_read_view *)xmalloc(sizeof(*rv));
-	index_read_view_create(&rv->base, &vtab, base->def);
+	memtx_index_read_view_create(&rv->base, &vtab, base->def);
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
@@ -685,13 +687,13 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	struct memtx_hash_index *index =
 		(struct memtx_hash_index *)xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_hash_index_vtab, def);
+	memtx_index_create(&index->base, memtx, &memtx_hash_index_vtab, def);
 
-	light_index_create(&index->hash_table, index->base.def->key_def,
+	light_index_create(&index->hash_table,
+			   index->base.base.def->key_def,
 			   &memtx->index_extent_allocator,
 			   &memtx->index_extent_stats);
-	return &index->base;
+	return &index->base.base;
 }
 
 /* }}} */

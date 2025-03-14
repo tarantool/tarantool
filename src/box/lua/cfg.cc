@@ -224,6 +224,17 @@ lbox_cfg_set_memtx_memory(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_memtx_enable_sort_data(struct lua_State *L)
+{
+	try {
+		box_set_memtx_enable_sort_data();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
 lbox_cfg_set_memtx_max_tuple_size(struct lua_State *L)
 {
 	try {
@@ -545,6 +556,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_wal_cleanup_delay", lbox_cfg_set_wal_cleanup_delay},
 		{"cfg_set_read_only", lbox_cfg_set_read_only},
 		{"cfg_set_memtx_memory", lbox_cfg_set_memtx_memory},
+		{"cfg_set_memtx_enable_sort_data", lbox_cfg_set_memtx_enable_sort_data},
 		{"cfg_set_memtx_max_tuple_size", lbox_cfg_set_memtx_max_tuple_size},
 		{"cfg_set_vinyl_memory", lbox_cfg_set_vinyl_memory},
 		{"cfg_set_vinyl_max_tuple_size", lbox_cfg_set_vinyl_max_tuple_size},
