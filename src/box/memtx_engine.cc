@@ -1552,6 +1552,12 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 							MEMTX_EXTENT_SIZE;
 }
 
+static void
+memtx_engine_switch_to_ro(struct engine *engine)
+{
+	memtx_tx_abort_writers_for_ro(engine);
+}
+
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .free = */ memtx_engine_free,
 	/* .shutdown = */ memtx_engine_shutdown,
@@ -1568,7 +1574,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .rollback = */ generic_engine_rollback,
 	/* .send_to_read_view = */ memtx_engine_send_to_read_view,
 	/* .abort_with_conflict = */ memtx_engine_abort_with_conflict,
-	/* .switch_to_ro = */ generic_engine_switch_to_ro,
+	/* .switch_to_ro = */ memtx_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ memtx_engine_begin_final_recovery,

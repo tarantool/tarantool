@@ -117,6 +117,11 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiversion concurrency control. */
 	TXN_SUPPORTS_MVCC = 0x800,
+	/**
+	 * Transaction has been aborted since the instance has become
+	 * read-only so no writes should be committed.
+	 */
+	TXN_IS_ABORTED_RO_NODE = 0x1000,
 };
 
 enum {
@@ -576,18 +581,26 @@ txn_clear_flags(struct txn *txn, unsigned int flags)
 /**
  * Returns the code of the error that caused abort of the given transaction.
  */
-static inline enum box_error_code
-txn_flags_to_error_code(struct txn *txn)
+static inline struct error *
+txn_diag_set_from_flags(struct txn *txn)
 {
-	if (txn_has_flag(txn, TXN_IS_CONFLICTED))
-		return ER_TRANSACTION_CONFLICT;
-	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD))
-		return ER_TRANSACTION_YIELD;
-	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_TIMEOUT))
-		return ER_TRANSACTION_TIMEOUT;
-	else if (txn_has_flag(txn, TXN_IS_ROLLED_BACK))
-		return ER_TXN_ROLLBACK;
-	return ER_UNKNOWN;
+	if (txn_has_flag(txn, TXN_IS_ABORTED_RO_NODE)) {
+		struct error *e = diag_set(ClientError, ER_READONLY);
+		error_append_msg(e, " - ");
+		error_append_msg(e,
+				 "the node became read-only while the "
+				 "transaction was processed.");
+		return e;
+	} else if (txn_has_flag(txn, TXN_IS_CONFLICTED)) {
+		return diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+	} else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD)) {
+		return diag_set(ClientError, ER_TRANSACTION_YIELD);
+	} else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_TIMEOUT)) {
+		return diag_set(ClientError, ER_TRANSACTION_TIMEOUT);
+	} else if (txn_has_flag(txn, TXN_IS_ROLLED_BACK)) {
+		return diag_set(ClientError, ER_TXN_ROLLBACK);
+	}
+	return diag_set(ClientError, ER_UNKNOWN);
 }
 
 /**
@@ -599,7 +612,7 @@ txn_check_can_continue(struct txn *txn)
 {
 	enum txn_status status = txn->status;
 	if (status == TXN_ABORTED) {
-		diag_set(ClientError, txn_flags_to_error_code(txn));
+		txn_diag_set_from_flags(txn);
 		return -1;
 	} else if (status == TXN_COMMITTED) {
 		diag_set(ClientError, ER_TXN_COMMIT);
