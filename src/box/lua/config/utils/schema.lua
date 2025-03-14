@@ -4,6 +4,7 @@
 -- itself (affects work of the schema methods):
 --
 -- * allowed_values
+-- * unique_items
 -- * validate
 -- * default
 -- * apply_default_if
@@ -415,18 +416,6 @@ end
 
 -- {{{ Derived schema node type constructors: enum, set
 
-local function validate_no_repeat(data, w)
-    local visited = {}
-    for _, item in ipairs(data) do
-        assert(type(item) == 'string')
-        if visited[item] then
-            w.error('Values should be unique, but %q appears at ' ..
-                'least twice', item)
-        end
-        visited[item] = true
-    end
-end
-
 -- Shortcut for a string scalar with given allowed values.
 local function enum(allowed_values, annotations)
     local scalar_def = {
@@ -445,10 +434,10 @@ end
 local function set(allowed_values, annotations)
     local array_def = {
         items = enum(allowed_values),
-        validate = validate_no_repeat,
+        unique_items = true,
     }
     for k, v in pairs(annotations or {}) do
-        assert(k ~= 'type' and k ~= 'items' and k ~= 'validate')
+        assert(k ~= 'type' and k ~= 'items')
         array_def[k] = v
     end
     return array(array_def)
@@ -611,6 +600,56 @@ local function validate_by_allowed_values(schema, data, ctx)
     end
 end
 
+-- If the unique_items annotation is present (and truthly), verify
+-- that the given array has no duplicates.
+local function validate_unique_items(schema, data, ctx)
+    if not schema.unique_items then
+        return
+    end
+
+    -- These prerequisites are checked in
+    -- validate_schema_node_unique_items().
+    assert(schema.type == 'array')
+    assert(schema.items.type == 'string')
+
+    -- It is checked in validate_impl(), but let's have an
+    -- assertion here.
+    assert(type(data) == 'table')
+
+    -- If we support the annotation only for an array of strings,
+    -- a simple duplicate check algorithm with a visited set can
+    -- be used.
+    --
+    -- We can extend it to all the scalar types except 'any'
+    -- without changing the algorithm.
+    --
+    -- If we add support for numeric types here and add support of
+    -- cdata<int64_t> and cdata<uint64_t> to them, we should
+    -- reimplement the duplicate check (different cdata objects
+    -- are different keys in a table even if they represent the
+    -- same number).
+    --
+    -- If we allow 'any' or composite types for an item, we have
+    -- to reimplement the algorithm too and introduce some kind of
+    -- a deep comparison or deep hashing.
+    local visited = {}
+    for _, item in ipairs(data) do
+        -- An array can't have holes (see table_is_array()) and it
+        -- can't contain box.NULL values (only values accepted by
+        -- the given schema node are allowed). It means that only
+        -- string items are possible in our case.
+        --
+        -- That all is checked in validate_impl() before calling
+        -- this function.
+        assert(type(item) == 'string')
+        if visited[item] then
+            walkthrough_error(ctx, 'Values should be unique, but %q appears ' ..
+                'at least twice', item)
+        end
+        visited[item] = true
+    end
+end
+
 -- Call schema node specific validation function.
 local function validate_by_node_function(schema, data, ctx)
     if schema.validate == nil then
@@ -685,6 +724,7 @@ local function validate_impl(schema, data, ctx)
     end
 
     validate_by_allowed_values(schema, data, ctx)
+    validate_unique_items(schema, data, ctx)
 
     -- Call schema node specific validation function.
     --
@@ -708,6 +748,8 @@ end
 -- Annotations taken into accounts:
 --
 -- * allowed_values (table) -- whitelist of values
+-- * unique_items (boolean) -- whether array values should be
+--                             unique
 -- * validate (function) -- schema node specific validator
 --
 --   validate = function(data, w)
@@ -1747,7 +1789,7 @@ local function jsonschema_impl(schema, ctx)
             items = jsonschema_impl(schema.items, ctx),
         }
         walkthrough_leave(ctx)
-        if schema.validate == validate_no_repeat then
+        if schema.unique_items then
             res.uniqueItems = true
         end
         return set_common_jsonschema_fields(res, schema)
@@ -1806,6 +1848,7 @@ local function preprocess_enter(ctx, schema)
     -- context of descendant schema nodes. Don't track them.
     local ignored_annotations = {
         allowed_values = true,
+        unique_items = true,
         validate = true,
         default = true,
         apply_default_if = true,
@@ -1923,6 +1966,63 @@ end
 
 -- }}} Schema preprocessing
 
+-- {{{ Schema validation
+
+-- The unique_items annotation is only applicable to an array of
+-- strings.
+--
+-- We can support other item types in a future, but let's be
+-- conservative on the first step. See validate_unique_items() for
+-- details.
+local function validate_schema_node_unique_items(schema, ctx)
+    if not schema.unique_items then
+        return
+    end
+
+    if schema.type ~= 'array' then
+        walkthrough_error(ctx, '"unique_items" requires an array of ' ..
+            'strings, got a %s', schema.type)
+    end
+
+    if schema.items.type ~= 'string' then
+        walkthrough_error(ctx, '"unique_items" requires an array of ' ..
+            'strings, got an array of %s items', schema.items.type)
+    end
+end
+
+local function validate_schema_impl(schema, ctx)
+    validate_schema_node_unique_items(schema, ctx)
+
+    -- luacheck: ignore 542 empty if branch
+    if is_scalar(schema) then
+        -- Nothing to do.
+    elseif schema.type == 'record' then
+        for field_name, field_def in pairs(schema.fields) do
+            walkthrough_enter(ctx, field_name)
+            validate_schema_impl(field_def, ctx)
+            walkthrough_leave(ctx)
+        end
+    elseif schema.type == 'map' then
+        walkthrough_enter(ctx, '*')
+        validate_schema_impl(schema.key, ctx)
+        validate_schema_impl(schema.value, ctx)
+        walkthrough_leave(ctx)
+    elseif schema.type == 'array' then
+        walkthrough_enter(ctx, '*')
+        validate_schema_impl(schema.items, ctx)
+        walkthrough_leave(ctx)
+    else
+        assert(false)
+    end
+end
+
+local function validate_schema(name, schema)
+    local ctx = {path = {}, name = name}
+    validate_schema_impl(schema, ctx)
+end
+
+-- }}} Schema validation
+
 -- {{{ Schema object constructor: new
 
 -- Define a field lookup function on a schema object.
@@ -2006,6 +2106,8 @@ local function new(name, schema, opts)
 
     assert(type(name) == 'string')
     assert(type(schema) == 'table')
+
+    validate_schema(name, schema)
 
     local ctx = {
         annotation_stack = {},

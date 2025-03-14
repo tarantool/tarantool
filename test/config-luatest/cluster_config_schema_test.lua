@@ -625,32 +625,6 @@ g.test_name_failure = function()
     end
 end
 
-g.test_sharding = function()
-    local config = {
-        groups = {
-            ['group-001'] = {
-                replicasets = {
-                    ['replicaset-001'] = {
-                        instances = {
-                            ['instance-001'] = {
-                                sharding = {
-                                    roles = {'storage'},
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    }
-    local err = '[cluster_config] groups.group-001.replicasets.' ..
-                'replicaset-001.instances.instance-001.sharding: ' ..
-                'sharding.roles cannot be defined in the instance scope'
-    t.assert_error_msg_equals(err, function()
-        cluster_config:validate(config)
-    end)
-end
-
 -- Verify options consistency on the global level.
 --
 -- Expected instance config fields plus the following additional
@@ -778,6 +752,7 @@ end
 -- * sharding.shard_index
 -- * sharding.sync_timeout
 -- * sharding.weight
+-- * sharding.roles
 g.test_scope = function()
     local function exp_err(path, scope)
         return ('[cluster_config] %s: The option must not be present in the ' ..
@@ -996,6 +971,18 @@ g.test_scope = function()
             data = {
                 sharding = {
                     weight = 10,
+                },
+            },
+            global = true,
+            group = true,
+            replicaset = true,
+            instance = false,
+        },
+        {
+            name = 'sharding.roles',
+            data = {
+                sharding = {
+                    roles = {'storage'},
                 },
             },
             global = true,
