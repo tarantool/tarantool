@@ -36,6 +36,7 @@
 
 #include "errinj.h"
 #include "fiber.h"
+#include "txn.h"
 
 struct engine *engines[MAX_ENGINE_COUNT + 1];
 enum recovery_state recovery_state = RECOVERY_NOT_STARTED;
@@ -85,9 +86,15 @@ engine_free(void)
 void
 engine_switch_to_ro(void)
 {
-	struct engine *engine;
-	engine_foreach(engine)
-		engine->vtab->switch_to_ro(engine);
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		if (txn->n_new_rows != 0 &&
+		    txn->n_new_rows != txn->n_local_rows &&
+		    txn->status == TXN_INPROGRESS) {
+			txn_abort_with_conflict(txn);
+			txn_set_flags(txn, TXN_IS_ABORTED_RO_NODE);
+		}
+	}
 }
 
 int
@@ -360,12 +367,6 @@ generic_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
 	(void)engine;
 	(void)txn;
 	unreachable();
-}
-
-void
-generic_engine_switch_to_ro(struct engine *engine)
-{
-	(void)engine;
 }
 
 int
