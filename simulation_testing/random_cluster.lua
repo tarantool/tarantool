@@ -4,6 +4,8 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
 local fio = require('fio')
+local Proxy = require('luatest.replica_proxy')
+local proxy_handling = require('proxy_handling')
 
 
 
@@ -62,12 +64,17 @@ end
 local function rand_cfg(cg, replica_count, replica_id)
     local uri_set = {}
     for i = 1, replica_count do
-        local replica_uri = server.build_listen_uri('replica_'..tostring(i), cg.cluster.id)
-        uri_set[i] = replica_uri
+        if i == replica_id then
+            table.insert(uri_set, server.build_listen_uri('replica_'..tostring(i), cg.cluster.id))
+        else
+            local proxy_uri = fio.abspath(
+                server.build_listen_uri('proxy_'..tostring(replica_id)..'_to_' ..tostring(i), cg.cluster.id)
+            )
+            table.insert(uri_set, proxy_uri)
+        end
     end
 
     local memtx_dir, wal_dir, log_dir = create_dirs_for_replica(replica_id)
-
     local log_file = fio.pathjoin(log_dir, 'replica_'..tostring(replica_id)..'.log')
 
     local box_cfg = {
@@ -84,12 +91,12 @@ local function rand_cfg(cg, replica_count, replica_id)
         wal_mode = 'write'
     }
 
-    print("Configured replicas:", replica_count,
+    print("Configured replica:", replica_id,
           "\nReplication URIs:", table.concat(uri_set, ", "),
           "\nSynchro quorum:", box_cfg.replication_synchro_quorum,
           "\nReplication timeout:", box_cfg.replication_timeout)
 
-    return replica_count, box_cfg
+    return box_cfg
 end
 
 --- Clear Cluster
@@ -97,25 +104,34 @@ local function clear_cluster(cg)
     if cg.cluster then
         cg.cluster:drop()
     end
+    if cg.proxies then
+        for _, proxy in ipairs(cg.proxies) do
+            proxy:stop()
+        end
+    end
     cg = {}
     cg.replicas = {}
+    cg.proxies = {}
 end
 
 --- Random Cluster Generator
 local function rand_cluster(max_number_replicas)
     local cg = {}
     cg.replicas = {}
+    cg.proxies = {}
     clear_cluster(cg)
     cg.cluster = cluster:new{}
     local replica_count = math.random(3, max_number_replicas)
     local candidates_count=0
+
+    -- Creating nodes and their configurations
     for i = 1, replica_count do
         create_dirs_for_replica(i)
-        -- Генерация конфигурации для каждой реплики
-        local _, box_cfg = rand_cfg(cg, replica_count, i)
+        -- Generating the configuration for each replica
+        local box_cfg = rand_cfg(cg, replica_count, i)
 
-        -- Случайный выбор election_mode
-        if math.random() > 0.5 then
+        -- Random selection of selection_mode
+        if math.random() > 0 then
             box_cfg.election_mode = 'candidate'
             candidates_count = candidates_count + 1
         else
@@ -125,15 +141,26 @@ local function rand_cluster(max_number_replicas)
         if i == replica_count and candidates_count == 0 then
             box_cfg.election_mode = 'candidate'
         end
-        -- Создание и добавление реплики в кластер
+        -- Creating and adding a replica to a cluster
         cg.replicas[i] = cg.cluster:build_and_add_server{
             alias = 'replica_'..tostring(i),
             box_cfg = box_cfg,
         }
-        
-        print("replica_"..tostring(i).." added to cluster as ", box_cfg.election_mode)
     end
 
+    -- Create a proxy for all connections
+    for i_id = 1, replica_count do
+        for j_id = 1, replica_count do
+            if i_id ~= j_id then  -- The node does not connect to itself
+                -- Creating a proxy for the i_id -> j_id connection
+                local proxy = proxy_handling.create_proxy_for_connection(cg, i_id, j_id)
+                table.insert(cg.proxies, proxy)
+                proxy:start({force = true})
+                print(string.format("Proxy for replica_%d to replica_%d started.", i_id, j_id))
+                
+            end
+        end
+    end
 
     -- Start the cluster
     cg.cluster:start()
