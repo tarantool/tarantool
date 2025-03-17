@@ -205,6 +205,7 @@ local default_cfg = {
     net_msg_max           = 768,
     sql_cache_size        = 5 * 1024 * 1024,
     txn_timeout           = 365 * 100 * 86400,
+    txn_synchro_timeout   = 5,
     txn_isolation         = "best-effort",
     memtx_sort_threads    = nil,
 
@@ -408,6 +409,7 @@ local template_cfg = {
     net_msg_max           = 'number',
     sql_cache_size        = 'number',
     txn_timeout           = 'number',
+    txn_synchro_timeout   = 'number',
     memtx_sort_threads    = 'number',
 
     metrics = 'table',
@@ -546,6 +548,7 @@ local dynamic_cfg = {
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
     txn_timeout             = private.cfg_set_txn_timeout,
+    txn_synchro_timeout     = private.cfg_set_txn_synchro_timeout,
     txn_isolation           = private.cfg_set_txn_isolation,
     auth_type               = private.cfg_set_auth_type,
     auth_delay              = private.cfg_set_security,

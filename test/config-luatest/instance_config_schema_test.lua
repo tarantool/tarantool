@@ -886,6 +886,7 @@ g.test_database = function()
             hot_standby = true,
             mode = 'ro',
             txn_timeout = 1,
+            txn_synchro_timeout = 5,
             txn_isolation = 'best-effort',
             use_mvcc_engine = true,
         },
@@ -933,6 +934,7 @@ g.test_database = function()
         mode = box.NULL,
         txn_timeout = 3153600000,
         txn_isolation = 'best-effort',
+        txn_synchro_timeout = 5,
         use_mvcc_engine = false,
     }
     local res = instance_config:apply_default({}).database

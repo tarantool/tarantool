@@ -438,6 +438,7 @@ struct errcode_record {
 	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
 	_(ER_ALIEN_ENGINE, 292,			"Snapshot contains alien space engine row", "engine", STRING) \
 	_(ER_MVCC_UNAVAILABLE, 293,		"MVCC is unavailable for storage engine '%s' so it cannot be used in the same transaction with '%s', which supports MVCC", "engine_without_mvcc", STRING, "engine_with_mvcc", STRING) \
+	_(ER_SYNC_TIMEOUT, 294,			"Quorum collection for a synchronous transaction is timed out. The transaction is detached from this fiber and continues waiting for quorum") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
