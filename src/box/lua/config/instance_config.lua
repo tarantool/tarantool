@@ -922,6 +922,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'txn_timeout',
             default = 365 * 100 * 86400,
         }),
+        txn_synchro_timeout = schema.scalar({
+            type = 'number',
+            box_cfg = 'txn_synchro_timeout',
+            default = 5,
+        }),
         txn_isolation = schema.enum({
             'read-committed',
             'read-confirmed',

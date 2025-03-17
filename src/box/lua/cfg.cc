@@ -500,6 +500,14 @@ lbox_cfg_set_txn_timeout(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_txn_synchro_timeout(struct lua_State *L)
+{
+	if (box_set_txn_synchro_timeout() != 0)
+		luaT_error(L);
+	return 0;
+}
+
+static int
 lbox_cfg_set_txn_isolation(struct lua_State *L)
 {
 	if (box_set_txn_isolation() != 0)
@@ -572,6 +580,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_sql_cache_size", lbox_set_prepared_stmt_cache_size},
 		{"cfg_set_feedback", lbox_cfg_set_feedback},
 		{"cfg_set_txn_timeout", lbox_cfg_set_txn_timeout},
+		{"cfg_set_txn_synchro_timeout", lbox_cfg_set_txn_synchro_timeout},
 		{"cfg_set_txn_isolation", lbox_cfg_set_txn_isolation},
 		{"cfg_set_auth_type", lbox_cfg_set_auth_type},
 		{"cfg_get_force_recovery", lbox_cfg_get_force_recovery},

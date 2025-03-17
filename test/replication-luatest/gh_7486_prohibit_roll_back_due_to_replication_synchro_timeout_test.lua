@@ -47,6 +47,9 @@ g.test_replication_synchro_timeout_does_not_roll_back_if_new = function(cg)
         }
         local fiber = require('fiber')
         require('compat').replication_synchro_timeout = 'new'
+        -- set txn_synchro_timeout to a large value
+        -- to avoid detaching the fiber from the transaction
+        box.cfg{ txn_synchro_timeout = 10000 }
         local f = fiber.create(function() box.space.test:insert{1} end)
         f:set_joinable(true)
         t.helpers.retrying({timeout = wait_timeout}, function()
