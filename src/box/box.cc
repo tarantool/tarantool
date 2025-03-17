@@ -119,6 +119,7 @@ struct rmean *rmean_box;
 double on_shutdown_trigger_timeout = 3.0;
 
 double txn_timeout_default;
+double txn_synchro_timeout;
 
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
@@ -1910,6 +1911,24 @@ box_check_txn_timeout(void)
 	return timeout;
 }
 
+static double
+box_check_txn_synchro_timeout(void)
+{
+	double timeout = cfg_getd_default("txn_synchro_timeout", 5);
+	if (replication_synchro_timeout_rollback_enabled && timeout != 5) {
+		diag_set(ClientError, ER_CFG, "txn_synchro_timeout",
+			 "option is disabled if compat option "
+			 "`replication_synchro_timeout` is set to 'old'");
+		return -1;
+	}
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "txn_synchro_timeout",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 /**
  * Get and check isolation level from config, converting number or string to
  * enum txn_isolation_level.
@@ -2063,6 +2082,8 @@ box_check_config(void)
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
 		diag_raise();
 	if (box_check_txn_timeout() < 0)
+		diag_raise();
+	if (box_check_txn_synchro_timeout() < 0)
 		diag_raise();
 	if (box_check_txn_isolation() == txn_isolation_level_MAX)
 		diag_raise();
@@ -3685,6 +3706,17 @@ box_set_txn_timeout(void)
 	if (timeout < 0)
 		return -1;
 	txn_timeout_default = timeout;
+	return 0;
+}
+
+int
+box_set_txn_synchro_timeout(void)
+{
+	double timeout = box_check_txn_synchro_timeout();
+	if (timeout < 0)
+		return -1;
+	txn_synchro_timeout = timeout;
+	txn_limbo_on_parameters_change(&txn_limbo);
 	return 0;
 }
 
@@ -5854,6 +5886,8 @@ box_cfg_xc(void)
 	if (box_set_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_set_replication_synchro_timeout() != 0)
+		diag_raise();
+	if (box_set_txn_synchro_timeout() != 0)
 		diag_raise();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
