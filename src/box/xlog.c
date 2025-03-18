@@ -710,9 +710,19 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
-		const char *filename =
-			xdir_format_filename(dir, vclock_sum(vclock), NONE);
+		const char *filename;
+		const char *tmp = dir->filename_ext;
+
+		/* First remove the sort data file (if any). */
+		dir->filename_ext = ".sortdata";
+		filename = xdir_format_filename(dir, vclock_sum(vclock), NONE);
 		xlog_remove_file(filename, rm_flags);
+
+		/* Now take care of the snapshot. */
+		dir->filename_ext = tmp;
+		filename = xdir_format_filename(dir, vclock_sum(vclock), NONE);
+		xlog_remove_file(filename, rm_flags);
+
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 		if (flags & XDIR_GC_REMOVE_ONE)

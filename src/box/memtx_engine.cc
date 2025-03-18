@@ -60,6 +60,9 @@
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
 #include "memtx_space_upgrade.h"
+#include "memtx_sort_data.h"
+#include "memtx_index.h"
+#include "memtx_index_read_view.h"
 #include "tt_sort.h"
 #include "assoc.h"
 #include "wal.h"
@@ -189,6 +192,10 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++) {
+			struct memtx_index *index =
+				(struct memtx_index *)space->index[j];
+			if (index->built_presorted)
+				continue;
 			if (memtx_build_secondary_index(space->index[j],
 							pk) < 0)
 				return -1;
@@ -199,6 +206,62 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 	}
 	memtx_space->replace = memtx_space_replace_all_keys;
+	return 0;
+}
+
+/**
+ * Secondary indexes can be built in bulk with O(n) sorting algorithm after the
+ * PK data is recovered (after the initial recovery), if we have the memtx sort
+ * data enabled and available. This function builds such indexes.
+ */
+static int
+memtx_build_presorted_secondary_keys(struct space *space, void *param)
+{
+	/* Check if we have memtx index sort data available. */
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	if (memtx->msd == NULL)
+		return 0;
+
+	/*
+	 * A before_replace trigger can change the inserted tuple, so we should
+	 * not proceed using the O(n) SK sort that does not account that.
+	 */
+	if (space_has_before_replace_triggers(space)) {
+		say_info("Skipped sort data for space '%s': the space has "
+			 "before_replace triggers.", space_name(space));
+		return 0;
+	}
+
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	if (space->engine != param || space_index(space, 0) == NULL ||
+	    memtx_space->replace == memtx_space_replace_all_keys)
+		return 0;
+
+	if (space->index_id_max > 0) {
+		struct index *pk = space->index[0];
+		ssize_t n_tuples = index_size(pk);
+		assert(n_tuples >= 0);
+
+		if (n_tuples > 0) {
+			say_info("Building presorted indexes in space '%s'...",
+				 space_name(space));
+		}
+
+		for (uint32_t j = 1; j < space->index_count; j++) {
+			struct memtx_index *index =
+				(struct memtx_index *)space->index[j];
+			/* If the presorted build is not supported - skip. */
+			if (index->build_presorted == NULL)
+				continue;
+			index->built_presorted =
+				memtx_index_build_presorted(index, memtx->msd);
+		}
+
+		if (n_tuples > 0) {
+			say_info("Space '%s' presorted indexes: done",
+				 space_name(space));
+		}
+	}
 	return 0;
 }
 
@@ -293,6 +356,12 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	if (xlog_cursor_open(&cursor, filename) < 0)
 		return -1;
 
+	if (memtx->enable_sort_data && !memtx->force_recovery &&
+	    /* TODO: the _index space has triggers. */true) {
+		memtx->msd = memtx_sort_data_start_read(memtx->snap_dir.dirname,
+							vclock, &INSTANCE_UUID);
+	}
+
 	int rc;
 	struct xrow_header row;
 	uint64_t row_count = 0;
@@ -318,7 +387,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	}
 	xlog_cursor_close(&cursor, false);
 	if (rc < 0)
-		return -1;
+		goto fail;
 
 	/**
 	 * We should never try to read snapshots with no EOF
@@ -338,10 +407,17 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 */
 	if (state == SNAPSHOT_RECOVERY_NOT_STARTED) {
 		diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
-		return -1;
+		goto fail;
 	}
 
 	return 0;
+
+fail:
+	if (memtx->msd != NULL) {
+		memtx_sort_data_reader_delete(memtx->msd);
+		memtx->msd = NULL;
+	}
+	return -1;
 }
 
 static int
@@ -479,8 +555,10 @@ static int
 memtx_engine_begin_final_recovery(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	if (memtx->state == MEMTX_OK)
+	if (memtx->state == MEMTX_OK) {
+		assert(memtx->msd == NULL);
 		return 0;
+	}
 
 	assert(memtx->state == MEMTX_INITIAL_RECOVERY);
 	/* End of the fast path: loaded the primary key. */
@@ -492,6 +570,13 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 	if (rc != 0) {
 		diag_log();
 		panic("Failed to complete recovery from snapshot!");
+	}
+
+	if (memtx->msd != NULL) {
+		/* We're good to perform O(1) SK builds now. */
+		space_foreach(memtx_build_presorted_secondary_keys, memtx);
+		memtx_sort_data_reader_delete(memtx->msd);
+		memtx->msd = NULL;
 	}
 
 	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
@@ -835,6 +920,10 @@ struct checkpoint {
 	 * checkpoint already exists.
 	 */
 	bool touch;
+	/**
+	 * The sort data file information (included spaces, offsets, etc.).
+	 */
+	struct memtx_sort_data *msd;
 };
 
 /** Space filter for checkpoint. */
@@ -857,6 +946,12 @@ primary_index_filter(struct space *space, struct index *index, void *arg)
 	(void)space;
 	(void)arg;
 	return index->def->iid == 0;
+}
+
+static bool
+checkpoint_index_filter(struct space *, struct index *index, void *)
+{
+	return index->def->iid == 0 || index->def->type == TREE;
 }
 
 /*
@@ -913,7 +1008,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	rv_opts.name = "checkpoint";
 	rv_opts.is_system = true;
 	rv_opts.filter_space = checkpoint_space_filter;
-	rv_opts.filter_index = primary_index_filter;
+	rv_opts.filter_index = checkpoint_index_filter;
 	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
 		free(ckpt);
 		return NULL;
@@ -928,6 +1023,14 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	box_raft_checkpoint_local(&ckpt->raft);
 	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state,
 			     &ckpt->synchro_vclock);
+
+	/* The sort data constructor can return NULL too. */
+	struct memtx_engine *memtx =
+		(struct memtx_engine *)engine_by_name("memtx");
+	ckpt->msd = memtx->enable_sort_data ?
+		    memtx_sort_data_new(&ckpt->rv, snap_dirname,
+					&INSTANCE_UUID) : NULL;
+
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -935,6 +1038,8 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 static void
 checkpoint_delete(struct checkpoint *ckpt)
 {
+	if (ckpt->msd != NULL)
+		memtx_sort_data_delete(ckpt->msd);
 	read_view_close(&ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
@@ -1072,6 +1177,12 @@ checkpoint_f(va_list ap)
 		xlog_clear(snap);
 		return -1;
 	}
+	if (ckpt->msd != NULL && memtx_sort_data_open(ckpt->msd) != 0) {
+		memtx_sort_data_delete(ckpt->msd);
+		/* See the comment above. */
+		xlog_clear(snap);
+		return -1;
+	}
 
 	struct mh_i32_t *temp_space_ids;
 
@@ -1117,6 +1228,9 @@ checkpoint_f(va_list ap)
 			rc = -1;
 			break;
 		}
+		/* We're going to write the PK tuple pointers. */
+		if (ckpt->msd != NULL)
+			memtx_sort_data_begin(ckpt->msd, space_rv->id, 0);
 		unsigned int loops = 0;
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
@@ -1133,6 +1247,13 @@ checkpoint_f(va_list ap)
 						    result.data, result.size);
 			if (rc != 0)
 				break;
+			/* PK sort data. */
+			if (ckpt->msd != NULL &&
+			    memtx_sort_data_write(ckpt->msd, &result.ptr,
+						  sizeof(result.ptr), 1) != 0) {
+				rc = -1;
+				break;
+			}
 			/* Yield to make thread cancellable. */
 			if (++loops % YIELD_LOOPS == 0)
 				fiber_sleep(0);
@@ -1143,6 +1264,37 @@ checkpoint_f(va_list ap)
 			}
 		}
 		index_read_view_iterator_destroy(&it);
+		if (rc != 0)
+			break;
+
+		if (ckpt->msd == NULL)
+			continue; /* The rest is related solely to sort data. */
+
+		/* Finished writing PK tuple pointers. */
+		memtx_sort_data_commit(ckpt->msd);
+
+		/* Now let's write the secondary indexes' sort data. */
+		for (uint32_t i = 1; i <= space_rv->index_id_max; i++) {
+			/*
+			 * The index may be excluded from the
+			 * sort data or just not support it.
+			 */
+			if (!memtx_sort_data_begin(ckpt->msd, space_rv->id, i))
+				continue;
+
+			bool have_more;
+			do {
+				rc = memtx_index_read_view_dump_sort_data(
+					(struct memtx_index_read_view *)
+					space_rv->index_map[i], YIELD_LOOPS,
+					ckpt->msd, &have_more);
+				fiber_sleep(0);
+			} while (have_more);
+			if (rc != 0)
+				break;
+
+			memtx_sort_data_commit(ckpt->msd);
+		}
 		if (rc != 0)
 			break;
 	}
@@ -1178,10 +1330,14 @@ checkpoint_f(va_list ap)
 done:
 	if (xlog_close(snap) != 0)
 		goto fail;
+	if (ckpt->msd != NULL)
+		memtx_sort_data_close(ckpt->msd);
 	say_info("done");
 	return 0;
 fail:
 	xlog_discard(snap);
+	if (ckpt->msd != NULL)
+		memtx_sort_data_discard(ckpt->msd);
 	return -1;
 }
 
@@ -1660,7 +1816,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor, int sort_threads,
+		 const char *allocator, float alloc_factor,
+		 int sort_threads, bool enable_sort_data,
 		 memtx_on_indexes_built_cb on_indexes_built)
 {
 	int64_t snap_signature;
@@ -1825,6 +1982,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	tuple_format_ref(memtx->func_key_format);
 
 	memtx->on_indexes_built_cb = on_indexes_built;
+	memtx->enable_sort_data = enable_sort_data;
+	memtx->msd = NULL; /* The recovery time field. */
 
 	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;
@@ -1966,6 +2125,12 @@ memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
 	}
 	quota_set(&memtx->quota, size);
 	return 0;
+}
+
+void
+memtx_engine_set_enable_sort_data(struct memtx_engine *memtx, bool value)
+{
+	memtx->enable_sort_data = value;
 }
 
 void

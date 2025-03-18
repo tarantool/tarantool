@@ -109,6 +109,28 @@ struct mh_i64ptr_node_t {
 #include "salad/mhash.h"
 
 /*
+ * Map: (void *) => (void *)
+ */
+#define mh_name _ptrptr
+#define mh_key_t void *
+
+/** The ptr to ptr hash node. */
+struct mh_ptrptr_node_t {
+	/** The ptr to ptr hash key. */
+	mh_key_t key;
+	/** The ptr to ptr hash value. */
+	void *val;
+};
+
+#define mh_node_t struct mh_ptrptr_node_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((uintptr_t)(a)->key >> 5)
+#define mh_hash_key(a, arg) ((uintptr_t)(a) >> 5)
+#define mh_cmp(a, b, arg) (((a)->key) != ((b)->key))
+#define mh_cmp_key(a, b, arg) ((a) != ((b)->key))
+#include "salad/mhash.h"
+
+/*
  * Map: (char * with length) => (void *)
  */
 enum {

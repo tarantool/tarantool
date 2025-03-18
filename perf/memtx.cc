@@ -128,6 +128,7 @@ private:
 					   memtx_granularity, "small",
 					   memtx_alloc_factor,
 					   /*threads_num=*/0,
+					   /*enable_sort_data=*/false,
 					   memtx_on_indexes_built_mock_cb);
 		if (memtx == nullptr)
 			panic("failed to create new memtx engine");
