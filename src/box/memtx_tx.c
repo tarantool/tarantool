@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "key_list.h"
 #include "schema_def.h"
 #include "small/mempool.h"
 
@@ -129,6 +130,10 @@ struct memtx_story {
 	 * the story is the only reason why @a tuple cannot be deleted.
 	 */
 	bool tuple_is_retained;
+	/**
+	 * Whether there is an associated functional key in `func_key_storage`.
+	 */
+	bool has_func_key;
 	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
@@ -343,12 +348,22 @@ memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    struct tuple *until, hint_t until_hint);
 
 /**
+ * Destroy and free any kind of gap item.
+ */
+static void
+memtx_tx_delete_gap(struct gap_item_base *item);
+
+/**
  * Helper structure for searching for point_hole_item in the hash table,
  * @sa point_hole_item_pool.
  */
 struct point_hole_key {
+	/** Index in which we are looking. */
 	struct index *index;
+	/** We use tuple as a key - it is compared to key of point_hole_item. */
 	struct tuple *tuple;
+	/** Functional key of the tuple, must be set if index is functional. */
+	struct tuple *func_key;
 };
 
 /** Hash calculatore for the key. */
@@ -356,35 +371,47 @@ static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
-	return key->index->unique_id ^ def->tuple_hash(key->tuple, def);
+	uint32_t tuple_hash = 0;
+	if (likely(!def->for_func_index)) {
+		assert(key->func_key == NULL);
+		tuple_hash = def->tuple_hash(key->tuple, def);
+	} else {
+		assert(key->func_key != NULL);
+		const char *data = tuple_data(key->func_key);
+		mp_decode_array(&data);
+		tuple_hash = key_hash(data, def);
+	}
+	return key->index->unique_id ^ tuple_hash;
+
 }
 
 /** point_hole_item comparator. */
 static int
-point_hole_storage_equal(const struct point_hole_item *obj1,
-			 const struct point_hole_item *obj2)
+point_hole_storage_cmp(const struct point_hole_item *obj1,
+		       const struct point_hole_item *obj2)
 {
 	/* Canonical msgpack is comparable by memcmp. */
 	if (obj1->index_unique_id != obj2->index_unique_id ||
 	    obj1->key_len != obj2->key_len)
 		return 1;
-	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
+	return memcmp(obj1->key, obj2->key, obj1->key_len);
 }
 
 /** point_hole_item comparator with key. */
 static int
-point_hole_storage_key_equal(const struct point_hole_key *key,
-			     const struct point_hole_item *object)
+point_hole_storage_key_cmp(const struct point_hole_key *key,
+			   const struct point_hole_item *object)
 {
 	if (key->index->unique_id != object->index_unique_id)
 		return 1;
 	assert(key->index != NULL);
 	assert(key->tuple != NULL);
 	struct key_def *def = key->index->def->key_def;
-	hint_t oh = def->key_hint(object->key, def->part_count, def);
-	hint_t kh = def->tuple_hint(key->tuple, def);
-	return def->tuple_compare_with_key(key->tuple, kh, object->key,
-					   def->part_count, oh, def);
+	uint64_t tuple_hint = HINT_NONE;
+	if (unlikely(def->for_func_index))
+		tuple_hint = (uint64_t)key->func_key;
+	return tuple_compare_with_key(key->tuple, tuple_hint, object->key,
+				      def->part_count, HINT_NONE, def);
 }
 
 /**
@@ -401,8 +428,67 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #define mh_arg_t int
 #define mh_hash(a, arg) ((*(a))->hash)
 #define mh_hash_key(a, arg) ( point_hole_storage_key_hash(a) )
-#define mh_cmp(a, b, arg) point_hole_storage_equal(*(a), *(b))
-#define mh_cmp_key(a, b, arg) point_hole_storage_key_equal((a), *(b))
+#define mh_cmp(a, b, arg) point_hole_storage_cmp(*(a), *(b))
+#define mh_cmp_key(a, b, arg) point_hole_storage_key_cmp((a), *(b))
+#define MH_SOURCE
+#include "salad/mhash.h"
+
+/** Key for search in `func_key_storage`. */
+struct func_key_storage_key {
+	/** Tuple whose functional key we are searching for. */
+	struct tuple *tuple;
+	/** Dense id of the functional index. */
+	uint32_t index_id;
+};
+
+/** Hash calculator for key of `func_key_storage`. */
+static uint32_t
+func_key_storage_key_hash(const struct func_key_storage_key *key)
+{
+	uintptr_t u = (uintptr_t)key->tuple;
+	if (sizeof(uintptr_t) > sizeof(uint32_t))
+		u ^= (u >> 32);
+	return key->index_id ^ u;
+}
+
+/** An element of `func_key_storage`. */
+struct func_key_storage_item {
+	/** Original tuple. */
+	struct tuple *tuple;
+	/** Functional key. Must be referenced by the item. */
+	struct tuple *func_key;
+	/** Dense id of the functional index. */
+	uint32_t index_id;
+	/** Hash of the item. */
+	uint32_t hash;
+};
+
+/** Comparator for elements of `func_key_storage`. */
+static int
+func_key_storage_cmp(const struct func_key_storage_item *obj1,
+		     const struct func_key_storage_item *obj2)
+{
+	return obj1->index_id != obj2->index_id ||
+	       obj1->tuple != obj2->tuple;
+}
+
+/** Comparator for element and key of `func_key_storage`. */
+static int
+func_key_storage_key_cmp(const struct func_key_storage_key *key,
+			 const struct func_key_storage_item *object)
+{
+	return key->index_id != object->index_id ||
+	       key->tuple != object->tuple;
+}
+
+#define mh_name _func_key_storage
+#define mh_key_t struct func_key_storage_key *
+#define mh_node_t struct func_key_storage_item
+#define mh_arg_t int
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) func_key_storage_key_hash(a)
+#define mh_cmp(a, b, arg) func_key_storage_cmp((a), (b))
+#define mh_cmp_key(a, b, arg) func_key_storage_key_cmp((a), (b))
 #define MH_SOURCE
 #include "salad/mhash.h"
 
@@ -592,6 +678,12 @@ struct tx_manager
 	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
+	/**
+	 * Hash table that holds functional keys of dirty tuples.
+	 * Filled lazily: there can be dirty tuples without an entry
+	 * here - it will be created on demand.
+	 */
+	struct mh_func_key_storage_t *func_key_storage;
 	/** Mempool for point_hole_item objects. */
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
@@ -629,51 +721,147 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
-void
-memtx_tx_manager_init()
+/** Forward declaration, description will be later along with definition. */
+static struct memtx_story *
+memtx_tx_story_get(struct tuple *tuple);
+
+/**
+ * A general-purpose helper for saving/calculating functional keys.
+ * The function searches for a functional key of @a tuple from @a index
+ * in @a tx_manager::func_key_storage. If the key is not found, the function
+ * saves @a func_key to the storage, if it is passed, or calculates the key
+ * if @a func_key is NULL.
+ *
+ * Returns functional key of the tuple. Never fails - panics on any error.
+ */
+static struct tuple *
+memtx_tx_tuple_func_key_impl(struct tuple *tuple, struct index *index,
+			     struct tuple *func_key)
 {
-	rlist_create(&txm.read_view_txs);
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
-		size_t item_size = sizeof(struct memtx_story) +
-				   i * sizeof(struct memtx_story_link);
-		mempool_create(&txm.memtx_tx_story_pool[i],
-			       cord_slab_cache(), item_size);
+	assert(index->def->key_def->for_func_index);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+
+	struct func_key_storage_key key = {
+		.tuple = tuple,
+		.index_id = index->dense_id,
+	};
+	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
+	if (pos != mh_end(txm.func_key_storage)) {
+		return mh_func_key_storage_node(txm.func_key_storage,
+						pos)->func_key;
 	}
-	txm.history = mh_history_new();
-	memtx_tx_mempool_create(&txm.point_hole_item_pool,
-				sizeof(struct point_hole_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	txm.point_holes = mh_point_holes_new();
-	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
-				sizeof(struct inplace_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
-				sizeof(struct nearby_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
-				sizeof(struct count_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
-				sizeof(struct full_scan_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	rlist_create(&txm.all_stories);
-	txm.traverse_all_stories = &txm.all_stories;
-	txm.must_do_gc_steps = 0;
-	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
+
+	if (func_key == NULL) {
+		/* Key list uses region under the hood. */
+		uint32_t region_svp = region_used(&fiber()->gc);
+
+		/* The key is not found and not passed - calculate it. */
+		struct key_list_iterator it;
+		if (key_list_iterator_create(&it, tuple, index->def, false,
+					     tuple_format_runtime) != 0) {
+			diag_log();
+			panic("failed to obtain functional index key");
+		}
+
+		/* A single step - only singe-key indexes are supported. */
+		if (key_list_iterator_next(&it, &func_key) != 0) {
+			diag_log();
+			panic("failed to obtain functional index key");
+		}
+
+		/* Truncate the region when we are done. */
+		region_truncate(&fiber()->gc, region_svp);
+	}
+
+	/* Reference the key and save it to the hash table. */
+	tuple_ref(func_key);
+	struct func_key_storage_item item = {
+		.tuple = tuple,
+		.index_id = index->dense_id,
+		.func_key = func_key,
+		.hash = func_key_storage_key_hash(&key),
+	};
+	pos = mh_func_key_storage_put(txm.func_key_storage, &item, NULL, 0);
+	VERIFY(pos != mh_end(txm.func_key_storage));
+
+	/* Mark that the story has a func key. */
+	memtx_tx_story_get(tuple)->has_func_key = true;
+
+	return func_key;
 }
 
 void
-memtx_tx_manager_free()
+memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
+		       struct tuple *func_key)
 {
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
-		mempool_destroy(&txm.memtx_tx_story_pool[i]);
-	mh_history_delete(txm.history);
-	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
-	mh_point_holes_delete(txm.point_holes);
-	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
-	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
+	assert(func_key != NULL);
+	if (memtx_tx_manager_use_mvcc_engine &&
+	    tuple_has_flag(tuple, TUPLE_IS_DIRTY))
+		memtx_tx_tuple_func_key_impl(tuple, index, func_key);
+}
+
+/**
+ * Returns functional key of the tuple. Must be called only for dirty tuples.
+ * Never fails - panics in case of any error.
+ *
+ * NB: can call a Lua function from the index under the hood.
+ */
+static struct tuple *
+memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
+{
+	return memtx_tx_tuple_func_key_impl(tuple, index, NULL);
+}
+
+/**
+ * Removes functional key of @a tuple from `func_key_storage`.
+ * Must be called for dirty tuples.
+ */
+static void
+memtx_tx_clear_func_key(struct tuple *tuple, uint32_t index_id)
+{
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+
+	struct func_key_storage_key key = {
+		.tuple = tuple,
+		.index_id = index_id,
+	};
+	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
+	if (pos == mh_end(txm.func_key_storage))
+		return;
+	struct tuple *fkey =
+		mh_func_key_storage_node(txm.func_key_storage, pos)->func_key;
+	mh_func_key_storage_del(txm.func_key_storage, pos, 0);
+	tuple_unref(fkey);
+}
+
+/**
+ * A helper to check if tuple key is excluded. Encapsulates functional indexes.
+ *
+ * NB: can call a Lua function from the index under the hood.
+ */
+static bool
+memtx_tx_tuple_key_is_excluded(struct tuple *tuple, struct index *index,
+			       struct key_def *def)
+{
+	/* Return early to avoid func key calculation. */
+	if (likely(!def->has_exclude_null))
+		return false;
+	if (def->for_func_index)
+		tuple = memtx_tx_tuple_func_key(tuple, index);
+	return tuple_key_is_excluded(tuple, def, MULTIKEY_NONE);
+}
+
+/**
+ * A helper to calculate tuple hint. Encapsulates functional indexes.
+ *
+ * NB: can call a Lua function from the index under the hood.
+ */
+static hint_t
+memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *def)
+{
+	if (unlikely(index->def->key_def->for_func_index))
+		return (hint_t)memtx_tx_tuple_func_key(tuple, index);
+	return tuple_hint(tuple, def);
 }
 
 void
@@ -951,6 +1139,12 @@ memtx_tx_story_delete(struct memtx_story *story)
 		assert(rlist_empty(&story->link[i].read_gaps));
 	}
 
+	/* Clear associated functional keys only if there are any. */
+	if (unlikely(story->has_func_key)) {
+		for (uint32_t i = 0; i < story->index_count; i++)
+			memtx_tx_clear_func_key(story->tuple, i);
+	}
+
 	memtx_tx_stats_discard(&txm.story_stats[story->status],
 			       memtx_story_size(story));
 	if (story->tuple_is_retained)
@@ -1226,11 +1420,13 @@ memtx_tx_story_reorder(struct memtx_story *story,
 }
 
 /**
- * Unlink @a story from all chains, must be already removed from the index.
+ * Fully unlinks @a story - unlinks it from all story chains, unlinks
+ * all transaction statements and deletes all associated trackers.
  */
 static void
 memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 {
+	/* Unlink from all story chains. */
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
@@ -1245,6 +1441,38 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 			link->older_story = NULL;
 			link->newer_story = NULL;
 		}
+	}
+
+	/* Unlink all transaction statements. */
+	if (story->add_stmt != NULL)
+		memtx_tx_story_unlink_added_by(story, story->add_stmt);
+	while (story->del_stmt != NULL)
+		memtx_tx_story_unlink_deleted_by(story, story->del_stmt);
+	/*
+	 * Unlink and delete all gaps since they belong to the story that
+	 * is going to be deleted.
+	 */
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		struct rlist *read_gaps = &story->link[i].read_gaps;
+		while (!rlist_empty(&story->link[i].read_gaps)) {
+			struct gap_item_base *item =
+				rlist_first_entry(read_gaps,
+						  struct gap_item_base,
+						  in_read_gaps);
+			memtx_tx_delete_gap(item);
+		}
+	}
+	/*
+	 * Remove all read trackers since they point to the story that
+	 * is going to be deleted.
+	 */
+	while (!rlist_empty(&story->reader_list)) {
+		struct tx_read_tracker *tracker =
+			rlist_first_entry(&story->reader_list,
+					  struct tx_read_tracker,
+					  in_reader_list);
+		rlist_del(&tracker->in_reader_list);
+		rlist_del(&tracker->in_read_set);
 	}
 }
 
@@ -1264,6 +1492,10 @@ memtx_tx_story_find_top(struct memtx_story *story, uint32_t ind)
  * indexes if necessary: used in garbage collection step and preserves the top
  * of the history chain invariant (as opposed to
  * `memtx_tx_story_full_unlink_on_space_delete`).
+ *
+ * Note that it doesn't unlink transaction statements and trackers - they
+ * are expected to be absent, otherwise garbage collector wouldn't unlink
+ * the story.
  */
 static void
 memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
@@ -1303,9 +1535,8 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 				struct key_def *key_def = index->def->key_def;
 				assert(story->tuple == removed ||
 				       (removed == NULL &&
-					tuple_key_is_excluded(story->tuple,
-							      key_def,
-							      MULTIKEY_NONE)));
+					memtx_tx_tuple_key_is_excluded(
+						story->tuple, index, key_def)));
 				(void)key_def;
 				link->in_index = NULL;
 				/*
@@ -1419,6 +1650,9 @@ memtx_tx_story_gc_step()
 	memtx_tx_story_delete(story);
 }
 
+/**
+ * Run several rounds of story garbage collection process.
+ */
 void
 memtx_tx_story_gc()
 {
@@ -1560,10 +1794,14 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 				 uint32_t ind)
 {
 	assert(story->link[ind].newer_story == NULL);
+	struct index *index = space->index[ind];
 	struct mh_point_holes_t *ht = txm.point_holes;
 	struct point_hole_key key;
-	key.index = space->index[ind];
+	key.index = index;
 	key.tuple = story->tuple;
+	key.func_key = NULL;
+	if (index->def->key_def->for_func_index)
+		key.func_key = memtx_tx_tuple_func_key(story->tuple, index);
 	mh_int_t pos = mh_point_holes_find(ht, &key, 0);
 	if (pos == mh_end(ht))
 		return;
@@ -1595,7 +1833,7 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 static bool
 memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
 		       enum iterator_type type, const char *key,
-		       uint32_t part_count)
+		       uint32_t part_count, struct index *index)
 {
 	if (key == NULL) {
 		assert(part_count == 0);
@@ -1605,8 +1843,10 @@ memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
 		return true;
 	}
 
-	int cmp = tuple_compare_with_key(tuple, HINT_NONE, key,
-					 part_count, HINT_NONE, def);
+	hint_t t_hint = memtx_tx_tuple_hint(tuple, index, def);
+	hint_t k_hint = key_hint(key, part_count, def);
+	int cmp = tuple_compare_with_key(tuple, t_hint, key, part_count,
+					 k_hint, def);
 
 	bool equal_matches = type == ITER_EQ || type == ITER_REQ ||
 			     type == ITER_LE || type == ITER_GE;
@@ -1625,12 +1865,11 @@ memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
 static bool
 memtx_tx_tuple_is_before(struct key_def *cmp_def, struct tuple *tuple,
 			 struct tuple *until, hint_t until_hint,
-			 enum iterator_type type)
+			 enum iterator_type type, struct index *index)
 {
 	int dir = iterator_direction(type);
-	hint_t th = tuple_hint(tuple, cmp_def);
-	int until_cmp = tuple_compare(until, until_hint,
-				      tuple, th, cmp_def);
+	hint_t th = memtx_tx_tuple_hint(tuple, index, cmp_def);
+	int until_cmp = tuple_compare(until, until_hint, tuple, th, cmp_def);
 	return dir * until_cmp > 0;
 }
 
@@ -1645,14 +1884,16 @@ static bool
 memtx_tx_tuple_matches_until(struct key_def *key_def, struct tuple *tuple,
 			     enum iterator_type type, const char *key,
 			     uint32_t part_count, struct key_def *cmp_def,
-			     struct tuple *until, hint_t until_hint)
+			     struct tuple *until, hint_t until_hint,
+			     struct index *index)
 {
 	/* Check the border (if any) using the cmp_def. */
 	if (until != NULL && !memtx_tx_tuple_is_before(cmp_def, tuple, until,
-						       until_hint, type))
+						       until_hint, type, index))
 		return false;
 
-	return memtx_tx_tuple_matches(key_def, tuple, type, key, part_count);
+	return memtx_tx_tuple_matches(key_def, tuple, type, key, part_count,
+				      index);
 }
 
 /**
@@ -1686,7 +1927,7 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 		bool tuple_matches = memtx_tx_tuple_matches_until(
 			index->def->key_def, story->tuple, item->type,
 			item->key, item->part_count, index->def->cmp_def,
-			item->until, item->until_hint);
+			item->until, item->until_hint, index);
 
 		/*
 		 * Someone has counted tuples in the index by a key and iterator
@@ -1838,13 +2079,13 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
 		if (item->key != NULL) {
+			const char *key = item->key;
+			uint32_t part_count = item->part_count;
 			struct key_def *def = index->def->key_def;
-			hint_t oh =
-				def->key_hint(item->key, item->part_count, def);
-			hint_t kh = def->tuple_hint(tuple, def);
-			cmp = def->tuple_compare_with_key(tuple, kh, item->key,
-							  item->part_count, oh,
-							  def);
+			hint_t oh = key_hint(key, part_count, def);
+			hint_t kh = memtx_tx_tuple_hint(tuple, index, def);
+			cmp = tuple_compare_with_key(tuple, kh, key,
+						     part_count, oh, def);
 		}
 		int dir = iterator_direction(item->type);
 		bool is_full_key = item->part_count ==
@@ -1927,6 +2168,12 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	assert(new_tuple != NULL);
 	struct space *space = stmt->space;
 
+	/*
+	 * Create add_story to make the tuple dirty so that replace
+	 * in functional index would save the functional key.
+	 */
+	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
+
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
@@ -1937,17 +2184,19 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		struct tuple **replaced = &directly_replaced[i];
 		struct tuple **successor = &direct_successor[i];
 		*replaced = *successor = NULL;
-		tuple_excluded[i] = tuple_key_is_excluded(new_tuple,
-							  index->def->key_def,
-							  MULTIKEY_NONE);
-		if (!tuple_excluded[i] &&
-		    index_replace(index, NULL, new_tuple,
+		if (index_replace(index, NULL, new_tuple,
 				  DUP_REPLACE_OR_INSERT,
 				  replaced, successor) != 0)
 		{
 			directly_replaced_count = i;
 			goto fail;
 		}
+		/*
+		 * Check if the tuple is excluded after replace to calculate
+		 * functional key only once.
+		 */
+		tuple_excluded[i] = memtx_tx_tuple_key_is_excluded(
+			new_tuple, index, index->def->key_def);
 	}
 	directly_replaced_count = space->index_count;
 
@@ -1959,8 +2208,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		goto fail;
 	stmt->is_own_change = is_own_change;
 
-	/* Create add_story. */
-	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
+	/* Link add_story. */
 	memtx_tx_story_link_added_by(add_story, stmt);
 
 	/* Create next story in the primary index if necessary. */
@@ -2048,7 +2296,7 @@ fail:
 			panic("failed to rollback change");
 		}
 	}
-
+	memtx_tx_story_delete(add_story);
 	return -1;
 }
 
@@ -2085,9 +2333,9 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	 */
 	struct space *space = stmt->space;
 	for (uint32_t i = 0; i < space->index_count; i++) {
-		if (!tuple_key_is_excluded(del_story->tuple,
-					   space->index[i]->def->key_def,
-					   MULTIKEY_NONE)) {
+		struct index *index = space->index[i];
+		if (!memtx_tx_tuple_key_is_excluded(del_story->tuple, index,
+						    index->def->key_def)) {
 			memtx_tx_handle_counted_write(space, del_story, i);
 		}
 	}
@@ -2822,8 +3070,8 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			continue;					       \
 		}							       \
 		assert(link->newer_story == NULL);			       \
-		if (tuple_key_is_excluded(story->tuple, index->def->key_def,   \
-					  MULTIKEY_NONE)) {		       \
+		if (memtx_tx_tuple_key_is_excluded(story->tuple, index,	       \
+						   index->def->key_def)) {     \
 			assert(link->older_story == NULL);		       \
 			continue;					       \
 		}							       \
@@ -2847,7 +3095,7 @@ memtx_tx_index_invisible_count_matching_until_slow(
 	assert(until == NULL ||
 	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
 				      ITER_GE : type == ITER_REQ ? ITER_LE :
-				      type, key, part_count));
+				      type, key, part_count, index));
 
 	uint32_t res = 0;
 	struct memtx_story *story;
@@ -2855,7 +3103,7 @@ memtx_tx_index_invisible_count_matching_until_slow(
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
 						  key, part_count, cmp_def,
-						  until, until_hint))
+						  until, until_hint, index))
 			continue;
 
 		struct tuple *visible = NULL;
@@ -2891,9 +3139,6 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
 	return visible != NULL;
 }
 
-/**
- * Destroy and free any kind of gap item.
- */
 static void
 memtx_tx_delete_gap(struct gap_item_base *item)
 {
@@ -3018,9 +3263,8 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 			story->link[i].in_index = NULL;
 
 			/* Skip chains of excluded tuples. */
-			if (tuple_key_is_excluded(story->tuple,
-						  index->def->key_def,
-						  MULTIKEY_NONE))
+			if (memtx_tx_tuple_key_is_excluded(story->tuple, index,
+							   index->def->key_def))
 				continue;
 
 			struct tuple *new_tuple = NULL;
@@ -3061,34 +3305,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 		story = rlist_first_entry(&space->memtx_stories,
 					  struct memtx_story,
 					  in_space_stories);
-		if (story->add_stmt != NULL)
-			memtx_tx_story_unlink_added_by(story, story->add_stmt);
-		while (story->del_stmt != NULL)
-			memtx_tx_story_unlink_deleted_by(story,
-							 story->del_stmt);
 		memtx_tx_story_full_unlink_on_space_delete(story);
-		for (uint32_t i = 0; i < story->index_count; i++) {
-			struct rlist *read_gaps = &story->link[i].read_gaps;
-			while (!rlist_empty(&story->link[i].read_gaps)) {
-				struct gap_item_base *item =
-					rlist_first_entry(read_gaps,
-							  struct gap_item_base,
-							  in_read_gaps);
-				memtx_tx_delete_gap(item);
-			}
-		}
-		/*
-		 * Remove all read trackers since they point to the story that
-		 * is going to be deleted.
-		 */
-		while (!rlist_empty(&story->reader_list)) {
-			struct tx_read_tracker *tracker =
-				rlist_first_entry(&story->reader_list,
-						  struct tx_read_tracker,
-						  in_reader_list);
-			rlist_del(&tracker->in_reader_list);
-			rlist_del(&tracker->in_read_set);
-		}
 		memtx_tx_story_delete(story);
 	}
 
@@ -3313,7 +3530,6 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 	for (uint32_t i = 0; i < def->part_count; i++)
 		mp_next(&tmp);
 	size_t key_len = tmp - key;
-	memtx_tx_story_gc();
 	point_hole_storage_new(index, key, key_len, txn);
 }
 
@@ -3448,7 +3664,6 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	} else {
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
-	memtx_tx_story_gc();
 }
 
 /**
@@ -3477,7 +3692,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	assert(until == NULL ||
 	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
 				      ITER_GE : type == ITER_REQ ? ITER_LE :
-				      type, key, part_count));
+				      type, key, part_count, index));
 
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
@@ -3504,7 +3719,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
 						  key, part_count, cmp_def,
-						  until, until_hint))
+						  until, until_hint, index))
 			continue;
 
 		/*
@@ -3519,7 +3734,6 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 			invisible_count++;
 	});
 
-	memtx_tx_story_gc();
 	return invisible_count;
 }
 
@@ -3536,7 +3750,6 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
 	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
-	memtx_tx_story_gc();
 }
 
 /**
@@ -3684,3 +3897,64 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 #if defined(ENABLE_READ_VIEW)
 # include "memtx_tx_read_view.c"
 #endif /* defined(ENABLE_READ_VIEW) */
+
+void
+memtx_tx_manager_init(void)
+{
+	rlist_create(&txm.read_view_txs);
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
+		size_t item_size = sizeof(struct memtx_story) +
+				   i * sizeof(struct memtx_story_link);
+		mempool_create(&txm.memtx_tx_story_pool[i],
+			       cord_slab_cache(), item_size);
+	}
+	txm.history = mh_history_new();
+	memtx_tx_mempool_create(&txm.point_hole_item_pool,
+				sizeof(struct point_hole_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	txm.point_holes = mh_point_holes_new();
+	txm.func_key_storage = mh_func_key_storage_new();
+	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
+				sizeof(struct inplace_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
+				sizeof(struct nearby_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
+				sizeof(struct count_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
+				sizeof(struct full_scan_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	rlist_create(&txm.all_stories);
+	txm.traverse_all_stories = &txm.all_stories;
+	txm.must_do_gc_steps = 0;
+	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
+}
+
+void
+memtx_tx_manager_free(void)
+{
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns)
+		memtx_tx_clear_txn_read_lists(txn);
+
+	struct memtx_story *story, *tmp;
+	rlist_foreach_entry_safe(story, &txm.all_stories, in_all_stories, tmp) {
+		for (size_t i = 0; i < story->index_count; i++)
+			story->link[i].in_index = NULL;
+		memtx_tx_story_full_unlink_on_space_delete(story);
+		memtx_tx_story_delete(story);
+	}
+
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
+		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mh_history_delete(txm.history);
+	mh_func_key_storage_delete(txm.func_key_storage);
+	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
+	mh_point_holes_delete(txm.point_holes);
+	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
+	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
+}
