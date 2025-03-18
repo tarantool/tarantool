@@ -1199,6 +1199,19 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 	struct space *old_space = alter->old_space;
 	struct tuple_format *new_format = new_space->format;
 	struct tuple_format *old_format = old_space->format;
+
+	if (old_format == NULL)
+		return;
+
+	assert(new_format != NULL);
+	for (uint32_t i = 0; i < old_space->index_count; i++) {
+		struct key_def *key_def =
+			alter->old_space->index[i]->def->key_def;
+		if (!tuple_format_is_compatible_with_key_def(new_format,
+							     key_def))
+			diag_raise();
+	}
+
 	if (new_space->upgrade != NULL) {
 		/*
 		 * Tuples stored in the space will be checked against
@@ -1206,17 +1219,7 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 		 */
 		return;
 	}
-	if (old_format != NULL) {
-		assert(new_format != NULL);
-		for (uint32_t i = 0; i < old_space->index_count; i++) {
-			struct key_def *key_def =
-				alter->old_space->index[i]->def->key_def;
-			if (!tuple_format_is_compatible_with_key_def(new_format,
-								     key_def))
-				diag_raise();
-		}
-		space_check_format_with_yield(old_space, new_format);
-	}
+	space_check_format_with_yield(old_space, new_format);
 }
 
 /** Change non-essential properties of a space. */
