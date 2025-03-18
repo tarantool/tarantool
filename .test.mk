@@ -14,7 +14,7 @@ MAX_FILES ?= 4096
 VARDIR ?= /tmp/t
 
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
-CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel
+CMAKE_BUILD = cmake --build ${BUILD_DIR} --parallel
 
 .PHONY: configure
 configure:
@@ -132,8 +132,6 @@ test-static: build run-luajit-test run-test
 # Static build (cmake)
 
 .PHONY: test-static-cmake
-test-static-cmake: SRC_DIR = ${STATIC_DIR}
-test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
 test-static-cmake: build run-test-ctest
 
