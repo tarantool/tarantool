@@ -997,3 +997,118 @@ g.test_roles_cfg_deep_merge = function(g)
         end,
     })
 end
+
+-- Make sure the roles are stopped on graceful shutdown.
+g.test_role_graceful_shutdown = function(g)
+    local one = [[
+        local function stop()
+            require('log').verbose('Role one stopped')
+        end
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = stop,
+        }
+    ]]
+
+    local two = [[
+        local function stop()
+            require('log').verbose('Role two stopped')
+        end
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = stop,
+        }
+    ]]
+
+    local log_path = '/var/log/instance-001/tarantool.log'
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two'},
+            ['log'] = {
+                ['to'] = 'file',
+                ['file'] = '.' .. log_path,
+                ['level'] = 'verbose',
+            },
+        },
+        verify = function() end,
+    })
+
+    g.server:stop()
+
+    -- Can't use the grep_log helper here because it's per line only.
+    local log_file = io.open(g.server.chdir .. log_path, 'r')
+    local log_content = log_file:read('*all')
+    log_file:close()
+
+    t.assert_str_contains(log_content,
+        '.*Terminated\n' ..
+        '.* roles.on_shutdown: stopping role two\n' ..
+        '.* Role two stopped\n' ..
+        '.* roles.on_shutdown: stopping role one\n' ..
+        '.* Role one stopped\n' ..
+        '.* tx_binary: stopped\n',
+        true)
+end
+
+-- Make sure the roles are stopped on graceful shutdown in correct order.
+g.test_role_graceful_shutdown_order = function(g)
+    local one = [[
+        local function stop()
+            require('log').verbose('Role one stopped')
+        end
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = stop,
+            dependencies = {'two'},
+        }
+    ]]
+
+    local two = [[
+        local function stop()
+            require('log').verbose('Role two stopped')
+        end
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = stop,
+        }
+    ]]
+
+    local log_path = '/var/log/instance-001/tarantool.log'
+    helpers.success_case(g, {
+        roles = {one = one, two = two},
+        options = {
+            ['roles'] = {'one', 'two'},
+            ['log'] = {
+                ['to'] = 'file',
+                ['file'] = '.' .. log_path,
+                ['level'] = 'verbose',
+            },
+        },
+        verify = function() end,
+    })
+
+    g.server:stop()
+
+    -- Can't use the grep_log helper here because it's per line only.
+    local log_file = io.open(g.server.chdir .. log_path, 'r')
+    local log_content = log_file:read('*all')
+    log_file:close()
+
+    t.assert_str_contains(log_content,
+        '.*Terminated\n' ..
+        '.* roles.on_shutdown: stopping role one\n' ..
+        '.* Role one stopped\n' ..
+        '.* roles.on_shutdown: stopping role two\n' ..
+        '.* Role two stopped\n' ..
+        '.* tx_binary: stopped\n',
+        true)
+end
