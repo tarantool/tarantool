@@ -1,0 +1,4 @@
+langchain-core
+langchain-deepseek
+langgraph
+requests
