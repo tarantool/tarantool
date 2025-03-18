@@ -1,0 +1,77 @@
+local t = require('luatest')
+local server = require('luatest.server')
+local netbox = require('net.box')
+
+local g = t.group('json_index_test')
+
+g.before_all(function()
+    g.server = server:new({alias = 'master'})
+    g.server:start()
+    g.conn = netbox.connect(g.server.net_box_uri)
+
+    g.server:exec(function()
+        box.cfg{}
+        local s = box.schema.space.create('test', {
+            format = {
+                {name = 'id', type = 'unsigned'},
+                {name = 'json1', type = 'array'},
+                {name = 'json2', type = 'array'},
+            },
+        })
+        s:create_index('pk', {parts = {'id'}})
+    end)
+end)
+
+g.after_all(function()
+    g.conn:close()
+    g.server:drop()
+end)
+
+g.before_each(function()
+    g.server:exec(function()
+        box.space.test:truncate()
+        if box.space.test.index.sk then
+            box.space.test.index.sk:drop()
+        end
+    end)
+end)
+
+g.test_json_index_sequential_fields = function()
+    local result = g.server:exec(function()
+        local s = box.space.test
+
+        if s.index.sk then
+            s.index.sk:drop()
+        end
+
+        local parts = {
+            {2, 'unsigned', path = '[1]'},
+            {3, 'unsigned', path = '[1]'},
+        }
+        local sk = s:create_index('sk', {type = 'hash', parts = parts})
+        s:replace{1, {1, 2}, {3, 4}}
+        return sk:get{1, 3}
+    end)
+
+    t.assert_not_equals(result, nil)
+end
+
+g.test_json_index_non_sequential_fields = function()
+    local result = g.server:exec(function()
+        local s = box.space.test
+
+        if s.index.sk then
+            s.index.sk:drop()
+        end
+
+        local parts = {
+            {2, 'unsigned', path = '[1]'},
+            {4, 'unsigned', path = '[1]'},
+        }
+        local sk = s:create_index('sk', {type = 'hash', parts = parts})
+        s:replace{1, {1, 2}, {}, {3, 4}}
+        return sk:get{1, 3}
+    end)
+
+    t.assert_not_equals(result, nil)
+end
