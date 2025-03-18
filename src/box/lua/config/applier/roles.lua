@@ -13,6 +13,9 @@ local roles_state = {
     -- The box.status watcher, used to call on_event callbacks.
     box_status_watcher = nil,
 
+    -- On shutdown trigger to call the 'stop' callback for all roles.
+    on_shutdown_trigger = nil,
+
     -- Last values received from box.status watcher.
     last_box_status_value = nil,
 
@@ -83,6 +86,23 @@ local function apply(_config)
                 error('Timeout reached while waiting for box_status_watcher', 0)
             end
         end
+    end
+
+    if roles_state.on_shutdown_trigger == nil then
+        roles_state.on_shutdown_trigger = function()
+            -- Stop the roles in reverse order they were started.
+            for id = #roles_state.last_roles_ordered, 1, -1 do
+                local role_name = roles_state.last_roles_ordered[id]
+                log.verbose('roles.on_shutdown: stopping role ' .. role_name)
+                local ok, err = pcall(roles_state.last_loaded[role_name].stop)
+                if not ok then
+                    log.error(('Error stopping role %s: %s'):format(
+                        role_name, err))
+                end
+            end
+        end
+
+        box.ctl.on_shutdown(roles_state.on_shutdown_trigger)
     end
 end
 
