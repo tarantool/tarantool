@@ -110,10 +110,16 @@ struct memtx_engine {
 	struct checkpoint *checkpoint;
 	/** The directory where to store snapshots. */
 	struct xdir snap_dir;
+	/** The directory where to store the sort data. */
+	struct xdir sortdata_dir;
 	/** Limit disk usage of checkpointing (bytes per second). */
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Save and load the sort data. */
+	bool sort_data_enabled;
+	/** The memtx index sort data reader (only non-NULL on recovery). */
+	struct memtx_sort_data_reader *msdr;
 	/**
 	 * A callback run once memtx engine builds secondary indexes for the
 	 * data.
@@ -204,7 +210,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor, int threads_num,
+		 const char *allocator, float alloc_factor,
+		 int threads_num, bool sort_data_enabled,
 		 memtx_on_indexes_built_cb on_indexes_built);
 
 /**
@@ -222,6 +229,9 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 
 int
 memtx_engine_set_memory(struct memtx_engine *memtx, size_t size);
+
+void
+memtx_engine_set_sort_data_enabled(struct memtx_engine *memtx, bool value);
 
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
@@ -324,14 +334,15 @@ memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		    bool dontdump, unsigned granularity,
 		    const char *allocator, float alloc_factor,
-		    int sort_threads,
+		    int sort_threads, bool sort_data_enabled,
 		    memtx_on_indexes_built_cb on_indexes_built)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
 				 tuple_arena_max_size, objsize_min, dontdump,
 				 granularity, allocator, alloc_factor,
-				 sort_threads, on_indexes_built);
+				 sort_threads, sort_data_enabled,
+				 on_indexes_built);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;

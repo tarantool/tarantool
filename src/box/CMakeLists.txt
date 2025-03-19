@@ -218,6 +218,7 @@ set(box_sources
     engine.c
     memtx_engine.cc
     memtx_space.c
+    memtx_sort_data.c
     memtx_index.c
     memtx_index_read_view.c
     sysview.c

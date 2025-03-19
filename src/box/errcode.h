@@ -439,6 +439,7 @@ struct errcode_record {
 	_(ER_ALIEN_ENGINE, 292,			"Snapshot contains alien space engine row", "engine", STRING) \
 	_(ER_MVCC_UNAVAILABLE, 293,		"MVCC is unavailable for storage engine '%s' so it cannot be used in the same transaction with '%s', which supports MVCC", "engine_without_mvcc", STRING, "engine_with_mvcc", STRING) \
 	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
+	_(ER_INVALID_SORTDATA_FILE, 295,	"Invalid SORTDATA file %s: %s", "path", STRING, "details", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
