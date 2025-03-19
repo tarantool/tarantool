@@ -78,6 +78,7 @@
 #include "box/lua/console.h"
 #include "box/session.h"
 #include "box/memtx_tx.h"
+#include "box/memtx_engine.h"
 #include "box/module_cache.h"
 #include "box/watcher.h"
 #include "systemd.h"

@@ -506,6 +506,8 @@ struct hash_read_view {
 	struct light_index_view view;
 	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+	/** Used for dumping into the sort data file. */
+	struct light_index_iterator dump_iterator;
 };
 
 /** Read view iterator implementation. */
@@ -623,6 +625,42 @@ hash_read_view_create_iterator(struct index_read_view *base,
 	return hash_read_view_iterator_start(it, type, key, part_count);
 }
 
+/** Implementation of dump_sort_data memtx_index_read_view callback. */
+static int
+hash_read_view_dump_primary_key(
+	struct memtx_index_read_view *base, ssize_t tuple_count,
+	struct memtx_sort_data *msd, bool *have_more)
+{
+	struct hash_read_view *rv = (struct hash_read_view *)base;
+
+	/* Collect the data to save. */
+	struct tuple **buffer =
+		(struct tuple **)xcalloc(tuple_count, sizeof(*buffer));
+	ssize_t dumped = 0;
+	while (dumped != tuple_count) {
+		struct tuple **ptuple = light_index_view_iterator_get_and_next(
+			&rv->view, &rv->dump_iterator);
+		if (ptuple == NULL) {
+			*have_more = false;
+			/* Restart the iterator for the next snapshot. */
+			light_index_view_iterator_begin(&rv->view,
+							&rv->dump_iterator);
+			break;
+		}
+		buffer[dumped++] = *ptuple;
+	}
+
+	/* Write the collected data to the sort data file. */
+	if (memtx_sort_data_write(msd, buffer, sizeof(*buffer), dumped) != 0) {
+		*have_more = false;
+		free(buffer);
+		return -1;
+	}
+
+	free(buffer);
+	return 0;
+}
+
 /** Implementation of create_read_view index callback. */
 static struct index_read_view *
 memtx_hash_index_create_read_view(struct index *base)
@@ -639,6 +677,8 @@ memtx_hash_index_create_read_view(struct index *base)
 	struct hash_read_view *rv =
 		(struct hash_read_view *)xmalloc(sizeof(*rv));
 	memtx_index_read_view_create(&rv->base, &vtab, base->def);
+	if (base->def->iid == 0)
+		rv->base.dump_primary_key = hash_read_view_dump_primary_key;
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
@@ -646,6 +686,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	index_ref(base);
 	light_index_view_create(&rv->view, &index->hash_table);
 	hash_read_view_reset_key_def(rv);
+	light_index_view_iterator_begin(&rv->view, &rv->dump_iterator);
 	return (struct index_read_view *)rv;
 }
 
