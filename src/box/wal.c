@@ -336,6 +336,7 @@ tx_complete_rollback(void)
 	if (stailq_last_entry(&writer->rollback, struct journal_entry,
 			      fifo) != writer->last_entry)
 		return;
+	journal_queue_rollback();
 	stailq_reverse(&writer->rollback);
 	tx_schedule_queue(&writer->rollback);
 	/* TX-thread can try sending transactions to WAL again. */

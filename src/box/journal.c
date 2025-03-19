@@ -157,6 +157,21 @@ journal_queue_flush(void)
 	fiber_sleep(0);
 }
 
+void
+journal_queue_rollback(void)
+{
+	struct stailq rollback;
+	stailq_create(&rollback);
+	stailq_concat(&rollback, &journal_queue.requests);
+	stailq_reverse(&rollback);
+	struct journal_entry *req;
+	stailq_foreach_entry(req, &rollback, fifo) {
+		req->res = JOURNAL_ENTRY_ERR_CASCADE;
+		req->is_complete = true;
+		req->write_async_cb(req);
+	}
+}
+
 int
 journal_write_row(struct xrow_header *row)
 {
