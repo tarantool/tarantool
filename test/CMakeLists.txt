@@ -108,7 +108,6 @@ add_subdirectory(vinyl-luatest)
 if(ENABLE_FUZZER)
     add_subdirectory(fuzz)
 endif()
-add_subdirectory(fuzz/lua)
 add_subdirectory(unit)
 foreach(TEST_SUITE ${EXTRA_TEST_SUITES})
     add_subdirectory(
