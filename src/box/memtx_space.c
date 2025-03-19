@@ -42,6 +42,7 @@
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 #include "column_mask.h"
 #include "sequence.h"
 #include "memtx_space_upgrade.h"
