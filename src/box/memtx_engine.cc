@@ -60,6 +60,8 @@
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
 #include "memtx_space_upgrade.h"
+#include "memtx_index.h"
+#include "memtx_index_read_view.h"
 #include "tt_sort.h"
 #include "assoc.h"
 #include "wal.h"
