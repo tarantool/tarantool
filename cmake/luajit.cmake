@@ -28,6 +28,11 @@ TestAndAppendFLag(CMAKE_C_FLAGS -Wno-tautological-compare)
 TestAndAppendFLag(CMAKE_C_FLAGS -Wno-misleading-indentation)
 TestAndAppendFLag(CMAKE_C_FLAGS -Wno-varargs)
 TestAndAppendFLag(CMAKE_C_FLAGS -Wno-implicit-fallthrough)
+# Building luzer shared library requires libluajit.a built with
+# -fPIC enabled.
+if(ENABLE_FUZZER)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+endif()
 
 set(BUILDMODE static CACHE STRING
     "Build mode: build only static lib" FORCE)
