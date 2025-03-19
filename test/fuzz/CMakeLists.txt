@@ -200,10 +200,10 @@ if (NOT ENABLE_UB_SANITIZER)
 endif ()
 
 include(ProtobufMutator)
-include(BuildLuaTests)
 
 add_subdirectory(luaL_loadbuffer)
 add_subdirectory(sql_fuzzer)
+add_subdirectory(lua)
 
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS} lua-tests

@@ -51,3 +51,51 @@ set_tests_properties(
     LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${TEST_SUITE_NAME}-deps
 )
+
+function(create_luzer_test)
+  cmake_parse_arguments(
+    FUZZ
+    ""
+    "FILENAME"
+    "TEST_ENV;LABELS"
+    ""
+    ${ARGN}
+  )
+  get_filename_component(test_name ${FUZZ_FILENAME} NAME_WE)
+  string(REPLACE "_test" "" test_prefix ${test_name})
+  set(dict_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix}.dict)
+  set(libfuzzer_opts_effective ${LIBFUZZER_OPTS})
+  if(EXISTS ${dict_path})
+    set(libfuzzer_opts_effective "${libfuzzer_opts_effective} -dict=${dict_path}")
+  endif()
+  set(corpus_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix})
+  if(EXISTS ${corpus_path})
+    set(libfuzzer_opts_effective "${libfuzzer_opts_effective} ${corpus_path}")
+  endif()
+
+  string(REGEX REPLACE "^${PROJECT_SOURCE_DIR}/" "" test_title
+    "${FUZZ_FILENAME}")
+  add_test(NAME ${test_title}
+    # LUAJIT_TEST_BINARY is used below because we want to be sure
+    # that LuaJIT-based fuzzing tests are still working for the
+    # Tarantool runtime.
+    COMMAND ${BASH} -c "${LUAJIT_TEST_BINARY} \
+      ${FUZZ_FILENAME} ${libfuzzer_opts_effective}"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS "${FUZZ_LABELS}"
+    ENVIRONMENT "${FUZZ_TEST_ENV}"
+    DEPENDS ${LUAJIT_TEST_BINARY}
+  )
+endfunction()
+
+# luzer library is unsupported in OSS Fuzz environment, so
+# building the library is disabled.
+if (NOT ${OSS_FUZZ})
+  # Build library and set LUZER_LUA_PATH and LUZER_LUA_CPATH.
+  include(BuildLuzer)
+endif()
+
+# Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
+include(BuildLuaTests)
