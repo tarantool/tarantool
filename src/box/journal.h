@@ -229,6 +229,10 @@ journal_queue_on_complete(const struct journal_entry *entry)
 	assert(journal_queue.size >= 0);
 }
 
+/** Rollback all txns waiting in queue. */
+void
+journal_queue_rollback(void);
+
 /**
  * Complete asynchronous write.
  */
@@ -271,6 +275,7 @@ journal_write_submit(struct journal_entry *entry)
 	journal_queue_on_append(entry);
 	if (current_journal->write_async(current_journal, entry) != 0) {
 		journal_queue_on_complete(entry);
+		journal_queue_rollback();
 		return -1;
 	}
 	return 0;
