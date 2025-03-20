@@ -199,6 +199,9 @@ end
 local function break_connection_between_two_nodes(two_nodes, initial_replication, delay)
     fiber.create(function()
 
+        if not two_nodes or #two_nodes < 2 then
+            error("[CRASH SIMULATION] Invalid nodes provided: two_nodes must contain exactly 2 nodes")
+        end
 
         local function is_node_ready(node)
             local replication_info = node:exec(function()
@@ -209,6 +212,10 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
 
         local node1 = two_nodes[1]
         local node2 = two_nodes[2]
+
+        if not node1 or not node2 then
+            error("[CRASH SIMULATION] Invalid nodes: one or both nodes are nil")
+        end
 
         if not is_node_ready(node1) then
             error(string.format("[CRASH SIMULATION] Node %s is not connected or is not replicated", node1.alias))
@@ -280,7 +287,10 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
 
     elseif type_of_crashing == 3 then
         if #crash_nodes > 0 then
-            local success, err = pcall(break_connection_between_two_nodes, crash_nodes, initial_replication, delay)
+            local success, err = pcall(function()
+                break_connection_between_two_nodes(crash_nodes, initial_replication, delay)
+            end)
+
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error: Failed to break connection between nodes: %s", err))
             end
@@ -307,9 +317,16 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
 
                 local type_of_crashing = math.random(1, 4)
                 local delay = tools.calculate_delay(lower_crash_time_bound, upper_crash_time_bound)
-                local crash_node = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                local crash_node_nodes
+                if type_of_crashing == 3 then
+                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
+                else
+                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                end
+                
                 local crashed_proxy_nodes = proxy_handling.get_random_proxies_for_crash(cg, nodes_activity_states, 1)  -- at first time, only 1 proxy
-                crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_node, crashed_proxy_nodes)
+                -- error in two nodes
+                crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_node_nodes, crashed_proxy_nodes)
             end)
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error in crash_simulation: %s", err))

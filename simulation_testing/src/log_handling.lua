@@ -7,7 +7,7 @@ local xlog = require('xlog')
 local crash_functions = require("crash_functions")
 local tools = require("tools")
 
-local is_node_alive_by_alias = require("crash_functions").is_node_alive_by_alias
+--local is_node_alive_by_alias = require("crash_functions").is_node_alive_by_alias
 
 
 -- Function for reading the xlog
@@ -127,11 +127,12 @@ end
 local function get_last_n_entries(node, space_name, n)
     
     local success, result = pcall(function()
-        if is_node_alive_by_alias(node) then
+        if crash_functions.is_node_alive_by_alias(node) then
             return node:exec(function(space_name, n)
                 local space = box.space[space_name]
                 if not space then
-                    error(string.format("Space '%s' does not exist.", space_name))
+                    LogError(string.format("[GET LAST ENTRIES] Space '%s' does not exist.", space_name))
+                    return nil;
                 end
 
                 local entries = space:select(nil, {iterator = 'REQ', limit = n})
@@ -140,8 +141,7 @@ local function get_last_n_entries(node, space_name, n)
         end
     end)
 
-    if not success and is_node_alive_by_alias(node) then
-        LogError(string.format("[GET LAST ENTRIES][Node %s] %s", node.alias, json.encode(result)))
+    if not success then
         return nil
     end
 
@@ -249,7 +249,7 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                     for _, node in ipairs(valid_nodes) do
             
                         local success, result = pcall(function()
-                            if is_node_alive_by_alias(node) then
+                            if crash_functions.is_node_alive_by_alias(node) then
                                 if  n < count  then
                                     return get_last_n_entries(node, space_name, n)
                                 end
