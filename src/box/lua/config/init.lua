@@ -529,6 +529,68 @@ function methods.info(self, version)
         table.concat(supported_versions, ', '), version), 0)
 end
 
+function methods.is_storage(self, opts)
+    selfcheck(self, 'is_storage')
+    initcheck(self, 'is_storage', 'cluster')
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local sharding_roles = self:get(
+        'sharding.roles', {instance = opts.instance}) or {}
+
+    for _, role in ipairs(sharding_roles) do
+        if role == 'storage' then
+            return true
+        end
+    end
+    return false
+end
+
+function methods.is_router(self, opts)
+    selfcheck(self, 'is_router')
+    initcheck(self, 'is_router', 'cluster')
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local sharding_roles = self:get(
+        'sharding.roles', {instance = opts.instance}) or {}
+
+    for _, role in ipairs(sharding_roles) do
+        if role == 'router' then
+            return true
+        end
+    end
+    return false
+end
+
+function methods.has_role(self, role, opts)
+    selfcheck(self, 'has_role')
+    initcheck(self, 'has_role', 'cluster')
+    if type(role) ~= 'string' then
+        error(('Expected string, got %s'):format(type(role)), 0)
+    end
+
+    opts = opts or {}
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+
+    local roles = self:get('roles', {instance = opts.instance}) or {}
+
+    for _, r in ipairs(roles) do
+        if r == role then
+            return true
+        end
+    end
+    return false
+end
+
 -- Cluster configuration (internal method).
 --
 -- It is given as is after merging from all the configuration
