@@ -4336,7 +4336,25 @@ on_commit_schema_set_bootstrap_leader_uuid(struct trigger *trigger, void *event)
 	(void)event;
 	struct tt_uuid *uuid = (struct tt_uuid *)trigger->data;
 	bootstrap_leader_uuid = *uuid;
+
+	/*
+	 * Sync the supervised bootstrap flags.
+	 *
+	 * is_supervised_bootstrap_leader has to be consistent
+	 * with bootstrap_leader_uuid.
+	 *
+	 * The graceful bootstrap request is no-op, when the
+	 * database is already bootstrapped. If we met the flag
+	 * here, it is likely that
+	 * box.ctl.make_bootstrap_leader({graceful = true}) is
+	 * issued during the bootstrap or recovery process. It
+	 * means that request is not actual anymore: we either
+	 * already the bootstrap leader or another peer bootstraps
+	 * us.
+	 */
 	is_supervised_bootstrap_leader = tt_uuid_is_equal(uuid, &INSTANCE_UUID);
+	is_graceful_supervised_bootstrap_requested = false;
+
 	say_info("instance %s is assigned as a bootstrap leader",
 		 tt_uuid_str(uuid));
 	box_broadcast_ballot();

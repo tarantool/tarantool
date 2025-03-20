@@ -452,9 +452,14 @@ box_iterator_position_unpack(const char *packed_pos,
 
 /**
  * For bootstrap_strategy = "supervised", set this node as the bootstrap leader.
+ *
+ * If the `graceful` flag is set, an attempt to connect to other nodes is
+ * performed first (during box.cfg.replication_connect_timeout) and if another
+ * node advertises itself as a bootstrap leader, the current node joins to the
+ * existing replicaset.
  */
 int
-box_make_bootstrap_leader(void);
+box_make_bootstrap_leader(bool graceful);
 
 /**
  * Select data, satisfying filters (key and iterator), and dump it to port.
