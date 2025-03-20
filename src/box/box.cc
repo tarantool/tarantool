@@ -2246,8 +2246,21 @@ box_set_bootstrap_leader_record(void)
 }
 
 int
-box_make_bootstrap_leader(void)
+box_make_bootstrap_leader(bool graceful)
 {
+	is_graceful_supervised_bootstrap_requested = graceful;
+	if (graceful && is_box_configured) {
+		say_info("graceful bootstrap request is discarded: the "
+			 "instance is already bootstrapped");
+		return 0;
+	} else if (graceful) {
+		say_info("graceful bootstrap is requested: the instance "
+			 "is going to check whether a bootstrap leader "
+			 "already exists and if the check fails the instance "
+			 "takes this role");
+		return 0;
+	}
+
 	if (tt_uuid_is_nil(&INSTANCE_UUID)) {
 		/*
 		 * Can't store the UUID of the given instance as
@@ -5345,8 +5358,15 @@ bootstrap_master(void)
 	 * With "auto" bootstrap strategy refuse to boot unless everyone agrees
 	 * this node is the bootstrap leader.
 	 */
-	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO) {
 		check_bootstrap_unanimity();
+	} else if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+		 is_graceful_supervised_bootstrap_requested) {
+		say_info("graceful bootstrap request succeeded: no bootstrap "
+			 "leader is found in connected peers, so the current "
+			 "instance proceeds as a bootstrap leader");
+		is_graceful_supervised_bootstrap_requested = false;
+	}
 	engine_bootstrap_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
@@ -5389,6 +5409,13 @@ bootstrap_from_master(struct replica *master)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    is_graceful_supervised_bootstrap_requested) {
+		say_info("graceful bootstrap request failed: other bootstrap "
+			 "leader is found within connected peers, proceed as a "
+			 "regular replica");
+		is_graceful_supervised_bootstrap_requested = false;
+	}
 	try {
 		applier_resume_to_state(applier, APPLIER_READY,
 					TIMEOUT_INFINITY);
