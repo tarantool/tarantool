@@ -166,7 +166,7 @@ execute('SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
   - name: COLUMN_6
     type: integer
   - name: COLUMN_7
-    type: boolean
+    type: any
   - name: COLUMN_8
     type: boolean
   rows:
