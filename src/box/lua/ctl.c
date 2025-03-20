@@ -118,7 +118,22 @@ lbox_ctl_demote(struct lua_State *L)
 static int
 lbox_ctl_make_bootstrap_leader(struct lua_State *L)
 {
-	if (box_make_bootstrap_leader() != 0)
+	bool graceful = false;
+
+	if (!lua_isnoneornil(L, 1)) {
+		if (!lua_istable(L, 1)) {
+			diag_set(IllegalParams,
+				 "box.ctl.make_bootstrap_leader() expects a "
+				 "table as the first argument, got %s",
+				 luaL_typename(L, 1));
+			return luaT_error(L);
+		}
+		lua_getfield(L, 1, "graceful");
+		graceful = lua_toboolean(L, -1) != 0;
+		lua_pop(L, 1);
+	}
+
+	if (box_make_bootstrap_leader(graceful) != 0)
 		return luaT_error(L);
 	return 0;
 }
