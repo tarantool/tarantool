@@ -823,3 +823,90 @@ g.test_no_sharding_role = function(g)
     local cluster = cluster.new(g, config)
     cluster:start()
 end
+
+-- Ensure that is_storage and is_router work correctly.
+g.test_has_sharding_role = function(g)
+    skip_if_no_vshard()
+
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.storage', {
+            roles = {'sharding'},
+            password = 'storage',
+        })
+        :set_global_option('iproto.advertise.sharding', {
+            login = 'storage',
+        })
+        :set_global_option('replication.failover', 'manual')
+        :use_group('g-001')
+
+        -- Replicaset with only storage role.
+        :use_replicaset('s')
+        :set_replicaset_option('sharding.roles', {'storage'})
+        :set_replicaset_option('leader', 's-001')
+        :add_instance('s-001', {})
+
+        -- Replicaset with only router role.
+        :use_replicaset('r')
+        :set_replicaset_option('sharding.roles', {'router'})
+        :set_replicaset_option('leader', 'r-001')
+        :add_instance('r-001', {})
+
+        -- Replicaset with both storage and router roles.
+        :use_replicaset('rs')
+        :set_replicaset_option('sharding.roles', {'storage', 'router'})
+        :set_replicaset_option('leader', 'rs-001')
+        :add_instance('rs-001', {})
+
+        -- Replicaset without sharding roles.
+        :use_replicaset('n')
+        :set_replicaset_option('leader', 'n-001')
+        :add_instance('n-001', {})
+
+        :config()
+
+    local cluster = cluster.new(g, config)
+    cluster:start()
+
+    cluster['s-001']:exec(function()
+        local config = require('config')
+
+        t.assert(config:is_storage())
+        t.assert_not(config:is_router())
+        t.assert(config:is_storage({instance = 's-001'}))
+        t.assert_not(config:is_router({instance = 's-001'}))
+    end)
+
+    cluster['r-001']:exec(function()
+        local config = require('config')
+
+        t.assert_not(config:is_storage())
+        t.assert(config:is_router())
+        t.assert_not(config:is_storage({instance = 'r-001'}))
+        t.assert(config:is_router({instance = 'r-001'}))
+    end)
+
+    cluster['rs-001']:exec(function()
+        local config = require('config')
+
+        t.assert(config:is_storage())
+        t.assert(config:is_router())
+        t.assert(config:is_storage({instance = 'rs-001'}))
+        t.assert(config:is_router({instance = 'rs-001'}))
+    end)
+
+    cluster['n-001']:exec(function()
+        local config = require('config')
+
+        t.assert_not(config:is_storage())
+        t.assert_not(config:is_router())
+        t.assert_not(config:is_storage({instance = 'n-001'}))
+        t.assert_not(config:is_router({instance = 'n-001'}))
+
+        t.assert(config:is_storage({instance = 's-001'}))
+        t.assert_not(config:is_router({instance = 's-001'}))
+        t.assert_not(config:is_storage({instance = 'r-001'}))
+        t.assert(config:is_router({instance = 'r-001'}))
+        t.assert(config:is_storage({instance = 'rs-001'}))
+        t.assert(config:is_router({instance = 'rs-001'}))
+    end)
+end

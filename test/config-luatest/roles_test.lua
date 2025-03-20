@@ -1,4 +1,7 @@
 local t = require('luatest')
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
+local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
@@ -1111,4 +1114,48 @@ g.test_role_graceful_shutdown_order = function(g)
         '.* Role two stopped\n' ..
         '.* tx_binary: stopped\n',
         true)
+end
+
+-- Ensure that has_role works correctly.
+g.test_has_role = function(_g)
+    local config = cbuilder:new()
+        :use_group('g-001')
+        :use_replicaset('r-001')
+        :add_instance('i-001', {})
+        :set_replicaset_option('roles', {'one'})
+
+        :use_group('g-002')
+        :use_replicaset('r-002')
+        :add_instance('i-002', {})
+        :set_replicaset_option('roles', {'two'})
+
+        :config()
+
+    local cluster = cluster:new(config)
+
+    local role = string.dump(function()
+        return {
+            stop = function() end,
+            apply = function() end,
+            validate = function() end,
+        }
+    end)
+
+
+    treegen.write_file(cluster._dir, 'one.lua', role)
+    treegen.write_file(cluster._dir, 'two.lua', role)
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local config = require('config')
+
+        t.assert(config:has_role('one'))
+        t.assert(config:has_role('one', {instance = 'i-001'}))
+        t.assert_not(config:has_role('two'))
+        t.assert_not(config:has_role('two', {instance = 'i-001'}))
+
+        t.assert(config:has_role('two', {instance = 'i-002'}))
+        t.assert_not(config:has_role('one', {instance = 'i-002'}))
+    end)
 end
