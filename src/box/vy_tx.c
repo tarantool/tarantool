@@ -1118,8 +1118,10 @@ vy_tx_manager_abort_writers_for_ro(struct engine *engine)
 		if (tx == NULL || stailq_empty(&txn->stmts))
 			continue;
 		/* Applier ignores ro flag. */
-		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
+		if (tx->state == VINYL_TX_READY && !tx->is_applier_session) {
 			vy_tx_abort_with_conflict(tx);
+			txn_set_flags(txn, TXN_IS_ABORTED_RO_NODE);
+		}
 	}
 }
 

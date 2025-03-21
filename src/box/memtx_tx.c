@@ -770,6 +770,22 @@ memtx_tx_abort_with_conflict(struct txn *txn)
 }
 
 void
+memtx_tx_abort_writers_for_ro(struct engine *engine)
+{
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns) {
+		if (txn->engines[engine->id] == NULL ||
+		    stailq_empty(&txn->stmts))
+			continue;
+		if (txn->n_new_rows != txn->n_local_rows &&
+		    txn->status == TXN_INPROGRESS) {
+			txn_abort_with_conflict(txn);
+			txn_set_flags(txn, TXN_IS_ABORTED_RO_NODE);
+		}
+	}
+}
+
+void
 memtx_tx_send_to_read_view(struct txn *txn, int64_t psn)
 {
 	assert((txn->status == TXN_IN_READ_VIEW) == (txn->rv_psn != 0));
