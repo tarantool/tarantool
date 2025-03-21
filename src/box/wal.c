@@ -418,6 +418,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  double wal_retention_period,
 		  const struct tt_uuid *instance_uuid,
 		  struct vclock *instance_vclock,
+		  struct vclock *checkpoint_vclock,
 		  wal_on_garbage_collection_f on_garbage_collection,
 		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
@@ -450,6 +451,8 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	vclock_create(&writer->vclock);
 	vclock_create(&writer->checkpoint_vclock);
+	if (checkpoint_vclock != NULL)
+		vclock_copy(&writer->checkpoint_vclock, checkpoint_vclock);
 	rlist_create(&writer->watchers);
 
 	writer->on_garbage_collection = on_garbage_collection;
@@ -478,11 +481,30 @@ wal_open_f(struct cbus_call_msg *msg)
 	const char *path = xdir_format_filename(&writer->wal_dir,
 				vclock_sum(&writer->vclock), NONE);
 	assert(!xlog_is_open(&writer->current_wal));
+
+	uint64_t sum_already_on_disk = 0;
+	for (struct vclock *vclock = vclockset_first(&writer->wal_dir.index);
+	     vclock != NULL;
+	     vclock = vclockset_next(&writer->wal_dir.index, vclock)) {
+		if (vclock_compare(&writer->checkpoint_vclock, vclock) > 0)
+			continue;
+		const char *name = xdir_format_filename(&writer->wal_dir,
+							vclock_sum(vclock),
+							NONE);
+		struct stat attr;
+		if (stat(name, &attr) != 0)
+			say_warn("failed to get file size %s, consider it"
+				 " equal to zero", name);
+		else
+			sum_already_on_disk += (uint64_t)attr.st_size;
+	}
+	writer->checkpoint_wal_size = sum_already_on_disk;
 	return xlog_open(&writer->current_wal, path, &writer->wal_dir.opts);
 }
 
 /**
- * Try to open the current WAL file for appending if it exists.
+ * Try to open the current WAL file for appending if it exists
+ * and scan writer->wal_dir to set writer->checkpoint_wal_size.
  */
 static int
 wal_open(struct wal_writer *writer)
@@ -544,6 +566,7 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 int64_t wal_max_size, double wal_retention_period,
 	 const struct tt_uuid *instance_uuid,
 	 struct vclock *instance_vclock,
+	 struct vclock *checkpoint_vclock,
 	 wal_on_garbage_collection_f on_garbage_collection,
 	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
@@ -551,7 +574,8 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_size,
 			  wal_retention_period, instance_uuid, instance_vclock,
-			  on_garbage_collection, on_checkpoint_threshold);
+			  checkpoint_vclock, on_garbage_collection,
+			  on_checkpoint_threshold);
 
 	/* Start WAL thread. */
 	if (cord_costart(&writer->cord, "wal", wal_writer_f, NULL) != 0)
