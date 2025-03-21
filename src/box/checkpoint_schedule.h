@@ -53,10 +53,12 @@ struct checkpoint_schedule {
  *
  * @now is the current time.
  * @interval is the configured interval between checkpoints.
+ * @time_since_checkpoint is the time since the last checkpoint
  */
 void
 checkpoint_schedule_cfg(struct checkpoint_schedule *sched,
-			double now, double interval);
+			double now, double interval,
+			double time_since_checkpoint);
 
 /**
  * Reset a checkpoint schedule.

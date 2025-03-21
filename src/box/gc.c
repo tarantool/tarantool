@@ -135,7 +135,7 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 	rlist_create(&gc.consumers);
 	gc_tree_new(&gc.active_consumers);
 	fiber_cond_create(&gc.cleanup_cond);
-	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
+	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0, 0);
 
 	gc.cleanup_fiber = fiber_new_system("gc", gc_cleanup_fiber_f);
 	if (gc.cleanup_fiber == NULL)
@@ -477,14 +477,19 @@ gc_set_checkpoint_interval(double interval)
 	 * if it's waiting for checkpointing to complete, because
 	 * checkpointing code doesn't tolerate spurious wakeups.
 	 */
+	struct gc_checkpoint *last = gc_last_checkpoint();
+	double time_since_checkpoint = 0;
+	if (last != NULL && !gc.checkpoint_is_in_progress)
+		time_since_checkpoint = ev_time() - last->timestamp;
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
-				ev_monotonic_now(loop()), interval);
+				ev_monotonic_now(loop()), interval,
+				time_since_checkpoint);
 	if (!gc.checkpoint_is_in_progress)
 		fiber_wakeup(gc.checkpoint_fiber);
 }
 
 void
-gc_add_checkpoint(const struct vclock *vclock)
+gc_add_checkpoint(const struct vclock *vclock, double timestamp)
 {
 	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
 	if (last_checkpoint != NULL &&
@@ -511,6 +516,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 
 	rlist_create(&checkpoint->refs);
 	vclock_copy(&checkpoint->vclock, vclock);
+	checkpoint->timestamp = timestamp;
 	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
 	gc.checkpoint_count++;
 
@@ -564,7 +570,7 @@ gc_do_checkpoint(bool is_scheduled)
 	 * Finally, track the newly created checkpoint in the garbage
 	 * collector state.
 	 */
-	gc_add_checkpoint(&checkpoint.vclock);
+	gc_add_checkpoint(&checkpoint.vclock, ev_time());
 out:
 	if (rc != 0)
 		engine_abort_checkpoint();
@@ -593,7 +599,8 @@ gc_checkpoint(void)
 	 */
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
 				ev_monotonic_now(loop()),
-				gc.checkpoint_schedule.interval);
+				gc.checkpoint_schedule.interval,
+				0);
 	fiber_wakeup(gc.checkpoint_fiber);
 
 	if (gc_do_checkpoint(false) != 0)
