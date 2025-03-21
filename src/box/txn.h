@@ -139,6 +139,7 @@ enum {
 	TXN_SIGNATURE_UNKNOWN = JOURNAL_ENTRY_ERR_UNKNOWN,
 	TXN_SIGNATURE_IO = JOURNAL_ENTRY_ERR_IO,
 	TXN_SIGNATURE_CASCADE = JOURNAL_ENTRY_ERR_CASCADE,
+	TXN_SIGNATURE_CANCELLED = JOURNAL_ENTRY_ERR_CANCELLED,
 	/**
 	 * The default signature value for failed transactions.
 	 * Indicates either write failure or any other failure
@@ -162,6 +163,17 @@ enum {
 	 * installed into the global diag.
 	 */
 	TXN_SIGNATURE_ABORT = JOURNAL_ENTRY_ERR_MIN - 4,
+};
+
+enum txn_commit_wait_mode {
+	/** Commit blocks until the txn is complete. */
+	TXN_COMMIT_WAIT_MODE_COMPLETE,
+	/**
+	 * Txn is sent to the journal is completed later asynchronously. Commit
+	 * returns right away. Unless the journal queue is full. Then the commit
+	 * is blocked until there is space in the queue.
+	 */
+	TXN_COMMIT_WAIT_MODE_SUBMIT,
 };
 
 /** \cond public */
@@ -670,7 +682,7 @@ txn_abort(struct txn *txn);
  * freed.
  */
 int
-txn_commit_try_async(struct txn *txn);
+txn_commit_submit(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects

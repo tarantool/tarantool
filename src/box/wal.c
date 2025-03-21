@@ -70,13 +70,7 @@ static int
 wal_write_async(struct journal *, struct journal_entry *);
 
 static int
-wal_write(struct journal *, struct journal_entry *);
-
-static int
 wal_write_none_async(struct journal *, struct journal_entry *);
-
-static int
-wal_write_none(struct journal *, struct journal_entry *);
 
 /*
  * WAL writer - maintain a Write Ahead Log for every change
@@ -432,9 +426,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	journal_create(&writer->base,
 		       wal_mode == WAL_NONE ?
-		       wal_write_none_async : wal_write_async,
-		       wal_mode == WAL_NONE ?
-		       wal_write_none : wal_write);
+		       wal_write_none_async : wal_write_async);
 
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;
@@ -1376,24 +1368,6 @@ fail:
 }
 
 static int
-wal_write(struct journal *journal, struct journal_entry *entry)
-{
-	/*
-	 * We can reuse async WAL engine transparently
-	 * to the caller.
-	 */
-	if (wal_write_async(journal, entry) != 0)
-		return -1;
-
-	assert(!entry->is_complete);
-	do {
-		fiber_yield();
-	} while (!entry->is_complete);
-
-	return 0;
-}
-
-static int
 wal_write_none_async(struct journal *journal,
 		     struct journal_entry *entry)
 {
@@ -1407,12 +1381,6 @@ wal_write_none_async(struct journal *journal,
 	entry->res = vclock_sum(&writer->vclock);
 	journal_async_complete(entry);
 	return 0;
-}
-
-static int
-wal_write_none(struct journal *journal, struct journal_entry *entry)
-{
-	return wal_write_none_async(journal, entry);
 }
 
 void
