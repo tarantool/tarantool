@@ -33,6 +33,12 @@ local function assert_master_waits_for_replica(server, uuid)
              'Server ' .. server.alias .. ' waits for replica ' .. uuid)
 end
 
+local function grep_log(server, query)
+    local logfile = fio.pathjoin(server.workdir, server.alias .. '.log')
+    local opts = {filename = logfile}
+    return server:grep_log(query, nil, opts)
+end
+
 g_auto.after_each(function(cg)
     cg.replica_set:drop()
 end)
@@ -762,6 +768,11 @@ g_supervised.before_test('test_no_bootstrap_without_replication', function(cg)
     }
 end)
 
+-- If the given instance is not chosen as the bootstrap leader
+-- before the first box.cfg() call and there is no replication
+-- upstreams, there are no ways to load the database.
+--
+-- A startup failure is expected in this scenario.
 g_supervised.test_no_bootstrap_without_replication = function(cg)
     cg.server1:start{wait_until_ready = false}
     local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
@@ -773,4 +784,318 @@ g_supervised.test_no_bootstrap_without_replication = function(cg)
     query = 'failed to connect to the bootstrap leader'
     t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
              'Bootstrap leader not found')
+end
+
+g_supervised.before_test('test_early_leader_singleton', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+            -- NB: The test case also verifies that a instance
+            -- successfully bootstraps the database if no
+            -- upstreams are configured.
+        },
+        env = {
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] =
+                'box.ctl.make_bootstrap_leader()',
+        },
+    }
+end)
+
+-- If the given instance is chosen as a bootstrap leader before
+-- the first box.cfg() call, it is expected to successfully
+-- bootstrap the database even if there are no upstreams
+-- configured.
+--
+-- This logic is added in gh-10858.
+g_supervised.test_early_leader_singleton = function(cg)
+    cg.server1:start()
+
+    t.assert_equals(cg.server1:get_instance_id(), 1,
+                    'Server 1 is the bootstrap leader')
+
+    cg.server1:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader uuid is correct')
+    end)
+end
+
+g_supervised.before_test('test_early_leader_with_replica', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+            -- Don't start this third server to verify that once
+            -- a bootstrap leader is found, a replica doesn't wait
+            -- anything else to register in the replicaset.
+            server.build_listen_uri('server3', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+        -- This way we verify that when the replica connects to
+        -- the bootstrap leader, it correctly determines that it
+        -- is the bootstrap leader and doesn't wait anything else.
+        replication_connect_timeout = 1000,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+
+    cg.server2.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader()'
+end)
+
+-- If the given instance is chosen as a bootstrap leader before
+-- the first box.cfg() call, it is expected that it is
+-- successfully bootstrapped and bootstraps a replica.
+--
+-- This logic is added in gh-10858.
+g_supervised.test_early_leader_with_replica = function(cg)
+    cg.replica_set:start()
+    t.assert_equals(cg.server2:get_instance_id(), 1,
+                    'Server 2 is the bootstrap leader')
+    local leader_uuid = cg.server2:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader uuid is correct')
+        return box.info.uuid
+    end)
+    t.helpers.retrying({}, cg.server1.assert_follows_upstream, cg.server1, 1)
+
+    -- Verify a log message on a bootstrap leader.
+    local exp_msg = 'instance [0-9a-f-]+ is assigned as a bootstrap leader'
+    local found = grep_log(cg.server2, exp_msg)
+    t.assert(found)
+    t.assert_str_contains(found, leader_uuid)
+
+    -- Verify a log message on a replica.
+    local exp_msg = 'instance [0-9a-f-]+ is assigned as a bootstrap leader'
+    local found = grep_log(cg.server1, exp_msg)
+    t.assert(found)
+    t.assert_str_contains(found, leader_uuid)
+end
+
+g_supervised.before_test('test_early_leader_several_leaders', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+            -- Both instances advertise itself as bootstrap
+            -- leaders.
+            env = {
+                ['TARANTOOL_RUN_BEFORE_BOX_CFG'] =
+                    'box.ctl.make_bootstrap_leader()',
+            },
+        }
+    end
+end)
+
+-- For the sake of completeness verify behavior in the incorrect
+-- situation: two instances within the same replicaset are
+-- assigned as bootstrap leaders.
+g_supervised.test_early_leader_several_leaders = function(cg)
+    cg.replica_set:start({wait_until_ready = false})
+    local query = 'ER_REPLICASET_UUID_MISMATCH'
+    t.helpers.retrying({}, function()
+        local found = grep_log(cg.server1, query) or
+                      grep_log(cg.server2, query)
+        t.assert(found, ('Found %s'):format(query))
+    end)
+end
+
+local g_graceful_supervised = t.group('graceful-bootstrap-strategy-supervised')
+
+g_graceful_supervised.before_test('test_singleton', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+        },
+        env = {
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] =
+                'box.ctl.make_bootstrap_leader({graceful = true})',
+        },
+    }
+end)
+
+-- Bootstraps immediately if there are no upstreams to wait.
+g_graceful_supervised.test_singleton = function(cg)
+    cg.server1:start()
+    t.assert_equals(cg.server1:get_instance_id(), 1,
+                    'Server 1 is the bootstrap leader')
+end
+
+g_graceful_supervised.before_test('test_no_peer', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            -- Don't start server2.
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+        -- Wait for server2 for a long time.
+        replication_connect_timeout = 1000,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+
+    cg.server1.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader({graceful = true})'
+end)
+
+-- Waits for other peers.
+g_graceful_supervised.test_no_peer = function(cg)
+    cg.server1:start({wait_until_ready = false})
+    fiber.sleep(1)
+    t.assert_error(cg.server1.connect_net_box, cg.server1)
+end
+
+g_graceful_supervised.before_test('test_no_leader', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+
+    cg.server1.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader({graceful = true})'
+end)
+
+-- All connected, no leader => let's bootstrap.
+--
+-- Plus verify several other cases.
+g_graceful_supervised.test_no_leader = function(cg)
+    cg.replica_set:start()
+    t.assert_equals(cg.server1:get_instance_id(), 1,
+                    'Server 1 is the bootstrap leader')
+    local uuid_1 = cg.server1:call('box.info').uuid
+
+    -- Verify that a message about the reason why this instance
+    -- is a bootstrap leader is issued.
+    local exp_msg = 'graceful bootstrap request succeeded: no bootstrap ' ..
+        'leader is found in connected peers, so the current instance ' ..
+        'proceeds as a bootstrap leader'
+    local found = grep_log(cg.server1, exp_msg)
+    t.assert(found)
+
+    -- Also, verify that when the database is bootstrapped the
+    -- graceful bootstrap request is discarded.
+    --
+    -- Try it on a replica (server2).
+    cg.server2:exec(function()
+        box.ctl.make_bootstrap_leader({graceful = true})
+    end)
+    local exp_msg = 'graceful bootstrap request is discarded: the ' ..
+        'instance is already bootstrapped'
+    t.helpers.retrying({}, function()
+        local found = grep_log(cg.server2, exp_msg)
+        t.assert(found)
+    end)
+    cg.server2:exec(function(uuid_1)
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil)
+        t.assert_equals(tup[2], uuid_1)
+    end, {uuid_1})
+
+    -- And verify that if {graceful = false} is passed, it
+    -- actually means the non-graceful bootstrap leader
+    -- assignment.
+    cg.server2:exec(function()
+        box.ctl.make_bootstrap_leader({graceful = false})
+
+        -- Bootstrap leader is updated. This wouldn't occur with
+        -- the graceful bootstrap request.
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil)
+        t.assert_equals(tup[2], box.info.uuid)
+    end)
+
+    -- Verify incorrect argument.
+    cg.server2:exec(function()
+        local exp_err_msg = 'box.ctl.make_bootstrap_leader() expects a ' ..
+            'table as the first argument, got boolean'
+        t.assert_error_msg_equals(exp_err_msg, function()
+            box.ctl.make_bootstrap_leader(true)
+        end)
+    end)
+end
+
+g_graceful_supervised.before_test('test_other_leader', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+
+    cg.server1.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader({graceful = true})'
+    cg.server2.env.TARANTOOL_RUN_BEFORE_BOX_CFG =
+        'box.ctl.make_bootstrap_leader({graceful = false})'
+end)
+
+-- If some of the peers is already a leader, act as a regular
+-- replica.
+g_graceful_supervised.test_other_leader = function(cg)
+    cg.server2:start()
+    t.assert_equals(cg.server2:get_instance_id(), 1)
+    cg.server1:start()
+    t.assert_equals(cg.server1:get_instance_id(), 2)
+
+    -- Verify that the message about the graceful bootstrap
+    -- request failure is issued.
+    local exp_msg = 'graceful bootstrap request failed: other bootstrap ' ..
+        'leader is found within connected peers, proceed as a regular replica'
+    t.helpers.retrying({}, function()
+        local found = grep_log(cg.server1, exp_msg)
+        t.assert(found)
+    end)
 end

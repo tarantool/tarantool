@@ -2246,13 +2246,31 @@ box_set_bootstrap_leader_record(void)
 }
 
 int
-box_make_bootstrap_leader(void)
+box_make_bootstrap_leader(bool graceful)
 {
+	is_graceful_supervised_bootstrap_requested = graceful;
+	if (graceful && is_box_configured) {
+		say_info("graceful bootstrap request is discarded: the "
+			 "instance is already bootstrapped");
+		return 0;
+	} else if (graceful) {
+		say_info("graceful bootstrap is requested: the instance "
+			 "is going to check whether a bootstrap leader "
+			 "already exists and if the check fails the instance "
+			 "takes this role");
+		return 0;
+	}
+
 	if (tt_uuid_is_nil(&INSTANCE_UUID)) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "box.ctl.make_bootstrap_leader()",
-			 "promoting this instance before box.cfg() is called");
-		return -1;
+		/*
+		 * Can't store the UUID of the given instance as
+		 * the bootstrap leader UUID at this moment,
+		 * because there is no instance UUID yet. Postpone
+		 * this action till the bootstrap.
+		 */
+		is_supervised_bootstrap_leader = true;
+		say_info("this instance is assigned as a bootstrap leader");
+		return 0;
 	}
 	/* Bootstrap strategy is read by the time instance uuid is known. */
 	assert(bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID);
@@ -2271,6 +2289,7 @@ box_make_bootstrap_leader(void)
 		return box_set_bootstrap_leader_record();
 	} else {
 		bootstrap_leader_uuid = INSTANCE_UUID;
+		is_supervised_bootstrap_leader = true;
 		box_broadcast_ballot();
 		return 0;
 	}
@@ -5339,8 +5358,15 @@ bootstrap_master(void)
 	 * With "auto" bootstrap strategy refuse to boot unless everyone agrees
 	 * this node is the bootstrap leader.
 	 */
-	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO) {
 		check_bootstrap_unanimity();
+	} else if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+		 is_graceful_supervised_bootstrap_requested) {
+		say_info("graceful bootstrap request succeeded: no bootstrap "
+			 "leader is found in connected peers, so the current "
+			 "instance proceeds as a bootstrap leader");
+		is_graceful_supervised_bootstrap_requested = false;
+	}
 	engine_bootstrap_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
@@ -5383,6 +5409,13 @@ bootstrap_from_master(struct replica *master)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    is_graceful_supervised_bootstrap_requested) {
+		say_info("graceful bootstrap request failed: other bootstrap "
+			 "leader is found within connected peers, proceed as a "
+			 "regular replica");
+		is_graceful_supervised_bootstrap_requested = false;
+	}
 	try {
 		applier_resume_to_state(applier, APPLIER_READY,
 					TIMEOUT_INFINITY);
