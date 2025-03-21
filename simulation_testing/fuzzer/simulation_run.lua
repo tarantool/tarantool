@@ -16,6 +16,7 @@ local tools = require("tools")
 math.randomseed(os.time())
 
 SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
+WITHOUT_TXN_ISOLATION = os.getenv("WITHOUT_TXN_ISOLATION")
 Logger = logger.Logger
 logger.init_logger()
 

@@ -39,9 +39,12 @@ local function rand_cfg(cg, replica_count, replica_id)
         log = memtx_dir .. '/replica_'..replica_id..'.log',
         wal_dir = wal_dir,
         log = log_file,
-        txn_isolation = 'best-effort',
         wal_mode = 'write'
     }
+
+    if not WITHOUT_TXN_ISOLATION then
+        box_cfg.txn_isolation = 'best-effort'
+    end
 
     print("Configured replica:", replica_id,
           "\nReplication URIs:", table.concat(uri_set, ", "),
