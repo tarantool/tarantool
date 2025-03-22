@@ -119,6 +119,7 @@ struct rmean *rmean_box;
 double on_shutdown_trigger_timeout = 3.0;
 
 double txn_timeout_default;
+double txn_synchro_timeout;
 
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
@@ -1910,6 +1911,18 @@ box_check_txn_timeout(void)
 	return timeout;
 }
 
+static double
+box_check_txn_synchro_timeout(void)
+{
+	double timeout = cfg_getd_default("txn_synchro_timeout", 5);
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "txn_synchro_timeout",
+			 "the value must be greater than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 /**
  * Get and check isolation level from config, converting number or string to
  * enum txn_isolation_level.
@@ -3686,6 +3699,23 @@ box_set_txn_timeout(void)
 	if (timeout < 0)
 		return -1;
 	txn_timeout_default = timeout;
+	return 0;
+}
+
+int
+box_set_txn_synchro_timeout(void)
+{
+	double value = box_check_txn_synchro_timeout();
+	if (replication_synchro_timeout_rollback_enabled && value != 5) {
+		diag_set(ClientError, ER_CFG, "txn_synchro_timeout",
+			 "option is disabled if compat option "
+			 "`replication_synchro_timeout` is set to 'old'");
+		return -1;
+	}
+	if (value < 0)
+		return -1;
+	txn_synchro_timeout = value;
+	txn_limbo_on_parameters_change(&txn_limbo);
 	return 0;
 }
 
