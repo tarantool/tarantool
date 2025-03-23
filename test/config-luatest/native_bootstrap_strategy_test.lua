@@ -28,6 +28,19 @@ local function verify_cluster_mode(cluster, exp_mode_list)
     t.assert_equals(i - 1, #exp_mode_list)
 end
 
+local function find_rw(cluster)
+    local leader
+    cluster:each(function(server)
+        local ok, info = pcall(server.call, server, 'box.info')
+        if ok and not info.ro then
+            t.assert_equals(leader, nil)
+            leader = info.name
+        end
+    end)
+    t.assert_not_equals(leader, nil)
+    return leader
+end
+
 local function verify_bootstrap_leader(cluster, exp_leader)
     local uuid2name = {}
     local leader_uuid
@@ -260,4 +273,63 @@ g.test_failover_manual = function()
     cluster:start_instance('i-004')
     verify_cluster_mode(cluster, {'ro', 'rw', 'ro', 'ro'})
     verify_bootstrap_leader(cluster, 'i-002')
+end
+
+g.test_failover_election = function()
+    local config = cbuilder:new()
+        :use_replicaset('r-001')
+        :set_replicaset_option('replication.failover', 'election')
+        :set_replicaset_option('replication.bootstrap_strategy', 'native')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    -- Verify the test case predicate: there is one RW instance
+    -- and it is a bootstrap leader.
+    --
+    -- We can see some intermediate states:
+    --
+    -- * there is no RW instance at the moment
+    -- * the new RW instance is promoted, but the new bootstrap
+    --   leader record is not written yet
+    --
+    -- So, the predicate is implemented with retrying.
+    local function verify(cluster)
+        return wait(function()
+            local leader = find_rw(cluster)
+            verify_bootstrap_leader(cluster, leader)
+            return leader
+        end)
+    end
+
+    -- Bootstrap.
+    local cluster = cluster:new(config)
+    cluster:start()
+    local initial_leader = verify(cluster)
+
+    -- Stop the RW node and wait for another RW.
+    cluster[initial_leader]:stop()
+    verify(cluster)
+
+    -- Reload config.
+    cluster:each(function(server)
+        if server.process == nil then
+            return
+        end
+
+        server:exec(function()
+            require('config'):reload()
+        end)
+    end)
+    verify(cluster)
+
+    -- Join a replica.
+    local config_2 = cbuilder:new(config)
+        :use_replicaset('r-001')
+        :add_instance('i-004', {})
+        :config()
+    cluster:sync(config_2)
+    cluster:start_instance('i-004')
+    verify(cluster)
 end
