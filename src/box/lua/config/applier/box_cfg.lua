@@ -259,6 +259,31 @@ local function set_ro_rw(config, box_cfg)
             assert(false)
         end
     elseif failover == 'supervised' then
+        -- If replication.bootstrap_strategy = supervised or
+        -- native, all the leader management actions are performed
+        -- by the failover coordinator (an external agent).
+        --
+        -- Don't do anything in the case, just start in RO and
+        -- wait for an external agent to make its decision about
+        -- an RW instance.
+        local bootstrap_strategy = configdata:get(
+            'replication.bootstrap_strategy', {use_default = true})
+        local externally_managed_mode_strategies = {
+            supervised = true,
+            native = true,
+        }
+        if externally_managed_mode_strategies[bootstrap_strategy] then
+            if is_startup then
+                box_cfg.read_only = true
+            else
+                -- Don't change the read_only flag on the
+                -- reconfiguration. It is managed by an external
+                -- agent.
+                box_cfg.read_only = nil
+            end
+            return
+        end
+
         if configdata:bootstrap_leader_name() == nil then
             local warning = 'box_cfg.apply: cannot determine a bootstrap ' ..
                 'leader based on the configuration. Make sure learners are ' ..
@@ -1168,7 +1193,19 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
 
     -- If the strategy is 'native', ensure that the watcher is
     -- started.
-    start_native_bs_watcher()
+    --
+    -- The only exception is replication.failover = supervised.
+    -- In this case all the leader management actions are
+    -- performed by the failover coordinator (an external agent).
+    -- Ensure that the watcher is stopped in the case.
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    if failover == 'supervised' then
+        stop_native_bs_watcher()
+        return
+    else
+        start_native_bs_watcher()
+    end
 
     -- There is nothing to do on configuration reload: the
     -- box_cfg.read_only flag is already set and the background
@@ -1186,10 +1223,7 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
     end
 
     local configured_as_rw = not box_cfg.read_only
-    local failover = configdata:get('replication.failover',
-        {use_default = true})
 
-    -- luacheck: ignore 542 empty if branch
     if failover == 'off' then
         -- The logic is very similar to the failover = 'manual'
         -- one, but it is called only on the first RW instance,
@@ -1219,8 +1253,10 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
             box.ctl.make_bootstrap_leader({graceful = true})
         end
     elseif failover == 'supervised' then
-        -- TODO: NYI
+        -- Unreachable.
+        assert(false)
     else
+        -- Unreachable.
         assert(false)
     end
 end

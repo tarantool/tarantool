@@ -1,12 +1,27 @@
+local fiber = require('fiber')
+local net_box = require('net.box')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local it = require('test.interactive_tarantool')
 
 local g = t.group()
+
+g.after_each(function(g)
+    if g.it ~= nil then
+        g.it:close()
+    end
+end)
 
 -- Shortcut to make test cases more readable.
 local function wait(f, ...)
     return t.helpers.retrying({timeout = 60}, f, ...)
+end
+
+local function admin(g, server, command)
+    g.it = it.connect(server)
+    g.it:roundtrip(command)
+    g.it:close()
 end
 
 -- {{{ Verify database mode / bootstrap leader
@@ -332,4 +347,136 @@ g.test_failover_election = function()
     cluster:sync(config_2)
     cluster:start_instance('i-004')
     verify(cluster)
+end
+
+-- Run the same test for replication.bootstrap_strategy =
+-- 'supervised' and 'native', because we expect the same behavior.
+local g_supervised_and_native = t.group('supervised_and_native', {
+    {bootstrap_strategy = 'supervised'},
+    {bootstrap_strategy = 'native'},
+})
+
+-- Just ensure that no leadership management actions are performed
+-- by the instance itself.
+--
+-- An external agent (the failover coordinator) is responsible for
+-- them.
+g_supervised_and_native.test_failover_supervised = function(g)
+    local strategy = g.params.bootstrap_strategy
+
+    local config = cbuilder:new()
+        :use_replicaset('r-001')
+        :set_replicaset_option('replication.failover', 'supervised')
+        :set_replicaset_option('replication.bootstrap_strategy', strategy)
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :add_instance('i-003', {})
+        :config()
+
+    -- No bootstrap, wait for the coordinator.
+    local cluster = cluster:new(config)
+    cluster:start({wait_until_ready = false})
+
+    -- Give the instances a chance to perform a replicaset
+    -- bootstrap. It shouldn't occur and this is the idea of the
+    -- test.
+    fiber.sleep(1)
+
+    cluster:each(function(server)
+        -- No bootstrapped database, so no privileges granted.
+        --
+        -- Let's use a watch request that doesn't need any
+        -- permissions.
+        local uri = server.net_box_uri
+        local status = wait(function()
+            local conn = net_box.connect(uri, {fetch_schema = false})
+            return conn:watch_once('box.status')
+        end)
+        -- Verify that we still in the 'loading' status, not
+        -- 'running'. Also, this way we ensure that the process
+        -- is alive and waits for the agent's command.
+        t.assert_type(status, 'table')
+        t.assert_equals(status.status, 'loading')
+    end)
+
+    -- Imitate the external agent using the admin socket.
+    admin(g, cluster['i-001'], [[
+        require('fiber').new(function()
+            box.ctl.make_bootstrap_leader({graceful = true})
+            box.cfg({read_only = false})
+        end)
+    ]])
+    cluster:each(function(server)
+        server:wait_until_ready()
+    end)
+    verify_cluster_mode(cluster, {'rw', 'ro', 'ro'})
+    verify_bootstrap_leader(cluster, 'i-001')
+
+    -- Reconfiguration doesn't drop the RW mode to RO.
+    cluster['i-001']:exec(function()
+        local config = require('config')
+
+        config:reload()
+        t.assert_equals(box.info.ro, false)
+    end)
+end
+
+-- Same as the previous test case, but cover a replicaset with one
+-- instance.
+g_supervised_and_native.test_failover_supervised_singleton = function(g)
+    local strategy = g.params.bootstrap_strategy
+
+    local config = cbuilder:new()
+        :use_replicaset('r-001')
+        :set_replicaset_option('replication.failover', 'supervised')
+        :set_replicaset_option('replication.bootstrap_strategy', strategy)
+        :add_instance('i-001', {})
+        :config()
+
+    -- No bootstrap, wait for the coordinator.
+    local cluster = cluster:new(config)
+    cluster:start({wait_until_ready = false})
+
+    -- Give the instances a chance to perform a replicaset
+    -- bootstrap. It shouldn't occur and this is the idea of the
+    -- test.
+    fiber.sleep(1)
+
+    cluster:each(function(server)
+        -- No bootstrapped database, so no privileges granted.
+        --
+        -- Let's use a watch request that doesn't need any
+        -- permissions.
+        local uri = server.net_box_uri
+        local status = wait(function()
+            local conn = net_box.connect(uri, {fetch_schema = false})
+            return conn:watch_once('box.status')
+        end)
+        -- Verify that we still in the 'loading' status, not
+        -- 'running'. Also, this way we ensure that the process
+        -- is alive and waits for the agent's command.
+        t.assert_type(status, 'table')
+        t.assert_equals(status.status, 'loading')
+    end)
+
+    -- Imitate the external agent using the admin socket.
+    admin(g, cluster['i-001'], [[
+        require('fiber').new(function()
+            box.ctl.make_bootstrap_leader({graceful = true})
+            box.cfg({read_only = false})
+        end)
+    ]])
+    cluster:each(function(server)
+        server:wait_until_ready()
+    end)
+    verify_cluster_mode(cluster, {'rw'})
+    verify_bootstrap_leader(cluster, 'i-001')
+
+    -- Reconfiguration doesn't drop the RW mode to RO.
+    cluster['i-001']:exec(function()
+        local config = require('config')
+
+        config:reload()
+        t.assert_equals(box.info.ro, false)
+    end)
 end
