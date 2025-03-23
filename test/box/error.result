@@ -503,6 +503,7 @@ t;
  |   291: box.error.REPLICA_GC
  |   292: box.error.ALIEN_ENGINE
  |   293: box.error.MVCC_UNAVAILABLE
+ |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
  | ...
 
 test_run:cmd("setopt delimiter ''");
