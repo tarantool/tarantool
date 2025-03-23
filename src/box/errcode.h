@@ -432,6 +432,13 @@ struct errcode_record {
 	_(ER_READ_VIEW_BUSY, 285,		"The read view is busy") \
 	_(ER_READ_VIEW_CLOSED, 286,		"The read view is closed") \
 	_(ER_WAL_QUEUE_FULL, 287,		"The WAL queue is full") \
+	/* ER_INVALID_VCLOCK, 288, Unused */ \
+	/* ER_SYNC_QUEUE_FULL, 289, Unused */ \
+	/* ER_KEY_PART_VALUE_OUT_OF_RANGE, 290, Unused */ \
+	/* ER_REPLICA_GC, 291, Unused */ \
+	/* ER_ALIEN_ENGINE, 292, Unused */ \
+	/* ER_MVCC_UNAVAILABLE, 293, Unused */ \
+	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
