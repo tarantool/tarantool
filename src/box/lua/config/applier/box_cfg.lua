@@ -1052,6 +1052,23 @@ local function start_native_bs_watcher()
 
         -- Move the bootstrap leader flag together with the RW
         -- mode.
+        --
+        -- Note: In the replication.failover = 'off' mode several
+        -- RW instances may appear simultaneously. The
+        -- `bootstrap_leader_uuid` tuple in the _schema system
+        -- space is protected from replication conflicts (see
+        -- before_replace_dd_schema() from src/box/alter.cc), so
+        -- if the leadership is taken on several instances
+        -- simultaneously, it is harmless except, maybe, some
+        -- extra database writes.
+        --
+        -- TODO: Unlike the 'auto' strategy if one RW node is off,
+        -- another RW node doesn't take the bootstrap leadership
+        -- automatically. It may be a problem for a user: no way
+        -- to register a new replica in this case. The workaround
+        -- is to switch some accessible RW node to RO and then
+        -- back to RW. Or call box.ctl.make_bootstrap_leader()
+        -- manually.
         local is_rw = not status.is_ro
         if is_rw and not am_i_effective_bs_leader() then
             local ok, err = pcall(box.ctl.make_bootstrap_leader)
@@ -1071,6 +1088,42 @@ local function stop_native_bs_watcher()
     -- unregistered watcher raises an error.
     pcall(native_bs_watcher.unregister, native_bs_watcher)
     native_bs_watcher = nil
+end
+
+-- Valid only for failover = 'off'.
+--
+-- Leans on box_cfg.read_only, so it is to be called after
+-- set_ro_rw(), set_isolated() and force_ro_on_startup().
+local function am_i_first_rw(configdata, box_cfg)
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    assert(failover == 'off')
+
+    local configured_as_rw = not box_cfg.read_only
+    if not configured_as_rw then
+        return false
+    end
+
+    -- If the instance is the only one in the replicaset,
+    -- it is set as RW by default (even if database.mode is not
+    -- set).
+    if #configdata:peers() == 1 then
+        return true
+    end
+
+    -- Find the first RW instance (lexicographically).
+    local first_rw_peer
+    for _, peer_name in ipairs(configdata:peers()) do
+        local opts = {instance = peer_name, use_default = true}
+        local mode = configdata:get('database.mode', opts)
+        if mode == 'rw' then
+            first_rw_peer = peer_name
+            break
+        end
+    end
+    assert(first_rw_peer ~= nil)
+
+    return first_rw_peer == configdata:names().instance_name
 end
 
 local function set_bootstrap_strategy_native(configdata, box_cfg)
@@ -1108,7 +1161,13 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
 
     -- luacheck: ignore 542 empty if branch
     if failover == 'off' then
-        -- TODO: NYI
+        -- The logic is very similar to the failover = 'manual'
+        -- one, but it is called only on the first RW instance,
+        -- because it is possible that several instances are
+        -- configured as RW.
+        if am_i_first_rw(configdata, box_cfg) then
+            box.ctl.make_bootstrap_leader({graceful = true})
+        end
     elseif failover == 'manual' then
         -- If the given instance is configured as RW (by the logic
         -- from set_ro_rw()) and there is no local snapshot, then
