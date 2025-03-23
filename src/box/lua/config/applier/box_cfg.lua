@@ -1126,6 +1126,36 @@ local function am_i_first_rw(configdata, box_cfg)
     return first_rw_peer == configdata:names().instance_name
 end
 
+-- Valid only for failover = 'election'.
+local function am_i_first_candidate(configdata)
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    assert(failover == 'election')
+
+    local first_candidate
+    for _, peer_name in ipairs(configdata:peers()) do
+        local opts = {instance = peer_name, use_default = true}
+        local is_anon = configdata:get('replication.anon', opts)
+        local election_mode = configdata:get('replication.election_mode', opts)
+
+        -- A candidate is a non-anonymous instance that has
+        -- replication.election_mode = null or 'candidate'.
+        --
+        -- See set_ro_rw().
+        if election_mode == nil then
+            election_mode = is_anon and 'off' or 'candidate'
+        end
+
+        if election_mode == 'candidate' then
+            first_candidate = peer_name
+            break
+        end
+    end
+    assert(first_candidate ~= nil)
+
+    return first_candidate == configdata:names().instance_name
+end
+
 local function set_bootstrap_strategy_native(configdata, box_cfg)
     -- If the strategy is switched from 'native' to some other
     -- one, stop the watcher that handles the 'native' strategy.
@@ -1182,7 +1212,12 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
             box.ctl.make_bootstrap_leader({graceful = true})
         end
     elseif failover == 'election' then
-        -- TODO: NYI
+        -- First non-anonymous instance that has
+        -- replication.election_mode = null or 'candidate'
+        -- bootstraps the replicaset.
+        if am_i_first_candidate(configdata) then
+            box.ctl.make_bootstrap_leader({graceful = true})
+        end
     elseif failover == 'supervised' then
         -- TODO: NYI
     else
