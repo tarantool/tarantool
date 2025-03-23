@@ -502,6 +502,7 @@ t;
  |   289: box.error.SYNC_QUEUE_FULL
  |   290: box.error.KEY_PART_VALUE_OUT_OF_RANGE
  |   291: box.error.REPLICA_GC
+ |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
  | ...
 
 test_run:cmd("setopt delimiter ''");
