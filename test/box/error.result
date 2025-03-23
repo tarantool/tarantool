@@ -488,6 +488,7 @@ t;
  |   274: box.error.UNCONFIGURED
  |   277: box.error.INVALID_DEC
  |   278: box.error.IN_ANOTHER_PROMOTE
+ |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
  | ...
 
 test_run:cmd("setopt delimiter ''");
