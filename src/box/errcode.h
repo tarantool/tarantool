@@ -332,6 +332,21 @@ struct errcode_record {
 	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
 	/*279 */_(ER_UNUSED10,			"") \
+	/*280 */_(ER_UNUSED11,			"") \
+	/*281 */_(ER_UNUSED12,			"") \
+	/*282 */_(ER_UNUSED13,			"") \
+	/*283 */_(ER_UNUSED14,			"") \
+	/*284 */_(ER_UNUSED15,			"") \
+	/*285 */_(ER_UNUSED16,			"") \
+	/*286 */_(ER_UNUSED17,			"") \
+	/*287 */_(ER_UNUSED18,			"") \
+	/*288 */_(ER_UNUSED19,			"") \
+	/*289 */_(ER_UNUSED20,			"") \
+	/*290 */_(ER_UNUSED21,			"") \
+	/*291 */_(ER_UNUSED22,			"") \
+	/*292 */_(ER_UNUSED23,			"") \
+	/*293 */_(ER_UNUSED24,			"") \
+	/*294 */_(ER_CANT_UPGRADE_INDEXED_FIELD, "Space upgrade doesn't support changing indexed fields (space %s (%d), index %s, old tuple - %s, new tuple - %s)") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
