@@ -436,6 +436,9 @@ struct errcode_record {
 	_(ER_SYNC_QUEUE_FULL, 289,		"The synchronous transaction queue is full") \
 	_(ER_KEY_PART_VALUE_OUT_OF_RANGE, 290,	"The value of key part exceeds the supported range for type", "partno", UINT, "field_type", STRING, "value", MSGPACK, "min", MSGPACK, "max", MSGPACK) \
 	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
+	/* ER_ALIEN_ENGINE, 292, Unused */ \
+	/* ER_MVCC_UNAVAILABLE, 293, Unused */ \
+	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
