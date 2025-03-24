@@ -2248,7 +2248,6 @@ box_set_bootstrap_leader_record(void)
 int
 box_make_bootstrap_leader(bool graceful)
 {
-	is_graceful_supervised_bootstrap_requested = graceful;
 	if (graceful && is_box_configured) {
 		say_info("graceful bootstrap request is discarded: the "
 			 "instance is already bootstrapped");
@@ -2258,6 +2257,9 @@ box_make_bootstrap_leader(bool graceful)
 			 "is going to check whether a bootstrap leader "
 			 "already exists and if the check fails the instance "
 			 "takes this role");
+		is_graceful_supervised_bootstrap_requested = graceful;
+		//box_broadcast_ballot();
+		replicaset_connect_wakeup();
 		return 0;
 	}
 
@@ -5350,8 +5352,17 @@ check_global_ids_integrity(void)
 static void
 bootstrap_master(void)
 {
-	/* Do not allow to bootstrap a readonly instance as master. */
-	if (cfg_geti("read_only") == 1) {
+	/*
+	 * Do not allow to bootstrap a readonly instance as master.
+	 *
+	 * Allow an exception for the supervised bootstrap
+	 * strategy, because the commmand to bootstrap may be
+	 * received during the in progress box.cfg() call and
+	 * there is no way to change box.cfg.read_only at this
+	 * time.
+	 */
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    cfg_geti("read_only") == 1) {
 		tnt_raise(ClientError, ER_BOOTSTRAP_READONLY);
 	}
 	/*

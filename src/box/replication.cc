@@ -225,6 +225,15 @@ struct replicaset_connect_state {
 	struct fiber_cond wakeup;
 };
 
+static struct fiber_cond *replicaset_connect_wakeup_cond = NULL;
+
+void
+replicaset_connect_wakeup(void)
+{
+	if (replicaset_connect_wakeup_cond != NULL)
+		fiber_cond_signal(replicaset_connect_wakeup_cond);
+}
+
 static void
 replicaset_set_sync_quorum(const struct replicaset_connect_state *state)
 {
@@ -1251,7 +1260,11 @@ replicaset_connect(const struct uri_set *uris,
 	memset(&state, 0, sizeof(state));
 	fiber_cond_create(&state.wakeup);
 
-	if (uris->uri_count == 0) {
+	/*
+	 * An exception for supervised XXX.
+	 */
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    uris->uri_count == 0) {
 		replicaset_set_sync_quorum(&state);
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
@@ -1333,6 +1346,7 @@ replicaset_connect(const struct uri_set *uris,
 			trigger_clear(&trigger->base);
 		}
 	});
+	replicaset_connect_wakeup_cond = &state.wakeup;
 	while (!replicaset_is_connected(&state, appliers, count,
 					connect_quorum)) {
 		double wait_start = ev_monotonic_now(loop());
@@ -1342,6 +1356,7 @@ replicaset_connect(const struct uri_set *uris,
 		}
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
+	replicaset_connect_wakeup_cond = NULL;
 	if (state.connected < count) {
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);

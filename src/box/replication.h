@@ -706,6 +706,12 @@ replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect);
 
 /**
+ * XXX
+ */
+void
+replicaset_connect_wakeup(void);
+
+/**
  * Reload replica URIs.
  *
  * Called on reconfiguration in case the remote peer URIs are the same.
