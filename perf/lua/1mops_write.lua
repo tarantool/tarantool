@@ -44,6 +44,7 @@ local HELP = [[
 local parsed_params = {
     {'engine', 'string'},
     {'fibers', 'number'},
+    {'columns', 'number'},
     {'index', 'string'},
     {'nodes', 'number'},
     {'nohint', 'boolean'},
@@ -120,13 +121,17 @@ local nodes = params.nodes or 1
 
 -- engine to use
 local engine = params.engine or 'memtx'
-assert(engine == 'memtx' or engine == 'vinyl')
+assert(engine == 'memtx' or engine == 'vinyl' or engine == 'memcs')
 
 -- WAL mode
 local wal_mode = params.wal_mode or 'write'
 assert(wal_mode == 'write'
        or wal_mode == 'none'
        or wal_mode == 'fsync')
+
+-- number of columns in the table
+local num_columns = params.columns or 1
+assert(num_columns >= 1)
 
 -- type of index to use
 local index_config = {}
@@ -168,14 +173,14 @@ local std_redirect = {
 }
 
 print(string.format([[
-# making %d REPLACE operations,
+# making %d REPLACE operations in %s engine,
 # %d operations per txn,
 # using %d fibers,
 # in a replicaset of %d nodes,
 # using %s index type%s
 # with WAL mode %s
 # ]],
-      num_ops, ops_per_txn, num_fibers, nodes,
+      num_ops, engine, ops_per_txn, num_fibers, nodes,
       index_config.type, hints_msg, wal_mode))
 
 box.cfg{
@@ -234,21 +239,25 @@ if (nodes > 1) then
     end
 end
 
-local space
-local done = false
-local err
-
 if (test_sync) then
     box.cfg{replication_synchro_quorum = nodes}
     print('# promoting')
     box.ctl.promote()
     print('# done')
-    space, err = box.schema.create_space('test',
-                                         {engine = engine, is_sync = true})
-else
-    space, err = box.schema.create_space('test',
-                                         {engine = engine})
 end
+
+local done = false
+local space_format = {}
+for i = 1, num_columns do
+    table.insert(space_format, {'field_' .. tostring(i), 'unsigned'})
+end
+local create_space_opts = {
+    engine = engine,
+    field_count = num_columns,
+    format = space_format,
+    is_sync = test_sync or nil
+}
+local space, err = box.schema.create_space('test', create_space_opts)
 if space == false then
     exit(1, 'error creating space ' .. json.encode(err))
 end
@@ -258,13 +267,20 @@ if (res ~= true) then
          json.encode(index_config) .. ' :' .. json.encode(err))
 end
 
+-- preallocate the test tuple
+local tuple = {}
+for i = 1, num_columns do -- luacheck: no unused
+    table.insert(tuple, 0)
+end
+
 -- THE load fiber
 local function fiber_load(start, s)
     start = start % max_space_size
     for _ = 1, trans_per_fiber do
         box.begin()
         for _ = 1, ops_per_txn do
-            s:replace{start}
+            tuple[1] = start
+            s:replace(tuple)
             start = start + 1
             if start == max_space_size then
                 start = 0
