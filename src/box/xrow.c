@@ -1614,6 +1614,7 @@ error:
 				goto error;
 			request->tuple_formats = value;
 			request->tuple_formats_end = data;
+			break;
 		default:
 			continue; /* unknown key */
 		}
