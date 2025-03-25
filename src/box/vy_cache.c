@@ -333,10 +333,12 @@ vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
 		vy_cache_node_delete(cache->env, replaced);
 	}
 	if (direction > 0 &&
+	    !(node->flags & VY_CACHE_LEFT_LINKED) &&
 	    boundary_level < node->left_boundary_level) {
 		node->left_boundary_level = boundary_level;
 		node->left_lsn = link_lsn;
 	} else if (direction < 0 &&
+		   !(node->flags & VY_CACHE_RIGHT_LINKED) &&
 		   boundary_level < node->right_boundary_level) {
 		node->right_boundary_level = boundary_level;
 		node->right_lsn = link_lsn;
