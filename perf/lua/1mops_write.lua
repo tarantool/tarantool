@@ -10,6 +10,7 @@ local fiber = require('fiber')
 local math = require('math')
 local json = require('json')
 local fio = require('fio')
+local tarantool = require('tarantool')
 
 -- XXX: This benchmark should be able to work standalone without
 -- any provided libraries or set LUA_PATH. Add stubs for that
@@ -53,6 +54,12 @@ local parsed_params = {
     {'wal_mode', 'string'},
     {'warmup', 'number'},
 }
+
+local BUILDDIR = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.'))
+local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
+                                '?.' .. tarantool.build.mod_format)
+package.cpath = MODULEPATH .. ';' .. package.cpath
+local has_test_module, test_module = pcall(require, '1mops_write_module')
 
 local params
 local bench
@@ -265,15 +272,20 @@ end
 -- THE load fiber
 local function fiber_load(start, s)
     start = start % 1000000 -- limit the size of space to 1M elements
-    for _ = 1, trans_per_fiber do
-        box.begin()
-        for _ = 1, ops_per_txn do
-            tuple[1] = start
-            s:replace(tuple)
-            start = start + 1
+    if has_test_module then
+        test_module.fiber(s.id, trans_per_fiber, ops_per_txn,
+                          num_columns, start)
+    else
+        for _ = 1, trans_per_fiber do
+            box.begin()
+            for _ = 1, ops_per_txn do
+                tuple[1] = start
+                s:replace(tuple)
+                start = start + 1
+            end
+            box.commit()
+            fiber.yield()
         end
-        box.commit()
-        fiber.yield()
     end
 end
 
