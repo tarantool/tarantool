@@ -80,6 +80,7 @@ end
 
 -- Function to check that more than half of the proxy connections for a given node are not crashed 
 -- (the proxy connection in this case is not crashed unless both i_to_j and j_to_i proxies are crashed)
+-- Strict condition, that doesn't match for testing Pre-Vote stage case
 local function is_half_proxy_connections_non_crashed(cg, i, activity_states)
 
     local total_connections = find_proxies_by_prefix(cg, i)
@@ -90,10 +91,48 @@ local function is_half_proxy_connections_non_crashed(cg, i, activity_states)
     return non_crashed_count >= total_count / 2
 end
 
+local function is_quorum_healthy(cg, activity_states)
+    local replica_count = #cg.replicas
+    local quorum_size = math.floor(replica_count / 2) + 1
+    
+    -- Сollect all the nodes that can be part of the quorum
+    local potential_quorum_nodes = {}
+    for _, node in ipairs(cg.replicas) do
+        if activity_states[node.alias] ~= 'crashed' then
+            table.insert(potential_quorum_nodes, node)
+        end
+    end
+    
+    -- If it hasn't enough nodes for a quorum
+    if #potential_quorum_nodes < quorum_size then
+        return false
+    end
+    
+    -- Check if there is at least one group of nodes of the quorum_size size,
+    -- where each node have half of all of active connections
+    local combinations = require('tools').combinations(potential_quorum_nodes, quorum_size)
+    
+    for _, quorum_candidate in ipairs(combinations) do
+        local quorum_healthy = true
+        
+        for _, node in ipairs(quorum_candidate) do
+            local i = tonumber(string.match(node.alias, "replica_(%d+)"))
+            if not is_half_proxy_connections_non_crashed(cg, i, activity_states) then
+                quorum_healthy = false
+                break
+            end
+        end
+        
+        if quorum_healthy then
+            return true
+        end
+    end
+    
+    return false
+end
+
 -- Safe function for getting random crash proxies
 local function get_random_proxies_for_crash(cg, activity_states, num_to_select)
-
-    local replica_count = #cg.replicas
 
     -- Finding proxies that can be crashed
     local candidates = {}
@@ -129,12 +168,10 @@ local function get_random_proxies_for_crash(cg, activity_states, num_to_select)
         temp_activity_states[proxy.alias] = 'crashed'
     end
 
-    -- Check that the is_half_proxy_connections_not_crashed condition is met for each node
-    for i = 1, replica_count do
-        if not is_half_proxy_connections_non_crashed(cg, i, temp_activity_states) then
-            LogInfo(string.format("[CRASH SIMULATION] Node %d would have less than half of its connections non crashed.", i))
-            return {}
-        end
+    -- Check that a healthy quorum remains after the crash
+    if not is_quorum_healthy(cg, temp_activity_states) then
+        LogInfo("[CRASH SIMULATION] Proposed proxy crashes would leave no healthy quorum.")
+        return {}
     end
 
     return selected_proxies
