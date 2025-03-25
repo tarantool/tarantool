@@ -10,6 +10,7 @@ local fiber = require('fiber')
 local math = require('math')
 local json = require('json')
 local fio = require('fio')
+local tarantool = require('tarantool')
 
 -- XXX: This benchmark should be able to work standalone without
 -- any provided libraries or set LUA_PATH. Add stubs for that
@@ -36,6 +37,7 @@ local HELP = [[
    insert_ratio <number, 0.1> - ratio of insertions, defines the space size
    wal_mode <string, 'write'> - WAL synchronization mode
    warmup <number, 10>        - percent of ops to skip before measurement
+   c_fiber <boolean, false>   - use the C fiber to perform the operations
 
  Being run without options, this benchmark tests the HASH index of the memtx
  engine by running 50 fibers that replace 150 integers, using each as a primary
@@ -55,7 +57,11 @@ local parsed_params = {
     {'insert_ratio', 'number'},
     {'wal_mode', 'string'},
     {'warmup', 'number'},
+    {'c_fiber', 'boolean'},
 }
+
+-- the C fiber module, loaded below once the option is parsed.
+local test_module = nil
 
 local params
 local bench
@@ -148,6 +154,22 @@ if params.index == 'TREE' then
     end
 end
 
+-- whether to perform the operations in a C fiber
+local use_c_fiber = params.c_fiber or false
+if use_c_fiber then
+    -- the loader also searches the working directory, so the module is
+    -- found without BUILDDIR when the test runs from the build tree.
+    local BUILDDIR = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.'))
+    local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
+                                    '?.' .. tarantool.build.mod_format)
+    package.cpath = MODULEPATH .. ';' .. package.cpath
+    local ok, module = pcall(require, '1mops_write_module')
+    if not ok then
+        exit(1, 'error loading the C fiber module, check BUILDDIR')
+    end
+    test_module = module
+end
+
 -- warm up part, not counted in average
 local warmup_thr = params.warmup or 10
 warmup_thr = warmup_thr > 100 and 100 or warmup_thr
@@ -180,9 +202,12 @@ print(string.format([[
 # in a replicaset of %d nodes,
 # using %s index type%s
 # with WAL mode %s
+# with %d columns in the tuples,
+# using the %s fiber
 # ]],
       num_ops, engine, ops_per_txn, num_fibers, nodes,
-      index_config.type, hints_msg, wal_mode))
+      index_config.type, hints_msg, wal_mode, num_columns,
+      use_c_fiber and 'C' or 'Lua'))
 
 box.cfg{
     log_level = 0,
@@ -278,6 +303,10 @@ end
 -- THE load fiber
 local function fiber_load(start, s)
     start = start % max_space_size
+    if use_c_fiber then
+        return test_module.fiber_load(s.id, trans_per_fiber, ops_per_txn,
+                                      num_columns, start, max_space_size)
+    end
     for _ = 1, trans_per_fiber do
         box.begin()
         for _ = 1, ops_per_txn do
