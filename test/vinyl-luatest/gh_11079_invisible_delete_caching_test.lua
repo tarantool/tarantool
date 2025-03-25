@@ -199,3 +199,59 @@ g.test_deferred_delete = function(cg)
                         {{60, 600}, {40, 400}, {20, 200}})
     end)
 end
+
+g.test_partial_key_forward = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.space.create('test', {engine = 'vinyl'})
+        s:create_index('primary', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+
+        s:replace({0, 2})
+        s:replace({2, 0})
+
+        box.begin()
+        t.assert_equals(s:select(), {{0, 2}, {2, 0}})
+
+        local f = fiber.new(function()
+            s:replace({0, 1})
+            s:delete({0, 2})
+            t.assert_equals(s:select(), {{0, 1}, {2, 0}})
+            t.assert_equals(s:select({1}, {iterator = 'gt'}), {{2, 0}})
+        end)
+        f:set_joinable(true)
+        t.assert_equals({f:join(5)}, {true})
+
+        t.assert_equals(s:select({}, {iterator = 'lt'}), {{2, 0}, {0, 2}})
+        t.assert_equals(s:select({0, 1}, {iterator = 'gt'}), {{0, 2}, {2, 0}})
+        box.commit()
+    end)
+end
+
+g.test_partial_key_backward = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.space.create('test', {engine = 'vinyl'})
+        s:create_index('primary', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+
+        s:replace({0, 2})
+        s:replace({2, 0})
+
+        box.begin()
+        t.assert_equals(s:select(), {{0, 2}, {2, 0}})
+
+        local f = fiber.new(function()
+            s:replace({2, 1})
+            s:delete({2, 0})
+            t.assert_equals(s:select(), {{0, 2}, {2, 1}})
+            t.assert_equals(s:select({1}, {iterator = 'lt'}), {{0, 2}})
+        end)
+        f:set_joinable(true)
+        t.assert_equals({f:join(5)}, {true})
+
+        t.assert_equals(s:select({}, {iterator = 'gt'}), {{0, 2}, {2, 0}})
+        t.assert_equals(s:select({2, 1}, {iterator = 'lt'}), {{2, 0}, {0, 2}})
+        box.commit()
+    end)
+end
