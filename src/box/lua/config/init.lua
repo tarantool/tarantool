@@ -297,14 +297,15 @@ function methods._store(self, iconfig, cconfig, source_info)
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
--- Invoke lua, compat, mkdir, console and box_cfg appliers at the
--- first phase. Invoke all the other ones at the second phase.
+-- Invoke the appliers depending on the phase. The first phase
+-- might be long due to the long recovery process.
 function methods._apply_on_startup(self, opts)
     local first_phase_appliers = {
         lua = true,
         compat = true,
         mkdir = true,
         console = true,
+        runtime_priv = true,
         box_cfg = true,
     }
 
@@ -381,10 +382,10 @@ function methods._startup(self, instance_name, config_file)
 
     -- Startup phase 1/2.
     --
-    -- Start compat, mkdir, console and box_cfg appliers. The
-    -- latter may force the read-only mode on this phase.
+    -- Start first-phase appliers. The box_cfg applier may force
+    -- the read-only mode on this phase.
     --
-    -- This phase may take a long time.
+    -- This phase may take a long time due to recovery.
     self:_store(self:_collect({sync_source = 'all'}))
     local needs_retry = self:_apply_on_startup({phase = 1})
 
