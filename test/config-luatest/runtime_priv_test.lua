@@ -1,4 +1,5 @@
 local t = require('luatest')
+local net_box = require('net.box')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('test.config-luatest.cluster')
 
@@ -199,5 +200,48 @@ g.test_no_user_privileges_lua_call_ro_mode = function()
          t.assert_error_msg_equals(exp_err, function()
              conn:call('baz')
          end)
+    end)
+end
+
+g.test_direct_lua_call_before_initial_bootstrap = function()
+    local config = cbuilder:new()
+        :set_global_option('replication.bootstrap_strategy', 'supervised')
+        :set_global_option('replication.failover', 'off')
+        :set_global_option('credentials.users.guest', {
+            privileges = {
+                lua_call_priv({'box.info', 'box.ctl.make_bootstrap_leader'}),
+            },
+        })
+        :add_instance('i-001', {database = {mode = 'rw'}})
+        :add_instance('i-002', {database = {mode = 'ro'}})
+        :config()
+
+    -- Don't wait for the startup since the cluster stays in
+    -- the initial `box.cfg{}` and waits for the leader appoint.
+    local cluster = cluster.new(g, config)
+    cluster:start({wait_until_ready = false})
+    local server = cluster['i-001']
+
+    -- Guest is the only user it's possible to connect as.
+    local conn
+    t.helpers.retrying({timeout = 60}, function()
+        -- The schema can't be fetched before the bootstrap.
+        conn = net_box.connect(server.net_box_uri, {fetch_schema = false})
+        t.assert_equals(conn.state, 'active')
+    end)
+
+    -- The user `guest` can't use the `loadstring()` function
+    -- because he has no such permissions.
+    local exp_err = access_error_msg('guest', 'loadstring')
+    t.assert_error_msg_equals(exp_err, conn.call, conn, 'loadstring')
+
+    -- Verify the guest might execute the configured functions
+    -- and may bootstrap cluster by calling the
+    -- `box.ctl.make_bootstrap_leader()` function.
+    t.assert_equals(conn:call('box.info').status, 'loading')
+
+    conn:call('box.ctl.make_bootstrap_leader')
+    t.helpers.retrying({timeout = 10}, function()
+        t.assert_equals(conn:call('box.info').status, 'running')
     end)
 end
