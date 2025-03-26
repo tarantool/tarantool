@@ -104,6 +104,7 @@ string(JOIN ";" LUZER_TESTS
   uri_escape_test.lua
   uri_parse_test.lua
   uuid_frombin_test.lua
+  yaml_decode_test.lua
 )
 
 make_lua_path(FUZZ_LUA_PATH
