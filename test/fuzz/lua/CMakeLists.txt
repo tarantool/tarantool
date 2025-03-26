@@ -99,3 +99,35 @@ endif()
 
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)
+
+# test_engine.lua supports luzer, but test_mvcc.lua is not.
+string(JOIN ";" LUZER_TESTS
+  uri_parse_test.lua
+)
+
+make_lua_path(FUZZ_LUA_PATH
+  PATHS
+  ${LUZER_LUA_PATH}
+  ${CMAKE_CURRENT_SOURCE_DIR}/?.lua
+)
+list(APPEND TEST_ENV
+  "LUA_PATH=${FUZZ_LUA_PATH};"
+  "LUA_CPATH=${LUZER_LUA_CPATH};"
+)
+if (ENABLE_ASAN)
+  list(APPEND TEST_ENV
+    "LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/asan/lsan.supp;"
+  )
+endif()
+foreach(test_name ${LUZER_TESTS})
+  create_luzer_test(
+    FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/${test_name}
+    TEST_ENV "${TEST_ENV}"
+    LABELS "fuzzing;${TEST_SUITE_NAME}"
+  )
+endforeach()
+set_tests_properties(
+  # To be enabled in scope tarantool/security#151.
+  test/fuzz/lua/uri_parse_test.lua
+  PROPERTIES DISABLED TRUE
+)

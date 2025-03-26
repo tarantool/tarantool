@@ -12,3 +12,6 @@ leak:l_load
 leak:lbox_console_format_yaml
 leak:yaml_parser_initialize
 leak:yaml_emitter_initialize
+
+# to be removed in scope of gh-11904
+leak:lj_vm_cpcall
