@@ -102,6 +102,8 @@ include(BuildLuaTests)
 
 # test_engine.lua supports luzer, but test_mvcc.lua is not.
 string(JOIN ";" LUZER_TESTS
+  msgpack_decode_test.lua
+  msgpack_itv_test.lua
   uri_parse_test.lua
 )
 
