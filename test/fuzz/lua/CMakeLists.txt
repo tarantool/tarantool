@@ -106,6 +106,7 @@ string(JOIN ";" LUZER_TESTS
   msgpack_itv_test.lua
   pickle_unpack_test.lua
   uri_parse_test.lua
+  uuid_frombin_test.lua
 )
 
 make_lua_path(FUZZ_LUA_PATH
