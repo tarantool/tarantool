@@ -104,6 +104,7 @@ include(BuildLuaTests)
 string(JOIN ";" LUZER_TESTS
   msgpack_decode_test.lua
   msgpack_itv_test.lua
+  pickle_unpack_test.lua
   uri_parse_test.lua
 )
 
@@ -131,5 +132,7 @@ endforeach()
 set_tests_properties(
   # To be enabled in scope tarantool/security#151.
   test/fuzz/lua/uri_parse_test.lua
+  # To be enabled in scope tarantool/tarantool#12063.
+  test/fuzz/lua/pickle_unpack_test.lua
   PROPERTIES DISABLED TRUE
 )
