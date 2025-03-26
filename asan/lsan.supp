@@ -20,5 +20,9 @@ leak:yaml_emitter_initialize
 # See https://github.com/ligurio/luzer/issues/52.
 leak:lj_BC_FUNCC
 
+# to be removed in scope gh-12065
+leak:luamp_decode_extension_box
+leak:luamp_encode_with_ctx_r
+
 # to be removed in scope of gh-11904
 leak:lj_vm_cpcall
