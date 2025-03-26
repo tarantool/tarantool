@@ -96,6 +96,7 @@ string(JOIN ";" LUZER_TESTS
   console_eval_test.lua
   csv_load_test.lua
   decimal_new_test.lua
+  json_decode_test.lua
   misc_memprof_test.lua
   misc_sysprof_test.lua
   msgpack_decode_test.lua
@@ -130,6 +131,8 @@ foreach(test_name ${LUZER_TESTS})
   )
 endforeach()
 set_tests_properties(
+  # To be enabled in scope tarantool/tarantool#11898.
+  json_decode_test
   # To be enabled in scope tarantool/security#151.
   uri_parse_test
   # To be enabled in scope tarantool/tarantool#12063.
