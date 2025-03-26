@@ -117,6 +117,11 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiversion concurrency control. */
 	TXN_SUPPORTS_MVCC = 0x800,
+	/**
+	 * Transaction has been aborted since the instance has become
+	 * read-only so no writes should be committed.
+	 */
+	TXN_IS_ABORTED_RO_NODE = 0x1000,
 };
 
 enum {
@@ -580,6 +585,8 @@ txn_clear_flags(struct txn *txn, unsigned int flags)
 static inline enum box_error_code
 txn_flags_to_error_code(struct txn *txn)
 {
+	if (txn_has_flag(txn, TXN_IS_ABORTED_RO_NODE))
+		return ER_READONLY;
 	if (txn_has_flag(txn, TXN_IS_CONFLICTED))
 		return ER_TRANSACTION_CONFLICT;
 	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD))
