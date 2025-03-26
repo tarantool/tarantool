@@ -26,3 +26,6 @@ leak:yaml_emitter_initialize
 # - utf8_len_test
 # - utf8_offset_test
 leak:lj_BC_FUNCC
+
+# to be removed in scope of gh-11904
+leak:lj_vm_cpcall
