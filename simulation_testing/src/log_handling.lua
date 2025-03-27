@@ -54,6 +54,11 @@ end
 
 local function periodic_insert(cg, space_name, i_0, step, interval)
     fiber.create(function(cg, space_name, i_0, step, interval)
+        local txn_opts = {}
+        if WITHOUT_LINEARIZABLE ~= "true" then
+            txn_opts = { txn_isolation = 'linearizable' }
+        end
+        
         local key = i_0
         while true do
             local ok, err = pcall(function()
@@ -69,15 +74,15 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                     local operation_args = {key, value}
 
                     local insert_status, insert_result = pcall(function()
-                        leader_node:exec(function(operation_args, space_name)
-                            box.begin({txn_isolation = 'linearizable'})
+                        leader_node:exec(function(operation_args, space_name, txn_opts)
+                            box.begin(txn_opts)
                             box.space[space_name]:insert(operation_args)
                             box.commit()
-                        end, {operation_args, space_name})
+                        end, {operation_args, space_name, txn_opts})
                     end)
 
                     if insert_status then
-                        if SUCCESSFUL_LOGS then
+                        if SUCCESSFUL_LOGS == "true" then
                             LogInfo("[PERIODIC INSERT] Successfully inserted key: " .. key ..
                                     ", value: " .. value ..
                                     ", into space: '" .. space_name .. "'")
@@ -92,7 +97,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end)
 
                         if exists_status and exists_result then
-                            if SUCCESSFUL_LOGS then
+                            if SUCCESSFUL_LOGS == "true" then
                                 LogInfo("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
                             end
                             key = key + step
@@ -273,7 +278,7 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                     if all_entries_recieved then
                         local common_length = find_max_common_length(entries_by_node, step)
                         local divergence = n - common_length    
-                        if SUCCESSFUL_LOGS then
+                        if SUCCESSFUL_LOGS  == "true" then
                             LogInfo(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
                         else
                             if divergence ~= 0 then

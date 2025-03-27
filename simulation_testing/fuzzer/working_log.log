@@ -1,0 +1,2035 @@
+2025-03-27 17:52:08.754 [64710] main/104/simulation_run.lua main.cc:496 I> Tarantool 3.4.0-entrypoint-143-gefc3383640 Linux-x86_64-Debug
+2025-03-27 17:52:08.754 [64710] main/104/simulation_run.lua main.cc:499 I> log level 5 (INFO)
+2025-03-27 17:52:08.754 [64710] main/104/simulation_run.lua gc.c:131 I> wal/engine cleanup is paused
+2025-03-27 17:52:08.758 [64710] main/104/simulation_run.lua tuple.c:410 I> mapping 268435456 bytes for memtx tuple arena...
+2025-03-27 17:52:08.759 [64710] main/104/simulation_run.lua memtx_engine.cc:1749 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2025-03-27 17:52:08.759 [64710] main/104/simulation_run.lua tuple.c:410 I> mapping 134217728 bytes for vinyl tuple arena...
+2025-03-27 17:52:08.785 [64710] main/104/simulation_run.lua box.cc:2274 I> update replication_synchro_quorum = 1
+2025-03-27 17:52:08.785 [64710] main/104/simulation_run.lua box.cc:3328 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2025-03-27 17:52:08.785 [64710] main/104/simulation_run.lua box.cc:5439 I> instance uuid c964265e-f913-4ca1-bb28-e4491e522058
+2025-03-27 17:52:08.785 [64710] main/104/simulation_run.lua memtx_engine.cc:718 I> initializing an empty data directory
+2025-03-27 17:52:08.856 [64710] main/104/simulation_run.lua replication.cc:563 I> assigned id 1 to replica c964265e-f913-4ca1-bb28-e4491e522058
+2025-03-27 17:52:08.856 [64710] main/104/simulation_run.lua box.cc:2274 I> update replication_synchro_quorum = 1
+2025-03-27 17:52:08.856 [64710] main/104/simulation_run.lua alter.cc:4163 I> replicaset uuid 2731d8f1-c6c9-439e-8490-1a5c6a267109
+2025-03-27 17:52:08.861 [64710] snapshot/101/main memtx_engine.cc:1063 I> saving snapshot `./memtx_dir/00000000000000000000.snap.inprogress'
+2025-03-27 17:52:08.866 [64710] snapshot/101/main memtx_engine.cc:1165 I> done
+2025-03-27 17:52:08.867 [64710] main/104/simulation_run.lua box.cc:5936 I> ready to accept requests
+2025-03-27 17:52:08.867 [64710] main/105/gc gc.c:319 I> wal/engine cleanup is resumed
+2025-03-27 17:52:08.868 [64710] main/104/simulation_run.lua/box.load_cfg load_cfg.lua:942 I> set 'log' configuration option to "./working_log.log"
+2025-03-27 17:52:08.868 [64710] main/106/checkpoint_daemon gc.c:643 I> scheduled next checkpoint for Thu Mar 27 19:26:57 2025
+2025-03-27 17:52:08.876 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log replica_set.lua:75 I> Replica set "rs-vIv6FrSDrZJd" initialized
+2025-03-27 17:52:08.944 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 64724) started
+2025-03-27 17:52:08.969 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_2" (pid: 64728) started
+2025-03-27 17:52:09.007 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_3" (pid: 64733) started
+2025-03-27 17:52:09.007 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 64724) within 60 sec
+2025-03-27 17:52:27.650 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_2" (pid: 64728) within 60 sec
+2025-03-27 17:52:27.657 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 64733) within 60 sec
+2025-03-27 17:52:27.662 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log replica_set.lua:177 I> All servers started in replica set "rs-vIv6FrSDrZJd"
+2025-03-27 17:52:27.662 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 64724) within 60 sec
+2025-03-27 17:52:27.662 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_2" (pid: 64728) within 60 sec
+2025-03-27 17:52:27.663 [64710] main/104/simulation_run.lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 64733) within 60 sec
+2025-03-27 17:52:47.669 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Node replica_1 is follower 
+
+2025-03-27 17:52:47.670 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Node replica_2 is follower 
+
+2025-03-27 17:52:47.671 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Node replica_3 is leader 
+
+2025-03-27 17:52:47.677 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_1_to_2 is active 
+
+2025-03-27 17:52:47.677 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_1_to_3 is active 
+
+2025-03-27 17:52:47.678 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_2_to_1 is active 
+
+2025-03-27 17:52:47.678 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_2_to_3 is active 
+
+2025-03-27 17:52:47.678 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_3_to_1 is active 
+
+2025-03-27 17:52:47.678 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> Proxy proxy_3_to_2 is active 
+
+2025-03-27 17:52:47.686 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> The 'test' space is created and configured on the leader 
+
+2025-03-27 17:52:47.686 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] Started 
+
+2025-03-27 17:52:47.686 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Started 
+
+2025-03-27 17:52:47.687 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Started 
+
+2025-03-27 17:52:47.687 [64710] main/104/simulation_run.lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] Started 
+
+2025-03-27 17:52:47.690 [64710] main main.cc:1074 I> entering the event loop
+2025-03-27 17:52:47.698 [64710] main/405/lua/...src.logger logger.lua:16 I> No intervals found. 
+
+2025-03-27 17:52:47.698 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 100 
+
+2025-03-27 17:52:47.698 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:47.698 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:49.702 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 99 
+
+2025-03-27 17:52:49.702 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:49.702 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:51.706 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 98 
+
+2025-03-27 17:52:51.706 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:51.706 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:53.711 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 97 
+
+2025-03-27 17:52:53.712 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:53.712 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:55.713 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 96 
+
+2025-03-27 17:52:55.716 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:55.716 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:57.687 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_1_to_2 is paused for a time 5 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: active 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:52:57.687 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: crashed 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:52:57.688 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:52:57.717 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 95 
+
+2025-03-27 17:52:57.719 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:57.719 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:52:59.721 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 94 
+
+2025-03-27 17:52:59.722 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:52:59.722 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:01.725 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 93 
+
+2025-03-27 17:53:01.726 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:01.726 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_1_to_2 is resumed 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:02.685 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:02.686 [64710] main/408/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:03.728 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 92 
+
+2025-03-27 17:53:03.731 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:03.731 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:05.731 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 91 
+
+2025-03-27 17:53:05.734 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:05.734 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:07.685 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy 
+
+2025-03-27 17:53:07.733 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 90 
+
+2025-03-27 17:53:07.737 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:07.737 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:09.742 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 89 
+
+2025-03-27 17:53:09.746 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:09.746 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:11.741 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 88 
+
+2025-03-27 17:53:11.749 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:11.749 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:13.742 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 87 
+
+2025-03-27 17:53:13.751 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:13.751 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:15.749 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 86 
+
+2025-03-27 17:53:15.754 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:15.754 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:17.686 [64710] main/410/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 1 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:17.687 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:17.749 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 85 
+
+2025-03-27 17:53:17.758 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:17.758 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:18.688 [64710] main/410/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:19.752 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 84 
+
+2025-03-27 17:53:19.760 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:19.760 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:21.755 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 83 
+
+2025-03-27 17:53:21.762 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:21.762 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:23.760 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 82 
+
+2025-03-27 17:53:23.766 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:23.766 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:25.760 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 82 
+
+2025-03-27 17:53:25.768 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:25.768 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:27.686 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_1" (pid: 64724) closed
+2025-03-27 17:53:27.688 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_1" (pid: 64724) within 60 sec
+2025-03-27 17:53:27.761 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] No entries found for node 'replica_1'. 
+
+2025-03-27 17:53:27.767 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Skipping divergence calculation as some nodes have missing entries. 
+
+2025-03-27 17:53:27.773 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:27.785 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:27.791 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:525 I> Artifacts of server "replica_1" saved from /tmp/t/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF
+2025-03-27 17:53:27.792 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_1" (pid: 64724) killed
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is stopped for a time 3 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:27.792 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:28.623 [64710] main/317/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 64724
+2025-03-27 17:53:28.887 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:29.770 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 79 
+
+2025-03-27 17:53:29.774 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:29.991 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:30.811 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 64956) within 60 sec
+2025-03-27 17:53:31.094 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 64956) started
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is started again 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:31.295 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:31.296 [64710] main/411/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:31.775 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 78 
+
+2025-03-27 17:53:31.777 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:32.198 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:33.305 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:33.781 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 77 
+
+2025-03-27 17:53:33.782 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:34.407 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:35.511 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:35.785 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 76 
+
+2025-03-27 17:53:35.785 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:53:35.785 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:53:36.614 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 2 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:37.688 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:37.717 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:37.786 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 75 
+
+2025-03-27 17:53:37.787 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:53:37.787 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:53:38.822 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:53:39.689 [64710] main/447/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:53:39.794 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 74 
+
+2025-03-27 17:53:39.794 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:53:39.794 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:53:39.924 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:53:41.797 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:41.797 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:41.798 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 73 
+
+2025-03-27 17:53:43.803 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 72 
+
+2025-03-27 17:53:43.803 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:43.803 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:45.808 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 71 
+
+2025-03-27 17:53:45.808 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:45.808 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:47.686 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy 
+
+2025-03-27 17:53:47.811 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:47.811 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:47.812 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 70 
+
+2025-03-27 17:53:49.815 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:49.815 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:49.815 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 69 
+
+2025-03-27 17:53:51.819 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:51.819 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:51.820 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 68 
+
+2025-03-27 17:53:53.826 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 67 
+
+2025-03-27 17:53:53.826 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:53.826 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:55.828 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:55.828 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:55.830 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 66 
+
+2025-03-27 17:53:57.686 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy 
+
+2025-03-27 17:53:57.833 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:57.833 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:57.837 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 65 
+
+2025-03-27 17:53:59.836 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:53:59.836 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:53:59.840 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 64 
+
+2025-03-27 17:54:01.842 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:01.842 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:01.847 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 63 
+
+2025-03-27 17:54:03.842 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:03.842 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:03.851 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 62 
+
+2025-03-27 17:54:05.847 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:05.847 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:05.855 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 61 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 5 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: crashed 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:07.687 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:07.688 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:07.688 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:54:07.688 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:07.688 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:07.852 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:07.852 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:07.857 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 60 
+
+2025-03-27 17:54:09.857 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:09.857 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:09.861 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 59 
+
+2025-03-27 17:54:11.862 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:11.862 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:11.866 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 58 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: active 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:12.691 [64710] main/452/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:13.865 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:13.865 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:13.869 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 57 
+
+2025-03-27 17:54:15.867 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:15.867 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:15.882 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 56 
+
+2025-03-27 17:54:17.687 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is paused for a time 1 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: crashed 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:17.687 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:17.870 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:17.870 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:17.884 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 55 
+
+2025-03-27 17:54:18.687 [64710] main/454/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is resumed 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: active 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:18.688 [64710] main/454/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:19.874 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:19.874 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:19.887 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 54 
+
+2025-03-27 17:54:21.877 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:21.877 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:21.890 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 53 
+
+2025-03-27 17:54:23.881 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:23.881 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:23.893 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 52 
+
+2025-03-27 17:54:25.884 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:54:25.884 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:25.896 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 51 
+
+2025-03-27 17:54:27.688 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_2" (pid: 64728) closed
+2025-03-27 17:54:27.689 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_2" (pid: 64728) within 60 sec
+2025-03-27 17:54:27.727 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:525 I> Artifacts of server "replica_2" saved from /tmp/t/rs-vIv6FrSDrZJd/replica_2-PmAuhakWApcC to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_2-PmAuhakWApcC
+2025-03-27 17:54:27.789 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_2" (pid: 64728) killed
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_2 is stopped for a time 1 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: crashed 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:27.789 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:27.885 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:27.898 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 50 
+
+2025-03-27 17:54:27.985 [64710] main/432/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 64728
+2025-03-27 17:54:28.800 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_2" (pid: 65146) within 60 sec
+2025-03-27 17:54:28.828 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_2" (pid: 65146) started
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_2 is started again 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:29.280 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:29.281 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:29.281 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:29.281 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:29.281 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:29.281 [64710] main/455/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:29.889 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:29.904 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 49 
+
+2025-03-27 17:54:29.933 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:31.035 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:31.894 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:31.907 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 48 
+
+2025-03-27 17:54:32.138 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:33.243 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:33.898 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:54:33.913 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 47 
+
+2025-03-27 17:54:34.345 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:35.449 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:35.903 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:35.903 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:35.919 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 46 
+
+2025-03-27 17:54:36.553 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:37.656 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:37.688 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_1" (pid: 64956) closed
+2025-03-27 17:54:37.689 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_1" (pid: 64956) within 60 sec
+2025-03-27 17:54:37.788 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:516 I> Artifacts of server "replica_1" already saved to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF
+2025-03-27 17:54:37.788 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_1" (pid: 64956) killed
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is stopped for a time 2 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:37.788 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:37.904 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:37.904 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:37.921 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 45 
+
+2025-03-27 17:54:38.703 [64710] main/476/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 64956
+2025-03-27 17:54:38.759 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:39.813 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 65191) within 60 sec
+2025-03-27 17:54:39.863 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:39.911 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:39.911 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:39.927 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 44 
+
+2025-03-27 17:54:40.425 [64710] main/506/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 65191) started
+2025-03-27 17:54:40.425 [64710] main/506/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is started again 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:40.426 [64710] main/506/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:40.965 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:41.916 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:41.916 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:41.931 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 43 
+
+2025-03-27 17:54:42.070 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:43.172 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:43.918 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:43.918 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:43.933 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 42 
+
+2025-03-27 17:54:44.277 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:45.380 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:45.922 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:45.922 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:45.936 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 41 
+
+2025-03-27 17:54:46.483 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:47.586 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:47.688 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_3" (pid: 64733) closed
+2025-03-27 17:54:47.691 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_3" (pid: 64733) within 60 sec
+2025-03-27 17:54:47.793 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:525 I> Artifacts of server "replica_3" saved from /tmp/t/rs-vIv6FrSDrZJd/replica_3-eQ6oHbqx5P-P to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_3-eQ6oHbqx5P-P
+2025-03-27 17:54:47.793 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_3" (pid: 64733) killed
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_3 is stopped for a time 4 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: crashed 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:47.793 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:47.923 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:47.924 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:47.938 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 40 
+
+2025-03-27 17:54:48.690 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:49.705 [64710] main/545/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 64733
+2025-03-27 17:54:49.794 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:49.925 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:49.925 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:49.939 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 39 
+
+2025-03-27 17:54:50.896 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:51.832 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 65302) within 60 sec
+2025-03-27 17:54:51.926 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:51.926 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:51.942 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 38 
+
+2025-03-27 17:54:51.997 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_3" (pid: 65302) started
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_3 is started again 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:52.333 [64710] main/543/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: active 
+
+2025-03-27 17:54:53.102 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:53.930 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:53.930 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:53.951 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 37 
+
+2025-03-27 17:54:54.206 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:55.309 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:55.935 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:55.935 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:55.954 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 36 
+
+2025-03-27 17:54:56.417 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:57.519 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:57.689 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_3_to_1 is paused for a time 3 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:54:57.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: crashed 
+
+2025-03-27 17:54:57.939 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:57.939 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:57.957 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 35 
+
+2025-03-27 17:54:58.625 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:59.727 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:54:59.944 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:54:59.944 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:54:59.966 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 34 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_3_to_1 is resumed 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:00.689 [64710] main/596/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:00.831 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:01.934 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:01.948 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:01.948 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:01.968 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 33 
+
+2025-03-27 17:55:03.037 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:03.950 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:03.951 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:03.971 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 32 
+
+2025-03-27 17:55:04.138 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:05.242 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:05.955 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:05.955 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:05.981 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 31 
+
+2025-03-27 17:55:06.344 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:07.448 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:07.692 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_1" (pid: 65191) closed
+2025-03-27 17:55:07.694 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_1" (pid: 65191) within 60 sec
+2025-03-27 17:55:07.789 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:516 I> Artifacts of server "replica_1" already saved to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF
+2025-03-27 17:55:07.789 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_1" (pid: 65191) killed
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is stopped for a time 1 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:07.789 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:07.958 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:07.958 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:07.982 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 30 
+
+2025-03-27 17:55:08.553 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:08.832 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 65414) within 60 sec
+2025-03-27 17:55:08.965 [64710] main/580/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 65191
+2025-03-27 17:55:09.344 [64710] main/609/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 65414) started
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is started again 
+
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:09.344 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:09.345 [64710] main/609/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:09.655 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:09.962 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:09.962 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:09.992 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 29 
+
+2025-03-27 17:55:10.757 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:11.863 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:11.965 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:11.965 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:11.993 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 28 
+
+2025-03-27 17:55:12.966 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:13.972 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:13.972 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:13.997 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 27 
+
+2025-03-27 17:55:14.067 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:15.170 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:15.979 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:15.980 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:16.002 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 26 
+
+2025-03-27 17:55:16.275 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:17.378 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 1 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: crashed 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:17.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:17.987 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:17.987 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:18.007 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 25 
+
+2025-03-27 17:55:18.485 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:18.691 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:18.692 [64710] main/650/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:19.588 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:19.990 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:19.990 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:20.013 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 24 
+
+2025-03-27 17:55:20.689 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:21.997 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:21.998 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:22.023 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 23 
+
+2025-03-27 17:55:24.001 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:24.001 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:24.026 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 22 
+
+2025-03-27 17:55:26.004 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:26.004 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:26.031 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 21 
+
+2025-03-27 17:55:27.689 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_1" (pid: 65414) closed
+2025-03-27 17:55:27.691 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_1" (pid: 65414) within 60 sec
+2025-03-27 17:55:27.789 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:516 I> Artifacts of server "replica_1" already saved to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF
+2025-03-27 17:55:27.790 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_1" (pid: 65414) killed
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is stopped for a time 2 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:27.790 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:28.006 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:28.033 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 20 
+
+2025-03-27 17:55:29.529 [64710] main/638/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 65414
+2025-03-27 17:55:29.810 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 65525) within 60 sec
+2025-03-27 17:55:30.008 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:30.035 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 19 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 65525) started
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is started again 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:30.399 [64710] main/655/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:32.010 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:32.039 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 18 
+
+2025-03-27 17:55:34.013 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:34.045 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 17 
+
+2025-03-27 17:55:36.016 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:36.017 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:36.052 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 16 
+
+2025-03-27 17:55:37.690 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy 
+
+2025-03-27 17:55:38.019 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:38.019 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:38.053 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 15 
+
+2025-03-27 17:55:40.023 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:40.023 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:40.058 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 14 
+
+2025-03-27 17:55:42.026 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:42.026 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:42.063 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 13 
+
+2025-03-27 17:55:44.029 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:44.029 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:44.069 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 12 
+
+2025-03-27 17:55:46.035 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:55:46.035 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:46.071 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 11 
+
+2025-03-27 17:55:47.692 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_1" (pid: 65525) closed
+2025-03-27 17:55:47.694 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_1" (pid: 65525) within 60 sec
+2025-03-27 17:55:47.783 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:516 I> Artifacts of server "replica_1" already saved to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_1--gzMtUQtVZtF
+2025-03-27 17:55:47.791 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_1" (pid: 65525) killed
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is stopped for a time 5 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:47.791 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:48.037 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:48.072 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 10 
+
+2025-03-27 17:55:48.887 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:49.008 [64710] main/638/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 65525
+2025-03-27 17:55:49.991 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:50.043 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:50.083 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 9 
+
+2025-03-27 17:55:51.094 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:52.045 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:52.084 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 8 
+
+2025-03-27 17:55:52.195 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:52.812 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_1" (pid: 65615) within 60 sec
+2025-03-27 17:55:53.298 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:53.440 [64710] main/696/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_1" (pid: 65615) started
+2025-03-27 17:55:53.440 [64710] main/696/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_1 is started again 
+
+2025-03-27 17:55:53.440 [64710] main/696/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:53.441 [64710] main/696/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:54.049 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:55:54.095 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 7 
+
+2025-03-27 17:55:54.404 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:55.507 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:56.051 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:56.051 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:56.095 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 6 
+
+2025-03-27 17:55:56.612 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 is set for the time 2 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: crashed 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:57.692 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:57.716 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:58.053 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:55:58.053 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:55:58.098 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 5 
+
+2025-03-27 17:55:58.819 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_3 has been removed 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:55:59.694 [64710] main/725/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:55:59.923 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:00.059 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:56:00.059 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:56:00.106 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 4 
+
+2025-03-27 17:56:02.066 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:02.066 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:02.113 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 3 
+
+2025-03-27 17:56:04.070 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:04.070 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:04.117 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 2 
+
+2025-03-27 17:56:06.074 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:06.074 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:06.122 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 1 
+
+2025-03-27 17:56:07.691 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is paused for a time 2 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:07.691 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: crashed 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:07.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:08.076 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:08.076 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is resumed 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:09.692 [64710] main/730/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:10.078 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:10.078 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:12.080 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:12.080 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:12.138 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 1 
+
+2025-03-27 17:56:14.085 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:14.085 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:16.091 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:16.091 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 is set for the time 1 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: crashed 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:17.692 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:17.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:18.094 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:18.094 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] The WAL write delay for node replica_1 has been removed 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:18.693 [64710] main/732/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:20.099 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:20.099 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:22.104 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:22.104 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:22.174 [64710] main/405/lua/...src.logger logger.lua:16 I> [DIVERGENCE MONITOR] Divergence of entries: 1 
+
+2025-03-27 17:56:24.110 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:24.111 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:26.115 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:26.115 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:27.692 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Removing 2 nodes will make the cluster unhealthy 
+
+2025-03-27 17:56:28.120 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:28.120 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:30.125 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:30.125 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:32.127 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:32.127 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:34.129 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:34.129 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:36.135 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_3-eQ6oHbqx5P-P 
+
+2025-03-27 17:56:36.135 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:37.693 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:562 I> Connection to server "replica_3" (pid: 65302) closed
+2025-03-27 17:56:37.694 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "process is terminated" condition for server "replica_3" (pid: 65302) within 60 sec
+2025-03-27 17:56:37.719 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:516 I> Artifacts of server "replica_3" already saved to /tmp/t/artifacts/rs-vIv6FrSDrZJd/replica_3-eQ6oHbqx5P-P
+2025-03-27 17:56:37.793 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:585 I> Process of server "replica_3" (pid: 65302) killed
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_3 is stopped for a time 2 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: crashed 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:37.793 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:38.139 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:38.823 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:39.763 [64710] main/624/ProxyConnectionIO/test-run.lib.luatest.luatest.log process.lua:80 I> Killing GC'ed process 65302
+2025-03-27 17:56:39.820 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:533 I> Wait for "server is ready" condition for server "replica_3" (pid: 65688) within 60 sec
+2025-03-27 17:56:39.925 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:40.141 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:40.469 [64710] main/733/lua/test-run.lib.luatest.luatest.log server.lua:464 I> Server "replica_3" (pid: 65688) started
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Node replica_3 is started again 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: active 
+
+2025-03-27 17:56:40.470 [64710] main/733/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:41.031 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:42.134 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:42.143 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:43.238 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:44.146 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:44.343 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:45.450 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:46.148 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:56:46.148 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:56:46.553 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:47.657 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:47.693 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:56:47.693 [64710] main/809/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_3_to_2 is paused for a time 2 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: crashed 
+
+2025-03-27 17:56:47.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:48.152 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:56:48.152 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:56:48.763 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_3_to_2 is resumed 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: restored 
+
+2025-03-27 17:56:49.694 [64710] main/809/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:49.867 [64710] main/404/lua/...src.logger logger.lua:16 I> [PERIODIC INSERT] No leader found. Retrying in 1 seconds... 
+
+2025-03-27 17:56:50.159 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 1 Problems: 
+
+2025-03-27 17:56:50.160 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR] [CLUSTER] No leader detected for more than 10 seconds 
+
+2025-03-27 17:56:52.161 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:56:52.161 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:54.164 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:56:54.164 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:56.169 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:56:56.169 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:57.694 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy crashes are disabled 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is paused for a time 2 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: crashed 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: restored 
+
+2025-03-27 17:56:57.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:56:58.172 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:56:58.172 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Proxy for node proxy_2_to_3 is resumed 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I> [NODES ACTIVITY STATES] Current states of nodes and proxies: 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I> Nodes: 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_1, State: restored 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_2, State: restored 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Node: replica_3, State: restored 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I> Proxies: 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_3, State: active 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_1_to_2, State: restored 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_1, State: active 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_2_to_3, State: restored 
+
+2025-03-27 17:56:59.694 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_2, State: restored 
+
+2025-03-27 17:56:59.695 [64710] main/826/lua/...src.logger logger.lua:16 I>   - Proxy: proxy_3_to_1, State: restored 
+
+2025-03-27 17:57:00.175 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:57:00.175 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:57:02.178 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:57:02.178 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:57:04.182 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Leader: replica_1--gzMtUQtVZtF 
+
+2025-03-27 17:57:04.182 [64710] main/407/lua/...src.logger logger.lua:16 I> [REPLICATION MONITOR][CLUSTER] Detected 0 Problems: 
+
+2025-03-27 17:57:04.646 [64710] main/406/lua/...src.logger logger.lua:16 I> [CRASH SIMULATION] Error in crash_simulation: fiber is cancelled 
+
+2025-03-27 17:57:07.644 [64710] main/103/on_shutdown fiber.c:2387 E> TimedOut: timed out
+2025-03-27 17:57:07.644 [64710] main/103/on_shutdown say.c:86 F> cannot gracefully shutdown client fibers

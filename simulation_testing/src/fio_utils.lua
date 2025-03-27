@@ -102,7 +102,7 @@ local function create_memtx()
         memtx_dir = memtx_path,
     }
 
-    if not WITHOUT_TXN_ISOLATION then
+    if WITHOUT_BEST_EFFORT ~= "true" then
         box_cfg.txn_isolation = 'best-effort'
     end
 

@@ -15,8 +15,14 @@ local tools = require("tools")
 
 math.randomseed(os.time())
 
-SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
-WITHOUT_TXN_ISOLATION = os.getenv("WITHOUT_TXN_ISOLATION")
+SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS") or "false"
+WITHOUT_BEST_EFFORT = os.getenv("WITHOUT_BEST_EFFORT") or "false"
+WITHOUT_LINEARIZABLE = os.getenv("WITHOUT_LINEARIZABLE") or "false"
+WITHOUT_PROXY = os.getenv("WITHOUT_PROXY") or "false"
+print("ENV_SUCCESSFUL_LOGS: " .. SUCCESSFUL_LOGS)
+print("WITHOUT_BEST_EFFORT: " .. WITHOUT_BEST_EFFORT)
+print("WITHOUT_LINEARIZABLE: " .. WITHOUT_LINEARIZABLE)
+print("WITHOUT_PROXY: " .. WITHOUT_PROXY)
 Logger = logger.Logger
 logger.init_logger()
 

@@ -117,22 +117,25 @@ local function LogInfo_nodes_activity_states()
     for alias, state in pairs(nodes_activity_states) do
         if alias:startswith("replica_") then
             table.insert(nodes, {alias = alias, state = state, id = extract_id(alias)})
-        elseif alias:startswith("proxy_") then
+        elseif alias:startswith("proxy_") and WITHOUT_PROXY ~= "true" then
             table.insert(proxies, {alias = alias, state = state, id = extract_id(alias)})
         end
     end
 
     table.sort(nodes, function(a, b) return a.id < b.id end)
-    table.sort(proxies, function(a, b) return a.id < b.id end)
-
+    
     LogInfo("Nodes:")
     for _, node in ipairs(nodes) do
         LogInfo(string.format("  - Node: %s, State: %s", node.alias, node.state))
     end
 
-    LogInfo("Proxies:")
-    for _, proxy in ipairs(proxies) do
-        LogInfo(string.format("  - Proxy: %s, State: %s", proxy.alias, proxy.state))
+    if WITHOUT_PROXY ~= "true" then
+        table.sort(proxies, function(a, b) return a.id < b.id end)
+        
+        LogInfo("Proxies:")
+        for _, proxy in ipairs(proxies) do
+            LogInfo(string.format("  - Proxy: %s, State: %s", proxy.alias, proxy.state))
+        end
     end
 end
 
@@ -297,8 +300,12 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
         end
 
     elseif type_of_crashing == 4 then
+
+        if WITHOUT_PROXY ~= "true" then
+            LogInfo("[CRASH SIMULATION] Proxy crashes are disabled")
+        end
         
-        if #crashed_proxy_nodes > 0 then
+        if WITHOUT_PROXY ~= "true" and #crashed_proxy_nodes > 0 then
             for i, proxy in ipairs(crashed_proxy_nodes) do
                 local success, err = pcall(pause_proxy, proxy, delay)
                 if not success then
@@ -315,7 +322,12 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
             local success, err = pcall(function()
                 fiber.sleep(crash_interval)
 
-                local type_of_crashing = math.random(1, 4)
+                local type_of_crashing
+                if WITHOUT_PROXY == "true" then 
+                    type_of_crashing = math.random(1, 3)
+                else
+                    type_of_crashing = math.random(1, 4)
+                end
                 local delay = tools.calculate_delay(lower_crash_time_bound, upper_crash_time_bound)
                 local crash_node_nodes
                 if type_of_crashing == 3 then
@@ -324,7 +336,10 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
                     crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
                 end
                 
-                local crashed_proxy_nodes = proxy_handling.get_random_proxies_for_crash(cg, nodes_activity_states, 1)  -- at first time, only 1 proxy
+                local crashed_proxy_nodes = {}
+                if WITHOUT_PROXY ~= "true" then
+                    crashed_proxy_nodes = proxy_handling.get_random_proxies_for_crash(cg, nodes_activity_states, 1) -- at first time, only 1 proxy
+                end
                 -- error in two nodes
                 crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_node_nodes, crashed_proxy_nodes)
             end)
