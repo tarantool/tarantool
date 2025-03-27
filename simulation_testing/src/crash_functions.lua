@@ -43,6 +43,8 @@ local function get_node_by_id(nodes, node_id)
     return nil
 end
 
+
+
 -- The function of getting all workable nodes
 local function get_non_crashed_nodes(nodes, nodes_activity_states)
     local non_crashed_nodes = {}
@@ -59,6 +61,14 @@ local function get_non_crashed_nodes(nodes, nodes_activity_states)
     end
 
     return non_crashed_nodes
+end
+
+local function node_is_alive_by_id(cg,nodes_activity_states, node_id)
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
+    if get_node_by_id(available_nodes, node_id) == nil then
+        return false
+    end
+    return true
 end
 
 local function count_crashed_nodes(nodes_activity_states)
@@ -82,15 +92,13 @@ local function is_cluster_healthy(N, num_crashed_nodes)
 end
 
 
--- Safe function for getting random crash nodes
-local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
-
+local function is_this_crash_safe(nodes, nodes_activity_states, num_to_select)
     -- Checking that the limit on the number of active nodes in the cluster is not violated
     local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states)
     local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
     if not is_cluster_healthy(#nodes, new_num_crashed_nodes) then
         LogInfo("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
-        return {}
+        return false
     end
     
     -- Filtering nodes whose state is not equal to "crashed"
@@ -98,9 +106,16 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
 
     if #available_nodes < num_to_select then
         LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
+        return false
+    end
+    return true
+end
+
+-- Safe function for getting random crash nodes
+local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
+    if (not is_this_crash_safe(nodes, nodes_activity_states, num_to_select)) then
         return {}
     end
-
     -- Randomly select nodes
     local selected_nodes = {}
     while #selected_nodes < num_to_select do
@@ -383,4 +398,6 @@ return {
     connection_exists = connection_exists,
     is_node_alive_by_alias = is_node_alive_by_alias,
     crash_simulation = crash_simulation,
+    node_is_alive_by_id = node_is_alive_by_id,
+    is_this_crash_safe = is_this_crash_safe
 }
