@@ -635,6 +635,22 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
+/**
+ * A helper to calculate tuple hint.
+ *
+ * NB: must be called only for dirty tuples.
+ */
+static hint_t
+memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *def)
+{
+	VERIFY(!index->def->key_def->for_func_index);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	/* R-tree does not support tuple hint. */
+	if (unlikely(index->def->type == RTREE))
+		return HINT_NONE;
+	return tuple_hint(tuple, def);
+}
+
 void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 {
@@ -1591,8 +1607,8 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 
 static bool
 memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
-		       enum iterator_type type, const char *key,
-		       uint32_t part_count)
+		       hint_t tuple_hint, enum iterator_type type,
+		       const char *key, uint32_t part_count)
 {
 	if (key == NULL) {
 		assert(part_count == 0);
@@ -1602,8 +1618,9 @@ memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
 		return true;
 	}
 
-	int cmp = tuple_compare_with_key(tuple, HINT_NONE, key,
-					 part_count, HINT_NONE, def);
+	hint_t k_hint = key_hint(key, part_count, def);
+	int cmp = tuple_compare_with_key(tuple, tuple_hint, key, part_count,
+					 k_hint, def);
 
 	bool equal_matches = type == ITER_EQ || type == ITER_REQ ||
 			     type == ITER_LE || type == ITER_GE;
@@ -1621,35 +1638,36 @@ memtx_tx_tuple_matches(struct key_def *def, struct tuple *tuple,
  */
 static bool
 memtx_tx_tuple_is_before(struct key_def *cmp_def, struct tuple *tuple,
-			 struct tuple *until, hint_t until_hint,
-			 enum iterator_type type)
+			 hint_t tuple_hint, struct tuple *until,
+			 hint_t until_hint, enum iterator_type type)
 {
 	int dir = iterator_direction(type);
-	hint_t th = tuple_hint(tuple, cmp_def);
 	int until_cmp = tuple_compare(until, until_hint,
-				      tuple, th, cmp_def);
+				      tuple, tuple_hint, cmp_def);
 	return dir * until_cmp > 0;
 }
 
 /**
  * Check if @a tuple matches the given @a key and iterator @a type by the
- * given @a key_def and is positioned prior to @a until in index according
+ * given @a cmp_def and is positioned prior to @a until in index according
  * to the iterator @a type direction and the given @a cmp_def.
  *
  * The @a until parameter is optional (can be NULL).
  */
 static bool
-memtx_tx_tuple_matches_until(struct key_def *key_def, struct tuple *tuple,
-			     enum iterator_type type, const char *key,
-			     uint32_t part_count, struct key_def *cmp_def,
+memtx_tx_tuple_matches_until(struct key_def *cmp_def, struct tuple *tuple,
+			     hint_t tuple_hint, enum iterator_type type,
+			     const char *key, uint32_t part_count,
 			     struct tuple *until, hint_t until_hint)
 {
 	/* Check the border (if any) using the cmp_def. */
-	if (until != NULL && !memtx_tx_tuple_is_before(cmp_def, tuple, until,
+	if (until != NULL && !memtx_tx_tuple_is_before(cmp_def, tuple,
+						       tuple_hint, until,
 						       until_hint, type))
 		return false;
 
-	return memtx_tx_tuple_matches(key_def, tuple, type, key, part_count);
+	return memtx_tx_tuple_matches(cmp_def, tuple, tuple_hint, type, key,
+				      part_count);
 }
 
 /**
@@ -1680,10 +1698,12 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 		struct count_gap_item *item =
 			(struct count_gap_item *)item_base;
 
+		hint_t tuple_hint = memtx_tx_tuple_hint(story->tuple, index,
+						  index->def->cmp_def);
 		bool tuple_matches = memtx_tx_tuple_matches_until(
-			index->def->key_def, story->tuple, item->type,
-			item->key, item->part_count, index->def->cmp_def,
-			item->until, item->until_hint);
+			index->def->cmp_def, story->tuple, tuple_hint,
+			item->type, item->key, item->part_count, item->until,
+			item->until_hint);
 
 		/*
 		 * Someone has counted tuples in the index by a key and iterator
@@ -1837,7 +1857,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
 			hint_t oh = key_hint(item->key, item->part_count, def);
-			hint_t kh = tuple_hint(tuple, def);
+			hint_t kh = memtx_tx_tuple_hint(tuple, index, def);
 			cmp = tuple_compare_with_key(tuple, kh, item->key,
 						     item->part_count, oh,
 						     def);
@@ -2833,7 +2853,6 @@ memtx_tx_index_invisible_count_matching_until_slow(
 	enum iterator_type type, const char *key, uint32_t part_count,
 	struct tuple *until, hint_t until_hint)
 {
-	struct key_def *key_def = index->def->key_def;
 	struct key_def *cmp_def = index->def->cmp_def;
 
 	/*
@@ -2841,17 +2860,21 @@ memtx_tx_index_invisible_count_matching_until_slow(
 	 * tuple in the index according to the iterator direction and key.
 	 */
 	assert(until == NULL ||
-	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
-				      ITER_GE : type == ITER_REQ ? ITER_LE :
+	       memtx_tx_tuple_matches(cmp_def, until, until_hint,
+				      type == ITER_EQ ? ITER_GE :
+				      type == ITER_REQ ? ITER_LE :
 				      type, key, part_count));
 
 	uint32_t res = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+		hint_t tuple_hint = memtx_tx_tuple_hint(story->tuple, index,
+							cmp_def);
 		/* All tuples in the story chain share the same key. */
-		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
-						  key, part_count, cmp_def,
-						  until, until_hint))
+		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple,
+						  tuple_hint, type, key,
+						  part_count, until,
+						  until_hint))
 			continue;
 
 		struct tuple *visible = NULL;
@@ -3433,7 +3456,6 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				const char *key, uint32_t part_count,
 				struct tuple *until, hint_t until_hint)
 {
-	struct key_def *key_def = index->def->key_def;
 	struct key_def *cmp_def = index->def->cmp_def;
 
 	/*
@@ -3441,8 +3463,9 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	 * tuple in the index according to the iterator direction and key.
 	 */
 	assert(until == NULL ||
-	       memtx_tx_tuple_matches(key_def, until, type == ITER_EQ ?
-				      ITER_GE : type == ITER_REQ ? ITER_LE :
+	       memtx_tx_tuple_matches(cmp_def, until, until_hint,
+				      type == ITER_EQ ? ITER_GE :
+				      type == ITER_REQ ? ITER_LE :
 				      type, key, part_count));
 
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
@@ -3467,9 +3490,12 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	uint32_t invisible_count = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
+		hint_t tuple_hint = memtx_tx_tuple_hint(story->tuple, index,
+							cmp_def);
 		/* All tuples in the story chain share the same key. */
-		if (!memtx_tx_tuple_matches_until(key_def, story->tuple, type,
-						  key, part_count, cmp_def,
+		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple,
+						  tuple_hint, type,
+						  key, part_count,
 						  until, until_hint))
 			continue;
 
