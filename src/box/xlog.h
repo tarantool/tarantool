@@ -97,6 +97,7 @@ enum xdir_type {
 	SNAP,		/* memtx snapshot */
 	XLOG,		/* write ahead log */
 	VYLOG,		/* vinyl metadata log */
+	SORTDATA,	/* the memtx sort data file */
 };
 
 /**
@@ -367,6 +368,8 @@ struct xlog_meta {
 	 * directory for missing WALs.
 	 */
 	struct vclock prev_vclock;
+	/* Size of the XLOG header. */
+	size_t size;
 };
 
 /**
@@ -602,7 +605,7 @@ xlog_close(struct xlog *l);
  * the out argument. Useful if the caller needs to reuse the xlog fd for reads.
  */
 int
-xlog_close_reuse_fd(struct xlog *l, int *fd);
+xlog_close_reuse_fd(struct xlog *l, int *fd, bool write_eof);
 
 /**
  * Materializes an xlog object.
