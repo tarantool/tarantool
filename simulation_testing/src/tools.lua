@@ -45,15 +45,19 @@ local function check_node(node)
 end
 
 local function get_initial_replication(nodes)
+
     local initial_replication = {}
     for _, node in ipairs(nodes) do
         local replication = node:exec(function()
             return box.cfg.replication
         end)
         initial_replication[node.alias] = replication
+
     end
+
     return initial_replication
 end
+
 
 local function get_random_node(nodes, timeout)
     if not nodes or #nodes == 0 then

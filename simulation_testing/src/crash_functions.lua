@@ -34,6 +34,17 @@ local function connection_exists(node1_id, node2_id)
     return nodes_connection_states['replica_'..tostring(node1_id)..'replica_'..tostring(node2_id)] == true
 end
 
+local function get_node_by_id(nodes, node_id)
+    for _, node in pairs(nodes) do
+        if node.alias == "replica_".. tostring(node_id) then
+            return node
+        end
+    end
+    return nil
+end
+
+
+
 -- The function of getting all workable nodes
 local function get_non_crashed_nodes(nodes, nodes_activity_states)
     local non_crashed_nodes = {}
@@ -50,6 +61,14 @@ local function get_non_crashed_nodes(nodes, nodes_activity_states)
     end
 
     return non_crashed_nodes
+end
+
+local function node_is_alive_by_id(cg,nodes_activity_states, node_id)
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
+    if get_node_by_id(available_nodes, node_id) == nil then
+        return false
+    end
+    return true
 end
 
 local function count_crashed_nodes(nodes_activity_states)
@@ -72,15 +91,14 @@ local function is_cluster_healthy(N, num_crashed_nodes)
     return (N - num_crashed_nodes) >= min_num_non_crashed_nodes
 end
 
--- Safe function for getting random crash nodes
-local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
 
+local function is_this_crash_safe(nodes, nodes_activity_states, num_to_select)
     -- Checking that the limit on the number of active nodes in the cluster is not violated
     local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states)
     local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
     if not is_cluster_healthy(#nodes, new_num_crashed_nodes) then
         LogInfo("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
-        return {}
+        return false
     end
     
     -- Filtering nodes whose state is not equal to "crashed"
@@ -88,9 +106,16 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
 
     if #available_nodes < num_to_select then
         LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
+        return false
+    end
+    return true
+end
+
+-- Safe function for getting random crash nodes
+local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
+    if (not is_this_crash_safe(nodes, nodes_activity_states, num_to_select)) then
         return {}
     end
-
     -- Randomly select nodes
     local selected_nodes = {}
     while #selected_nodes < num_to_select do
@@ -143,8 +168,6 @@ local function stop_node(node, delay)
     fiber.create(function()
 
         tools.check_node(node)
-
-
         node:stop()
         update_node_state(node, "crashed")
         LogInfo(string.format("[CRASH SIMULATION] Node %s is stopped for a time %s", node.alias, delay))
@@ -272,9 +295,20 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
 end
 
 local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_nodes ,crashed_proxy_nodes)
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
+    if (#crash_nodes > #available_nodes or #available_nodes <  math.floor(#cg.replicas /2) + 1) then
+        LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
+        return
+    end
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
     if type_of_crashing == 1 then
         if #crash_nodes > 0 then
-            local success, err = pcall(stop_node, crash_nodes[1], delay)
+            local node = get_node_by_id(available_nodes,crash_nodes[1])
+            if node == nil then
+                LogInfo("[CRASH SIMULATION] Node is not available")
+                return
+            end
+            local success, err = pcall(stop_node, get_node_by_id(available_nodes,crash_nodes[1]), delay)
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error: Failed to stop node: %s", err))
             end
@@ -282,7 +316,12 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
 
     elseif type_of_crashing == 2 then
         if #crash_nodes > 0 then
-            local success, err = pcall(create_delay_to_write_operations, crash_nodes[1], delay)
+            local node = get_node_by_id(available_nodes,crash_nodes[1])
+            if node == nil then
+                LogInfo("[CRASH SIMULATION] Node with id "..tostring(crash_nodes[1]).." is not available")
+                return
+            end
+            local success, err = pcall(create_delay_to_write_operations, get_node_by_id(available_nodes,crash_nodes[1]), delay)
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error: Failed to create delay for node: %s", err))
             end
@@ -290,8 +329,17 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
 
     elseif type_of_crashing == 3 then
         if #crash_nodes > 0 then
+            local node_1 = get_node_by_id(available_nodes,crash_nodes[1])
+            local node_2 = get_node_by_id(available_nodes,crash_nodes[2])
+
+            if node_1 == nil  or  node_2 == nil then
+                LogInfo("[CRASH SIMULATION] Node is not available")
+                return
+            end
+
             local success, err = pcall(function()
-                break_connection_between_two_nodes(crash_nodes, initial_replication, delay)
+                local crash_nodes_ = { node_1, node_2 }
+                break_connection_between_two_nodes(crash_nodes_, initial_replication, delay)
             end)
 
             if not success then
@@ -314,8 +362,8 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             end
         end
     end
-
 end
+
 local function random_crash_simulation(cg, nodes_activity_states, initial_replication, lower_crash_time_bound, upper_crash_time_bound, crash_interval)
     fiber.create(function()
         while true do
@@ -344,7 +392,7 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
                 crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_node_nodes, crashed_proxy_nodes)
             end)
             if not success then
-                LogInfo(string.format("[CRASH SIMULATION] Error in crash_simulation: %s", err))
+                LogError(string.format("[CRASH SIMULATION] Error in crash_simulation: %s", err))
             end
         end
     end)
@@ -365,4 +413,6 @@ return {
     connection_exists = connection_exists,
     is_node_alive_by_alias = is_node_alive_by_alias,
     crash_simulation = crash_simulation,
+    node_is_alive_by_id = node_is_alive_by_id,
+    is_this_crash_safe = is_this_crash_safe
 }

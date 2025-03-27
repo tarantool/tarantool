@@ -82,7 +82,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                     end)
 
                     if insert_status then
-                        if SUCCESSFUL_LOGS == "true" then
+                        if _G.SUCCESSFUL_LOGS == "true" then
                             LogInfo("[PERIODIC INSERT] Successfully inserted key: " .. key ..
                                     ", value: " .. value ..
                                     ", into space: '" .. space_name .. "'")
@@ -97,7 +97,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end)
 
                         if exists_status and exists_result then
-                            if SUCCESSFUL_LOGS == "true" then
+                            if _G.SUCCESSFUL_LOGS == "true" then
                                 LogInfo("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
                             end
                             key = key + step
@@ -277,8 +277,14 @@ local function divergence_monitor(cg, space_name, n, step, interval)
 
                     if all_entries_recieved then
                         local common_length = find_max_common_length(entries_by_node, step)
-                        local divergence = n - common_length    
-                        if SUCCESSFUL_LOGS  == "true" then
+                        local divergence
+                        if n < count then
+                            divergence = n - common_length
+                        else
+                            divergence = count - common_length
+                        end
+
+                        if _G.SUCCESSFUL_LOGS then
                             LogInfo(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
                         else
                             if divergence ~= 0 then

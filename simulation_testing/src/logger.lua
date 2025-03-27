@@ -3,7 +3,10 @@ local fio_utils = require('fio_utils')
 local random_cluster = require('random_cluster')
 Logger = require('log')
 
-function extra_logs(...)
+_G.EXTRA_LOGS = function (...)
+end
+
+_G.HAS_ERROR = function ()
 end
 
 -- Определяем функции сразу как глобальные
@@ -13,7 +16,7 @@ _G.LogInfo = function(...)
         t[i] = tostring(select(i, ...))
     end
     local msg = table.concat(t, "\t")
-    extra_logs(msg)
+    EXTRA_LOGS(msg)
     Logger.info(string.format("%s \n", msg))
 end
 
@@ -23,7 +26,8 @@ _G.LogError = function(...)
         t[i] = tostring(select(i, ...))
     end
     local msg = table.concat(t, "\t")
-    extra_logs(msg)
+    EXTRA_LOGS(msg)
+    HAS_ERROR()
     Logger.error(string.format("%s\n", msg))
 end
 
@@ -47,5 +51,4 @@ end
 return {
     Logger = Logger,
     init_logger = init_logger,
-    extra_logs = extra_logs
 }
