@@ -651,6 +651,20 @@ memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *de
 	return tuple_hint(tuple, def);
 }
 
+/**
+ * A helper to check if tuple key is excluded.
+ *
+ * NB: must be called only for dirty tuples.
+ */
+static bool
+memtx_tx_tuple_key_is_excluded(struct tuple *tuple, struct index *index,
+			       struct key_def *def)
+{
+	VERIFY(!index->def->key_def->for_func_index);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	return tuple_key_is_excluded(tuple, def, MULTIKEY_NONE);
+}
+
 void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 {
@@ -1316,9 +1330,8 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 				struct key_def *key_def = index->def->key_def;
 				assert(story->tuple == removed ||
 				       (removed == NULL &&
-					tuple_key_is_excluded(story->tuple,
-							      key_def,
-							      MULTIKEY_NONE)));
+					memtx_tx_tuple_key_is_excluded(
+						story->tuple, index, key_def)));
 				(void)key_def;
 				link->in_index = NULL;
 				/*
@@ -1946,18 +1959,13 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
-	bool tuple_excluded[space->index_count];
 	uint32_t directly_replaced_count = 0;
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
 		struct tuple **replaced = &directly_replaced[i];
 		struct tuple **successor = &direct_successor[i];
 		*replaced = *successor = NULL;
-		tuple_excluded[i] = tuple_key_is_excluded(new_tuple,
-							  index->def->key_def,
-							  MULTIKEY_NONE);
-		if (!tuple_excluded[i] &&
-		    index_replace(index, NULL, new_tuple,
+		if (index_replace(index, NULL, new_tuple,
 				  DUP_REPLACE_OR_INSERT,
 				  replaced, successor) != 0)
 		{
@@ -1992,7 +2000,10 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct tuple *next = directly_replaced[i];
 		struct tuple *succ = direct_successor[i];
-		if (next == NULL && !tuple_excluded[i]) {
+		struct index *index = space->index[i];
+		bool tuple_is_excluded = memtx_tx_tuple_key_is_excluded(
+			new_tuple, index, index->def->key_def);
+		if (next == NULL && !tuple_is_excluded) {
 			/* Collect conflicts. */
 			memtx_tx_handle_gap_write(space, add_story, succ, i);
 			memtx_tx_handle_point_hole_write(space, add_story, i);
@@ -2101,9 +2112,9 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	 */
 	struct space *space = stmt->space;
 	for (uint32_t i = 0; i < space->index_count; i++) {
-		if (!tuple_key_is_excluded(del_story->tuple,
-					   space->index[i]->def->key_def,
-					   MULTIKEY_NONE)) {
+		struct index *index = space->index[i];
+		if (!memtx_tx_tuple_key_is_excluded(del_story->tuple, index,
+						    index->def->key_def)) {
 			memtx_tx_handle_counted_write(space, del_story, i);
 		}
 	}
@@ -2838,8 +2849,8 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			continue;					       \
 		}							       \
 		assert(link->newer_story == NULL);			       \
-		if (tuple_key_is_excluded(story->tuple, index->def->key_def,   \
-					  MULTIKEY_NONE)) {		       \
+		if (memtx_tx_tuple_key_is_excluded(story->tuple, index,        \
+						   index->def->key_def)) {     \
 			assert(link->older_story == NULL);		       \
 			continue;					       \
 		}							       \
@@ -3032,9 +3043,8 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 			story->link[i].in_index = NULL;
 
 			/* Skip chains of excluded tuples. */
-			if (tuple_key_is_excluded(story->tuple,
-						  index->def->key_def,
-						  MULTIKEY_NONE))
+			if (memtx_tx_tuple_key_is_excluded(story->tuple, index,
+							   index->def->key_def))
 				continue;
 
 			struct tuple *new_tuple = NULL;
