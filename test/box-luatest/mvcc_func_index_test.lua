@@ -72,3 +72,150 @@ g.test_crash_on_shutdown = function(cg)
         mvcc_check_has_tuple_stories()
     end)
 end
+
+g.test_func_index_point_hole_write = function(cg)
+    cg.server:exec(function()
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local txn = txn_proxy.new()
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[2]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        box.begin()
+        t.assert_equals(s.index.func:get{10}, nil)
+        txn:begin()
+        txn('box.space.test:replace{1, 10}')
+        t.assert_equals(s.index.func:get{10}, nil)
+        txn:commit()
+        t.assert_equals(s.index.func:get{10}, nil)
+        box.commit()
+    end)
+end
+
+g.test_func_index_count = function(cg)
+    cg.server:exec(function()
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local txn = txn_proxy.new()
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[2]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        box.begin()
+        t.assert_equals(s.index.func:count(1, {iterator = 'GE'}), 0)
+        txn:begin()
+        txn('box.space.test:insert{1, 10}')
+        t.assert_equals(s.index.func:count(1, {iterator = 'GE'}), 0)
+        txn:commit()
+        t.assert_equals(s.index.func:count(1, {iterator = 'GE'}), 0)
+        box.commit()
+    end)
+end
+
+g.test_func_index_offset = function(cg)
+    cg.server:exec(function()
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local txn = txn_proxy.new()
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[2]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        s:replace{1, 10}
+        s:replace{3, 8}
+
+        box.begin()
+        t.assert_equals(s.index.func:select(nil, {offset = 1}), {{1, 10}})
+        txn:begin()
+        txn('box.space.test:insert{2, 9}')
+        t.assert_equals(s.index.func:select(nil, {offset = 1}), {{1, 10}})
+        txn:commit()
+        t.assert_equals(s.index.func:select(nil, {offset = 1}), {{1, 10}})
+        box.commit()
+    end)
+end
+
+g.test_func_exclude_null = function(cg)
+    cg.server:exec(function()
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[3]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('primary', {parts = {{2, 'unsigned'}}})
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned', is_nullable = true, exclude_null = true}},
+        })
+
+        s:replace{box.NULL, 1, 1}
+        s:replace{box.NULL, 2, box.NULL}
+        t.assert_equals(s.index.func:select(), {{nil, 1, 1}})
+        t.assert_equals(s.index.func:count(), 1)
+    end)
+end
+
+g.test_func_index_no_ffi_with_mvcc = function(cg)
+    cg.server:exec(function()
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[2]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        t.assert_equals(s.index.pk.get, s.index.pk.get_ffi)
+        -- Func index must use LuaC when MVCC is enabled.
+        t.assert_equals(s.index.func.get, s.index.func.get_luac)
+    end)
+
+    -- Restart server in order to disable MVCC.
+    cg.server:restart({box_cfg = {memtx_use_mvcc_engine = false}})
+    cg.server:exec(function()
+        local s = box.space.test
+        t.assert_equals(s.index.pk.get, s.index.pk.get_ffi)
+        -- Func index should use FFI when MVCC is disabled.
+        t.assert_equals(s.index.func.get, s.index.func.get_ffi)
+    end)
+end
