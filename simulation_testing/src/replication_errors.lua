@@ -1,15 +1,16 @@
 local is_node_alive_by_id = require("crash_functions").is_node_alive_by_id
 local connection_exists = require("crash_functions").connection_exists
 
+local monitor_config = {
+    leader_absent_time = 10, 
+    max_terms_change_by_period = 5,
+    terms_change_period = 10,
+    check_interval = 2,
+}
+
 local function monitor_replication(cg)
     local fiber = require('fiber')
 
-    local monitor_config = {
-        leader_absent_time = 10, 
-        max_terms_change_by_period = 5,
-        terms_change_period = 10,
-        check_interval = 2,
-    }
 
     local state = {
         term_changes = {}, 
@@ -132,5 +133,6 @@ local function monitor_replication(cg)
 end
 
 return {
-    run_replication_monitor = monitor_replication
+    run_replication_monitor = monitor_replication,
+    monitor_config = monitor_config,
 }
