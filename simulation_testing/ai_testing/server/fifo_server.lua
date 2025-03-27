@@ -148,11 +148,11 @@ local function apply_operation(op)
             table.insert(crash_nodes, op.node_2)
         end
 
-        if crash_functions.is_this_crash_safe(CLUSTER.replicas,nodes_activity_states, #crash_nodes) then
+        if crash_functions.is_this_crash_safe(CLUSTER.replicas ,nodes_activity_states, #crash_nodes) then
             return {}
         end
-        for _,node in ipairs(crash_nodes) do
-            if not crash_functions.node_is_alive_by_id(CLUSTER.replicas,nodes_activity_states, node) then
+        for _, node in ipairs(crash_nodes) do
+            if not crash_functions.node_is_alive_by_id(CLUSTER , nodes_activity_states, node) then
                 return {}
             end
         end

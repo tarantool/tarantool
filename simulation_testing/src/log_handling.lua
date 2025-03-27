@@ -238,7 +238,7 @@ local function divergence_monitor(cg, space_name, n, step, interval)
 
                 valid_nodes = crash_functions.get_non_crashed_nodes( 
                     cg.replicas,
-                    nodes_activity_states
+                    crash_functions.nodes_activity_states
                 )
 
                 if #valid_nodes > 0 then
