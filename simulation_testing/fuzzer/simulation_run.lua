@@ -19,10 +19,12 @@ SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS") or "false"
 WITHOUT_BEST_EFFORT = os.getenv("WITHOUT_BEST_EFFORT") or "false"
 WITHOUT_LINEARIZABLE = os.getenv("WITHOUT_LINEARIZABLE") or "false"
 WITHOUT_PROXY = os.getenv("WITHOUT_PROXY") or "false"
+WORKING_LOG_PATH = os.getenv("WORKING_LOG_PATH") or './working_log.log'
 print("ENV_SUCCESSFUL_LOGS: " .. SUCCESSFUL_LOGS)
 print("WITHOUT_BEST_EFFORT: " .. WITHOUT_BEST_EFFORT)
 print("WITHOUT_LINEARIZABLE: " .. WITHOUT_LINEARIZABLE)
 print("WITHOUT_PROXY: " .. WITHOUT_PROXY)
+print("WORKING_LOG_PATH: " .. WORKING_LOG_PATH)
 Logger = logger.Logger
 logger.init_logger()
 
