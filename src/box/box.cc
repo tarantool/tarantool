@@ -101,6 +101,7 @@
 #include "tt_sort.h"
 #include "event.h"
 #include "tweaks.h"
+#include "memtx_tx.h"
 
 static char status[64] = "unconfigured";
 
@@ -6431,6 +6432,7 @@ box_init(void)
 	crash_callback = box_crash_callback;
 	mempool_create(&sync_trigger_data_pool, &cord()->slabc,
 		       sizeof(struct sync_trigger_data));
+	memtx_tx_manager_init();
 }
 
 void
@@ -6494,6 +6496,8 @@ box_shutdown(void)
 void
 box_free(void)
 {
+	/* Free tx manager resources - space cache must not use them. */
+	memtx_tx_manager_free();
 	/* References engines. */
 	space_cache_destroy();
 	box_storage_free();
