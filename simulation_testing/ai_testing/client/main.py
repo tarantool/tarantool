@@ -1,4 +1,5 @@
-from src.cluster_client import *
+from src.fifo_client import *
+
 if __name__ == "__main__":
-    client = TarantoolClusterClient("http://0.0.0.0:9090")
+    client = TarantoolClusterClient()
     client.work(3)

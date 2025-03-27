@@ -15,7 +15,7 @@ local tools = require("tools")
 
 math.randomseed(os.time())
 
-SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
+_G.SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
 Logger = logger.Logger
 logger.init_logger()
 

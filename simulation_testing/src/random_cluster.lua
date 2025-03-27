@@ -36,7 +36,6 @@ local function rand_cfg(cg, replica_count, replica_id)
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
         memtx_dir = memtx_dir,
-        log = memtx_dir .. '/replica_'..replica_id..'.log',
         wal_dir = wal_dir,
         log = log_file,
         txn_isolation = 'best-effort',
@@ -118,9 +117,7 @@ local function make_cluster(replica_count)
     -- Wait for election leader on voter replicas
     for _, repl in ipairs(cg.replicas) do
         repl:wait_until_ready()
-        if repl.box_cfg.election_mode == 'voter' then
-            repl:wait_until_election_leader_found()
-        end
+        repl:wait_until_election_leader_found()
     end
     return cg
 end

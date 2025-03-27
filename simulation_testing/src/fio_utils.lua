@@ -1,4 +1,21 @@
 local fio = require('fio')
+local json = require("dkjson")
+
+
+
+
+local function add_error_scenario(data)
+    local filename = "./error_scenarios/scenarios.json"
+    local file = io.open(filename, "a")
+    if file then
+        -- Convert data to JSON and append to file
+        file:write("{".. json.encode(data) .. "\n}, \n")
+        file:close()
+        print("Data appended successfully")
+    else
+        print("Failed to open file for writing")
+    end
+end
 
 -- File copy function
 local function copy_file(src_file, dest_file)
@@ -160,5 +177,6 @@ return {
     delete_directory = delete_directory,
     create_memtx = create_memtx,
     clear_dirs_for_all_replicas = clear_dirs_for_all_replicas,
-    create_dirs_for_replica = create_dirs_for_replica
+    create_dirs_for_replica = create_dirs_for_replica,
+    add_error_scenario = add_error_scenario
 }
