@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "key_list.h"
 #include "schema_def.h"
 #include "small/mempool.h"
 
@@ -129,6 +130,10 @@ struct memtx_story {
 	 * the story is the only reason why @a tuple cannot be deleted.
 	 */
 	bool tuple_is_retained;
+	/**
+	 * Whether there is an associated functional key in `func_key_storage`.
+	 */
+	bool has_func_key;
 	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
@@ -353,8 +358,12 @@ memtx_tx_delete_gap(struct gap_item_base *item);
  * @sa point_hole_item_pool.
  */
 struct point_hole_key {
+	/** Index in which we are looking. */
 	struct index *index;
+	/** We use tuple as a key - it is compared to key of point_hole_item. */
 	struct tuple *tuple;
+	/** Functional key of the tuple, must be set if index is functional. */
+	struct tuple *func_key;
 };
 
 /** Hash calculatore for the key. */
@@ -362,7 +371,18 @@ static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
-	return key->index->unique_id ^ tuple_hash(key->tuple, def);
+	uint32_t tuple_hash = 0;
+	if (likely(!def->for_func_index)) {
+		assert(key->func_key == NULL);
+		tuple_hash = def->tuple_hash(key->tuple, def);
+	} else {
+		assert(key->func_key != NULL);
+		const char *data = tuple_data(key->func_key);
+		mp_decode_array(&data);
+		tuple_hash = key_hash(data, def);
+	}
+	return key->index->unique_id ^ tuple_hash;
+
 }
 
 /** point_hole_item comparator. */
@@ -387,10 +407,15 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 	assert(key->index != NULL);
 	assert(key->tuple != NULL);
 	struct key_def *def = key->index->def->key_def;
-	hint_t oh = key_hint(object->key, def->part_count, def);
-	hint_t kh = tuple_hint(key->tuple, def);
-	return tuple_compare_with_key(key->tuple, kh, object->key,
-				      def->part_count, oh, def);
+	uint64_t tuple_hint = HINT_NONE;
+	if (unlikely(def->for_func_index))
+		tuple_hint = (uint64_t)key->func_key;
+	/*
+	 * Note that it's OK to always pass HINT_NONE for the key - hints
+	 * won't be used then if the index is not functional.
+	 */
+	return tuple_compare_with_key(key->tuple, tuple_hint, object->key,
+				      def->part_count, HINT_NONE, def);
 }
 
 /**
@@ -409,6 +434,66 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #define mh_hash_key(a, arg) ( point_hole_storage_key_hash(a) )
 #define mh_cmp(a, b, arg) point_hole_storage_equal(*(a), *(b))
 #define mh_cmp_key(a, b, arg) point_hole_storage_key_equal((a), *(b))
+#define MH_SOURCE
+#include "salad/mhash.h"
+
+/** Key for search in `func_key_storage`. */
+struct func_key_storage_key {
+	/** Tuple whose functional key we are searching for. */
+	struct tuple *tuple;
+	/** Dense id of the functional index. */
+	uint32_t index_id;
+};
+
+/** Hash calculator for key of `func_key_storage`. */
+static uint32_t
+func_key_storage_key_hash(const struct func_key_storage_key *key)
+{
+	static_assert(sizeof(uintptr_t) > sizeof(uint32_t),
+		      "The following code relies on it");
+	uintptr_t u = (uintptr_t)key->tuple;
+	u ^= (u >> 32);
+	return key->index_id ^ u;
+}
+
+/** An element of `func_key_storage`. */
+struct func_key_storage_item {
+	/** Original tuple. */
+	struct tuple *tuple;
+	/** Functional key. Must be referenced by the item. */
+	struct tuple *func_key;
+	/** Dense id of the functional index. */
+	uint32_t index_id;
+	/** Hash of the item. */
+	uint32_t hash;
+};
+
+/** Comparator for elements of `func_key_storage`. */
+static int
+func_key_storage_equal(const struct func_key_storage_item *obj1,
+		       const struct func_key_storage_item *obj2)
+{
+	return obj1->index_id != obj2->index_id ||
+	       obj1->tuple != obj2->tuple;
+}
+
+/** Comparator for element and key of `func_key_storage`. */
+static int
+func_key_storage_key_equal(const struct func_key_storage_key *key,
+			   const struct func_key_storage_item *object)
+{
+	return key->index_id != object->index_id ||
+	       key->tuple != object->tuple;
+}
+
+#define mh_name _func_key_storage
+#define mh_key_t struct func_key_storage_key *
+#define mh_node_t struct func_key_storage_item
+#define mh_arg_t int
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) func_key_storage_key_hash(a)
+#define mh_cmp(a, b, arg) func_key_storage_equal((a), (b))
+#define mh_cmp_key(a, b, arg) func_key_storage_key_equal((a), (b))
 #define MH_SOURCE
 #include "salad/mhash.h"
 
@@ -598,6 +683,12 @@ struct tx_manager
 	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
+	/**
+	 * Hash table that holds functional keys of dirty tuples.
+	 * Filled lazily: there can be dirty tuples without an entry
+	 * here - it will be created on demand.
+	 */
+	struct mh_func_key_storage_t *func_key_storage;
 	/** Mempool for point_hole_item objects. */
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
@@ -635,33 +726,131 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
+/** Forward declaration, description will be later along with definition. */
+static struct memtx_story *
+memtx_tx_story_get(struct tuple *tuple);
+
 /**
- * A helper to calculate tuple hint.
+ * Returns functional key of the tuple. Must be called only for dirty tuples.
+ * Never fails - panics in case of any error.
  *
- * NB: must be called only for dirty tuples.
+ * NB: can call a Lua function from the index under the hood.
+ */
+static struct tuple *
+memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
+{
+	assert(index->def->key_def->for_func_index);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+
+	struct func_key_storage_key key = {
+		.tuple = tuple,
+		.index_id = index->dense_id,
+	};
+	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
+	if (pos != mh_end(txm.func_key_storage)) {
+		return mh_func_key_storage_node(txm.func_key_storage,
+						pos)->func_key;
+	}
+
+	/* Key list uses region under the hood. */
+	uint32_t region_svp = region_used(&fiber()->gc);
+
+	/* The key is not found and not passed - calculate it. */
+	struct key_list_iterator it;
+	if (key_list_iterator_create(&it, tuple, index->def, false,
+				     tuple_format_runtime) != 0) {
+		diag_log();
+		panic("failed to obtain functional index key");
+	}
+
+	/* A single step - only singe-key indexes are supported. */
+	struct tuple *func_key = NULL;
+	if (key_list_iterator_next(&it, &func_key) != 0) {
+		diag_log();
+		panic("failed to obtain functional index key");
+	}
+
+	/* Check if not multikey. */
+	struct tuple *next_key = NULL;
+	assert(key_list_iterator_next(&it, &next_key) == 0 && next_key == NULL);
+	(void)next_key;
+
+	/* Truncate the region when we are done. */
+	region_truncate(&fiber()->gc, region_svp);
+
+	/* Reference the key and save it to the hash table. */
+	tuple_ref(func_key);
+	struct func_key_storage_item item = {
+		.tuple = tuple,
+		.index_id = index->dense_id,
+		.func_key = func_key,
+		.hash = func_key_storage_key_hash(&key),
+	};
+	pos = mh_func_key_storage_put(txm.func_key_storage, &item, NULL, 0);
+	VERIFY(pos != mh_end(txm.func_key_storage));
+
+	/* Mark that the story has a func key. */
+	memtx_tx_story_get(tuple)->has_func_key = true;
+
+	return func_key;
+}
+
+/**
+ * Removes functional key of @a tuple from `func_key_storage`.
+ * Must be called for dirty tuples.
+ */
+static void
+memtx_tx_clear_func_key(struct tuple *tuple, uint32_t index_id)
+{
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+
+	struct func_key_storage_key key = {
+		.tuple = tuple,
+		.index_id = index_id,
+	};
+	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
+	if (pos == mh_end(txm.func_key_storage))
+		return;
+	struct tuple *fkey =
+		mh_func_key_storage_node(txm.func_key_storage, pos)->func_key;
+	mh_func_key_storage_del(txm.func_key_storage, pos, 0);
+	tuple_unref(fkey);
+}
+
+/**
+ * A helper to calculate tuple hint. Encapsulates functional indexes.
+ *
+ * NB: must be called only for dirty tuples. Can call a Lua function
+ *     from the index under the hood.
  */
 static hint_t
 memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *def)
 {
-	VERIFY(!index->def->key_def->for_func_index);
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	/* R-tree does not support tuple hint. */
 	if (unlikely(index->def->type == RTREE))
 		return HINT_NONE;
+	if (unlikely(index->def->key_def->for_func_index))
+		return (hint_t)memtx_tx_tuple_func_key(tuple, index);
 	return tuple_hint(tuple, def);
 }
 
 /**
- * A helper to check if tuple key is excluded.
+ * A helper to check if tuple key is excluded. Encapsulates functional indexes.
  *
- * NB: must be called only for dirty tuples.
+ * NB: must be called only for dirty tuples. Can call a Lua function
+ *     from the index under the hood.
  */
 static bool
 memtx_tx_tuple_key_is_excluded(struct tuple *tuple, struct index *index,
 			       struct key_def *def)
 {
-	VERIFY(!index->def->key_def->for_func_index);
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	/* Return early to avoid func key calculation. */
+	if (likely(!def->has_exclude_null))
+		return false;
+	if (def->for_func_index)
+		tuple = memtx_tx_tuple_func_key(tuple, index);
 	return tuple_key_is_excluded(tuple, def, MULTIKEY_NONE);
 }
 
@@ -909,6 +1098,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
 	memtx_tx_stats_collect(stats, pool->objsize);
 	story->tuple_is_retained = false;
+	story->has_func_key = false;
 	story->index_count = index_count;
 	story->add_stmt = NULL;
 	story->add_psn = 0;
@@ -938,6 +1128,12 @@ memtx_tx_story_delete(struct memtx_story *story)
 		assert(story->link[i].newer_story == NULL);
 		assert(story->link[i].older_story == NULL);
 		assert(rlist_empty(&story->link[i].read_gaps));
+	}
+
+	/* Clear associated functional keys only if there are any. */
+	if (unlikely(story->has_func_key)) {
+		for (uint32_t i = 0; i < story->index_count; i++)
+			memtx_tx_clear_func_key(story->tuple, i);
 	}
 
 	memtx_tx_stats_discard(&txm.story_stats[story->status],
@@ -1586,10 +1782,14 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 				 uint32_t ind)
 {
 	assert(story->link[ind].newer_story == NULL);
+	struct index *index = space->index[ind];
 	struct mh_point_holes_t *ht = txm.point_holes;
 	struct point_hole_key key;
-	key.index = space->index[ind];
+	key.index = index;
 	key.tuple = story->tuple;
+	key.func_key = NULL;
+	if (index->def->key_def->for_func_index)
+		key.func_key = memtx_tx_tuple_func_key(story->tuple, index);
 	mh_int_t pos = mh_point_holes_find(ht, &key, 0);
 	if (pos == mh_end(ht))
 		return;
@@ -3698,6 +3898,7 @@ memtx_tx_manager_init(void)
 				sizeof(struct point_hole_item),
 				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes = mh_point_holes_new();
+	txm.func_key_storage = mh_func_key_storage_new();
 	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
 				sizeof(struct inplace_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
@@ -3734,6 +3935,7 @@ memtx_tx_manager_free(void)
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
 	mh_history_delete(txm.history);
+	mh_func_key_storage_delete(txm.func_key_storage);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
 	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
