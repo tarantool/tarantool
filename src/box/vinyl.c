@@ -699,6 +699,11 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "covering index");
 		return -1;
 	}
+	if (index_def->opts.layout != NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "vinyl",
+			 "'layout' option");
+		return -1;
+	}
 	return 0;
 }
 
