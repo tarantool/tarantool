@@ -726,13 +726,17 @@ static struct memtx_story *
 memtx_tx_story_get(struct tuple *tuple);
 
 /**
- * Returns functional key of the tuple. Must be called only for dirty tuples.
- * Never fails - panics in case of any error.
+ * A general-purpose helper for saving/calculating functional keys.
+ * The function searches for a functional key of @a tuple from @a index
+ * in @a tx_manager::func_key_storage. If the key is not found, the function
+ * saves @a func_key to the storage, if it is passed, or calculates the key
+ * if @a func_key is NULL.
  *
- * NB: can call a Lua function from the index under the hood.
+ * Returns functional key of the tuple. Never fails - panics on any error.
  */
 static struct tuple *
-memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
+memtx_tx_tuple_func_key_impl(struct tuple *tuple, struct index *index,
+			     struct tuple *func_key)
 {
 	assert(index->def->key_def->for_func_index);
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
@@ -747,26 +751,27 @@ memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
 						pos)->func_key;
 	}
 
-	/* Key list uses region under the hood. */
-	uint32_t region_svp = region_used(&fiber()->gc);
+	if (func_key == NULL) {
+		/* Key list uses region under the hood. */
+		uint32_t region_svp = region_used(&fiber()->gc);
 
-	/* The key is not found and not passed - calculate it. */
-	struct key_list_iterator it;
-	if (key_list_iterator_create(&it, tuple, index->def, false,
-				     tuple_format_runtime) != 0) {
-		diag_log();
-		panic("failed to obtain functional index key");
+		/* The key is not found and not passed - calculate it. */
+		struct key_list_iterator it;
+		if (key_list_iterator_create(&it, tuple, index->def, false,
+					     tuple_format_runtime) != 0) {
+			diag_log();
+			panic("failed to obtain functional index key");
+		}
+
+		/* A single step - only singe-key indexes are supported. */
+		if (key_list_iterator_next(&it, &func_key) != 0) {
+			diag_log();
+			panic("failed to obtain functional index key");
+		}
+
+		/* Truncate the region when we are done. */
+		region_truncate(&fiber()->gc, region_svp);
 	}
-
-	/* A single step - only singe-key indexes are supported. */
-	struct tuple *func_key = NULL;
-	if (key_list_iterator_next(&it, &func_key) != 0) {
-		diag_log();
-		panic("failed to obtain functional index key");
-	}
-
-	/* Truncate the region when we are done. */
-	region_truncate(&fiber()->gc, region_svp);
 
 	/* Reference the key and save it to the hash table. */
 	tuple_ref(func_key);
@@ -783,6 +788,28 @@ memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
 	memtx_tx_story_get(tuple)->has_func_key = true;
 
 	return func_key;
+}
+
+void
+memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
+		       struct tuple *func_key)
+{
+	assert(func_key != NULL);
+	if (memtx_tx_manager_use_mvcc_engine &&
+	    tuple_has_flag(tuple, TUPLE_IS_DIRTY))
+		memtx_tx_tuple_func_key_impl(tuple, index, func_key);
+}
+
+/**
+ * Returns functional key of the tuple. Must be called only for dirty tuples.
+ * Never fails - panics in case of any error.
+ *
+ * NB: can call a Lua function from the index under the hood.
+ */
+static struct tuple *
+memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
+{
+	return memtx_tx_tuple_func_key_impl(tuple, index, NULL);
 }
 
 /**
@@ -2145,6 +2172,9 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	assert(new_tuple != NULL);
 	struct space *space = stmt->space;
 
+	/* Create story to make the tuple dirty during replace. */
+	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
+
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
@@ -2172,8 +2202,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		goto fail;
 	stmt->is_own_change = is_own_change;
 
-	/* Create add_story. */
-	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
+	/* Link add_story. */
 	memtx_tx_story_link_added_by(add_story, stmt);
 
 	/* Create next story in the primary index if necessary. */
@@ -2264,7 +2293,7 @@ fail:
 			panic("failed to rollback change");
 		}
 	}
-
+	memtx_tx_story_delete(add_story);
 	return -1;
 }
 

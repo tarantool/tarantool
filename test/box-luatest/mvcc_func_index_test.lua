@@ -219,3 +219,33 @@ g.test_func_index_no_ffi_with_mvcc = function(cg)
         t.assert_equals(s.index.func.get, s.index.func.get_ffi)
     end)
 end
+
+-- The case checks MVCC efficiency - the function must be called once
+-- for each replace, not more than that.
+g.test_one_func_call_per_replace = function(cg)
+    cg.server:exec(function()
+        rawset(_G, 'counter', 0)
+
+        box.schema.func.create('test', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                counter = counter + 1
+                return {tuple[1]}
+            end]]
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('func', {
+            func = 'test',
+            parts = {{1, 'unsigned'}},
+        })
+
+        t.assert_equals(rawget(_G, 'counter'), 0)
+        for i = 1, 10 do
+            s:replace{i}
+            -- One function call for each replace.
+            t.assert_equals(rawget(_G, 'counter'), i)
+        end
+    end)
+end
