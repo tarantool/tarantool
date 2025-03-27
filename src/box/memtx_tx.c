@@ -362,7 +362,7 @@ static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
-	return key->index->unique_id ^ def->tuple_hash(key->tuple, def);
+	return key->index->unique_id ^ tuple_hash(key->tuple, def);
 }
 
 /** point_hole_item comparator. */
@@ -387,10 +387,10 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 	assert(key->index != NULL);
 	assert(key->tuple != NULL);
 	struct key_def *def = key->index->def->key_def;
-	hint_t oh = def->key_hint(object->key, def->part_count, def);
-	hint_t kh = def->tuple_hint(key->tuple, def);
-	return def->tuple_compare_with_key(key->tuple, kh, object->key,
-					   def->part_count, oh, def);
+	hint_t oh = key_hint(object->key, def->part_count, def);
+	hint_t kh = tuple_hint(key->tuple, def);
+	return tuple_compare_with_key(key->tuple, kh, object->key,
+				      def->part_count, oh, def);
 }
 
 /**
@@ -1836,12 +1836,11 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		int cmp = 0;
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
-			hint_t oh =
-				def->key_hint(item->key, item->part_count, def);
-			hint_t kh = def->tuple_hint(tuple, def);
-			cmp = def->tuple_compare_with_key(tuple, kh, item->key,
-							  item->part_count, oh,
-							  def);
+			hint_t oh = key_hint(item->key, item->part_count, def);
+			hint_t kh = tuple_hint(tuple, def);
+			cmp = tuple_compare_with_key(tuple, kh, item->key,
+						     item->part_count, oh,
+						     def);
 		}
 		int dir = iterator_direction(item->type);
 		bool is_full_key = item->part_count ==
