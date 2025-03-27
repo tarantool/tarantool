@@ -636,53 +636,6 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 static struct tx_manager txm;
 
 void
-memtx_tx_manager_init()
-{
-	rlist_create(&txm.read_view_txs);
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
-		size_t item_size = sizeof(struct memtx_story) +
-				   i * sizeof(struct memtx_story_link);
-		mempool_create(&txm.memtx_tx_story_pool[i],
-			       cord_slab_cache(), item_size);
-	}
-	txm.history = mh_history_new();
-	memtx_tx_mempool_create(&txm.point_hole_item_pool,
-				sizeof(struct point_hole_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	txm.point_holes = mh_point_holes_new();
-	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
-				sizeof(struct inplace_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
-				sizeof(struct nearby_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
-				sizeof(struct count_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
-				sizeof(struct full_scan_gap_item),
-				MEMTX_TX_ALLOC_TRACKER);
-	rlist_create(&txm.all_stories);
-	txm.traverse_all_stories = &txm.all_stories;
-	txm.must_do_gc_steps = 0;
-	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
-}
-
-void
-memtx_tx_manager_free()
-{
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
-		mempool_destroy(&txm.memtx_tx_story_pool[i]);
-	mh_history_delete(txm.history);
-	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
-	mh_point_holes_delete(txm.point_holes);
-	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
-	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
-	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
-}
-
-void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 {
 	memset(stats, 0, sizeof(*stats));
@@ -3698,3 +3651,50 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 #if defined(ENABLE_READ_VIEW)
 # include "memtx_tx_read_view.c"
 #endif /* defined(ENABLE_READ_VIEW) */
+
+void
+memtx_tx_manager_init(void)
+{
+	rlist_create(&txm.read_view_txs);
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
+		size_t item_size = sizeof(struct memtx_story) +
+				   i * sizeof(struct memtx_story_link);
+		mempool_create(&txm.memtx_tx_story_pool[i],
+			       cord_slab_cache(), item_size);
+	}
+	txm.history = mh_history_new();
+	memtx_tx_mempool_create(&txm.point_hole_item_pool,
+				sizeof(struct point_hole_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	txm.point_holes = mh_point_holes_new();
+	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
+				sizeof(struct inplace_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.nearby_gap_item_mempoool,
+				sizeof(struct nearby_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.count_gap_item_mempool,
+				sizeof(struct count_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.full_scan_gap_item_mempool,
+				sizeof(struct full_scan_gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	rlist_create(&txm.all_stories);
+	txm.traverse_all_stories = &txm.all_stories;
+	txm.must_do_gc_steps = 0;
+	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
+}
+
+void
+memtx_tx_manager_free(void)
+{
+	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
+		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mh_history_delete(txm.history);
+	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
+	mh_point_holes_delete(txm.point_holes);
+	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.count_gap_item_mempool);
+	memtx_tx_mempool_destroy(&txm.full_scan_gap_item_mempool);
+}
