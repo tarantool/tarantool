@@ -1840,6 +1840,8 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		struct key_def *key_def = index_def->key_def;
 		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
 			key != NULL) {
+			/* Save functional key to MVCC, even excluded one. */
+			memtx_tx_save_func_key(new_tuple, base, key);
 			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
 				continue;
 			/* Perform insertion, log it in list. */

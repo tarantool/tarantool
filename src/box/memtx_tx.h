@@ -506,6 +506,18 @@ memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
 }
 
 /**
+ * Save functional key of a tuple to memtx_tx. It is not mandatory to call
+ * this function outside memtx_tx - it is exported only for optimization.
+ * If the functional key is manually saved, memtx_tx won't need to call the
+ * index function again in order to obtain the key.
+ *
+ * Save to call when memtx_tx is disabled - in this case it's simply no-op.
+ */
+void
+memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
+		       struct tuple *func_key);
+
+/**
  * Clean memtx_tx part of @a txn.
  *
  * NB: can trigger story garbage collection.
