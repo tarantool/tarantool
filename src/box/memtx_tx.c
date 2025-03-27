@@ -3688,6 +3688,18 @@ memtx_tx_manager_init(void)
 void
 memtx_tx_manager_free(void)
 {
+	struct txn *txn;
+	rlist_foreach_entry(txn, &txns, in_txns)
+		memtx_tx_clear_txn_read_lists(txn);
+
+	struct memtx_story *story, *tmp;
+	rlist_foreach_entry_safe(story, &txm.all_stories, in_all_stories, tmp) {
+		for (size_t i = 0; i < story->index_count; i++)
+			story->link[i].in_index = NULL;
+		memtx_tx_story_full_unlink_on_space_delete(story);
+		memtx_tx_story_delete(story);
+	}
+
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
 	mh_history_delete(txm.history);

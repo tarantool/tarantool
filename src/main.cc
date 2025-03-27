@@ -587,7 +587,6 @@ tarantool_free(void)
 #endif
 	event_free();
 	ssl_free();
-	memtx_tx_manager_free();
 	coll_free();
 	systemd_free();
 	say_logger_free();
@@ -1007,7 +1006,6 @@ main(int argc, char **argv)
 	cbus_init();
 	tnt_thread_init();
 	coll_init();
-	memtx_tx_manager_init();
 	module_init();
 	ssl_init();
 	event_init();
