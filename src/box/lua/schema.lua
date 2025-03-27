@@ -1571,6 +1571,7 @@ local index_options = {
     func = 'number, string',
     hint = 'boolean',
     covers = 'table',
+    layout = 'string',
 }
 
 local function jsonpaths_from_idx_parts(parts)
@@ -1746,6 +1747,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             func = options.func,
             hint = options.hint,
             covers = options.covers,
+            layout = options.layout,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
