@@ -290,6 +290,7 @@ luaT_toibuf
 luaT_tolstring
 luaT_tuple_encode
 luaT_tuple_new
+memtx_tx_manager_use_mvcc_engine
 memtx_tx_story_gc_step
 PMurHash32
 PMurHash32_Process
