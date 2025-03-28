@@ -3,6 +3,7 @@ local fio = require('fio')
 local fiber = require('fiber')
 local uri = require('uri')
 local Proxy = require('luatest.replica_proxy')
+--local Proxy = require('custom_proxy')
 local server = require('luatest.server')
 
 local tmp_dir = fio.tempdir()
