@@ -2,36 +2,53 @@ local fiber = require('fiber')
 
 local tools = require("tools")
 local proxy_handling = require('proxy_handling')
+local string = require('string')
 
 math.randomseed(os.clock())
 
 -- Table for tracking the status of nodes
-nodes_activity_states = {}
+_G.nodes_activity_states = {}
 
-nodes_connection_states = {}
+
+_G.nodes_connection_states = {}
+
+
+local lock_ch = fiber.channel(1)
+lock_ch:put(true)
+
+local function lock()
+    lock_ch:get()  -- когда «токена» в канале нет, вызов заблокируется
+end
+
+local function unlock()
+    lock_ch:put(true)  -- вернём «токен» в канал, разблокируем «очередь»
+end
+
 
 
 local function update_node_state(node_or_proxy, state_status)
-    nodes_activity_states[node_or_proxy.alias] = state_status
+    lock()
+    _G.nodes_activity_states[node_or_proxy.alias] = state_status
+    unlock()
 end
 
 local function update_node_connection_state(node1,node2, state)
-    nodes_connection_states[node1.alias..node2.alias] = state
-    nodes_connection_states[node2.alias..node1.alias] = state
+    _G.nodes_connection_states[node1.alias..node2.alias] = state
+    _G.nodes_connection_states[node2.alias..node1.alias] = state
 end
 
 local function is_node_alive_by_id(replica_id)
-    return nodes_activity_states["replica_"..tostring(replica_id)] ~= 'crashed'
+    return _G.nodes_activity_states["replica_"..tostring(replica_id)] ~= 'crashed'
 end
 
 
 local function is_node_alive_by_alias(node)
-    return nodes_activity_states[node.alias] ~= 'crashed'
+    return _G.nodes_activity_states[node.alias] ~= 'crashed'
 end
 
 
 local function connection_exists(node1_id, node2_id)
-    return nodes_connection_states['replica_'..tostring(node1_id)..'replica_'..tostring(node2_id)] == true
+    return _G.nodes_connection_states['replica_'..tostring(node1_id)..'replica_'..tostring(node2_id)] == true
 end
 
 local function get_node_by_id(nodes, node_id)
@@ -46,11 +63,11 @@ end
 
 
 -- The function of getting all workable nodes
-local function get_non_crashed_nodes(nodes, nodes_activity_states)
+local function get_non_crashed_nodes(nodes, nodes_activity_states, prefix)
     local non_crashed_nodes = {}
 
     for _, node in ipairs(nodes) do
-        if nodes_activity_states[node.alias] ~= "crashed" then
+        if node.alias:startswith(prefix) == true and nodes_activity_states[node.alias] ~= "crashed" then
             table.insert(non_crashed_nodes, node)
         end
     end
@@ -64,18 +81,18 @@ local function get_non_crashed_nodes(nodes, nodes_activity_states)
 end
 
 local function node_is_alive_by_id(cg,nodes_activity_states, node_id)
-    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica")
     if get_node_by_id(available_nodes, node_id) == nil then
         return false
     end
     return true
 end
 
-local function count_crashed_nodes(nodes_activity_states)
+local function count_crashed_nodes(nodes_activity_states, alias_prefix)
     local crashed_count = 0
 
-    for _, state in pairs(nodes_activity_states) do
-        if state == "crashed" then
+    for alias, state in pairs(nodes_activity_states) do
+        if state == "crashed" and alias:startswith(alias_prefix) == true then
             crashed_count = crashed_count + 1
         end
     end
@@ -86,34 +103,66 @@ end
 -- Checking the condition for a sufficient number of workable nodes
 --- N is the total number of nodes in the cluster
 --- num_crashed_nodes is the number of crashed nodes in the cluster
-local function is_cluster_healthy(N, num_crashed_nodes)
-    local min_num_non_crashed_nodes = math.floor(N / 2) + 1
+local function is_cluster_healthy(N, num_crashed_nodes, node_type)
+    local min_num_non_crashed_nodes
+    if node_type == "replica" then
+            min_num_non_crashed_nodes = math.floor(N / 2) + 1
+    else
+            min_num_non_crashed_nodes = math.floor(N / 2)
+    end
     return (N - num_crashed_nodes) >= min_num_non_crashed_nodes
 end
 
 
-local function is_this_crash_safe(nodes, nodes_activity_states, num_to_select)
+local function is_this_node_crash_safe(nodes, nodes_activity_states, num_to_select)
+    lock()
     -- Checking that the limit on the number of active nodes in the cluster is not violated
-    local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states)
+    local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states, "replica_")
     local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
-    if not is_cluster_healthy(#nodes, new_num_crashed_nodes) then
+    if not is_cluster_healthy(#nodes, new_num_crashed_nodes, "replica") then
         LogInfo("[CRASH SIMULATION] Removing " .. num_to_select .. " nodes will make the cluster unhealthy")
+        unlock()
         return false
     end
     
     -- Filtering nodes whose state is not equal to "crashed"
-    local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states)
-
+    local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states, "replica_")
     if #available_nodes < num_to_select then
         LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
+        unlock()
         return false
     end
+    unlock()
+    return true
+end
+
+local function is_this_proxy_crash_safe(nodes, nodes_activity_states, num_to_select)
+    lock()
+    -- Checking that the limit on the number of active nodes in the cluster is not violated
+    local prev_num_crashed_nodes = count_crashed_nodes(nodes_activity_states, "proxy_")
+    local new_num_crashed_nodes = prev_num_crashed_nodes + num_to_select
+    if not is_cluster_healthy(#nodes, new_num_crashed_nodes,"proxy") then
+        LogInfo("[CRASH SIMULATION] Breaking connection will make the cluster unhealthy")
+        unlock()
+        return false
+    end
+    
+    -- Filtering nodes whose state is not equal to "crashed"
+    local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states, "proxy_")
+    if #available_nodes < num_to_select then
+        LogInfo("[CRASH SIMULATION] Not enough healthy connections to break")
+        unlock()
+        return false
+    end
+    unlock()
     return true
 end
 
 -- Safe function for getting random crash nodes
 local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_select)
-    if (not is_this_crash_safe(nodes, nodes_activity_states, num_to_select)) then
+    local available_nodes = get_non_crashed_nodes(nodes, nodes_activity_states, "replica_")
+
+    if (is_this_node_crash_safe(nodes, nodes_activity_states, num_to_select) == false) then
         return {}
     end
     -- Randomly select nodes
@@ -121,7 +170,7 @@ local function get_random_nodes_for_crash(nodes, nodes_activity_states, num_to_s
     while #selected_nodes < num_to_select do
         local index = math.random(#available_nodes)
         local node = table.remove(available_nodes, index) 
-        table.insert(selected_nodes, node) 
+        table.insert(selected_nodes, node)
     end
 
     return selected_nodes
@@ -139,7 +188,7 @@ local function LogInfo_nodes_activity_states()
     local nodes = {}
     local proxies = {}
 
-    for alias, state in pairs(nodes_activity_states) do
+    for alias, state in pairs(_G.nodes_activity_states) do
         if alias:startswith("replica_") then
             table.insert(nodes, {alias = alias, state = state, id = extract_id(alias)})
         elseif alias:startswith("proxy_") then
@@ -163,7 +212,6 @@ end
 
 local function stop_node(node, delay)
     fiber.create(function()
-
         tools.check_node(node)
         node:stop()
         update_node_state(node, "crashed")
@@ -185,7 +233,6 @@ local function pause_proxy(proxy, delay)
         update_node_state(proxy, "crashed")
         LogInfo(string.format("[CRASH SIMULATION] Proxy for node %s is paused for a time %s", proxy.alias, delay))
         LogInfo_nodes_activity_states()
-
         fiber.sleep(delay)
 
         proxy:resume()
@@ -204,7 +251,7 @@ local function create_delay_to_write_operations(node, delay)
         node:exec(function()
             box.error.injection.set('ERRINJ_WAL_DELAY', true)
         end)
-        update_node_state(node, "crashed")
+        -- update_node_state(node, "crashed")
         LogInfo(string.format("[CRASH SIMULATION] The WAL write delay for node %s is set for the time %d", node.alias, delay))
         LogInfo_nodes_activity_states()
 
@@ -213,7 +260,7 @@ local function create_delay_to_write_operations(node, delay)
         node:exec(function()
             box.error.injection.set('ERRINJ_WAL_DELAY', false)
         end)
-        update_node_state(node, "restored")
+        -- update_node_state(node, "restored")
         LogInfo(string.format("[CRASH SIMULATION] The WAL write delay for node %s has been removed", node.alias))
         LogInfo_nodes_activity_states()
     end)
@@ -292,32 +339,33 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
 end
 
 local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_nodes ,crashed_proxy_nodes)
-    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
+    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica_")
     if type_of_crashing == 1 then
-        if (#crash_nodes > #available_nodes or #available_nodes <  math.floor(#cg.replicas /2) + 1) then
-            LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
-            return
+        if is_this_node_crash_safe(cg.replicas,nodes_activity_states, #crash_nodes) == false then
+            return {}
         end
         if #crash_nodes > 0 then
-            local node = get_node_by_id(available_nodes,crash_nodes[1])
+
+            local node = crash_nodes[1]
             if node == nil then
                 LogInfo("[CRASH SIMULATION] Node is not available")
                 return
             end
-            local success, err = pcall(stop_node, get_node_by_id(available_nodes,crash_nodes[1]), delay)
+            local success, err = pcall(stop_node, node, delay)
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error: Failed to stop node: %s", err))
             end
+        else
+            LogInfo("[CRASH SIMULATION] No Nodes to crash")
         end
-
     elseif type_of_crashing == 2 then
         if #crash_nodes > 0 then
-            local node = get_node_by_id(available_nodes,crash_nodes[1])
+            local node = crash_nodes[1]
             if node == nil then
                 LogInfo("[CRASH SIMULATION] Node with id "..tostring(crash_nodes[1]).." is not available")
                 return
             end
-            local success, err = pcall(create_delay_to_write_operations, get_node_by_id(available_nodes,crash_nodes[1]), delay)
+            local success, err = pcall(create_delay_to_write_operations, node, delay)
             if not success then
                 LogInfo(string.format("[CRASH SIMULATION] Error: Failed to create delay for node: %s", err))
             end
@@ -325,8 +373,8 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
 
     elseif type_of_crashing == 3 then
         if #crash_nodes > 0 then
-            local node_1 = get_node_by_id(available_nodes,crash_nodes[1])
-            local node_2 = get_node_by_id(available_nodes,crash_nodes[2])
+            local node_1 = crash_nodes[1]
+            local node_2 = crash_nodes[2]
 
             if node_1 == nil  or  node_2 == nil then
                 LogInfo("[CRASH SIMULATION] Node is not available")
@@ -344,7 +392,9 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
         end
 
     elseif type_of_crashing == 4 then
-        
+        if is_this_proxy_crash_safe(cg.proxies ,nodes_activity_states, #crashed_proxy_nodes) == false then
+            return {}
+        end
         if #crashed_proxy_nodes > 0 then
             for i, proxy in ipairs(crashed_proxy_nodes) do
                 local success, err = pcall(pause_proxy, proxy, delay)
@@ -398,5 +448,6 @@ return {
     is_node_alive_by_alias = is_node_alive_by_alias,
     crash_simulation = crash_simulation,
     node_is_alive_by_id = node_is_alive_by_id,
-    is_this_crash_safe = is_this_crash_safe
+    is_this_node_crash_safe = is_this_node_crash_safe,
+    is_this_proxy_crash_safe = is_this_proxy_crash_safe,
 }

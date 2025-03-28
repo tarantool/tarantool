@@ -77,7 +77,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                     end)
 
                     if insert_status then
-                        if _G.SUCCESSFUL_LOGS then
+                        if _G.SUCCESSFUL_LOGS == 0 then
                             LogInfo("[PERIODIC INSERT] Successfully inserted key: " .. key ..
                                     ", value: " .. value ..
                                     ", into space: '" .. space_name .. "'")
@@ -92,7 +92,7 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end)
 
                         if exists_status and exists_result then
-                            if _G.SUCCESSFUL_LOGS then
+                            if _G.SUCCESSFUL_LOGS == 0 then
                                 LogInfo("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
                             end
                             key = key + step
@@ -238,7 +238,8 @@ local function divergence_monitor(cg, space_name, n, step, interval)
 
                 valid_nodes = crash_functions.get_non_crashed_nodes( 
                     cg.replicas,
-                    nodes_activity_states
+                    _G.nodes_activity_states,
+                    "replica_"
                 )
 
                 if #valid_nodes > 0 then
@@ -279,7 +280,7 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                             divergence = count - common_length
                         end
 
-                        if _G.SUCCESSFUL_LOGS then
+                        if _G.SUCCESSFUL_LOGS == 0 then
                             LogInfo(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
                         else
                             if divergence ~= 0 then

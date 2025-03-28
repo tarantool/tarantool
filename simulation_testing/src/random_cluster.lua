@@ -4,7 +4,7 @@ local server = require('luatest.server')
 local fio = require('fio')
 local fio_utils = require('fio_utils')
 local proxy_handling = require('proxy_handling')
-
+local fiber = require('fiber')
 
 
 
@@ -125,7 +125,9 @@ end
 --- Random Cluster Generator
 local function rand_cluster(max_number_replicas)
     local replica_count = math.random(3, max_number_replicas)
-    return make_cluster(replica_count)
+    local cg = make_cluster(replica_count)
+    fiber.sleep(20)
+    return cg
 end
 
 

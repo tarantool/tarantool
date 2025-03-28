@@ -42,9 +42,9 @@ local proxy_to_replica_obj = Proxy:new({
 })
 proxy_to_replica_obj:start({force = true})
 
-master:start({wait_until_ready = true})
+master:start({wait_until_ready = false})
 
-replica:start({wait_until_ready = true})
+replica:start({wait_until_ready = false})
 
 master:wait_until_ready()
 

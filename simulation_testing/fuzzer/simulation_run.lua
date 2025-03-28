@@ -20,12 +20,6 @@ Logger = logger.Logger
 logger.init_logger()
 
 local cg = random_cluster.rand_cluster(3)
-fiber.sleep(20)
-
-
-
-
-
 
 local initial_replication = tools.get_initial_replication(cg.replicas)
 
@@ -98,14 +92,14 @@ log_handling.divergence_monitor(
 
 
 LogInfo("[CRASH SIMULATION] Started")
-local crash_time = 5 -- Crash-specific time, which sets the increased frequency of crashes
+local crash_time = 60 -- Crash-specific time, which sets the increased frequency of crashes
 crash_functions.random_crash_simulation(
     cg,
-    nodes_activity_states,
+    _G.nodes_activity_states,
     initial_replication,
-    1,
+    10,
     crash_time,
-    2 * crash_time
+    10
 )
 
 LogInfo("[REPLICATION MONITOR] Started")

@@ -2,9 +2,9 @@ local is_node_alive_by_id = require("crash_functions").is_node_alive_by_id
 local connection_exists = require("crash_functions").connection_exists
 
 local monitor_config = {
-    leader_absent_time = 10, 
-    max_terms_change_by_period = 5,
-    terms_change_period = 10,
+    leader_absent_time = 60, 
+    max_terms_change_by_period = 3,
+    terms_change_period = 20,
     check_interval = 2,
 }
 
@@ -119,7 +119,7 @@ local function monitor_replication(cg)
 
             if #problems > 0 then
                 for _, problem in ipairs(problems) do
-                    LogInfo('[REPLICATION MONITOR] '.. problem)
+                    LogError('[REPLICATION MONITOR] '.. problem)
                 end
             end
         end)

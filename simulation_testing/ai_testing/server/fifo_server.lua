@@ -30,12 +30,16 @@ local STATE = {
     logs = "",
     has_error = 0
 }
+
 _G.EXTRA_LOGS = function (msg)
     STATE.logs = STATE.logs .. "\n" .. msg
 end
 
+_G.error_data = {}
+
 _G.HAS_ERROR = function ()
     STATE.has_error = 1
+    fio_utils.add_error_scenario({nodes_count = STATE.nodes_count,operations = _G.error_data.operations, logs = STATE.logs})
 end
 
 logger.init_logger()
@@ -44,7 +48,6 @@ logger.init_logger()
 local CLUSTER = {}
 local initial_replication = {}
 local is_created = 0
-local nodes_activity_states = {}
 
 -- Request validation
 local function validate_request(request)
@@ -131,8 +134,8 @@ local function create_cluster(count)
     LogInfo("[REPLICATION MONITOR] Started")
     replication_errors.monitor_config = {
         leader_absent_time = 10, 
-        max_terms_change_by_period = 5,
-        terms_change_period = 10,
+        max_terms_change_by_period = 3,
+        terms_change_period = 20,
         check_interval = 2,
     }
     fiber.create(function(CLUSTER) replication_errors.run_replication_monitor(CLUSTER) end, CLUSTER)
@@ -141,32 +144,35 @@ end
 
 -- Operation handling
 local function apply_operation(op)
-    fiber.create(function()
-        fiber.sleep(2)
-        local crash_nodes = {op.node_1}
-        if op.node_2 ~= -1 then
-            table.insert(crash_nodes, op.node_2)
-        end
+    local available_nodes = crash_functions.get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica_")
 
-        if crash_functions.is_this_crash_safe(CLUSTER.replicas ,nodes_activity_states, #crash_nodes) then
+    local crash_nodes = {crash_functions.get_node_by_id(available_nodes,op.node_1)}
+    local crash_proxies = {}
+    if op.node_2 ~= -1 then
+        table.insert(crash_nodes, crash_functions.get_node_by_id(available_nodes,op.node_2))
+    end
+    if op.crash_type == 2  then
+        op.crash_type = 3
+        table.insert(crash_proxies, proxy_handling.find_proxy_by_ids(CLUSTER, op.node_1, op.node_2))
+        table.insert(crash_proxies, proxy_handling.find_proxy_by_ids(CLUSTER, op.node_2, op.node_1))
+    end
+    
+    for _, node in ipairs(crash_nodes) do
+        if not crash_functions.node_is_alive_by_id(CLUSTER , _G.nodes_activity_states , node) then
             return {}
         end
-        for _, node in ipairs(crash_nodes) do
-            if not crash_functions.node_is_alive_by_id(CLUSTER , nodes_activity_states, node) then
-                return {}
-            end
-        end
+    end
 
-        crash_functions.crash_simulation(
-            CLUSTER,
-            nodes_activity_states,
-            initial_replication,
-            op.crash_type,
-            op.crash_time,
-            crash_nodes,
-            {}
-        )
-        end, op)
+    crash_functions.crash_simulation(
+        CLUSTER,
+        _G.nodes_activity_states,
+        initial_replication,
+        op.crash_type + 1,
+        op.crash_time,
+        crash_nodes,
+        crash_proxies
+    )
+    fiber.sleep(op.crash_time / 10)
 end
 
 -- Request handlers
@@ -196,15 +202,17 @@ local function handle_start(data)
 end
 
 local function handle_simulate(data)
+    _G.error_data = data
     local status = "200"
-    local result = {
+    local result = {}
+    STATE = {
         nodes_count = STATE.nodes_count,
-        logs = STATE.logs,
-        has_error = STATE.has_error
+        logs = "",
+        has_error = 0
     }
+    local max_delay = 0
 
     if not data then
-        HAS_ERROR()
         status = "400"
         result = { error = "Invalid JSON" }
     
@@ -215,7 +223,7 @@ local function handle_simulate(data)
             local error_msg = ""
 
             -- Operation validation
-            if not op.crash_type or (op.crash_type < 0 or op.crash_type > 2) then
+            if (not op.crash_type) or (op.crash_type < 0 or op.crash_type > 2) then
 
                 valid = false
                 error_msg = "Invalid crash_type"
@@ -232,29 +240,35 @@ local function handle_simulate(data)
                     error_msg = "node_2 must be -1 for this crash_type"
                 end
             end
+            if (not op.crash_time) or op.crash_time < 0 then
+
+                valid = false
+                error_msg = "Invalid crash_time"
+            else
+                max_delay = math.max(max_delay, op.crash_time)
+            end
+
             if valid then
 
                 local success,_ = pcall(apply_operation,op)
                 if not success then
-                    HAS_ERROR()
                     result = { error = error_msg }
                     status = "400"
+                    break
                 end
-                
             else
-                HAS_ERROR()
                 result = { error = error_msg }
                 status = "400"
+                break
             end
         end
     else
-        HAS_ERROR()
-        if STATE.has_error == 1 then
-            fio_utils.add_error_scenario({nodes_count = STATE.nodes_count,operations = data.operations, logs = STATE.logs})
-        end
         status = "400"
     end
-
+    if status == "200" then
+        result = STATE
+    end
+    -- fiber.sleep(max_delay)
     return { status = status, body = result }
 end
 

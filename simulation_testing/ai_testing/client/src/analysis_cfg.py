@@ -126,7 +126,7 @@ ANALYSIS_CONFIG = AnalysisConfig(
         " - If crash_type is 0 or 1, then node_1 is an integer indicating the node number on which the operation should occur, node_2 = -1",
         " - If crash_type = 2, then node_1 and node_2 are the node numbers between which the connection should be broken",
         " - node_1 and node_2 must not exceed the nodes_count value specified in the client message",
-        "crash_time value must be an integer from 1 to 100!",
+        "crash_time value must be an integer from 10 to 100!",
         "No text in values!",
         "Number of operations can be from 10 to 10000",
         "Each new scenario must differ from the previous ones",

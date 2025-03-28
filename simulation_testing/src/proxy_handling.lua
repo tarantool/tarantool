@@ -31,6 +31,19 @@ local function get_proxy_state(proxy)
     end
 end
 
+local function find_proxy_by_ids(cg, id_1, id_2)
+
+    for _, proxy in ipairs(cg.proxies) do
+        if proxy.alias == string.format("proxy_%d_to_%d", id_1, id_2) then
+            if _G.nodes_activity_states[proxy.alias] == "crashed" then
+                return nil
+            end
+            return proxy
+        end
+    end
+    return nil
+end
+
 -- Finding all proxies whose alias starts with proxy_i
 local function find_proxies_by_prefix(cg, i)
     local prefix = string.format("proxy_%d_to_", i)
@@ -183,5 +196,6 @@ return {
     find_proxies_by_prefix = find_proxies_by_prefix,
     count_non_crashed_proxy_connections = count_non_crashed_proxy_connections,
     is_half_proxy_connections_non_crashed = is_half_proxy_connections_non_crashed,
-    get_random_proxies_for_crash = get_random_proxies_for_crash
+    get_random_proxies_for_crash = get_random_proxies_for_crash,
+    find_proxy_by_ids = find_proxy_by_ids
 }
