@@ -154,6 +154,27 @@ extern struct uri cfg_bootstrap_leader_uri;
 extern char cfg_bootstrap_leader_name[];
 
 /**
+ * Whether the given instance is configured to make bootstrap of
+ * the replicaset.
+ *
+ * Has an effect only in the supervised bootstrap strategy.
+ *
+ * This flag have to be consistent with bootstrap_leader_uuid
+ * except the following cases:
+ *
+ * - INSTANCE_UUID is zero UUID
+ * - the bootstrap strategy is not 'supervised'
+ */
+extern bool is_supervised_bootstrap_leader;
+
+/**
+ * A graceful bootstrap leadership request means that we check
+ * other peers first and if there is no bootstrap leader across
+ * them, continue as the bootstrap leader.
+ */
+extern bool is_graceful_supervised_bootstrap_requested;
+
+/**
  * Configured name of this instance. Might be different from the actual name if
  * the configuration is not fully applied yet.
  */
