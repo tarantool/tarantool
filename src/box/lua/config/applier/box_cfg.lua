@@ -156,20 +156,6 @@ end
 
 -- }}} audit_log
 
--- {{{ replication.bootstrap_strategy
-
-local function set_bootstrap_strategy(configdata, box_cfg)
-    local bootstrap_strategy = configdata:get('replication.bootstrap_strategy',
-        {use_default = true})
-
-    -- 'native' is implemented as 'supervised' under the hood.
-    if bootstrap_strategy == 'native' then
-        box_cfg.bootstrap_strategy = 'supervised'
-    end
-end
-
--- }}} replication.bootstrap_strategy
-
 -- {{{ Set RO/RW
 
 local function set_ro_rw(config, box_cfg)
@@ -273,6 +259,22 @@ local function set_ro_rw(config, box_cfg)
             assert(false)
         end
     elseif failover == 'supervised' then
+        -- If replication.bootstrap_strategy = supervised or
+        -- native, all the leader management actions are performed
+        -- by the failover coordinator (an external agent).
+        --
+        -- Don't do anything in the case.
+        local bootstrap_strategy = configdata:get(
+            'replication.bootstrap_strategy', {use_default = true})
+        local no_op_strategies = {
+            supervised = true,
+            native = true,
+        }
+        if no_op_strategies[bootstrap_strategy] then
+            box_cfg.read_only = true
+            return
+        end
+
         if configdata:bootstrap_leader_name() == nil then
             local warning = 'box_cfg.apply: cannot determine a bootstrap ' ..
                 'leader based on the configuration. Make sure learners are ' ..
@@ -1024,6 +1026,243 @@ end
 
 -- }}} Force RO on startup
 
+-- {{{ replication.bootstrap_strategy
+
+local native_bs_watcher
+
+local function am_i_effective_bs_leader()
+    local t = box.space._schema:get({'bootstrap_leader_uuid'})
+    if t == nil then
+        return false
+    end
+
+    local leader_uuid = t[2]
+    if leader_uuid == nil then
+        return false
+    end
+
+    return leader_uuid == box.info.uuid
+end
+
+local function start_native_bs_watcher()
+    if native_bs_watcher ~= nil then
+        return
+    end
+
+    native_bs_watcher = box.watch('box.status', function(key, status)
+        assert(key == 'box.status')
+
+        -- Don't do anything on early database loading stages or
+        -- if we're in the 'orphan' status.
+        --
+        -- The latter anyway assumes RO.
+        if status.status ~= 'running' then
+            return
+        end
+
+        -- TODO: Move synchro queue owner together with the RW
+        -- mode.
+
+        -- Move the bootstrap leader flag together with the RW
+        -- mode.
+        --
+        -- Note: In the replication.failover = 'off' mode several
+        -- RW instances may appear simultaneously. The
+        -- `bootstrap_leader_uuid` tuple in the _schema system
+        -- space is protected from replication conflicts (see
+        -- before_replace_dd_schema() from src/box/alter.cc), so
+        -- if the leadership is taken on several instances
+        -- simultaneously, it is harmless except, maybe, some
+        -- extra database writes.
+        --
+        -- TODO: Unlike the 'auto' strategy if one RW node is off,
+        -- another RW node doesn't take the bootstrap leadership
+        -- automatically. It may be a problem for a user: no way
+        -- to register a new replica in this case. The workaround
+        -- is to switch some accessible RW node to RO and then
+        -- back to RW. Or call box.ctl.make_bootstrap_leader()
+        -- manually.
+        local is_rw = not status.is_ro
+        if is_rw and not am_i_effective_bs_leader() then
+            local ok, err = pcall(box.ctl.make_bootstrap_leader)
+            if not ok then
+                log.error('box.ctl.make_bootstrap_leader() failed: %s', err)
+            end
+        end
+    end)
+end
+
+local function stop_native_bs_watcher()
+    if native_bs_watcher == nil then
+        return
+    end
+
+    -- NB: <watcher object>:unregister() on an already
+    -- unregistered watcher raises an error.
+    pcall(native_bs_watcher.unregister, native_bs_watcher)
+    native_bs_watcher = nil
+end
+
+-- Valid only for failover = 'off'.
+--
+-- Leans on box_cfg.read_only, so it is to be called after
+-- set_ro_rw(), set_isolated() and force_ro_on_startup().
+local function am_i_first_rw(configdata, box_cfg)
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    assert(failover == 'off')
+
+    local configured_as_rw = not box_cfg.read_only
+    if not configured_as_rw then
+        return false
+    end
+
+    -- If the instance is the only one in the replicaset,
+    -- it is set as RW by default (even if database.mode is not
+    -- set).
+    if #configdata:peers() == 1 then
+        return true
+    end
+
+    -- Find the first RW instance (lexicographically).
+    local first_rw_peer
+    for _, peer_name in ipairs(configdata:peers()) do
+        local opts = {instance = peer_name, use_default = true}
+        local mode = configdata:get('database.mode', opts)
+        if mode == 'rw' then
+            first_rw_peer = peer_name
+            break
+        end
+    end
+    assert(first_rw_peer ~= nil)
+
+    return first_rw_peer == configdata:names().instance_name
+end
+
+-- Valid only for failover = 'election'.
+local function am_i_first_candidate(configdata)
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    assert(failover == 'election')
+
+    local first_candidate
+    for _, peer_name in ipairs(configdata:peers()) do
+        local opts = {instance = peer_name, use_default = true}
+        local is_anon = configdata:get('replication.anon', opts)
+        local election_mode = configdata:get('replication.election_mode', opts)
+
+        -- A candidate is a non-anonymous instance that has
+        -- replication.election_mode = null or 'candidate'.
+        --
+        -- See set_ro_rw().
+        if election_mode == nil then
+            election_mode = is_anon and 'off' or 'candidate'
+        end
+
+        if election_mode == 'candidate' then
+            first_candidate = peer_name
+            break
+        end
+    end
+    assert(first_candidate ~= nil)
+
+    return first_candidate == configdata:names().instance_name
+end
+
+local function set_bootstrap_strategy_native(configdata, box_cfg)
+    -- If the strategy is switched from 'native' to some other
+    -- one, stop the watcher that handles the 'native' strategy.
+    local bootstrap_strategy = configdata:get('replication.bootstrap_strategy',
+        {use_default = true})
+    if bootstrap_strategy ~= 'native' then
+        stop_native_bs_watcher()
+        return
+    end
+
+    -- If the strategy is 'native', ensure that the watcher is
+    -- started.
+    --
+    -- The only exception is replication.failover = supervised.
+    -- In this case all the leader management actions are
+    -- performed by the failover coordinator (an external agent).
+    -- Ensure that the watcher is stopped in the case.
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    if failover == 'supervised' then
+        stop_native_bs_watcher()
+        return
+    else
+        start_native_bs_watcher()
+    end
+
+    -- There is nothing to do on configuration reload: the
+    -- box_cfg.read_only flag is already set and the background
+    -- watcher is started.
+    local is_startup = type(box.cfg) == 'function'
+    if not is_startup then
+        return
+    end
+
+    -- If there is a local snapshot, then the replicaset is
+    -- already bootstrapped. Nothing to do.
+    local has_snap = snapshot.get_path(configdata._iconfig_def) ~= nil
+    if has_snap then
+        return
+    end
+
+    local configured_as_rw = not box_cfg.read_only
+
+    if failover == 'off' then
+        -- The logic is very similar to the failover = 'manual'
+        -- one, but it is called only on the first RW instance,
+        -- because it is possible that several instances are
+        -- configured as RW.
+        if am_i_first_rw(configdata, box_cfg) then
+            box.ctl.make_bootstrap_leader({graceful = true})
+        end
+    elseif failover == 'manual' then
+        -- If the given instance is configured as RW (by the logic
+        -- from set_ro_rw()) and there is no local snapshot, then
+        -- it is possible that this instance will bootstrap the
+        -- replicaset.
+        --
+        -- Let's mark is as a possible bootstrap leader. If we
+        -- find that the replicaset is already bootstrapped, when
+        -- connect to other peers, then we proceed as a usual
+        -- replica.
+        if configured_as_rw then
+            box.ctl.make_bootstrap_leader({graceful = true})
+        end
+    elseif failover == 'election' then
+        -- First non-anonymous instance that has
+        -- replication.election_mode = null or 'candidate'
+        -- bootstraps the replicaset.
+        if am_i_first_candidate(configdata) then
+            box.ctl.make_bootstrap_leader({graceful = true})
+        end
+    elseif failover == 'supervised' then
+        -- Unreachable.
+        assert(false)
+    else
+        -- Unreachable.
+        assert(false)
+    end
+end
+
+local function set_bootstrap_strategy(configdata, box_cfg)
+    local bootstrap_strategy = configdata:get('replication.bootstrap_strategy',
+        {use_default = true})
+
+    -- 'native' is implemented as 'supervised' under the hood.
+    if bootstrap_strategy == 'native' then
+        box_cfg.bootstrap_strategy = 'supervised'
+    end
+
+    set_bootstrap_strategy_native(configdata, box_cfg)
+end
+
+-- }}} replication.bootstrap_strategy
+
 -- {{{ Hooks (utility function)
 
 -- See hooks_new().
@@ -1080,7 +1319,6 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-    set_bootstrap_strategy(configdata, box_cfg)
     set_ro_rw(config, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
@@ -1093,6 +1331,13 @@ local function apply(config)
 
     -- Safe startup mode. May enforce RO.
     local needs_retry = force_ro_on_startup(configdata, box_cfg)
+
+    -- bootstrap_strategy = native needs a bit extra logic.
+    --
+    -- It leans on set_ro_rw(), set_isolated() and
+    -- force_ro_on_startup() logic that sets box_cfg.read_only, so
+    -- let's call it afterwards.
+    set_bootstrap_strategy(configdata, box_cfg)
 
     -- Finally, run box.cfg().
     local is_startup = type(box.cfg) == 'function'
