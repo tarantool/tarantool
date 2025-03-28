@@ -90,6 +90,7 @@ local USAGE_STRING = [[
    test_duration <number, 2*60>          - test duration time (sec)
    test_dir <string, ./%s>  - path to a test directory
    engine <string, '%s'>              - engine (%s)
+   api <string, 'lapi'>                  - API ('lapi', 'sql', 'mix')
    fault_injection <boolean, false>      - enable fault injection
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
@@ -626,52 +627,97 @@ end
 
 local function select_op(space, idx_type, key)
     local opts = select_opts(idx_type)
-    space:select(key, opts)
+    space:select(key, select_opts)
+    if api == 'lapi' then
+        space:select(key, select_opts)
+    elseif api == 'sql' then
+        local field_name = space:format()[1].name
+        box.execute(('SELECT * FROM %s WHERE %s = "%s"'):
+                    format(space.name, field_name, key))
+    end
 end
 
-local function get_op(space, key)
-    space:get(key)
+local function get_op(space, api, key)
+    if api == 'lapi' then
+        space:get(key)
+    elseif api == 'sql' then
+        local field_name = space:format()[1].name
+        box.execute(('SELECT * FROM %s WHERE %s = "%s"'):
+                    format(space.name, field_name, key))
+    end
 end
 
-local function put_op(space, tuple)
-    space:put(tuple)
+local function put_op(space, api, tuple)
+    if api == 'lapi' then
+        space:put(tuple)
+    elseif api == 'sql' then
+        local values = ''
+        local sql_query =
+            ('INSERT INTO %s VALUES ()'):format(space.name, values)
+        box.execute(sql_query)
+    end
 end
 
-local function delete_op(space, tuple)
-    space:delete(tuple)
+local function delete_op(space, api, tuple)
+    if api == 'lapi' then
+        space:delete(tuple)
+    elseif api == 'sql' then
+        local field_name = space:format()[1].name
+        local key = tuple[1]
+        local sql_query = ('DELETE FROM %s WHERE %s = "%s"'):
+            format(space.name, field_name, key)
+        box.execute(sql_query)
+    end
 end
 
-local function insert_op(space, tuple)
-    space:insert(tuple)
+local function insert_op(space, api, tuple)
+    if api == 'lapi' then
+        space:insert(tuple)
+    elseif api == 'sql' then
+        local values =
+            fun.iter(tuple):map(function(x) return json.encode(x) end):totable()
+        local sql_values = table.concat(values, ' ')
+        box.execute(('INSERT INTO %s VALUES ()'):format(space.name, sql_values))
+    end
 end
 
-local function upsert_op(space, tuple, tuple_ops)
+local function upsert_op(space, _api, tuple, tuple_ops)
     assert(next(tuple_ops) ~= nil)
     space:upsert(tuple, tuple_ops)
 end
 
-local function update_op(space, key, tuple_ops)
+local function update_op(space, api, key, tuple_ops)
     assert(next(tuple_ops) ~= nil)
-    space:update(key, tuple_ops)
+    if api == 'lapi' then
+        space:update(key, tuple_ops)
+    elseif api == 'sql' then
+        local field_name = space:format()[1].name
+        box.execute(('UPDATE %s SET %s = "%s"'):
+            format(space.name, field_name, key))
+    end
 end
 
-local function replace_op(space, tuple)
-    space:replace(tuple)
+local function replace_op(space, api, tuple)
+    if api == 'lapi' then
+        space:replace(tuple)
+    elseif api == 'sql' then
+        box.execute(('REPLACE INTO %s DEFAULT VALUES'):format(space.name))
+    end
 end
 
-local function bsize_op(space)
+local function bsize_op(space, _api)
     space:bsize()
 end
 
-local function len_op(space)
+local function len_op(space, _api)
     space:len()
 end
 
-local function format_op(space, space_format)
+local function format_op(space, _api, space_format)
     space:format(space_format)
 end
 
-local function insert_arrow_op(space, batch)
+local function insert_arrow_op(space, _api, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
@@ -685,7 +731,7 @@ local function index_is_multikey(idx)
     return false
 end
 
-local function setup_box(engine_name, test_dir, verbose)
+local function setup_box(engine_name, test_dir, verbose, api)
     log.info('SETUP')
     assert(SUPPORTED_ENGINES_SET[engine_name], 'engine is not supported')
     -- Configuration reference (box.cfg),
@@ -736,7 +782,7 @@ local function setup_box(engine_name, test_dir, verbose)
     log.info('FINISH BOX.CFG')
 end
 
-local function setup_space(engine_name, space_name)
+local function setup_space(engine_name, space_name, api)
     log.info('CREATE A SPACE')
     assert(SUPPORTED_ENGINES_SET[engine_name], 'engine is not supported')
     local space_format = random_space_format(engine_name)
@@ -757,8 +803,8 @@ local function setup_space(engine_name, space_name)
         space_opts.temporary = oneof({true, false})
     end
     local space = box.schema.space.create(space_name, space_opts)
-    index_create_op(space)
-    index_create_op(space)
+    index_create_op(space, api)
+    index_create_op(space, api)
     log.info('FINISH SETUP')
     return space
 end
@@ -893,33 +939,50 @@ local function index_opts(space, is_primary)
     return opts
 end
 
-function index_create_op(space)
+function index_create_op(space, api)
     local idx_id = index_id_func()
     local idx_name = 'idx_' .. idx_id
     local is_primary = idx_id == 1
     local opts = index_opts(space, is_primary)
-    space:create_index(idx_name, opts)
+    -- Create primary key using Lua API.
+    if api == 'lapi' or is_primary then
+        space:create_index(idx_name, opts)
+    elseif api == 'sql' then
+        local parts_names = {}
+        for _, p in ipairs(opts.parts) do
+            table.insert(parts_names, p[1])
+        end
+        local parts_str = table.concat(parts_names, ', ')
+        local sql_query = ('CREATE INDEX %s ON %s(%s);'):
+            format(idx_name, space.name, parts_str)
+        box.execute(sql_query)
+    end
 end
 
-local function index_drop_op(space)
+local function index_drop_op(space, api)
     if not space.enabled then return end
     local idx = oneof(space.index)
-    if idx ~= nil then idx:drop() end
+    if api == 'lapi' then
+        if idx ~= nil then idx:drop() end
+    elseif api == 'sql' then
+        local sql_query = ('DROP INDEX %s;'):format(idx.name)
+        box.execute(sql_query)
+    end
 end
 
-local function index_alter_op(_, idx, opts)
+local function index_alter_op(_, _api, idx, opts)
     assert(idx)
     assert(opts)
     opts.if_not_exists = nil
     idx:alter(opts)
 end
 
-local function index_compact_op(_, idx)
+local function index_compact_op(_, _api, idx)
     assert(idx)
     idx:compact()
 end
 
-local function index_max_op(_, idx)
+local function index_max_op(_, _api, idx)
     assert(idx)
     if not tarantool_indices[idx.type].is_max_support then
         return
@@ -927,7 +990,7 @@ local function index_max_op(_, idx)
     idx:max()
 end
 
-local function index_min_op(_, idx)
+local function index_min_op(_, _api, idx)
     assert(idx)
     if not tarantool_indices[idx.type].is_min_support then
         return
@@ -935,7 +998,7 @@ local function index_min_op(_, idx)
     idx:min()
 end
 
-local function index_random_op(_, idx)
+local function index_random_op(_, _api, idx)
     assert(idx)
     if idx.type ~= 'BITSET' and
        idx.type ~= 'RTREE' then
@@ -943,17 +1006,17 @@ local function index_random_op(_, idx)
     end
 end
 
-local function index_rename_op(_, idx, idx_name)
+local function index_rename_op(_, _api, idx, idx_name)
     assert(idx)
     idx:rename(idx_name)
 end
 
-local function index_stat_op(_, idx)
+local function index_stat_op(_, _api, idx)
     assert(idx)
     idx:stat()
 end
 
-local function index_get_op(_space, idx, key)
+local function index_get_op(space, api, idx, key)
     assert(idx)
     assert(key)
     local index_opts = tarantool_indices[idx.type]
@@ -961,10 +1024,14 @@ local function index_get_op(_space, idx, key)
        not index_opts.is_non_unique_support then
         return
     end
-    idx:get(key)
+    if api == 'lapi' then
+        idx:get(key)
+    elseif api == 'sql' then
+        get_op(space, api, key)
+    end
 end
 
-local function index_select_op(_space, idx, key)
+local function index_select_op(space, api, idx, key)
     assert(idx)
     assert(key)
     local opts = select_opts(idx.type)
@@ -989,14 +1056,20 @@ local function index_pagination_op(_space, idx, key)
         opts.after = oneof(tuples)
         idx:select(key, opts)
     end
+    idx:select(key)
+    if api == 'lapi' then
+        idx:select(key)
+    elseif api == 'sql' then
+        select_op(space, api, idx.type, key)
+    end
 end
 
-local function index_count_op(_, idx)
+local function index_count_op(_, _api, idx)
     assert(idx)
     idx:count()
 end
 
-local function index_update_op(_space, key, idx, tuple_ops)
+local function index_update_op(space, api, key, idx, tuple_ops)
     assert(idx)
     assert(key)
     assert(tuple_ops)
@@ -1006,10 +1079,14 @@ local function index_update_op(_space, key, idx, tuple_ops)
        not index_opts.is_non_unique_support then
         return
     end
-    idx:update(key, tuple_ops)
+    if api == 'lapi' then
+        idx:update(key, tuple_ops)
+    elseif api == 'sql' then
+        update_op(space, api, key, tuple_ops)
+    end
 end
 
-local function index_delete_op(_space, idx, key)
+local function index_delete_op(space, api, idx, key)
     assert(idx)
     assert(key)
     local index_opts = tarantool_indices[idx.type]
@@ -1017,7 +1094,13 @@ local function index_delete_op(_space, idx, key)
        not index_opts.is_non_unique_support then
         return
     end
-    idx:delete(key)
+    if api == 'lapi' then
+        idx:delete(key)
+    elseif api == 'sql' then
+        local field_name = space:format()[1].name
+        box.execute(('DELETE FROM %s WHERE %s = "%s"'):
+            format(space.name, field_name, key))
+    end
 end
 
 local function index_arrow_stream_op(space, idx, fields, key)
@@ -1057,7 +1140,6 @@ local function index_arrow_stream_op(space, idx, fields, key)
     end
     arrow.arrow_stream_free(stream)
 end
-
 
 -- Generate random field value, `opts` is a map with options.
 -- Available options:
@@ -1388,7 +1470,7 @@ local ops = {
     },
 
     TX_BEGIN = {
-        func = function()
+        func = function(_space, api)
             if box.is_in_txn() then
                 return
             end
@@ -1396,22 +1478,34 @@ local ops = {
             if box.cfg.memtx_use_mvcc_engine then
                txn_opts.txn_isolation = oneof(isolation_levels)
             end
-            box.begin(txn_opts)
+            if api == 'lapi' then
+                box.begin(txn_opts)
+            elseif api == 'sql' then
+                box.execute('START TRANSACTION')
+            end
         end,
         args = function(_) return end,
     },
     TX_COMMIT = {
-        func = function()
+        func = function(_space, api)
             if box.is_in_txn() then
-                box.commit()
+                if api == 'lapi' then
+                    box.commit()
+                elseif api == 'sql' then
+                    box.execute('COMMIT')
+                end
             end
         end,
         args = function(_) return end,
     },
     TX_ROLLBACK = {
-        func = function()
+        func = function(_space, api)
             if box.is_in_txn() then
-                box.rollback()
+                if api == 'lapi' then
+                    box.rollback()
+                elseif api == 'sql' then
+                    box.execute('ROLLBACK')
+                end
             end
         end,
         args = function(_) return end,
@@ -1435,7 +1529,7 @@ local ops = {
     },
 }
 
-local function apply_op(space, op_name)
+local function apply_op(space, op_name, api)
     local op = ops[op_name]
     if op.engines ~= nil and not contains(op.engines, space.engine) then
         log.info('SKIP: %s does not support %s', space.engine, op_name)
@@ -1444,7 +1538,7 @@ local function apply_op(space, op_name)
     local func = op.func
     local args = { op.args(space) }
     log.info('%s %s', op_name, json.encode(args))
-    local pcall_args = {func, space, unpack(args)}
+    local pcall_args = {func, space, api, unpack(args)}
     local ok, err = pcall(unpack(pcall_args))
     if ok ~= true then
         log.info('ERROR: opname "%s", err "%s", args %s',
@@ -1455,7 +1549,7 @@ end
 
 local shared_gen_state
 
-local function worker_func(id, space, test_gen, deadline)
+local function worker_func(id, space, test_gen, deadline, api)
     log.info('Worker #%d has started.', id)
     local gen, param, state = test_gen:unwrap()
     shared_gen_state = state
@@ -1467,7 +1561,8 @@ local function worker_func(id, space, test_gen, deadline)
             break
         end
         shared_gen_state = state
-        local err = apply_op(space, operation_name)
+        local cur_api = api == 'mix' and oneof({'lapi', 'sql'}) or api
+        local err = apply_op(space, operation_name, cur_api)
         table.insert(errors, err)
     end
     log.info('Worker #%d has finished.', id)
@@ -1874,10 +1969,9 @@ local function start_error_injections(space, deadline)
 end
 
 local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode, fault_injection, seed)
+                        engine_name, verbose_mode, fault_injection, seed, api)
     math.randomseed(seed)
     log.info('Random seed: %d', seed)
-
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
@@ -1893,13 +1987,13 @@ local function run_test(num_workers, test_duration, test_dir,
     local space_id_func = counter()
     setup_box(engine_name, test_dir, verbose_mode)
     local space_name = ('test_%d'):format(space_id_func())
-    local space = setup_space(engine_name, space_name)
+    local space = setup_space(engine_name, space_name, api)
     local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
     local f
     for id = 1, num_workers do
-        f = fiber.new(worker_func, id, space, test_gen, deadline)
+        f = fiber.new(worker_func, id, space, test_gen, deadline, api)
         f:set_joinable(true)
         f:name('WRK #' .. id)
         table.insert(fibers, f)
@@ -1995,7 +2089,8 @@ local function TestOneInput(buf)
         box_cfg = true
     end
     local space_name = ('space_%d'):format(space_id)
-    local space = setup_space(engine_name, space_name)
+    local api = fdp:oneof({'sql', 'lapi', 'mix'})
+    local space = setup_space(engine_name, space_name, api)
     local MAX_OPS = fdp:consume_integer(10, 50)
     log.info('Maximum number of operations: %d', MAX_OPS)
     local num_workers = fdp:consume_integer(1, 200)
@@ -2050,4 +2145,4 @@ end
 local args = parse_args()
 
 run_test(args.num_workers, args.test_duration, args.test_dir,
-         args.engine, args.verbose, args.fault_injection, args.seed)
+         args.engine, args.verbose, args.fault_injection, args.seed, args.api)
