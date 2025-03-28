@@ -293,12 +293,11 @@ end
 
 local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_nodes ,crashed_proxy_nodes)
     local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
-    if (#crash_nodes > #available_nodes or #available_nodes <  math.floor(#cg.replicas /2) + 1) then
-        LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
-        return
-    end
-    local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states)
     if type_of_crashing == 1 then
+        if (#crash_nodes > #available_nodes or #available_nodes <  math.floor(#cg.replicas /2) + 1) then
+            LogInfo("[CRASH SIMULATION] Not enough healthy nodes to select")
+            return
+        end
         if #crash_nodes > 0 then
             local node = get_node_by_id(available_nodes,crash_nodes[1])
             if node == nil then
