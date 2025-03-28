@@ -1162,7 +1162,7 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 			goto rollback_abort;
 		});
 		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
-		    journal_queue_is_full()) {
+		    journal_queue_would_block()) {
 			diag_set(ClientError, ER_WAL_QUEUE_FULL);
 			goto rollback_abort;
 		}
