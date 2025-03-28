@@ -889,6 +889,13 @@ I['database.txn_timeout'] = format_text([[
     A timeout (in seconds) after which the transaction is rolled back.
 ]])
 
+I['database.txn_synchro_timeout'] = format_text([[
+    A timeout (in seconds) after which the fiber is detached from synchronous
+    transaction that is currently collecting quorum. After the timeout expires,
+    the transaction is not rolled back but continues to wait for a quorum in
+    background.
+]])
+
 I['database.use_mvcc_engine'] = 'Whether the transactional manager is enabled.'
 
 -- }}} database configuration

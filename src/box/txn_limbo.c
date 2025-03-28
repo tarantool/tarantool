@@ -406,15 +406,11 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(txn_has_flag(entry->txn, TXN_WAIT_SYNC));
 	double start_time = fiber_clock();
 	while (true) {
-		int rc;
-		if (replication_synchro_timeout_rollback_enabled) {
-			double timeout = start_time +
-				replication_synchro_timeout - fiber_clock();
-			rc = fiber_cond_wait_timeout(
-				&limbo->wait_cond, timeout);
-		} else {
-			rc = fiber_cond_wait(&limbo->wait_cond);
-		}
+		double timeout = (replication_synchro_timeout_rollback_enabled ?
+			replication_synchro_timeout : txn_synchro_timeout);
+		double timeout_rest = start_time + timeout - fiber_clock();
+		int rc = fiber_cond_wait_timeout(
+			&limbo->wait_cond, timeout_rest);
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0 && fiber_is_cancelled())
@@ -426,6 +422,12 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	}
 
 	assert(!txn_limbo_is_empty(limbo));
+
+	if (!replication_synchro_timeout_rollback_enabled) {
+		diag_set(ClientError, ER_SYNC_TIMEOUT);
+		return -1;
+	}
+
 	struct txn_limbo_entry *e;
 	bool is_first_waiting_entry = true;
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {

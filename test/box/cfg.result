@@ -124,6 +124,8 @@ cfg_filter(box.cfg)
  |     - 0.5
  |   - - txn_isolation
  |     - best-effort
+ |   - - txn_synchro_timeout
+ |     - 5
  |   - - txn_timeout
  |     - 3153600000
  |   - - vinyl_bloom_fpr
@@ -278,6 +280,8 @@ cfg_filter(box.cfg)
  |     - 0.5
  |   - - txn_isolation
  |     - best-effort
+ |   - - txn_synchro_timeout
+ |     - 5
  |   - - txn_timeout
  |     - 3153600000
  |   - - vinyl_bloom_fpr
