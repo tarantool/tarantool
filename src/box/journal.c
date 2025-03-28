@@ -94,7 +94,7 @@ void
 journal_queue_wakeup(void)
 {
 	if (!stailq_empty(&journal_queue.requests) &&
-	    !journal_queue_is_full()) {
+	    journal_queue.size < journal_queue.max_size) {
 		struct journal_entry *req =
 				stailq_first_entry(&journal_queue.requests,
 						   typeof(*req), fifo);
@@ -103,11 +103,15 @@ journal_queue_wakeup(void)
 }
 
 int
-journal_queue_wait(struct journal_entry *entry)
+journal_queue_wait(struct journal_entry *entry, bool no_wait)
 {
-	if (!journal_queue_is_full() &&
+	if (journal_queue.size < journal_queue.max_size &&
 	    stailq_empty(&journal_queue.requests))
 		return 0;
+	if (no_wait) {
+		diag_set(ClientError, ER_WAL_QUEUE_FULL);
+		return -1;
+	}
 	int rc = -1;
 	struct journal_entry *prev_entry =
 			stailq_last_entry(&journal_queue.requests,

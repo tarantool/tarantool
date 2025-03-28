@@ -1161,11 +1161,6 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 				 "txn commit async injection");
 			goto rollback_abort;
 		});
-		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE &&
-		    journal_queue_is_full()) {
-			diag_set(ClientError, ER_WAL_QUEUE_FULL);
-			goto rollback_abort;
-		}
 	}
 	/*
 	 * Do not cache the flag value in a variable. The flag might be deleted
@@ -1179,7 +1174,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		goto rollback_abort;
 	}
 	fiber_set_txn(fiber(), NULL);
-	if (journal_write_submit(req) != 0)
+	if (journal_write_submit(req,
+				 wait_mode == TXN_COMMIT_WAIT_MODE_NONE) != 0)
 		goto rollback_io;
 	if (wait_mode != TXN_COMMIT_WAIT_MODE_COMPLETE) {
 		if (txn_has_flag(txn, TXN_IS_DONE))

@@ -188,19 +188,12 @@ void
 journal_queue_wakeup(void);
 
 /**
- * Check whether any of the queue size limits is reached.
- * If the queue is full, we must wait for some of the entries to be written
- * before proceeding with a new asynchronous write request.
+ * Yield until there's some space in the journal queue.
+ *
+ * If no_wait is true then fail if request has to yield.
  */
-static inline bool
-journal_queue_is_full(void)
-{
-	return journal_queue.size >= journal_queue.max_size;
-}
-
-/** Yield until there's some space in the journal queue. */
 int
-journal_queue_wait(struct journal_entry *entry);
+journal_queue_wait(struct journal_entry *entry, bool no_wait);
 
 /** Flush journal queue. Next wal_sync() will sync flushed requests. */
 void
@@ -257,12 +250,15 @@ journal_write_row(struct xrow_header *row);
 /**
  * Queue a single entry to the journal in asynchronous way.
  *
+ * If no_wait is true then fail if request has to wait before being written
+ * to WAL.
+ *
  * @return 0 if write was queued to a backend or -1 in case of an error.
  */
 static inline int
-journal_write_submit(struct journal_entry *entry)
+journal_write_submit(struct journal_entry *entry, bool no_wait)
 {
-	if (journal_queue_wait(entry) != 0)
+	if (journal_queue_wait(entry, no_wait) != 0)
 		return -1;
 	/*
 	 * We cannot account entry after write. If journal is synchronous
@@ -280,7 +276,7 @@ journal_write_submit(struct journal_entry *entry)
 static inline int
 journal_write(struct journal_entry *entry)
 {
-	if (journal_write_submit(entry) != 0)
+	if (journal_write_submit(entry, /*no_wait*/false) != 0)
 		return -1;
 	while (!entry->is_complete)
 		fiber_yield();
