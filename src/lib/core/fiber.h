@@ -278,6 +278,25 @@ API_EXPORT struct fiber *
 fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr, fiber_func f);
 
 /**
+ * Reads the maximum number of memory maps available.
+ * @return The maximum map count, or -1 on failure.
+ */
+int
+read_max_map_count();
+
+/**
+ * Sets the limit for client fiber creation.
+ * @param limit The maximum number of client fibers allowed.
+ */
+void
+fiber_set_client_limit(int limit);
+
+/**
+ * Maximum number of allowed client fibers.
+ */
+extern int64_t fiber_max_count;
+
+/**
  * Return control to another fiber and wait until it'll be woken.
  *
  * \note this is not a cancellation point (\sa fiber_testcancel()), but it is
