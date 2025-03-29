@@ -370,7 +370,7 @@ struct replicaset {
 		 * synchronized and hence contribute to the
 		 * quorum.
 		 */
-		int synced;
+		int synced_and_part_of_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
@@ -470,6 +470,8 @@ struct replica {
 	enum applier_state applier_sync_state;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
+	/** True if this applier is part of the synchronous quorum */
+	bool is_part_of_sync_quorum;
 };
 
 enum {
@@ -682,8 +684,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Reload replica URIs.
  *
