@@ -1093,6 +1093,8 @@ gc_load_consumers(void)
 	struct index *index = space_index(space, 0);
 	assert(index != NULL);
 	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
 	struct tuple *tuple = NULL;
 	struct gc_consumer_def def;
 	int rc = 0;

@@ -5887,8 +5887,10 @@ box_cfg_xc(void)
 	/*
 	 * Load persistent WAL GC consumers.
 	 */
-	if (gc_load_consumers() != 0)
+	if (gc_load_consumers() != 0) {
+		say_error("Failed to recover WAL GC consumers");
 		diag_raise();
+	}
 
 	/*
 	 * Initialize GC of anonymous replicas after loading WAL GC consumers.
