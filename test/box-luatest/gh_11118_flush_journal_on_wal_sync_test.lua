@@ -1,0 +1,51 @@
+local server = require('luatest.server')
+local t = require('luatest')
+
+local g = t.group()
+
+g.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g.after_test('test_flush_journal_on_wal_sync', function(cg)
+    cg.server:exec(function()
+        box.cfg{wal_queue_max_size = box.NULL}
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
+end)
+
+g.test_flush_journal_on_wal_sync = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.create_space('test', {engine = 'vinyl'})
+        s:create_index('pk')
+        box.cfg{wal_queue_max_size = 100}
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        local f1 = fiber.new(function()
+            s:insert({1, string.rep('a', 1000)})
+        end)
+        f1:set_joinable(true)
+        fiber.yield()
+        local f2 = fiber.new(function()
+            -- This tuple will be missing in sk if there is no queue flush.
+            s:insert({2})
+        end)
+        f2:set_joinable(true)
+        fiber.yield()
+        local ddl = fiber.new(function()
+            s:create_index('sk')
+        end)
+        ddl:set_joinable(true)
+        fiber.yield()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert(f1:join(), {true})
+        t.assert(f2:join(), {true})
+        t.assert(ddl:join(), {true})
+        t.assert_equals(s.index.sk:select(), s.index.pk:select())
+    end)
+end

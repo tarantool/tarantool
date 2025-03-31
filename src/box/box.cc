@@ -2926,7 +2926,6 @@ box_wait_limbo_acked(double timeout)
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
 
-		journal_queue_flush();
 		if (wal_sync(NULL) != 0)
 			return -1;
 
