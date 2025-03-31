@@ -667,6 +667,7 @@ wal_sync(struct vclock *vclock)
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
+	journal_queue_flush();
 	struct wal_vclock_msg msg;
 	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
 			   wal_sync_f);
