@@ -553,6 +553,7 @@ relay_status_update(struct cmsg *msg)
 static void
 tx_status_update(struct cmsg *msg)
 {
+	ERROR_INJECT_YIELD(ERRINJ_RELAY_TX_STATUS_UPDATE_DELAY);
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
 	struct relay *relay = status->relay;
 	vclock_copy(&relay->tx.vclock, &status->vclock);
@@ -585,6 +586,15 @@ tx_status_update(struct cmsg *msg)
 			      vclock_get(ack.vclock, instance_id));
 	}
 	trigger_run(&replicaset.on_ack, &ack);
+
+	if (!relay->tx.is_paired) {
+		/*
+		 * Reset the route so that `relay_check_status_needs_update`
+		 * could process it later, during `relay_subscribe_update`.
+		 */
+		cmsg_init(msg, NULL);
+		return;
+	}
 
 	static const struct cmsg_hop route[] = {
 		{relay_status_update, NULL}
