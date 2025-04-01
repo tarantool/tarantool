@@ -81,7 +81,6 @@ end)
 
 LogInfo(result)
 
---[[
 LogInfo("[PERIODIC INSERT] Started")
 log_handling.periodic_insert(
     cg,
@@ -99,7 +98,6 @@ log_handling.divergence_monitor(
     1,
     2
 )
-]]--
 
 
 LogInfo("[CRASH SIMULATION] Started")

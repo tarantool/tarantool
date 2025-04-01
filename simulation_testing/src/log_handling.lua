@@ -97,7 +97,6 @@ local function periodic_insert(cg, space_name, i_0, step, interval)
                         end)
 
                         if exists_status and exists_result then
-                            if _G.SUCCESSFUL_LOGS == 0 then
                             if _G.SUCCESSFUL_LOGS == "true" then
                                 LogInfo("[PERIODIC INSERT] Key " .. key .. " already exists. Incrementing key and retrying...")
                             end
@@ -237,6 +236,12 @@ end
 local function divergence_monitor(cg, space_name, n, step, interval)
     fiber.create(function()
         local count = 0
+
+        -- only for non linearizable insertions
+        if WITHOUT_LINEARIZABLE == "true" then
+            local counter_of_divs_events = 0
+        end
+
         while true do
             local valid_nodes = {}
             -- Wrapped the entire cycle in pcall for safe execution
@@ -286,11 +291,15 @@ local function divergence_monitor(cg, space_name, n, step, interval)
                             divergence = count - common_length
                         end
 
-                        if _G.SUCCESSFUL_LOGS == 0 then
-                            LogInfo(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
-                        else
-                            if divergence ~= 0 then
-                                LogInfo(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                        if divergence ~= 0 then
+                            if WITHOUT_LINEARIZABLE == "false" then
+                                LogError(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                            else
+                                counter_of_divs_events = counter_of_divs_events + 1
+                                if counter_of_divs_events == 10 then
+                                    LogError(string.format("[DIVERGENCE MONITOR] Divergence of entries: %d", divergence))
+                                    counter_of_divs_events = 0
+                                end
                             end
                         end
                     else

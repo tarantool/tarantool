@@ -343,7 +343,7 @@ end
 
 local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_nodes ,crashed_proxy_nodes)
     local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica_")
-    if type_of_crashing == 1 then
+    if type_of_crashing == 0 then
         if is_this_node_crash_safe(cg.replicas,nodes_activity_states, #crash_nodes) == false then
             return {}
         end
@@ -361,7 +361,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
         else
             LogInfo("[CRASH SIMULATION] No Nodes to crash")
         end
-    elseif type_of_crashing == 2 then
+    elseif type_of_crashing == 1 then
         if #crash_nodes > 0 then
             local node = crash_nodes[1]
             if node == nil then
@@ -374,7 +374,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             end
         end
 
-    elseif type_of_crashing == 3 then
+    elseif type_of_crashing == 2 then
         if #crash_nodes > 0 then
             local node_1 = crash_nodes[1]
             local node_2 = crash_nodes[2]
@@ -394,9 +394,13 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             end
         end
 
-    elseif type_of_crashing == 4 then
+    elseif type_of_crashing == 3 then
+
+        if WITHOUT_PROXY == "true" then
+            LogInfo("[CRASH SIMULATION] Proxy crashes are disabled")
+        end
         
-        if #crashed_proxy_nodes > 0 then
+        if WITHOUT_PROXY ~= "true" and #crashed_proxy_nodes > 0 then
             for i, proxy in ipairs(crashed_proxy_nodes) do
                 local success, err = pcall(pause_proxy, proxy, delay)
                 if not success then
@@ -413,10 +417,15 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
             local success, err = pcall(function()
                 fiber.sleep(crash_interval)
 
-                local type_of_crashing = math.random(1, 4)
+                local type_of_crashing
+                if WITHOUT_PROXY == "true" then 
+                    type_of_crashing = math.random(0, 2)
+                else
+                    type_of_crashing = math.random(0, 3)
+                end
                 local delay = tools.calculate_delay(lower_crash_time_bound, upper_crash_time_bound)
                 local crash_node_nodes
-                if type_of_crashing == 3 then
+                if type_of_crashing == 2 then
                     crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
                 else
                     crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
