@@ -113,12 +113,17 @@ local function create_memtx()
     end
     fio.mkdir(memtx_path)
 
-    box.cfg {
+    local box_cfg = {
         checkpoint_count = 2,
         memtx_use_mvcc_engine = true,
         memtx_dir = memtx_path,
-        txn_isolation = 'best-effort'
     }
+
+    if WITHOUT_BEST_EFFORT ~= "true" then
+        box_cfg.txn_isolation = 'best-effort'
+    end
+
+    box.cfg(box_cfg)
 end
 
 local function clear_dirs_for_all_replicas()

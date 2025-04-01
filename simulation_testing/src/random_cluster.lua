@@ -18,11 +18,13 @@ local function rand_cfg(cg, replica_count, replica_id)
     for i = 1, replica_count do
         if i == replica_id then
             table.insert(uri_set, server.build_listen_uri('replica_'..tostring(i), cg.cluster.id))
-        else
+        elseif WITHOUT_PROXY ~= "true" then
             local proxy_uri = fio.abspath(
-                server.build_listen_uri('proxy_'..tostring(replica_id)..'_to_' ..tostring(i), cg.cluster.id)
+                server.build_listen_uri('proxy_'..tostring(replica_id)..'_to_'..tostring(i), cg.cluster.id)
             )
             table.insert(uri_set, proxy_uri)
+        else
+            table.insert(uri_set, server.build_listen_uri('replica_'..tostring(i), cg.cluster.id))
         end
     end
 
@@ -38,9 +40,12 @@ local function rand_cfg(cg, replica_count, replica_id)
         memtx_dir = memtx_dir,
         wal_dir = wal_dir,
         log = log_file,
-        txn_isolation = 'best-effort',
         wal_mode = 'write'
     }
+
+    if WITHOUT_BEST_EFFORT ~= "true" then
+        box_cfg.txn_isolation = 'best-effort'
+    end
 
     print("Configured replica:", replica_id,
           "\nReplication URIs:", table.concat(uri_set, ", "),
@@ -55,7 +60,7 @@ local function clear_cluster(cg)
     if cg.cluster then
         cg.cluster:drop()
     end
-    if cg.proxies then
+    if cg.proxies and WITHOUT_PROXY ~= "true" then
         for _, proxy in ipairs(cg.proxies) do
             proxy:stop()
         end
@@ -98,15 +103,16 @@ local function make_cluster(replica_count)
         }
     end
 
-    -- Create a proxy for all connections
-    for i_id = 1, replica_count do
-        for j_id = 1, replica_count do
-            if i_id ~= j_id then  -- The node does not connect to itself
-                -- Creating a proxy for the i_id -> j_id connection
-                local proxy = proxy_handling.create_proxy_for_connection(cg, i_id, j_id)
-                table.insert(cg.proxies, proxy)
-                proxy:start({force = true})
-                print(string.format("Proxy for replica_%d to replica_%d started.", i_id, j_id))
+    -- Create proxies only if they are enabled
+    if WITHOUT_PROXY ~= "true" then
+        for i_id = 1, replica_count do
+            for j_id = 1, replica_count do
+                if i_id ~= j_id then
+                    local proxy = proxy_handling.create_proxy_for_connection(cg, i_id, j_id)
+                    table.insert(cg.proxies, proxy)
+                    proxy:start({force = true})
+                    print(string.format("Proxy for replica_%d to replica_%d started.", i_id, j_id))
+                end
             end
         end
     end
