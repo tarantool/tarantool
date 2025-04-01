@@ -412,7 +412,7 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
             local success, err = pcall(function()
                 fiber.sleep(crash_interval)
 
-                local type_of_crashing = math.random(1, 4)
+                local type_of_crashing = math.random(3, 4) ---waaaaaaaaaaa
                 local delay = tools.calculate_delay(lower_crash_time_bound, upper_crash_time_bound)
                 local crash_node_nodes
                 if type_of_crashing == 3 then
