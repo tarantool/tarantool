@@ -120,7 +120,7 @@ enum bootstrap_strategy {
 };
 
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */
-extern enum bootstrap_strategy bootstrap_strategy;
+extern enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
 
 enum replicaset_state {
 	REPLICASET_BOOTSTRAP,
@@ -258,6 +258,12 @@ replication_reconnect_interval(void)
 double
 replication_disconnect_timeout(void);
 
+/**
+ * Update the replication synchronization quorum
+ */
+void
+replicaset_on_bootstrap_strategy_change(void);
+
 void
 replication_init(int num_threads);
 
@@ -355,11 +361,10 @@ struct replicaset {
 		 */
 		int loading;
 		/**
-		 * Number of appliers that have successfully
-		 * synchronized and hence contribute to the
-		 * quorum.
+		 * Number of applicants who have successfully
+		 * synchronized and are in the sync quorum.
 		 */
-		int synced;
+		int synced_in_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
@@ -459,6 +464,8 @@ struct replica {
 	enum applier_state applier_sync_state;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
+	/** Whether this applier is in the synchronization quorum */
+	bool is_in_sync_quorum;
 };
 
 enum {
