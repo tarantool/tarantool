@@ -111,6 +111,7 @@ memtx_tree_data_is_equal(const struct memtx_tree_data_common *a,
 }
 
 #define BPS_INNER_CARD
+#define BPS_TIME_SERIES_OPTIMIZED
 #define BPS_TREE_NAME memtx_tree
 #define BPS_TREE_BLOCK_SIZE (512)
 #define BPS_TREE_EXTENT_SIZE MEMTX_EXTENT_SIZE
