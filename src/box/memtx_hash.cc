@@ -358,45 +358,125 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	return 0;
 }
 
+/**
+ * If key is present then replace it's tuple with `new_tuple'. Otherwise
+ * insert `new_tuple'. In case of replace old tuple is returned in `dup_tuple'.
+ * Insert or replace position is returned in `pos'.
+ *
+ * Also adds OOM injection and setting txn flag `TXN_STMT_ROLLBACK'.
+ *
+ * Returns 0 on success and -1 on OOM (diag is set).
+ */
+static int
+memtx_hash_index_replace_impl(struct memtx_hash_index *index,
+			      struct tuple *new_tuple, struct tuple **dup_tuple,
+			      uint32_t *pos)
+{
+	uint32_t h = tuple_hash(new_tuple, index->base.def->key_def);
+	if (index_inject_oom() != 0)
+		goto fail;
+	*pos = light_index_replace(&index->hash_table, h, new_tuple,
+				   dup_tuple);
+	if (*pos == light_index_end) {
+		if (index_inject_oom() != 0)
+			goto fail;
+		*pos = light_index_insert(&index->hash_table, h, new_tuple);
+		if (*pos == light_index_end)
+			goto fail;
+		*dup_tuple = NULL;
+	}
+	return 0;
+fail:
+	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	return -1;
+}
+
+/**
+ * Similar to light_index_insert but returns status and not position.
+ *
+ * Also adds OOM injection and setting txn flag `TXN_STMT_ROLLBACK' on OOM
+ * to `light_index_insert'.
+ *
+ * Returns 0 on success and -1 on OOM (diag is set).
+ */
+static int
+memtx_hash_index_insert_impl(struct memtx_hash_index *index,
+			     struct tuple *new_tuple)
+{
+	uint32_t h = tuple_hash(new_tuple, index->base.def->key_def);
+	if (index_inject_oom() != 0)
+		goto fail;
+	if (light_index_insert(&index->hash_table,
+			       h, new_tuple) == light_index_end)
+		goto fail;
+	return 0;
+fail:
+	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	return -1;
+}
+
+/**
+ * Adds OOM injection and setting txn flag `TXN_STMT_ROLLBACK' on OOM
+ * to `light_index_delete'.
+ *
+ * Returns 0 on success and -1 on OOM (diag is set).
+ */
+static int
+memtx_hash_index_delete_impl(struct memtx_hash_index *index, uint32_t pos)
+{
+	if (index_inject_oom() != 0)
+		goto fail;
+	if (light_index_delete(&index->hash_table, pos) != 0)
+		goto fail;
+	return 0;
+fail:
+	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	return -1;
+}
+
+/**
+ * Adds OOM injection and setting txn flag `TXN_STMT_ROLLBACK' on OOM
+ * to `light_index_delete_value'.
+ *
+ * Returns 0 on success and -1 on OOM (diag is set).
+ */
+static int
+memtx_hash_index_delete_value_impl(struct memtx_hash_index *index,
+				   struct tuple *tuple)
+{
+	uint32_t h = tuple_hash(tuple, index->base.def->key_def);
+	if (index_inject_oom() != 0)
+		goto fail;
+	if (light_index_delete_value(&index->hash_table, h, tuple) != 0)
+		goto fail;
+	return 0;
+fail:
+	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	return -1;
+}
+
 static int
 memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode,
 			 struct tuple **result, struct tuple **successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	struct light_index_core *hash_table = &index->hash_table;
 
 	/* HASH index doesn't support ordering. */
 	*successor = NULL;
 
-	if (new_tuple) {
-		uint32_t h = tuple_hash(new_tuple, base->def->key_def);
-		struct tuple *dup_tuple = NULL;
-		uint32_t pos = light_index_replace(hash_table, h, new_tuple,
-						   &dup_tuple);
-		if (pos == light_index_end)
-			pos = light_index_insert(hash_table, h, new_tuple);
-
-		ERROR_INJECT(ERRINJ_HASH_INDEX_REPLACE, {
-			light_index_delete(hash_table, pos);
-			pos = light_index_end;
-		});
-
-		if (pos == light_index_end) {
-			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-				 "hash_table", "key");
+	if (new_tuple != NULL) {
+		struct tuple *dup_tuple;
+		uint32_t pos;
+		if (memtx_hash_index_replace_impl(
+				index, new_tuple, &dup_tuple, &pos) != 0)
 			return -1;
-		}
 		if (index_check_dup(base, old_tuple, new_tuple,
 				    dup_tuple, mode) != 0) {
-			light_index_delete(hash_table, pos);
-			if (dup_tuple) {
-				uint32_t pos = light_index_insert(hash_table, h, dup_tuple);
-				if (pos == light_index_end) {
-					panic("Failed to allocate memory in "
-					      "recover of int hash_table");
-				}
-			}
+			VERIFY(memtx_hash_index_delete_impl(index, pos) == 0);
+			if (dup_tuple)
+				VERIFY(memtx_hash_index_insert_impl(
+						index, dup_tuple) == 0);
 			return -1;
 		}
 
@@ -406,10 +486,13 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		}
 	}
 
-	if (old_tuple) {
-		uint32_t h = tuple_hash(old_tuple, base->def->key_def);
-		int res = light_index_delete_value(hash_table, h, old_tuple);
-		assert(res == 0); (void) res;
+	if (old_tuple != NULL) {
+		if (memtx_hash_index_delete_value_impl(index, old_tuple) != 0) {
+			if (new_tuple != NULL)
+				VERIFY(memtx_hash_index_delete_value_impl(
+						index, new_tuple) == 0);
+			return -1;
+		}
 	}
 	*result = old_tuple;
 	return 0;
