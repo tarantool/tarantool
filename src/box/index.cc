@@ -295,7 +295,7 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 index->def->space_name, index->def->space_id,
 				 old_tuple, new_tuple, NULL);
-			return -1;
+			goto fail;
 		}
 	} else { /* dup_tuple != NULL */
 		if (dup_tuple != old_tuple &&
@@ -310,10 +310,13 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 				 index->def->name, index->def->space_name,
 				 tuple_str(dup_tuple), tuple_str(new_tuple),
 				 dup_tuple, new_tuple);
-			return -1;
+			goto fail;
 		}
 	}
 	return 0;
+fail:
+	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	return -1;
 }
 
 char *
@@ -958,6 +961,23 @@ index_read_view_delete(struct index_read_view *rv)
 	rv->vtab->free(rv);
 	index_def_delete(def);
 }
+
+#ifndef NDEBUG
+
+int
+index_inject_oom(void)
+{
+	struct errinj *e = errinj(ERRINJ_INDEX_OOM, ERRINJ_BOOL);
+	ERROR_INJECT_COUNTDOWN(ERRINJ_INDEX_OOM_COUNTDOWN, e->bparam = true);
+	if (e->bparam && !txn_has_flag(in_txn(), TXN_STMT_ROLLBACK)) {
+		diag_set(OutOfMemory, 0,
+			 "errinj", "errinj");
+		return -1;
+	}
+	return 0;
+}
+
+#endif /** ifndef NDEBUG */
 
 /* }}} */
 

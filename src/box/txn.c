@@ -368,8 +368,10 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 		diag_log();
 		panic("statement rollback trigger failed");
 	}
+	txn_set_flags(txn, TXN_STMT_ROLLBACK);
 	if (stmt->engine != NULL && stmt->space != NULL)
 		engine_rollback_statement(stmt->engine, txn, stmt);
+	txn_clear_flags(txn, TXN_STMT_ROLLBACK);
 }
 
 /*
@@ -606,6 +608,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 {
 	assert(txn == in_txn());
 	assert(txn != NULL);
+	assert(!txn_has_flag(txn, TXN_STMT_ROLLBACK));
 	if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return -1;
@@ -667,6 +670,7 @@ int
 txn_commit_stmt(struct txn *txn, struct request *request)
 {
 	assert(txn->in_sub_stmt > 0);
+	assert(!txn_has_flag(txn, TXN_STMT_ROLLBACK));
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.

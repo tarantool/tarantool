@@ -1474,13 +1474,18 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
+    -- Set to number of passes before starting to fail primitive index data
+    -- operations.
+    ERRINJ_INDEX_OOM_COUNTDOWN = {
+        enable = function()
+            return math.random(100)
+        end,
+        disable = function()
+            return -1
+        end,
+    },
     -- Set to true to fail index iterator creation.
     ERRINJ_INDEX_ITERATOR_NEW = {
-        enable = enable_errinj_boolean,
-        disable = disable_errinj_boolean,
-    },
-    -- Set to true to fail insertion into memtx hash index.
-    ERRINJ_HASH_INDEX_REPLACE = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },

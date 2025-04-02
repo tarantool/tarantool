@@ -96,9 +96,10 @@ struct errinj {
 	_(ERRINJ_HTTPC_EXECUTE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_HTTP_RESPONSE_ADD_WAIT, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_OOM, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_OOM_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_INDEX_RESERVE, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_INDEX_ITERATOR_NEW, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_HASH_INDEX_REPLACE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_IPROTO_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_DISABLE_WATCH, ERRINJ_BOOL, {.bparam = false}) \
