@@ -1101,5 +1101,8 @@ main(int argc, char **argv)
 	free((void *)instance.name);
 	free((void *)instance.config);
 	tarantool_free();
+	ERROR_INJECT(ERRINJ_WRITE_EXIT_CODE_TO_STDERR, {
+		fprintf(stderr, "Tarantool exited with code %d\n", exit_code);
+	});
 	return exit_code;
 }
