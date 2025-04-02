@@ -2129,7 +2129,7 @@ memtx_index_extent_alloc(struct matras_allocator *matras_allocator)
 		goto fail;
 	return ret;
 fail:
-	if (in_txn() != NULL && in_txn()->status == TXN_ABORTED) {
+	if (in_txn() != NULL && txn_has_flag(in_txn(), TXN_STMT_ROLLBACK)) {
 		/*
 		 * We cannot sanely reserve blocks for rollback because strictly
 		 * speaking the whole index can change. We cannot tolerate

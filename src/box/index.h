@@ -1090,6 +1090,27 @@ index_read_view_iterator_position(struct index_read_view_iterator *iterator,
 	return iterator->base.position(iterator, pos, size);
 }
 
+#ifndef NDEBUG
+
+/**
+ * After `ERRINJ_INDEX_OOM_COUNTDOWN' countdown start to fail
+ * unless txn flag `TXN_STMT_ROLLBACK' is set or txn is aborted.
+ *
+ * Return 0 on no OOM injection and -1 otherwise.
+ */
+int
+index_inject_oom(void);
+
+#else
+
+static inline int
+index_inject_oom(void)
+{
+	return 0;
+}
+
+#endif /** ifndef NDEBUG */
+
 /*
  * Virtual method stubs.
  */

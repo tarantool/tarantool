@@ -116,6 +116,14 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiple engines. */
 	TXN_SUPPORTS_MULTI_ENGINE = 0x800,
+	/**
+	 * Set during statement rollback.
+	 *
+	 * If statetement is rolled back we should not fail due to OOM.
+	 * This flag is set when statement rollback is started. If it is set
+	 * then memory allocated even if memory limit is reached.
+	 */
+	TXN_STMT_ROLLBACK = 0x1000,
 };
 
 enum {
