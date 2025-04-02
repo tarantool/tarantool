@@ -635,6 +635,22 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
+/**
+ * A helper to calculate tuple hint.
+ *
+ * NB: must be called only for dirty tuples.
+ */
+static hint_t
+memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *def)
+{
+	VERIFY(!index->def->key_def->for_func_index);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	/* R-tree does not support tuple hint. */
+	if (unlikely(index->def->type == RTREE))
+		return HINT_NONE;
+	return tuple_hint(tuple, def);
+}
+
 void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 {
@@ -1682,7 +1698,8 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 		struct count_gap_item *item =
 			(struct count_gap_item *)item_base;
 
-		hint_t hint = tuple_hint(story->tuple, index->def->cmp_def);
+		hint_t hint = memtx_tx_tuple_hint(story->tuple, index,
+						  index->def->cmp_def);
 		bool tuple_matches = memtx_tx_tuple_matches_until(
 			index->def->cmp_def, story->tuple, hint, item->type,
 			item->key, item->part_count, item->until,
@@ -1840,7 +1857,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
 			hint_t oh = key_hint(item->key, item->part_count, def);
-			hint_t kh = tuple_hint(tuple, def);
+			hint_t kh = memtx_tx_tuple_hint(tuple, index, def);
 			cmp = tuple_compare_with_key(tuple, kh, item->key,
 						     item->part_count, oh,
 						     def);
@@ -2851,9 +2868,7 @@ memtx_tx_index_invisible_count_matching_until_slow(
 	uint32_t res = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
-		/* R-tree index, that can appear here, does not support hint. */
-		hint_t hint = index->def->type == RTREE ? HINT_NONE :
-			      tuple_hint(story->tuple, cmp_def);
+		hint_t hint = memtx_tx_tuple_hint(story->tuple, index, cmp_def);
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple, hint,
 						  type, key, part_count,
@@ -3473,7 +3488,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	uint32_t invisible_count = 0;
 	struct memtx_story *story;
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
-		hint_t hint = tuple_hint(story->tuple, cmp_def);
+		hint_t hint = memtx_tx_tuple_hint(story->tuple, index, cmp_def);
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple, hint,
 						  type, key, part_count,
