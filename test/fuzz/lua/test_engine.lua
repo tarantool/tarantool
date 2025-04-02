@@ -1479,11 +1479,6 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
-    -- Set to true to fail insertion into memtx hash index.
-    ERRINJ_HASH_INDEX_REPLACE = {
-        enable = enable_errinj_boolean,
-        disable = disable_errinj_boolean,
-    },
     -- Set to true to delay freeing memory after dropped memtx
     -- index.
     ERRINJ_MEMTX_DELAY_GC = {

@@ -354,34 +354,29 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 	/* HASH index doesn't support ordering. */
 	*successor = NULL;
 
-	if (new_tuple) {
+	if (new_tuple != NULL) {
 		uint32_t h = tuple_hash(new_tuple, base->def->key_def);
 		struct tuple *dup_tuple = NULL;
-		uint32_t pos = light_index_replace(hash_table, h, new_tuple,
-						   &dup_tuple);
+		uint32_t pos = INDEX_OOM_ERRINJ(
+					light_index_replace, light_index_end,
+					hash_table, h, new_tuple, &dup_tuple);
 		if (pos == light_index_end)
-			pos = light_index_insert(hash_table, h, new_tuple);
-
-		ERROR_INJECT(ERRINJ_HASH_INDEX_REPLACE, {
-			light_index_delete(hash_table, pos);
-			pos = light_index_end;
-		});
-
+			pos = INDEX_OOM_ERRINJ(light_index_insert, -1,
+					       hash_table, h, new_tuple);
 		if (pos == light_index_end) {
-			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
-				 "hash_table", "key");
-			return -1;
+			txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+			goto oom;
 		}
 		if (index_check_dup(base, old_tuple, new_tuple,
 				    dup_tuple, mode) != 0) {
-			light_index_delete(hash_table, pos);
-			if (dup_tuple) {
-				uint32_t pos = light_index_insert(hash_table, h, dup_tuple);
-				if (pos == light_index_end) {
-					panic("Failed to allocate memory in "
-					      "recover of int hash_table");
-				}
-			}
+			txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+			VERIFY(INDEX_OOM_ERRINJ(light_index_delete, -1,
+						hash_table, pos) == 0);
+			if (dup_tuple)
+				VERIFY(INDEX_OOM_ERRINJ(
+						light_index_insert, -1,
+						hash_table, h,
+						dup_tuple) != light_index_end);
 			return -1;
 		}
 
@@ -391,13 +386,27 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		}
 	}
 
-	if (old_tuple) {
+	if (old_tuple != NULL) {
 		uint32_t h = tuple_hash(old_tuple, base->def->key_def);
-		int res = light_index_delete_value(hash_table, h, old_tuple);
-		assert(res == 0); (void) res;
+		if (INDEX_OOM_ERRINJ(light_index_delete_value, -1, hash_table,
+				     h, old_tuple) != 0) {
+			txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+			if (new_tuple != NULL) {
+				uint32_t h = tuple_hash(new_tuple,
+							base->def->key_def);
+				VERIFY(INDEX_OOM_ERRINJ(
+						light_index_delete_value, -1,
+						hash_table, h, new_tuple) == 0);
+			}
+			goto oom;
+		}
 	}
 	*result = old_tuple;
 	return 0;
+oom:
+	diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
+		 "hash_table", "key");
+	return -1;
 }
 
 /** Implementation of create_iterator for memtx hash index. */
