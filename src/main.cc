@@ -883,5 +883,8 @@ main(int argc, char **argv)
 		close(fd);
 		rename("tt_exit_file.txt.inprogress", "tt_exit_file.txt");
 	} while (false));
+	ERROR_INJECT(ERRINJ_WRITE_EXIT_CODE_TO_STDERR, {
+		fprintf(stderr, "Tarantool exited with code %d\n", exit_code);
+	});
 	return exit_code;
 }
