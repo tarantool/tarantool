@@ -315,7 +315,7 @@ log_set_nonblock(struct log *log)
 static int
 log_rotate(struct log *log)
 {
-	if (pm_atomic_load(&log->type) != SAY_LOGGER_FILE)
+	if (log->type != SAY_LOGGER_FILE)
 		return 0;
 
 	ERROR_INJECT(ERRINJ_LOG_ROTATE, { usleep(10); });
@@ -1398,9 +1398,11 @@ log_destroy(struct log *log)
 	while(log->rotating_threads > 0)
 		tt_pthread_cond_wait(&log->rotate_cond, &log->rotate_mutex);
 	tt_pthread_mutex_unlock(&log->rotate_mutex);
-	pm_atomic_store(&log->type, SAY_LOGGER_BOOT);
-
-	if (log->fd != -1)
+	/*
+	 * Do not close stderr because it's used for reporting crashes
+	 * and memory leaks.
+	 */
+	if (log->type != SAY_LOGGER_STDERR)
 		close(log->fd);
 	free(log->syslog_ident);
 	free(log->path);
