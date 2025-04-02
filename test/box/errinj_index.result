@@ -93,7 +93,7 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in memtx_tree_index for replace
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{1} -- still can delete, it does not require extents if no read view
 ---
@@ -136,7 +136,7 @@ check_iter_and_size(621)
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in memtx_tree_index for replace
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{2} -- still can delete, it does not require extents if no read view
 ---
@@ -322,7 +322,7 @@ res
 ...
 for i = 501,2500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{1} -- still can delete, it does not require extents if no read view
 ---
@@ -362,7 +362,7 @@ check_iter_and_size(1023)
 ...
 for i = 2501,3500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{2} -- still can delete, it does not require extents if no read view
 ---
@@ -391,7 +391,7 @@ res
 ...
 for i = 3501,4500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 16384 bytes in hash_table for key
+- error: Failed to allocate 16384 bytes in mempool for new slab
 ...
 s:delete{3} -- still can delete, it does not require extents if no read view
 ---
@@ -462,15 +462,15 @@ res
   - [5009, 5009]
   - [5010, 5010]
 ...
-errinj.set("ERRINJ_HASH_INDEX_REPLACE", true)
+errinj.set("ERRINJ_INDEX_OOM", true)
 ---
 - ok
 ...
 s:replace{3594, 3594}
 ---
-- error: Failed to allocate 16384 bytes in hash_table for key
+- error: Failed to allocate 0 bytes in errinj for errinj
 ...
-errinj.set("ERRINJ_HASH_INDEX_REPLACE", false)
+errinj.set("ERRINJ_INDEX_OOM", false)
 ---
 - ok
 ...
