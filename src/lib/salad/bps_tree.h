@@ -3156,7 +3156,6 @@ static inline void
 bps_tree_garbage_push(struct bps_tree_common *tree, struct bps_block *block,
 		      bps_tree_block_id_t id)
 {
-	assert(block); (void) block;
 	bps_tree_block_id_t next_leaf_id = (bps_tree_block_id_t)(-1);
 	bps_tree_block_id_t prev_leaf_id = (bps_tree_block_id_t)(-1);
 	if (block->type == BPS_TREE_BT_LEAF) {
@@ -3165,8 +3164,7 @@ bps_tree_garbage_push(struct bps_tree_common *tree, struct bps_block *block,
 		prev_leaf_id = leaf->prev_id;
 	}
 
-	struct bps_garbage *garbage = (struct bps_garbage *)
-		bps_tree_touch_block(tree, id);
+	struct bps_garbage *garbage = (struct bps_garbage *)block;
 	garbage->header.type = BPS_TREE_BT_GARBAGE;
 	garbage->next_id = tree->garbage_head_id;
 	garbage->next_leaf_id = next_leaf_id;
