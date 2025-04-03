@@ -47,6 +47,7 @@
 #include "schema.h"
 #include "session.h"
 #include "trivia/util.h"
+#include "memtx_index_read_view.h"
 
 #include <PMurHash.h>
 
@@ -304,7 +305,7 @@ access_check_sequence(struct sequence *seq)
 /** Read view implementation. */
 struct sequence_data_read_view {
 	/** Base class. */
-	struct index_read_view base;
+	struct memtx_index_read_view base;
 	/** Frozen view of the data index. */
 	struct light_sequence_view view;
 };
@@ -421,7 +422,7 @@ sequence_data_read_view_create(struct index *index)
 			generic_index_read_view_create_iterator_with_offset,
 	};
 	struct sequence_data_read_view *rv = xmalloc(sizeof(*rv));
-	index_read_view_create(&rv->base, &vtab, index->def);
+	memtx_index_read_view_create(&rv->base, &vtab, index->def);
 	light_sequence_view_create(&rv->view, &sequence_data_index);
 	return (struct index_read_view *)rv;
 }

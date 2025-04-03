@@ -2427,7 +2427,7 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	});
 
 	/* Sync data and link the file to the final name. */
-	if (xlog_close_reuse_fd(&writer->data_xlog, &run->fd) != 0 ||
+	if (xlog_close_reuse_fd(&writer->data_xlog, &run->fd, true) != 0 ||
 	    xlog_materialize(&writer->data_xlog) != 0) {
 		xlog_discard(&writer->data_xlog);
 		goto out;

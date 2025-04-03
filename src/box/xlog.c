@@ -136,6 +136,7 @@ xlog_meta_create(struct xlog_meta *meta, const char *filetype,
 		vclock_copy(&meta->prev_vclock, prev_vclock);
 	else
 		vclock_clear(&meta->prev_vclock);
+	meta->size = SIZE_MAX; /* Unknown. */
 }
 
 /**
@@ -320,7 +321,9 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 				 (int)(key_end - key), key);
 		}
 	}
-	*data = end + 1; /* skip the last trailing \n of \n\n sequence */
+	end++; /* skip the last trailing \n of \n\n sequence */
+	meta->size = end - *data;
+	*data = end;
 	return 0;
 }
 
@@ -356,6 +359,11 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 		dir->filetype = "VYLOG";
 		dir->filename_ext = ".vylog";
 		dir->suffix = INPROGRESS;
+		break;
+	case SORTDATA:
+		dir->filetype = "SORTDATA";
+		dir->filename_ext = ".sortdata";
+		dir->suffix = NONE;
 		break;
 	default:
 		unreachable();
@@ -842,8 +850,6 @@ static void
 xlog_free(struct xlog *xlog)
 {
 	assert(xlog->fd < 0);
-	assert(xlog->obuf.slabc == &cord()->slabc);
-	assert(xlog->zbuf.slabc == &cord()->slabc);
 	obuf_destroy(&xlog->obuf);
 	obuf_destroy(&xlog->zbuf);
 	ZSTD_freeCCtx(xlog->zctx);
@@ -1522,11 +1528,11 @@ xlog_write_eof(struct xlog *l)
 }
 
 int
-xlog_close_reuse_fd(struct xlog *l, int *fd)
+xlog_close_reuse_fd(struct xlog *l, int *fd, bool write_eof)
 {
 	assert(l->fd >= 0);
 	int rc = xlog_flush(l) < 0 ? -1 : 0;
-	if (rc == 0)
+	if (rc == 0 && write_eof)
 		rc = xlog_write_eof(l);
 	if (rc == 0)
 		rc = xlog_sync(l);
@@ -1540,7 +1546,7 @@ int
 xlog_close(struct xlog *l)
 {
 	int fd;
-	int rc = xlog_close_reuse_fd(l, &fd);
+	int rc = xlog_close_reuse_fd(l, &fd, true);
 	close(fd);
 	return rc;
 }

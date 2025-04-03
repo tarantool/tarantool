@@ -44,9 +44,10 @@
 #include "txn.h"
 #include "memtx_tx.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 
 struct memtx_bitset_index {
-	struct index base;
+	struct memtx_index base;
 	struct tt_bitset_index index;
 #ifndef OLD_GOOD_BITSET
 	struct matras *id_to_tuple;
@@ -543,8 +544,7 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 
 	struct memtx_bitset_index *index =
 		(struct memtx_bitset_index *)xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_bitset_index_vtab, def);
+	memtx_index_create(&index->base, memtx, &memtx_bitset_index_vtab, def);
 
 #ifndef OLD_GOOD_BITSET
 	index->spare_id = SPARE_ID_END;
@@ -559,5 +559,5 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 #endif /* #ifndef OLD_GOOD_BITSET */
 
 	tt_bitset_index_create(&index->index, realloc);
-	return &index->base;
+	return &index->base.base;
 }
