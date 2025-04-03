@@ -174,11 +174,14 @@ compare(type_t a, type_t b)
 	return a < b ? -1 : a > b ? 1 : 0;
 }
 static int extents_count = 0;
+static bool extent_alloc_failure = false;
 
 static void *
 extent_alloc(struct matras_allocator *allocator)
 {
 	(void)allocator;
+	if (extent_alloc_failure)
+		return NULL;
 	++extents_count;
 	return xmalloc(BPS_TREE_EXTENT_SIZE);
 }
@@ -920,10 +923,44 @@ insert_successor_test()
 	ok(true, "successor test");
 }
 
+static void
+gh_11326_oom_on_insertion_test()
+{
+	plan(1);
+	header();
+
+	test tree;
+	test_view view;
+	type_t replaced;
+	struct test_iterator iterator;
+
+	test_create(&tree, 0, &allocator, NULL);
+	test_insert(&tree, 0, &replaced, NULL);
+	test_view_create(&view, &tree);
+
+	extent_alloc_failure = true;
+	fail_unless(test_insert(&tree, 1, &replaced, NULL) != 0);
+	debug_check(&tree);
+	fail_unless(test_size(&tree) == 1);
+	iterator = test_first(&tree);
+	type_t *v = test_iterator_get_elem(&tree, &iterator);
+	fail_unless(v != NULL && *v == 0);
+	fail_unless(test_iterator_next(&tree, &iterator) == false);
+	extent_alloc_failure = false;
+
+	test_view_destroy(&view);
+	test_destroy(&tree);
+
+	ok(true, "gh-11326: OOM on insertion test");
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(12);
+	plan(13);
 	header();
 
 	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
@@ -942,6 +979,11 @@ main(void)
 	delete_value_check();
 	insert_successor_test();
 
+	matras_allocator_destroy(&allocator);
+
+	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+	gh_11326_oom_on_insertion_test();
 	matras_allocator_destroy(&allocator);
 
 	footer();
