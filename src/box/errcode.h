@@ -329,9 +329,9 @@ struct errcode_record {
 	/*274 */_(ER_UNCONFIGURED,		"Please call box.cfg{} first") \
 	/*275 */_(ER_UNUSED8,			"") \
 	/*276 */_(ER_UNUSED9,			"") \
-	/*277 */_(ER_UNUSED10,			"") \
+	/*277 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
 	/*278 */_(ER_IN_ANOTHER_PROMOTE,	"box.ctl.promote() is already running") \
-	/*279 */_(ER_INVALID_DEC,		"Invalid decimal: '%s'") \
+	/*279 */_(ER_UNUSED10,			"") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
