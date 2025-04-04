@@ -187,17 +187,6 @@ struct journal {
 void
 journal_queue_wakeup(void);
 
-/**
- * Check whether any of the queue size limits is reached.
- * If the queue is full, we must wait for some of the entries to be written
- * before proceeding with a new asynchronous write request.
- */
-static inline bool
-journal_queue_is_full(void)
-{
-	return journal_queue.size >= journal_queue.max_size;
-}
-
 /** Yield until there's some space in the journal queue. */
 int
 journal_queue_wait(struct journal_entry *entry);
@@ -257,6 +246,14 @@ extern struct journal *current_journal;
 /** Write a single row in a blocking way. */
 int
 journal_write_row(struct xrow_header *row);
+
+/** Checks whether journal_write_submit() call will yield. */
+static inline bool
+journal_queue_would_block(void)
+{
+	return journal_queue.size > journal_queue.max_size ||
+	       !stailq_empty(&journal_queue.requests);
+}
 
 /**
  * Queue a single entry to the journal in asynchronous way.

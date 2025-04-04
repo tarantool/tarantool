@@ -94,7 +94,7 @@ void
 journal_queue_wakeup(void)
 {
 	if (!stailq_empty(&journal_queue.requests) &&
-	    !journal_queue_is_full()) {
+	    journal_queue.size < journal_queue.max_size) {
 		struct journal_entry *req =
 				stailq_first_entry(&journal_queue.requests,
 						   typeof(*req), fifo);
@@ -105,7 +105,7 @@ journal_queue_wakeup(void)
 int
 journal_queue_wait(struct journal_entry *entry)
 {
-	if (!journal_queue_is_full() &&
+	if (journal_queue.size < journal_queue.max_size &&
 	    stailq_empty(&journal_queue.requests))
 		return 0;
 	int rc = -1;
