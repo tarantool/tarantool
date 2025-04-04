@@ -314,6 +314,13 @@ M['replication.autoexpel'] = function(data, w)
     end
 end
 
+M['replication.bootstrap_strategy'] = function(_data, w)
+    -- Forbid in the instance scope, because it has no
+    -- sense to set the option for a part of a
+    -- replicaset.
+    validate_scope(w, {'global', 'group', 'replicaset'})
+end
+
 M['replication.failover'] = function(_data, w)
     -- Forbid in the instance scope, because it has no
     -- sense to set the option for a part of a
