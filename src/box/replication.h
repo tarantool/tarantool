@@ -269,6 +269,12 @@ replication_effective_reconnect_timeout(void)
 double
 replication_disconnect_timeout(void);
 
+/**
+ * Update the replication synchronization quorum
+ */
+void
+replicaset_on_bootstrap_strategy_change(void);
+
 void
 replication_init(int num_threads);
 
@@ -366,11 +372,10 @@ struct replicaset {
 		 */
 		int loading;
 		/**
-		 * Number of appliers that have successfully
-		 * synchronized and hence contribute to the
-		 * quorum.
+		 * Number of applicants who have successfully
+		 * synchronized and are in the sync quorum.
 		 */
-		int synced;
+		int synced_in_quorum;
 		/**
 		 * Signaled whenever an applier changes its
 		 * state.
@@ -470,6 +475,8 @@ struct replica {
 	enum applier_state applier_sync_state;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
+	/** Whether this applier is in the synchronization quorum */
+	bool is_in_sync_quorum;
 };
 
 enum {
@@ -682,8 +689,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Reload replica URIs.
  *

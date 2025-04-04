@@ -44,6 +44,7 @@
 #include "sio.h"
 #include "tweaks.h"
 #include "txn.h"
+#include "watcher.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -178,30 +179,24 @@ replicaset_connect_quorum(int total)
 }
 
 /**
- * Effective quorum value determining how many nodes to sync with (we sync with
- * every node to which we connected successfully).
- * Used for every bootstrap_strategy, except "legacy". "Legacy" simply uses
- * replication_connect_quorum.
- */
+* Number of replicas that have to be synchronized
+* in order to form a quorum in the replica set.
+*/
 static int replication_sync_quorum_auto;
 
-/**
- * Return the number of replicas that have to be synchronized
- * in order to form a quorum in the replica set.
- */
 static int
 replicaset_sync_quorum(void)
 {
 	switch (bootstrap_strategy) {
-	case BOOTSTRAP_STRATEGY_LEGACY:
-		return MIN(replication_connect_quorum,
-			   replicaset.applier.total);
-	case BOOTSTRAP_STRATEGY_AUTO:
-	case BOOTSTRAP_STRATEGY_CONFIG:
-	case BOOTSTRAP_STRATEGY_SUPERVISED:
-		return replication_sync_quorum_auto;
-	default:
-		unreachable();
+		case BOOTSTRAP_STRATEGY_LEGACY:
+			return MIN(replication_connect_quorum,
+					   replicaset.applier.total);
+		case BOOTSTRAP_STRATEGY_AUTO:
+		case BOOTSTRAP_STRATEGY_CONFIG:
+		case BOOTSTRAP_STRATEGY_SUPERVISED:
+			return replication_sync_quorum_auto;
+		default:
+			unreachable();
 	}
 }
 
@@ -211,22 +206,63 @@ replicaset_sync_quorum(void)
 struct replicaset_connect_state {
 	/** Number of successfully connected appliers. */
 	int connected;
-	/**
-	 * Number of appliers which were connected to a loading instance. This
-	 * is a subset of \a connected excluded from replicaset_sync_quorum
-	 * calculation.
-	 */
-	int booting;
 	/** Number of appliers that failed to connect. */
 	int failed;
 	/** Signaled when an applier connects or stops. */
 	struct fiber_cond wakeup;
 };
 
-static void
-replicaset_set_sync_quorum(const struct replicaset_connect_state *state)
+static bool
+replica_must_be_in_sync_quorum(struct replica *replica)
 {
-	replication_sync_quorum_auto = state->connected - state->booting;
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_LEGACY)
+		return true;
+
+	if (replica->applier == NULL)
+		return false;
+
+	assert(instance_id != 0);
+	int64_t remote_lsn =
+		vclock_get(&replica->applier->ballot.vclock, instance_id);
+	int64_t local_lsn = vclock_get(instance_vclock, instance_id);
+	return remote_lsn > local_lsn;
+}
+
+static void
+replicaset_set_sync_quorum_auto()
+{
+	replication_sync_quorum_auto = 0;
+	replicaset_foreach(replica) {
+		replica->is_in_sync_quorum = replica_must_be_in_sync_quorum(replica);
+		replication_sync_quorum_auto += (int)replica->is_in_sync_quorum;
+	}
+	struct replica *replica;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
+		replica->is_in_sync_quorum = replica_must_be_in_sync_quorum(replica);
+		replication_sync_quorum_auto += (int)replica->is_in_sync_quorum;
+	}
+}
+
+static void
+replicaset_count_synced_in_quorum()
+{
+	replicaset.applier.synced_in_quorum = 0;
+	replicaset_foreach(replica) {
+		replicaset.applier.synced_in_quorum +=
+			(replica->applier_sync_state == APPLIER_SYNC);
+	}
+	struct replica *replica;
+	rlist_foreach_entry(replica, &replicaset.anon, in_anon) {
+		replicaset.applier.synced_in_quorum +=
+			(replica->applier_sync_state == APPLIER_SYNC);
+	}
+}
+
+static void
+replicaset_sync_quorum_auto_init()
+{
+	replicaset_set_sync_quorum_auto();
+	replicaset_count_synced_in_quorum();
 }
 
 /**
@@ -719,7 +755,8 @@ replica_on_applier_sync(struct replica *replica)
 		return;
 
 	replica->applier_sync_state = APPLIER_SYNC;
-	replicaset.applier.synced++;
+	if (replica->is_in_sync_quorum)
+		++replicaset.applier.synced_in_quorum;
 
 	replicaset_check_quorum();
 }
@@ -826,8 +863,9 @@ replica_on_applier_disconnect(struct replica *replica)
 		return;
 	switch (replica->applier_sync_state) {
 	case APPLIER_SYNC:
-		assert(replicaset.applier.synced > 0);
-		replicaset.applier.synced--;
+		if (replica->is_in_sync_quorum)
+			--replicaset.applier.synced_in_quorum;
+		assert(replicaset.applier.synced_in_quorum >= 0);
 		FALLTHROUGH;
 	case APPLIER_CONNECTED:
 		assert(replicaset.applier.connected > 0);
@@ -1007,7 +1045,6 @@ next:
 	replicaset.applier.total = count;
 	replicaset.applier.connected = 0;
 	replicaset.applier.loading = 0;
-	replicaset.applier.synced = 0;
 
 	struct applier *appliers_for_delete[VCLOCK_MAX] = {};
 	int appliers_for_delete_count = 0;
@@ -1025,7 +1062,6 @@ next:
 			 * reconfiguration.
 			 */
 			replicaset.applier.connected++;
-			replicaset.applier.synced++;
 			replica_hash_remove(&uniq, other);
 			applier = other->applier;
 			replica_clear_applier(other);
@@ -1157,8 +1193,21 @@ bootstrap_leader_is_connected(struct applier **appliers, int count)
 static bool
 replicaset_is_connected(struct replicaset_connect_state *state,
 			struct applier **appliers, int count,
-			bool connect_quorum)
+			bool wait_all)
 {
+	/* Update connected and failed counters. */
+	state->connected = 0;
+	state->failed = 0;
+	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		if (applier->state == APPLIER_CONNECTED) {
+			state->connected++;
+		} else if (applier->state == APPLIER_STOPPED ||
+				   applier->state == APPLIER_OFF) {
+			state->failed++;
+		}
+	}
+
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
 		/*
@@ -1178,23 +1227,10 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			return true;
 		}
 	}
-	/* Update connected and failed counters. */
-	state->connected = 0;
-	state->booting = 0;
-	state->failed = 0;
-	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
-		if (applier->state == APPLIER_CONNECTED) {
-			state->connected++;
-			if (!applier->ballot.is_booted)
-				state->booting++;
-		} else if (applier->state == APPLIER_STOPPED ||
-			   applier->state == APPLIER_OFF) {
-			state->failed++;
-		}
-	}
+
 	if (state->connected == count)
 		return true;
+
 	/*
 	 * After a quorum is reached, it is considered enough to proceed. Except
 	 * if a connection is critical. Connection *is* critical even with 0
@@ -1205,7 +1241,7 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 	 * different cluster UUIDs.
 	 */
 	if (state->connected >= replicaset_connect_quorum(count) &&
-	    !connect_quorum) {
+	    !wait_all) {
 		return true;
 	}
 	if (count - state->failed < replicaset_connect_quorum(count))
@@ -1215,14 +1251,13 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect)
+		   bool demand_quorum, bool keep_connect, bool wait_all)
 {
 	struct replicaset_connect_state state;
 	memset(&state, 0, sizeof(state));
 	fiber_cond_create(&state.wakeup);
 
 	if (uris->uri_count == 0) {
-		replicaset_set_sync_quorum(&state);
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
 		uri_set_destroy(&replication_uris);
@@ -1248,7 +1283,7 @@ replicaset_connect(const struct uri_set *uris,
 
 	say_info("connecting to %d replicas", count);
 
-	if (!connect_quorum) {
+	if (!demand_quorum) {
 		/*
 		 * Enter orphan mode on configuration change and
 		 *
@@ -1303,8 +1338,7 @@ replicaset_connect(const struct uri_set *uris,
 			trigger_clear(&trigger->base);
 		}
 	});
-	while (!replicaset_is_connected(&state, appliers, count,
-					connect_quorum)) {
+	while (!replicaset_is_connected(&state, appliers, count, wait_all)) {
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0) {
 			fiber_testcancel();
@@ -1317,7 +1351,7 @@ replicaset_connect(const struct uri_set *uris,
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
 		if (state.connected < replicaset_connect_quorum(count) &&
-		    connect_quorum) {
+		    demand_quorum) {
 			tnt_raise(ClientError, ER_CFG, "replication",
 				  "failed to connect to one or more replicas");
 		}
@@ -1339,11 +1373,6 @@ replicaset_connect(const struct uri_set *uris,
 	}
 	triggers_guard.is_active = false;
 
-	/*
-	 * Remember how many appliers are connected to check
-	 * replicaset_sync_quorum later on.
-	 */
-	replicaset_set_sync_quorum(&state);
 	/* Now all the appliers are connected, update the replica set. */
 	replicaset_update(appliers, count, keep_connect);
 	appliers_guard.is_active = false;
@@ -1444,6 +1473,11 @@ replicaset_follow(void)
 void
 replicaset_sync(void)
 {
+	if (cfg_replication_anon)
+		return;
+
+	replicaset_sync_quorum_auto_init();
+
 	int quorum = replicaset_sync_quorum();
 
 	if (quorum == 0) {
@@ -1462,7 +1496,7 @@ replicaset_sync(void)
 	 * replication_sync_lag or return on replication_sync_timeout
 	 */
 	double deadline = ev_monotonic_now(loop()) + replication_sync_timeout;
-	while (replicaset.applier.synced < quorum &&
+	while (replicaset.applier.synced_in_quorum < quorum &&
 	       replicaset.applier.connected +
 	       replicaset.applier.loading >= quorum) {
 		if (fiber_cond_wait_deadline(&replicaset.applier.cond,
@@ -1470,15 +1504,15 @@ replicaset_sync(void)
 			break;
 	}
 
-	if (replicaset.applier.synced < quorum) {
+	if (replicaset.applier.synced_in_quorum < quorum) {
 		/*
 		 * Not enough replicas connected to form a quorum.
 		 * Do not stall configuration, leave the instance
 		 * in 'orphan' state.
 		 */
 		say_crit("failed to synchronize with %d out of %d replicas",
-			 replicaset.applier.total - replicaset.applier.synced,
-			 replicaset.applier.total);
+				 quorum - replicaset.applier.synced_in_quorum,
+			 	 replicaset.applier.total);
 		box_set_orphan(true);
 	} else {
 		say_info("replica set sync complete");
@@ -1494,7 +1528,7 @@ replicaset_sync(void)
 void
 replicaset_check_quorum(void)
 {
-	if (replicaset.applier.synced >= replicaset_sync_quorum())
+	if (replicaset.applier.synced_in_quorum >= replicaset_sync_quorum())
 		box_set_orphan(false);
 }
 
