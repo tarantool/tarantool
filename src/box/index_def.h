@@ -120,6 +120,11 @@ struct index_opts {
 	 * Number of covered fields.
 	 */
 	uint32_t covered_field_count;
+	/**
+	 * Engine dependent. For engines supporting various layouts means a
+	 * string with the layout options.
+	 */
+	char *layout;
 };
 
 extern const struct index_opts index_opts_default;
@@ -140,6 +145,8 @@ index_opts_create(struct index_opts *opts)
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
+	free(opts->covered_fields);
+	free(opts->layout);
 	TRASH(opts);
 }
 
@@ -171,6 +178,12 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 	for (uint32_t i = 0; i < o1->covered_field_count; i++) {
 		if (o1->covered_fields[i] != o2->covered_fields[i])
 			return false;
+	}
+	if (o1->layout != NULL && o2->layout != NULL) {
+		if (strcmp(o1->layout, o2->layout) != 0)
+			return false;
+	} else if (o1->layout != NULL || o2->layout != NULL) {
+		return false;
 	}
 	return true;
 }

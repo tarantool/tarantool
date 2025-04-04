@@ -639,6 +639,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_setfield(L, -2, "covers");
 		}
 
+		if (index_def->opts.layout != NULL) {
+			lua_pushstring(L, index_def->opts.layout);
+			lua_setfield(L, -2, "layout");
+		}
+
 		lua_pushstring(L, "sequence_id");
 		if (k == 0 && space->sequence != NULL) {
 			lua_pushnumber(L, space->sequence->def->id);

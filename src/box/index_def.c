@@ -54,6 +54,7 @@ const struct index_opts index_opts_default = {
 	/* .hint                = */ INDEX_HINT_DEFAULT,
 	/* .covered_fields      = */ NULL,
 	/* .covered_field_count = */ 0,
+	/* .layout              = */ NULL,
 };
 
 /**
@@ -113,6 +114,24 @@ index_opts_parse_covered_fields(const char **data, void *opts,
 	return 0;
 }
 
+/** Parse index layout option given as MsgPack in `data' into `opts'. */
+static int
+index_opts_parse_layout(const char **data, void *opts, struct region *region)
+{
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	if (mp_typeof(**data) != MP_STR) {
+		diag_set(IllegalParams, "'layout' must be string");
+		return -1;
+	}
+	uint32_t len = 0;
+	const char *str = mp_decode_str(data, &len);
+	if (len > 0) {
+		index_opts->layout = xregion_alloc(region, len + 1);
+		strlcpy(index_opts->layout, str, len + 1);
+	}
+	return 0;
+}
+
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
@@ -128,6 +147,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF_LEGACY("sql"),
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
+	OPT_DEF_CUSTOM("layout", index_opts_parse_layout),
 	OPT_END,
 };
 
@@ -144,6 +164,9 @@ const struct opt_def index_opts_reg[] = {
 static void
 index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
+	if (opts->layout != NULL)
+		opts->layout = xstrdup(opts->layout);
+
 	if (opts->covered_field_count == 0)
 		return;
 	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
@@ -213,6 +236,8 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 		       dup->covered_field_count *
 		       sizeof(*dup->covered_fields));
 	}
+	if (dup->layout != NULL)
+		dup->layout = xstrdup(dup->layout);
 }
 
 struct index_def *
@@ -235,7 +260,6 @@ index_def_dup(const struct index_def *def)
 void
 index_def_delete(struct index_def *index_def)
 {
-	free(index_def->opts.covered_fields);
 	index_opts_destroy(&index_def->opts);
 	free(index_def->name);
 	free(index_def->space_name);
