@@ -176,6 +176,12 @@ void
 memtx_tx_abort_with_conflict(struct txn *txn);
 
 /**
+ * Implementation of engine_switch_to_ro callback.
+ */
+void
+memtx_tx_abort_writers_for_ro(struct engine *engine);
+
+/**
  * Implementation of engine_abort_with_conflict callback.
  * Do not use directly.
  */
