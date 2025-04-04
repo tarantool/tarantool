@@ -1363,16 +1363,26 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 	int rc;
 	struct region *gc = &fiber()->gc;
 	size_t gc_svp = region_used(gc);
-	bool do_ipc_decode = request->arrow_ipc != NULL;
 	struct ArrowArray *array = request->arrow_array;
 	struct ArrowSchema *schema = request->arrow_schema;
 
-	if (do_ipc_decode) {
+	if (request->arrow_ipc == NULL) {
+		assert(array != NULL);
+		assert(schema != NULL);
+		assert(request->arrow_ipc_end == NULL);
+		struct region *txn_region = tx_region_acquire(txn);
+		rc = arrow_ipc_encode(array, schema, txn_region,
+				      &request->arrow_ipc,
+				      &request->arrow_ipc_end);
+		tx_region_release(txn, TX_ALLOC_SYSTEM);
+		if (rc != 0)
+			goto eof;
+	} else {
 		assert(array == NULL);
 		assert(schema == NULL);
 		assert(request->arrow_ipc_end != NULL);
-		array = xregion_alloc_object(&fiber()->gc, struct ArrowArray);
-		schema = xregion_alloc_object(&fiber()->gc, struct ArrowSchema);
+		array = xregion_alloc_object(gc, struct ArrowArray);
+		schema = xregion_alloc_object(gc, struct ArrowSchema);
 		rc = arrow_ipc_decode(array, schema, request->arrow_ipc,
 				      request->arrow_ipc_end);
 		if (rc != 0)
@@ -1381,12 +1391,10 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 
 	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
 
-	if (do_ipc_decode) {
-		assert(array->release != NULL);
-		assert(schema->release != NULL);
+	if (array->release != NULL)
 		array->release(array);
+	if (schema->release != NULL)
 		schema->release(schema);
-	}
 eof:
 	region_truncate(gc, gc_svp);
 	return rc;

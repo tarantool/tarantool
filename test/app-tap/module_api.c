@@ -3364,19 +3364,41 @@ test_fiber_basic_api(lua_State *L)
 	return 1;
 }
 
+static void
+arrow_schema_destroy(struct ArrowSchema *schema)
+{
+	schema->release = NULL;
+}
+
+static void
+arrow_array_destroy(struct ArrowArray *array)
+{
+	array->release = NULL;
+}
+
 static int
 test_box_insert_arrow(struct lua_State *L)
 {
 	fail_unless(lua_gettop(L) == 1);
 	fail_unless(lua_isnumber(L, 1));
 	uint32_t space_id = lua_tointeger(L, 1);
+
 	struct ArrowSchema schema;
-	struct ArrowArray array;
 	memset(&schema, 0, sizeof(schema));
+	schema.format = "+s";
+	schema.release = arrow_schema_destroy;
+
+	struct ArrowArray array;
 	memset(&array, 0, sizeof(array));
+	array.n_buffers = 1;
+	const void *buffers[1] = {NULL};
+	array.buffers = buffers;
+	array.release = arrow_array_destroy;
 
 	int rc = box_insert_arrow(space_id, &array, &schema);
 	fail_unless(rc == -1);
+	fail_unless(array.release == NULL);
+	fail_unless(schema.release == NULL);
 	check_diag("ClientError", "memtx does not support arrow format");
 	lua_pushboolean(L, 1);
 	return 1;
