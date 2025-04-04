@@ -71,6 +71,11 @@ struct space_vtab {
 	int (*execute_update)(struct space *, struct txn *,
 			      struct request *, struct tuple **result);
 	int (*execute_upsert)(struct space *, struct txn *, struct request *);
+	/**
+	 * Executes a batch insert request.
+	 *
+	 * The implementation may move or release the input array and schema.
+	 */
 	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
 				    struct ArrowArray *array,
 				    struct ArrowSchema *schema);

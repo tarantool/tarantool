@@ -42,7 +42,6 @@
 #include "session.h"
 #include "wal_ext.h"
 #include "rmean.h"
-#include "arrow_ipc.h"
 
 double too_long_threshold;
 
@@ -280,21 +279,8 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	if (space != NULL && space->wal_ext != NULL)
 		space_wal_ext_process_request(space->wal_ext, stmt, request);
 	struct region *txn_region = tx_region_acquire(txn);
-	if (request->arrow_array != NULL) {
-		assert(request->arrow_schema != NULL);
-		assert(request->arrow_ipc == NULL);
-		assert(request->arrow_ipc_end == NULL);
-		if (arrow_ipc_encode(
-				request->arrow_array, request->arrow_schema,
-				txn_region, &request->arrow_ipc,
-				&request->arrow_ipc_end) != 0) {
-			tx_region_release(txn, TX_ALLOC_SYSTEM);
-			return -1;
-		}
-	}
 	xrow_encode_dml(request, txn_region, row->body, &row->bodycnt);
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
-	txn_region = NULL;
 	stmt->row = row;
 	return 0;
 }

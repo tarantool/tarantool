@@ -437,12 +437,7 @@ lbox_insert_arrow(lua_State *L)
 	struct ArrowSchema schema;
 	if (arrow_ipc_decode(&array, &schema, data, data + len) != 0)
 		return luaT_error(L);
-	int rc = box_insert_arrow(space_id, &array, &schema);
-	if (schema.release != NULL)
-		schema.release(&schema);
-	if (array.release != NULL)
-		array.release(&array);
-	if (rc != 0)
+	if (box_insert_arrow(space_id, &array, &schema) != 0)
 		return luaT_error(L);
 	return 0;
 }
