@@ -37,6 +37,7 @@
 #include "small/small.h"
 #include "xrow_update.h"
 #include "coll_id_cache.h"
+#include "mpstream/mpstream.h"
 
 static struct mempool tuple_iterator_pool;
 static struct small_alloc runtime_alloc;
@@ -715,6 +716,15 @@ box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size)
 {
 	assert(tuple != NULL);
 	return tuple_to_buf(tuple, buf, size);
+}
+
+void
+tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream)
+{
+	size_t bsize = box_tuple_bsize(tuple);
+	char *ptr = mpstream_reserve(stream, bsize);
+	box_tuple_to_buf(tuple, ptr, bsize);
+	mpstream_advance(stream, bsize);
 }
 
 box_tuple_format_t *

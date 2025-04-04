@@ -1523,6 +1523,12 @@ ssize_t
 tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 
 /**
+ * Serialize a tuple to a MsgPack stream.
+ */
+void
+tuple_to_mpstream(struct tuple *tuple, struct mpstream *stream);
+
+/**
  * Amount of memory allocated on runtime arena for tuples.
  *
  * This metric disregards the internal fragmentation: it does not
