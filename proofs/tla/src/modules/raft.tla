@@ -47,9 +47,8 @@ ASSUME /\ ElectionQuorum \in Nat
        /\ ElectionQuorum < Cardinality(Servers)
 ASSUME MaxRaftTerm \in Int
 
+\* Raft implementation.
 VARIABLES
-    msgs,
-    \* Raft implementation.
     state,                \* {"Follower", "Candidate", "Leader"}.
     term,                 \* The current term number of each node.
     volatileTerm,         \* Not yet persisted term.
@@ -57,34 +56,49 @@ VARIABLES
     volatileVote,         \* Not yet persisted vote.
     leader,               \* The leader as known by node.
     votesReceived,        \* The set of nodes, which voted for the candidate.
-    leaderWitnessMap,     \* A bitmap of sources, which see leader in this term.
     isBroadcastScheduled, \* Whether state should be broadcasted to other nodes.
-    candidateVclock,      \* Vclock of the candidate for which node is voting.
-    \* Tx implementation (see box module).
-    vclock,
-    \* Relay implementation
-    relayRaftMsg
+    candidateVclock       \* Vclock of the candidate for which node is voting.
 
-raftVars == <<state, term, volatileTerm, vote, volatileVote, leader,
-              votesReceived, leaderWitnessMap, isBroadcastScheduled,
-              candidateVclock>>
+raftVars ==
+    <<state, term, volatileTerm, vote, volatileVote, leader, votesReceived,
+      isBroadcastScheduled, candidateVclock>>
 
-\* Limbo substitution.
-CONSTANTS SplitBrainCheck, MaxClientRequests
-VARIABLES limbo, limboVclock, limboOwner, limboPromoteGreatestTerm,
-          limboPromoteTermMap, limboConfirmedLsn, limboVolatileConfirmedLsn,
-          limboConfirmedVclock, limboAckCount, limboSynchroMsg,
-          limboPromoteLatch, error, relayLastAck, tId, clientCtr, walQueue
-LOCAL limboVarsSub == <<limbo, limboVclock, limboOwner,
-                        limboPromoteGreatestTerm, limboPromoteTermMap,
-                        limboConfirmedLsn, limboVolatileConfirmedLsn,
-                        limboConfirmedVclock, limboAckCount, limboSynchroMsg,
-                        limboPromoteLatch, error, relayLastAck, tId, clientCtr,
-                        walQueue>>
+\* Variables, defined in non imported modules.
+VARIABLES
+    msgs,         \* tarantool module.
+    vclock,       \* box module.
+    relayRaftMsg  \* relay module.
 
 --------------------------------------------------------------------------------
 \* Imports
 --------------------------------------------------------------------------------
+
+\* Limbo substitution.
+CONSTANTS SplitBrainCheck, MaxClientRequests
+
+VARIABLES
+    limbo,
+    limboVclock,
+    limboOwner,
+    limboPromoteGreatestTerm,
+    limboPromoteTermMap,
+    limboConfirmedLsn,
+    limboVolatileConfirmedLsn,
+    limboConfirmedVclock,
+    limboAckCount,
+    limboSynchroMsg,
+    limboPromoteLatch,
+    error,
+    relayLastAck,
+    tId,
+    clientCtr,
+    walQueue
+
+LOCAL limboVarsSub ==
+    <<limbo, limboVclock, limboOwner, limboPromoteGreatestTerm,
+      limboPromoteTermMap, limboConfirmedLsn, limboVolatileConfirmedLsn,
+      limboConfirmedVclock, limboAckCount, limboSynchroMsg, limboPromoteLatch,
+      error, relayLastAck, tId, clientCtr, walQueue>>
 
 LOCAL INSTANCE limbo
 LOCAL INSTANCE definitions
@@ -102,7 +116,6 @@ RaftInit ==
     /\ volatileVote = [i \in Servers |-> Nil]
     /\ leader = [i \in Servers |-> Nil]
     /\ votesReceived = [i \in Servers |-> { }]
-    /\ leaderWitnessMap = [i \in Servers |-> [j \in Servers |-> FALSE]]
     /\ isBroadcastScheduled = [i \in Servers |-> FALSE]
     /\ candidateVclock = [i \in Servers |-> [j \in Servers |-> 0]]
 
@@ -115,7 +128,6 @@ RaftVars(i) == [
     volatileVote |-> volatileVote[i],
     leader |-> leader[i],
     votesReceived |-> votesReceived[i],
-    leaderWitnessMap |-> leaderWitnessMap[i],
     isBroadcastScheduled |-> isBroadcastScheduled[i],
     candidateVclock |-> candidateVclock[i]
 ]
@@ -131,7 +143,6 @@ RaftScheduleNewTermVars(vars, newTerm) ==
         !.volatileVote = Nil,
         !.leader = Nil,
         !.votesReceived = {},
-        !.leaderWitnessMap = [i \in Servers |-> FALSE],
         !.isBroadcastScheduled = TRUE,
         !.candidateVclock = [i \in Servers |-> 0]
     ]
@@ -143,8 +154,6 @@ RaftScheduleNewTerm(i, newTerm) ==
        /\ volatileVote' = [volatileVote EXCEPT ![i] = vars.volatileVote]
        /\ leader' = [leader EXCEPT ![i] = vars.leader]
        /\ votesReceived' = [votesReceived EXCEPT ![i] = vars.votesReceived]
-       /\ leaderWitnessMap' = [leaderWitnessMap EXCEPT
-                                    ![i] = vars.leaderWitnessMap]
        /\ isBroadcastScheduled' = [isBroadcastScheduled EXCEPT ![i] =
                                     vars.isBroadcastScheduled]
        /\ candidateVclock' = [candidateVclock EXCEPT ![i] =
@@ -154,7 +163,7 @@ RaftProcessTerm(i, newTerm) ==
     IF newTerm > volatileTerm[i]
     THEN RaftScheduleNewTerm(i, newTerm)
     ELSE UNCHANGED <<state, volatileTerm, volatileVote, leader, votesReceived,
-                     leaderWitnessMap, isBroadcastScheduled, candidateVclock>>
+                     isBroadcastScheduled, candidateVclock>>
 
 RaftScheduleNewVoteVars(vars, j, newCandidateVclock) ==
     [vars EXCEPT
@@ -172,18 +181,11 @@ RaftScheduleNewVote(i, j, newCandidateVclock) ==
 RaftCanVoteFor(i, newCandidateVclock) ==
     BagCompare(newCandidateVclock, vclock[i]) \in {0, 1}
 
-\* Implementation of the raft_sm_election_update.
+\* Implementation of the raft_sm_election_update. leader_witness_map is not
+\* needed in TLA, since it's impossible to figure out when applier dies.
 RaftElectionUpdate(i) ==
-    \* Pre-vote protection, everyone must agree, that leader is gone.
-    IF \A j \in Servers: leaderWitnessMap[i][j] = FALSE
-    THEN /\ RaftScheduleNewTerm(i, term[i] + 1)
-         /\ RaftScheduleNewVote(i, i, vclock[i])
-    ELSE UNCHANGED <<state, volatileTerm, volatileVote, leader,
-                     votesReceived, leaderWitnessMap, isBroadcastScheduled,
-                     candidateVclock>>
-
-RaftNotifyIsLeaderSeen(i, source, is_seen) ==
-    leaderWitnessMap' = [leaderWitnessMap EXCEPT ![i][source] = is_seen]
+    /\ RaftScheduleNewTerm(i, term[i] + 1)
+    /\ RaftScheduleNewVote(i, i, vclock[i])
 
 \* Server times out and tries to start new election.
 \* Implementation of the raft_sm_election_update_cb.
@@ -192,11 +194,9 @@ RaftTimeout(i) ==
        \/ Max({term[j] : j \in DOMAIN term}) < MaxRaftTerm
     \* In Tarantool timer is stopped on leader.
     /\ IF /\ state[i] \in {Follower, Candidate}
-       THEN /\ RaftNotifyIsLeaderSeen(i, i, FALSE)
-            /\ RaftElectionUpdate(i)
+       THEN RaftElectionUpdate(i)
        ELSE UNCHANGED <<state, volatileTerm, volatileVote, leader,
-                        votesReceived, leaderWitnessMap, isBroadcastScheduled,
-                        candidateVclock>>
+                        votesReceived, isBroadcastScheduled, candidateVclock>>
     /\ UNCHANGED <<msgs, term, vote, limboVarsSub>>
 
 \* Send to WAL if node can vote for the candidate or if only term is changed.
@@ -253,7 +253,6 @@ RaftWorkerHandleBroadcast(i) ==
             vote |-> vote[i],
             state |-> state[i],
             leader_id |-> leader[i],
-            is_leader_seen |-> leaderWitnessMap[i][i],
             vclock |-> IF state[i] = Candidate THEN vclock[i] ELSE <<>>
         ])
         newMsgs == [j \in Servers |-> TxMsg(TxRelayType, xrow)]
@@ -278,17 +277,7 @@ RaftWorker(i) ==
           /\ UNCHANGED <<walQueue, volatileVote, candidateVclock,
                          relayRaftMsg>>
     /\ UNCHANGED <<msgs, limboVars, vclock, state, term, volatileTerm, vote,
-                   leader, votesReceived, leaderWitnessMap,
-                   isBroadcastScheduled>>
-
-\* Implementation of the box_raft_worker_f.
-
-RaftProcessHeartbeat(i, source) ==
-    /\ source = leader[i]
-    /\ leaderWitnessMap' = [leaderWitnessMap EXCEPT ![i][i] = TRUE]
-    /\ IF leaderWitnessMap[i][i] = FALSE
-       THEN RaftScheduleBroadcast(i)
-       ELSE UNCHANGED <<isBroadcastScheduled>>
+                   leader, votesReceived, isBroadcastScheduled>>
 
 RaftApplyVars(i, vars) ==
     /\ state' = [state EXCEPT ![i] = vars.state]
@@ -298,7 +287,6 @@ RaftApplyVars(i, vars) ==
     /\ volatileVote' = [volatileVote EXCEPT ![i] = vars.volatileVote]
     /\ leader' = [leader EXCEPT ![i] = vars.leader]
     /\ votesReceived' = [votesReceived EXCEPT ![i] = vars.votesReceived]
-    /\ leaderWitnessMap' = [leaderWitnessMap EXCEPT ![i] = vars.leaderWitnessMap]
     /\ isBroadcastScheduled' = [isBroadcastScheduled EXCEPT ![i] =
                                     vars.isBroadcastScheduled]
     /\ candidateVclock' = [candidateVclock EXCEPT ![i] = vars.candidateVclock]
@@ -309,35 +297,6 @@ RaftApplyVars(i, vars) ==
 \* variable is not seen until the end of the step. The function implements
 \* the following operator:
 \*
-\* RaftProcessMsg(i, entry) ==
-\*    /\ entry.body.term >= volatileTerm[i]
-\*    /\ /\ RaftProcessTerm(i, entry.body.term)
-\*       /\ RaftNotifyIsLeaderSeen(i, entry.replica_id,
-\*                                 entry.body.is_leader_seen)
-\*       /\ /\ entry.body.vote # 0
-\*          /\ IF state[i] \in {Follower, Leader}
-\*               THEN /\ leader[i] = Nil
-\*                    /\ entry.body.vote # i
-\*                    /\ entry.body.state = Candidate
-\*                    /\ volatileVote[i] = Nil
-\*                    /\ RaftTryNewVote(i, entry.replica_id, entry.body.vclock)
-\*               ELSE \* state[i] = Candidate
-\*                     LET newVotes == votesReceived[i] \cup {entry.replica_id}
-\*                     IN /\ entry.body.vote = i
-\*                        /\ votesReceived' =
-\*                            [votesReceived EXCEPT ![i] = newVotes]
-\*                        /\ /\ Cardinality(newVotes) >= ElectionQuorum
-\*                           /\ RaftBecomeLeader(i)
-\*       /\ IF /\ entry.body.state # Leader
-\*             /\ leader[i] = entry.replica_id THEN
-\*               /\ leader' = [leader EXCEPT ![i] = Nil]
-\*               /\ RaftNotifyIsLeaderSeen(i, i, FALSE)
-\*               /\ RaftScheduleBroadcast(i)
-\*          ELSE \* entry.body.state = Leader
-\*               /\ leader[i] # entry.replica_id
-\*               /\ leader[i] = Nil
-\*               /\ RaftFollowLeader(i, entry.replica_id)
-\*
 RaftProcessMsg(i, entry) ==
     IF entry.body.term >= volatileTerm[i]
     THEN LET raftVarsInit == RaftVars(i)
@@ -345,35 +304,31 @@ RaftProcessMsg(i, entry) ==
                 IF entry.body.term > raftVarsInit.volatileTerm[i]
                 THEN RaftScheduleNewTermVars(raftVars, entry.body.term)
                 ELSE raftVarsInit
-             raftVarsSeen == [raftVarsTerm EXCEPT
-                    !.leaderWitnessMap[entry.replica_id] =
-                        entry.body.is_leader_seen]
              raftVarsVote ==
                 IF entry.body.vote # 0
-                THEN IF raftVarsSeen.state \in {Follower, Leader}
-                     THEN IF /\ raftVarsSeen.leader = Nil
+                THEN IF raftVarsTerm.state \in {Follower, Leader}
+                     THEN IF /\ raftVarsTerm.leader = Nil
                              /\ entry.body.vote # i
                              /\ entry.body.state = Candidate
-                             /\ raftVarsSeen.volatileVote = Nil
+                             /\ raftVarsTerm.volatileVote = Nil
                              /\ RaftCanVoteFor(i, entry.body.vclock)
-                          THEN RaftScheduleNewVoteVars(raftVarsSeen,
+                          THEN RaftScheduleNewVoteVars(raftVarsTerm,
                                 entry.replica_id, entry.body.vclock)
-                          ELSE raftVarsSeen
+                          ELSE raftVarsTerm
                      ELSE \* state = Candidate
                           IF entry.body.vote = i
-                          THEN LET raftVarsTmp == [raftVarsSeen EXCEPT
+                          THEN LET raftVarsTmp == [raftVarsTerm EXCEPT
                             !.votesReceived = @ \cup {entry.replica_id}]
                                IN IF Cardinality(raftVarsTmp.votesReceived) >=
                                     ElectionQuorum
                                   THEN RaftBecomeLeaderVars(raftVarsTmp, i)
                                   ELSE raftVarsTmp
-                          ELSE raftVarsSeen
-                ELSE raftVarsSeen
+                          ELSE raftVarsTerm
+                ELSE raftVarsTerm
              raftVarsFinal == IF entry.body.state # Leader
                               THEN IF raftVarsVote.leader = entry.replica_id
                                    THEN [raftVarsVote EXCEPT
                                             !.leader = Nil,
-                                            !.leaderWitnessMap[i] = FALSE,
                                             !.isBroadcastScheduled = TRUE]
                                    ELSE raftVarsVote
                               ELSE \* entry.body.state = Leader

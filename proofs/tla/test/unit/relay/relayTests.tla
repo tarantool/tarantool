@@ -2,11 +2,11 @@
 
 EXTENDS FiniteSets
 
-CONSTANTS Servers, MaxHeartbeatsPerTerm
+CONSTANTS Servers
 
-VARIABLES msgs, relaySentLsn, relayLastAck, relayRaftMsg, relayHeartbeatCtr,
+VARIABLES msgs, relaySentLsn, relayLastAck, relayRaftMsg,
           txQueue, vclock, wal, term
-allVars == <<msgs, relaySentLsn, relayLastAck, relayRaftMsg, relayHeartbeatCtr,
+allVars == <<msgs, relaySentLsn, relayLastAck, relayRaftMsg,
              txQueue, vclock, wal, term>>
 
 INSTANCE relay

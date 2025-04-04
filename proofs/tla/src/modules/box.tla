@@ -66,10 +66,10 @@ LOCAL txnVarsSub == <<tId, clientCtr, walQueue>>
 \* Raft substitution.
 CONSTANTS ElectionQuorum, MaxRaftTerm
 VARIABLES state, term, volatileTerm, vote, volatileVote, leader, votesReceived,
-          leaderWitnessMap, isBroadcastScheduled, candidateVclock,
+          isBroadcastScheduled, candidateVclock,
           relayRaftMsg
 LOCAL raftVarsSub == <<state, term, volatileTerm, vote, volatileVote, leader,
-                       votesReceived, leaderWitnessMap, isBroadcastScheduled,
+                       votesReceived, isBroadcastScheduled,
                        candidateVclock, relayRaftMsg>>
 
 \* Limbo substitution.

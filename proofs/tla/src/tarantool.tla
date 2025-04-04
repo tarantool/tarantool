@@ -38,8 +38,7 @@ CONSTANTS
     ElectionQuorum,      \* The number of votes needed to elect a leader.
     MaxClientRequests,   \* The max number of ClientRequests, -1 means unlimited
     SplitBrainCheck,     \* Whether SplitBrain errors should be raised.
-    MaxRaftTerm,         \* The maximum term, which can be achieved in the rs.
-    MaxHeartbeatsPerTerm \* The maximum number of hearbeats per term.
+    MaxRaftTerm          \* The maximum term, which can be achieved in the rs.
 
 ASSUME Cardinality(Servers) > 0
 ASSUME /\ ElectionQuorum \in Nat
@@ -47,7 +46,6 @@ ASSUME /\ ElectionQuorum \in Nat
 ASSUME MaxClientRequests \in Int
 ASSUME SplitBrainCheck \in {TRUE, FALSE}
 ASSUME MaxRaftTerm \in Int
-ASSUME MaxHeartbeatsPerTerm \in Int
 
 -------------------------------------------------------------------------------
 \* Global variables
@@ -109,7 +107,6 @@ VARIABLES
     volatileVote,         \* Not yet persisted vote.
     leader,               \* The leader as known by node.
     votesReceived,        \* The set of nodes, which voted for the candidate.
-    leaderWitnessMap,     \* A bitmap of sources, which see leader in this term.
     isBroadcastScheduled, \* Whether state should be broadcasted to other nodes.
     candidateVclock       \* Vclock of the candidate for which node is voting.
 
@@ -117,8 +114,7 @@ VARIABLES
 VARIABLES
     relaySentLsn,     \* Last sent LSN to the peer. See relay->r->cursor.
     relayLastAck,     \* Last received ack from replica.
-    relayRaftMsg,     \* Raft message for broadcast.
-    relayHeartbeatCtr \* The number of heartbeats done.
+    relayRaftMsg      \* Raft message for broadcast.
 
 \* Applier implementation
 VARIABLES
@@ -163,30 +159,29 @@ AliveServers == {i \in Servers : error[i] = Nil}
 RaftNextTnt ==
    /\ RaftNext(AliveServers)
    /\ UNCHANGED <<applierAckMsg, applierVclock, vclock, txQueue,
-                  relayHeartbeatCtr, relayRaftMsg, relaySentLsn,
-                  txApplierQueue, wal>>
+                  relayRaftMsg, relaySentLsn, txApplierQueue, wal>>
 
 BoxNextTnt ==
     /\ BoxNext(AliveServers)
-    /\ UNCHANGED <<wal, relayHeartbeatCtr, relaySentLsn>>
+    /\ UNCHANGED <<wal, relaySentLsn>>
 
 LimboNextTnt ==
     /\ LimboNext(AliveServers)
     /\ UNCHANGED <<applierAckMsg, applierVclock, candidateVclock,
-                   isBroadcastScheduled, leader, leaderWitnessMap, msgs,
-                   relayHeartbeatCtr, relayRaftMsg, relaySentLsn, term,
-                   txApplierQueue, txQueue, vclock, volatileTerm, volatileVote,
-                   vote, votesReceived, wal>>
+                   isBroadcastScheduled, leader, msgs,
+                   relayRaftMsg, relaySentLsn, term, txApplierQueue, txQueue,
+                   vclock, volatileTerm, volatileVote, vote, votesReceived,
+                   wal>>
 
 TxnNextTnt ==
     /\ TxnNext(AliveServers)
     /\ UNCHANGED <<applierAckMsg, applierVclock, candidateVclock, error,
-                   isBroadcastScheduled, leader, leaderWitnessMap,
-                   limboAckCount, limboConfirmedLsn, limboConfirmedVclock,
-                   limboOwner, limboPromoteGreatestTerm, limboPromoteTermMap,
-                   limboVclock, limboVolatileConfirmedLsn, msgs,
-                   relayHeartbeatCtr, relayLastAck, relayRaftMsg, relaySentLsn,
-                   term, txApplierQueue, txQueue, vclock, volatileTerm,
+                   isBroadcastScheduled, leader, limboAckCount,
+                   limboConfirmedLsn, limboConfirmedVclock, limboOwner,
+                   limboPromoteGreatestTerm, limboPromoteTermMap, limboVclock,
+                   limboVolatileConfirmedLsn, msgs,
+                   relayLastAck, relayRaftMsg, relaySentLsn, term,
+                   txApplierQueue, txQueue, vclock, volatileTerm,
                    volatileVote, vote, votesReceived, wal>>
 
 WalNextTnt ==
@@ -197,7 +192,7 @@ WalNextTnt ==
 RelayNextTnt ==
     /\ RelayNext(AliveServers)
     /\ UNCHANGED <<applierAckMsg, applierVclock, candidateVclock, clientCtr,
-                   error, isBroadcastScheduled, leader, leaderWitnessMap,
+                   error, isBroadcastScheduled, leader,
                    limbo, limboAckCount, limboConfirmedLsn,
                    limboConfirmedVclock, limboOwner, limboPromoteGreatestTerm,
                    limboPromoteLatch, limboPromoteTermMap, limboSynchroMsg,

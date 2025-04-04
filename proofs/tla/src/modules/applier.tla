@@ -62,10 +62,10 @@ LOCAL txnVarsSub == <<tId, clientCtr, walQueue>>
 \* Raft substitution.
 CONSTANTS ElectionQuorum, MaxRaftTerm
 VARIABLES state, term, volatileTerm, vote, volatileVote, leader, votesReceived,
-          leaderWitnessMap, isBroadcastScheduled, candidateVclock, vclock,
+          isBroadcastScheduled, candidateVclock, vclock,
           relayRaftMsg
 LOCAL raftVarsSub == <<state, term, volatileTerm, vote, volatileVote, leader,
-                       votesReceived, leaderWitnessMap, isBroadcastScheduled,
+                       votesReceived, isBroadcastScheduled,
                        candidateVclock, vclock, relayRaftMsg>>
 
 \* Limbo substitution.
@@ -122,9 +122,6 @@ ApplierProcess(i, j) ==
        \/ ApplierRead(i, j)
     /\ UNCHANGED <<msgs, txnVarsSub, raftVarsSub, limboVarsSub, txApplierQueue>>
 
-ApplierProcessHeartbeat(i, entry) ==
-    RaftProcessHeartbeat(i, entry.replica_id)
-
 ApplierSynchroIsSplitBrain(i, entry) ==
     /\ SplitBrainCheck = TRUE
     /\ limboPromoteTermMap[entry.replica_id] # limboPromoteGreatestTerm[i]
@@ -177,8 +174,6 @@ ApplierApplyTx(i, entry) ==
 TxOnApplierReceive(i, entry) ==
     \/ /\ entry.lsn # -1 \* DmlType, PromoteType, ConfirmType
        /\ ApplierApplyTx(i, entry)
-    \/ /\ entry.type = OkType
-       /\ ApplierProcessHeartbeat(i, entry)
     \/ /\ entry.type = RaftType
        /\ RaftProcessMsg(i, entry)
 

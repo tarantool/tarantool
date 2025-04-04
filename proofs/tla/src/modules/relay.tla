@@ -37,12 +37,9 @@ EXTENDS Integers, Sequences, FiniteSets
 \* Declaration
 --------------------------------------------------------------------------------
 
-CONSTANTS
-    Servers,
-    MaxHeartbeatsPerTerm
+CONSTANTS Servers
 
 ASSUME Cardinality(Servers) > 0
-ASSUME MaxHeartbeatsPerTerm \in Int
 
 VARIABLES
     msgs,
@@ -50,7 +47,6 @@ VARIABLES
     relaySentLsn,      \* Last sent LSN to the peer. See relay->r->cursor.
     relayLastAck,      \* Last received ack from replica.
     relayRaftMsg,      \* Raft message for broadcast.
-    relayHeartbeatCtr, \* The number of heartbeats done.
     \* Tx implementation (see box module).
     txQueue,
     vclock,
@@ -59,7 +55,7 @@ VARIABLES
     \* Raft implementation (see raft module).
     term
 
-relayVars == <<relaySentLsn, relayLastAck, relayRaftMsg, relayHeartbeatCtr>>
+relayVars == <<relaySentLsn, relayLastAck, relayRaftMsg>>
 
 --------------------------------------------------------------------------------
 \* Imports
@@ -76,7 +72,6 @@ RelayInit ==
     /\ relayLastAck = [i \in Servers |-> [j \in Servers |-> EmptyAck(Servers)]]
     /\ relaySentLsn = [i \in Servers |-> [j \in Servers |-> 0]]
     /\ relayRaftMsg = [i \in Servers |-> [j \in Servers |-> EmptyGeneralMsg]]
-    /\ relayHeartbeatCtr = [i \in Servers |-> [j \in Servers |-> 0]]
 
 \* Implementation of the relay_process_wal_event.
 RelayProcessWalEvent(i, j) ==
@@ -93,7 +88,7 @@ RelayProcessWalEvent(i, j) ==
        /\ relaySentLsn' = [relaySentLsn EXCEPT ![i][j] = newSentLsn]
        /\ UNCHANGED
             \* Without {msgs, relaySentLsn}.
-            <<relayLastAck, relayRaftMsg, relayHeartbeatCtr, txQueue>>
+            <<relayLastAck, relayRaftMsg, txQueue>>
 
 RelayRaftSend(i, j) ==
     /\ Send(msgs, i, j, RelaySource, relayRaftMsg.body)
@@ -101,7 +96,7 @@ RelayRaftSend(i, j) ==
        IN relayRaftMsg = [relayRaftMsg EXCEPT ![i][j] = newMsg]
     /\ UNCHANGED
             \* Without {msgs, relayRaftMsg}.
-            <<relayLastAck, relaySentLsn, relayHeartbeatCtr, txQueue>>
+            <<relayLastAck, relaySentLsn, txQueue>>
 
 \* Implementation of the relay_reader_f.
 RelayRead(i, j) ==
@@ -112,21 +107,7 @@ RelayRead(i, j) ==
             Tail(msgs[j][i][ApplierSource])]
     /\ UNCHANGED
             \* Without {msgs, relayLastAck}.
-            <<relaySentLsn, relayRaftMsg, relayHeartbeatCtr, txQueue>>
-
-RelaySendHeartbeat(i, j) ==
-    /\ \/ MaxHeartbeatsPerTerm = -1
-       \/ relayHeartbeatCtr[i][j] < MaxHeartbeatsPerTerm
-    /\ Send(msgs, i, j, RelaySource,
-            XrowEntry(OkType, i, DefaultGroup, DefaultFlags, [
-                vclock |-> vclock[i],
-                term |-> term[i]
-            ])
-       )
-    /\ relayHeartbeatCtr' = [relayHeartbeatCtr EXCEPT ![i][j] = @ + 1]
-    /\ UNCHANGED
-            \* Without {msgs, relayHearbeatCtr}.
-            <<relayLastAck, relaySentLsn, relayRaftMsg, txQueue>>
+            <<relaySentLsn, relayRaftMsg, txQueue>>
 
 \* Implementation of the relay_check_status_needs_update.
 RelayStatusUpdate(i, j) ==
@@ -136,12 +117,11 @@ RelayStatusUpdate(i, j) ==
        /\ relayLastAck' = [relayLastAck EXCEPT ![i][j] = EmptyAck(Servers)]
        /\ UNCHANGED
             \* Without {txQueue, relayLastAck}
-            <<msgs, relaySentLsn, relayRaftMsg, relayHeartbeatCtr>>
+            <<msgs, relaySentLsn, relayRaftMsg>>
 
 RelayProcess(i, j) ==
     /\ IF i # j \* No replication to self.
-       THEN \/ RelaySendHeartbeat(i, j)
-            \/ RelayRead(i, j)
+       THEN \/ RelayRead(i, j)
             \/ RelayStatusUpdate(i, j)
             \/ RelayProcessWalEvent(i, j)
             \/ /\ relayRaftMsg[i][j].is_ready = TRUE
