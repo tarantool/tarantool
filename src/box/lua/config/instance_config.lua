@@ -1336,6 +1336,7 @@ return schema.new('instance_config', schema.record({
         }, {
             box_cfg = 'bootstrap_strategy',
             default = 'auto',
+            validate = validators['replication.bootstrap_strategy'],
         }),
         autoexpel = schema.record({
             enabled = schema.scalar({
