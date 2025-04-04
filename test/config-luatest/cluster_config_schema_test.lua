@@ -799,6 +799,18 @@ g.test_scope = function()
             instance = false,
         },
         {
+            name = 'replication.bootstrap_strategy',
+            data = {
+                replication = {
+                    bootstrap_strategy = 'auto',
+                },
+            },
+            global = true,
+            group = true,
+            replicaset = true,
+            instance = false,
+        },
+        {
             name = 'replication.failover',
             data = {
                 replication = {
