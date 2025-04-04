@@ -69,6 +69,8 @@ bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
 char cfg_bootstrap_leader_name[NODE_NAME_SIZE_MAX];
+bool is_supervised_bootstrap_leader = false;
+bool is_graceful_supervised_bootstrap_requested = false;
 char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 bool replication_synchro_timeout_rollback_enabled = true;
@@ -1143,6 +1145,14 @@ applier_is_bootstrap_leader(const struct applier *applier)
 static bool
 bootstrap_leader_is_connected(struct applier **appliers, int count)
 {
+	/*
+	 * In the supervised strategy it is possible that we know
+	 * locally that the given instance is a bootstrap leader.
+	 */
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    is_supervised_bootstrap_leader)
+		return true;
+
 	for (int i = 0; i < count; i++) {
 		struct applier *applier = appliers[i];
 		if (applier->state == APPLIER_CONNECTED &&
@@ -1162,11 +1172,31 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
 		/*
-		 * With "supervised" strategy we may continue only once the
-		 * bootstrap leader appears.
+		 * With "supervised" strategy we may continue either:
+		 *
+		 * * when the leader appears, or
+		 * * when the graceful bootstrap is requested and
+		 *   all the upstreams are connected
+		 * * when the graceful bootstrap is requested and
+		 *   the connection timeout is exceeded
 		 */
-		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED)
-			return bootstrap_leader_is_connected(appliers, count);
+		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED) {
+			bool has_leader = bootstrap_leader_is_connected(
+				appliers, count);
+			if (has_leader)
+				/* Has leader -- proceed. */
+				return true;
+			else if (!is_graceful_supervised_bootstrap_requested)
+				/* No leader -- wait. */
+				return false;
+			/*
+			 * At this point there is a graceful
+			 * bootstrap request and no leaders. Let's
+			 * fall down to check if there are
+			 * connections to wait for (similarly to
+			 * the "auto" and "config" strategies).
+			 */
+		}
 		/*
 		 * With "config" strategy we may continue either when the leader
 		 * appears or when there are no more connections to wait for.
@@ -1664,6 +1694,26 @@ replicaset_find_join_master_cfg(void)
 static struct replica *
 replicaset_find_join_master_supervised(void)
 {
+	/*
+	 * If we're known as a bootstrap leader, just bootstrap
+	 * the database.
+	 *
+	 * Unlike the 'auto' bootstrap strategy, the 'supervised'
+	 * one has no safety checks with waiting for ballots from
+	 * other replicaset members (except when the graceful
+	 * bootstrap is requested).
+	 *
+	 * NB: It is possible to run the cycle below first and
+	 * verify other members status known at this moment.
+	 * However, since we don't wait for connecting to all the
+	 * instances, it has a low chance to catch a problem.
+	 * As result, it would just make the result of calling
+	 * this function less predictable without visible gains
+	 * for a user.
+	 */
+	if (is_supervised_bootstrap_leader)
+		return NULL;
+
 	struct replica *leader = NULL;
 	replicaset_foreach(replica) {
 		struct applier *applier = replica->applier;
@@ -1672,10 +1722,34 @@ replicaset_find_join_master_supervised(void)
 		if (applier_is_bootstrap_leader(applier))
 			leader = replica;
 	}
-	if (leader == NULL) {
+
+	/*
+	 * At this point the waiting logic from
+	 * replicaset_is_connected() is finished. There are the
+	 * following situations, when it is possible:
+	 *
+	 * 1. A bootstrap leader is found.
+	 * 2. All the instances from box.cfg.replication are
+	 *    connected, but no one is a bootstrap leader.
+	 * 3. box.cfg.replication_connect_timeout is reached.
+	 *
+	 * In case of the situation 1 we're going to bootstrap or
+	 * to recovery, depending on whether the leader is the
+	 * current instance.
+	 *
+	 * In the 2 and 3 situations, it depends on the graceful
+	 * bootstrap request. If there is one, we're going to
+	 * bootstrap. Otherwise, an error is reported.
+	 */
+	if (leader == NULL && !is_graceful_supervised_bootstrap_requested) {
 		tnt_raise(ClientError, ER_CFG, "bootstrap_strategy",
 			  "failed to connect to the bootstrap leader");
 	}
+
+	/*
+	 * NULL is possible here and it means to assign the
+	 * current instance as a bootstrap leader.
+	 */
 	return leader;
 }
 
