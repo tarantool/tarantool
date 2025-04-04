@@ -333,7 +333,6 @@ set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 add_subdirectory(lib)
 add_subdirectory(box)
-add_subdirectory(tla)
 
 include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 

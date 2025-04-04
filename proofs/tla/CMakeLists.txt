@@ -9,14 +9,13 @@ set(TEST_SUITE_NAME "tla")
 message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 
 list(APPEND TLA_LIBRARIES
-  ${PROJECT_SOURCE_DIR}/src/tla
-  ${PROJECT_SOURCE_DIR}/src/tla/modules
+  ${PROJECT_SOURCE_DIR}/proofs/tla/src/modules
+  ${PROJECT_SOURCE_DIR}/proofs/tla/src/
 )
 list(JOIN TLA_LIBRARIES ":" TLA_LIBRARIES_STR)
 
 file(GLOB_RECURSE tests
-  ${CMAKE_CURRENT_SOURCE_DIR}/unit/*.tla
-  ${CMAKE_CURRENT_SOURCE_DIR}/integration/*.tla
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/*.tla
 )
 foreach(test_path ${tests})
   get_filename_component(test_name ${test_path} NAME)
