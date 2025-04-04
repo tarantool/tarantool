@@ -276,8 +276,6 @@ insert_batch_lua_func(struct lua_State *L)
 				 batch_row_count, sparse_mode);
 		if (box_insert_arrow(space_id, &array, &schema) != 0)
 			return luaT_error(L);
-		schema.release(&schema);
-		array.release(&array);
 	}
 	return 0;
 }

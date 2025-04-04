@@ -4134,7 +4134,12 @@ box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
 	request.space_id = space_id;
 	request.arrow_array = array;
 	request.arrow_schema = schema;
-	return box_process1(&request, NULL);
+	int rc = box_process1(&request, NULL);
+	if (array->release != NULL)
+		array->release(array);
+	if (schema->release != NULL)
+		schema->release(schema);
+	return rc;
 }
 
 /**

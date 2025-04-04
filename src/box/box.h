@@ -683,7 +683,7 @@ struct ArrowSchema;
  * If a column is nullable in space format, it can be omitted. All non-nullable
  * columns (including primary key parts) must be present in the batch.
  *
- * This function does not release neither `array` nor `schema`.
+ * Both `array` and `schema` are moved or released, even on failure.
  *
  * \param space_id space identifier
  * \param array input data in ArrowArray format
