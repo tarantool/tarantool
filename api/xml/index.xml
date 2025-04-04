@@ -443,6 +443,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8430ac7a529aca65985ffded8d443ecf" kind="enumvalue"><name>ER_REPLICA_GC</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceafcf057af6fcd16f6416b4a7f25d38d09" kind="enumvalue"><name>ER_ALIEN_ENGINE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea13c39fded19c7143e232ad6630746562" kind="enumvalue"><name>ER_MVCC_UNAVAILABLE</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea230d861bedb2ae026ad806ce2eff2a94" kind="enumvalue"><name>ER_CANT_UPGRADE_INDEXED_FIELD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
