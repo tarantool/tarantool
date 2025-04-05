@@ -191,7 +191,7 @@ RaftElectionUpdate(i) ==
 \* Implementation of the raft_sm_election_update_cb.
 RaftTimeout(i) ==
     /\ \/ MaxRaftTerm = -1
-       \/ Max({term[j] : j \in DOMAIN term}) < MaxRaftTerm
+       \/ SetMax({term[j] : j \in DOMAIN term}) < MaxRaftTerm
     \* In Tarantool timer is stopped on leader.
     /\ IF /\ state[i] \in {Follower, Candidate}
        THEN RaftElectionUpdate(i)

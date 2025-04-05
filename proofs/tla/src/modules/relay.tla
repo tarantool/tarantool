@@ -75,8 +75,8 @@ RelayInit ==
 
 \* Implementation of the relay_process_wal_event.
 RelayProcessWalEvent(i, j) ==
-    LET startIdx == FirstEntryMoreLsnIdx(wal[i], relaySentLsn[i][j],
-                                         LAMBDA x: x.lsn)
+    LET startIdx == FirstEntryWithGreaterLsnIdx(wal[i], relaySentLsn[i][j],
+                                                LAMBDA x: x.lsn)
         entries == IF startIdx > 0
                    THEN SubSeq(wal[i], startIdx, Len(wal[i]))
                    ELSE << >>

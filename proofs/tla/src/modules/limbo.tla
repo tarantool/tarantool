@@ -102,7 +102,7 @@ LimboInit ==
 LOCAL LimboConfirm(i, newLimbo, newVclock) ==
     IF ~LimboIsInRollback(i, limboSynchroMsg, limboPromoteLatch)
     THEN LET k == Cardinality(Servers) - ElectionQuorum
-             confirmLsn == BagNthElement(newVclock, k)
+             confirmLsn == BagKthOrderStatistic(newVclock, k)
              idx == CHOOSE x \in Len(newLimbo)..1 :
                   /\ x.stmts[Len(x.stmts)].lsn # -1
                   /\ x.stmts[Len(x.stmts)].lsn <= confirmLsn
@@ -120,7 +120,7 @@ LimboAck(i, newLimbo, source, lsn) ==
     IF /\ limboOwner[i] = i
        /\ Len(newLimbo[i]) > 0
        /\ lsn > limboVclock[i][source]
-    THEN LET newVclock == BagAssign(limboVclock[i], source, lsn)
+    THEN LET newVclock == BagSet(limboVclock[i], source, lsn)
          IN /\ limboVclock' = [limboVclock EXCEPT ![i] = newVclock]
             /\ IF /\ newLimbo[i][1].lsn # -1
                   /\ newLimbo[i][1].lsn <= lsn
@@ -221,13 +221,13 @@ LOCAL LimboWriteConfirm(i, lsn) ==
 \* first several entries are deleted, in read_promote, the whole limbo is
 \* cleaned)
 LOCAL LimboReadConfirmLsn(i, lsn) ==
-    LET newVclock == BagAssign(limboConfirmedVclock[i], limboOwner[i], lsn)
+    LET newVclock == BagSet(limboConfirmedVclock[i], limboOwner[i], lsn)
     IN /\ limboConfirmedLsn' = [limboConfirmedLsn EXCEPT ![i] = lsn]
        /\ limboConfirmedVclock' = [limboConfirmedVclock EXCEPT ![i] = newVclock]
 
 \* Second part of the txn_limbo_read_confirm.
 LOCAL LimboReadConfirmLsnLimbo(i, lsn) ==
-    LET startIdx == FirstEntryMoreLsnIdx(limbo[i], lsn,
+    LET startIdx == FirstEntryWithGreaterLsnIdx(limbo[i], lsn,
                                     LAMBDA txn: txn.stmts[Len(txn.stmts)].lsn)
         newLimbo == SubSeq(limbo[i], startIdx, Len(limbo[i]))
     IN /\ Assert(startIdx > 0, "startIdx is < 0 in LimboReadConfirmLsnLimbo")

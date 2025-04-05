@@ -42,12 +42,14 @@ CONSTANTS
 
 ASSUME Cardinality(Servers) > 0
 
+\* Wal implementation.
 VARIABLES
-    \* Wal implementation.
-    wal,      \* Sequence of log entries, persisted in WAL.
-    walQueue, \* Queue from TX thread to WAL.
-    \* Tx implementation (see box module).
-    txQueue
+    wal,     \* Sequence of log entries, persisted in WAL.
+    walQueue \* Queue from TX thread to WAL.
+
+\* Variables, defined in non imported modules.
+VARIABLES
+    txQueue  \* box module.
 
 walVars == <<wal, walQueue>>
 

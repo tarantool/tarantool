@@ -31,51 +31,65 @@
 
 --------------------------------- MODULE utils ---------------------------------
 
-EXTENDS Integers, Sequences, TLC, definitions
+EXTENDS Integers, Sequences, FiniteSets, TLC, definitions
 
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 \* General helper operators
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
-Max(S) == CHOOSE m \in S: \A n \in S: n <= m
+\* Sets variable var to value for server i.
+VarSet(i, var, value) ==
+    (i :> value) @@ var
 
-\* Helper for bumping vclock. Given a `bag` of any kind (see Bag standard
-\* module) and entry `e`, return a new bag with `v` more `e` in it.
+\* Sends the xrow message from i to j. See details about messaging system in
+\* the tarantool module, alongside with the declaration of the msgs variable.
+Send(messages, i, j, source, xrow) ==
+    LET newMsgs == Append(messages[i][j][source], xrow)
+    IN [messages EXCEPT ![i][j][source] = newMsgs]
+
+\* Returns the maximum value in the set 'S'.
+SetMax(S) ==
+    CHOOSE m \in S: \A n \in S: n <= m
+
+--------------------------------------------------------------------------------
+\* Vclock helpers
+--------------------------------------------------------------------------------
+\* Bag module is used for vclocks (see Bag standard module, basically mutiset).
+
+\* Given a bag and entry e, return a new bag with v more e in it.
 BagAdd(bag, e, v) ==
     IF e \in DOMAIN bag
     THEN [bag EXCEPT ![e] = bag[e] + v]
     ELSE bag @@ (e :> v)
 
-BagAssign(bag, e, v) ==
-    (e :> v) @@ bag
+\* Assigns bag[e] = v.
+BagSet(bag, e, v) == VarSet(e, bag, v)
 
-\* Compare two bags b1 and b2.
-\* Returns:
+\* Compares two bags b1 and b2. Returns:
 \*   0  if for all s in Servers b1[s] = b2[s]
 \*   1  if for all s in Servers b1[s] >= b2[s] and b1 differs in at least one s
 \*  -1  otherwise
 BagCompare(b1, b2) ==
-    /\ Assert(DOMAIN b1 = DOMAIN b2, "Domains are not equal in bag compare")
-    /\ IF \A s \in DOMAIN b1: b1[s] >= b2[s]
-       THEN IF \A s \in DOMAIN b1: b1[s] = b2[s] THEN 0 ELSE 1
-       ELSE -1
+    IF /\ \A s \in DOMAIN b1: b1[s] >= b2[s]
+       /\ Assert(DOMAIN b1 = DOMAIN b2, "Domains are not equal in compare")
+    THEN IF \A s \in DOMAIN b1: b1[s] = b2[s] THEN 0 ELSE 1
+    ELSE -1
 
+\* Returns the number of elements < x.
 BagCountLess(b, x) ==
-    Len({i \in DOMAIN b: b[i] < x})
+    Cardinality({i \in DOMAIN b: b[i] < x})
 
-BagCountLessEqual(b, x) ==
-    Len({i \in DOMAIN b: b[i] <= x})
+\* Returns the number of elements <= x.
+BagCountLessOrEqual(b, x) ==
+    Cardinality({i \in DOMAIN b: b[i] <= x})
 
-\* kth order statistic of the bag.
-BagNthElement(b, k) ==
-    LET idx == CHOOSE x \in DOMAIN b:
-                   /\ BagCountLess(b, x) <= k
-                   /\ BagCountLessEqual(b, x) > k
-    IN b[idx]
-
-Send(messages, i, j, source, xrow) ==
-    LET newMsgs == Append(messages[i][j][source], xrow)
-    IN [messages EXCEPT ![i][j][source] = newMsgs]
+\* Returns kth order statistic of the bag.
+BagKthOrderStatistic(b, k) ==
+    IF k >= Cardinality(DOMAIN b) THEN -1
+    ELSE LET idx == CHOOSE x \in DOMAIN b:
+                   /\ BagCountLess(b, b[x]) <= k
+                   /\ BagCountLessOrEqual(b, b[x]) > k
+         IN b[idx]
 
 -------------------------------------------------------------------------------
 \* Structure declarations
@@ -127,7 +141,7 @@ GeneralMsg(body) == [
     body |-> body
 ]
 
-MoreCmp(a, b) == a > b
+GreaterCmp(a, b) == a > b
 EqualCmp(a, b) == a = b
 
 FirstEntryLsnIdx(w, lsn, Op(_), Cmp(_, _)) ==
@@ -135,10 +149,11 @@ FirstEntryLsnIdx(w, lsn, Op(_), Cmp(_, _)) ==
     THEN CHOOSE k \in 1..Len(w) : Cmp(Op(w[k]), lsn)
     ELSE -1
 
-FirstEntryMoreLsnIdx(w, lsn, Op(_)) ==
-    FirstEntryLsnIdx(w, lsn, Op, MoreCmp)
+FirstEntryWithGreaterLsnIdx(w, lsn, Op(_)) ==
+    FirstEntryLsnIdx(w, lsn, Op, GreaterCmp)
 
-FirstEntryEqualLsnIdx(w, lsn, Op(_)) ==
+\* TODO: I don't need it?
+FirstEntryWithEqualLsnIdx(w, lsn, Op(_)) ==
     FirstEntryLsnIdx(w, lsn, Op, EqualCmp)
 
 EmptyGeneralMsg == [is_ready |-> FALSE, body |-> <<>>]
@@ -149,7 +164,7 @@ EmptyAck(servers) == XrowEntry(OkType, Nil, DefaultGroup, DefaultFlags,
 \* Solving cyclic dependencies
 -------------------------------------------------------------------------------
 
-\* Cyclic dependecy, if placed in limbo.tla: txn -> limbo -> txn
+\* Cyclic dependency, if placed in limbo.tla: txn -> limbo -> txn
 LimboIsInRollback(i, synchroMsg, promoteLatch) ==
     \/ synchroMsg[i] # EmptyGeneralMsg
     \/ promoteLatch[i] = TRUE
