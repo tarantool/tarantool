@@ -45,19 +45,10 @@ ASSUME Cardinality(Servers) > 0
 ASSUME MaxClientRequests \in Int
 
 VARIABLES
-    \* Transaction implementation.
-    tId,               \* A sequentially growing transaction id (abstraction).
-    clientCtr,         \* The number of done ClientRequests
-    \* WAL implementation.
-    walQueue,          \* Queue from TX thread to WAL.
-    \* Limbo implementation.
-    limbo,             \* Sequence of not yet confirmed entries.
-    limboSynchroMsg,   \* Synchro request to write.
-    limboPromoteLatch, \* Order access to the promote data.
-    \* Raft implementation.
-    state              \* {"Follower", "Candidate", "Leader"}.
-
-txnVars == <<tId, clientCtr>>
+    txn,   \* Implemented in the current module.
+    wal,   \* For access of the queue.
+    limbo, \* For access of the txns, synchroMsg, promoteLatch.
+    raft   \* For acess of the state.
 
 --------------------------------------------------------------------------------
 \* Imports
@@ -71,58 +62,84 @@ LOCAL INSTANCE utils
 --------------------------------------------------------------------------------
 
 TxnInit ==
-    /\ tId = [i \in Servers |-> 0]
-    /\ clientCtr = 0
+    txn = [i \in Servers |-> [
+        tId |-> 0,      \* A sequentially growing transaction id (abstraction)
+        clientCtr |-> 0 \* The number of done ClientRequests.
+    ]]
+
+LOCAL TxnState(i) == [
+    tId |-> txn[i].tId,
+    clientCtr |-> txn[i].clientCtr,
+    walQueue |-> wal[i].queue,
+    limboTxns |-> limbo[i].txns,
+    \* RO variables.
+    raftState |-> raft[i].state,
+    limboPromoteLatch |-> limbo[i].promoteLatch,
+    limboSynchroMsg |-> limbo[i].synchroMsg
+]
+
+LOCAL TxnStateApply(i, state) ==
+    /\ txn' = VarSet(i, "tId", state.tId,
+              VarSet(i, "clientCtr", state.clientCtr, txn))
+    /\ wal' = VarSet(i, "queue", state.walQueue, wal)
+    /\ limbo' = VarSet(i, "txns", state.limboTxns, limbo)
+    /\ UNCHANGED <<raft>>
 
 \* Implementation of the txn_begin.
-LOCAL TxnBegin(i, stmts) ==
+LOCAL TxnBegin(state, stmts) ==
     \* id is fully abstractional and is not represented in real code. it's
     \* used in order to identify the transaction in the limbo. Note,
-    \* that it's not tsn, which must be assigned during WalProcess, but it
-    \* won't be, since it's not needed in TLA for now.
-    LET id == tId[i] + 1
-    IN [id |-> id, stmts |-> stmts]
+    \* that it's not tsn, which must be assigned during WalProcess (but it
+    \* won't be, since it's not needed in TLA for now).
+    LET id == state.tId + 1
+    IN [id |-> id,
+        \* stmts is a sequence of XrowEntries, which are written to wal,
+        \* non empty, cannot have different types.
+        stmts |-> stmts]
 
 \* Implementation of the txn_commit_impl for synchronous tx.
 \* Adds entry to the limbo and sends it to the WAL thread for writing,
 \* where it's processed by WalProcess operator.
-LOCAL TxnCommit(i, txn) ==
+LOCAL TxnCommit(state, txnToApply) ==
     LET \* Set wait_sync flag if limbo is not empty.
-        newStmts == IF /\ Len(limbo[i]) > 0
-                       /\ txn.stmts[1].group_id # LocalGroup
-                       /\ txn.stmts[1].type # NopType
-                    THEN [j \in 1..Len(txn.stmts) |-> [txn.stmts[j]
-                          EXCEPT !.flags = [txn.stmts[j].flags
-                          EXCEPT !.wait_sync = TRUE]]]
-                    ELSE txn.stmts
-        newTxn == [txn EXCEPT !.stmts = newStmts]
-        entry == JournalEntry(txn.stmts, newTxn)
-        newWalQueue == Append(walQueue[i], entry)
-        newLimbo == IF newStmts[1].flags.wait_sync = TRUE
-                    THEN Append(limbo[i], newTxn)
-                    ELSE limbo[i]
+        newStmts == IF /\ Len(state.limboTxns) > 0
+                       /\ txnToApply.stmts[1].group_id # LocalGroup
+                       /\ txnToApply.stmts[1].type # NopType
+                    THEN [j \in 1..Len(txnToApply.stmts) |->
+                            [txnToApply.stmts[j] EXCEPT
+                                !.flags = [txnToApply.stmts[j].flags
+                                    EXCEPT !.wait_sync = TRUE]
+                            ]
+                         ]
+                    ELSE txnToApply.stmts
+        newTxn == [txnToApply EXCEPT !.stmts = newStmts]
+        newWalQueue == Append(state.walQueue, newTxn)
+        newLimboTxns == IF newStmts[1].flags.wait_sync = TRUE
+                        THEN Append(state.limboTxns, newTxn)
+                        ELSE state.limboTxns
         doWrite == \/ newStmts[1].flags.wait_sync = FALSE
-                   \/ ~LimboIsInRollback(i, limboSynchroMsg, limboPromoteLatch)
-    IN IF doWrite
-       THEN /\ walQueue' = [walQueue EXCEPT ![i] = newWalQueue]
-            /\ limbo' = [limbo EXCEPT ![i] = newLimbo]
-            \* It's impossible to update tId in TxnBegin, since it returns txn.
-            /\ tId' = [tId EXCEPT ![i] = @ + 1]
-       ELSE UNCHANGED <<walQueue, limbo, tId>>
+                   \/ ~LimboIsInRollback(state.limboSynchroMsg,
+                                         state.limboPromoteLatch)
+    IN IF doWrite THEN [state EXCEPT
+            !.tId = state.tId + 1,
+            !.walQueue = newWalQueue,
+            !.limboTxns = newLimboTxns
+       ] ELSE state
 
-TxnDo(i, entry) ==
+TxnDo(state, entry) ==
     LET stmts == <<entry>>
-    IN TxnCommit(i, TxnBegin(i, stmts))
+    IN TxnCommit(state, TxnBegin(state, stmts))
 
-ClientRequest(i) ==
-    /\ IF /\ \/ clientCtr = -1
-             \/ clientCtr < MaxClientRequests
-          /\ state[i] = Leader
-       THEN /\ TxnDo(i, XrowEntry(DmlType, i, DefaultGroup, SyncFlags, {}))
-            /\ clientCtr' = clientCtr + 1
-       ELSE UNCHANGED <<clientCtr, walQueue, limbo, tId>>
-    /\ UNCHANGED <<limboSynchroMsg, limboPromoteLatch, state>>
+LOCAL ClientRequest(i, state) ==
+    IF /\ \/ state.clientCtr = -1
+          \/ state.clientCtr < MaxClientRequests
+       /\ state.raftState = Leader
+    THEN LET entry == XrowEntry(DmlType, i, DefaultGroup, SyncFlags, {})
+             stateTxn == TxnDo(state, entry)
+         IN [stateTxn EXCEPT !.clientCtr = @ + 1]
+    ELSE state
 
-TxnNext(servers) == \E i \in servers: ClientRequest(i)
+TxnNext(servers) == \E i \in servers:
+    TxnStateApply(i, ClientRequest(i, TxnState(i)))
 
 ================================================================================

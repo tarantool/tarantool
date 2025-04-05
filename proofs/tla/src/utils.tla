@@ -37,9 +37,9 @@ EXTENDS Integers, Sequences, FiniteSets, TLC, definitions
 \* General helper operators
 --------------------------------------------------------------------------------
 
-\* Sets variable var to value for server i.
-VarSet(i, var, value) ==
-    (i :> value) @@ var
+\* Sets root.variable = value for server i.
+VarSet(i, variable, value, root) ==
+    [root EXCEPT ![i] = [root[i] EXCEPT ![variable] = value]]
 
 \* Sends the xrow message from i to j. See details about messaging system in
 \* the tarantool module, alongside with the declaration of the msgs variable.
@@ -63,7 +63,8 @@ BagAdd(bag, e, v) ==
     ELSE bag @@ (e :> v)
 
 \* Assigns bag[e] = v.
-BagSet(bag, e, v) == VarSet(e, bag, v)
+BagSet(bag, e, v) ==
+    (e :> v) @@ bag
 
 \* Compares two bags b1 and b2. Returns:
 \*   0  if for all s in Servers b1[s] = b2[s]
@@ -117,17 +118,6 @@ XrowEntryIsGlobal(e) ==
 LastLsn(xlog) ==
     IF Len(xlog) = 0 THEN 0 ELSE xlog[Len(xlog)].lsn
 
-\* Entry, which is sent to WAL thread. Entry cannot have rows of different
-\* types (abstraction). Put in walQueue.
-\*  - `rows` is a sequence of XrowEntries, which are written to wal, non empty;
-\*  - `txn` is either created by TxnBegin or Nil.
-JournalEntry(rows, txn) == [
-    rows |-> rows,
-    \* Txn is complete_data in struct journal_entry. Used to assign
-    \* LSNs to limbo after entry is written. rows are written explicitly.
-    complete_data |-> txn
-]
-
 \* Msg from any thread to Tx thread. Put in TxQueue. Abstraction to process
 \* different Tx events.
 TxMsg(txEntryType, body) == [
@@ -165,8 +155,8 @@ EmptyAck(servers) == XrowEntry(OkType, Nil, DefaultGroup, DefaultFlags,
 -------------------------------------------------------------------------------
 
 \* Cyclic dependency, if placed in limbo.tla: txn -> limbo -> txn
-LimboIsInRollback(i, synchroMsg, promoteLatch) ==
-    \/ synchroMsg[i] # EmptyGeneralMsg
-    \/ promoteLatch[i] = TRUE
+LimboIsInRollback(synchroMsg, promoteLatch) ==
+    \/ synchroMsg # EmptyGeneralMsg
+    \/ promoteLatch = TRUE
 
 ================================================================================

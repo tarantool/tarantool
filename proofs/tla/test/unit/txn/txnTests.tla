@@ -1,36 +1,92 @@
 ------------------------------- MODULE txnTests --------------------------------
 
-EXTENDS Sequences, FiniteSets, definitions, utils
+EXTENDS Sequences, FiniteSets, TLC, definitions, utils
+ASSUME LET T == INSTANCE TLC IN T!PrintT("txnTests")
+
+--------------------------------------------------------------------------------
+\* Imports
+--------------------------------------------------------------------------------
 
 CONSTANTS Servers, MaxClientRequests
 ASSUME Cardinality(Servers) = 1
-
-VARIABLES tId, clientCtr, limbo, limboSynchroMsg, limboPromoteLatch,
-          walQueue, state
-allVars == <<tId, clientCtr, limbo, limboSynchroMsg, limboPromoteLatch,
-             walQueue, state>>
-
+VARIABLES txn, wal, limbo, raft
+allVars == <<txn, wal, limbo, raft>>
 INSTANCE txn
-
-ASSUME LET T == INSTANCE TLC IN T!PrintT("txnTests")
 
 --------------------------------------------------------------------------------
 \* Unit tests
 --------------------------------------------------------------------------------
+
+LOCAL name == "s1"
+LOCAL TxnDefaultState == [
+    tId |-> 0,
+    clientCtr |-> 0,
+    walQueue |-> <<>>,
+    limboTxns |-> <<>>,
+    \* RO variables.
+    raftState |-> Leader,
+    limboPromoteLatch |-> FALSE,
+    limboSynchroMsg |-> EmptyGeneralMsg
+]
+
+\* Basic test.
+ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, SyncFlags, {})
+           txnToWrite == [id |-> 1, stmts |-> <<entry>>]
+       IN TxnDo(TxnDefaultState, entry) = [TxnDefaultState EXCEPT
+            !.tId = 1,
+            !.walQueue = <<txnToWrite>>,
+            !.limboTxns = <<txnToWrite>> \* lsn is assigned after write, in Tx thread.
+          ]
+
+\* Test, that async is not added to limbo.
+ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, DefaultFlags, {})
+           txnToWrite == [id |-> 1, stmts |-> <<entry>>]
+       IN TxnDo(TxnDefaultState, entry) = [TxnDefaultState EXCEPT
+            !.tId = 1,
+            !.walQueue = <<txnToWrite>>
+          ]
+
+LOCAL AsyncToLimboFlags == [wait_sync |-> TRUE, wait_ack |-> FALSE]
+\* Test, that async is added to limbo, when limbo is non empty.
+ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, DefaultFlags, {})
+           entryToWrite == [entry EXCEPT !.flags = AsyncToLimboFlags]
+           txnToWrite == [id |-> 2, stmts |-> <<entryToWrite>>]
+           oldTxn == [id |-> 1, stmts |-> <<entry>>]
+           state == [TxnDefaultState EXCEPT !.tId = 1, !.limboTxns = <<oldTxn>>]
+       IN TxnDo(state, entry) = [state EXCEPT
+            !.tId = 2,
+            !.walQueue = <<txnToWrite>>,
+            !.limboTxns = <<oldTxn, txnToWrite>>
+          ]
+
+\* Test, that sync write is not scheduled, if limbo is writing promote.
+ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, SyncFlags, {})
+           state == [TxnDefaultState EXCEPT !.limboPromoteLatch = TRUE]
+       IN TxnDo(state, entry) = state
+
+\* Test, that async write is scheduled, even if limbo is writing promote.
+ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, DefaultFlags, {})
+           txnToWrite == [id |-> 1, stmts |-> <<entry>>]
+           state == [TxnDefaultState EXCEPT !.limboPromoteLatch = TRUE]
+       IN TxnDo(state, entry) = [state EXCEPT
+            !.tId = 1,
+            !.walQueue = <<txnToWrite>>
+          ]
 
 --------------------------------------------------------------------------------
 \* Specification test
 --------------------------------------------------------------------------------
 
 Init == /\ TxnInit
-        /\ limbo = [i \in Servers |-> << >>]
-        /\ limboSynchroMsg = [i \in Servers |-> EmptyGeneralMsg]
-        /\ limboPromoteLatch = [i \in Servers |-> FALSE]
-        /\ walQueue = [i \in Servers |-> << >>]
-        /\ state = [i \in Servers |-> Leader]
+        /\ wal = [i \in Servers |-> [queue |-> << >>]]
+        /\ raft = [i \in Servers |-> [state |-> Leader]]
+        /\ limbo = [i \in Servers |-> [
+                txns |-> << >>,
+                promoteLatch |-> FALSE,
+                synchroMsg |-> EmptyGeneralMsg]
+           ]
 
 Next == TxnNext(Servers)
-
 Spec == Init /\ [][Next]_allVars /\ WF_allVars(Next)
 
 ------------------------------
@@ -38,9 +94,9 @@ Spec == Init /\ [][Next]_allVars /\ WF_allVars(Next)
 ------------------------------
 
 TIdOnlyIncreases ==
-    [][\A i \in Servers: tId[i]' >= tId[i]]_tId
+    [][\A i \in Servers: txn[i].tId' >= txn[i].tId]_txn
 
 LimboSizeEqualsToRequestCtr ==
-    \A i \in Servers: clientCtr = Len(limbo[i])
+    \A i \in Servers: txn[i].clientCtr = Len(limbo[i].txns)
 
 ===============================================================================

@@ -31,62 +31,61 @@
 
 ---------------------------------- MODULE wal ----------------------------------
 
-EXTENDS Integers, FiniteSets, Sequences
+EXTENDS Integers, FiniteSets, Sequences, utils
 
 --------------------------------------------------------------------------------
 \* Declaration
 --------------------------------------------------------------------------------
 
-CONSTANTS
-    Servers
-
+CONSTANTS Servers
 ASSUME Cardinality(Servers) > 0
 
-\* Wal implementation.
 VARIABLES
-    wal,     \* Sequence of log entries, persisted in WAL.
-    walQueue \* Queue from TX thread to WAL.
-
-\* Variables, defined in non imported modules.
-VARIABLES
-    txQueue  \* box module.
-
-walVars == <<wal, walQueue>>
-
---------------------------------------------------------------------------------
-\* Imports
---------------------------------------------------------------------------------
-
-LOCAL INSTANCE utils
+    wal,  \* Imlemented in the current module.
+    box   \* For access of the queue.
 
 --------------------------------------------------------------------------------
 \* Implementation
 --------------------------------------------------------------------------------
 
 WalInit ==
-    /\ wal = [i \in Servers |-> << >>]
-    /\ walQueue = [i \in Servers |-> << >>]
+    wal = [i \in Servers |-> [
+        rows |-> << >>, \* Sequence of log entries, persisted in wal.
+        queue |-> << >> \* Queue from TX thread to WAL.
+    ]]
+
+LOCAL WalState(i) == [
+    rows |-> wal[i].rows,
+    queue |-> wal[i].queue,
+    boxQueue |-> box[i].queue
+]
+
+LOCAL WalStateApply(i, state) ==
+    /\ wal' = VarSet(i, "queue", state.queue,
+              VarSet(i, "rows", state.rows, wal))
+    /\ box' = VarSet(i, "queue", state.boxQueue, box)
 
 \* Implementation of the wal_write_to_disk, non failing.
-WalProcess(i) ==
-    /\ Len(walQueue[i]) > 0
-    /\ LET entry == Head(walQueue[i])
-           \* Implementation of the wal_assign_lsn.
-           newRows == [j \in 1..Len(entry.rows) |->
-                [entry.rows[j] EXCEPT !.lsn = IF entry.rows[j].lsn = -1 THEN
-                 LastLsn(wal[i]) + j ELSE entry.rows[j].lsn]]
-           \* Write to disk.
-           newWal == wal[i] \o newRows
-           \* Update txn only if it's not Nil.
-           newEntry == [entry EXCEPT !.rows = newRows, !.complete_data =
-                IF entry.complete_data # <<>> THEN [entry.complete_data EXCEPT
-                !.stmts = newRows] ELSE entry.complete_data]
-           newTxQueue == Append(txQueue[i], TxMsg(TxWalType, newEntry))
-           newWalQueue == Tail(walQueue[i])
-       IN /\ wal' = [wal EXCEPT ![i] = newWal] \* write to disk.
-          /\ txQueue' = [txQueue EXCEPT ![i] = newTxQueue] \* send msg to Tx.
-          /\ walQueue' = [walQueue EXCEPT ![i] = newWalQueue]
+WalProcess(state) ==
+    IF Len(state.queue) > 0
+    THEN LET txn == Head(state.queue)
+             \* Implementation of the wal_assign_lsn.
+             newRows == [j \in 1..Len(txn.stmts) |->
+                  [txn.stmts[j] EXCEPT !.lsn = IF txn.stmts[j].lsn = -1 THEN
+                   LastLsn(state.rows) + j ELSE txn.stmts[j].lsn]]
+             \* Write to disk.
+             newWalRows == state.rows \o newRows
+             newTxn == [txn EXCEPT !.stmts = newRows]
+             newBoxQueue == Append(state.boxQueue, TxMsg(TxWalType, newTxn))
+             newWalQueue == Tail(state.queue)
+         IN [state EXCEPT
+                !.rows = newWalRows,
+                !.queue = newWalQueue,
+                !.boxQueue = newBoxQueue
+            ]
+    ELSE state
 
-WalNext(servers) == \E i \in servers: WalProcess(i)
+WalNext(servers) == \E i \in servers:
+    WalStateApply(i, WalProcess(WalState(i)))
 
 ================================================================================
