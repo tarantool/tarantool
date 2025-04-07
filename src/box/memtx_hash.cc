@@ -632,6 +632,8 @@ memtx_hash_index_create_read_view(struct index *base)
 		.create_iterator = hash_read_view_create_iterator,
 		.create_iterator_with_offset =
 			generic_index_read_view_create_iterator_with_offset,
+		.create_arrow_stream =
+			generic_index_read_view_create_arrow_stream,
 	};
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
@@ -670,6 +672,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
+	/* .create_arrow_stream = */ generic_index_create_arrow_stream,
 	/* .create_read_view = */ memtx_hash_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,

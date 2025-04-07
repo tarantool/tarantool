@@ -1158,7 +1158,7 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 	(void)key;
 	(void)part_count;
 	(void)pos;
-	diag_set(UnsupportedIndexFeature, base->def, "read view");
+	diag_set(UnsupportedIndexFeature, base->def, "iterator");
 	return NULL;
 }
 
@@ -1215,6 +1215,41 @@ generic_index_read_view_create_iterator_with_offset(
 	return 0;
 fail:
 	index_read_view_iterator_destroy(it);
+	return -1;
+}
+
+int
+generic_index_create_arrow_stream(struct index *index,
+				  uint32_t field_count, const uint32_t *fields,
+				  const char *key, uint32_t part_count,
+				  const struct arrow_options *options,
+				  struct ArrowArrayStream *stream)
+{
+	(void)field_count;
+	(void)fields;
+	(void)key;
+	(void)part_count;
+	(void)options;
+	(void)stream;
+	diag_set(UnsupportedIndexFeature, index->def, "arrow stream");
+	return -1;
+}
+
+int
+generic_index_read_view_create_arrow_stream(
+	struct index_read_view *rv,
+	uint32_t field_count, const uint32_t *fields,
+	const char *key, uint32_t part_count,
+	const struct arrow_options *options,
+	struct ArrowArrayStream *stream)
+{
+	(void)field_count;
+	(void)fields;
+	(void)key;
+	(void)part_count;
+	(void)options;
+	(void)stream;
+	diag_set(UnsupportedIndexFeature, rv->def, "arrow stream in read view");
 	return -1;
 }
 
