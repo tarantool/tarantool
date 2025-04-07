@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;3.4.0-entrypoint-240-gac36c7661a&quot;</initializer>
+        <initializer>&quot;3.4.0-entrypoint-241-gbf5bce3632&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -9960,7 +9960,7 @@ In case of an invalid key set a diag and return -1. <simplesect kind="see"><para
         <detaileddescription>
 <para>A record batch from the Arrow <computeroutput>array</computeroutput> is inserted into the space columns, whose names are provided by the Arrow <computeroutput>schema</computeroutput>. Column types in the schema must match the types of the corresponding fields in the space format.</para>
 <para>If a column is nullable in space format, it can be omitted. All non-nullable columns (including primary key parts) must be present in the batch.</para>
-<para>This function does not release neither <computeroutput>array</computeroutput> nor <computeroutput>schema</computeroutput>.</para>
+<para>Both <computeroutput>array</computeroutput> and <computeroutput>schema</computeroutput> are moved or released, even on failure.</para>
 <para><parameterlist kind="param"><parameteritem>
 <parameternamelist>
 <parametername>space_id</parametername>
@@ -13933,7 +13933,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight></codeline>
 <codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>4</highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.4.0-entrypoint-240-gac36c7661a&quot;</highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.4.0-entrypoint-241-gbf5bce3632&quot;</highlight></codeline>
 <codeline lineno="75" refid="module_8h_1ad63a17703ee9303be2682b7bb08e7a9f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>TZDATA_VERSION<sp/>&quot;2022a&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="76"><highlight class="normal"></highlight></codeline>
 <codeline lineno="81" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight></codeline>
