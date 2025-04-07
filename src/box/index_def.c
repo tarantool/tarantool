@@ -127,7 +127,8 @@ index_opts_parse_layout(const char **data, void *opts, struct region *region)
 	const char *str = mp_decode_str(data, &len);
 	if (len > 0) {
 		index_opts->layout = xregion_alloc(region, len + 1);
-		strlcpy(index_opts->layout, str, len + 1);
+		memcpy(index_opts->layout, str, len);
+		index_opts->layout[len] = '\0';
 	}
 	return 0;
 }
