@@ -17,5 +17,8 @@ leak:yaml_emitter_initialize
 leak:luamp_decode_extension_box
 leak:luamp_encode_with_ctx_r
 
+# to be removed in scope gh-12064
+leak:box_error_new_va
+
 # to be removed in scope of gh-11904
 leak:lj_vm_cpcall
