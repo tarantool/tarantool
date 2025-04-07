@@ -84,6 +84,9 @@ BagCountLess(b, x) ==
 BagCountLessOrEqual(b, x) ==
     Cardinality({i \in DOMAIN b: b[i] <= x})
 
+BagCountGreaterOrEqual(b, x) ==
+    Cardinality({i \in DOMAIN b: b[i] >= x})
+
 \* Returns kth order statistic of the bag.
 BagKthOrderStatistic(b, k) ==
     IF k >= Cardinality(DOMAIN b) THEN -1
@@ -110,9 +113,6 @@ XrowEntry(xrowType, replica_id, groupId, flags, body) == [
     flags |-> flags,
     body |-> body
 ]
-
-XrowEntryIsGlobal(e) ==
-    IF e.group_id = DefaultGroup THEN TRUE ELSE FALSE
 
 \* LSN of the last entry in the log or 0 if the log is empty.
 LastLsn(xlog) ==

@@ -22,11 +22,11 @@ LOCAL TxnDefaultState == [
     tId |-> 0,
     clientCtr |-> 0,
     walQueue |-> <<>>,
-    limboTxns |-> <<>>,
+    txns |-> <<>>,
     \* RO variables.
     raftState |-> Leader,
-    limboPromoteLatch |-> FALSE,
-    limboSynchroMsg |-> EmptyGeneralMsg
+    promoteLatch |-> FALSE,
+    synchroMsg |-> EmptyGeneralMsg
 ]
 
 \* Basic test.
@@ -35,7 +35,7 @@ ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, SyncFlags, {})
        IN TxnDo(TxnDefaultState, entry) = [TxnDefaultState EXCEPT
             !.tId = 1,
             !.walQueue = <<txnToWrite>>,
-            !.limboTxns = <<txnToWrite>> \* lsn is assigned after write, in Tx thread.
+            !.txns = <<txnToWrite>> \* lsn is assigned after write.
           ]
 
 \* Test, that async is not added to limbo.
@@ -52,22 +52,22 @@ ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, DefaultFlags, {})
            entryToWrite == [entry EXCEPT !.flags = AsyncToLimboFlags]
            txnToWrite == [id |-> 2, stmts |-> <<entryToWrite>>]
            oldTxn == [id |-> 1, stmts |-> <<entry>>]
-           state == [TxnDefaultState EXCEPT !.tId = 1, !.limboTxns = <<oldTxn>>]
+           state == [TxnDefaultState EXCEPT !.tId = 1, !.txns = <<oldTxn>>]
        IN TxnDo(state, entry) = [state EXCEPT
             !.tId = 2,
             !.walQueue = <<txnToWrite>>,
-            !.limboTxns = <<oldTxn, txnToWrite>>
+            !.txns = <<oldTxn, txnToWrite>>
           ]
 
 \* Test, that sync write is not scheduled, if limbo is writing promote.
 ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, SyncFlags, {})
-           state == [TxnDefaultState EXCEPT !.limboPromoteLatch = TRUE]
+           state == [TxnDefaultState EXCEPT !.promoteLatch = TRUE]
        IN TxnDo(state, entry) = state
 
 \* Test, that async write is scheduled, even if limbo is writing promote.
 ASSUME LET entry == XrowEntry(DmlType, name, DefaultGroup, DefaultFlags, {})
            txnToWrite == [id |-> 1, stmts |-> <<entry>>]
-           state == [TxnDefaultState EXCEPT !.limboPromoteLatch = TRUE]
+           state == [TxnDefaultState EXCEPT !.promoteLatch = TRUE]
        IN TxnDo(state, entry) = [state EXCEPT
             !.tId = 1,
             !.walQueue = <<txnToWrite>>

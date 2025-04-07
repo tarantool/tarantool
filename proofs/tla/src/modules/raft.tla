@@ -255,7 +255,7 @@ RaftWorkerHandleBroadcast(i) ==
             leader_id |-> leader[i],
             vclock |-> IF state[i] = Candidate THEN vclock[i] ELSE <<>>
         ])
-        newMsgs == [j \in Servers |-> TxMsg(TxRelayType, xrow)]
+        newMsgs == [j \in Servers |-> GeneralMsg(xrow)]
     IN relayRaftMsg' = [relayRaftMsg EXCEPT ![i] = newMsgs]
 
 \* Implementation of the box_raft_worker_f.
@@ -273,7 +273,7 @@ RaftWorker(i) ==
                          limboVolatileConfirmedLsn, limboPromoteLatch>>
        \/ /\ /\ state[i] = Leader
              /\ limboPromoteTermMap[i][i] # term[i]
-          /\ LimboPromoteQsync(i)
+          /\ LimboPromoteQsync(i, term[i])
           /\ UNCHANGED <<walQueue, volatileVote, candidateVclock,
                          relayRaftMsg>>
     /\ UNCHANGED <<msgs, limboVars, vclock, state, term, volatileTerm, vote,

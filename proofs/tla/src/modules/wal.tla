@@ -57,13 +57,13 @@ WalInit ==
 LOCAL WalState(i) == [
     rows |-> wal[i].rows,
     queue |-> wal[i].queue,
-    boxQueue |-> box[i].queue
+    txQueue |-> box[i].queue
 ]
 
 LOCAL WalStateApply(i, state) ==
     /\ wal' = VarSet(i, "queue", state.queue,
               VarSet(i, "rows", state.rows, wal))
-    /\ box' = VarSet(i, "queue", state.boxQueue, box)
+    /\ box' = VarSet(i, "queue", state.txQueue, box)
 
 \* Implementation of the wal_write_to_disk, non failing.
 WalProcess(state) ==
@@ -76,12 +76,12 @@ WalProcess(state) ==
              \* Write to disk.
              newWalRows == state.rows \o newRows
              newTxn == [txn EXCEPT !.stmts = newRows]
-             newBoxQueue == Append(state.boxQueue, TxMsg(TxWalType, newTxn))
+             newTxQueue == Append(state.txQueue, TxMsg(TxWalType, newTxn))
              newWalQueue == Tail(state.queue)
          IN [state EXCEPT
                 !.rows = newWalRows,
                 !.queue = newWalQueue,
-                !.boxQueue = newBoxQueue
+                !.txQueue = newTxQueue
             ]
     ELSE state
 

@@ -31,104 +31,108 @@
 
 --------------------------------- MODULE relay ---------------------------------
 
-EXTENDS Integers, Sequences, FiniteSets
+EXTENDS Integers, Sequences, FiniteSets, utils, definitions
 
 --------------------------------------------------------------------------------
 \* Declaration
 --------------------------------------------------------------------------------
 
 CONSTANTS Servers
-
 ASSUME Cardinality(Servers) > 0
 
 VARIABLES
-    msgs,
-    \* Relay implementation.
-    relaySentLsn,      \* Last sent LSN to the peer. See relay->r->cursor.
-    relayLastAck,      \* Last received ack from replica.
-    relayRaftMsg,      \* Raft message for broadcast.
-    \* Tx implementation (see box module).
-    txQueue,
-    vclock,
-    \* WAL implementation (see wal module).
-    wal,
-    \* Raft implementation (see raft module).
-    term
-
-relayVars == <<relaySentLsn, relayLastAck, relayRaftMsg>>
-
---------------------------------------------------------------------------------
-\* Imports
---------------------------------------------------------------------------------
-
-LOCAL INSTANCE definitions
-LOCAL INSTANCE utils
+    relay, \* Implemented in the current module.
+    box,   \* For access of the queue, vclock.
+    msgs,  \* See tarantool module.
+    wal    \* For access of the rows.
 
 --------------------------------------------------------------------------------
 \* Implementation
 --------------------------------------------------------------------------------
 
 RelayInit ==
-    /\ relayLastAck = [i \in Servers |-> [j \in Servers |-> EmptyAck(Servers)]]
-    /\ relaySentLsn = [i \in Servers |-> [j \in Servers |-> 0]]
-    /\ relayRaftMsg = [i \in Servers |-> [j \in Servers |-> EmptyGeneralMsg]]
+    relay = [i \in Servers |-> [
+        relayQueue |-> << >>,
+        lastAck |-> [j \in Servers |-> EmptyAck(Servers)],
+        sentLsn |-> [j \in Servers |-> 0],
+        raftMsg |-> [j \in Servers |-> EmptyGeneralMsg]
+    ]]
 
-\* Implementation of the relay_process_wal_event.
-RelayProcessWalEvent(i, j) ==
-    LET startIdx == FirstEntryWithGreaterLsnIdx(wal[i], relaySentLsn[i][j],
+LOCAL RelayState(i, j) == [
+    msgsToSend |-> msgs[i][j][RelaySource],
+    msgsToReceive |-> msgs[j][i][ApplierSource],
+    relayQueue |-> relay[i].relayQueue,
+    lastAck |-> relay[i].lastAck[j],
+    sentLsn |-> relay[i].sentLsn[j],
+    raftMsg |-> relay[i].raftMsg[j],
+    txQueue |-> box[i].queue,
+    \* RO variables.
+    toInstance |-> j,
+    walRows |-> wal[i].rows
+]
+
+LOCAL RelayStateApply(i, state) ==
+    /\ msgs' = [msgs EXCEPT
+        ![i][state.toInstance][RelaySource] = state.msgsToSend,
+        ![state.toInstance][i][ApplierSource] = state.msgsToReceive]
+    /\ relay' = VarSet(i, "lastAck", [relay[i].lastAck EXCEPT
+                            ![state.toInstance] = state.lastAck],
+                VarSet(i, "sentLsn", [relay[i].sentLsn EXCEPT
+                            ![state.toInstance] = state.sentLsn],
+                VarSet(i, "raftMsg", [relay[i].raftMsg EXCEPT
+                            ![state.toInstance] = state.raftMsg],
+                VarSet(i, "relayQueue", state.relayQueue,
+                relay))))
+    /\ box' = VarSet(i, "queue", state.txQueue, box)
+    /\ UNCHANGED <<wal>>
+
+RelayProcessWalEvent(state) ==
+    LET startIdx == FirstEntryWithGreaterLsnIdx(state.walRows, state.sentLsn,
                                                 LAMBDA x: x.lsn)
-        entries == IF startIdx > 0
-                   THEN SubSeq(wal[i], startIdx, Len(wal[i]))
-                   ELSE << >>
-        globalEntries == SelectSeq(entries, XrowEntryIsGlobal)
-        newSentLsn == IF globalEntries = <<>>
-                      THEN relaySentLsn[i][j]
-                      ELSE LastLsn(globalEntries)
-    IN /\ msgs' = [msgs EXCEPT ![i][j] = msgs[i][j] \o entries]
-       /\ relaySentLsn' = [relaySentLsn EXCEPT ![i][j] = newSentLsn]
-       /\ UNCHANGED
-            \* Without {msgs, relaySentLsn}.
-            <<relayLastAck, relayRaftMsg, txQueue>>
+        entries ==
+            IF startIdx > 0 THEN
+                LET tmp == SubSeq(state.walRows, startIdx, Len(state.walRows))
+                IN [j \in 1..Len(tmp) |->
+                    IF tmp[j].group_id = LocalGroup THEN [tmp[j] EXCEPT
+                        !.type = NopType,
+                        !.group_id = DefaultGroup,
+                        !.body = << >>
+                    ] ELSE tmp[j]]
+            ELSE << >>
+        newSentLsn == IF entries = << >>
+                      THEN state.sentLsn
+                      ELSE LastLsn(entries)
+    IN [state EXCEPT
+        !.msgsToSend = state.msgsToSend \o entries,
+        !.sentLsn = newSentLsn
+    ]
 
-RelayRaftSend(i, j) ==
-    /\ Send(msgs, i, j, RelaySource, relayRaftMsg.body)
-    /\ LET newMsg == [relayRaftMsg[i][j] EXCEPT !.is_ready = FALSE]
-       IN relayRaftMsg = [relayRaftMsg EXCEPT ![i][j] = newMsg]
-    /\ UNCHANGED
-            \* Without {msgs, relayRaftMsg}.
-            <<relayLastAck, relaySentLsn, txQueue>>
+RelayRaftTrySend(state) ==
+    IF state.raftMsg.is_ready = TRUE THEN [state EXCEPT
+        !.msgsToSend = Append(state.msgsToSend, state.raftMsg.body),
+        !.raftMsg = EmptyGeneralMsg
+    ] ELSE state
 
 \* Implementation of the relay_reader_f.
-RelayRead(i, j) ==
-    /\ Len(msgs[j][i][ApplierSource]) > 0
-    /\ relayLastAck' = [relayLastAck EXCEPT ![i][j] =
-            Head(msgs[j][i][ApplierSource])]
-    /\ msgs' = [msgs EXCEPT ![j][i][ApplierSource] =
-            Tail(msgs[j][i][ApplierSource])]
-    /\ UNCHANGED
-            \* Without {msgs, relayLastAck}.
-            <<relaySentLsn, relayRaftMsg, txQueue>>
+RelayRead(state) ==
+    IF Len(state.msgsToReceive) > 0 THEN [state EXCEPT
+        !.lastAck = Head(state.msgsToReceive),
+        !.msgsToReceive = Tail(state.msgsToReceive)
+    ] ELSE state
 
 \* Implementation of the relay_check_status_needs_update.
-RelayStatusUpdate(i, j) ==
-    LET newTxQueue == Append(txQueue[i], TxMsg(TxRelayType, relayLastAck[i][j]))
-    IN /\ relayLastAck[i][j] # EmptyAck(Servers)
-       /\ txQueue' = [txQueue EXCEPT ![i] = newTxQueue]
-       /\ relayLastAck' = [relayLastAck EXCEPT ![i][j] = EmptyAck(Servers)]
-       /\ UNCHANGED
-            \* Without {txQueue, relayLastAck}
-            <<msgs, relaySentLsn, relayRaftMsg>>
+RelayStatusUpdate(state) ==
+    IF Len(state.relayQueue) > 0 THEN [state EXCEPT
+        !.txQueue = Append(state.txQueue, TxMsg(TxRelayType, state.lastAck)),
+        !.relayQueue = Tail(state.relayQueue)
+    ] ELSE state
 
-RelayProcess(i, j) ==
-    /\ IF i # j \* No replication to self.
-       THEN \/ RelayRead(i, j)
-            \/ RelayStatusUpdate(i, j)
-            \/ RelayProcessWalEvent(i, j)
-            \/ /\ relayRaftMsg[i][j].is_ready = TRUE
-               /\ RelayRaftSend(i, j)
-       ELSE UNCHANGED <<relayVars, msgs, txQueue>>
-    /\ UNCHANGED <<vclock, term, wal>>
-
-RelayNext(servers) == \E i, j \in servers: RelayProcess(i, j)
+RelayNext(servers) == \E i, j \in servers:
+    LET state == RelayState(i, j)
+    IN /\ i # j \* No replication to self.
+       /\ \/ RelayStateApply(i, RelayRead(state))
+          \/ RelayStateApply(i, RelayStatusUpdate(state))
+          \/ RelayStateApply(i, RelayProcessWalEvent(state))
+          \/ RelayStateApply(i, RelayRaftTrySend(state))
 
 ================================================================================

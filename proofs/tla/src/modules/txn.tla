@@ -31,7 +31,7 @@
 
 ---------------------------------- MODULE txn ----------------------------------
 
-EXTENDS Integers, FiniteSets, Sequences
+EXTENDS Integers, FiniteSets, Sequences, utils, definitions
 
 --------------------------------------------------------------------------------
 \* Declaration
@@ -51,13 +51,6 @@ VARIABLES
     raft   \* For acess of the state.
 
 --------------------------------------------------------------------------------
-\* Imports
---------------------------------------------------------------------------------
-
-LOCAL INSTANCE definitions
-LOCAL INSTANCE utils
-
---------------------------------------------------------------------------------
 \* Implementation
 --------------------------------------------------------------------------------
 
@@ -71,18 +64,18 @@ LOCAL TxnState(i) == [
     tId |-> txn[i].tId,
     clientCtr |-> txn[i].clientCtr,
     walQueue |-> wal[i].queue,
-    limboTxns |-> limbo[i].txns,
+    txns |-> limbo[i].txns,
     \* RO variables.
     raftState |-> raft[i].state,
-    limboPromoteLatch |-> limbo[i].promoteLatch,
-    limboSynchroMsg |-> limbo[i].synchroMsg
+    promoteLatch |-> limbo[i].promoteLatch,
+    synchroMsg |-> limbo[i].synchroMsg
 ]
 
 LOCAL TxnStateApply(i, state) ==
     /\ txn' = VarSet(i, "tId", state.tId,
               VarSet(i, "clientCtr", state.clientCtr, txn))
     /\ wal' = VarSet(i, "queue", state.walQueue, wal)
-    /\ limbo' = VarSet(i, "txns", state.limboTxns, limbo)
+    /\ limbo' = VarSet(i, "txns", state.txns, limbo)
     /\ UNCHANGED <<raft>>
 
 \* Implementation of the txn_begin.
@@ -102,7 +95,7 @@ LOCAL TxnBegin(state, stmts) ==
 \* where it's processed by WalProcess operator.
 LOCAL TxnCommit(state, txnToApply) ==
     LET \* Set wait_sync flag if limbo is not empty.
-        newStmts == IF /\ Len(state.limboTxns) > 0
+        newStmts == IF /\ Len(state.txns) > 0
                        /\ txnToApply.stmts[1].group_id # LocalGroup
                        /\ txnToApply.stmts[1].type # NopType
                     THEN [j \in 1..Len(txnToApply.stmts) |->
@@ -115,15 +108,14 @@ LOCAL TxnCommit(state, txnToApply) ==
         newTxn == [txnToApply EXCEPT !.stmts = newStmts]
         newWalQueue == Append(state.walQueue, newTxn)
         newLimboTxns == IF newStmts[1].flags.wait_sync = TRUE
-                        THEN Append(state.limboTxns, newTxn)
-                        ELSE state.limboTxns
+                        THEN Append(state.txns, newTxn)
+                        ELSE state.txns
         doWrite == \/ newStmts[1].flags.wait_sync = FALSE
-                   \/ ~LimboIsInRollback(state.limboSynchroMsg,
-                                         state.limboPromoteLatch)
+                   \/ ~LimboIsInRollback(state.synchroMsg, state.promoteLatch)
     IN IF doWrite THEN [state EXCEPT
             !.tId = state.tId + 1,
             !.walQueue = newWalQueue,
-            !.limboTxns = newLimboTxns
+            !.txns = newLimboTxns
        ] ELSE state
 
 TxnDo(state, entry) ==
@@ -134,7 +126,7 @@ LOCAL ClientRequest(i, state) ==
     IF /\ \/ state.clientCtr = -1
           \/ state.clientCtr < MaxClientRequests
        /\ state.raftState = Leader
-    THEN LET entry == XrowEntry(DmlType, i, DefaultGroup, SyncFlags, {})
+    THEN LET entry == XrowEntry(DmlType, i, DefaultGroup, SyncFlags, <<>>)
              stateTxn == TxnDo(state, entry)
          IN [stateTxn EXCEPT !.clientCtr = @ + 1]
     ELSE state

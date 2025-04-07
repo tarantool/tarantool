@@ -26,7 +26,7 @@ ASSUME LET entry == XrowEntry(DmlType, "s1", DefaultGroup, SyncFlags, {})
            txn == [id |-> 1, stmts |-> <<entry>>]
            state == [
                 rows |-> << >>,
-                boxQueue |-> << >>,
+                txQueue |-> << >>,
                 queue |-> <<txn>>
            ]
            expectedEntry == [entry EXCEPT !.lsn = 1]
@@ -34,7 +34,7 @@ ASSUME LET entry == XrowEntry(DmlType, "s1", DefaultGroup, SyncFlags, {})
        IN WalProcess(state) = [
             queue |-> << >>,
             rows |-> <<expectedEntry>>,
-            boxQueue |-> <<TxMsg(TxWalType, expectedTxn)>>
+            txQueue |-> <<TxMsg(TxWalType, expectedTxn)>>
           ]
 
 --------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ TxnSimulate(i) ==
           /\ UNCHANGED <<box>>
 
 Init == /\ WalInit
-        /\ box = [i \in Servers |-> [queue |-> <<>>]]
+        /\ box = [i \in Servers |-> [queue |-> << >>]]
         /\ tId = 1
 
 Next == \/ /\ WalNext(Servers)
@@ -68,7 +68,7 @@ WalNoGapsAndIncreasingLsnInv ==
     \A i \in Servers:
         LET rows == wal[i].rows
         IN IF Len(rows) > 1 THEN
-            \A j \in 2..Len(rows): rows[j].lsn = rows[j-1].lsn + 1
+            \A j \in 2..Len(rows): rows[j].lsn = rows[j - 1].lsn + 1
            ELSE TRUE
 
 WalSizeProp ==

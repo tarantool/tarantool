@@ -31,7 +31,7 @@
 
 --------------------------------- MODULE limbo ---------------------------------
 
-EXTENDS Integers, Sequences, FiniteSets
+EXTENDS Integers, Sequences, FiniteSets, utils
 
 --------------------------------------------------------------------------------
 \* Declaration
@@ -65,155 +65,201 @@ VARIABLES
     \* Relay implementation
     relayLastAck
 
-limboVars == <<limbo, limboVclock, limboOwner, limboPromoteGreatestTerm,
-               limboPromoteTermMap, limboConfirmedLsn, limboConfirmedVclock,
-               limboVolatileConfirmedLsn, limboAckCount, limboSynchroMsg,
-               limboPromoteLatch>>
-
-\* Txn substitution.
-CONSTANTS MaxClientRequests
-VARIABLES tId, clientCtr, walQueue, state
-LOCAL txnVarsSub == <<tId, clientCtr, walQueue, state>>
+VARIABLES
+    limbo, \* Implemented in the current module.
+    box,   \* For access of the error.
+    relay  \* For access of the lastAck.
 
 --------------------------------------------------------------------------------
 \* Imports
 --------------------------------------------------------------------------------
 
+\* Txn substitution.
+CONSTANTS MaxClientRequests
+VARIABLES txn, wal, raft
 LOCAL INSTANCE txn
-LOCAL INSTANCE utils
 
 --------------------------------------------------------------------------------
 \* Implementation
 --------------------------------------------------------------------------------
 
 LimboInit ==
-    /\ limbo = [i \in Servers |-> << >>]
-    /\ limboVclock = [i \in Servers |-> [j \in Servers |-> 0]]
-    /\ limboOwner = [i \in Servers |-> Nil]
-    /\ limboPromoteGreatestTerm = [i \in Servers |-> 0]
-    /\ limboPromoteTermMap = [i \in Servers |-> [j \in Servers |-> 0]]
-    /\ limboConfirmedLsn = [i \in Servers |-> 0]
-    /\ limboConfirmedVclock = [i \in Servers |-> [j \in Servers |-> 0]]
-    /\ limboVolatileConfirmedLsn = [i \in Servers |-> 0]
-    /\ limboAckCount = [i \in Servers |-> 0]
-    /\ limboSynchroMsg = [i \in Servers |-> EmptyGeneralMsg]
-    /\ limboPromoteLatch = [i \in Servers |-> FALSE]
+    limbo = [i \in Servers |-> [
+        \* Sequence of not yet confirmed entries.
+        txns |-> << >>,
+        \* How owner LSN is visible on other nodes.
+        vclock |-> [j \in Servers |-> 0],
+        \* Owner of the limbo as seen by server.
+        owner |-> Nil,
+        \* The biggest promote term seen.
+        promoteGreatestTerm |-> 0,
+        \* Latest terms received with PROMOTE entries.
+        promoteTermMap |-> [j \in Servers |-> 0],
+        \* Maximal quorum lsn that has been persisted.
+        confirmedLsn |-> 0,
+        \* Not yet persisted confirmedLsn.
+        volatileConfirmedLsn |-> 0,
+        \* Biggest known confirmed lsn for each owner.
+        confimedVclock |-> [j \in Servers |-> 0],
+        \* Number of ACKs for the first txn in limbo.
+        ackCount |-> 0,
+        \* Synchro request to write.
+        synchroMsg |-> EmptyGeneralMsg,
+        \* Order access to the promote data.
+        promoteLatch |-> FALSE,
+    ]]
 
-LOCAL LimboConfirm(i, newLimbo, newVclock) ==
-    IF ~LimboIsInRollback(i, limboSynchroMsg, limboPromoteLatch)
+LOCAL LimboState(i) == [
+    txns |-> limbo[i].txns, \* Also passed to txn.
+    limboVclock |-> limbo[i].vclock,
+    owner |-> limbo[i].owner,
+    promoteGreatestTerm |-> limbo[i].promoteGreatestTerm,
+    promoteTermMap |-> limbo[i].promoteTermMap,
+    confirmedLsn |-> limbo[i].confirmedLsn,
+    volatileConfirmedLsn |-> limbo[i].volatileConfirmedLsn,
+    confimedVclock |-> limbo[i].confirmedVclock,
+    ackCount |-> limbo[i].ackCount,
+    synchroMsg |-> limbo[i].synchroMsg,
+    promoteLatch |-> limbo[i].promoteLatch,
+    limboIsOwned |-> limbo[i].owner = i,
+    promoteQsyncLsn |-> limbo[i].promoteQsyncLsn,
+    promoteQsyncTerm |-> limbo[i].promoteQsyncTerm,
+    \* Txn state.
+    tId |-> txn[i].tId,
+    walQueue |-> wal[i].queue,
+    \* Box state,
+    error |-> Nil,
+    \* RO variables.
+    i |-> i, \* Should not be used to access global variables.
+]
+
+LOCAL LimboStateApply(i, state) ==
+    /\ limbo' = VarSet(i, "txns", state.txns,
+                VarSet(i, "vclock", state.limboVclock,
+                VarSet(i, "owner", state.owner,
+                VarSet(i, "promoteGreatestTerm", state.promoteGreatestTerm,
+                VarSet(i, "promoteTermMap", state.promoteTermMap,
+                VarSet(i, "confirmedLsn", state.confirmedLsn,
+                VarSet(i, "volatileConfirmedLsn", state.volatileConfirmedLsn,
+                VarSet(i, "confirmedVclock", state.confirmedVclock,
+                VarSet(i, "ackCount", state.ackCount,
+                VarSet(i, "synchroMsg", state.synchroMsg,
+                VarSet(i, "promoteQsyncLsn", state.promoteQsyncLsn,
+                VarSet(i, "promoteQsyncTerm", state.promoteQsyncTerm,
+                VarSet(i, "promoteLatch", state.promoteLatch, limbo
+                ))))))))))))) \* LOL
+    /\ txn
+
+LOCAL LimboConfirm(state) ==
+    IF ~LimboIsInRollback(state.synchroMsg, state.promoteLatch)
     THEN LET k == Cardinality(Servers) - ElectionQuorum
-             confirmLsn == BagKthOrderStatistic(newVclock, k)
-             idx == CHOOSE x \in Len(newLimbo)..1 :
+             confirmLsn == BagKthOrderStatistic(state.limboVclock, k)
+             idx == CHOOSE x \in Len(state.txns)..1 :
                   /\ x.stmts[Len(x.stmts)].lsn # -1
                   /\ x.stmts[Len(x.stmts)].lsn <= confirmLsn
-             maxAssignedLsn == newLimbo[idx]
-             newAckCount == IF idx + 1 > Len(newLimbo) THEN 0
-                            ELSE IF newLimbo[idx + 1].stmts[1].lsn = -1 THEN 0
-                                 ELSE newLimbo[idx + 1].stmts[1].lsn
-         IN /\ limboVolatileConfirmedLsn' =
-                  [limboVolatileConfirmedLsn EXCEPT ![i] = maxAssignedLsn]
-            /\ limboAckCount' = [limboAckCount EXCEPT ![i] = newAckCount]
-    ELSE UNCHANGED <<limboVolatileConfirmedLsn, limboAckCount>>
+             maxAssignedLsn == state.txns[idx]
+             newAckCount == IF idx + 1 > Len(state.txns) THEN 0
+                            ELSE IF state.txns[idx + 1].stmts[1].lsn = -1 THEN 0
+                                 ELSE BagCountGreaterOrEqual(state.limboVclock,
+                                        state.txns[idx + 1].stmts[1].lsn)
+         IN [state EXCEPT
+                !.volatileConfirmedLsn = maxAssignedLsn,
+                !.ackCount = newAckCount]
+    ELSE state
 
 \* txn_limbo_ack.
-LimboAck(i, newLimbo, source, lsn) ==
-    IF /\ limboOwner[i] = i
-       /\ Len(newLimbo[i]) > 0
-       /\ lsn > limboVclock[i][source]
-    THEN LET newVclock == BagSet(limboVclock[i], source, lsn)
-         IN /\ limboVclock' = [limboVclock EXCEPT ![i] = newVclock]
-            /\ IF /\ newLimbo[i][1].lsn # -1
-                  /\ newLimbo[i][1].lsn <= lsn
-               THEN LET incAckCount == limboAckCount[i] + 1
-                    IN IF limboAckCount[i] + 1 > ElectionQuorum
-                       THEN LimboConfirm(i, newLimbo, newVclock)
-                       ELSE /\ limboAckCount' =
-                                   [limboAckCount EXCEPT ![i] = incAckCount]
-                            /\ UNCHANGED <<limboVolatileConfirmedLsn>>
-               ELSE UNCHANGED <<limboAckCount, limboVolatileConfirmedLsn>>
-    ELSE UNCHANGED <<limboVclock, limboAckCount, limboVolatileConfirmedLsn>>
+LimboAck(state, source, lsn) ==
+    IF /\ state.limboIsOwned
+       /\ Len(state.txns) > 0
+       /\ lsn > state.limboVclock[source]
+    THEN LET newVclock == BagSet(state.limboVclock, source, lsn)
+             vclockState == [state EXCEPT !.limboVclock = newVclock]
+         IN IF /\ vclockState.txns[1].lsn # -1
+               /\ vclockState.txns[1].lsn <= lsn
+            THEN LET countState == [vclockState EXCEPT
+                         !.ackCount = vclockState.ackCount + 1]
+                 IN IF countState.ackCount > ElectionQuorum
+                    THEN LimboConfirm(countState)
+                    ELSE countState
+            ELSE vclockState
+    ELSE state
 
-LOCAL LimboBegin(i) ==
-    limboPromoteLatch' = [limboPromoteLatch EXCEPT ![i] = TRUE]
+LOCAL LimboBegin(state) ==
+    [state EXCEPT !.promoteLatch = TRUE]
 
-LOCAL LimboCommit(i) ==
-    limboPromoteLatch' = [limboPromoteLatch EXCEPT ![i] = FALSE]
+LOCAL LimboCommit(state) ==
+    [state EXCEPT !.promoteLatch = FALSE]
 
-LOCAL LimboReqPrepare(i, entry) ==
-    limboVolatileConfirmedLsn' =
-        [limboVolatileConfirmedLsn EXCEPT ![i] = entry.body.lsn]
+LOCAL LimboReqPrepare(state, entry) ==
+    [state EXCEPT !.volatileConfirmedLsn = entry.lsn]
 
 \* Part of txn_limbo_req_commit, doesn't include reading written request.
-LOCAL LimboReqCommit(i, entry) ==
+LOCAL LimboReqCommit(state, entry) ==
     LET t == entry.body.term
-        newMap == IF t > limboPromoteTermMap[i] THEN
-                  [limboPromoteTermMap[i] EXCEPT ![entry.body.origin_id] = t]
-                  ELSE limboPromoteTermMap[i]
-        newGreatestTerm == IF t > limboPromoteGreatestTerm[i]
-                           THEN t ELSE limboPromoteGreatestTerm[i]
-    IN /\ limboPromoteTermMap' = [limboPromoteTermMap EXCEPT ![i] = newMap]
-       /\ limboPromoteGreatestTerm' =
-            [limboPromoteGreatestTerm EXCEPT ![i] = newGreatestTerm]
+        newMap == IF t > state.promoteTermMap[entry.body.origin_id] THEN
+                  [state.promoteTermMap EXCEPT ![entry.body.origin_id] = t]
+                  ELSE state.promoteTermMap
+        newGreatestTerm == IF t > state.promoteGreatestTerm
+                           THEN t ELSE state.promoteGreatestTerm
+    IN [state EXCEPT
+        !.promoteTermMap = newMap,
+        !.promoteGreatestTerm = newGreatestTerm
+    ]
 
-LOCAL LimboIsSplitBrain(i, entry) ==
+LOCAL LimboIsSplitBrain(state, entry) ==
     /\ SplitBrainCheck = TRUE
-    /\ entry.replica_id # limboOwner[i]
+    /\ entry.replica_id # state.owner
 
-LOCAL LimboRaiseSplitBrainIfNeeded(i, entry) ==
-    IF LimboIsSplitBrain(i, entry)
-    THEN error[i] = SplitBrainError
-    ELSE UNCHANGED <<error>>
+LOCAL LimboRaiseSplitBrainIfNeeded(state, entry) ==
+    IF LimboIsSplitBrain(state, entry)
+    THEN [state EXCEPT !.error = SplitBrainError]
+    ELSE state
 
 \* Part of txn_limbo_req_prepare. Checks whether synchro request can
 \* be applied without yields.
-LOCAL LimboReqPrepareCheck(i, entry) ==
-    /\ limboPromoteLatch[i] = FALSE
-    /\ ~LimboIsSplitBrain(i, entry)
-    /\ \/ Len(limbo[i]) = 0
-       \/ limbo[i][Len(limbo[i])].stmts[1].lsn # -1
+LOCAL LimboReqPrepareCheck(state, entry) ==
+    /\ state.promoteLatch[i] = FALSE
+    /\ ~LimboIsSplitBrain(state, entry)
+    /\ \/ Len(state.txns) = 0
+       \/ state.txns[Len(state.txns)].stmts[1].lsn # -1
 
-LOCAL LimboWriteStart(i, entry) ==
-    /\ LimboBegin(i)
-    /\ LimboReqPrepare(i, entry)
-    /\ TxnDo(i, entry)
+LOCAL LimboWriteStart(state, entry) ==
+    /\ TxnDo(LimboReqPrepare(LimboBegin(state), entry), entry)
 
-LimboWriteEnd(i, entry, Read(_, _)) ==
-    /\ LimboReqCommit(i, entry)
+LimboWriteEnd(state, entry, Read(_, _)) ==
+    /\ LimboReqCommit(state, entry)
     /\ Read(i, entry)
     /\ LimboCommit(i)
 
 \* Part of apply_synchro_req.
-LimboScheduleWrite(i, entry) ==
-    /\ LimboRaiseSplitBrainIfNeeded(i, entry)
-    /\ IF /\ ~LimboIsSplitBrain(i, entry)
-          /\ LimboReqPrepareCheck(i, entry)
-       THEN /\ limboSynchroMsg' =
-                    [limboSynchroMsg EXCEPT ![i] = GeneralMsg(entry)]
-            /\ UNCHANGED <<tId, walQueue, error, limbo,
-                           limboVolatileConfirmedLsn, limboPromoteLatch>>
-       ELSE /\ LimboWriteStart(i, entry)
-            /\ UNCHANGED <<error, limboSynchroMsg>>
+LimboScheduleWrite(state, entry) ==
+    LET newState == LimboRaiseSplitBrainIfNeeded(state, entry)
+    IN IF newState.error = Nil
+       THEN IF LimboReqPrepareCheck(newState, entry)
+            THEN LimboWriteStart(newState, entry)
+            ELSE [newState EXCEPT !.synchroMsg = GeneralMsg(entry)]
+       ELSE newState
 
-LOCAL LimboWritePromote(i, lsn) ==
-    LET entry == XrowEntry(PromoteType, i, DefaultGroup,
+LOCAL LimboWritePromote(state, lsn, term) ==
+    LET entry == XrowEntry(PromoteType, state.i, DefaultGroup,
                            DefaultFlags, [
-            replica_id |-> limboOwner[i],
-            origin_id |-> i,
+            replica_id |-> state.owner,
+            origin_id |-> state.i,
             lsn |-> lsn,
-            term |-> limboPromoteTermMap
+            term |-> term,
         ])
-    IN LimboScheduleWrite(i, entry)
+    IN LimboScheduleWrite(state, entry)
 
 \* txn_limbo_write_confirm.
-LOCAL LimboWriteConfirm(i, lsn) ==
-    LET entry == XrowEntry(ConfirmType, i, DefaultGroup,
+LOCAL LimboWriteConfirm(state, lsn) ==
+    LET entry == XrowEntry(ConfirmType, state.i, DefaultGroup,
                           DefaultFlags, [
-            replica_id |-> limboOwner[i],
-            origin_id |-> i,
+            replica_id |-> state.owner,
+            origin_id |-> state.i,
             lsn |-> lsn,
             term |-> 0
         ])
-    IN LimboWriteStart(i, entry)
+    IN LimboWriteStart(state, entry)
 
 \* First part of the txn_limbo_read_confirm. It must be splitted, since
 \* this part is also used in LimboReadPromote and in TLA+ it's not possible
@@ -244,57 +290,75 @@ LimboReadPromote(i, entry) ==
     /\ limboVolatileConfirmedLsn =
             [limboVolatileConfirmedLsn EXCEPT ![i] = limboConfirmedLsn[i]]
 
-LOCAL LimboLastLsn(i) ==
-    IF Len(limbo[i]) = 0
-    THEN limboConfirmedLsn[i]
-    ELSE LET stmts == limbo[Len(limbo[i])].stmts
+LOCAL LimboLastLsn(state) ==
+    IF Len(state.txns) = 0
+    THEN state.confirmedLsn
+    ELSE LET stmts == state.txns[Len(state.txns)].stmts
          IN stmts[Len(stmts)].lsn
 
-LimboPromoteQsync(i) ==
-    LET lastLsn == LimboLastLsn(i)
-    IN /\ lastLsn # -1 \* wal_sync()
-       /\ \A j \in Servers: \* box_wait_limbo_acked()
-            /\ j # i
-            /\ relayLastAck[i][j].body.vclock[i] >= lastLsn
-       /\ LimboWritePromote(i, lastLsn)
+LOCAL LimboPromoteQsync(state, lsn, term) ==
+    IF lsn # -1 \* wal_sync()
+    THEN IF \A j \in Servers: \* box_wait_limbo_acked()
+             \/ j = state.i
+             \/ relay[state.i].lastAck[j].body.vclock[state.i] >= lastLsn
+         THEN [LimboWritePromote(state, lastLsn, term)
+                   EXCEPT !.promoteQsyncLsn = 0, !.promoteQsyncTerm = term]
+         ELSE [state EXCEPT !.promoteQsyncLsn = lastLsn,
+                    !.promoteQsyncTerm = term]
+    ELSE state
 
-LimboProcess(i) ==
-    /\ \/ IF /\ limboSynchroMsg[i].is_ready
-             /\ LimboReqPrepareCheck(i, limboSynchroMsg[i])
-          THEN /\ LimboWriteStart(i, limboSynchroMsg[i])
-               /\ limboSynchroMsg = [limboSynchroMsg EXCEPT ![i] = EmptyGeneralMsg]
-          ELSE UNCHANGED <<limboVars, txnVarsSub, error, relayLastAck>>
-       \/ \* limbo_bump_confirmed_lsn
-          IF /\ limboOwner[i] = i
-             /\ ~LimboIsInRollback(i, limboSynchroMsg, limboPromoteLatch)
-             /\ limboVolatileConfirmedLsn[i] # limboConfirmedLsn[i]
-          THEN /\ LimboWriteConfirm(i, limboVolatileConfirmedLsn[i])
-          ELSE UNCHANGED <<limboVars, txnVarsSub, error, relayLastAck>>
-    /\ UNCHANGED
-            \* Without {tId, walQueue, error, limbo, limboSynchroMsg,
-            \*          limboVolatileConfirmedLsn, limboPromoteLatch}
-            <<error, relayLastAck, limboVclock, limboOwner,
-              limboPromoteGreatestTerm, limboPromoteTermMap, limboConfirmedLsn,
-              limboConfirmedVclock, limboAckCount, limboSynchroMsg>>
+LimboPromoteQsyncTry(state) ==
+    LimboPromoteQsync(state, state.promoteQsyncLsn, state.promoteQsyncTerm)
+
+\* TODO: it's actually difficult to write promote, since it
+\* requires written entry in wal, so in real Tarantool there will be
+\* frequent promotes. We should properly block raft worker
+\* until the promote is written. Requires proper yields.
+LimboPromoteQsyncRaft(state, term) ==
+    IF state.promoteQsyncLsn = 0
+    THEN LimboPromoteQsync(state, LimboLastLsn(state), term)
+    ELSE state
+
+LimboPromoteQsync(state) ==
+    LET lastLsn == IF state.promoteQsyncLsn = 0 THEN LimboLastLsn(state)
+                   ELSE state.promoteQsyncLsn
+    IN /\ lastLsn # -1 \* wal_sync()
+       /\ IF \A j \in Servers: \* box_wait_limbo_acked()
+              \/ j = state.i
+              \/ relay[state.i].lastAck[j].body.vclock[state.i] >= lastLsn
+          THEN [LimboWritePromote(state, lastLsn, term)
+                    EXCEPT !.promoteQsyncLsn = 0]
+          ELSE [state EXCEPT !.promoteQsyncLsn = lastLsn]
+
+LimboProcess(i, state) ==
+    \/ /\ state.synchroMsg.is_ready
+       /\ LimboReqPrepareCheck(state, state.synchroMsg.body)
+       /\ [LimboWriteStart(state, state.synchroMsg.body)
+           EXCEPT !.synchroMsg = EmptyGeneralMsg]
+    \/ \* limbo_bump_confirmed_lsn
+       /\ state.limboIsOwned
+       /\ ~LimboIsInRollback(state.synchroMsg, state.promoteLatch)
+       /\ state.volatileConfirmedLsn # state.confirmedLsn[i]
+       /\ LimboWriteConfirm(state, state.volatileConfirmedLsn[i])
+    \/ /\ state.promoteQsyncLsn # 0
+       /\ LimboPromoteQsyncTry(state)
 
 LOCAL FindTxnInLimbo(newLimbo, txn) ==
     CHOOSE i \in 1..Len(newLimbo) : newLimbo[i].id = txn.id
 
 \* Implementation of the txn_on_journal_write.
-TxnOnJournalWrite(i, entry) ==
+TxnOnJournalWrite(state, txnWritten) ==
     \* Implementation of the txn_on_journal_write. Assign LSNs to limbo entries.
-    IF entry.rows[1].flags.wait_sync = TRUE
-    THEN LET idx == FindTxnInLimbo(limbo[i], entry.complete_data)
-             newLimbo == [limbo[i] EXCEPT ![idx] = entry.complete_data]
-         IN /\ limbo' = [limbo EXCEPT ![i] = newLimbo]
-            /\ LET row == entry.rows[Len(entry.rows)]
-               IN IF row.flags.wait_ack = TRUE
-                  THEN LimboAck(i, newLimbo, row.replica_id, row.lsn)
-                  ELSE UNCHANGED <<limboVclock, limboVolatileConfirmedLsn,
-                                   limboAckCount>>
-    ELSE UNCHANGED <<limbo, limboVclock, limboVolatileConfirmedLsn,
-                     limboAckCount>>
+    /\ txnWritten.stmts[1].flags.wait_sync = TRUE
+    /\ LET idx == FindTxnInLimbo(state.txns, txnWritten)
+           newState ==
+                [state EXCEPT !.txns = [state.txns EXCEPT ![idx] = txnWritten]]
+           row == txnWritten.stmts[Len(txnWritten.stmts)]
+       IN IF row.flags.wait_ack = TRUE
+          THEN LimboAck(newState, row.replica_id, row.lsn)
+          ELSE newState
 
-LimboNext(servers) == \E i \in servers: LimboProcess(i)
+LimboNext(servers) == \E i \in servers:
+    LimboStateApply(i, LimboProcess(LimboState(i)))
 
 ================================================================================
