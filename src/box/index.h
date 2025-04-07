@@ -52,6 +52,8 @@ struct index_read_view_iterator;
 struct index_def;
 struct key_def;
 struct info_handler;
+struct arrow_options;
+struct ArrowArrayStream;
 
 typedef struct tuple box_tuple_t;
 typedef struct key_def box_key_def_t;
@@ -657,6 +659,12 @@ struct index_vtab {
 							uint32_t part_count,
 							const char *pos,
 							uint32_t offset);
+	/** Create an index Arrow stream. */
+	int (*create_arrow_stream)(struct index *index,
+				   uint32_t field_count, const uint32_t *fields,
+				   const char *key, uint32_t part_count,
+				   const struct arrow_options *options,
+				   struct ArrowArrayStream *stream);
 	/** Create an index read view. */
 	struct index_read_view *(*create_read_view)(struct index *index);
 	/** Introspection (index:stat()) */
@@ -777,6 +785,13 @@ struct index_read_view_vtab {
 				       const char *key, uint32_t part_count,
 				       const char *pos, uint32_t offset,
 				       struct index_read_view_iterator *it);
+	/** Create an index read view Arrow stream. */
+	int
+	(*create_arrow_stream)(struct index_read_view *rv,
+			       uint32_t field_count, const uint32_t *fields,
+			       const char *key, uint32_t part_count,
+			       const struct arrow_options *options,
+			       struct ArrowArrayStream *stream);
 };
 
 /**
@@ -1046,6 +1061,18 @@ index_create_iterator(struct index *index, enum iterator_type type,
 	return index->vtab->create_iterator(index, type, key, part_count, NULL);
 }
 
+static inline int
+index_create_arrow_stream(struct index *index,
+			  uint32_t field_count, const uint32_t *fields,
+			  const char *key, uint32_t part_count,
+			  const struct arrow_options *options,
+			  struct ArrowArrayStream *stream)
+{
+	return index->vtab->create_arrow_stream(index, field_count, fields,
+						key, part_count, options,
+						stream);
+}
+
 static inline struct index_read_view *
 index_create_read_view(struct index *index)
 {
@@ -1174,6 +1201,19 @@ index_read_view_iterator_position(struct index_read_view_iterator *iterator,
 	return iterator->base.position(iterator, pos, size);
 }
 
+static inline int
+index_read_view_create_arrow_stream(
+	struct index_read_view *rv,
+	uint32_t field_count, const uint32_t *fields,
+	const char *key, uint32_t part_count,
+	const struct arrow_options *options,
+	struct ArrowArrayStream *stream)
+{
+	return rv->vtab->create_arrow_stream(rv, field_count, fields,
+					     key, part_count, options,
+					     stream);
+}
+
 /*
  * Virtual method stubs.
  */
@@ -1227,6 +1267,19 @@ generic_index_read_view_create_iterator_with_offset(
 	const char *key, uint32_t part_count,
 	const char *pos, uint32_t offset,
 	struct index_read_view_iterator *it);
+int
+generic_index_create_arrow_stream(struct index *index,
+				  uint32_t field_count, const uint32_t *fields,
+				  const char *key, uint32_t part_count,
+				  const struct arrow_options *options,
+				  struct ArrowArrayStream *stream);
+int
+generic_index_read_view_create_arrow_stream(
+	struct index_read_view *rv,
+	uint32_t field_count, const uint32_t *fields,
+	const char *key, uint32_t part_count,
+	const struct arrow_options *options,
+	struct ArrowArrayStream *stream);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 int

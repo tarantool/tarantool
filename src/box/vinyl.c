@@ -4840,6 +4840,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
+	/* .create_arrow_stream = */ generic_index_create_arrow_stream,
 	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,
