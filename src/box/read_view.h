@@ -35,10 +35,16 @@ struct space_read_view {
 	/** Space name. */
 	char *name;
 	/**
+	 * Tuple field definition array used by this space. Allocated only if
+	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
+	 */
+	struct field_def *fields;
+	/** Number of entries in the fields array. */
+	uint32_t field_count;
+	/**
 	 * Tuple format data used by this space. Allocated only if
 	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
-	 * Used for creation of space_read_view::format and
-	 * box_raw_read_view_space::fields.
+	 * Used for creation of space_read_view::format.
 	 */
 	char *format_data;
 	/** Length of tuple format data. */
