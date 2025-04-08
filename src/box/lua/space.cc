@@ -32,6 +32,7 @@
 #include "box/lua/trigger.h"
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
+#include "box/lua/tuple_format.h"
 #include "box/lua/key_def.h"
 #include "box/sql/sqlLimit.h"
 #include "lua/utils.h"
@@ -509,6 +510,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space:on_replace */
 	lua_pushstring(L, "on_replace");
 	lua_pushcfunction(L, lbox_space_on_replace);
+	lua_settable(L, i);
+
+	/* space.format_object */
+	lua_pushstring(L, "format_object");
+	luaT_push_tuple_format(L, space->format);
 	lua_settable(L, i);
 
 	/* space:before_replace */

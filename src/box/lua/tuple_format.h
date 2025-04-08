@@ -35,6 +35,14 @@ int
 box_tuple_format_serialize_impl(struct lua_State *L,
 				struct tuple_format *format);
 
+/**
+ * Allocate and push a box.tuple.format userdata onto the Lua stack.
+ * The created tuple format object is initialized with a reference to
+ * the given format.
+ */
+void
+luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
