@@ -1,6 +1,7 @@
 local t = require('luatest')
 local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
+local treegen = require('luatest.treegen')
 local fio = require('fio')
 local fiber = require('fiber')
 local socket = require('socket')
@@ -539,15 +540,7 @@ local g_supervised = t.group('gh-8509-bootstrap-strategy-supervised')
 local server2_admin
 local SOCKET_TIMEOUT = 5
 
-local function make_bootstrap_leader_initial(sockname, opts)
-    opts = opts or {}
-    local command
-    if opts.graceful then
-        command = 'box.ctl.make_bootstrap_leader({graceful = true})'
-    else
-        command = 'box.ctl.make_bootstrap_leader()'
-    end
-
+local function admin(sockname, command)
     local sock, err = socket.tcp_connect('unix/', sockname)
     t.assert_equals(err, nil, 'Connection successful')
     local greeting = sock:read(128, SOCKET_TIMEOUT)
@@ -557,6 +550,18 @@ local function make_bootstrap_leader_initial(sockname, opts)
     local response = sock:read(8, SOCKET_TIMEOUT)
     t.assert_equals(response, '---\n...\n', 'The call succeeded')
     sock:close()
+end
+
+local function make_bootstrap_leader_initial(sockname, opts)
+    opts = opts or {}
+    local command
+    if opts.graceful then
+        command = 'box.ctl.make_bootstrap_leader({graceful = true})'
+    else
+        command = 'box.ctl.make_bootstrap_leader()'
+    end
+
+    admin(sockname, command)
 end
 
 g_supervised.after_each(function(cg)
@@ -1162,6 +1167,189 @@ g_graceful_supervised.test_after_box_cfg = function(cg)
     -- Run box.cfg.make_bootstrap_leader({graceful = true}).
     t.helpers.retrying({}, function()
         make_bootstrap_leader_initial(cg.server1_admin, {graceful = true})
+    end)
+
+    -- Now the database should be bootstrapped.
+    cg.server1:wait_until_ready()
+    cg.server2:wait_until_ready()
+
+    -- Verify that server1 was the bootstrap leader.
+    t.assert_equals(cg.server1:get_instance_id(), 1)
+
+    -- Verify that a message about the reason why this instance
+    -- is a bootstrap leader is issued.
+    local exp_msg = 'Graceful bootstrap request succeeded: no bootstrap ' ..
+        'leader is found in connected peers, so the current instance ' ..
+        'proceeds as a bootstrap leader'
+    local found = grep_log(cg.server1, exp_msg)
+    t.assert(found)
+end
+
+g_graceful_supervised.before_test('test_singleton_read_only', function(cg)
+    cg.replica_set = replica_set:new{}
+
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+            -- It is allowed to bootstrap the database in
+            -- read_only in the 'supervised' strategy.
+            read_only = true,
+        },
+    }
+
+    local dir = cg.server1.workdir
+    cg.server1.command = fio.pathjoin(dir, 'server1.lua')
+    treegen.write_file(dir, 'server1.lua', string.dump(function()
+        local fun = require('fun')
+        local json = require('json')
+
+        local function default_cfg()
+            return {
+                work_dir = os.getenv('TARANTOOL_WORKDIR'),
+                listen = os.getenv('TARANTOOL_LISTEN'),
+            }
+        end
+
+        local function env_cfg()
+            local cfg = os.getenv('TARANTOOL_BOX_CFG')
+            if cfg == nil then
+                return {}
+            end
+            local res = json.decode(cfg)
+            assert(type(res) == 'table')
+            return res
+        end
+
+        local function box_cfg(cfg)
+            return fun.chain(default_cfg(), env_cfg(), cfg or {}):tomap()
+        end
+
+        -- It is the same as the default instance file
+        -- (luatest/server_instance.lua) till this line.
+        -- The test case related logic is below.
+
+        -- Bootstrap in RO.
+        box.ctl.make_bootstrap_leader({graceful = true})
+        box.cfg(box_cfg())
+
+        -- Go to RW and grant guest all the permissions (to allow
+        -- server:exec() and other methods work).
+        box.cfg({read_only = false})
+        local opts = {if_not_exists = true}
+        box.schema.user.grant('guest', 'super', nil, nil, opts)
+
+        rawset(_G, 'ready', true)
+    end))
+end)
+
+g_graceful_supervised.test_singleton_read_only = function(cg)
+    cg.replica_set:start()
+    t.assert_equals(cg.server1:get_instance_id(), 1)
+    cg.server1:exec(function()
+        t.assert_equals(box.info.ro, false)
+    end)
+end
+
+g_graceful_supervised.before_test('test_after_box_cfg_read_only', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+        -- It is allowed to bootstrap the database in
+        -- read_only in the 'supervised' strategy.
+        read_only = true,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        local box_cfg = table.copy(cg.box_cfg)
+        box_cfg.instance_uuid = ({uuid1, uuid2})[i]
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = box_cfg,
+        }
+    end
+
+    local dir = cg.server1.workdir
+
+    -- luatest works with logs differently depending on its
+    -- revision and we have to set the log file manually to make
+    -- things working before [1] with a non-default instance
+    -- file.
+    --
+    -- [1]: https://github.com/tarantool/luatest/pull/415
+    cg.server1.box_cfg.log = fio.pathjoin(dir, 'server1.log')
+
+    cg.server1.command = fio.pathjoin(dir, 'server1.lua')
+    cg.server1_admin = fio.pathjoin(dir, 'server1.admin')
+    cg.server1.env.TARANTOOL_CONSOLE = ('unix/:%s'):format(cg.server1_admin)
+    treegen.write_file(dir, 'server1.lua', string.dump(function()
+        local fun = require('fun')
+        local json = require('json')
+        local console = require('console')
+        local fiber = require('fiber')
+
+        local function default_cfg()
+            return {
+                work_dir = os.getenv('TARANTOOL_WORKDIR'),
+                listen = os.getenv('TARANTOOL_LISTEN'),
+            }
+        end
+
+        local function env_cfg()
+            local cfg = os.getenv('TARANTOOL_BOX_CFG')
+            if cfg == nil then
+                return {}
+            end
+            local res = json.decode(cfg)
+            assert(type(res) == 'table')
+            return res
+        end
+
+        local function box_cfg(cfg)
+            return fun.chain(default_cfg(), env_cfg(), cfg or {}):tomap()
+        end
+
+        -- It is the same as the default instance file
+        -- (luatest/server_instance.lua) till this line.
+        -- The test case related logic is below.
+
+        console.listen(os.getenv('TARANTOOL_CONSOLE'))
+
+        local bootstrap_is_done_latch = fiber.channel(1)
+        rawset(_G, 'bootstrap', function()
+            box.ctl.make_bootstrap_leader({graceful = true})
+            box.cfg({read_only = false})
+            local opts = {if_not_exists = true}
+            box.schema.user.grant('guest', 'super', nil, nil, opts)
+            bootstrap_is_done_latch:put(true)
+        end)
+
+        box.cfg(box_cfg())
+
+        bootstrap_is_done_latch:get()
+        rawset(_G, 'ready', true)
+    end))
+end)
+
+g_graceful_supervised.test_after_box_cfg_read_only = function(cg)
+    cg.replica_set:start({wait_until_ready = false})
+
+    -- Wait until server1 connects to itself and server2.
+    t.helpers.retrying({}, function()
+        local found_1 = grep_log(cg.server1, 'remote master 11111111')
+        local found_2 = grep_log(cg.server1, 'remote master 22222222')
+        t.assert(found_1 ~= nil and found_2 ~= nil)
+    end)
+
+    -- Bootstrap in RO, reconfigure to RW, grant permissions for
+    -- :exec().
+    t.helpers.retrying({}, function()
+        admin(cg.server1_admin, 'bootstrap()')
     end)
 
     -- Now the database should be bootstrapped.

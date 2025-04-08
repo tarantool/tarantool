@@ -5388,8 +5388,17 @@ check_global_ids_integrity(void)
 static void
 bootstrap_master(void)
 {
-	/* Do not allow to bootstrap a readonly instance as master. */
-	if (cfg_geti("read_only") == 1) {
+	/*
+	 * Do not allow to bootstrap a readonly instance as master.
+	 *
+	 * Allow an exception for the supervised bootstrap
+	 * strategy, because the command to bootstrap may be
+	 * received during the in progress box.cfg() call and
+	 * there is no way to change box.cfg.read_only at this
+	 * time.
+	 */
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    cfg_geti("read_only") == 1) {
 		tnt_raise(ClientError, ER_BOOTSTRAP_READONLY);
 	}
 	/*
