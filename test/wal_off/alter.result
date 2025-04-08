@@ -33,6 +33,7 @@ end;
 -- cleanup
 for k, v in pairs(spaces) do
     v:drop()
+    spaces[k] = nil
 end;
 ---
 ...

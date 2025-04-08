@@ -15,6 +15,7 @@ end;
 -- cleanup
 for k, v in pairs(spaces) do
     v:drop()
+    spaces[k] = nil
 end;
 test_run:cmd("setopt delimiter ''");
 
