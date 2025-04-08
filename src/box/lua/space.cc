@@ -417,6 +417,29 @@ luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
 	lua_setmetatable(L, -2);
 }
 
+void
+lbox_push_tuple_format(struct lua_State *L, struct tuple_format *format)
+{
+	if (format == NULL) {
+		lua_pushnil(L);
+		return;
+	}
+
+	tuple_format_ref(format);
+
+	struct tuple_format **pf = (struct tuple_format **)lua_newuserdata(L, sizeof(*pf));
+	*pf = format;
+
+	luaL_getmetatable(L, "box.tuple.format");
+	lua_setmetatable(L, -2);
+}
+
+void
+lbox_push_space_format_object(struct lua_State *L, struct space *space)
+{
+    lbox_push_tuple_format(L, space->format);
+}
+
 /**
  * Make a single space available in Lua,
  * via box.space[] array.
@@ -481,6 +504,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space:on_replace */
 	lua_pushstring(L, "on_replace");
 	lua_pushcfunction(L, lbox_space_on_replace);
+	lua_settable(L, i);
+
+	/* space.format_object */
+	lua_pushstring(L, "format_object");
+	lbox_push_space_format_object(L, space);
 	lua_settable(L, i);
 
 	/* space:before_replace */
