@@ -82,11 +82,7 @@ lbox_tuple_format_new(struct lua_State *L)
 	 * object. So we have to be extra careful not to call anything that may
 	 * trigger Lua GC after we create a format and before we reference it.
 	 */
-	struct tuple_format **format_ptr =
-		lua_newuserdata(L, sizeof(*format_ptr));
-	*format_ptr = NULL;
-	luaL_getmetatable(L, tuple_format_typename);
-	lua_setmetatable(L, -2);
+	struct tuple_format **format_ptr = lbox_space_format_new_impl(L);
 	struct tuple_format *format =
 		runtime_tuple_format_new(format_data, format_data_len,
 					 names_only);
@@ -166,6 +162,16 @@ lbox_tuple_format_validate(lua_State *L)
 		return luaT_error(L);
 
 	return 0;
+}
+
+struct tuple_format **
+lbox_space_format_new_impl(struct lua_State *L)
+{
+	struct tuple_format **format_ptr =
+		(struct tuple_format **)lua_newuserdata(L, sizeof(*format_ptr));
+	*format_ptr = NULL;
+	luaL_setmetatable(L, tuple_format_typename);
+	return format_ptr;
 }
 
 /*

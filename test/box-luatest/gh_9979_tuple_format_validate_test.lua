@@ -12,6 +12,14 @@ g.after_all(function()
     g.server:drop()
 end)
 
+g.after_each(function()
+    g.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+    end)
+end)
+
 g.test_tuple_format_validate = function()
     g.server:exec(function()
         local format = box.tuple.format.new({
@@ -94,6 +102,31 @@ g.test_tuple_format_validate = function()
             },
             format.validate, format, tuple_case)
         end
+    end)
+end
+
+g.test_space_format_object = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local s = box.schema.space.create('test', {
+            format = {
+                {name = 'id', type = 'string'},
+                {name = 'data', type = 'any'},
+            }
+        })
+        t.assert(s.format_object ~= nil, 'space.format_object should exist')
+        -- it must be a box.tuple.format
+        t.assert(box.tuple.format.is(s.format_object),
+                 'format_object must be a box.tuple.format')
+
+        -- positive: valid tuple passes
+        s.format_object:validate({'foo', 123})
+
+        -- negative: wrong id type raises FIELD_TYPE
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.FIELD_TYPE,
+        }, s.format_object.validate, s.format_object, {1, 123})
     end)
 end
 
