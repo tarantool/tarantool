@@ -771,32 +771,54 @@ g_supervised.test_wait_for_bootstrap_leader = function(cg)
     assert_not_booted(cg.server2)
 end
 
-g_supervised.before_test('test_no_bootstrap_without_replication', function(cg)
+g_supervised.before_test('test_bootstrap_without_replication', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
         alias = 'server1',
         box_cfg = {
             bootstrap_strategy = 'supervised',
+            -- Let the test fail on :wait_until_ready() timeout if
+            -- the box.ctl.make_bootstrap_leader() command doesn't
+            -- wake up the logic that waits for a bootstrap
+            -- leader (replicaset_connect()).
+            replication_connect_timeout = 1000,
         },
     }
+
+    cg.server1_admin = fio.pathjoin(cg.server1.workdir, 'server1.admin')
+    local run_before_cfg = string.format([[
+        local console = require('console')
+        console.listen('unix/:%s')
+    ]], cg.server1_admin)
+
+    cg.server1.env.TARANTOOL_RUN_BEFORE_BOX_CFG = run_before_cfg
 end)
 
 -- If the given instance is not chosen as the bootstrap leader
 -- before the first box.cfg() call and there is no replication
--- upstreams, there are no ways to load the database.
---
--- A startup failure is expected in this scenario.
-g_supervised.test_no_bootstrap_without_replication = function(cg)
+-- upstreams, it waits for the box.ctl.make_bootstrap_leader()
+-- command.
+g_supervised.test_bootstrap_without_replication = function(cg)
     cg.server1:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
-    local query = "can't initialize storage"
+
+    -- Let the instance step into box.cfg(). This way we verify
+    -- that it doesn't exit immediately if there is no
+    -- box.cfg.make_bootstrap_leader(<...>) before box.cfg().
+    fiber.sleep(1)
+
+    -- Run box.cfg.make_bootstrap_leader() and wait till the
+    -- database bootstrap.
     t.helpers.retrying({}, function()
-        t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
-                 'Server fails to boot')
+        make_bootstrap_leader_initial(cg.server1_admin)
     end)
-    query = 'failed to connect to the bootstrap leader'
-    t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
-             'Bootstrap leader not found')
+    cg.server1:wait_until_ready()
+
+    t.assert_equals(cg.server1:get_instance_id(), 1)
+    cg.server1:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil)
+        t.assert_equals(tup[2], box.info.uuid)
+    end)
 end
 
 g_supervised.before_test('test_early_leader_singleton', function(cg)
@@ -956,6 +978,54 @@ g_graceful_supervised.test_singleton = function(cg)
     cg.server1:start()
     t.assert_equals(cg.server1:get_instance_id(), 1,
                     'Server 1 is the bootstrap leader')
+end
+
+g_graceful_supervised.before_test('test_singleton_after_box_cfg', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+            -- Let the test fail on :wait_until_ready() timeout if
+            -- the box.ctl.make_bootstrap_leader({graceful = true})
+            -- command doesn't wake up the logic that waits for a
+            -- bootstrap leader (replicaset_connect()).
+            replication_connect_timeout = 1000,
+        },
+    }
+
+    cg.server1_admin = fio.pathjoin(cg.server1.workdir, 'server1.admin')
+    local run_before_cfg = string.format([[
+        local console = require('console')
+        console.listen('unix/:%s')
+    ]], cg.server1_admin)
+
+    cg.server1.env.TARANTOOL_RUN_BEFORE_BOX_CFG = run_before_cfg
+end)
+
+-- Same as `test_bootstrap_without_replication`, but for the
+-- graceful bootstrap request.
+g_graceful_supervised.test_singleton_after_box_cfg = function(cg)
+    cg.server1:start{wait_until_ready = false}
+
+    -- Let the instance step into box.cfg(). This way we verify
+    -- that it doesn't exit immediately if there is no
+    -- box.cfg.make_bootstrap_leader(<...>) before box.cfg().
+    fiber.sleep(1)
+
+    -- Run box.cfg.make_bootstrap_leader({graceful = true}) and
+    -- wait till the database bootstrap.
+    t.helpers.retrying({}, function()
+        make_bootstrap_leader_initial(cg.server1_admin, {graceful = true})
+    end)
+    cg.server1:wait_until_ready()
+
+    t.assert_equals(cg.server1:get_instance_id(), 1)
+    cg.server1:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil)
+        t.assert_equals(tup[2], box.info.uuid)
+    end)
 end
 
 g_graceful_supervised.before_test('test_no_peer', function(cg)

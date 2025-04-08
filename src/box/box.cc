@@ -2275,8 +2275,10 @@ box_make_bootstrap_leader_graceful(void)
 		 "takes this role");
 
 	/* Wake up replicaset_connect() if the flag is turn on. */
-	if (!tt_uuid_is_nil(&INSTANCE_UUID))
+	if (!tt_uuid_is_nil(&INSTANCE_UUID)) {
 		box_broadcast_ballot();
+		replicaset_connect_wakeup();
+	}
 
 	return 0;
 }
@@ -2304,6 +2306,7 @@ box_make_bootstrap_leader_nongraceful(void)
 		bootstrap_leader_uuid = INSTANCE_UUID;
 		is_supervised_bootstrap_leader = true;
 		box_broadcast_ballot();
+		replicaset_connect_wakeup();
 		return 0;
 	}
 }

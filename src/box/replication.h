@@ -706,6 +706,18 @@ replicaset_connect(const struct uri_set *uris,
 		   bool connect_quorum, bool keep_connect);
 
 /**
+ * Wake up replicaset_connect() to re-verify if the waiting for
+ * connect quorum/bootstrap leader can be finished. To be called
+ * after changing local bootstrap leadership flags in the
+ * supervised bootstrap strategy.
+ *
+ * No-op if replicaset_connect() is not in the waiting loop or not
+ * in progress at all.
+ */
+void
+replicaset_connect_wakeup(void);
+
+/**
  * Reload replica URIs.
  *
  * Called on reconfiguration in case the remote peer URIs are the same.
