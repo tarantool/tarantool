@@ -12,6 +12,14 @@ g.after_all(function()
     g.server:drop()
 end)
 
+g.after_each(function()
+    g.server:exec(function()
+        if box.space.test then
+            box.space.test:drop()
+        end
+    end)
+end)
+
 g.test_tuple_format_validate = function()
     g.server:exec(function()
         local format = box.tuple.format.new({
@@ -36,8 +44,7 @@ g.test_tuple_format_validate = function()
             {'key6', {nested = {more = {levels = true}}}, 1, {'tag'},
                 {structure = 'ok'}},
             {'t1', 'b1', 123, {'x', 'y', 'z'}, {list = {1, 2, 3}, note = 'yes'}},
-            {'json1', require('json').decode('{"x":1}'), 10, {'json'},
-                {data = {valid = true}}},
+            {'json1', {x = 1}, 10, {'json'}, {data = {valid = true}}},
         }
 
         for _, case in ipairs(valid_cases) do
@@ -49,7 +56,7 @@ g.test_tuple_format_validate = function()
         local invalid_cases = {
             {
                 -- key not a string
-                value    = {1, 'value', 1, {}, {}},
+                value = {1, 'value', 1, {}, {}},
                 field = 1, name = 'key', expected = 'string',
                 actual = 'unsigned',
             },
@@ -67,8 +74,8 @@ g.test_tuple_format_validate = function()
             },
             {
                 -- tags not an array
-                value    = {'key', 'value', 1, 'not_array', {}},
-                field    = 4, name = 'tags',
+                value = {'key', 'value', 1, 'not_array', {}},
+                field = 4, name = 'tags',
                 expected = 'array', actual = 'string',
             },
         }
@@ -98,6 +105,31 @@ g.test_tuple_format_validate = function()
     end)
 end
 
+g.test_space_format_object = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local s = box.schema.space.create('test', {
+            format = {
+                {name = 'id', type = 'string'},
+                {name = 'data', type = 'any'},
+            }
+        })
+        t.assert(s.format_object ~= nil, 'space.format_object should exist')
+        -- it must be a box.tuple.format
+        t.assert(box.tuple.format.is(s.format_object),
+                 'format_object must be a box.tuple.format')
+
+        -- positive: valid tuple passes
+        s.format_object:validate({'foo', 123})
+
+        -- negative: wrong id type raises FIELD_TYPE
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.FIELD_TYPE,
+        }, s.format_object.validate, s.format_object, {1, 123})
+    end)
+end
+
 g.test_format_validate_usage_error = function()
     g.server:exec(function()
         local t = require('luatest')
@@ -117,4 +149,36 @@ g.test_format_validate_usage_error = function()
             )
         end
     end)
+end
+
+g.test_netbox_space_format_object = function()
+    local net = require('net.box')
+
+    g.server:exec(function()
+        box.schema.space.create('test', {
+            format = {
+                {name = 'id', type = 'unsigned'},
+                {name = 'data', type = 'string'},
+            }
+        })
+        box.space.test:create_index('primary', { parts = {1, 'unsigned'} })
+    end)
+
+    local conn = net.connect(g.server.net_box_uri, { fetch_schema = true })
+    t.assert(conn:ping())
+
+    local sp = conn.space.test
+    t.assert(sp)
+    t.assert(sp.format_object ~= nil)
+
+    -- valid tuple
+    sp.format_object:validate({1, 'a'})
+
+    -- invalid tuple
+    local ok_invalid = pcall(function()
+        sp.format_object:validate({'a', 123})
+    end)
+    t.assert(not ok_invalid)
+
+    conn:close()
 end
