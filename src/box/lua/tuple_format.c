@@ -168,6 +168,18 @@ lbox_tuple_format_validate(lua_State *L)
 	return 0;
 }
 
+void
+luaT_push_tuple_format(struct lua_State *L, struct tuple_format *format)
+{
+	struct tuple_format **format_ptr =
+		lua_newuserdata(L, sizeof(*format_ptr));
+	*format_ptr = NULL;
+	luaL_getmetatable(L, tuple_format_typename);
+	lua_setmetatable(L, -2);
+	tuple_format_ref(format);
+	*format_ptr = format;
+}
+
 /*
  * Simply returns `ipairs(format:totable())`.
  */
