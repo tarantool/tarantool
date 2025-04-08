@@ -170,6 +170,20 @@ lbox_tuple_format_validate(lua_State *L)
 	return 0;
 }
 
+void
+lbox_push_space_format_object(struct lua_State *L, struct tuple_format *format)
+{
+	if (format == NULL) {
+		lua_pushnil(L);
+		return;
+	}
+	tuple_format_ref(format);
+	struct tuple_format **pf = (struct tuple_format **)
+					lua_newuserdata(L, sizeof(*pf));
+	*pf = format;
+	luaL_setmetatable(L, tuple_format_typename);
+}
+
 /*
  * Simply returns `ipairs(format:totable())`.
  */

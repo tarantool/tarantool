@@ -12,15 +12,28 @@ g.after_all(function()
     g.server:drop()
 end)
 
-g.test_tuple_format_validate = function()
+g.test_tuple_and_space_format_validate = function()
     g.server:exec(function()
-        local format = box.tuple.format.new({
-            {name = 'key', type = 'string'},
-            {name = 'value', type = 'any'},
-            {name = 'count', type = 'unsigned'},
-            {name = 'tags', type = 'array'},
-            {name = 'metadata', type = 'map'},
-        })
+        local t = require('luatest')
+        local json = require('json')
+
+        local fmt = {
+            { name = 'key', type = 'string' },
+            { name = 'value', type = 'any' },
+            { name = 'count', type = 'unsigned' },
+            { name = 'tags', type = 'array' },
+            { name = 'metadata', type = 'map' },
+        }
+
+        local space = box.schema.space.create('test_validate', { format = fmt })
+
+        local space_fmt = space.format_object
+        local tuple_fmt = box.tuple.format.new(fmt)
+
+        local validators = {
+            { name = 'tuple', obj = tuple_fmt },
+            { name = 'space', obj = space_fmt  },
+        }
 
         local valid_cases = {
             {'key1', 'value1', 1, {'tag1', 'tag2'}, {author = 'user'}},
@@ -54,11 +67,13 @@ g.test_tuple_format_validate = function()
                 {dict = {k = 'v'}}}),
         }
 
-        for _, case in ipairs(valid_cases) do
-            local _, err = format:validate(case)
-            if err then
-                error("validation failed: " .. tostring(err) ..
-                " for tuple: " .. require('json').encode(case))
+        for _, v in ipairs(validators) do
+            for _, c in ipairs(valid_cases) do
+                local _, err = v.obj:validate(c)
+                if err then
+                    error(("%s-validator failed on valid case %s: %s")
+                          :format(v.name, json.encode(c), err))
+                end
             end
         end
 
@@ -80,22 +95,29 @@ g.test_tuple_format_validate = function()
             },
         }
 
-        for _, case in ipairs(invalid_cases) do
-            local message = string.format(
-                    "Tuple field %d (%s) type does not match one required " ..
-                    "by operation: expected %s, got %s",
-                    case.field, case.name, case.expected, case.actual
+        for _, v in ipairs(validators) do
+            for _, case in ipairs(invalid_cases) do
+                local expected = {
+                    type = 'ClientError',
+                    code = box.error.FIELD_TYPE,
+                    message = string.format(
+                        "Tuple field %d (%s) type does not match one " ..
+                        "required by operation: expected %s, got %s",
+                        case.field, case.name, case.expected, case.actual
+                    ),
+                }
+                t.assert_error_covers(
+                    expected,
+                    v.obj.validate,
+                    v.obj,
+                    case.value,
+                    string.format(
+                        "%s-validator failed for case %s",
+                        v.name, json.encode(case.value)
+                    )
                 )
-            local code = box.error.FIELD_TYPE
-
-            local expected_error = {
-                type = 'ClientError',
-                code = code,
-                message = message,
-            }
-
-            t.assert_error_covers(expected_error, format.validate, format,
-                case.value)
+            end
         end
+
     end)
 end

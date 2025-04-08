@@ -35,6 +35,14 @@ int
 box_tuple_format_serialize_impl(struct lua_State *L,
 				struct tuple_format *format);
 
+/**
+ * Pushes a box.tuple.format userdata onto the Lua stack for the given
+ * tuple_format.
+ * Stack: Output is box.tuple.format userdata or nil if format is NULL.
+ */
+void
+lbox_push_space_format_object(struct lua_State *L, struct tuple_format *format);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

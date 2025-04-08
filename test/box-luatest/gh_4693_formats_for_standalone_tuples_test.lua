@@ -63,6 +63,7 @@ g.test_box_tuple_format_gc = function(cg)
     t.tarantool.skip_if_not_debug()
 
     cg.server:exec(function()
+        collectgarbage()
         box.tuple.format.new{{name = 'field0'}}
         collectgarbage()
         box.tuple.format.new{{name = 'field1'}}

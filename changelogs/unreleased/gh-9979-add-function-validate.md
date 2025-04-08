@@ -1,3 +1,3 @@
 ## feature/box
 
-* Added `validate` methods to `tuple.format` objects.
+* Added `tuple.format:validate(tuple)` and `space.format_object:validate(tuple)` methods.
