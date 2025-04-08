@@ -225,6 +225,15 @@ struct replicaset_connect_state {
 	struct fiber_cond wakeup;
 };
 
+static struct fiber_cond *replicaset_connect_wakeup_cond = NULL;
+
+void
+replicaset_connect_wakeup(void)
+{
+	if (replicaset_connect_wakeup_cond != NULL)
+		fiber_cond_signal(replicaset_connect_wakeup_cond);
+}
+
 static void
 replicaset_set_sync_quorum(const struct replicaset_connect_state *state)
 {
@@ -1251,7 +1260,19 @@ replicaset_connect(const struct uri_set *uris,
 	memset(&state, 0, sizeof(state));
 	fiber_cond_create(&state.wakeup);
 
-	if (uris->uri_count == 0) {
+	/*
+	 * Return immediately if there are no configured
+	 * upstreams to wait.
+	 *
+	 * The supervised bootstrap strategy has an exception
+	 * here, because it waits not only for replicas, but also
+	 * for local bootstrap leadership flags (it is relevant on
+	 * bootstrap/join and irrelevant on a reconfiguration).
+	 */
+	if (uris->uri_count == 0 &&
+	    (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED ||
+	     (replicaset_state != REPLICASET_BOOTSTRAP &&
+	      replicaset_state != REPLICASET_JOIN))) {
 		replicaset_set_sync_quorum(&state);
 		/* Cleanup the replica set. */
 		replicaset_update(NULL, 0, false);
@@ -1276,7 +1297,11 @@ replicaset_connect(const struct uri_set *uris,
 	for (; count < uris->uri_count; count++)
 		appliers[count] = applier_new(&uris->uris[count]);
 
-	say_info("connecting to %d replicas", count);
+	if (count == 0)
+		say_info("no upstreams are configured, waiting for the "
+			 "bootstrap command");
+	else
+		say_info("connecting to %d replicas", count);
 
 	if (!connect_quorum) {
 		/*
@@ -1333,6 +1358,10 @@ replicaset_connect(const struct uri_set *uris,
 			trigger_clear(&trigger->base);
 		}
 	});
+	replicaset_connect_wakeup_cond = &state.wakeup;
+	auto cond_guard = make_scoped_guard([&]{
+		replicaset_connect_wakeup_cond = NULL;
+	});
 	while (!replicaset_is_connected(&state, appliers, count,
 					connect_quorum)) {
 		double wait_start = ev_monotonic_now(loop());
@@ -1342,6 +1371,8 @@ replicaset_connect(const struct uri_set *uris,
 		}
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
+	replicaset_connect_wakeup_cond = NULL;
+	cond_guard.is_active = false;
 	if (state.connected < count) {
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);
