@@ -59,7 +59,9 @@ endif()
 
 include(ExternalProject)
 
-set(GIT_REF "68e62715310f197f489f03a33dce501c0a2e4450")
+# FIXME: Update Git reference after merging
+# https://github.com/ligurio/lua-c-api-tests/pull/121.
+set(GIT_REF "ligurio/gh-xxxx-lapi-bitop")
 # Git reference can be overridden with environment variable. It is
 # needed for checking build by project itself.
 if (DEFINED ENV{LUA_TESTS_GIT_REF})
