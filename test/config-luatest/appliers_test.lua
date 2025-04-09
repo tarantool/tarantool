@@ -56,7 +56,7 @@ local appliers_script = [[
     console.apply(config)
     local fiber = require('internal.config.applier.fiber')
     fiber.apply(config)
-    local app = require('internal.config.applier.app')
+    local app = require('internal.config.applier.app').stage_2
     local ok, err = pcall(app.post_apply, config)
     %s
     os.exit(0)

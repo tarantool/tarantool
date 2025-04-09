@@ -1,4 +1,5 @@
 local log = require('internal.config.utils.log')
+local file = require('internal.config.utils.file')
 local fiber = require('fiber')
 
 local roles_state = {
@@ -9,6 +10,14 @@ local roles_state = {
     -- Ordered list of roles, where the order is determined by the
     -- dependencies between roles.
     last_roles_ordered = {},
+
+    -- Roles loaded before box.cfg is applied, where the key is the role name
+    -- and the value is `true`.
+    early_loaded_roles = nil,
+
+    -- Map with the metadata for the roles, where the key is the role name and
+    -- the value is a table with the metadata.
+    metadata = {},
 
     -- The box.status watcher, used to call on_event callbacks.
     box_status_watcher = nil,
@@ -23,6 +32,59 @@ local roles_state = {
     -- and the value is the config for the role.
     last_roles_cfg = nil,
 }
+
+-- Fill the roles_state.metadata with the metadata for the roles.
+-- If the metadata cannot be obtained, then the metadata for the role will be an
+-- empty table.
+local function update_roles_metadata(role_names)
+    if role_names == nil or next(role_names) == nil then
+        return
+    end
+
+    for _, role_name in pairs(role_names) do
+        local ok, res = pcall(file.get_module_metadata, role_name)
+        if not ok then
+            log.error(('Unable to get metadata for role %q: %s'):format(
+                role_name, res))
+            roles_state.metadata[role_name] = {}
+        else
+            roles_state.metadata[role_name] = res
+        end
+    end
+end
+
+-- Load roles by their names. If the role is already loaded, then it will be
+-- used from the cache.
+local function load_roles(roles_names)
+    local loaded = {}
+    for _, role_name in ipairs(roles_names) do
+        local role = roles_state.last_loaded[role_name]
+        if not role then
+            log.verbose('roles.post_apply: load role ' .. role_name)
+            role = require(role_name)
+            if type(role) ~= 'table' then
+                local err = 'Unable to use module %s as a role: ' ..
+                    'expected table, got %s'
+                error(err:format(role_name, type(role)), 0)
+            end
+            local funcs = {'validate', 'apply', 'stop'}
+            for _, func_name in pairs(funcs) do
+                if type(role[func_name]) ~= 'function' then
+                    local err = 'Role %s does not contain function %s'
+                    error(err:format(role_name, func_name), 0)
+                end
+            end
+        end
+        loaded[role_name] = role
+        if role.dependencies ~= nil and type(role.dependencies) ~= 'table' then
+            local err = 'Role %q has field "dependencies" of type %s, '..
+                        'array-like table or nil expected'
+            error(err:format(role_name, type(role.dependencies)), 0)
+        end
+    end
+
+    return loaded
+end
 
 -- Function decorator that is used to prevent call_on_event_callbacks() from
 -- being called concurrently by watcher and post_apply().
@@ -75,7 +137,12 @@ local function box_status_watcher()
     end)
 end
 
-local function apply(_config)
+-- This function will be called once before the box.cfg is applied and on every
+-- config reload before post_apply.
+-- Starts background watchers and triggers, collect roles information, load
+-- early_load roles.
+local function preload(config)
+    -- Setup the box.status watcher.
     if roles_state.box_status_watcher == nil then
         roles_state.box_status_watcher = box_status_watcher()
 
@@ -88,6 +155,7 @@ local function apply(_config)
         end
     end
 
+    -- Setup the on_shutdown trigger.
     if roles_state.on_shutdown_trigger == nil then
         roles_state.on_shutdown_trigger = function()
             -- Stop the roles in reverse order they were started.
@@ -103,6 +171,54 @@ local function apply(_config)
         end
 
         box.ctl.on_shutdown(roles_state.on_shutdown_trigger)
+    end
+
+    -- Get the list of roles from the config.
+    local configdata = config._configdata
+    local role_names = configdata:get('roles', {use_default = true})
+    if role_names == nil then
+        role_names = {}
+    end
+
+    -- Update the metadata for the roles.
+    roles_state.metadata = {}
+    update_roles_metadata(role_names)
+
+    -- Get roles with the 'early_load' metadata tag set to `true`.
+    -- early_load_roles will contain role names in the same order as in
+    -- role_names (i.e. the order in which they are defined in the config).
+    -- We track duplicates in early_load_roles_set to avoid loading the same
+    -- role multiple times.
+    local early_load_roles = {}
+    local early_load_roles_set = {}
+    for _, role_name in ipairs(role_names) do
+        local md = roles_state.metadata[role_name]
+        if not early_load_roles_set[role_name]
+        and md ~= nil and md['early_load'] then
+            table.insert(early_load_roles, role_name)
+        end
+        early_load_roles_set[role_name] = true
+    end
+
+    if roles_state.early_loaded_roles == nil then
+        -- This is the first call to preload(), load roles with the 'early_load'
+        -- metadata tag before box.cfg is applied.
+        roles_state.early_loaded_roles = {}
+        local loaded = load_roles(early_load_roles)
+        for role_name in pairs(loaded) do
+            roles_state.early_loaded_roles[role_name] = true
+        end
+    else
+        -- box.cfg was already called, check that no new roles with the
+        -- 'early_load' metadata tag were added.
+        for _, role_name in ipairs(early_load_roles) do
+            if not roles_state.early_loaded_roles[role_name] then
+                log.error(('Role %q with the "early_load" tag was added ' ..
+                           'to the config, it cannot be loaded before the ' ..
+                           'first box.cfg call'):format(role_name))
+
+            end
+        end
     end
 end
 
@@ -209,6 +325,11 @@ local function resort_roles(original_order, roles)
     return ordered
 end
 
+-- This function will be called after the box.cfg is applied and on every config
+-- reload after preload().
+-- Stops roles that are not in the new config, loads new roles, validates and
+-- applies configs for the roles, calls on_event callback for the 'config.apply'
+-- event.
 local function post_apply(config)
     local configdata = config._configdata
     local role_names = configdata:get('roles', {use_default = true})
@@ -231,32 +352,7 @@ local function post_apply(config)
     stop_roles(roles)
 
     -- Load roles.
-    local loaded = {}
-    for _, role_name in ipairs(roles_ordered) do
-        local role = roles_state.last_loaded[role_name]
-        if not role then
-            log.verbose('roles.post_apply: load role ' .. role_name)
-            role = require(role_name)
-            if type(role) ~= 'table' then
-                local err = 'Unable to use module %s as a role: ' ..
-                    'expected table, got %s'
-                error(err:format(role_name, type(role)), 0)
-            end
-            local funcs = {'validate', 'apply', 'stop'}
-            for _, func_name in pairs(funcs) do
-                if type(role[func_name]) ~= 'function' then
-                    local err = 'Role %s does not contain function %s'
-                    error(err:format(role_name, func_name), 0)
-                end
-            end
-        end
-        loaded[role_name] = role
-        if role.dependencies ~= nil and type(role.dependencies) ~= 'table' then
-            local err = 'Role %q has field "dependencies" of type %s, '..
-                        'array-like table or nil expected'
-            error(err:format(role_name, type(role.dependencies)), 0)
-        end
-    end
+    local loaded = load_roles(roles_ordered)
 
     -- Re-sorting of roles taking into account dependencies between them.
     roles_ordered = resort_roles(roles_ordered, loaded)
@@ -293,7 +389,13 @@ local function post_apply(config)
 end
 
 return {
-    name = 'roles',
-    apply = apply,
-    post_apply = post_apply,
+    stage_1 = {
+        name = 'roles.stage_1',
+        apply = preload,
+    },
+    stage_2 = {
+        name = 'roles.stage_2',
+        apply = function() end,
+        post_apply = post_apply,
+    },
 }
