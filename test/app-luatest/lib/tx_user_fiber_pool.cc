@@ -16,13 +16,64 @@ namespace {
 
 enum test_msg_type {
 	TEST_MSG_ECHO,
+	TEST_MSG_INSERT,
 	TEST_MSG_FLUSH,
 	TEST_MSG_TERMINATE,
 };
 
+struct insert_payload {
+	insert_payload(uint32_t _space_id, const std::vector<char> &_tuple)
+		: space_id(_space_id)
+		, tuple(_tuple)
+	{
+	}
+
+	uint32_t space_id;
+	std::vector<char> tuple;
+};
+
 struct test_msg {
-	test_msg_type type = TEST_MSG_ECHO;
-	uint64_t key = 0;
+	test_msg() {
+		this->type = TEST_MSG_ECHO;
+		this->key = 0;
+	}
+
+	test_msg(uint32_t space_id, const std::vector<char> &tuple)
+		: type(TEST_MSG_INSERT)
+		, insert(space_id, tuple)
+	{
+	}
+
+	test_msg(const test_msg &msg) {
+		this->type = msg.type;
+		switch (this->type) {
+		case TEST_MSG_ECHO:
+			this->key = msg.key;
+			break;
+		case TEST_MSG_INSERT:
+			new(&this->insert) insert_payload(msg.insert);
+			break;
+		default:
+			break;
+		}
+	}
+
+	~test_msg() {
+		switch (type) {
+		case TEST_MSG_INSERT:
+			insert. ~insert_payload();
+			break;
+		default:
+			break;
+		}
+	}
+
+	test_msg_type type;
+	union {
+		uint64_t key;
+		insert_payload insert;
+	};
+
 };
 
 struct tx_module {
@@ -121,6 +172,15 @@ tx_module_push_f(void *arg)
 	delete key;
 }
 
+static void
+tx_module_insert_f(void *arg)
+{
+	insert_payload *payload = (insert_payload *)arg;
+	box_insert(payload->space_id, payload->tuple.data(),
+		   payload->tuple.data() + payload->tuple.size(), NULL);
+	delete payload;
+}
+
 struct worker {
 public:
 	worker()
@@ -171,6 +231,10 @@ private:
 		switch (msg.type) {
 		case TEST_MSG_ECHO:
 			tnt_tx_push(tx_module_push_f, new uint64_t(msg.key));
+			break;
+		case TEST_MSG_INSERT:
+			tnt_tx_push(tx_module_insert_f,
+				    new insert_payload(msg.insert));
 			break;
 		case TEST_MSG_FLUSH:
 			tnt_tx_flush();
@@ -241,6 +305,23 @@ worker_echo(box_function_ctx_t *, const char *args, const char *)
 	msg.type = TEST_MSG_ECHO;
 	msg.key = decode_arg_u64(args);
 	glob_worker->push(msg);
+	return 0;
+}
+
+int
+worker_insert(box_function_ctx_t *, const char *args, const char *args_end)
+{
+	assert(glob_worker != nullptr);
+	assert(mp_typeof(*args) == MP_ARRAY);
+	uint32_t count = mp_decode_array(&args);
+	assert(count == 2);
+	(void)count;
+	assert(mp_typeof(*args) == MP_UINT);
+	uint64_t space_id = mp_decode_uint(&args);
+	assert(space_id <= UINT32_MAX);
+	assert(mp_typeof(*args) == MP_ARRAY);
+	test_msg insert(space_id, std::vector<char>(args, args_end));
+	glob_worker->push(insert);
 	return 0;
 }
 
