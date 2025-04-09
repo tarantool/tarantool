@@ -7,10 +7,9 @@ local g = t.group()
 -- Public API for foreign threads to execute work in TX thread.
 --
 
-g.before_all(function(cg)
-    cg.server = server:new()
-    cg.server:start()
-    cg.server:exec(function()
+
+local load_helper = function(server)
+    server:exec(function()
         package.cpath = ('%s/test/app-luatest/lib/?.%s;%s'):format(
             os.getenv('BUILDDIR'), jit.os == 'OSX' and 'dylib' or 'so',
             package.path)
@@ -20,6 +19,7 @@ g.before_all(function(cg)
         rawset(_G, 'worker_start', lib:load('worker_start'))
         rawset(_G, 'worker_stop', lib:load('worker_stop'))
         rawset(_G, 'worker_echo', lib:load('worker_echo'))
+        rawset(_G, 'worker_insert', lib:load('worker_insert'))
         rawset(_G, 'worker_flush', lib:load('worker_flush'))
         rawset(_G, 'tx_wait_key', lib:load('tx_wait_key'))
         rawset(_G, 'tx_set_max_size', lib:load('tx_set_max_size'))
@@ -27,6 +27,12 @@ g.before_all(function(cg)
         rawset(_G, 'tx_pop_all', lib:load('tx_pop_all'))
         rawset(_G, 'tx_get_all', lib:load('tx_get_all'))
     end)
+end
+
+g.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    load_helper(cg.server)
 end)
 
 g.before_each(function(cg)
@@ -104,5 +110,29 @@ g.test_pool_size = function(cg)
         t.assert_equals(_G.tx_pop_all(), expected)
 
         _G.fiber.tx_user_pool_size(old_size)
+    end)
+end
+
+g.after_test('test_gh_11267_box_operations', function(cg)
+    cg.server:exec(function()
+        _G.worker_stop()
+    end)
+    -- Restart server as the test may influence the others due
+    -- to spawning many fibers.
+    cg.server:restart()
+    load_helper(cg.server)
+end)
+
+g.test_gh_11267_box_operations = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        for i = 1, 10000 do
+            _G.worker_insert(s.id, {i})
+        end
+        _G.worker_flush()
+        t.helpers.retrying({}, function()
+            t.assert_equals(s:count(), 10000)
+        end)
     end)
 end

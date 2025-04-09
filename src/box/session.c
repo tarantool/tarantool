@@ -108,6 +108,8 @@ session_on_stop(struct trigger *trigger, void *event)
 	trigger_clear(trigger);
 	/* Destroy the session */
 	session_delete(fiber_get_session(fiber()));
+	fiber_set_session(fiber(), NULL);
+	fiber_set_user(fiber(), NULL);
 	return 0;
 }
 
