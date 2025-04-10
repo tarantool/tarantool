@@ -71,4 +71,15 @@ TxMsg(txEntryType, body) == [
     body |-> body
 ]
 
+EmptyGeneralMsg == [is_ready |-> FALSE, body |-> <<>>]
+
+-------------------------------------------------------------------------------
+\* Solving cyclic dependencies.
+-------------------------------------------------------------------------------
+
+\* Cyclic dependency, if placed in limbo.tla: txn -> limbo -> txn.
+LimboIsInRollback(synchroMsg, promoteLatch) ==
+    \/ synchroMsg # EmptyGeneralMsg
+    \/ promoteLatch = TRUE
+
 ================================================================================
