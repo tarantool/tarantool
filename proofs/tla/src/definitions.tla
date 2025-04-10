@@ -31,6 +31,11 @@
 
 ------------------------------ MODULE definitions ------------------------------
 
+\* See Raft's state variable.
+Follower == "FOLLOWER"
+Candidate == "CANDIDATE"
+Leader == "LEADER"
+
 \* XrowEntry types.
 DmlType == "INSERT"
 PromoteType == "PROMOTE"
