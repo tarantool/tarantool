@@ -1184,7 +1184,8 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 		assert(limbo_entry->lsn > 0);
 		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
 		if (rc < 0) {
-			if (fiber_is_cancelled()) {
+			if (fiber_is_cancelled() ||
+			    !replication_synchro_timeout_rollback_enabled) {
 				txn->fiber = NULL;
 				return -1;
 			} else {

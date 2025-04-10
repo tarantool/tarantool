@@ -297,6 +297,7 @@ g.test_defaults = function()
             hot_standby = false,
             mode = box.NULL,
             txn_timeout = 3153600000,
+            txn_synchro_timeout = 5,
             txn_isolation = 'best-effort',
             use_mvcc_engine = false,
         },

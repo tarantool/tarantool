@@ -97,6 +97,12 @@ extern struct event *box_on_recovery_state_event;
  * otherwise it will be rolled back.
  */
 extern double txn_timeout_default;
+/**
+ * Timeout after which the fiber is detached from synchronous transaction that
+ * is currently collecting quorum. After the timeout expires, the transaction
+ * is not rolled back but continues to wait for a quorum.
+ */
+extern double txn_synchro_timeout;
 
 /** "internal.ballot" built-in event key. */
 extern const char *box_ballot_event_key;
@@ -388,6 +394,7 @@ void box_set_net_msg_max(void);
 int box_set_prepared_stmt_cache_size(void);
 int box_set_feedback(void);
 int box_set_txn_timeout(void);
+int box_set_txn_synchro_timeout(void);
 int box_set_txn_isolation(void);
 int box_set_auth_type(void);
 int box_set_bootstrap_strategy(void);
