@@ -888,6 +888,21 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	/* Only HASH and TREE indexes check parts there. */
 	if (index_def_check_field_types(index_def, space_name(space)) != 0)
 		return -1;
+
+	/* Checks for memtx MVCC unsupported features. */
+	if (memtx_tx_manager_use_mvcc_engine) {
+		if (key_def->is_multikey) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Memtx MVCC engine", "multikey indexes");
+			return -1;
+		}
+		if (key_def->for_func_index) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Memtx MVCC engine", "functional indexes");
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
