@@ -59,6 +59,11 @@ ForceAsyncFlags == [wait_sync |-> FALSE, wait_ack |-> FALSE, force_async |-> TRU
 
 \* Type of cbus messages to Tx thread.
 TxWalType == "WAL"
+TxRelayType == "RELAY"
+
+\* See msgs variable for description.
+RelaySource == 1
+ApplierSource == 2
 
 \* Reserved value.
 Nil == "NIL"
