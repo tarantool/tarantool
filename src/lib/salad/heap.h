@@ -74,13 +74,9 @@
  * my_type instances.
  * The function below is example of valid comparator by value:
  *
- * bool test_type_less(const heap_t *heap, const struct heap_node *a,
- *		       const struct heap_node *b) {
+ * bool test_type_less(const struct my_type *a,
+ *		       const struct my_type *b) {
  *
- *	const struct my_type *left = (struct my_type *)((char *)a -
- *					offsetof(struct my_type, vnode));
- *	const struct my_type *right = (struct my_type *)((char *)b -
- *					offsetof(struct my_type, vnode));
  *	return left->value < right->value;
  * }
  *
@@ -464,6 +460,8 @@ HEAP(delete)(heap_t *heap, heap_value_t *value)
 static inline void
 HEAP(update)(heap_t *heap, heap_value_t *value)
 {
+	if (heap->size < 2)
+		return;
 	HEAP(update_node)(heap, value_to_node(value));
 }
 
@@ -500,6 +498,9 @@ HEAP(iterator_init)(heap_t *heap, struct heap_iterator *it)
 static inline heap_value_t *
 HEAP(iterator_next)(struct heap_iterator *it)
 {
+	if (it->heap->size == 0)
+		return NULL;
+
 	if (it->curr_pos == it->heap->size)
 		return NULL;
 	return node_to_value(it->heap->harr[it->curr_pos++]);
