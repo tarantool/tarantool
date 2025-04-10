@@ -1836,6 +1836,12 @@ I['replication.bootstrap_strategy'] = format_text([[
       `replication_connect_quorum` number of other nodes to be connected. This
       option is added to keep the compatibility with the current versions of
       Cartridge and might be removed in the future.
+
+    Note: when using bootstrap strategies `supervised` or `native` with a
+    supervised failover (see `replication.failover` configuration option)
+    Tarantool automatically grants the guest user privileges allowing to execute
+    the internal `failover.execute` call for performing the initial cluster
+    bootstrap.
 ]])
 
 I['replication.connect_timeout'] = format_text([[
