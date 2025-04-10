@@ -81,7 +81,7 @@ end
 
 
 g.test_atomic_index_create = function(cg)
-    cg.server:exec(function()
+    cg.server:exec(function(memtx_use_mvcc_engine)
         local s = box.schema.space.create('s')
         s:create_index('pk', {parts = {{1, 'scalar'}}})
 
@@ -92,19 +92,23 @@ g.test_atomic_index_create = function(cg)
         -- If the index creation is not transactional then we gonna have a new
         -- disabled functional index. But if it is then the index creation is
         -- rolled back.
+        --
+        -- Also, functional indexes are not supported by memtx MVCC.
 
-        local err = "Function '42' does not exist"
+        local err = memtx_use_mvcc_engine and
+            "Memtx MVCC engine does not support functional indexes" or
+            "Function '42' does not exist"
         t.assert_error_msg_equals(err, s.create_index, s, 'fk', {func = 42})
 
         -- The created index should be dropped if the index creation is atomic.
         t.assert_equals(box.space.s.index.fk, nil)
-    end)
+    end, {cg.params.mvcc})
 end
 
 -- The index drop is not testable without error injection.
 
 g.test_atomic_index_alter = function(cg)
-    cg.server:exec(function()
+    cg.server:exec(function(memtx_use_mvcc_engine)
         local s = box.schema.space.create('s')
         s:create_index('pk', {parts = {{1, 'scalar'}}})
         local sk = s:create_index('sk')
@@ -116,13 +120,17 @@ g.test_atomic_index_alter = function(cg)
         -- If the index creation is not transactional then we gonna have a
         -- disabled functional index. But if it is then the index alter is
         -- rolled back.
+        --
+        -- Also, functional indexes are not supported by memtx MVCC.
 
-        local err = "Function '42' does not exist"
+        local err = memtx_use_mvcc_engine and
+            "Memtx MVCC engine does not support functional indexes" or
+            "Function '42' does not exist"
         t.assert_error_msg_equals(err, sk.alter, sk, {name = 'fk', func = 42})
 
         -- The index name should be reverted if the index alter is atomic.
         t.assert_equals(box.space.s.index[1].name, 'sk')
-    end)
+    end, {cg.params.mvcc})
 end
 
 g.test_atomic_sequence_drop = function(cg)
@@ -152,6 +160,8 @@ g.test_atomic_sequence_drop = function(cg)
 end
 
 g.test_atomic_func_drop = function(cg)
+    -- Functional indexes are note supported by memtx MVCC.
+    t.skip_if(cg.params.mvcc)
     cg.server:exec(function()
         local s = box.schema.space.create('s')
         s:create_index('pk')
