@@ -79,6 +79,26 @@ local function extract_funcs(user_name, ctx)
     return funcs
 end
 
+-- Grant other implicit privileges derived from configuration
+-- options other than in the `credentials` section.
+local function grant_implicit_privileges(configdata)
+    -- For the bootstrap strategies involving the external
+    -- coordinator we need for the guest user to be able to
+    -- perform the initial bootstrap.
+    local bootstrap_strategy = configdata:get('replication.bootstrap_strategy',
+                                              {use_default = true})
+    local failover = configdata:get('replication.failover',
+                                    {use_default = true})
+    local externally_managed_mode_strategies = {
+        ['supervised'] = true,
+        ['native'] = true,
+    }
+    if failover == 'supervised' and
+       externally_managed_mode_strategies[bootstrap_strategy] then
+        box.internal.lua_call_runtime_priv_grant('guest', 'failover.execute')
+    end
+end
+
 local function apply(config_module)
     -- Prepare a context with the configuration information to
     -- transform.
@@ -117,6 +137,8 @@ local function apply(config_module)
             end
         end
     end
+
+    grant_implicit_privileges(configdata)
 end
 
 return {
