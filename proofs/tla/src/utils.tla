@@ -71,7 +71,23 @@ TxMsg(txEntryType, body) == [
     body |-> body
 ]
 
+GeneralMsg(body) == [
+    is_ready |-> TRUE,
+    body |-> body
+]
+
+GreaterCmp(a, b) == a > b
+
+FirstEntryLsnIdx(w, lsn, Op(_), Cmp(_, _)) ==
+    IF \E k \in 1..Len(w) : Cmp(Op(w[k]), lsn)
+    THEN CHOOSE k \in 1..Len(w) : Cmp(Op(w[k]), lsn)
+    ELSE -1
+
+FirstEntryWithGreaterLsnIdx(w, lsn, Op(_)) ==
+    FirstEntryLsnIdx(w, lsn, Op, GreaterCmp)
 EmptyGeneralMsg == [is_ready |-> FALSE, body |-> <<>>]
+EmptyAck(servers) == XrowEntry(OkType, Nil, DefaultGroup, DefaultFlags,
+                               [vclock |-> [i \in servers |-> 0], term |-> 0])
 
 -------------------------------------------------------------------------------
 \* Solving cyclic dependencies.
