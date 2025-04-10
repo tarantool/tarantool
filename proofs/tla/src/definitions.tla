@@ -52,8 +52,9 @@ LocalGroup == "LOCAL"
 \* Flags of the XrowEntry:
 \* - wait_sync - true for any transaction, that would enter the limbo.
 \* - wait_ack - true for a synchronous transaction.
-DefaultFlags == [wait_sync |-> FALSE, wait_ack |-> FALSE] \* Async.
-SyncFlags == [wait_sync |-> TRUE, wait_ack |-> TRUE]
+DefaultFlags == [wait_sync |-> FALSE, wait_ack |-> FALSE, force_async |-> FALSE]
+SyncFlags == [wait_sync |-> TRUE, wait_ack |-> TRUE, force_async |-> FALSE]
+ForceAsyncFlags == [wait_sync |-> FALSE, wait_ack |-> FALSE, force_async |-> TRUE]
 
 \* Type of cbus messages to Tx thread.
 TxWalType == "WAL"

@@ -17,7 +17,8 @@ INSTANCE txn
 \* Unit tests
 --------------------------------------------------------------------------------
 
-LOCAL name == "s1"
+LOCAL name == CHOOSE x \in Servers: TRUE
+
 LOCAL TxnDefaultState == [
     tId |-> 0,
     clientCtr |-> 0,

@@ -259,6 +259,7 @@ RaftWorkerHandleBroadcast(i) ==
     IN relayRaftMsg' = [relayRaftMsg EXCEPT ![i] = newMsgs]
 
 \* Implementation of the box_raft_worker_f.
+\* TODO: raft worker block, worker writes synchronously
 RaftWorker(i) ==
     /\ \/ /\ \/ volatileTerm[i] # term[i]
              \/ volatileVote[i] # vote[i]

@@ -150,13 +150,4 @@ EmptyGeneralMsg == [is_ready |-> FALSE, body |-> <<>>]
 EmptyAck(servers) == XrowEntry(OkType, Nil, DefaultGroup, DefaultFlags,
                                [vclock |-> [i \in servers |-> 0], term |-> 0])
 
--------------------------------------------------------------------------------
-\* Solving cyclic dependencies
--------------------------------------------------------------------------------
-
-\* Cyclic dependency, if placed in limbo.tla: txn -> limbo -> txn
-LimboIsInRollback(synchroMsg, promoteLatch) ==
-    \/ synchroMsg # EmptyGeneralMsg
-    \/ promoteLatch = TRUE
-
 ================================================================================

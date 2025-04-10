@@ -46,6 +46,8 @@ VARIABLES
     msgs,  \* See tarantool module.
     wal    \* For access of the rows.
 
+
+fdsjlfdsjfsdljfsdfdsfsdfjsdlfjds
 --------------------------------------------------------------------------------
 \* Implementation
 --------------------------------------------------------------------------------

@@ -20,8 +20,9 @@ INSTANCE relay
 \* Unit tests
 --------------------------------------------------------------------------------
 
-toName == "s2"
-fromName == "s1"
+LOCAL toName == CHOOSE x \in Servers: TRUE
+LOCAL fromName == CHOOSE x \in Servers: x # toName
+
 LOCAL RelayDefaultState == [
     msgsToSend |-> << >>,
     msgsToReceive |-> << >>,

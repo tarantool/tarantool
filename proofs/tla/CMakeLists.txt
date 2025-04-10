@@ -18,7 +18,7 @@ file(GLOB_RECURSE tests
   ${CMAKE_CURRENT_SOURCE_DIR}/test/*.tla
 )
 
-# Remove files that match *_TTrace_*.tla
+# Remove files that match *_TTrace_*.tla. These are remainings of the runs.
 foreach(test ${tests})
   if(test MATCHES ".*_TTrace_.*\\.tla$")
     list(REMOVE_ITEM tests ${test})

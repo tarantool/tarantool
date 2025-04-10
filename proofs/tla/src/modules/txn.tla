@@ -98,6 +98,7 @@ LOCAL TxnCommit(state, txnToApply) ==
         newStmts == IF /\ Len(state.txns) > 0
                        /\ txnToApply.stmts[1].group_id # LocalGroup
                        /\ txnToApply.stmts[1].type # NopType
+                       /\ txnToApply.stmts[1].flags.force_async = FALSE
                     THEN [j \in 1..Len(txnToApply.stmts) |->
                             [txnToApply.stmts[j] EXCEPT
                                 !.flags = [txnToApply.stmts[j].flags
