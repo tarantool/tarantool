@@ -1,8 +1,8 @@
 /*
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
- */
+* SPDX-License-Identifier: BSD-2-Clause
+*
+* Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
+*/
 
 #pragma once
 

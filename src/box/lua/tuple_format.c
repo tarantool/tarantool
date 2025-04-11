@@ -1,12 +1,13 @@
 /*
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
- */
+* SPDX-License-Identifier: BSD-2-Clause
+*
+* Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
+*/
 
 #include "box/lua/tuple_format.h"
 
 #include "box/tuple.h"
+#include "box/lua/tuple.h"
 #include "box/tuple_format.h"
 
 #include "lua/msgpack.h"
@@ -35,25 +36,25 @@ lbox_tuple_format_gc(struct lua_State *L)
 {
 	struct tuple_format *format = luaT_check_tuple_format(L, 1);
 	/*
-	 * The pointer is NULL if we failed to create the format in
-	 * lbox_tuple_format_new.
-	 */
+	* The pointer is NULL if we failed to create the format in
+	* lbox_tuple_format_new.
+	*/
 	if (format != NULL)
 		tuple_format_unref(format);
 	return 0;
 }
 
 /*
- * Creates a new tuple format from a format clause (can be omitted). The format
- * clause is a Lua table (the same as the one passed to `format`
- * method of space objects): it is encoded into MsgPack to reuse existing
- * field definition decoding (see also `space_def_new_from_tuple`). Throws a Lua
- * exception on failure.
- *
- * In some cases (formats received over IPROTO or formats for read views) we
- * only need to get the 'name' field options and ignore the rest, hence the
- * `names_only` flag is provided.
- */
+* Creates a new tuple format from a format clause (can be omitted). The format
+* clause is a Lua table (the same as the one passed to `format`
+* method of space objects): it is encoded into MsgPack to reuse existing
+* field definition decoding (see also `space_def_new_from_tuple`). Throws a Lua
+* exception on failure.
+*
+* In some cases (formats received over IPROTO or formats for read views) we
+* only need to get the 'name' field options and ignore the rest, hence the
+* `names_only` flag is provided.
+*/
 static int
 lbox_tuple_format_new(struct lua_State *L)
 {
@@ -61,7 +62,7 @@ lbox_tuple_format_new(struct lua_State *L)
 	size_t region_svp = region_used(region);
 	struct mpstream stream;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
-		      luamp_error, L);
+		luamp_error, L);
 	if (luamp_encode(L, luaL_msgpack_default, &stream, 1) != 0) {
 		region_truncate(region, region_svp);
 		return luaT_error(L);
@@ -76,11 +77,11 @@ lbox_tuple_format_new(struct lua_State *L)
 	}
 	bool names_only = lua_toboolean(L, 2);
 	/*
-	 * Tuple formats are reusable. It means that runtime_tuple_format_new
-	 * may return a format that is actually referenced by another Lua
-	 * object. So we have to be extra careful not to call anything that may
-	 * trigger Lua GC after we create a format and before we reference it.
-	 */
+	* Tuple formats are reusable. It means that runtime_tuple_format_new
+	* may return a format that is actually referenced by another Lua
+	* object. So we have to be extra careful not to call anything that may
+	* trigger Lua GC after we create a format and before we reference it.
+	*/
 	struct tuple_format **format_ptr =
 		lua_newuserdata(L, sizeof(*format_ptr));
 	*format_ptr = NULL;
@@ -88,7 +89,7 @@ lbox_tuple_format_new(struct lua_State *L)
 	lua_setmetatable(L, -2);
 	struct tuple_format *format =
 		runtime_tuple_format_new(format_data, format_data_len,
-					 names_only);
+					names_only);
 	region_truncate(region, region_svp);
 	if (format == NULL)
 		return luaT_error(L);
@@ -128,8 +129,8 @@ box_tuple_format_serialize_impl(struct lua_State *L,
 }
 
 /*
- * Returns the format clause with which this tuple format was created.
- */
+* Returns the format clause with which this tuple format was created.
+*/
 static int
 lbox_tuple_format_serialize(struct lua_State *L)
 {
@@ -138,8 +139,45 @@ lbox_tuple_format_serialize(struct lua_State *L)
 }
 
 /*
- * Simply returns `ipairs(format:totable())`.
- */
+* Validate a tuple or a Lua table against a given tuple format.
+* Returns true if the value conforms to the format, otherwise throws
+* an error.
+*/
+static int
+lbox_tuple_format_validate(lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return luaL_error(L, "Usage: format:validate(tuple_or_table)");
+
+	struct tuple_format **format_ptr =
+		(struct tuple_format **)
+		luaL_checkudata(L, 1, tuple_format_typename);
+
+	struct tuple_format *format = *format_ptr;
+	if (format == NULL)
+		return luaL_error(L, "Invalid tuple format");
+
+	struct tuple *tuple = NULL;
+	if (luaT_istuple(L, 2)) {
+		tuple = luaT_checktuple(L, 2);
+	} else if (lua_istable(L, 2)) {
+		tuple = luaT_tuple_new(L, 2, format);
+		if (tuple == NULL)
+			return luaT_error(L);
+	} else {
+		return luaL_error(L, "Expected tuple or table");
+	}
+
+	if (box_tuple_validate(tuple, format) != 0)
+		return luaT_error(L);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/*
+* Simply returns `ipairs(format:totable())`.
+*/
 static int
 lbox_tuple_format_ipairs(struct lua_State *L)
 {
@@ -160,6 +198,7 @@ box_lua_tuple_format_init(struct lua_State *L)
 		{"totable", lbox_tuple_format_serialize},
 		{"ipairs", lbox_tuple_format_ipairs},
 		{"pairs", lbox_tuple_format_ipairs},
+		{"validate", lbox_tuple_format_validate},
 		{NULL, NULL}
 	};
 	luaL_register_type(L, tuple_format_typename, lbox_tuple_format_meta);
