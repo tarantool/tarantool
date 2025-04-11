@@ -3832,8 +3832,12 @@ memtx_tx_snapshot_cleaner_hash(const struct tuple *a)
 
 struct memtx_tx_snapshot_cleaner_entry
 {
+	/* A dirty tuple that is present in read-view but should be cleaned. */
 	struct tuple *from;
+	/* Cleaned version of the tuple. */
 	struct tuple *to;
+	/* The tuples share the same key, so one hint is enough. */
+	hint_t hint;
 };
 
 #define mh_name _snapshot_cleaner
@@ -3868,6 +3872,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = tuple;
 		entry.to = clean;
+		entry.hint = memtx_tx_tuple_hint(tuple, index,
+						 index->def->cmp_def);
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	});
 	/*
@@ -3890,6 +3896,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 			struct memtx_tx_snapshot_cleaner_entry entry;
 			entry.from = alter_stmt->new_tuple;
 			entry.to = alter_stmt->old_tuple;
+			/* Hint is not used if MVCC is off. */
+			entry.hint = HINT_NONE;
 			mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
 		}
 	}
