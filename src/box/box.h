@@ -196,6 +196,9 @@ box_is_ro(void);
 /** \endcond public */
 
 bool
+box_is_waiting_own_rows(void);
+
+bool
 box_is_orphan(void);
 
 /** Check if the instance is not registered in the replicaset. */
@@ -215,6 +218,9 @@ API_EXPORT int
 box_wait_ro(bool ro, double timeout);
 
 /** \endcond public */
+
+void
+box_set_waiting_own_rows(bool instance_gets_all_its_own_rows);
 
 /**
  * Switch this instance from 'orphan' to 'running' state or

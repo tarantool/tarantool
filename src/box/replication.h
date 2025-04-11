@@ -397,6 +397,8 @@ struct replicaset {
 		 * state.
 		 */
 		struct fiber_cond cond;
+		bool pause_before_subscribe;
+		struct fiber_cond subscribe_cond;
 		/*
 		 * The latch is used to order replication requests
 		 * running on behalf of all dead replicas
@@ -703,8 +705,7 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  */
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect);
-
+		   bool demand_quorum, bool keep_connect, bool wait_all);
 /**
  * Wake up replicaset_connect() to re-verify if the waiting for
  * connect quorum/bootstrap leader can be finished. To be called
