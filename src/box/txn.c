@@ -1418,6 +1418,12 @@ box_txn_set_timeout(double timeout)
 void
 box_txn_make_sync(void)
 {
+	txn_set_xrow_flags(IPROTO_FLAG_WAIT_ACK);
+}
+
+void
+txn_set_xrow_flags(uint8_t xrow_flags)
+{
 	struct txn *txn = in_txn();
 	/*
 	 * Do nothing if transaction is not started,
@@ -1426,7 +1432,13 @@ box_txn_make_sync(void)
 	if (!txn)
 		return;
 
-	txn_set_flags(txn, TXN_WAIT_ACK);
+	const uint8_t flags_map[] = {
+		[IPROTO_FLAG_WAIT_SYNC] = TXN_WAIT_SYNC,
+		[IPROTO_FLAG_WAIT_ACK] = TXN_WAIT_ACK,
+	};
+
+	txn->flags |= flags_map[xrow_flags & IPROTO_FLAG_WAIT_SYNC];
+	txn->flags |= flags_map[xrow_flags & IPROTO_FLAG_WAIT_ACK];
 }
 
 /** Wait for a linearization point for a transaction. */
