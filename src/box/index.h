@@ -638,6 +638,9 @@ struct index_vtab {
 	 * @param successor - if the index supports ordering, then in case of
 	 *  insert (!) here the successor tuple is returned. In other words,
 	 *  here will be stored the tuple, before which new tuple is inserted.
+	 *
+	 * NB: do not use the same object for @a result and @a successor - they
+	 *     are different returned values and implementation can rely on it.
 	 */
 	int (*replace)(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
