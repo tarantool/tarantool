@@ -853,6 +853,7 @@ set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
 add_subdirectory(extra)
 add_subdirectory(test)
+add_subdirectory(proofs/tla)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(AUTHOR_WARNING "Benchmarks are available only in release build")
 else ()
