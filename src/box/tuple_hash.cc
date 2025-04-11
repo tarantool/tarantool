@@ -230,21 +230,31 @@ tuple_hash_impl(struct tuple *tuple, struct key_def *key_def)
 					       key_def->parts[0].coll);
 	}
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
-		/* If parts of key_def are not sequential we need to call
-		 * tuple_field. Otherwise, tuple is hashed sequentially without
-		 * need of tuple_field
+		/* If a JSON path is used, the field is accessed via
+		 * tuple_field_raw_by_part(), since the path may point to nested
+		 * data and the structure must be navigated to access it.
+		 * 
+		 * If the path is not used, but the field is not immediately
+		 * after the previous one, you must explicitly jump to the
+		 * desired field using tuple_field_raw(), since msgpack does
+		 * not allow random access - only sequential access.
+		 * 
+		 * If the field follows immediately after the previous field,
+		 * no explicit extraction is needed, since the field pointer
+		 * already points to the previous field, and tuple_hash_field()
+		 * will move it to the next field itself.
 		 */
-		if (prev_fieldno + 1 != key_def->parts[part_id].fieldno) {
-			struct key_part *part = &key_def->parts[part_id];
-			if (has_json_paths) {
-				field = tuple_field_raw_by_part(format, tuple_raw,
-								field_map, part,
-								MULTIKEY_NONE);
-			} else {
-				field = tuple_field_raw(format, tuple_raw, field_map,
-						    part->fieldno);
-			}
+		struct key_part *part = &key_def->parts[part_id];
+
+		if (has_json_paths) {
+			field = tuple_field_raw_by_part(
+				format, tuple_raw, field_map, part,
+				MULTIKEY_NONE);
+		} else if (prev_fieldno + 1 != part->fieldno) {
+			field = tuple_field_raw(
+				format, tuple_raw, field_map, part->fieldno);
 		}
+
 		if (has_optional_parts && (field == NULL || field >= end)) {
 			total_size += tuple_hash_null(&h, &carry);
 		} else {
