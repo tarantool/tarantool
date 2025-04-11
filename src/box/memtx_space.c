@@ -331,10 +331,11 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 
 	/* Update secondary keys. */
 	for (i++; i < space->index_count; i++) {
-		struct tuple *unused;
+		struct tuple *delete;
+		struct tuple *successor;
 		struct index *index = space->index[i];
 		if (index_replace(index, old_tuple, new_tuple,
-				  DUP_INSERT, &unused, &unused) != 0)
+				  DUP_INSERT, &delete, &successor) != 0)
 			goto rollback;
 	}
 
@@ -346,11 +347,12 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 
 rollback:
 	for (; i > 0; i--) {
-		struct tuple *unused;
+		struct tuple *delete;
+		struct tuple *successor;
 		struct index *index = space->index[i - 1];
 		/* Rollback must not fail. */
 		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &unused, &unused) != 0) {
+				  DUP_INSERT, &delete, &successor) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
