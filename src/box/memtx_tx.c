@@ -188,8 +188,6 @@ struct point_hole_item {
 	struct txn *txn;
 	/** Saved key. Points to @a short_key or allocated in txn's region. */
 	const char *key;
-	/** Saved key len. */
-	size_t key_len;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
 	/** Saved space id. */
@@ -336,11 +334,13 @@ static int
 point_hole_storage_equal(const struct point_hole_item *obj1,
 			 const struct point_hole_item *obj2)
 {
-	/* Canonical msgpack is comparable by memcmp. */
-	if (obj1->index != obj2->index ||
-	    obj1->key_len != obj2->key_len)
+	if (obj1->index != obj2->index)
 		return 1;
-	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
+	struct key_def *key_def = obj1->index->def->key_def;
+	uint32_t part_count = key_def->part_count;
+	return key_compare(obj1->key, part_count, HINT_NONE,
+			   obj2->key, part_count, HINT_NONE,
+			   key_def) != 0;
 }
 
 /** point_hole_item comparator with key. */
@@ -3058,7 +3058,6 @@ point_hole_storage_new(struct index *index, const char *key,
 						     MEMTX_TX_ALLOC_TRACKER);
 	}
 	memcpy((char *)object->key, key, key_len);
-	object->key_len = key_len;
 	object->space_id = index->def->space_id;
 	object->is_head = true;
 
