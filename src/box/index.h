@@ -620,8 +620,6 @@ struct index {
 	int refs;
 	/** Space cache version at the time of construction. */
 	uint32_t space_cache_version;
-	/** Globally unique ID. */
-	uint32_t unique_id;
 	/** Compact ID - index in space->index array. */
 	uint32_t dense_id;
 	/**
