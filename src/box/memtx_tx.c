@@ -367,6 +367,14 @@ struct point_hole_key {
 	struct tuple *func_key;
 };
 
+/** Combine hash of index with hash of tuple. */
+static uint32_t
+point_hole_storage_combine_index_and_tuple_hash(struct index *index,
+						uint32_t tuple_hash)
+{
+	return (uintptr_t)index->unique_id ^ tuple_hash;
+}
+
 /** Hash calculatore for the key. */
 static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
@@ -382,8 +390,8 @@ point_hole_storage_key_hash(struct point_hole_key *key)
 		mp_decode_array(&data);
 		tuple_hash = key_hash(data, def);
 	}
-	return key->index->unique_id ^ tuple_hash;
-
+	return point_hole_storage_combine_index_and_tuple_hash(key->index,
+							       tuple_hash);
 }
 
 /** point_hole_item comparator. */
@@ -3474,7 +3482,9 @@ point_hole_storage_new(struct index *index, const char *key,
 	object->is_head = true;
 
 	struct key_def *def = index->def->key_def;
-	object->hash = object->index_unique_id ^ key_hash(key, def);
+	uint32_t hash = key_hash(key, def);
+	object->hash = point_hole_storage_combine_index_and_tuple_hash(index,
+								       hash);
 
 	const struct point_hole_item **put =
 		(const struct point_hole_item **) &object;
