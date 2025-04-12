@@ -179,8 +179,8 @@ struct point_hole_item {
 	struct rlist ring;
 	/** Link in txn->point_holes_list. */
 	struct rlist in_point_holes_list;
-	/** Saved index->unique_id. */
-	uint32_t index_unique_id;
+	/** Saved index. */
+	struct index *index;
 	/** Precalculated hash for storing in hash table.. */
 	uint32_t hash;
 	/** Saved txn. */
@@ -315,7 +315,7 @@ static uint32_t
 point_hole_storage_combine_index_and_tuple_hash(struct index *index,
 						uint32_t tuple_hash)
 {
-	return (uintptr_t)index->unique_id ^ tuple_hash;
+	return (uintptr_t)index ^ tuple_hash;
 }
 
 /** Hash calculatore for the key. */
@@ -334,7 +334,7 @@ point_hole_storage_equal(const struct point_hole_item *obj1,
 			 const struct point_hole_item *obj2)
 {
 	/* Canonical msgpack is comparable by memcmp. */
-	if (obj1->index_unique_id != obj2->index_unique_id ||
+	if (obj1->index != obj2->index ||
 	    obj1->key_len != obj2->key_len)
 		return 1;
 	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
@@ -345,7 +345,7 @@ static int
 point_hole_storage_key_equal(const struct point_hole_key *key,
 			     const struct point_hole_item *object)
 {
-	if (key->index->unique_id != object->index_unique_id)
+	if (key->index != object->index)
 		return 1;
 	assert(key->index != NULL);
 	assert(key->tuple != NULL);
@@ -1610,6 +1610,7 @@ point_hole_item_delete(struct point_hole_item *object)
 {
 	rlist_del(&object->ring);
 	rlist_del(&object->in_point_holes_list);
+	index_unref(object->index);
 	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	memtx_tx_mempool_free(object->txn, pool, object);
 }
@@ -3010,7 +3011,8 @@ point_hole_storage_new(struct index *index, const char *key,
 	rlist_create(&object->ring);
 	rlist_create(&object->in_point_holes_list);
 	object->txn = txn;
-	object->index_unique_id = index->unique_id;
+	object->index = index;
+	index_ref(index);
 	if (key_len <= sizeof(object->short_key)) {
 		object->key = object->short_key;
 	} else {
