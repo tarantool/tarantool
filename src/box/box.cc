@@ -347,6 +347,64 @@ title(const char *new_status)
 	box_broadcast_status();
 }
 
+/**
+ * Create a message describing the ro state and put it into a buffer.
+ */
+static int
+box_ro_state_msg(char *buf, int size)
+{
+	int total = 0;
+	struct raft *raft = box_raft();
+	if (raft_is_ro(raft)) {
+		const char *state = raft_state_str(raft->state);
+		uint64_t term = raft->volatile_term;
+		SNPRINT(total, snprintf, buf, size,
+			"state is election %s with term %llu",
+			state, (unsigned long long)term);
+		uint32_t id = raft->leader;
+		if (id != REPLICA_ID_NIL) {
+			SNPRINT(total, snprintf, buf, size, ", leader is %u",
+				id);
+			struct replica *r = replica_by_id(id);
+			/*
+			 * XXX: when the leader is dropped from _cluster, it
+			 * is not reported to Raft.
+			 */
+			if (r != NULL)
+				SNPRINT(total, snprintf, buf, size, " (%s)",
+					tt_uuid_str(&r->uuid));
+		}
+	} else if (txn_limbo_is_ro(&txn_limbo)) {
+		uint32_t id = txn_limbo.owner_id;
+		uint64_t term = txn_limbo.promote_greatest_term;
+		SNPRINT(total, snprintf, buf, size,
+			"synchro queue with term %llu belongs to %u",
+			(unsigned long long)term, (unsigned)id);
+		struct replica *r = replica_by_id(id);
+		if (r != NULL)
+			SNPRINT(total, snprintf, buf, size, " (%s)",
+				tt_uuid_str(&r->uuid));
+		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
+			if (txn_limbo.is_frozen_due_to_fencing)
+				SNPRINT(total, snprintf, buf, size,
+					" and is frozen due to fencing");
+			else if (txn_limbo.is_frozen_until_promotion)
+				SNPRINT(total, snprintf, buf, size,
+					" and is frozen until promotion");
+		}
+	} else {
+		if (is_ro)
+			SNPRINT(total, snprintf, buf, size,
+				"box.cfg.read_only is true");
+		else if (is_orphan)
+			SNPRINT(total, snprintf, buf, size, "it is an orphan");
+		else
+			unreachable();
+	}
+	(void)total;
+	return 0;
+}
+
 void
 box_update_ro_summary(void)
 {
@@ -356,9 +414,14 @@ box_update_ro_summary(void)
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
-
-	if (is_ro_summary)
+	if (is_ro_summary) {
 		engine_switch_to_ro();
+		char *buf = tt_static_buf();
+		VERIFY(box_ro_state_msg(buf, TT_STATIC_BUF_LEN) == 0);
+		say_info("box switched to read-only - %s", buf);
+	} else {
+		say_info("box switched to rw");
+	}
 	fiber_cond_broadcast(&ro_cond);
 	box_broadcast_status();
 	box_broadcast_election();
@@ -392,7 +455,9 @@ box_check_writable(void)
 		return 0;
 	struct error *e = diag_set(ClientError, ER_READONLY);
 	struct raft *raft = box_raft();
-	error_append_msg(e, " - ");
+	char *buf = tt_static_buf();
+	VERIFY(box_ro_state_msg(buf, TT_STATIC_BUF_LEN) == 0);
+	error_append_msg(e, " - %s", buf);
 	error_set_str(e, "reason", box_ro_reason());
 	/*
 	 * In case of multiple reasons at the same time only one is reported.
@@ -405,56 +470,29 @@ box_check_writable(void)
 		uint64_t term = raft->volatile_term;
 		error_set_str(e, "state", state);
 		error_set_uint(e, "term", term);
-		error_append_msg(e, "state is election %s with term %llu",
-				 state, (unsigned long long)term);
 		uint32_t id = raft->leader;
 		if (id != REPLICA_ID_NIL) {
 			error_set_uint(e, "leader_id", id);
-			error_append_msg(e, ", leader is %u", id);
 			struct replica *r = replica_by_id(id);
 			/*
 			 * XXX: when the leader is dropped from _cluster, it
 			 * is not reported to Raft.
 			 */
-			if (r != NULL) {
+			if (r != NULL)
 				error_set_uuid(e, "leader_uuid", &r->uuid);
-				error_append_msg(e, " (%s)",
-						 tt_uuid_str(&r->uuid));
-			}
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
 		uint32_t id = txn_limbo.owner_id;
 		uint64_t term = txn_limbo.promote_greatest_term;
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
-		error_append_msg(e, "synchro queue with term %llu belongs "
-				 "to %u", (unsigned long long)term,
-				 (unsigned)id);
 		struct replica *r = replica_by_id(id);
 		/*
 		 * XXX: when an instance is deleted from _cluster, its limbo's
 		 * ownership is not cleared.
 		 */
-		if (r != NULL) {
+		if (r != NULL)
 			error_set_uuid(e, "queue_owner_uuid", &r->uuid);
-			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
-		}
-		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
-			if (txn_limbo.is_frozen_due_to_fencing) {
-				error_append_msg(e, " and is frozen due to "
-						    "fencing");
-			} else if (txn_limbo.is_frozen_until_promotion) {
-				error_append_msg(e, " and is frozen until "
-						    "promotion");
-			}
-		}
-	} else {
-		if (is_ro)
-			error_append_msg(e, "box.cfg.read_only is true");
-		else if (is_orphan)
-			error_append_msg(e, "it is an orphan");
-		else
-			assert(false);
 	}
 	diag_log();
 	return -1;
