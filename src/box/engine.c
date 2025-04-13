@@ -84,14 +84,6 @@ engine_free(void)
 	engine_count = 0;
 }
 
-void
-engine_switch_to_ro(void)
-{
-	struct engine *engine;
-	engine_foreach(engine)
-		engine->vtab->switch_to_ro(engine);
-}
-
 int
 engine_bootstrap(void)
 {
@@ -362,12 +354,6 @@ generic_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
 	(void)engine;
 	(void)txn;
 	unreachable();
-}
-
-void
-generic_engine_switch_to_ro(struct engine *engine)
-{
-	(void)engine;
 }
 
 int
