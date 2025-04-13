@@ -414,7 +414,6 @@ box_update_ro_summary(void)
 	if (is_ro_summary == old_is_ro_summary)
 		return;
 	if (is_ro_summary) {
-		engine_switch_to_ro();
 		struct txn *txn;
 		rlist_foreach_entry(txn, &txns, in_txns) {
 			if (txn->n_new_rows != 0 &&
