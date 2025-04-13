@@ -415,6 +415,15 @@ box_update_ro_summary(void)
 		return;
 	if (is_ro_summary) {
 		engine_switch_to_ro();
+		struct txn *txn;
+		rlist_foreach_entry(txn, &txns, in_txns) {
+			if (txn->n_new_rows != 0 &&
+			    txn->n_new_rows != txn->n_local_rows &&
+			    txn->status == TXN_INPROGRESS) {
+				txn_abort_with_conflict(txn);
+				txn_set_flags(txn, TXN_IS_ABORTED_RO_NODE);
+			}
+		}
 		char *buf = tt_static_buf();
 		VERIFY(box_ro_state_msg(buf, TT_STATIC_BUF_LEN) == 0);
 		say_info("box switched to read-only - %s", buf);
