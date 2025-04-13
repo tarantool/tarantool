@@ -1110,20 +1110,6 @@ vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync)
 }
 
 void
-vy_tx_manager_abort_writers_for_ro(struct engine *engine)
-{
-	struct txn *txn;
-	rlist_foreach_entry(txn, &txns, in_txns) {
-		struct vy_tx *tx = txn->engines_tx[engine->id];
-		if (tx == NULL || stailq_empty(&txn->stmts))
-			continue;
-		/* Applier ignores ro flag. */
-		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
-			vy_tx_abort_with_conflict(tx);
-	}
-}
-
-void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
