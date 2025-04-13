@@ -3084,7 +3084,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 		 * list and that's enough.
 		 */
 		assert(!rlist_empty(&object->ring));
-		rlist_del(&object->ring);
 	} else if (!rlist_empty(&object->ring)) {
 		/*
 		 * Hash table point to this item, but there are more
@@ -3100,7 +3099,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 		struct point_hole_item **preplaced = &replaced;
 		mh_point_holes_put(txm.point_holes, put, &preplaced, 0);
 		assert(replaced == object);
-		rlist_del(&object->ring);
 		another->is_head = true;
 	} else {
 		/*
@@ -3113,6 +3111,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 		assert(pos != mh_end(txm.point_holes));
 		mh_point_holes_del(txm.point_holes, pos, 0);
 	}
+	rlist_del(&object->ring);
 	rlist_del(&object->in_point_holes_list);
 	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	memtx_tx_mempool_free(object->txn, pool, object);
