@@ -3982,9 +3982,12 @@ memtx_tx_manager_free(void)
 
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	assert(mh_size(txm.history) == 0);
 	mh_history_delete(txm.history);
+	assert(mh_size(txm.func_key_storage) == 0);
 	mh_func_key_storage_delete(txm.func_key_storage);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
+	assert(mh_size(txm.point_holes) == 0);
 	mh_point_holes_delete(txm.point_holes);
 	memtx_tx_mempool_destroy(&txm.inplace_gap_item_mempoool);
 	memtx_tx_mempool_destroy(&txm.nearby_gap_item_mempoool);
