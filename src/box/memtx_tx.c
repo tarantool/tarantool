@@ -1819,6 +1819,19 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 			 uint32_t ind);
 
 /**
+ * Deletes the point hole item. The deletion of the item from the point hole
+ * storage is handled separately.
+ */
+static void
+point_hole_item_delete(struct point_hole_item *object)
+{
+	rlist_del(&object->ring);
+	rlist_del(&object->in_point_holes_list);
+	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
+	memtx_tx_mempool_free(object->txn, pool, object);
+}
+
+/**
  * Check for possible conflict relations during insertion of @a new tuple,
  * (with the corresponding @a story) into index @a ind. It is needed if and
  * only if that was real insertion - there was no replaced tuple in the index.
@@ -1850,7 +1863,6 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 	 */
 	mh_point_holes_del(ht, pos, 0);
 
-	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	bool has_more_items;
 	do {
 		memtx_tx_track_story_gap(item->txn, story, ind);
@@ -1859,11 +1871,7 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 			rlist_entry(item->ring.next,
 				    struct point_hole_item, ring);
 		has_more_items = next_item != item;
-
-		rlist_del(&item->ring);
-		rlist_del(&item->in_point_holes_list);
-		memtx_tx_mempool_free(item->txn, pool, item);
-
+		point_hole_item_delete(item);
 		item = next_item;
 	} while (has_more_items);
 }
@@ -3540,10 +3548,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 		assert(pos != mh_end(txm.point_holes));
 		mh_point_holes_del(txm.point_holes, pos, 0);
 	}
-	rlist_del(&object->ring);
-	rlist_del(&object->in_point_holes_list);
-	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
-	memtx_tx_mempool_free(object->txn, pool, object);
+	point_hole_item_delete(object);
 }
 
 /**
