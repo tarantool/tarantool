@@ -1568,7 +1568,6 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .rollback = */ generic_engine_rollback,
 	/* .send_to_read_view = */ memtx_engine_send_to_read_view,
 	/* .abort_with_conflict = */ memtx_engine_abort_with_conflict,
-	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ memtx_engine_begin_final_recovery,
