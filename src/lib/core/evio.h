@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -73,8 +74,8 @@ typedef void
 struct evio_service {
 	/** Total count of services */
 	int entry_count;
-	/** Array of structures that encapsulate work with sockets */
-	struct evio_service_entry *entries;
+	/** List of structures that encapsulate work with sockets */
+	struct rlist entries;
 	/** Service name. E.g. 'primary', 'secondary', etc. */
 	char name[SERVICE_NAME_MAXLEN];
 	/**
