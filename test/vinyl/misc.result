@@ -358,11 +358,11 @@ ch1:get()
 ...
 ch1:get()
 ---
-- Transaction has been aborted by conflict
+- Can't modify data on a read-only instance
 ...
 ch1:get()
 ---
-- Transaction has been aborted by conflict
+- Can't modify data on a read-only instance
 ...
 ch2:get()
 ---

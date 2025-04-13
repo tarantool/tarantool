@@ -2634,12 +2634,6 @@ vinyl_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
 	vy_tx_abort_with_conflict_impl(tx);
 }
 
-static void
-vinyl_engine_switch_to_ro(struct engine *engine)
-{
-	vy_tx_manager_abort_writers_for_ro(engine);
-}
-
 /* }}} Public API of transaction control */
 
 /** {{{ Environment */
@@ -4774,7 +4768,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .rollback = */ vinyl_engine_rollback,
 	/* .send_to_read_view = */ vinyl_engine_send_to_read_view,
 	/* .abort_with_conflict = */ vinyl_engine_abort_with_conflict,
-	/* .switch_to_ro = */ vinyl_engine_switch_to_ro,
+	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
