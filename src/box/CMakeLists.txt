@@ -218,6 +218,7 @@ set(box_sources
     engine.c
     memtx_engine.cc
     memtx_space.c
+    memtx_sort_data.c
     sysview.c
     sysalloc.c
     blackhole.c

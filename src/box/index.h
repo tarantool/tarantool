@@ -732,6 +732,8 @@ struct read_view_tuple {
 	const char *data;
 	/** Size of tuple data. */
 	uint32_t size;
+	/** Pointer to the in-index tuple. */
+	struct tuple *ptr;
 };
 
 /** Object returned if there's no more tuples matching the search criteria. */
@@ -742,6 +744,7 @@ read_view_tuple_none(void)
 	tuple.needs_upgrade = false;
 	tuple.data = NULL;
 	tuple.size = 0;
+	tuple.ptr = NULL;
 	return tuple;
 }
 
