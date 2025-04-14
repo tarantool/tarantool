@@ -190,8 +190,6 @@ struct point_hole_item {
 	const char *key;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
-	/** Saved space id. */
-	uint32_t space_id;
 	/** Flag that the hash tables stores pointer to this item. */
 	bool is_head;
 };
@@ -3050,7 +3048,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		struct point_hole_item *hole_item;
 		rlist_foreach_entry(hole_item, &txn->point_holes_list,
 				    in_point_holes_list) {
-			if (space->def->id == hole_item->space_id) {
+			if (space->def->id == hole_item->index->def->space_id) {
 				memtx_tx_abort_with_conflict(txn);
 				break;
 			}
@@ -3296,7 +3294,6 @@ point_hole_storage_new(struct index *index, const char *key,
 						     MEMTX_TX_ALLOC_TRACKER);
 	}
 	memcpy((char *)object->key, key, key_len);
-	object->space_id = index->def->space_id;
 	object->is_head = true;
 
 	struct key_def *def = index->def->key_def;
