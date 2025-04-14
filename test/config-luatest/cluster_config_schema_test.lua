@@ -259,6 +259,7 @@ g.test_defaults = function()
             },
             count = 2,
             snap_io_rate_limit = box.NULL,
+            save_secondary_indexes = false,
         },
         iproto = {
             advertise = {
