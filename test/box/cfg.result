@@ -73,6 +73,8 @@ cfg_filter(box.cfg)
  |     - 107374182
  |   - - memtx_min_tuple_size
  |     - <hidden>
+ |   - - memtx_sort_data_enabled
+ |     - false
  |   - - memtx_use_mvcc_engine
  |     - false
  |   - - metrics
@@ -229,6 +231,8 @@ cfg_filter(box.cfg)
  |     - 107374182
  |   - - memtx_min_tuple_size
  |     - <hidden>
+ |   - - memtx_sort_data_enabled
+ |     - false
  |   - - memtx_use_mvcc_engine
  |     - false
  |   - - metrics

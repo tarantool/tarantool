@@ -674,17 +674,25 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock)
 }
 
 const char *
-xdir_format_filename(struct xdir *dir, int64_t signature,
-		enum log_suffix suffix)
+xlog_format_filename(const char *dirname, int64_t signature,
+		     const char *ext, enum log_suffix suffix)
 {
 	return tt_snprintf(PATH_MAX, "%s/%020lld%s%s",
-			   dir->dirname, (long long) signature,
-			   dir->filename_ext, suffix == INPROGRESS ?
-					      inprogress_suffix : "");
+			   dirname, (long long)signature, ext,
+			   suffix == INPROGRESS ? inprogress_suffix : "");
+}
+
+const char *
+xdir_format_filename(struct xdir *dir, int64_t signature,
+		     enum log_suffix suffix)
+{
+	return xlog_format_filename(dir->dirname, signature,
+				    dir->filename_ext, suffix);
 }
 
 void
-xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
+xdir_collect_garbage_cb(struct xdir *dir, int64_t signature, unsigned flags,
+			xlog_remove_cb_f xlog_remove_callback)
 {
 	unsigned rm_flags = XLOG_RM_VERBOSE;
 	if (flags & XDIR_GC_ASYNC)
@@ -710,14 +718,23 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
+		int64_t del_signature = vclock_sum(vclock);
 		const char *filename =
-			xdir_format_filename(dir, vclock_sum(vclock), NONE);
+			xdir_format_filename(dir, del_signature, NONE);
 		xlog_remove_file(filename, rm_flags);
+		if (xlog_remove_callback != NULL)
+			xlog_remove_callback(dir->dirname, del_signature);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 		if (flags & XDIR_GC_REMOVE_ONE)
 			break;
 	}
+}
+
+void
+xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
+{
+	return xdir_collect_garbage_cb(dir, signature, flags, NULL);
 }
 
 int
@@ -780,13 +797,11 @@ xdir_add_vclock(struct xdir *xdir, const struct vclock *vclock)
 /* {{{ struct xlog */
 
 int
-xlog_materialize(struct xlog *l)
+xlog_materialize_filename(char *filename)
 {
-	char *filename = l->filename;
 	char new_filename[PATH_MAX];
 	char *suffix = strrchr(filename, '.');
 
-	assert(l->is_inprogress);
 	assert(suffix);
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 
@@ -796,14 +811,22 @@ xlog_materialize(struct xlog *l)
 
 	ERROR_INJECT_SLEEP(ERRINJ_XLOG_RENAME_DELAY);
 
-	if (rename(filename, new_filename) != 0) {
+	if (rename(filename, new_filename) != 0 && errno != ENOENT) {
 		say_syserror("can't rename %s to %s", filename, new_filename);
-		diag_set(SystemError, "failed to rename '%s' file",
-				filename);
+		diag_set(SystemError, "failed to rename '%s' file", filename);
 		return -1;
 	}
-	l->is_inprogress = false;
 	filename[suffix - filename] = '\0';
+	return 0;
+}
+
+int
+xlog_materialize(struct xlog *l)
+{
+	assert(l->is_inprogress);
+	if (xlog_materialize_filename(l->filename) != 0)
+		return -1;
+	l->is_inprogress = false;
 	return 0;
 }
 
