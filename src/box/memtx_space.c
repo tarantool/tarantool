@@ -46,6 +46,7 @@
 #include "sequence.h"
 #include "memtx_space_upgrade.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "schema.h"
 #include "small/region.h"
 
@@ -158,6 +159,13 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 				memtx, memtx->recovery.last_space_id) != 0)
 			return -1;
 
+		/* Use the sort data for secondary keys if required. */
+		if (memtx->recovery.sort_data_reader != NULL &&
+		    memtx_sort_data_reader_space_init(
+				memtx->recovery.sort_data_reader,
+				space->def->id) != 0)
+			return -1;
+
 		/* Start building the new space's PK. */
 		index_begin_build(space->index[0]);
 
@@ -183,6 +191,14 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
+
+	/* Deal with the MemTX sort data if enabled. */
+	if (memtx->recovery.sort_data_reader != NULL &&
+	    memtx_sort_data_reader_pk_add_tuple(
+			memtx->recovery.sort_data_reader, new_tuple) != 0)
+		return -1;
+
+	/* Add the tuple to the PK to be built. */
 	if (index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
 	memtx_space_update_tuple_stat(space, NULL, new_tuple);

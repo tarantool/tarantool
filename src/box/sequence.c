@@ -351,6 +351,7 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
 	assert(buf_end <= buf + buf_size);
 	result->data = buf;
 	result->size = buf_end - buf;
+	result->ptr = NULL; /* Invalid, should not be used. */
 	return 0;
 }
 

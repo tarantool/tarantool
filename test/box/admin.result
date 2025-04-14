@@ -87,6 +87,8 @@ cfg_filter(box.cfg)
     - <hidden>
   - - memtx_use_mvcc_engine
     - false
+  - - memtx_use_sort_data
+    - false
   - - metrics
     - - - exclude
         - []
