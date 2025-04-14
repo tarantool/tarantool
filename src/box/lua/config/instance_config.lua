@@ -992,6 +992,11 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = box.NULL,
         }),
+        sort_data_enabled = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'memtx_sort_data_enabled',
+            default = false,
+        }),
     }),
     vinyl = schema.record({
         bloom_fpr = schema.scalar({
