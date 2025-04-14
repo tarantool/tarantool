@@ -344,6 +344,7 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 	case SNAP:
 		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
+		dir->filename_ext_paired = ".sortdata";
 		dir->suffix = INPROGRESS;
 		break;
 	case XLOG:
@@ -673,14 +674,29 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock)
 	retention_vclock_set(find, xdir->retention_period);
 }
 
-const char *
-xdir_format_filename(struct xdir *dir, int64_t signature,
-		enum log_suffix suffix)
+static const char *
+xdir_format_filename_impl(const char *dirname, int64_t signature,
+			  const char *ext, enum log_suffix suffix)
 {
 	return tt_snprintf(PATH_MAX, "%s/%020lld%s%s",
-			   dir->dirname, (long long) signature,
-			   dir->filename_ext, suffix == INPROGRESS ?
-					      inprogress_suffix : "");
+			   dirname, (long long)signature, ext,
+			   suffix == INPROGRESS ? inprogress_suffix : "");
+}
+
+const char *
+xdir_format_filename(struct xdir *dir, int64_t signature,
+		     enum log_suffix suffix)
+{
+	return xdir_format_filename_impl(dir->dirname, signature,
+					 dir->filename_ext, suffix);
+}
+
+const char *
+xdir_format_filename_paired(struct xdir *dir, int64_t signature,
+			    enum log_suffix suffix)
+{
+	return xdir_format_filename_impl(dir->dirname, signature,
+					 dir->filename_ext_paired, suffix);
 }
 
 void
@@ -710,9 +726,18 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
-		const char *filename =
-			xdir_format_filename(dir, vclock_sum(vclock), NONE);
+		/* Remove the paired file if any. */
+		const char *filename;
+		if (dir->filename_ext_paired != NULL) {
+			filename = xdir_format_filename_paired(
+				dir, vclock_sum(vclock), NONE);
+			xlog_remove_file(filename, rm_flags);
+		}
+
+		/* Remove the XLOG file itself. */
+		filename = xdir_format_filename(dir, vclock_sum(vclock), NONE);
 		xlog_remove_file(filename, rm_flags);
+
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 		if (flags & XDIR_GC_REMOVE_ONE)
@@ -779,14 +804,17 @@ xdir_add_vclock(struct xdir *xdir, const struct vclock *vclock)
 
 /* {{{ struct xlog */
 
-int
-xlog_materialize(struct xlog *l)
+/**
+ * Same as xlog_materialize but works with the filename instead of the xlog
+ * structure. If @p is_optional is true then no error is raised if the file
+ * does not exist.
+ */
+static int
+xlog_materialize_filename(char *filename, bool is_optional)
 {
-	char *filename = l->filename;
 	char new_filename[PATH_MAX];
 	char *suffix = strrchr(filename, '.');
 
-	assert(l->is_inprogress);
 	assert(suffix);
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 
@@ -796,14 +824,26 @@ xlog_materialize(struct xlog *l)
 
 	ERROR_INJECT_SLEEP(ERRINJ_XLOG_RENAME_DELAY);
 
-	if (rename(filename, new_filename) != 0) {
+	if (rename(filename, new_filename) != 0 &&
+	    (!is_optional || errno != ENOENT)) {
 		say_syserror("can't rename %s to %s", filename, new_filename);
-		diag_set(SystemError, "failed to rename '%s' file",
-				filename);
+		diag_set(SystemError, "failed to rename '%s' file", filename);
 		return -1;
 	}
-	l->is_inprogress = false;
 	filename[suffix - filename] = '\0';
+	return 0;
+}
+
+int
+xlog_materialize(struct xlog *l)
+{
+	assert(l->is_inprogress);
+	if (xlog_materialize_filename(l->filename, false) != 0)
+		return -1;
+	if (l->filename_paired[0] != '\0' &&
+	    xlog_materialize_filename(l->filename_paired, true) != 0)
+		return -1;
+	l->is_inprogress = false;
 	return 0;
 }
 
@@ -999,22 +1039,39 @@ err:
 	return -1;
 }
 
-int
-xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock)
+/**
+ * Updates the file timestamp.
+ */
+static int
+xdir_touch_filename(const char *filename)
 {
-	int64_t signature = vclock_sum(vclock);
-	const char *filename = xdir_format_filename(dir, signature, NONE);
-
-	if (dir->type != SNAP) {
-		assert(false);
-		diag_set(SystemError, "Can't touch xlog '%s'", filename);
-		return -1;
-	}
 	if (utime(filename, NULL) != 0) {
 		diag_set(SystemError, "Can't update xlog timestamp: '%s'",
 			 filename);
 		return -1;
 	}
+	return 0;
+}
+
+int
+xdir_touch_paired_xlog(struct xdir *dir, const struct vclock *vclock)
+{
+	/* Touch the XLOG file. */
+	int64_t signature = vclock_sum(vclock);
+	const char *filename_snap = xdir_format_filename(dir, signature, NONE);
+	if (dir->type != SNAP) {
+		assert(false);
+		diag_set(SystemError, "Can't touch xlog '%s'", filename_snap);
+		return -1;
+	}
+	if (xdir_touch_filename(filename_snap) != 0)
+		return -1;
+
+	/* Touch the paired file. */
+	const char *filename_sortdata =
+		xdir_format_filename_paired(dir, signature, NONE);
+	if (xdir_touch_filename(filename_sortdata) != 0 && errno != ENOENT)
+		return -1;
 	return 0;
 }
 
@@ -1053,6 +1110,38 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 		return -1;
 	}
 
+	return 0;
+}
+
+int
+xdir_create_paired_xlog(struct xdir *dir, struct xlog *xlog,
+			const struct vclock *vclock,
+			const char **filename_paired)
+{
+	/* Create the XLOG file. */
+	if (xdir_create_xlog(dir, xlog, vclock) != 0)
+		return -1;
+
+	/* Check if the paired file exists. */
+	int64_t signature = vclock_sum(vclock);
+	const char *existing_filename_paired =
+		xdir_format_filename_paired(dir, signature, NONE);
+	if (access(existing_filename_paired, F_OK) == 0) {
+		xlog_discard(xlog);
+		errno = EEXIST;
+		diag_set(SystemError, "file '%s' already exists",
+			 existing_filename_paired);
+		return -1;
+	}
+
+	/* Provide the potential new paired file name. */
+	assert(filename_paired != NULL);
+	*filename_paired = xdir_format_filename_paired(dir, signature,
+						       INPROGRESS);
+
+	/* Save the file as a subject to remove on discard. */
+	snprintf(xlog->filename_paired, sizeof(xlog->filename_paired),
+		 "%s", *filename_paired);
 	return 0;
 }
 
@@ -1557,6 +1646,12 @@ xlog_discard(struct xlog *l)
 		assert(l->is_inprogress);
 		xlog_remove_file(l->filename, 0);
 		l->filename[0] = '\0';
+	}
+	if (l->filename_paired[0] != '\0') {
+		assert(strcmp(l->meta.filetype, "SNAP") == 0);
+		assert(l->is_inprogress);
+		xlog_remove_file(l->filename_paired, 0);
+		l->filename_paired[0] = '\0';
 	}
 }
 
