@@ -1118,6 +1118,7 @@ g.test_snapshot = function()
             },
             count = 1,
             snap_io_rate_limit = 1,
+            save_secondary_indexes = true,
         },
     }
     instance_config:validate(iconfig)
@@ -1131,6 +1132,7 @@ g.test_snapshot = function()
         },
         count = 2,
         snap_io_rate_limit = box.NULL,
+        save_secondary_indexes = false,
     }
     local res = instance_config:apply_default({}).snapshot
     t.assert_equals(res, exp)
@@ -1436,9 +1438,6 @@ g.test_box_cfg_coverage = function()
 
         -- Moved to the CLI options (see gh-8876).
         force_recovery = true,
-
-        -- To be introduced in the near future.
-        memtx_sort_data_enabled = true,
     }
 
     -- There are options, where defaults are changed deliberately.
