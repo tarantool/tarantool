@@ -366,6 +366,7 @@ int box_set_wal_queue_max_size(void);
 int box_set_replication_synchro_queue_max_size(void);
 int box_set_wal_cleanup_delay(void);
 void box_set_memtx_memory(void);
+void box_set_memtx_sort_data_enabled(void);
 void box_set_memtx_max_tuple_size(void);
 void box_set_vinyl_memory(void);
 void box_set_vinyl_max_tuple_size(void);
