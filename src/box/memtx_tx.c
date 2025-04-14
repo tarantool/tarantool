@@ -182,14 +182,14 @@ struct point_hole_item {
 	struct rlist in_point_holes_list;
 	/** Saved index. */
 	struct index *index;
-	/** Precalculated hash for storing in hash table.. */
-	uint32_t hash;
 	/** Saved txn. */
 	struct txn *txn;
 	/** Saved key. Points to @a short_key or allocated in txn's region. */
 	const char *key;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
+	/** Precalculated hash for storing in hash table. */
+	uint32_t hash;
 	/** Flag that the hash tables stores pointer to this item. */
 	bool is_head;
 };
