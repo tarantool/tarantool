@@ -148,6 +148,7 @@ struct errinj {
 	_(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SORTDATA_WRITE_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
