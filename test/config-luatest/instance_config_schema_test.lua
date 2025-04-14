@@ -1438,6 +1438,9 @@ g.test_box_cfg_coverage = function()
 
         -- Moved to the CLI options (see gh-8876).
         force_recovery = true,
+
+        -- To be introduced in the near future.
+        memtx_use_sort_data = true,
     }
 
     -- There are options, where defaults are changed deliberately.

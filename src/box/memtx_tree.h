@@ -37,10 +37,27 @@ extern "C" {
 
 struct index;
 struct index_def;
+struct index_read_view;
 struct memtx_engine;
+struct memtx_sort_data_writer;
 
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def);
+
+/**
+ * Dump the index sort data via the given writer.
+ */
+int
+memtx_tree_index_read_view_dump_sort_data(
+	struct index_read_view *base, int tuple_count,
+	struct memtx_sort_data_writer *msd, bool *have_more);
+
+/**
+ * Build the index using the O(n) sort algorithm with MemTX sort data.
+ */
+int
+memtx_tree_index_build_using_sort_data(struct index *base,
+				       struct memtx_sort_data_reader *reader);
 
 #if defined(__cplusplus)
 } /* extern "C" */
