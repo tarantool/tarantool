@@ -352,6 +352,7 @@ g.test_defaults = function()
             min_tuple_size = 16,
             max_tuple_size = 1048576,
             sort_threads = box.NULL,
+            use_sort_data = false,
         },
         config = {
             reload = 'auto',
