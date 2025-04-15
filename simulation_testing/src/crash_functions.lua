@@ -341,9 +341,58 @@ local function break_connection_between_two_nodes(two_nodes, initial_replication
     end)
 end
 
-local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_nodes ,crashed_proxy_nodes)
+-- Function emulates a bad connection for some proxy.
+local function emulate_bad_connection(proxy, nodes_activity_states, failure_duration, failure_interval, total_duration)
+
+    -- Default parameters
+    failure_duration = tonumber(failure_duration) or 5
+    failure_interval = tonumber(failure_interval) or 10
+    total_duration = tonumber(total_duration) or 60
+
+    LogInfo(string.format(
+        "[CRASH SIMULATION] Start emulation for %s: failure_duration=%d, failure_interval=%d, total_duration=%d",
+        proxy.alias, failure_duration, failure_interval, total_duration
+    ))
+
+    update_node_state(proxy, "bad_connection")
+
+    fiber.create(function()
+        local start_time = fiber.time()
+        local end_time = start_time + total_duration
+
+        while fiber.time() < end_time do
+    
+            proxy:pause()
+            --LogInfo(string.format("[CRASH SIMULATION][EMULATE BAD CONNECTION] %s PAUSED", proxy.alias))
+
+            -- Waiting for the duration of the failure (but not longer than the remaining time)
+            local remaining = end_time - fiber.time()
+            local actual_duration = math.min(failure_duration, remaining)
+            if actual_duration > 0 then
+                fiber.sleep(actual_duration)
+            else
+                break 
+            end
+
+            proxy:resume()
+            --LogInfo(string.format("[CRASH SIMULATION][EMULATE BAD CONNECTION] %s RESUMED", proxy.alias))
+
+            -- Waiting for the interval between failures (if there is time left)
+            remaining = end_time - fiber.time()
+            if remaining > 0 then
+                fiber.sleep(math.min(failure_interval, remaining))
+            end
+        end
+
+        update_node_state(proxy, "normal_connection")
+        LogInfo(string.format("[CRASH SIMULATION][EMULATE BAD CONNECTION] %s EMULATION COMPLETED", proxy.alias))
+    end)
+end
+
+
+local function crash_simulation(cg, nodes_activity_states, initial_replication, type_of_action, delay, crash_nodes, crashed_proxy_nodes, bad_connection_proxies)
     local available_nodes = get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica_")
-    if type_of_crashing == 0 then
+    if type_of_action == 0 then
         if is_this_node_crash_safe(cg.replicas,nodes_activity_states, #crash_nodes) == false then
             return {}
         end
@@ -361,7 +410,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
         else
             LogInfo("[CRASH SIMULATION] No Nodes to crash")
         end
-    elseif type_of_crashing == 1 then
+    elseif type_of_action == 1 then
         if #crash_nodes > 0 then
             local node = crash_nodes[1]
             if node == nil then
@@ -374,7 +423,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             end
         end
 
-    elseif type_of_crashing == 2 then
+    elseif type_of_action == 2 then
         if #crash_nodes > 0 then
             local node_1 = crash_nodes[1]
             local node_2 = crash_nodes[2]
@@ -394,7 +443,7 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
             end
         end
 
-    elseif type_of_crashing == 3 then
+    elseif type_of_action == 3 then
 
         if WITHOUT_PROXY == "true" then
             LogInfo("[CRASH SIMULATION] Proxy crashes are disabled")
@@ -408,6 +457,36 @@ local function crash_simulation(cg, nodes_activity_states, initial_replication, 
                 end
             end
         end
+
+    -- note: bad_connection is not crash
+    elseif type_of_action == 4 then
+
+        if WITHOUT_PROXY == "true" then
+            LogInfo("[CRASH SIMULATION] Proxy disabled -> bad connection emulation also disabled")
+        end
+        
+        if WITHOUT_PROXY ~= "true" and bad_connection_proxies and #bad_connection_proxies > 0 then
+        
+            local failure_duration = math.random(1, 5)
+            local failure_interval = failure_duration + math.random(0, 5)
+            local total_duration = 60 * math.random(2, 10)
+            
+            for i, proxy in ipairs(bad_connection_proxies) do
+                local success, err = pcall(emulate_bad_connection, 
+                    proxy, 
+                    nodes_activity_states, 
+                    failure_duration, 
+                    failure_interval, 
+                    total_duration
+                )
+                if not success then
+                    LogInfo(string.format(
+                        "[CRASH SIMULATION] Error: Failed to emulate bad connection for proxy %d: %s", 
+                        i, err
+                    ))
+                end
+            end
+        end
     end
 end
 
@@ -417,26 +496,30 @@ local function random_crash_simulation(cg, nodes_activity_states, initial_replic
             local success, err = pcall(function()
                 fiber.sleep(crash_interval)
 
-                local type_of_crashing
+                local type_of_action
                 if WITHOUT_PROXY == "true" then 
-                    type_of_crashing = math.random(0, 2)
+                    type_of_action = math.random(0, 2)
                 else
-                    type_of_crashing = math.random(0, 3)
+                    type_of_action = math.random(0, 4)
                 end
+
                 local delay = tools.calculate_delay(lower_crash_time_bound, upper_crash_time_bound)
-                local crash_node_nodes
-                if type_of_crashing == 2 then
-                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
-                else
-                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
-                end
                 
+                local crash_node_nodes = {}
                 local crashed_proxy_nodes = {}
-                if WITHOUT_PROXY ~= "true" then
-                    crashed_proxy_nodes = proxy_handling.get_random_proxies_for_crash(cg, nodes_activity_states, 1) -- at first time, only 1 proxy
+                local bad_connection_proxies = {}
+                
+                if type_of_action == 2 then
+                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 2)
+                elseif type_of_action == 0 or type_of_action == 1 then
+                    crash_node_nodes = get_random_nodes_for_crash(cg.replicas, nodes_activity_states, 1)
+                elseif type_of_action == 3 and WITHOUT_PROXY ~= "true" then
+                    crashed_proxy_nodes = proxy_handling.get_random_proxies_for_crash(cg, nodes_activity_states, 1)
+                elseif type_of_action == 4 and WITHOUT_PROXY ~= "true" then
+                    bad_connection_proxies = proxy_handling.get_available_proxies(cg, nodes_activity_states, 1)
                 end
-                -- error in two nodes
-                crash_simulation(cg, nodes_activity_states, initial_replication, type_of_crashing, delay, crash_node_nodes, crashed_proxy_nodes)
+    
+                crash_simulation(cg, nodes_activity_states, initial_replication, type_of_action, delay, crash_node_nodes, crashed_proxy_nodes, bad_connection_proxies)
             end)
             if not success then
                 LogError(string.format("[CRASH SIMULATION] Error in crash_simulation: %s", err))

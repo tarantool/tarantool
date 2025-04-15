@@ -130,7 +130,7 @@ end
 
 --- Random Cluster Generator
 local function rand_cluster(max_number_replicas)
-    local replica_count = math.random(3, max_number_replicas)
+    local replica_count = math.random(max_number_replicas, max_number_replicas)
     local cg = make_cluster(replica_count)
     fiber.sleep(20)
     return cg

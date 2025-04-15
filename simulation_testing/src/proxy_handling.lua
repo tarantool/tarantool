@@ -31,19 +31,6 @@ local function get_proxy_state(proxy)
     end
 end
 
-local function find_proxy_by_ids(cg, id_1, id_2)
-
-    for _, proxy in ipairs(cg.proxies) do
-        if proxy.alias == string.format("proxy_%d_to_%d", id_1, id_2) then
-            if _G.nodes_activity_states[proxy.alias] == "crashed" then
-                return nil
-            end
-            return proxy
-        end
-    end
-    return nil
-end
-
 -- Finding all proxies whose alias starts with proxy_i
 local function find_proxies_by_prefix(cg, i)
     local prefix = string.format("proxy_%d_to_", i)
@@ -60,16 +47,16 @@ end
 
 -- Function for counting non-crashed proxy-connections
 -- (the proxy-connection in this case is not crashed unless both i_to_j and j_to_i proxies are crashed)
-local function count_non_crashed_proxy_connections(cg, i, activity_states)
+local function count_non_crashed_proxy_connections(cg, node_idx, activity_states)
     local non_crashed_connections_counter = 0
 
-    local outgoing_proxies = find_proxies_by_prefix(cg, i)
+    local outgoing_proxies = find_proxies_by_prefix(cg, node_idx)
 
     for _, outgoing_proxy in ipairs(outgoing_proxies) do
     
         local j = tonumber(string.match(outgoing_proxy.alias, "proxy_%d_to_(%d+)"))
 
-        local incoming_proxy_alias = string.format("proxy_%d_to_%d", j, i)
+        local incoming_proxy_alias = string.format("proxy_%d_to_%d", j, node_idx)
 
         local incoming_proxy = nil
         for _, proxy in ipairs(cg.proxies) do
@@ -91,13 +78,12 @@ local function count_non_crashed_proxy_connections(cg, i, activity_states)
     return non_crashed_connections_counter
 end
 
--- Function to check that more than half of the proxy connections for a given node are not crashed 
+-- Function to check that half of the proxy connections for a given node_idx are not crashed 
 -- (the proxy connection in this case is not crashed unless both i_to_j and j_to_i proxies are crashed)
--- Strict condition, that doesn't match for testing Pre-Vote stage case
-local function is_half_proxy_connections_non_crashed(cg, i, activity_states)
+local function is_half_proxy_connections_non_crashed(cg, node_idx, activity_states)
 
-    local total_connections = find_proxies_by_prefix(cg, i)
-    local non_crashed_count = count_non_crashed_proxy_connections(cg, i, activity_states)
+    local total_connections = find_proxies_by_prefix(cg, node_idx)
+    local non_crashed_count = count_non_crashed_proxy_connections(cg, node_idx, activity_states)
 
     local total_count = #total_connections
 
@@ -147,16 +133,17 @@ end
 -- Safe function for getting random crash proxies
 local function get_random_proxies_for_crash(cg, activity_states, num_to_select)
 
-    -- Finding proxies that can be crashed
+    -- Finding proxies that can be crashed (not crashed and not bad_connection)
     local candidates = {}
     for _, proxy in pairs(cg.proxies) do
-        if activity_states[proxy.alias] ~= 'crashed' then
+        local state = activity_states[proxy.alias]
+        if state ~= 'crashed' and state ~= 'bad_connection' then
             table.insert(candidates, proxy)
         end
     end
 
     if #candidates < num_to_select then
-        LogInfo(string.format("[CRASH SIMULATION] Not enough candidates to crash. Needed: %d, available: %d", num_to_select, #candidates))
+        LogInfo(string.format("[CRASH SIMULATION] Not enough candidates to crash. Needed: %d, available: %d (excluding crashed and bad_connection)", num_to_select, #candidates))
         return {}
     end
 
@@ -190,6 +177,39 @@ local function get_random_proxies_for_crash(cg, activity_states, num_to_select)
     return selected_proxies
 end
 
+-- Returns random proxies that are not crashed or in bad_connection state
+local function get_available_proxies(cg, activity_states, num_to_select)
+    -- Filter available proxies
+    local available = {}
+    for _, proxy in pairs(cg.proxies) do
+        local state = activity_states[proxy.alias]
+        if state ~= 'crashed' and state ~= 'bad_connection' then
+            table.insert(available, proxy)
+        end
+    end
+
+    if #available < num_to_select then
+        LogInfo(string.format(
+            "[PROXY SELECT] Need %d proxies, but only %d available (not crashed/bad_connection)",
+            num_to_select, #available
+        ))
+        return {}
+    end
+
+    -- Random shuffle and selection
+    for i = #available, 2, -1 do
+        local j = math.random(i)
+        available[i], available[j] = available[j], available[i]
+    end
+
+    local result = {}
+    for i = 1, num_to_select do
+        result[i] = available[i]
+    end
+
+    return result
+end
+
 return {
     create_proxy_for_connection = create_proxy_for_connection,
     get_proxy_state = get_proxy_state,
@@ -197,5 +217,5 @@ return {
     count_non_crashed_proxy_connections = count_non_crashed_proxy_connections,
     is_half_proxy_connections_non_crashed = is_half_proxy_connections_non_crashed,
     get_random_proxies_for_crash = get_random_proxies_for_crash,
-    find_proxy_by_ids = find_proxy_by_ids
+    get_available_proxies = get_available_proxies
 }

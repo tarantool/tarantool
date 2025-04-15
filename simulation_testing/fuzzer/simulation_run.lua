@@ -28,7 +28,7 @@ print("WORKING_LOG_PATH: " .. _G.WORKING_LOG_PATH)
 Logger = logger.Logger
 logger.init_logger()
 
-local cg = random_cluster.rand_cluster(3)
+local cg = random_cluster.rand_cluster(5)
 
 local initial_replication = tools.get_initial_replication(cg.replicas)
 
@@ -106,9 +106,9 @@ crash_functions.random_crash_simulation(
     cg,
     _G.nodes_activity_states,
     initial_replication,
+    1,
     10,
-    crash_time,
-    10
+    11
 )
 
 LogInfo("[REPLICATION MONITOR] Started")
