@@ -230,21 +230,22 @@ tuple_hash_impl(struct tuple *tuple, struct key_def *key_def)
 					       key_def->parts[0].coll);
 	}
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
-		/* If parts of key_def are not sequential we need to call
-		 * tuple_field. Otherwise, tuple is hashed sequentially without
-		 * need of tuple_field
+		struct key_part *part = &key_def->parts[part_id];
+
+		/* If the key_def parts are not consecutive (or a JSON path
+		 * is used in which the fields in memory are not consecutive
+		 * the field must be explicitly extracted using
+		 * tuple_field_row() or tuple_field_row_by_part.
 		 */
-		if (prev_fieldno + 1 != key_def->parts[part_id].fieldno) {
-			struct key_part *part = &key_def->parts[part_id];
-			if (has_json_paths) {
-				field = tuple_field_raw_by_part(format, tuple_raw,
-								field_map, part,
-								MULTIKEY_NONE);
-			} else {
-				field = tuple_field_raw(format, tuple_raw, field_map,
-						    part->fieldno);
-			}
+		if (has_json_paths) {
+			field = tuple_field_raw_by_part(
+				format, tuple_raw, field_map, part,
+				MULTIKEY_NONE);
+		} else if (prev_fieldno + 1 != part->fieldno) {
+			field = tuple_field_raw(
+				format, tuple_raw, field_map, part->fieldno);
 		}
+
 		if (has_optional_parts && (field == NULL || field >= end)) {
 			total_size += tuple_hash_null(&h, &carry);
 		} else {
