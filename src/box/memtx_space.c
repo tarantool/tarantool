@@ -351,12 +351,8 @@ rollback:
 		struct tuple *successor;
 		struct index *index = space->index[i - 1];
 		/* Rollback must not fail. */
-		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &delete, &successor) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
+		VERIFY(index_replace(index, new_tuple, old_tuple,
+				     DUP_INSERT, &delete, &successor) == 0);
 	}
 	return -1;
 }

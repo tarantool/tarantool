@@ -1236,6 +1236,7 @@ txn_rollback_stmt(struct txn *txn)
 	assert(txn->in_sub_stmt > 0);
 	txn->in_sub_stmt--;
 	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt], false);
+	txn_clear_flags(txn, TXN_STMT_ROLLBACK);
 }
 
 void

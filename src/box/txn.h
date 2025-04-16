@@ -119,6 +119,8 @@ enum txn_flag {
 	TXN_IS_STARTED_IN_ENGINE = 0x400,
 	/** Transaction supports multiversion concurrency control. */
 	TXN_SUPPORTS_MVCC = 0x800,
+	/** Set during statement rollback. */
+	TXN_STMT_ROLLBACK = 0x1000,
 };
 
 enum {

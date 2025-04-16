@@ -1217,6 +1217,20 @@ index_read_view_create_arrow_stream(
 					     stream);
 }
 
+/**
+ * Add OOM behaviour to func. After countdown starts to fail returning
+ * `oom_value' unless TXN_STMT_ROLLBACK flag is set.
+ */
+#define INDEX_OOM_ERRINJ(func, oom_value, ...) ({ \
+	ERROR_INJECT_COUNTDOWN(ERRINJ_INDEX_OOM_COUNTDOWN, { \
+		struct errinj *e = errinj(ERRINJ_INDEX_OOM, ERRINJ_BOOL); \
+		e->bparam = true; \
+	}); \
+	(!errinjs[ERRINJ_INDEX_OOM].bparam || \
+	 txn_has_flag(in_txn(), TXN_STMT_ROLLBACK) ? \
+		func(__VA_ARGS__) : oom_value); \
+})
+
 /*
  * Virtual method stubs.
  */
