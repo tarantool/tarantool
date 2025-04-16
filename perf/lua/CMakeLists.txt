@@ -64,7 +64,6 @@ function(create_perf_lua_test)
     DEPENDS ${BENCH_TARGET}-deps)
 endfunction()
 
-create_perf_lua_test(NAME 1mops_write)
 create_perf_lua_test(NAME box_select)
 create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME luafun)
@@ -72,6 +71,12 @@ create_perf_lua_test(NAME tuple_field_by_name)
 create_perf_lua_test(NAME uri_escape_unescape)
 
 include_directories(${MSGPUCK_INCLUDE_DIRS})
+
+build_module(1mops_write_module 1mops_write_module.c)
+target_link_libraries(1mops_write_module msgpuck)
+create_perf_lua_test(NAME 1mops_write
+                     DEPENDS column_scan_module
+)
 
 build_module(column_scan_module column_scan_module.c)
 target_link_libraries(column_scan_module msgpuck)
