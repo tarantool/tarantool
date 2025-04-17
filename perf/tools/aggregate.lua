@@ -75,6 +75,7 @@ local function influx_line(measurement, tags, fields)
             influx_kv(fields), time)
 end
 
+local bench_configs = {}
 for _, file in pairs(fio.listdir(input_dir)) do
     -- Skip files in which we are not interested.
     if not file:match('%.json$') then goto continue end
@@ -83,9 +84,12 @@ for _, file in pairs(fio.listdir(input_dir)) do
     local bench_name = fio.basename(file, '.json')
     local benchmarks = json.decode(data).benchmarks
 
+    local subtests = table.copy(REPORTED_FIELDS)
     for _, bench in ipairs(benchmarks) do
         local full_tag_set = table.deepcopy(tag_set)
         full_tag_set.name = bench.name
+        -- FIXME: Exclude 'iterations'.
+        table.insert(subtests, bench.name)
 
         -- Save commit as a field, since we don't want to filter
         -- benchmarks by the commit (one point of data).
@@ -98,7 +102,17 @@ for _, file in pairs(fio.listdir(input_dir)) do
         local line = influx_line(bench_name, full_tag_set, field_set)
         out_fh:write(line)
     end
+    table.insert(bench_configs, {
+        subtests = subtests,
+        bench_name = bench_name,
+    })
     ::continue::
 end
 
 out_fh:close()
+
+local bench_config_name = 'config_name.json'
+local config_fh = assert(fio.open(bench_config_name,
+                         {'O_WRONLY', 'O_CREAT', 'O_TRUNC'}))
+config_fh:write(json.encode(bench_configs))
+config_fh:close()
