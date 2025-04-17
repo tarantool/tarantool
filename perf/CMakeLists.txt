@@ -186,6 +186,7 @@ add_custom_target(test-perf
 
 
 set(PERF_SUMMARY ${PERF_OUTPUT_DIR}/summary.txt)
+set(PERF_CONFIG ${PERF_OUTPUT_DIR}/config_bench.json)
 add_custom_target(test-perf-aggregate
                   DEPENDS ${BENCH_RESULTS}
                   BYPRODUCTS ${PERF_SUMMARY}
@@ -193,5 +194,6 @@ add_custom_target(test-perf-aggregate
                   COMMAND ${TARANTOOL_BIN} ${CMAKE_CURRENT_SOURCE_DIR}/tools/aggregate.lua
                     --output=${PERF_SUMMARY}
                     --input_dir=${PERF_OUTPUT_DIR}
+                    --config_path=${PERF_CONFIG}
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
