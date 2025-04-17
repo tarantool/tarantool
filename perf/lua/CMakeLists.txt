@@ -71,6 +71,12 @@ create_perf_lua_test(NAME luafun)
 create_perf_lua_test(NAME tuple_field_by_name)
 create_perf_lua_test(NAME uri_escape_unescape)
 
+create_perf_lua_test(NAME recovery)
+file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/recovery_script.lua
+              INPUT ${CMAKE_CURRENT_SOURCE_DIR}/recovery_script.lua)
+
+create_perf_lua_test(NAME box_snapshot)
+
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 
 build_module(column_scan_module column_scan_module.c)
