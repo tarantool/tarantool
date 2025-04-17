@@ -40,31 +40,28 @@ endif()
 #
 # Check supported standards
 #
-if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
-   (NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
-    set(CMAKE_REQUIRED_FLAGS "-std=c11")
-    check_c_source_compiles("
-    /*
-     * FreeBSD 10 ctype.h header fail to compile on gcc4.8 in c11 mode.
-     * Make sure we aren't affected.
-     */
-    #include <ctype.h>
-    int main(void) { return 0; }
-    " HAVE_STD_C11)
-    set(CMAKE_REQUIRED_FLAGS "-std=gnu99")
-    check_c_source_compiles("int main(void) { return 0; }" HAVE_STD_GNU99)
-    set(CMAKE_REQUIRED_FLAGS "-std=c++11")
-    check_cxx_source_compiles("int main(void) { return 0; }" HAVE_STD_CXX11)
-    set(CMAKE_REQUIRED_FLAGS "-std=gnu++0x")
-    check_cxx_source_compiles("int main(void) { return 0; }" HAVE_STD_GNUXX0X)
-    set(CMAKE_REQUIRED_FLAGS "")
-endif()
-if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
-   (NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
+# C++17 mode is the default since GCC 11; it can be explicitly selected with
+# the -std=c++17 command-line flag, or -std=gnu++17 to enable GNU extensions
+# as well. Some C++17 features are available since GCC 5, but support was
+# experimental and the ABI of C++17 features was not stable until GCC 9 [1].
+#
+# Clang 5 and later implement all the features of the ISO C++ 2017 standard.
+# By default, Clang 16 or later builds C++ code according to the C++17
+# standard [2].
+#
+# 1. https://gcc.gnu.org/projects/cxx-status.html#cxx17
+# 2. https://clang.llvm.org/cxx_status.html#cxx17
+#
+set(CMAKE_REQUIRED_FLAGS "-std=c11")
+check_c_source_compiles("int main(void) { return 0; }" HAVE_STD_C11)
+set(CMAKE_REQUIRED_FLAGS "-std=c++17")
+check_cxx_source_compiles("int main(void) { return 0; }" HAVE_STD_CXX17)
+set(CMAKE_REQUIRED_FLAGS "")
+if(NOT HAVE_STD_C11 OR NOT HAVE_STD_CXX17)
     message (FATAL_ERROR
-        "${CMAKE_C_COMPILER} should support -std=c11 or -std=gnu99. "
-        "${CMAKE_CXX_COMPILER} should support -std=c++11 or -std=gnu++0x. "
-        "Please consider upgrade to gcc 4.5+ or clang 3.2+.")
+        "${CMAKE_C_COMPILER} should support -std=c11. "
+        "${CMAKE_CXX_COMPILER} should support -std=c++17. "
+        "Please consider upgrade to gcc 9+ or clang 5+.")
 endif()
 
 #
@@ -200,18 +197,8 @@ macro(enable_tnt_compile_flags)
     # of the code.
 
     # Set standard
-    if (HAVE_STD_C11)
-        add_compile_flags("C" "-std=c11")
-    else()
-        add_compile_flags("C" "-std=gnu99")
-    endif()
-
-    if (HAVE_STD_CXX11)
-        add_compile_flags("CXX" "-std=c++11")
-    else()
-        add_compile_flags("CXX" "-std=gnu++0x")
-        add_definitions("-Doverride=")
-    endif()
+    add_compile_flags("C" "-std=c11")
+    add_compile_flags("CXX" "-std=c++17")
 
     add_compile_flags("C;CXX"
         "-Wall"
@@ -306,8 +293,7 @@ macro(enable_tnt_compile_flags)
 
     # Only add -Werror if it's a debug build, done by developers.
     # Release builds should not cause extra trouble.
-    if ((${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        AND HAVE_STD_C11 AND HAVE_STD_CXX11)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_flags("C;CXX" "-Werror")
     endif()
 
