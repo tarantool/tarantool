@@ -118,7 +118,7 @@ test_func_adapter_func_is_pinned(void)
 			func_adapter_func_create(func, pin_type);
 		fail_if(func_adapter == NULL);
 
-		enum func_holder_type returned_pin_type;
+		enum func_holder_type returned_pin_type = FUNC_HOLDER_MAX;
 		ok(func_is_pinned(func, &returned_pin_type),
 		   "Underlying func must be pinned");
 		is(returned_pin_type, pin_type,
