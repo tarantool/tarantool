@@ -1,0 +1,82 @@
+name: perf_analysis
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'release/**'
+  schedule:
+    - cron: '0 0 * * *'  # Once a day at midnight.
+
+concurrency:
+  # Update of a developer branch cancels the previously scheduled workflow
+  # run for this branch. However, the 'master' branch, release branch, and
+  # tag workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow run ID' +
+  # 'workflow run attempt' because it is a unique combination for any run.
+  # So it effectively discards grouping.
+  #
+  # Important: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push event.
+  group: ${{ (
+    github.ref == 'refs/heads/master' ||
+    startsWith(github.ref, 'refs/heads/release/') ||
+    startsWith(github.ref, 'refs/tags/')) &&
+    format('{0}-{1}', github.run_id, github.run_attempt) ||
+    format('{0}-{1}-perf-analysis', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  perf_analysis:
+    runs-on:
+      - self-hosted
+      - Linux
+      - x86_64
+
+    timeout-minutes: 60
+
+    env:
+      PERF_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      PERF_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
+      INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN_EXTRACT_RESULTS }}
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          repository: tarantool/tarantool
+          ref: ${{ inputs.submodule && 'master' || env.PERF_COMMIT }}
+      - uses: ./.github/actions/environment
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+      - name: Extract performance results data
+        run: |
+          apt install -y python3-venv
+          python3 -m venv venv_influx
+          source ./venv_influx/bin/activate
+          pip install influxdb-client==1.44.0 PyYAML==6.0.2
+          python3 ./perf/tools/extract_perf_data.py \
+            --influx_url "${{ env.INFLUXDB_URL }}" \
+            --influx_token "${{ env.INFLUXDB_TOKEN }}" \
+            --branch master --config ./perf/tools/config_bench.json
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+      - name: Setup and run Apache Otava
+        run: |
+          # Apache Otava is tested against Python 3.8, 3.9, and 3.10.
+          curl -fsSL https://pyenv.run | bash
+          pyenv install 3.8
+          pyenv shell 3.8.20
+          python3.8 -m venv venv_otava
+          source venv_otava/bin/activate
+          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.3
+          git clone https://github.com/apache/otava
+          cd otava
+          poetry install -v
+          otava regressions tarantool
