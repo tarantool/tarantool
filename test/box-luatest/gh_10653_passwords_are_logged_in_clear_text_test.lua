@@ -4,7 +4,7 @@ local t = require("luatest")
 local g = t.group()
 
 g.before_all(function()
-    g.single_uri_with_creds = "user:passwrd@localhost:0"
+    g.single_uri_with_creds = "user:passwrd@127.0.0.1:0"
     g.server1 = server:new({ alias = "server1" })
 
     g.server1:start()
@@ -64,9 +64,9 @@ local function get_listen_uri_with_password()
 end
 
 g_repl.before_all(function(cg)
-    local single_uri = 'localhost:0'
+    local single_uri = '127.0.0.1:0'
 
-    -- We cannot start a server with `localhost:0` listen address in luatest,
+    -- We cannot start a server with `127.0.0.1:0` listen address in luatest,
     -- because we don't know which port the server will take and don't know
     -- which port to connect to. So instead start a server with predefined
     -- luatest listening address, and reconfigure box.cfg.listen afterwards.
