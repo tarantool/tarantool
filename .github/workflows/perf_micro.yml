@@ -153,6 +153,53 @@ jobs:
           --fail --silent -o /dev/null
           --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}"
           --data-binary @./perf/output/summary.txt
+      - name: Prepare data with performance results for analysis
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests (secrets are unavailable in fork
+        # pull requests).
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          apt install -y python3-venv
+          python3 -m venv venv_influx
+          source ./venv_influx/bin/activate
+          pip install influxdb-client==1.44.0 PyYAML==6.0.2
+          mkdir -p perf_data
+          python3 ./perf/tools/extract_perf_data.py \
+            --influx_url ${{ env.INFLUXDB_URL }} \
+            --influx_token ${{ env.INFLUXDB_TOKEN }} \
+            --branch ${{ env.PERF_BRANCH }} \
+            --config ./perf/output/config_bench.json \
+            --base_path perf_data
+        env:
+          INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
+          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN_EXTRACT_RESULTS }}
+      # Beware, Apache Otava is tested against Python 3.8,
+      # 3.9, and 3.10.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Run performance results analysis
+        # Run on push to the 'master' and release branches or on
+        # non-fork pull requests (secrets are unavailable in fork
+        # pull requests).
+        if: github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          python3 -m venv venv_otava
+          source venv_otava/bin/activate
+          curl -sSL https://install.python-poetry.org | python - --version 1.8.3
+          export PATH="/root/.local/bin:$PATH"
+          git clone https://github.com/apache/otava
+          cd otava
+          # Use intermediate version until the first release,
+          # see https://github.com/apache/otava/issues/51.
+          git reset --hard 73cf53e
+          poetry install -v
+          export OTAVA_CONFIG=$(realpath ../otava.yaml)
+          MAGNITUDE=0.2
+          otava regressions --magnitude ${MAGNITUDE} tarantool
+          otava analyze --magnitude ${MAGNITUDE} tarantool
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
