@@ -405,6 +405,6 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
         ${SQL_BIN_DIR}/opcodes.h)
 
 target_link_libraries(box box_error tuple xrow xlog vclock crc32 raft
-                      node_name ${common_libraries})
+    node_name ${common_libraries} ${EXTRA_BOX_LINK_LIBRARIES})
 
 add_dependencies(box build_bundled_libs generate_sql_files)
