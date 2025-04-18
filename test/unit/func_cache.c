@@ -38,7 +38,7 @@ func_cache_pin_test_one_holder(void)
 
 	func_cache_init();
 	struct func *f1 = test_func_new(1, "func1");
-	enum func_holder_type type;
+	enum func_holder_type type = FUNC_HOLDER_MAX;
 	struct func_cache_holder h1;
 
 	func_cache_insert(f1);
@@ -73,7 +73,7 @@ func_cache_pin_test_fifo(void)
 
 	func_cache_init();
 	struct func *f1 = test_func_new(1, "func1");
-	enum func_holder_type type;
+	enum func_holder_type type = FUNC_HOLDER_MAX;
 	struct func_cache_holder h1, h2;
 
 	func_cache_insert(f1);
@@ -109,7 +109,7 @@ func_cache_pin_test_lifo(void)
 
 	func_cache_init();
 	struct func *f1 = test_func_new(1, "func1");
-	enum func_holder_type type;
+	enum func_holder_type type = FUNC_HOLDER_MAX;
 	struct func_cache_holder h1, h2;
 
 	func_cache_insert(f1);
@@ -146,7 +146,7 @@ func_cache_pin_test_several(void)
 	func_cache_init();
 	struct func *f1 = test_func_new(1, "func1");
 	struct func *f2 = test_func_new(2, "func2");
-	enum func_holder_type type;
+	enum func_holder_type type = FUNC_HOLDER_MAX;
 	struct func_cache_holder h1, h2, h3;
 
 	func_cache_insert(f1);
