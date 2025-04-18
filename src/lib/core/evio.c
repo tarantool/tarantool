@@ -134,6 +134,13 @@ evio_setsockopt_server(int fd, int family, int type)
 	if (sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
 		       &on, sizeof(on)))
 		return -1;
+	/*
+	 * Allow binding to the same port for ipv4 and ipv6 simultaneously on
+	 * platforms with dualstack sockets support.
+	 */
+	if (family == AF_INET6 && sio_setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY,
+						 &on, sizeof(on)))
+		return -1;
 
 #ifndef TARANTOOL_WSL1_WORKAROUND_ENABLED
 	/* Send all buffered messages on socket before take
@@ -434,7 +441,26 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 				 "can't resolve uri for bind");
 			return -1;
 		}
+		bool uri_bind_success = false;
 		for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
+			struct evio_service_entry *iter_entry;
+			bool address_found = false;
+			rlist_foreach_entry(iter_entry, &service->entries,
+					    link) {
+				if (iter_entry->addr_len == ai->ai_addrlen &&
+				    memcmp(&iter_entry->addr, ai->ai_addr,
+					   iter_entry->addr_len) == 0) {
+					address_found = true;
+					break;
+				}
+			}
+			if (address_found) {
+				say_debug("Duplicate address %s returned by"
+					  " getaddrinfo is omitted",
+					  sio_strfaddr(ai->ai_addr,
+						       ai->ai_addrlen));
+				continue;
+			}
 			struct evio_service_entry *entry =
 				xmalloc(sizeof(struct evio_service_entry));
 			evio_service_entry_create(entry, service);
@@ -454,8 +480,7 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 			memcpy(&entry->addr, ai->ai_addr, ai->ai_addrlen);
 			entry->addr_len = ai->ai_addrlen;
 			if (evio_service_entry_bind_addr(entry) == 0) {
-				freeaddrinfo(res);
-				return 0;
+				uri_bind_success = true;
 			} else {
 				say_error("%s: failed to bind on %s: %s",
 					  evio_service_name(entry->service),
@@ -467,9 +492,14 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 			}
 		}
 		freeaddrinfo(res);
-		diag_set(SocketError, sio_socketname(-1), "%s: failed to bind",
-			 evio_service_name(service));
-		return -1;
+		if (!uri_bind_success) {
+			diag_set(SocketError, sio_socketname(-1),
+				 "%s: failed to bind",
+				 evio_service_name(service));
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 }
 
