@@ -134,6 +134,13 @@ evio_setsockopt_server(int fd, int family, int type)
 	if (sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
 		       &on, sizeof(on)))
 		return -1;
+	/*
+	 * Allow binding to the same port for ipv4 and ipv6 simultaneously on
+	 * platforms with dualstack sockets support.
+	 */
+	if (family == AF_INET6 && sio_setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY,
+						 &on, sizeof(on)))
+		return -1;
 
 #ifndef TARANTOOL_WSL1_WORKAROUND_ENABLED
 	/* Send all buffered messages on socket before take
@@ -390,6 +397,19 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 		return -1;
 	}
 	for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
+		struct evio_service_entry *iter_entry;
+		rlist_foreach_entry(iter_entry, &service->entries,
+				    link) {
+			if (iter_entry->addr_len == ai->ai_addrlen &&
+			    memcmp(&iter_entry->addr, ai->ai_addr,
+				   iter_entry->addr_len) == 0) {
+				say_debug("Duplicate address %s returned by"
+					  " getaddrinfo is omitted",
+					  sio_strfaddr(ai->ai_addr,
+						       ai->ai_addrlen));
+				goto next;
+			}
+		}
 		struct evio_service_entry *entry =
 			xmalloc(sizeof(struct evio_service_entry));
 		evio_service_entry_create(entry, service);
@@ -408,21 +428,24 @@ evio_service_bind_uri(struct evio_service *service, const struct uri *u)
 		uri_copy(&entry->uri, u);
 		memcpy(&entry->addr, ai->ai_addr, ai->ai_addrlen);
 		entry->addr_len = ai->ai_addrlen;
-		if (evio_service_entry_bind_addr(entry) == 0) {
+		if (evio_service_entry_bind_addr(entry) != 0) {
+			say_error("%s: failed to bind on %s: %s",
+				  evio_service_name(entry->service),
+				  sio_strfaddr(ai->ai_addr, ai->ai_addrlen),
+				  diag_last_error(diag_get())->errmsg);
+			evio_service_entry_stop(entry);
+			evio_service_delete_entry(entry);
 			freeaddrinfo(res);
-			return 0;
+			diag_set(SocketError, sio_socketname(-1),
+				 "%s: failed to bind",
+				 evio_service_name(service));
+			return -1;
 		}
-		say_error("%s: failed to bind on %s: %s",
-			  evio_service_name(entry->service),
-			  sio_strfaddr(ai->ai_addr, ai->ai_addrlen),
-			  diag_last_error(diag_get())->errmsg);
-		evio_service_entry_stop(entry);
-		evio_service_delete_entry(entry);
+next:
+		;
 	}
 	freeaddrinfo(res);
-	diag_set(SocketError, sio_socketname(-1), "%s: failed to bind",
-		 evio_service_name(service));
-	return -1;
+	return 0;
 }
 
 /** Destroy the entry uri, ctx and stop everything related to ev. **/
