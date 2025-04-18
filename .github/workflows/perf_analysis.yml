@@ -5,6 +5,8 @@ on:
     branches:
       - 'master'
       - 'release/**'
+  # To be removed.
+  pull_request:
   schedule:
     - cron: '0 0 * * *'  # Once a day at midnight.
 
