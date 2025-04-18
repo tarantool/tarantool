@@ -13,7 +13,6 @@ Usage: tarantool test_engine.lua
 ]]
 
 local arrow
-local column_scanner
 local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
@@ -93,15 +92,14 @@ local seed = params.seed or os.time()
 math.randomseed(seed)
 log.info('Random seed: %d', seed)
 
--- MEMCS engine requires Tarantool Enterprise and two Lua C modules:
--- `arrow_c_api_wrapper` and `scanner_c_api_wrapper`.
+-- MEMCS engine requires Tarantool Enterprise and a Lua C module:
+-- `arrow_c_api_wrapper`.
 if arg_engine == 'memcs' then
     local tarantool = require('tarantool')
     if tarantool.package ~= 'Tarantool Enterprise' then
         error('Engine ' .. arg_engine .. ' requires Tarantool Enterprise')
     end
     arrow = require('arrow_c_api_wrapper')
-    column_scanner = require('scanner_c_api_wrapper')
 end
 
 -- The table contains a whitelist of errors that will be ignored
@@ -906,38 +904,6 @@ local function index_delete_op(_space, idx, key)
     idx:delete(key)
 end
 
-local function index_scan_column_op(space, idx, fields, key)
-    local mpkey = msgpack.encode(key)
-    local scanner = column_scanner.box_index_scanner(space.id, idx.id, fields,
-                                                     mpkey)
-    while true do
-        -- We want to finish early with a very small probability.
-        if math.random(1, 20) == 1 then
-            log.info('SCAN_COLUMN: finish early')
-            break
-        end
-        local max_batch_size = oneof({10, 10^6})
-        local batch_size = math.random(1, max_batch_size)
-        log.info('SCAN_COLUMN: going to read batch of size ' .. batch_size)
-        local result = column_scanner.box_scanner_next(scanner, batch_size)
-        -- Print only small batches: huge ones would clutter up the logs.
-        if result.row_count <= 10 then
-            log.info('SCAN_COLUMN: has read batch ' .. json.encode(result))
-        else
-            log.info('SCAN_COLUMN: has read big batch of size ' ..
-                     result.row_count)
-        end
-        if oneof({true, false}) then
-            log.info('SCAN_COLUMN: yield after batch')
-            fiber.yield()
-        end
-        if result.row_count == 0 then
-            break
-        end
-    end
-    column_scanner.box_scanner_free(scanner)
-end
-
 local function index_arrow_stream_op(space, idx, fields, key)
     local mpkey = msgpack.encode(key)
     local batch_size
@@ -1066,9 +1032,8 @@ local function random_index_field_ids(index)
     return fields
 end
 
--- Generates random arguments for space scanner
--- (column_scanner/arrow_stream) - chooses random index,
--- chooses fields covered by the index and generates a key.
+-- Generates random arguments for space scanner (arrow_stream) - chooses random
+-- index, chooses fields covered by the index and generates a key.
 local function random_scanner_args(space)
     local idx_n = oneof(keys(space.index))
     local idx = space.index[idx_n]
@@ -1325,11 +1290,6 @@ local ops = {
     },
 
     -- memcs-specific.
-    INDEX_SCAN_COLUMN_OP = {
-        func = index_scan_column_op,
-        args = random_scanner_args,
-        engines = {'memcs'},
-    },
     INDEX_ARROW_STREAM_OP = {
         func = index_arrow_stream_op,
         args = random_scanner_args,
