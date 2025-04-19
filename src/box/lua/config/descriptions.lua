@@ -1612,6 +1612,11 @@ I['memtx.sort_threads'] = format_text([[
     value is 256. The default is to use all available cores.
 ]])
 
+I['memtx.sort_data_enabled'] = format_text([[
+    Whether to use the O(n) secondary key sort using additional snapshot data
+    (if the latter is available) and write the data during `box.snapshot()`.
+]])
+
 -- }}} memtx configuration
 
 -- {{{ metrics configuration

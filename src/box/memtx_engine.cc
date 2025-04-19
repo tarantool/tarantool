@@ -60,6 +60,7 @@
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
 #include "memtx_space_upgrade.h"
+#include "memtx_sort_data.h"
 #include "tt_sort.h"
 #include "assoc.h"
 #include "wal.h"
@@ -293,6 +294,43 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	if (xlog_cursor_open(&cursor, filename) < 0)
 		return -1;
 
+	/*
+	 * If Tarantool has started in force_recovery mode, we insert tuples
+	 * into SKs one by one to detect unique key violations, so bulk load
+	 * of secondary keys with O(n) sort is not applicable. Let's ignore
+	 * the sort data file in this case.
+	 *
+	 * If the `_index` space has a before_replace trigger, it might change
+	 * the contents of the space thus affecting the indexes we are about
+	 * to recover. So the sort data we've saved for a specific index_def
+	 * might get invalid once the index had been changed using a trigger.
+	 * E. g.: we've saved the sort data of an index with hints enabled,
+	 * but on recovery we made the index hintless using the before_replace
+	 * trigger on the `_index` space. Now the saved sort data is invalid
+	 * for the altered index.
+	 */
+	if (memtx->sort_data_enabled) {
+		struct space *_index = space_by_id(BOX_INDEX_ID);
+		bool _index_has_before_replace_triggers =
+			space_has_before_replace_triggers(_index);
+		if (memtx->force_recovery) {
+			say_warn("memtx_sort_data_enabled = true but no"
+				 " memtx sort data used: force recovery");
+		} else if (_index_has_before_replace_triggers) {
+			say_warn("memtx_sort_data_enabled = true but "
+				 "no memtx sort data used: the _index"
+				 " space has before_replace triggers");
+		} else {
+			memtx->msdr = memtx_sort_data_reader_new(
+				memtx->snap_dir.dirname,
+				vclock, &INSTANCE_UUID);
+			if (memtx->msdr == NULL) {
+				say_warn("memtx_sort_data_enabled = true but"
+					 " no memtx sort data file found");
+			}
+		}
+	}
+
 	int rc;
 	struct xrow_header row;
 	uint64_t row_count = 0;
@@ -318,7 +356,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	}
 	xlog_cursor_close(&cursor, false);
 	if (rc < 0)
-		return -1;
+		goto fail;
 
 	/**
 	 * We should never try to read snapshots with no EOF
@@ -338,10 +376,17 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 */
 	if (state == SNAPSHOT_RECOVERY_NOT_STARTED) {
 		diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
-		return -1;
+		goto fail;
 	}
 
 	return 0;
+
+fail:
+	if (memtx->msdr != NULL) {
+		memtx_sort_data_reader_delete(memtx->msdr);
+		memtx->msdr = NULL;
+	}
+	return -1;
 }
 
 static int
@@ -479,8 +524,10 @@ static int
 memtx_engine_begin_final_recovery(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	if (memtx->state == MEMTX_OK)
+	if (memtx->state == MEMTX_OK) {
+		assert(memtx->msdr == NULL);
 		return 0;
+	}
 
 	assert(memtx->state == MEMTX_INITIAL_RECOVERY);
 	/* End of the fast path: loaded the primary key. */
@@ -494,7 +541,8 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		panic("Failed to complete recovery from snapshot!");
 	}
 
-	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
+	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine &&
+	    memtx->msdr == NULL) {
 		/*
 		 * Fast start path: "play out" WAL
 		 * records using the primary key only,
@@ -513,6 +561,12 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
 		memtx->on_indexes_built_cb();
+	}
+
+	/* Remove the sort data reader as not required anymore. */
+	if (memtx->msdr != NULL) {
+		memtx_sort_data_reader_delete(memtx->msdr);
+		memtx->msdr = NULL;
 	}
 	return 0;
 }
@@ -553,6 +607,8 @@ memtx_engine_end_recovery(struct engine *engine)
 			return -1;
 		memtx->on_indexes_built_cb();
 	}
+
+	/* Also removes *.sortdata.inprogress files. */
 	xdir_remove_temporary_files(&memtx->snap_dir);
 
 	/* Complete space initialization. */
@@ -824,6 +880,8 @@ struct checkpoint {
 	struct xdir dir;
 	/** New snapshot file. */
 	struct xlog snap;
+	/** New sort data file writer. */
+	struct memtx_sort_data *msd;
 	/** Raft request to be written to the snapshot file. */
 	struct raft_request raft;
 	/** Synchro request to be written to the snapshot file. */
@@ -831,7 +889,7 @@ struct checkpoint {
 	/** The limbo confirmed vclock at the moment of checkpoint creation. */
 	struct vclock synchro_vclock;
 	/**
-	 * Do nothing, just touch the snapshot file - the
+	 * Do not write a new snapshot file, just touch it - the
 	 * checkpoint already exists.
 	 */
 	bool touch;
@@ -857,6 +915,26 @@ primary_index_filter(struct space *space, struct index *index, void *arg)
 	(void)space;
 	(void)arg;
 	return index->def->iid == 0;
+}
+
+/*
+ * In case if the MemTX sort data is enabled, we'll need to include secondary
+ * keys supporting the sort data into the read view in order to dump the data
+ * into the file.
+ */
+static bool
+checkpoint_index_filter(struct space *space, struct index *index, void *)
+{
+	if (index->def->iid == 0)
+		return true;
+	if (!space_is_memtx(space))
+		return false;
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	if (!memtx->sort_data_enabled)
+		return false;
+	if (index->def->type != TREE)
+		return false;
+	return !index->def->key_def->for_func_index;
 }
 
 /*
@@ -899,6 +977,16 @@ is_tuple_temporary(const char *data, uint32_t space_id,
 	}
 }
 
+static int
+checkpoint_dump_sort_data(
+	struct index_read_view *rv, ssize_t tuple_count,
+	struct memtx_sort_data *msd, bool *have_more)
+{
+	assert(rv->def->type == TREE);
+	return memtx_tree_index_read_view_dump_sort_data(rv, tuple_count,
+							 msd, have_more);
+}
+
 static struct checkpoint *
 checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
@@ -913,7 +1001,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	rv_opts.name = "checkpoint";
 	rv_opts.is_system = true;
 	rv_opts.filter_space = checkpoint_space_filter;
-	rv_opts.filter_index = primary_index_filter;
+	rv_opts.filter_index = checkpoint_index_filter;
 	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
 		free(ckpt);
 		return NULL;
@@ -928,6 +1016,14 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	box_raft_checkpoint_local(&ckpt->raft);
 	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state,
 			     &ckpt->synchro_vclock);
+
+	/* The sort data constructor can return NULL too. */
+	struct memtx_engine *memtx =
+		(struct memtx_engine *)engine_by_name("memtx");
+	ckpt->msd = memtx->sort_data_enabled ?
+		    memtx_sort_data_writer_new(&ckpt->rv, snap_dirname,
+					       &INSTANCE_UUID) : NULL;
+
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -935,6 +1031,8 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 static void
 checkpoint_delete(struct checkpoint *ckpt)
 {
+	if (ckpt->msd != NULL)
+		memtx_sort_data_writer_delete(ckpt->msd);
 	read_view_close(&ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
@@ -1052,18 +1150,17 @@ checkpoint_f(va_list ap)
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	if (ckpt->touch) {
-		if (xdir_touch_xlog(&ckpt->dir, &ckpt->vclock) == 0)
+		if (xdir_touch_paired_xlog(&ckpt->dir, &ckpt->vclock) == 0)
 			return 0;
-		/*
-		 * Failed to touch an existing snapshot, create
-		 * a new one.
-		 */
+		/* Failed to touch an existing snapshot, create a new one. */
 		ckpt->touch = false;
 	}
 
 	struct xlog *snap = &ckpt->snap;
 	assert(!xlog_is_open(snap));
-	if (xdir_create_xlog(&ckpt->dir, snap, &ckpt->vclock) != 0) {
+	const char *sortdata_filename;
+	if (xdir_create_paired_xlog(&ckpt->dir, snap, &ckpt->vclock,
+				    &sortdata_filename) != 0) {
 		/*
 		 * We call memtx_engine_abort_checkpoint on failure to discard
 		 * an incomplete xlog file. Clear the xlog object so that it's
@@ -1072,6 +1169,9 @@ checkpoint_f(va_list ap)
 		xlog_clear(snap);
 		return -1;
 	}
+	if (memtx_sort_data_writer_create_file(ckpt->msd, &ckpt->vclock,
+					       sortdata_filename) != 0)
+		return -1;
 
 	struct mh_i32_t *temp_space_ids;
 
@@ -1108,15 +1208,21 @@ checkpoint_f(va_list ap)
 				break;
 			is_synchro_written = true;
 		}
-		struct index_read_view *index_rv =
-			space_read_view_index(space_rv, 0);
-		assert(index_rv != NULL);
-		struct index_read_view_iterator it;
-		if (index_read_view_create_iterator(index_rv, ITER_ALL,
-						    NULL, 0, &it) != 0) {
-			rc = -1;
+
+		/* Start dumping PK data into the sort data file if required. */
+		rc = memtx_sort_data_writer_begin_pk(ckpt->msd, space_rv->id);
+		if (rc != 0)
 			break;
-		}
+
+		/* Dump inserts into the snapshot. */
+		struct index_read_view *pk_rv =
+			space_read_view_index(space_rv, 0);
+		assert(pk_rv != NULL);
+		struct index_read_view_iterator it;
+		rc = index_read_view_create_iterator(pk_rv, ITER_ALL,
+						     NULL, 0, &it);
+		if (rc != 0)
+			break;
 		unsigned int loops = 0;
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
@@ -1128,11 +1234,20 @@ checkpoint_f(va_list ap)
 					       space_rv->id,
 					       temp_space_ids))
 				continue;
+
+			/* Write the tuple into the snapshot. */
 			rc = checkpoint_write_tuple(snap, space_rv->id,
 						    space_rv->group_id,
 						    result.data, result.size);
 			if (rc != 0)
 				break;
+
+			/* Write the tuple into the sort data file if started */
+			rc = memtx_sort_data_writer_put_pk_tuple(ckpt->msd,
+								 result.ptr);
+			if (rc != 0)
+				break;
+
 			/* Yield to make thread cancellable. */
 			if (++loops % YIELD_LOOPS == 0)
 				fiber_sleep(0);
@@ -1143,6 +1258,39 @@ checkpoint_f(va_list ap)
 			}
 		}
 		index_read_view_iterator_destroy(&it);
+		if (rc != 0)
+			break;
+
+		/* Finish writing the PK sort data if started. */
+		rc = memtx_sort_data_writer_commit_pk(ckpt->msd);
+		if (rc != 0)
+			break;
+
+		/* Now dump secondary indexes' sort data if required. */
+		for (uint32_t i = 1; i <= space_rv->index_id_max; i++) {
+			bool have_data;
+			if (memtx_sort_data_writer_begin(ckpt->msd,
+							 space_rv->id, i,
+							 &have_data) != 0)
+				return -1;
+			if (!have_data)
+				continue;
+			assert(space_rv->index_map[i] != NULL);
+
+			bool have_more;
+			do {
+				rc = checkpoint_dump_sort_data(
+					space_rv->index_map[i], YIELD_LOOPS,
+					ckpt->msd, &have_more);
+				fiber_sleep(0);
+			} while (rc == 0 && have_more);
+			if (rc != 0)
+				break;
+
+			rc = memtx_sort_data_writer_commit(ckpt->msd);
+			if (rc != 0)
+				break;
+		}
 		if (rc != 0)
 			break;
 	}
@@ -1177,6 +1325,8 @@ checkpoint_f(va_list ap)
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
+		goto fail;
+	if (memtx_sort_data_writer_close_file(ckpt->msd) != 0)
 		goto fail;
 	say_info("done");
 	return 0;
@@ -1269,8 +1419,8 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 static ssize_t
 memtx_engine_abort_checkpoint_f(va_list ap)
 {
-	struct xlog *xlog = va_arg(ap, typeof(xlog));
-	xlog_discard(xlog);
+	struct checkpoint *ckpt = va_arg(ap, typeof(ckpt));
+	xlog_discard(&ckpt->snap);
 	return 0;
 }
 
@@ -1281,9 +1431,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 	if (memtx->checkpoint == NULL)
 		return;
 
-	assert(!xlog_is_open(&memtx->checkpoint->snap));
-
-	coio_call(memtx_engine_abort_checkpoint_f, &memtx->checkpoint->snap);
+	coio_call(memtx_engine_abort_checkpoint_f, memtx->checkpoint);
 	checkpoint_delete(memtx->checkpoint);
 	memtx->checkpoint = NULL;
 }
@@ -1292,8 +1440,8 @@ static void
 memtx_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
-			     XDIR_GC_ASYNC);
+	uint64_t signature = vclock_sum(vclock);
+	xdir_collect_garbage(&memtx->snap_dir, signature, XDIR_GC_ASYNC);
 }
 
 static int
@@ -1303,6 +1451,7 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	const char *filename = xdir_format_filename(&memtx->snap_dir,
 						    vclock_sum(vclock), NONE);
+	/* The memtx sort data is not backed-up since it's optional. */
 	return cb(filename, cb_arg);
 }
 
@@ -1660,7 +1809,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor, int sort_threads,
+		 const char *allocator, float alloc_factor,
+		 int sort_threads, bool sort_data_enabled,
 		 memtx_on_indexes_built_cb on_indexes_built)
 {
 	int64_t snap_signature;
@@ -1836,6 +1986,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	tuple_format_ref(memtx->func_key_format);
 
 	memtx->on_indexes_built_cb = on_indexes_built;
+	memtx->sort_data_enabled = sort_data_enabled;
+	memtx->msdr = NULL; /* The recovery time field. */
 
 	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;
@@ -1977,6 +2129,12 @@ memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
 	}
 	quota_set(&memtx->quota, size);
 	return 0;
+}
+
+void
+memtx_engine_set_sort_data_enabled(struct memtx_engine *memtx, bool value)
+{
+	memtx->sort_data_enabled = value;
 }
 
 void
