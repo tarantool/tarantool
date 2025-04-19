@@ -408,6 +408,15 @@ memtx_sort_data_parse_entry(const char *fname, const char *line,
 	return true;
 }
 
+static const char *
+memtx_sort_data_parse_string(const char *line, const char *str)
+{
+	size_t str_len = strlen(str);
+	if (memcmp(line, str, str_len) != 0)
+		return NULL;
+	return line + str_len;
+}
+
 struct memtx_sort_data_reader *
 memtx_sort_data_reader_new(const char *dirname, const struct vclock *vclock,
 			   const struct tt_uuid *instance_uuid)
