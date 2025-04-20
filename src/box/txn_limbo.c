@@ -41,24 +41,81 @@
 
 struct txn_limbo txn_limbo;
 
-static int
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term, struct vclock *vclock);
-
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
+
+/** Data corresponding to a single confirm writing. */
+struct confirm_entry {
+	/** LSN of confirmed transaction. */
+	int64_t lsn;
+	/** Header of msgpuck-encoded confirm request. */
+	struct xrow_header row;
+	/** Body of msgpuck-encoded confirm request. */
+	char row_body[XROW_BODY_LEN_MAX];
+	/** Journal entry corresponding to this confirm writing. */
+	struct journal_entry base;
+};
+
+void
+txn_limbo_confirm_write_async_cb(struct journal_entry *entry)
+{
+	assert(entry->is_complete);
+	struct confirm_entry *confirm_entry =
+		container_of(entry, struct confirm_entry, base);
+	struct txn_limbo *limbo = entry->complete_data;
+
+	if (confirm_entry->lsn == limbo->submitted_confirm_lsn) {
+		limbo->submitted_confirm_lsn = -1;
+		/* try again if the last submitted entry failed */
+		if (confirm_entry->base.res < 0)
+			fiber_wakeup(limbo->worker);
+	}
+	if (confirm_entry->base.res < 0) {
+		diag_set_journal_res(confirm_entry->base.res);
+		diag_log();
+	} else {
+		txn_limbo_read_confirm(limbo, confirm_entry->lsn);
+	}
+	/** it is safe to free journal_entry in write_async_cb callback */
+	mempool_free(&limbo->confirm_entry_pool, confirm_entry);
+}
+
+void
+txn_limbo_confirm_entry_create(
+	struct txn_limbo *limbo, struct confirm_entry *entry, int64_t lsn)
+{
+	entry->lsn = lsn;
+	journal_entry_create(
+		&entry->base, 1, 0, txn_limbo_confirm_write_async_cb, limbo);
+	entry->base.rows[0] = &entry->row;
+
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_CONFIRM,
+		.replica_id = limbo->owner_id,
+		.lsn = lsn,
+		.term = 0,
+		.confirmed_vclock = NULL,
+	};
+	xrow_encode_synchro(&entry->row, entry->row_body, &req);
+}
 
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
  */
-static int
-txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
+int
+txn_limbo_confirm_write_submit(
+	struct txn_limbo *limbo, struct confirm_entry *entry)
 {
-	assert(lsn > limbo->confirmed_lsn);
+	assert(entry->lsn > limbo->confirmed_lsn);
+	assert(entry->lsn > limbo->submitted_confirm_lsn);
 	assert(!limbo->is_in_rollback);
-	return txn_limbo_write_synchro(limbo, IPROTO_RAFT_CONFIRM, lsn, 0,
-				       NULL);
+
+	if (journal_write_submit(&entry->base) != 0)
+		return -1;
+
+	limbo->submitted_confirm_lsn = entry->lsn;
+	return 0;
 }
 
 static int
@@ -66,18 +123,33 @@ txn_limbo_worker_bump_confirmed_lsn(struct txn_limbo *limbo)
 {
 	assert(limbo->volatile_confirmed_lsn >= limbo->confirmed_lsn);
 	while (txn_limbo_is_owned_by_current_instance(limbo) &&
-	       limbo->volatile_confirmed_lsn > limbo->confirmed_lsn) {
+	       limbo->volatile_confirmed_lsn > limbo->confirmed_lsn &&
+	       limbo->volatile_confirmed_lsn > limbo->submitted_confirm_lsn) {
 		if (limbo->is_in_rollback)
 			return -1;
-		/* It can get bumped again while we are writing. */
-		int64_t volatile_confirmed_lsn = limbo->volatile_confirmed_lsn;
-		if (txn_limbo_write_confirm(limbo,
-					    volatile_confirmed_lsn) != 0) {
+
+		struct confirm_entry *entry =
+			xmempool_alloc(&limbo->confirm_entry_pool);
+
+		int64_t lsn = limbo->volatile_confirmed_lsn;
+		txn_limbo_confirm_entry_create(limbo, entry, lsn);
+
+		if (journal_queue_would_block()) {
+			journal_queue_wait(&entry->base);
+			/**
+			 * While we were waiting, some of the
+			 * limbo->volatile_confirmed_lsn or limbo->owner_id,
+			 * limbo->is_in_rollback values might have changed.
+			 */
+			continue;
+		}
+		assert(lsn == limbo->volatile_confirmed_lsn);
+
+		ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_WORKER_DELAY);
+		if (txn_limbo_confirm_write_submit(limbo, entry) != 0) {
 			diag_log();
 			return -1;
 		}
-		ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_WORKER_DELAY);
-		txn_limbo_read_confirm(limbo, volatile_confirmed_lsn);
 	}
 	assert(limbo->volatile_confirmed_lsn >= limbo->confirmed_lsn);
 	return 0;
@@ -134,6 +206,11 @@ txn_limbo_create(struct txn_limbo *limbo)
 		panic("failed to allocate synchronous queue worker fiber");
 	limbo->worker->f_arg = limbo;
 	fiber_set_joinable(limbo->worker, true);
+
+	mempool_create(&limbo->confirm_entry_pool, &cord()->slabc,
+		       sizeof(struct confirm_entry) +
+		       sizeof(struct xrow_header *));
+	limbo->submitted_confirm_lsn = -1;
 }
 
 void
@@ -527,23 +604,6 @@ synchro_request_write(const struct synchro_request *req)
 	return journal_write_row(&row);
 }
 
-/** Create a request for a specific limbo and write it to WAL. */
-static int
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term, struct vclock *vclock)
-{
-	assert(lsn >= 0);
-
-	struct synchro_request req = {
-		.type = type,
-		.replica_id = limbo->owner_id,
-		.lsn = lsn,
-		.term = term,
-		.confirmed_vclock = vclock,
-	};
-	return synchro_request_write(&req);
-}
-
 /** Write a request to WAL or panic. */
 static void
 synchro_request_write_or_panic(const struct synchro_request *req)
@@ -663,7 +723,7 @@ txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
 {
 	assert(confirm_lsn > limbo->volatile_confirmed_lsn);
 	limbo->volatile_confirmed_lsn = confirm_lsn;
-	fiber_wakeup(limbo->worker);
+	fiber_call(limbo->worker);
 }
 
 /**

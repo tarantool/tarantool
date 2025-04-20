@@ -269,6 +269,16 @@ struct txn_limbo {
 	 * `confirmed_lsn`.
 	 */
 	struct fiber *worker;
+	/** `confirm_entry` memory pool. */
+	struct mempool confirm_entry_pool;
+	/**
+	 * Let's imagine the greatest confirm-lsn was ever submitted. Then if
+	 * this entry is not yet complete, then `submitted_confirm_lsn` equals
+	 * to this greatest confirm-lsn. But if this entry ended (no matter
+	 * with success or failure), then `submitted_confirm_lsn` equals to -1,
+	 * until greatest confirm-lsn is bumped.
+	 */
+	int64_t submitted_confirm_lsn;
 };
 
 /**
