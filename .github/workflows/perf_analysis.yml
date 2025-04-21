@@ -62,10 +62,13 @@ jobs:
           python3 -m venv venv_influx
           source ./venv_influx/bin/activate
           pip install influxdb-client==1.44.0 PyYAML==6.0.2
+          mkdir -p perf_data
           python3 ./perf/tools/extract_perf_data.py \
             --influx_url "${{ env.INFLUXDB_URL }}" \
             --influx_token "${{ env.INFLUXDB_TOKEN }}" \
-            --branch master --config ./perf/tools/config_bench.json
+            --branch master \
+            --config ./perf/tools/config_bench.json \
+            --base_path perf_data
       - name: Setup tmate session
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
