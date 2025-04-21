@@ -62,7 +62,7 @@ from(bucket:"{influx_bucket}")
 |> drop(columns: ["_start", "_stop", "iterations"])
 """
 
-DEFAULT_BASE_PATH = "examples/csv/data"
+DEFAULT_BASE_PATH = os.path.abspath(os.getcwd())
 DEFAULT_HOURS_NUM = 24*30
 DEFAULT_BRANCH_NAME = "master"
 DEFAULT_INFLUXDB_BUCKET = "perf-debug"
@@ -111,8 +111,6 @@ def main():
     parser.add_argument('--hours', default=DEFAULT_HOURS_NUM)
     parser.add_argument('--base_path', default=DEFAULT_BASE_PATH)
     args = parser.parse_args()
-
-    # TODO: Validate arguments.
 
     print(("""Used parameters:
     Git branch name: {}
