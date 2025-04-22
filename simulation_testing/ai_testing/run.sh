@@ -6,6 +6,8 @@ CLIENT_CORES="1"       # Ядро для клиента
 SERVER_DIR="server"
 CLIENT_DIR="client"
 ENV_SUCCESSFUL_LOGS=1
+WITHOUT_PROXY="true"
+WORKING_LOG_PATH="./working_log.log"
 
 
 # Проверка доступности утилит

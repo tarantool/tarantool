@@ -107,6 +107,10 @@ ANALYSIS_CONFIG = AnalysisConfig(
             {
                 "id": 2,
                 "description": "Break the connection between two nodes for a few seconds"
+            },
+            {
+                "id": 3,
+                "description": "Intermittent connection loss between two nodes: the link is broken for break_duration seconds every period seconds, during total_time seconds"
             }
         ]
     },
@@ -116,17 +120,23 @@ ANALYSIS_CONFIG = AnalysisConfig(
             "operations": [
                 {"crash_type": 0, "node_1": 1, "node_2": -1, "crash_time": 5},
                 {"crash_type": 1, "node_1": 2, "node_2": -1, "crash_time": 7},
-                {"crash_type": 2, "node_1": 1, "node_2": 3, "crash_time": 10}
+                {"crash_type": 2, "node_1": 1, "node_2": 3, "crash_time": 10},
+                {"crash_type": 3, "node_1": 1, "node_2": 2, "break_duration": 3, "period": 10, "total_time": 30}
             ]
         }
     },
     "strict_rules": [
-        "Operation values (crash_type): 0, 1, or 2 (integers!)",
+        "Operation values (crash_type): 0, 1, 2, or 3 (integers!)",
         "Node values:",
         " - If crash_type is 0 or 1, then node_1 is an integer indicating the node number on which the operation should occur, node_2 = -1",
         " - If crash_type = 2, then node_1 and node_2 are the node numbers between which the connection should be broken",
+        " - If crash_type = 3, then node_1 and node_2 are the node numbers between which the intermittent connection loss should occur",
         " - node_1 and node_2 must not exceed the nodes_count value specified in the client message",
         "crash_time value must be an integer from 10 to 100!",
+        "For crash_type = 3:",
+        " - break_duration must be an integer from 1 to 10",
+        " - period must be an integer from 5 to 30",
+        " - total_time must be an integer from 30 to 300",
         "No text in values!",
         "Number of operations can be from 10 to 10000",
         "Each new scenario must differ from the previous ones",
@@ -141,7 +151,13 @@ ANALYSIS_CONFIG = AnalysisConfig(
         "operations": [
             {"type": "object",
                 "patternProperties": {
-                    "crash_type": {"type": "integer", "enum": [0, 1, 2],  "node_1": {"type": "integer"},  "node_2": {"type": "integer"},  "crash_time": {"type": "integer"} }
+                    "crash_type": {"type": "integer", "enum": [0, 1, 2, 3]},
+                    "node_1": {"type": "integer"},
+                    "node_2": {"type": "integer"},
+                    "crash_time": {"type": "integer"},
+                    "break_duration": {"type": "integer"},
+                    "period": {"type": "integer"},
+                    "total_time": {"type": "integer"}
                 }
             }
         ]

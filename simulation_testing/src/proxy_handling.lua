@@ -210,6 +210,19 @@ local function get_available_proxies(cg, activity_states, num_to_select)
     return result
 end
 
+local function find_proxy_by_ids(cg, id_1, id_2)
+
+    for _, proxy in ipairs(cg.proxies) do
+        if proxy.alias == string.format("proxy_%d_to_%d", id_1, id_2) then
+            if _G.nodes_activity_states[proxy.alias] == "crashed" then
+                return nil
+            end
+            return proxy
+        end
+    end
+    return nil
+end
+
 return {
     create_proxy_for_connection = create_proxy_for_connection,
     get_proxy_state = get_proxy_state,
@@ -217,5 +230,6 @@ return {
     count_non_crashed_proxy_connections = count_non_crashed_proxy_connections,
     is_half_proxy_connections_non_crashed = is_half_proxy_connections_non_crashed,
     get_random_proxies_for_crash = get_random_proxies_for_crash,
-    get_available_proxies = get_available_proxies
+    get_available_proxies = get_available_proxies,
+    find_proxy_by_ids = find_proxy_by_ids
 }

@@ -70,7 +70,10 @@ class TarantoolClusterClient:
             analysis = analyzer.analyze_feedback(client_response)
             message = analysis["messages"][-1].content
             try:
-                return json.dumps(json.loads(message)), None
+                parsed = json.loads(message)
+                if "error" in parsed:
+                    return None, parsed["error"]
+                return json.dumps(parsed), None
             except json.JSONDecodeError:
                 return f"Raw response: {message}", None
         except Exception as e:

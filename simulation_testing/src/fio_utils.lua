@@ -11,9 +11,9 @@ local function add_error_scenario(data)
         -- Convert data to JSON and append to file
         file:write("{".. json.encode(data) .. "\n}, \n")
         file:close()
-        print("Data appended successfully")
+        print("Data appended successfully in" .. filename)
     else
-        print("Failed to open file for writing")
+        print("Failed to open file for writing " .. filename)
     end
 end
 

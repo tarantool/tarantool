@@ -1,6 +1,6 @@
 package.path = package.path .. ";../../src/?.lua"
 
-local json = require("dkjson")
+local json = require("json")
 local cluster = require('random_cluster')
 local logger = require("logger")
 local crash_functions = require("crash_functions")
@@ -12,7 +12,11 @@ local replication_errors = require("replication_errors")
 local fio_utils = require("fio_utils")
 
 
-_G.SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS")
+_G.SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS") or "false"
+_G.WITHOUT_BEST_EFFORT = os.getenv("WITHOUT_BEST_EFFORT") or "false"
+_G.WITHOUT_LINEARIZABLE = os.getenv("WITHOUT_LINEARIZABLE") or "false"
+_G.WITHOUT_PROXY = os.getenv("WITHOUT_PROXY") or "false"
+_G.WORKING_LOG_PATH = os.getenv("WORKING_LOG_PATH") or "./working_log.log"
 
 -- Improved FIFO management
 local function setup_fifos()
@@ -144,35 +148,57 @@ end
 
 -- Operation handling
 local function apply_operation(op)
-    local available_nodes = crash_functions.get_non_crashed_nodes(cg.replicas, nodes_activity_states, "replica_")
-
-    local crash_nodes = {crash_functions.get_node_by_id(available_nodes,op.node_1)}
+    local available_nodes = crash_functions.get_non_crashed_nodes(CLUSTER.replicas, _G.nodes_activity_states, "replica_")
+    local crash_nodes = {}
     local crash_proxies = {}
+    table.insert(crash_nodes, crash_functions.get_node_by_id(available_nodes, op.node_1))
     if op.node_2 ~= -1 then
         table.insert(crash_nodes, crash_functions.get_node_by_id(available_nodes,op.node_2))
     end
-    if op.crash_type == 2  then
-        op.crash_type = 3
+
+    if op.crash_type == 2 or op.crash_type == 3 then
         table.insert(crash_proxies, proxy_handling.find_proxy_by_ids(CLUSTER, op.node_1, op.node_2))
         table.insert(crash_proxies, proxy_handling.find_proxy_by_ids(CLUSTER, op.node_2, op.node_1))
     end
     
-    for _, node in ipairs(crash_nodes) do
-        if not crash_functions.node_is_alive_by_id(CLUSTER , _G.nodes_activity_states , node) then
-            return {}
-        end
-    end
+    -- for _, node in ipairs(crash_nodes) do
+    --     print("Node: " .. node.alias.. " state: " .. _G.nodes_activity_states[node.alias])
+    --     if not crash_functions.node_is_alive_by_id(CLUSTER , _G.nodes_activity_states , node) then
+    --         print("********************************************************************")
+    --         return {}
+    --     end
+    -- end
+    if op.crash_type == 3 then
+    for _, proxy in ipairs(crash_proxies) do
+            if _G.nodes_activity_states[proxy.alias] ~= "crashed" and _G.nodes_activity_states[proxy.alias] ~= "bad_connection" then
+                local suc, _ = pcall(crash_functions.emulate_bad_connection,
+                    proxy,
+                    _G.nodes_activity_states,
+                    op.break_duration,
+                    op.period,
+                    op.total_time
+                )
 
-    crash_functions.crash_simulation(
-        CLUSTER,
-        _G.nodes_activity_states,
-        initial_replication,
-        op.crash_type + 1,
-        op.crash_time,
-        crash_nodes,
-        crash_proxies
-    )
-    fiber.sleep(op.crash_time / 10)
+                if not suc then
+                    return {}
+                end
+            end
+        end
+        fiber.sleep(op.total_time / 10)
+    else
+        crash_functions.crash_simulation(
+            CLUSTER,
+            _G.nodes_activity_states,
+            initial_replication,
+            op.crash_type,
+            op.crash_time,
+            crash_nodes,
+            crash_proxies,
+            {}
+        )
+
+        fiber.sleep(op.crash_time / 10)
+    end
 end
 
 -- Request handlers
@@ -223,36 +249,42 @@ local function handle_simulate(data)
             local error_msg = ""
 
             -- Operation validation
-            if (not op.crash_type) or (op.crash_type < 0 or op.crash_type > 2) then
-
+            if (not op.crash_type) or (op.crash_type < 0 or op.crash_type > 3) then
                 valid = false
                 error_msg = "Invalid crash_type"
-            elseif op.crash_type == 2 then
+            elseif op.crash_type == 2 or op.crash_type == 3 then
                 if not op.node_1 or not op.node_2 or op.node_1 == op.node_2 then
-
                     valid = false
-                    error_msg = "Invalid nodes for crash_type 2"
+                    error_msg = "Invalid nodes for crash_type " .. op.crash_type
+                end
+                if op.crash_type == 3 then
+                    if not op.break_duration or not op.period or not op.total_time then
+                        valid = false
+                        error_msg = "Missing parameters for intermittent connection loss"
+                    else
+                        max_delay = math.max(max_delay, op.total_time)
+                    end
                 end
             else
-                
                 if op.node_2 ~= -1 then
                     valid = false
                     error_msg = "node_2 must be -1 for this crash_type"
                 end
             end
-            if (not op.crash_time) or op.crash_time < 0 then
-
-                valid = false
-                error_msg = "Invalid crash_time"
-            else
-                max_delay = math.max(max_delay, op.crash_time)
+            if op.crash_type ~= 3 then
+                if (not op.crash_time) or op.crash_time < 0 then
+                    valid = false
+                    error_msg = "Invalid crash_time"
+                else
+                    max_delay = math.max(max_delay, op.crash_time)
+                end
             end
 
             if valid then
 
-                local success,_ = pcall(apply_operation,op)
+                local success,err = pcall(apply_operation,op)
                 if not success then
-                    result = { error = error_msg }
+                    result = { error = err }
                     status = "400"
                     break
                 end
@@ -264,6 +296,7 @@ local function handle_simulate(data)
         end
     else
         status = "400"
+        result = { error = "Missing or invalid operations" }
     end
     if status == "200" then
         result = STATE

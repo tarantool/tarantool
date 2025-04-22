@@ -1,6 +1,5 @@
 local fio = require('fio')
 local fio_utils = require('fio_utils')
-local random_cluster = require('random_cluster')
 Logger = require('log')
 
 _G.EXTRA_LOGS = function (...)
@@ -33,7 +32,7 @@ end
 
 local function init_logger()
     
-    local log_dir = fio.dirname(WORKING_LOG_PATH)
+    local log_dir = fio.dirname(_G.WORKING_LOG_PATH)
     if not fio.path.is_dir(log_dir) then
         fio.mkdir(log_dir)
     end

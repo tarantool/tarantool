@@ -19,7 +19,7 @@ _G.SUCCESSFUL_LOGS = os.getenv("ENV_SUCCESSFUL_LOGS") or "false"
 _G.WITHOUT_BEST_EFFORT = os.getenv("WITHOUT_BEST_EFFORT") or "false"
 _G.WITHOUT_LINEARIZABLE = os.getenv("WITHOUT_LINEARIZABLE") or "false"
 _G.WITHOUT_PROXY = os.getenv("WITHOUT_PROXY") or "false"
-_G.WORKING_LOG_PATH = os.getenv("WORKING_LOG_PATH") or './working_log.log'
+_G.WORKING_LOG_PATH = os.getenv("WORKING_LOG_PATH") or "./working_log.log"
 print("ENV_SUCCESSFUL_LOGS: " .. _G.SUCCESSFUL_LOGS)
 print("WITHOUT_BEST_EFFORT: " .. _G.WITHOUT_BEST_EFFORT)
 print("WITHOUT_LINEARIZABLE: " .. _G.WITHOUT_LINEARIZABLE)
