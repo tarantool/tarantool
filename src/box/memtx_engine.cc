@@ -494,7 +494,19 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		panic("Failed to complete recovery from snapshot!");
 	}
 
-	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
+	/*
+	 * Usually during final recovery, when .xlog files are loaded and
+	 * applied, a special memtx_space_replace_primary_key function is
+	 * used for faster recovery. The function only updates primary key
+	 * while all other indexes are scheduled to build at the end of
+	 * recovery.
+	 *
+	 * This approach doesn't work with MVCC engine and synchro spaces:
+	 * When transactions appear in xlog and they may or may not be
+	 * committed, we should process them in normal mode throughout all
+	 * indexes in order to leave transaction history in each index.
+	 */
+	if (!memtx_tx_manager_use_mvcc_engine) {
 		/*
 		 * Fast start path: "play out" WAL
 		 * records using the primary key only,
@@ -502,13 +514,6 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		 */
 		memtx->state = MEMTX_FINAL_RECOVERY;
 	} else {
-		/*
-		 * If force_recovery = true, it's
-		 * a disaster recovery mode. Build
-		 * secondary keys before reading the WAL,
-		 * to detect and discard duplicates in
-		 * unique keys.
-		 */
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
