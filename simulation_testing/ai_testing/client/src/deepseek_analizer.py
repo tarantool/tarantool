@@ -1,4 +1,5 @@
 from src.analysis_cfg import *
+import os
 
 class DeepSeekAnalyzer:
     def __init__(self, api_key: str, config: AnalysisConfig):
@@ -72,7 +73,7 @@ class DeepSeekAnalyzer:
         )
 
 
-API_KEY = "sk-e123e150c99e4f14b47f813315838974"
+API_KEY = os.environ['DEEPSEEK_API_KEY']
     
 analyzer = DeepSeekAnalyzer(
     api_key=API_KEY,
