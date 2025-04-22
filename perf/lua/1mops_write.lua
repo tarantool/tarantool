@@ -146,7 +146,7 @@ warmup_thr = warmup_thr < 0 and 0 or warmup_thr
 -- END OF TUNABLE OPTIONS
 
 -- transactions per fiber
-local trans_per_fiber = num_ops/ops_per_txn/num_fibers
+local trans_per_fiber = math.floor(num_ops/ops_per_txn/num_fibers)
 
 -- by default no output from replicas are received
 -- redirect it into master's one breaks terminal
@@ -282,9 +282,10 @@ fiber.create(function()
     fiber.create(function()
         while true do
             local prev_t = clock.time()
-            local prev_lsn = box.info.lsn
+            local prev_total = box.stat().REPLACE.total
             fiber.sleep(0.1)
-            local rps = (box.info.lsn - prev_lsn) / (clock.time() - prev_t)
+            local rps = (box.stat().REPLACE.total - prev_total) /
+                (clock.time() - prev_t)
             if (rps > max_rps) then
                 max_rps=rps
             end
@@ -293,11 +294,11 @@ fiber.create(function()
     if warmup_thr > 0 then
         io.write('# Warmup... ')
         io.flush()
-        while box.info.lsn < num_ops / 100 * warmup_thr do
+        while box.stat().REPLACE.total < num_ops / 100 * warmup_thr do
             fiber.sleep(0.001)
         end
-        ops_done = box.info.lsn
-        print('done, lsn: ', ops_done)
+        ops_done = box.stat().REPLACE.total
+        print(string.format('done: %d ops', ops_done))
         timer_begin = {
             clock.time(),
             clock.proc()
@@ -307,7 +308,8 @@ end)
 
 -- start fibers for the main load
 for i = 1, num_fibers do
-    fibers_storage[i] = fiber.create(fiber_load, i*num_ops, space)
+    fibers_storage[i] =
+        fiber.create(fiber_load, i*trans_per_fiber*ops_per_txn, space)
     if (fibers_storage[i]:status() ~= 'dead') then
         fibers_storage[i]:wakeup() -- needed for backward compatibility with 1.7
     end
@@ -320,7 +322,7 @@ for i = 1, num_fibers do
     end -- the loop is needed for backward compatibility with 1.7
 end
 
-ops_done = box.info.lsn - ops_done
+ops_done = box.stat().REPLACE.total - ops_done
 
 -- stop timer for master
 local res
