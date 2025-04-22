@@ -63,6 +63,7 @@
 #include "tt_sort.h"
 #include "assoc.h"
 #include "wal.h"
+#include "scoped_guard.h"
 
 #include <type_traits>
 
@@ -1048,16 +1049,12 @@ checkpoint_f(va_list ap)
 	enum { YIELD_LOOPS = 10 };
 #endif
 
-	int rc = 0;
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	if (ckpt->touch) {
 		if (xdir_touch_xlog(&ckpt->dir, &ckpt->vclock) == 0)
 			return 0;
-		/*
-		 * Failed to touch an existing snapshot, create
-		 * a new one.
-		 */
+		/* Failed to touch an existing snapshot, create a new one. */
 		ckpt->touch = false;
 	}
 
@@ -1072,21 +1069,25 @@ checkpoint_f(va_list ap)
 		xlog_clear(snap);
 		return -1;
 	}
+	/*
+	 * XLOG buffers have to be created and destroyed from the same cord.
+	 * So we can only discard closed XLOG in memtx_engine_abort_checkpoint.
+	 */
+	auto discard_snap = make_scoped_guard([&] { xlog_discard(snap); });
 
-	struct mh_i32_t *temp_space_ids;
-
+	struct mh_i32_t *temp_space_ids = mh_i32_new();
+	auto _ = make_scoped_guard([=] { mh_i32_delete(temp_space_ids); });
 	bool is_synchro_written = false;
 	say_info("saving snapshot `%s'", snap->filename);
 	ERROR_INJECT_WHILE(ERRINJ_SNAP_WRITE_DELAY, {
 		fiber_sleep(0.001);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
-			goto fail;
+			return -1;
 		}
 	});
 	ERROR_INJECT(ERRINJ_SNAP_SKIP_ALL_ROWS, goto done);
 	struct space_read_view *space_rv;
-	temp_space_ids = mh_i32_new();
 	read_view_foreach_space(space_rv, &ckpt->rv) {
 		FiberGCChecker gc_check;
 		bool skip = false;
@@ -1102,10 +1103,10 @@ checkpoint_f(va_list ap)
 		 * during checkpoint join.
 		 */
 		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
-			rc = checkpoint_write_system_data(snap, &ckpt->raft,
-							  &ckpt->synchro_state);
-			if (rc != 0)
-				break;
+			if (checkpoint_write_system_data(
+					snap, &ckpt->raft,
+					&ckpt->synchro_state) != 0)
+				return -1;
 			is_synchro_written = true;
 		}
 		struct index_read_view *index_rv =
@@ -1113,57 +1114,54 @@ checkpoint_f(va_list ap)
 		assert(index_rv != NULL);
 		struct index_read_view_iterator it;
 		if (index_read_view_create_iterator(index_rv, ITER_ALL,
-						    NULL, 0, &it) != 0) {
-			rc = -1;
-			break;
-		}
+						    NULL, 0, &it) != 0)
+			return -1;
+		auto _ = make_scoped_guard([&] {
+			index_read_view_iterator_destroy(&it);
+		});
 		unsigned int loops = 0;
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
-			struct read_view_tuple result;
-			rc = index_read_view_iterator_next_raw(&it, &result);
-			if (rc != 0 || result.data == NULL)
+			struct read_view_tuple tuple;
+			if (index_read_view_iterator_next_raw(&it, &tuple) != 0)
+				return -1;
+			if (tuple.data == NULL)
 				break;
-			if (is_tuple_temporary(result.data,
+			if (is_tuple_temporary(tuple.data,
 					       space_rv->id,
 					       temp_space_ids))
 				continue;
-			rc = checkpoint_write_tuple(snap, space_rv->id,
-						    space_rv->group_id,
-						    result.data, result.size);
-			if (rc != 0)
-				break;
+
+			/* Write the tuple into the snapshot. */
+			if (checkpoint_write_tuple(snap, space_rv->id,
+						   space_rv->group_id,
+						   tuple.data, tuple.size) != 0)
+				return -1;
+
 			/* Yield to make thread cancellable. */
 			if (++loops % YIELD_LOOPS == 0)
 				fiber_sleep(0);
 			if (fiber_is_cancelled()) {
 				diag_set(FiberIsCancelled);
-				rc = -1;
-				break;
+				return -1;
 			}
 		}
-		index_read_view_iterator_destroy(&it);
-		if (rc != 0)
-			break;
 	}
-	mh_i32_delete(temp_space_ids);
-	if (rc != 0)
-		goto fail;
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_CORRUPTED_INSERT_ROW, {
 		if (checkpoint_write_corrupted_insert_row(snap) != 0)
-			goto fail;
+			return -1;
 	});
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, {
 		if (checkpoint_write_missing_space_row(snap) != 0)
-			goto fail;
+			return -1;
 	});
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, {
 		if (checkpoint_write_unknown_row_type(snap) != 0)
-			goto fail;
+			return -1;
 	});
 	ERROR_INJECT(ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW, {
 		if (checkpoint_write_invalid_system_row(snap) != 0)
-			goto fail;
+			return -1;
 	});
 	/*
 	 * There may be no user data (e.g. when only RAFT_PROMOTE is written),
@@ -1173,16 +1171,14 @@ checkpoint_f(va_list ap)
 	if (!is_synchro_written &&
 	    checkpoint_write_system_data(snap, &ckpt->raft,
 					 &ckpt->synchro_state) != 0)
-		goto fail;
+		return -1;
 	goto done;
 done:
 	if (xlog_close(snap) != 0)
-		goto fail;
+		return -1;
+	discard_snap.is_active = false;
 	say_info("done");
 	return 0;
-fail:
-	xlog_discard(snap);
-	return -1;
 }
 
 static int
