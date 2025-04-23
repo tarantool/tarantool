@@ -33,6 +33,9 @@ local function monitor_replication(cg)
                 end)
                 
                 if not ok_inner then
+                    if is_node_alive_by_id(id) then
+                       table.insert(problems, '[replica_'..tostring(id)..'] Is NOT CRASHED but is UHEALTHY: Check replica_'..tostring(id)..'.log')
+                    end
                     goto continue
                 end
 

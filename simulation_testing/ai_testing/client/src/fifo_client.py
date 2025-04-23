@@ -108,7 +108,7 @@ class TarantoolClusterClient:
                     break
                 
                 current_state = json.dumps(response['body'])
-                print("New state:", current_state)
+                print("New state:", json.dumps(response['body']['has_error']))
                 
             except json.JSONDecodeError as e:
                 print(f"JSON Error: {str(e)}")
