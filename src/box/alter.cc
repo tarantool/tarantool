@@ -816,10 +816,7 @@ alter_space_new(struct space *old_space)
 	alter->txn = in_txn();
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
-	if (old_space->format != NULL)
-		alter->new_min_field_count = old_space->format->min_field_count;
-	else
-		alter->new_min_field_count = 0;
+	alter->new_min_field_count = old_space->format->min_field_count;
 	alter->n_rows = txn_n_rows(txn);
 	return alter;
 }
@@ -1207,10 +1204,6 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 	struct space *new_space = alter->new_space;
 	struct space *old_space = alter->old_space;
 	struct tuple_format *new_format = new_space->format;
-	struct tuple_format *old_format = old_space->format;
-
-	if (old_format == NULL)
-		return;
 
 	assert(new_format != NULL);
 	for (uint32_t i = 0; i < old_space->index_count; i++) {
@@ -1831,12 +1824,10 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 		 * old and new tuples.
 		 */
 		is_min_field_count_changed = true;
-	} else if (old_space->format != NULL) {
+	} else {
 		is_min_field_count_changed =
 			old_space->format->min_field_count !=
 			alter->new_min_field_count;
-	} else {
-		is_min_field_count_changed = false;
 	}
 	for (uint32_t index_id = begin; index_id < end; ++index_id) {
 		struct index *old_index = space_index(old_space, index_id);
