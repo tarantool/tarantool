@@ -281,14 +281,11 @@ local ops_done = 0
 fiber.create(function()
     fiber.create(function()
         while true do
-            local prev_t = clock.time()
-            local prev_total = box.stat().REPLACE.total
-            fiber.sleep(0.1)
-            local rps = (box.stat().REPLACE.total - prev_total) /
-                (clock.time() - prev_t)
+            local rps = box.stat().REPLACE.rps
             if (rps > max_rps) then
                 max_rps=rps
             end
+            fiber.sleep(1)
         end
     end)
     if warmup_thr > 0 then
