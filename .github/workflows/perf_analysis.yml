@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+  pull_request:
   schedule:
     # Once a day at 02:00, should be later than `perf_micro.yml`.
     - cron: '0 2 * * *'
@@ -63,7 +64,7 @@ jobs:
           python3 ./perf/tools/extract_perf_data.py \
             --influx_url ${{ env.INFLUXDB_URL }} \
             --influx_token ${{ env.INFLUXDB_TOKEN }} \
-            --branch ${{ env.PERF_BRANCH }} \
+            --branch "master" \
             --config ./perf/tools/config_bench.json \
             --base_path perf_data
         env:
