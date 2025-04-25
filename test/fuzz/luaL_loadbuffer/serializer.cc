@@ -221,7 +221,7 @@ GetCounterIncrement(const std::string &counter_name)
 	std::string retval = counter_name;
 	retval += " = ";
 	retval += counter_name;
-	retval += " + 1\n";
+	retval += " + 1;\n";
 	return retval;
 }
 
@@ -1200,6 +1200,10 @@ PROTO_TOSTRING(UnaryOperator, op)
 PROTO_TOSTRING(Name, name)
 {
 	std::string ident = ConvertToStringDefault(name.name(), true);
+	/* Prevent using reserved keywords as identifiers. */
+	if (KReservedLuaKeywords.find(ident) != KReservedLuaKeywords.end()) {
+		ident += "_1";
+	}
 	/* Identifier has default name, add an index. */
 	if (!ident.compare(kDefaultIdent)) {
 		ident += std::to_string(name.num() % kMaxIdentifiers);
