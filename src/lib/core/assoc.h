@@ -55,7 +55,11 @@ extern "C" {
 static inline uint32_t
 mh_ptr_hash(const void *ptr)
 {
-	uintptr_t u = (uintptr_t)ptr;
+	/*
+	 * The pointer is assumed to be 16-bytes aligned,
+	 * so let's ignore last (insignificant) bits.
+	 */
+	uintptr_t u = (uintptr_t)ptr >> 4;
 	return u ^ (u >> 32);
 }
 
@@ -106,6 +110,28 @@ struct mh_i64ptr_node_t {
 #define mh_hash_key(a, arg) (a)
 #define mh_cmp(a, b, arg) ((a->key) != (b->key))
 #define mh_cmp_key(a, b, arg) ((a) != (b->key))
+#include "salad/mhash.h"
+
+/*
+ * Map: (void *) => (void *)
+ */
+#define mh_name _ptrptr
+#define mh_key_t void *
+
+/** The ptr to ptr hash node. */
+struct mh_ptrptr_node_t {
+	/** The ptr to ptr hash key. */
+	mh_key_t key;
+	/** The ptr to ptr hash value. */
+	void *val;
+};
+
+#define mh_node_t struct mh_ptrptr_node_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) (mh_ptr_hash((a)->key))
+#define mh_hash_key(a, arg) (mh_ptr_hash(a))
+#define mh_cmp(a, b, arg) (((a)->key) != ((b)->key))
+#define mh_cmp_key(a, b, arg) ((a) != ((b)->key))
 #include "salad/mhash.h"
 
 /*
