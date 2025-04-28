@@ -45,13 +45,13 @@ enum {
 	 * For simplicity, assume that the total engine count can't exceed
 	 * the value of this constant.
 	 */
-	MAX_ENGINE_COUNT = 10,
+	MAX_ENGINE_COUNT = 7,
 	/**
 	 * Max number of engines involved in a multi-statement transaction.
 	 * This value must be greater than any `engine::id' of an engine
 	 * without `ENGINE_BYPASS_TX' flag.
 	 */
-	MAX_TX_ENGINE_COUNT = 3,
+	MAX_TX_ENGINE_COUNT = 4,
 };
 
 struct engine;

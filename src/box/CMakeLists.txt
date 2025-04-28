@@ -353,6 +353,10 @@ if(ENABLE_MEMCS_ENGINE)
     list(APPEND box_sources ${MEMCS_ENGINE_SOURCES})
 endif()
 
+if(ENABLE_QUIVER_ENGINE)
+    list(APPEND box_sources ${QUIVER_ENGINE_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 if(OSS_FUZZ)
   target_link_options(box PUBLIC "-stdlib=libstdc++")
