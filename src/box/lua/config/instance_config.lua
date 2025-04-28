@@ -2196,6 +2196,21 @@ return schema.new('instance_config', schema.record({
         default = false,
         validate = validators['isolated'],
     }),
+    -- Options for the stateboard service.
+    stateboard = enterprise_edition(schema.record({
+        enabled = schema.scalar({
+            type = 'boolean',
+            default = false,
+        }),
+        renew_interval = schema.scalar({
+            type = 'number',
+            default = 2,
+        }),
+        keepalive_interval = schema.scalar({
+            type = 'number',
+            default = 10,
+        }),
+    })),
 }), {
     methods = {
         instance_uri = instance_uri,

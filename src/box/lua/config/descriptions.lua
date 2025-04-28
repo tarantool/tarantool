@@ -2355,6 +2355,41 @@ I['sql.cache_size'] = format_text([[
 
 -- }}} sql configuration
 
+-- {{{ stateboard configuration
+
+I['stateboard'] = format_text([[
+    These options define configuration parameters related to the stateboard
+    service allowing Tarantool instances to report their state into some extra
+    key-value storage (e.g. etcd or Tarantool config.storage).
+
+    An instance with an enabled stateboard reports its status to
+    `<prefix>/state/by-name/{{ instance_name }}` where prefix is received from
+    the `config.*.prefix` option. The provided information is in YAML format
+    with the following fields:
+
+    - `hostname` (`string`): hostname
+    - `pid` (`integer`): Tarantool process ID
+    - `mode` (`'ro'` or `'rw'`): instance mode (see `box.info.ro`).
+    - `status` (`string`): instance status (see `box.info.status` for possible
+      values and their description).
+]])
+
+I['stateboard.enabled'] = format_text([[
+    Enable or disable the stateboard service.
+]])
+
+I['stateboard.keepalive_interval'] = format_text([[
+    A time interval (in seconds) that specifies how long a transient state
+    information is stored.
+]])
+
+I['stateboard.renew_interval'] = format_text([[
+    A time interval (in seconds) that specifies how often a Tarantool instance
+    writes its state information to the stateboard.
+]])
+
+-- }}} stateboard configuration
+
 -- {{{ vinyl configuration
 
 I['vinyl'] = format_text([[
