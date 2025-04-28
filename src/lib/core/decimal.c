@@ -46,18 +46,10 @@
 static __thread decContext decimal_context = {
 	/* Maximum precision during operations. */
 	DECIMAL_MAX_DIGITS,
-	/*
-	 * Maximum decimal logarithm of the number.
-	 * Allows for precision = DECIMAL_MAX_DIGITS
-	 */
-	DECIMAL_MAX_DIGITS - 1,
-	/*
-	 * Minimal adjusted exponent. The smallest absolute value will be
-	 * exp((1 - DECIMAL_MAX_DIGITS) - 1) =
-	 * exp(-DECIMAL_MAX_DIGITS) allowing for scale =
-	 * DECIMAL_MAX_DIGITS
-	 */
-	-1,
+	/* Maximal adjusted exponent. */
+	DEC_MAX_MATH,
+	/* Minimal adjusted exponent. */
+	-DEC_MAX_MATH,
 	/* Rounding mode: .5 rounds away from 0. */
 	DECIMAL_ROUNDING,
 	/* Turn off signalling for failed operations. */

@@ -62,13 +62,6 @@
 	is(decimal_from_##type(&dec, a), expect(&dec), "decimal construction from "#a" "#expect);\
 })
 
-#define dectest_op_fail(op, stra, strb) ({\
-	decimal_t a, b, c;\
-	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
-	is(decimal_from_string(&b, #strb), &b, "decimal_from_string("#strb")");\
-	is(decimal_##op(&c, &a, &b), NULL, "decimal_"#op"("#stra", "#strb") - overflow");\
-})
-
 #define dectest_op1_fail(op, stra) ({\
 	decimal_t a, b;\
 	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
@@ -410,7 +403,7 @@ test_mp_print(void)
 int
 main(void)
 {
-	plan(312);
+	plan(324);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -428,9 +421,6 @@ main(void)
 
 	dectest_op(add, 1e-38, 1e-38, 2e-38);
 	dectest_op(add, -1e-38, 1e-38, 0);
-	/* Check that maximum scale == 38. Otherwise rounding occurs. */
-	dectest_op(add, 1e-39, 0, 0);
-	dectest_op(add, 1e-39, 1e-38, 1e-38);
 	dectest_op(mul, 1e-19, 1e-19, 1e-38);
 	dectest_op(add, 1e37, 0, 1e37);
 	dectest_op(mul, 1e18, 1e18, 1e36);
@@ -438,6 +428,13 @@ main(void)
 	dectest_op(pow, 10, 2, 100);
 	dectest_op(pow, 2, 10, 1024);
 	dectest_op(pow, 100, 0.5, 10);
+
+	dectest_op(add, 1e1000, 1e1000, 2e1000);
+	dectest_op(add, 1e-1000, 1e-1000, 2e-1000);
+	dectest_op(mul, 1e1000, 1e1000, 1e2000);
+	dectest_op(mul, 1e-1000, 1e-1000, 1e-2000);
+	dectest_op(div, 1e1000, 1e-1000, 1e2000);
+	dectest_op(div, 1e-1000, 1e1000, 1e-2000);
 
 	dectest_op1(log10, 100, 2, 0);
 	dectest_op1(ln, 10, 2.3, 2);
@@ -447,10 +444,11 @@ main(void)
 	dectest_op1(exp, 2, 7.39, 2);
 	dectest_op1(sqrt, 100, 10, 0);
 
-	/* 39 digits > DECIMAL_MAX_DIGITS (== 38) */
-	dectest_construct(double, 2e38, failure);
-	dectest_construct(string, "1e38", failure);
-	dectest_construct(string, "100000000000000000000000000000000000000", failure);
+	/* Check large exponents. */
+	dectest_construct(double, 1e300, success);
+	dectest_construct(double, 1e-300, success);
+	dectest_construct(string, "1e1000", success);
+	dectest_construct(string, "1e-1000", success);
 	/* Check that inf and NaN are not allowed. Check bad input. */
 	dectest_construct(string, "inf", failure);
 	dectest_construct(string, "NaN", failure);
@@ -459,10 +457,6 @@ main(void)
 	dectest_construct(int64, LONG_MIN, success);
 	dectest_construct(int64, LONG_MAX, success);
 	dectest_construct(uint64, ULONG_MAX, success);
-
-	dectest_op_fail(add, 9e37, 1e37);
-	dectest_op_fail(mul, 1e19, 1e19);
-	dectest_op_fail(div, 1e19, 1e-19);
 
 	dectest_op1_fail(ln, 0);
 	dectest_op1_fail(ln, -1);
