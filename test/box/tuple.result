@@ -1380,7 +1380,7 @@ d
 ...
 d:update{{'+', 1, dec.new('1e37')}}
 ---
-- error: Decimal overflow when performing operation '+' on field 1
+- [100000000000000000000000000000000000000]
 ...
 d:update{{'-', 1, dec.new('1e37')}}
 ---

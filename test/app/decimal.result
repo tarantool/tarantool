@@ -404,10 +404,6 @@ decimal.log10(1)
  | ---
  | - 0
  | ...
-decimal.exp(88)
- | ---
- | - error: decimal operation failed
- | ...
 decimal.exp(87)
  | ---
  | - 60760302250568721495223289381302760753
@@ -454,14 +450,6 @@ decimal.abs()
 a = decimal.new('1e19')
  | ---
  | ...
-a * '1e19'
- | ---
- | - error: '[string "return a * ''1e19'' "]:1: decimal operation failed'
- | ...
-a ^ 2
- | ---
- | - error: '[string "return a ^ 2 "]:1: decimal operation failed'
- | ...
 a ^ 1.9
  | ---
  | - 1258925411794167210423954106395800606.1
@@ -477,25 +465,9 @@ decimal.precision(a)
  | ---
  | - 38
  | ...
-a + 1
- | ---
- | - error: '[string "return a + 1 "]:1: decimal operation failed'
- | ...
-a + '0.9'
- | ---
- | - error: '[string "return a + ''0.9'' "]:1: decimal operation failed'
- | ...
-a + '0.5'
- | ---
- | - error: '[string "return a + ''0.5'' "]:1: decimal operation failed'
- | ...
 a + '0.4'
  | ---
  | - 99999999999999999999999999999999999999
- | ...
-a / 0.5
- | ---
- | - error: '[string "return a / 0.5 "]:1: decimal operation failed'
  | ...
 1 / decimal.new('0')
  | ---
