@@ -57,6 +57,7 @@
 #include "memtx_engine.h"
 #include "memtx_space.h"
 #include "memcs_engine.h"
+#include "quiver_engine.h"
 #include "sysview.h"
 #include "blackhole.h"
 #include "service_engine.h"
@@ -5303,7 +5304,6 @@ engine_init()
 				    cfg_geti("memtx_sort_threads"),
 				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
-	assert(memtx->base.id < MAX_TX_ENGINE_COUNT);
 	box_set_memtx_max_tuple_size();
 
 	memcs_engine_register();
@@ -5315,10 +5315,11 @@ engine_init()
 				    cfg_geti("vinyl_write_threads"),
 				    box_is_force_recovery);
 	engine_register(vinyl);
-	assert(vinyl->id < MAX_TX_ENGINE_COUNT);
 	box_set_vinyl_max_tuple_size();
 	box_set_vinyl_cache();
 	box_set_vinyl_timeout();
+
+	quiver_engine_register();
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);

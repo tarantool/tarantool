@@ -47,6 +47,8 @@ void
 engine_register(struct engine *engine)
 {
 	assert(engine_count < MAX_ENGINE_COUNT);
+	assert((engine->flags & ENGINE_BYPASS_TX) != 0 ||
+	       engine_count < MAX_TX_ENGINE_COUNT);
 	engine->id = engine_count++;
 	engines[engine->id] = engine;
 }
