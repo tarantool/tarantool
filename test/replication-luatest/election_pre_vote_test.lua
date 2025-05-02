@@ -32,11 +32,13 @@ g.before_all(function()
 end)
 
 g.before_each(function()
+    g.cluster:wait_for_fullmesh()
+    -- Wait until an arbitrary node discovers the leader.
+    g.node1:wait_until_election_leader_found()
     g.leader = g.cluster:get_leader()
     t.assert(g.leader ~= nil, 'Cluster elected a leader')
     g.follower1 = g.node1 ~= g.leader and g.node1 or g.node2
     g.follower2 = g.node3 ~= g.leader and g.node3 or g.node2
-    g.cluster:wait_for_fullmesh()
 end)
 
 local function get_election_term()
