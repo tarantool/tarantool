@@ -1779,7 +1779,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	int regTupleid;
 	int iCol;
 	int nKey;
-	int iSortTab;		/* Sorter cursor to read from */
 	int nSortData;		/* Trailing values to read from sorter */
 	int i;
 	int bSeq;		/* True if sorter record includes seq. no. */
@@ -1804,17 +1803,13 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	}
 	nKey = pOrderBy->nExpr - pSort->nOBSat;
 	if (pSort->sortFlags & SORTFLAG_UseSorter) {
-		int regSortOut = ++pParse->nMem;
-		iSortTab = pParse->nTab++;
 		if (pSort->labelBkOut)
 			addrOnce = sqlVdbeAddOp0(v, OP_Once);
-		sqlVdbeAddOp3(v, OP_OpenPseudo, iSortTab, regSortOut,
-				  nKey + 1 + nSortData);
 		if (addrOnce)
 			sqlVdbeJumpHere(v, addrOnce);
 		addr = 1 + sqlVdbeAddOp2(v, OP_SorterSort, iTab, addrBreak);
 		codeOffset(v, p->iOffset, addrContinue);
-		sqlVdbeAddOp3(v, OP_SorterData, iTab, regSortOut, iSortTab);
+		sqlVdbeAddOp1(v, OP_SorterData, iTab);
 		bSeq = 0;
 	} else {
 		/* In case of DESC sorting order data should be taken from
@@ -1823,7 +1818,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 				    OP_Last : OP_Sort;
 		addr = 1 + sqlVdbeAddOp2(v, opPositioning, iTab, addrBreak);
 		codeOffset(v, p->iOffset, addrContinue);
-		iSortTab = iTab;
 		bSeq = 1;
 	}
 	for (i = 0, iCol = nKey + bSeq; i < nSortData; i++) {
@@ -1833,7 +1827,7 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 		} else {
 			iRead = iCol++;
 		}
-		sqlVdbeAddOp3(v, OP_Column, iSortTab, iRead, regRow + i);
+		sqlVdbeAddOp3(v, OP_Column, iTab, iRead, regRow + i);
 		VdbeComment((v, "%s",
 			     aOutEx[i].zName ? aOutEx[i].zName : aOutEx[i].
 			     zSpan));
@@ -2552,7 +2546,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 
 	/* Allocate cursors for Current, Queue, and Distinct. */
 	regCurrent = ++pParse->nMem;
-	sqlVdbeAddOp3(v, OP_OpenPseudo, iCurrent, regCurrent, nCol);
+	sqlVdbeAddOp2(v, OP_OpenPseudo, iCurrent, nCol);
 	struct sql_space_info *info;
 	if (pOrderBy) {
 		VdbeComment((v, "Orderby table"));
@@ -2591,13 +2585,13 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	addrTop = sqlVdbeAddOp2(v, OP_Rewind, iQueue, addrBreak);
 
 	/* Transfer the next row in Queue over to Current */
-	sqlVdbeAddOp1(v, OP_NullRow, iCurrent);	/* To reset column cache */
 	if (pOrderBy) {
 		sqlVdbeAddOp3(v, OP_Column, iQueue, pOrderBy->nExpr + 1,
 				  regCurrent);
 	} else {
 		sqlVdbeAddOp2(v, OP_RowData, iQueue, regCurrent);
 	}
+	sqlVdbeAddOp2(v, OP_PseudoData, iCurrent, regCurrent);
 	sqlVdbeAddOp1(v, OP_Delete, iQueue);
 
 	/* Output the single row in Current */
@@ -5995,8 +5989,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		int iAbortFlag;	/* Mem address which causes query abort if positive */
 		int groupBySort;	/* Rows come from source in GROUP BY order */
 		int addrEnd;	/* End of processing for this SELECT */
-		int sortPTab = 0;	/* Pseudotable used to decode sorting results */
-		int sortOut = 0;	/* Output register from the sorter */
 		int orderByGrp = 0;	/* True if the GROUP BY and ORDER BY are the same */
 
 		/* Remove any and all aliases between the result set and the
@@ -6186,11 +6178,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				sqlReleaseTempReg(pParse, regRecord);
 				sqlReleaseTempRange(pParse, regBase, nCol);
 				sqlWhereEnd(pWInfo);
-				sAggInfo.sortingIdxPTab = sortPTab =
-				    pParse->nTab++;
-				sortOut = sqlGetTempReg(pParse);
-				sqlVdbeAddOp3(v, OP_OpenPseudo, sortPTab,
-						  sortOut, nCol);
 				sqlVdbeAddOp2(v, OP_SorterSort,
 						  sAggInfo.sortingIdx, addrEnd);
 				VdbeComment((v, "GROUP BY sort"));
@@ -6223,14 +6210,13 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			addrTopOfLoop = sqlVdbeCurrentAddr(v);
 			sqlExprCacheClear(pParse);
 			if (groupBySort) {
-				sqlVdbeAddOp3(v, OP_SorterData,
-						  sAggInfo.sortingIdx, sortOut,
-						  sortPTab);
+				sqlVdbeAddOp1(v, OP_SorterData,
+					      sAggInfo.sortingIdx);
 			}
 			for (j = 0; j < pGroupBy->nExpr; j++) {
 				if (groupBySort) {
 					sqlVdbeAddOp3(v, OP_Column,
-							  sortPTab, j,
+						      sAggInfo.sortingIdx, j,
 							  iBMem + j);
 				} else {
 					sAggInfo.directMode = 1;
