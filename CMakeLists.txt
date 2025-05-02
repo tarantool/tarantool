@@ -34,6 +34,14 @@ find_program(RM rm)
 include (CTest)
 enable_testing()
 
+# CMake generates a file `.envrc`, supported by `direnv` [1] and
+# that allows loading and unloading environment variables
+# depending on the current directory.
+#
+# 1. https://direnv.net/
+set(ENVRC_FILENAME ${PROJECT_SOURCE_DIR}/.envrc)
+file(REMOVE ${ENVRC_FILENAME})
+
 # Define PACKAGE macro in tarantool/config.h
 set(PACKAGE "Tarantool" CACHE STRING "Package name.")
 
