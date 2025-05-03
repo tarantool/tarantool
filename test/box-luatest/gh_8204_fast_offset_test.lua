@@ -453,16 +453,13 @@ g_mvcc.test_count = function()
         box.schema.space.create('make_conflicting_writer')
         box.space.make_conflicting_writer:create_index('pk', {sequence = true})
 
-        local kd = require('key_def').new(s.index.pk.parts)
-
-        local all_iterators = {'lt', 'le', 'req', 'eq', 'ge', 'gt'}
-        local existing_keys = {}
-        local unexisting_keys = {}
-        local test_keys = {}
+        -- The test space data.
+        local existing_keys = {{1, 1}, {1, 3}, {1, 5},
+                               {3, 1}, {3, 3}, {3, 5},
+                               {5, 1}, {5, 3}, {5, 5}}
 
         -- Prepare proxies.
         local txn_proxy = require('test.box.lua.txn_proxy')
-        local tx = txn_proxy.new()
         local tx1 = txn_proxy.new()
         local tx2 = txn_proxy.new()
 
@@ -481,8 +478,8 @@ g_mvcc.test_count = function()
             return require('luatest.pp').tostring(raw_table)
         end
 
-        -- Check if count on sk_fast index with given key and iterator gives the
-        -- expected result for the given transaction.
+        -- Check if count on the primary kay with given key and iterator gives
+        -- the expected result for the given transaction.
         local function check(tx, it, key, expected_count, file, line)
             -- The location of the callee.
             local file = file or debug.getinfo(2, 'S').source
@@ -560,84 +557,427 @@ g_mvcc.test_count = function()
             t.assert_equals(s:len(), old_len, comment)
         end
 
-        -- Check if a tuple matches to the given iterator type and key.
-        local function tuple_matches(tuple, it, key)
-            -- An empty key matches to anything.
-            if #key == 0 then
-                return true
-            end
-
-            local lt_matches = it == 'lt' or it == 'le'
-            local eq_matches = it == 'le' or it == 'ge' or
-                               it == 'eq' or it == 'req'
-            local gt_matches = it == 'ge' or it == 'gt'
-
-            local cmp = kd:compare_with_key(tuple, key)
-            return (cmp == 0 and eq_matches) or
-                   (cmp < 0 and lt_matches) or
-                   (cmp > 0 and gt_matches)
+        -- Check if the local tables are consistent with space contents.
+        local function check_space()
+            t.assert_equals(s:len(), #existing_keys)
+            t.assert_equals(s:select(), existing_keys)
         end
 
-        -- Simple manual count implementation.
-        local function count_matching(t, it, key)
-            local result = 0
-            for _, tuple in pairs(t) do
-                if tuple_matches(tuple, it, key) then
-                    result = result + 1
-                end
+        -- Insert the keys to exist.
+        for _, key in pairs(existing_keys) do
+            s:insert(key)
+        end
+        check_space()
+
+        -- No conflict (count by full key & replace any key).
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {3, 3}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'replace', {5, 5}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {3, 3}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {3, 5}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {5, 3}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'replace', {5, 5}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {1, 1}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {1, 5}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {3, 1}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {3, 3}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {3, 5}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {5, 3}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'replace', {5, 5}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {3, 3}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'replace', {5, 5}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {3, 3}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {3, 5}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {5, 3}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'replace', {5, 5}, success)
+        check_space()
+
+        -- No conflict (count by partial key & replace any key).
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {1, 3}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'replace', {5, 5}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {3, 5}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {5, 3}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'replace', {5, 5}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {1, 1}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {1, 3}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {1, 5}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {3, 1}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {3, 3}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {3, 5}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {5, 1}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {5, 3}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'replace', {5, 5}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {1, 3}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {1, 5}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'replace', {5, 5}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {3, 1}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {3, 5}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {5, 1}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {5, 3}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'replace', {5, 5}, success)
+        check_space()
+
+        -- No conflict (count all & replace any key).
+        count_do(tx1, tx2, 'all', {}, 9, 'replace', {1, 1}, success)
+        count_do(tx1, tx2, 'all', {}, 9, 'replace', {3, 3}, success)
+        count_do(tx1, tx2, 'all', {}, 9, 'replace', {5, 5}, success)
+        check_space()
+
+        -- Conflict (count by full key & insert matching).
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {1, 6}, conflict)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {3, 2}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {1, 6}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {3, 2}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {3, 4}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {5, 2}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {6, 6}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {3, 4}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {5, 2}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {6, 6}, conflict)
+        check_space()
+
+        -- Conflict (count by partial key & insert matching).
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {1, 4}, conflict)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {2, 6}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {2, 0}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {3, 6}, conflict)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {3, 0}, conflict)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {3, 4}, conflict)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {3, 6}, conflict)
+        end
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {3, 0}, conflict)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {5, 0}, conflict)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {6, 6}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {4, 0}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {5, 4}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {6, 6}, conflict)
+        check_space()
+
+        -- Conflict (count all & insert matching).
+        count_do(tx1, tx2, 'all', {}, 9, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'all', {}, 9, 'insert', {3, 4}, conflict)
+        count_do(tx1, tx2, 'all', {}, 9, 'insert', {6, 6}, conflict)
+        check_space()
+
+        -- Conflict (count full unexisting & insert matching).
+        count_do(tx1, tx2, 'lt', {1, 1}, 0, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'lt', {1, 1}, 0, 'insert', {1, 0}, conflict)
+        count_do(tx1, tx2, 'le', {1, 0}, 0, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'le', {1, 0}, 0, 'insert', {1, 0}, conflict)
+        count_do(tx1, tx2, 'eq', {3, 4}, 0, 'insert', {3, 4}, conflict)
+        count_do(tx1, tx2, 'req', {3, 4}, 0, 'insert', {3, 4}, conflict)
+        count_do(tx1, tx2, 'ge', {5, 6}, 0, 'insert', {5, 6}, conflict)
+        count_do(tx1, tx2, 'ge', {5, 6}, 0, 'insert', {6, 6}, conflict)
+        count_do(tx1, tx2, 'gt', {5, 5}, 0, 'insert', {5, 6}, conflict)
+        count_do(tx1, tx2, 'gt', {5, 5}, 0, 'insert', {6, 6}, conflict)
+
+        -- Conflict (count partial unexisting & insert matching).
+        count_do(tx1, tx2, 'lt', {1}, 0, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'le', {0}, 0, 'insert', {0, 0}, conflict)
+        count_do(tx1, tx2, 'eq', {2}, 0, 'insert', {2, 3}, conflict)
+        count_do(tx1, tx2, 'req', {2}, 0, 'insert', {2, 3}, conflict)
+        count_do(tx1, tx2, 'ge', {6}, 0, 'insert', {6, 3}, conflict)
+        count_do(tx1, tx2, 'gt', {5}, 0, 'insert', {6, 3}, conflict)
+
+        -- Conflict (count by full key & delete matching).
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {1, 1}, conflict)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {1, 5}, conflict)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {3, 1}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {1, 1}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {1, 5}, conflict)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {3, 3}, conflict)
+        count_do(tx1, tx2, 'req', {3, 3}, 1, 'delete', {3, 3}, conflict)
+        count_do(tx1, tx2, 'eq', {3, 3}, 1, 'delete', {3, 3}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {3, 3}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {5, 1}, conflict)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {5, 5}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {3, 5}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {5, 3}, conflict)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {5, 5}, conflict)
+        check_space()
+
+        -- Conflict (count by partial key & delete matching).
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {1, 1}, conflict)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {1, 3}, conflict)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {1, 5}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {1, 1}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {3, 1}, conflict)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {3, 5}, conflict)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {3, 1}, conflict)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {3, 3}, conflict)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {3, 5}, conflict)
+        end
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {3, 1}, conflict)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {5, 1}, conflict)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {5, 5}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {5, 1}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {5, 3}, conflict)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {5, 5}, conflict)
+        check_space()
+
+        -- Conflict (count all & delete matching).
+        count_do(tx1, tx2, 'all', {}, 9, 'delete', {1, 1}, conflict)
+        count_do(tx1, tx2, 'all', {}, 9, 'delete', {3, 3}, conflict)
+        count_do(tx1, tx2, 'all', {}, 9, 'delete', {5, 5}, conflict)
+        check_space()
+
+        -- No conflict (count by full key & insert not matching).
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {3, 4}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {5, 2}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'insert', {6, 6}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {3, 4}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {5, 2}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'insert', {6, 6}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3, 3}, 1, 'insert', {0, 0}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'insert', {3, 4}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'insert', {6, 6}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {0, 0}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {1, 6}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'insert', {3, 2}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {0, 0}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {1, 6}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'insert', {3, 2}, success)
+        check_space()
+
+        -- No conflict (count by partial key & insert not matching).
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {3, 0}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {5, 0}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'insert', {6, 6}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {4, 0}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {5, 4}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'insert', {6, 6}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {0, 0}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {1, 4}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {2, 6}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {4, 0}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {5, 4}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'insert', {6, 6}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {0, 0}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {1, 4}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'insert', {2, 6}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {0, 0}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {2, 0}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'insert', {3, 6}, success)
+        check_space()
+
+        -- No conflict (count by full key & delete not matching).
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {3, 3}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {5, 1}, success)
+        count_do(tx1, tx2, 'lt', {3, 3}, 4, 'delete', {5, 5}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {3, 5}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {5, 3}, success)
+        count_do(tx1, tx2, 'le', {3, 3}, 5, 'delete', {5, 5}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {1, 1}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {1, 5}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {3, 1}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {3, 5}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {5, 3}, success)
+            count_do(tx1, tx2, it, {3, 3}, 1, 'delete', {5, 5}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {1, 1}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {1, 5}, success)
+        count_do(tx1, tx2, 'ge', {3, 3}, 5, 'delete', {3, 1}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {1, 1}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {1, 5}, success)
+        count_do(tx1, tx2, 'gt', {3, 3}, 4, 'delete', {3, 3}, success)
+        check_space()
+
+        -- No conflict (count by partial key & delete not matching).
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {3, 1}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {5, 1}, success)
+        count_do(tx1, tx2, 'lt', {3}, 3, 'delete', {5, 5}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {5, 1}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {5, 3}, success)
+        count_do(tx1, tx2, 'le', {3}, 6, 'delete', {5, 5}, success)
+        for _, it in pairs({'eq', 'req'}) do
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {1, 1}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {1, 3}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {1, 5}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {5, 1}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {5, 3}, success)
+            count_do(tx1, tx2, it, {3}, 3, 'delete', {5, 5}, success)
+        end
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {1, 1}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {1, 3}, success)
+        count_do(tx1, tx2, 'ge', {3}, 6, 'delete', {1, 5}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {1, 1}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {3, 1}, success)
+        count_do(tx1, tx2, 'gt', {3}, 3, 'delete', {3, 5}, success)
+        check_space()
+    end)
+end
+
+g_mvcc.test_count_consistency = function()
+    g_mvcc.server:exec(function()
+        -- The test space with fast offset PK.
+        local s = box.schema.space.create('test')
+        s:create_index('pk', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+
+        local existing_keys = {{1, 1}, {1, 3}, {1, 5},
+                               {3, 1}, {3, 3}, {3, 5},
+                               {5, 1}, {5, 3}, {5, 5}}
+        local unexisting_keys = {{1, 0}, {1, 2}, {1, 4}, {1, 6},
+                                 {3, 0}, {3, 2}, {3, 4}, {3, 6},
+                                 {5, 0}, {5, 2}, {5, 4}, {5, 6},
+                                 {0, 0}, {2, 2}, {4, 4}, {6, 6}}
+
+        -- Proxy helpers.
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local success = ''
+
+        -- Stringify a table (key or tuple) to use in lua code string.
+        -- E. g. array of 2 elements is transformed into "{1, 2}" string.
+        local function to_lua_code(table)
+            -- Create a raw table without metatables.
+            local raw_table = {}
+            for k, v in pairs(table) do
+                raw_table[k] = v
             end
-            return result
+            return require('luatest.pp').tostring(raw_table)
         end
 
-        -- Check for consistency of count with the given key and iterator in the
-        -- given transaction: first performs a count, and then performs inserts
-        -- and deletes of keys and checks if the count result remains the same.
-        --
-        -- If the transaction is nil, starts and commits a new one.
-        local function check_consistency(tx_arg, it, key, expected_count)
+        -- Check if count on the primary kay with given key and iterator gives
+        -- the expected result for the given transaction.
+        local function check(tx, it, key, expected_count)
             -- The location of the callee.
             local file = debug.getinfo(2, 'S').source
             local line = debug.getinfo(2, 'l').currentline
 
-            local old_len = s:len()
-            local tx = tx_arg or txn_proxy.new()
+            -- The stringified key.
+            local key = to_lua_code(key)
 
-            -- Start a transaction manually if no passed.
-            if tx_arg == nil then
-                tx:begin()
+            local code = string.format('box.space.test.index.pk:count(%s, ' ..
+                                       '{iterator = "%s"})', key, it)
+
+            local comment = string.format('\nkey: %s,\niterator: %s,' ..
+                                          '\nfile: %s,\nline: %d,',
+                                          key, it, file, line)
+
+            local ok, res = pcall(tx, code)
+            t.assert(ok, comment)
+            t.assert_equals(res, {expected_count}, comment)
+        end
+
+        -- The test routine.
+        local function test(tx)
+            -- Full key.
+            check(tx, 'lt', {3, 3}, 4)
+            check(tx, 'le', {3, 3}, 5)
+            for _, key in pairs(existing_keys) do
+                check(tx, 'eq', key, 1)
+                check(tx, 'req', key, 1)
             end
+            check(tx, 'ge', {3, 3}, 5)
+            check(tx, 'gt', {3, 3}, 4)
 
-            check(tx, it, key, expected_count, file, line)
+            -- Partial key.
+            check(tx, 'lt', {3}, 3)
+            check(tx, 'le', {3}, 6)
+            for _, key in pairs({{1}, {3}, {5}}) do
+                check(tx, 'eq', key, 3)
+                check(tx, 'req', key, 3)
+            end
+            check(tx, 'ge', {3}, 6)
+            check(tx, 'gt', {3}, 3)
+
+            -- Empty key.
+            check(tx, 'lt', {}, 9)
+            check(tx, 'le', {}, 9)
+            check(tx, 'eq', {}, 9)
+            check(tx, 'req', {}, 9)
+            check(tx, 'ge', {}, 9)
+            check(tx, 'gt', {}, 9)
+
+            -- Full unexisting key.
+            check(tx, 'lt', {1, 1}, 0)
+            check(tx, 'lt', {0, 0}, 0)
+            check(tx, 'le', {1, 0}, 0)
+            check(tx, 'eq', {3, 4}, 0)
+            check(tx, 'req', {3, 4}, 0)
+            check(tx, 'ge', {5, 6}, 0)
+            check(tx, 'ge', {8, 8}, 0)
+            check(tx, 'gt', {5, 5}, 0)
+            check(tx, 'gt', {8, 8}, 0)
+
+            -- Partial unexisting key.
+            check(tx, 'lt', {1}, 0)
+            check(tx, 'lt', {0}, 0)
+            check(tx, 'le', {0}, 0)
+            check(tx, 'eq', {2}, 0)
+            check(tx, 'req', {2}, 0)
+            check(tx, 'ge', {6}, 0)
+            check(tx, 'ge', {8}, 0)
+            check(tx, 'gt', {5}, 0)
+            check(tx, 'gt', {8}, 0)
+        end
+
+        -- Check for consistency of counts in a transaction: first performs a
+        -- number of counts, and then performs various inserts, replaces and
+        -- deletes of keys and checks if the count results remain the same.
+        local function check_consistency()
+            -- The location of the callee.
+            local existing_keys = s:select()
+            local old_len = #existing_keys
+            local tx = txn_proxy.new()
+
+            tx:begin()
+            test(tx)
             for _, new_key in pairs(unexisting_keys) do
                 s:insert(new_key)
-                check(tx, it, key, expected_count, file, line)
+                test(tx)
             end
             for _, old_key in pairs(existing_keys) do
                 s:delete(old_key)
-                check(tx, it, key, expected_count, file, line)
+                test(tx)
             end
             for _, old_key in pairs(unexisting_keys) do
                 s:delete(old_key)
-                check(tx, it, key, expected_count, file, line)
+                test(tx)
             end
             for _, new_key in pairs(existing_keys) do
                 s:insert(new_key)
-                check(tx, it, key, expected_count, file, line)
+                test(tx)
             end
-
-            -- Autocommit if no transaction passed.
-            if tx_arg == nil then
-                t.assert_equals(tx:commit(), success)
-            end
-
+            t.assert_equals(tx:commit(), success)
             t.assert_equals(s:len(), old_len)
             t.assert_equals(s:select(), existing_keys)
-        end
-
-        -- Some keys are defined to exist in the space, others - aren't. This
-        -- is useful for testing (one knows what can be inserted or deleted).
-        local function to_exist(i)
-            return i % 2 == 1 -- 1, 3, 5 exist, 0, 2, 4, 6 - don't.
         end
 
         -- Check if the local tables are consistent with space contents.
@@ -646,114 +986,14 @@ g_mvcc.test_count = function()
             t.assert_equals(s:select(), existing_keys)
         end
 
-        -- Generate key lists.
-        for i = 0, 6 do
-            for j = 0, 6 do
-                if to_exist(i) or j == i then
-                    if not to_exist(i) or not to_exist(j) then
-                        table.insert(unexisting_keys, {i, j})
-                    else
-                        table.insert(existing_keys, {i, j})
-                    end
-                    table.insert(test_keys, {i, j})
-                end
-            end
-            table.insert(test_keys, {i})
-        end
-        table.insert(test_keys, {})
-
         -- Insert the keys to exist.
         for _, key in pairs(existing_keys) do
             s:insert(key)
         end
         check_space()
 
-        -- No conflict (count by key & replace any key).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                for _, tuple in pairs(existing_keys) do
-                    count_do(tx1, tx2, it, key, expect,
-                             'replace', tuple, success)
-                end
-            end
-        end
-        check_space()
-
-        -- Conflict (count by key & insert matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                for _, tuple in pairs(unexisting_keys) do
-                    if tuple_matches(tuple, it, key) then
-                        count_do(tx1, tx2, it, key, expect,
-                                 'insert', tuple, conflict)
-                    end
-                end
-            end
-        end
-        check_space()
-
-        -- Conflict (count by key & delete matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                for _, tuple in pairs(existing_keys) do
-                    if tuple_matches(tuple, it, key) then
-                        count_do(tx1, tx2, it, key, expect,
-                                 'delete', tuple, conflict)
-                    end
-                end
-            end
-        end
-        check_space()
-
-        -- No conflict (count by key & insert not matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                for _, tuple in pairs(unexisting_keys) do
-                    if not tuple_matches(tuple, it, key) then
-                        count_do(tx1, tx2, it, key, expect,
-                                 'insert', tuple, success)
-                    end
-                end
-            end
-        end
-        check_space()
-
-        -- No conflict (count by key & delete not matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                for _, tuple in pairs(existing_keys) do
-                    if not tuple_matches(tuple, it, key) then
-                        count_do(tx1, tx2, it, key, expect,
-                                 'delete', tuple, success)
-                    end
-                end
-            end
-        end
-        check_space()
-
         -- Consistency in the read view.
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                check_consistency(nil, it, key, expect)
-            end
-        end
-        check_space()
-
-        -- Consistency in the read view (in a single transaction).
-        tx:begin()
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local expect = count_matching(existing_keys, it, key)
-                check_consistency(tx, it, key, expect)
-            end
-        end
-        t.assert_equals(tx:commit(), success)
+        check_consistency()
         check_space()
     end)
 end
@@ -801,19 +1041,13 @@ g_mvcc.test_offset = function()
         box.schema.space.create('make_conflicting_writer')
         box.space.make_conflicting_writer:create_index('pk', {sequence = true})
 
-        local kd = require('key_def').new(s.index.pk.parts)
-
-        local all_iterators = {'lt', 'le', 'req', 'eq', 'ge', 'gt'}
-        local iterator_is_reverse = {lt = true, le = true, req = true}
-        local existing_keys = {}
-        local unexisting_keys = {}
-        local all_keys = {}
-        local test_keys = {}
-        local test_offsets = {0, 3, 100}
+        -- The test space data.
+        local existing_keys = {{1, 1}, {1, 3}, {1, 5},
+                               {3, 1}, {3, 3}, {3, 5},
+                               {5, 1}, {5, 3}, {5, 5}}
 
         -- Prepare proxies.
         local txn_proxy = require('test.box.lua.txn_proxy')
-        local tx = txn_proxy.new()
         local tx1 = txn_proxy.new()
         local tx2 = txn_proxy.new()
 
@@ -831,41 +1065,6 @@ g_mvcc.test_offset = function()
             end
             return require('luatest.pp').tostring(raw_table)
         end
-
-        -- Some keys are defined to exist in the space, others - aren't. This
-        -- is useful for testing (one knows what can be inserted or deleted).
-        local function to_exist(i)
-            return i % 2 == 1 -- 1, 3, 5 exist, 0, 2, 4, 6 - don't.
-        end
-
-        -- Check if the local tables are consistent with space contents.
-        local function check_spaces()
-            t.assert_equals(s:len(), #existing_keys)
-            t.assert_equals(s:select(), existing_keys)
-        end
-
-        -- Generate key lists.
-        for i = 0, 6 do
-            for j = 0, 6 do
-                if to_exist(i) or j == i then
-                    if not to_exist(i) or not to_exist(j) then
-                        table.insert(unexisting_keys, {i, j})
-                    else
-                        table.insert(existing_keys, {i, j})
-                    end
-                    table.insert(all_keys, {i, j})
-                    table.insert(test_keys, {i, j})
-                end
-            end
-            table.insert(test_keys, {i})
-        end
-        table.insert(test_keys, {})
-
-        -- Insert the keys to exist.
-        for _, key in pairs(existing_keys) do
-            s:insert(key)
-        end
-        check_spaces()
 
         -- Check if select in the test space with given key and iterator gives
         -- the expected result.
@@ -899,7 +1098,7 @@ g_mvcc.test_offset = function()
         --
         -- The tuple inserted/deleted by tx2 is cleaned up.
         -- The make_conflicting_writer space is updated but not restored.
-        local function select_do(it, key, offset, expect, op, tuple, tx1_result)
+        local function test(it, key, offset, expect, op, tuple, tx1_result)
             assert(op == 'insert' or op == 'replace' or op == 'delete')
 
             local old_len = s:len()
@@ -948,229 +1147,379 @@ g_mvcc.test_offset = function()
             t.assert_equals(s:len(), old_len, comment)
         end
 
-        -- Check if a tuple matches to the given iterator type and key.
-        local function tuple_matches(tuple, it, key)
-            -- An empty key matches to anything.
-            if #key == 0 then
-                return true
-            end
-
-            local lt_matches = it == 'lt' or it == 'le'
-            local eq_matches = it == 'le' or it == 'ge' or
-                               it == 'eq' or it == 'req'
-            local gt_matches = it == 'ge' or it == 'gt'
-
-            local cmp = kd:compare_with_key(tuple, key)
-            return (cmp == 0 and eq_matches) or
-                   (cmp < 0 and lt_matches) or
-                   (cmp > 0 and gt_matches)
+        -- Check if the local tables are consistent with space contents.
+        local function check_space()
+            t.assert_equals(s:len(), #existing_keys)
+            t.assert_equals(s:select(), existing_keys)
         end
 
-        -- Check for consistency of select with key, iterator and offset in the
-        -- given transaction: first performs a select, and then performs various
-        -- inserts, replaces and deletes of keys and checks if the select result
-        -- remains the same.
-        --
-        -- If the transaction is nil, starts and commits a new one.
-        local function check_consistency(tx_arg, it, key, offset, expect)
+        -- Insert the keys to exist.
+        for _, key in pairs(existing_keys) do
+            s:insert(key)
+        end
+        check_space()
+
+        -- Conflict (select & replace/delete first).
+        for _, op in pairs({'replace', 'delete'}) do
+            -- Full key.
+            test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+
+            -- Partial key.
+            test('lt', {3}, 1, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('lt', {4}, 4, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('le', {3}, 4, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('le', {4}, 4, {{1, 3}, {1, 1}}, op, {1, 3}, conflict)
+            test('eq', {3}, 2, {{3, 5}}, op, {3, 5}, conflict)
+            test('req', {3}, 2, {{3, 1}}, op, {3, 1}, conflict)
+            test('ge', {5}, 1, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('ge', {4}, 1, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('gt', {3}, 1, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+            test('gt', {4}, 1, {{5, 3}, {5, 5}}, op, {5, 3}, conflict)
+        end
+        check_space()
+
+        -- No conflict (select & replace skipped).
+        -- Full key, reverse iterators.
+        for _, tuple in pairs({{3, 1}, {1, 5}}) do
+            test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+        end
+        -- Full key, forward iterators.
+        for _, tuple in pairs({{3, 5}, {5, 1}}) do
+            test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 5}, {3, 3}, {3, 1}, {1, 5}}) do
+            test('lt', {5}, 4, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('lt', {4}, 4, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('le', {3}, 4, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+            test('le', {4}, 4, {{1, 3}, {1, 1}}, 'replace', tuple, success)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 1}, {3, 3}, {3, 5}, {5, 1}}) do
+            test('ge', {3}, 4, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('ge', {2}, 4, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('gt', {1}, 4, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+            test('gt', {2}, 4, {{5, 3}, {5, 5}}, 'replace', tuple, success)
+        end
+        -- Partial key, equality iterators.
+        test('eq', {3}, 2, {{3, 5}}, 'replace', {3, 1}, success)
+        test('eq', {3}, 2, {{3, 5}}, 'replace', {3, 3}, success)
+        test('req', {3}, 2, {{3, 1}}, 'replace', {3, 5}, success)
+        test('req', {3}, 2, {{3, 1}}, 'replace', {3, 3}, success)
+        check_space()
+
+        -- Conflict (select & delete skipped).
+        -- Full key, reverse iterators.
+        for _, tuple in pairs({{3, 1}, {1, 5}}) do
+            test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+        end
+        -- Full key, forward iterators.
+        for _, tuple in pairs({{3, 5}, {5, 1}}) do
+            test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 5}, {3, 3}, {3, 1}, {1, 5}}) do
+            test('lt', {5}, 4, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('lt', {4}, 4, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('le', {3}, 4, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+            test('le', {4}, 4, {{1, 3}, {1, 1}}, 'delete', tuple, conflict)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 1}, {3, 3}, {3, 5}, {5, 1}}) do
+            test('ge', {3}, 4, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('ge', {2}, 4, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('gt', {1}, 4, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+            test('gt', {2}, 4, {{5, 3}, {5, 5}}, 'delete', tuple, conflict)
+        end
+        -- Partial key, equality iterators.
+        test('eq', {3}, 2, {{3, 5}}, 'delete', {3, 1}, conflict)
+        test('eq', {3}, 2, {{3, 5}}, 'delete', {3, 3}, conflict)
+        test('req', {3}, 2, {{3, 1}}, 'delete', {3, 5}, conflict)
+        test('req', {3}, 2, {{3, 1}}, 'delete', {3, 3}, conflict)
+        check_space()
+
+        -- Conflict (select & insert potentially skipped).
+        -- Full key, reverse iterators.
+        for _, tuple in pairs({{3, 0}, {1, 6}, {1, 4}}) do
+            test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+        end
+        -- Full key, forward iterators.
+        for _, tuple in pairs({{3, 6}, {5, 0}, {5, 2}}) do
+            test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 6}, {3, 4}, {3, 2}, {1, 6}, {1, 4}}) do
+            test('lt', {5}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('lt', {4}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('le', {3}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+            test('le', {4}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, conflict)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{3, 0}, {3, 2}, {3, 4}, {5, 0}, {5, 2}}) do
+            test('ge', {3}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('ge', {2}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('gt', {1}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+            test('gt', {2}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, conflict)
+        end
+        -- Partial key, equality iterators.
+        for _, tuple in pairs({{3, 0}, {3, 2}, {3, 4}, {3, 6}}) do
+            test('eq', {3}, 2, {{3, 5}}, 'insert', tuple, conflict)
+            test('req', {3}, 2, {{3, 1}}, 'insert', tuple, conflict)
+        end
+        check_space()
+
+        -- No conflict (select & replace/delete not matching).
+        for _, op in pairs({'replace', 'delete'}) do
+            -- Full key, reverse iterators.
+            for _, tuple in pairs({{3, 3}, {3, 5}, {5, 1}, {5, 3}, {5, 5}}) do
+                test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, op, tuple, success)
+            end
+            -- Full key, forward iterators.
+            for _, tuple in pairs({{1, 1}, {1, 3}, {1, 5}, {3, 1}, {3, 3}}) do
+                test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, op, tuple, success)
+            end
+            -- Partial key, reverse iterators.
+            for _, tuple in pairs({{5, 1}, {5, 3}, {5, 5}}) do
+                test('lt', {5}, 4, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('lt', {4}, 4, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('le', {3}, 4, {{1, 3}, {1, 1}}, op, tuple, success)
+                test('le', {4}, 4, {{1, 3}, {1, 1}}, op, tuple, success)
+            end
+            -- Partial key, reverse iterators.
+            for _, tuple in pairs({{1, 1}, {1, 3}, {1, 5}}) do
+                test('ge', {3}, 4, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('ge', {2}, 4, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('gt', {1}, 4, {{5, 3}, {5, 5}}, op, tuple, success)
+                test('gt', {2}, 4, {{5, 3}, {5, 5}}, op, tuple, success)
+            end
+            -- Partial key, equality iterators.
+            for _, tuple in pairs({{1, 1}, {1, 3}, {1, 5}, {5, 1}, {5, 5}}) do
+                test('eq', {3}, 2, {{3, 5}}, op, tuple, success)
+                test('req', {3}, 2, {{3, 1}}, op, tuple, success)
+            end
+        end
+        check_space()
+
+        -- No conflict (select & insert not matching).
+        -- Full key, reverse iterators.
+        for _, tuple in pairs({{3, 4}, {3, 6}, {4, 4}, {5, 0}, {5, 6}}) do
+            test('lt', {3, 3}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('lt', {3, 2}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('le', {3, 2}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('le', {3, 1}, 2, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+        end
+        -- Full key, forward iterators.
+        for _, tuple in pairs({{1, 0}, {1, 6}, {2, 2}, {3, 0}}) do
+            test('ge', {3, 5}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('ge', {3, 4}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('gt', {3, 3}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('gt', {3, 4}, 2, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{5, 0}, {5, 2}, {5, 4}, {5, 6}, {6, 6}}) do
+            test('lt', {5}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('lt', {4}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('le', {3}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+            test('le', {4}, 4, {{1, 3}, {1, 1}}, 'insert', tuple, success)
+        end
+        -- Partial key, reverse iterators.
+        for _, tuple in pairs({{1, 0}, {1, 2}, {1, 4}, {1, 6}}) do
+            test('ge', {3}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('ge', {2}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('gt', {1}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+            test('gt', {2}, 4, {{5, 3}, {5, 5}}, 'insert', tuple, success)
+        end
+        -- Partial key, equality iterators.
+        for _, tuple in pairs({{1, 0}, {1, 6}, {4, 4}, {5, 0}, {5, 6}}) do
+            test('eq', {3}, 2, {{3, 5}}, 'insert', tuple, success)
+            test('req', {3}, 2, {{3, 1}}, 'insert', tuple, success)
+        end
+        check_space()
+    end)
+end
+
+g_mvcc.test_offset_consistency = function()
+    g_mvcc.server:exec(function()
+        -- The test space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
+
+        -- Create a space to make tested transactions writing - only writing
+        -- transactions can cause conflicts with aborts.
+        box.schema.space.create('make_conflicting_writer')
+        box.space.make_conflicting_writer:create_index('pk', {sequence = true})
+
+        local existing_keys = {{1, 1}, {1, 3}, {1, 5},
+                               {3, 1}, {3, 3}, {3, 5},
+                               {5, 1}, {5, 3}, {5, 5}}
+        local unexisting_keys = {{1, 0}, {1, 2}, {1, 4}, {1, 6},
+                                 {3, 0}, {3, 2}, {3, 4}, {3, 6},
+                                 {5, 0}, {5, 2}, {5, 4}, {5, 6},
+                                 {0, 0}, {2, 2}, {4, 4}, {6, 6}}
+
+        -- The transaction proxy.
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local success = ''
+
+        -- Stringify a table (key or tuple) to use in lua code string.
+        -- E. g. array of 2 elements is transformed into "{1, 2}" string.
+        local function to_lua_code(table)
+            -- Create a raw table without metatables.
+            local raw_table = {}
+            for k, v in pairs(table) do
+                raw_table[k] = v
+            end
+            return require('luatest.pp').tostring(raw_table)
+        end
+
+        -- Check if select in the test space with given key and iterator gives
+        -- the expected result.
+        local function check(tx, it, key, offset, expect)
             -- The location of the callee.
             local file = debug.getinfo(2, 'S').source
             local line = debug.getinfo(2, 'l').currentline
 
+            -- The stringified key.
+            local key_str = to_lua_code(key)
+
+            local code = string.format('box.space.test:select(%s, ' ..
+                                       '{iterator = "%s", offset = %d})',
+                                       key_str, it, offset)
+
+            local comment = string.format(
+                '\nkey: %s,\niterator: %s,\noffset = %d\nfile: %s,' ..
+                '\nline: %d,', key_str, it, offset, file, line)
+
+            box.space.test.index.pk:len()
+            local ok, res = pcall(tx, code)
+            box.space.test.index.pk:bsize()
+            t.assert(ok, comment)
+            t.assert_equals(res, {expect}, comment)
+        end
+
+        -- The test routine.
+        local function test(tx)
+            -- Full key.
+            check(tx, 'lt', {3, 3}, 2, {{1, 3}, {1, 1}})
+            check(tx, 'lt', {3, 2}, 2, {{1, 3}, {1, 1}})
+            check(tx, 'le', {3, 2}, 2, {{1, 3}, {1, 1}})
+            check(tx, 'le', {3, 1}, 2, {{1, 3}, {1, 1}})
+            check(tx, 'ge', {3, 5}, 2, {{5, 3}, {5, 5}})
+            check(tx, 'ge', {3, 4}, 2, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {3, 3}, 2, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {3, 4}, 2, {{5, 3}, {5, 5}})
+
+            -- Partial key.
+            check(tx, 'lt', {3}, 1, {{1, 3}, {1, 1}})
+            check(tx, 'lt', {4}, 4, {{1, 3}, {1, 1}})
+            check(tx, 'lt', {5}, 4, {{1, 3}, {1, 1}})
+            check(tx, 'le', {3}, 4, {{1, 3}, {1, 1}})
+            check(tx, 'le', {4}, 4, {{1, 3}, {1, 1}})
+            check(tx, 'eq', {3}, 2, {{3, 5}})
+            check(tx, 'req', {3}, 2, {{3, 1}})
+            check(tx, 'ge', {5}, 1, {{5, 3}, {5, 5}})
+            check(tx, 'ge', {4}, 1, {{5, 3}, {5, 5}})
+            check(tx, 'ge', {3}, 4, {{5, 3}, {5, 5}})
+            check(tx, 'ge', {2}, 4, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {1}, 4, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {2}, 4, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {3}, 1, {{5, 3}, {5, 5}})
+            check(tx, 'gt', {4}, 1, {{5, 3}, {5, 5}})
+
+            -- Skip everything.
+            for _, offset in pairs({3, 4, 5, 50}) do
+                check(tx, 'lt', {3}, offset, {})
+                check(tx, 'lt', {2}, offset, {})
+                check(tx, 'le', {2}, offset, {})
+                check(tx, 'le', {1}, offset, {})
+                for _, key in pairs({{1}, {3}, {5}}) do
+                    check(tx, 'eq', key, offset, {})
+                    check(tx, 'req', key, offset, {})
+                end
+                check(tx, 'ge', {5}, offset, {})
+                check(tx, 'ge', {4}, offset, {})
+                check(tx, 'gt', {4}, offset, {})
+                check(tx, 'gt', {3}, offset, {})
+            end
+        end
+
+        -- Check for consistency of select in a transaction. First performs a
+        -- number of selects, and then performs various inserts, replaces and
+        -- deletes of keys and checks if select results remain the same.
+        local function check_consistency()
+            -- The location of the callee.
             local existing_keys = s:select()
             local old_len = #existing_keys
-            local tx = tx_arg or txn_proxy.new()
+            local tx = txn_proxy.new()
 
-            -- Start a transaction manually if no passed.
-            if tx_arg == nil then
-                tx:begin()
-            end
-
-            check(tx, it, key, offset, expect, file, line)
+            tx:begin()
+            test(tx)
             for _, new_key in pairs(unexisting_keys) do
                 s:insert(new_key)
-                check(tx, it, key, offset, expect, file, line)
+                test(tx)
             end
             for _, old_key in pairs(existing_keys) do
                 s:delete(old_key)
-                check(tx, it, key, offset, expect, file, line)
+                test(tx)
             end
             for _, old_key in pairs(unexisting_keys) do
                 s:delete(old_key)
-                check(tx, it, key, offset, expect, file, line)
+                test(tx)
             end
             for _, new_key in pairs(existing_keys) do
                 s:insert(new_key)
-                check(tx, it, key, offset, expect, file, line)
+                test(tx)
             end
-
-            -- Autocommit if no transaction passed.
-            if tx_arg == nil then
-                t.assert_equals(tx:commit(), success)
-            end
-
+            t.assert_equals(tx:commit(), success)
             t.assert_equals(s:len(), old_len)
             t.assert_equals(s:select(), existing_keys)
         end
 
-        -- Conflict (select & replace first).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    local first = selected[offset + 1]
-                    if first ~= nil then
-                        select_do(it, key, offset, expect,
-                                  'replace', first, conflict)
-                    end
-                end
-            end
+        -- Check if the local tables are consistent with space contents.
+        local function check_space()
+            t.assert_equals(s:len(), #existing_keys)
+            t.assert_equals(s:select(), existing_keys)
         end
 
-        -- Conflict (select & delete first).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    local first = selected[offset + 1]
-                    if first ~= nil then
-                        select_do(it, key, offset, expect,
-                                  'delete', first, conflict)
-                    end
-                end
-            end
+        -- Insert the keys to exist.
+        for _, key in pairs(existing_keys) do
+            s:insert(key)
         end
-
-        -- No conflict (select & replace skipped).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    local skipped = {unpack(selected, 1, offset)}
-                    for _, tuple in pairs(skipped) do
-                        select_do(it, key, offset, expect,
-                                  'replace', tuple, success)
-                    end
-                end
-            end
-        end
-        check_spaces()
-
-        -- Conflict (select & delete skipped).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    local skipped = {unpack(selected, 1, offset)}
-                    for _, tuple in pairs(skipped) do
-                        select_do(it, key, offset, expect,
-                                  'delete', tuple, conflict)
-                    end
-                end
-            end
-        end
-        check_spaces()
-
-        -- Conflict (select & insert potentially skipped).
-        for _, it in pairs(all_iterators) do
-            local dir = iterator_is_reverse[it] and -1 or 1
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    local first = selected[offset + 1]
-                    for _, tuple in pairs(unexisting_keys) do
-                        local matches = tuple_matches(tuple, it, key)
-                        local is_before_first = first == nil or
-                            kd:compare(tuple, first) * dir >= 0
-                        if matches and is_before_first then
-                            select_do(it, key, offset, expect,
-                                      'insert', tuple, conflict)
-                        end
-                    end
-                end
-            end
-        end
-
-        -- No conflict (select & replace not matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    for _, tuple in pairs(existing_keys) do
-                        if not tuple_matches(tuple, it, key) then
-                            select_do(it, key, offset, expect,
-                                      'replace', tuple, success)
-                        end
-                    end
-                end
-            end
-        end
-        check_spaces()
-
-        -- No conflict (select & delete not matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    for _, tuple in pairs(existing_keys) do
-                        if not tuple_matches(tuple, it, key) then
-                            select_do(it, key, offset, expect,
-                                      'delete', tuple, success)
-                        end
-                    end
-                end
-            end
-        end
-        check_spaces()
-
-        -- No conflict (select & insert not matching).
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    for _, tuple in pairs(unexisting_keys) do
-                        if not tuple_matches(tuple, it, key) then
-                            select_do(it, key, offset, expect,
-                                      'insert', tuple, success)
-                        end
-                    end
-                end
-            end
-        end
-        check_spaces()
+        check_space()
 
         -- Consistency in the read view.
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    check_consistency(nil, it, key, offset, expect)
-                end
-            end
-        end
-        check_spaces()
-
-        -- Consistency in the read view (in a single transaction).
-        tx:begin()
-        for _, it in pairs(all_iterators) do
-            for _, key in pairs(test_keys) do
-                local selected = s:select(key, {iterator = it})
-                for _, offset in pairs(test_offsets) do
-                    local expect = {unpack(selected, offset + 1, #selected)}
-                    check_consistency(tx, it, key, offset, expect)
-                end
-            end
-        end
-        t.assert_equals(tx:commit(), success)
-        check_spaces()
+        check_consistency()
+        check_space()
     end)
 end
