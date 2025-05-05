@@ -354,7 +354,7 @@ local function connect_common(cfg_or_name, ...)
                   'or name (string) but got ' .. type(cfg_or_name))
     end
     if type(cfg_or_name) == 'table' then
-        return connect_by_cfg(cfg_or_name, ...)
+        return connect_by_cfg(cfg_or_name)
     else
         return connect_by_rs_name(cfg_or_name, ...)
     end
