@@ -194,6 +194,15 @@ test-coverage: build run-luajit-test run-test
 	     --exclude '*/third_party/*'
 	lcov --list ${OUTPUT_FILE}
 
+.PHONY: run-cbmc-proofs
+run-cbmc-proofs: CMAKE_PARAMS = -DENABLE_BUNDLED_LIBUNWIND=OFF \
+                                -DENABLE_BUNDLED_ICONV=ON \
+                                -DENABLE_PROOFS=ON \
+                                -DCMAKE_BUILD_TYPE=Debug
+run-cbmc-proofs: configure
+	cmake --build ${BUILD_DIR} --parallel --target proofs
+	ctest --test-dir ${BUILD_DIR} -L proofs
+
 ##############################
 # OSX                        #
 ##############################
