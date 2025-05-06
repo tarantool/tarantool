@@ -94,6 +94,18 @@ int  decimal_scale(const decimal_t *dec) {
 	return dec->exponent < 0 ? -dec->exponent : 0;
 }
 
+bool
+decimal_fits_fixed_point(decimal_t *dec, int precision, int scale)
+{
+	decimal_t tmp = *dec;
+	decNumberReduce(&tmp, dec, &decimal_context);
+	VERIFY(decimal_check_status(&tmp, &decimal_context) != NULL);
+	int d = tmp.exponent + scale;
+	if (d < 0)
+		return false;
+	return tmp.digits + d <= precision;
+}
+
 decimal_t *
 decimal_zero(decimal_t *dec)
 {

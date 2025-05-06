@@ -505,6 +505,7 @@ t;
  |   293: box.error.MVCC_UNAVAILABLE
  |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
  |   295: box.error.SYNC_TIMEOUT
+ |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
  | ...
 
 test_run:cmd("setopt delimiter ''");

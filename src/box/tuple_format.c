@@ -40,6 +40,7 @@
 #include "field_default_func.h"
 #include "tt_static.h"
 #include "mpstream/mpstream.h"
+#include "mp_decimal.h"
 
 #include <PMurHash.h>
 
@@ -512,6 +513,7 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 	for (uint32_t i = 0; i < field_count; ++i) {
 		struct tuple_field *field = tuple_format_field(format, i);
 		field->type = fields[i].type;
+		field->type_params = fields[i].type_params;
 		field->nullable_action = fields[i].nullable_action;
 		struct coll *coll = NULL;
 		uint32_t cid = fields[i].coll_id;
@@ -985,6 +987,10 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 		}
 		if (! field_type1_contains_type2(field1->type, field2->type))
 			return false;
+		if (field_type_is_fixed_decimal[field1->type] &&
+		    field_type_is_fixed_decimal[field2->type] &&
+		    field1->type_params.scale != field2->type_params.scale)
+			return false;
 		/*
 		 * Do not allow transition from nullable to non-nullable:
 		 * it would require a check of all data in the space.
@@ -1060,6 +1066,18 @@ tuple_field_validate(struct tuple_format *format, struct tuple_field *field,
 				 tuple_field_path(field, format),
 				 field_type_strs[field->type], details,
 				 mp_data, mp_min, mp_max);
+			return -1;
+		}
+	}
+	if (field_type_is_fixed_decimal[field->type]) {
+		decimal_t value;
+		const char *mp = mp_data;
+		VERIFY(mp_decode_decimal(&mp, &value) != NULL);
+		int precision = field_type_decimal_precision[field->type];
+		if (!decimal_fits_fixed_point(&value, precision,
+					      field->type_params.scale)) {
+			diag_set(ClientError, ER_FIELD_IRREPRESENTABLE_VALUE,
+				 tuple_field_path(field, format), mp_data);
 			return -1;
 		}
 	}

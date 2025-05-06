@@ -80,7 +80,19 @@ enum field_type {
 	FIELD_TYPE_UINT64,
 	FIELD_TYPE_FLOAT32,
 	FIELD_TYPE_FLOAT64,
+	FIELD_TYPE_DECIMAL32,
+	FIELD_TYPE_DECIMAL64,
+	FIELD_TYPE_DECIMAL128,
+	FIELD_TYPE_DECIMAL256,
 	field_type_MAX
+};
+
+/**
+ * Extra parameters for parametric types like FIELD_TYPE_DECIMAL32 etc.
+ */
+union field_type_params {
+	/** Used by fix fixed point decimals. */
+	int64_t scale;
 };
 
 /**
@@ -104,6 +116,8 @@ extern const bool field_type_is_fixed_signed[];
 extern const bool field_type_is_fixed_unsigned[];
 extern const int64_t field_type_min_value[];
 extern const uint64_t field_type_max_value[];
+extern const bool field_type_is_fixed_decimal[];
+extern const int field_type_decimal_precision[];
 
 extern const char *on_conflict_action_strs[];
 
@@ -150,6 +164,8 @@ struct field_def {
 	 * then UNKNOWN is stored for it.
 	 */
 	enum field_type type;
+	/** Extra parameters for parametric types like decimal32 etc. */
+	union field_type_params type_params;
 	/** 0-terminated field name. */
 	char *name;
 	/** True, if a field can store NULL. */

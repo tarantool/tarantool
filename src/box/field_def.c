@@ -93,6 +93,10 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_UINT64]   =  */ 1U << MP_UINT,
 	/* [FIELD_TYPE_FLOAT32]  =  */ 1U << MP_FLOAT,
 	/* [FIELD_TYPE_FLOAT64]  =  */ 1U << MP_DOUBLE,
+	/* [FIELD_TYPE_DECIMAL32]  =  */ 0, /* only MP_DECIMAL is supported */
+	/* [FIELD_TYPE_DECIMAL64]  =  */ 0, /* only MP_DECIMAL is supported */
+	/* [FIELD_TYPE_DECIMAL128] =  */ 0, /* only MP_DECIMAL is supported */
+	/* [FIELD_TYPE_DECIMAL256] =  */ 0, /* only MP_DECIMAL is supported */
 };
 
 static_assert(lengthof(field_mp_type) == field_type_MAX,
@@ -125,6 +129,10 @@ const uint32_t field_ext_type[] = {
 	/* [FIELD_TYPE_UINT64]    = */ 0,
 	/* [FIELD_TYPE_FLOAT32]   = */ 0,
 	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+	/* [FIELD_TYPE_DECIMAL32]  = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_DECIMAL64]  = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_DECIMAL128] = */ 1U << MP_DECIMAL,
+	/* [FIELD_TYPE_DECIMAL256] = */ 1U << MP_DECIMAL,
 };
 
 static_assert(lengthof(field_ext_type) == field_type_MAX,
@@ -156,6 +164,10 @@ const char *field_type_strs[] = {
 	/* [FIELD_TYPE_UINT64]   = */ "uint64",
 	/* [FIELD_TYPE_FLOAT32]  = */ "float32",
 	/* [FIELD_TYPE_FLOAT64]  = */ "float64",
+	/* [FIELD_TYPE_DECIMAL32]  = */ "decimal32",
+	/* [FIELD_TYPE_DECIMAL64]  = */ "decimal64",
+	/* [FIELD_TYPE_DECIMAL128] = */ "decimal128",
+	/* [FIELD_TYPE_DECIMAL256] = */ "decimal256",
 };
 
 static_assert(lengthof(field_type_strs) == field_type_MAX,
@@ -190,6 +202,10 @@ const bool field_type_is_fixed_signed[] = {
 	/* [FIELD_TYPE_UINT64]    = */ false,
 	/* [FIELD_TYPE_FLOAT32]   = */ false,
 	/* [FIELD_TYPE_FLOAT64]   = */ false,
+	/* [FIELD_TYPE_DECIMAL32]  = */ false,
+	/* [FIELD_TYPE_DECIMAL64]  = */ false,
+	/* [FIELD_TYPE_DECIMAL128] = */ false,
+	/* [FIELD_TYPE_DECIMAL256] = */ false,
 };
 
 static_assert(lengthof(field_type_is_fixed_signed) == field_type_MAX,
@@ -224,6 +240,10 @@ const bool field_type_is_fixed_unsigned[] = {
 	/* [FIELD_TYPE_UINT64]    = */ true,
 	/* [FIELD_TYPE_FLOAT32]   = */ false,
 	/* [FIELD_TYPE_FLOAT64]   = */ false,
+	/* [FIELD_TYPE_DECIMAL32]  = */ false,
+	/* [FIELD_TYPE_DECIMAL64]  = */ false,
+	/* [FIELD_TYPE_DECIMAL128] = */ false,
+	/* [FIELD_TYPE_DECIMAL256] = */ false,
 };
 
 static_assert(lengthof(field_type_is_fixed_unsigned) == field_type_MAX, "Each "
@@ -255,6 +275,10 @@ const int64_t field_type_min_value[] = {
 	/* [FIELD_TYPE_UINT64]    = */ 0,
 	/* [FIELD_TYPE_FLOAT32]   = */ 0,
 	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+	/* [FIELD_TYPE_DECIMAL32]  = */ 0,
+	/* [FIELD_TYPE_DECIMAL64]  = */ 0,
+	/* [FIELD_TYPE_DECIMAL128] = */ 0,
+	/* [FIELD_TYPE_DECIMAL256] = */ 0,
 };
 
 static_assert(lengthof(field_type_min_value) == field_type_MAX,
@@ -286,10 +310,86 @@ const uint64_t field_type_max_value[] = {
 	/* [FIELD_TYPE_UINT64]    = */ UINT64_MAX,
 	/* [FIELD_TYPE_FLOAT32]   = */ 0,
 	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+	/* [FIELD_TYPE_DECIMAL32]  = */ 0,
+	/* [FIELD_TYPE_DECIMAL64]  = */ 0,
+	/* [FIELD_TYPE_DECIMAL128] = */ 0,
+	/* [FIELD_TYPE_DECIMAL256] = */ 0,
 };
 
 static_assert(lengthof(field_type_max_value) == field_type_MAX,
 	      "Each field type must be present in field_type_max_value");
+
+const bool field_type_is_fixed_decimal[] = {
+	/* [FIELD_TYPE_ANY]       = */ false,
+	/* [FIELD_TYPE_UNSIGNED]  = */ false,
+	/* [FIELD_TYPE_STRING]    = */ false,
+	/* [FIELD_TYPE_NUMBER]    = */ false,
+	/* [FIELD_TYPE_DOUBLE]    = */ false,
+	/* [FIELD_TYPE_INTEGER]   = */ false,
+	/* [FIELD_TYPE_BOOLEAN]   = */ false,
+	/* [FIELD_TYPE_VARBINARY] = */ false,
+	/* [FIELD_TYPE_SCALAR]    = */ false,
+	/* [FIELD_TYPE_DECIMAL]   = */ false,
+	/* [FIELD_TYPE_UUID]      = */ false,
+	/* [FIELD_TYPE_DATETIME]  = */ false,
+	/* [FIELD_TYPE_INTERVAL]  = */ false,
+	/* [FIELD_TYPE_ARRAY]     = */ false,
+	/* [FIELD_TYPE_MAP]       = */ false,
+	/* [FIELD_TYPE_INT8]      = */ false,
+	/* [FIELD_TYPE_UINT8]     = */ false,
+	/* [FIELD_TYPE_INT16]     = */ false,
+	/* [FIELD_TYPE_UINT16]    = */ false,
+	/* [FIELD_TYPE_INT32]     = */ false,
+	/* [FIELD_TYPE_UINT32]    = */ false,
+	/* [FIELD_TYPE_INT64]     = */ false,
+	/* [FIELD_TYPE_UINT64]    = */ false,
+	/* [FIELD_TYPE_FLOAT32]   = */ false,
+	/* [FIELD_TYPE_FLOAT64]   = */ false,
+	/* [FIELD_TYPE_DECIMAL32]  = */ true,
+	/* [FIELD_TYPE_DECIMAL64]  = */ true,
+	/* [FIELD_TYPE_DECIMAL128] = */ true,
+	/* [FIELD_TYPE_DECIMAL256] = */ true,
+};
+
+static_assert(lengthof(field_type_is_fixed_decimal) == field_type_MAX,
+	      "Each field type must be present in "
+	      "field_type_is_fixed_decimal");
+
+const int field_type_decimal_precision[] = {
+	/* [FIELD_TYPE_ANY]       = */ 0,
+	/* [FIELD_TYPE_UNSIGNED]  = */ 0,
+	/* [FIELD_TYPE_STRING]    = */ 0,
+	/* [FIELD_TYPE_NUMBER]    = */ 0,
+	/* [FIELD_TYPE_DOUBLE]    = */ 0,
+	/* [FIELD_TYPE_INTEGER]   = */ 0,
+	/* [FIELD_TYPE_BOOLEAN]   = */ 0,
+	/* [FIELD_TYPE_VARBINARY] = */ 0,
+	/* [FIELD_TYPE_SCALAR]    = */ 0,
+	/* [FIELD_TYPE_DECIMAL]   = */ 0,
+	/* [FIELD_TYPE_UUID]      = */ 0,
+	/* [FIELD_TYPE_DATETIME]  = */ 0,
+	/* [FIELD_TYPE_INTERVAL]  = */ 0,
+	/* [FIELD_TYPE_ARRAY]     = */ 0,
+	/* [FIELD_TYPE_MAP]       = */ 0,
+	/* [FIELD_TYPE_INT8]      = */ 0,
+	/* [FIELD_TYPE_UINT8]     = */ 0,
+	/* [FIELD_TYPE_INT16]     = */ 0,
+	/* [FIELD_TYPE_UINT16]    = */ 0,
+	/* [FIELD_TYPE_INT32]     = */ 0,
+	/* [FIELD_TYPE_UINT32]    = */ 0,
+	/* [FIELD_TYPE_INT64]     = */ 0,
+	/* [FIELD_TYPE_UINT64]    = */ 0,
+	/* [FIELD_TYPE_FLOAT32]   = */ 0,
+	/* [FIELD_TYPE_FLOAT64]   = */ 0,
+	/* [FIELD_TYPE_DECIMAL32]  = */ 9,
+	/* [FIELD_TYPE_DECIMAL64]  = */ 18,
+	/* [FIELD_TYPE_DECIMAL128] = */ 38,
+	/* [FIELD_TYPE_DECIMAL256] = */ 76,
+};
+
+static_assert(lengthof(field_type_is_fixed_decimal) == field_type_MAX,
+	      "Each field type must be present in "
+	      "field_type_is_fixed_decimal");
 
 const char *on_conflict_action_strs[] = {
 	/* [ON_CONFLICT_ACTION_NONE]     = */ "none",
@@ -328,19 +428,27 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2)
 	bool type1_contains_type2 = (mp_type1 & mp_type2) == mp_type2;
 	if (!type1_contains_type2)
 		return false;
-	if (!field_type_is_fixed_int(type1))
-		return true;
-	if (!field_type_is_fixed_int(type2)) {
-		/* uint64 is an alias for unsigned. */
-		return type1 == FIELD_TYPE_UINT64 &&
-		       type2 == FIELD_TYPE_UNSIGNED;
-	}
+	if (field_type_is_fixed_int(type1)) {
+		if (!field_type_is_fixed_int(type2)) {
+			/* uint64 is an alias for unsigned. */
+			return type1 == FIELD_TYPE_UINT64 &&
+			       type2 == FIELD_TYPE_UNSIGNED;
+		}
 
-	int64_t min1 = field_type_min_value[type1];
-	int64_t min2 = field_type_min_value[type2];
-	uint64_t max1 = field_type_max_value[type1];
-	uint64_t max2 = field_type_max_value[type2];
-	return min1 <= min2 && max1 >= max2;
+		int64_t min1 = field_type_min_value[type1];
+		int64_t min2 = field_type_min_value[type2];
+		uint64_t max1 = field_type_max_value[type1];
+		uint64_t max2 = field_type_max_value[type2];
+		return min1 <= min2 && max1 >= max2;
+	}
+	if (field_type_is_fixed_decimal[type1]) {
+		if (!field_type_is_fixed_decimal[type2])
+			return false;
+		int p1 = field_type_decimal_precision[type1];
+		int p2 = field_type_decimal_precision[type2];
+		return p1 >= p2;
+	}
+	return true;
 }
 
 /**
@@ -370,6 +478,7 @@ field_def_parse_foreign_key(const char **data, void *opts,
 static const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("type", field_type, struct field_def, type,
 		     field_type_by_name_wrapper),
+	OPT_DEF("scale", OPT_INT64, struct field_def, type_params.scale),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
 	OPT_DEF("is_nullable", OPT_BOOL, struct field_def, is_nullable),
 	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
@@ -391,6 +500,7 @@ static const struct opt_def field_def_reg_names_only[] = {
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
+	.type_params = { .scale = INT64_MAX, },
 	.name = NULL,
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
@@ -632,6 +742,18 @@ field_def_decode(struct field_def *field, const char **data,
 	if (field->compression_type == compression_type_MAX) {
 		field_def_error(fieldno, "unknown compression type");
 		return -1;
+	}
+	if (field_type_is_fixed_decimal[field->type]) {
+		if (field->type_params.scale == INT64_MAX) {
+			field_def_error(fieldno, "scale is not specified");
+			return -1;
+		}
+	} else {
+		if (field->type_params.scale != INT64_MAX) {
+			field_def_error(fieldno, "scale makes sense only for"
+					" fixed-point decimals");
+			return -1;
+		}
 	}
 	return 0;
 }
