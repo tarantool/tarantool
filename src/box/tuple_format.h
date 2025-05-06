@@ -122,6 +122,8 @@ struct tuple_field {
 	 * then UNKNOWN is stored for it.
 	 */
 	enum field_type type;
+	/** Extra parameters for parametric types like decimal32 etc. */
+	union field_type_params type_params;
 	/**
 	 * Offset slot in field map in tuple. Normally tuple
 	 * stores field map - offsets of all fields participating

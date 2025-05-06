@@ -452,10 +452,71 @@ test_print(void)
 	check_plan();
 }
 
+static void
+test_fits_fixed_point(void)
+{
+	plan(44);
+	header();
+
+	decimal_t a;
+
+	is(decimal_from_string(&a, "9999e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -11), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+
+	is(decimal_from_string(&a, "-9999e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -11), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+
+	is(decimal_from_string(&a, "9990e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -12), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+	is(decimal_fits_fixed_point(&a, 3, -11), true);
+	is(decimal_fits_fixed_point(&a, 2, -11), false);
+	is(decimal_fits_fixed_point(&a, 4, -11), true);
+
+	is(decimal_from_string(&a, "1000"), &a);
+	is(decimal_fits_fixed_point(&a, 4, 0), true);
+	is(decimal_fits_fixed_point(&a, 3, 0), false);
+	is(decimal_fits_fixed_point(&a, 3, -1), true);
+	is(decimal_fits_fixed_point(&a, 2, -1), false);
+	is(decimal_fits_fixed_point(&a, 2, -2), true);
+	is(decimal_fits_fixed_point(&a, 1, -2), false);
+	is(decimal_fits_fixed_point(&a, 1, -3), true);
+	is(decimal_fits_fixed_point(&a, 0, -3), false);
+
+	is(decimal_from_string(&a, "9999e-10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, 10), true);
+	is(decimal_fits_fixed_point(&a, 3, 10), false);
+	is(decimal_fits_fixed_point(&a, 5, 10), true);
+	is(decimal_fits_fixed_point(&a, 100, 9), false);
+	is(decimal_fits_fixed_point(&a, 5, 11), true);
+	is(decimal_fits_fixed_point(&a, 4, 11), false);
+	is(decimal_fits_fixed_point(&a, 6, 11), true);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(325);
+	plan(326);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -524,6 +585,7 @@ main(void)
 	test_mp_decimal();
 	test_mp_print();
 	test_print();
+	test_fits_fixed_point();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);
