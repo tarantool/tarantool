@@ -69,6 +69,13 @@ int
 decimal_scale(const decimal_t *dec);
 
 /**
+ * @return whether decimal can be represented as fixed point
+ * decimal with given precision and scale.
+ */
+bool
+decimal_fits_fixed_point(decimal_t *dec, int precision, int scale);
+
+/**
  * Initialize a zero decimal number.
  */
 decimal_t *
