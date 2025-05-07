@@ -152,6 +152,10 @@ struct xdir {
 	 * File name extension (.xlog or .snap).
 	 */
 	const char *filename_ext;
+	/**
+	 * Paired file name extension (.sortdata for .snap, none otherwise).
+	 */
+	const char *filename_ext_paired;
 	/** File create mode in this directory. */
 	mode_t mode;
 	/*
@@ -229,6 +233,13 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock);
 const char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
+
+/**
+ * Same as xdir_format_filename but returns the paired file name.
+ */
+const char *
+xdir_format_filename_paired(struct xdir *dir, int64_t signature,
+			    enum log_suffix suffix);
 
 /**
  * Return true if the given directory index has files whose
@@ -409,7 +420,9 @@ struct xlog {
 	int64_t tx_rows;
 	/** Log file name. */
 	char filename[PATH_MAX];
-	/** Whether this file has .inprogress suffix. */
+	/** Paired file name. */
+	char filename_paired[PATH_MAX];
+	/** Whether these files have .inprogress suffix. */
 	bool is_inprogress;
 	/*
 	 * If true, we can flush the data in this buffer whenever
@@ -452,7 +465,7 @@ struct xlog {
 };
 
 /**
- * Touch xdir snapshot file.
+ * Touch xdir snapshot and its paired file.
  *
  * @param xdir xdir
  * @param vclock        the global state of replication (vector
@@ -462,7 +475,7 @@ struct xlog {
  * @retval -1 if error
  */
 int
-xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
+xdir_touch_paired_xlog(struct xdir *dir, const struct vclock *vclock);
 
 /**
  * Create a new file and open it in write (append) mode.
@@ -481,6 +494,17 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
 int
 xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 		 const struct vclock *vclock);
+
+/**
+ * Same as xdir_create_xlog, but also check if the paired
+ * file exists and provides the file name.
+ *
+ * @param[out] filename_paired the name of the paired file
+ */
+int
+xdir_create_paired_xlog(struct xdir *dir, struct xlog *xlog,
+			const struct vclock *vclock,
+			const char **filename_paired);
 
 /**
  * Create new xlog writer based on fd.
