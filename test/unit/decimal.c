@@ -185,10 +185,10 @@ test_pack_unpack(void)
 	test_decpack("-3.141592653589793");
 	test_decpack("1234567891234567890.0987654321987654321");
 	test_decpack("-1234567891234567890.0987654321987654321");
-	test_decpack("0.0000000000000000000000000000000000001");
-	test_decpack("-0.0000000000000000000000000000000000001");
-	test_decpack("0.00000000000000000000000000000000000001");
-	test_decpack("-0.00000000000000000000000000000000000001");
+	test_decpack("1E-37");
+	test_decpack("-1E-37");
+	test_decpack("1E-38");
+	test_decpack("-1E-38");
 	test_decpack("99999999999999999999999999999999999999");
 	test_decpack("-99999999999999999999999999999999999999");
 
@@ -278,10 +278,10 @@ test_mp_decimal(void)
 	test_mpdec("-3.141592653589793");
 	test_mpdec("1234567891234567890.0987654321987654321");
 	test_mpdec("-1234567891234567890.0987654321987654321");
-	test_mpdec("0.0000000000000000000000000000000000001");
-	test_mpdec("-0.0000000000000000000000000000000000001");
-	test_mpdec("0.00000000000000000000000000000000000001");
-	test_mpdec("-0.00000000000000000000000000000000000001");
+	test_mpdec("1E-37");
+	test_mpdec("-1E-37");
+	test_mpdec("1E-38");
+	test_mpdec("-1E-38");
 	test_mpdec("99999999999999999999999999999999999999");
 	test_mpdec("-99999999999999999999999999999999999999");
 
@@ -400,10 +400,31 @@ test_mp_print(void)
 	check_plan();
 }
 
+static void
+test_print(void)
+{
+	plan(4);
+	header();
+
+	char buf[DECIMAL_MAX_STR_LEN + 1];
+	decimal_t d;
+
+	is(decimal_from_string(&d, "1e1000"), &d, "decimal(1e1000)");
+	decimal_to_string(&d, buf);
+	is(strcmp("1E+1000", buf), 0, "checking to_string(1e1000)");
+
+	is(decimal_from_string(&d, "1e-1000"), &d, "decimal(1e-1000)");
+	decimal_to_string(&d, buf);
+	is(strcmp("1E-1000", buf), 0, "checking to_string(1e-1000)");
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(324);
+	plan(325);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -470,6 +491,7 @@ main(void)
 
 	test_mp_decimal();
 	test_mp_print();
+	test_print();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);
