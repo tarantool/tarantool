@@ -91,6 +91,7 @@ local instance_config_fields = {
     'audit_log',
     'roles_cfg',
     'roles',
+    'stateboard',
     'failover',
     'compat',
     'labels',
@@ -443,6 +444,11 @@ g.test_defaults = function()
             wal_cleanup_delay_deprecation = 'old',
         },
         isolated = false,
+        stateboard = {
+            enabled = false,
+            renew_interval = 2,
+            keepalive_interval = 10,
+        },
     }
 
     -- Global defaults.
