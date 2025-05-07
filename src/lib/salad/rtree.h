@@ -60,6 +60,9 @@ struct rtree_neighbor {
 	void *child;
 	int level;
 	sq_coord_t distance;
+	/* Is used for sorting neighbors with same distence */
+	void *cmp_ctx;
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
 };
 
 typedef rb_tree(struct rtree_neighbor) rtnt_t;
@@ -99,8 +102,7 @@ enum spatial_search_op
 };
 
 /* A box in RTREE_DIMENSION space */
-struct rtree_rect
-{
+struct rtree_rect {
 	/* coords: { low X, upper X, low Y, upper Y, etc } */
 	coord_t coords[RTREE_MAX_DIMENSION * 2];
 };
@@ -114,6 +116,13 @@ typedef bool (*rtree_comparator_t)(const struct rtree_rect *rt1,
 enum rtree_distance_type {
 	RTREE_EUCLID = 0, /* Euclid distance, sqrt(dx*dx + dy*dy) */
 	RTREE_MANHATTAN = 1 /* Manhattan distance, fabs(dx) + fabs(dy) */
+};
+
+/* Neighbor pagination mode */
+enum position_type {
+	NO_PAGINATION = 0, /* No rtree pagination */
+	SET_POS = 1, /* new position set */
+	FIND_POS = 2 /* find pos tuple in rtree */
 };
 
 /* Main rtree struct */
@@ -177,6 +186,12 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+
+	/* Is used for sorting neighbors with same distance */
+	void *cmp_ctx;
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
+	int (*neighb_cmp)(void *child, struct rtree_iterator *itr,
+			  const char *pr_key_pos);
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
@@ -264,6 +279,18 @@ rtree_purge(struct rtree *tree);
 bool
 rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 	     enum spatial_search_op op, struct rtree_iterator *itr);
+
+/**
+ * @brief Skip neighbors for neighbor pagination
+ * @param itr - pointer to iterator (must be initialized earlier),
+ *  iterator itr should be used for accessing found record
+ * @param pos_distance min distance of last fetched rect
+ * @param pr_key_pos primary key of the position
+ */
+void
+rtree_skip_neighbors(struct rtree_iterator *itr,
+		     sq_coord_t pos_distance,
+		     const char *pr_key_pos);
 
 /**
  * @brief Insert a record to the tree
