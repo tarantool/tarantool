@@ -4,6 +4,7 @@
  * Copyright 2010-2023, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include "box/lua/tuple.h"
 #include "box/lua/tuple_format.h"
 
 #include "box/tuple.h"
@@ -81,11 +82,7 @@ lbox_tuple_format_new(struct lua_State *L)
 	 * object. So we have to be extra careful not to call anything that may
 	 * trigger Lua GC after we create a format and before we reference it.
 	 */
-	struct tuple_format **format_ptr =
-		lua_newuserdata(L, sizeof(*format_ptr));
-	*format_ptr = NULL;
-	luaL_getmetatable(L, tuple_format_typename);
-	lua_setmetatable(L, -2);
+	struct tuple_format **format_ptr = lbox_space_format_new_impl(L);
 	struct tuple_format *format =
 		runtime_tuple_format_new(format_data, format_data_len,
 					 names_only);
@@ -138,6 +135,48 @@ lbox_tuple_format_serialize(struct lua_State *L)
 }
 
 /*
+ * Validate a tuple or a Lua table against a given tuple format.
+ * Returns true if the value conforms to the format, otherwise throws
+ * an error.
+ */
+static int
+lbox_tuple_format_validate(lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return luaL_error(L, "Usage: format:validate(tuple_or_table)");
+
+	struct tuple_format *format = luaT_check_tuple_format(L, 1);
+	if (format == NULL)
+		return luaL_error(L, "Invalid tuple format");
+
+	struct tuple *tuple = NULL;
+	if (luaT_istuple(L, 2)) {
+		tuple = luaT_checktuple(L, 2);
+	} else if (lua_istable(L, 2)) {
+		tuple = luaT_tuple_new(L, 2, format);
+		if (tuple == NULL)
+			return luaT_error(L);
+	} else {
+		return luaL_error(L, "Expected tuple or table");
+	}
+
+	if (box_tuple_validate(tuple, format) != 0)
+		return luaT_error(L);
+
+	return 0;
+}
+
+struct tuple_format **
+lbox_space_format_new_impl(struct lua_State *L)
+{
+	struct tuple_format **format_ptr =
+		(struct tuple_format **)lua_newuserdata(L, sizeof(*format_ptr));
+	*format_ptr = NULL;
+	luaL_setmetatable(L, tuple_format_typename);
+	return format_ptr;
+}
+
+/*
  * Simply returns `ipairs(format:totable())`.
  */
 static int
@@ -160,6 +199,7 @@ box_lua_tuple_format_init(struct lua_State *L)
 		{"totable", lbox_tuple_format_serialize},
 		{"ipairs", lbox_tuple_format_ipairs},
 		{"pairs", lbox_tuple_format_ipairs},
+		{"validate", lbox_tuple_format_validate},
 		{NULL, NULL}
 	};
 	luaL_register_type(L, tuple_format_typename, lbox_tuple_format_meta);

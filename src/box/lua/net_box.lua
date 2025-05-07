@@ -1034,6 +1034,37 @@ function remote_methods:wait_state(state, timeout)
     return self.state == state or state[self.state] or false
 end
 
+local function make_format_object_proxy(conn, space_name, raw_cdata)
+    return setmetatable({
+        conn       = conn,
+        space_name = space_name,
+        raw        = raw_cdata,
+    }, {
+        __index = function(proxy, key)
+            if key == 'validate' then
+                return function(_, tuple)
+                    local expr = string.format(
+                        "return box.space.%s.format_object:validate(...)",
+                        proxy.space_name
+                    )
+                    return proxy.conn:eval(expr, { tuple })
+                end
+            end
+            local v = proxy.raw[key]
+            if type(v) == 'function' then
+                return function(_, ...) return v(proxy.raw, ...) end
+            end
+            return v
+        end,
+        __serialize = function(proxy)
+            return proxy.raw:totable()
+        end,
+        __tostring = function(proxy)
+            return require('yaml').encode(proxy.raw:totable())
+        end,
+    })
+end
+
 function remote_methods:_install_schema(schema_version, spaces, indices,
                                         collations, space_sequences)
     local sl, space_mt, index_mt = {}, self._space_mt, self._index_mt
@@ -1062,7 +1093,9 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         -- We pass `names_only=true` because format clauses received from IPROTO
         -- can be incompatible with, for instance, the data types known on the
         -- client.
-        s._format_cdata = box.internal.tuple_format.new(format, true)
+        local raw_fmt = box.internal.tuple_format.new(format, true)
+        s._format_cdata = raw_fmt
+        s.format_object = make_format_object_proxy(self, s.name, raw_fmt)
         s.connection = self
         if #space > 5 then
             local opts = space[6]
