@@ -16,7 +16,7 @@ decimal.new('1234.5678')
  | ...
 decimal.new('1e6')
  | ---
- | - 1000000
+ | - 1E+6
  | ...
 decimal.new('-6.234612e2')
  | ---
@@ -78,11 +78,11 @@ decimal.new(-1)
  | ...
 decimal.new(2^64)
  | ---
- | - 18446744073709600000
+ | - 1.84467440737096E+19
  | ...
 decimal.new(2^(-20))
  | ---
- | - 0.00000095367431640625
+ | - 9.5367431640625E-7
  | ...
 
 -- incorrect constructions
@@ -151,7 +151,7 @@ a * b
  | ...
 a / b
  | ---
- | - 100
+ | - 1.0E+2
  | ...
 a ^ b
  | ---
@@ -159,7 +159,7 @@ a ^ b
  | ...
 b ^ a
  | ---
- | - 0.0000000001
+ | - 1E-10
  | ...
 -a + -b == -(a + b)
  | ---
@@ -456,7 +456,7 @@ a ^ 1.9
  | ...
 a * '1e18'
  | ---
- | - 10000000000000000000000000000000000000
+ | - 1E+37
  | ...
 a = decimal.new(string.rep('9', 38))
  | ---
@@ -492,11 +492,11 @@ a = decimal.new('1e5')
  | ...
 a
  | ---
- | - 100000
+ | - 1E+5
  | ...
 decimal.trim(a)
  | ---
- | - 100000
+ | - 1E+5
  | ...
 decimal.trim(decimal.rescale(a, 10))
  | ---
@@ -508,11 +508,11 @@ decimal.rescale(a, 10)
  | ...
 decimal.rescale(a, -5)
  | ---
- | - 100000
+ | - 1E+5
  | ...
 decimal.rescale(a, 0)
  | ---
- | - 100000
+ | - 1E+5
  | ...
 decimal.rescale(a, 32)
  | ---
@@ -521,7 +521,7 @@ decimal.rescale(a, 32)
 -- scale too big
 decimal.rescale(a, 33)
  | ---
- | - 100000
+ | - 1E+5
  | ...
 decimal.trim(decimal.rescale(a, 10))
  | ---
@@ -546,11 +546,11 @@ decimal.round(decimal.new(0.9), 0)
  | ...
 decimal.round(decimal.new(9.9), 0)
  | ---
- | - 10
+ | - 1E+1
  | ...
 decimal.round(decimal.new(99.9), 0)
  | ---
- | - 100
+ | - 1.0E+2
  | ...
 decimal.round(decimal.new(99.4), 0)
  | ---
