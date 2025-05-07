@@ -332,13 +332,6 @@ vy_tx_manager_destroy_read_view(struct vy_tx_manager *xm,
 void
 vy_tx_manager_abort_writers_for_ddl(struct space *space, bool *need_wal_sync);
 
-/**
- * Abort all local rw transactions that haven't reached WAL yet.
- * Called before switching to read-only mode.
- */
-void
-vy_tx_manager_abort_writers_for_ro(struct engine *engine);
-
 /** Initialize a tx object. */
 void
 vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx);

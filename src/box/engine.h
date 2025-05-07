@@ -198,12 +198,6 @@ struct engine_vtab {
 	 */
 	void (*abort_with_conflict)(struct engine *engine, struct txn *txn);
 	/**
-	 * Notify the engine that the instance is about to switch
-	 * to read-only mode. The engine is supposed to abort all
-	 * active rw transactions when this method is called.
-	 */
-	void (*switch_to_ro)(struct engine *);
-	/**
 	 * Bootstrap an empty data directory
 	 */
 	int (*bootstrap)(struct engine *);
@@ -481,12 +475,6 @@ void
 engine_free(void);
 
 /**
- * Called before switching the instance to read-only mode.
- */
-void
-engine_switch_to_ro(void);
-
-/**
  * Initialize an empty data directory
  */
 int
@@ -569,7 +557,6 @@ void generic_engine_rollback_statement(struct engine *, struct txn *,
 void generic_engine_rollback(struct engine *, struct txn *);
 void generic_engine_send_to_read_view(struct engine *, struct txn *, int64_t);
 void generic_engine_abort_with_conflict(struct engine *, struct txn *);
-void generic_engine_switch_to_ro(struct engine *);
 int generic_engine_bootstrap(struct engine *);
 int generic_engine_begin_initial_recovery(struct engine *,
 					  const struct vclock *);
