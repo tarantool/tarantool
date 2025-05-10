@@ -78,6 +78,7 @@ g.test_limbo_in_rollback_confirm_not_written = function(cg)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         t.assert(_G.fiber.find(fid):join())
         -- Check that CONFIRM request was not written to the WAL.
-        t.assert(box.error.injection.get('ERRINJ_WAL_WRITE_COUNT'), write_count)
+        t.assert_equals(
+            box.error.injection.get('ERRINJ_WAL_WRITE_COUNT'), write_count)
     end, {fid})
 end
