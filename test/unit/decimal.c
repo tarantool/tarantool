@@ -119,7 +119,7 @@ char buf[64];
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
 	uint32_t l1 = decimal_len(&dec);\
-	ok(l1 <= 21 && l1 >= 2, "decimal_len("str")");\
+	ok(l1 <= 25 && l1 >= 2, "decimal_len("str")");\
 	char *b1 = decimal_pack(buf, &dec);\
 	is(b1, buf + l1, "decimal_len("str") == len(decimal_pack("str")");\
 	const char *b2 = buf;\
@@ -171,7 +171,7 @@ const uint32_t magic = 0xdecdecde;
 static int
 test_pack_unpack(void)
 {
-	plan(187);
+	plan(235);
 
 	test_decpack("0");
 	test_decpack("-0");
@@ -191,6 +191,16 @@ test_pack_unpack(void)
 	test_decpack("-1E-38");
 	test_decpack("99999999999999999999999999999999999999");
 	test_decpack("-99999999999999999999999999999999999999");
+	test_decpack("9.99E+1000");
+	test_decpack("-9.99E-1000");
+	/* Decimal with 38 significant digits and maximum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999E+999999");
+	/* Normal decimal with 38 significant digits and minimum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999E-999999");
+	/* Minimal subnormal decimal. */
+	test_decpack("1E-1000036");
+	/* Another subnormal decimal. */
+	test_decpack("9.99E-1000034");
 
 	/* Check correct encoding of positive exponent numbers. */
 	decimal_t dec, d1;
@@ -219,12 +229,6 @@ test_pack_unpack(void)
 	test_unpack(b, 1, failure, "");
 	b = "\x00\x9c";
 	test_unpack(b, 2, success, "9");
-	/*     V - scale 39 overflows any number. */
-	b = "\x27\x0c";
-	test_unpack(b, 2, failure, "");
-	/*     V   V - scale -38 overflows any number */
-	b = "\xd0\xda\x0c";
-	test_unpack(b, 3, failure, "");
 	b = "\x26\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x9c";
@@ -233,6 +237,15 @@ test_pack_unpack(void)
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x9c";
 	test_unpack(b, 21, success, "99999999999999999999999999999999999999");
+	/* 999e+999998 with adjusted exponent of 1000000. */
+	b = "\xd2\xff\xf0\xbd\xc2\x99\x9c";
+	test_unpack(b, 7, failure, "");
+	/* 9e-1000037 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x65\x9c";
+	test_unpack(b, 6, failure, "");
+	/* 9999e-1000037 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x65\x09\x99\x9c";
+	test_unpack(b, 8, failure, "");
 	/* Missing nibble. */
 	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
@@ -240,11 +253,6 @@ test_pack_unpack(void)
 	test_unpack(b, 21, failure, "");
 	/*         V - 39th digit overflows the buffer. */
 	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, failure, "");
-	/*     V - scale -1 multiplies the number by 10 and overflows. */
-	b = "\xff\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x9c";
 	test_unpack(b, 21, failure, "");
