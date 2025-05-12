@@ -1042,7 +1042,9 @@ test:do_execsql_test(
     [[
         SELECT TYPEOF(AVG(d)), AVG(d) FROM t18;
     ]], {
-        "decimal", dec.new('3333333333333333333373.7666666666666667')
+        "decimal",
+        dec.new("3333333333333333333373." ..
+                "766666666666666666666666666666666666666666666666666667")
     })
 
 test:do_execsql_test(
