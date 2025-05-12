@@ -451,17 +451,22 @@ static_assert(DECIMAL_DIGIT_CAPACITY >= DECIMAL_MAX_DIGITS,
 	      "DECIMAL_MAX_DIGITS");
 
 /*
- * Packed decimal representation is a BCD array (binary coded decimal),
- * containing 2 digits per byte, except one last nibble containing the sign.
- * So an input string of length L might fill up 2 * L - 1 digits.
+ * In decimal_unpack() we check BCD (binary coded decimal) input length
+ * to make sure it will fit into decimal_t. Length should be less than
+ * or equal to (DECIMAL_DIGIT_CAPACITY + 1) / 2.
  *
- * If DECIMAL_DIGIT_CAPACITY (CAP for short) is odd, we're fine. This is true
- * for now, because CAP = DECDPUN(3) * DECNUMUNITS(13) = 39, and maximum string
- * length (20) holds exactly 39 digits.
+ * At the same time we should make sure that this limit allows us
+ * to pass DECIMAL_MAX_DIGITS in BCD. BCD contains 2 digits per byte,
+ * except one last nibble containing the sign. So an input string of length
+ * L might fill up 2 * L - 1 digits.
  *
- * OTOH, if CAP becomes even, this means max safe input will be of length
- * (CAP + 1) / 2 == CAP / 2, allowing CAP - 1 digits at max. Hence
- * CAP - 1 must be >= DECIMAL_MAX_DIGITS.
+ * If DECIMAL_DIGIT_CAPACITY is odd then than limit allows to pass
+ * DECIMAL_DIGIT_CAPACITY digits which is surely greater than
+ * DECIMAL_MAX_DIGITS (we check it in assertion above and also it is
+ * true by decNumber design).
+ *
+ * If DECIMAL_DIGIT_CAPACITY is even then BCD can pass
+ * DECIMAL_DIGIT_CAPACITY - 1 digits.
  */
 static_assert(DECIMAL_DIGIT_CAPACITY % 2 == 1 ||
 	      DECIMAL_DIGIT_CAPACITY - 1 >= DECIMAL_MAX_DIGITS,

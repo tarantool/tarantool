@@ -32,7 +32,7 @@
  */
 
 /** Maximum decimal digigts taken by a decimal representation. */
-#define DECIMAL_MAX_DIGITS 38
+#define DECIMAL_MAX_DIGITS 76
 #define DECNUMDIGITS DECIMAL_MAX_DIGITS
 #include <decNumber/decNumber.h>
 #include <stdint.h>

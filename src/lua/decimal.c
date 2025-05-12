@@ -435,7 +435,7 @@ tarantool_lua_decimal_init(struct lua_State *L)
 				       "int32_t digits;"
 				       "int32_t exponent;"
 				       "uint8_t bits;"
-				       "uint16_t lsu[13];"
+				       "uint16_t lsu[26];"
 			      "} decimal_t;");
 	assert(rc == 0);
 	(void)rc;
