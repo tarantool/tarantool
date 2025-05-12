@@ -12,7 +12,8 @@ endif()
 # We support building with Clang and gcc. First check 
 # what we're using for build.
 #
-if (CMAKE_C_COMPILER_ID STREQUAL Clang)
+if (CMAKE_C_COMPILER_ID STREQUAL Clang OR
+    CMAKE_C_COMPILER_ID STREQUAL AppleClang)
     set(CMAKE_COMPILER_IS_CLANG  ON)
     set(CMAKE_COMPILER_IS_GNUCC  OFF)
     set(CMAKE_COMPILER_IS_GNUCXX OFF)
