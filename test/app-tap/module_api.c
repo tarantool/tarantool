@@ -2924,29 +2924,34 @@ test_decimal(struct lua_State *L)
 		{box_decimal_minus, "1",   "-1"},
 		{box_decimal_log10, "100", "2" },
 		{box_decimal_log10, "2",
-			/* Zero and 38 digits of the logarith. */
-			"0.30102999566398119521373889472449302677"},
+			/* Zero and 76 digits of the logarith. */
+			"0.30102999566398119521373889472449302676"
+			"81898814621085413104274611271081892744"},
 		{box_decimal_log10, "1",   "0" },
 		{box_decimal_ln,    "2",
 			/*
-			 * Zero and 37 digits of the logarith.
+			 * Zero and 75 digits of the logarith.
 			 *
+			 * 2, 1, 9, 6, 9, 6, 9, 4, 7, 1,
 			 * Interesting that it should be
-			 * ...656808 (not ...656810) if we'll
-			 * round 'exact' value to 38 digits.
+			 * ...219697 (not ...219700) if we'll
+			 * round 'exact' value to 76 digits.
 			 *
 			 * I guess it is okay to have precision
 			 * loss near to DECIMAL_MAX_DIGITS digits
 			 * after period, so just hold the result
 			 * in the test.
 			 */
-			"0.6931471805599453094172321214581765681"},
+			"0.69314718055994530941723212145817656807"
+			"5500134360255254120680009493393621970"},
 		{box_decimal_ln,    "1",   "0" },
 		{box_decimal_exp,   "0",   "1" },
 		{box_decimal_exp,   "1",
-			"2.7182818284590452353602874713526624978"},
+			"2.7182818284590452353602874713526624977"
+			"57247093699959574966967627724076630354"},
 		{box_decimal_exp,   "2",
-			"7.3890560989306502272304274605750078132"},
+			"7.3890560989306502272304274605750078131"
+			"80315570551847324087127822522573796079"},
 		{box_decimal_sqrt,  "4",   "2" },
 	};
 	for (size_t i = 0; i < lengthof(unary_cases); ++i) {
@@ -2982,16 +2987,20 @@ test_decimal(struct lua_State *L)
 		{box_decimal_mul,       "6",    "7",   "42"  },
 		{box_decimal_mul,
 			/*
-			 * Zero and three 38 times
-			 * (DECIMAL_MAX_DIGITS == 38).
+			 * Zero and three 76 times
+			 * (DECIMAL_MAX_DIGITS == 76).
 			 */
-			"0.33333333333333333333333333333333333333",
-			/* Zero and nine 38 times. */
-			"3",   "0.99999999999999999999999999999999999999"},
+			"0.33333333333333333333333333333333333333"
+			"33333333333333333333333333333333333333",
+			/* Zero and nine 76 times. */
+			"3",
+			"0.99999999999999999999999999999999999999"
+			"99999999999999999999999999999999999999"},
 		{box_decimal_div,       "7",    "2",   "3.5" },
 		{box_decimal_div,       "-7",   "3",
-			/* Two and three 37 times. */
-			"-2.3333333333333333333333333333333333333"},
+			/* Two and three 75 times. */
+			"-2.3333333333333333333333333333333333333"
+			"33333333333333333333333333333333333333"},
 		{box_decimal_div,       "36.6", "5",   "7.32"},
 		{box_decimal_div,       "36.6", "0.5", "73.2"},
 		{box_decimal_pow,       "2",    "8",   "256" },

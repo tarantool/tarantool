@@ -90,7 +90,7 @@ char buf[64];
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
 	uint32_t l1 = mp_sizeof_decimal(&dec);\
-	ok(l1 <= 25 && l1 >= 4, "mp_sizeof_decimal("str")");\
+	ok(l1 <= 43 && l1 >= 4, "mp_sizeof_decimal("str")");\
 	char *b1 = mp_encode_decimal(buf, &dec);\
 	is(b1, buf + l1, "mp_sizeof_decimal("str") == len(mp_encode_decimal("str"))");\
 	const char *b2 = buf;\
@@ -119,7 +119,7 @@ char buf[64];
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
 	uint32_t l1 = decimal_len(&dec);\
-	ok(l1 <= 25 && l1 >= 2, "decimal_len("str")");\
+	ok(l1 <= 44 && l1 >= 2, "decimal_len("str")");\
 	char *b1 = decimal_pack(buf, &dec);\
 	is(b1, buf + l1, "decimal_len("str") == len(decimal_pack("str")");\
 	const char *b2 = buf;\
@@ -189,18 +189,22 @@ test_pack_unpack(void)
 	test_decpack("-1E-37");
 	test_decpack("1E-38");
 	test_decpack("-1E-38");
-	test_decpack("99999999999999999999999999999999999999");
-	test_decpack("-99999999999999999999999999999999999999");
+	test_decpack("99999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999");
+	test_decpack("-99999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999");
 	test_decpack("9.99E+1000");
 	test_decpack("-9.99E-1000");
-	/* Decimal with 38 significant digits and maximum exponent. */
-	test_decpack("9.9999999999999999999999999999999999999E+999999");
-	/* Normal decimal with 38 significant digits and minimum exponent. */
-	test_decpack("9.9999999999999999999999999999999999999E-999999");
+	/* Decimal with 76 significant digits and maximum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999E+999999");
+	/* Normal decimal with 76 significant digits and minimum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999E-999999");
 	/* Minimal subnormal decimal. */
-	test_decpack("1E-1000036");
+	test_decpack("1E-1000074");
 	/* Another subnormal decimal. */
-	test_decpack("9.99E-1000034");
+	test_decpack("9.99E-1000072");
 
 	/* Check correct encoding of positive exponent numbers. */
 	decimal_t dec, d1;
@@ -229,43 +233,60 @@ test_pack_unpack(void)
 	test_unpack(b, 1, failure, "");
 	b = "\x00\x9c";
 	test_unpack(b, 2, success, "9");
-	b = "\x26\x09\x99\x99\x99\x99\x99\x99"
+	/* 76 digits number. */
+	b = "\x4c\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, success, "0.99999999999999999999999999999999999999");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, success,
+		    "0.99999999999999999999999999999999999999"
+		    "99999999999999999999999999999999999999");
+	/* 76 digits number. */
 	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, success, "99999999999999999999999999999999999999");
-	/* 999e+999998 with adjusted exponent of 1000000. */
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, success,
+		    "99999999999999999999999999999999999999"
+		    "99999999999999999999999999999999999999");
 	b = "\xd2\xff\xf0\xbd\xc2\x99\x9c";
 	test_unpack(b, 7, failure, "");
-	/* 9e-1000037 cannot be represented as subnormal. */
-	b = "\xce\x00\x0f\x42\x65\x9c";
+	/* 9e-1000075 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x8b\x9c";
 	test_unpack(b, 6, failure, "");
-	/* 9999e-1000037 cannot be represented as subnormal. */
-	b = "\xce\x00\x0f\x42\x65\x09\x99\x9c";
+	/* 9999e-1000075 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x8b\x09\x99\x9c";
 	test_unpack(b, 8, failure, "");
 	/* Missing nibble. */
 	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99";
 	test_unpack(b, 21, failure, "");
-	/*         V - 39th digit overflows the buffer. */
+	/*         V - 77th digit overflows the buffer. */
 	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, failure, "");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, failure, "");
 	/* Too long, non-empty. */
 	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x99\x9c";
-	test_unpack(b, 22, failure, "");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x9c";
+	test_unpack(b, 41, failure, "");
 	/* Too long, empty. Still fails. */
 	b = "\x00\x00\x00\x00\x00\x00\x00\x00"
 	    "\x00\x00\x00\x00\x00\x00\x00\x00"
-	    "\x00\x00\x00\x00\x00\x0c";
-	test_unpack(b, 22, failure, "");
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x0c";
+	test_unpack(b, 41, failure, "");
 	return check_plan();
 }
 
@@ -290,8 +311,10 @@ test_mp_decimal(void)
 	test_mpdec("-1E-37");
 	test_mpdec("1E-38");
 	test_mpdec("-1E-38");
-	test_mpdec("99999999999999999999999999999999999999");
-	test_mpdec("-99999999999999999999999999999999999999");
+	test_mpdec("99999999999999999999999999999999999999"
+		   "99999999999999999999999999999999999999");
+	test_mpdec("-99999999999999999999999999999999999999"
+		   "99999999999999999999999999999999999999");
 
 	return check_plan();
 }
@@ -468,8 +491,9 @@ main(void)
 	dectest_op1(log10, 100, 2, 0);
 	dectest_op1(ln, 10, 2.3, 2);
 	dectest_op1(ln, 1.1, 0.1, 1);
-	dectest_op1(ln, 1.0000000000000000000000000000000000001,
-		    0.0000000000000000000000000000000000001, 0);
+	dectest_op1(ln,
+		    1.000000000000000000000000000000000000000000000000000000000000000000000000001,
+		    0.000000000000000000000000000000000000000000000000000000000000000000000000001, 0);
 	dectest_op1(exp, 2, 7.39, 2);
 	dectest_op1(sqrt, 100, 10, 0);
 
