@@ -108,6 +108,30 @@ struct mh_i64ptr_node_t {
 #define mh_cmp_key(a, b, arg) ((a) != (b->key))
 #include "salad/mhash.h"
 
+static inline uint32_t
+mh_u64_hash(uint64_t u64)
+{
+	return u64 ^ (u64 >> 32);
+}
+
+/*
+ * Map: (uint64_t) => (uint32_t)
+ */
+#define mh_name _u64u32
+#define mh_key_t uint64_t
+struct mh_u64u32_node_t {
+	mh_key_t key;
+	uint32_t val;
+};
+
+#define mh_node_t struct mh_u64u32_node_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) (mh_u64_hash((a)->key))
+#define mh_hash_key(a, arg) (mh_u64_hash(a))
+#define mh_cmp(a, b, arg) ((a->key) != (b->key))
+#define mh_cmp_key(a, b, arg) ((a) != (b->key))
+#include "salad/mhash.h"
+
 /*
  * Map: (char * with length) => (void *)
  */
