@@ -223,6 +223,14 @@ void
 xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock);
 
 /**
+ * Return a file name based on directory path, vector clock
+ * sum, and a suffix (.inprogress or not).
+ */
+const char *
+xlog_format_filename(const char *dirname, int64_t signature,
+		     const char *ext, enum log_suffix suffix);
+
+/**
  * Return a file name based on directory type, vector clock
  * sum, and a suffix (.inprogress or not).
  */
@@ -269,12 +277,23 @@ enum {
 	XDIR_GC_REMOVE_ONE = 1 << 1,
 };
 
+typedef void
+(*xlog_remove_cb_f)(const char *dirname, int64_t signature);
+
 /**
  * Remove files whose signature is less than specified.
  * For possible values of @flags see XDIR_GC_*.
  */
 void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
+
+/**
+ * Same as xdir_collect_garbage but calls the @a xlog_remove_callback for each
+ * removed XLOG file signature.
+ */
+void
+xdir_collect_garbage_cb(struct xdir *dir, int64_t signature, unsigned flags,
+			xlog_remove_cb_f xlog_remove_callback);
 
 /**
  * Unlink single file with given vclock. If there's no file corresponding to
@@ -619,6 +638,13 @@ xlog_close_reuse_fd(struct xlog *l, int *fd);
  */
 int
 xlog_materialize(struct xlog *l);
+
+/**
+ * Same as xlog_materialize but works with the filename instead of the xlog
+ * structure. The filename buffer is updated accordingly.
+ */
+int
+xlog_materialize_filename(char *filename);
 
 /**
  * Discards an xlog object.

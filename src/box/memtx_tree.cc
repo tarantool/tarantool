@@ -31,6 +31,7 @@
 #include "memtx_tree.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -213,6 +214,8 @@ struct memtx_tree_index {
 	memtx_tree_t<USE_HINT> tree;
 	struct memtx_tree_data<USE_HINT> *build_array;
 	size_t build_array_size, build_array_alloc_size;
+	/** True if the MemTX sort data used for the secondary key. */
+	bool use_sk_sort_data;
 	struct memtx_gc_task gc_task;
 	memtx_tree_iterator_t<USE_HINT> gc_iterator;
 	/** Whether index is functional. */
@@ -2024,6 +2027,50 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		base, type, key, part_count, pos, 0);
 }
 
+/**
+ * Build the index using the O(n) sort algorithm with MemTX sort data.
+ */
+template<bool USE_HINT>
+static int
+memtx_tree_index_build_presorted(struct memtx_tree_index<USE_HINT> *index,
+				 struct memtx_sort_data_reader *reader)
+{
+	/* Check if can use the sort data. */
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	if (cmp_def->for_func_index)
+		panic("func indexes aren't expected to be presorted");
+
+	/*
+	 * Load the build array. Note that the names are not canonical: the
+	 * build_array_alloc_size used to be in elements, but it's in bytes.
+	 */
+	int rc = -1;
+	size_t build_array_bsize = memtx_sort_data_reader_get_size(reader);
+	struct memtx_tree_data<USE_HINT> *build_array =
+		(struct memtx_tree_data<USE_HINT> *)xmalloc(build_array_bsize);
+	size_t build_array_size = build_array_bsize / sizeof(build_array[0]);
+	if (memtx_sort_data_reader_get(reader, build_array) != 0)
+		goto clean_up; /* Failed to read sort data. */
+
+	/* Fix the tuple pointers. */
+	for (size_t i = 0; i < build_array_size; i++) {
+		struct tuple *old_ptr = build_array[i].tuple;
+		struct tuple *new_ptr =
+			memtx_sort_data_reader_resolve_tuple(reader, old_ptr);
+		if (new_ptr == NULL)
+			goto clean_up; /* Corrupted sort data. */
+		build_array[i].tuple = new_ptr;
+	}
+
+	/* Build the index. */
+	memtx_tree_build(&index->tree, build_array, build_array_size);
+	rc = 0; /* We're good now. */
+
+clean_up:
+	free(build_array);
+	return rc;
+}
+
 template <bool USE_HINT>
 static void
 memtx_tree_index_begin_build(struct index *base)
@@ -2031,7 +2078,25 @@ memtx_tree_index_begin_build(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	assert(memtx_tree_size(&index->tree) == 0);
-	(void)index;
+
+	/* Check if the SK sort data can be used. */
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	uint32_t space_id = base->def->space_id;
+	uint32_t index_id = base->def->iid;
+	index->use_sk_sort_data =
+		memtx->sort_data_reader != NULL && index_id > 0 &&
+		!space_has_before_replace_triggers(space_by_id(space_id));
+	if (index->use_sk_sort_data &&
+	    memtx_sort_data_reader_seek(memtx->sort_data_reader,
+					space_id, index_id,
+					&index->use_sk_sort_data) != 0) {
+		diag_log();
+		panic("Failed to seek the SK sort data");
+	}
+	if (index->use_sk_sort_data) {
+		say_info("Using MemTX sort data for building index '%s' of "
+			 "space '%s'", base->def->name, base->def->space_name);
+	}
 }
 
 template <bool USE_HINT>
@@ -2040,7 +2105,8 @@ memtx_tree_index_reserve(struct index *base, uint32_t size_hint)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	if (size_hint < index->build_array_alloc_size)
+	if (index->use_sk_sort_data ||
+	    size_hint < index->build_array_alloc_size)
 		return 0;
 	struct memtx_tree_data<USE_HINT> *tmp =
 		(struct memtx_tree_data<USE_HINT> *)
@@ -2098,10 +2164,28 @@ template <bool USE_HINT>
 static int
 memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 {
-	if (tuple_key_is_excluded(tuple, base->def->key_def, MULTIKEY_NONE))
-		return 0;
+	/* Skip if we use the MemTX sort data for SK build. */
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
+	if (index->use_sk_sort_data) {
+		assert(base->def->iid > 0);
+		return 0;
+	}
+
+	if (tuple_key_is_excluded(tuple, base->def->key_def, MULTIKEY_NONE))
+		return 0;
+
+	/* Deal with the PK sort data if required. */
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (memtx->sort_data_reader != NULL && base->def->iid == 0) {
+		uint32_t space_id = base->def->space_id;
+		bool is_first = index->build_array == NULL;
+		if (memtx_sort_data_reader_pk_add_tuple(memtx->sort_data_reader,
+							space_id, is_first,
+							tuple) != 0)
+			return -1;
+	}
+
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	return memtx_tree_index_build_array_append(index, tuple,
 						   tuple_hint(tuple, cmp_def));
@@ -2211,10 +2295,30 @@ template <bool USE_HINT>
 static void
 memtx_tree_index_end_build(struct index *base)
 {
+	/* Build using the SK sort data if required. */
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (index->use_sk_sort_data) {
+		assert(base->def->iid > 0);
+		if (memtx_tree_index_build_presorted(
+				index, memtx->sort_data_reader) != 0) {
+			diag_log();
+			panic("Failed to process the SK sort data");
+		}
+		return;
+	}
+
+	/* Check the PK sort data if required. */
+	uint32_t space_id = base->def->space_id;
+	if (memtx->sort_data_reader != NULL && base->def->iid == 0 &&
+	    memtx_sort_data_reader_pk_check(memtx->sort_data_reader,
+					    space_id) != 0) {
+		diag_log();
+		panic("Failed to process the PK sort data");
+	}
+
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	tt_sort(index->build_array, index->build_array_size,
 		sizeof(index->build_array[0]), memtx_tree_qcompare<USE_HINT>,
 		cmp_def, memtx->sort_threads);
@@ -2248,6 +2352,8 @@ struct tree_read_view {
 	memtx_tree_view_t<USE_HINT> tree_view;
 	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+	/** Used for dumping into the sort data file. */
+	memtx_tree_iterator_t<USE_HINT> dump_iterator;
 };
 
 /** Read view iterator implementation. */
@@ -2475,11 +2581,66 @@ memtx_tree_index_create_read_view(struct index *base)
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
+	invalidate_tree_iterator(&rv->dump_iterator);
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
 	tree_read_view_reset_key_def(rv);
 	return (struct index_read_view *)rv;
+}
+
+/** Dump the tree data into the sort data file. */
+template<bool USE_HINT>
+static int
+memtx_tree_index_read_view_dump_sort_data(
+	struct index_read_view *base, ssize_t tuple_count,
+	struct memtx_sort_data_writer *sort_data, bool *have_more)
+{
+	/* Collect the data to save. */
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	struct memtx_tree_data<USE_HINT> *buffer =
+		(struct memtx_tree_data<USE_HINT> *)
+			xcalloc(tuple_count, sizeof(*buffer));
+	ssize_t dumped = 0;
+	while (dumped != tuple_count &&
+	       memtx_tree_view_iterator_next(&rv->tree_view,
+					     &rv->dump_iterator)) {
+		struct memtx_tree_data<USE_HINT> *data =
+			memtx_tree_view_iterator_get_elem(
+				&rv->tree_view, &rv->dump_iterator);
+		if (memtx_tx_snapshot_clarify(&rv->cleaner,
+					      data->tuple) == NULL)
+			continue; /* Only dump visible data. */
+		buffer[dumped++] = *data;
+	}
+
+	/* Write the collected data to the sort data file. */
+	if (memtx_sort_data_writer_put(sort_data, buffer,
+				       sizeof(*buffer), dumped) != 0) {
+		free(buffer);
+		return -1;
+	}
+
+	*have_more = !memtx_tree_iterator_is_invalid(&rv->dump_iterator);
+	free(buffer);
+	return 0;
+}
+
+int
+memtx_tree_index_read_view_dump_sort_data(
+	struct index_read_view *base, ssize_t tuple_count,
+	struct memtx_sort_data_writer *sort_data, bool *have_more)
+{
+	struct key_def *key_def = base->def->key_def;
+	assert(!key_def->for_func_index);
+	if (base->def->opts.hint == INDEX_HINT_ON || key_def->is_multikey) {
+		return memtx_tree_index_read_view_dump_sort_data<true>(
+			base, tuple_count, sort_data, have_more);
+	} else {
+		return memtx_tree_index_read_view_dump_sort_data<false>(
+			base, tuple_count, sort_data, have_more);
+	}
 }
 
 /**

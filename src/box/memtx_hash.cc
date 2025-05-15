@@ -37,6 +37,7 @@
 #include "memtx_tx.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -711,6 +712,24 @@ memtx_hash_index_create_read_view(struct index *base)
 	return (struct index_read_view *)rv;
 }
 
+/** Implementation of build_next index callback. */
+static int
+memtx_hash_index_build_next(struct index *base, struct tuple *tuple)
+{
+	/* Deal with the memtx sort data. */
+	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (memtx->sort_data_reader != NULL && base->def->iid == 0) {
+		uint32_t space_id = base->def->space_id;
+		bool is_first = light_index_count(&index->hash_table) == 0;
+		if (memtx_sort_data_reader_pk_add_tuple(memtx->sort_data_reader,
+							space_id, is_first,
+							tuple) != 0)
+			return -1;
+	}
+	return generic_index_build_next(base, tuple);
+}
+
 static const struct index_vtab memtx_hash_index_vtab = {
 	/* .destroy = */ memtx_hash_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
@@ -741,7 +760,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
+	/* .build_next = */ memtx_hash_index_build_next,
 	/* .end_build = */ generic_index_end_build,
 };
 
