@@ -169,7 +169,6 @@ local function run_test(test)
     })
 end
 
-test_module.init()
 fiber.set_max_slice(9000)
 
 for _, test in ipairs(TESTS) do
