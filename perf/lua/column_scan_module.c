@@ -15,6 +15,16 @@
 
 #if defined(ENABLE_READ_VIEW)
 static box_raw_read_view_t *rv;
+
+static void
+init_rv(struct lua_State *L)
+{
+	if (rv == NULL) {
+		rv = box_raw_read_view_new("test");
+		if (rv == NULL)
+			luaT_error(L);
+	}
+}
 #endif /* ENABLE_READ_VIEW */
 
 static int
@@ -54,8 +64,7 @@ sum_iterator_lua_func(struct lua_State *L)
 static int
 sum_iterator_rv_lua_func(struct lua_State *L)
 {
-	if (rv == NULL)
-		return luaL_error(L, "run init() first");
+	init_rv(L);
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
@@ -145,8 +154,7 @@ sum_arrow_lua_func(struct lua_State *L)
 static int
 sum_arrow_rv_lua_func(struct lua_State *L)
 {
-	if (rv == NULL)
-		return luaL_error(L, "run init() first");
+	init_rv(L);
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
@@ -194,23 +202,10 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 }
 #endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
 
-static int
-init_lua_func(struct lua_State *L)
-{
-#if defined(ENABLE_READ_VIEW)
-	rv = box_raw_read_view_new("test");
-	if (rv == NULL)
-		return luaT_error(L);
-#endif /* defined(ENABLE_READ_VIEW) */
-	(void)L;
-	return 0;
-}
-
 LUA_API int
 luaopen_column_scan_module(struct lua_State *L)
 {
 	static const struct luaL_Reg lib[] = {
-		{"init", init_lua_func},
 		{"sum_iterator", sum_iterator_lua_func},
 #if defined(ENABLE_READ_VIEW)
 		{"sum_iterator_rv", sum_iterator_rv_lua_func},
