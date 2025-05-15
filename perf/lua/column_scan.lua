@@ -8,6 +8,8 @@
 -- the tarantool build directory if using out-of-source build.
 --
 
+require('compat').box_error_serialize_verbose = 'new'
+
 local clock = require('clock')
 local fiber = require('fiber')
 local fio = require('fio')
@@ -56,10 +58,25 @@ local MODULEPATH = fio.pathjoin(BUILDDIR, 'perf', 'lua',
 
 package.cpath = MODULEPATH .. ';' .. package.cpath
 
+local function die(fmt, ...)
+    local msg = fmt:format(...)
+    if log.cfg.log ~= nil then
+        log.error(msg)
+    end
+    io.stderr:write(msg .. '\n')
+    os.exit(1)
+end
+
+local function do_or_die(func, ...)
+    local ok, err = pcall(func, ...)
+    if not ok then
+        die('%s', err)
+    end
+end
+
 local has_column_scan, test_module = pcall(require, 'column_scan_module')
 if not has_column_scan then
-    io.stderr:write('Lua module "column_scan_module" is not found.\n')
-    os.exit(1)
+    die('Lua module "column_scan_module" is not found')
 end
 local test_funcs = {}
 
@@ -127,7 +144,7 @@ local function gen_insert(space_id, column_count, row_count)
     box.commit()
 end
 
-box.once('init', function()
+do_or_die(box.once, 'init', function()
     log.info('Creating the test space...')
     local format = {}
     for i = 1, params.column_count do
@@ -177,6 +194,7 @@ local TESTS = {
 
 local function run_test(test)
     local func = test.func
+    func() -- warmup
     local real_time_start = clock.time()
     local cpu_time_start = clock.proc()
     func()
@@ -193,8 +211,7 @@ fiber.set_max_slice(9000)
 
 for _, test in ipairs(TESTS) do
     log.info('Running test %s...', test.name)
-    test.func() -- warmup
-    run_test(test)
+    do_or_die(run_test, test)
 end
 
 bench:dump_results()
