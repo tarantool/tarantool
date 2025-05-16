@@ -28,6 +28,18 @@ init_rv(struct lua_State *L)
 #endif /* ENABLE_READ_VIEW */
 
 #if defined(ENABLE_ARROW)
+struct arrow_string {
+	int32_t len;
+	union {
+		char short_str[12];
+		struct PACKED {
+			char prefix[4];
+			int32_t buf_index;
+			int32_t offset;
+		};
+	};
+};
+
 static void
 arrow_schema_destroy(struct ArrowSchema *schema)
 {
@@ -171,6 +183,43 @@ sum_iterator_lua_func(struct lua_State *L)
 	return 1;
 }
 
+static int
+str_iterator_lua_func(struct lua_State *L)
+{
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	box_iterator_t *iter = box_index_iterator(space_id, index_id, ITER_ALL,
+						  key, key_end);
+	if (iter == NULL)
+		return luaT_error(L);
+	int rc = 0;
+	int64_t k = 0;
+	while (true) {
+		box_tuple_t *tuple;
+		rc = box_iterator_next(iter, &tuple);
+		if (rc != 0 || tuple == NULL)
+			break;
+		const char *data = box_tuple_field(tuple, field_no);
+		if (unlikely(data == NULL || mp_typeof(*data) != MP_STR)) {
+			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			break;
+		}
+		uint32_t len;
+		const char *str = mp_decode_str(&data, &len);
+		if (unlikely(len == 0 || str[0] != 'a' + k++ % 26)) {
+			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			break;
+		}
+	}
+	box_iterator_free(iter);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 #if defined(ENABLE_READ_VIEW)
 static int
 sum_iterator_rv_lua_func(struct lua_State *L)
@@ -216,6 +265,55 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 	luaL_pushuint64(L, sum);
 	return 1;
 }
+
+static int
+str_iterator_rv_lua_func(struct lua_State *L)
+{
+	init_rv(L);
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	box_raw_read_view_space_t *space =
+		box_raw_read_view_space_by_id(rv, space_id);
+	if (space == NULL)
+		return luaT_error(L);
+	box_raw_read_view_index_t *index =
+		box_raw_read_view_index_by_id(space, index_id);
+	if (index == NULL)
+		return luaT_error(L);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	box_raw_read_view_iterator_t iter;
+	if (box_raw_read_view_iterator_create(&iter, index, ITER_ALL,
+					      key, key_end) != 0)
+		return luaT_error(L);
+	int rc = 0;
+	int64_t k = 0;
+	while (true) {
+		uint32_t size;
+		const char *data;
+		rc = box_raw_read_view_iterator_next(&iter, &data, &size);
+		if (rc != 0 || data == NULL)
+			break;
+		if (unlikely(mp_typeof(*data) != MP_ARRAY ||
+			     mp_decode_array(&data) <= field_no)) {
+			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			break;
+		}
+		for (int i = 0; i < (int)field_no; i++)
+			mp_next(&data);
+		uint32_t len;
+		const char *str = mp_decode_str(&data, &len);
+		if (unlikely(len == 0 || str[0] != 'a' + k++ % 26)) {
+			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			break;
+		}
+	}
+	box_raw_read_view_iterator_destroy(&iter);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
 #endif /* defined(ENABLE_READ_VIEW) */
 
 #if defined(ENABLE_ARROW)
@@ -258,6 +356,63 @@ sum_arrow_lua_func(struct lua_State *L)
 		return luaT_error(L);
 	luaL_pushuint64(L, sum);
 	return 1;
+}
+
+static int
+str_arrow_lua_func(struct lua_State *L)
+{
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
+		return luaT_error(L);
+	bool use_view_types = lua_toboolean(L, 4);
+	bool touch_string = lua_toboolean(L, 5);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	uint32_t fields[] = {field_no};
+	uint32_t field_count = lengthof(fields);
+	box_arrow_options_t *options = box_arrow_options_new();
+	box_arrow_options_set_batch_row_count(options, 4096);
+	box_arrow_options_set_force_view_types(options, use_view_types);
+	struct ArrowArrayStream stream;
+	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
+					key, key_end, options, &stream);
+	if (rc != 0) {
+		box_arrow_options_delete(options);
+		return luaT_error(L);
+	}
+	int64_t k = 0;
+	struct ArrowArray array;
+	while (true) {
+		rc = stream.get_next(&stream, &array);
+		if (rc != 0 || array.n_children != 1)
+			break;
+		if (touch_string) {
+			int64_t count = array.children[0]->length;
+			const int32_t *offsets = array.children[0]->buffers[1];
+			const char *values = array.children[0]->buffers[2];
+			for (int64_t i = 0; i < count; i++, k++) {
+				int32_t pos = offsets[i];
+				/* Load first char of a string. */
+				if (unlikely(values[pos] != 'a' + k % 26)) {
+					rc = box_error_raise(
+						ER_PROC_LUA,
+						"unexpected result");
+					break;
+				}
+			}
+		}
+		if (array.release != NULL)
+			array.release(&array);
+	}
+	stream.release(&stream);
+	box_arrow_options_delete(options);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
 }
 #endif /* defined(ENABLE_ARROW) */
 
@@ -311,6 +466,101 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 	luaL_pushuint64(L, sum);
 	return 1;
 }
+
+static int
+str_arrow_rv_lua_func(struct lua_State *L)
+{
+	init_rv(L);
+	uint32_t space_id = luaL_checkinteger(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	uint32_t field_no = luaL_checkinteger(L, 3);
+	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
+		return luaT_error(L);
+	bool use_view_types = lua_toboolean(L, 4);
+	bool touch_string = lua_toboolean(L, 5);
+	box_raw_read_view_space_t *space =
+		box_raw_read_view_space_by_id(rv, space_id);
+	if (space == NULL)
+		return luaT_error(L);
+	box_raw_read_view_index_t *index =
+		box_raw_read_view_index_by_id(space, index_id);
+	if (index == NULL)
+		return luaT_error(L);
+	char key[8];
+	char *key_end = mp_encode_array(key, 0);
+	uint32_t fields[] = {field_no};
+	uint32_t field_count = lengthof(fields);
+	box_arrow_options_t *options = box_arrow_options_new();
+	box_arrow_options_set_batch_row_count(options, 4096);
+	box_arrow_options_set_force_view_types(options, use_view_types);
+	struct ArrowArrayStream stream;
+	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
+						key, key_end, options, &stream);
+	if (rc != 0) {
+		box_arrow_options_delete(options);
+		return luaT_error(L);
+	}
+	int64_t k = 0;
+	struct ArrowArray array;
+	while (true) {
+		rc = stream.get_next(&stream, &array);
+		if (rc != 0 || array.n_children != 1)
+			break;
+		const struct ArrowArray *column = array.children[0];
+		if (touch_string && !use_view_types) {
+			const int32_t *offsets = column->buffers[1];
+			const char *values = column->buffers[2];
+			for (int64_t i = 0; i < column->length; i++, k++) {
+				int32_t pos = offsets[i];
+				/* Load first char of a string. */
+				if (unlikely(values[pos] != 'a' + k % 26)) {
+					rc = box_error_raise(
+						ER_PROC_LUA,
+						"unexpected result");
+					break;
+				}
+			}
+		} else if (touch_string && use_view_types) {
+			const struct arrow_string *strings = column->buffers[1];
+			for (int64_t i = 0; i < column->length; i++, k++) {
+				const struct arrow_string *str = &strings[i];
+				/* Load first char of a string. */
+				char c;
+				if (str->len <= 12) {
+					c = str->short_str[0];
+				} else {
+					if (unlikely(str->buf_index < 0 ||
+						     str->buf_index >=
+						     column->n_buffers - 3)) {
+						rc = box_error_raise(
+							ER_PROC_LUA,
+							"unexpected result");
+						break;
+					}
+					const char *buf =
+						column->buffers[2 +
+							str->buf_index];
+					c = buf[str->offset];
+				}
+				if (unlikely(c != 'a' + k % 26)) {
+					rc = box_error_raise(
+						ER_PROC_LUA,
+						"unexpected result");
+					break;
+				}
+			}
+		}
+		if (array.release != NULL)
+			array.release(&array);
+	}
+	stream.release(&stream);
+	box_arrow_options_delete(options);
+	if (array.release != NULL)
+		array.release(&array);
+	if (rc != 0)
+		return luaT_error(L);
+	return 0;
+}
 #endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
 
 LUA_API int
@@ -321,14 +571,18 @@ luaopen_column_scan_module(struct lua_State *L)
 		{"gen_arrow", gen_arrow_lua_func},
 #endif /* defined(ENABLE_ARROW) */
 		{"sum_iterator", sum_iterator_lua_func},
+		{"str_iterator", str_iterator_lua_func},
 #if defined(ENABLE_READ_VIEW)
 		{"sum_iterator_rv", sum_iterator_rv_lua_func},
+		{"str_iterator_rv", str_iterator_rv_lua_func},
 #endif /* defined(ENABLE_READ_VIEW) */
 #if defined(ENABLE_ARROW)
 		{"sum_arrow", sum_arrow_lua_func},
+		{"str_arrow", str_arrow_lua_func},
 #endif /* defined(ENABLE_ARROW) */
 #if defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW)
 		{"sum_arrow_rv", sum_arrow_rv_lua_func},
+		{"str_arrow_rv", str_arrow_rv_lua_func},
 #endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
 		{NULL, NULL},
 	};
