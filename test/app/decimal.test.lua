@@ -112,7 +112,6 @@ decimal.ln(1)
 decimal.log10(0)
 decimal.log10(-1)
 decimal.log10(1)
-decimal.exp(88)
 decimal.exp(87)
 decimal.sqrt(-5)
 decimal.sqrt(5)
@@ -127,17 +126,11 @@ decimal.precision()
 decimal.abs()
 
 a = decimal.new('1e19')
-a * '1e19'
-a ^ 2
 a ^ 1.9
 a * '1e18'
-a = decimal.new(string.rep('9', 38))
+a = decimal.new(string.rep('9', 76))
 decimal.precision(a)
-a + 1
-a + '0.9'
-a + '0.5'
 a + '0.4'
-a / 0.5
 1 / decimal.new('0')
 
 a = decimal.new('-13')
@@ -152,9 +145,9 @@ decimal.trim(decimal.rescale(a, 10))
 decimal.rescale(a, 10)
 decimal.rescale(a, -5)
 decimal.rescale(a, 0)
-decimal.rescale(a, 32)
+decimal.rescale(a, 70)
 -- scale too big
-decimal.rescale(a, 33)
+decimal.rescale(a, 71)
 decimal.trim(decimal.rescale(a, 10))
 a = decimal.new('123.456789000000000')
 a

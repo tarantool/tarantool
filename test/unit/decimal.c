@@ -62,13 +62,6 @@
 	is(decimal_from_##type(&dec, a), expect(&dec), "decimal construction from "#a" "#expect);\
 })
 
-#define dectest_op_fail(op, stra, strb) ({\
-	decimal_t a, b, c;\
-	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
-	is(decimal_from_string(&b, #strb), &b, "decimal_from_string("#strb")");\
-	is(decimal_##op(&c, &a, &b), NULL, "decimal_"#op"("#stra", "#strb") - overflow");\
-})
-
 #define dectest_op1_fail(op, stra) ({\
 	decimal_t a, b;\
 	is(decimal_from_string(&a, #stra), &a, "decimal_from_string("#stra")");\
@@ -97,7 +90,7 @@ char buf[64];
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
 	uint32_t l1 = mp_sizeof_decimal(&dec);\
-	ok(l1 <= 25 && l1 >= 4, "mp_sizeof_decimal("str")");\
+	ok(l1 <= 43 && l1 >= 4, "mp_sizeof_decimal("str")");\
 	char *b1 = mp_encode_decimal(buf, &dec);\
 	is(b1, buf + l1, "mp_sizeof_decimal("str") == len(mp_encode_decimal("str"))");\
 	const char *b2 = buf;\
@@ -126,7 +119,7 @@ char buf[64];
 	decimal_t dec;\
 	decimal_from_string(&dec, str);\
 	uint32_t l1 = decimal_len(&dec);\
-	ok(l1 <= 21 && l1 >= 2, "decimal_len("str")");\
+	ok(l1 <= 44 && l1 >= 2, "decimal_len("str")");\
 	char *b1 = decimal_pack(buf, &dec);\
 	is(b1, buf + l1, "decimal_len("str") == len(decimal_pack("str")");\
 	const char *b2 = buf;\
@@ -178,7 +171,7 @@ const uint32_t magic = 0xdecdecde;
 static int
 test_pack_unpack(void)
 {
-	plan(187);
+	plan(235);
 
 	test_decpack("0");
 	test_decpack("-0");
@@ -192,12 +185,26 @@ test_pack_unpack(void)
 	test_decpack("-3.141592653589793");
 	test_decpack("1234567891234567890.0987654321987654321");
 	test_decpack("-1234567891234567890.0987654321987654321");
-	test_decpack("0.0000000000000000000000000000000000001");
-	test_decpack("-0.0000000000000000000000000000000000001");
-	test_decpack("0.00000000000000000000000000000000000001");
-	test_decpack("-0.00000000000000000000000000000000000001");
-	test_decpack("99999999999999999999999999999999999999");
-	test_decpack("-99999999999999999999999999999999999999");
+	test_decpack("1E-37");
+	test_decpack("-1E-37");
+	test_decpack("1E-38");
+	test_decpack("-1E-38");
+	test_decpack("99999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999");
+	test_decpack("-99999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999");
+	test_decpack("9.99E+1000");
+	test_decpack("-9.99E-1000");
+	/* Decimal with 76 significant digits and maximum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999E+999999");
+	/* Normal decimal with 76 significant digits and minimum exponent. */
+	test_decpack("9.9999999999999999999999999999999999999"
+		     "99999999999999999999999999999999999999E-999999");
+	/* Minimal subnormal decimal. */
+	test_decpack("1E-1000074");
+	/* Another subnormal decimal. */
+	test_decpack("9.99E-1000072");
 
 	/* Check correct encoding of positive exponent numbers. */
 	decimal_t dec, d1;
@@ -226,45 +233,60 @@ test_pack_unpack(void)
 	test_unpack(b, 1, failure, "");
 	b = "\x00\x9c";
 	test_unpack(b, 2, success, "9");
-	/*     V - scale 39 overflows any number. */
-	b = "\x27\x0c";
-	test_unpack(b, 2, failure, "");
-	/*     V   V - scale -38 overflows any number */
-	b = "\xd0\xda\x0c";
-	test_unpack(b, 3, failure, "");
-	b = "\x26\x09\x99\x99\x99\x99\x99\x99"
+	/* 76 digits number. */
+	b = "\x4c\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, success, "0.99999999999999999999999999999999999999");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, success,
+		    "0.99999999999999999999999999999999999999"
+		    "99999999999999999999999999999999999999");
+	/* 76 digits number. */
 	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, success, "99999999999999999999999999999999999999");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, success,
+		    "99999999999999999999999999999999999999"
+		    "99999999999999999999999999999999999999");
+	b = "\xd2\xff\xf0\xbd\xc2\x99\x9c";
+	test_unpack(b, 7, failure, "");
+	/* 9e-1000075 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x8b\x9c";
+	test_unpack(b, 6, failure, "");
+	/* 9999e-1000075 cannot be represented as subnormal. */
+	b = "\xce\x00\x0f\x42\x8b\x09\x99\x9c";
+	test_unpack(b, 8, failure, "");
 	/* Missing nibble. */
 	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99";
 	test_unpack(b, 21, failure, "");
-	/*         V - 39th digit overflows the buffer. */
+	/*         V - 77th digit overflows the buffer. */
 	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, failure, "");
-	/*     V - scale -1 multiplies the number by 10 and overflows. */
-	b = "\xff\x09\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x9c";
-	test_unpack(b, 21, failure, "");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 40, failure, "");
 	/* Too long, non-empty. */
 	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
 	    "\x99\x99\x99\x99\x99\x99\x99\x99"
-	    "\x99\x99\x99\x99\x99\x9c";
-	test_unpack(b, 22, failure, "");
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x9c";
+	test_unpack(b, 41, failure, "");
 	/* Too long, empty. Still fails. */
 	b = "\x00\x00\x00\x00\x00\x00\x00\x00"
 	    "\x00\x00\x00\x00\x00\x00\x00\x00"
-	    "\x00\x00\x00\x00\x00\x0c";
-	test_unpack(b, 22, failure, "");
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x0c";
+	test_unpack(b, 41, failure, "");
 	return check_plan();
 }
 
@@ -285,12 +307,14 @@ test_mp_decimal(void)
 	test_mpdec("-3.141592653589793");
 	test_mpdec("1234567891234567890.0987654321987654321");
 	test_mpdec("-1234567891234567890.0987654321987654321");
-	test_mpdec("0.0000000000000000000000000000000000001");
-	test_mpdec("-0.0000000000000000000000000000000000001");
-	test_mpdec("0.00000000000000000000000000000000000001");
-	test_mpdec("-0.00000000000000000000000000000000000001");
-	test_mpdec("99999999999999999999999999999999999999");
-	test_mpdec("-99999999999999999999999999999999999999");
+	test_mpdec("1E-37");
+	test_mpdec("-1E-37");
+	test_mpdec("1E-38");
+	test_mpdec("-1E-38");
+	test_mpdec("99999999999999999999999999999999999999"
+		   "99999999999999999999999999999999999999");
+	test_mpdec("-99999999999999999999999999999999999999"
+		   "99999999999999999999999999999999999999");
 
 	return check_plan();
 }
@@ -407,10 +431,92 @@ test_mp_print(void)
 	check_plan();
 }
 
+static void
+test_print(void)
+{
+	plan(4);
+	header();
+
+	char buf[DECIMAL_MAX_STR_LEN + 1];
+	decimal_t d;
+
+	is(decimal_from_string(&d, "1e1000"), &d, "decimal(1e1000)");
+	decimal_to_string(&d, buf);
+	is(strcmp("1E+1000", buf), 0, "checking to_string(1e1000)");
+
+	is(decimal_from_string(&d, "1e-1000"), &d, "decimal(1e-1000)");
+	decimal_to_string(&d, buf);
+	is(strcmp("1E-1000", buf), 0, "checking to_string(1e-1000)");
+
+	footer();
+	check_plan();
+}
+
+static void
+test_fits_fixed_point(void)
+{
+	plan(44);
+	header();
+
+	decimal_t a;
+
+	is(decimal_from_string(&a, "9999e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -11), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+
+	is(decimal_from_string(&a, "-9999e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -11), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+
+	is(decimal_from_string(&a, "9990e10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, -10), true);
+	is(decimal_fits_fixed_point(&a, 3, -10), false);
+	is(decimal_fits_fixed_point(&a, 5, -10), true);
+	is(decimal_fits_fixed_point(&a, 100, -12), false);
+	is(decimal_fits_fixed_point(&a, 5, -9), true);
+	is(decimal_fits_fixed_point(&a, 4, -9), false);
+	is(decimal_fits_fixed_point(&a, 6, -9), true);
+	is(decimal_fits_fixed_point(&a, 3, -11), true);
+	is(decimal_fits_fixed_point(&a, 2, -11), false);
+	is(decimal_fits_fixed_point(&a, 4, -11), true);
+
+	is(decimal_from_string(&a, "1000"), &a);
+	is(decimal_fits_fixed_point(&a, 4, 0), true);
+	is(decimal_fits_fixed_point(&a, 3, 0), false);
+	is(decimal_fits_fixed_point(&a, 3, -1), true);
+	is(decimal_fits_fixed_point(&a, 2, -1), false);
+	is(decimal_fits_fixed_point(&a, 2, -2), true);
+	is(decimal_fits_fixed_point(&a, 1, -2), false);
+	is(decimal_fits_fixed_point(&a, 1, -3), true);
+	is(decimal_fits_fixed_point(&a, 0, -3), false);
+
+	is(decimal_from_string(&a, "9999e-10"), &a);
+	is(decimal_fits_fixed_point(&a, 4, 10), true);
+	is(decimal_fits_fixed_point(&a, 3, 10), false);
+	is(decimal_fits_fixed_point(&a, 5, 10), true);
+	is(decimal_fits_fixed_point(&a, 100, 9), false);
+	is(decimal_fits_fixed_point(&a, 5, 11), true);
+	is(decimal_fits_fixed_point(&a, 4, 11), false);
+	is(decimal_fits_fixed_point(&a, 6, 11), true);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(312);
+	plan(326);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -428,9 +534,6 @@ main(void)
 
 	dectest_op(add, 1e-38, 1e-38, 2e-38);
 	dectest_op(add, -1e-38, 1e-38, 0);
-	/* Check that maximum scale == 38. Otherwise rounding occurs. */
-	dectest_op(add, 1e-39, 0, 0);
-	dectest_op(add, 1e-39, 1e-38, 1e-38);
 	dectest_op(mul, 1e-19, 1e-19, 1e-38);
 	dectest_op(add, 1e37, 0, 1e37);
 	dectest_op(mul, 1e18, 1e18, 1e36);
@@ -439,18 +542,27 @@ main(void)
 	dectest_op(pow, 2, 10, 1024);
 	dectest_op(pow, 100, 0.5, 10);
 
+	dectest_op(add, 1e1000, 1e1000, 2e1000);
+	dectest_op(add, 1e-1000, 1e-1000, 2e-1000);
+	dectest_op(mul, 1e1000, 1e1000, 1e2000);
+	dectest_op(mul, 1e-1000, 1e-1000, 1e-2000);
+	dectest_op(div, 1e1000, 1e-1000, 1e2000);
+	dectest_op(div, 1e-1000, 1e1000, 1e-2000);
+
 	dectest_op1(log10, 100, 2, 0);
 	dectest_op1(ln, 10, 2.3, 2);
 	dectest_op1(ln, 1.1, 0.1, 1);
-	dectest_op1(ln, 1.0000000000000000000000000000000000001,
-		    0.0000000000000000000000000000000000001, 0);
+	dectest_op1(ln,
+		    1.000000000000000000000000000000000000000000000000000000000000000000000000001,
+		    0.000000000000000000000000000000000000000000000000000000000000000000000000001, 0);
 	dectest_op1(exp, 2, 7.39, 2);
 	dectest_op1(sqrt, 100, 10, 0);
 
-	/* 39 digits > DECIMAL_MAX_DIGITS (== 38) */
-	dectest_construct(double, 2e38, failure);
-	dectest_construct(string, "1e38", failure);
-	dectest_construct(string, "100000000000000000000000000000000000000", failure);
+	/* Check large exponents. */
+	dectest_construct(double, 1e300, success);
+	dectest_construct(double, 1e-300, success);
+	dectest_construct(string, "1e1000", success);
+	dectest_construct(string, "1e-1000", success);
 	/* Check that inf and NaN are not allowed. Check bad input. */
 	dectest_construct(string, "inf", failure);
 	dectest_construct(string, "NaN", failure);
@@ -459,10 +571,6 @@ main(void)
 	dectest_construct(int64, LONG_MIN, success);
 	dectest_construct(int64, LONG_MAX, success);
 	dectest_construct(uint64, ULONG_MAX, success);
-
-	dectest_op_fail(add, 9e37, 1e37);
-	dectest_op_fail(mul, 1e19, 1e19);
-	dectest_op_fail(div, 1e19, 1e-19);
 
 	dectest_op1_fail(ln, 0);
 	dectest_op1_fail(ln, -1);
@@ -476,6 +584,8 @@ main(void)
 
 	test_mp_decimal();
 	test_mp_print();
+	test_print();
+	test_fits_fixed_point();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);

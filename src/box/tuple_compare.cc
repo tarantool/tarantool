@@ -522,6 +522,10 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		       mp_compare_scalar_coll(field_a, field_b, coll) :
 		       mp_compare_scalar(field_a, field_b);
 	case FIELD_TYPE_DECIMAL:
+	case FIELD_TYPE_DECIMAL32:
+	case FIELD_TYPE_DECIMAL64:
+	case FIELD_TYPE_DECIMAL128:
+	case FIELD_TYPE_DECIMAL256:
 		return mp_compare_decimal(field_a, field_b);
 	case FIELD_TYPE_UUID:
 		return mp_compare_uuid(field_a, field_b);
@@ -574,6 +578,10 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 		       mp_compare_scalar_with_type(field_a, a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_DECIMAL:
+	case FIELD_TYPE_DECIMAL32:
+	case FIELD_TYPE_DECIMAL64:
+	case FIELD_TYPE_DECIMAL128:
+	case FIELD_TYPE_DECIMAL256:
 		return mp_compare_number_with_type(field_a, a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_UUID:
@@ -2010,6 +2018,10 @@ field_hint(const char *field, struct coll *coll)
 	case FIELD_TYPE_SCALAR:
 		return field_hint_scalar(field, coll);
 	case FIELD_TYPE_DECIMAL:
+	case FIELD_TYPE_DECIMAL32:
+	case FIELD_TYPE_DECIMAL64:
+	case FIELD_TYPE_DECIMAL128:
+	case FIELD_TYPE_DECIMAL256:
 		return field_hint_decimal(field);
 	case FIELD_TYPE_UUID:
 		return field_hint_uuid(field);
@@ -2135,6 +2147,10 @@ key_def_set_hint_func(struct key_def *def)
 		key_def_set_hint_func<FIELD_TYPE_SCALAR>(def);
 		break;
 	case FIELD_TYPE_DECIMAL:
+	case FIELD_TYPE_DECIMAL32:
+	case FIELD_TYPE_DECIMAL64:
+	case FIELD_TYPE_DECIMAL128:
+	case FIELD_TYPE_DECIMAL256:
 		key_def_set_hint_func<FIELD_TYPE_DECIMAL>(def);
 		break;
 	case FIELD_TYPE_UUID:

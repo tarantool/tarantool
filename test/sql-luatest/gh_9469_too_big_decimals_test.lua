@@ -14,7 +14,7 @@ end)
 
 g.test_too_big_decimal = function()
     g.server:exec(function()
-        local dec = '111111111111111111111111111111111111111.0'
+        local dec = string.rep('1', 2000000) .. '.0'
         local sql = ([[SELECT %s;]]):format(dec)
         local exp = ([[Invalid decimal: '%s']]):format(dec)
         local res, err = box.execute(sql)
@@ -22,11 +22,6 @@ g.test_too_big_decimal = function()
         t.assert_equals(err.message, exp)
 
         sql = ([[SELECT -%s;]]):format(dec)
-        res, err = box.execute(sql)
-        t.assert(res == nil)
-        t.assert_equals(err.message, exp)
-
-        sql = ([[CREATE TABLE T(i DEC PRIMARY KEY DEFAULT(%s);]]):format(dec)
         res, err = box.execute(sql)
         t.assert(res == nil)
         t.assert_equals(err.message, exp)

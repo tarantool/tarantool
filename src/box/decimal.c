@@ -3,6 +3,9 @@
 #include "core/decimal.h"
 #include "core/mp_decimal.h"
 
+static_assert(BOX_DECIMAL_STRING_BUFFER_SIZE >= DECIMAL_MAX_STR_LEN,
+	      "API buffer size should be not less than implementation");
+
 #define BOX_DECIMAL_UNARY_OP(op)					\
 box_decimal_t *								\
 box_decimal_##op(box_decimal_t *res, const box_decimal_t *dec)		\

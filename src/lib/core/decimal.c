@@ -46,18 +46,10 @@
 static __thread decContext decimal_context = {
 	/* Maximum precision during operations. */
 	DECIMAL_MAX_DIGITS,
-	/*
-	 * Maximum decimal logarithm of the number.
-	 * Allows for precision = DECIMAL_MAX_DIGITS
-	 */
-	DECIMAL_MAX_DIGITS - 1,
-	/*
-	 * Minimal adjusted exponent. The smallest absolute value will be
-	 * exp((1 - DECIMAL_MAX_DIGITS) - 1) =
-	 * exp(-DECIMAL_MAX_DIGITS) allowing for scale =
-	 * DECIMAL_MAX_DIGITS
-	 */
-	-1,
+	/* Maximal adjusted exponent. */
+	DEC_MAX_MATH,
+	/* Minimal adjusted exponent. */
+	-DEC_MAX_MATH,
 	/* Rounding mode: .5 rounds away from 0. */
 	DECIMAL_ROUNDING,
 	/* Turn off signalling for failed operations. */
@@ -100,6 +92,18 @@ int decimal_precision(const decimal_t *dec) {
 
 int  decimal_scale(const decimal_t *dec) {
 	return dec->exponent < 0 ? -dec->exponent : 0;
+}
+
+bool
+decimal_fits_fixed_point(decimal_t *dec, int precision, int scale)
+{
+	decimal_t tmp = *dec;
+	decNumberReduce(&tmp, dec, &decimal_context);
+	VERIFY(decimal_check_status(&tmp, &decimal_context) != NULL);
+	int d = tmp.exponent + scale;
+	if (d < 0)
+		return false;
+	return tmp.digits + d <= precision;
 }
 
 decimal_t *
@@ -459,17 +463,22 @@ static_assert(DECIMAL_DIGIT_CAPACITY >= DECIMAL_MAX_DIGITS,
 	      "DECIMAL_MAX_DIGITS");
 
 /*
- * Packed decimal representation is a BCD array (binary coded decimal),
- * containing 2 digits per byte, except one last nibble containing the sign.
- * So an input string of length L might fill up 2 * L - 1 digits.
+ * In decimal_unpack() we check BCD (binary coded decimal) input length
+ * to make sure it will fit into decimal_t. Length should be less than
+ * or equal to (DECIMAL_DIGIT_CAPACITY + 1) / 2.
  *
- * If DECIMAL_DIGIT_CAPACITY (CAP for short) is odd, we're fine. This is true
- * for now, because CAP = DECDPUN(3) * DECNUMUNITS(13) = 39, and maximum string
- * length (20) holds exactly 39 digits.
+ * At the same time we should make sure that this limit allows us
+ * to pass DECIMAL_MAX_DIGITS in BCD. BCD contains 2 digits per byte,
+ * except one last nibble containing the sign. So an input string of length
+ * L might fill up 2 * L - 1 digits.
  *
- * OTOH, if CAP becomes even, this means max safe input will be of length
- * (CAP + 1) / 2 == CAP / 2, allowing CAP - 1 digits at max. Hence
- * CAP - 1 must be >= DECIMAL_MAX_DIGITS.
+ * If DECIMAL_DIGIT_CAPACITY is odd then than limit allows to pass
+ * DECIMAL_DIGIT_CAPACITY digits which is surely greater than
+ * DECIMAL_MAX_DIGITS (we check it in assertion above and also it is
+ * true by decNumber design).
+ *
+ * If DECIMAL_DIGIT_CAPACITY is even then BCD can pass
+ * DECIMAL_DIGIT_CAPACITY - 1 digits.
  */
 static_assert(DECIMAL_DIGIT_CAPACITY % 2 == 1 ||
 	      DECIMAL_DIGIT_CAPACITY - 1 >= DECIMAL_MAX_DIGITS,
@@ -487,47 +496,40 @@ decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 
 	int32_t scale;
 	const char *end = *data + len;
-	const char *svp = *data;
-	enum mp_type type = mp_typeof(**data);
+	const char *p = *data;
+	enum mp_type type = mp_typeof(*p);
 	if (type == MP_UINT) {
-		if (mp_check_uint(*data, end) > 0)
+		if (mp_check_uint(p, end) > 0)
 			return NULL;
-		scale = mp_decode_uint(data);
+		scale = mp_decode_uint(&p);
 	} else if (type == MP_INT) {
-		if (mp_check_int(*data, end) > 0)
+		if (mp_check_int(p, end) > 0)
 			return NULL;
-		scale = mp_decode_int(data);
+		scale = mp_decode_int(&p);
 	} else {
 		return NULL;
 	}
-	/*
-	 * scale = -exponent. The exponent should be in range
-	 * [-DECIMAL_MAX_DIGITS; DECIMAL_MAX_DIGITS)
-	 */
-	if (scale > DECIMAL_MAX_DIGITS ||
-	    scale <= -DECIMAL_MAX_DIGITS) {
-		*data = svp;
+	len -= p - *data;
+	/* First check that there is enough space to store the digits. */
+	if (len > (DECIMAL_DIGIT_CAPACITY + 1) / 2)
 		return NULL;
-	}
-
-	len -= *data - svp;
-	/* First check that there is enough space to strore the digits. */
-	if (len > (DECIMAL_DIGIT_CAPACITY + 1) / 2) {
-		*data = svp;
-		return NULL;
-	}
 	/* No digits to decode. */
-	if (len == 0) {
-		*data = svp;
+	if (len == 0)
 		return NULL;
-	}
-	decimal_t *res = decPackedToNumber((uint8_t *)*data, len, &scale, dec);
-	/* Now check that the resulting number fits in our limits. */
-	if (res != NULL && decimal_precision(res) <= DECIMAL_MAX_DIGITS) {
-		*data += len;
-	} else {
-		res = NULL;
-		*data = svp;
-	}
-	return res;
+	if (decPackedToNumber((uint8_t *)p, len, &scale, dec) == NULL)
+		return NULL;
+	/*
+	 * Check for precision, adjusted exponent and handle case of
+	 * subnormal numbers when allowed exponent is lower but
+	 * the precision is reduced accordingly.
+	 */
+	int32_t adj_exp = dec->exponent + dec->digits - 1;
+	int32_t emin_sub = decimal_context.emin - DECIMAL_MAX_DIGITS + 1;
+	if (!(dec->digits <= DECIMAL_MAX_DIGITS &&
+	      adj_exp <= decimal_context.emax &&
+	      ((adj_exp >= decimal_context.emin) ||
+	       (adj_exp >= emin_sub && dec->digits <= adj_exp - emin_sub + 1))))
+		return NULL;
+	*data = end;
+	return dec;
 }
