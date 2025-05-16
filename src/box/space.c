@@ -260,9 +260,6 @@ space_reattach_constraints(struct space *space)
 void
 space_cleanup_constraints(struct space *space)
 {
-	if (space->format == NULL)
-		return;
-
 	struct tuple_format *format = space->format;
 	for (size_t j = 0; j < format->constraint_count; j++) {
 		struct tuple_constraint *constr = &format->constraint[j];
@@ -587,9 +584,9 @@ space_create(struct space *space, struct engine *engine,
 	rlist_create(&space->coll_id_holders);
 	space->run_triggers = true;
 
+	assert(format != NULL);
 	space->format = format;
-	if (format != NULL)
-		tuple_format_ref(format);
+	tuple_format_ref(format);
 
 	space->def = space_def_dup(def);
 	bool is_on_recovery = recovery_state < FINISHED_RECOVERY;
@@ -674,11 +671,9 @@ fail:
 	free(space->check_unique_constraint_map);
 	if (space->def != NULL)
 		space_def_delete(space->def);
-	if (space->format != NULL) {
-		space_cleanup_constraints(space);
-		space_unpin_defaults(space);
-		tuple_format_unref(space->format);
-	}
+	space_cleanup_constraints(space);
+	space_unpin_defaults(space);
+	tuple_format_unref(space->format);
 	space_unpin_collations(space);
 	return -1;
 }
@@ -746,11 +741,9 @@ space_delete(struct space *space)
 	}
 	free(space->index_map);
 	free(space->check_unique_constraint_map);
-	if (space->format != NULL) {
-		space_cleanup_constraints(space);
-		space_unpin_defaults(space);
-		tuple_format_unref(space->format);
-	}
+	space_cleanup_constraints(space);
+	space_unpin_defaults(space);
+	tuple_format_unref(space->format);
 	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
