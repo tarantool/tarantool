@@ -71,23 +71,25 @@ typedef void
 		 struct sockaddr *addr, socklen_t addrlen);
 
 struct evio_service {
-        /** Total count of services */
-        int entry_count;
-        /** Array of structures that encapsulate work with sockets */
-        struct evio_service_entry *entries;
-        /** Service name. E.g. 'primary', 'secondary', etc. */
-        char name[SERVICE_NAME_MAXLEN];
-        /**
-         * A callback invoked on every accepted client socket.
-         * If a callback returned != 0, the accepted socket is
-         * closed and the error is logged.
-         *
-         * On success the callback must move the IO stream object
-         * it was passed.
-         */
-        evio_accept_f on_accept;
-        void *on_accept_param;
-        ev_loop *loop;
+	/** Total count of services */
+	int entry_count;
+	/** Array of structures that encapsulate work with sockets */
+	struct evio_service_entry *entries;
+	/** Service name. E.g. 'primary', 'secondary', etc. */
+	char name[SERVICE_NAME_MAXLEN];
+	/**
+	 * A callback invoked on every accepted client socket.
+	 * If a callback returned != 0, the accepted socket is
+	 * closed and the error is logged.
+	 *
+	 * On success the callback must move the IO stream object
+	 * it was passed.
+	 */
+	evio_accept_f on_accept;
+	/**  The iproto_thread used in the callback above */
+	void *on_accept_param;
+	/** Event loop */
+	ev_loop *loop;
 };
 
 /**
