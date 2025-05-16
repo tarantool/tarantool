@@ -97,6 +97,36 @@ box.cfg({
     checkpoint_count = 1,
 })
 
+local gen_arrow = test_module.gen_arrow
+
+local function gen_insert(space_id, column_count, row_count)
+    local s = box.space[space_id]
+    local tuple = {}
+    local pct_complete = 0
+    log.info('Generating the test data set...')
+    box.begin()
+    for i = 1, row_count do
+        for j = 1, column_count do
+            if j % 2 == 1 then
+                tuple[j] = i
+            else
+                tuple[j] = row_count - i + 1
+            end
+        end
+        s:insert(tuple)
+        if i % 1000 == 0 then
+            box.commit()
+            local pct = math.floor(100 * i / row_count)
+            if pct ~= pct_complete then
+                log.info('%d%% complete', pct)
+                pct_complete = pct
+            end
+            box.begin()
+        end
+    end
+    box.commit()
+end
+
 box.once('init', function()
     log.info('Creating the test space...')
     local format = {}
@@ -109,30 +139,13 @@ box.once('init', function()
         format = format,
     })
     s:create_index('pk')
-    log.info('Generating the test data set...')
-    local tuple = {}
-    local pct_complete = 0
-    box.begin()
-    for i = 1, params.row_count do
-        for j = 1, params.column_count do
-            if j % 2 == 1 then
-                tuple[j] = i
-            else
-                tuple[j] = params.row_count - i + 1
-            end
-        end
-        s:insert(tuple)
-        if i % 1000 == 0 then
-            box.commit()
-            local pct = math.floor(100 * i / params.row_count)
-            if pct ~= pct_complete then
-                log.info('%d%% complete', pct)
-                pct_complete = pct
-            end
-            box.begin()
-        end
+    local gen
+    if params.engine == 'memcs' or params.engine == 'quiver' then
+        gen = gen_arrow
+    else
+        gen = gen_insert
     end
-    box.commit()
+    gen(s.id, params.column_count, params.row_count)
     log.info('Writing a snapshot...')
     box.snapshot()
 end)
