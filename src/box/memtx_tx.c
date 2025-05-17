@@ -180,20 +180,16 @@ struct point_hole_item {
 	struct rlist ring;
 	/** Link in txn->point_holes_list. */
 	struct rlist in_point_holes_list;
-	/** Saved index->unique_id. */
-	uint32_t index_unique_id;
-	/** Precalculated hash for storing in hash table.. */
-	uint32_t hash;
+	/** Saved index. */
+	struct index *index;
 	/** Saved txn. */
 	struct txn *txn;
 	/** Saved key. Points to @a short_key or allocated in txn's region. */
 	const char *key;
-	/** Saved key len. */
-	size_t key_len;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
-	/** Saved space id. */
-	uint32_t space_id;
+	/** Precalculated hash for storing in hash table. */
+	uint32_t hash;
 	/** Flag that the hash tables stores pointer to this item. */
 	bool is_head;
 };
@@ -313,12 +309,22 @@ struct point_hole_key {
 	struct tuple *tuple;
 };
 
+/** Combine hash of index with hash of tuple. */
+static uint32_t
+point_hole_storage_combine_index_and_tuple_hash(struct index *index,
+						uint32_t tuple_hash)
+{
+	return (uintptr_t)index ^ tuple_hash;
+}
+
 /** Hash calculatore for the key. */
 static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
-	return key->index->unique_id ^ def->tuple_hash(key->tuple, def);
+	uint32_t tuple_hash = def->tuple_hash(key->tuple, def);
+	return point_hole_storage_combine_index_and_tuple_hash(key->index,
+							       tuple_hash);
 }
 
 /** point_hole_item comparator. */
@@ -326,11 +332,13 @@ static int
 point_hole_storage_equal(const struct point_hole_item *obj1,
 			 const struct point_hole_item *obj2)
 {
-	/* Canonical msgpack is comparable by memcmp. */
-	if (obj1->index_unique_id != obj2->index_unique_id ||
-	    obj1->key_len != obj2->key_len)
+	if (obj1->index != obj2->index)
 		return 1;
-	return memcmp(obj1->key, obj2->key, obj1->key_len) != 0;
+	struct key_def *key_def = obj1->index->def->key_def;
+	uint32_t part_count = key_def->part_count;
+	return key_compare(obj1->key, part_count, HINT_NONE,
+			   obj2->key, part_count, HINT_NONE,
+			   key_def) != 0;
 }
 
 /** point_hole_item comparator with key. */
@@ -338,7 +346,7 @@ static int
 point_hole_storage_key_equal(const struct point_hole_key *key,
 			     const struct point_hole_item *object)
 {
-	if (key->index->unique_id != object->index_unique_id)
+	if (key->index != object->index)
 		return 1;
 	assert(key->index != NULL);
 	assert(key->tuple != NULL);
@@ -1549,6 +1557,20 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 			 uint32_t ind);
 
 /**
+ * Deletes the point hole item. The deletion of the item from the point hole
+ * storage is handled separately.
+ */
+static void
+point_hole_item_delete(struct point_hole_item *object)
+{
+	rlist_del(&object->ring);
+	rlist_del(&object->in_point_holes_list);
+	index_unref(object->index);
+	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
+	memtx_tx_mempool_free(object->txn, pool, object);
+}
+
+/**
  * Check for possible conflict relations during insertion of @a new tuple,
  * (with the corresponding @a story) into index @a ind. It is needed if and
  * only if that was real insertion - there was no replaced tuple in the index.
@@ -1576,7 +1598,6 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 	 */
 	mh_point_holes_del(ht, pos, 0);
 
-	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	bool has_more_items;
 	do {
 		memtx_tx_track_story_gap(item->txn, story, ind);
@@ -1585,11 +1606,7 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 			rlist_entry(item->ring.next,
 				    struct point_hole_item, ring);
 		has_more_items = next_item != item;
-
-		rlist_del(&item->ring);
-		rlist_del(&item->in_point_holes_list);
-		memtx_tx_mempool_free(item->txn, pool, item);
-
+		point_hole_item_delete(item);
 		item = next_item;
 	} while (has_more_items);
 }
@@ -2793,7 +2810,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		struct point_hole_item *hole_item;
 		rlist_foreach_entry(hole_item, &txn->point_holes_list,
 				    in_point_holes_list) {
-			if (space->def->id == hole_item->space_id) {
+			if (space->def->id == hole_item->index->def->space_id) {
 				memtx_tx_abort_with_conflict(txn);
 				break;
 			}
@@ -3030,7 +3047,8 @@ point_hole_storage_new(struct index *index, const char *key,
 	rlist_create(&object->ring);
 	rlist_create(&object->in_point_holes_list);
 	object->txn = txn;
-	object->index_unique_id = index->unique_id;
+	object->index = index;
+	index_ref(index);
 	if (key_len <= sizeof(object->short_key)) {
 		object->key = object->short_key;
 	} else {
@@ -3038,12 +3056,12 @@ point_hole_storage_new(struct index *index, const char *key,
 						     MEMTX_TX_ALLOC_TRACKER);
 	}
 	memcpy((char *)object->key, key, key_len);
-	object->key_len = key_len;
-	object->space_id = index->def->space_id;
 	object->is_head = true;
 
 	struct key_def *def = index->def->key_def;
-	object->hash = object->index_unique_id ^ key_hash(key, def);
+	uint32_t hash = key_hash(key, def);
+	object->hash = point_hole_storage_combine_index_and_tuple_hash(index,
+								       hash);
 
 	const struct point_hole_item **put =
 		(const struct point_hole_item **) &object;
@@ -3072,7 +3090,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 		 * list and that's enough.
 		 */
 		assert(!rlist_empty(&object->ring));
-		rlist_del(&object->ring);
 	} else if (!rlist_empty(&object->ring)) {
 		/*
 		 * Hash table point to this item, but there are more
@@ -3088,7 +3105,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 		struct point_hole_item **preplaced = &replaced;
 		mh_point_holes_put(txm.point_holes, put, &preplaced, 0);
 		assert(replaced == object);
-		rlist_del(&object->ring);
 		another->is_head = true;
 	} else {
 		/*
@@ -3101,9 +3117,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 		assert(pos != mh_end(txm.point_holes));
 		mh_point_holes_del(txm.point_holes, pos, 0);
 	}
-	rlist_del(&object->in_point_holes_list);
-	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
-	memtx_tx_mempool_free(object->txn, pool, object);
+	point_hole_item_delete(object);
 }
 
 /**
