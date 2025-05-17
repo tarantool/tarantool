@@ -32,6 +32,21 @@ function(create_unit_test)
   add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
   target_compile_definitions(${UNIT_PREFIX}.test PRIVATE ${UNIT_COMPILE_DEFINITIONS})
   target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
+  # FIXME: Since version 3.4, CMake doesn't add flags to export
+  # symbols from executables without the ENABLE_EXPORTS target
+  # property, see CMP0065 [1] for details. Without this property,
+  # some unit tests produce build warnings with LTO optimization
+  # enabled (for example, on Fedora 39), see also [2].
+  # [1]: https://cmake.org/cmake/help/latest/policy/CMP0065.html
+  # [2]: https://github.com/tarantool/tarantool/issues/11517
+  if(ENABLE_LTO)
+      # The CMP0065 is removed from CMake version 4.0 [1].
+      # Thus, set the ENABLE_EXPORTS directly.
+      # [1]: https://cmake.org/cmake/help/latest/manual/cmake-policies.7.html#policies-introduced-by-cmake-3-4-removed-by-cmake-4-0
+      set_target_properties(${UNIT_PREFIX}.test
+          PROPERTIES ENABLE_EXPORTS TRUE
+      )
+  endif()
   set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test" PARENT_SCOPE)
 endfunction()
 
