@@ -1,6 +1,12 @@
 local log = require('internal.config.utils.log')
 local file = require('internal.config.utils.file')
+local expression = require('internal.config.utils.expression')
 local fiber = require('fiber')
+
+local fail_if_vars = {
+    tarantool_version = _TARANTOOL:match('^%d+%.%d+%.%d+'),
+}
+assert(fail_if_vars.tarantool_version ~= nil)
 
 local roles_state = {
     -- Loaded roles, where the key is the role name and the value is the
@@ -183,6 +189,25 @@ local function preload(config)
     -- Update the metadata for the roles.
     roles_state.metadata = {}
     update_roles_metadata(role_names)
+
+    -- Check `fail_if` tag for roles and raise an error if the check fails.
+    for _, role_name in ipairs(role_names) do
+        local md = roles_state.metadata[role_name]
+        if md ~= nil and md['fail_if'] ~= nil then
+            local expr = md['fail_if']
+            local ok, res = pcall(expression.eval, expr, fail_if_vars)
+
+            if not ok then
+                error(('Role %q has invalid "fail_if" expression: %s')
+                    :format(role_name, res), 0)
+            end
+
+            if res then
+                error(('Role %q failed the "fail_if" check: %q')
+                    :format(role_name, expr), 0)
+            end
+        end
+    end
 
     -- Get roles with the 'early_load' metadata tag set to `true`.
     -- early_load_roles will contain role names in the same order as in
