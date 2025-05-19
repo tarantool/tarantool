@@ -138,3 +138,64 @@ g.test_app_cfg_deep_merge = function(g)
         end,
     })
 end
+
+g.test_tarantool_version_check = function(g)
+    local one = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version < 0.0.0"
+-- ...
+    ]]
+
+    local two = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version > 0.0.0"
+-- ...
+    ]]
+
+    local three = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version >< 0.0.0"
+-- ...
+    ]]
+
+    helpers.success_case(g, {
+        script = one,
+        options = {
+            ['app.file'] = 'main.lua',
+        },
+        verify = function() end,
+    })
+
+    helpers.success_case(g, {
+        script = one,
+        options = {
+            ['app.module'] = 'main',
+        },
+        verify = function() end,
+    })
+
+    helpers.failure_case({
+        script = two,
+        options = {['app.file'] = 'main.lua'},
+        exp_err = 'App "main.lua" failed the "fail_if" check: ' ..
+                  '"tarantool_version > 0.0.0"'
+    })
+
+    helpers.failure_case({
+        script = two,
+        options = {['app.module'] = 'main'},
+        exp_err = 'App "main" failed the "fail_if" check: ' ..
+                  '"tarantool_version > 0.0.0"'
+    })
+
+    helpers.failure_case({
+        script = three,
+        options = {['app.file'] = 'main.lua'},
+        exp_err = 'App "main.lua" has invalid "fail_if" expression: ' ..
+                  'Unexpected token "<"'
+    })
+
+    helpers.failure_case({
+        script = three,
+        options = {['app.module'] = 'main'},
+        exp_err = 'App "main" has invalid "fail_if" expression: ' ..
+                  'Unexpected token "<"'
+    })
+end
