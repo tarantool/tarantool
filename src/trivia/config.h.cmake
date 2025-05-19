@@ -278,6 +278,7 @@
 /* Cacheline size to calculate alignments */
 #define CACHELINE_SIZE 64
 
+#cmakedefine ENABLE_ERRINJ_EXTRAS 1
 #cmakedefine ENABLE_FLIGHT_RECORDER 1
 #cmakedefine ENABLE_TUPLE_COMPRESSION 1
 #cmakedefine ENABLE_SPACE_UPGRADE 1

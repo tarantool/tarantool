@@ -33,6 +33,13 @@
 #include <limits.h>
 #include <stddef.h>
 #include "trivia/util.h"
+
+#ifdef ENABLE_ERRINJ_EXTRAS
+#include "errinj_extras.h"
+#else
+#define ERRINJ_EXTRAS(_)
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -88,8 +95,6 @@ struct errinj {
 	_(ERRINJ_ENGINE_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1}) \
-	_(ERRINJ_FLIGHTREC_RECREATE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_FLIGHTREC_LOG_DELAY, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_HTTPC_EXECUTE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_HTTP_RESPONSE_ADD_WAIT, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
@@ -139,7 +144,6 @@ struct errinj {
 	_(ERRINJ_SNAP_WRITE_INVALID_SYSTEM_ROW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_SPACE_UPGRADE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
@@ -204,6 +208,7 @@ struct errinj {
 	_(ERRINJ_XLOG_WRITE_INVALID_VALUE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_WRITE_UNKNOWN_TYPE, ERRINJ_BOOL, {.bparam = false}) \
+	ERRINJ_EXTRAS(_)
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
