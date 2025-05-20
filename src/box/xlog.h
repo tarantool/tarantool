@@ -100,13 +100,6 @@ enum xdir_type {
 };
 
 /**
- * Newly created snapshot files get .inprogress filename suffix.
- * The suffix is removed  when the file is finished
- * and closed.
- */
-enum log_suffix { NONE, INPROGRESS };
-
-/**
  * Suffix added to path of inprogress files.
  */
 #define inprogress_suffix ".inprogress"
@@ -128,8 +121,6 @@ struct xdir {
 	 * are skipped.
 	 */
 	bool force_recovery;
-	/* Default filename suffix for a new file. */
-	enum log_suffix suffix;
 	/**
 	 * Additional flags to apply at open(2) to write.
 	 */
@@ -467,6 +458,7 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
  * Create a new file and open it in write (append) mode.
  * Note: an existing file is impossible to open for append,
  * the old files are never appended to.
+ * Note: the new xlog isn't materialized, see xlog_materialize().
  *
  * @param xdir xdir
  * @param[out] xlog xlog structure
@@ -480,6 +472,13 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
 int
 xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 		 const struct vclock *vclock);
+
+/**
+ * Shortcut for xdir_create_xlog() + xlog_materialize().
+ */
+int
+xdir_create_materialized_xlog(struct xdir *dir, struct xlog *xlog,
+			      const struct vclock *vclock);
 
 /**
  * Create new xlog writer based on fd.
