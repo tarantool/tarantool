@@ -37,6 +37,7 @@
 #include "memtx_tx.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"

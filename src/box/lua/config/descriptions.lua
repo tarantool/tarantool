@@ -2342,6 +2342,11 @@ I['snapshot.snap_io_rate_limit'] = format_text([[
     rate of dumps to `.run` and `.index` files.
 ]])
 
+I['snapshot.save_secondary_indexes'] = format_text([[
+    Whether to use the O(n) secondary key sort using additional snapshot data
+    (if the latter is available) and write the data during `box.snapshot()`.
+]])
+
 -- }}} snapshot configuration
 
 -- {{{ sql configuration

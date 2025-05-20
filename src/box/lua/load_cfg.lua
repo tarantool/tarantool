@@ -209,6 +209,7 @@ local default_cfg = {
     txn_synchro_timeout   = 5,
     txn_isolation         = "best-effort",
     memtx_sort_threads    = nil,
+    memtx_sort_data_enabled = false,
 
     metrics     = {
         include = 'all',
@@ -413,6 +414,7 @@ local template_cfg = {
     txn_timeout           = 'number',
     txn_synchro_timeout   = 'number',
     memtx_sort_threads    = 'number',
+    memtx_sort_data_enabled = 'boolean',
 
     metrics = 'table',
 }
@@ -499,6 +501,7 @@ local dynamic_cfg = {
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
     memtx_memory            = private.cfg_set_memtx_memory,
+    memtx_sort_data_enabled = private.cfg_set_memtx_sort_data_enabled,
     memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
     vinyl_memory            = private.cfg_set_vinyl_memory,
     vinyl_max_tuple_size    = private.cfg_set_vinyl_max_tuple_size,
@@ -691,6 +694,7 @@ end
 
 local dynamic_cfg_skip_at_load = {
     memtx_memory            = true,
+    memtx_sort_data_enabled = true,
     memtx_max_tuple_size    = true,
     vinyl_memory            = true,
     vinyl_max_tuple_size    = true,
