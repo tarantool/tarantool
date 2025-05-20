@@ -433,7 +433,10 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;
-	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid, &opts);
+	xdir_create(&writer->wal_dir, wal_dirname, "XLOG", instance_uuid,
+		    &opts);
+	writer->wal_dir.force_recovery = true;
+	writer->wal_dir.store_prev_vclock = true;
 	/*
 	 * wal_retention_period must be set before gc is woken up.
 	 * Otherwise files which must be preserved can be deleted.

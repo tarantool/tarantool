@@ -35,7 +35,7 @@ create_xlog(struct xlog *xlog, char *dirname)
 	memset(&tt_uuid, 1, sizeof(tt_uuid));
 	memset(&vclock, 0, sizeof(vclock));
 
-	xdir_create(&xdir, dirname, XLOG, &tt_uuid, &xlog_opts_default);
+	xdir_create(&xdir, dirname, "XLOG", &tt_uuid, &xlog_opts_default);
 
 	fail_if(xdir_create_materialized_xlog(&xdir, xlog, &vclock) < 0);
 }

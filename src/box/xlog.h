@@ -89,17 +89,6 @@ extern const struct xlog_opts xlog_opts_default;
 /* {{{ log dir */
 
 /**
- * Type of log directory. A single filesystem directory can be
- * used for write ahead logs, memtx snapshots or vinyl run files,
- * but an xlog object sees only those files which match its type.
- */
-enum xdir_type {
-	SNAP,		/* memtx snapshot */
-	XLOG,		/* write ahead log */
-	VYLOG,		/* vinyl metadata log */
-};
-
-/**
  * Suffix added to path of inprogress files.
  */
 #define inprogress_suffix ".inprogress"
@@ -122,6 +111,11 @@ struct xdir {
 	 */
 	bool force_recovery;
 	/**
+	 * Store vclock of the previous file in the meta to
+	 * check for gaps on recovery.
+	 */
+	bool store_prev_vclock;
+	/**
 	 * Additional flags to apply at open(2) to write.
 	 */
 	int open_wflags;
@@ -138,11 +132,11 @@ struct xdir {
 	 * XLOG (meaning it's a write ahead log) SNAP (a
 	 * snapshot) or VYLOG.
 	 */
-	const char *filetype;
+	char filetype[10];
 	/**
 	 * File name extension (.xlog or .snap).
 	 */
-	const char *filename_ext;
+	char filename_ext[11];
 	/** File create mode in this directory. */
 	mode_t mode;
 	/*
@@ -159,15 +153,13 @@ struct xdir {
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX];
-	/** Snapshots or xlogs */
-	enum xdir_type type;
 };
 
 /**
  * Initialize a log dir.
  */
 void
-xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
+xdir_create(struct xdir *dir, const char *dirname, const char *filetype,
 	    const struct tt_uuid *instance_uuid, const struct xlog_opts *opts);
 
 /**

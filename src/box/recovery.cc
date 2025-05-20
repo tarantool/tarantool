@@ -96,7 +96,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 		free(r);
 	});
 
-	xdir_create(&r->wal_dir, wal_dirname, XLOG, &INSTANCE_UUID,
+	xdir_create(&r->wal_dir, wal_dirname, "XLOG", &INSTANCE_UUID,
 		    &xlog_opts_default);
 	r->wal_dir.force_recovery = force_recovery;
 

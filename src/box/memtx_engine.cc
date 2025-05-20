@@ -922,7 +922,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	opts.rate_limit = snap_io_rate_limit;
 	opts.sync_interval = SNAP_SYNC_INTERVAL;
 	opts.free_cache = true;
-	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
+	xdir_create(&ckpt->dir, snap_dirname, "SNAP", &INSTANCE_UUID, &opts);
 	xlog_clear(&ckpt->snap);
 	vclock_create(&ckpt->vclock);
 	box_raft_checkpoint_local(&ckpt->raft);
@@ -1671,7 +1671,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		return NULL;
 	}
 
-	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID,
+	xdir_create(&memtx->snap_dir, snap_dirname, "SNAP", &INSTANCE_UUID,
 		    &xlog_opts_default);
 	memtx->snap_dir.force_recovery = force_recovery;
 
