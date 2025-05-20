@@ -437,7 +437,7 @@ int
 xdir_open_cursor(struct xdir *dir, int64_t signature,
 		 struct xlog_cursor *cursor)
 {
-	const char *filename = xdir_format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature);
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) {
 		diag_set(SystemError, "failed to open '%s' file", filename);
@@ -674,13 +674,11 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock)
 }
 
 const char *
-xdir_format_filename(struct xdir *dir, int64_t signature,
-		enum log_suffix suffix)
+xdir_format_filename(struct xdir *dir, int64_t signature)
 {
-	return tt_snprintf(PATH_MAX, "%s/%020lld%s%s",
-			   dir->dirname, (long long) signature,
-			   dir->filename_ext, suffix == INPROGRESS ?
-					      inprogress_suffix : "");
+	return tt_snprintf(PATH_MAX, "%s/%020lld%s",
+			   dir->dirname, (long long)signature,
+			   dir->filename_ext);
 }
 
 void
@@ -711,7 +709,7 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
 		const char *filename =
-			xdir_format_filename(dir, vclock_sum(vclock), NONE);
+			xdir_format_filename(dir, vclock_sum(vclock));
 		xlog_remove_file(filename, rm_flags);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
@@ -726,8 +724,7 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 	struct vclock *find = vclockset_match(&dir->index, to_remove);
 	if (vclock_compare(find, to_remove) != 0)
 		return -1;
-	const char *filename =
-		xdir_format_filename(dir, vclock_sum(find), NONE);
+	const char *filename = xdir_format_filename(dir, vclock_sum(find));
 	if (!xlog_remove_file(filename, XLOG_RM_VERBOSE))
 		return -1;
 	vclockset_remove(&dir->index, find);
@@ -1003,7 +1000,7 @@ int
 xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock)
 {
 	int64_t signature = vclock_sum(vclock);
-	const char *filename = xdir_format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature);
 
 	if (dir->type != SNAP) {
 		assert(false);
@@ -1042,7 +1039,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	xlog_meta_create(&meta, dir->filetype, dir->instance_uuid,
 			 vclock, prev_vclock);
 
-	const char *filename = xdir_format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature);
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta,
 			&dir->opts) != 0)
 		return -1;

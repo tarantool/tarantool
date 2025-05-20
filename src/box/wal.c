@@ -480,7 +480,7 @@ wal_open_f(struct cbus_call_msg *msg)
 	(void)msg;
 	struct wal_writer *writer = &wal_writer_singleton;
 	const char *path = xdir_format_filename(&writer->wal_dir,
-				vclock_sum(&writer->vclock), NONE);
+				vclock_sum(&writer->vclock));
 	assert(!xlog_is_open(&writer->current_wal));
 
 	uint64_t sum_already_on_disk = 0;
@@ -490,8 +490,7 @@ wal_open_f(struct cbus_call_msg *msg)
 		if (vclock_compare(&writer->checkpoint_vclock, vclock) > 0)
 			continue;
 		const char *name = xdir_format_filename(&writer->wal_dir,
-							vclock_sum(vclock),
-							NONE);
+							vclock_sum(vclock));
 		struct stat attr;
 		if (stat(name, &attr) != 0)
 			say_warn("failed to get file size %s, consider it"
@@ -511,7 +510,7 @@ static int
 wal_open(struct wal_writer *writer)
 {
 	const char *path = xdir_format_filename(&writer->wal_dir,
-				vclock_sum(&writer->vclock), NONE);
+				vclock_sum(&writer->vclock));
 	if (access(path, F_OK) != 0) {
 		if (errno == ENOENT) {
 			/* No WAL, nothing to do. */
