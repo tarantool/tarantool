@@ -429,9 +429,23 @@ local function purge_password_from_uris(uri)
     return purge_password_from_uri(uri)
 end
 
+local function purge_password_from_listen_options_uri(uri)
+    if uri == nil or type(uri) == "table" then
+        return purge_password_from_uris(uri)
+    end
+
+    local parts = {}
+    for sub_uri in string.gmatch(uri, "[^, ]+") do
+        table.insert(parts, purge_password_from_uri(sub_uri))
+    end
+    return table.concat(parts, ", ")
+end
+
 -- options that require modification for logging
 local log_cfg_option = {
+    listen = purge_password_from_listen_options_uri,
     replication = purge_password_from_uris,
+    bootstrap_leader = purge_password_from_uris,
 }
 
 
