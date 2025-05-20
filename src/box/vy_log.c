@@ -213,7 +213,7 @@ vy_log_rotate(const struct vclock *vclock);
 static inline const char *
 vy_log_filename(int64_t signature)
 {
-	return xdir_format_filename(&vy_log.dir, signature, NONE);
+	return xdir_format_filename(&vy_log.dir, signature);
 }
 
 /**

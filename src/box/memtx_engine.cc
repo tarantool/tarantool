@@ -286,7 +286,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	say_info("recovery start");
 	int64_t signature = vclock_sum(vclock);
 	const char *filename = xdir_format_filename(&memtx->snap_dir,
-						    signature, NONE);
+						    signature);
 
 	say_info("recovering from `%s'", filename);
 	struct xlog_cursor cursor;
@@ -1302,7 +1302,7 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	const char *filename = xdir_format_filename(&memtx->snap_dir,
-						    vclock_sum(vclock), NONE);
+						    vclock_sum(vclock));
 	return cb(filename, cb_arg);
 }
 
@@ -1703,8 +1703,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	     vclock != NULL;
 	     vclock = vclockset_next(&memtx->snap_dir.index, vclock)) {
 		const char *name = xdir_format_filename(&memtx->snap_dir,
-							vclock_sum(vclock),
-							NONE);
+							vclock_sum(vclock));
 		struct stat attr;
 		double timestamp = ev_time();
 		if (stat(name, &attr) != 0)

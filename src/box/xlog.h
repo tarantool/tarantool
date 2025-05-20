@@ -227,8 +227,7 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock);
  * sum, and a suffix (.inprogress or not).
  */
 const char *
-xdir_format_filename(struct xdir *dir, int64_t signature,
-		     enum log_suffix suffix);
+xdir_format_filename(struct xdir *dir, int64_t signature);
 
 /**
  * Return true if the given directory index has files whose
