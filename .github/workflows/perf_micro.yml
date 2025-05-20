@@ -29,6 +29,11 @@ on:
         description: Git revision from submodule repository
         required: true
         type: string
+      tarantool_revision:
+        description: Git revision for the Tarantool repository
+        required: false
+        default: 'master'
+        type: string
   schedule:
     - cron: '0 0 * * *'  # Once a day at midnight.
 
@@ -91,7 +96,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           repository: tarantool/tarantool
-          ref: ${{ inputs.submodule && 'master' || env.PERF_COMMIT }}
+          ref: ${{ inputs.tarantool_revision || env.PERF_COMMIT }}
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
