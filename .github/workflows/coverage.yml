@@ -19,6 +19,11 @@ on:
         description: Git revision from submodule repository
         required: true
         type: string
+      tarantool_revision:
+        description: Git revision for the Tarantool repository
+        required: false
+        default: 'master'
+        type: string
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
@@ -74,7 +79,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           repository: tarantool/tarantool
-          ref: ${{ inputs.submodule && 'master' || github.ref }}
+          ref: ${{ inputs.tarantool_revision || github.ref }}
 
       - name: Set environment
         uses: ./.github/actions/environment
