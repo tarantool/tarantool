@@ -715,7 +715,7 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 void
 vy_log_init(const char *dir)
 {
-	xdir_create(&vy_log.dir, dir, VYLOG, &INSTANCE_UUID,
+	xdir_create(&vy_log.dir, dir, "VYLOG", &INSTANCE_UUID,
 		    &xlog_opts_default);
 	latch_create(&vy_log.latch);
 	mempool_create(&vy_log.tx_pool, cord_slab_cache(),

@@ -329,7 +329,7 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 /* {{{ struct xdir */
 
 void
-xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
+xdir_create(struct xdir *dir, const char *dirname, const char *filetype,
 	    const struct tt_uuid *instance_uuid, const struct xlog_opts *opts)
 {
 	memset(dir, 0, sizeof(*dir));
@@ -340,24 +340,11 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 	dir->instance_uuid = instance_uuid;
 	snprintf(dir->dirname, sizeof(dir->dirname), "%s", dirname);
 	dir->open_wflags = 0;
-	switch (type) {
-	case SNAP:
-		dir->filetype = "SNAP";
-		dir->filename_ext = ".snap";
-		break;
-	case XLOG:
-		dir->filetype = "XLOG";
-		dir->filename_ext = ".xlog";
-		dir->force_recovery = true;
-		break;
-	case VYLOG:
-		dir->filetype = "VYLOG";
-		dir->filename_ext = ".vylog";
-		break;
-	default:
-		unreachable();
-	}
-	dir->type = type;
+	VERIFY((size_t)snprintf(dir->filetype, sizeof(dir->filetype),
+				"%s", filetype) < sizeof(dir->filetype));
+	VERIFY((size_t)snprintf(dir->filename_ext, sizeof(dir->filename_ext),
+				".%s", filetype) < sizeof(dir->filename_ext));
+	strtolower(dir->filename_ext);
 	dir->retention_period = 0;
 }
 
@@ -998,12 +985,6 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock)
 {
 	int64_t signature = vclock_sum(vclock);
 	const char *filename = xdir_format_filename(dir, signature);
-
-	if (dir->type != SNAP) {
-		assert(false);
-		diag_set(SystemError, "Can't touch xlog '%s'", filename);
-		return -1;
-	}
 	if (utime(filename, NULL) != 0) {
 		diag_set(SystemError, "Can't update xlog timestamp: '%s'",
 			 filename);
@@ -1024,12 +1005,8 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	assert(signature >= 0);
 	assert(!tt_uuid_is_nil(dir->instance_uuid));
 
-	/*
-	 * For WAL dir: store vclock of the previous xlog file
-	 * to check for gaps on recovery.
-	 */
 	const struct vclock *prev_vclock = NULL;
-	if (dir->type == XLOG && !vclockset_empty(&dir->index))
+	if (dir->store_prev_vclock && !vclockset_empty(&dir->index))
 		prev_vclock = vclockset_last(&dir->index);
 
 	struct xlog_meta meta;
