@@ -948,8 +948,9 @@ wal_opt_rotate(struct wal_writer *writer)
 	if (xlog_is_open(&writer->current_wal))
 		return 0;
 
-	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
-			     &writer->vclock) != 0)
+	if (xdir_create_materialized_xlog(&writer->wal_dir,
+					  &writer->current_wal,
+					  &writer->vclock) != 0)
 		return -1;
 	/*
 	 * Keep track of the new WAL vclock. Required for garbage
@@ -1314,8 +1315,8 @@ wal_writer_f(va_list ap)
 	     vclock_compare(&writer->vclock,
 			    &writer->current_wal.meta.vclock) > 0)) {
 		struct xlog l;
-		if (xdir_create_xlog(&writer->wal_dir, &l,
-				     &writer->vclock) == 0)
+		if (xdir_create_materialized_xlog(&writer->wal_dir, &l,
+						  &writer->vclock) == 0)
 			wal_xlog_close(&l);
 		else
 			diag_log();

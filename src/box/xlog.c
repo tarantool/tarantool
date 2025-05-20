@@ -344,18 +344,15 @@ xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
 	case SNAP:
 		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
-		dir->suffix = INPROGRESS;
 		break;
 	case XLOG:
 		dir->filetype = "XLOG";
 		dir->filename_ext = ".xlog";
-		dir->suffix = NONE;
 		dir->force_recovery = true;
 		break;
 	case VYLOG:
 		dir->filetype = "VYLOG";
 		dir->filename_ext = ".vylog";
-		dir->suffix = INPROGRESS;
 		break;
 	default:
 		unreachable();
@@ -1040,16 +1037,19 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 			 vclock, prev_vclock);
 
 	const char *filename = xdir_format_filename(dir, signature);
-	if (xlog_create(xlog, filename, dir->open_wflags, &meta,
-			&dir->opts) != 0)
-		return -1;
+	return xlog_create(xlog, filename, dir->open_wflags, &meta, &dir->opts);
+}
 
-	/* Rename xlog file */
-	if (dir->suffix != INPROGRESS && xlog_materialize(xlog) != 0) {
+int
+xdir_create_materialized_xlog(struct xdir *dir, struct xlog *xlog,
+			      const struct vclock *vclock)
+{
+	if (xdir_create_xlog(dir, xlog, vclock) != 0)
+		return -1;
+	if (xlog_materialize(xlog) != 0) {
 		xlog_discard(xlog);
 		return -1;
 	}
-
 	return 0;
 }
 
