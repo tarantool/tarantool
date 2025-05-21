@@ -65,6 +65,8 @@
 #include "arrow_ce.h"
 #include "arrow_ipc.h"
 
+struct rlist box_on_insert_arrow = RLIST_HEAD_INITIALIZER(box_on_insert_arrow);
+
 /**
  * Controls whether to consider system spaces indefinitely synchronous when the
  * synchronous queue is claimed.
@@ -1397,6 +1399,7 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 	if (rc != 0)
 		goto release;
 
+	box_run_on_insert_arrow(space, txn, array, schema, fields);
 	rc = space->vtab->execute_insert_arrow(space, txn, array,
 					       schema, fields);
 
