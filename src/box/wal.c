@@ -900,7 +900,7 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 	}
 	if (vclock != NULL)
 		xdir_collect_garbage(&writer->wal_dir, vclock_sum(vclock),
-				     XDIR_GC_ASYNC);
+				     XDIR_GC_ASYNC, NULL);
 
 	return 0;
 }
@@ -1022,7 +1022,8 @@ retry:
 		warn_no_space = false;
 	}
 
-	xdir_collect_garbage(&writer->wal_dir, gc_lsn, XDIR_GC_REMOVE_ONE);
+	xdir_collect_garbage(&writer->wal_dir, gc_lsn,
+			     XDIR_GC_REMOVE_ONE, NULL);
 	notify_gc = true;
 	goto retry;
 error:

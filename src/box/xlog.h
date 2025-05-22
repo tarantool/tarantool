@@ -251,12 +251,18 @@ enum {
 	XDIR_GC_REMOVE_ONE = 1 << 1,
 };
 
+typedef void
+(*xlog_remove_cb_f)(const char *filename);
+
 /**
- * Remove files whose signature is less than specified.
+ * Remove files whose signature is less than specified. Calls the given
+ * callback on each removed file signature.
+ *
  * For possible values of @flags see XDIR_GC_*.
  */
 void
-xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
+xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags,
+		     xlog_remove_cb_f xlog_remove_callback);
 
 /**
  * Unlink single file with given vclock. If there's no file corresponding to
@@ -954,7 +960,8 @@ typedef int
 extern xlog_remove_file_impl_f xlog_remove_file_impl;
 
 /**
- * Removes an xlog file with the given name.
+ * Removes an xlog file with the given name and calls the given callback on
+ * successful deletion.
  *
  * Returns true if the file was removed or didn't exist. If the file wasn't
  * removed due to an error, logs the error and returns false.
@@ -962,7 +969,8 @@ extern xlog_remove_file_impl_f xlog_remove_file_impl;
  * See XLOG_RM_* for available flags.
  */
 bool
-xlog_remove_file(const char *filename, unsigned flags);
+xlog_remove_file(const char *filename, unsigned flags,
+		 xlog_remove_cb_f remove_callback);
 
 /** }}} */
 
