@@ -137,6 +137,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	}
 	space_rv->index_id_max = space->index_id_max;
 	memset(space_rv->index_map, 0, index_map_size);
+	space_rv->index_count = 0;
 	for (uint32_t i = 0; i <= space->index_id_max; i++) {
 		struct index *index = space->index_map[i];
 		if (index == NULL ||
@@ -146,6 +147,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		if (space_rv->index_map[i] == NULL)
 			goto fail;
 		space_rv->index_map[i]->space = space_rv;
+		space_rv->index_count++;
 	}
 	return space_rv;
 fail:

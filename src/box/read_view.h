@@ -78,6 +78,8 @@ struct space_read_view {
 	 * (The number of entries in index_map is index_id_max + 1.)
 	 */
 	uint32_t index_id_max;
+	/** The amount on non-NULL entries in the index_map. */
+	uint32_t index_count;
 	/**
 	 * Sparse (may contain nulls) array of index read views,
 	 * indexed by index id.
