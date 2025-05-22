@@ -608,7 +608,26 @@ i3:select{box.NULL}
   - [6, 1, null, 2]
   - [7, 1, null, 100]
 ...
+-- Alter of PK is forbidden
 i1:alter{parts = {4, 'unsigned'}}
+---
+- error: Tarantool does not support non-trivial alter of primary index along with
+    rebuild of dependent secondary indexes
+...
+-- Drop indexes, alter PK, and create them again
+i2:drop()
+---
+...
+i3:drop()
+---
+...
+i1:alter{parts = {4, 'unsigned'}}
+---
+...
+i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+---
+...
+i3 = s:create_index('i3', { type = 'tree', parts = {{3, 'unsigned', is_nullable = true}}, unique = true })
 ---
 ...
 i2:select{1}
@@ -642,7 +661,19 @@ i3:select{box.NULL}
 s:truncate()
 ---
 ...
+i2:drop()
+---
+...
+i3:drop()
+---
+...
 i1:alter{parts = {1, 'str'}}
+---
+...
+i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+---
+...
+i3 = s:create_index('i3', { type = 'tree', parts = {{3, 'unsigned', is_nullable = true}}, unique = true })
 ---
 ...
 _ = s:replace{"5", 1, box.NULL}
