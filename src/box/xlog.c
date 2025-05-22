@@ -665,6 +665,11 @@ xdir_format_filename(struct xdir *dir, int64_t signature)
 			   dir->filename_ext);
 }
 
+/** See the definition. */
+static bool
+xlog_do_remove_file(const char *filename, unsigned flags,
+		    xlog_remove_cb_f remove_callback);
+
 void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 {
@@ -694,7 +699,7 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	       vclock_sum(vclock) < signature) {
 		const char *filename =
 			xdir_format_filename(dir, vclock_sum(vclock));
-		xlog_remove_file(filename, rm_flags);
+		xlog_do_remove_file(filename, rm_flags, dir->gc_cb);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 		if (flags & XDIR_GC_REMOVE_ONE)
@@ -2155,6 +2160,8 @@ struct xlog_remove_file_task {
 	struct coio_task base;
 	/** Path to the file. */
 	char *filename;
+	/** Callback for successful file deletion. */
+	xlog_remove_cb_f callback;
 	/** Bitwise combination of XLOG_RM_* flags. */
 	unsigned flags;
 };
@@ -2180,7 +2187,8 @@ xlog_remove_file_impl_f xlog_remove_file_impl = xlog_remove_file_impl_default;
 
 /** Blocking implementation of xlog_remove_file(). */
 static bool
-xlog_remove_file_blocking(const char *filename, unsigned flags)
+xlog_remove_file_blocking(const char *filename, unsigned flags,
+			  xlog_remove_cb_f remove_callback)
 {
 	bool existed;
 	if (xlog_remove_file_impl(filename, &existed) != 0) {
@@ -2191,6 +2199,8 @@ xlog_remove_file_blocking(const char *filename, unsigned flags)
 	}
 	if (existed && (flags & XLOG_RM_VERBOSE) != 0)
 		say_info("removed %s", filename);
+	if (existed && remove_callback)
+		remove_callback(filename);
 	return true;
 }
 
@@ -2199,7 +2209,7 @@ xlog_remove_file_cb(struct coio_task *base)
 {
 	struct xlog_remove_file_task *task =
 		(struct xlog_remove_file_task *)base;
-	xlog_remove_file_blocking(task->filename, task->flags);
+	xlog_remove_file_blocking(task->filename, task->flags, task->callback);
 	return 0;
 }
 
@@ -2215,7 +2225,8 @@ xlog_remove_file_done_cb(struct coio_task *base)
 
 /** Asynchronous implementation of xlog_remove_file(). */
 static bool
-xlog_remove_file_async(const char *filename, unsigned flags)
+xlog_remove_file_async(const char *filename, unsigned flags,
+		       xlog_remove_cb_f remove_callback)
 {
 	struct xlog_remove_file_task *task;
 	struct grp_alloc all = grp_alloc_initializer();
@@ -2224,6 +2235,7 @@ xlog_remove_file_async(const char *filename, unsigned flags)
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
 	task = grp_alloc_create_data(&all, sizeof(*task));
 	task->filename = grp_alloc_create_str0(&all, filename);
+	task->callback = remove_callback;
 	task->flags = flags;
 	assert(grp_alloc_size(&all) == 0);
 	coio_task_create(&task->base, xlog_remove_file_cb,
@@ -2232,13 +2244,26 @@ xlog_remove_file_async(const char *filename, unsigned flags)
 	return true;
 }
 
+/**
+ * Remove the file with the given @a filename and call
+ * @a remove_callback on the successful deletion.
+ */
+static bool
+xlog_do_remove_file(const char *filename, unsigned flags,
+		    xlog_remove_cb_f remove_callback)
+{
+	if (flags & XLOG_RM_ASYNC)
+		return xlog_remove_file_async(filename, flags,
+					      remove_callback);
+	else
+		return xlog_remove_file_blocking(filename, flags,
+						 remove_callback);
+}
+
 bool
 xlog_remove_file(const char *filename, unsigned flags)
 {
-	if (flags & XLOG_RM_ASYNC)
-		return xlog_remove_file_async(filename, flags);
-	else
-		return xlog_remove_file_blocking(filename, flags);
+	return xlog_do_remove_file(filename, flags, NULL);
 }
 
 /* }}} */
