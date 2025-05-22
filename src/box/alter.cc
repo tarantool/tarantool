@@ -1397,10 +1397,11 @@ public:
 	                         new_index_def->key_def->part_count,
 	                         old_index->def->key_def->parts,
 	                         old_index->def->key_def->part_count) != 0) {
-	                /*
-	                 * Primary parts have been changed -
-	                 * update secondary indexes.
-	                 */
+			/*
+			 * Primary parts have been changed - remember it to
+			 * check that no secondary indexes depending on pk
+			 * need to be rebuilt.
+			 */
 	                alter->pk_def = new_index_def->key_def;
 	        }
 	}
@@ -1566,7 +1567,10 @@ public:
 		new_index_def(new_index_def_arg),
 		old_index_def(old_index_def_arg)
 	{
-		/* We may want to rebuild secondary keys as well. */
+		/*
+		 * We should check that no secondary indexes depending on pk
+		 * need to be rebuilt.
+		 */
 		if (new_index_def->iid == 0)
 			alter->pk_def = new_index_def->key_def;
 	}
@@ -1876,18 +1880,24 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
 		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
-		if (!index_def_change_requires_rebuild(old_index, new_def))
+		if (!index_def_change_requires_rebuild(old_index, new_def)) {
 			try {
 				(void) new ModifyIndex(alter, old_index, new_def);
 			} catch (Exception *e) {
 				return -1;
 			}
-		else
-			try {
-				(void) new RebuildIndex(alter, new_def, old_def);
-			} catch (Exception *e) {
-				return -1;
-			}
+		} else {
+			/*
+			 * Rebuild of several indexes in one statement is broken
+			 * because we need to maintain consistency of built
+			 * indexes while building the next ones, and we don't.
+			 * Simply forbid such alters.
+			 */
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+				 "alter of primary index along with non-unique "
+				 "or nullable secondary indexes");
+			return -1;
+		}
 		guard.is_active = false;
 	}
 	return 0;
