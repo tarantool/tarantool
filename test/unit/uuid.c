@@ -122,13 +122,13 @@ main(void)
                                 .time_hi_and_version = 18482,
                                 .clock_seq_hi_and_reserved = 175,
                                 .clock_seq_low = 139,
-                                .node = "Ad\325,b\353"},
+                                .node = {'A', 'd', '\325', ',', 'b', '\353'}},
                 (struct tt_uuid){.time_low = 409910263,
                                 .time_mid = 53143,
                                 .time_hi_and_version = 20014,
                                 .clock_seq_hi_and_reserved = 139,
                                 .clock_seq_low = 27,
-                                .node = "v\025Oo9I"},
+                                .node = {'v', '\025', 'O', 'o', '9', 'I'}},
                 1);
 
 
@@ -138,13 +138,13 @@ main(void)
                                 .time_hi_and_version = 11903,
                                 .clock_seq_hi_and_reserved = 175,
                                 .clock_seq_low = 80,
-                                .node = "Ad\325,b\353"},
+                                .node = {'A', 'd', '\325', ',', 'b', '\353'}},
                 (struct tt_uuid){.time_low = 532451999,
                                 .time_mid = 23976,
                                 .time_hi_and_version = 10437,
                                 .clock_seq_hi_and_reserved = 139,
                                 .clock_seq_low = 54,
-                                .node = "v\025Oo9I"},
+                                .node = {'v', '\025', 'O', 'o', '9', 'I'}},
                 -1);
 
         mp_uuid_test();
