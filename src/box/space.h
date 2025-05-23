@@ -235,8 +235,7 @@ struct space {
 	/** This space has foreign key constraints in its format. */
 	bool has_foreign_keys;
 	/**
-	 * Space format or NULL if space does not have format
-	 * (sysview engine, for example).
+	 * Space format, cannot be NULL.
 	 */
 	struct tuple_format *format;
 	/**
