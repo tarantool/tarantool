@@ -3,6 +3,9 @@
   <compound refid="structbox__decimal" kind="struct"><name>box_decimal</name>
     <member refid="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" kind="variable"><name>internal</name></member>
   </compound>
+  <compound refid="unionfield__type__params" kind="union"><name>field_type_params</name>
+    <member refid="unionfield__type__params_1a3754993008ced0f6a10f690ebb40d145" kind="variable"><name>scale</name></member>
+  </compound>
   <compound refid="unionPACKED" kind="union"><name>PACKED</name>
     <member refid="unionPACKED_1ab16a07e887ef727e6085637bad928d45" kind="variable"><name>fieldno</name></member>
     <member refid="unionPACKED_1a4c3fa9f54c4da8295b2cdf3ca5f843ac" kind="variable"><name>flags</name></member>
@@ -124,6 +127,10 @@
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa4b16790b92367cdc563a9ef39ee953b1" kind="enumvalue"><name>FIELD_TYPE_UINT64</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfaff9b755a110b72bae60c39836d6e9b28" kind="enumvalue"><name>FIELD_TYPE_FLOAT32</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa5830e446c7a004076b4b70edf8953969" kind="enumvalue"><name>FIELD_TYPE_FLOAT64</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfab8f9ac5fa2f1c849ec9cbe03875cd526" kind="enumvalue"><name>FIELD_TYPE_DECIMAL32</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa054260d3a7079ddf0257dc75441b5c77" kind="enumvalue"><name>FIELD_TYPE_DECIMAL64</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfafee83ad4a35427deb2f3922e7bb890f3" kind="enumvalue"><name>FIELD_TYPE_DECIMAL128</name></member>
+    <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfa03d1ffd36e735fe677442b981470b3c5" kind="enumvalue"><name>FIELD_TYPE_DECIMAL256</name></member>
     <member refid="module_8h_1af4e6ca114114786cc23f3d5a1f8d14bfad9d9ff6bc850b99a8230934e8257c79e" kind="enumvalue"><name>field_type_MAX</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619" kind="enum"><name>on_conflict_action</name></member>
     <member refid="module_8h_1ac42b7e2d98df6589252f8ede07932619aa9b27bf642c85cef5f63d92c1f880e63" kind="enumvalue"><name>ON_CONFLICT_ACTION_NONE</name></member>
@@ -445,6 +452,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea13c39fded19c7143e232ad6630746562" kind="enumvalue"><name>ER_MVCC_UNAVAILABLE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea230d861bedb2ae026ad806ce2eff2a94" kind="enumvalue"><name>ER_CANT_UPGRADE_INDEXED_FIELD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea177c9e0c61cfc4e2482b1c7407c962b7" kind="enumvalue"><name>ER_SYNC_TIMEOUT</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3b94a3f1043482e9715e43f9b3e7d3c3" kind="enumvalue"><name>ER_FIELD_IRREPRESENTABLE_VALUE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>

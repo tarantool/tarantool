@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.8" xml:lang="en-US">
+  <compounddef id="unionfield__type__params" kind="union" language="C++" prot="public">
+    <compoundname>field_type_params</compoundname>
+    <includes refid="module_8h" local="no">module.h</includes>
+    <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="unionfield__type__params_1a3754993008ced0f6a10f690ebb40d145" prot="public" static="no" mutable="no">
+        <type>int64_t</type>
+        <definition>int64_t field_type_params::scale</definition>
+        <argsstring></argsstring>
+        <name>scale</name>
+        <qualifiedname>field_type_params::scale</qualifiedname>
+        <briefdescription>
+<para>Used by fix fixed point decimals. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="2280" column="9" bodyfile="src/module.h" bodystart="2280" bodyend="-1"/>
+      </memberdef>
+    </sectiondef>
+    <briefdescription>
+<para>Extra parameters for parametric types like FIELD_TYPE_DECIMAL32 etc. </para>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <location file="src/module.h" line="2278" column="1" bodyfile="src/module.h" bodystart="2278" bodyend="2281"/>
+    <listofallmembers>
+      <member refid="unionfield__type__params_1a3754993008ced0f6a10f690ebb40d145" prot="public" virt="non-virtual"><scope>field_type_params</scope><name>scale</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

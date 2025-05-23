@@ -37,7 +37,8 @@ var searchData=
   ['fiber_5ftime64_34',['fiber_time64',['../module_8h.html#ae1e9fb25b47b6090a587c92aaf536aed',1,'module.h']]],
   ['fiber_5fwakeup_35',['fiber_wakeup',['../module_8h.html#a661de7f72aa265ff6ffcb8b3acfafe40',1,'module.h']]],
   ['fiber_5fyield_36',['fiber_yield',['../module_8h.html#aaa5beb40f119b9400bb57b81820b24ff',1,'module.h']]],
-  ['field_5ftype_37',['field_type',['../unionPACKED.html#ae1b4d9361929d8bc2b374a36a2133910',1,'PACKED::field_type'],['../module_8h.html#af4e6ca114114786cc23f3d5a1f8d14bf',1,'field_type:&#160;module.h']]],
-  ['fieldno_38',['fieldno',['../unionPACKED.html#ab16a07e887ef727e6085637bad928d45',1,'PACKED']]],
-  ['flags_39',['flags',['../unionPACKED.html#a4c3fa9f54c4da8295b2cdf3ca5f843ac',1,'PACKED']]]
+  ['field_5ftype_37',['field_type',['../module_8h.html#af4e6ca114114786cc23f3d5a1f8d14bf',1,'field_type:&#160;module.h'],['../unionPACKED.html#ae1b4d9361929d8bc2b374a36a2133910',1,'PACKED::field_type']]],
+  ['field_5ftype_5fparams_38',['field_type_params',['../unionfield__type__params.html',1,'']]],
+  ['fieldno_39',['fieldno',['../unionPACKED.html#ab16a07e887ef727e6085637bad928d45',1,'PACKED']]],
+  ['flags_40',['flags',['../unionPACKED.html#a4c3fa9f54c4da8295b2cdf3ca5f843ac',1,'PACKED']]]
 ];
