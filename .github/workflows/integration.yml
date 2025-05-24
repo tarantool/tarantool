@@ -20,6 +20,11 @@ on:
         description: Git revision from submodule repository
         required: true
         type: string
+      tarantool_revision:
+        description: Git revision for the Tarantool repository
+        required: false
+        default: 'master'
+        type: string
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
@@ -51,7 +56,7 @@ jobs:
 
     uses: tarantool/tarantool/.github/workflows/reusable_build.yml@master
     with:
-      ref: ${{ inputs.submodule && 'master' || github.ref }}
+      ref: ${{ inputs.tarantool_revision || github.ref }}
       os: ubuntu
       dist: focal
       submodule: ${{ inputs.submodule }}
