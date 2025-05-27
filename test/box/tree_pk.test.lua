@@ -214,14 +214,28 @@ i2:select{2}
 i2:select{1, 5}
 i3:select{box.NULL}
 
+-- Alter of PK is forbidden
 i1:alter{parts = {4, 'unsigned'}}
+
+-- Drop indexes, alter PK, and create them again
+i2:drop()
+i3:drop()
+i1:alter{parts = {4, 'unsigned'}}
+i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+i3 = s:create_index('i3', { type = 'tree', parts = {{3, 'unsigned', is_nullable = true}}, unique = true })
+
 i2:select{1}
 i2:select{2}
 i2:select{1, 1}
 i3:select{box.NULL}
 
 s:truncate()
+i2:drop()
+i3:drop()
 i1:alter{parts = {1, 'str'}}
+i2 = s:create_index('i2', { type = 'tree', parts = {2, 'unsigned'}, unique = false })
+i3 = s:create_index('i3', { type = 'tree', parts = {{3, 'unsigned', is_nullable = true}}, unique = true })
+
 _ = s:replace{"5", 1, box.NULL}
 _ = s:replace{"4", 1, box.NULL}
 _ = s:replace{"6", 1, box.NULL}
