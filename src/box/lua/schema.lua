@@ -954,6 +954,7 @@ box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local _func_index = box.space[box.schema.FUNC_INDEX_ID]
+    local _filters = box.space[box.schema.FILTERS_ID]
     -- This is needed to support dropping temporary spaces
     -- in read-only mode, because sequences aren't supported for them yet
     -- and therefore such requests aren't allowed in read-only mode.
@@ -966,6 +967,9 @@ box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
     end
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
+    end
+    for _, t in _filters.index.primary:pairs({space_id}) do
+        _filters:delete({space_id, t.index_id})
     end
     for _, t in _func_index.index.primary:pairs({space_id}) do
         _func_index:delete({space_id, t.index_id})
@@ -1798,6 +1802,8 @@ box.schema.index.drop = atomic_wrapper(function(space_id, index_id)
     end
     local _index = box.space[box.schema.INDEX_ID]
     local _func_index = box.space[box.schema.FUNC_INDEX_ID]
+    local _filters = box.space[box.schema.FILTERS_ID]
+    _filters:delete({space_id, index_id})
     for _, v in box.space._func_index:pairs{space_id, index_id} do
         _func_index:delete({v.space_id, v.index_id})
     end
@@ -1922,6 +1928,29 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
         _func_index:insert{space_id, index_id, index_opts.func}
     end
     space_sequence_alter_commit(sequence_proxy)
+end)
+
+box.schema.index.alter_filters = atomic_wrapper(function(space_id, index_id, options)
+    local space = box.space[space_id]
+    local _filters = box.space[box.schema.FILTERS_ID]
+    if space == nil then
+        box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id), 2)
+    end
+    if space.index[index_id] == nil then
+        box.error(box.error.NO_SUCH_INDEX_ID, index_id, space.name, 2)
+    end
+    if options == nil then
+        _filters:delete({space_id, index_id})
+        return
+    end
+    local filters = options.filters
+    local tuple_opts = setmetatable({}, {__serialize = 'map'})
+    -- TODO: type checks and field names
+    if #filters > 0 then
+        _filters:replace{space_id, index_id, filters, tuple_opts}
+    else
+        _filters:delete{space_id, index_id}
+    end
 end)
 
 -- a static box_tuple_t ** instance for calling box_index_* API
@@ -2773,6 +2802,14 @@ base_index_mt.tuple_pos = function(index, tuple)
                            iterator_pos_end[0] - iterator_pos[0])
     builtin.box_region_truncate(region_svp)
     return ret
+end
+
+base_index_mt.alter_filters = function(index, options)
+    check_index_arg(index, 'alter_filters', 2)
+    if index.id == nil or index.space_id == nil then
+        box.error(box.error.ILLEGAL_PARAMS, "Usage: index:alter_filters{opts}", 2)
+    end
+    return box.schema.index.alter_filters(index.space_id, index.id, options)
 end
 
 local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}

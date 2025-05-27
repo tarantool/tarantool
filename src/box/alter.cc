@@ -2520,6 +2520,21 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 }
 
 /**
+ * Whether the index has dependent data.
+ */
+static int
+index_has_data(struct index *index, bool *has_data)
+{
+	char key[20];
+	char *key_end = key;
+	key_end = mp_encode_array(key_end, 2);
+	key_end = mp_encode_uint(key_end, index->def->space_id);
+	key_end = mp_encode_uint(key_end, index->def->iid);
+	assert(key_end <= key + sizeof(key));
+	return space_has_data_impl(BOX_FILTERS_ID, 0, key, has_data);
+}
+
+/**
  * Just like with _space, 3 major cases:
  *
  * - insert a tuple = addition of a new index. The
@@ -2634,6 +2649,19 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			  space_name(old_space),
 			  "can not add a secondary key before primary");
 		return -1;
+	}
+
+	if (new_tuple == NULL) {
+		bool has_data = false;
+		if (index_has_data(old_index, &has_data) != 0)
+			return -1;
+
+		if (has_data) {
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 space_name(old_space),
+				 "can drop index with dependent data");
+			return -1;
+		}
 	}
 
 	struct alter_space *alter = alter_space_new(old_space);
@@ -5765,6 +5793,22 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
+#if defined(ENABLE_MEMCS_ENGINE)
+# include "alter_filters.cc"
+#else /* !defined(ENABLE_MEMCS_ENGINE) */
+
+/** A stub trigger invoked on replace in the _filters space. */
+static int
+on_replace_dd_filters(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition", "filters");
+	return -1;
+}
+
+#endif /* !defined(ENABLE_MEMCS_ENGINE) */
+
 TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
@@ -5780,4 +5824,5 @@ TRIGGER(on_replace_sequence_data, on_replace_dd_sequence_data);
 TRIGGER(on_replace_space_sequence, on_replace_dd_space_sequence);
 TRIGGER(on_replace_trigger, on_replace_dd_trigger);
 TRIGGER(on_replace_func_index, on_replace_dd_func_index);
+TRIGGER(on_replace_filters, on_replace_dd_filters);
 /* vim: set foldmethod=marker */
