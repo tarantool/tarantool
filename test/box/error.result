@@ -507,6 +507,8 @@ t;
  |   295: box.error.SYNC_TIMEOUT
  |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
  |   297: box.error.KEY_PART_IRREPRESENTABLE_VALUE
+ |   298: box.error.NO_FILTERS
+ |   299: box.error.INVALID_FILTERS
  | ...
 
 test_run:cmd("setopt delimiter ''");
