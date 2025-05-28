@@ -1159,3 +1159,45 @@ g.test_has_role = function(_g)
         t.assert_not(config:has_role('one', {instance = 'i-002'}))
     end)
 end
+
+g.test_tarantool_version_check = function(g)
+    local one = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version < 0.0.0"
+-- ...
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local two = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version > 0.0.0"
+-- ...
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+
+    helpers.success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'}
+        },
+        verify = function() end
+    })
+
+    helpers.failure_case({
+        roles = {two = two},
+        options = {
+            ['roles'] = {'two'}
+        },
+        exp_err = 'Roles "two" failed the "fail_if" check: ' ..
+                  '"tarantool_version > 0.0.0"'
+    })
+end
