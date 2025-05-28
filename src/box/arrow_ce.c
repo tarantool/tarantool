@@ -176,6 +176,8 @@ int
 arrow_validate_batch(struct ArrowArray *array, struct ArrowSchema *schema,
 		     struct space *space, uint32_t *fields)
 {
+	if (schema->n_children == 0)
+		return 0;
 	int rc = -1;
 	struct tuple_format *format = space->format;
 	struct region *gc = &fiber()->gc;

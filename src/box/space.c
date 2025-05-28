@@ -62,6 +62,7 @@
 #include "tweaks.h"
 #include "txn_limbo.h"
 #include "sql.h"
+#include "arrow_ce.h"
 #include "arrow_ipc.h"
 
 /**
@@ -1389,8 +1390,17 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 			goto eof;
 	}
 
-	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
+	uint32_t *fields = schema->n_children == 0 ? NULL :
+			   xregion_alloc_array(gc, typeof(*fields),
+					       schema->n_children);
+	rc = arrow_validate_batch(array, schema, space, fields);
+	if (rc != 0)
+		goto release;
 
+	rc = space->vtab->execute_insert_arrow(space, txn, array,
+					       schema, fields);
+
+release:
 	if (array->release != NULL)
 		array->release(array);
 	if (schema->release != NULL)
@@ -1550,11 +1560,13 @@ generic_space_bsize(struct space *space)
 int
 generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				   struct ArrowArray *array,
-				   struct ArrowSchema *schema)
+				   struct ArrowSchema *schema,
+				   uint32_t *fields)
 {
 	(void)txn;
 	(void)array;
 	(void)schema;
+	(void)fields;
 	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
 		 "arrow format");
 	return -1;

@@ -78,7 +78,8 @@ struct space_vtab {
 	 */
 	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
 				    struct ArrowArray *array,
-				    struct ArrowSchema *schema);
+				    struct ArrowSchema *schema,
+				    uint32_t *fields);
 
 	int (*ephemeral_replace)(struct space *, const char *, const char *);
 
@@ -773,7 +774,8 @@ space_cleanup_constraints(struct space *space);
 size_t generic_space_bsize(struct space *);
 int generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				       struct ArrowArray *array,
-				       struct ArrowSchema *schema);
+				       struct ArrowSchema *schema,
+				       uint32_t *fields);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
 int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);
