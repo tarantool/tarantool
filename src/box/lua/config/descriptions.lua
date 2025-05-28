@@ -2367,9 +2367,11 @@ I['stateboard'] = format_text([[
     the `config.*.prefix` option. The provided information is in YAML format
     with the following fields:
 
-    - `hostname` (`string`): hostname
-    - `pid` (`integer`): Tarantool process ID
+    - `hostname` (`string`): hostname.
+    - `pid` (`integer`): Tarantool process ID.
     - `mode` (`'ro'` or `'rw'`): instance mode (see `box.info.ro`).
+    - `ro_reason` (`string`): the reason why the instance is read-only (see
+      `box.info.ro_reason`).
     - `status` (`string`): instance status (see `box.info.status` for possible
       values and their description).
 ]])
