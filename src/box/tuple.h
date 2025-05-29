@@ -962,16 +962,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		offset_slot = field->offset_slot;
 		if (offset_slot == TUPLE_OFFSET_SLOT_NIL)
 			goto parse;
-		if (offset_slot_hint != NULL) {
-			*offset_slot_hint = offset_slot;
-			/*
-			 * Hint is never requested for a multikey field without
-			 * providing a concrete multikey index.
-			 */
-			assert(!field->is_multikey_part ||
-			       multikey_idx != MULTIKEY_NONE);
-		} else if (field->is_multikey_part &&
-			   multikey_idx == MULTIKEY_NONE) {
+		if (field->is_multikey_part && multikey_idx == MULTIKEY_NONE) {
 			/*
 			 * When the field is multikey, the offset slot points
 			 * not at the data. It points at 'extra' array of
@@ -980,8 +971,21 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			 * not known when the field is accessed not in an index.
 			 * For example, in an application's Lua code by a JSON
 			 * path.
+			 *
+			 * Also, JSON tree has an interesting property. Imagine
+			 * having a field with path '[1][*]' in the tree. Then,
+			 * when looking for a field '[1][1]' (or '[1]["abc"]',
+			 * the second key can be anything), the field with path
+			 * '[1][*]' will be returned since '*' is actually
+			 * wildcard. Hence, if the format is stale and there are
+			 * no multikey fields in actual format, we can obtain
+			 * here a multikey field even if we didn't search for it
+			 * and multikey_idx will be MULTIKEY_NONE in this case.
+			 * Offset slot of such field should be skipped.
 			 */
 			goto parse;
+		} else if (offset_slot_hint != NULL) {
+			*offset_slot_hint = offset_slot;
 		}
 offset_slot_access:
 		/* Indexed field */
