@@ -126,6 +126,7 @@ box_truncate
 box_tuple_bsize
 box_tuple_compare
 box_tuple_compare_with_key
+box_tuple_data
 box_tuple_extract_key
 box_tuple_field
 box_tuple_field_by_path

@@ -147,6 +147,15 @@ API_EXPORT uint32_t
 box_tuple_field_count(box_tuple_t *tuple);
 
 /**
+ * Return the pointer to the raw tuple MsgPack Array data.
+ * \param tuple tuple.
+ * \param bsize will be set to the number of bytes of raw MsgPack data if not
+ *        NULL provided
+ */
+API_EXPORT const char *
+box_tuple_data(box_tuple_t *tuple, size_t *bsize);
+
+/**
  * Return the number of bytes used to store internal tuple data (MsgPack Array).
  * \param tuple a tuple
  */
