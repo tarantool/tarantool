@@ -295,7 +295,8 @@ box_backup_stop(void);
 /**
  * Spit out some basic module status (master/slave, etc.
  */
-const char *box_status(void);
+API_EXPORT const char *
+box_status(void);
 
 /**
  * Reset box statistics.
