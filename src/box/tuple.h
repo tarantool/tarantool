@@ -102,7 +102,7 @@ typedef struct tuple_format box_tuple_format_t;
  * Each Tuple has associated format (class). Default format is used to
  * create tuples which are not attach to any particular space.
  */
-box_tuple_format_t *
+API_EXPORT box_tuple_format_t *
 box_tuple_format_default(void);
 
 /**
@@ -127,7 +127,7 @@ typedef struct tuple box_tuple_t;
  * \retval 0 always
  * \sa box_tuple_unref()
  */
-int
+API_EXPORT int
 box_tuple_ref(box_tuple_t *tuple);
 
 /**
@@ -136,21 +136,21 @@ box_tuple_ref(box_tuple_t *tuple);
  * \param tuple a tuple
  * \sa box_tuple_ref()
  */
-void
+API_EXPORT void
 box_tuple_unref(box_tuple_t *tuple);
 
 /**
  * Return the number of fields in tuple (the size of MsgPack Array).
  * \param tuple a tuple
  */
-uint32_t
+API_EXPORT uint32_t
 box_tuple_field_count(box_tuple_t *tuple);
 
 /**
  * Return the number of bytes used to store internal tuple data (MsgPack Array).
  * \param tuple a tuple
  */
-size_t
+API_EXPORT size_t
 box_tuple_bsize(box_tuple_t *tuple);
 
 /**
@@ -163,7 +163,7 @@ box_tuple_bsize(box_tuple_t *tuple);
  * If buffer size is not enough then the return value is the number of bytes
  * which would have been written if enough space had been available.
  */
-ssize_t
+API_EXPORT ssize_t
 box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size);
 
 /**
@@ -171,7 +171,7 @@ box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size);
  * \param tuple tuple
  * \return tuple_format
  */
-box_tuple_format_t *
+API_EXPORT box_tuple_format_t *
 box_tuple_format(box_tuple_t *tuple);
 
 /**
@@ -184,7 +184,7 @@ box_tuple_format(box_tuple_t *tuple);
  * \retval NULL if i >= box_tuple_field_count(tuple)
  * \retval msgpack otherwise
  */
-const char *
+API_EXPORT const char *
 box_tuple_field(box_tuple_t *tuple, uint32_t fieldno);
 
 /**
@@ -251,13 +251,13 @@ typedef struct tuple_iterator box_tuple_iterator_t;
  *
  * \post box_tuple_position(it) == 0
  */
-box_tuple_iterator_t *
+API_EXPORT box_tuple_iterator_t *
 box_tuple_iterator(box_tuple_t *tuple);
 
 /**
  * Destroy and free tuple iterator.
  */
-void
+API_EXPORT void
 box_tuple_iterator_free(box_tuple_iterator_t *it);
 
 /**
@@ -270,7 +270,7 @@ box_tuple_iterator_free(box_tuple_iterator_t *it);
  * \param it tuple iterator
  * \returns position.
  */
-uint32_t
+API_EXPORT uint32_t
 box_tuple_position(box_tuple_iterator_t *it);
 
 /**
@@ -279,7 +279,7 @@ box_tuple_position(box_tuple_iterator_t *it);
  * \param it tuple iterator
  * \post box_tuple_position(it) == 0
  */
-void
+API_EXPORT void
 box_tuple_rewind(box_tuple_iterator_t *it);
 
 /**
@@ -294,7 +294,7 @@ box_tuple_rewind(box_tuple_iterator_t *it);
  * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
  * value is NULL.
  */
-const char *
+API_EXPORT const char *
 box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno);
 
 /**
@@ -308,7 +308,7 @@ box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno);
  * \post box_tuple_position(it) == box_tuple_field_count(tuple) if returned
  * value is NULL.
  */
-const char *
+API_EXPORT const char *
 box_tuple_next(box_tuple_iterator_t *it);
 
 /**
@@ -322,7 +322,7 @@ box_tuple_next(box_tuple_iterator_t *it);
  * \pre data, end is valid MsgPack Array
  * \sa \code box.tuple.new(data) \endcode
  */
-box_tuple_t *
+API_EXPORT box_tuple_t *
 box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
 
 /**
@@ -340,7 +340,7 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
  *
  * @sa box_update()
  */
-box_tuple_t *
+API_EXPORT box_tuple_t *
 box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 /**
@@ -365,7 +365,7 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
  *
  * @sa box_upsert()
  */
-box_tuple_t *
+API_EXPORT box_tuple_t *
 box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 /**
@@ -376,7 +376,7 @@ box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
  * @retval  0 The tuple is valid.
  * @retval -1 The tuple is invalid.
  */
-int
+API_EXPORT int
 box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format);
 
 /** \endcond public */
