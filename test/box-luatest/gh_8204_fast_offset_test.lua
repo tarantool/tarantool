@@ -7,6 +7,13 @@ local g_mvcc = t.group('gh-8204-mvcc')
 g_generic.before_all(function()
     g_generic.server = server:new({ alias = 'master' })
     g_generic.server:start()
+    g_generic.server:exec(function()
+        local fiber = require('fiber')
+        -- The test cases run lots of read operations without yields,
+        -- so default fiber slice is not enough. Let's set a huge one
+        -- by default to make the test stable even on very slow runners.
+        fiber.set_max_slice(30)
+    end)
 end)
 
 g_mvcc.before_all(function()
@@ -15,6 +22,10 @@ g_mvcc.before_all(function()
         box_cfg = { memtx_use_mvcc_engine = true }
     })
     g_mvcc.server:start()
+    g_mvcc.server:exec(function()
+        local fiber = require('fiber')
+        fiber.set_max_slice(30)
+    end)
 end)
 
 for _, g in pairs({g_generic, g_mvcc}) do
