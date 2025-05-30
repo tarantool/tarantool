@@ -5,6 +5,10 @@ description: Install build and test dependencies on Debian-based systems
 runs:
   using: composite
   steps:
+    - uses: tarantool/setup-tarantool@v3
+      with:
+        tarantool-version: 2.11
+
     - run: |
         apt-get --allow-releaseinfo-change update
         apt-get -y -f install \
@@ -12,7 +16,6 @@ runs:
           ninja-build \
           cmake \
           lua5.1 \
-          luarocks \
           lcov \
           ruby-dev \
           liblz4-dev \
@@ -22,6 +25,10 @@ runs:
           libtool \
           util-linux
 
-        luarocks install luacheck 0.26.1
-        gem install coveralls-lcov
+        curl -L https://tarantool.io/release/2/installer.sh | sudo bash
+        sudo apt install -y tt
+
+        tt rocks install luatest
+        tt rocks install luacheck
+
       shell: bash

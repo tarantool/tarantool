@@ -182,3 +182,6 @@ DartConfiguration.tcl
 # TLA+ files
 states/
 *_TTrace_*
+
+# Lua Rocks
+.rocks/
