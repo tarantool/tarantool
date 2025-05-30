@@ -692,6 +692,15 @@ box_tuple_field_count(box_tuple_t *tuple)
 	return tuple_field_count(tuple);
 }
 
+const char *
+box_tuple_data(box_tuple_t *tuple, size_t *bsize)
+{
+	assert(tuple != NULL);
+	if (bsize != NULL)
+		*bsize = tuple_bsize(tuple);
+	return tuple_data(tuple);
+}
+
 size_t
 box_tuple_bsize(box_tuple_t *tuple)
 {
