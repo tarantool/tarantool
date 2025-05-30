@@ -292,10 +292,16 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg);
 void
 box_backup_stop(void);
 
+/** \cond public */
+
 /**
- * Spit out some basic module status (master/slave, etc.
+ * The current status of the instance. It is either "running", "loading",
+ * "orphan" or "hot_standby". See box.info.status Lua API for the reference.
  */
-const char *box_status(void);
+API_EXPORT const char *
+box_status(void);
+
+/** \endcond public */
 
 /**
  * Reset box statistics.

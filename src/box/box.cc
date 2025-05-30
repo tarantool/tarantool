@@ -6265,7 +6265,7 @@ box_backup_stop(void)
 	}
 }
 
-const char *
+API_EXPORT const char *
 box_status(void)
 {
     return status;
