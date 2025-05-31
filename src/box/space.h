@@ -58,6 +58,46 @@ struct tuple_format;
 struct space_upgrade;
 struct space_wal_ext;
 
+/** Context passed to box_on_insert_arrow trigger callback. */
+struct box_on_insert_arrow_ctx {
+	/** Target space. */
+	struct space *space;
+	/** The issued transaction. */
+	struct txn *txn;
+	/** The data inserted. */
+	struct ArrowArray *array;
+	/** The data schema. */
+	struct ArrowSchema *schema;
+	/** The schema field mapping. */
+	uint32_t *fields;
+};
+
+/**
+ * Triggers invoked on insert_arrow (by box_insert_arrow).
+ * Trigger callback is passed on_box_insert_arrow_ctx.
+ */
+extern struct rlist box_on_insert_arrow;
+
+/** Runs box_on_insert_arrow triggers. */
+static inline void
+box_run_on_insert_arrow(struct space *space,
+			struct txn *txn,
+			struct ArrowArray *array,
+			struct ArrowSchema *schema,
+			uint32_t *fields)
+{
+	if (likely(rlist_empty(&box_on_insert_arrow)))
+		return;
+	struct box_on_insert_arrow_ctx ctx = {
+		.space = space,
+		.txn = txn,
+		.array = array,
+		.schema = schema,
+		.fields = fields,
+	};
+	trigger_run(&box_on_insert_arrow, &ctx);
+}
+
 struct space_vtab {
 	/** Free a space instance. */
 	void (*destroy)(struct space *);
@@ -78,7 +118,8 @@ struct space_vtab {
 	 */
 	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
 				    struct ArrowArray *array,
-				    struct ArrowSchema *schema);
+				    struct ArrowSchema *schema,
+				    uint32_t *fields);
 
 	int (*ephemeral_replace)(struct space *, const char *, const char *);
 
@@ -772,7 +813,8 @@ space_cleanup_constraints(struct space *space);
 size_t generic_space_bsize(struct space *);
 int generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				       struct ArrowArray *array,
-				       struct ArrowSchema *schema);
+				       struct ArrowSchema *schema,
+				       uint32_t *fields);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
 int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);

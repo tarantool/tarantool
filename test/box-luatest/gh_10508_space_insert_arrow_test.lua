@@ -49,7 +49,8 @@ end
 g.test_space_insert_arrow = function(cg)
     cg.server:exec(function(mp_arrow_hex)
         local msgpack = require('msgpack')
-        local s = box.schema.create_space('test')
+        local s = box.schema.create_space('test',
+                                          {format = {{'a', 'unsigned'}}})
 
         t.assert_error_msg_equals(
             "Usage: space:insert_arrow(arrow)",

@@ -55,7 +55,8 @@ end)
 -- Test various invalid requests.
 g.test_iproto_insert_arrow_invalid = function(cg)
     cg.server:exec(function()
-        local s = box.schema.create_space('test')
+        local s = box.schema.create_space('test',
+                                          {format = {{'a', 'unsigned'}}})
         s:create_index('pk')
 
         -- <MP_MAP> {}

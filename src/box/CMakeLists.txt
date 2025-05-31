@@ -287,6 +287,7 @@ set(box_sources
     decimal.c
     read_view.c
     mp_box_ctx.c
+    arrow_ce.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
