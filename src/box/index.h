@@ -624,12 +624,11 @@ struct index {
 	uint32_t dense_id;
 	/**
 	 * List of gap_item's describing gap reads in the index with NULL
-	 * successor OR full scan gaps.
-	 * The first type happens when reading from empty index,
-	 * or when reading from rightmost part of ordered index (TREE).
-	 * The second type happens when a full scan was finished for
-	 * unordered index (HASH).
-	 * @sa struct gap_item_base.
+	 * successor, full scan and count gaps, see enum gap_item_type for
+	 * more info.
+	 *
+	 * NB: do not add items to the end of the list - it is reserved for
+	 * full count items.
 	 */
 	struct rlist read_gaps;
 };

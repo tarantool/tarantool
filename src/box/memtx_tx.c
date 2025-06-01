@@ -3514,6 +3514,41 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 }
 
 /**
+ * Check if a full count had been performed by the @a txn in @a index and
+ * recorded in the MVCC already. See the @a memtx_tx_track_count_until_slow
+ * for more details on how such a gap item is inserted into the index gap list.
+ */
+static bool
+memtx_tx_index_full_count_recorded_already(struct index *index, struct txn *txn)
+{
+	struct gap_item_base *item_base;
+	rlist_foreach_entry_reverse(item_base, &index->read_gaps,
+				    in_read_gaps) {
+		/* Not a count item = no full count items expected next. */
+		if (item_base->type != GAP_COUNT)
+			break;
+
+		/* Skip if not gap item of the current transaction. */
+		if (item_base->txn != txn)
+			continue;
+
+		/* Not a full count = no full count items expected next. */
+		struct count_gap_item *item =
+			(struct count_gap_item *)item_base;
+		if (item->part_count != 0)
+			break;
+
+		/* Same if not a full count without `until` specified. */
+		if (item->until != NULL)
+			break;
+
+		/* Found a full count gap item of the txn created previously. */
+		return true;
+	}
+	return false;
+}
+
+/**
  * Record in TX manager that a transaction @a txn have counted @a index of @a
  * space by @a key and iterator @a type. This function must be used for queries
  * that count tuples in indexes (for example, index:size or index:count) or if
@@ -3541,10 +3576,29 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				      ITER_GE : type == ITER_REQ ? ITER_LE :
 				      type, key, part_count));
 
+	/* Check if a full index count happened previously by the txn. */
+	if (txn != NULL && part_count == 0 && until == NULL &&
+	    memtx_tx_index_full_count_recorded_already(index, txn)) {
+		return memtx_tx_index_invisible_count_matching_until(
+			txn, space, index, type, key,
+			part_count, until, until_hint);
+	}
+
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
 			txn, type, key, part_count, until, until_hint);
-		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+		/*
+		 * Empty key count trackers are inserted in the end of the index
+		 * gap list, so we can search for an existing empty key gap item
+		 * without traversing the whole list and check if a new one will
+		 * be a duplicate.
+		 */
+		if (part_count == 0 && until == NULL) {
+			rlist_add_tail(&index->read_gaps,
+				       &item->base.in_read_gaps);
+		} else {
+			rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+		}
 	}
 
 	/*
