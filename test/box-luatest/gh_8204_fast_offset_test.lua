@@ -1041,6 +1041,103 @@ g_mvcc.test_past_history = function()
     end)
 end
 
+g_mvcc.test_redundant_trackers = function()
+    g_mvcc.server:exec(function()
+        -- The test space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:insert({1})
+        s:insert({2})
+
+        -- Prepare proxies.
+        local txn_proxy = require('test.box.lua.txn_proxy')
+        local tx1 = txn_proxy.new()
+        local tx2 = txn_proxy.new()
+        local tx3 = txn_proxy.new()
+
+        -- Create a full count gap item with `until' specified for the tx1.
+        tx1:begin()
+        local old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        tx1('box.space.test:select({}, {offset = 1})')
+        local new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- Create a non-count gap item for the tx1.
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        tx1('box.space.test:select({1}, {iterator = "GE"})')
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- Do tx1:count({}) and create a full count gap item with no `until'.
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(tx1('return box.space.test:count{}')[1], 2)
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- Insert an item and do tx1:count({}) once again.
+        -- No new tracker must be created.
+        tx3:begin()
+        tx3('box.space.test:replace{3}')
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(tx1('return box.space.test:count{}')[1], 2)
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(new_tracker_mem, old_tracker_mem)
+
+        -- Commit and reopen the writer to make the readers different.
+        tx3:commit()
+        t.assert_equals(box.space.test:len(), 3)
+        tx3:begin()
+        tx3('box.space.test:replace{4}')
+
+        -- Create a count gap item with `until' specified for the tx2.
+        tx2:begin()
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        tx2('box.space.test:select({}, {offset = 1})')
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- Do tx2:count({}) and create its full count gap item with no `until'.
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(tx2('return box.space.test:count{}')[1], 3)
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- No new trackers for both tx1 and tx2 on count({}).
+        tx3('box.space.test:replace{5}')
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(tx1('return box.space.test:count{}')[1], 2)
+        t.assert_equals(tx2('return box.space.test:count{}')[1], 3)
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(new_tracker_mem, old_tracker_mem)
+
+        -- Create some other trackers in the front of the gap list.
+        tx3('box.space.test:replace{6}')
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        tx1('box.space.test:select({1}, {iterator = "GT"})')
+        tx2('box.space.test:select({2}, {iterator = "GE"})')
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_gt(new_tracker_mem, old_tracker_mem)
+
+        -- Still no new trackers for both tx1 and tx2 on count({}).
+        tx3('box.space.test:replace{7}')
+        old_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(tx1('return box.space.test:count{}')[1], 2)
+        t.assert_equals(tx2('return box.space.test:count{}')[1], 3)
+        new_tracker_mem = box.stat.memtx().tx.mvcc.trackers.total
+        t.assert_equals(new_tracker_mem, old_tracker_mem)
+
+        -- Commit the writer.
+        tx3:commit()
+        t.assert_equals(box.space.test:len(), 7)
+
+        -- Check and commit the readers.
+        t.assert_equals(tx1('return box.space.test:count{}')[1], 2)
+        t.assert_equals(tx2('return box.space.test:count{}')[1], 3)
+        tx1:commit()
+        tx2:commit()
+    end)
+end
+
 g_mvcc.test_offset = function()
     g_mvcc.server:exec(function()
         -- The test space.
