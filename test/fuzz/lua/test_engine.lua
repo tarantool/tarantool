@@ -848,7 +848,7 @@ local function index_opts(space, is_primary)
     if space.engine == 'memtx' and
        opts.type == 'TREE' and
        opts.func == nil then
-        opts.hint = true
+        opts.hint = oneof({true, false})
     end
 
     if opts.type == 'RTREE' then
