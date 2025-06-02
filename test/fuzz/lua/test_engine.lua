@@ -567,8 +567,8 @@ local isolation_levels = {
     'read-confirmed',
 }
 
-local function select_op(space, idx_type, key)
-    local select_opts = {
+local function select_opts(idx_type)
+    local opts = {
         iterator = oneof(tarantool_indices[idx_type].iterator_type),
         -- The maximum number of tuples.
         limit = math.random(100, 500),
@@ -581,7 +581,12 @@ local function select_op(space, idx_type, key)
         -- the last selected tuple as the second value.
         fetch_pos = oneof({true, false}),
     }
-    space:select(key, select_opts)
+    return opts
+end
+
+local function select_op(space, idx_type, key)
+    local opts = select_opts(idx_type)
+    space:select(key, opts)
 end
 
 local function get_op(space, key)
@@ -979,7 +984,8 @@ end
 local function index_select_op(_space, idx, key)
     assert(idx)
     assert(key)
-    idx:select(key)
+    local opts = select_opts(idx.type)
+    idx:select(key, opts)
 end
 
 local function index_count_op(_, idx)
