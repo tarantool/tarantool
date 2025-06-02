@@ -630,6 +630,84 @@ local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
+-- Func names for functional indexes.
+local func_index_func_single = 'func_index_func_single'
+local func_index_func_multi = 'func_index_func_multi'
+-- Length of all func indexes, will be set on setup.
+local func_index_key_len
+local func_index_key_parts
+local func_index_key_types
+
+local function setup_funcs(engine_name)
+    func_index_key_len = math.random(1, 10)
+    func_index_key_parts = {}
+    func_index_key_types = {}
+    for i = 1, func_index_key_len do
+        table.insert(func_index_key_parts, math.random(1, 100))
+        table.insert(func_index_key_types, oneof{'unsigned', 'string'})
+    end
+    local func_string_template = 'tostring(tuple[%d %% #tuple] or "nil")'
+    local func_unsigned_template = 'string.byte(tostring(tuple[%d %% #tuple] or "nil"))'
+
+    local func_index_func_single_body = 'function(tuple) return {'
+    for i = 1, func_index_key_len do
+        local part = func_index_key_parts[i]
+        local template = func_index_key_types[i] == 'string' and
+                         func_string_template or func_unsigned_template
+        local delim = i < func_index_key_len and ', ' or '} end'
+        func_index_func_single_body = func_index_func_single_body ..
+                                      string.format(template, part) .. delim
+    end
+    log.error('Generated func %s', func_index_func_single_body)
+
+    box.schema.func.create(func_index_func_single, {
+        is_deterministic = true, is_sandboxed = true,
+        body = func_index_func_single_body
+    })
+
+    local func_index_func_multi_body = [[function(tuple)
+        local ret = {}
+        for i = 1, string.byte(tostring(tuple[0])) % 10 + 1 do
+            local value = {i,
+    ]]
+    for i = 1, func_index_key_len do
+        local part = func_index_key_parts[i]
+        local template = func_index_key_types[i] == 'string' and
+                         func_string_template or func_unsigned_template
+        local delim = i < func_index_key_len and ', ' or '}'
+        func_index_func_multi_body = func_index_func_multi_body ..
+                                     string.format(template, part) .. delim
+    end
+    func_index_func_multi_body = func_index_func_multi_body .. [[
+                table.insert(ret, value)
+        end
+        return ret
+    end]]
+    log.error('Generated func %s', func_index_func_multi_body)
+
+    box.schema.func.create(func_index_func_multi, {
+        is_deterministic = true, is_sandboxed = true, is_multikey = true,
+        body = func_index_func_multi_body
+    })
+end
+
+local function func_index_gen_parts(func_name)
+    assert(func_name == func_index_func_single or
+           func_name == func_index_func_multi)
+
+    local parts = {}
+    local base = 0
+    if func_name == func_index_func_multi then
+        table.insert(parts, {1, 'unsigned'})
+        base = 1
+    end
+
+    for i = 1, func_index_key_len do
+        table.insert(parts, {base + i, func_index_key_types[i]})
+    end
+    return parts
+end
+
 local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('SETUP')
     assert(engine_name == 'memtx' or
@@ -682,6 +760,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     box.cfg(box_cfg_options)
     log.info('FINISH BOX.CFG')
 
+    setup_funcs()
+
     log.info('CREATE A SPACE')
     local space_format = random_space_format(engine_name)
     -- TODO: support `constraint`.
@@ -730,7 +810,6 @@ local function index_opts(space, is_primary)
     local opts = {
         if_not_exists = false,
         -- TODO: support `sequence`,
-        -- TODO: support functional indices.
     }
 
     local indices = fun.iter(keys(tarantool_indices)):filter(
@@ -750,15 +829,36 @@ local function index_opts(space, is_primary)
                   true or
                   tarantool_indices[opts.type].is_unique_support
 
-    -- 'hint' is only reasonable with memtx tree index.
     if space.engine == 'memtx' and
-       opts.type == 'TREE' then
+       opts.type == 'TREE' and
+       not is_primary then
+        -- Turn secondary tree index into functional with 33% probability.
+        local is_func = oneof({true, false, false})
+        if is_func then
+            opts.func = func_index_func_single
+            -- Multikey func index is not supported by memtx MVCC.
+            local func_multikey_is_supported = not box.cfg.memtx_use_mvcc_engine
+            if oneof({false, func_multikey_is_supported}) then
+                opts.func = func_index_func_multi
+            end
+        end
+    end
+
+    -- 'hint' is only reasonable with non-functional memtx tree index.
+    if space.engine == 'memtx' and
+       opts.type == 'TREE' and
+       opts.func == nil then
         opts.hint = true
     end
 
     if opts.type == 'RTREE' then
         opts.distance = oneof({'euclid', 'manhattan'})
         opts.dimension = RTREE_DIMENSION
+    end
+
+    if opts.func ~= nil then
+        opts.parts = func_index_gen_parts(opts.func)
+        return opts
     end
 
     opts.parts = {}
