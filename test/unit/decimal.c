@@ -168,6 +168,54 @@ const uint32_t magic = 0xdecdecde;
 	} \
 })
 
+#define dectest_scale_from(type, expected_str, scale, value) ({\
+	decimal_t dec;\
+	decimal_t expected;\
+	is(decimal_scale_from_##type(&dec, value, scale), &dec);\
+	is(decimal_from_string(&expected, expected_str), &expected);\
+	is(decimal_compare(&dec, &expected), 0);\
+})
+
+#define dectest_scale_from_wide(type, expected_str, scale, ...) ({\
+	decimal_t dec;\
+	decimal_t expected;\
+	uint64_t value[] = {__VA_ARGS__};\
+	is(decimal_scale_from_##type(&dec, value, scale), &dec);\
+	is(decimal_from_string(&expected, expected_str), &expected);\
+	is(decimal_compare(&dec, &expected), 0);\
+})
+
+#define dectest_scale_to(type, dec_str, scale, expected) ({\
+	decimal_t dec;\
+	type##_t value;\
+	is(decimal_from_string(&dec, dec_str), &dec);\
+	is(decimal_scale_to_##type(&dec, scale, &value), &dec);\
+	is(value, expected);\
+})
+
+#define dectest_scale_to_wide(type, dec_str, scale, ...) ({\
+	decimal_t dec;\
+	uint64_t expected[] = {__VA_ARGS__};\
+	uint64_t value[4];\
+	is(decimal_from_string(&dec, dec_str), &dec);\
+	is(decimal_scale_to_##type(&dec, scale, value), &dec);\
+	is(memcmp(value, expected, sizeof(expected)), 0);\
+})
+
+#define dectest_scale_to_overflow(type, dec_str, scale) ({\
+	decimal_t dec;\
+	type##_t value;\
+	is(decimal_from_string(&dec, dec_str), &dec);\
+	is(decimal_scale_to_##type(&dec, scale, &value), NULL);\
+})
+
+#define dectest_scale_to_wide_overflow(type, dec_str, scale) ({\
+	decimal_t dec;\
+	uint64_t value[4];\
+	is(decimal_from_string(&dec, dec_str), &dec);\
+	is(decimal_scale_to_##type(&dec, scale, value), NULL);\
+})
+
 static int
 test_pack_unpack(void)
 {
@@ -513,10 +561,327 @@ test_fits_fixed_point(void)
 	check_plan();
 }
 
+static void
+test_scale_from_int32(void)
+{
+	plan(15);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_from(int32, "1.01", 2, 101);
+	dectest_scale_from(int32, "999", 0, 999);
+	dectest_scale_from(int32, "9990", -1, 999);
+
+	/* Check value limits. */
+	dectest_scale_from(int32, "2147483647", 0, INT32_MAX);
+	dectest_scale_from(int32, "-2147483648", 0, INT32_MIN);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_from_int64(void)
+{
+	plan(15);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_from(int64, "1.01", 2, 101);
+	dectest_scale_from(int64, "999", 0, 999);
+	dectest_scale_from(int64, "9990", -1, 999);
+
+	/* Check value limits. */
+	dectest_scale_from(int64, "9223372036854775807", 0, INT64_MAX);
+	dectest_scale_from(int64, "-9223372036854775808", 0, INT64_MIN);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_from_int128(void)
+{
+	plan(60);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_from_wide(int128, "1.01", 2, 101, 0);
+	dectest_scale_from_wide(int128, "999", 0, 999, 0);
+	dectest_scale_from_wide(int128, "9990", -1, 999, 0);
+
+	dectest_scale_from_wide(int128, "0", 0, 0, 0);
+	dectest_scale_from_wide(int128, "1", 0, 1, 0);
+	dectest_scale_from_wide(int128, "12", 0, 12, 0);
+	dectest_scale_from_wide(int128, "123", 0, 123, 0);
+	dectest_scale_from_wide(int128, "1234", 0, 1234, 0);
+	dectest_scale_from_wide(int128, "12345", 0, 12345, 0);
+	dectest_scale_from_wide(int128, "123456", 0, 123456, 0);
+	dectest_scale_from_wide(int128, "1234567", 0, 1234567, 0);
+	dectest_scale_from_wide(int128, "-1", 0, -1, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-12", 0, -12, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-123", 0, -123, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-1234", 0, -1234, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-12345", 0, -12345, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-123456", 0, -123456, UINT64_MAX);
+	dectest_scale_from_wide(int128, "-1234567", 0, -1234567, UINT64_MAX);
+
+	/* Check limits. */
+	dectest_scale_from_wide(int128,
+				"170141183460469231731687303715884105727",
+				0, UINT64_MAX, INT64_MAX);
+	dectest_scale_from_wide(int128,
+				"-170141183460469231731687303715884105728",
+				0, 0, INT64_MIN);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_from_int256(void)
+{
+	plan(64);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_from_wide(int256, "1.01", 2, 101, 0, 0, 0);
+	dectest_scale_from_wide(int256, "999", 0, 999, 0, 0, 0);
+	dectest_scale_from_wide(int256, "9990", -1, 999, 0, 0, 0);
+
+	dectest_scale_from_wide(int256, "0", 0, 0, 0, 0, 0);
+	dectest_scale_from_wide(int256, "1", 0, 1, 0, 0, 0);
+	dectest_scale_from_wide(int256, "12", 0, 12, 0, 0, 0);
+	dectest_scale_from_wide(int256, "123", 0, 123, 0, 0, 0);
+	dectest_scale_from_wide(int256, "1234", 0, 1234, 0, 0, 0);
+	dectest_scale_from_wide(int256, "12345", 0, 12345, 0, 0, 0);
+	dectest_scale_from_wide(int256, "123456", 0, 123456, 0, 0, 0);
+	dectest_scale_from_wide(int256, "1234567", 0, 1234567, 0, 0, 0);
+	dectest_scale_from_wide(int256, "-1", 0, -1,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-12", 0, -12,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-123", 0, -123,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-1234", 0, -1234,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-12345", 0, -12345,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-123456", 0, -123456,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_from_wide(int256, "-1234567", 0, -1234567,
+				UINT64_MAX, UINT64_MAX, UINT64_MAX);
+
+	/* Check limits. */
+	dectest_scale_from_wide(int256,
+				"99999999999999999999999999999999999999"
+				"99999999999999999999999999999999999999", 0,
+				18446744073709551615ULL, 8607968719199866879ULL,
+				532749306367912313ULL, 1593091911132452277ULL);
+	dectest_scale_from_wide(int256,
+				"-99999999999999999999999999999999999999"
+				"99999999999999999999999999999999999999", 0,
+				~18446744073709551615ULL + 1,
+				~8607968719199866879ULL, ~532749306367912313ULL,
+				~1593091911132452277ULL);
+
+	/* Check over the limits. */
+	decimal_t dec;
+	uint64_t value1[] = {
+		0, 8607968719199866880ULL,
+		532749306367912313ULL, 1593091911132452277ULL,
+	};
+	is(decimal_scale_from_int256(&dec, value1, 0), NULL);
+	uint64_t value2[] = {
+		~18446744073709551615ULL, ~8607968719199866879ULL,
+		~532749306367912313ULL, ~1593091911132452277ULL,
+	};
+	is(decimal_scale_from_int256(&dec, value2, 0), NULL);
+
+	/* Check maximum 256 bit values. */
+	uint64_t value3[] = {UINT64_MAX, UINT64_MAX, UINT64_MAX, INT64_MAX};
+	is(decimal_scale_from_int256(&dec, value1, 0), NULL);
+	uint64_t value4[] = {0, 0, 0, INT64_MIN};
+	is(decimal_scale_from_int256(&dec, value2, 0), NULL);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_to_int32(void)
+{
+	plan(21);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_to(int32, "1.01", 2, 101);
+	dectest_scale_to(int32, "999", 0, 999);
+	dectest_scale_to(int32, "9990", -1, 999);
+
+	/* Check overflow due to scale */
+	dectest_scale_to_overflow(int32, "1e100", 0);
+
+	/* Check value limits. */
+	dectest_scale_to(int32, "2147483647", 0, INT32_MAX);
+	dectest_scale_to(int32, "-2147483648", 0, INT32_MIN);
+
+	/* Check over the limits. */
+	dectest_scale_to_overflow(int32, "2147483648", 0);
+	dectest_scale_to_overflow(int32, "-2147483649", 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_to_int64(void)
+{
+	plan(21);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_to(int64, "1.01", 2, 101);
+	dectest_scale_to(int64, "999", 0, 999);
+	dectest_scale_to(int64, "9990", -1, 999);
+
+	/* Check overflow due to scale */
+	dectest_scale_to_overflow(int64, "1e100", 0);
+
+	/* Check value limits. */
+	dectest_scale_to(int64, "9223372036854775807", 0, INT64_MAX);
+	dectest_scale_to(int64, "-9223372036854775808", 0, INT64_MIN);
+
+	/* Check over the limits. */
+	dectest_scale_to_overflow(int64, "9223372036854775808", 0);
+	dectest_scale_to_overflow(int64, "-9223372036854775809", 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_to_int128(void)
+{
+	plan(74);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_to_wide(int128, "1.01", 2, 101, 0);
+	dectest_scale_to_wide(int128, "999", 0, 999, 0);
+	dectest_scale_to_wide(int128, "9990", -1, 999, 0);
+
+	/* Check overflow due to scale */
+	dectest_scale_to_wide_overflow(int128, "1e100", 0);
+
+	dectest_scale_to_wide(int128, "0", 0, 0, 0);
+	dectest_scale_to_wide(int128, "1", 0, 1, 0);
+	dectest_scale_to_wide(int128, "12", 0, 12, 0);
+	dectest_scale_to_wide(int128, "123", 0, 123, 0);
+	dectest_scale_to_wide(int128, "1234", 0, 1234, 0);
+	dectest_scale_to_wide(int128, "12345", 0, 12345, 0);
+	dectest_scale_to_wide(int128, "123456", 0, 123456, 0);
+	dectest_scale_to_wide(int128, "1234567", 0, 1234567, 0);
+	dectest_scale_to_wide(int128, "-1", 0, -1, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-12", 0, -12, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-123", 0, -123, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-1234", 0, -1234, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-12345", 0, -12345, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-123456", 0, -123456, UINT64_MAX);
+	dectest_scale_to_wide(int128, "-1234567", 0, -1234567, UINT64_MAX);
+
+	/* Check limits. */
+	dectest_scale_to_wide(int128,
+			      "170141183460469231731687303715884105727",
+			      0, UINT64_MAX, INT64_MAX);
+	dectest_scale_to_wide(int128,
+			      "-170141183460469231731687303715884105728",
+			      0, 0, INT64_MIN);
+
+	/* Check over the limits. */
+	dectest_scale_to_wide_overflow(
+		int128, "170141183460469231731687303715884105728", 0);
+	dectest_scale_to_wide_overflow(
+		int128, "-170141183460469231731687303715884105729", 0);
+
+	/*  Check inner branches. */
+
+	/* Check another branch of checking negative limits. */
+	dectest_scale_to_wide_overflow(
+		int128, "-170141183460469231750134047789593657344", 0);
+	/* Check 1000 multiplier overflow. */
+	dectest_scale_to_wide_overflow(
+		int128, "10000000000000000000000000000000000000"
+			"00000000000000000000000000000000000000", 0);
+	/* Check multiply overflow. */
+	dectest_scale_to_wide_overflow(
+		int128, "900000000000000000000000000000000000000", 0);
+	/* Check add overflow. */
+	dectest_scale_to_wide_overflow(
+		int128, "340300000000000000000000000000000000000", 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_scale_to_int256(void)
+{
+	plan(62);
+	header();
+
+	/* Check scale works. */
+	dectest_scale_to_wide(int256, "1.01", 2, 101, 0, 0, 0);
+	dectest_scale_to_wide(int256, "999", 0, 999, 0, 0, 0);
+	dectest_scale_to_wide(int256, "9990", -1, 999, 0, 0, 0);
+
+	/* Check overflow due to scale */
+	dectest_scale_to_wide_overflow(int256, "1e100", 0);
+
+	dectest_scale_to_wide(int256, "0", 0, 0, 0, 0, 0);
+	dectest_scale_to_wide(int256, "1", 0, 1, 0, 0, 0);
+	dectest_scale_to_wide(int256, "12", 0, 12, 0, 0, 0);
+	dectest_scale_to_wide(int256, "123", 0, 123, 0, 0, 0);
+	dectest_scale_to_wide(int256, "1234", 0, 1234, 0, 0, 0);
+	dectest_scale_to_wide(int256, "12345", 0, 12345, 0, 0, 0);
+	dectest_scale_to_wide(int256, "123456", 0, 123456, 0, 0, 0);
+	dectest_scale_to_wide(int256, "1234567", 0, 1234567, 0, 0, 0);
+	dectest_scale_to_wide(int256, "-1", 0, -1,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-12", 0, -12,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-123", 0, -123,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-1234", 0, -1234,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-12345", 0, -12345,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-123456", 0, -123456,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+	dectest_scale_to_wide(int256, "-1234567", 0, -1234567,
+			      UINT64_MAX, UINT64_MAX, UINT64_MAX);
+
+	/* Check limits. */
+	dectest_scale_to_wide(int256,
+			      "99999999999999999999999999999999999999"
+			      "99999999999999999999999999999999999999", 0,
+			      18446744073709551615ULL, 8607968719199866879ULL,
+			      532749306367912313ULL, 1593091911132452277ULL);
+	dectest_scale_to_wide(int256,
+			      "-99999999999999999999999999999999999999"
+			      "99999999999999999999999999999999999999", 0,
+			      ~18446744073709551615ULL + 1,
+			      ~8607968719199866879ULL, ~532749306367912313ULL,
+			      ~1593091911132452277ULL);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(326);
+	plan(334);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -586,6 +951,14 @@ main(void)
 	test_mp_print();
 	test_print();
 	test_fits_fixed_point();
+	test_scale_from_int32();
+	test_scale_from_int64();
+	test_scale_from_int128();
+	test_scale_from_int256();
+	test_scale_to_int32();
+	test_scale_to_int64();
+	test_scale_to_int128();
+	test_scale_to_int256();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);

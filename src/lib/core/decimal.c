@@ -107,6 +107,299 @@ decimal_fits_fixed_point(decimal_t *dec, int precision, int scale)
 }
 
 decimal_t *
+decimal_scale_from_int32(decimal_t *dec, int32_t value, int scale)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decNumberFromInt32(&tmp, value);
+	decNumberFromInt32(&dec_scale, -scale);
+	decNumberScaleB(dec, &tmp, &dec_scale, &decimal_context);
+	return decimal_check_status(dec, &decimal_context);
+}
+
+decimal_t *
+decimal_scale_from_int64(decimal_t *dec, int64_t value, int scale)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decNumberFromInt64(&tmp, value);
+	decNumberFromInt32(&dec_scale, -scale);
+	decNumberScaleB(dec, &tmp, &dec_scale, &decimal_context);
+	return decimal_check_status(dec, &decimal_context);
+}
+
+/** Big integer arithmetic below assumes little endianness. */
+#if defined(HAVE_BYTE_ORDER_BIG_ENDIAN)
+#error "big endian is not supported"
+#endif
+
+/**
+ * Divide positive wide integer given in array `value' of length `len' by
+ * `divisor'. The result is stored in wide integer given by array `result' of
+ * length `len'. Remainder is stored in `remainder'.
+ */
+static void
+int_divide(const uint64_t *value, int len, uint64_t divisor, uint64_t *result,
+	   uint64_t *remainder)
+{
+	memset(result, 0, sizeof(*result) * len);
+	*remainder = 0;
+	for (int i = len * 64 - 1; i >= 0; i--) {
+		*remainder = *remainder << 1 |
+			     ((value[i / 64] >> (i % 64)) & 1);
+		if (*remainder >= divisor) {
+			*remainder -= divisor;
+			result[i / 64] |= (1ULL << (i % 64));
+		}
+	}
+}
+
+/**
+ * Negate inplace positive wide integer given by `value' and `len'. Negative
+ * value bits are in 2's complement format.
+ */
+static void
+int_negate(uint64_t *value, int len)
+{
+	int carry = 1;
+	for (int i = 0; i < len; i++) {
+		value[i] = ~value[i] + carry;
+		carry = carry && value[i] == 0 ? 1 : 0;
+	}
+}
+
+/**
+ * 1000 multiplier/divisor below based on this expectation. Also the digits
+ * calculations in decimal_from_wide_int().
+ */
+static_assert(DECDPUN == 3, "unexpected DECDPUN");
+
+/**
+ * Initialize decimal from wide integer given by array `value' of length `len'.
+ * Integer is 2's complement signed. Similar to `decNumberFromInt64' but works
+ * with wide integers.
+ *
+ * The overflow is possible only for 256-bit values due to decimal mantissa
+ * size.
+ *
+ * Return true on success and false in case of overflow.
+ */
+static bool
+decimal_from_wide_int(decimal_t *dec, const uint64_t *value, int len)
+{
+	assert(len <= 4);
+	uint64_t zero[4];
+	decNumberZero(dec);
+	memset(zero, 0, sizeof(*zero) * len);
+	if (memcmp(value, zero, sizeof(*value) * len) == 0)
+		return true;
+	int neg = value[len - 1] >> 63;
+	uint64_t tmp[4];
+	memcpy(tmp, value, sizeof(*tmp) * len);
+	if (neg)
+		int_negate(tmp, len);
+	dec->digits = 0;
+	int i;
+	for (i = 0; memcmp(tmp, zero, sizeof(*tmp) * len) != 0; i++) {
+		uint64_t quotient[4];
+		uint64_t remainder;
+		if (i >= DECNUMUNITS)
+			return false;
+		int_divide(tmp, len, 1000, quotient, &remainder);
+		memcpy(tmp, quotient, sizeof(*tmp) * len);
+		dec->lsu[i] = remainder;
+		dec->digits += DECDPUN;
+	}
+	if (dec->lsu[i - 1] < 10)
+		dec->digits -= 2;
+	else if (dec->lsu[i - 1] < 100)
+		dec->digits -= 1;
+	if (dec->digits > DECIMAL_MAX_DIGITS)
+		return false;
+	if (neg)
+		dec->bits |= DECNEG;
+	return true;
+}
+
+decimal_t *
+decimal_scale_from_int128(decimal_t *dec, const uint64_t *value, int scale)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	VERIFY(decimal_from_wide_int(&tmp, value, /*len=*/2));
+	decNumberFromInt32(&dec_scale, -scale);
+	decNumberScaleB(dec, &tmp, &dec_scale, &decimal_context);
+	return decimal_check_status(dec, &decimal_context);
+}
+
+decimal_t *
+decimal_scale_from_int256(decimal_t *dec, const uint64_t *value, int scale)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	if (!decimal_from_wide_int(&tmp, value, /*len=*/4))
+		return NULL;
+	decNumberFromInt32(&dec_scale, -scale);
+	decNumberScaleB(dec, &tmp, &dec_scale, &decimal_context);
+	return decimal_check_status(dec, &decimal_context);
+}
+
+const decimal_t *
+decimal_scale_to_int32(const decimal_t *dec, int scale, int32_t *value)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decimal_t dec_zero;
+	decNumberFromInt32(&dec_scale, scale);
+	decNumberScaleB(&tmp, dec, &dec_scale, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	decNumberZero(&dec_zero);
+	decNumberRescale(&tmp, &tmp, &dec_zero, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	*value = decNumberToInt32(&tmp, &decimal_context);
+	return decimal_check_status(&tmp,
+				    &decimal_context) != NULL ? dec : NULL;
+}
+
+const decimal_t *
+decimal_scale_to_int64(const decimal_t *dec, int scale, int64_t *value)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decimal_t dec_zero;
+	decNumberFromInt32(&dec_scale, scale);
+	decNumberScaleB(&tmp, dec, &dec_scale, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	decNumberZero(&dec_zero);
+	decNumberRescale(&tmp, &tmp, &dec_zero, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	*value = decNumberToInt64(&tmp, &decimal_context);
+	return decimal_check_status(&tmp,
+				    &decimal_context) != NULL ? dec : NULL;
+}
+
+/**
+ * Multiply positive wide integer given in array `value' of length `len'
+ * by `multiplier'. The result is stored in wide integer given by array
+ * `result' of length `len'.
+ *
+ * Return true on success and false in case of overflow.
+ */
+static bool
+int_multiply(const uint64_t *value, int len, uint32_t multiplier,
+	     uint64_t *result)
+{
+	uint64_t carry = 0;
+	for (int i = 0; i < len; i++) {
+		__uint128_t product = (__uint128_t)value[i] * multiplier +
+				      carry;
+		result[i] = (uint64_t)product;
+		carry = (uint64_t)(product >> 64);
+	}
+	return carry == 0;
+}
+
+/**
+ * Add positive wide integers. The operands are given by arrays `a' and `b'
+ * of length `len'. The result is stored in `a'.
+ *
+ * Return true on success and false in case of overflow.
+ */
+static bool
+int_add_equal(uint64_t *a, const uint64_t *b, int len)
+{
+	uint64_t carry = 0;
+	for (int i = 0; i < len; i++) {
+		a[i] += b[i] + carry;
+		carry = a[i] < b[i];
+	}
+	return carry == 0;
+}
+
+/**
+ * Converts integer in `dec' to wide int given by array `value' of length
+ * `len'. Similar to `decNumberToInt64' but works with wide integers.
+ *
+ * Return true on success and fail in case of overflow.
+ */
+static bool
+decimal_to_wide_int(const decimal_t *dec, uint64_t *value, int len)
+{
+	assert(dec->exponent == 0);
+	assert(len <= 4);
+	uint64_t mul[4];
+	memset(value, 0, sizeof(*value) * len);
+	memset(mul, 0, sizeof(*mul) * len);
+	mul[0] = 1;
+	const decNumberUnit *up = dec->lsu;
+	for (int d = 0; d < dec->digits; up++, d += DECDPUN) {
+		uint64_t tmp[4];
+		if (up != dec->lsu) {
+			if (!int_multiply(mul, len, /*multiplier=*/1000, tmp))
+				return false;
+			memcpy(mul, tmp, sizeof(*mul) * len);
+		}
+		if (!int_multiply(mul, len, *up, tmp))
+			return false;
+		if (!int_add_equal(value, tmp, len))
+			return false;
+	}
+	if (dec->bits & DECNEG) {
+		if (value[len - 1] > (uint64_t)INT64_MIN)
+			return false;
+		if (value[len - 1] == (uint64_t)INT64_MIN) {
+			for (int i = 0; i < len - 1; i++) {
+				if (value[i] > 0)
+					return false;
+			}
+		}
+		int_negate(value, len);
+		return true;
+	} else {
+		return value[len - 1] <= INT64_MAX;
+	}
+}
+
+const decimal_t *
+decimal_scale_to_int128(const decimal_t *dec, int scale, uint64_t *value)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decimal_t dec_zero;
+	decNumberFromInt32(&dec_scale, scale);
+	decNumberScaleB(&tmp, dec, &dec_scale, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	decNumberZero(&dec_zero);
+	decNumberRescale(&tmp, &tmp, &dec_zero, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	return decimal_to_wide_int(&tmp, value, /*len=*/2) ? dec : NULL;
+}
+
+const decimal_t *
+decimal_scale_to_int256(const decimal_t *dec, int scale, uint64_t *value)
+{
+	decimal_t tmp;
+	decimal_t dec_scale;
+	decimal_t dec_zero;
+	decNumberFromInt32(&dec_scale, scale);
+	decNumberScaleB(&tmp, dec, &dec_scale, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	assert(decimal_check_status(&tmp, &decimal_context) != NULL);
+	decNumberZero(&dec_zero);
+	decNumberRescale(&tmp, &tmp, &dec_zero, &decimal_context);
+	if (decimal_check_status(&tmp, &decimal_context) == NULL)
+		return NULL;
+	return decimal_to_wide_int(&tmp, value, /*len=*/4) ? dec : NULL;
+}
+
+decimal_t *
 decimal_zero(decimal_t *dec)
 {
 	decNumberZero(dec);
