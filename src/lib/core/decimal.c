@@ -106,6 +106,66 @@ decimal_fits_fixed_point(decimal_t *dec, int precision, int scale)
 	return tmp.digits + d <= precision;
 }
 
+void
+decimal_from_fixed_point(decimal_t *dec, int scale, decimal_t *result)
+{
+	assert(dec->exponent == 0);
+	decimal_t dec_scale;
+	decNumberFromInt32(&dec_scale, -scale);
+	decNumberScaleB(result, dec, &dec_scale, &decimal_context);
+	assert(decimal_check_status(result, &decimal_context) != NULL);
+}
+
+void
+decimal_to_fixed_point(decimal_t *dec, int scale, decimal_t *result)
+{
+	decimal_t dec_scale;
+	decimal_t dec_zero;
+	decNumberFromInt32(&dec_scale, scale);
+	decNumberScaleB(result, dec, &dec_scale, &decimal_context);
+	assert(decimal_check_status(result, &decimal_context) != NULL);
+	decNumberZero(&dec_zero);
+	decNumberRescale(result, result, &dec_zero, &decimal_context);
+}
+
+void
+decimal_from_fixed_point32(decimal_t *dec, int32_t value, int scale)
+{
+	assert(value >= -999999999 && value <= 999999999);
+	decimal_t tmp;
+	decNumberFromInt32(&tmp, value);
+	decimal_from_fixed_point(&tmp, scale, dec);
+}
+
+void
+decimal_from_fixed_point64(decimal_t *dec, int64_t value, int scale)
+{
+	assert(value >= -999999999999999999LL && value <= 999999999999999999LL);
+	decimal_t tmp;
+	decNumberFromInt64(&tmp, value);
+	decimal_from_fixed_point(&tmp, scale, dec);
+}
+
+void
+decimal_to_fixed_point32(decimal_t *dec, int32_t *value, int scale)
+{
+	assert(decimal_fits_fixed_point(dec, 9, scale));
+	decimal_t tmp;
+	decimal_to_fixed_point(dec, scale, &tmp);
+	*value = decNumberToInt32(&tmp, &decimal_context);
+	assert(decimal_check_status(&tmp, &decimal_context) != NULL);
+}
+
+void
+decimal_to_fixed_point64(decimal_t *dec, int64_t *value, int scale)
+{
+	assert(decimal_fits_fixed_point(dec, 18, scale));
+	decimal_t tmp;
+	decimal_to_fixed_point(dec, scale, &tmp);
+	*value = decNumberToInt64(&tmp, &decimal_context);
+	assert(decimal_check_status(&tmp, &decimal_context) != NULL);
+}
+
 decimal_t *
 decimal_zero(decimal_t *dec)
 {
