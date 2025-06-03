@@ -146,6 +146,8 @@ local err_pat_whitelist = {
     "box_insert_arrow: field [%d]+ has unsupported type",
     "Engine 'memcs' does not support variable field count",
     "Engine 'memcs' does not support primary index rebuild",
+    "Engine 'memcs' does not support clearing space field nullability",
+    "Engine 'memcs' does not support clearing indexed field nullability",
 }
 
 local function keys(t)
