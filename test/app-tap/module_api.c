@@ -16,6 +16,7 @@
 #include <lauxlib.h>
 
 #include "arrow/abi.h"
+#include "trivia/config.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -2623,18 +2624,16 @@ tuple_field_by_path(struct lua_State *L)
 /**
  * Check decimal value against expected one.
  */
-static void
-check_decimal(const box_decimal_t *dec, const char *exp)
-{
-	/*
-	 * Ideally we shouldn't use anything from the decimal
-	 * library to validate its implementation. However we
-	 * use decimal_to_string() here for simplicity.
-	 */
-	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
-	box_decimal_to_string(dec, str);
-	fail_unless(strcmp(str, exp) == 0);
-}
+#define check_decimal(dec, exp) do { \
+	/* \
+	 * Ideally we shouldn't use anything from the decimal \
+	 * library to validate its implementation. However we \
+	 * use decimal_to_string() here for simplicity. \
+	 */ \
+	char str[BOX_DECIMAL_STRING_BUFFER_SIZE]; \
+	box_decimal_to_string(dec, str); \
+	fail_unless(strcmp(str, exp) == 0); \
+} while (0)
 
 enum {
 	POISON_SIZE = 16,
@@ -2772,6 +2771,35 @@ test_decimal(struct lua_State *L)
 	fail_unless(p == &vostok_1);
 	check_decimal(&vostok_1, "1961");
 
+	/* From 32-bit fixed point decimal. */
+	box_decimal_t d32;
+	int32_t d32fp = 54321;
+	box_decimal_from_fixed_point32(&d32, d32fp, 3);
+	check_decimal(&d32, "54.321");
+
+	/* From 64-bit fixed point decimal. */
+	box_decimal_t d64;
+	int64_t d64fp = 54321;
+	box_decimal_from_fixed_point64(&d64, d64fp, 3);
+	check_decimal(&d64, "54.321");
+
+#ifdef ENABLE_WIDE_DECIMAL
+
+	/* From 128-bit fixed point decimal. */
+	box_decimal_t d128;
+	uint64_t d128fp[2] = {~54321ULL + 1, UINT64_MAX};
+	box_decimal_from_fixed_point128(&d128, d128fp, 3);
+	check_decimal(&d128, "-54.321");
+
+	/* From 256-bit fixed point decimal. */
+	box_decimal_t d256;
+	uint64_t d256fp[4] = {~54321ULL + 1, UINT64_MAX, UINT64_MAX,
+			      UINT64_MAX};
+	box_decimal_from_fixed_point256(&d256, d256fp, 3);
+	check_decimal(&d256, "-54.321");
+
+#endif /** ifdef(ENABLE_WIDE_DECIMAL) */
+
 	/* To int64_t. */
 	box_decimal_t carthage;
 	box_decimal_from_string(&carthage, "-146");
@@ -2787,6 +2815,36 @@ test_decimal(struct lua_State *L)
 	cp = box_decimal_to_uint64(&g, &g_u64);
 	fail_unless(cp == &g);
 	fail_unless(g_u64 == (uint64_t)9);
+
+	/* Convert to 32-bit fixed point decimal. */
+	box_decimal_from_string(&d32, "1.23");
+	box_decimal_to_fixed_point32(&d32, &d32fp, 2);
+	fail_unless(d32fp == 123);
+
+	/* Convert to 64-bit fixed point decimal. */
+	box_decimal_from_string(&d64, "1.23");
+	box_decimal_to_fixed_point64(&d64, &d64fp, 2);
+	fail_unless(d64fp == 123);
+
+#ifdef ENABLE_WIDE_DECIMAL
+
+	/* Convert to 128-bit fixed point decimal. */
+	memset(d128fp, 0, sizeof(d128fp));
+	box_decimal_from_string(&d128, "-1.23");
+	box_decimal_to_fixed_point128(&d128, d128fp, 2);
+	fail_unless(d128fp[0] == ~123ULL + 1);
+	fail_unless(d128fp[1] == UINT64_MAX);
+
+	/* Convert to 256-bit fixed point decimal. */
+	memset(d256fp, 0, sizeof(d256fp));
+	box_decimal_from_string(&d256, "-1.23");
+	box_decimal_to_fixed_point256(&d256, d256fp, 2);
+	fail_unless(d256fp[0] == ~123ULL + 1);
+	fail_unless(d256fp[1] == UINT64_MAX);
+	fail_unless(d256fp[2] == UINT64_MAX);
+	fail_unless(d256fp[3] == UINT64_MAX);
+
+#endif /** ifdef(ENABLE_WIDE_DECIMAL) */
 
 	/* Compare. */
 	box_decimal_t five_1;
