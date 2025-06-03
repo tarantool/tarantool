@@ -76,6 +76,105 @@ bool
 decimal_fits_fixed_point(decimal_t *dec, int precision, int scale);
 
 /**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+decimal_t *
+decimal_scale_from_int32(decimal_t *dec, int32_t value, int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+decimal_t *
+decimal_scale_from_int64(decimal_t *dec, int64_t value, int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * 128 bit value is given as array with native endianness.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+decimal_t *
+decimal_scale_from_int128(decimal_t *dec, const uint64_t *value, int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * 256 bit value is given as array with native endianness.
+ *
+ * Note that not all 256 bit values are representable as decimal_t. If
+ * value is not representable then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+decimal_t *
+decimal_scale_from_int256(decimal_t *dec, const uint64_t *value, int scale);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 32 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+const decimal_t *
+decimal_scale_to_int32(const decimal_t *dec, int scale, int32_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 64 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+const decimal_t *
+decimal_scale_to_int64(const decimal_t *dec, int scale, int64_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 128 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+const decimal_t *
+decimal_scale_to_int128(const decimal_t *dec, int scale, uint64_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 256 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+const decimal_t *
+decimal_scale_to_int256(const decimal_t *dec, int scale, uint64_t *value);
+
+/**
  * Initialize a zero decimal number.
  */
 decimal_t *
