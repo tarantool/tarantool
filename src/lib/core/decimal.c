@@ -146,6 +146,28 @@ decimal_from_fixed_point64(decimal_t *dec, int64_t value, int scale)
 	decimal_from_fixed_point(&tmp, scale, dec);
 }
 
+#ifndef ENABLE_WIDE_DECIMAL
+
+void
+decimal_from_fixed_point128(decimal_t *dec, const uint64_t *value, int scale)
+{
+	(void)dec;
+	(void)value;
+	(void)scale;
+	unreachable();
+}
+
+void
+decimal_from_fixed_point256(decimal_t *dec, const uint64_t *value, int scale)
+{
+	(void)dec;
+	(void)value;
+	(void)scale;
+	unreachable();
+}
+
+#endif /** ifndef(ENABLE_WIDE_DECIMAL) */
+
 void
 decimal_to_fixed_point32(decimal_t *dec, int32_t *value, int scale)
 {
@@ -165,6 +187,28 @@ decimal_to_fixed_point64(decimal_t *dec, int64_t *value, int scale)
 	*value = decNumberToInt64(&tmp, &decimal_context);
 	assert(decimal_check_status(&tmp, &decimal_context) != NULL);
 }
+
+#ifndef ENABLE_WIDE_DECIMAL
+
+void
+decimal_to_fixed_point128(decimal_t *dec, uint64_t *value, int scale)
+{
+	(void)dec;
+	(void)value;
+	(void)scale;
+	unreachable();
+}
+
+void
+decimal_to_fixed_point256(decimal_t *dec, uint64_t *value, int scale)
+{
+	(void)dec;
+	(void)value;
+	(void)scale;
+	unreachable();
+}
+
+#endif /** ifndef(ENABLE_WIDE_DECIMAL) */
 
 decimal_t *
 decimal_zero(decimal_t *dec)
