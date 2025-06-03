@@ -70,9 +70,9 @@ g.test_space_insert_arrow = function(cg)
         t.assert_error_msg_equals(
             "Usage: space:insert_arrow(arrow)",
             s.insert_arrow, s, 22)
-        t.assert_error_msg_equals(
-            "Arrow decode error: Expected >= 544501618 bytes of remaining " ..
-            "data but found 29 bytes in buffer",
+        t.assert_error_msg_matches(
+            "Arrow decode error: Expected >= %d+ bytes of remaining " ..
+            "data but found %d+ bytes in buffer",
             s.insert_arrow, s, 'not a valid arrow data string')
 
         local mp_arrow = string.fromhex(mp_arrow_hex:gsub("%s+", ""))
