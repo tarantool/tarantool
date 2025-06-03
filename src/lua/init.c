@@ -73,13 +73,23 @@
 #include "lua/builtin_modcache.h"
 #include "lua/tweaks.h"
 #include "lua/xml.h"
-#include "lua/etcd_client.h"
-#include "lua/compress.h"
 #include "digest.h"
 #include "errinj.h"
+#include "trivia/config.h"
 
 #ifdef ENABLE_BACKTRACE
 #include "core/backtrace.h"
+#endif
+
+#ifdef ENABLE_LUA_EXTRAS
+#include "lua/extras.h"
+#else
+#define EXTRA_LUA_MODULES
+static inline void
+tarantool_lua_extras_init(struct lua_State *L)
+{
+	(void)L;
+}
 #endif
 
 #include <small/ibuf.h>
@@ -217,7 +227,6 @@ static const char *lua_modules[] = {
 	"swim", swim_lua,
 	"internal.protobuf.wireformat", protobuf_wireformat_lua,
 	"protobuf", protobuf_lua,
-	COMPRESS_LUA_MODULES
 	/* jit.* library */
 	"jit.vmdef", jit_vmdef_lua,
 	"jit.bc", jit_bc_lua,
@@ -249,7 +258,7 @@ static const char *lua_modules[] = {
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
 	"version", version_lua,
-	ETCD_CLIENT_LUA_MODULES
+	EXTRA_LUA_MODULES
 	NULL
 };
 
@@ -803,8 +812,8 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
-	tarantool_lua_compress_init(L);
 	tarantool_lua_trigger_init(L);
+	tarantool_lua_extras_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif

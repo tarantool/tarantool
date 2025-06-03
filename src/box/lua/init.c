@@ -73,20 +73,22 @@
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
 #include "box/lua/iproto.h"
-#include "box/lua/audit.h"
-#include "box/lua/flight_recorder.h"
-#include "box/lua/read_view.h"
-#include "box/lua/security.h"
-#include "box/lua/space_upgrade.h"
-#include "box/lua/wal_ext.h"
-#include "box/lua/wal_retention_period.h"
 #include "box/lua/trigger.h"
 #include "box/lua/config/utils/expression_lexer.h"
-#include "box/lua/failover.h"
-#include "box/lua/integrity.h"
-#include "box/lua/config/extras.h"
 
 #include "mpstream/mpstream.h"
+#include "trivia/config.h"
+
+#ifdef ENABLE_BOX_LUA_EXTRAS
+#include "lua/extras.h"
+#else
+#define EXTRA_BOX_LUA_MODULES
+static inline void
+box_lua_extras_init(struct lua_State *L)
+{
+	(void)L;
+}
+#endif
 
 static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
 
@@ -217,23 +219,12 @@ static const char *lua_sources[] = {
 	 */
 	"box/feedback_daemon", NULL, feedback_daemon_lua,
 #endif
-	/*
-	 * Must be loaded after schema_lua, because it redefines
-	 * box.schema.space.upgrade.
-	 */
-	SPACE_UPGRADE_BOX_LUA_MODULES
-	AUDIT_BOX_LUA_MODULES
-	FLIGHT_RECORDER_BOX_LUA_MODULES
-	READ_VIEW_BOX_LUA_MODULES
-	SECURITY_BOX_LUA_MODULES
-	INTEGRITY_BOX_LUA_MODULES
 	"box/xlog", "xlog", xlog_lua,
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/console", "console", console_lua,
-	"box/load_cfg", NULL, load_cfg_lua,
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
 	"box/iproto", "iproto", iproto_lua,
@@ -476,15 +467,19 @@ static const char *lua_sources[] = {
 	"config",
 	config_init_lua,
 
-	CONFIG_EXTRAS_LUA_MODULES
-
 	/* }}} config */
 
 	"connpool",
 	"experimental.connpool",
 	connpool_lua,
 
-	FAILOVER_LUA_MODULES
+	EXTRA_BOX_LUA_MODULES
+
+	/*
+	 * box/load_cfg uses functions defined by the extra modules
+	 * so it should be loaded after them.
+	 */
+	"box/load_cfg", NULL, load_cfg_lua,
 
 	NULL
 };
@@ -949,16 +944,10 @@ box_lua_init(struct lua_State *L)
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
 	box_lua_iproto_init(L);
-	box_lua_space_upgrade_init(L);
-	box_lua_audit_init(L);
-	box_lua_wal_retention_period_init(L);
-	box_lua_wal_ext_init(L);
-	box_lua_read_view_init(L);
-	box_lua_security_init(L);
-	box_lua_flightrec_init(L);
 	box_lua_trigger_init(L);
-	box_lua_integrity_init(L);
 	box_lua_expression_lexer_init(L);
+	box_lua_extras_init(L);
+
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

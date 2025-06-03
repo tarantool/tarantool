@@ -5,21 +5,21 @@
  */
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
+
 #include "trivia/config.h"
 
 #if defined(ENABLE_INTEGRITY)
-#include "lua/integrity_impl.h"
+
+/**
+ * Auxiliary function of the integrity module that allows to verify
+ * a file from C code. Must be called only after module initialization.
+ */
+bool
+integrity_verify_file(const char *path, const char *buffer, size_t size);
+
 #else /* !defined(ENABLE_INTEGRITY) */
-
-#define INTEGRITY_BOX_LUA_MODULES
-
-struct lua_State;
-
-static inline void
-box_lua_integrity_init(struct lua_State *L)
-{
-	(void)L;
-}
 
 /**
  * Placeholder function that is properly implemented inside integrity module.

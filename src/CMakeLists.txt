@@ -74,11 +74,9 @@ lua_source(lua_sources lua/varbinary.lua varbinary_lua)
 lua_source(lua_sources lua/protobuf_wireformat.lua protobuf_wireformat_lua)
 lua_source(lua_sources lua/protobuf.lua protobuf_lua)
 lua_source(lua_sources lua/version.lua version_lua)
-if (ENABLE_COMPRESS_MODULE)
-    lua_source(lua_sources ${COMPRESS_MODULE_LUA_SOURCE} compress_lua)
-endif()
-if (ENABLE_ETCD_CLIENT)
-    lua_multi_source(lua_sources ${ETCD_CLIENT_LUA_SOURCES})
+
+if(ENABLE_LUA_EXTRAS)
+    lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
 endif()
 
 # 3rd party lua sources

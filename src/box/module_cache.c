@@ -22,7 +22,7 @@
 
 #include "box/error.h"
 #include "box/port.h"
-#include "box/lua/integrity.h"
+#include "box/integrity.h"
 
 #include "lua/utils.h"
 #include "libeio/eio.h"
