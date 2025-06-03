@@ -16,6 +16,7 @@
 #include <lauxlib.h>
 
 #include "arrow/abi.h"
+#include "trivia/config.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -2623,18 +2624,16 @@ tuple_field_by_path(struct lua_State *L)
 /**
  * Check decimal value against expected one.
  */
-static void
-check_decimal(const box_decimal_t *dec, const char *exp)
-{
-	/*
-	 * Ideally we shouldn't use anything from the decimal
-	 * library to validate its implementation. However we
-	 * use decimal_to_string() here for simplicity.
-	 */
-	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
-	box_decimal_to_string(dec, str);
-	fail_unless(strcmp(str, exp) == 0);
-}
+#define check_decimal(dec, exp) do { \
+	/* \
+	 * Ideally we shouldn't use anything from the decimal \
+	 * library to validate its implementation. However we \
+	 * use decimal_to_string() here for simplicity. \
+	 */ \
+	char str[BOX_DECIMAL_STRING_BUFFER_SIZE]; \
+	box_decimal_to_string(dec, str); \
+	fail_unless(strcmp(str, exp) == 0); \
+} while (0)
 
 enum {
 	POISON_SIZE = 16,
@@ -2772,6 +2771,29 @@ test_decimal(struct lua_State *L)
 	fail_unless(p == &vostok_1);
 	check_decimal(&vostok_1, "1961");
 
+	/* Scale from 32-bit integer. */
+	box_decimal_t d32;
+	box_decimal_scale_from_int32(&d32, 54321, 3);
+	check_decimal(&d32, "54.321");
+
+	/* Scale from 64-bit integer. */
+	box_decimal_t d64;
+	box_decimal_scale_from_int64(&d64, 54321, 3);
+	check_decimal(&d64, "54.321");
+
+	/* Scale from 128-bit integer. */
+	box_decimal_t d128;
+	uint64_t int128[2] = {~54321ULL + 1, UINT64_MAX};
+	box_decimal_scale_from_int128(&d128, int128, 3);
+	check_decimal(&d128, "-54.321");
+
+	/* Scale from 256-bit integer. */
+	box_decimal_t d256;
+	uint64_t int256[4] = {~54321ULL + 1, UINT64_MAX, UINT64_MAX,
+			      UINT64_MAX};
+	box_decimal_scale_from_int256(&d256, int256, 3);
+	check_decimal(&d256, "-54.321");
+
 	/* To int64_t. */
 	box_decimal_t carthage;
 	box_decimal_from_string(&carthage, "-146");
@@ -2787,6 +2809,34 @@ test_decimal(struct lua_State *L)
 	cp = box_decimal_to_uint64(&g, &g_u64);
 	fail_unless(cp == &g);
 	fail_unless(g_u64 == (uint64_t)9);
+
+	/* Scale to 32-bit integer. */
+	int32_t int32;
+	box_decimal_from_string(&d32, "1.23");
+	box_decimal_scale_to_int32(&d32, 2, &int32);
+	fail_unless(int32 == 123);
+
+	/* Scale to 64-bit integer. */
+	int64_t int64;
+	box_decimal_from_string(&d64, "1.23");
+	box_decimal_scale_to_int64(&d64, 2, &int64);
+	fail_unless(int64 == 123);
+
+	/* Scale to 128-bit integer. */
+	memset(int128, 0, sizeof(int128));
+	box_decimal_from_string(&d128, "-1.23");
+	box_decimal_scale_to_int128(&d128, 2, int128);
+	fail_unless(int128[0] == ~123ULL + 1);
+	fail_unless(int128[1] == UINT64_MAX);
+
+	/* Scale to 256-bit integer. */
+	memset(int256, 0, sizeof(int256));
+	box_decimal_from_string(&d256, "-1.23");
+	box_decimal_scale_to_int256(&d256, 2, int256);
+	fail_unless(int256[0] == ~123ULL + 1);
+	fail_unless(int256[1] == UINT64_MAX);
+	fail_unless(int256[2] == UINT64_MAX);
+	fail_unless(int256[3] == UINT64_MAX);
 
 	/* Compare. */
 	box_decimal_t five_1;

@@ -173,6 +173,51 @@ API_EXPORT box_decimal_t *
 box_decimal_from_uint64(box_decimal_t *dec, uint64_t num);
 
 /**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT box_decimal_t *
+box_decimal_scale_from_int32(box_decimal_t *dec, int32_t value, int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT box_decimal_t *
+box_decimal_scale_from_int64(box_decimal_t *dec, int64_t value, int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * 128 bit value is given as array with native endianness.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT box_decimal_t *
+box_decimal_scale_from_int128(box_decimal_t *dec, const uint64_t *value,
+			      int scale);
+
+/**
+ * Initialize a decimal from given integer value and scale.
+ * Scale is a negated exponent.
+ *
+ * 256 bit value is given as array with native endianness.
+ *
+ * Note that not all 256 bit values are representable as box_decimal_t. If
+ * value is not representable then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT box_decimal_t *
+box_decimal_scale_from_int256(box_decimal_t *dec, const uint64_t *value,
+			      int scale);
+
+/**
  * Copy decimal value from one storage to another.
  *
  * Use this function where you would use memcpy() if the precise
@@ -224,6 +269,64 @@ box_decimal_to_int64(const box_decimal_t *dec, int64_t *num);
  */
 API_EXPORT const box_decimal_t *
 box_decimal_to_uint64(const box_decimal_t *dec, uint64_t *num);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 32 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT const box_decimal_t *
+box_decimal_scale_to_int32(const box_decimal_t *dec, int scale, int32_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 64 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT const box_decimal_t *
+box_decimal_scale_to_int64(const box_decimal_t *dec, int scale, int64_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 128 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT const box_decimal_t *
+box_decimal_scale_to_int128(const box_decimal_t *dec, int scale,
+			    uint64_t *value);
+
+/**
+ * Convert decimal to integer given scale is \a scale.
+ *
+ * Scale is a negated exponent. For example 1.23 will be converted to
+ * 123 if scale is 2 and to 1230 if scale is 3.
+ *
+ * If decimal cannot be presented exactly with given scale then it is rounded.
+ * If result cannot fit in 128 bits then it is error.
+ *
+ * @return NULL on error and \a dec on success.
+ */
+API_EXPORT const box_decimal_t *
+box_decimal_scale_to_int256(const box_decimal_t *dec, int scale,
+			    uint64_t *value);
 
 /* }}} decimal conversions */
 

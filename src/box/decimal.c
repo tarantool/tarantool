@@ -85,6 +85,36 @@ box_decimal_from_uint64(box_decimal_t *dec, uint64_t num)
 }
 
 box_decimal_t *
+box_decimal_scale_from_int32(box_decimal_t *dec, int32_t value, int scale)
+{
+	return (box_decimal_t *)decimal_scale_from_int32(
+					(decimal_t *)dec, value, scale);
+}
+
+box_decimal_t *
+box_decimal_scale_from_int64(box_decimal_t *dec, int64_t value, int scale)
+{
+	return (box_decimal_t *)decimal_scale_from_int64(
+					(decimal_t *)dec, value, scale);
+}
+
+box_decimal_t *
+box_decimal_scale_from_int128(box_decimal_t *dec, const uint64_t *value,
+			      int scale)
+{
+	return (box_decimal_t *)decimal_scale_from_int128(
+					(decimal_t *)dec, value, scale);
+}
+
+box_decimal_t *
+box_decimal_scale_from_int256(box_decimal_t *dec, const uint64_t *value,
+			      int scale)
+{
+	return (box_decimal_t *)decimal_scale_from_int256(
+					(decimal_t *)dec, value, scale);
+}
+
+box_decimal_t *
 box_decimal_copy(box_decimal_t *dest, const box_decimal_t *src)
 {
 	/*
@@ -118,6 +148,40 @@ box_decimal_to_uint64(const box_decimal_t *dec, uint64_t *num)
 {
 	return (const box_decimal_t *)decimal_to_uint64(
 		(const decimal_t *)dec, num);
+}
+
+const box_decimal_t *
+box_decimal_scale_to_int32(const box_decimal_t *dec, int scale, int32_t *value)
+{
+	return (const box_decimal_t *)
+			decimal_scale_to_int32((const decimal_t *)dec,
+					       scale, value);
+}
+
+const box_decimal_t *
+box_decimal_scale_to_int64(const box_decimal_t *dec, int scale, int64_t *value)
+{
+	return (const box_decimal_t *)
+			decimal_scale_to_int64((const decimal_t *)dec,
+					       scale, value);
+}
+
+const box_decimal_t *
+box_decimal_scale_to_int128(const box_decimal_t *dec, int scale,
+			    uint64_t *value)
+{
+	return (const box_decimal_t *)
+			decimal_scale_to_int128((const decimal_t *)dec,
+						scale, value);
+}
+
+const box_decimal_t *
+box_decimal_scale_to_int256(const box_decimal_t *dec, int scale,
+			    uint64_t *value)
+{
+	return (const box_decimal_t *)
+			decimal_scale_to_int256((const decimal_t *)dec,
+						scale, value);
 }
 
 /* }}} decimal conversions */
