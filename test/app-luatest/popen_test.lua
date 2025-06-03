@@ -58,3 +58,41 @@ g.test_inherit_fds = function()
     t.assert_equals(ffi.string(ibuf.rpos, #msg), msg)
     ibuf:recycle()
 end
+
+g.test_popen_is_closed = function()
+    local ph = popen.shell('true')
+
+    -- Check that status can be seen if 'is_closed()' returns 'false'.
+    t.assert_equals(ph:is_closed(), false)
+    t.assert_equals(type(ph.status.state), 'string')
+    t.assert_equals(type(ph:info().status.state), 'string')
+
+    -- Check the error description for an invalid argument to the 'is_closed()'
+    -- when the handle is alive.
+    local exp_err = {
+        type = 'IllegalParams',
+        message = 'Bad params, use: ph:is_closed()',
+    }
+    t.assert_error_covers(exp_err, ph.is_closed)
+
+    -- Check that 'is_closed()' works properly when handle is closed.
+    t.assert_equals(ph:close(), true)
+    t.assert_equals(ph:is_closed(), true)
+
+    -- Check the error description for an invalid argument to the 'is_closed()'
+    -- when the handle is closed.
+    t.assert_error_covers(exp_err, ph.is_closed)
+
+    -- Check that status cannot be seen if 'is_closed()' returns 'true'.
+    exp_err = {
+        type = 'IllegalParams',
+        message = 'Attempt to index a closed popen handle',
+    }
+    t.assert_error_covers(exp_err, ph.__index, ph, 'status')
+
+    exp_err = {
+        type = 'IllegalParams',
+        message = 'popen: attempt to operate on a closed handle',
+    }
+    t.assert_error_covers(exp_err, ph.info, ph)
+end

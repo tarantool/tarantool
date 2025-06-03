@@ -2277,6 +2277,30 @@ lbox_popen_close(struct lua_State *L)
 }
 
 /**
+ * Check if the popen handle is closed.
+ *
+ * @param handle  a handle to check
+ *
+ * Raise an error on incorrect parameters:
+ *
+ * - IllegalParams: an incorrect handle parameter.
+ *
+ * Return `true` if popen handle is closed, `false` otherwise.
+ */
+static int
+lbox_popen_is_closed(struct lua_State *L)
+{
+	bool is_closed;
+	struct popen_handle *handle = luaT_check_popen_handle(L, 1, &is_closed);
+	if (handle == NULL) {
+		diag_set(IllegalParams, "Bad params, use: ph:is_closed()");
+		return luaT_error(L);
+	}
+	lua_pushboolean(L, is_closed);
+	return 1;
+}
+
+/**
  * Get a field from a handle.
  *
  * @param handle  a handle of a child process
@@ -2507,6 +2531,7 @@ tarantool_lua_popen_init(struct lua_State *L)
 		{"shutdown",		lbox_popen_shutdown,	},
 		{"info",		lbox_popen_info,	},
 		{"close",		lbox_popen_close,	},
+		{"is_closed",		lbox_popen_is_closed	},
 		{"__index",		lbox_popen_index	},
 		{"__serialize",		lbox_popen_serialize	},
 		{"__gc",		lbox_popen_gc		},
