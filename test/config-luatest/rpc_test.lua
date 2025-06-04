@@ -4,6 +4,8 @@ local t = require('luatest')
 local fun = require('fun')
 local treegen = require('luatest.treegen')
 local server = require('luatest.server')
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
 local socket = require('socket')
 local helpers = require('test.config-luatest.helpers')
 
@@ -1166,3 +1168,68 @@ end
 g.after_test('test_call_connects_to_all_if_prioritized', function(g)
     stop_stub_servers(g)
 end)
+
+g.test_closes_unused_connections = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.myuser',
+            {password =  'secret',
+             roles = { 'replication' },
+             privileges = {{permissions = {'execute'}, universe = true}}})
+        :set_global_option('iproto.advertise.peer.login', 'myuser')
+        :set_global_option('connpool.idle_timeout', 2)
+        :add_instance('i-001', { database = { mode = 'rw' } })
+        :add_instance('i-002', {})
+        :config()
+
+    local cluster = cluster:new(config)
+
+    -- Simulate a lag before connecting to differentiate
+    -- if a new connection has been established.
+    treegen.write_file(cluster._dir, 'override/net/box.lua',
+        string.dump(function()
+        local fiber = require('fiber')
+        local loaders = require('internal.loaders')
+
+        local builtin_netbox = loaders.builtin['net.box']
+        local builtin_connect = builtin_netbox.connect
+        builtin_netbox.connect = function(...)
+            fiber.sleep(1)
+            return builtin_connect(...)
+        end
+
+        return builtin_netbox
+    end))
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+        local fiber = require('fiber')
+
+
+        local function time(f, ...)
+            local t0 = clock.monotonic()
+            f(...)
+            local t1 = clock.monotonic()
+            return t1 - t0
+        end
+
+        -- Check the frequent access is performed without a
+        -- delay.
+        local t1 = time(function()
+            for _=1,10 do
+                connpool.call('box.info', nil, {mode = 'ro'})
+            end
+        end)
+        t.assert_lt(t1, 2)
+
+        -- Wait for the connection to be closed due to
+        -- inactivity.
+        fiber.sleep(3)
+
+        -- Check opening a new connection took some time.
+        local t2 = time(connpool.call, 'box.info', nil, {mode = 'ro'})
+        t.assert_gt(t2, 0.9)
+    end)
+end
