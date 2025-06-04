@@ -1110,25 +1110,17 @@ static int
 txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req,
 		    enum txn_commit_wait_mode wait_mode)
 {
-	uint32_t origin_id = req->rows[0]->replica_id;
-	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo)) {
-		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
-			diag_set(ClientError, ER_SYNC_QUEUE_FULL);
-			return -1;
-		}
-		if (txn_limbo_wait_for_space(&txn_limbo) != 0)
-			return -1;
-	}
-
 	/*
 	 * Remote rows, if any, come before local rows, so check for originating
 	 * instance id in the first row.
 	 */
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn,
-					    req->approx_len);
-	if (txn->limbo_entry == NULL)
+	uint32_t origin_id = req->rows[0]->replica_id;
+	if (origin_id == 0 && txn_limbo_would_block(&txn_limbo) &&
+	    wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
+		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
 		return -1;
-	return 0;
+	}
+	return txn_limbo_submit(&txn_limbo, origin_id, txn, req->approx_len);
 }
 
 static int
