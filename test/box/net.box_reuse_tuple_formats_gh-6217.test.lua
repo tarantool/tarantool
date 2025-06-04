@@ -4,7 +4,7 @@ errinj = box.error.injection
 box.schema.user.grant('guest', 'execute', 'universe')
 
 -- Check that formats created by net.box for schema are reused (gh-6217).
-COUNT = 113
+COUNT = 200
 errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', COUNT)
 connections = {}
 for i = 1, COUNT do                                                         \
