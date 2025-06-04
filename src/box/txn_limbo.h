@@ -62,6 +62,7 @@ struct txn_limbo_entry {
 	 * written to WAL yet.
 	 */
 	int64_t lsn;
+	bool is_volatile;
 	/**
 	 * Result flags. Only one of them can be true. But both
 	 * can be false if the transaction is still waiting for
@@ -338,9 +339,9 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * Allocate, create, and append a new transaction to the limbo.
  * The limbo entry is allocated on the transaction's region.
  */
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
-		 size_t approx_len);
+int
+txn_limbo_append_blocking(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+			  size_t approx_len);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
@@ -545,10 +546,6 @@ txn_limbo_shutdown(void);
 /** Set maximal limbo size in bytes. */
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
-
-/** Wait for space in the limbo to add a new entry. */
-int
-txn_limbo_wait_for_space(struct txn_limbo *limbo);
 
 #if defined(__cplusplus)
 }
