@@ -45,6 +45,11 @@ struct txn;
 struct synchro_request;
 
 enum txn_limbo_entry_state {
+	/**
+	 * Is saved in the limbo, but isn't accounted yet and isn't persisted
+	 * anywhere.
+	 */
+	TXN_LIMBO_ENTRY_VOLATILE,
 	/** Is saved and accounted in the limbo. */
 	TXN_LIMBO_ENTRY_SUBMITTED,
 	/** Committed, not in the limbo anymore. */
@@ -331,8 +336,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * Allocate, create, and append a new transaction to the limbo.
  * The limbo entry is allocated on the transaction's region.
  */
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len);
 
 /** Remove the entry from the limbo, mark as rolled back. */
@@ -538,10 +543,6 @@ txn_limbo_shutdown(void);
 /** Set maximal limbo size in bytes. */
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
-
-/** Wait for space in the limbo to add a new entry. */
-int
-txn_limbo_wait_for_space(struct txn_limbo *limbo);
 
 #if defined(__cplusplus)
 }
