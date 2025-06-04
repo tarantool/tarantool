@@ -227,6 +227,7 @@ static inline void
 txn_limbo_on_append(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
 	limbo->size += entry->approx_len;
 	limbo->len++;
 }
@@ -236,6 +237,8 @@ static inline void
 txn_limbo_on_remove(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
+	if (entry->state == TXN_LIMBO_ENTRY_VOLATILE)
+		return;
 	bool limbo_was_full = txn_limbo_is_full(limbo);
 	limbo->size -= entry->approx_len;
 	assert(limbo->size >= 0);
@@ -246,8 +249,27 @@ txn_limbo_on_remove(struct txn_limbo *limbo,
 		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+static void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
+{
+	struct txn *this_txn = in_txn();
+	fiber_set_txn(fiber(), NULL);
+	while (!txn_limbo_is_empty(limbo)) {
+		struct txn_limbo_entry *e = txn_limbo_last_entry(limbo);
+		if (e->state != TXN_LIMBO_ENTRY_VOLATILE)
+			break;
+		txn_limbo_abort(limbo, e);
+		txn_clear_flags(e->txn, TXN_WAIT_ACK);
+		assert(e->txn->signature < 0);
+		e->txn->signature = TXN_SIGNATURE_CASCADE;
+		e->txn->limbo_entry = NULL;
+		txn_limbo_complete(e->txn, false);
+	}
+	fiber_set_txn(fiber(), this_txn);
+}
+
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
@@ -269,13 +291,13 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 * it should be done right now. See in the limbo comments why.
 		 */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return NULL;
+		return -1;
 	}
 	if (id == 0)
 		id = instance_id;
 	if  (limbo->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
-		return NULL;
+		return -1;
 	} else if (limbo->owner_id != id && !txn_is_fully_local(txn)) {
 		if (txn_limbo_is_empty(limbo)) {
 			diag_set(ClientError, ER_SYNC_QUEUE_FOREIGN,
@@ -284,7 +306,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->owner_id);
 		}
-		return NULL;
+		return -1;
 	}
 	size_t size;
 	struct txn_limbo_entry *e = region_alloc_object(&txn->region,
@@ -296,16 +318,44 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	}
 	if (e == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object", "e");
-		return NULL;
+		return -1;
 	}
 	e->txn = txn;
 	e->approx_len = approx_len;
 	e->lsn = -1;
-	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
 	e->insertion_time = fiber_clock();
+	txn->limbo_entry = e;
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
+	if (!txn_limbo_is_full(limbo))
+		goto success;
+	e->state = TXN_LIMBO_ENTRY_VOLATILE;
+	while (true) {
+		if (fiber_cond_wait(&limbo->wait_cond) != 0) {
+			txn_limbo_rollback_all_volatile(limbo);
+			assert(e->state == TXN_LIMBO_ENTRY_ROLLBACK);
+		}
+		if (e->state == TXN_LIMBO_ENTRY_ROLLBACK) {
+			/* Cascading rollback. */
+			fiber_set_txn(fiber(), NULL);
+			diag_set(ClientError, ER_SYNC_ROLLBACK);
+			return -1;
+		}
+		if (txn_limbo_is_full(limbo))
+			continue;
+		if (txn_limbo_first_entry(limbo) == e)
+			break;
+		if (rlist_prev_entry(e, in_queue)->state != TXN_LIMBO_ENTRY_VOLATILE)
+			break;
+	}
+	if (txn_limbo_last_entry(limbo) != e) {
+		struct txn_limbo_entry *next = rlist_next_entry(e, in_queue);
+		assert(next->state == TXN_LIMBO_ENTRY_VOLATILE);
+		fiber_wakeup(next->txn->fiber);
+	}
+success:
+	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
 	txn_limbo_on_append(limbo, e);
-	return e;
+	return 0;
 }
 
 static inline void
@@ -1500,16 +1550,6 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_lock(&limbo->promote_latch);
 	limbo->do_validate = false;
 	latch_unlock(&limbo->promote_latch);
-}
-
-int
-txn_limbo_wait_for_space(struct txn_limbo *limbo)
-{
-	while (txn_limbo_is_full(limbo)) {
-		if (fiber_cond_wait(&limbo->wait_cond) != 0)
-			return -1;
-	}
-	return 0;
 }
 
 void
