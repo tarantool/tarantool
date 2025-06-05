@@ -505,8 +505,14 @@ box_raft_try_promote(void)
 	};
 	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
-	while (!fiber_is_cancelled() && !ctx.is_done)
-		fiber_yield();
+
+	ev_tstamp deadline = ev_monotonic_now(raft_loop()) +
+		3 * raft->election_timeout;
+	do {
+		if (fiber_yield_deadline(deadline))
+			break;
+	} while (!fiber_is_cancelled() && !ctx.is_done);
+
 	trigger_clear(&trig);
 
 	if (raft->state == RAFT_STATE_LEADER)
@@ -515,7 +521,7 @@ box_raft_try_promote(void)
 	int connected = replicaset.healthy_count;
 	int quorum = replicaset_healthy_quorum();
 	if (!ctx.is_done) {
-		diag_set(FiberIsCancelled);
+		diag_set(TimedOut);
 	} else if (raft->leader != 0) {
 		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
 	} else if (connected < quorum) {
