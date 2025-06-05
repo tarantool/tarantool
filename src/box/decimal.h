@@ -173,6 +173,66 @@ API_EXPORT box_decimal_t *
 box_decimal_from_uint64(box_decimal_t *dec, uint64_t num);
 
 /**
+ * Initialize a decimal from fixed point decimal value.
+ *
+ * Fixed point value must be in range of 32-bit fixed point decimal.
+ * Otherwise result is undefined.
+ *
+ * @param dec where to store the decimal result
+ * @param value fixed point decimal mantissa
+ * @param scale fixed point decimal scale
+ */
+API_EXPORT void
+box_decimal_from_fixed_point32(box_decimal_t *dec, int32_t value, int scale);
+
+/**
+ * Initialize a decimal with from fixed point decimal value.
+ *
+ * Fixed point value must be in range of 64-bit fixed point decimal.
+ * Otherwise result is undefined.
+ *
+ * @param dec where to store the decimal result
+ * @param value fixed point decimal mantissa
+ * @param scale fixed point decimal scale
+ */
+API_EXPORT void
+box_decimal_from_fixed_point64(box_decimal_t *dec, int64_t value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Initialize a decimal with from fixed point decimal value.
+ *
+ * Fixed point value must be in range of 128-bit fixed point decimal.
+ * Otherwise result is undefined.
+ *
+ * @param dec where to store the decimal result
+ * @param value pointer to fixed point decimal mantissa, should point to array
+ *        of size 2 (giving 128-bit of precision)
+ * @param scale fixed point decimal scale
+ */
+API_EXPORT void
+box_decimal_from_fixed_point128(box_decimal_t *dec, const uint64_t *value,
+				int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Initialize a decimal with from fixed point decimal value.
+ *
+ * Fixed point value must be in range of 256-bit fixed point decimal.
+ * Otherwise result is undefined.
+ *
+ * @param dec where to store the decimal result
+ * @param value pointer to fixed point decimal mantissa, should point to array
+ *        of size 4 (giving 256-bit of precision)
+ * @param scale fixed point decimal scale
+ */
+API_EXPORT void
+box_decimal_from_fixed_point256(box_decimal_t *dec, const uint64_t *value,
+				int scale);
+
+/**
  * Copy decimal value from one storage to another.
  *
  * Use this function where you would use memcpy() if the precise
@@ -224,6 +284,62 @@ box_decimal_to_int64(const box_decimal_t *dec, int64_t *num);
  */
 API_EXPORT const box_decimal_t *
 box_decimal_to_uint64(const box_decimal_t *dec, uint64_t *num);
+
+/**
+ * Convert a given decimal to fixed point decimal.
+ *
+ * Decimal must fit in fixed point decimal with given scale and 32-bit
+ * mantissa. Otherwise result is undefined.
+ *
+ * @param dec source decimal number
+ * @param value pointer where to store fixed point decimal mantissa
+ * @param scale fixed pointer scale
+ */
+API_EXPORT void
+box_decimal_to_fixed_point32(box_decimal_t *dec, int32_t *value, int scale);
+
+/**
+ * Convert a given decimal to fixed point decimal.
+ *
+ * Decimal must fit in fixed point decimal with given scale and 64-bit
+ * mantissa. Otherwise result is undefined.
+ *
+ * @param dec source decimal number
+ * @param value pointer where to store fixed point decimal mantissa
+ * @param scale fixed pointer scale
+ */
+API_EXPORT void
+box_decimal_to_fixed_point64(box_decimal_t *dec, int64_t *value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Convert a given decimal to fixed point decimal.
+ *
+ * Decimal must fit in fixed point decimal with given scale and 128-bit
+ * mantissa. Otherwise result is undefined.
+ *
+ * @param dec source decimal number
+ * @param value pointer where to store fixed point decimal mantissa
+ * @param scale fixed pointer scale
+ */
+API_EXPORT void
+box_decimal_to_fixed_point128(box_decimal_t *dec, uint64_t *value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Convert a given decimal to fixed point decimal.
+ *
+ * Decimal must fit in fixed point decimal with given scale and 256-bit
+ * mantissa. Otherwise result is undefined.
+ *
+ * @param dec source decimal number
+ * @param value pointer where to store fixed point decimal mantissa
+ * @param scale fixed pointer scale
+ */
+API_EXPORT void
+box_decimal_to_fixed_point256(box_decimal_t *dec, uint64_t *value, int scale);
 
 /* }}} decimal conversions */
 
