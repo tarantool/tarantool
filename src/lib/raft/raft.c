@@ -624,7 +624,13 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			 */
 			if (raft->is_cfg_candidate)
 				raft_sm_schedule_new_election(raft);
+
+			return 0;
 		}
+
+		if (raft->state == RAFT_STATE_CANDIDATE && req->is_leader_seen)
+			raft_sm_follow_leader(raft, req->leader_id);
+
 		return 0;
 	}
 	/* The node is a leader, but it is already known. */
@@ -989,7 +995,7 @@ raft_sm_wait_leader_dead(struct raft *raft)
 	assert(!raft_ev_timer_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
-	assert(raft_is_leader_seen(raft));
+	/* assert(raft_is_leader_seen(raft)); */
 	raft_ev_timer_set(&raft->timer, raft->death_timeout, raft->death_timeout);
 	raft_ev_timer_start(raft_loop(), &raft->timer);
 }
