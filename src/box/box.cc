@@ -3409,6 +3409,16 @@ box_set_memtx_memory(void)
 }
 
 void
+box_set_memtx_sort_data_enabled(void)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	bool value = cfg_getb("memtx_sort_data_enabled");
+	memtx_engine_set_sort_data_enabled(memtx, value);
+}
+
+void
 box_set_memtx_max_tuple_size(void)
 {
 	struct memtx_engine *memtx;
@@ -5350,6 +5360,7 @@ engine_init()
 				    cfg_geti("memtx_sort_threads"),
 				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
+	box_set_memtx_sort_data_enabled();
 	box_set_memtx_max_tuple_size();
 
 	memcs_engine_register();

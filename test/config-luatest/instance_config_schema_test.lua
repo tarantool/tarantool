@@ -1118,6 +1118,7 @@ g.test_snapshot = function()
             },
             count = 1,
             snap_io_rate_limit = 1,
+            save_secondary_indexes = true,
         },
     }
     instance_config:validate(iconfig)
@@ -1131,6 +1132,7 @@ g.test_snapshot = function()
         },
         count = 2,
         snap_io_rate_limit = box.NULL,
+        save_secondary_indexes = false,
     }
     local res = instance_config:apply_default({}).snapshot
     t.assert_equals(res, exp)
