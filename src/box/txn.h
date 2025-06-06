@@ -316,6 +316,10 @@ struct txn_stmt {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
+	/** The first Arrow inserted key (MP_ARRAY, allocated on txn). */
+	const char *min_key;
+	/** The last Arrow inserted key (MP_ARRAY, allocated on txn). */
+	const char *max_key;
 	/** Structure, which contains tuples for rollback. */
 	struct txn_stmt_rollback_info rollback_info;
 	/**

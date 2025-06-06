@@ -303,6 +303,8 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->space = NULL;
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->min_key = NULL;
+	stmt->max_key = NULL;
 	stmt->rollback_info.old_tuple = NULL;
 	stmt->rollback_info.new_tuple = NULL;
 	stmt->add_story = NULL;
