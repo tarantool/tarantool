@@ -21,15 +21,23 @@ local function create_uri_table(addr, count)
     return uris_table, path_table
 end
 
-local function check_connection(port)
-    local conn = net_box.connect(port)
-    local rc = conn:ping()
-    conn:close()
-    return rc
+local function check_connection(uris)
+    if type(uris) == "string" then
+        uris = {uris}
+    end
+    for _, uri in ipairs(uris) do
+        local conn = net_box.connect(uri)
+        local rc = conn:ping()
+        conn:close()
+        if not rc then
+            return false
+        end
+    end
+    return true
 end
 
 local test = tap.test('gh-6535-listen-update-numeric-uri')
-test:plan(116)
+test:plan(115)
 
 -- Check connection if listening uri passed as a single port number.
 local port_number = 0
@@ -46,9 +54,10 @@ test:ok(box.info.listen:match("unix/:"), "box.info.listen")
 -- Check connection if listening uri passed as a table of port numbers.
 local port_numbers = {0, 0, 0, 0, 0}
 box.cfg{listen = port_numbers}
-for i, _ in ipairs(port_numbers) do
-    test:ok(check_connection(box.info.listen[i]), "URI as a table of numbers")
-end
+test:istable(box.info.listen, "box.info.listen is a table")
+test:ok(#box.info.listen / #port_numbers >= 1, "All ports are bound")
+test:ok(#box.info.listen % #port_numbers == 0, "All protocols are bound")
+test:ok(check_connection(box.info.listen), "URI as a table of numbers")
 
 -- Check connection if listening uri passed as a table of strings.
 local uri_table, path_table = create_uri_table("./tarantool", 5)
