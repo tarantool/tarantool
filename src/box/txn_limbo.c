@@ -236,6 +236,8 @@ static inline void
 txn_limbo_on_remove(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
+	if (entry->is_volatile)
+		return;
 	bool limbo_was_full = txn_limbo_is_full(limbo);
 	limbo->size -= entry->approx_len;
 	assert(limbo->size >= 0);
@@ -306,12 +308,22 @@ txn_limbo_append_blocking(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	e->is_rollback = false;
 	e->insertion_time = fiber_clock();
 	txn->limbo_entry = e;
+	say_info("limbo: add entry");
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	if (!txn_limbo_is_full(limbo))
 		goto success;
 	while (true) {
-		if (fiber_cond_wait(&limbo->wait_cond) != 0)
+		if (fiber_cond_wait(&limbo->wait_cond) != 0) {
+			say_info("limbo: is cancelled, rollback cascading");
+			txn_limbo_on_cascading_rollback(limbo);
+			assert(e->is_rollback);
+		}
+		if (e->is_rollback) {
+			/* Cascading rollback. */
+			fiber_set_txn(fiber(), NULL);
+			diag_set(ClientError, ER_SYNC_ROLLBACK);
 			return -1;
+		}
 		if (txn_limbo_is_full(limbo))
 			continue;
 		if (txn_limbo_first_entry(limbo) == e)
@@ -1490,6 +1502,27 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	 * sync transactions can live on replica infinitely.
 	 */
 	fiber_cond_broadcast(&limbo->wait_cond);
+}
+
+// TODO: remove "on" from the name.
+void
+txn_limbo_on_cascading_rollback(struct txn_limbo *limbo)
+{
+	say_info("limbo: cascading rollback");
+	struct txn *this_txn = in_txn();
+	fiber_set_txn(fiber(), NULL);
+	while (!txn_limbo_is_empty(limbo)) {
+		struct txn_limbo_entry *e = txn_limbo_last_entry(limbo);
+		if (!e->is_volatile)
+			break;
+		txn_limbo_abort(limbo, e);
+		txn_clear_flags(e->txn, TXN_WAIT_ACK);
+		assert(e->txn->signature < 0);
+		e->txn->signature = TXN_SIGNATURE_CASCADE;
+		e->txn->limbo_entry = NULL;
+		txn_limbo_complete(e->txn, false);
+	}
+	fiber_set_txn(fiber(), this_txn);
 }
 
 void
