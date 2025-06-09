@@ -5,7 +5,7 @@ local g = t.group()
 
 -- Sizes of objects from transaction manager.
 -- Please update them, if you changed the relevant structures.
-local SIZE_OF_STMT = 144
+local SIZE_OF_STMT = 160
 -- Size of story with one link (for spaces with 1 index).
 local SIZE_OF_STORY = 144
 -- Size of tuple with 2 number fields
