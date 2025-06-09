@@ -564,6 +564,7 @@
     <member refid="module_8h_1a2211f2682d19f564c55f2888e35d6430" kind="function"><name>box_tuple_ref</name></member>
     <member refid="module_8h_1a22d7b12b1afbff0c3cc20726c10cc6cc" kind="function"><name>box_tuple_unref</name></member>
     <member refid="module_8h_1a800d61b749ed483d35b65025eaa3039e" kind="function"><name>box_tuple_field_count</name></member>
+    <member refid="module_8h_1a0bf51406abdaed2efa950aa428ca3ad1" kind="function"><name>box_tuple_data</name></member>
     <member refid="module_8h_1a6812d20a87dc1f55648679680d0d2272" kind="function"><name>box_tuple_bsize</name></member>
     <member refid="module_8h_1af520a6742b61a5bcb879b75d09d72f4e" kind="function"><name>box_tuple_to_buf</name></member>
     <member refid="module_8h_1afb5de2d649fd56eacbe7d734643620ea" kind="function"><name>box_tuple_format</name></member>
