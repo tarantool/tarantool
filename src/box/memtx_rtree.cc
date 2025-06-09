@@ -209,7 +209,7 @@ memtx_rtree_index_size(struct index *base)
 	struct space *space = space_by_id(base->def->space_id);
 	/* Substract invisible count. */
 	return rtree_number_of_records(&index->tree) -
-	       memtx_tx_index_invisible_count(in_txn(), space, base);
+	       memtx_tx_track_count(in_txn(), space, base, ITER_GE, NULL, 0);
 }
 
 static ssize_t
