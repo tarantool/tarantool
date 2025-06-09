@@ -738,9 +738,16 @@ replica_on_applier_sync(struct replica *replica)
 static void
 replica_on_applier_connect(struct replica *replica)
 {
+	struct applier *applier = replica->applier;
+	if (box_is_waiting_for_own_rows()) {
+		auto &t = box_check_waiting_for_own_rows_trigger;
+		int64_t remote_lsn =
+			vclock_get(&applier->ballot.vclock, instance_id);
+		t.target_lsn = MAX(t.target_lsn, remote_lsn);
+	}
+
 	if (replica->applier_sync_state == APPLIER_CONNECTED)
 		return;
-	struct applier *applier = replica->applier;
 
 	assert(tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
@@ -1176,8 +1183,24 @@ bootstrap_leader_is_connected(struct applier **appliers, int count)
 static bool
 replicaset_is_connected(struct replicaset_connect_state *state,
 			struct applier **appliers, int count,
-			bool connect_quorum)
+			bool wait_all)
 {
+	/* Update connected and failed counters. */
+	state->connected = 0;
+	state->booting = 0;
+	state->failed = 0;
+	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		if (applier->state == APPLIER_CONNECTED) {
+			state->connected++;
+			if (!applier->ballot.is_booted)
+				state->booting++;
+		} else if (applier->state == APPLIER_STOPPED ||
+				   applier->state == APPLIER_OFF) {
+			state->failed++;
+		}
+	}
+
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
 		/*
@@ -1217,21 +1240,6 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 			return true;
 		}
 	}
-	/* Update connected and failed counters. */
-	state->connected = 0;
-	state->booting = 0;
-	state->failed = 0;
-	for (int i = 0; i < count; i++) {
-		struct applier *applier = appliers[i];
-		if (applier->state == APPLIER_CONNECTED) {
-			state->connected++;
-			if (!applier->ballot.is_booted)
-				state->booting++;
-		} else if (applier->state == APPLIER_STOPPED ||
-			   applier->state == APPLIER_OFF) {
-			state->failed++;
-		}
-	}
 	if (state->connected == count)
 		return true;
 	/*
@@ -1244,7 +1252,7 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 	 * different cluster UUIDs.
 	 */
 	if (state->connected >= replicaset_connect_quorum(count) &&
-	    !connect_quorum) {
+	    !wait_all) {
 		return true;
 	}
 	if (count - state->failed < replicaset_connect_quorum(count))
@@ -1254,7 +1262,7 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 
 void
 replicaset_connect(const struct uri_set *uris,
-		   bool connect_quorum, bool keep_connect)
+		   bool demand_quorum, bool keep_connect, bool wait_all)
 {
 	struct replicaset_connect_state state;
 	memset(&state, 0, sizeof(state));
@@ -1303,7 +1311,7 @@ replicaset_connect(const struct uri_set *uris,
 	else
 		say_info("connecting to %d replicas", count);
 
-	if (!connect_quorum) {
+	if (!demand_quorum) {
 		/*
 		 * Enter orphan mode on configuration change and
 		 *
@@ -1362,8 +1370,7 @@ replicaset_connect(const struct uri_set *uris,
 	auto cond_guard = make_scoped_guard([&]{
 		replicaset_connect_wakeup_cond = NULL;
 	});
-	while (!replicaset_is_connected(&state, appliers, count,
-					connect_quorum)) {
+	while (!replicaset_is_connected(&state, appliers, count, wait_all)) {
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0) {
 			fiber_testcancel();
@@ -1378,7 +1385,7 @@ replicaset_connect(const struct uri_set *uris,
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
 		if (state.connected < replicaset_connect_quorum(count) &&
-		    connect_quorum) {
+		    demand_quorum) {
 			tnt_raise(ClientError, ER_CFG, "replication",
 				  "failed to connect to one or more replicas");
 		}
@@ -1557,6 +1564,19 @@ replicaset_check_quorum(void)
 {
 	if (replicaset.applier.synced >= replicaset_sync_quorum())
 		box_set_orphan(false);
+}
+
+int64_t
+replicaset_max_instance_lsn(void)
+{
+	int64_t max_lsn = 0;
+	replicaset_foreach(replica) {
+		if (replica->applier == NULL)
+			continue;
+		struct vclock *remote_vclock = &replica->applier->ballot.vclock;
+		max_lsn = MAX(max_lsn, vclock_get(remote_vclock, instance_id));
+	}
+	return max_lsn;
 }
 
 /** A helper to update relay health on its start/stop. */
