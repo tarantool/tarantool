@@ -19,7 +19,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="3334" column="10" bodyfile="src/module.h" bodystart="3334" bodyend="-1"/>
+        <location file="src/module.h" line="3344" column="10" bodyfile="src/module.h" bodystart="3344" bodyend="-1"/>
       </memberdef>
     </sectiondef>
     <briefdescription>
@@ -28,7 +28,7 @@
     <detaileddescription>
 <para>See <ref refid="module_8h_1a90d26cf0c54dfa5e878e95ca0f73202a" kindref="member">box_decimal_t</ref>. </para>
     </detaileddescription>
-    <location file="src/module.h" line="3324" column="1" bodyfile="src/module.h" bodystart="3324" bodyend="3335"/>
+    <location file="src/module.h" line="3334" column="1" bodyfile="src/module.h" bodystart="3334" bodyend="3345"/>
     <listofallmembers>
       <member refid="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" prot="public" virt="non-virtual"><scope>box_decimal</scope><name>internal</name></member>
     </listofallmembers>

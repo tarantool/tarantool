@@ -599,6 +599,7 @@
     <member refid="module_8h_1aa62bc1dd0c418fe0031c32f44e048ce4" kind="function"><name>box_is_ro</name></member>
     <member refid="module_8h_1adf6a73f9ce8d72029ea976cf2999ba30" kind="function"><name>box_wait_ro</name></member>
     <member refid="module_8h_1a1d96086f343e0739efabf43174a3fa35" kind="function"><name>box_ro_reason</name></member>
+    <member refid="module_8h_1aea52506f29df1be0ad66721617c7452f" kind="function"><name>box_status</name></member>
     <member refid="module_8h_1a7fb00cd4eac4d388d58e9e5ef1ea1b3f" kind="function"><name>box_return_tuple</name></member>
     <member refid="module_8h_1a96bf7ae13f994a18d2f9dcf7816578ca" kind="function"><name>box_return_mp</name></member>
     <member refid="module_8h_1a4a816d0fc386d810b874b50db1f50293" kind="function"><name>box_space_id_by_name</name></member>
