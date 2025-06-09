@@ -31,16 +31,17 @@
  * SUCH DAMAGE.
  */
 
-/** Maximum decimal digigts taken by a decimal representation. */
-#define DECIMAL_MAX_DIGITS 76
-#define DECNUMDIGITS DECIMAL_MAX_DIGITS
-#include <decNumber/decNumber.h>
 #include <stdint.h>
 #include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/** Maximum decimal digigts taken by a decimal representation. */
+#define DECIMAL_MAX_DIGITS 76
+#define DECNUMDIGITS DECIMAL_MAX_DIGITS
+#include <decNumber/decNumber.h>
 
 enum {
 	/*
@@ -74,6 +75,104 @@ decimal_scale(const decimal_t *dec);
  */
 bool
 decimal_fits_fixed_point(decimal_t *dec, int precision, int scale);
+
+/**
+ * Convert fixed point decimal given by integer \a dec and \a scale
+ * to decimal \a result.
+ *
+ * \a dec is expected to be an integer with 0 exponent.
+ */
+void
+decimal_from_fixed_point(decimal_t *dec, int scale, decimal_t *result);
+
+/**
+ * Convert floating point decimal \a dec to fixed point decimal of given
+ * \a scale. The mantissa is stored in \a result.
+ *
+ * \a should be representable as fixed point with \a scale. Otherwise
+ * result is undefined.
+ *
+ * \a result is integer with 0 exponent.
+ *
+ */
+void
+decimal_to_fixed_point(decimal_t *dec, int scale, decimal_t *result);
+
+/**
+ * Initialize \a dec from 32-bit fixed point decimal given by \a value and
+ * \a scale. \a value should be in range of 32-bit fixed point decimal.
+ * Otherwise result is undefined.
+ */
+void
+decimal_from_fixed_point32(decimal_t *dec, int32_t value, int scale);
+
+/**
+ * Initialize \a dec from 64-bit fixed point decimal given by \a value and
+ * \a scale. \a value should be in range of 64-bit fixed point decimal.
+ * Otherwise result is undefined.
+ */
+void
+decimal_from_fixed_point64(decimal_t *dec, int64_t value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Initialize \a dec from 128-bit fixed point decimal given by \a value and
+ * \a scale. \a value should be in range of 128-bit fixed point decimal.
+ * Otherwise result is undefined.
+ */
+void
+decimal_from_fixed_point128(decimal_t *dec, const uint64_t *value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Initialize \a dec from 256-bit fixed point decimal given by \a value and
+ * \a scale. \a value should be in range of 256-bit fixed point decimal.
+ * Otherwise result is undefined.
+ */
+void
+decimal_from_fixed_point256(decimal_t *dec, const uint64_t *value, int scale);
+
+/**
+ * Convert \a dec to 32-bit fixed point decimal of \a scale. The mantissa is
+ * saved in \a value.
+ * \a dec must fit in fixed point decimal of \a scale and 32-bit mantissa.
+ * Otherwise result is undefined.
+ */
+void
+decimal_to_fixed_point32(decimal_t *dec, int32_t *value, int scale);
+
+/**
+ * Convert \a dec to 64-bit fixed point decimal of \a scale. The mantissa is
+ * saved in \a value.
+ * \a dec must fit in fixed point decimal of \a scale and 64-bit mantissa.
+ * Otherwise result is undefined.
+ */
+void
+decimal_to_fixed_point64(decimal_t *dec, int64_t *value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Convert \a dec to 128-bit fixed point decimal of \a scale. The mantissa is
+ * saved in \a value.
+ * \a dec must fit in fixed point decimal of \a scale and 128-bit mantissa.
+ * Otherwise result is undefined.
+ */
+void
+decimal_to_fixed_point128(decimal_t *dec, uint64_t *value, int scale);
+
+/**
+ * Supported only in EE version.
+ *
+ * Convert \a dec to 256-bit fixed point decimal of \a scale. The mantissa is
+ * saved in \a value.
+ * \a dec must fit in fixed point decimal of \a scale and 256-bit mantissa.
+ * Otherwise result is undefined.
+ */
+void
+decimal_to_fixed_point256(decimal_t *dec, uint64_t *value, int scale);
 
 /**
  * Initialize a zero decimal number.

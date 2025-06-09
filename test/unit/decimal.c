@@ -513,10 +513,162 @@ test_fits_fixed_point(void)
 	check_plan();
 }
 
+static void
+test_from_fixed_point(void)
+{
+	plan(9);
+	header();
+
+	decimal_t fixed;
+	decimal_t flt;
+	decimal_t expected;
+
+	is(decimal_from_string(&fixed, "101"), &fixed);
+	decimal_from_fixed_point(&fixed, 2, &flt);
+	is(decimal_from_string(&expected, "1.01"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	is(decimal_from_string(&fixed, "999"), &fixed);
+	decimal_from_fixed_point(&fixed, 0, &flt);
+	is(decimal_from_string(&expected, "999"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	is(decimal_from_string(&fixed, "9990"), &fixed);
+	decimal_from_fixed_point(&fixed, -1, &flt);
+	is(decimal_from_string(&expected, "99900"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_to_fixed_point(void)
+{
+	plan(9);
+	header();
+
+	decimal_t fixed;
+	decimal_t flt;
+	decimal_t expected;
+
+	is(decimal_from_string(&flt, "1.01"), &flt);
+	decimal_to_fixed_point(&flt, 2, &fixed);
+	is(decimal_from_string(&expected, "101"), &expected);
+	is(decimal_compare(&fixed, &expected), 0);
+
+	is(decimal_from_string(&flt, "999"), &flt);
+	decimal_to_fixed_point(&flt, 0, &fixed);
+	is(decimal_from_string(&expected, "999"), &expected);
+	is(decimal_compare(&fixed, &expected), 0);
+
+	is(decimal_from_string(&flt, "99900"), &flt);
+	decimal_to_fixed_point(&flt, -1, &fixed);
+	is(decimal_from_string(&expected, "9990"), &expected);
+	is(decimal_compare(&fixed, &expected), 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_from_fixed_point32(void)
+{
+	plan(4);
+	header();
+
+	decimal_t flt;
+	decimal_t expected;
+
+	decimal_from_fixed_point32(&flt, 999999999, 2);
+	is(decimal_from_string(&expected, "9999999.99"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	decimal_from_fixed_point32(&flt, -999999999, 2);
+	is(decimal_from_string(&expected, "-9999999.99"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_from_fixed_point64(void)
+{
+	plan(4);
+	header();
+
+	decimal_t flt;
+	decimal_t expected;
+
+	decimal_from_fixed_point64(&flt, 999999999999999999LL, 2);
+	is(decimal_from_string(&expected, "9999999999999999.99"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	decimal_from_fixed_point64(&flt, -999999999999999999LL, 2);
+	is(decimal_from_string(&expected, "-9999999999999999.99"), &expected);
+	is(decimal_compare(&flt, &expected), 0);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_to_fixed_point32(void)
+{
+	plan(6);
+	header();
+
+	int32_t fixed;
+	decimal_t flt;
+	decimal_t expected;
+
+	is(decimal_from_string(&flt, "9999999.99"), &flt);
+	decimal_to_fixed_point32(&flt, &fixed, 2);
+	is(fixed, 999999999);
+
+	is(decimal_from_string(&flt, "-9999999.99"), &flt);
+	decimal_to_fixed_point32(&flt, &fixed, 2);
+	is(fixed, -999999999);
+
+	is(decimal_from_string(&flt, "123.45"), &flt);
+	decimal_to_fixed_point32(&flt, &fixed, 4);
+	is(fixed, 1234500);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_to_fixed_point64(void)
+{
+	plan(6);
+	header();
+
+	int64_t fixed;
+	decimal_t flt;
+	decimal_t expected;
+
+	is(decimal_from_string(&flt, "9999999999999999.99"), &flt);
+	decimal_to_fixed_point64(&flt, &fixed, 2);
+	is(fixed, 999999999999999999LL);
+
+	is(decimal_from_string(&flt, "-9999999999999999.99"), &flt);
+	decimal_to_fixed_point64(&flt, &fixed, 2);
+	is(fixed, -999999999999999999LL);
+
+	is(decimal_from_string(&flt, "123.45"), &flt);
+	decimal_to_fixed_point64(&flt, &fixed, 4);
+	is(fixed, 1234500);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(326);
+	plan(332);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -586,6 +738,12 @@ main(void)
 	test_mp_print();
 	test_print();
 	test_fits_fixed_point();
+	test_from_fixed_point();
+	test_to_fixed_point();
+	test_from_fixed_point32();
+	test_from_fixed_point64();
+	test_to_fixed_point32();
+	test_to_fixed_point64();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);

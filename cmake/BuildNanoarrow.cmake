@@ -4,8 +4,10 @@ macro(nanoarrow_build)
     set(NANOARROW_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/nanoarrow/)
     set(NANOARROW_INCLUDE_DIR ${NANOARROW_INSTALL_DIR}/include/)
 
-    set(NANOARROW_CORE_LIBRARY ${NANOARROW_INSTALL_DIR}/lib/libnanoarrow.a)
-    set(NANOARROW_IPC_LIBRARY ${NANOARROW_INSTALL_DIR}/lib/libnanoarrow_ipc.a)
+    set(NANOARROW_CORE_LIBRARY
+        ${NANOARROW_INSTALL_DIR}/lib/libnanoarrow_static.a)
+    set(NANOARROW_IPC_LIBRARY
+        ${NANOARROW_INSTALL_DIR}/lib/libnanoarrow_ipc_static.a)
     set(FLATCCRT_LIBRARY ${NANOARROW_INSTALL_DIR}/lib/libflatccrt.a)
     set(NANOARROW_LIBRARIES
         ${NANOARROW_CORE_LIBRARY} ${NANOARROW_IPC_LIBRARY} ${FLATCCRT_LIBRARY})
