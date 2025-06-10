@@ -192,7 +192,7 @@ int
 journal_queue_wait(struct journal_entry *entry);
 
 /** Flush journal queue. Next wal_sync() will sync flushed requests. */
-void
+int
 journal_queue_flush(void);
 
 /** Set maximal journal queue size in bytes. */
