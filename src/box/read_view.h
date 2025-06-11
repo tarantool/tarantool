@@ -17,6 +17,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct cord;
+struct engine;
 struct field_def;
 struct index;
 struct index_read_view;
@@ -34,6 +35,8 @@ struct space_read_view {
 	uint32_t id;
 	/** Space name. */
 	char *name;
+	/** Space engine */
+	struct engine *engine;
 	/**
 	 * Tuple field definition array used by this space. Allocated only if
 	 * read_view_opts::enable_field_names is set, otherwise set to NULL.

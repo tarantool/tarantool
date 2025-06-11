@@ -135,6 +135,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	} else {
 		space_rv->upgrade = NULL;
 	}
+	space_rv->engine = space->engine;
 	space_rv->index_id_max = space->index_id_max;
 	memset(space_rv->index_map, 0, index_map_size);
 	for (uint32_t i = 0; i <= space->index_id_max; i++) {
