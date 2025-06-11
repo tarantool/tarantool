@@ -100,10 +100,13 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	struct grp_alloc all = grp_alloc_initializer();
 	grp_alloc_reserve_data(&all, sizeof(*space_rv));
 	grp_alloc_reserve_str0(&all, space_name(space));
+	grp_alloc_reserve_str0(&all, space_engine_name(space));
 	grp_alloc_reserve_data(&all, index_map_size);
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
 	space_rv = grp_alloc_create_data(&all, sizeof(*space_rv));
 	space_rv->name = grp_alloc_create_str0(&all, space_name(space));
+	space_rv->engine = grp_alloc_create_str0(&all,
+						 space_engine_name(space));
 	space_rv->index_map = grp_alloc_create_data(&all, index_map_size);
 	assert(grp_alloc_size(&all) == 0);
 
