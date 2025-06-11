@@ -1183,6 +1183,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'snap_io_rate_limit',
             default = box.NULL,
         }),
+        save_secondary_indexes = schema.scalar({
+            type = 'boolean',
+            box_cfg = 'memtx_sort_data_enabled',
+            default = false,
+        }),
     }),
     replication = schema.record({
         failover = schema.enum({
