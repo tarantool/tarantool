@@ -407,6 +407,13 @@ space_name(const struct space *space)
 	return space->def->name;
 }
 
+/** Get space engine name. */
+static inline const char *
+space_engine_name(const struct space *space)
+{
+	return space->engine->name;
+}
+
 /** Return true if space is data-temporary. */
 static inline bool
 space_is_data_temporary(const struct space *space)

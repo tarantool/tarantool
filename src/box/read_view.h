@@ -34,6 +34,8 @@ struct space_read_view {
 	uint32_t id;
 	/** Space name. */
 	char *name;
+	/** Space engine */
+	char *engine;
 	/**
 	 * Tuple field definition array used by this space. Allocated only if
 	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
