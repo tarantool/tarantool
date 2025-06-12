@@ -248,7 +248,7 @@ txn_limbo_on_remove(struct txn_limbo *limbo,
 		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
-static void
+void
 txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
 {
 	struct txn *this_txn = in_txn();

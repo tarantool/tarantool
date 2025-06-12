@@ -36,6 +36,7 @@
 #include "xrow.h"
 
 struct journal *current_journal = NULL;
+on_cascading_rollback_f on_cascading_rollback = journal_on_cascading_rollback_nop;
 
 struct journal_queue journal_queue = {
 	.max_size = 16 * 1024 * 1024, /* 16 megabytes */
@@ -153,6 +154,7 @@ journal_queue_wait(struct journal_entry *entry)
 		journal_queue_wakeup();
 		return 0;
 	}
+	on_cascading_rollback();
 	/* Take this request and all the next ones. */
 	struct stailq rollback;
 	stailq_cut_tail(&journal_queue.requests, &prev_entry->fifo,
@@ -196,6 +198,7 @@ journal_queue_flush(void)
 void
 journal_queue_rollback(void)
 {
+	on_cascading_rollback();
 	struct stailq rollback;
 	stailq_create(&rollback);
 	stailq_concat(&rollback, &journal_queue.requests);
@@ -206,6 +209,11 @@ journal_queue_rollback(void)
 		req->is_complete = true;
 		req->write_async_cb(req);
 	}
+}
+
+void
+journal_on_cascading_rollback_nop(void)
+{
 }
 
 int

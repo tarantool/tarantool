@@ -43,6 +43,7 @@ struct xrow_header;
 struct journal_entry;
 
 typedef void (*journal_write_async_f)(struct journal_entry *entry);
+typedef void (*on_cascading_rollback_f)(void);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -237,11 +238,15 @@ journal_async_complete(struct journal_entry *entry)
 	entry->write_async_cb(entry);
 }
 
+void
+journal_on_cascading_rollback_nop(void);
+
 /**
  * Depending on the step of recovery and instance configuration
  * points at a concrete implementation of the journal.
  */
 extern struct journal *current_journal;
+extern on_cascading_rollback_f on_cascading_rollback;
 
 /** Write a single row in a blocking way. */
 int
