@@ -330,6 +330,12 @@ txn_limbo_rollback_volatile_up_to(struct txn_limbo *limbo,
 	}
 }
 
+void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
+{
+	txn_limbo_rollback_volatile_up_to(limbo, NULL);
+}
+
 int
 txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len)
