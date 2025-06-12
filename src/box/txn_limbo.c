@@ -174,8 +174,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	e->txn = txn;
 	e->lsn = -1;
-	e->is_commit = false;
-	e->is_rollback = false;
+	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
 	e->insertion_time = fiber_clock();
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	limbo->len++;
@@ -196,7 +195,7 @@ txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(!rlist_empty(&entry->in_queue));
 	assert(txn_limbo_last_entry(limbo) == entry);
-	assert(entry->is_rollback);
+	assert(entry->state == TXN_LIMBO_ENTRY_ROLLBACK);
 
 	rlist_del_entry(entry, in_queue);
 	limbo->len--;
@@ -206,7 +205,8 @@ txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
-	entry->is_rollback = true;
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
+	entry->state = TXN_LIMBO_ENTRY_ROLLBACK;
 	if (entry == limbo->entry_to_confirm)
 		limbo->entry_to_confirm = NULL;
 	/*
@@ -351,7 +351,7 @@ complete:
 	 * The first tx to be rolled back already performed all
 	 * the necessary cleanups for us.
 	 */
-	if (entry->is_rollback) {
+	if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
 		return -1;
 	}
@@ -480,7 +480,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn = NULL;
 			continue;
 		}
-		e->is_commit = true;
+		assert(e->state == TXN_LIMBO_ENTRY_SUBMITTED);
+		e->state = TXN_LIMBO_ENTRY_COMMIT;
 		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
 			limbo->confirm_lag = fiber_clock() - e->insertion_time;
 		e->txn->limbo_entry = NULL;
