@@ -494,6 +494,9 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 
+void
+txn_limbo_on_cascading_rollback(struct txn_limbo *limbo);
+
 /** Start filtering incoming syncrho requests. */
 void
 txn_limbo_filter_enable(struct txn_limbo *limbo);

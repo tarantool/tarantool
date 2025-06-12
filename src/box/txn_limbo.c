@@ -325,6 +325,7 @@ txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	e->lsn = -1;
 	e->insertion_time = fiber_clock();
 	txn->limbo_entry = e;
+	say_info("limbo: add entry");
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	if (!txn_limbo_is_full(limbo))
 		goto success;
