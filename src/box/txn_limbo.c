@@ -334,6 +334,12 @@ txn_limbo_rollback_volatile_up_to(struct txn_limbo *limbo,
 	}
 }
 
+void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
+{
+	txn_limbo_rollback_volatile_up_to(limbo, NULL);
+}
+
 bool
 txn_limbo_would_block(struct txn_limbo *limbo)
 {

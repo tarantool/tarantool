@@ -490,6 +490,16 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 
+/**
+ * Rollback all the volatile txns. That is, the ones waiting for space in the
+ * limbo and not yet sent to the journal. It is supposed to happen when some
+ * older txn wants to get rolled back. For example, when its WAL write fails.
+ * The it must cascading-rollback all the newer txns, including the ones not yet
+ * visible to the journal.
+ */
+void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo);
+
 /** Start filtering incoming syncrho requests. */
 void
 txn_limbo_filter_enable(struct txn_limbo *limbo);
