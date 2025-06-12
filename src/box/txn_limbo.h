@@ -44,6 +44,12 @@ extern "C" {
 struct txn;
 struct synchro_request;
 
+enum txn_limbo_entry_state {
+	TXN_LIMBO_ENTRY_SUBMITTED,
+	TXN_LIMBO_ENTRY_COMMIT,
+	TXN_LIMBO_ENTRY_ROLLBACK,
+};
+
 /**
  * Transaction and its quorum metadata, to be stored in limbo.
  */
@@ -62,13 +68,7 @@ struct txn_limbo_entry {
 	 * written to WAL yet.
 	 */
 	int64_t lsn;
-	/**
-	 * Result flags. Only one of them can be true. But both
-	 * can be false if the transaction is still waiting for
-	 * its resolution.
-	 */
-	bool is_commit;
-	bool is_rollback;
+	enum txn_limbo_entry_state state;
 	/** When this entry was added to the queue. */
 	double insertion_time;
 };
@@ -76,7 +76,7 @@ struct txn_limbo_entry {
 static inline bool
 txn_limbo_entry_is_complete(const struct txn_limbo_entry *e)
 {
-	return e->is_commit || e->is_rollback;
+	return e->state > TXN_LIMBO_ENTRY_SUBMITTED;
 }
 
 /**
