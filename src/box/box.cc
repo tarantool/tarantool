@@ -6599,6 +6599,12 @@ on_garbage_collection(void)
 }
 
 static void
+box_on_journal_cascading_rollback(void)
+{
+	txn_limbo_rollback_all_volatile(&txn_limbo);
+}
+
+static void
 box_storage_init(void)
 {
 	assert(!is_storage_initialized);
@@ -6617,6 +6623,7 @@ box_storage_init(void)
 	engine_init();
 	schema_init();
 	txn_limbo_init();
+	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
