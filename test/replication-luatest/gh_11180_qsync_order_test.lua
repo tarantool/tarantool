@@ -25,6 +25,8 @@ end)
 
 g.after_each(function(cg)
     cg.server:exec(function()
+        box.ctl.promote()
+        box.ctl.wait_rw()
         box.space.test:truncate()
         box.space.test_async:truncate()
     end)
@@ -286,5 +288,79 @@ g.test_spurious_wakeup = function(cg)
         wakeuper:cancel()
         t.assert_equals(results, {'commit 1', 'commit 2', 'commit 3'})
         t.assert_equals(s:select(), {{1, data}, {2, data}, {3, data}})
+    end)
+end
+
+--
+-- gh-11180: rollback of a txn due to a WAL error wouldn't cascading rollback
+-- the newer txns which were prepared but didn't reach the journal yet (at the
+-- moment of writing such txns could only be the ones waiting for space in the
+-- limbo).
+--
+g.test_cascading_rollback_from_journal = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.space.test
+        local data = string.rep('a', 1000)
+        local timeout = 60
+        local old_max_size = box.cfg.replication_synchro_queue_max_size
+        box.cfg{replication_synchro_queue_max_size = #data * 2}
+        local results = {}
+        local function make_txn_fiber(id)
+            return fiber.create(function()
+                fiber.self():set_joinable(true)
+                box.begin()
+                box.on_rollback(function()
+                    table.insert(results, ('rollback %s'):format(id))
+                end)
+                box.on_commit(function()
+                    table.insert(results, ('commit %s'):format(id))
+                end)
+                s:replace{id, data}
+                box.commit()
+            end)
+        end
+        local function join_with_error(f, expected_err)
+            local ok, err = f:join()
+            t.assert_not(ok)
+            t.assert_covers(err:unpack(), expected_err)
+        end
+        --
+        -- txn1 is stuck in WAL.
+        -- txn2 is in the limbo, but waits for WAL space.
+        -- txn3-5 are volatile, wait for limbo space.
+        --
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local f1 = make_txn_fiber(1)
+        local f2 = make_txn_fiber(2)
+        local f3 = make_txn_fiber(3)
+        local f4 = make_txn_fiber(4)
+        local f5 = make_txn_fiber(5)
+        t.helpers.retrying({timeout = timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+        --
+        -- txn1 fails due to a WAL error. But then WAL has no error. So the
+        -- next txns must be rolled back only due to cascade. Not due to WAL
+        -- errors.
+        --
+        box.error.injection.set('ERRINJ_WAL_ROTATE', true)
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        join_with_error(f1, {name = 'WAL_IO'})
+        join_with_error(f2, {name = 'CASCADE_ROLLBACK'})
+        join_with_error(f3, {name = 'SYNC_ROLLBACK'})
+        join_with_error(f4, {name = 'SYNC_ROLLBACK'})
+        join_with_error(f5, {name = 'SYNC_ROLLBACK'})
+        t.assert_equals(results, {'rollback 5', 'rollback 4', 'rollback 3',
+                                  'rollback 2', 'rollback 1'})
+        --
+        -- None of the txns 2-5 even tried going to WAL. The delay wasn't
+        -- re-activated.
+        --
+        t.assert(not box.error.injection.get('ERRINJ_WAL_DELAY'))
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', -1)
+        box.error.injection.set('ERRINJ_WAL_ROTATE', false)
+        box.cfg{replication_synchro_queue_max_size = old_max_size}
     end)
 end
