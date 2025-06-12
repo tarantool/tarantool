@@ -42,7 +42,11 @@ extern "C" {
 struct xrow_header;
 struct journal_entry;
 
-typedef void (*journal_write_async_f)(struct journal_entry *entry);
+typedef void
+(*journal_write_async_f)(struct journal_entry *entry);
+
+typedef void
+(*journal_on_cascading_rollback_f)(void);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -242,6 +246,13 @@ journal_async_complete(struct journal_entry *entry)
  * points at a concrete implementation of the journal.
  */
 extern struct journal *current_journal;
+/**
+ * The callback invoked when the journal is about to perform a cascading
+ * rollback. It is expected that all the newer txns which might be prepared but
+ * not yet visible to the journal would get rolled back as well when this
+ * callback is fired.
+ */
+extern journal_on_cascading_rollback_f journal_on_cascading_rollback;
 
 /** Write a single row in a blocking way. */
 int
