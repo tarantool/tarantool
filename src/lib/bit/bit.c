@@ -205,3 +205,130 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 
 extern inline size_t
 bit_iterator_next(struct bit_iterator *it);
+
+/*
+ * The code below is taken from Apache Arrow C++ library and modified.
+ * Please see the NOTICE file.
+ */
+
+struct bitmap_word_align_params {
+	/**
+	 * Unaligned (we require word alignment)
+	 * bit prefix of the bitmap (cannot be processed
+	 * via popcount).
+	 */
+	uint64_t leading_bits;
+	/**
+	 * Bit suffix of the bitmap which is smaller
+	 * than a word in size, which means popcount
+	 * cannot be used on it.
+	 */
+	uint64_t trailing_bits;
+	/**
+	 * Bit offset from the start of the bitmap to
+	 * the start of the @a trailing_bits.
+	 */
+	size_t trailing_bit_offset;
+	/**
+	 * Pointer to the start of the word aligned
+	 * part of the bitmap (can be processed via popcount).
+	 */
+	const uint8_t *aligned_start;
+	/** Count of bits in the word aligned part of the bitmap. */
+	size_t aligned_bits;
+	/** Count of words in the word aligned part of the bitmap. */
+	size_t aligned_words;
+};
+
+/**
+ * @brief Implementation of bitmap aligning up to multiple
+ * of words.
+ */
+static inline struct bitmap_word_align_params
+bitmap_word_align(size_t align_in_bytes, const uint8_t *data,
+		  size_t bit_offset, size_t length)
+{
+	assert(IS_POWER_OF_2(align_in_bytes));
+	const size_t align_in_bits = align_in_bytes * 8;
+	/**
+	 * Compute a "bit address" that we can align up to
+	 * `align_in_bits`. We don't care about losing the
+	 * upper bits since we are only	interested in the
+	 * difference between both addresses.
+	 */
+	const uint64_t bit_addr = (size_t)data * 8 + (uint64_t)bit_offset;
+	const uint64_t aligned_bit_addr =
+		ROUND_UP_TO_POWER_OF_2(bit_addr, align_in_bits);
+	struct bitmap_word_align_params p;
+	p.leading_bits = MIN((uint64_t)length, aligned_bit_addr - bit_addr);
+	p.aligned_words = (length - p.leading_bits) / align_in_bits;
+	p.aligned_bits = p.aligned_words * align_in_bits;
+	p.trailing_bits = length - p.leading_bits - p.aligned_bits;
+	p.trailing_bit_offset = bit_offset + p.leading_bits + p.aligned_bits;
+	p.aligned_start = data + (bit_offset + p.leading_bits) / 8;
+	return p;
+}
+
+size_t
+bit_count(const uint8_t *data, size_t bit_offset, size_t length)
+{
+	const size_t pop_len = sizeof(size_t) * 8;
+	size_t count = 0;
+	if (unlikely(length == 0)) {
+		return 0;
+	}
+
+	const struct bitmap_word_align_params p =
+		bitmap_word_align(pop_len / 8, data, bit_offset, length);
+	/** Count possibly unaligned prefix. */
+	for (size_t i = bit_offset; i < bit_offset + p.leading_bits; ++i) {
+		if (bit_test(data, i)) {
+			++count;
+		}
+	}
+
+	if (p.aligned_words > 0) {
+		/**
+		 * popcount as much as possible with the widest possible count
+		 */
+		const uint64_t *u64_data = (const uint64_t *)p.aligned_start;
+		assert(((size_t)u64_data & 7) == 0);
+		const uint64_t *end = u64_data + p.aligned_words;
+
+		const size_t k_count_unroll_factor = 4;
+		const size_t words_rounded = ROUND_DOWN(p.aligned_words,
+							k_count_unroll_factor);
+		size_t count_unroll[k_count_unroll_factor];
+		memset(count_unroll, 0, sizeof(count_unroll));
+
+		/** Unroll the loop for better performance */
+		for (size_t i = 0;
+		     i < words_rounded;
+		     i += k_count_unroll_factor) {
+			for (size_t k = 0; k < k_count_unroll_factor; k++) {
+				count_unroll[k] += bit_count_u64(u64_data[k]);
+			}
+			u64_data += k_count_unroll_factor;
+		}
+		for (size_t k = 0; k < k_count_unroll_factor; k++) {
+			count += count_unroll[k];
+		}
+
+		/** The trailing part */
+		for (; u64_data < end; ++u64_data) {
+			count += bit_count_u64(*u64_data);
+		}
+	}
+
+	/**
+	 * Account for left over bits (in theory we could fall back to smaller
+	 * versions of popcount but the code complexity is likely not worth it)
+	 */
+	for (size_t i = p.trailing_bit_offset; i < bit_offset + length; ++i) {
+		if (bit_test(data, i)) {
+			++count;
+		}
+	}
+
+	return count;
+}
