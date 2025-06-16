@@ -1571,4 +1571,3 @@ tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
-
