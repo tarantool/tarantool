@@ -82,12 +82,12 @@ create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
 struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
-		       const char *end, bool validate);
+		       const char *end, bool validate, bool limit_size);
 
 template <class ALLOC>
 static inline struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
-			 const char *end, bool validate);
+			 const char *end, bool validate, bool limit_size);
 
 static void
 memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop);
@@ -1986,7 +1986,7 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 template<class ALLOC>
 static struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
-			 const char *end, bool validate)
+			 const char *end, bool validate, bool limit_size)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
@@ -2023,7 +2023,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
 	});
-	if (unlikely(total > memtx->max_tuple_size)) {
+	if (limit_size && unlikely(total > memtx->max_tuple_size)) {
 		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total,
 			 memtx->max_tuple_size);
 		error_log(diag_last_error(diag_get()));
@@ -2057,7 +2057,7 @@ template<class ALLOC>
 static inline struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	return memtx_tuple_new_raw_impl<ALLOC>(format, data, end, true);
+	return memtx_tuple_new_raw_impl<ALLOC>(format, data, end, true, true);
 }
 
 template<class ALLOC>
