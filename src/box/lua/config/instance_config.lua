@@ -2,7 +2,6 @@ local schema = require('experimental.config.utils.schema')
 local descriptions = require('internal.config.descriptions')
 local tarantool = require('tarantool')
 local urilib = require('uri')
-local fio = require('fio')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
 local validators = require('internal.config.validators')
@@ -216,59 +215,6 @@ local function base_dir(self, iconfig)
     return type(box.cfg) == 'function' and work_dir or nil
 end
 
--- Interpret the given path as relative to the given base
--- directory.
-local function rebase_file_path(base_dir, path)
-    -- fio.pathjoin('/foo', '/bar') gives '/foo/bar/', see
-    -- gh-8816.
-    --
-    -- Let's check whether the second path is absolute.
-    local needs_prepending = base_dir ~= nil and not path:startswith('/')
-    if needs_prepending then
-        path = fio.pathjoin(base_dir, path)
-    end
-
-    -- Let's consider the following example.
-    --
-    -- config:
-    --   context:
-    --     foo:
-    --       from: file
-    --       file: ../foo.txt
-    -- process:
-    --   work_dir: x
-    --
-    -- In such a case we get correct "x/../foo.txt" on
-    -- startup, but fio.open() complains if there is no "x"
-    -- directory.
-    --
-    -- The working directory is created at startup if needed,
-    -- so a user is not supposed to create it manually before
-    -- first tarantool startup.
-    --
-    -- Let's strip all these ".." path components using
-    -- fio.abspath().
-    path = fio.abspath(path)
-
-    -- However, if possible, use a relative path. Sometimes an
-    -- absolute path overruns the Unix socket path length limit
-    -- (107 on Linux and 103 on Mac OS -- in our case).
-    --
-    -- Using a relative path allows to listen on the given Unix
-    -- socket path in such cases.
-    local cwd = fio.cwd()
-    if cwd == nil then
-        return path
-    end
-    if not cwd:endswith('/') then
-        cwd = cwd .. '/'
-    end
-    if path:startswith(cwd) then
-        path = path:sub(#cwd + 1, #path)
-    end
-    return path
-end
-
 -- Interpret the given path as relative to the given working
 -- directory from the config.
 --
@@ -276,7 +222,7 @@ end
 -- box.cfg() call if the working directory is set.
 local function prepare_file_path(self, iconfig, path)
     local base_dir = self:base_dir(iconfig)
-    return rebase_file_path(base_dir, path)
+    return file.rebase_file_path(base_dir, path)
 end
 
 -- Read a config.context[name] variable depending on its "from"
@@ -289,7 +235,7 @@ local function read_context_var_noexc(base_dir, def)
         end
         return true, value
     elseif def.from == 'file' then
-        local path = rebase_file_path(base_dir, def.file)
+        local path = file.rebase_file_path(base_dir, def.file)
         return pcall(file.universal_read, path, 'file')
     else
         assert(false)
