@@ -674,6 +674,21 @@ bit_count_u64(uint64_t x)
 #undef POPCOUNT_NAIVE
 
 /**
+ * @brief Returns the number of 1-bits in @a data vector starting from
+ *	  @a bit_offset.
+ * @param data byte vector of length @a length bits.
+ * @param bit_offset offset within the byte vector from where to start
+ *		     counting 1-bits.
+ * @param length length in bits of byte vector @a data.
+ * @return the number of 1-bits in @a data.
+ *
+ * Implementation adopted from the internals of the Apache
+ * Arrow C++ library.
+ */
+size_t
+bit_count(const uint8_t *data, size_t bit_offset, size_t length);
+
+/**
  * @brief Rotate @a x left by @a r bits
  * @param x integer
  * @param r number for bits to rotate
