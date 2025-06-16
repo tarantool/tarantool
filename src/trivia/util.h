@@ -65,6 +65,9 @@ extern "C" {
 } while (0)
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#define ROUND_UP_TO_POWER_OF_2(x, f) (((x) + ((f) - 1)) & ~((f) - 1))
+#define ROUND_DOWN(x, f) (((x) / (f)) * f)
+#define IS_POWER_OF_2(x) ((x) > 0 && ((x) & ((x) - 1)) == 0)
 
 /* Macros to define enum and corresponding strings. */
 #define ENUM0_MEMBER(s, ...) s,

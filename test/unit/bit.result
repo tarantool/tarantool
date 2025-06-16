@@ -723,3 +723,5 @@ Source value: true
 	*** test_bit_copy_range ***
 Source value: false
 	*** test_bit_copy_range: done ***
+	*** test_bit_count ***
+	*** test_bit_count: done ***
