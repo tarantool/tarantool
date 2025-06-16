@@ -72,6 +72,10 @@ else()
     list(APPEND core_sources ssl.c ssl_error.cc)
 endif()
 
+if(ENABLE_WIDE_DECIMAL)
+    list(APPEND core_sources ${WIDE_DECIMAL_SOURCES})
+endif()
+
 include_directories(${OPENSSL_INCLUDE_DIR}
                     ${NANOARROW_INCLUDE_DIRS}
                     ${EXTRA_CORE_INCLUDE_DIRS})

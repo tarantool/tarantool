@@ -84,6 +84,32 @@ box_decimal_from_uint64(box_decimal_t *dec, uint64_t num)
 	return (box_decimal_t *)decimal_from_uint64((decimal_t *)dec, num);
 }
 
+API_EXPORT void
+box_decimal_from_fixed_point32(box_decimal_t *dec, int32_t value, int scale)
+{
+	decimal_from_fixed_point32((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_from_fixed_point64(box_decimal_t *dec, int64_t value, int scale)
+{
+	decimal_from_fixed_point64((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_from_fixed_point128(box_decimal_t *dec, const uint64_t *value,
+				int scale)
+{
+	decimal_from_fixed_point128((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_from_fixed_point256(box_decimal_t *dec, const uint64_t *value,
+				int scale)
+{
+	decimal_from_fixed_point256((decimal_t *)dec, value, scale);
+}
+
 box_decimal_t *
 box_decimal_copy(box_decimal_t *dest, const box_decimal_t *src)
 {
@@ -118,6 +144,30 @@ box_decimal_to_uint64(const box_decimal_t *dec, uint64_t *num)
 {
 	return (const box_decimal_t *)decimal_to_uint64(
 		(const decimal_t *)dec, num);
+}
+
+API_EXPORT void
+box_decimal_to_fixed_point32(box_decimal_t *dec, int32_t *value, int scale)
+{
+	decimal_to_fixed_point32((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_to_fixed_point64(box_decimal_t *dec, int64_t *value, int scale)
+{
+	decimal_to_fixed_point64((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_to_fixed_point128(box_decimal_t *dec, uint64_t *value, int scale)
+{
+	decimal_to_fixed_point128((decimal_t *)dec, value, scale);
+}
+
+API_EXPORT void
+box_decimal_to_fixed_point256(box_decimal_t *dec, uint64_t *value, int scale)
+{
+	decimal_to_fixed_point256((decimal_t *)dec, value, scale);
 }
 
 /* }}} decimal conversions */
