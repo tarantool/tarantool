@@ -34,6 +34,7 @@
 #include <small/small.h>
 #include <small/mempool.h>
 
+#include "allocator.h"
 #include "fiber.h"
 #include "errinj.h"
 #include "coio_task.h"
@@ -83,6 +84,10 @@ create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate, bool limit_size);
+
+struct tuple *
+(*memtx_tuple_new_raw_nofail)(struct tuple_format *format, const char *data,
+			      const char *end, bool validate, bool limit_size);
 
 template <class ALLOC>
 static inline struct tuple *
@@ -1641,6 +1646,11 @@ memtx_set_tuple_format_vtab(const char *allocator_name)
 	} else {
 		unreachable();
 	}
+
+	/* XSysAlloc - a non-failing allocator for internal purposes. */
+	memtx_tuple_new_raw_nofail = memtx_tuple_new_raw_impl<XSysAlloc>;
+	create_memtx_tuple_format_vtab<XSysAlloc>(
+		&memtx_tuple_format_nofail_vtab);
 }
 
 int
@@ -2015,14 +2025,17 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		total -= TUPLE_COMPACT_SAVINGS;
 	}
 
-	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
-		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
-		goto end;
-	});
-	ERROR_INJECT_COUNTDOWN(ERRINJ_TUPLE_ALLOC_COUNTDOWN, {
-		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
-		goto end;
-	});
+	if (!std::is_same_v<ALLOC, XSysAlloc>) {
+		ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
+			diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+			goto end;
+		});
+		ERROR_INJECT_COUNTDOWN(ERRINJ_TUPLE_ALLOC_COUNTDOWN, {
+			diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+			goto end;
+		});
+	}
+
 	if (limit_size && unlikely(total > memtx->max_tuple_size)) {
 		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total,
 			 memtx->max_tuple_size);
@@ -2073,7 +2086,17 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 template<class ALLOC>
 static inline void
 memtx_tuple_info(struct tuple_format *format, struct tuple *tuple,
-		 struct tuple_info *info);
+		 struct tuple_info *info)
+{
+	(void)format;
+	info->data_size = tuple_bsize(tuple);
+	info->header_size = sizeof(struct tuple);
+	if (tuple_is_compact(tuple))
+		info->header_size -= TUPLE_COMPACT_SAVINGS;
+	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
+	info->waste_size = 0;
+	info->arena_type = TUPLE_ARENA_MALLOC;
+}
 
 template<>
 inline void
@@ -2099,22 +2122,8 @@ memtx_tuple_info<SmallAlloc>(struct tuple_format *format, struct tuple *tuple,
 	}
 }
 
-template<>
-inline void
-memtx_tuple_info<SysAlloc>(struct tuple_format *format, struct tuple *tuple,
-			   struct tuple_info *info)
-{
-	(void)format;
-	info->data_size = tuple_bsize(tuple);
-	info->header_size = sizeof(struct tuple);
-	if (tuple_is_compact(tuple))
-		info->header_size -= TUPLE_COMPACT_SAVINGS;
-	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
-	info->waste_size = 0;
-	info->arena_type = TUPLE_ARENA_MALLOC;
-}
-
 struct tuple_format_vtab memtx_tuple_format_vtab;
+struct tuple_format_vtab memtx_tuple_format_nofail_vtab;
 
 template<class ALLOC>
 static inline void

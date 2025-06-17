@@ -32,7 +32,9 @@
 #include <tuple>
 
 #include <small/small.h>
+#include <small/quota.h>
 #include "sysalloc.h"
+#include "trivia/util.h"
 
 typedef int (*allocator_stats_cb)(const void *, void *);
 
@@ -171,11 +173,34 @@ public:
 		sys_stats(&sys_alloc, &data_stats);
 		alloc_stats->sys.used = data_stats.used;
 	}
-private:
+protected:
 	static struct sys_alloc sys_alloc;
 };
 
-using allocators = std::tuple<SmallAlloc, SysAlloc>;
+/* Specialization of SysAlloc without quota. */
+class XSysAlloc : public SysAlloc
+{
+public:
+	static inline void
+	create(struct allocator_settings *settings)
+	{
+		(void)settings;
+		static struct quota infinite_quota;
+		quota_init(&infinite_quota, QUOTA_MAX);
+		sys_alloc_create(&sys_alloc, &infinite_quota);
+	}
+
+	static inline void *
+	alloc(size_t size)
+	{
+		void *ptr = SysAlloc::alloc(size);
+		if (ptr == nullptr)
+			alloc_failure(__FILE__, __LINE__, size);
+		return ptr;
+	}
+};
+
+using allocators = std::tuple<SmallAlloc, SysAlloc, XSysAlloc>;
 
 template <class F, class... ARGS>
 static void
