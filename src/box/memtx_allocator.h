@@ -462,11 +462,13 @@ void
 memtx_allocators_destroy();
 
 using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc>,
-				    MemtxAllocator<SysAlloc>>;
+				    MemtxAllocator<SysAlloc>,
+				    MemtxAllocator<XSysAlloc>>;
 
 using memtx_allocators_read_view =
 		std::tuple<MemtxAllocator<SmallAlloc>::ReadView *,
-			   MemtxAllocator<SysAlloc>::ReadView *>;
+			   MemtxAllocator<SysAlloc>::ReadView *,
+			   MemtxAllocator<XSysAlloc>::ReadView *>;
 
 /** Opens a read view for each MemtxAllocator. */
 memtx_allocators_read_view
