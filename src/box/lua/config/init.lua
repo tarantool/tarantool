@@ -5,6 +5,7 @@ local configdata = require('internal.config.configdata')
 local aboard = require('internal.config.utils.aboard')
 local tarantool = require('tarantool')
 local textutils = require('internal.config.utils.textutils')
+local log = require('internal.config.utils.log')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -145,6 +146,25 @@ function methods._initialize(self)
     self:_register_source(require('internal.config.source.env').new({
         env_var_suffix = 'default',
     }))
+
+    local skipped_once = false
+    box.watch('box.internal.SIGUSR2', function()
+        -- The watcher function is invoked once the watcher is
+        -- registered, but we only need to react to signals here.
+        if not skipped_once then
+            skipped_once = true
+            return
+        end
+
+        log.info('Configuration reloading by SIGUSR2 is started')
+        local ok, err = self:_reload_noexc({sync_source = 'all'})
+        if not ok then
+            log.warn('Configuration reloading by SIGUSR2 is failed: %s', err)
+        else
+            log.info('Configuration reloading by SIGUSR2 is finished: ' ..
+                'status=%s', self._status)
+        end
+    end)
 end
 
 -- Collect data from configuration sources.
