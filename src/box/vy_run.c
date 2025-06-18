@@ -38,7 +38,7 @@
 #include "cbus.h"
 #include "memory.h"
 #include "coio_task.h"
-
+#include "mp_util.h"
 #include "replication.h"
 #include "tuple_bloom.h"
 #include "xlog.h"
@@ -243,23 +243,17 @@ vy_run_env_coio_call(struct vy_run_env *env, struct cbus_call_msg *msg,
 
 /**
  * Initialize page info struct
- *
- * @retval 0 for Success
- * @retval -1 for error
  */
-static int
+static void
 vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 		    const char *min_key, struct key_def *cmp_def)
 {
 	memset(page_info, 0, sizeof(*page_info));
 	page_info->offset = offset;
 	page_info->unpacked_size = 0;
-	page_info->min_key = vy_key_dup(min_key);
-	if (page_info->min_key == NULL)
-		return -1;
+	page_info->min_key = mp_dup(min_key);
 	uint32_t part_count = mp_decode_array(&min_key);
 	page_info->min_key_hint = key_hint(min_key, part_count, cmp_def);
-	return page_info->min_key == NULL ? -1 : 0;
 }
 
 /**
@@ -567,9 +561,7 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 		case VY_PAGE_INFO_MIN_KEY:
 			key_beg = pos;
 			mp_next(&pos);
-			page->min_key = vy_key_dup(key_beg);
-			if (page->min_key == NULL)
-				return -1;
+			page->min_key = mp_dup(key_beg);
 			part_count = mp_decode_array(&key_beg);
 			page->min_key_hint = key_hint(key_beg, part_count,
 						      cmp_def);
@@ -687,16 +679,12 @@ vy_run_info_decode(struct vy_run_info *run_info,
 		case VY_RUN_INFO_MIN_KEY:
 			tmp = pos;
 			mp_next(&pos);
-			run_info->min_key = vy_key_dup(tmp);
-			if (run_info->min_key == NULL)
-				return -1;
+			run_info->min_key = mp_dup(tmp);
 			break;
 		case VY_RUN_INFO_MAX_KEY:
 			tmp = pos;
 			mp_next(&pos);
-			run_info->max_key = vy_key_dup(tmp);
-			if (run_info->max_key == NULL)
-				return -1;
+			run_info->max_key = mp_dup(tmp);
 			break;
 		case VY_RUN_INFO_MIN_LSN:
 			run_info->min_lsn = mp_decode_uint(&pos);
@@ -2263,14 +2251,11 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 		return -1;
 	if (run->info.page_count == 0) {
 		assert(run->info.min_key == NULL);
-		run->info.min_key = vy_key_dup(key);
-		if (run->info.min_key == NULL)
-			return -1;
+		run->info.min_key = mp_dup(key);
 	}
 	struct vy_page_info *page = run->page_info + run->info.page_count;
-	if (vy_page_info_create(page, writer->data_xlog.offset,
-				key, writer->cmp_def) != 0)
-		return -1;
+	vy_page_info_create(page, writer->data_xlog.offset, key,
+			    writer->cmp_def);
 	run->info.page_count++;
 	xlog_tx_begin(&writer->data_xlog);
 	return 0;
@@ -2417,9 +2402,7 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 		goto out;
 
 	assert(run->info.max_key == NULL);
-	run->info.max_key = vy_key_dup(key);
-	if (run->info.max_key == NULL)
-		goto out;
+	run->info.max_key = mp_dup(key);
 
 	ERROR_INJECT(ERRINJ_VY_RUN_FILE_RENAME, {
 		diag_set(ClientError, ER_INJECTION, "vinyl run file rename");
@@ -2532,16 +2515,10 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			prev_tuple = tuple;
 			if (key == NULL)
 				goto close_err;
-			if (run->info.min_key == NULL) {
-				run->info.min_key = vy_key_dup(key);
-				if (run->info.min_key == NULL)
-					goto close_err;
-			}
-			if (page_min_key == NULL) {
-				page_min_key = vy_key_dup(key);
-				if (page_min_key == NULL)
-					goto close_err;
-			}
+			if (run->info.min_key == NULL)
+				run->info.min_key = mp_dup(key);
+			if (page_min_key == NULL)
+				page_min_key = mp_dup(key);
 			if (xrow.lsn > max_lsn)
 				max_lsn = xrow.lsn;
 			if (xrow.lsn < min_lsn)
@@ -2550,9 +2527,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		}
 		struct vy_page_info *info;
 		info = run->page_info + run->info.page_count;
-		if (vy_page_info_create(info, page_offset,
-					page_min_key, cmp_def) != 0)
-			goto close_err;
+		vy_page_info_create(info, page_offset, page_min_key, cmp_def);
 		info->row_count = page_row_count;
 		info->size = next_page_offset - page_offset;
 		info->unpacked_size = xlog_cursor_tx_pos(&cursor);
@@ -2564,11 +2539,8 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		page_min_key = NULL;
 	}
 
-	if (key != NULL) {
-		run->info.max_key = vy_key_dup(key);
-		if (run->info.max_key == NULL)
-			goto close_err;
-	}
+	if (key != NULL)
+		run->info.max_key = mp_dup(key);
 	run->info.max_lsn = max_lsn;
 	run->info.min_lsn = min_lsn;
 
