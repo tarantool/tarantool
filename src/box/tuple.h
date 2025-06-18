@@ -765,15 +765,6 @@ const char *
 tuple_str(struct tuple *tuple);
 
 /**
- * Format msgpack into string using a static buffer.
- * Useful for debugger. Example: [1, 2, "string"]
- * @param msgpack to format
- * @return formatted null-terminated string
- */
-const char *
-mp_str(const char *data);
-
-/**
  * Get the format of the tuple.
  * @param tuple Tuple.
  * @retval Tuple format instance.

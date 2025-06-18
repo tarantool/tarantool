@@ -48,6 +48,7 @@
 #include "mp_datetime.h"
 #include "mp_decimal.h"
 #include "mp_uuid.h"
+#include "mp_util.h"
 
 #define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
 

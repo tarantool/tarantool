@@ -64,6 +64,7 @@
 #include "xrow.h"
 #include "tuple.h"
 #include "space_cache.h"
+#include "mp_util.h"
 
 struct gc_state gc;
 

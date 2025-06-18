@@ -8,6 +8,16 @@
 #include "mp_util.h"
 #include "msgpuck.h"
 #include "small/region.h"
+#include "tt_static.h"
+
+const char *
+mp_str(const char *data)
+{
+	char *buf = tt_static_buf();
+	if (mp_snprint(buf, TT_STATIC_BUF_LEN, data) < 0)
+		return "<failed to format message pack>";
+	return buf;
+}
 
 const char *
 mp_vformat_on_region(struct region *region, size_t *size, const char *format,

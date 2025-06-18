@@ -885,12 +885,3 @@ tuple_str(struct tuple *tuple)
 		return "<failed to format tuple>";
 	return buf;
 }
-
-const char *
-mp_str(const char *data)
-{
-	char *buf = tt_static_buf();
-	if (mp_snprint(buf, TT_STATIC_BUF_LEN, data) < 0)
-		return "<failed to format message pack>";
-	return buf;
-}
