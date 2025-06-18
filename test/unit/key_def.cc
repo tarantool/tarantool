@@ -12,6 +12,7 @@
 #include "trivia/util.h"
 #include "tuple.h"
 #include "tt_static.h"
+#include "mp_util.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"

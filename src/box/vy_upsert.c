@@ -37,6 +37,7 @@
 #include "xrow_update.h"
 #include "fiber.h"
 #include "column_mask.h"
+#include "mp_util.h"
 
 /**
  * Check that key hasn't been changed after applying upsert operation.

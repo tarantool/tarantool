@@ -15,6 +15,15 @@ extern "C"
 struct region;
 
 /**
+ * Format msgpack into string using a static buffer.
+ * Useful for debugger. Example: [1, 2, "string"]
+ * @param msgpack to format
+ * @return formatted null-terminated string
+ */
+const char *
+mp_str(const char *data);
+
+/**
  * Encode variables from the variable argument list according to format string
  * into a buffer allocated on region.
  *
