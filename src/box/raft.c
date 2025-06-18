@@ -505,8 +505,12 @@ box_raft_try_promote(void)
 	};
 	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
-	while (!fiber_is_cancelled() && !ctx.is_done)
-		fiber_yield();
+
+	double deadline = ev_monotonic_now(loop()) + raft->election_timeout;
+	while (!fiber_is_cancelled() && !ctx.is_done) {
+		if (fiber_yield_deadline(deadline))
+			break;
+	}
 	trigger_clear(&trig);
 
 	if (raft->state == RAFT_STATE_LEADER)
@@ -514,16 +518,16 @@ box_raft_try_promote(void)
 
 	int connected = replicaset.healthy_count;
 	int quorum = replicaset_healthy_quorum();
-	if (!ctx.is_done) {
+	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
-	} else if (raft->leader != 0) {
-		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
 	} else if (connected < quorum) {
 		diag_set(ClientError, ER_NO_ELECTION_QUORUM, connected, quorum);
+	} else if (raft->leader != 0) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
 	} else if (ctx.term < raft->volatile_term) {
 		diag_set(ClientError, ER_OLD_TERM, (unsigned long long)ctx.term,
 			 (unsigned long long)raft->volatile_term);
-	} else {
+	} else if (ctx.is_done) {
 		assert(!raft->is_candidate);
 		if (box_election_mode == ELECTION_MODE_MANUAL) {
 			diag_set(TimedOut);
@@ -531,7 +535,10 @@ box_raft_try_promote(void)
 			assert(box_election_mode != ELECTION_MODE_CANDIDATE);
 			diag_set(ClientError, ER_ELECTION_DISABLED);
 		}
+	} else {
+		diag_set(TimedOut);
 	}
+
 	raft_restore(raft);
 	return -1;
 }
