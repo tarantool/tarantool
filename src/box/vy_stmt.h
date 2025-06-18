@@ -494,14 +494,6 @@ struct tuple *
 vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count);
 
 /**
- * Copy the key in a new memory area.
- * @retval not NULL Success.
- * @retval     NULL Memory error.
- */
-char *
-vy_key_dup(const char *key);
-
-/**
  * Create a new surrogate DELETE from @a tuple using @a format.
  * A surrogate tuple has format->field_count fields from the source
  * with all unindexed fields replaced with MessagePack NIL.
