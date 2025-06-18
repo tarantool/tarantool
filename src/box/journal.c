@@ -42,6 +42,33 @@ struct journal_queue journal_queue = {
 	.requests = STAILQ_INITIALIZER(journal_queue.requests),
 };
 
+static struct journal_entry *
+journal_first_entry(void)
+{
+	return stailq_first_entry(&journal_queue.requests,
+				  struct journal_entry, fifo);
+}
+
+static struct journal_entry *
+journal_last_entry(void)
+{
+	return stailq_last_entry(&journal_queue.requests,
+				 struct journal_entry, fifo);
+}
+
+static struct journal_entry *
+journal_pop_first_entry(void)
+{
+	return stailq_shift_entry(&journal_queue.requests,
+				  struct journal_entry, fifo);
+}
+
+static inline bool
+journal_queue_is_full(void)
+{
+	return journal_queue.size >= journal_queue.max_size;
+}
+
 void
 diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 {
@@ -89,12 +116,8 @@ void
 journal_queue_wakeup(void)
 {
 	if (!stailq_empty(&journal_queue.requests) &&
-	    !journal_queue_is_full()) {
-		struct journal_entry *req =
-				stailq_first_entry(&journal_queue.requests,
-						   typeof(*req), fifo);
-		fiber_wakeup(req->fiber);
-	}
+	    !journal_queue_is_full())
+		fiber_wakeup(journal_first_entry()->fiber);
 }
 
 int
@@ -104,9 +127,7 @@ journal_queue_wait(struct journal_entry *entry)
 	    stailq_empty(&journal_queue.requests))
 		return 0;
 	int rc = -1;
-	struct journal_entry *prev_entry =
-			stailq_last_entry(&journal_queue.requests,
-					  typeof(*prev_entry), fifo);
+	struct journal_entry *prev_entry = journal_last_entry();
 	stailq_add_tail_entry(&journal_queue.requests, entry, fifo);
 	assert(entry->fiber == NULL);
 	entry->fiber = fiber();
@@ -136,8 +157,7 @@ journal_queue_wait(struct journal_entry *entry)
 		diag_set(FiberIsCancelled);
 	} else {
 		/* There is a space in queue to handle this request. */
-		VERIFY(stailq_shift_entry(&journal_queue.requests,
-					  typeof(*entry), fifo) == entry);
+		VERIFY(journal_pop_first_entry() == entry);
 		journal_queue_wakeup();
 		rc = 0;
 	}
