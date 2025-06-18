@@ -4,11 +4,35 @@
  * Copyright 2021, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include <assert.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "diag.h"
 #include "mp_util.h"
 #include "msgpuck.h"
 #include "small/region.h"
+#include "trivia/util.h"
 #include "tt_static.h"
+
+size_t
+mp_len(const char *data)
+{
+	const char *end = data;
+	mp_next(&end);
+	return end - data;
+}
+
+char *
+mp_dup(const char *data)
+{
+	size_t len = mp_len(data);
+	char *copy = xmalloc(len);
+	memcpy(copy, data, len);
+	return copy;
+}
 
 const char *
 mp_str(const char *data)

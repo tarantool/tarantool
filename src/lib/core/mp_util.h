@@ -15,6 +15,22 @@ extern "C"
 struct region;
 
 /**
+ * Return msgpack data length.
+ * @param msgpack data
+ * @return msgapck data length
+ */
+size_t
+mp_len(const char *data);
+
+/**
+ * Duplicate msgpack data.
+ * @param msgpack to duplicate
+ * @return copy of msgpack data allocated with xmalloc()
+ */
+char *
+mp_dup(const char *data);
+
+/**
  * Format msgpack into string using a static buffer.
  * Useful for debugger. Example: [1, 2, "string"]
  * @param msgpack to format
