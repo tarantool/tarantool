@@ -427,9 +427,30 @@ check_error("version.bad.xlog", "file format version")
 ---
 - true
 ...
-check_error("format.bad.xlog", "not support 'SNOP' file type")
+collect_results(fio.pathjoin(pattern_prefix, "format.bad.xlog"))
 ---
-- true
+- - {'HEADER': {'lsn': 1, 'replica_id': 1, 'type': 'UPDATE', 'timestamp': 1475796386.2266},
+    'BODY': {'space_id': 272, 'index_base': 1, 'key': ['max_id'], 'tuple': [['+',
+          2, 1]]}}
+  - {'HEADER': {'lsn': 2, 'replica_id': 1, 'type': 'INSERT', 'timestamp': 1475796386.2291},
+    'BODY': {'space_id': 280, 'tuple': [512, 1, 'test', 'memtx', 0, {}, []]}}
+  - {'HEADER': {'lsn': 3, 'replica_id': 1, 'type': 'INSERT', 'timestamp': 1475796409.4258},
+    'BODY': {'space_id': 288, 'tuple': [512, 0, 'primary', 'tree', {'unique': true,
+          'lsn': 2}, [[0, 'unsigned']]]}}
+  - {'HEADER': {'lsn': 4, 'replica_id': 1, 'type': 'INSERT', 'timestamp': 1475796454.2693},
+    'BODY': {'space_id': 512, 'tuple': [1, 2, 3, 4]}}
+  - {'HEADER': {'lsn': 5, 'replica_id': 1, 'type': 'REPLACE', 'timestamp': 1475796459.9428},
+    'BODY': {'space_id': 512, 'tuple': [2, 2, 3, 4]}}
+  - {'HEADER': {'lsn': 6, 'replica_id': 1, 'type': 'DELETE', 'timestamp': 1475796470.6977},
+    'BODY': {'space_id': 512, 'key': [1]}}
+  - {'HEADER': {'lsn': 7, 'replica_id': 1, 'type': 'UPDATE', 'timestamp': 1475796500.8061},
+    'BODY': {'space_id': 512, 'index_base': 1, 'key': [2], 'tuple': [['=', 3, 4]]}}
+  - {'HEADER': {'lsn': 8, 'replica_id': 1, 'type': 'UPSERT', 'timestamp': 1475796514.5016},
+    'BODY': {'space_id': 512, 'operations': [['=', 3, 4]], 'index_base': 1, 'tuple': [
+        3, 4, 5, 6]}}
+  - {'HEADER': {'lsn': 9, 'replica_id': 1, 'type': 'UPSERT', 'timestamp': 1475796515.7168},
+    'BODY': {'space_id': 512, 'operations': [['=', 3, 4]], 'index_base': 1, 'tuple': [
+        3, 4, 5, 6]}}
 ...
 collect_results(fio.pathjoin(pattern_prefix, "crc.bad.xlog"))
 ---
