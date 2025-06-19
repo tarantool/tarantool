@@ -624,6 +624,21 @@ I['config.storage.timeout'] = format_text([[
 
 -- }}} config configuration
 
+-- {{{ connpool configuration
+
+I['connpool'] = format_text([[
+    The `connpool` section defines configuration parameters related to
+    the Tarantool connection pool that can be used to communicate with other
+    instances within the cluster.
+]])
+
+I['connpool.idle_timeout'] = format_text([[
+    A timeout (in seconds) in which the unused connections opened by
+    unused connections indirectly opened by connpool methods.
+]])
+
+-- }}} connpool configuration
+
 -- {{{ console configuration
 
 I['console'] = format_text([[

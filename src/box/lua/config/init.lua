@@ -137,6 +137,7 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.autoexpel'))
     self:_register_applier(require('internal.config.applier.roles').stage_2)
     self:_register_applier(require('internal.config.applier.app').stage_2)
+    self:_register_applier(require('internal.config.applier.connpool'))
 
     if extras ~= nil then
         extras.initialize(self)
