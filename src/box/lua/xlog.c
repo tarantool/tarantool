@@ -340,21 +340,6 @@ lbox_xlog_parser_open_pairs(struct lua_State *L)
 		free(cur);
 		return luaT_error(L);
 	}
-	if (strncmp(cur->meta.filetype, "SNAP", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "XLOG", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "RUN", 3) != 0 &&
-	    strncmp(cur->meta.filetype, "INDEX", 5) != 0 &&
-	    strncmp(cur->meta.filetype, "DATA", 4) != 0 &&
-	    strncmp(cur->meta.filetype, "VYLOG", 4) != 0) {
-		char buf[1024];
-		snprintf(buf, sizeof(buf), "'%.*s' file type",
-			 (int) strlen(cur->meta.filetype),
-			 cur->meta.filetype);
-		diag_set(ClientError, ER_UNSUPPORTED, "xlog reader", buf);
-		xlog_cursor_close(cur, false);
-		free(cur);
-		return luaT_error(L);
-	}
 	/* push iteration function */
 	lua_pushcclosure(L, &lbox_xlog_parser_iterate, 1);
 	/* push log and set GC */
