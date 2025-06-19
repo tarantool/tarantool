@@ -906,6 +906,28 @@ role_revoke(struct user *grantee, struct user *role)
 	return 0;
 }
 
+/**
+ * Check if a role is granted to a user or role with the given auth token.
+ */
+bool
+role_is_granted(struct user *role, uint8_t auth_token)
+{
+	/* Check if the role is granted directly. */
+	if (user_map_is_set(&role->users, auth_token))
+		return true;
+
+	/* Check if the role is granted transitively. */
+	struct user_map_iterator it;
+	user_map_iterator_init(&it, &role->users);
+	struct user *transitive_role;
+	while ((transitive_role = user_map_iterator_next(&it))) {
+		if (transitive_role->def->type == SC_ROLE &&
+		    role_is_granted(transitive_role, auth_token))
+			return true;
+	}
+	return false;
+}
+
 int
 priv_grant(struct user *grantee, struct priv_def *priv,
 	   struct txn_stmt *rolled_back_stmt)
