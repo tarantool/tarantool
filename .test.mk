@@ -194,6 +194,19 @@ test-coverage: build run-luajit-test run-test
 	     --exclude '*/third_party/*'
 	lcov --list ${OUTPUT_FILE}
 
+# Flaky catching workflow build
+
+.PHONY: test-debug
+test-debug-flaky: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
+                                 -DTEST_BUILD=ON
+test-debug-flaky: build
+	LUA_PATTERN="./test/*/*test.lua"
+	UNITTEST_PATTERN="./test/unit/*.test.c*"
+	TESTS=$$(git diff --relative=test --name-only \
+	         ${COMMIT_RANGE} -- $${LUA_PATTERN} $${UNITTEST_PATTERN})
+	./test/test-run.py --force --retries=0 --repeat $$N_TRIALS $$TESTS
+
+
 ##############################
 # OSX                        #
 ##############################
