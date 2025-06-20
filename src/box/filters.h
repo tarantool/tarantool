@@ -44,10 +44,9 @@ extern "C" {
  * `count` is an output argument that will be set to the number of filters.
  */
 static struct filter_def *
-filters_from_tuple(struct tuple *tuple, struct space *space, uint32_t *count)
+filters_from_tuple(struct tuple *tuple, uint32_t *count)
 {
 	(void)tuple;
-	(void)space;
 	(void)count;
 	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
 		 "index filters");

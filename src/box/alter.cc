@@ -5836,7 +5836,7 @@ on_replace_dd_filters(struct trigger *trigger, void *event)
 	/* All checks are done - we can parse filters now. */
 	if (old_tuple == NULL) {
 		assert(new_tuple != NULL);
-		filters = filters_from_tuple(new_tuple, space, &filter_count);
+		filters = filters_from_tuple(new_tuple, &filter_count);
 		if (filters == NULL)
 			return -1;
 	} else if (new_tuple != NULL && old_tuple != NULL) {
