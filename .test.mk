@@ -16,6 +16,9 @@ NPROC ?= $(shell nproc || sysctl -n hw.logicalcpu || sysctl -n hw.ncpu)
 MAX_PROCS ?= 2048
 MAX_FILES ?= 4096
 
+N_TRIALS ?= 128
+COMMIT_RANGE ?= master..HEAD
+
 VARDIR ?= /tmp/t
 TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
 
@@ -194,6 +197,28 @@ test-coverage: build run-luajit-test run-test
 	     --exclude '*/test/*' \
 	     --exclude '*/third_party/*'
 	lcov --list ${OUTPUT_FILE}
+
+# Flaky catching workflow build
+
+.PHONY: test-debug-flaky
+test-debug-flaky: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
+                                 -DTEST_BUILD=ON
+test-debug-flaky: LUA_PATTERN = "./*/*test.lua"
+test-debug-flaky: UNITTEST_PATTERN = "./unit/*.test.c*"
+
+test-debug-flaky: build install-test-deps
+	cd test && \
+	TESTS=$$(git diff --relative=test --name-only \
+	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN}) && \
+	(([ -n "$${TESTS}" ] && ${TEST_RUN_ENV} \
+	  ./test-run.py --force \
+	                --vardir ${VARDIR} \
+	                --retries=0 \
+	                --repeat=${N_TRIALS} \
+	                ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS} \
+	                $${TESTS}) || \
+	 [ ! -n "$${TESTS}" ])
+
 
 ##############################
 # OSX                        #
