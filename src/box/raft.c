@@ -452,6 +452,8 @@ fail:
  */
 struct box_raft_watch_ctx {
 	bool is_done;
+	bool is_quorum_lost;
+	int healthy_count;
 	uint64_t term;
 	struct fiber *owner;
 };
@@ -462,6 +464,20 @@ box_raft_try_promote_f(struct trigger *trig, void *event)
 	struct raft *raft = event;
 	assert(raft == box_raft());
 	struct box_raft_watch_ctx *ctx = trig->data;
+
+	/*
+	 * If there was a quorum loss, the flag is_quorum_lost will set to
+	 * true. After this case, this flag will not be changed.
+	 * box_raft_watch_ctx also contains a healthy_count of replicaset
+	 * during the first quorum loss.
+	 */
+	int healthy_count = replicaset.healthy_count;
+	if (!ctx->is_quorum_lost &&
+	    healthy_count < replicaset_healthy_quorum()) {
+		ctx->is_quorum_lost = true;
+		ctx->healthy_count = healthy_count;
+	}
+
 	/*
 	 * Term ended with nothing, probably split vote which led to a next
 	 * term.
@@ -500,30 +516,36 @@ box_raft_try_promote(void)
 	struct trigger trig;
 	struct box_raft_watch_ctx ctx = {
 		.is_done = false,
+		.is_quorum_lost = false,
+		.healthy_count = replicaset.healthy_count,
 		.term = raft->volatile_term,
 		.owner = fiber(),
 	};
 	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
-	while (!fiber_is_cancelled() && !ctx.is_done)
-		fiber_yield();
+
+	double deadline = ev_monotonic_now(loop()) + raft->election_timeout;
+	while (!fiber_is_cancelled() && !ctx.is_done) {
+		if (fiber_yield_deadline(deadline))
+			break;
+	}
+	ERROR_INJECT_YIELD(ERRINJ_RAFT_PROMOTE_DELAY);
 	trigger_clear(&trig);
 
 	if (raft->state == RAFT_STATE_LEADER)
 		return 0;
 
-	int connected = replicaset.healthy_count;
-	int quorum = replicaset_healthy_quorum();
-	if (!ctx.is_done) {
+	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
+	} else if (ctx.is_quorum_lost) {
+		diag_set(ClientError, ER_NO_ELECTION_QUORUM,
+			 ctx.healthy_count, replicaset_healthy_quorum());
 	} else if (raft->leader != 0) {
 		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
-	} else if (connected < quorum) {
-		diag_set(ClientError, ER_NO_ELECTION_QUORUM, connected, quorum);
 	} else if (ctx.term < raft->volatile_term) {
 		diag_set(ClientError, ER_OLD_TERM, (unsigned long long)ctx.term,
-			 (unsigned long long)raft->volatile_term);
-	} else {
+			(unsigned long long)raft->volatile_term);
+	} else if (ctx.is_done) {
 		assert(!raft->is_candidate);
 		if (box_election_mode == ELECTION_MODE_MANUAL) {
 			diag_set(TimedOut);
@@ -531,7 +553,10 @@ box_raft_try_promote(void)
 			assert(box_election_mode != ELECTION_MODE_CANDIDATE);
 			diag_set(ClientError, ER_ELECTION_DISABLED);
 		}
+	} else {
+		diag_set(TimedOut);
 	}
+
 	raft_restore(raft);
 	return -1;
 }
