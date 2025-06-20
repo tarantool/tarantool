@@ -506,6 +506,7 @@ t;
  |   294: box.error.CANT_UPGRADE_INDEXED_FIELD
  |   295: box.error.SYNC_TIMEOUT
  |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
+ |   297: box.error.INVALID_SORTDATA_FILE
  | ...
 
 test_run:cmd("setopt delimiter ''");
