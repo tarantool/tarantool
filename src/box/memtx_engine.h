@@ -229,6 +229,12 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
 /** Tuple format vtab for memtx engine. */
 extern struct tuple_format_vtab memtx_tuple_format_vtab;
 
+/**
+ * Tuple format vtab for memtx engine that never fails allocations due to OOM.
+ * It doesn't use quota at all, so should be used only for recovery from OOM.
+ */
+extern struct tuple_format_vtab memtx_tuple_format_nofail_vtab;
+
 enum {
 	MEMTX_EXTENT_SIZE = 16 * 1024,
 	MEMTX_SLAB_SIZE = 4 * 1024 * 1024
@@ -236,11 +242,17 @@ enum {
 
 /**
  * Allocate and return new memtx tuple. Data validation depends
- * on @a validate value. On error returns NULL and set diag.
+ * on @a validate value. When `limit_size` is true, the tuple size
+ * is limited to the maximum allowed size. On error returns NULL and
+ * set diag.
  */
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
-		       const char *end, bool validate);
+		       const char *end, bool validate, bool limit_size);
+
+extern struct tuple *
+(*memtx_tuple_new_raw_nofail)(struct tuple_format *format, const char *data,
+			      const char *end, bool validate, bool limit_size);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,

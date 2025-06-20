@@ -64,6 +64,7 @@
 #include "relay.h"
 #include "gc.h"
 #include "memtx_tx.h"
+#include "filters.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -1587,10 +1588,14 @@ void
 RebuildIndex::prepare(struct alter_space *alter)
 {
 	/* Get the new index and build it.  */
+	struct index *old_index = space_index(alter->old_space,
+					      old_index_def->iid);
 	new_index = space_index(alter->new_space, new_index_def->iid);
 	assert(new_index != NULL);
 	space_build_index_with_yield(alter->old_space, alter->new_space,
 				     new_index);
+	(void)old_index;
+	assert(index_has_filters(old_index) == index_has_filters(new_index));
 }
 
 void
@@ -1734,6 +1739,47 @@ TruncateIndex::~TruncateIndex()
 	if (new_index == NULL)
 		return;
 	index_abort_create(new_index);
+}
+
+class AlterIndexFilters: public AlterSpaceOp
+{
+	struct index *index;
+	uint32_t filter_count;
+	struct filter_def *filters;
+	struct filter_opts *opts;
+public:
+	AlterIndexFilters(struct alter_space *alter, struct index *index,
+			  uint32_t filter_count, struct filter_def *filters,
+			  struct filter_opts *opts)
+		: AlterSpaceOp(alter), index(index), filter_count(filter_count),
+		  filters(filters), opts(opts)
+	{}
+	virtual void prepare(struct alter_space *alter);
+	virtual void commit(struct alter_space *alter, int64_t lsn);
+	virtual void rollback(struct alter_space *alter);
+};
+
+void
+AlterIndexFilters::prepare(struct alter_space *alter)
+{
+	AlterYieldGuard guard(alter->old_space);
+	if (index_set_filters(index, filters, filter_count, opts) != 0)
+		diag_raise();
+}
+
+void
+AlterIndexFilters::commit(struct alter_space *alter, int64_t signature)
+{
+	(void)alter;
+	(void)signature;
+	index_set_filters_commit(index);
+}
+
+void
+AlterIndexFilters::rollback(struct alter_space *alter)
+{
+	(void)alter;
+	index_set_filters_rollback(index);
 }
 
 /**
@@ -2618,6 +2664,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		diag_set(ClientError, ER_ALTER_SPACE,
 			  space_name(old_space),
 			  "can not add a secondary key before primary");
+		return -1;
+	}
+
+	if (new_tuple == NULL && index_has_filters(old_index)) {
+		diag_set(ClientError, ER_ALTER_SPACE, space_name(old_space),
+			 "cannot drop an index with filters");
 		return -1;
 	}
 
@@ -5750,6 +5802,70 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/** A trigger invoked on replace in the _filters space. */
+static int
+on_replace_dd_filters(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	uint32_t space_id;
+	uint32_t index_id;
+	struct tuple *tuple = old_tuple != NULL ? old_tuple : new_tuple;
+	if (tuple_field_u32(tuple, BOX_FILTERS_FIELD_SPACE_ID, &space_id) != 0)
+		return -1;
+	if (tuple_field_u32(tuple, BOX_FILTERS_FIELD_INDEX_ID, &index_id) != 0)
+		return -1;
+
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+
+	/* Default parameters. They will be used in the case of deletion. */
+	uint32_t filter_count = 0;
+	struct filter_def *filters = NULL;
+	struct filter_opts *opts = NULL;
+
+	/* All checks are done - we can parse filters now. */
+	if (old_tuple == NULL) {
+		assert(new_tuple != NULL);
+		filters = filters_from_tuple(new_tuple, &filter_count);
+		if (filters == NULL)
+			return -1;
+	} else if (new_tuple != NULL && old_tuple != NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Filter", "alter");
+		return -1;
+	}
+
+	struct alter_space *alter = alter_space_new(space);
+	if (alter == NULL)
+		return -1;
+	auto alter_guard =
+		make_scoped_guard([=] {alter_space_delete(alter);});
+
+
+	if (alter_space_move_indexes(alter, 0, space->index_count) != 0)
+		return -1;
+
+	try {
+		(void)new AlterIndexFilters(alter, index, filter_count,
+					    filters, opts);
+		(void)new UpdateSchemaVersion(alter);
+		alter_space_do(stmt, alter);
+	} catch (Exception *e) {
+		return -1;
+	}
+	alter_guard.is_active = false;
+	return 0;
+}
+
 TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
@@ -5765,4 +5881,5 @@ TRIGGER(on_replace_sequence_data, on_replace_dd_sequence_data);
 TRIGGER(on_replace_space_sequence, on_replace_dd_space_sequence);
 TRIGGER(on_replace_trigger, on_replace_dd_trigger);
 TRIGGER(on_replace_func_index, on_replace_dd_func_index);
+TRIGGER(on_replace_filters, on_replace_dd_filters);
 /* vim: set foldmethod=marker */
