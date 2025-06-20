@@ -78,6 +78,7 @@ local instance_config_fields = {
     'sql',
     'memtx',
     'vinyl',
+    'quiver',
     'wal',
     'snapshot',
     'replication',
@@ -292,6 +293,11 @@ g.test_defaults = function()
             memory = 134217728,
             timeout = 60,
         },
+        quiver = is_enterprise and {
+            dir = 'var/lib/{{ instance_name }}',
+            memory = 134217728,
+            run_size = 16777216,
+        } or nil,
         database = {
             instance_uuid = box.NULL,
             replicaset_uuid = box.NULL,

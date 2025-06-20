@@ -83,6 +83,12 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+local function ifdef_quiver(value)
+    if private.cfg_set_quiver_memory ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -111,6 +117,10 @@ local default_cfg = {
     vinyl_range_size          = nil, -- set automatically
     vinyl_page_size           = 8 * 1024,
     vinyl_bloom_fpr           = 0.05,
+
+    quiver_dir          = ifdef_quiver('.'),
+    quiver_memory       = ifdef_quiver(128 * 1024 * 1024),
+    quiver_run_size     = ifdef_quiver(16 * 1024 * 1024),
 
     log                 = log.cfg.log,
     log_nonblock        = log.cfg.nonblock,
@@ -316,6 +326,10 @@ local template_cfg = {
     vinyl_page_size           = 'number',
     vinyl_bloom_fpr           = 'number',
 
+    quiver_dir          = ifdef_quiver('string'),
+    quiver_memory       = ifdef_quiver('number'),
+    quiver_run_size     = ifdef_quiver('number'),
+
     log                 = 'string',
     log_nonblock        = 'boolean',
     log_level           = 'number, string',
@@ -519,6 +533,8 @@ local dynamic_cfg = {
     vinyl_cache             = private.cfg_set_vinyl_cache,
     vinyl_timeout           = private.cfg_set_vinyl_timeout,
     vinyl_defer_deletes     = nop,
+    quiver_memory           = private.cfg_set_quiver_memory,
+    quiver_run_size         = private.cfg_set_quiver_run_size,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
@@ -710,6 +726,8 @@ local dynamic_cfg_skip_at_load = {
     vinyl_max_tuple_size    = true,
     vinyl_cache             = true,
     vinyl_timeout           = true,
+    quiver_memory           = ifdef_quiver(true),
+    quiver_run_size         = ifdef_quiver(true),
     too_long_threshold      = true,
     election_mode           = true,
     election_timeout        = true,

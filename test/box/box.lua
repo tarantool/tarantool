@@ -21,6 +21,9 @@ local _hide = {
 }
 
 local _enterprise_keys = {
+    quiver_dir = true,
+    quiver_memory = true,
+    quiver_run_size = true,
     audit_log = true,
     audit_nonblock = true,
     audit_format = true,

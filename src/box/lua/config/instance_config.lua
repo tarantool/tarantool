@@ -1069,6 +1069,25 @@ return schema.new('instance_config', schema.record({
             default = 4,
         }),
     }),
+    quiver = enterprise_edition(schema.record({
+        dir = enterprise_edition(schema.scalar({
+            type = 'string',
+            box_cfg = 'quiver_dir',
+            box_cfg_nondynamic = true,
+            mkdir = true,
+            default = 'var/lib/{{ instance_name }}',
+        })),
+        memory = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'quiver_memory',
+            default = 128 * 1024 * 1024,
+        })),
+        run_size = enterprise_edition(schema.scalar({
+            type = 'integer',
+            box_cfg = 'quiver_run_size',
+            default = 16 * 1024 * 1024,
+        })),
+    })),
     wal = schema.record({
         dir = schema.scalar({
             type = 'string',
