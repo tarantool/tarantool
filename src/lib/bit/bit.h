@@ -50,11 +50,6 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/** @cond false **/
-#define bit_likely(x)    __builtin_expect((x),1)
-#define bit_unlikely(x)  __builtin_expect((x),0)
-/** @endcond **/
-
 /**
  * @brief Unaligned load from memory.
  * @param p pointer
@@ -869,7 +864,7 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 	it->start = (const char *) data;
 	it->next = it->start;
 	it->end = it->next + size;
-	if (bit_unlikely(size == 0)) {
+	if (unlikely(size == 0)) {
 		it->word = 0;
 		return;
 	}
@@ -878,7 +873,7 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 	it->word_base = 0;
 
 	/* Check if size is a multiple of sizeof(ITER_UINT) */
-	if (bit_likely(size % sizeof(ITER_UINT) == 0)) {
+	if (likely(size % sizeof(ITER_UINT) == 0)) {
 		it->word = ITER_LOAD(it->next);
 		it->next += sizeof(ITER_UINT);
 	} else {
@@ -901,8 +896,8 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 inline size_t
 bit_iterator_next(struct bit_iterator *it)
 {
-	while (bit_unlikely(it->word == 0)) {
-		if (bit_unlikely(it->next >= it->end))
+	while (unlikely(it->word == 0)) {
+		if (unlikely(it->next >= it->end))
 			return SIZE_MAX;
 
 		/* Extract the next word from memory */
