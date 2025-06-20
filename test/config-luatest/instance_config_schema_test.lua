@@ -1451,6 +1451,7 @@ g.test_box_cfg_coverage = function()
         pid_file = true,
         wal_dir = true,
         vinyl_dir = true,
+        quiver_dir = true,
 
         -- The effective default is determined depending of
         -- the replication.failover option.

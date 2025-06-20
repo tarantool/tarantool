@@ -2487,6 +2487,33 @@ I['vinyl.write_threads'] = format_text([[
 
 -- }}} vinyl configuration
 
+-- {{{ quiver configuration
+
+I['quiver'] = format_text([[
+   This section defines configuration parameters related to
+   the quiver storage engine.
+]])
+
+I['quiver.dir'] = format_text([[
+    A directory where quiver files or subdirectories will be stored. This option
+    may contain a relative file path. In this case, it is interpreted as
+    relative to `process.work_dir`.
+]])
+
+I['quiver.memory'] = format_text([[
+    The maximum size of in-memory buffers used for accumulating write requests.
+    The quiver engine decides when it should start dumping in-memory buffers to
+    disk depending on this parameter.
+]])
+
+I['quiver.run_size'] = format_text([[
+    The maximum size of a run file, in bytes. When the quiver engine dumps
+    in-memory buffers to disk, it splits the output stream into files depending
+    on this parameter.
+]])
+
+-- }}} quiver configuration
+
 -- {{{ wal configuration
 
 I['wal'] = format_text([[
