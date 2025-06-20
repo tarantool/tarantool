@@ -4810,8 +4810,7 @@ box_connect_replica(const struct tt_uuid *uuid, const struct vclock *gc_vclock,
 
 	/* No replica object with nil UUID. */
 	if (tt_uuid_is_nil(uuid)) {
-		*out = NULL;
-		return ReplicaConnectionGuard(NULL);
+		tnt_raise(ClientError, ER_NIL_UUID);
 	}
 
 	struct replica *replica = replica_by_uuid(uuid);
