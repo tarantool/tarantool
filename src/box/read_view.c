@@ -97,13 +97,16 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	struct space_read_view *space_rv;
 	size_t index_map_size = sizeof(*space_rv->index_map) *
 				(space->index_id_max + 1);
+	size_t space_engine_size = sizeof(*space_engine(space));
 	struct grp_alloc all = grp_alloc_initializer();
 	grp_alloc_reserve_data(&all, sizeof(*space_rv));
 	grp_alloc_reserve_str0(&all, space_name(space));
+	grp_alloc_reserve_data(&all, space_engine_size);
 	grp_alloc_reserve_data(&all, index_map_size);
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
 	space_rv = grp_alloc_create_data(&all, sizeof(*space_rv));
 	space_rv->name = grp_alloc_create_str0(&all, space_name(space));
+	space_rv->engine = grp_alloc_create_data(&all, space_engine_size);
 	space_rv->index_map = grp_alloc_create_data(&all, index_map_size);
 	assert(grp_alloc_size(&all) == 0);
 
@@ -135,6 +138,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	} else {
 		space_rv->upgrade = NULL;
 	}
+	memcpy(space_rv->engine, space_engine(space), space_engine_size);
 	space_rv->index_id_max = space->index_id_max;
 	memset(space_rv->index_map, 0, index_map_size);
 	for (uint32_t i = 0; i <= space->index_id_max; i++) {
