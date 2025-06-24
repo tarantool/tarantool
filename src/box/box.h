@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include "trigger.h"
 
 #include <stdbool.h>
 
@@ -116,6 +117,17 @@ extern struct tt_uuid bootstrap_leader_uuid;
 
 /** box.cfg.force_recovery. */
 extern bool box_is_force_recovery;
+
+/**
+ * A trigger that is set on the wal_on_write event to track the moment when the
+ * instance receives from the replicaset all of its transactions that it lost.
+ */
+extern struct waiting_for_own_rows_trigger {
+	/** Inherit trigger. */
+	struct trigger base;
+	/** Target LSN to wait for. */
+	int64_t target_lsn;
+} box_check_waiting_for_own_rows_trigger;
 
 /*
  * Initialize box library
@@ -203,6 +215,13 @@ box_is_ro(void);
 
 bool
 box_is_orphan(void);
+
+/**
+ * Check if the instance is waiting for some of its own transactions
+ * that it lost to be replicated back to it.
+ */
+bool
+box_is_waiting_for_own_rows(void);
 
 /** Check if the instance is not registered in the replicaset. */
 bool
