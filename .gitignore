@@ -48,6 +48,7 @@ test/Makefile
 test/*/Makefile
 test/*/*/Makefile
 test/*/*-workdir-*
+proofs/tla/test/Makefile
 Doxyfile.API
 RPM
 *.src.rpm
