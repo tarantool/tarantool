@@ -75,6 +75,16 @@ txn_limbo_is_ro(struct txn_limbo *limbo)
 	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
 }
 
+/** Pop the first entry. */
+static inline void
+txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	assert(!rlist_empty(&entry->in_queue));
+	assert(txn_limbo_first_entry(limbo) == entry);
+	rlist_del_entry(entry, in_queue);
+	limbo->len--;
+}
+
 void
 txn_limbo_complete(struct txn *txn, bool is_success)
 {
@@ -177,15 +187,6 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	limbo->len++;
 	return e;
-}
-
-static inline void
-txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
-{
-	assert(!rlist_empty(&entry->in_queue));
-	assert(txn_limbo_first_entry(limbo) == entry);
-	rlist_del_entry(entry, in_queue);
-	limbo->len--;
 }
 
 void
