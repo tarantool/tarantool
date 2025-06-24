@@ -202,7 +202,7 @@ txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	txn_limbo_on_remove(limbo, entry);
 }
 
-void
+static void
 txn_limbo_complete(struct txn *txn, bool is_success)
 {
 	/*
@@ -234,6 +234,40 @@ txn_limbo_complete(struct txn *txn, bool is_success)
 	fiber_set_txn(fiber(), NULL);
 	fiber_set_user(fiber(), orig_creds);
 	fiber_set_session(fiber(), orig_session);
+}
+
+/** Complete the given limbo entry with a failure and the given reason. */
+static void
+txn_limbo_complete_fail(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
+			int64_t signature)
+{
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
+	struct txn *txn = entry->txn;
+	txn->signature = signature;
+	txn->limbo_entry = NULL;
+	txn_limbo_abort(limbo, entry);
+	txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+	txn_limbo_complete(txn, false);
+}
+
+/** Complete the given limbo entry with a success. */
+static void
+txn_limbo_complete_success(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
+	struct txn *txn = entry->txn;
+	entry->state = TXN_LIMBO_ENTRY_COMMIT;
+	if (txn_has_flag(txn, TXN_WAIT_ACK))
+		limbo->confirm_lag = fiber_clock() - entry->insertion_time;
+	txn->limbo_entry = NULL;
+	txn_limbo_pop_first(limbo, entry);
+	txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+	/*
+	 * Should be written to WAL by now. Confirm is always written after the
+	 * affected transactions.
+	 */
+	assert(txn->signature >= 0);
+	txn_limbo_complete(txn, true);
 }
 
 struct txn_limbo_entry *
@@ -461,11 +495,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	struct txn_limbo_entry *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
-		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		txn_limbo_complete(e->txn, false);
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_QUORUM_TIMEOUT);
 		if (e == entry)
 			break;
 	}
@@ -628,19 +658,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn = NULL;
 			continue;
 		}
-		assert(e->state == TXN_LIMBO_ENTRY_SUBMITTED);
-		e->state = TXN_LIMBO_ENTRY_COMMIT;
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
-			limbo->confirm_lag = fiber_clock() - e->insertion_time;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_pop_first(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		/*
-		 * Should be written to WAL by now. Confirm is always written
-		 * after the affected transactions.
-		 */
-		assert(e->txn->signature >= 0);
-		txn_limbo_complete(e->txn, true);
+		txn_limbo_complete_success(limbo, e);
 	}
 	/*
 	 * Track CONFIRM lsn on replica in order to detect split-brain by
@@ -696,16 +714,12 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	if (last_rollback == NULL)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
-		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_ACK);
 		/*
 		 * Should be written to WAL by now. Rollback is always written
 		 * after the affected transactions.
 		 */
 		assert(e->txn->signature >= 0);
-		e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_complete(e->txn, false);
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_SYNC_ROLLBACK);
 		if (e == last_rollback)
 			break;
 	}
