@@ -309,7 +309,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 }
 
 static inline void
-txn_limbo_remove(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(!rlist_empty(&entry->in_queue));
 	assert(txn_limbo_first_entry(limbo) == entry);
@@ -317,32 +317,24 @@ txn_limbo_remove(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	txn_limbo_on_remove(limbo, entry);
 }
 
-static inline void
-txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
-{
-	assert(!rlist_empty(&entry->in_queue));
-	assert(txn_limbo_last_entry(limbo) == entry);
-	assert(entry->state == TXN_LIMBO_ENTRY_ROLLBACK);
-
-	rlist_del_entry(entry, in_queue);
-	txn_limbo_on_remove(limbo, entry);
-	++limbo->rollback_count;
-}
-
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
-	entry->state = TXN_LIMBO_ENTRY_ROLLBACK;
-	if (entry == limbo->entry_to_confirm)
-		limbo->entry_to_confirm = NULL;
+	assert(!rlist_empty(&entry->in_queue));
 	/*
 	 * The simple rule about rollback/commit order applies
 	 * here as well: commit always in the order of WAL write,
 	 * rollback in the reversed order. Rolled back transaction
 	 * is always the last.
 	 */
-	txn_limbo_pop(limbo, entry);
+	assert(txn_limbo_last_entry(limbo) == entry);
+	entry->state = TXN_LIMBO_ENTRY_ROLLBACK;
+	if (entry == limbo->entry_to_confirm)
+		limbo->entry_to_confirm = NULL;
+	rlist_del_entry(entry, in_queue);
+	txn_limbo_on_remove(limbo, entry);
+	++limbo->rollback_count;
 }
 
 void
@@ -624,7 +616,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * created in the applier.
 			 */
 			txn_clear_flags(e->txn, TXN_WAIT_SYNC);
-			txn_limbo_remove(limbo, e);
+			txn_limbo_pop_first(limbo, e);
 			/*
 			 * The limbo entry now should not be used by the owner
 			 * transaction since it just became a plain one. Nullify
@@ -640,7 +632,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
 			limbo->confirm_lag = fiber_clock() - e->insertion_time;
 		e->txn->limbo_entry = NULL;
-		txn_limbo_remove(limbo, e);
+		txn_limbo_pop_first(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		/*
 		 * Should be written to WAL by now. Confirm is always written
