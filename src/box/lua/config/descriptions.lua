@@ -487,6 +487,15 @@ I['config.etcd.http.request.timeout'] = format_text([[
 I['config.etcd.http.request.unix_socket'] = format_text([[
     A Unix domain socket used to connect to an etcd server.
 ]])
+I['config.etcd.http.request.verbose'] = format_text([[
+    Whether to print debugging information about HTTP requests and responses
+    issued by the etcd configuration source.
+
+    The information is written to stderr (disregarding tarantool log
+    configuration). In a typical setup it arrives to journald.
+
+    See https://curl.se/libcurl/c/CURLOPT_VERBOSE.html for details.
+]])
 
 I['config.etcd.password'] = 'A password used for authentication.'
 
