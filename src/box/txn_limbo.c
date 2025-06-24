@@ -177,6 +177,31 @@ txn_limbo_is_ro(struct txn_limbo *limbo)
 		txn_limbo_is_frozen(limbo));
 }
 
+/** Decrease queue size once write request is complete. */
+static inline void
+txn_limbo_on_remove(struct txn_limbo *limbo,
+		    const struct txn_limbo_entry *entry)
+{
+	bool limbo_was_full = txn_limbo_is_full(limbo);
+	limbo->size -= entry->approx_len;
+	assert(limbo->size >= 0);
+	limbo->len--;
+	assert(limbo->len >= 0);
+	/* Wake up all fibers waiting to add a new limbo entry. */
+	if (limbo_was_full && !txn_limbo_is_full(limbo))
+		fiber_cond_broadcast(&limbo->wait_cond);
+}
+
+/** Pop the first entry. */
+static inline void
+txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	assert(!rlist_empty(&entry->in_queue));
+	assert(txn_limbo_first_entry(limbo) == entry);
+	rlist_del_entry(entry, in_queue);
+	txn_limbo_on_remove(limbo, entry);
+}
+
 void
 txn_limbo_complete(struct txn *txn, bool is_success)
 {
@@ -229,21 +254,6 @@ txn_limbo_on_append(struct txn_limbo *limbo,
 {
 	limbo->size += entry->approx_len;
 	limbo->len++;
-}
-
-/** Decrease queue size once write request is complete. */
-static inline void
-txn_limbo_on_remove(struct txn_limbo *limbo,
-		    const struct txn_limbo_entry *entry)
-{
-	bool limbo_was_full = txn_limbo_is_full(limbo);
-	limbo->size -= entry->approx_len;
-	assert(limbo->size >= 0);
-	limbo->len--;
-	assert(limbo->len >= 0);
-	/* Wake up all fibers waiting to add a new limbo entry. */
-	if (limbo_was_full && !txn_limbo_is_full(limbo))
-		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
 struct txn_limbo_entry *
@@ -306,15 +316,6 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	txn_limbo_on_append(limbo, e);
 	return e;
-}
-
-static inline void
-txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
-{
-	assert(!rlist_empty(&entry->in_queue));
-	assert(txn_limbo_first_entry(limbo) == entry);
-	rlist_del_entry(entry, in_queue);
-	txn_limbo_on_remove(limbo, entry);
 }
 
 void
