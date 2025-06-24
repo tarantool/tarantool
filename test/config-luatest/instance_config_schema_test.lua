@@ -111,6 +111,7 @@ g.test_config_enterprise = function()
                     request = {
                         timeout = 1,
                         unix_socket = 'six',
+                        verbose = true,
                     }
                 },
                 watchers = {
