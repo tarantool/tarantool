@@ -169,6 +169,11 @@ struct memtx_engine {
 	int sort_threads;
 	/** Set of extents allocated using malloc. */
 	struct mh_ptr_t *malloc_extents;
+	/** The fields that are only used on .snap recovery. */
+	struct {
+		/** ID of the space the last insert is performed into. */
+		uint32_t last_space_id;
+	} recovery;
 };
 
 struct memtx_gc_task;
@@ -212,6 +217,13 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
  */
 void
 memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h);
+
+/**
+ * End building a space fast recovered (using PK build) from the snapshot.
+ * This means building its PK and (optionally) building its secondary keys.
+ */
+int
+memtx_end_build_snapshot_space(struct memtx_engine *memtx, uint32_t space_id);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
