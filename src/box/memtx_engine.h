@@ -169,6 +169,11 @@ struct memtx_engine {
 	int sort_threads;
 	/** Set of extents allocated using malloc. */
 	struct mh_ptr_t *malloc_extents;
+	/** The fields that are only used on .snap recovery. */
+	struct {
+		/** ID of the space the last insert is performed into. */
+		uint32_t last_space_id;
+	} recovery;
 };
 
 struct memtx_gc_task;
@@ -241,6 +246,13 @@ enum {
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
+
+/**
+ * End building indexes of a previously recovered space
+ * and begin the current space build if required.
+ */
+int
+memtx_space_on_replace_build_next(struct space *space);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,
