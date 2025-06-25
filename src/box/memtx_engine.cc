@@ -112,7 +112,7 @@ memtx_end_build_primary_key(struct space *space, void *param)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	if (space->engine != param || space_index(space, 0) == NULL ||
-	    memtx_space->replace == memtx_space_replace_all_keys)
+	    memtx_space->replace != memtx_space_replace_build_next)
 		return 0;
 
 	index_end_build(space->index[0]);
@@ -254,6 +254,25 @@ memtx_engine_free(struct engine *engine)
 	free(memtx);
 }
 
+/*
+ * Usually during final recovery, when .xlog files are loaded and applied,
+ * a special memtx_space_replace_primary_key function is used for faster
+ * recovery. The function only updates primary key while all other indexes
+ * are scheduled to build at the end of recovery.
+ *
+ * This approach doesn't work with MVCC engine and synchro spaces: when
+ * transactions appear in xlog and they may or may not be committed, we
+ * should process them in normal mode throughout all indexes in order to
+ * leave transaction history in each index.
+ *
+ * So all space indexes are built early in this case.
+ */
+static bool
+memtx_build_spaces_early()
+{
+	return memtx_tx_manager_use_mvcc_engine;
+}
+
 /**
  * State of memtx engine snapshot recovery.
  */
@@ -277,7 +296,8 @@ enum snapshot_recovery_state {
  */
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state);
+				  enum snapshot_recovery_state *state,
+				  uint32_t *prev_space_id);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -295,13 +315,15 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 		return -1;
 
 	int rc;
+	uint32_t prev_space_id = BOX_ID_NIL;
 	struct xrow_header row;
 	uint64_t row_count = 0;
 	bool force_recovery = false;
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
-		rc = memtx_engine_recover_snapshot_row(&row, &state);
+		rc = memtx_engine_recover_snapshot_row(&row, &state,
+						       &prev_space_id);
 		if (state == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
@@ -316,6 +338,13 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 					     row_count / 1e6);
 			fiber_yield_timeout(0);
 		}
+	}
+	/* Build the last space's primary and seconday keys if required. */
+	if (prev_space_id != BOX_ID_NIL) {
+		struct space *last_space = space_by_id(prev_space_id);
+		memtx_end_build_primary_key(last_space, memtx);
+		if (memtx_build_spaces_early())
+			memtx_build_secondary_keys(last_space, memtx);
 	}
 	xlog_cursor_close(&cursor, false);
 	if (rc < 0)
@@ -398,7 +427,8 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 
 static int
 memtx_engine_recover_snapshot_row(struct xrow_header *row,
-				  enum snapshot_recovery_state *state)
+				  enum snapshot_recovery_state *state,
+				  uint32_t *prev_space_id)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
@@ -427,6 +457,21 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 		diag_set(ClientError, ER_ALIEN_ENGINE, space->engine->name);
 		goto log_request;
 	}
+	/*
+	 * Build the previous space's primary key if started filling
+	 * a new one, bulid the space's secondary keys if required.
+	 */
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)space->engine;
+	if (prev_space_id != NULL && *prev_space_id != space->def->id &&
+	    *prev_space_id != BOX_ID_NIL) {
+		struct space *prev_space = space_by_id(*prev_space_id);
+		memtx_end_build_primary_key(prev_space, memtx);
+		if (memtx_build_spaces_early())
+			memtx_build_secondary_keys(prev_space, memtx);
+	}
+	if (prev_space_id != NULL)
+		*prev_space_id = space->def->id;
 	struct txn *txn;
 	txn = txn_begin();
 	if (txn == NULL)
@@ -484,7 +529,10 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		return 0;
 
 	assert(memtx->state == MEMTX_INITIAL_RECOVERY);
-	/* End of the fast path: loaded the primary key. */
+	/*
+	 * The primary key is built in the memtx_engine_recover_snapshot[_row]
+	 * if we recover from a snapshot. This build is for replication.
+	 */
 	space_foreach(memtx_end_build_primary_key, memtx);
 
 	/* Complete space initialization. */
@@ -495,19 +543,7 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		panic("Failed to complete recovery from snapshot!");
 	}
 
-	/*
-	 * Usually during final recovery, when .xlog files are loaded and
-	 * applied, a special memtx_space_replace_primary_key function is
-	 * used for faster recovery. The function only updates primary key
-	 * while all other indexes are scheduled to build at the end of
-	 * recovery.
-	 *
-	 * This approach doesn't work with MVCC engine and synchro spaces:
-	 * When transactions appear in xlog and they may or may not be
-	 * committed, we should process them in normal mode throughout all
-	 * indexes in order to leave transaction history in each index.
-	 */
-	if (!memtx_tx_manager_use_mvcc_engine) {
+	if (!memtx_build_spaces_early()) {
 		/*
 		 * Fast start path: "play out" WAL
 		 * records using the primary key only,
@@ -516,6 +552,10 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		memtx->state = MEMTX_FINAL_RECOVERY;
 	} else {
 		memtx->state = MEMTX_OK;
+		/*
+		 * Indexes are built in memtx_engine_recover_snapshot[_row] if
+		 * we recover from a snapshot. This build is for replication.
+		 */
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
 		memtx->on_indexes_built_cb();
@@ -747,7 +787,7 @@ memtx_engine_bootstrap(struct engine *engine)
 	struct xrow_header row;
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = memtx_engine_recover_snapshot_row(&row, &state);
+		rc = memtx_engine_recover_snapshot_row(&row, &state, NULL);
 		if (rc < 0)
 			break;
 	}
