@@ -12,6 +12,7 @@
 
 #include "clock.h"
 #include "diag.h"
+#include "errinj.h"
 #include "fiber.h"
 #include "qsort_arg.h"
 #include "say.h"
@@ -275,6 +276,7 @@ check_presorted(va_list ap)
 	struct sort_data *sort = worker->sort;
 	worker->presorted = true;
 
+	ERROR_INJECT_SLEEP_FOR(ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY);
 	void *pos = sort->data + worker->begin * sort->elem_size;
 	void *limit = sort->data + (worker->end - 1) * sort->elem_size;
 	for (; pos < limit; pos += sort->elem_size) {

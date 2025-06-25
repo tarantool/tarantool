@@ -150,6 +150,20 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 			       enum dup_replace_mode mode,
 			       struct tuple **result)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	if (memtx->recovery.last_space_id != space->def->id) {
+		/* Build PK and possibly SKs of the previous space. */
+		if (memtx->recovery.last_space_id != BOX_ID_NIL &&
+		    memtx_end_build_snapshot_space(
+				memtx, memtx->recovery.last_space_id) != 0)
+			return -1;
+
+		/* Start building the new space's PK. */
+		index_begin_build(space->index[0]);
+
+		memtx->recovery.last_space_id = space->def->id;
+	}
+
 	assert(old_tuple == NULL);
 	/*
 	 * If before_replace trigger changes tuple, the request is updated
@@ -978,7 +992,6 @@ memtx_space_add_primary_key(struct space *space)
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_INITIAL_RECOVERY:
-		index_begin_build(space->index[0]);
 		memtx_space->replace = memtx_space_replace_build_next;
 		break;
 	case MEMTX_FINAL_RECOVERY:

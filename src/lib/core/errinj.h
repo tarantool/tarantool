@@ -151,6 +151,7 @@ struct errinj {
 	_(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
