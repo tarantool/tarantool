@@ -667,10 +667,18 @@
     <member refid="module_8h_1ac068234331e788d607868fd95cefa88f" kind="function"><name>box_decimal_from_double</name></member>
     <member refid="module_8h_1ab1d0e0cb965eeeb0a00f867b4ee3431f" kind="function"><name>box_decimal_from_int64</name></member>
     <member refid="module_8h_1a7e5a5a5609e5ee0cdaf33cef61a90077" kind="function"><name>box_decimal_from_uint64</name></member>
+    <member refid="module_8h_1a227f32322d571c6f6381bc72a88bf678" kind="function"><name>box_decimal_scale_from_int32</name></member>
+    <member refid="module_8h_1a4eb0a5484cbe49e65c61a4cdba51a03d" kind="function"><name>box_decimal_scale_from_int64</name></member>
+    <member refid="module_8h_1a6c90a1dbf9e913e8ebf9f95330e570e8" kind="function"><name>box_decimal_scale_from_int128</name></member>
+    <member refid="module_8h_1a8c1d16f165c38b5d72fb9ef18ab5ac3e" kind="function"><name>box_decimal_scale_from_int256</name></member>
     <member refid="module_8h_1ac308e450dedd64c9ed97a0fa841de8bc" kind="function"><name>box_decimal_copy</name></member>
     <member refid="module_8h_1a7a20acf8704e0a8de6b2c6e70cabda94" kind="function"><name>box_decimal_to_string</name></member>
     <member refid="module_8h_1aef891f48c3de2b70a23565833977e51b" kind="function"><name>box_decimal_to_int64</name></member>
     <member refid="module_8h_1aa7984e1af9644427d4431d483313cda1" kind="function"><name>box_decimal_to_uint64</name></member>
+    <member refid="module_8h_1aed176d1daf608d41d24239bc9d73fdab" kind="function"><name>box_decimal_scale_to_int32</name></member>
+    <member refid="module_8h_1ad7b07d7e0fc3db346f1414384e6cc93e" kind="function"><name>box_decimal_scale_to_int64</name></member>
+    <member refid="module_8h_1a043c0cbd03ee3567a306458cfb66b440" kind="function"><name>box_decimal_scale_to_int128</name></member>
+    <member refid="module_8h_1a1d85d17e483ac8d9bc8be0c304e1bb24" kind="function"><name>box_decimal_scale_to_int256</name></member>
     <member refid="module_8h_1a84169b77917c2d12a4ef8027e4beacef" kind="function"><name>box_decimal_round</name></member>
     <member refid="module_8h_1a37aced6f227b3dbd48169ce4ba092504" kind="function"><name>box_decimal_floor</name></member>
     <member refid="module_8h_1abe405bddd53bc745cd54851b071e49c5" kind="function"><name>box_decimal_trim</name></member>
