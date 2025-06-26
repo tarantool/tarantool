@@ -645,6 +645,7 @@ end
 --
 -- * groups (map)
 -- * conditional (array of maps)
+-- * include (array of strings)
 g.test_additional_options_global = function()
     -- Some valid values for the additional fields.
     local additional_options = {
@@ -653,7 +654,11 @@ g.test_additional_options_global = function()
             {
                 ['if'] = '1.2.3 == 1.2.3',
             },
-        }
+        },
+        include = {
+            'config_a.yaml',
+            '/etc/tarantool/conf.d/*.yaml',
+        },
     }
 
     -- Verify that the fields on the given level are instance
