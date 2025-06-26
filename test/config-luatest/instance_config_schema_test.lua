@@ -112,6 +112,7 @@ g.test_config_enterprise = function()
                         timeout = 1,
                         unix_socket = 'six',
                         verbose = true,
+                        interface = 'eth0',
                     }
                 },
                 watchers = {
