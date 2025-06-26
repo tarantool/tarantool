@@ -480,6 +480,15 @@ I['config.etcd.http'] = format_text([[
 
 I['config.etcd.http.request'] = 'HTTP client request options.'
 
+I['config.etcd.http.request.interface'] = format_text([[
+    Set the interface to use as outgoing network interface for the etcd
+    configuration source.
+
+    The interface can be specified as an interface name, an IP address, or a
+    hostname.
+
+    See https://curl.se/libcurl/c/CURLOPT_INTERFACE.html for details.
+]])
 I['config.etcd.http.request.timeout'] = format_text([[
     A time period required to process an HTTP request to an etcd server:
     from sending a request to receiving a response.
