@@ -1504,6 +1504,28 @@ local function upgrade_to_3_3_0()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 3.5.0
+--------------------------------------------------------------------------------
+
+local function create_space_filters()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _index = box.space[box.schema.INDEX_ID]
+    local space_id = box.schema.FILTERS_ID
+
+    log.info("create space _filters")
+    local format = {{name = 'space_id', type = 'unsigned'},
+                    {name = 'index_id', type = 'unsigned'},
+                    {name = 'filters', type = 'array'},
+                    {name = 'opts', type = 'map'}}
+    _space:insert{space_id, ADMIN, '_filters', 'memtx', 0, setmap({}), format}
+    _index:insert{space_id, 0, 'primary', 'tree', { unique = true },
+                  {{0, 'unsigned'}, {1, 'unsigned'}}}
+end
+local function upgrade_to_3_5_0()
+    create_space_filters()
+end
+
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion.new(1, 7, 5), func = upgrade_to_1_7_5},
@@ -1528,6 +1550,7 @@ local handlers = {
     {version = mkversion.new(3, 0, 0), func = upgrade_to_3_0_0},
     {version = mkversion.new(3, 1, 0), func = upgrade_to_3_1_0},
     {version = mkversion.new(3, 3, 0), func = upgrade_to_3_3_0},
+    {version = mkversion.new(3, 5, 0), func = upgrade_to_3_5_0},
 }
 builtin.box_init_latest_dd_version_id(
     box.internal.version_to_id(handlers[#handlers].version))

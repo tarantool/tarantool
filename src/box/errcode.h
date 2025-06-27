@@ -441,6 +441,8 @@ struct errcode_record {
 	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
 	_(ER_SYNC_TIMEOUT, 295,			"Quorum collection for a synchronous transaction is timed out. The transaction is detached from this fiber and continues waiting for quorum") \
 	_(ER_FIELD_IRREPRESENTABLE_VALUE, 296,	"The value does not fit in field type", "field", STRING, "value", MSGPACK) \
+	_(ER_NO_FILTERS, 297,			"Index has no filters") \
+	_(ER_INVALID_FILTERS, 298,		"Filter array is invalid", "details", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

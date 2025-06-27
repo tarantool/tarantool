@@ -413,6 +413,7 @@ typedef int64_t bps_tree_block_card_t;
 #define bps_tree_view_find _api_name(view_find)
 #define bps_tree_find_get_offset _api_name(find_get_offset)
 #define bps_tree_view_find_get_offset _api_name(view_find_get_offset)
+#define bps_tree_reserve _api_name(reserve)
 #define bps_tree_insert_impl _bps_tree(insert)
 #define bps_tree_insert _api_name(insert)
 #define bps_tree_insert_get_iterator _api_name(insert_get_iterator)
@@ -3260,6 +3261,28 @@ bps_tree_reserve_blocks(struct bps_tree_common *tree, bps_tree_block_id_t count)
 		bps_tree_garbage_push(tree, block, id);
 	}
 	return true;
+}
+
+/* Reserve memory for the next `count` operations. */
+static inline int
+bps_tree_reserve(struct bps_tree *tree, size_t count)
+{
+	struct bps_tree_common *base = &tree->common;
+
+
+	/* Reserve blocks. */
+	size_t block_count = (BPS_TREE_MAX_DEPTH + 1) * count;
+	if (!bps_tree_reserve_blocks(base, block_count))
+		return -1;
+
+	/*
+	 * Reserve space for max blocks to touch: root + 3 per next level
+	 * for each operation.
+	 */
+	size_t matras_count = count * (1 + (BPS_TREE_MAX_DEPTH - 1) * 3);
+	if (matras_touch_reserve(base->matras, matras_count != 0))
+		return -1;
+	return 0;
 }
 
 /**
@@ -7631,6 +7654,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_view_find
 #undef bps_tree_find_get_offset
 #undef bps_tree_view_find_get_offset
+#undef bps_tree_reserve
 #undef bps_tree_insert_impl
 #undef bps_tree_insert
 #undef bps_tree_insert_get_iterator
