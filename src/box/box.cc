@@ -5151,6 +5151,9 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
 			  tt_uuid_str(&req.instance_uuid));
+	} else if (tt_uuid_is_nil(&req.instance_uuid)) {
+		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe "
+			  "a replica which doesn't exist");
 	}
 	/*
 	 * Replica name mismatch is not considered a critical error. It can
