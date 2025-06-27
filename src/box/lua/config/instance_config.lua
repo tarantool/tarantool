@@ -366,6 +366,9 @@ return schema.new('instance_config', schema.record({
                     verbose = schema.scalar({
                         type = 'boolean',
                     }),
+                    interface = schema.scalar({
+                        type = 'string',
+                    }),
                 }),
             }),
             watchers = schema.record({
