@@ -31,6 +31,7 @@ lua_source(lua_sources lua/config/applier/autoexpel.lua    config_applier_autoex
 lua_source(lua_sources lua/config/applier/box_cfg.lua      config_applier_box_cfg_lua)
 lua_source(lua_sources lua/config/applier/runtime_priv.lua config_applier_runtime_priv_lua)
 lua_source(lua_sources lua/config/applier/compat.lua       config_applier_compat_lua)
+lua_source(lua_sources lua/config/applier/connpool.lua     config_applier_connpool_lua)
 lua_source(lua_sources lua/config/applier/console.lua      config_applier_console_lua)
 lua_source(lua_sources lua/config/applier/credentials.lua  config_applier_credentials_lua)
 lua_source(lua_sources lua/config/applier/fiber.lua        config_applier_fiber_lua)

@@ -4,6 +4,8 @@ local t = require('luatest')
 local fun = require('fun')
 local treegen = require('luatest.treegen')
 local server = require('luatest.server')
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
 local socket = require('socket')
 local helpers = require('test.config-luatest.helpers')
 
@@ -1166,3 +1168,57 @@ end
 g.after_test('test_call_connects_to_all_if_prioritized', function(g)
     stop_stub_servers(g)
 end)
+
+g.test_closes_unused_connections = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.myuser',
+            {password =  'secret',
+             roles = { 'replication' },
+             privileges = {{permissions = {'execute'}, universe = true}}})
+        :set_global_option('iproto.advertise.peer.login', 'myuser')
+        :set_global_option('connpool.idle_timeout', 2)
+        :add_instance('i-001', { database = { mode = 'rw' } })
+        :add_instance('i-002', {})
+        :config()
+
+    local cluster = cluster:new(config)
+
+    -- Add a counter for to count netbox.connect() calls.
+    treegen.write_file(cluster._dir, 'override/net/box.lua',
+        string.dump(function()
+        local loaders = require('internal.loaders')
+
+        rawset(_G, 'connects', 0)
+
+        local builtin_netbox = loaders.builtin['net.box']
+        local builtin_connect = builtin_netbox.connect
+        builtin_netbox.connect = function(...)
+            _G.connects = _G.connects + 1
+            return builtin_connect(...)
+        end
+
+        return builtin_netbox
+    end))
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+        local fiber = require('fiber')
+
+        -- Check frequent access requires establishing
+        -- connections only once per each instance.
+        for _=1,10 do
+            connpool.call('box.info', nil, {mode = 'ro'})
+        end
+        t.assert_equals(_G.connects, 2)
+
+        -- Wait for the connections to be closed due to
+        -- inactivity.
+        fiber.sleep(4)
+
+        -- Check connpool needed to open new connections.
+        connpool.call('box.info', nil, {mode = 'ro'})
+        t.assert_equals(_G.connects, 4)
+    end)
+end

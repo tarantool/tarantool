@@ -97,6 +97,7 @@ local instance_config_fields = {
     'compat',
     'labels',
     'isolated',
+    'connpool',
 }
 
 -- Verify that the fields of the given schema correspond to the
@@ -454,6 +455,9 @@ g.test_defaults = function()
             enabled = false,
             renew_interval = 2,
             keepalive_interval = 10,
+        },
+        connpool = {
+            idle_timeout = 60,
         },
     }
 
