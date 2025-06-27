@@ -411,7 +411,9 @@ cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
     pParse->initiateTTrans = true;
     sql_create_view(pParse);
   } else {
-    sql_store_select(pParse, S);
+    sql_expr_list_delete(C);
+    pParse->parsed_ast_type = AST_TYPE_SELECT;
+    pParse->parsed_ast.select = S;
   }
 }
 
