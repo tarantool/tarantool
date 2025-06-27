@@ -55,6 +55,7 @@ const struct index_opts index_opts_default = {
 	/* .covered_fields      = */ NULL,
 	/* .covered_field_count = */ 0,
 	/* .layout              = */ NULL,
+	/* .aggregates          = */ NULL,
 };
 
 /**
@@ -133,6 +134,37 @@ index_opts_parse_layout(const char **data, void *opts, struct region *region)
 	return 0;
 }
 
+/**
+ * Parse index 'aggregates' option given as MsgPack in 'data' into 'opts'.
+ * The MsgPack is copied to a memory allocated on 'region'.
+ */
+static int
+index_opts_parse_aggregates(const char **data, void *opts,
+			    struct region *region)
+{
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	const char *aggregates = *data;
+	if (mp_typeof(**data) != MP_ARRAY) {
+		diag_set(IllegalParams, "'aggregates' must be array");
+		return -1;
+	}
+	uint32_t aggregate_count = mp_decode_array(data);
+	if (aggregate_count == 0)
+		return 0;
+
+	for (uint32_t i = 0; i < aggregate_count; i++) {
+		if (mp_typeof(**data) != MP_MAP) {
+			diag_set(IllegalParams,
+				 "'aggregates' elements must be map");
+			return -1;
+		}
+		mp_next(data);
+	}
+	index_opts->aggregates = xregion_alloc(region, *data - aggregates);
+	memcpy(index_opts->aggregates, aggregates, *data - aggregates);
+	return 0;
+}
+
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
@@ -149,6 +181,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
 	OPT_DEF_CUSTOM("layout", index_opts_parse_layout),
+	OPT_DEF_CUSTOM("aggregates", index_opts_parse_aggregates),
 	OPT_END,
 };
 
@@ -201,6 +234,8 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 	}
 	if (dup->layout != NULL)
 		dup->layout = xstrdup(dup->layout);
+	if (dup->aggregates != NULL)
+		dup->aggregates = mp_dup(dup->aggregates);
 }
 
 struct index_def *

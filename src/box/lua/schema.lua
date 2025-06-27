@@ -1566,6 +1566,7 @@ local index_options = {
     hint = 'boolean',
     covers = 'table',
     layout = 'string',
+    aggregates = 'table',
 }
 
 local function jsonpaths_from_idx_parts(parts)
@@ -1622,6 +1623,32 @@ local function func_id_by_name(func_name, level)
 end
 box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
 
+-- Normalize one field:
+-- - field referenced as name is resolved to 0-based field number.
+-- - field referenced as 1-based field number is converted to 0-based.
+local function normalize_field(field, format, what, index, level)
+    local idx
+    local field_ref = what .. "[" .. index .. "]: "
+    if type(field) == 'string' then
+        idx = format_field_index_by_name(format, field)
+        if idx == nil then
+            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                      "field was not found by name '" .. field .. "'",
+                      level + 1)
+        end
+    elseif type(field) == 'number' then
+        if field <= 0 then
+            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                      "field (number) must be one-based", level + 1)
+        end
+        idx = field
+    else
+        box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                  "field (name or number) is expected", level + 1)
+    end
+    return idx - 1
+end
+
 -- Normalize array of fields `fields`:
 -- - fields referenced as name are resolved to 0-based field number.
 -- - fields referenced as 1-based field number are converted to 0-based.
@@ -1630,26 +1657,22 @@ local function normalize_fields(fields, format, what, level)
     -- sparse array or map with keys.
     local result = {}
     for i, field in ipairs(fields) do
-        local idx
-        local field_ref = what .. "[" .. i .. "]: "
-        if type(field) == 'string' then
-            idx = format_field_index_by_name(format, field)
-            if idx == nil then
-                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                          "field was not found by name '" .. field .. "'",
-                          level + 1)
-            end
-        elseif type(field) == 'number' then
-            if field <= 0 then
-                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                          "field (number) must be one-based", level + 1)
-            end
-            idx = field
-        else
-            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                      "field (name or number) is expected", level + 1)
+        result[i] = normalize_field(field, format, what, i, level + 1)
+    end
+    return result
+end
+
+-- Normalize array of aggregates `aggregates`: all fields are normalized.
+local function normalize_aggregates(aggregates, format, what, level)
+    -- Do not much care if opts.aggregates is something strange like
+    -- sparse array or map with keys.
+    local result = {}
+    for i, aggregate in ipairs(aggregates) do
+        result[i] = table.deepcopy(aggregate)
+        if type(aggregate) == 'table' and aggregate.field ~= nil then
+            result[i].field = normalize_field(aggregate.field, format, what, i,
+                                              level + 1)
         end
-        result[i] = idx - 1
     end
     return result
 end
@@ -1742,6 +1765,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             hint = options.hint,
             covers = options.covers,
             layout = options.layout,
+            aggregates = options.aggregates,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
@@ -1770,6 +1794,10 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     if index_opts.covers ~= nil then
         index_opts.covers = normalize_fields(index_opts.covers, format,
                                              'options.covers', 2)
+    end
+    if index_opts.aggregates ~= nil then
+        index_opts.aggregates = normalize_aggregates(
+            index_opts.aggregates, format, 'options.aggregates', 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, iid,
@@ -1915,6 +1943,10 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     if options.covers ~= nil then
         index_opts.covers = normalize_fields(options.covers, format,
                                              'options.covers', 2)
+    end
+    if options.aggregates ~= nil then
+        index_opts.aggregates = normalize_aggregates(
+            options.aggregates, format, 'options.aggregates', 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, index_id,
