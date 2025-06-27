@@ -6,6 +6,8 @@ local net = require('net.box')
 -- with error log level
 -- Transactional triggers are already tested in their own test suite
 
+-- This comment line is to test the debug_catch_flaky CI workflow.
+
 local g = t.group()
 
 local function server_is_dead(s)
