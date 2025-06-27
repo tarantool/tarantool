@@ -6,7 +6,6 @@
 
 # to be removed in scope of gh-10532
 leak:index_def_new
-leak:sql_create_view
 leak:sqlParser
 leak:sql_prepare_and_execute
 

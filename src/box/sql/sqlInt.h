@@ -2809,16 +2809,6 @@ sql_create_view(struct Parse *parse_context);
 int
 sql_view_assign_cursors(struct Parse *parse, const char *view_stmt);
 
-/**
- * Store duplicate of SELECT into parsing context.
- * This routine is called during parsing.
- *
- * @param parse_context Current parsing context.
- * @param select Select to be stored.
- */
-void
-sql_store_select(struct Parse *parse_context, struct Select *select);
-
 void
 sql_drop_table(struct Parse *);
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
