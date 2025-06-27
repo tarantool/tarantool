@@ -637,11 +637,11 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 }
 
 /**
- * True if the space has records identified by key 'uid'.
+ * True if the space has records identified by a MsgPack encoded key.
  * Uses 'iid' index.
  */
 int
-space_has_data(uint32_t id, uint32_t iid, uint32_t uid, bool *out)
+space_has_data_impl(uint32_t id, uint32_t iid, const char *key, bool *out)
 {
 	struct space *space = space_by_id(id);
 	if (space == NULL) {
@@ -663,10 +663,9 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid, bool *out)
 	if (index == NULL)
 		return -1;
 
-	char key[6];
-	assert(mp_sizeof_uint(BOX_SYSTEM_ID_MIN) <= sizeof(key));
-	mp_encode_uint(key, uid);
-	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 1);
+	uint32_t part_count = mp_decode_array(&key);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key,
+						    part_count);
 	if (it == NULL)
 		return -1;
 	IteratorGuard iter_guard(it);
@@ -675,6 +674,22 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid, bool *out)
 		return -1;
 	*out = (tuple != NULL);
 	return 0;
+}
+
+
+/**
+ * True if the space has records identified by key 'uid'.
+ * Uses 'iid' index.
+ */
+int
+space_has_data(uint32_t id, uint32_t iid, uint32_t uid, bool *out)
+{
+	char key[10];
+	char *key_end = key;
+	key_end = mp_encode_array(key_end, 1);
+	key_end = mp_encode_uint(key_end, uid);
+	assert(key_end <= key + sizeof(key));
+	return space_has_data_impl(id, iid, key, out);
 }
 
 /* }}} */
