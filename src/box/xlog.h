@@ -93,6 +93,9 @@ extern const struct xlog_opts xlog_opts_default;
  */
 #define inprogress_suffix ".inprogress"
 
+typedef void
+(*xlog_remove_cb_f)(const char *filename);
+
 /**
  * A handle for a data directory with write ahead logs, snapshots,
  * vylogs.
@@ -153,6 +156,11 @@ struct xdir {
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX];
+	/**
+	 * The callback called on the xdir garbage
+	 * collection with the deleted file name passed.
+	 */
+	xlog_remove_cb_f gc_cb;
 };
 
 /**
@@ -252,7 +260,9 @@ enum {
 };
 
 /**
- * Remove files whose signature is less than specified.
+ * Remove files whose signature is less than specified. Calls the xdir GC
+ * callback on each removed file name.
+ *
  * For possible values of @flags see XDIR_GC_*.
  */
 void
@@ -954,7 +964,8 @@ typedef int
 extern xlog_remove_file_impl_f xlog_remove_file_impl;
 
 /**
- * Removes an xlog file with the given name.
+ * Removes an xlog file with the given name and calls the given callback on
+ * successful deletion.
  *
  * Returns true if the file was removed or didn't exist. If the file wasn't
  * removed due to an error, logs the error and returns false.
@@ -962,7 +973,8 @@ extern xlog_remove_file_impl_f xlog_remove_file_impl;
  * See XLOG_RM_* for available flags.
  */
 bool
-xlog_remove_file(const char *filename, unsigned flags);
+xlog_remove_file(const char *filename, unsigned flags,
+		 xlog_remove_cb_f remove_callback);
 
 /** }}} */
 
