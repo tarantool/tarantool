@@ -340,6 +340,9 @@ int
 txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len);
 
+int
+txn_limbo_flush(struct txn_limbo *limbo);
+
 /** Remove the entry from the limbo, mark as rolled back. */
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry);

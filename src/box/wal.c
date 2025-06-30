@@ -312,6 +312,7 @@ tx_schedule_queue(struct stailq *queue)
 static inline void
 wal_begin_rollback(void)
 {
+	say_info("wal_begin_rollback");
 	/* Signal WAL-thread stop accepting new transactions. */
 	wal_writer_singleton.is_in_rollback = true;
 }
@@ -319,6 +320,7 @@ wal_begin_rollback(void)
 static void
 wal_complete_rollback(struct cmsg *base)
 {
+	say_info("wal_complete_rollback");
 	(void) base;
 	/* WAL-thread can try writing transactions again. */
 	wal_writer_singleton.is_in_rollback = false;
@@ -644,10 +646,12 @@ wal_sync_f(struct cbus_call_msg *data)
 	struct wal_vclock_msg *msg = (struct wal_vclock_msg *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->is_in_rollback) {
+		say_info("wal_sync_f: sees rollback");
 		/* We're rolling back a failed write. */
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
+	say_info("wal_sync_f: all ok");
 	vclock_copy(&msg->vclock, &writer->vclock);
 	return 0;
 }
@@ -671,11 +675,17 @@ wal_sync(struct vclock *vclock)
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
-	if (journal_queue_flush() != 0)
+	say_info("wal_sync: flush start");
+	if (journal_queue_flush() != 0) {
+		say_info("wal_sync: flush fail");
 		return -1;
+	}
+	say_info("wal_sync: flush ok");
+	say_info("wal_sync: send msg");
 	struct wal_vclock_msg msg;
 	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
 			   wal_sync_f);
+	say_info("wal_sync: got msg: %d", rc);
 	if (vclock != NULL)
 		vclock_copy(vclock, &msg.vclock);
 	ERROR_INJECT_YIELD(ERRINJ_WAL_SYNC_DELAY);

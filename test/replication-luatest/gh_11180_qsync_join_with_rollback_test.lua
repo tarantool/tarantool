@@ -43,14 +43,21 @@ g.test_cascading_rollback_while_waiting_for_limbo_space = function(cg)
         local fiber = require('fiber')
         local data = string.rep('a', 1000)
         local s = box.space.test
+        local log = require('log')
 
         rawset(_G, 'test_is_committed', false)
         local function make_txn_fiber(id)
             return fiber.create(function()
                 fiber.self():set_joinable(true)
+                fiber.self():name(("worker-%s"):format(id))
                 box.begin()
                 box.on_commit(function()
+                    log.info(('Committing %s'):format(id))
+                    t.assert(not _G.test_is_committed)
                     _G.test_is_committed = true
+                end)
+                box.on_rollback(function()
+                    log.info(('Rolling back %s'):format(id))
                 end)
                 s:replace{id, data}
                 box.commit()
@@ -101,7 +108,9 @@ g.test_cascading_rollback_while_waiting_for_limbo_space = function(cg)
         --
         box.error.injection.set('ERRINJ_WAL_ROTATE', true)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
-        t.assert_not((_G.test_f2:join()))
+        local ok, err = _G.test_f2:join()
+        t.assert_not(ok)
+        t.assert_covers(err:unpack(), {name = 'WAL_IO'})
         box.error.injection.set('ERRINJ_WAL_ROTATE', false)
 
         t.assert(box.space.test:get{1})

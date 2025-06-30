@@ -404,6 +404,7 @@ txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 						TXN_SIGNATURE_CANCELLED);
 			assert(e->state == TXN_LIMBO_ENTRY_ROLLBACK);
 		}
+		ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_SUBMIT_WAKEUP_DELAY);
 		if (e->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 			/* Cascading rollback. */
 			fiber_set_txn(fiber(), NULL);
@@ -445,6 +446,41 @@ success:
 	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
 	txn_limbo_on_append(limbo, e);
 	return 0;
+}
+
+int
+txn_limbo_flush(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	if (txn_limbo_last_entry(limbo)->state != TXN_LIMBO_ENTRY_VOLATILE)
+		return 0;
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	trigger_clear(&txn->fiber_on_stop);
+	trigger_clear(&txn->fiber_on_yield);
+	txn->status = TXN_PREPARED;
+	txn->fiber = fiber();
+	txn_set_flags(txn, TXN_WAIT_SYNC);
+	int rc = txn_limbo_submit(limbo, limbo->owner_id, txn, 0);
+	if (rc == 0) {
+		assert(txn->limbo_entry != NULL);
+		assert(txn->limbo_entry != limbo->entry_to_confirm);
+		assert(!txn_has_flag(txn, TXN_IS_DONE));
+		rlist_del_entry(txn->limbo_entry, in_queue);
+		txn->limbo_entry = NULL;
+	} else {
+		assert(txn->limbo_entry == NULL);
+		if (!txn_has_flag(txn, TXN_IS_DONE)) {
+			txn->signature = TXN_SIGNATURE_ROLLBACK;
+			txn_complete_fail(txn);
+		}
+	}
+	assert(in_txn() == NULL || in_txn() == txn);
+	fiber_set_txn(fiber(), NULL);
+	txn_free(txn);
+	return rc;
 }
 
 void
@@ -1051,7 +1087,7 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 	trigger_create(&on_complete, txn_commit_cb, &cwp, NULL);
 	struct trigger on_rollback;
 	trigger_create(&on_rollback, txn_rollback_cb, &cwp, NULL);
-	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
+	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
 	double deadline = fiber_clock() + timeout;

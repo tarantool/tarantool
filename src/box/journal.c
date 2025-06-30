@@ -204,6 +204,7 @@ journal_queue_flush(void)
 void
 journal_queue_rollback(void)
 {
+	say_info("journal_queue_rollback()");
 	journal_on_cascading_rollback();
 	struct stailq rollback;
 	stailq_create(&rollback);
