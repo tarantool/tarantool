@@ -40,6 +40,10 @@
 #include "diag.h"
 #include <stdint.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * This file is a link between all the update operations for all
  * the field types. It functions like a router, when an update
@@ -956,5 +960,9 @@ xrow_update_op_do_splice(struct xrow_update_op *op,
 			 struct xrow_update_scalar *scalar);
 
 /* }}} Scalar helpers. */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_UPDATE_FIELD_H */
