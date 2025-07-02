@@ -146,7 +146,7 @@ warmup_thr = warmup_thr < 0 and 0 or warmup_thr
 -- END OF TUNABLE OPTIONS
 
 -- transactions per fiber
-local trans_per_fiber = num_ops/ops_per_txn/num_fibers
+local trans_per_fiber = math.floor(num_ops/ops_per_txn/num_fibers)
 
 -- by default no output from replicas are received
 -- redirect it into master's one breaks terminal
@@ -308,7 +308,8 @@ end)
 
 -- start fibers for the main load
 for i = 1, num_fibers do
-    fibers_storage[i] = fiber.create(fiber_load, i*num_ops, space)
+    fibers_storage[i] =
+        fiber.create(fiber_load, i*trans_per_fiber*ops_per_txn, space)
     if (fibers_storage[i]:status() ~= 'dead') then
         fibers_storage[i]:wakeup() -- needed for backward compatibility with 1.7
     end
