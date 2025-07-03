@@ -1216,10 +1216,7 @@ whereLoopDelete(struct WhereLoop *p)
 	sql_xfree(p);
 }
 
-/*
- * Free a WhereInfo structure
- */
-static void
+void
 whereInfoFree(struct WhereInfo *pWInfo)
 {
 	if (ALWAYS(pWInfo)) {

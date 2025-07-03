@@ -3007,6 +3007,10 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 void
 sql_table_truncate(struct Parse *parse, struct SrcList *tab_list);
 
+/** Free a WhereInfo structure. */
+void
+whereInfoFree(struct WhereInfo *pWInfo);
+
 void sqlUpdate(Parse *, SrcList *, ExprList *, Expr *,
 		   enum on_conflict_action);
 WhereInfo *sqlWhereBegin(Parse *, SrcList *, Expr *, ExprList *, ExprList *,
