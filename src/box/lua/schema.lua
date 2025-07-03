@@ -1907,8 +1907,8 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
-    if index_opts.covers ~= nil then
-        index_opts.covers = normalize_fields(index_opts.covers, format,
+    if options.covers ~= nil then
+        index_opts.covers = normalize_fields(options.covers, format,
                                              'options.covers', 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
