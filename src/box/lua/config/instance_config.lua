@@ -2188,6 +2188,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        datetime_apply_timezone_action = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
         box_consider_system_spaces_synchronous = schema.enum({
             'old',
             'new',
