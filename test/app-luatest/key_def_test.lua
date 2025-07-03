@@ -229,3 +229,56 @@ g.test_compare_keys = function()
                         ret, msg)
     end
 end
+
+g.test_fixed_point_decimal = function()
+    local decimal = require('decimal')
+
+    local errmsg = "scale is not specified for type decimal32"
+    -- Creation.
+    t.assert_error_msg_equals(errmsg, key_def_lib.new, {
+        {type = 'decimal32', fieldno = 2},
+    })
+    -- Validation.
+    local key_def = key_def_lib.new({
+        {type = 'decimal32', scale = 3, fieldno = 3},
+    })
+    key_def:validate_tuple(box.tuple.new({1, 1, decimal.new(1.001)}))
+    key_def:validate_key({decimal.new(1.001)})
+    key_def:validate_full_key({decimal.new(1.001)})
+    local errmsg = "The value of key part does not fit in type"
+    t.assert_error_msg_equals(errmsg, key_def.validate_tuple, key_def,
+                              box.tuple.new({1, 1, decimal.new(1.0001)}))
+    t.assert_error_msg_equals(errmsg, key_def.validate_key, key_def,
+                              {decimal.new(1.0001)})
+    t.assert_error_msg_equals(errmsg, key_def.validate_full_key, key_def,
+                              {decimal.new(1.0001)})
+    -- Merging.
+    local key_def_1 = key_def_lib.new({
+        {type = 'decimal32', scale = 3, fieldno = 3},
+    })
+    local key_def_2 = key_def_lib.new({
+        {type = 'decimal64', scale = 2, fieldno = 4},
+    })
+    key_def = key_def_1:merge(key_def_2)
+    key_def:validate_tuple(box.tuple.new({
+        1, 1, decimal.new(1.001), decimal.new(2.02)
+    }))
+    t.assert_error_msg_equals(
+                errmsg, key_def.validate_tuple, key_def,
+                box.tuple.new({1, 1, decimal.new(1.0001), decimal.new(2.02)}))
+    t.assert_error_msg_equals(
+                errmsg, key_def.validate_tuple, key_def,
+                box.tuple.new({1, 1, decimal.new(1.001), decimal.new(2.002)}))
+    -- Serizalization.
+    local key_def = key_def_lib.new({
+        {type = 'decimal32', scale = 3, fieldno = 7},
+    })
+    t.assert_equals(json_lib.decode(json_lib.encode(key_def)), {{
+        type = 'decimal32',
+        scale = 3,
+        fieldno = 7,
+        is_nullable = false,
+        exclude_null = false,
+        sort_order = 'asc',
+    }})
+end

@@ -265,7 +265,7 @@ check_collate_arg(struct Parse *parse, struct Expr *expr)
 	while (left->op == TK_COLLATE)
 		left = left->pLeft;
 	enum field_type type = sql_expr_type(left);
-	if (!field_type1_contains_type2(type, FIELD_TYPE_STRING)) {
+	if (!field_type1_contains_type2(type, NULL, FIELD_TYPE_STRING, NULL)) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 			 "COLLATE clause can't be used with non-string "
 			 "arguments");

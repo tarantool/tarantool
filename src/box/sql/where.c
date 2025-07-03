@@ -301,7 +301,8 @@ whereScanNext(WhereScan * pScan)
 							pX = pTerm->pExpr;
 							enum field_type expr_type =
 								expr_cmp_mutual_type(pX);
-							if (!field_type1_contains_type2(expr_type, pScan->idx_type))
+							if (!field_type1_contains_type2(expr_type, NULL,
+											pScan->idx_type, NULL))
 								continue;
 							if (pScan->is_column_seen) {
 								Parse *pParse =
@@ -707,7 +708,7 @@ termCanDriveIndex(WhereTerm * pTerm,	/* WHERE clause term to check */
 		return 0;
 	enum field_type type = pSrc->space->def->fields[pTerm->u.leftColumn].type;
 	enum field_type expr_type = expr_cmp_mutual_type(pTerm->pExpr);
-	if (!field_type1_contains_type2(expr_type, type))
+	if (!field_type1_contains_type2(expr_type, NULL, type, NULL))
 		return 0;
 	return 1;
 }

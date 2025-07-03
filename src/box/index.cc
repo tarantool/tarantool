@@ -154,7 +154,8 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 			goto error;
 		}
 		if (part_count == 1) {
-			if (key_part_validate(FIELD_TYPE_ARRAY, key, 0, false))
+			if (key_part_validate(FIELD_TYPE_ARRAY, NULL, key, 0,
+					      false))
 				goto error;
 			uint32_t array_size = mp_decode_array(&key);
 			if (array_size != d && array_size != d * 2) {
@@ -163,15 +164,15 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 				goto error;
 			}
 			for (uint32_t part = 0; part < array_size; part++) {
-				if (key_part_validate(FIELD_TYPE_NUMBER, key,
-						      part, false))
+				if (key_part_validate(FIELD_TYPE_NUMBER, NULL,
+						      key, part, false))
 					goto error;
 				mp_next(&key);
 			}
 		} else {
 			for (uint32_t part = 0; part < part_count; part++) {
-				if (key_part_validate(FIELD_TYPE_NUMBER, key,
-						      part, false))
+				if (key_part_validate(FIELD_TYPE_NUMBER, NULL,
+						      key, part, false))
 					goto error;
 				mp_next(&key);
 			}

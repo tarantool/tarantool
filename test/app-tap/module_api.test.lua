@@ -677,7 +677,7 @@ local function test_box_insert_arrow(test, module)
 end
 
 require('tap').test("module_api", function(test)
-    test:plan(52)
+    test:plan(54)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")

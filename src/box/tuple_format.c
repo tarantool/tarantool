@@ -282,7 +282,8 @@ tuple_field_ensure_child_compatibility(struct tuple_field *parent,
 	enum field_type expected_type =
 		child->token.type == JSON_TOKEN_STR ?
 		FIELD_TYPE_MAP : FIELD_TYPE_ARRAY;
-	if (field_type1_contains_type2(parent->type, expected_type)) {
+	if (field_type1_contains_type2(parent->type, NULL,
+				       expected_type, NULL)) {
 		parent->type = expected_type;
 	} else {
 		diag_set(ClientError, ER_INDEX_PART_TYPE_MISMATCH,
@@ -472,11 +473,13 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 	 * with field's one, then the part type is more strict
 	 * and the part type must be used in tuple_format.
 	 */
-	if (field_type1_contains_type2(field->type,
-					part->type)) {
+	if (field_type1_contains_type2(field->type, &field->type_params,
+				       part->type, &part->type_params)) {
 		field->type = part->type;
-	} else if (!field_type1_contains_type2(part->type,
-					       field->type)) {
+		field->type_params = part->type_params;
+	} else if (!field_type1_contains_type2(
+					part->type, &part->type_params,
+					field->type, &field->type_params)) {
 		int errcode;
 		if (!field->is_key_part)
 			errcode = ER_FORMAT_MISMATCH_INDEX_PART;
@@ -985,11 +988,9 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 			else
 				return false;
 		}
-		if (! field_type1_contains_type2(field1->type, field2->type))
-			return false;
-		if (field_type_is_fixed_decimal[field1->type] &&
-		    field_type_is_fixed_decimal[field2->type] &&
-		    field1->type_params.scale != field2->type_params.scale)
+		if (!field_type1_contains_type2(
+				field1->type, &field1->type_params,
+				field2->type, &field2->type_params))
 			return false;
 		/*
 		 * Do not allow transition from nullable to non-nullable:

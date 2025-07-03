@@ -1002,7 +1002,9 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 		if (key_part_is_nullable(old_part) &&
 		    !key_part_is_nullable(new_part))
 			return true;
-		if (!field_type1_contains_type2(new_part->type, old_part->type))
+		if (!field_type1_contains_type2(
+				new_part->type, &new_part->type_params,
+				old_part->type, &old_part->type_params))
 			return true;
 		if (json_path_cmp(old_part->path, old_part->path_len,
 				  new_part->path, new_part->path_len,

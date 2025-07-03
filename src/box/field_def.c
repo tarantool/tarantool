@@ -408,13 +408,14 @@ field_type_by_name_wrapper(const char *str, uint32_t len)
 }
 
 bool
-field_type1_contains_type2(enum field_type type1, enum field_type type2)
+field_type1_contains_type2(enum field_type type1,
+			   const union field_type_params *type_params1,
+			   enum field_type type2,
+			   const union field_type_params *type_params2)
 {
 	uint32_t mp_type1, mp_type2;
 	assert(type1 < field_type_MAX);
 	assert(type2 < field_type_MAX);
-	if (type1 == type2)
-		return true;
 
 	bool is_mp_ext = field_mp_type[type2] == 0;
 	if (is_mp_ext) {
@@ -444,9 +445,11 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2)
 	if (field_type_is_fixed_decimal[type1]) {
 		if (!field_type_is_fixed_decimal[type2])
 			return false;
+		assert(type_params1 != NULL);
+		assert(type_params2 != NULL);
 		int p1 = field_type_decimal_precision[type1];
 		int p2 = field_type_decimal_precision[type2];
-		return p1 >= p2;
+		return p1 >= p2 && type_params1->scale == type_params2->scale;
 	}
 	return true;
 }
@@ -500,7 +503,7 @@ static const struct opt_def field_def_reg_names_only[] = {
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
-	.type_params = { .scale = INT64_MAX, },
+	.type_params = { 0 },
 	.name = NULL,
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
@@ -676,6 +679,7 @@ field_def_decode(struct field_def *field, const char **data,
 	}
 	int count = mp_decode_map(data);
 	*field = field_def_default;
+	field->type_params.scale = INT64_MAX;
 	bool is_action_missing = true;
 	uint32_t action_literal_len = strlen("nullable_action");
 	for (int i = 0; i < count; ++i) {
@@ -754,6 +758,7 @@ field_def_decode(struct field_def *field, const char **data,
 					" fixed-point decimals");
 			return -1;
 		}
+		field->type_params.scale = 0;
 	}
 	return 0;
 }

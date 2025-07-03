@@ -89,6 +89,88 @@ g.test_invalid_space_format = function(cg)
     end)
 end
 
+g.test_invalid_index_format = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test', {format = {
+            {'a', 'unsigned'}, {'b', 'decimal32', scale = 2},
+        }})
+        -- XXX Unfortunately difference in scale that causes
+        -- error is not visible.
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.FORMAT_MISMATCH_INDEX_PART,
+            field = "2 (b)",
+        }, s.create_index, s, 'pk', {parts = {2, scale = 3}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_PARTS,
+            partno = 1,
+            details = 'scale makes sense only for fixed-point decimals'
+        }, s.create_index, s, 'pk', {parts = {1, scale = 3}})
+        s:drop()
+
+        s = box.schema.create_space('test')
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_PARTS,
+            partno = 1,
+            details = 'scale is not specified',
+        }, s.create_index, s, 'pk', {
+            parts = {2, 'decimal32', sort_order = 'desc'}
+        })
+        -- A bit different from above. Here we have 166 format.
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_PARTS,
+            partno = 1,
+            details = 'scale is not specified',
+        }, s.create_index, s, 'pk', {parts = {2, 'decimal32'}})
+
+        -- Now check if first index is added and then format is set.
+        s:create_index('pk', {parts = {2, 'decimal32', scale = 2}})
+        -- XXX Unfortunately difference in scale that causes
+        -- error is not visible.
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.FORMAT_MISMATCH_INDEX_PART,
+            field = "2 (b)",
+        }, s.format, s, {{'a', 'unsigned'}, {'b', 'decimal32', scale = 3}})
+    end)
+end
+
+g.test_no_format = function(cg)
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        local s = box.schema.create_space('test')
+        s:create_index('pk', {parts = {1, 'decimal32', scale = 2}})
+        s:insert({decimal.new(1.01)})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.FIELD_IRREPRESENTABLE_VALUE,
+            value = decimal.new(1.001),
+        }, s.insert, s, {decimal.new(1.001)})
+    end)
+end
+
+g.test_index_key_validation = function(cg)
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        local s = box.schema.create_space('test', {format = {
+            {'a', 'decimal32', scale = 2}, {'b', 'unsigned'},
+        }})
+        s:create_index('pk')
+        s:insert({decimal.new(1.01), 1})
+        s:insert({decimal.new(2.02), 2})
+        t.assert_equals(s:get({decimal.new(2.02)}), {decimal.new(2.02), 2})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.KEY_PART_IRREPRESENTABLE_VALUE,
+            partno = 0,
+            value = decimal.new(2.002),
+        }, s.get, s, decimal.new(2.002))
+    end)
+end
+
 g.test_precision = function(cg)
     cg.server:exec(function()
         local decimal = require('decimal')
@@ -254,5 +336,43 @@ g.test_update = function(cg)
         t.assert_equals(s:select(), {
             {1, decimal.new(999999998)}, {2, decimal.new(-999999998)},
         })
+    end)
+end
+
+g.test_index_introspection = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test', {
+            engine = 'vinyl',
+            format = {{'a', 'unsigned'}, {'b', 'decimal32', scale = 7}}
+        })
+        s:create_index('pk', {parts = {'b'}})
+        t.assert_equals(s.index.pk.parts[1].scale, 7)
+    end)
+end
+
+-- Vinyl uses key def parts decoding and encoding which has extra
+-- paths in case of fixed point decimals.
+g.test_key_part_encode_decode = function(cg)
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        -- Test encoding positive scale.
+        local s = box.schema.create_space('test', {
+            engine = 'vinyl',
+            format = {{'a', 'unsigned'}, {'b', 'decimal32', scale = 2}}
+        })
+        s:create_index('pk', {parts = {'b'}})
+        s:insert({1, decimal.new(1.01)})
+        s:insert({2, decimal.new(2.02)})
+        box.snapshot()
+        s:drop()
+        -- Test encoding negative scale.
+        local s = box.schema.create_space('test', {
+            engine = 'vinyl',
+            format = {{'a', 'unsigned'}, {'b', 'decimal32', scale = -2}}
+        })
+        s:create_index('pk', {parts = {'b'}})
+        s:insert({1, decimal.new(100)})
+        s:insert({2, decimal.new(200)})
+        box.snapshot()
     end)
 end

@@ -49,6 +49,9 @@
 		fail(#expr, "false");	\
 } while (0)
 
+static void
+check_diag(const char *exp_err_type, const char *exp_err_msg);
+
 /* Test for constants */
 static const char *consts[] = {
 	PACKAGE_VERSION,
@@ -479,6 +482,27 @@ test_key_def_api(lua_State *L)
 	return 1;
 }
 
+static int
+test_key_def_api_decimals(lua_State *L)
+{
+	uint32_t decimal_types[] = {
+		FIELD_TYPE_DECIMAL32, FIELD_TYPE_DECIMAL64,
+		FIELD_TYPE_DECIMAL128, FIELD_TYPE_DECIMAL256,
+	};
+	uint32_t fields[] = {1};
+	for (size_t i = 0; i < lengthof(decimal_types); i++) {
+		box_key_def_t *key_def = box_key_def_new(fields,
+							 &decimal_types[i], 1);
+		fail_unless(key_def == NULL);
+		check_diag("ClientError",
+			   "box_key_def_new does not support fixed point"
+			   " decimal types");
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 /* }}} key_def api */
 
 /* {{{ key_def api v2 */
@@ -777,6 +801,28 @@ test_key_def_new_v2(struct lua_State *L)
 	box_tuple_unref(tuple_1);
 	box_tuple_unref(tuple_2);
 	box_key_def_delete(key_def);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+test_key_def_new_v2_decimals(struct lua_State *L)
+{
+	box_key_part_def_t part;
+	const char *decimal_types[] = {
+		"decimal32", "decimal64", "decimal128", "decimal256",
+	};
+	memset(&part, 0, sizeof(part));
+	part.fieldno = 1;
+	for (size_t i = 0; i < lengthof(decimal_types); i++) {
+		part.field_type = decimal_types[i];
+		box_key_def_t *key_def = box_key_def_new_v2(&part, 1);
+		fail_unless(key_def == NULL);
+		check_diag("ClientError",
+			   "box_key_def_new_v2 does not support fixed point"
+			   " decimal types");
+	}
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -3488,6 +3534,7 @@ luaopen_module_api(lua_State *L)
 		{"test_clock", test_clock },
 		{"test_pushtuple", test_pushtuple},
 		{"test_key_def_api", test_key_def_api},
+		{"test_key_def_api_decimals", test_key_def_api_decimals},
 		{"check_error", check_error},
 		{"test_call", test_call},
 		{"test_cpcall", test_cpcall},
@@ -3500,6 +3547,7 @@ luaopen_module_api(lua_State *L)
 		{"test_tuple_encode", test_tuple_encode},
 		{"test_tuple_new", test_tuple_new},
 		{"test_key_def_new_v2", test_key_def_new_v2},
+		{"test_key_def_new_v2_decimals", test_key_def_new_v2_decimals},
 		{"test_key_def_dump_parts", test_key_def_dump_parts},
 		{"test_key_def_validate_tuple", test_key_def_validate_tuple},
 		{"test_key_def_merge", test_key_def_merge},
