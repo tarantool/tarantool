@@ -123,7 +123,10 @@ extern const char *on_conflict_action_strs[];
 
 /** Check if @a type1 can store values of @a type2. */
 bool
-field_type1_contains_type2(enum field_type type1, enum field_type type2);
+field_type1_contains_type2(enum field_type type1,
+			   const union field_type_params *type_params1,
+			   enum field_type type2,
+			   const union field_type_params *type_params2);
 
 /**
  * Return true for fixed-size integer field `type'.

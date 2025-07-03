@@ -275,10 +275,12 @@ test_field_type1_contains_type2(void)
 {
 	plan(field_type_MAX * field_type_MAX);
 	header();
+	union field_type_params type_params = {0};
 	for (int i = 0; i < field_type_MAX; i++) {
 		for (int j = 0; j < field_type_MAX; j++) {
 			int idx = i * field_type_MAX + j;
-			is(field_type1_contains_type2(j, i),
+			is(field_type1_contains_type2(j, &type_params,
+						      i, &type_params),
 			   field_type_compatibility[idx],
 			   "%s can store values of %s",
 			   field_type_strs[j], field_type_strs[i]);

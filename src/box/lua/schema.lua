@@ -1289,6 +1289,11 @@ local function update_index_parts(format, parts, level)
                       "options.parts[" .. i .. "]: type (string) is expected",
                       level + 1)
         end
+        if fmt then
+           if part.scale == nil then
+               part.scale = fmt.scale
+           end
+        end
         if part.collation == nil and fmt then
             part.collation = fmt.collation
         end

@@ -82,6 +82,11 @@ luaT_push_key_def_parts(struct lua_State *L, const struct key_def *key_def)
 		lua_pushstring(L, field_type_strs[part->type]);
 		lua_setfield(L, -2, "type");
 
+		if (field_type_is_fixed_decimal[part->type]) {
+			luaL_pushint64(L, part->type_params.scale);
+			lua_setfield(L, -2, "scale");
+		}
+
 		lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
 		lua_setfield(L, -2, "fieldno");
 
@@ -182,6 +187,21 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 	if (part->type == field_type_MAX) {
 		diag_set(IllegalParams, "Unknown field type: %s", type_name);
 		return -1;
+	}
+	if (field_type_is_fixed_decimal[part->type]) {
+		lua_pushstring(L, "scale");
+		lua_gettable(L, -2);
+		if (!lua_isnil(L, -1)) {
+			part->type_params.scale = lua_tointeger(L, -1);
+		} else {
+			diag_set(IllegalParams,
+				 "scale is not specified for type %s",
+				 type_name);
+			return -1;
+		}
+		lua_pop(L, 1);
+	} else {
+		part->type_params.scale = 0;
 	}
 
 	/* Set part->is_nullable and part->nullable_action. */
@@ -652,6 +672,7 @@ lbox_key_def_new(struct lua_State *L)
 	if (lua_gettop(L) != 1 || lua_istable(L, 1) != 1)
 		return luaL_error(L, "Bad params, use: key_def.new({"
 				  "{fieldno = fieldno, type = type"
+				  "[, scale = <number>]"
 				  "[, is_nullable = <boolean>]"
 				  "[, exclude_null = <boolean>]"
 				  "[, sort_order = <string>]"

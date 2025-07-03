@@ -58,6 +58,8 @@ struct key_part_def {
 	uint32_t fieldno;
 	/** Type of the tuple field. */
 	enum field_type type;
+	/** Extra parameters for parametric types like decimal32 etc. */
+	union field_type_params type_params;
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
 	/** True if a key part can store NULLs. */
@@ -89,6 +91,8 @@ struct key_part {
 	uint32_t fieldno;
 	/** Type of the tuple field */
 	enum field_type type;
+	/** Extra parameters for parametric types like decimal32 etc. */
+	union field_type_params type_params;
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
 	/** Collation definition for string comparison */
@@ -864,33 +868,17 @@ key_def_incomparable_type(const struct key_def *key_def)
 /**
  * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
  * @param type KeyDef type
+ * @param type_params parametrized types parameters
  * @param key Pointer to MsgPack field to be tested.
  * @param field_no - a field number (is used to store an error message)
  *
  * @retval 0  mp_type is valid.
  * @retval -1 mp_type is invalid.
  */
-static inline int
-key_part_validate(enum field_type key_type, const char *key,
-		  uint32_t field_no, bool is_nullable)
-{
-	if (unlikely(!field_mp_type_is_compatible(key_type, key, is_nullable))) {
-		diag_set(ClientError, ER_KEY_PART_TYPE, field_no,
-			 field_type_strs[key_type]);
-		return -1;
-	}
-	if (field_type_is_fixed_int(key_type)) {
-		char mp_min[16], mp_max[16];
-		if (!field_mp_is_in_fixed_int_range(
-				key_type, key, mp_min, mp_max, NULL)) {
-			diag_set(ClientError, ER_KEY_PART_VALUE_OUT_OF_RANGE,
-				 field_no, field_type_strs[key_type], key,
-				 mp_min, mp_max);
-			return -1;
-		}
-	}
-	return 0;
-}
+int
+key_part_validate(enum field_type key_type,
+		  const union field_type_params *type_params, const char *key,
+		  uint32_t field_no, bool is_nullable);
 
 /**
  * Compare two key part arrays.

@@ -521,7 +521,7 @@ tuple_validate_field(const char *field, struct key_part *part,
 				    part->path_len, part->path));
 		return -1;
 	}
-	if (key_part_validate(part->type, field, field_no,
+	if (key_part_validate(part->type, &part->type_params, field, field_no,
 			      key_part_is_nullable(part)) != 0)
 		return -1;
 	return 0;
