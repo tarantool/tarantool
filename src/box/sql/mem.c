@@ -290,7 +290,7 @@ void
 mem_destroy(struct Mem *mem)
 {
 	mem_clear(mem);
-	if (mem->szMalloc > 0) {
+	if (mem->zMalloc != NULL) {
 		sql_xfree(mem->zMalloc);
 		mem->szMalloc = 0;
 		mem->zMalloc = NULL;
@@ -410,7 +410,8 @@ set_str_const(struct Mem *mem, char *value, size_t len, int alloc_type)
 }
 
 static inline void
-set_str_dynamic(struct Mem *mem, char *value, size_t len, int alloc_type)
+set_str_dynamic(struct Mem *mem, char *value, size_t len, size_t size,
+		int alloc_type)
 {
 	assert(mem->szMalloc == 0 || value != mem->zMalloc);
 	mem_destroy(mem);
@@ -419,7 +420,7 @@ set_str_dynamic(struct Mem *mem, char *value, size_t len, int alloc_type)
 	mem->type = MEM_TYPE_STR;
 	mem->flags = alloc_type;
 	mem->zMalloc = mem->z;
-	mem->szMalloc = len;
+	mem->szMalloc = size;
 }
 
 void
@@ -437,7 +438,7 @@ mem_set_str_static(struct Mem *mem, char *value, size_t len)
 void
 mem_set_str_allocated(struct Mem *mem, char *value, size_t len)
 {
-	set_str_dynamic(mem, value, len, 0);
+	set_str_dynamic(mem, value, len, len, 0);
 }
 
 void
@@ -455,7 +456,8 @@ mem_set_str0_static(struct Mem *mem, char *value)
 void
 mem_set_str0_allocated(struct Mem *mem, char *value)
 {
-	set_str_dynamic(mem, value, strlen(value), 0);
+	size_t len = strlen(value);
+	set_str_dynamic(mem, value, len, len + 1, 0);
 }
 
 static int
