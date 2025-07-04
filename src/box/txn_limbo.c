@@ -40,6 +40,28 @@
 
 struct txn_limbo txn_limbo;
 
+static inline struct txn_limbo_entry *
+txn_limbo_first_entry(struct txn_limbo *limbo)
+{
+	return rlist_first_entry(&limbo->queue, struct txn_limbo_entry,
+				 in_queue);
+}
+
+static inline struct txn_limbo_entry *
+txn_limbo_last_entry(struct txn_limbo *limbo)
+{
+	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
+				in_queue);
+}
+
+double
+txn_limbo_age(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	return fiber_clock() - txn_limbo_first_entry(limbo)->insertion_time;
+}
+
 static inline void
 txn_limbo_create(struct txn_limbo *limbo)
 {

@@ -259,6 +259,10 @@ struct txn_limbo {
  */
 extern struct txn_limbo txn_limbo;
 
+/** Get the age of the oldest non-confirmed limbo entry. */
+double
+txn_limbo_age(struct txn_limbo *limbo);
+
 static inline bool
 txn_limbo_is_empty(struct txn_limbo *limbo)
 {
@@ -267,20 +271,6 @@ txn_limbo_is_empty(struct txn_limbo *limbo)
 
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo);
-
-static inline struct txn_limbo_entry *
-txn_limbo_first_entry(struct txn_limbo *limbo)
-{
-	return rlist_first_entry(&limbo->queue, struct txn_limbo_entry,
-				 in_queue);
-}
-
-static inline struct txn_limbo_entry *
-txn_limbo_last_entry(struct txn_limbo *limbo)
-{
-	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
-				in_queue);
-}
 
 /**
  * Return the latest term as seen in PROMOTE requests from instance with id
