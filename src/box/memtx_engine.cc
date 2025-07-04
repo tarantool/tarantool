@@ -1481,6 +1481,12 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	struct vclock limbo_vclock;
 	struct raft_request raft_req;
 	struct synchro_request synchro_req;
+	say_info("memtx_engine_join(): limbo flush begin");
+	if (txn_limbo_flush(&txn_limbo) != 0) {
+		say_info("memtx_engine_join(): limbo flush error");
+		return -1;
+	}
+	say_info("memtx_engine_join(): limbo flush ok");
 	/*
 	 * Sync WAL to make sure that all changes visible from
 	 * the frozen read view are successfully committed and
@@ -1490,15 +1496,23 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	 * yield between read-view creation. Moreover, wal syncing
 	 * should happen after creation of all engine's read-views.
 	 */
-	if (wal_sync(arg->vclock) != 0)
+	say_info("memtx_engine_join(): wal_sync begin");
+	if (wal_sync(arg->vclock) != 0) {
+		say_info("memtx_engine_join(): wal_sync fail");
 		return -1;
+	}
+	say_info("memtx_engine_join(): wal_sync done");
 
 	/*
 	 * Start sending data only when the latest sync
 	 * transaction is confirmed.
 	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
+	say_info("memtx_engine_join(): limbo wait begin");
+	if (txn_limbo_wait_confirm(&txn_limbo) != 0) {
+		say_info("memtx_engine_join(): limbo wait fail");
 		return -1;
+	}
+	say_info("memtx_engine_join(): limbo wait ok");
 
 	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
 	box_raft_checkpoint_remote(&raft_req);

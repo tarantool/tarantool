@@ -3191,10 +3191,10 @@ box_wait_limbo_acked(double timeout)
 	/* Wait for the last entries WAL write. */
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
-
+		if (txn_limbo_flush(&txn_limbo) != 0)
+			return -1;
 		if (wal_sync(NULL) != 0)
 			return -1;
-
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
@@ -6573,6 +6573,12 @@ on_garbage_collection(void)
 }
 
 static void
+box_on_journal_cascading_rollback(void)
+{
+	txn_limbo_rollback_all_volatile(&txn_limbo);
+}
+
+static void
 box_storage_init(void)
 {
 	assert(!is_storage_initialized);
@@ -6591,6 +6597,7 @@ box_storage_init(void)
 	engine_init();
 	schema_init();
 	txn_limbo_init();
+	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
