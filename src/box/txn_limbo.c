@@ -48,6 +48,28 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
 
+static inline struct txn_limbo_entry *
+txn_limbo_first_entry(struct txn_limbo *limbo)
+{
+	return rlist_first_entry(&limbo->queue, struct txn_limbo_entry,
+				 in_queue);
+}
+
+static inline struct txn_limbo_entry *
+txn_limbo_last_entry(struct txn_limbo *limbo)
+{
+	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
+				in_queue);
+}
+
+double
+txn_limbo_age(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	return fiber_clock() - txn_limbo_first_entry(limbo)->insertion_time;
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
