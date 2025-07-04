@@ -1585,12 +1585,7 @@ sql_create_view(struct Parse *parse_context)
 		n--;
 	end.z = &z[n - 1];
 	end.n = 1;
-	space->def->opts.sql = strndup(begin->z, n);
-	if (space->def->opts.sql == NULL) {
-		diag_set(OutOfMemory, n, "strndup", "opts.sql");
-		parse_context->is_aborted = true;
-		goto create_view_fail;
-	}
+	space->def->opts.sql = xstrndup(begin->z, n);
 	const char *space_name = sql_name_from_token(&create_entity_def->name);
 	int name_reg = ++parse_context->nMem;
 	sqlVdbeAddOp4(parse_context->pVdbe, OP_String8, 0, name_reg, 0,
@@ -1602,6 +1597,7 @@ sql_create_view(struct Parse *parse_context)
 					  OP_NoConflict);
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
 			       name_reg, space);
+	free(space->def->opts.sql);
 
  create_view_fail:
 	sql_expr_list_delete(view_def->aliases);
@@ -1619,14 +1615,6 @@ sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
 	sqlSrcListAssignCursors(parse, select->pSrc);
 	sql_select_delete(select);
 	return 0;
-}
-
-void
-sql_store_select(struct Parse *parse_context, struct Select *select)
-{
-	Select *select_copy = sqlSelectDup(select, 0);
-	parse_context->parsed_ast_type = AST_TYPE_SELECT;
-	parse_context->parsed_ast.select = select_copy;
 }
 
 /**

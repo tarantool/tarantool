@@ -214,6 +214,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* Address of the OpenEphemeral instruction. */
 	int addrOpen = sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
 				     (char *)info, P4_DYNAMIC);
+	sqlVdbeAddOp3(v, OP_IteratorOpen, iEph, 0, reg_eph);
 
 	pWInfo = sqlWhereBegin(pParse, pTabList, pWhere, 0, 0,
 				   WHERE_ONEPASS_DESIRED, pk_cursor);
@@ -234,6 +235,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	if (okOnePass) {
 		sqlVdbeChangeToNoop(v, addrOpen);
+		sqlVdbeChangeToNoop(v, addrOpen + 1);
 		nKey = pk_part_count;
 		regKey = iPk;
 	} else {
@@ -263,7 +265,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		}
 	} else {
 		labelContinue = sqlVdbeMakeLabel(v);
-		sqlVdbeAddOp3(v, OP_IteratorOpen, iEph, 0, reg_eph);
 		sqlVdbeAddOp2(v, OP_Rewind, iEph, labelBreak);
 		addrTop = sqlVdbeAddOp2(v, OP_RowData, iEph, regKey);
 		sqlVdbeAddOp4Int(v, OP_NotFound, pk_cursor, labelContinue,

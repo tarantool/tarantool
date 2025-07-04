@@ -448,22 +448,29 @@ sql_token(const char *z, int *type, bool *is_reserved)
  * Note that this functions can't be called on ordinary
  * space object. It's purpose is to clean-up parser->new_space.
  *
- * @param space Space to be deleted.
+ * @param parser Parser context.
  */
 static void
-parser_space_delete(struct space *space)
+parser_space_delete(struct Parse *parser)
 {
+	struct space *space = parser->create_column_def.space;
 	if (space == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
-	struct space *altered_space = space_by_name0(space->def->name);
 	uint32_t i = 0;
 	/*
-	 * Don't delete already existing defs and start from new
-	 * ones.
+	 * If create_table_def.new_space is NULL,
+	 * the query is ALTER TABLE ADD COLUMNS.
 	 */
-	if (altered_space != NULL)
-		i = altered_space->index_count;
+	if (parser->create_table_def.new_space == NULL) {
+		/*
+		 * Don't delete already existing defs and start from new
+		 * ones.
+		 */
+		struct space *altered_space = space_by_name0(space->def->name);
+		if (altered_space != NULL)
+			i = altered_space->index_count;
+	}
 	for (; i < space->index_count; ++i)
 		index_def_delete(space->index[i]->def);
 }
@@ -589,7 +596,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(pParse->create_column_def.space);
+	parser_space_delete(pParse);
 
 	if (pParse->pWithToFree)
 		sqlWithDelete(pParse->pWithToFree);

@@ -6429,8 +6429,10 @@ sqlSelect(Parse * pParse,		/* The parser context */
 					goto select_end;
 				}
 				updateAccumulator(pParse, &sAggInfo);
-				if (pParse->is_aborted)
+				if (pParse->is_aborted) {
+					whereInfoFree(pWInfo);
 					goto select_end;
+				}
 				assert(pMinMax == 0 || pMinMax->nExpr == 1);
 				if (sqlWhereIsOrdered(pWInfo) > 0) {
 					sqlVdbeGoto(v,

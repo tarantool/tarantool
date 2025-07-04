@@ -1216,8 +1216,7 @@ sqlVdbeList(Vdbe * p)
 				if (nSub == 0) {
 					uint32_t size = sizeof(SubProgram *);
 					char *bin = (char *)&pOp->p4.pProgram;
-					if (mem_copy_bin(pSub, bin, size) != 0)
-						return -1;
+					mem_copy_bin(pSub, bin, size);
 				} else if (j == nSub) {
 					char *bin = (char *)&pOp->p4.pProgram;
 					uint32_t size = sizeof(SubProgram *);

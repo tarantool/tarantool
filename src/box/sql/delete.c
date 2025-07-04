@@ -209,8 +209,13 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		int reg_pk = parse->nMem + 1;
 		int pk_len = is_view ? space->def->field_count + 1 :
 			     space->index[0]->def->key_def->part_count;
+		/*
+		 * This increase should not be necessary, but when filling
+		 * the tab_cursor cursors, an error occurs that causes
+		 * one more cursor to be filled than expected.
+		 */
+		parse->nTab++;
 		int eph_cursor = parse->nTab++;
-		int addr_eph_open = sqlVdbeCurrentAddr(v);
 		struct sql_space_info *info;
 		if (is_view) {
 			/*
@@ -239,8 +244,10 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 								 false);
 		}
 		parse->nMem += pk_len;
-		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0, (char *)info,
-			      P4_DYNAMIC);
+		int addr_eph_open = sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph,
+						  0, 0, (char *)info,
+						  P4_DYNAMIC);
+		sqlVdbeAddOp3(v, OP_IteratorOpen, eph_cursor, 0, reg_eph);
 
 		/* Construct a query to find the primary key for
 		 * every row to be deleted, based on the WHERE
@@ -296,6 +303,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			/* OP_Found will use an unpacked key */
 			key_len = pk_len;
 			sqlVdbeChangeToNoop(v, addr_eph_open);
+			sqlVdbeChangeToNoop(v, addr_eph_open + 1);
 		} else {
 			/* Add the PK key for this row to the
 			 * temporary table.
@@ -352,8 +360,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			sqlVdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 		} else {
-			sqlVdbeAddOp3(v, OP_IteratorOpen,
-					  eph_cursor, 0, reg_eph);
 			addr_loop = sqlVdbeAddOp1(v, OP_Rewind, eph_cursor);
 			sqlVdbeAddOp2(v, OP_RowData, eph_cursor, reg_key);
 		}

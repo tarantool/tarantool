@@ -159,10 +159,7 @@ int sql_found_count = 0;
 /* Return true if the cursor was opened using the OP_OpenSorter opcode. */
 #define isSorter(x) ((x)->eCurType==CURTYPE_SORTER)
 
-/*
- * Allocate VdbeCursor number iCur.  Return a pointer to it.  Return NULL
- * if we run out of memory.
- */
+/** Return a pointer to the allocated VdbeCursor. Does not fail. */
 static VdbeCursor *
 allocateCursor(
 	Vdbe *p,              /* The virtual machine */
@@ -197,16 +194,16 @@ allocateCursor(
 		sqlVdbeFreeCursor(p->apCsr[iCur]);
 		p->apCsr[iCur] = 0;
 	}
-	if (sqlVdbeMemClearAndResize(pMem, nByte) == 0) {
-		p->apCsr[iCur] = pCx = (VdbeCursor*)pMem->z;
-		memset(pCx, 0, offsetof(VdbeCursor,uc));
-		pCx->eCurType = eCurType;
-		pCx->nField = nField;
-		vdbe_field_ref_create(&pCx->field_ref, nField);
-		if (eCurType==CURTYPE_TARANTOOL) {
-			pCx->uc.pCursor = (BtCursor*)&pMem->z[bt_offset];
-			sqlCursorZero(pCx->uc.pCursor);
-		}
+	sqlVdbeMemClearAndResize(pMem, nByte);
+	pCx = (struct VdbeCursor *)pMem->z;
+	p->apCsr[iCur] = pCx;
+	memset(pCx, 0, offsetof(VdbeCursor, uc));
+	pCx->eCurType = eCurType;
+	pCx->nField = nField;
+	vdbe_field_ref_create(&pCx->field_ref, nField);
+	if (eCurType == CURTYPE_TARANTOOL) {
+		pCx->uc.pCursor = (struct BtCursor *)&pMem->z[bt_offset];
+		sqlCursorZero(pCx->uc.pCursor);
 	}
 	return pCx;
 }
@@ -1373,10 +1370,11 @@ case OP_Array: {
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	char *val = mem_encode_array(&aMem[pOp->p3], pOp->p1, &size, region);
-	if (val == NULL || mem_copy_array(pOut, val, size) != 0) {
+	if (val == NULL) {
 		region_truncate(region, svp);
 		goto abort_due_to_error;
 	}
+	mem_copy_array(pOut, val, size);
 	region_truncate(region, svp);
 	break;
 }
@@ -1394,10 +1392,11 @@ case OP_Map: {
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	char *val = mem_encode_map(&aMem[pOp->p3], pOp->p1, &size, region);
-	if (val == NULL || mem_copy_map(pOut, val, size) != 0) {
+	if (val == NULL) {
 		region_truncate(region, svp);
 		goto abort_due_to_error;
 	}
+	mem_copy_map(pOut, val, size);
 	region_truncate(region, svp);
 	break;
 }
@@ -2097,8 +2096,7 @@ case OP_MakeRecord: {
 	 * routine.
 	 */
 	if (bIsEphemeral) {
-		if (mem_copy_bin(pOut, tuple, tuple_size) != 0)
-			goto abort_due_to_error;
+		mem_copy_bin(pOut, tuple, tuple_size);
 		region_truncate(region, used);
 	} else {
 		/* Allocate memory on the region for the tuple
@@ -2457,8 +2455,6 @@ case OP_IteratorOpen: {
 			     space->def->field_count :
 			     space->def->exact_field_count,
 			     CURTYPE_TARANTOOL);
-	if (cur == NULL)
-		goto abort_due_to_error;
 	struct BtCursor *bt_cur = cur->uc.pCursor;
 	bt_cur->curFlags |= space->def->id == 0 ? BTCF_TEphemCursor :
 				BTCF_TaCursor;
@@ -2529,8 +2525,6 @@ case OP_SorterOpen: {
 	if (def == NULL)
 		goto abort_due_to_error;
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
-	if (pCx == NULL)
-		goto abort_due_to_error;
 	pCx->key_def = def;
 	if (sqlVdbeSorterInit(pCx) != 0)
 		goto abort_due_to_error;
@@ -2577,8 +2571,6 @@ case OP_OpenPseudo: {
 	assert(pOp->p1>=0);
 	assert(pOp->p3>=0);
 	pCx = allocateCursor(p, pOp->p1, pOp->p3, CURTYPE_PSEUDO);
-	if (pCx == NULL)
-		goto abort_due_to_error;
 	pCx->nullRow = 1;
 	pCx->uc.pseudoTableReg = pOp->p2;
 	assert(pOp->p5==0);
