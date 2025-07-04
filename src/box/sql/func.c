@@ -433,8 +433,7 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	if (start >= end)
 		return mem_set_bin_static(ctx->pOut, "", 0);
-	if (mem_copy_bin(ctx->pOut, &str[start], end - start) != 0)
-		ctx->is_aborted = true;
+	mem_copy_bin(ctx->pOut, &str[start], end - start);
 }
 
 /** Return the position of the last not removed character. */
@@ -544,8 +543,7 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	if (start >= end)
 		return mem_set_str0_static(ctx->pOut, "");
-	if (mem_copy_str(ctx->pOut, &str[start], end - start) != 0)
-		ctx->is_aborted = true;
+	mem_copy_str(ctx->pOut, &str[start], end - start);
 }
 
 /** Implementation of the POSITION() function. */
@@ -676,8 +674,10 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 		}
 		char *s = &argv[0].z[start];
 		uint64_t n = size - start;
-		ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, s, n) != 0 :
-				  mem_copy_bin(ctx->pOut, s, n) != 0;
+		if (is_str)
+			mem_copy_str(ctx->pOut, s, n);
+		else
+			mem_copy_bin(ctx->pOut, s, n);
 		return;
 	}
 
@@ -706,8 +706,10 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 	}
 	char *str = &argv[0].z[start];
 	uint64_t len = MIN(size - start, length);
-	ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, str, len) != 0 :
-			  mem_copy_bin(ctx->pOut, str, len) != 0;
+	if (is_str)
+		mem_copy_str(ctx->pOut, str, len);
+	else
+		mem_copy_bin(ctx->pOut, str, len);
 }
 
 static void
@@ -737,8 +739,7 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 		}
 		if (pos == end)
 			return mem_set_str_static(ctx->pOut, "", 0);
-		if (mem_copy_str(ctx->pOut, str + pos, end - pos) != 0)
-			ctx->is_aborted = true;
+		mem_copy_str(ctx->pOut, str + pos, end - pos);
 		return;
 	}
 
@@ -775,8 +776,7 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 		U8_NEXT((uint8_t *)str, cur, end, c);
 	}
 	assert(cur > pos);
-	if (mem_copy_str(ctx->pOut, str + pos, cur - pos) != 0)
-		ctx->is_aborted = true;
+	mem_copy_str(ctx->pOut, str + pos, cur - pos);
 }
 
 /**
@@ -1523,8 +1523,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	case MEM_TYPE_UUID: {
 		char buf[UUID_STR_LEN + 1];
 		tt_uuid_to_string(&argv[0].u.uuid, &buf[0]);
-		if (mem_copy_str(context->pOut, buf, UUID_STR_LEN) != 0)
-			context->is_aborted = true;
+		mem_copy_str(context->pOut, buf, UUID_STR_LEN);
 		break;
 	}
 	case MEM_TYPE_DATETIME: {
@@ -1532,8 +1531,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		uint32_t len = datetime_to_string(&context->pOut->u.dt, buf,
 						  DT_TO_STRING_BUFSIZE);
 		assert(len == strlen(buf));
-		if (mem_copy_str(context->pOut, buf, len) != 0)
-			context->is_aborted = true;
+		mem_copy_str(context->pOut, buf, len);
 		break;
 	}
 	case MEM_TYPE_INTERVAL: {
@@ -1541,8 +1539,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		uint32_t len = interval_to_string(&context->pOut->u.itv, buf,
 						  DT_IVAL_TO_STRING_BUFSIZE);
 		assert(len == strlen(buf));
-		if (mem_copy_str(context->pOut, buf, len) != 0)
-			context->is_aborted = true;
+		mem_copy_str(context->pOut, buf, len);
 		break;
 	}
 	case MEM_TYPE_DOUBLE:
@@ -1736,8 +1733,7 @@ soundexFunc(struct sql_context *context, int argc, const struct Mem *argv)
 			zResult[j++] = '0';
 		}
 		zResult[j] = 0;
-		if (mem_copy_str(context->pOut, zResult, 4) != 0)
-			context->is_aborted = true;
+		mem_copy_str(context->pOut, zResult, 4);
 	} else {
 		mem_set_str_static(context->pOut, "?000", 4);
 	}
