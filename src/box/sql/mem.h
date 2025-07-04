@@ -414,14 +414,14 @@ void
 mem_set_str0_allocated(struct Mem *mem, char *value);
 
 /** Copy string to a newly allocated memory. The MEM type becomes STRING. */
-int
+void
 mem_copy_str(struct Mem *mem, const char *value, size_t len);
 
 /**
  * Copy NULL-terminated string to a newly allocated memory. The MEM type becomes
  * STRING.
  */
-int
+void
 mem_copy_str0(struct Mem *mem, const char *value);
 
 /**
@@ -448,7 +448,7 @@ mem_set_bin_allocated(struct Mem *mem, char *value, size_t size);
  * Copy binary value to a newly allocated memory. The MEM type becomes
  * VARBINARY.
  */
-int
+void
 mem_copy_bin(struct Mem *mem, const char *value, size_t size);
 
 /**
@@ -476,7 +476,7 @@ void
 mem_set_map_allocated(struct Mem *mem, char *value, size_t size);
 
 /** Copy MAP value to a newly allocated memory. The MEM type becomes MAP. */
-int
+void
 mem_copy_map(struct Mem *mem, const char *value, size_t size);
 
 /**
@@ -504,7 +504,7 @@ void
 mem_set_array_allocated(struct Mem *mem, char *value, size_t size);
 
 /** Copy ARRAY value to a newly allocated memory. The MEM type becomes ARRAY. */
-int
+void
 mem_copy_array(struct Mem *mem, const char *value, size_t size);
 
 /** Clear MEM and set it to invalid state. */
@@ -774,9 +774,9 @@ int sqlVdbeCheckMemInvariants(struct Mem *);
  * pMem->zMalloc already meets or exceeds the requested size, this routine is a
  * no-op. Any prior string or blob content in the pMem object will be discarded.
  *
- * Return 0 on success or -1 if unable to complete the resizing.
+ * Return nothing because it does not fail.
  */
-int
+void
 sqlVdbeMemClearAndResize(struct Mem *pMem, size_t n);
 
 /*
