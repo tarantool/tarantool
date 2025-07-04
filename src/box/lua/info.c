@@ -724,14 +724,10 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "busy");
 	luaL_pushuint64(L, queue->promote_greatest_term);
 	lua_setfield(L, -2, "term");
-	if (queue->len == 0) {
+	if (queue->len == 0)
 		lua_pushnumber(L, 0);
-	} else {
-		struct txn_limbo_entry *oldest_entry =
-			txn_limbo_first_entry(queue);
-		double now = fiber_clock();
-		lua_pushnumber(L, now - oldest_entry->insertion_time);
-	}
+	else
+		lua_pushnumber(L, txn_limbo_age(queue));
 	lua_setfield(L, -2, "age");
 	lua_pushnumber(L, queue->confirm_lag);
 	lua_setfield(L, -2, "confirm_lag");
