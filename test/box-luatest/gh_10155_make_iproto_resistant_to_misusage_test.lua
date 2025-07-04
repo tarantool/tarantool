@@ -30,10 +30,6 @@ local function encode_map(map)
     return msgpack.object(setmetatable(map, {__serialize = 'map'}))
 end
 
-local function setmap(map)
-    return setmetatable(map, {__serialize = 'map'})
-end
-
 local function socket_write(s, header, body)
     return s:write(box.iproto.encode_packet(header, body))
 end
@@ -62,12 +58,12 @@ local function write_eval(s, expr)
     return s:write(box.iproto.encode_packet(header, body))
 end
 
-local function write_fetch_snapshot(s)
+local function write_fetch_snapshot(s, uuid)
     local header = {
         [key.REQUEST_TYPE] = box.iproto.type.FETCH_SNAPSHOT,
         [key.SYNC] = 1,
     }
-    local body = setmap({})
+    local body = { [key.INSTANCE_UUID] = uuid }
     return socket_write(s, header, body)
 end
 
@@ -203,7 +199,7 @@ end
 g.test_iproto_crash_fetch_snapshot_subscribe = function(g)
     local uuid = require('uuid').str()
     local replicaset_uuid = g.server:eval('return box.info.replicaset.uuid')
-    write_fetch_snapshot(g.s)
+    write_fetch_snapshot(g.s, uuid)
     local request_type = socket_read(g.s)[key.REQUEST_TYPE]
     t.assert_equals(request_type, type.OK)
     read_snapshot(g.s)
@@ -223,7 +219,7 @@ end
 g.test_iproto_crash_fetch_snapshot_subscribe_not_anon = function(g)
     local uuid = require('uuid').str()
     local replicaset_uuid = g.server:eval('return box.info.replicaset.uuid')
-    write_fetch_snapshot(g.s)
+    write_fetch_snapshot(g.s, uuid)
     local request_type = socket_read(g.s)[key.REQUEST_TYPE]
     t.assert_equals(request_type, type.OK)
     read_snapshot(g.s)
