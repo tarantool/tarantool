@@ -366,11 +366,11 @@ txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
 static void
 txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 {
+	txn_set_flags(txn, TXN_STMT_ROLLBACK);
 	if (stmt->has_triggers && trigger_run(&stmt->on_rollback, stmt) != 0) {
 		diag_log();
 		panic("statement rollback trigger failed");
 	}
-	txn_set_flags(txn, TXN_STMT_ROLLBACK);
 	if (stmt->engine != NULL && stmt->space != NULL)
 		engine_rollback_statement(stmt->engine, txn, stmt);
 	txn_clear_flags(txn, TXN_STMT_ROLLBACK);

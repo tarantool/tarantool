@@ -55,6 +55,7 @@ const struct index_opts index_opts_default = {
 	/* .covered_fields      = */ NULL,
 	/* .covered_field_count = */ 0,
 	/* .layout              = */ NULL,
+	/* .filters             = */ NULL,
 };
 
 /**
@@ -133,6 +134,37 @@ index_opts_parse_layout(const char **data, void *opts, struct region *region)
 	return 0;
 }
 
+/**
+ * Parse index covers options given as MsgPack in `data' into `opts'. Covered
+ * fields array is allocated on `region'.
+ */
+static int
+index_opts_parse_filters(const char **data, void *opts,
+			 struct region *region)
+{
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	const char *filters = *data;
+	if (mp_typeof(**data) != MP_ARRAY) {
+		diag_set(IllegalParams, "'filters' must be array");
+		return -1;
+	}
+	uint32_t filter_count = mp_decode_array(data);
+	if (filter_count == 0)
+		return 0;
+
+	for (uint32_t i = 0; i < filter_count; i++) {
+		if (mp_typeof(**data) != MP_MAP) {
+			diag_set(IllegalParams,
+				 "'filters' elements must be map");
+			return -1;
+		}
+		mp_next(data);
+	}
+	index_opts->filters = xregion_alloc(region, *data - filters);
+	memcpy(index_opts->filters, filters, *data - filters);
+	return 0;
+}
+
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
@@ -149,6 +181,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
 	OPT_DEF_CUSTOM("layout", index_opts_parse_layout),
+	OPT_DEF_CUSTOM("filters", index_opts_parse_filters),
 	OPT_END,
 };
 
@@ -167,6 +200,15 @@ index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
 	if (opts->layout != NULL)
 		opts->layout = xstrdup(opts->layout);
+
+	if (opts->filters != NULL) {
+		char *filters = opts->filters;
+		const char *filters_end = filters;
+		mp_next(&filters_end);
+		uint32_t filters_size = filters_end - filters;
+		opts->filters = xmalloc(filters_size);
+		memcpy(opts->filters, filters, filters_size);
+	}
 
 	if (opts->covered_field_count == 0)
 		return;
@@ -239,6 +281,14 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 	}
 	if (dup->layout != NULL)
 		dup->layout = xstrdup(dup->layout);
+	if (dup->filters != NULL) {
+		char *filters = dup->filters;
+		const char *filters_end = filters;
+		mp_next(&filters_end);
+		uint32_t filters_size = filters_end - filters;
+		dup->filters = xmalloc(filters_size);
+		memcpy(dup->filters, filters, filters_size);
+	}
 }
 
 struct index_def *

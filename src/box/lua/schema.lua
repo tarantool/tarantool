@@ -1561,6 +1561,7 @@ local index_options = {
     hint = 'boolean',
     covers = 'table',
     layout = 'string',
+    filters = 'table',
 }
 
 local function jsonpaths_from_idx_parts(parts)
@@ -1595,6 +1596,7 @@ local alter_index_template = {
     type = 'string',
     parts = 'table',
     sequence = 'boolean, number, string, table',
+    filters = 'table',
 }
 for k, v in pairs(index_options) do
     alter_index_template[k] = v
@@ -1617,6 +1619,32 @@ local function func_id_by_name(func_name, level)
 end
 box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
 
+-- Normalize one field:
+-- - fields referenced as name are resolved to 0-based field number.
+-- - fields referenced as 1-based field number are converted to 0-based.
+local function normalize_field(field, format, what, level, index)
+    local idx
+    local field_ref = what .. "[" .. index .. "]: "
+    if type(field) == 'string' then
+        idx = format_field_index_by_name(format, field)
+        if idx == nil then
+            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                      "field was not found by name '" .. field .. "'",
+                      level + 1)
+        end
+    elseif type(field) == 'number' then
+        if field <= 0 then
+            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                      "field (number) must be one-based", level + 1)
+        end
+        idx = field
+    else
+        box.error(box.error.ILLEGAL_PARAMS, field_ref ..
+                  "field (name or number) is expected", level + 1)
+    end
+    return idx - 1
+end
+
 -- Normalize array of fields `fields`:
 -- - fields referenced as name are resolved to 0-based field number.
 -- - fields referenced as 1-based field number are converted to 0-based.
@@ -1625,26 +1653,22 @@ local function normalize_fields(fields, format, what, level)
     -- sparse array or map with keys.
     local result = {}
     for i, field in ipairs(fields) do
-        local idx
-        local field_ref = what .. "[" .. i .. "]: "
-        if type(field) == 'string' then
-            idx = format_field_index_by_name(format, field)
-            if idx == nil then
-                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                          "field was not found by name '" .. field .. "'",
-                          level + 1)
-            end
-        elseif type(field) == 'number' then
-            if field <= 0 then
-                box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                          "field (number) must be one-based", level + 1)
-            end
-            idx = field
-        else
-            box.error(box.error.ILLEGAL_PARAMS, field_ref ..
-                      "field (name or number) is expected", level + 1)
+        result[i] = normalize_field(field, format, what, level + 1, i)
+    end
+    return result
+end
+
+-- Normalize array of filters `filters`: all fields are normalized.
+local function normalize_filters(filters, format, what, level)
+    -- Do not much care if opts.covers is something strange like
+    -- sparse array or map with keys.
+    local result = {}
+    for i, filter in ipairs(filters) do
+        result[i] = table.deepcopy(filter)
+        if type(filter) == 'table' and filter.field ~= nil then
+            result[i].field = normalize_field(filter.field, format, what,
+                                              level + 1, i)
         end
-        result[i] = idx - 1
     end
     return result
 end
@@ -1737,6 +1761,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             hint = options.hint,
             covers = options.covers,
             layout = options.layout,
+            filters = options.filters,
     }
     local field_type_aliases = {
         num = 'unsigned'; -- Deprecated since 1.7.2
@@ -1765,6 +1790,10 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
     if index_opts.covers ~= nil then
         index_opts.covers = normalize_fields(index_opts.covers, format,
                                              'options.covers', 2)
+    end
+    if index_opts.filters ~= nil then
+        index_opts.filters = normalize_filters(index_opts.filters, format,
+                                               'options.filters', 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, iid,
@@ -1907,9 +1936,13 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
     if index_opts.func ~= nil and type(index_opts.func) == 'string' then
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
-    if index_opts.covers ~= nil then
-        index_opts.covers = normalize_fields(index_opts.covers, format,
+    if options.covers ~= nil then
+        index_opts.covers = normalize_fields(options.covers, format,
                                              'options.covers', 2)
+    end
+    if options.filters ~= nil then
+        index_opts.filters = normalize_filters(options.filters, format,
+                                               'options.filters', 2)
     end
     local sequence_proxy = space_sequence_alter_prepare(format, parts, options,
                                                         space_id, index_id,
