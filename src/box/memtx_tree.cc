@@ -31,6 +31,7 @@
 #include "memtx_tree.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -43,7 +44,19 @@
 #include "trivia/config.h"
 #include "trivia/util.h"
 #include "tt_sort.h"
+#include "scoped_guard.h"
 #include <small/mempool.h>
+
+/**
+ * Check if an index has a tree with hints enabled given its definition.
+ */
+static bool
+memtx_tree_index_uses_hint(struct index_def *def)
+{
+	return def->key_def->for_func_index ||
+	       def->key_def->is_multikey ||
+	       def->opts.hint == INDEX_HINT_ON;
+}
 
 /**
  * Struct that is used as a key in BPS tree definition.
@@ -2237,6 +2250,61 @@ memtx_tree_index_end_build(struct index *base)
 	index->build_array_alloc_size = 0;
 }
 
+/**
+ * Build the index using the O(n) sort algorithm with MemTX sort data.
+ */
+template<bool USE_HINT>
+static int
+memtx_tree_index_build_using_sort_data(
+	struct index *base,
+	struct memtx_sort_data_reader *reader)
+{
+	assert(!base->def->key_def->for_func_index);
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+
+	/* Check if can use the sort data. */
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	if (cmp_def->for_func_index)
+		panic("func indexes aren't expected to be presorted");
+
+	/* Load the build array. */
+	size_t build_array_bsize = memtx_sort_data_reader_get_size(reader);
+	struct memtx_tree_data<USE_HINT> *build_array =
+		(struct memtx_tree_data<USE_HINT> *)xmalloc(build_array_bsize);
+	auto _ = make_scoped_guard([build_array] { free(build_array); });
+	size_t build_array_size = build_array_bsize / sizeof(build_array[0]);
+	if (memtx_sort_data_reader_get(reader, build_array) != 0)
+		return -1; /* Failed to read sort data. */
+
+	/* Fix the tuple pointers. */
+	for (size_t i = 0; i < build_array_size; i++) {
+		struct tuple *old_ptr = build_array[i].tuple;
+		struct tuple *new_ptr =
+			memtx_sort_data_reader_resolve_tuple(reader, old_ptr);
+		if (new_ptr == NULL)
+			return -1; /* Corrupted sort data. */
+		build_array[i].tuple = new_ptr;
+	}
+
+	/* Build the index. */
+	memtx_tree_build(&index->tree, build_array, build_array_size);
+	return 0;
+}
+
+int
+memtx_tree_index_build_using_sort_data(struct index *base,
+				       struct memtx_sort_data_reader *reader)
+{
+	if (memtx_tree_index_uses_hint(base->def)) {
+		return memtx_tree_index_build_using_sort_data<true>(base,
+								    reader);
+	} else {
+		return memtx_tree_index_build_using_sort_data<false>(base,
+								     reader);
+	}
+}
+
 /** Read view implementation. */
 template <bool USE_HINT>
 struct tree_read_view {
@@ -2248,6 +2316,8 @@ struct tree_read_view {
 	memtx_tree_view_t<USE_HINT> tree_view;
 	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+	/** Used for dumping into the sort data file. */
+	memtx_tree_iterator_t<USE_HINT> dump_iterator;
 };
 
 /** Read view iterator implementation. */
@@ -2475,11 +2545,64 @@ memtx_tree_index_create_read_view(struct index *base)
 	struct space *space = space_by_id(base->def->space_id);
 	assert(space != NULL);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space, base);
+	invalidate_tree_iterator(&rv->dump_iterator);
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
 	tree_read_view_reset_key_def(rv);
 	return (struct index_read_view *)rv;
+}
+
+/** Dump the tree data into the sort data file. */
+template<bool USE_HINT>
+static int
+memtx_tree_index_read_view_dump_sort_data(
+	struct index_read_view *base, ssize_t tuple_count,
+	struct memtx_sort_data_writer *sort_data, bool *have_more)
+{
+	assert(!base->def->key_def->for_func_index);
+
+	/* Collect the data to save. */
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	struct memtx_tree_data<USE_HINT> *buffer =
+		(struct memtx_tree_data<USE_HINT> *)
+			xmalloc(sizeof(*buffer) * tuple_count);
+	auto _ = make_scoped_guard([buffer] { free(buffer); });
+	ssize_t dumped = 0;
+	while (dumped != tuple_count &&
+	       memtx_tree_view_iterator_next(&rv->tree_view,
+					     &rv->dump_iterator)) {
+		struct memtx_tree_data<USE_HINT> *data =
+			memtx_tree_view_iterator_get_elem(
+				&rv->tree_view, &rv->dump_iterator);
+		if (memtx_tx_snapshot_clarify(&rv->cleaner,
+					      data->tuple) == NULL)
+			continue; /* Only dump visible data. */
+		buffer[dumped++] = *data;
+	}
+
+	/* Write the collected data to the sort data file. */
+	if (memtx_sort_data_writer_put(sort_data, buffer,
+				       sizeof(*buffer), dumped) != 0)
+		return -1;
+
+	*have_more = !memtx_tree_iterator_is_invalid(&rv->dump_iterator);
+	return 0;
+}
+
+int
+memtx_tree_index_read_view_dump_sort_data(
+	struct index_read_view *base, ssize_t tuple_count,
+	struct memtx_sort_data_writer *sort_data, bool *have_more)
+{
+	if (memtx_tree_index_uses_hint(base->def)) {
+		return memtx_tree_index_read_view_dump_sort_data<true>(
+			base, tuple_count, sort_data, have_more);
+	} else {
+		return memtx_tree_index_read_view_dump_sort_data<false>(
+			base, tuple_count, sort_data, have_more);
+	}
 }
 
 /**
@@ -2619,7 +2742,7 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	bool use_hint = false;
+	bool use_hint = memtx_tree_index_uses_hint(def);
 	const struct index_vtab *vtab;
 	if (def->key_def->for_func_index) {
 		if (def->key_def->func_index_func != NULL) {
@@ -2629,17 +2752,18 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 			vtab = get_memtx_tree_index_vtab
 				<MEMTX_TREE_VTAB_DISABLED>();
 		}
-		use_hint = true;
+		assert(use_hint);
 	} else if (def->key_def->is_multikey) {
 		vtab = get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_MULTIKEY>();
-		use_hint = true;
+		assert(use_hint);
 	} else if (def->opts.hint == INDEX_HINT_ON) {
 		vtab = get_memtx_tree_index_vtab
 			<MEMTX_TREE_VTAB_GENERAL, true>();
-		use_hint = true;
+		assert(use_hint);
 	} else {
 		vtab = get_memtx_tree_index_vtab
 			<MEMTX_TREE_VTAB_GENERAL, false>();
+		assert(!use_hint);
 	}
 	if (use_hint)
 		return memtx_tree_index_new_tpl<true>(memtx, def, vtab);
