@@ -2736,6 +2736,16 @@ C['groups.*.replicasets.*.bootstrap_leader'] = format_text([[
     manually, you need to set `replication.bootstrap_strategy` to `config`.
 ]])
 
+C['include'] = format_text([[
+    A list of files to include in the cluster configuration. The files are
+    included in the order they are specified in the list.
+]])
+
+C['include.*'] = format_text([[
+    A file to include in the cluster configuration. If the file path is a
+    relative path, it is interpreted relative to `process.work_dir`.
+]])
+
 -- }}} groups configuration
 
 -- }}} Cluster descriptions
