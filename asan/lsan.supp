@@ -5,7 +5,6 @@
 #leak:*
 
 # to be removed in scope of gh-10532
-leak:index_def_new
 leak:sql_ephemeral_space_new
 
 # to be removed in scope of gh-10184
