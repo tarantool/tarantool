@@ -65,6 +65,7 @@
 #include "index.h"
 #include "port.h"
 #include "txn.h"
+#include "txn_checkpoint.h"
 #include "txn_limbo.h"
 #include "user.h"
 #include "cfg.h"
@@ -3005,7 +3006,7 @@ box_wait_limbo_acked(double timeout)
 	/* Wait for the last entries WAL write. */
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
-		if (journal_sync(NULL) != 0)
+		if (txn_persist_all_prepared(NULL) != 0)
 			return -1;
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
