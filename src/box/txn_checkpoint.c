@@ -14,7 +14,7 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	 * For async txns the persistence means commit. For sync txns need to
 	 * wait for their confirmation explicitly.
 	 */
-	if (journal_sync(&out->journal_vclock) != 0)
+	if (txn_persist_all_prepared(&out->journal_vclock) != 0)
 		return -1;
 	/*
 	 * The synchronous transactions, persisted above, might still be not
@@ -27,4 +27,10 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	txn_limbo_checkpoint(limbo, &out->limbo_checkpoint, &out->limbo_vclock);
 	box_raft_checkpoint_remote(&out->raft_remote_checkpoint);
 	return 0;
+}
+
+int
+txn_persist_all_prepared(struct vclock *out)
+{
+	return journal_sync(out);
 }
