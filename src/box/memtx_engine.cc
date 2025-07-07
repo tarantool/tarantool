@@ -62,7 +62,6 @@
 #include "memtx_space_upgrade.h"
 #include "tt_sort.h"
 #include "assoc.h"
-#include "wal.h"
 
 #include <type_traits>
 
@@ -1490,9 +1489,8 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	 * yield between read-view creation. Moreover, wal syncing
 	 * should happen after creation of all engine's read-views.
 	 */
-	if (wal_sync(arg->vclock) != 0)
+	if (journal_sync(arg->vclock) != 0)
 		return -1;
-
 	/*
 	 * Start sending data only when the latest sync
 	 * transaction is confirmed.
