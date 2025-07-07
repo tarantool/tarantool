@@ -42,12 +42,16 @@ extern "C" {
 struct xrow_header;
 struct journal;
 struct journal_entry;
+struct vclock;
 
 typedef void
 (*journal_on_write_f)(struct journal_entry *entry);
 
 typedef int
 (*journal_submit_f)(struct journal *journal, struct journal_entry *entry);
+
+typedef int
+(*journal_sync_f)(struct journal *journal, struct vclock *out);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -182,6 +186,8 @@ extern struct journal_queue journal_queue;
 struct journal {
 	/** Asynchronous write */
 	journal_submit_f submit;
+	/** Ensure all the currently queued requests are written. */
+	journal_sync_f sync;
 };
 
 /** Wake the journal queue up. */
@@ -192,7 +198,11 @@ journal_queue_wakeup(void);
 int
 journal_queue_wait(struct journal_entry *entry);
 
-/** Flush journal queue. Next wal_sync() will sync flushed requests. */
+/**
+ * Make sure the volatile journal queue is emptied (either sent to WAL or rolled
+ * back). Keep in mind that it doesn't guarantee the success of the flushed
+ * entries.
+ */
 int
 journal_queue_flush(void);
 
@@ -279,6 +289,12 @@ journal_write(struct journal_entry *entry)
 	return 0;
 }
 
+static inline int
+journal_sync(struct vclock *out)
+{
+	return current_journal->sync(current_journal, out);
+}
+
 /**
  * Change the current implementation of the journaling API.
  * Happens during life cycle of an instance:
@@ -307,9 +323,11 @@ journal_set(struct journal *new_journal)
 }
 
 static inline void
-journal_create(struct journal *journal, journal_submit_f submit)
+journal_create(struct journal *journal, journal_submit_f submit,
+	       journal_sync_f sync)
 {
 	journal->submit = submit;
+	journal->sync = sync;
 }
 
 static inline bool
