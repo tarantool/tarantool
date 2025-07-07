@@ -746,7 +746,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write);
+	journal_create(&journal.base, recovery_journal_write, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -3190,10 +3190,8 @@ box_wait_limbo_acked(double timeout)
 	/* Wait for the last entries WAL write. */
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
-
-		if (wal_sync(NULL) != 0)
+		if (journal_sync(NULL) != 0)
 			return -1;
-
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
@@ -6138,7 +6136,7 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, bootstrap_journal_write);
+	journal_create(&bootstrap_journal, bootstrap_journal_write, NULL);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);
