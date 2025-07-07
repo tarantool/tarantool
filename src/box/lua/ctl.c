@@ -181,7 +181,7 @@ lbox_ctl_set_iproto_lockdown(struct lua_State *L)
 static int
 lbox_ctl_wal_sync(struct lua_State *L)
 {
-	if (wal_sync(NULL))
+	if (journal_sync(NULL))
 		return luaT_error(L);
 	return 0;
 }
