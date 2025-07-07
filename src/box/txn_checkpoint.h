@@ -38,6 +38,14 @@ struct txn_checkpoint {
 int
 txn_checkpoint_build(struct txn_checkpoint *out);
 
+/**
+ * Wait until all the prepared txns have been successfully written to the
+ * journal. However there is not guarantee that they are going to be committed.
+ * For synchronous txns just a journal write isn't enough.
+ */
+int
+txn_persist_all_prepared(struct vclock *out);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
