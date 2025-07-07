@@ -483,6 +483,12 @@ txn_free(struct txn *txn)
 	stailq_add(&txn_cache, &txn->in_txn_cache);
 }
 
+int
+txn_persist_all_prepared(struct vclock *out)
+{
+	return journal_sync(out);
+}
+
 void
 diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature)
 {

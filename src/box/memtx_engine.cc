@@ -1481,19 +1481,22 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	struct raft_request raft_req;
 	struct synchro_request synchro_req;
 	/*
-	 * Sync WAL to make sure that all changes visible from
-	 * the frozen read view are successfully committed and
-	 * obtain corresponding vclock.
+	 * Make sure that all changes visible from the frozen read view have
+	 * reached WAL and get the vclock collected exactly at that moment.
+	 *
+	 * For async txns the persistence means commit. For sync txns need to
+	 * wait for their confirmation explicitly.
 	 *
 	 * This cannot be done in prepare_join, as we should not
 	 * yield between read-view creation. Moreover, wal syncing
 	 * should happen after creation of all engine's read-views.
 	 */
-	if (journal_sync(arg->vclock) != 0)
+	if (txn_persist_all_prepared(arg->vclock) != 0)
 		return -1;
 	/*
-	 * Start sending data only when the latest sync
-	 * transaction is confirmed.
+	 * The synchronous transactions, persisted above, might still be not
+	 * committed. Lets make sure they are, so the read-view won't have any
+	 * rolled back data.
 	 */
 	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
 		return -1;
