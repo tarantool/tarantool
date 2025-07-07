@@ -40,10 +40,14 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct xrow_header;
+struct journal;
 struct journal_entry;
 
 typedef void
 (*journal_on_write_f)(struct journal_entry *entry);
+
+typedef int
+(*journal_submit_f)(struct journal *journal, struct journal_entry *entry);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -177,8 +181,7 @@ extern struct journal_queue journal_queue;
  */
 struct journal {
 	/** Asynchronous write */
-	int (*write_async)(struct journal *journal,
-			   struct journal_entry *entry);
+	journal_submit_f submit;
 };
 
 /** Wake the journal queue up. */
@@ -254,10 +257,10 @@ journal_write_submit(struct journal_entry *entry)
 		return -1;
 	/*
 	 * We cannot account entry after write. If journal is synchronous
-	 * the journal_queue_on_complete() is called in write_async().
+	 * the journal_queue_on_complete() is called in submit().
 	 */
 	journal_queue_on_append(entry);
-	if (current_journal->write_async(current_journal, entry) != 0) {
+	if (current_journal->submit(current_journal, entry) != 0) {
 		journal_queue_on_complete(entry);
 		journal_queue_rollback();
 		return -1;
@@ -304,17 +307,15 @@ journal_set(struct journal *new_journal)
 }
 
 static inline void
-journal_create(struct journal *journal,
-	       int (*write_async)(struct journal *journal,
-				  struct journal_entry *entry))
+journal_create(struct journal *journal, journal_submit_f submit)
 {
-	journal->write_async = write_async;
+	journal->submit = submit;
 }
 
 static inline bool
 journal_is_initialized(struct journal *journal)
 {
-	return journal->write_async != NULL;
+	return journal->submit != NULL;
 }
 
 #if defined(__cplusplus)
