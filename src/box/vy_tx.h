@@ -324,7 +324,7 @@ vy_tx_manager_destroy_read_view(struct vy_tx_manager *xm,
  *
  * @need_wal_sync is set if at least one transaction can't be
  * aborted, because it has reached WAL. The caller is supposed
- * to call wal_sync() to flush them.
+ * to call journal_sync() to flush them.
  */
 void
 vy_tx_manager_abort_writers_for_ddl(struct vy_tx_manager *xm,
