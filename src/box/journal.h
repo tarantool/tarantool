@@ -42,7 +42,8 @@ extern "C" {
 struct xrow_header;
 struct journal_entry;
 
-typedef void (*journal_write_async_f)(struct journal_entry *entry);
+typedef void
+(*journal_on_write_f)(struct journal_entry *entry);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -95,10 +96,8 @@ struct journal_entry {
 	void *complete_data;
 	/** Flags that should be set for the last entry row. */
 	uint8_t flags;
-	/**
-	 * Asynchronous write completion function.
-	 */
-	journal_write_async_f write_async_cb;
+	/** Write completion function. */
+	journal_on_write_f on_write;
 	/**
 	 * Approximate size of this request when encoded.
 	 */
@@ -129,11 +128,10 @@ struct region;
  */
 static inline void
 journal_entry_create(struct journal_entry *entry, size_t n_rows,
-		     size_t approx_len,
-		     journal_write_async_f write_async_cb,
+		     size_t approx_len, journal_on_write_f on_write,
 		     void *complete_data)
 {
-	entry->write_async_cb	= write_async_cb;
+	entry->on_write = on_write;
 	entry->complete_data	= complete_data;
 	entry->approx_len	= approx_len;
 	entry->n_rows		= n_rows;
@@ -150,7 +148,7 @@ journal_entry_create(struct journal_entry *entry, size_t n_rows,
  */
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
-		  journal_write_async_f write_async_cb,
+		  journal_on_write_f on_write,
 		  void *complete_data);
 
 /**
@@ -228,13 +226,10 @@ journal_queue_rollback(void);
 static inline void
 journal_async_complete(struct journal_entry *entry)
 {
-	assert(entry->write_async_cb != NULL);
-
+	assert(entry->on_write != NULL);
 	entry->is_complete = true;
-
 	journal_queue_on_complete(entry);
-
-	entry->write_async_cb(entry);
+	entry->on_write(entry);
 }
 
 /**
