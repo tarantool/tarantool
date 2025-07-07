@@ -73,6 +73,10 @@ wal_write_async(struct journal *, struct journal_entry *);
 static int
 wal_write_none_async(struct journal *, struct journal_entry *);
 
+/** Wait until all submitted writes are successfully flushed to disk. */
+static int
+wal_sync(struct journal *journal, struct vclock *vclock);
+
 /*
  * WAL writer - maintain a Write Ahead Log for every change
  * in the data state.
@@ -408,6 +412,15 @@ tx_notify_checkpoint(struct cmsg *msg)
 	free(msg);
 }
 
+static int
+wal_sync_none(struct journal *journal, struct vclock *out)
+{
+	(void)journal;
+	if (out != NULL)
+		vclock_copy(out, &wal_writer_singleton.vclock);
+	return 0;
+}
+
 /**
  * Initialize WAL writer context. Even though it's a singleton,
  * encapsulate the details just in case we may use
@@ -427,9 +440,12 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->wal_mode = wal_mode;
 	writer->wal_max_size = wal_max_size;
 
-	journal_create(&writer->base,
-		       wal_mode == WAL_NONE ?
-		       wal_write_none_async : wal_write_async);
+	if (wal_mode == WAL_NONE) {
+		journal_create(&writer->base, wal_write_none_async,
+			       wal_sync_none);
+	} else {
+		journal_create(&writer->base, wal_write_async, wal_sync);
+	}
 
 	struct xlog_opts opts = xlog_opts_default;
 	opts.sync_is_async = true;
@@ -650,20 +666,16 @@ wal_sync_f(struct cbus_call_msg *data)
 	return 0;
 }
 
-int
-wal_sync(struct vclock *vclock)
+static int
+wal_sync(struct journal *journal, struct vclock *vclock)
 {
+	(void)journal;
+	struct wal_writer *writer = &wal_writer_singleton;
+	assert(writer->wal_mode != WAL_NONE);
 	ERROR_INJECT(ERRINJ_WAL_SYNC, {
 		diag_set(ClientError, ER_INJECTION, "wal sync");
 		return -1;
 	});
-
-	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->wal_mode == WAL_NONE) {
-		if (vclock != NULL)
-			vclock_copy(vclock, &writer->vclock);
-		return 0;
-	}
 	if (!stailq_empty(&writer->rollback)) {
 		/* We're rolling back a failed write. */
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
