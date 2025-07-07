@@ -86,8 +86,7 @@ diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
-		  journal_write_async_f write_async_cb,
-		  void *complete_data)
+		  journal_on_write_f on_write, void *complete_data)
 {
 	struct journal_entry *entry;
 
@@ -100,9 +99,7 @@ journal_entry_new(size_t n_rows, struct region *region,
 		diag_set(OutOfMemory, size, "region", "struct journal_entry");
 		return NULL;
 	}
-
-	journal_entry_create(entry, n_rows, 0, write_async_cb,
-			     complete_data);
+	journal_entry_create(entry, n_rows, 0, on_write, complete_data);
 	return entry;
 }
 
@@ -177,7 +174,7 @@ journal_queue_wait(struct journal_entry *entry)
 		else
 			req->res = JOURNAL_ENTRY_ERR_CASCADE;
 		req->is_complete = true;
-		req->write_async_cb(req);
+		req->on_write(req);
 	}
 	diag_set(FiberIsCancelled);
 	return -1;
@@ -209,7 +206,7 @@ journal_queue_rollback(void)
 	stailq_foreach_entry(req, &rollback, fifo) {
 		req->res = JOURNAL_ENTRY_ERR_CASCADE;
 		req->is_complete = true;
-		req->write_async_cb(req);
+		req->on_write(req);
 	}
 }
 
