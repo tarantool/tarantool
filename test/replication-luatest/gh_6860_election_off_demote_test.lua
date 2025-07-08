@@ -26,6 +26,7 @@ local function replicaset_create(g)
     })
     g.replicaset:start()
     g.server2:update_box_cfg{read_only = false}
+    g.replicaset:wait_for_fullmesh()
 end
 
 local function replicaset_drop(g)
@@ -113,15 +114,20 @@ g.test_election_off_demote_other_no_leader = function(g)
     -- Server-2 sees that the queue is owned by server-1.
     g.server2:wait_for_synchro_queue_term(g.server1:get_election_term())
     g.server2:update_box_cfg{replication = ''}
-    g.server1:exec(function()
+    g.server1:exec(function(id)
         box.ctl.demote()
+        t.helpers.retrying({}, function()
+            local rs = box.info.replication[id]
+            t.assert(rs.upstream and rs.downstream)
+            t.assert_not_equals(rs.downstream.status, 'follow')
+        end)
         -- Bump the election term while leaving the synchro queue term intact.
         local msg = "Not enough peers connected to start elections: 1 out " ..
                      "of minimal required 2"
         t.assert_error_msg_content_equals(msg, box.ctl.promote)
         t.assert_equals(box.info.election.term, box.info.synchro.queue.term + 1)
         box.cfg{election_mode = 'off'}
-    end)
+    end, {g.server2:get_instance_id()})
     g.server2:update_box_cfg({replication = g.replication})
     g.server2:exec(function()
         t.helpers.retrying({timeout = 10, delay = 0.5}, function()
