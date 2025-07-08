@@ -56,6 +56,67 @@ local function universal_read(file_name, file_kind)
     return data
 end
 
+-- Interpret the given path as relative to the given base
+-- directory. And return the absolute path.
+local function rebase_file_abspath(base_dir, path)
+    -- fio.pathjoin('/foo', '/bar') gives '/foo/bar/', see
+    -- gh-8816.
+    --
+    -- Let's check whether the second path is absolute.
+    local needs_prepending = base_dir ~= nil and not path:startswith('/')
+    if needs_prepending then
+        path = fio.pathjoin(base_dir, path)
+    end
+
+    -- Let's consider the following example.
+    --
+    -- config:
+    --   context:
+    --     foo:
+    --       from: file
+    --       file: ../foo.txt
+    -- process:
+    --   work_dir: x
+    --
+    -- In such a case we get correct "x/../foo.txt" on
+    -- startup, but fio.open() complains if there is no "x"
+    -- directory.
+    --
+    -- The working directory is created at startup if needed,
+    -- so a user is not supposed to create it manually before
+    -- first tarantool startup.
+    --
+    -- Let's strip all these ".." path components using
+    -- fio.abspath().
+    path = fio.abspath(path)
+
+    return path
+end
+
+-- Interpret the given path as relative to the given base
+-- directory. If the resulting path is inside CWD, then
+-- return a relative path, otherwise return an absolute.
+local function rebase_file_path(base_dir, path)
+    path = rebase_file_abspath(base_dir, path)
+
+    -- If possible, use a relative path. Sometimes an
+    -- absolute path overruns the Unix socket path length limit
+    -- (107 on Linux and 103 on Mac OS -- in our case).
+    --
+    -- Using a relative path allows to listen on the given Unix
+    -- socket path in such cases.
+    local cwd = fio.cwd()
+    if cwd == nil then
+        return path
+    end
+    if not cwd:endswith('/') then
+        cwd = cwd .. '/'
+    end
+    if path:startswith(cwd) then
+        path = path:sub(#cwd + 1, #path)
+    end
+    return path
+end
 
 local function get_file_metadata(file_name)
     local function escape_regex(str)
@@ -167,6 +228,8 @@ end
 
 return {
     universal_read = universal_read,
+    rebase_file_abspath = rebase_file_abspath,
+    rebase_file_path = rebase_file_path,
     get_file_metadata = get_file_metadata,
     get_module_metadata = get_module_metadata,
 }

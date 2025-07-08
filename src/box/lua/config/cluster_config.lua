@@ -209,6 +209,9 @@ local nested_cluster_config = schema.new(schema_name, record_from_fields({
             }),
         }),
     }),
+    include = schema.array({
+        items = schema.scalar({type = 'string'}),
+    }),
 }))
 
 -- {{{ Support conditional sections

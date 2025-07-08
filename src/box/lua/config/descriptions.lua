@@ -2738,6 +2738,21 @@ C['groups.*.replicasets.*.bootstrap_leader'] = format_text([[
 
 -- }}} groups configuration
 
+-- {{{ include configuration
+
+C['include'] = format_text([[
+    A list of paths to include in the cluster configuration. The paths are
+    included in the order they are specified in the list.
+]])
+
+C['include.*'] = format_text([[
+    An absolute or relative path to a config file to be included, or a wildcard
+    pattern. Relative path are considered relative to the file, where they are
+    included.
+]])
+
+-- }}} include configuration
+
 -- }}} Cluster descriptions
 
 return {
