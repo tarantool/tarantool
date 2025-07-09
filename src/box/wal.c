@@ -731,6 +731,8 @@ wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
+	if (journal_queue_flush() != 0)
+		return -1;
 	return cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
 			 &checkpoint->base, wal_begin_checkpoint_f);
 }
