@@ -486,7 +486,24 @@ txn_free(struct txn *txn)
 int
 txn_persist_all_prepared(struct vclock *out)
 {
-	return journal_sync(out);
+	/*
+	 * All the txns after preparation until all the journal write follow the
+	 * same path:
+	 * - The limbo volatile queue.
+	 * - The journal volatile queue.
+	 * - The journal write.
+	 *
+	 * Some steps might be skipped (for instance, the limbo might be if the
+	 * txn is force-async or just async and the limbo is empty). But the
+	 * order never changes.
+	 *
+	 * It means, that if one would want to closely follow the latest known
+	 * prepared txn until it reaches WAL, then following this path the
+	 * needed txn will be surely found before any new txn is added (except
+	 * for forse-async, which might skip the volatile limbo queue and go
+	 * directly to the journal).
+	 */
+	return txn_limbo_flush(&txn_limbo) == 0 && journal_sync(out) == 0 ? 0 : -1;
 }
 
 void
@@ -1025,10 +1042,7 @@ txn_journal_entry_new(struct txn *txn)
 	return req;
 }
 
-/**
- * Prepare a transaction using engines, run triggers, etc.
- */
-static int
+int
 txn_prepare(struct txn *txn)
 {
 	if (txn_check_can_continue(txn) != 0)
