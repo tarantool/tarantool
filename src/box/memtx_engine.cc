@@ -40,6 +40,7 @@
 #include "info/info.h"
 #include "tuple.h"
 #include "txn.h"
+#include "txn_checkpoint.h"
 #include "memtx_tx.h"
 #include "memtx_tree.h"
 #include "iproto_constants.h"
@@ -1477,40 +1478,21 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
 
-	struct vclock limbo_vclock;
-	struct raft_request raft_req;
-	struct synchro_request synchro_req;
-	/*
-	 * Make sure that all changes visible from the frozen read view have
-	 * reached WAL and get the vclock collected exactly at that moment.
-	 *
-	 * For async txns the persistence means commit. For sync txns need to
-	 * wait for their confirmation explicitly.
-	 *
-	 * This cannot be done in prepare_join, as we should not
-	 * yield between read-view creation. Moreover, wal syncing
-	 * should happen after creation of all engine's read-views.
-	 */
-	if (txn_persist_all_prepared(arg->vclock) != 0)
+	struct txn_checkpoint txn_cp;
+	if (txn_checkpoint_build(&txn_cp) != 0)
 		return -1;
-	/*
-	 * The synchronous transactions, persisted above, might still be not
-	 * committed. Lets make sure they are, so the read-view won't have any
-	 * rolled back data.
-	 */
-	if (txn_limbo_wait_confirm(&txn_limbo) != 0)
-		return -1;
+	vclock_copy(arg->vclock, &txn_cp.journal_vclock);
+	struct raft_request *raft_checkpoint = &txn_cp.raft_remote_checkpoint;
+	struct synchro_request *synchro_checkpoint = &txn_cp.limbo_checkpoint;
 
-	txn_limbo_checkpoint(&txn_limbo, &synchro_req, &limbo_vclock);
-	box_raft_checkpoint_remote(&raft_req);
 	/* See raft_process_recovery, why these fields are not needed. */
-	raft_req.state = 0;
-	raft_req.vclock = NULL;
+	raft_checkpoint->state = 0;
+	raft_checkpoint->vclock = NULL;
 
 	/* Respond with vclock and JOIN_META. */
 	send_join_header(stream, arg->vclock);
 	if (arg->send_meta) {
-		send_join_meta(stream, &raft_req, &synchro_req);
+		send_join_meta(stream, raft_checkpoint, synchro_checkpoint);
 		struct xrow_header row;
 		/* Mark the beginning of the data stream. */
 		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
