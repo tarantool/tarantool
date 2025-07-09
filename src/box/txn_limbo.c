@@ -486,6 +486,87 @@ success:
 	return 0;
 }
 
+int
+txn_limbo_flush(struct txn_limbo *limbo)
+{
+	/* Fast path. */
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	if (txn_limbo_last_entry(limbo)->state != TXN_LIMBO_ENTRY_VOLATILE)
+		return 0;
+	/*
+	 * Slow path.
+	 * The limbo queue guarantees that if a txn is trying to be submitted
+	 * into it, then the submission would return right after all the
+	 * previous txns are sent to the journal and before any newer txns do
+	 * the same.
+	 *
+	 * Which means a flush could be done as simple as just doing a txn
+	 * submission. As soon as submit returns - all the older entries are
+	 * sent to the journal.
+	 *
+	 * To conveniently reuse the submission logic the flush creates a nop
+	 * txn to ride on it through the limbo queue.
+	 */
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	if (txn_prepare(txn) != 0)
+		unreachable();
+	txn->fiber = fiber();
+	txn_set_flags(txn, TXN_WAIT_SYNC);
+	int rc = txn_limbo_submit(limbo, limbo->owner_id, txn, 0);
+	if (rc == 0) {
+		assert(!txn_has_flag(txn, TXN_IS_DONE));
+		/*
+		 * The limbo entry might be already removed, if all the previous
+		 * txns got not just sent to WAL, but also covered by a confirm.
+		 *
+		 * Can happen, for example, if there was a sync txn in the
+		 * limbo and an async txn waiting for limbo space. Then this
+		 * flush would stand after the async txn.
+		 *
+		 * Then if the sync txn gets confirmed, it is committed. And all
+		 * the following non-sync txns are confirmed too. Even if they
+		 * aren't written to WAL yet, they just become non-synchronous
+		 * anymore.
+		 *
+		 * Including the mentioned waiting async txn and this flush-txn.
+		 */
+		if (txn->limbo_entry != NULL) {
+			/*
+			 * The worst part of this code is that the "fake" nop
+			 * txn must be removed from the middle of the limbo. It
+			 * can't stay there. Such behaviour doesn't fit neither
+			 * commit nor rollback, but the ability to reuse
+			 * submission for flushing the limbo justifies this.
+			 */
+			assert(txn->limbo_entry != limbo->entry_to_confirm);
+			rlist_del_entry(txn->limbo_entry, in_queue);
+			txn->limbo_entry = NULL;
+		}
+	} else {
+		assert(txn->limbo_entry == NULL);
+	}
+	/*
+	 * Roll the nop txn back. In theory it shouldn't matter if it is
+	 * committed or rolled back as it is nop anyway. But the rollback should
+	 * help to catch any issues if some code would accidentally find this
+	 * txn in the limbo and hang on-commit/rollback triggers on it. For
+	 * instance, to wait for the "last txn to be committed". Using the nop
+	 * txn for that would be wrong. The rollback would highlight such
+	 * misusage.
+	 */
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
+		txn->signature = TXN_SIGNATURE_ROLLBACK;
+		txn_complete_fail(txn);
+	}
+	assert(in_txn() == NULL || in_txn() == txn);
+	fiber_set_txn(fiber(), NULL);
+	txn_free(txn);
+	return rc;
+}
+
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
@@ -1100,7 +1181,7 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 	trigger_create(&on_complete, txn_commit_cb, &cwp, NULL);
 	struct trigger on_rollback;
 	trigger_create(&on_rollback, txn_rollback_cb, &cwp, NULL);
-	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
+	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
 	double deadline = fiber_clock() + timeout;
