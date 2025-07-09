@@ -705,6 +705,12 @@ struct txn *
 txn_begin(void);
 
 /**
+ * Prepare a transaction using engines, run triggers, etc.
+ */
+int
+txn_prepare(struct txn *txn);
+
+/**
  * Complete transaction processing with an error. All the changes are going to
  * be rolled back. The transaction's signature should be set to the rollback
  * reason.
