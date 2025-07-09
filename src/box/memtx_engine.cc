@@ -55,6 +55,7 @@
 #include "gc.h"
 #include "raft.h"
 #include "txn_limbo.h"
+#include "txn_checkpoint.h"
 #include "memtx_allocator.h"
 #include "index.h"
 #include "read_view.h"

@@ -181,3 +181,65 @@ g.test_get_read_view_vclock_of_volatile_limbo_txns = function(cg)
         t.assert(box.space.test:get{3})
     end)
 end
+
+g.test_get_limbo_checkpoint_exactly_on_time = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local data = string.rep('a', 1000)
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local function make_txn_fiber(id, on_commit)
+            return fiber.create(function()
+                fiber.self():set_joinable(true)
+                box.begin()
+                box.on_commit(function()
+                    if on_commit then
+                        on_commit()
+                    end
+                end)
+                box.space.test:replace{id, data}
+                box.commit()
+            end)
+        end
+        rawset(_G, 'test_f1', make_txn_fiber(1))
+        rawset(_G, 'test_f2', make_txn_fiber(2, function()
+            rawset(_G, 'test_f3', make_txn_fiber(3))
+        end))
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+    end)
+    cg.replica = server:new({
+        box_cfg = {
+            replication = cg.server.net_box_uri,
+            replication_timeout = 0.1,
+            replication_anon = true,
+            read_only = true,
+        }
+    })
+    cg.replica:start({wait_until_ready = false})
+    cg.server:exec(function()
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert_gt(box.info.replication_anon.count, 0)
+        end)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert((_G.test_f1:join()))
+        t.assert((_G.test_f2:join()))
+        t.assert((_G.test_f3:join()))
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+        t.assert(box.space.test:get{3})
+    end)
+    cg.replica:wait_until_ready()
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+        t.assert(box.space.test:get{3})
+    end)
+    cg.server:exec(function()
+        box.space.test:replace{4}
+    end)
+    cg.replica:wait_for_vclock_of(cg.server)
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{4})
+    end)
+end
