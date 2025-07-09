@@ -339,6 +339,22 @@ int
 txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len);
 
+/**
+ * Wait until all the limbo entries existing at the moment of calling are fully
+ * submitted into the limbo.
+ *
+ * It is guaranteed that if this function returns success, then all those limbo
+ * entries have been submitted to WAL. And the caller, for example, might do a
+ * journal sync right away to find out the vclock at the moment of the last
+ * limbo entry journal write.
+ *
+ * Any limbo entries added during the waiting are not going to be waited for.
+ * And are guaranteed not to be sent to the journal yet after this function
+ * returns success, until the next yield of the caller fiber.
+ */
+int
+txn_limbo_flush(struct txn_limbo *limbo);
+
 /** Remove the entry from the limbo, mark as rolled back. */
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
