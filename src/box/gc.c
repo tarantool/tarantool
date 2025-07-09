@@ -540,6 +540,9 @@ gc_do_checkpoint(bool is_scheduled)
 	rc = engine_begin_checkpoint(is_scheduled);
 	if (rc != 0)
 		goto out;
+	rc = txn_limbo_flush(&txn_limbo);
+	if (rc != 0)
+		goto out;
 	rc = wal_begin_checkpoint(&checkpoint);
 	if (rc != 0)
 		goto out;
