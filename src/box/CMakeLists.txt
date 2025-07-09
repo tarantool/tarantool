@@ -199,6 +199,7 @@ set(box_sources
     session.c
     port.c
     txn.c
+    txn_checkpoint.c
     txn_limbo.c
     raft.c
     box.cc
