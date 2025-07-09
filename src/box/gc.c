@@ -61,6 +61,7 @@
 #include "tt_static.h"
 #include "box.h"
 #include "txn.h"
+#include "txn_checkpoint.h"
 #include "xrow.h"
 #include "tuple.h"
 #include "space_cache.h"
@@ -529,6 +530,7 @@ gc_do_checkpoint(bool is_scheduled)
 {
 	int rc;
 	struct wal_checkpoint checkpoint;
+	struct txn_checkpoint txn_cp;
 	int64_t limbo_rollback_count = txn_limbo.rollback_count;
 
 	assert(!gc.checkpoint_is_in_progress);
@@ -558,7 +560,7 @@ gc_do_checkpoint(bool is_scheduled)
 	 * Wait the confirms on all "sync" transactions before
 	 * create a snapshot.
 	 */
-	rc = txn_limbo_wait_confirm(&txn_limbo);
+	rc = txn_checkpoint_build(&txn_cp);
 	if (rc != 0)
 		goto out;
 
