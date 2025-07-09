@@ -240,3 +240,87 @@ g.test_get_read_view_vclock_of_volatile_limbo_txns = function(cg)
         t.assert(box.space.test:get{3})
     end)
 end
+
+--
+-- gh-11180: during checkpoint creation the master has to make sure all the
+-- txns in it are confirmed. And only then it can create a checkpoint of the
+-- synchronous replication states like Raft and limbo.
+--
+-- There was a bug that the master, during waiting for the read-view txns to
+-- get persisted, would miss a new synchro txn appearing, and would later wait
+-- for its confirmation. Even though it is not even in the read-view. Then it
+-- would send to the replica a too new synchro state
+-- (confirm lsn > read-view's). Later the replica would receive the confirm of
+-- the newer txn and would think it is a conflicting confirmation. Because the
+-- replica would already have the too new confirmation lsn remembered.
+--
+g.test_get_limbo_checkpoint_exactly_on_time = function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local function make_txn_fiber(id, on_commit)
+            return _G.fiber.create(function()
+                _G.fiber.self():set_joinable(true)
+                box.begin()
+                box.on_commit(function()
+                    if on_commit then
+                        on_commit()
+                    end
+                end)
+                box.space.test:insert{id, _G.test_data}
+                box.commit()
+            end)
+        end
+        rawset(_G, 'test_f1', make_txn_fiber(1))
+        --
+        -- Right when the first txn gets committed, the second one is created.
+        -- It goes to the limbo and is trying to trick the master to wait for
+        -- its confirmation instead of the first txn.
+        --
+        rawset(_G, 'test_f2', make_txn_fiber(2, function()
+            rawset(_G, 'test_f3', make_txn_fiber(3))
+        end))
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+    end)
+    cg.replica = server:new({
+        box_cfg = {
+            replication = cg.server.net_box_uri,
+            replication_timeout = 0.1,
+            replication_anon = true,
+            read_only = true,
+        }
+    })
+    cg.replica:start({wait_until_ready = false})
+    cg.server:exec(function()
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert_gt(box.info.replication_anon.count, 0)
+        end)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert((_G.test_f1:join()))
+        t.assert((_G.test_f2:join()))
+        t.assert((_G.test_f3:join()))
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+        t.assert(box.space.test:get{3})
+    end)
+    cg.replica:wait_until_ready()
+    -- The third txn wasn't in the read-view. So it is going to be sent as a
+    -- follow-up. Need to wait for it explicitly.
+    cg.replica:wait_for_vclock_of(cg.server)
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+        t.assert(box.space.test:get{3})
+    end)
+    --
+    -- Ensure the replication still works.
+    --
+    cg.server:exec(function()
+        box.space.test:insert{4}
+    end)
+    cg.replica:wait_for_vclock_of(cg.server)
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{4})
+    end)
+end
