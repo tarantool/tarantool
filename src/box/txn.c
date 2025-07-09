@@ -1017,10 +1017,7 @@ txn_journal_entry_new(struct txn *txn)
 	return req;
 }
 
-/**
- * Prepare a transaction using engines, run triggers, etc.
- */
-static int
+int
 txn_prepare(struct txn *txn)
 {
 	if (txn_check_can_continue(txn) != 0)
