@@ -23,11 +23,24 @@ g.before_all(function(cg)
     end)
 end)
 
-g.after_all(function(cg)
-    cg.server:drop()
+g.after_each(function(cg)
     if cg.replica then
         cg.replica:drop()
+        cg.replica = nil
     end
+    cg.server:exec(function()
+        box.ctl.promote()
+        box.ctl.wait_rw()
+        for _, t in box.space._gc_consumers:pairs() do
+            box.ctl.replica_gc(t.uuid)
+        end
+        t.assert_equals(box.info.replication_anon.count, 0)
+        box.space.test:truncate()
+    end)
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
 end)
 
 g.test_cancel_before_waiting_for_limbo_space = function(cg)
@@ -164,5 +177,66 @@ g.test_cascading_rollback_while_waiting_for_limbo_space = function(cg)
     end)
     cg.server:exec(function()
         box.space.test:truncate()
+    end)
+end
+
+--
+-- gh-11180: the checkpoint creation would take the journal vclock of the
+-- read-view ignoring the volatile limbo entries waiting for space in the limbo.
+--
+g.test_get_read_view_vclock_of_volatile_limbo_txns = function(cg)
+    --
+    -- One txn in WAL, second one waiting for space in the limbo.
+    --
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local function make_txn_fiber(id)
+            return _G.fiber.create(function()
+                _G.fiber.self():set_joinable(true)
+                box.space.test:insert{id, _G.test_data}
+            end)
+        end
+        rawset(_G, 'test_f1', make_txn_fiber(1))
+        rawset(_G, 'test_f2', make_txn_fiber(2))
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+    end)
+    --
+    -- The replica creates a new read-view and needs its vclock.
+    --
+    cg.replica = server:new({
+        box_cfg = {
+            replication = cg.server.net_box_uri,
+            replication_timeout = 0.1,
+            replication_anon = true,
+            read_only = true,
+        }
+    })
+    cg.replica:start({wait_until_ready = false})
+    cg.server:exec(function()
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert_gt(box.info.replication_anon.count, 0)
+        end)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert((_G.test_f1:join()))
+        t.assert((_G.test_f2:join()))
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+    end)
+    cg.replica:wait_until_ready()
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{1})
+        t.assert(box.space.test:get{2})
+    end)
+    --
+    -- The replication still works.
+    --
+    cg.server:exec(function()
+        box.space.test:insert{3}
+    end)
+    cg.replica:wait_for_vclock_of(cg.server)
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{3})
     end)
 end
