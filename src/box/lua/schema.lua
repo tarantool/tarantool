@@ -2130,7 +2130,6 @@ local function iterator_pos_set(index, pos, ibuf, level)
         iterator_pos_end[0] = iterator_pos[0] + #pos
         return true
     else
-        ibuf:consume(ibuf.wpos - ibuf.rpos)
         local tuple, tuple_end = tuple_encode(ibuf, pos, level + 1)
         return builtin.box_index_tuple_position(
                 index.space_id, index.id, tuple, tuple_end,
@@ -2551,12 +2550,17 @@ end
 -- iteration
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
+    -- Encode the key on cord ibuf. Note, since the ibuf may be
+    -- reallocated when we encode iterator_pos, we can't use the pointers
+    -- returned by tuple_encode(). Instead we remember the key size
+    -- and set the pointers after all allocations are done.
     local ibuf = cord_ibuf_take()
-    local pkey, pkey_end = tuple_encode(ibuf, key, 2)
+    tuple_encode(ibuf, key, 2)
+    local key_size = ibuf:size()
     local svp = builtin.box_region_used()
-    local itype, after, offset = check_pairs_opts(opts, pkey + 1 >= pkey_end, 2)
+    local itype, after, offset = check_pairs_opts(opts, key_size <= 1, 2)
     local ok = iterator_pos_set(index, after, ibuf, 2)
-    local keybuf = ffi.string(pkey, pkey_end - pkey)
+    local keybuf = ffi.string(ibuf.rpos, key_size)
     cord_ibuf_put(ibuf)
     local cdata
     if ok then
@@ -2682,14 +2686,20 @@ base_index_mt.select_ffi = function(index, key, opts)
         return base_index_mt.select_luac(index, key, opts)
     end
     check_index_arg(index, 'select', 2)
+    -- Encode the key on cord ibuf. Note, since the ibuf may be
+    -- reallocated when we encode iterator_pos, we can't use the pointers
+    -- returned by tuple_encode(). Instead we remember the key size
+    -- and set the pointers after all allocations are done.
     local ibuf = cord_ibuf_take()
-    local key, key_end = tuple_encode(ibuf, key, 2)
-    local key_is_nil = key + 1 >= key_end
+    tuple_encode(ibuf, key, 2)
+    local key_size = ibuf:size()
+    local key_is_nil = key_size <= 1
     local new_position = nil
     local iterator, offset, limit, after, fetch_pos =
         check_select_opts(opts, key_is_nil, 2)
     local region_svp = builtin.box_region_used()
     local nok = not iterator_pos_set(index, after, ibuf, 2)
+    local key, key_end = ibuf.rpos, ibuf.rpos + key_size
     if not nok then
         nok = builtin.box_select_ffi(index.space_id, index.id, key, key_end,
                                      iterator_pos, iterator_pos_end, fetch_pos,
