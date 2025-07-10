@@ -478,12 +478,7 @@ struct tuple_info {
 	size_t header_size;
 	/** Size of the field_map. See also field_map_build_size(). */
 	size_t field_map_size;
-	/**
-	 * The amount of excess memory used to store the tuple in mempool.
-	 * Note that this value is calculated not during the actual allocation,
-	 * but afterwards. This means that it can be incorrect if the state of
-	 * the allocator changed. See also small_alloc_info().
-	 */
+	/** The amount of excess memory used to store the tuple in mempool. */
 	size_t waste_size;
 	/** Type of the arena where the tuple is allocated. */
 	enum tuple_arena_type arena_type;
