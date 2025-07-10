@@ -2130,7 +2130,6 @@ local function iterator_pos_set(index, pos, ibuf, level)
         iterator_pos_end[0] = iterator_pos[0] + #pos
         return true
     else
-        ibuf:consume(ibuf.wpos - ibuf.rpos)
         local tuple, tuple_end = tuple_encode(ibuf, pos, level + 1)
         return builtin.box_index_tuple_position(
                 index.space_id, index.id, tuple, tuple_end,
