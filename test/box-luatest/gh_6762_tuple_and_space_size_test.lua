@@ -69,23 +69,23 @@ g1.test_tuple_info_memtx = function(cg)
         -- Compact form of a tuple.
         t.assert_equals(s:insert{string.rep('c', 251), 0}:info(),
                         { data_size = 255,
-                          header_size = 6,
+                          header_size = 10,
                           field_map_size = 4,
-                          waste_size = 247,
+                          waste_size = 243,
                           arena = "memtx" }
         )
         -- Bulky form of a tuple.
         t.assert_equals(s:insert{string.rep('b', 252), 1}:info(),
                         { data_size = 256,
-                          header_size = 10,
+                          header_size = 14,
                           field_map_size = 4,
-                          waste_size = 242,
+                          waste_size = 238,
                           arena = "memtx" }
         )
         -- malloc'ed tuple.
         t.assert_equals(s:insert{string.rep('m', 1100*1000), 2}:info(),
                         { data_size = 1100007,
-                          header_size = 10,
+                          header_size = 14,
                           field_map_size = 4,
                           waste_size = 0,
                           arena = "malloc" }
@@ -168,20 +168,20 @@ g2.test_space_stat_memtx = function(cg)
                         s:stat().tuple.malloc.data_size)
 
         local old_stat = { tuple = {  memtx = { data_size = 511,
-                                                header_size = 16,
+                                                header_size = 24,
                                                 field_map_size = 8,
-                                                waste_size = 489 },
+                                                waste_size = 481 },
                                      malloc = { data_size = 2200014,
-                                                header_size = 20,
+                                                header_size = 28,
                                                 field_map_size = 8,
                                                 waste_size = 0 } }
                          }
         local new_stat = { tuple = {  memtx = { data_size = 517,
-                                                header_size = 22,
+                                                header_size = 34,
                                                 field_map_size = 12,
-                                                waste_size = 537 },
+                                                waste_size = 525 },
                                      malloc = { data_size = 1100007,
-                                                header_size = 10,
+                                                header_size = 14,
                                                 field_map_size = 4,
                                                 waste_size = 0 } }
                          }
@@ -227,5 +227,33 @@ g2.test_errors = function(cg)
         )
         t.assert_equals({s.stat{id = 'xxx'}},
                         {nil, "Space with id '0' doesn't exist"})
+    end)
+end
+
+-- Check that tuple waste size is calculated precisely.
+g2.test_gh_10217 = function(cg)
+    skip_if_asan_is_enabled()
+    cg.server:exec(function()
+        local s = box.schema.space.create('memtx')
+        s:create_index('pk')
+        for i = 1, 100 do
+            s:insert({i, string.rep('x', 100 * 1024)})
+        end
+        t.assert_equals(s:stat().tuple.memtx, {
+            data_size = 10240700,
+            header_size = 1400,
+            field_map_size = 0,
+            waste_size = 7452620,
+        })
+
+        for i = 1, 100 do
+            s:delete({i})
+        end
+        t.assert_equals(s:stat().tuple.memtx, {
+            data_size = 0,
+            header_size = 0,
+            field_map_size = 0,
+            waste_size = 0,
+        })
     end)
 end
