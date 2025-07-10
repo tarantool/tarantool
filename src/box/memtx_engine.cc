@@ -2081,15 +2081,19 @@ memtx_tuple_info<SmallAlloc>(struct tuple_format *format, struct tuple *tuple,
 			     struct tuple_info *info)
 {
 	(void)format;
-	size_t size = tuple_size(tuple);
+	size_t size = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
+	size_t header_size = sizeof(struct tuple);
+	if (tuple_is_compact(tuple))
+		header_size -= TUPLE_COMPACT_SAVINGS;
+
+	struct memtx_tuple *memtx_tuple = container_of(
+		tuple, struct memtx_tuple, base);
 	struct small_alloc_info alloc_info;
-	SmallAlloc::get_alloc_info(tuple, size, &alloc_info);
+	SmallAlloc::get_alloc_info(memtx_tuple, size, &alloc_info);
 
 	info->data_size = tuple_bsize(tuple);
-	info->header_size = sizeof(struct tuple);
-	if (tuple_is_compact(tuple))
-		info->header_size -= TUPLE_COMPACT_SAVINGS;
-	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
+	info->header_size = header_size + offsetof(struct memtx_tuple, base);
+	info->field_map_size = tuple_data_offset(tuple) - header_size;
 	if (alloc_info.is_large) {
 		info->waste_size = 0;
 		info->arena_type = TUPLE_ARENA_MALLOC;
@@ -2105,11 +2109,13 @@ memtx_tuple_info<SysAlloc>(struct tuple_format *format, struct tuple *tuple,
 			   struct tuple_info *info)
 {
 	(void)format;
-	info->data_size = tuple_bsize(tuple);
-	info->header_size = sizeof(struct tuple);
+	size_t header_size = sizeof(struct tuple);
 	if (tuple_is_compact(tuple))
-		info->header_size -= TUPLE_COMPACT_SAVINGS;
-	info->field_map_size = tuple_data_offset(tuple) - info->header_size;
+		header_size -= TUPLE_COMPACT_SAVINGS;
+
+	info->data_size = tuple_bsize(tuple);
+	info->header_size = header_size + offsetof(struct memtx_tuple, base);
+	info->field_map_size = tuple_data_offset(tuple) - header_size;
 	info->waste_size = 0;
 	info->arena_type = TUPLE_ARENA_MALLOC;
 }
