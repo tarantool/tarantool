@@ -112,18 +112,12 @@ memtx_space_update_tuple_stat(struct space *space, struct tuple *old_tuple,
 		assert(stat->data_size >= info.data_size);
 		assert(stat->header_size >= info.header_size);
 		assert(stat->field_map_size >= info.field_map_size);
+		assert(stat->waste_size >= info.waste_size);
 
 		stat->data_size -= info.data_size;
 		stat->header_size -= info.header_size;
 		stat->field_map_size -= info.field_map_size;
-		/*
-		 * Avoid negative values, since waste_size is calculated
-		 * imprecisely.
-		 */
-		if (stat->waste_size > info.waste_size)
-			stat->waste_size -= info.waste_size;
-		else
-			stat->waste_size = 0;
+		stat->waste_size -= info.waste_size;
 	}
 }
 
