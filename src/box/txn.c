@@ -483,6 +483,29 @@ txn_free(struct txn *txn)
 	stailq_add(&txn_cache, &txn->in_txn_cache);
 }
 
+int
+txn_persist_all_prepared(struct vclock *out)
+{
+	/*
+	 * All the txns after preparation until all the journal write follow the
+	 * same path:
+	 * - The limbo volatile queue.
+	 * - The journal volatile queue.
+	 * - The journal write.
+	 *
+	 * Some steps might be skipped (for instance, the limbo might be if the
+	 * txn is force-async or just async and the limbo is empty). But the
+	 * order never changes.
+	 *
+	 * It means, that if one would want to closely follow the latest known
+	 * prepared txn until it reaches WAL, then following this path the
+	 * needed txn will be surely found before any new txn is added (except
+	 * for forse-async, which might skip the volatile limbo queue and go
+	 * directly to the journal).
+	 */
+	return txn_limbo_flush(&txn_limbo) == 0 && journal_sync(out) == 0 ? 0 : -1;
+}
+
 void
 diag_set_txn_sign_detailed(const char *file, unsigned line, int64_t signature)
 {
@@ -1019,10 +1042,7 @@ txn_journal_entry_new(struct txn *txn)
 	return req;
 }
 
-/**
- * Prepare a transaction using engines, run triggers, etc.
- */
-static int
+int
 txn_prepare(struct txn *txn)
 {
 	if (txn_check_can_continue(txn) != 0)
@@ -1110,25 +1130,17 @@ static int
 txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req,
 		    enum txn_commit_wait_mode wait_mode)
 {
-	uint32_t origin_id = req->rows[0]->replica_id;
-	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo)) {
-		if (wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
-			diag_set(ClientError, ER_SYNC_QUEUE_FULL);
-			return -1;
-		}
-		if (txn_limbo_wait_for_space(&txn_limbo) != 0)
-			return -1;
-	}
-
 	/*
 	 * Remote rows, if any, come before local rows, so check for originating
 	 * instance id in the first row.
 	 */
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn,
-					    req->approx_len);
-	if (txn->limbo_entry == NULL)
+	uint32_t origin_id = req->rows[0]->replica_id;
+	if (origin_id == 0 && txn_limbo_is_full(&txn_limbo) &&
+	    wait_mode == TXN_COMMIT_WAIT_MODE_NONE) {
+		diag_set(ClientError, ER_SYNC_QUEUE_FULL);
 		return -1;
-	return 0;
+	}
+	return txn_limbo_submit(&txn_limbo, origin_id, txn, req->approx_len);
 }
 
 static int

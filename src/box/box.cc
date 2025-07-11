@@ -747,7 +747,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write);
+	journal_create(&journal.base, recovery_journal_write, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -3191,10 +3191,8 @@ box_wait_limbo_acked(double timeout)
 	/* Wait for the last entries WAL write. */
 	if (last_entry->lsn < 0) {
 		int64_t tid = last_entry->txn->id;
-
-		if (wal_sync(NULL) != 0)
+		if (txn_persist_all_prepared(NULL) != 0)
 			return -1;
-
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
@@ -6126,7 +6124,7 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, bootstrap_journal_write);
+	journal_create(&bootstrap_journal, bootstrap_journal_write, NULL);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);
@@ -6573,6 +6571,12 @@ on_garbage_collection(void)
 }
 
 static void
+box_on_journal_cascading_rollback(void)
+{
+	txn_limbo_rollback_all_volatile(&txn_limbo);
+}
+
+static void
 box_storage_init(void)
 {
 	assert(!is_storage_initialized);
@@ -6591,6 +6595,7 @@ box_storage_init(void)
 	engine_init();
 	schema_init();
 	txn_limbo_init();
+	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
