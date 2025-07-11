@@ -196,15 +196,20 @@ test-coverage: build run-luajit-test run-test
 
 # Flaky catching workflow build
 
-.PHONY: test-debug
+.PHONY: test-debug-flaky
 test-debug-flaky: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
                                  -DTEST_BUILD=ON
-test-debug-flaky: build
-	LUA_PATTERN="./test/*/*test.lua"
-	UNITTEST_PATTERN="./test/unit/*.test.c*"
+test-debug-flaky: LUA_PATTERN="./test/*/*test.lua"
+test-debug-flaky: UNITTEST_PATTERN="./test/unit/*.test.c*"
+test-debug-flaky: build install-test-deps
+	cd test && ${TEST_RUN_ENV} \
 	TESTS=$$(git diff --relative=test --name-only \
-	         ${COMMIT_RANGE} -- $${LUA_PATTERN} $${UNITTEST_PATTERN})
-	./test/test-run.py --force --retries=0 --repeat $$N_TRIALS $$TESTS
+	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN}) \
+	./test-run.py --force \
+	              --vardir ${VARDIR} \
+	              --retries=0 \
+	              --repeat=$${N_TRIALS} \
+	              ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS} $${TESTS}
 
 
 ##############################
