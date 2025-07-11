@@ -160,14 +160,11 @@ const struct opt_def index_opts_reg[] = {
  *
  * The implicitly covered fields are the fields of index key and pk index key.
  *
- * The result is allocated with malloc.
+ * The result is allocated with malloc, old `covered_fields` array is freed.
  */
 static void
 index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
-	if (opts->layout != NULL)
-		opts->layout = xstrdup(opts->layout);
-
 	if (opts->covered_field_count == 0)
 		return;
 	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
@@ -179,12 +176,31 @@ index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 	}
 	qsort(fields, j, sizeof(*fields), cmp_u32);
 	opts->covered_field_count = j;
+	free(opts->covered_fields);
 	if (opts->covered_field_count != 0) {
 		opts->covered_fields = fields;
 	} else {
 		opts->covered_fields = NULL;
 		free(fields);
 	}
+}
+
+/** Duplicate index options. */
+static void
+index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
+{
+	*dup = *opts;
+	if (dup->covered_fields != NULL) {
+		uint32_t *fields = dup->covered_fields;
+		dup->covered_fields =
+			xmalloc(dup->covered_field_count *
+				sizeof(*dup->covered_fields));
+		memcpy(dup->covered_fields, fields,
+		       dup->covered_field_count *
+		       sizeof(*dup->covered_fields));
+	}
+	if (dup->layout != NULL)
+		dup->layout = xstrdup(dup->layout);
 }
 
 struct index_def *
@@ -218,27 +234,9 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
-	def->opts = *opts;
+	index_opts_dup(opts, &def->opts);
 	index_opts_normalize(&def->opts, def->cmp_def);
 	return def;
-}
-
-/** Duplicate index options. */
-static void
-index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
-{
-	*dup = *opts;
-	if (dup->covered_fields != NULL) {
-		uint32_t *fields = dup->covered_fields;
-		dup->covered_fields =
-			xmalloc(dup->covered_field_count *
-				sizeof(*dup->covered_fields));
-		memcpy(dup->covered_fields, fields,
-		       dup->covered_field_count *
-		       sizeof(*dup->covered_fields));
-	}
-	if (dup->layout != NULL)
-		dup->layout = xstrdup(dup->layout);
 }
 
 struct index_def *
