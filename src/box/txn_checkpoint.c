@@ -56,6 +56,7 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
 	txn_on_commit(tle->txn, &on_commit);
 	txn_on_rollback(tle->txn, &on_rollback);
+	tle->is_corner_stone = true;
 	say_info("txn checkpoint wait persisted");
 	/*
 	 * Make sure that all changes visible from the frozen read view have

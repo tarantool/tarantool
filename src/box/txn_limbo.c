@@ -415,6 +415,7 @@ txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	e->approx_len = approx_len;
 	e->lsn = -1;
 	e->insertion_time = fiber_clock();
+	e->is_corner_stone = false;
 	txn->limbo_entry = e;
 	bool would_block = txn_limbo_would_block(limbo);
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
@@ -742,6 +743,7 @@ void
 txn_limbo_checkpoint(const struct txn_limbo *limbo, struct synchro_request *req,
 		     struct vclock *vclock)
 {
+	say_info("txn_limbo_checkpoint: confirmed lsn %lld", limbo->confirmed_lsn);
 	req->type = IPROTO_RAFT_PROMOTE;
 	req->replica_id = limbo->owner_id;
 	req->lsn = limbo->confirmed_lsn;
@@ -821,17 +823,16 @@ txn_limbo_write_synchro_or_panic(struct txn_limbo *limbo, uint16_t type,
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
+	say_info("txn_limbo_read_confirm: new %lld", lsn);
+	say_info("txn_limbo_read_confirm: old %lld", limbo->confirmed_lsn);
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
+	assert(limbo->confirmed_lsn <= lsn);
 	/*
 	 * Track CONFIRM lsn on replica in order to detect split-brain by
 	 * comparing existing confirm_lsn with the one arriving from a remote
 	 * instance.
 	 */
-	if (limbo->confirmed_lsn < lsn) {
-		limbo->confirmed_lsn = lsn;
-		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
-	}
 	struct txn_limbo_entry *e, *next;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, next) {
 		/*
@@ -850,7 +851,17 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
+			if (e->is_corner_stone) {
+				say_info("txn_limbo_read_confirm: found corner stone");
+				if (limbo->confirmed_lsn < e->lsn) {
+					limbo->confirmed_lsn = e->lsn;
+					vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, e->lsn);
+				} else {
+					assert(limbo->confirmed_lsn == lsn);
+				}
+			}
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
+			assert(!e->is_corner_stone);
 			/*
 			 * A transaction might be covered by the CONFIRM even if
 			 * it is not written to WAL yet when it is an async
@@ -886,8 +897,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn->limbo_entry = NULL;
 			e->txn = NULL;
 			continue;
+		} else {
+			assert(!e->is_corner_stone);
 		}
 		txn_limbo_complete_success(limbo, e);
+	}
+	if (limbo->confirmed_lsn < lsn) {
+		limbo->confirmed_lsn = lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
 }
 
@@ -896,6 +913,7 @@ static void
 txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
 {
 	assert(confirm_lsn > limbo->volatile_confirmed_lsn);
+	say_info("volatile_confirmed_lsn = %lld", confirm_lsn);
 	limbo->volatile_confirmed_lsn = confirm_lsn;
 	fiber_wakeup(limbo->worker);
 }

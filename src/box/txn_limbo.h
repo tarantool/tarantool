@@ -80,6 +80,7 @@ struct txn_limbo_entry {
 	enum txn_limbo_entry_state state;
 	/** When this entry was added to the queue. */
 	double insertion_time;
+	bool is_corner_stone;
 };
 
 static inline bool
