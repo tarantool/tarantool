@@ -422,6 +422,8 @@ BuildFiberIsCancelled(const char *file, unsigned line);
 struct error *
 BuildFiberSliceIsExceeded(const char *file, unsigned line);
 struct error *
+BuildFiberCountIsExceeded(const char *file, unsigned line);
+struct error *
 BuildTimedOut(const char *file, unsigned line);
 struct error *
 BuildChannelIsClosed(const char *file, unsigned line);
