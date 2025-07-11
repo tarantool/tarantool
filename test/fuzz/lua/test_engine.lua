@@ -146,6 +146,8 @@ local err_pat_whitelist = {
     "box_insert_arrow: field [%d]+ has unsupported type",
     "Engine 'memcs' does not support variable field count",
     "Engine 'memcs' does not support primary index rebuild",
+    "Engine 'memcs' does not support clearing space field nullability",
+    "Engine 'memcs' does not support clearing indexed field nullability",
 }
 
 local function keys(t)
@@ -776,14 +778,20 @@ local function index_opts(space, is_primary)
     local n_parts = math.random(1, table.getn(possible_fields))
     local id = unique_ids(n_parts)
     local is_nullable_support = not is_primary and
-        space.engine ~= 'memcs' and
         tarantool_indices[opts.type].is_nullable_support
     for i = 1, n_parts do
         local field_id = id()
         local field = possible_fields[field_id]
         -- Randomly set is_nullable if it is supported.
-        local is_nullable =
-            oneof({false, field.is_nullable and is_nullable_support})
+        -- Engine memcs does not support non_nullable index parts over
+        -- nullable fields - always set is_nullable in this case.
+        local is_nullable = false
+        if space.engine == 'memcs' and field.is_nullable then
+            is_nullable = true
+        elseif field.is_nullable and is_nullable_support then
+            is_nullable = oneof({true, false})
+        end
+
         local exclude_null = oneof({false, is_nullable})
         table.insert(opts.parts, {
             field.name, is_nullable = is_nullable,
