@@ -236,11 +236,13 @@ enum {
 
 /**
  * Allocate and return new memtx tuple. Data validation depends
- * on @a validate value. On error returns NULL and set diag.
+ * on @a validate value. When `limit_size` is true, the tuple size
+ * is limited to the maximum allowed size. On error returns NULL and
+ * set diag.
  */
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
-		       const char *end, bool validate);
+		       const char *end, bool validate, bool limit_size);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,
