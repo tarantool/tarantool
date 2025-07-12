@@ -417,7 +417,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		memset(&sNC, 0, sizeof(sNC));
 		sNC.pParse = pParse;
 		srcTab = -1;
-		reg_eph = -1;
 		assert(useTempTable == 0);
 		if (pList) {
 			nColumn = pList->nExpr;
