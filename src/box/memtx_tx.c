@@ -2172,6 +2172,22 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	struct memtx_story *del_story = stmt->del_story;
 
 	/*
+	 * Sink the story to the end of chain and mark it as deleted long
+	 * time ago (with some very low del_psn). After that the story will
+	 * be invisible to any reader (that's what is needed) and still be
+	 * able to store read set, if necessary.
+	 */
+	for (uint32_t i = 0; i < add_story->index_count; ) {
+		struct memtx_story *old_story = add_story->link[i].older_story;
+		if (old_story == NULL) {
+			/* Old story is absent. */
+			i++; /* Go to the next index. */
+			continue;
+		}
+		memtx_tx_story_reorder(add_story, old_story, i);
+	}
+
+	/*
 	 * In case of rollback of prepared statement we need to rollback
 	 * preparation actions and abort other transactions that managed
 	 * to read this prepared state.
@@ -2215,8 +2231,15 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 
 		/* Revert psn assignment. */
 		add_story->add_psn = 0;
-		if (del_story != NULL)
+
+		if (del_story != NULL) {
 			del_story->del_psn = 0;
+
+			for (uint32_t i = 1; i < del_story->index_count; i++) {
+				memtx_tx_handle_dups_in_secondary_index(
+					del_story, i);
+			}
+		}
 
 		/*
 		 * If a transaction managed to read this story it must
@@ -2230,47 +2253,33 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	if (del_story != NULL)
 		memtx_tx_story_unlink_deleted_by(del_story, stmt);
 
-	/*
-	 * Sink the story to the end of chain and mark is as deleted long
-	 * time ago (with some very low del_psn). After that the story will
-	 * be invisible to any reader (that's what is needed) and still be
-	 * able to store read set, if necessary.
-	 */
-	for (uint32_t i = 0; i < add_story->index_count; ) {
-		struct memtx_story *old_story = add_story->link[i].older_story;
-		if (old_story == NULL) {
-			/* Old story is absent. */
-			i++; /* Go to the next index. */
-			continue;
-		}
-		memtx_tx_story_reorder(add_story, old_story, i);
-	}
 	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
-/*
- * Abort with conflict all transactions that have read absence of @a story.
+/**
+ * Abort with conflict all transactions that have read the absence of the key
+ * corresponding to the @top_story->link[@ind] chain.
  */
 static void
-memtx_tx_abort_gap_readers_on_rollback(struct memtx_story *story)
+memtx_tx_abort_gap_readers_on_rollback(
+	struct memtx_story *top_story, uint32_t ind)
 {
-	for (uint32_t i = 0; i < story->index_count; i++) {
-		/*
-		 * We rely on the fact that all gap trackers are stored in the
-		 * top story of history chain.
-		 */
-		struct memtx_story *top = memtx_tx_story_find_top(story, i);
-		struct gap_item_base *item_base, *tmp;
-		rlist_foreach_entry_safe(item_base, &top->link[i].read_gaps,
-					 in_read_gaps, tmp) {
-			if (item_base->type != GAP_INPLACE)
-				continue;
-			struct inplace_gap_item *item =
-				(struct inplace_gap_item *)item_base;
-			if (!item->abort_on_rollback)
-				continue;
-			memtx_tx_abort_with_conflict(item_base->txn);
-		}
+	/*
+	 * We rely on the fact that all gap trackers are stored in the
+	 * top story of history chain.
+	 */
+	assert(top_story->link[ind].newer_story == NULL);
+
+	struct gap_item_base *item_base, *tmp;
+	rlist_foreach_entry_safe(item_base, &top_story->link[ind].read_gaps,
+				 in_read_gaps, tmp) {
+		if (item_base->type != GAP_INPLACE)
+			continue;
+		struct inplace_gap_item *item =
+			(struct inplace_gap_item *)item_base;
+		if (!item->abort_on_rollback)
+			continue;
+		memtx_tx_abort_with_conflict(item_base->txn);
 	}
 }
 
@@ -2281,6 +2290,7 @@ static void
 memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 {
 	struct memtx_story *del_story = stmt->del_story;
+	assert(del_story != NULL);
 
 	/*
 	 * In case of rollback of prepared statement we need to rollback
@@ -2311,14 +2321,22 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
 		}
 
+		struct memtx_story *top_story =
+			memtx_tx_story_find_top(del_story, 0);
+		memtx_tx_abort_gap_readers_on_rollback(top_story, 0);
+
+		for (uint32_t i = 1; i < del_story->index_count; i++) {
+			top_story = memtx_tx_handle_dups_in_secondary_index(
+				del_story, i);
+			/*
+			 * If a transaction managed to read absence this story
+			 * it must be aborted.
+			 */
+			memtx_tx_abort_gap_readers_on_rollback(top_story, i);
+		}
+
 		/* Revert psn assignment. */
 		del_story->del_psn = 0;
-
-		/*
-		 * If a transaction managed to read absence this story it must
-		 * be aborted.
-		 */
-		memtx_tx_abort_gap_readers_on_rollback(del_story);
 	}
 
 	/* Unlink the story from the statement. */
