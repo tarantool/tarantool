@@ -2546,6 +2546,22 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	struct memtx_story *del_story = stmt->del_story;
 
 	/*
+	 * Sink the story to the end of chain and mark is as deleted long
+	 * time ago (with some very low del_psn). After that the story will
+	 * be invisible to any reader (that's what is needed) and still be
+	 * able to store read set, if necessary.
+	 */
+	for (uint32_t i = 0; i < add_story->index_count; ) {
+		struct memtx_story *old_story = add_story->link[i].older_story;
+		if (old_story == NULL) {
+			/* Old story is absent. */
+			i++; /* Go to the next index. */
+			continue;
+		}
+		memtx_tx_story_reorder(add_story, old_story, i);
+	}
+
+	/*
 	 * In case of rollback of prepared statement we need to rollback
 	 * preparation actions and abort other transactions that managed
 	 * to read this prepared state.
@@ -2584,6 +2600,8 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			}
 		}
 
+		memtx_tx_handle_dups_in_secondary_indexes(del_story);
+
 		/* Revert psn assignment. */
 		add_story->add_psn = 0;
 		if (del_story != NULL)
@@ -2601,21 +2619,6 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	if (del_story != NULL)
 		memtx_tx_story_unlink_deleted_by(del_story, stmt);
 
-	/*
-	 * Sink the story to the end of chain and mark is as deleted long
-	 * time ago (with some very low del_psn). After that the story will
-	 * be invisible to any reader (that's what is needed) and still be
-	 * able to store read set, if necessary.
-	 */
-	for (uint32_t i = 0; i < add_story->index_count; ) {
-		struct memtx_story *old_story = add_story->link[i].older_story;
-		if (old_story == NULL) {
-			/* Old story is absent. */
-			i++; /* Go to the next index. */
-			continue;
-		}
-		memtx_tx_story_reorder(add_story, old_story, i);
-	}
 	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
@@ -2681,6 +2684,8 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 			assert(test_stmt->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
 		}
+
+		memtx_tx_handle_dups_in_secondary_indexes(del_story);
 
 		/* Revert psn assignment. */
 		del_story->del_psn = 0;
