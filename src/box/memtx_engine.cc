@@ -1999,6 +1999,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 	char *raw;
 	bool make_compact;
 	bool validate = (flags & MEMTX_TUPLE_NEW_RAW_NO_VALIDATE) == 0;
+	bool limit_size = (flags & MEMTX_TUPLE_NEW_RAW_NO_TUPLE_MAX_SIZE) == 0;
 	if (tuple_field_map_create(format, data, validate, &builder) != 0)
 		goto end;
 	field_map_size = field_map_build_size(&builder);
@@ -2024,7 +2025,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
 	});
-	if (unlikely(total > memtx->max_tuple_size)) {
+	if (unlikely(total > memtx->max_tuple_size) && limit_size) {
 		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total,
 			 memtx->max_tuple_size);
 		error_log(diag_last_error(diag_get()));
