@@ -235,12 +235,21 @@ enum {
 };
 
 /**
- * Allocate and return new memtx tuple. Data validation depends
- * on @a validate value. On error returns NULL and set diag.
+ * Flags for 'memtx_tuple_new_raw' function that allow
+ * to tune its behavior.
+ */
+enum {
+	/** This flag allows to disable data validation on tuple allocation. */
+	MEMTX_TUPLE_NEW_RAW_NO_VALIDATE = 1 << 0,
+};
+
+/**
+ * Allocate and return new memtx tuple. Behavior can be tuned with flags.
+ * On error returns NULL and set diag.
  */
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
-		       const char *end, bool validate);
+		       const char *end, unsigned flags);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,
