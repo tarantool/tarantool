@@ -44,7 +44,7 @@ jobs:
       arch: x86_64
       test-matrix: '{
         "include": [
-          {"os": "debian-buster"}, {"os": "debian-bullseye"},
+          {"os": "debian-bullseye"}, {"os": "debian-bookworm"},
           {"os": "centos-8"},
           {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
@@ -65,7 +65,7 @@ jobs:
       arch: aarch64
       test-matrix: '{
         "include": [
-          {"os": "debian-buster"}, {"os": "debian-bullseye"},
+          {"os": "debian-bullseye"}, {"os": "debian-bookworm"},
           {"os": "centos-8"},
           {"os": "fedora-35"}, {"os": "fedora-36"},
           {"os": "ubuntu-focal"}, {"os": "ubuntu-jammy"}
