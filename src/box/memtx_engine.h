@@ -241,6 +241,8 @@ enum {
 enum {
 	/** This flag allows to disable data validation on tuple allocation. */
 	MEMTX_TUPLE_NEW_RAW_NO_VALIDATE = 1 << 0,
+	/** This flag allows to bypass tuple max size limitation. */
+	MEMTX_TUPLE_NEW_RAW_NO_TUPLE_MAX_SIZE = 1 << 1,
 };
 
 /**
