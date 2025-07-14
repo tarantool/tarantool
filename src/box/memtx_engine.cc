@@ -82,12 +82,12 @@ create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
 struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
-		       const char *end, bool validate);
+		       const char *end, unsigned flags);
 
 template <class ALLOC>
 static inline struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
-			 const char *end, bool validate);
+			 const char *end, unsigned flags);
 
 static void
 memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop);
@@ -1986,7 +1986,7 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 template<class ALLOC>
 static struct tuple *
 memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
-			 const char *end, bool validate)
+			 const char *end, unsigned flags)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
@@ -1998,6 +1998,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 	uint32_t data_offset, field_map_size;
 	char *raw;
 	bool make_compact;
+	bool validate = (flags & MEMTX_TUPLE_NEW_RAW_NO_VALIDATE) == 0;
 	if (tuple_field_map_create(format, data, validate, &builder) != 0)
 		goto end;
 	field_map_size = field_map_build_size(&builder);
@@ -2057,7 +2058,7 @@ template<class ALLOC>
 static inline struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	return memtx_tuple_new_raw_impl<ALLOC>(format, data, end, true);
+	return memtx_tuple_new_raw_impl<ALLOC>(format, data, end, 0);
 }
 
 template<class ALLOC>
