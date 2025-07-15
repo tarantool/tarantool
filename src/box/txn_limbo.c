@@ -585,10 +585,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
-	if (limbo->confirmed_lsn < lsn) {
-		limbo->confirmed_lsn = lsn;
-		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
-	}
+	assert(limbo->confirmed_lsn <= lsn);
 	struct txn_limbo_entry *e, *tmp;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
 		/*
@@ -607,6 +604,22 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
+			if (!rlist_empty(&e->txn->on_commit)) {
+				/*
+				 * Bump the confirmed LSN right now, do not
+				 * batch with any newer txns. So on-commit
+				 * triggers would see the confirmation LSN
+				 * matching this txn exactly. Making an illusion
+				 * like each txn has its own confirmation.
+				 */
+				if (limbo->confirmed_lsn < e->lsn) {
+					limbo->confirmed_lsn = e->lsn;
+					vclock_follow(&limbo->confirmed_vclock,
+						      limbo->owner_id, e->lsn);
+				} else {
+					assert(limbo->confirmed_lsn == lsn);
+				}
+			}
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
 			/*
 			 * A transaction might be covered by the CONFIRM even if
@@ -638,6 +651,10 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			continue;
 		}
 		txn_limbo_complete_success(limbo, e);
+	}
+	if (limbo->confirmed_lsn < lsn) {
+		limbo->confirmed_lsn = lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
 }
 
