@@ -324,3 +324,78 @@ g.test_get_limbo_checkpoint_exactly_on_time = function(cg)
         t.assert(box.space.test:get{4})
     end)
 end
+
+--
+-- Collection of the limbo checkpoint must happen exactly when the last synchro
+-- txn included into the checkpoint gets committed. Moreover, this checkpoint
+-- must not cover any newer txns. Or the replica would mistakenly believe it
+-- has confirmed even the data that wasn't sent to it.
+--
+g.test_limbo_checkpoint_batch_confirm = function(cg)
+    --
+    -- The test is making the limbo write a single CONFIRM for 2 txns: one
+    -- included into the checkpoint for a new replica and one is not. The
+    -- checkpoint sent to the replica must not included the last txn.
+    --
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        rawset(_G, 'make_txn_fiber', function(id)
+            return _G.fiber.create(function()
+                _G.fiber.self():set_joinable(true)
+                box.space.test:insert{id, _G.test_data}
+            end)
+        end)
+        rawset(_G, 'test_f1', _G.make_txn_fiber(1))
+        rawset(_G, 'test_f2', _G.make_txn_fiber(2))
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+        -- Stall the limbo worker so it collects more than one CONFIRM in a
+        -- single batch.
+        box.error.injection.set('ERRINJ_TXN_LIMBO_WORKER_DELAY', true)
+    end)
+    cg.replica = server:new({
+        box_cfg = {
+            replication = cg.server.net_box_uri,
+            replication_timeout = 0.1,
+            replication_anon = true,
+            read_only = true,
+        }
+    })
+    cg.replica:start({wait_until_ready = false})
+    cg.server:exec(function()
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert_gt(box.info.replication_anon.count, 0)
+        end)
+        --
+        -- Get the first 2 txns into WAL and unblock the relay from its write
+        -- into _gc_consumers.
+        --
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        box.ctl.wal_sync()
+        --
+        -- The relay must have started the read-view creation. Make a newer txn
+        -- which must not end up in the limbo's checkpoint.
+        --
+        local old_synchro_queue_max_size = 1000000
+        box.cfg{replication_synchro_queue_max_size = 1000000}
+        _G.test_f2:wakeup()
+        local f3 = _G.make_txn_fiber(3)
+        box.error.injection.set('ERRINJ_TXN_LIMBO_WORKER_DELAY', false)
+        t.assert((_G.test_f1:join()))
+        t.assert((_G.test_f2:join()))
+        t.assert((f3:join()))
+        box.cfg{replication_synchro_queue_max_size = old_synchro_queue_max_size}
+    end)
+    cg.replica:wait_until_ready()
+    --
+    -- Ensure the replication still works.
+    --
+    cg.server:exec(function()
+        box.space.test:insert{4}
+    end)
+    cg.replica:wait_for_vclock_of(cg.server)
+    cg.replica:exec(function()
+        t.assert(box.space.test:get{4})
+    end)
+end
