@@ -417,6 +417,7 @@ txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	e->approx_len = approx_len;
 	e->lsn = -1;
 	e->insertion_time = fiber_clock();
+	e->is_corner_stone = false;
 	txn->limbo_entry = e;
 	bool would_block = txn_limbo_would_block(limbo);
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
@@ -828,15 +829,12 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
+	assert(limbo->confirmed_lsn <= lsn);
 	/*
 	 * Track CONFIRM lsn on replica in order to detect split-brain by
 	 * comparing existing confirm_lsn with the one arriving from a remote
 	 * instance.
 	 */
-	if (limbo->confirmed_lsn < lsn) {
-		limbo->confirmed_lsn = lsn;
-		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
-	}
 	struct txn_limbo_entry *e, *next;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, next) {
 		/*
@@ -855,7 +853,23 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
+			if (e->is_corner_stone) {
+				/*
+				 * Bump the confirmed LSN right now, do not
+				 * batch with any newer txns. So on-commit
+				 * triggers of the corner stone would see the
+				 * confirmation LSN matching this txn exactly.
+				 */
+				if (limbo->confirmed_lsn < e->lsn) {
+					limbo->confirmed_lsn = e->lsn;
+					vclock_follow(&limbo->confirmed_vclock,
+						      limbo->owner_id, e->lsn);
+				} else {
+					assert(limbo->confirmed_lsn == lsn);
+				}
+			}
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
+			assert(!e->is_corner_stone);
 			/*
 			 * A transaction might be covered by the CONFIRM even if
 			 * it is not written to WAL yet when it is an async
@@ -895,8 +909,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn->limbo_entry = NULL;
 			e->txn = NULL;
 			continue;
+		} else {
+			assert(!e->is_corner_stone);
 		}
 		txn_limbo_complete_success(limbo, e);
+	}
+	if (limbo->confirmed_lsn < lsn) {
+		limbo->confirmed_lsn = lsn;
+		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
 }
 

@@ -82,6 +82,13 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	txn_on_commit(tle->txn, &on_commit);
 	txn_on_rollback(tle->txn, &on_rollback);
 	/*
+	 * When this transaction gets confirmed, make sure the limbo's confirmed
+	 * LSN would match it exactly. Not get batched with any newer txns. It
+	 * important so the txn checkpoint doesn't cover any transactions
+	 * created after the checkpoint is started.
+	 */
+	tle->is_corner_stone = true;
+	/*
 	 * Make sure that all changes at the time of checkpoint start have
 	 * reached WAL and get the vclock collected exactly at that moment.
 	 *

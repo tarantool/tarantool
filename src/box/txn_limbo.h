@@ -80,6 +80,13 @@ struct txn_limbo_entry {
 	enum txn_limbo_entry_state state;
 	/** When this entry was added to the queue. */
 	double insertion_time;
+	/**
+	 * If this limbo entry needs to be confirmed without batching it with
+	 * any newer txns. It is useful for creating checkpoints, read-views.
+	 * When want to make sure the checkpoint's confirmation LSN would match
+	 * the LSN of the last synchro txn in this checkpoint.
+	 */
+	bool is_corner_stone;
 };
 
 static inline bool
