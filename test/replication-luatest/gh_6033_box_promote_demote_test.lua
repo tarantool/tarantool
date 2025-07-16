@@ -112,6 +112,7 @@ local function cluster_reinit(g)
         server:exec(function()
             box.ctl.demote()
         end)
+        wait_sync(g.cluster.servers)
     end
 end
 
