@@ -1,6 +1,7 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
+local proxy = require("luatest.replica_proxy")
 
 local wait_timeout = 120
 
@@ -15,23 +16,38 @@ g.before_each(function()
     g.cluster = cluster:new({})
     local node1_uri = server.build_listen_uri('node1', g.cluster.id)
     local node2_uri = server.build_listen_uri('node2', g.cluster.id)
-    local replication = {node1_uri, node2_uri}
     local box_cfg = {
         listen = node1_uri,
-        replication = replication,
-        -- To speed up new term when try to elect a first leader.
-        replication_timeout = 0.1,
+        replication_timeout = 1,
         replication_synchro_quorum = 2,
         election_timeout = 1000000,
     }
+
+    g.proxy_uri_1_to_2 = server.build_listen_uri(
+        "proxy_1_to_2", g.cluster.id)
+    g.proxy_uri_2_to_1 = server.build_listen_uri(
+        "proxy_2_to_1", g.cluster.id)
+    g.proxy_1_to_2 = proxy:new({
+        client_socket_path = g.proxy_uri_1_to_2,
+        server_socket_path = node2_uri})
+    g.proxy_2_to_1 = proxy:new({
+        client_socket_path = g.proxy_uri_2_to_1,
+        server_socket_path = node1_uri})
+
+    box_cfg.replication = {g.proxy_uri_1_to_2, node1_uri}
     g.node1 = g.cluster:build_server({alias = 'node1', box_cfg = box_cfg})
 
     box_cfg.listen = node2_uri
+    box_cfg.replication = {g.proxy_uri_2_to_1, node2_uri}
     g.node2 = g.cluster:build_server({alias = 'node2', box_cfg = box_cfg})
+
+    t.assert(g.proxy_1_to_2:start())
+    t.assert(g.proxy_2_to_1:start())
 
     g.cluster:add_server(g.node1)
     g.cluster:add_server(g.node2)
     g.cluster:start()
+    g.cluster:wait_for_fullmesh()
 end)
 
 g.after_each(function()
@@ -40,16 +56,8 @@ end)
 
 g.test_split_vote = function(g)
     -- Stop the replication so as the nodes can't request votes from each other.
-    local node1_repl = g.node1:exec(function()
-        local repl = box.cfg.replication
-        box.cfg{replication = {}}
-        return repl
-    end)
-    local node2_repl = g.node2:exec(function()
-        local repl = box.cfg.replication
-        box.cfg{replication = {}}
-        return repl
-    end)
+    g.proxy_1_to_2:pause()
+    g.proxy_2_to_1:pause()
 
     -- Both vote for self but don't see the split-vote yet.
     -- Have to promote the nodes to make them start elections when none of them
@@ -73,12 +81,8 @@ g.test_split_vote = function(g)
     end)
 
     -- Now let the nodes notice the split vote.
-    g.node1:exec(function(repl)
-        box.cfg{replication = repl}
-    end, {node1_repl})
-    g.node2:exec(function(repl)
-        box.cfg{replication = repl}
-    end, {node2_repl})
+    g.proxy_1_to_2:resume()
+    g.proxy_2_to_1:resume()
 
     t.helpers.retrying({timeout = wait_timeout}, function()
         local msg = 'split vote is discovered'
