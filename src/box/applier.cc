@@ -1526,23 +1526,19 @@ applier_synchro_filter_tx(struct stailq *rows)
 	row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	uint64_t term = txn_limbo_replica_term(&txn_limbo, row->replica_id);
 	assert(term <= txn_limbo.promote_greatest_term);
-	if (term == txn_limbo.promote_greatest_term)
-		return 0;
-
-	/*
-	 * We do not nopify promotion/demotion and most of confirm/rollback.
-	 * Such syncrhonous requests should be filtered by txn_limbo to detect
-	 * possible split brain situations.
-	 *
-	 * This means the only filtered out transactions are synchronous ones or
-	 * the ones depending on them.
-	 *
-	 * Any asynchronous transaction from an obsolete term when limbo is
-	 * claimed by someone is a marker of split-brain by itself: consider it
-	 * a synchronous transaction, which is committed with quorum 1.
-	 */
+	bool is_current_term = term == txn_limbo.promote_greatest_term;
 	struct applier_tx_row *item;
-	if (iproto_type_is_dml(row->type) && !row->wait_sync) {
+	if (iproto_type_is_dml(row->type)) {
+		if (is_current_term)
+			return 0;
+		/*
+		 * Any asynchronous transaction from an obsolete term when limbo
+		 * is claimed by someone is a marker of split-brain by itself:
+		 * consider it a synchronous transaction, which is committed
+		 * with quorum 1.
+		 */
+		if (row->wait_sync)
+			goto nopify;
 		if (txn_limbo.owner_id == REPLICA_ID_NIL)
 			return 0;
 		stailq_foreach_entry(item, rows, next) {
@@ -1554,39 +1550,72 @@ applier_synchro_filter_tx(struct stailq *rows)
 			return -1;
 		}
 		return 0;
-	} else if (iproto_type_is_synchro_request(row->type)) {
-		item = stailq_last_entry(rows, typeof(*item), next);
-		struct synchro_request req = item->req.synchro;
-		/* Note! Might be different from row->replica_id. */
-		uint32_t owner_id = req.replica_id;
-		int64_t confirmed_lsn =
-			txn_limbo_replica_confirmed_lsn(&txn_limbo, owner_id);
+	}
+	/*
+	 * We do not nopify promotion/demotion and most of confirm/rollback.
+	 * Such syncrhonous requests should be filtered by txn_limbo to detect
+	 * possible split brain situations.
+	 *
+	 * This means the only filtered out transactions are synchronous ones or
+	 * the ones depending on them.
+	 */
+	assert(iproto_type_is_synchro_request(row->type));
+	const struct synchro_request *req;
+	int64_t confirmed_lsn;
+	item = stailq_last_entry(rows, typeof(*item), next);
+	req = &item->req.synchro;
+	/* Note! Might be different from row->replica_id. */
+	confirmed_lsn = txn_limbo_replica_confirmed_lsn(&txn_limbo,
+							req->replica_id);
+	switch (row->type) {
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE:
+		/*
+		 * Never need to be nopified. Every PROMOTE / DEMOTE is either a
+		 * valid one or is a split brain. There is no such thing as an
+		 * "old already applied promotion".
+		 */
+		return 0;
+	case IPROTO_RAFT_CONFIRM:
+		if (req->lsn > confirmed_lsn)
+			return 0;
 		/*
 		 * A CONFIRM with lsn <= known confirm lsn for this replica may
 		 * be nopified without a second thought. The transactions it's
 		 * going to confirm were already confirmed by one of the
 		 * PROMOTE/DEMOTE requests in a new term.
 		 *
-		 * Same about a ROLLBACK with lsn > known confirm lsn.
-		 * These requests, although being out of date, do not contradict
-		 * anything, so we may silently skip them.
+		 * See that the CONFIRM can be nopified even in the current term
+		 * if it wants to commit already committed txns. This is a niche
+		 * case which might happen when a replica joins a master and
+		 * receives a valid fully confirmed read-view from it, but some
+		 * CONFIRM WAL entries might have been written by the master
+		 * after the read-view is sent. Then the replica would receive
+		 * those "already known" CONFIRMs during xlogs catch up.
+		 *
+		 * Besides, logically a confirmation of already confirmed txns
+		 * doesn't contradict anything.
 		 */
-		switch (row->type) {
-		case IPROTO_RAFT_PROMOTE:
-		case IPROTO_RAFT_DEMOTE:
+		break;
+	case IPROTO_RAFT_ROLLBACK:
+		if (req->lsn <= confirmed_lsn)
 			return 0;
-		case IPROTO_RAFT_CONFIRM:
-			if (req.lsn > confirmed_lsn)
-				return 0;
-			break;
-		case IPROTO_RAFT_ROLLBACK:
-			if (req.lsn <= confirmed_lsn)
-				return 0;
-			break;
-		default:
-			unreachable();
-		}
+		/*
+		 * Rollback in the current term wants to roll some currently
+		 * waiting transactions back. No case when it can be considered
+		 * outdated.
+		 */
+		if (is_current_term)
+			return 0;
+		/*
+		 * In older terms though this is fine to nopify it. Those txns
+		 * must have already been cancelled by the new leader anyway.
+		 */
+		break;
+	default:
+		unreachable();
 	}
+nopify:
 	stailq_foreach_entry(item, rows, next) {
 		row = &item->row;
 		row->type = IPROTO_NOP;
