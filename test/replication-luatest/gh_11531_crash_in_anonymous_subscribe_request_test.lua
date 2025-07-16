@@ -31,7 +31,7 @@ g.test_no_crash_with_anon_subscribe_request_and_nil_instance_uuid = function()
     -- requests don't have enough time to be deleted and, as a result the
     -- ER_PROTOCOL error is raised. We shouldn't fail our test due to this
     -- error.
-    t.helpers.retrying({delay = 0.1}, function()
+    t.helpers.retrying({delay = 0.1, timeout = 60}, function()
         -- If the ER_PROTOCOL error is raised, the connection is closed.
         -- In this scenario our test will fail due to ER_NO_CONNECTION error.
         -- On each iteration of t.helpers.retrying we should check that our
