@@ -6,6 +6,9 @@ test_run = require('test_run').new()
 -- gh-3055 follow-up: box.ctl.promote() could crash on an assertion after a
 -- spurious wakeup.
 --
+-- After #10836 patch we test that after fiber's join ER_NO_ELECTION_QUORUM
+-- error will be raised.
+--
 _ = box.space._cluster:insert{2, require('uuid').str()}
  | ---
  | ...
@@ -18,7 +21,7 @@ box.cfg{election_mode='manual',\
 fiber = require('fiber')
  | ---
  | ...
-f = fiber.create(function() box.ctl.promote() end)
+f = fiber.new(function() box.ctl.promote() end)
  | ---
  | ...
 f:set_joinable(true)
@@ -38,7 +41,7 @@ f:cancel()
 f:join()
  | ---
  | - false
- | - fiber is cancelled
+ | - 'Not enough peers connected to start elections: 1 out of minimal required 2'
  | ...
 box.cfg{election_mode='off'}
  | ---
