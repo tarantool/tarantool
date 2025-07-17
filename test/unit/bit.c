@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "unit.h"
 
@@ -329,9 +330,79 @@ test_bit_copy_range(bool src_val)
 	footer();
 }
 
+static void
+random_bytes(size_t n, unsigned char *out)
+{
+	for (size_t i = 0; i < n; i++) {
+		out[i] = rand() % 256;
+	}
+}
+
+static inline size_t
+bit_count_slow(const uint8_t *data, size_t bit_offset, size_t length)
+{
+	size_t count = 0;
+	for (size_t i = bit_offset; i < bit_offset + length; ++i) {
+		if (bit_test(data, i)) {
+			++count;
+		}
+	}
+	return count;
+}
+
+/**
+ * This test is taken from Apache Arrow C++ library and modified.
+ * Please, see the NOTICE file.
+ */
+static void
+test_bit_count(void)
+{
+	header();
+
+	const size_t buf_size = 1000;
+	alignas(8) unsigned char buf[buf_size];
+	memset(buf, 0, sizeof(buf));
+	const size_t buf_bits = buf_size * 8;
+
+	random_bytes(buf_size, buf);
+
+	/** Check start addresses with 64-bit alignment and without */
+	size_t byte_offsets[3] = {0, 1, 7};
+	size_t num_bits[3] = {buf_bits - 96, buf_bits - 101, buf_bits - 127};
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			ssize_t offsets[] = {
+				0, 12, 16, 32, 37, 63, 64, 128,
+				num_bits[j] - 30, num_bits[j] - 64
+			};
+			for (size_t k = 0; k < lengthof(offsets); k++) {
+				ssize_t offset = offsets[k];
+				if (offset < 0 ||
+				    (size_t)offset > num_bits[i]) {
+					continue;
+				}
+				size_t result =
+					bit_count(buf + byte_offsets[i],
+						  (size_t)offset,
+						  num_bits[i] - (size_t)offset);
+				size_t expected =
+					bit_count_slow(buf + byte_offsets[i],
+						       (size_t)offset,
+						       num_bits[i] -
+								(size_t)offset);
+				fail_if(result != expected);
+			}
+		}
+	}
+
+	footer();
+}
+
 int
 main(void)
 {
+	srand(time(NULL));
+
 	test_ctz_clz();
 	test_count();
 	test_rotl_rotr();
@@ -344,4 +415,5 @@ main(void)
 	test_bit_set_range();
 	test_bit_copy_range(true);
 	test_bit_copy_range(false);
+	test_bit_count();
 }
