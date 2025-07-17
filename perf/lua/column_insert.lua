@@ -29,7 +29,9 @@ local USAGE = [[
    row_count_total <number, 1000000> - number of inserted rows
    row_count_batch <number, 1000>    - number of rows per record batch
    use_arrow_api <boolean, false>    - use the Arrow API for batch insertion
-
+   secondary_index <boolean, false>  - whether secondary index present
+   secondary_covers <number, 0>      - number of fields covered by secondary
+                                       index
 ]]
 
 local params = benchmark.argparse(arg, {
@@ -41,6 +43,8 @@ local params = benchmark.argparse(arg, {
     {'row_count_total', 'number'},
     {'row_count_batch', 'number'},
     {'use_arrow_api', 'boolean'},
+    {'secondary_index', 'boolean'},
+    {'secondary_covers', 'number'},
 }, USAGE)
 
 local DEFAULT_ENGINE = 'memtx'
@@ -50,6 +54,7 @@ local DEFAULT_COLUMN_COUNT_TOTAL = 1000
 local DEFAULT_COLUMN_COUNT_BATCH = 100
 local DEFAULT_ROW_COUNT_TOTAL = 1000 * 1000
 local DEFAULT_ROW_COUNT_BATCH = 1000
+local DEFAULT_SECONDARY_COVERS = 0
 
 params.engine = params.engine or DEFAULT_ENGINE
 params.wal_mode = params.wal_mode or DEFAULT_WAL_MODE
@@ -61,11 +66,14 @@ params.column_count_batch = params.column_count_batch or
 params.row_count_total = params.row_count_total or DEFAULT_ROW_COUNT_TOTAL
 params.row_count_batch = params.row_count_batch or DEFAULT_ROW_COUNT_BATCH
 params.use_arrow_api = params.use_arrow_api or false
+params.secondary_index = params.secondary_index or false
+params.secondary_covers = params.secondary_covers or DEFAULT_SECONDARY_COVERS
 
 assert(params.column_count_batch <= params.column_count_total)
 assert(params.column_count_batch < 1000 * 1000)
 assert(params.row_count_batch <= params.row_count_total)
 assert(params.row_count_total % params.row_count_batch == 0)
+assert(params.secondary_covers >= 0)
 
 local bench = benchmark.new(params)
 
@@ -133,6 +141,13 @@ box.once('init', function()
         format = format,
     })
     s:create_index('pk')
+    if params.secondary_index then
+        local covers = {}
+        for i = 1, params.secondary_covers do
+            table.insert(covers, 2 + i)
+        end
+        s:create_index('sk', {parts = {2}, covers = covers})
+    end
 end)
 
 local function check_result(result, expected)
