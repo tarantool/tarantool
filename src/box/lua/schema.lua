@@ -2120,20 +2120,24 @@ local iterator_pos_end = ffi.new('const char *[1]')
 --
 -- Returns true on success. On failure, sets box.error and returns false.
 --
-local function iterator_pos_set(index, pos, ibuf, level)
+local function iterator_pos_set(index, pos, ibuf, level, key, key_end)
     if pos == nil then
         iterator_pos[0] = nil
         iterator_pos_end[0] = nil
-        return true
+        return true, key, key_end
     elseif type(pos) == 'string' then
         iterator_pos[0] = pos
         iterator_pos_end[0] = iterator_pos[0] + #pos
-        return true
+        return true, key, key_end
     else
         local tuple, tuple_end = tuple_encode(ibuf, pos, level + 1)
-        return builtin.box_index_tuple_position(
+        local ok = builtin.box_index_tuple_position(
                 index.space_id, index.id, tuple, tuple_end,
                 iterator_pos, iterator_pos_end) == 0
+        local key_size = key_end - key
+        key = ibuf.rpos
+        key_end = key + key_size
+        return ok, key, key_end
     end
 end
 
@@ -2556,7 +2560,8 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     local pkey, pkey_end = tuple_encode(ibuf, key, 2)
     local svp = builtin.box_region_used()
     local itype, after, offset = check_pairs_opts(opts, pkey + 1 >= pkey_end, 2)
-    local ok = iterator_pos_set(index, after, ibuf, 2)
+    local ok
+    ok, pkey, pkey_end = iterator_pos_set(index, after, ibuf, 2)
     local keybuf = ffi.string(pkey, pkey_end - pkey)
     cord_ibuf_put(ibuf)
     local cdata
@@ -2690,19 +2695,20 @@ base_index_mt.select_ffi = function(index, key, opts)
     local iterator, offset, limit, after, fetch_pos =
         check_select_opts(opts, key_is_nil, 2)
     local region_svp = builtin.box_region_used()
-    local nok = not iterator_pos_set(index, after, ibuf, 2)
-    if not nok then
-        nok = builtin.box_select_ffi(index.space_id, index.id, key, key_end,
-                                     iterator_pos, iterator_pos_end, fetch_pos,
-                                     port, iterator, offset, limit) ~= 0
+    local ok
+    ok, key, key_end = iterator_pos_set(index, after, ibuf, 2)
+    if ok then
+        ok = builtin.box_select_ffi(index.space_id, index.id, key, key_end,
+                                    iterator_pos, iterator_pos_end, fetch_pos,
+                                    port, iterator, offset, limit) == 0
     end
-    if not nok and fetch_pos and iterator_pos[0] ~= nil then
+    if not ok and fetch_pos and iterator_pos[0] ~= nil then
         new_position = ffi.string(iterator_pos[0],
                                   iterator_pos_end[0] - iterator_pos[0])
     end
     builtin.box_region_truncate(region_svp)
     cord_ibuf_put(ibuf)
-    if nok then
+    if not ok then
         box.error(box.error.last(), 2)
     end
 
