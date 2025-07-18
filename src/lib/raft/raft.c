@@ -625,6 +625,7 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			if (raft->is_cfg_candidate)
 				raft_sm_schedule_new_election(raft);
 		}
+
 		return 0;
 	}
 	/* The node is a leader, but it is already known. */
