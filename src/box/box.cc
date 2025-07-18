@@ -4810,7 +4810,8 @@ box_connect_replica(const struct tt_uuid *uuid, const struct vclock *gc_vclock,
 
 	/* No replica object with nil UUID. */
 	if (tt_uuid_is_nil(uuid)) {
-		tnt_raise(ClientError, ER_NIL_UUID);
+		*out = NULL;
+		return ReplicaConnectionGuard(NULL);
 	}
 
 	struct replica *replica = replica_by_uuid(uuid);
@@ -4943,6 +4944,10 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
+	/* No replica object with nil UUID. */
+	if (tt_uuid_is_nil(&req.instance_uuid))
+		tnt_raise(ClientError, ER_NIL_UUID);
+
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
@@ -5067,6 +5072,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
+	/* No replica object with nil UUID. */
+	if (tt_uuid_is_nil(&req.instance_uuid))
+		tnt_raise(ClientError, ER_NIL_UUID);
+
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
@@ -5168,6 +5177,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 
 	struct subscribe_request req;
 	xrow_decode_subscribe_xc(header, &req);
+
+	/* No replica object with nil UUID. */
+	if (tt_uuid_is_nil(&req.instance_uuid))
+		tnt_raise(ClientError, ER_NIL_UUID);
 
 	/* Forbid connection to itself */
 	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))

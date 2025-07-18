@@ -136,10 +136,7 @@ end)
 
 g.test_fetch_snapshot_no_uuid = function(g)
     write_fetch_snapshot(g.s)
-    local h, b = socket_read(g.s)
-    t.assert_equals(h[key.REQUEST_TYPE], type.TYPE_ERROR + box.error.NIL_UUID)
-    t.assert_equals(b[key.ERROR_24],
-                    'Nil UUID is reserved and can\'t be used in replication')
+    read_fetch_snapshot_response(g)
     g.server:exec(function()
         t.assert_equals(box.info.gc().consumers, {})
         t.assert_equals(box.space._gc_consumers:select{}, {})
