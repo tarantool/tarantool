@@ -454,6 +454,8 @@ struct box_raft_watch_ctx {
 	bool is_done;
 	uint64_t term;
 	struct fiber *owner;
+	/** Container for storing errors. */
+	struct diag diag;
 };
 
 static int
@@ -462,27 +464,56 @@ box_raft_try_promote_f(struct trigger *trig, void *event)
 	struct raft *raft = event;
 	assert(raft == box_raft());
 	struct box_raft_watch_ctx *ctx = trig->data;
+
+	if (raft->state == RAFT_STATE_LEADER)
+		goto done;
+	/*
+	 * The checking for quorum loss is not placed inside !is_candidate
+	 * check because the quorum may be restored when raft->is_candidate
+	 * becomes true. In this case we will lose the ER_NO_ELECTION_QUORUM
+	 * error and continue promote.
+	 */
+	int healthy_count = replicaset.healthy_count;
+	if (healthy_count < replicaset_healthy_quorum()) {
+		diag_set(ClientError, ER_NO_ELECTION_QUORUM,
+			 healthy_count, replicaset_healthy_quorum());
+		goto done;
+	}
+	/* The term ended with a leader being found. */
+	if (raft->leader != REPLICA_ID_NIL) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
+		goto done;
+	}
 	/*
 	 * Term ended with nothing, probably split vote which led to a next
 	 * term.
 	 */
-	if (raft->volatile_term > ctx->term)
+	if (raft->volatile_term > ctx->term) {
+		diag_set(ClientError, ER_OLD_TERM,
+			 (unsigned long long)ctx->term,
+			 (unsigned long long)raft->volatile_term);
 		goto done;
+	}
 	/*
 	 * Instance does not participate in terms as a candidate anymore. Can
 	 * happen not only if the node was a temporary candidate and the term
 	 * was bumped, but also if it was reconfigured during the waiting or it
 	 * lost the connection quorum.
 	 */
-	if (!raft->is_candidate)
+	if (!raft->is_candidate) {
+		if (box_election_mode == ELECTION_MODE_MANUAL) {
+			diag_set(TimedOut);
+		} else {
+			assert(box_election_mode != ELECTION_MODE_CANDIDATE);
+			diag_set(ClientError, ER_ELECTION_DISABLED);
+		}
 		goto done;
-	/* The term ended with a leader being found. */
-	if (raft->leader != REPLICA_ID_NIL)
-		goto done;
+	}
 	/* The term still continues with no resolution. */
 	return 0;
 done:
 	ctx->is_done = true;
+	diag_move(diag_get(), &ctx->diag);
 	fiber_wakeup(ctx->owner);
 	return 0;
 }
@@ -503,35 +534,37 @@ box_raft_try_promote(void)
 		.term = raft->volatile_term,
 		.owner = fiber(),
 	};
+	diag_create(&ctx.diag);
 	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
-	while (!fiber_is_cancelled() && !ctx.is_done)
-		fiber_yield();
+
+	double deadline = ev_monotonic_now(loop()) + raft->election_timeout;
+	while (!fiber_is_cancelled() && !ctx.is_done) {
+		if (fiber_yield_deadline(deadline))
+			break;
+	}
+	ERROR_INJECT_YIELD(ERRINJ_RAFT_PROMOTE_DELAY);
 	trigger_clear(&trig);
 
-	if (raft->state == RAFT_STATE_LEADER)
+	if (raft->state == RAFT_STATE_LEADER) {
+		/*
+		 * Since some errors from other functions may be set in
+		 * box_raft_try_promote_f's diag, we should always clear
+		 * ctx.diag before box_raft_try_promote completes successfully.
+		 * Otherwise it can lead to memory leaks.
+		 */
+		diag_destroy(&ctx.diag);
 		return 0;
-
-	int connected = replicaset.healthy_count;
-	int quorum = replicaset_healthy_quorum();
-	if (!ctx.is_done) {
-		diag_set(FiberIsCancelled);
-	} else if (raft->leader != 0) {
-		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
-	} else if (connected < quorum) {
-		diag_set(ClientError, ER_NO_ELECTION_QUORUM, connected, quorum);
-	} else if (ctx.term < raft->volatile_term) {
-		diag_set(ClientError, ER_OLD_TERM, (unsigned long long)ctx.term,
-			 (unsigned long long)raft->volatile_term);
-	} else {
-		assert(!raft->is_candidate);
-		if (box_election_mode == ELECTION_MODE_MANUAL) {
-			diag_set(TimedOut);
-		} else {
-			assert(box_election_mode != ELECTION_MODE_CANDIDATE);
-			diag_set(ClientError, ER_ELECTION_DISABLED);
-		}
 	}
+
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+	} else if (ctx.is_done) {
+		diag_move(&ctx.diag, diag_get());
+	} else {
+		diag_set(TimedOut);
+	}
+
 	raft_restore(raft);
 	return -1;
 }
