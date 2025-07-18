@@ -454,6 +454,10 @@ str_arrow_lua_func(struct lua_State *L)
 					key, key_end, options, &stream);
 	if (rc != 0) {
 		box_arrow_options_delete(options);
+		if (box_error_code(box_error_last()) == ER_UNSUPPORTED) {
+			lua_pushboolean(L, false);
+			return 1;
+		}
 		return luaT_error(L);
 	}
 	struct ArrowSchema schema;
@@ -462,12 +466,6 @@ str_arrow_lua_func(struct lua_State *L)
 		box_arrow_options_delete(options);
 		stream.release(&stream);
 		return luaT_error(L);
-	}
-	if (use_view_types && strcmp(schema.children[0]->format, "vu") != 0) {
-		box_arrow_options_delete(options);
-		stream.release(&stream);
-		lua_pushboolean(L, false);
-		return 1;
 	}
 	int64_t k = 0;
 	struct ArrowArray array;
@@ -588,6 +586,10 @@ str_arrow_rv_lua_func(struct lua_State *L)
 						key, key_end, options, &stream);
 	if (rc != 0) {
 		box_arrow_options_delete(options);
+		if (box_error_code(box_error_last()) == ER_UNSUPPORTED) {
+			lua_pushboolean(L, false);
+			return 1;
+		}
 		return luaT_error(L);
 	}
 	struct ArrowSchema schema;
@@ -596,12 +598,6 @@ str_arrow_rv_lua_func(struct lua_State *L)
 		box_arrow_options_delete(options);
 		stream.release(&stream);
 		return luaT_error(L);
-	}
-	if (use_view_types && strcmp(schema.children[0]->format, "vu") != 0) {
-		box_arrow_options_delete(options);
-		stream.release(&stream);
-		lua_pushboolean(L, false);
-		return 1;
 	}
 	int64_t k = 0;
 	struct ArrowArray array;
