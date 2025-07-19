@@ -564,8 +564,54 @@ local function validate_failover(found, peers, failover, leader)
         end
     end
 
-    -- Verify that 'election_mode' option is set to a value other
-    -- than 'off' only in the 'failover: election' mode.
+    -- Verify that 'election_mode' is unset or null if
+    -- 'failover: supervised'.
+    --
+    -- The actual box.cfg.election_mode value is deduced from
+    -- failover.replicasets.<replicaset_name>.synchro_mode (and
+    -- replication.anon).
+    --
+    -- Also, it is allowed to explicitly set the deduced value.
+    if failover == 'supervised' then
+        for peer_name, peer in pairs(peers) do
+            local election_mode = instance_config:get(peer.iconfig_def,
+                'replication.election_mode')
+            local is_anon = instance_config:get(peer.iconfig_def,
+                'replication.anon')
+
+            -- This option is allowed only in the global scope,
+            -- so it can't vary across peers of the same
+            -- replicaset, but it is taken on each loop iteration
+            -- for simplicity.
+            local mode_path = {'failover', 'replicasets', found.replicaset_name,
+                'synchro_mode'}
+            local synchro_mode = instance_config:get(peer.iconfig_def,
+                mode_path)
+
+            -- The election_mode value is deduced automatically,
+            -- but if a user set the same value explicitly, it is
+            -- OK.
+            local expected = 'off'
+            if synchro_mode and not is_anon then
+                expected = 'manual'
+            end
+
+            if election_mode ~= nil and election_mode ~= expected then
+                error(('replication.election_mode = %q is set for instance ' ..
+                    '%q of replicaset %q of group %q, but this option is ' ..
+                    'to be deduced from ' ..
+                    'failover.replicasets.%s.synchro_mode when ' ..
+                    'replication.failover = "supervised"; the suggestion is ' ..
+                    'to leave the replication.election_mode option ' ..
+                    'unset'):format(election_mode, peer_name,
+                    found.replicaset_name, found.group_name,
+                    found.replicaset_name), 0)
+            end
+        end
+    end
+
+    -- Verify that 'election_mode' is 'off' if 'failover: off' or
+    -- 'failover: manual'.
     --
     -- The alternative would be silent ignoring the election
     -- mode if failover mode is not 'election'.
@@ -577,7 +623,7 @@ local function validate_failover(found, peers, failover, leader)
     -- We can relax it in a future, though. For example, if two
     -- conflicting options are set in different scopes, we can
     -- ignore one from the outer scope.
-    if failover ~= 'election' then
+    if failover ~= 'election' and failover ~= 'supervised' then
         for peer_name, peer in pairs(peers) do
             local election_mode = instance_config:get(peer.iconfig_def,
                 'replication.election_mode')
