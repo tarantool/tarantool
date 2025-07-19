@@ -1015,6 +1015,188 @@ I['failover.replicasets.*.learners.*'] = format_text([[
     coordinator when selecting a master.
 ]])
 
+I['failover.replicasets.*.synchro_mode'] = format_text([[
+    The coordinator supports two leader appoint modes: one suits
+    better for asynchronous replication, the other one better
+    works for the quorum synchronous replication.
+
+    First of all, it may be confusing that the synchronous
+    replication is configured per-space in tarantool, but the
+    supervised failover option is per-replicaset.
+
+    Technically a user can enable the synchro mode and mark only
+    some spaces synchronous. However, this setup gives the worst
+    of two worlds:
+
+    - Asynchronous transactions are assumed as possibly depending
+      from a result of previously started synchronous ones, so if
+      there are sync transactions in fly, all the async ones are
+      waiting for finishing of the sync ones. This way we
+      sometimes get sync-level latency for async transactions.
+    - Async transactions from the old leader, whose result is
+      visible to a client, are not necessarily present in another
+      availability zone. A network partitioning and repairing may
+      lead to conflicting journals and disconnecting of the old
+      leader from the replicaset until manual repairing activities
+      are performed. It means that the autofailover may hurt the
+      redundancy factor. And that happens frequently comparing to
+      the usual async setup due to the stricter conflict
+      detection strategy.
+
+    To sum up: in the mixed setup we pay twice (for async and
+    qsync both -- possible conflicts and increased latency), but
+    it rewards with a kind of 'sometimes you get better latency'
+    comparing to qsync and 'sometimes you have linearizable
+    writes' comparing to async. For most applications it seems
+    worse than fair qsync (with all the spaces marked as
+    synchronous).
+
+    In this description we assume either all asynchronous spaces
+    or all synchronous ones.
+
+    `synchro_mode` = `false` handles a replicaset with
+    asynchronous replication: if all the spaces are created
+    without the `is_sync` option. It is default.
+
+    `synchro_mode` = `true` handles a replicaset with quorum
+    synchronous replication: if the spaces have the `is_sync`
+    option enabled.
+
+    Before describe how the modes work, let's introduce some
+    terms.
+
+    Imagine, a network partitioning happens. If the old leader is
+    not reachable from the active coordinator, it is *resigned*
+    (goes to read-only). The coordinator performs the
+    *autofailover*: it *appoints* the new leader (it goes to
+    read-write). The appoint may or may not claim *synchro queue*
+    ownership (to enable processing of synchronous transactions),
+    it may or may not require a *quorum* of replicas to agree
+    about the longest available journal; it depends on the chosen
+    `synchro_mode`.
+
+    Once the connectivity is repaired, the old leader attempts to
+    connect to the replicaset back. It succeeds or fails depending
+    on whether the journals are *diverged* and depending on the
+    *conflict detection* and the *conflict resolution* strategies.
+
+    The following description assumes such a network partitioning,
+    when the old leader lost connectivity with the active
+    coordinator, so the coordinator have to appoint a new leader.
+    The power off or hardware break situations are similar, but
+    the old leader goes back (if it is possible) only when it is
+    repaired. This way we cover wide variety of situations using
+    the network partitioning as an example.
+
+    Also, the active coordinator switch may occur in some network
+    partitioning situations and it adds some delay to resigning
+    and appointing. Other than that the autofailover process
+    remains the same.
+
+    `synchro_mode` = `false` works this way:
+
+    - The network partitioning may leave the old leader with the
+      journal, where the last transactions are not replicated to
+      the other availability zone. As result, these transactions
+      are not present on the future new leader.
+    - The old leader resigns after failover.lease_interval.
+    - The new leader is appointed without reaching any quorum of
+      replicas. It works while at least one instance is available.
+    - The new leader doesn't claim synchro queue ownership[^1].
+    - When the connectivity is repaired, the old leader (read-only
+      now) attempts to replicate the last transactions from the
+      journal to the new leader.
+    - If the journals are not diverged, or the conflict is not
+      detected, or all the conflicts are resolved, the old leader
+      successfully connects back to the replicaset. The redundancy
+      is repaired.
+    - Otherwise, the replica is disconnected from the replicaset.
+      Some manual actions are needed to extract the conflicting
+      journal entries, apply it to the new leader (if needed) and
+      rebootstrap the old leader (wipe the data directory and
+      start the instance from scratch).
+    - The conflict detection strategy is weak[^2]: the only
+      conflicts are attempts to insert the same key into an unique
+      index twice[^3].
+    - The conflict resolution is 'just fail' by default, but
+      a user may setup its own conflict resolution triggers
+      (ON CONFLICT or before_replace).
+
+    [^1]: It works in assumption that the synchro queue owner has
+          not been claimed before (for example, due to use of
+          `replication.failover` = `election` in the past). It can
+          be verified using `box.info.synchro.queue.owner`: it is
+          expected to be zero. Otherwise, the whole replicaset is
+          in read-only. box.ctl.demote() may repair this situation
+          if it is unintended.
+    [^2]: It is also true only if there is no synchro queue owner.
+    [^3]: It may happen if the client retries a writing operation
+          on the new leader after a failure with the old leader.
+
+    To sum up: here we have asynchronous replication guarantees.
+    Plus autoapply of the journal tail from the old leader that
+    may hurt data consistency. And each autofailover event may
+    decrease the redundancy factor until some complicated manual
+    actions are performed.
+
+    The on conflict triggers (before_replace in the Lua API) may
+    be used to define automatic conflict resolution strategy that
+    eliminates a need for manual action to return the redundancy
+    back.
+
+    `synchro_mode` = `true` works this way:
+
+    - After the network partitioning, the old leader resigns.
+      It rolls back transactions that are not confirmed by a
+      quorum.
+    - The new leader is chosen using a quorum based algorithm
+      and it is guaranteed to have all the quorum approved
+      transactions[^4].
+    - N/2+1 available replicas are necessary for a successful
+      appoint. It means that there is more room for the situation,
+      when the whole replicaset is read-only: we can't choose a
+      new leader if we can't reach N/2+1 replicas.
+    - The new leader claims synchro queue ownership when becoming
+      a leader[^5].
+    - There is no room for a conflict, when the connectivity is
+      repaired: each transaction either approved by the quorum or
+      rolled back[^6].
+    - The conflict detection strategy is strict: any divergence in
+      the journals is considered a conflict. However, it shouldn't
+      occur by the construction[^6].
+    - The conflict resolution strategy is the same as for
+      `synchro_mode` = `false`.
+
+    [^4]: Technically speaking, `synchro_mode` = `true` enables
+          `box.cfg.election_mode` = `manual` on instances. It
+          tunes the `box.ctl.promote()` behavior to check the
+          instance's vclock with a quorum of replicas before
+          actual write itself as the new synchro queue owner.
+    [^5]: By calling `box.ctl.promote()`.
+    [^6]: If all the spaces are `is_sync` = `true`. So, again,
+          mixing of async and sync spaces within one replicaset is
+          not a good idea.
+
+    To sum up: the synchronous replication guarantees are given,
+    which means linearizability for writing operations: once the
+    transaction is confirmed for the client it can be observed
+    even in case of a failure of one availability zone[^7]. The
+    autofailover doesn't hurt redundancy, no manual rebootstrap
+    required. However, if a redundancy factor lowers the N/2+1
+    bound, the whole replicaset is read-only. A strict conflict
+    detection strategy adds an extra layer of protection against
+    consistency violations.
+
+    [^7]: You may also be interested in the txn_isolation =
+          'linearizable' box.begin/box.atomic option for
+          linearizable reads.
+
+    Note that `synchro_mode` = `true` doesn't support a setup with
+    two availability zones for now. You need at least three zones
+    for it. Future tarantool versions may provide the two zones
+    setup support. Stay tuned!
+]])
+
 I['failover.replicasets.*.priority'] = format_text([[
     Priorities for the supervised failover mode.
 ]])
