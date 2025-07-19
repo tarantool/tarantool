@@ -3,6 +3,10 @@
 -- Verify all the compositions of possible replication.failover
 -- and replication.election_mode values.
 --
+-- If the election mode is set to a value other than null and the
+-- failover mode is 'supervised', the configuration is considered
+-- incorrect.
+--
 -- If the election mode is set to a value other than null or 'off'
 -- and the failover mode is not 'election', the configuration is
 -- considered incorrect.
@@ -19,6 +23,20 @@ local g = t.group()
 g.before_all(cluster.init)
 g.after_each(cluster.drop)
 g.after_all(cluster.clean)
+
+-- An error that should appear if replication.failover =
+-- supervised and replication.election_mode is set.
+--
+-- It a template and it should parametrized with election mode
+-- supervised_error_t:format(election_mode).
+local supervised_error_t = textutils.toline([[
+    replication.election_mode = %q is set for instance
+    "instance-004" of replicaset "replicaset-001" of group
+    "group-001", but this option is to be deduced from
+    failover.replicasets.replicaset-001.mode when
+    replication.failover = "supervised"; the suggestion is to
+    leave the replication.election_mode option unset
+]])
 
 -- An error that should appear if replication.failover and
 -- replication.election_mode are conflicting.
@@ -50,7 +68,7 @@ local error_t = textutils.toline([[
 --
 -- All the instances are in a replicaset with the given failover
 -- mode.
-local function build_config(failover, election_mode)
+local function build_config(failover, election_mode, supervised_mode, anon)
     local cb = cbuilder:new()
         :set_replicaset_option('replication.failover', failover)
         :add_instance('instance-001', {})
@@ -59,6 +77,7 @@ local function build_config(failover, election_mode)
         :add_instance('instance-004', {
             replication = {
                 election_mode = election_mode,
+                anon = anon,
             },
         })
 
@@ -70,14 +89,20 @@ local function build_config(failover, election_mode)
         cb:set_replicaset_option('leader', 'instance-001')
     end
 
+    if supervised_mode ~= nil then
+        cb:set_global_option('failover.replicasets.replicaset-001.mode',
+            supervised_mode)
+    end
+
     return cb:config()
 end
 
 -- Verify that the given incorrect configuration is reported as
 -- startup error.
-local function failure_case(failover, election_mode)
+local function failure_case(failover, election_mode, supervised_mode, anon)
     return function(g)
-        local config = build_config(failover, election_mode)
+        local config = build_config(failover, election_mode, supervised_mode,
+            anon)
 
         -- The error message shows the replication.failover
         -- parameter by its default value if it is missed or null.
@@ -87,27 +112,46 @@ local function failure_case(failover, election_mode)
             failover = 'off'
         end
 
-        cluster.startup_error(g, config, error_t:format(
-            election_mode, failover))
+        if failover == 'supervised' then
+            cluster.startup_error(g, config, supervised_error_t:format(
+                election_mode, failover))
+        else
+            cluster.startup_error(g, config, error_t:format(
+                election_mode, failover))
+        end
     end
 end
 
 -- Verify that the given correct configuration allows to start a
 -- replicaset successfully.
-local function success_case(failover, election_mode)
+local function success_case(failover, election_mode, supervised_mode, anon)
     return function(g)
-        local config = build_config(failover, election_mode)
+        local config = build_config(failover, election_mode, supervised_mode,
+            anon)
         local cluster = cluster.new(g, config)
         cluster:start()
 
-        cluster['instance-004']:exec(function(failover, election_mode)
-            -- The effective default value is 'off' or
-            -- 'candidate'.
+        cluster['instance-004']:exec(function(failover, election_mode,
+                                              supervised_mode, anon)
+            -- The effective default value is 'off' except:
+            --
+            -- * 'candidate' if failover = election
+            -- * 'manual' if failover = supervised and
+            --   failover.replicasets.<replicaset_name>.mode =
+            --   qsync
             if election_mode == nil then
-                election_mode = failover == 'election' and 'candidate' or 'off'
+                if failover == 'election' then
+                    election_mode = 'candidate'
+                elseif failover == 'supervised' and
+                       supervised_mode == 'qsync' and
+                       not anon then
+                    election_mode = 'manual'
+                else
+                    election_mode = 'off'
+                end
             end
             t.assert_equals(box.cfg.election_mode, election_mode)
-        end, {failover, election_mode})
+        end, {failover, election_mode, supervised_mode, anon})
     end
 end
 
@@ -163,6 +207,45 @@ for failover_str, enabled in pairs(failover_enables_election) do
             g[case_name] = failure_case(failover, election_mode)
         else
             g[case_name] = success_case(failover, election_mode)
+        end
+    end
+end
+
+-- Add test cases with
+-- failover.replicasets.<replicaset_name>.mode = qsync.
+for _, anon in ipairs({false, true}) do
+    for election_mode_str, _ in pairs(election_mode_requires_election) do
+        local supervised_mode = 'qsync'
+        local failover_str = 'supervised'
+        local expect_failure
+        if anon then
+            expect_failure =
+                election_mode_str ~= 'missed' and
+                election_mode_str ~= 'null' and
+                election_mode_str ~= 'off'
+        else
+            expect_failure =
+                election_mode_str ~= 'missed' and
+                election_mode_str ~= 'null' and
+                election_mode_str ~= 'manual'
+        end
+        local case_name = 'test_' .. table.concat({
+            'failover', failover_str,
+            'election_mode', election_mode_str,
+            'supervised_mode', supervised_mode,
+            'anon', tostring(anon),
+            'expect', expect_failure and 'failure' or 'success',
+        }, '_')
+
+        local failover = decode_missed_and_null(failover_str)
+        local election_mode = decode_missed_and_null(election_mode_str)
+
+        if expect_failure then
+            g[case_name] = failure_case(failover, election_mode,
+                supervised_mode, anon)
+        else
+            g[case_name] = success_case(failover, election_mode,
+                supervised_mode, anon)
         end
     end
 end
