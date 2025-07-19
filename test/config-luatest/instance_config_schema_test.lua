@@ -1840,7 +1840,8 @@ g.test_failover = function()
                     },
                     priority = {
                         instance001 = 1
-                    }
+                    },
+                    mode = 'async',
                 }
             },
             log = {
