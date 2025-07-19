@@ -365,6 +365,40 @@ end
 
 -- }}} Set RO/RW
 
+-- {{{ failover.replicasets.*.synchro_mode
+
+-- Set box.cfg.election_mode = 'manual' to tune box.ctl.promote()
+-- behavior: this way it checks vclock of this instance with a
+-- quorum of replicas to ensure that it is the latest one.
+-- Otherwise, box.ctl.promote() fails.
+--
+-- The box.ctl.promote() function is called in the appoint_commit
+-- function (it is part of the failover coordinator, which is
+-- currently closed source).
+--
+-- This is only revelant for replication.failover = supervised,
+-- when the synchro mode is enabled and the instance is not an
+-- anonymous replica.
+local function set_supervised_failover_mode(configdata, box_cfg)
+    local failover = configdata:get('replication.failover',
+        {use_default = true})
+    if failover ~= 'supervised' then
+        return
+    end
+
+    local replicaset_name = configdata._replicaset_name
+    local path = {'failover', 'replicasets', replicaset_name, 'synchro_mode'}
+    local synchro_mode = configdata:get(path, {use_default = true})
+    if not synchro_mode then
+        return
+    end
+
+    local is_anon = configdata:get('replication.anon', {use_default = true})
+    box_cfg.election_mode = is_anon and 'off' or 'manual'
+end
+
+-- }}} failover.replicasets.*.synchro_mode
+
 -- {{{ Revert changes in non-dynamic options
 
 local function revert_non_dynamic_options(config, box_cfg)
@@ -1332,6 +1366,7 @@ local function apply(config)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
     set_ro_rw(config, box_cfg)
+    set_supervised_failover_mode(configdata, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
     set_bootstrap_leader(configdata, box_cfg)
