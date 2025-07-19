@@ -2006,6 +2006,14 @@ return schema.new('instance_config', schema.record({
                         type = 'number',
                     }),
                 }),
+                -- There are two ways to appoint a leader. One
+                -- suits better for async replication mode, the
+                -- other one better works for the quorum
+                -- synchronous replication.
+                synchro_mode = schema.scalar({
+                    type = 'boolean',
+                    default = false,
+                }),
             }),
         }),
         log = schema.record({
