@@ -57,6 +57,18 @@ static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
  * key in index.
  */
 struct memtx_story_link {
+	/**
+	 * For a statement in transaction `TXN`, `is_own_change == true`
+	 * in story `A` for index `I` means:
+	 * - The tuple `A` replaced a tuple `B` that was added by
+	 *   this same transaction, and `A->tuple[I] == B->tuple[I]`;
+	 * - OR the key `A->tuple[I]` was not present in index `I` because this
+	 *   transaction `TXN` had previously executed a statement that removed/
+	 *   replaced a tuple `B`, such that `A->tuple[I] == B->tuple[I]` and
+	 *   this is guaranteed to always remain true (due to the presence of a
+	 *   read tracker or some other conditions).
+	 */
+	bool is_own_change;
 	/** Story that was happened after that story was ended. */
 	struct memtx_story *newer_story;
 	/** Story that was happened before that story was started. */
@@ -1159,6 +1171,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	rlist_add_tail(&txm.all_stories, &story->in_all_stories);
 	rlist_add(&space->memtx_stories, &story->in_space_stories);
 	for (uint32_t i = 0; i < index_count; i++) {
+		story->link[i].is_own_change = false;
 		story->link[i].newer_story = story->link[i].older_story = NULL;
 		rlist_create(&story->link[i].read_gaps);
 		story->link[i].in_index = space->index[i];
@@ -1707,7 +1720,7 @@ memtx_tx_story_gc()
  * Check whether the beginning of a @a story (that is insertion of its tuple)
  * is visible for transaction @a txn.
  * @param is_prepared_ok - whether prepared, not confirmed change is acceptable.
- * @param own_change - return true if the change was made by @txn itself.
+ * @param is_own_change - return true if the change was made by @txn itself.
  * @return true if the story beginning is visible, false otherwise.
  */
 static bool
@@ -1740,27 +1753,72 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 }
 
 /**
+ * Check whether a @a story is deleted by a transaction @a txn.
+ * @param is_own_change - return true if the change was made by @txn itself,
+ * and this is guaranteed to always remain true (due to the presence of a
+ * read tracker or some other conditions).
+ * @return true if a story is deleted by a transaction, false otherwise.
+ */
+static bool
+memtx_tx_story_is_deleted_by_txn(struct memtx_story *story, struct txn *txn,
+				 bool *is_own_change)
+{
+	struct txn_stmt *dels = story->del_stmt;
+	while (dels != NULL) {
+		if (dels->txn == txn) {
+			if (story->add_stmt != NULL &&
+			    story->add_stmt->txn == txn) {
+				*is_own_change = true;
+				return true;
+			}
+			/*
+			 * - DELETE or a REPLACE operation with on_replace
+			 *   triggers tracks a read.
+			 * - If a transaction @txn has left a read-tracker for
+			 *   @story, it can act as if no other transaction can
+			 *   delete or replace @story. Because if that happens,
+			 *   @txn will be aborted. Therefore, as long as @txn is
+			 *   not aborted, @story has definitely not been touched
+			 *   by any other transaction.
+			 * Thus, the presence of a statement stmt inside @txn
+			 * such that stmt->del_story == story, combined with the
+			 * presence of a read-tracker (@story, @txn), guarantees
+			 * that either @txn will be aborted, or it will commit
+			 * successfully, and in that case no other transaction
+			 * will delete or replace @story.
+			 */
+			*is_own_change = false;
+			struct tx_read_tracker *tracker;
+			rlist_foreach_entry(tracker, &story->reader_list,
+					    in_reader_list) {
+				if (tracker->reader == txn) {
+					*is_own_change = true;
+					break;
+				}
+			}
+			return true;
+		}
+		dels = dels->next_in_del_list;
+	}
+	*is_own_change = false;
+	return false;
+}
+
+/**
  * Check whether the end of a @a story (that is deletion of its tuple) is
  * visible for transaction @a txn.
  * @param is_prepared_ok - whether prepared, not confirmed change is acceptable.
- * @param own_change - return true if the change was made by @txn itself.
+ * @param is_own_change - return true if the change was made by @txn itself.
  * @return true if the story end is visible, false otherwise.
  */
 static bool
 memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 				 bool is_prepared_ok, bool *is_own_change)
 {
-	*is_own_change = false;
+	if (memtx_tx_story_is_deleted_by_txn(story, txn, is_own_change))
+		return true;
 
-	struct txn_stmt *dels = story->del_stmt;
-	while (dels != NULL) {
-		if (dels->txn == txn) {
-			/* Tuple is deleted by us (@txn). */
-			*is_own_change = true;
-			return true;
-		}
-		dels = dels->next_in_del_list;
-	}
+	assert(!*is_own_change);
 
 	int64_t rv_psn = INT64_MAX;
 	if (txn != NULL && txn->rv_psn != 0)
@@ -2035,14 +2093,14 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 	struct tuple *visible_replaced;
 	if (directly_replaced[0] == NULL ||
 	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
-		stmt->is_own_change = false;
+		add_story->link[0].is_own_change = false;
 		visible_replaced = directly_replaced[0];
 	} else {
 		struct memtx_story *story =
 			memtx_tx_story_get(directly_replaced[0]);
 		memtx_tx_story_find_visible_tuple(
 			story, txn, 0, true, &visible_replaced,
-			&stmt->is_own_change);
+			&add_story->link[0].is_own_change);
 	}
 
 	if (index_check_dup(space->index[0], *old_tuple, new_tuple,
@@ -2062,6 +2120,7 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 		struct tuple *visible;
 		if (!tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY)) {
 			visible = directly_replaced[i];
+			add_story->link[i].is_own_change = false;
 		} else {
 			/*
 			 * The replaced tuple is dirty. A chain of changes
@@ -2070,10 +2129,9 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 			 */
 			struct memtx_story *story =
 				memtx_tx_story_get(directly_replaced[i]);
-			bool unused;
-			memtx_tx_story_find_visible_tuple(story, txn,
-							  i, true, &visible,
-							  &unused);
+			memtx_tx_story_find_visible_tuple(
+				story, txn, i, true, &visible,
+				&add_story->link[i].is_own_change);
 		}
 
 		if (index_check_dup(space->index[i], visible_replaced,
@@ -2093,8 +2151,11 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 {
 	assert(story->link[ind].newer_story == NULL);
 	assert(txn != NULL);
+	bool unused;
+	bool abort_on_rollback =
+		!memtx_tx_story_is_deleted_by_txn(story, txn, &unused);
 	struct inplace_gap_item *item =
-		memtx_tx_inplace_gap_item_new(txn, true);
+		memtx_tx_inplace_gap_item_new(txn, abort_on_rollback);
 	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
 }
 
@@ -2314,7 +2375,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	 * transaction can interfere with insert: due to serialization the
 	 * previous delete statement guarantees that the insert will not fail.
 	 */
-	if (!stmt->is_own_change &&
+	if (!add_story->link[0].is_own_change &&
 	    (mode == DUP_INSERT ||
 	     space_has_before_replace_triggers(stmt->space) ||
 	     space_has_on_replace_triggers(stmt->space))) {
@@ -2372,7 +2433,7 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	assert(tuple_has_flag(old_tuple, TUPLE_IS_DIRTY));
 	struct memtx_story *del_story = memtx_tx_story_get(old_tuple);
 	if (del_story->add_stmt != NULL)
-		stmt->is_own_change = del_story->add_stmt->txn == stmt->txn;
+		stmt->is_own_delete = del_story->add_stmt->txn == stmt->txn;
 	memtx_tx_story_link_deleted_by(del_story, stmt);
 
 	/*
@@ -2462,7 +2523,10 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			struct txn_stmt *test_stmt = *from;
 			assert(test_stmt->del_story == add_story);
 			assert(test_stmt->txn != stmt->txn);
-			assert(!test_stmt->is_own_change);
+			struct memtx_story *test_story = test_stmt->add_story;
+			(void)test_story;
+			assert(!(test_story == NULL ? test_stmt->is_own_delete :
+			       test_story->link[0].is_own_change));
 			assert(test_stmt->txn->psn == 0);
 
 			/* Unlink from add_story list. */
@@ -2567,7 +2631,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 		     test_story != NULL;
 		     test_story = test_story->link[0].newer_story) {
 			struct txn_stmt *test_stmt = test_story->add_stmt;
-			if (test_stmt->is_own_change)
+			if (test_story->link[0].is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
 			assert(test_stmt->del_story == NULL);
@@ -2763,7 +2827,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		     test_story != NULL;
 		     test_story = test_story->link[0].newer_story) {
 			struct txn_stmt *test_stmt = test_story->add_stmt;
-			if (test_stmt->is_own_change)
+			if (test_story->link[0].is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
 			assert(test_stmt->del_story == NULL);
@@ -2852,7 +2916,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 * Ignore case when other TX executes insert after
 			 * precedence delete.
 			 */
-			if (test_stmt->is_own_change &&
+			if (newer_story->link[i].is_own_change &&
 			    test_stmt->del_story == NULL)
 				continue;
 			/*
