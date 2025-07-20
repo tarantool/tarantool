@@ -330,13 +330,11 @@ struct txn_stmt {
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
 	/*
-	 * Flag that shows whether this statement overwrites own transaction
-	 * statement. For example if a transaction makes two replaces of the
-	 * same key, the second statement will be with is_own_change = true.
-	 * Or if a transaction deletes some key and then inserts that key,
-	 * the insertion statement will be with is_own_change = true.
+	 * Flag that shows whether this DELETE statement removes a story
+	 * that was added by its own transaction. This value is false
+	 * if it's not a DELETE statement.
 	 */
-	bool is_own_change;
+	bool is_own_delete;
 	/**
 	* Request type - IPROTO type code
 	*/
