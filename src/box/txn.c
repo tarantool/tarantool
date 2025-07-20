@@ -311,7 +311,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
-	stmt->is_own_change = false;
+	stmt->is_own_delete = false;
 	stmt->type = type;
 	return stmt;
 }
