@@ -57,6 +57,20 @@ static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
  * key in index.
  */
 struct memtx_story_link {
+	/**
+	 * For a `replace` statement in transaction `TXN`,
+	 * `is_own_change == true` in story `A` for index `index` means:
+	 * - If `index == 0` (primary), that `A` replaced a tuple `B`
+	 *   (or `nil`) that was added by this same transaction (or replaced
+	 *   nothing because this transaction `TXN` had previously deleted
+	 *   this key (e.g. `delete{A->tuple[index])`}).
+	 * - If `index > 0` (secondary), that `A` replaced a tuple `B`
+	 *   (or `nil`) that was added by this same transaction and
+	 *   `A->tuple[index] == B->tuple[index]`, or the key `A->tuple[index]`
+	 *   was not present in index `index` because this transaction `TXN`
+	 *   had previously deleted this key.
+	 */
+	bool is_own_change;
 	/** Story that was happened after that story was ended. */
 	struct memtx_story *newer_story;
 	/** Story that was happened before that story was started. */
@@ -1159,6 +1173,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	rlist_add_tail(&txm.all_stories, &story->in_all_stories);
 	rlist_add(&space->memtx_stories, &story->in_space_stories);
 	for (uint32_t i = 0; i < index_count; i++) {
+		story->link[i].is_own_change = false;
 		story->link[i].newer_story = story->link[i].older_story = NULL;
 		rlist_create(&story->link[i].read_gaps);
 		story->link[i].in_index = space->index[i];
@@ -1740,6 +1755,42 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 }
 
 /**
+ * Check whether a @a story is deleted by a transaction @a txn.
+ * @param own_change - return true if the change was made by @txn itself.
+ * @return true if a story is deleted by a transaction, false otherwise.
+ */
+static bool
+memtx_tx_story_is_deleted_by_txn(struct memtx_story *story, struct txn *txn,
+				 bool *is_own_change)
+{
+	struct txn_stmt *dels = story->del_stmt;
+	while (dels != NULL) {
+		if (dels->txn == txn) {
+			/*
+			 * Assume this is a DELETE statement. Fortunately,
+			 * DELETE returns the removed tuple to the user and
+			 * naturally guarantees that in the serial schedule,
+			 * this DELETE will remove exactly what was returned to
+			 * the user (@a story). This guarantee is achieved
+			 * either through the read-tracker or by ensuring the
+			 * DELETE removes a tuple from the same transaction. In
+			 * any case, this guarantee exists and we can rely on it
+			 * - we definitely won't see anything with this key in
+			 * this index.
+			 * However, if the tuple was deleted via a REPLACE
+			 * statement (even our own) - we cannot guarantee
+			 * anything about secondary indexes.
+			 */
+			*is_own_change = (dels->add_story == NULL);
+			return true;
+		}
+		dels = dels->next_in_del_list;
+	}
+	*is_own_change = false;
+	return false;
+}
+
+/**
  * Check whether the end of a @a story (that is deletion of its tuple) is
  * visible for transaction @a txn.
  * @param is_prepared_ok - whether prepared, not confirmed change is acceptable.
@@ -1750,17 +1801,10 @@ static bool
 memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 				 bool is_prepared_ok, bool *is_own_change)
 {
-	*is_own_change = false;
+	if (memtx_tx_story_is_deleted_by_txn(story, txn, is_own_change))
+		return true;
 
-	struct txn_stmt *dels = story->del_stmt;
-	while (dels != NULL) {
-		if (dels->txn == txn) {
-			/* Tuple is deleted by us (@txn). */
-			*is_own_change = true;
-			return true;
-		}
-		dels = dels->next_in_del_list;
-	}
+	assert(!*is_own_change);
 
 	int64_t rv_psn = INT64_MAX;
 	if (txn != NULL && txn->rv_psn != 0)
@@ -2035,15 +2079,16 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 	struct tuple *visible_replaced;
 	if (directly_replaced[0] == NULL ||
 	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
-		stmt->is_own_change = false;
+		add_story->link[0].is_own_change = false;
 		visible_replaced = directly_replaced[0];
 	} else {
 		struct memtx_story *story =
 			memtx_tx_story_get(directly_replaced[0]);
 		memtx_tx_story_find_visible_tuple(
 			story, txn, 0, true, &visible_replaced,
-			&stmt->is_own_change);
+			&add_story->link[0].is_own_change);
 	}
+	stmt->is_own_change = add_story->link[0].is_own_change;
 
 	if (index_check_dup(space->index[0], *old_tuple, new_tuple,
 			    visible_replaced, mode) != 0) {
@@ -2062,6 +2107,7 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 		struct tuple *visible;
 		if (!tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY)) {
 			visible = directly_replaced[i];
+			add_story->link[i].is_own_change = false;
 		} else {
 			/*
 			 * The replaced tuple is dirty. A chain of changes
@@ -2070,10 +2116,9 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 			 */
 			struct memtx_story *story =
 				memtx_tx_story_get(directly_replaced[i]);
-			bool unused;
-			memtx_tx_story_find_visible_tuple(story, txn,
-							  i, true, &visible,
-							  &unused);
+			memtx_tx_story_find_visible_tuple(
+				story, txn, i, true, &visible,
+				&add_story->link[i].is_own_change);
 		}
 
 		if (index_check_dup(space->index[i], visible_replaced,
@@ -2093,8 +2138,11 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 {
 	assert(story->link[ind].newer_story == NULL);
 	assert(txn != NULL);
+	bool unused;
+	bool handle_on_rollback =
+		!memtx_tx_story_is_deleted_by_txn(story, txn, &unused);
 	struct inplace_gap_item *item =
-		memtx_tx_inplace_gap_item_new(txn, true);
+		memtx_tx_inplace_gap_item_new(txn, handle_on_rollback);
 	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
 }
 
@@ -2852,7 +2900,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 * Ignore case when other TX executes insert after
 			 * precedence delete.
 			 */
-			if (test_stmt->is_own_change &&
+			if (newer_story->link[i].is_own_change &&
 			    test_stmt->del_story == NULL)
 				continue;
 			/*
