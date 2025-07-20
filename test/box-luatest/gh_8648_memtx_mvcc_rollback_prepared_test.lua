@@ -102,7 +102,7 @@ g.test_rollback_prepared_simple_delete = function(cg)
         tx1:begin()
         tx1('box.space.test:replace{21, 31}')
         -- tx1 must overwrite {21, 30}.
-        t.assert_equals(tx1('box.space.test.index.sk:select{30}'), {{}})
+        t.assert_equals(tx1('box.space.test:select{21}'), {{{21, 31}}})
 
         local tx2 = txn_proxy.new()
         tx2:begin()
@@ -114,7 +114,7 @@ g.test_rollback_prepared_simple_delete = function(cg)
         box.error.injection.set('ERRINJ_WAL_WRITE', false)
 
         -- tx1 must continue to overwrite {21, 30}.
-        t.assert_equals(tx1('box.space.test.index.sk:select{30}'), {{}})
+        t.assert_equals(tx1('box.space.test:select{21}'), {{{21, 31}}})
 
         tx1:rollback()
     end)
