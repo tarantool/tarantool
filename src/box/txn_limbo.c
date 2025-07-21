@@ -1664,7 +1664,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
-	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
+	if (rlist_empty(&limbo->queue))
 		return;
 	/* The replication_synchro_quorum value may have changed. */
 	if (txn_limbo_is_owned_by_current_instance(limbo))
