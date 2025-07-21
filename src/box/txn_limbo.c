@@ -1456,8 +1456,17 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
-	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
+	if (rlist_empty(&limbo->queue))
 		return;
+	if (txn_limbo_is_frozen(limbo)) {
+		/*
+		 * If limbo is frozen we need to broadcast wait_cond
+		 * in order to not hang in box_wait_limbo_acked during
+		 * collecting acks.
+		 */
+		fiber_cond_broadcast(&limbo->wait_cond);
+		return;
+	}
 	/* The replication_synchro_quorum value may have changed. */
 	if (txn_limbo_is_owned_by_current_instance(limbo))
 		txn_limbo_confirm(limbo);
