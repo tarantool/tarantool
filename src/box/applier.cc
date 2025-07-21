@@ -2731,6 +2731,7 @@ applier_f(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 reconnect:
+		diag_clear(diag_get());
 		fiber_sleep(replication_effective_reconnect_timeout());
 	}
 	return 0;
