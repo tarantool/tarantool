@@ -2533,11 +2533,9 @@ box_set_instance_name(void)
 }
 
 /** Trigger to catch ACKs from all nodes when need to wait for quorum. */
-struct box_quorum_trigger {
+struct synchro_quorum_trigger {
 	/** Inherit trigger. */
 	struct trigger base;
-	/** Minimal number of nodes who should confirm the target LSN. */
-	int quorum;
 	/** Target LSN to wait for. */
 	int64_t target_lsn;
 	/** Replica ID whose LSN is being waited. */
@@ -2554,10 +2552,11 @@ struct box_quorum_trigger {
 };
 
 static int
-box_quorum_on_ack_f(struct trigger *trigger, void *event)
+synchro_quorum_on_ack_f(struct trigger *trigger, void *event)
 {
 	struct replication_ack *ack = (struct replication_ack *)event;
-	struct box_quorum_trigger *t = (struct box_quorum_trigger *)trigger;
+	struct synchro_quorum_trigger *t =
+		(struct synchro_quorum_trigger *)trigger;
 	int64_t new_lsn = vclock_get(ack->vclock, t->replica_id);
 	int64_t old_lsn = vclock_get(&t->vclock, ack->source);
 	if (new_lsn < t->target_lsn || old_lsn >= t->target_lsn)
@@ -2565,7 +2564,7 @@ box_quorum_on_ack_f(struct trigger *trigger, void *event)
 
 	vclock_follow(&t->vclock, ack->source, new_lsn);
 	++t->ack_count;
-	if (t->ack_count >= t->quorum) {
+	if (t->ack_count >= replication_synchro_quorum) {
 		fiber_wakeup(t->waiter);
 		trigger_clear(trigger);
 	}
@@ -2604,21 +2603,11 @@ box_check_waiting_for_own_rows(void)
 }
 
 /**
- * Wait until at least @a quorum of nodes confirm @a target_lsn from the node
- * with id @a lead_id.
+ * A helper which count how many nodes have the needed LSN of the given node.
  */
 static int
-box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
-		double timeout)
+box_ack_count(uint32_t lead_id, int64_t target_lsn, struct vclock *vclock)
 {
-#ifndef NDEBUG
-    ++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
-#endif
-
-	struct box_quorum_trigger t;
-	memset(&t, 0, sizeof(t));
-	vclock_create(&t.vclock);
-
 	/* Take this node into account immediately. */
 	int ack_count = vclock_get(box_vclock, lead_id) >= target_lsn;
 	replicaset_foreach(replica) {
@@ -2638,43 +2627,13 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 		 */
 		if (lsn == 0)
 			continue;
-		vclock_follow(&t.vclock, replica->id, lsn);
+		vclock_follow(vclock, replica->id, lsn);
 		if (lsn >= target_lsn) {
 			ack_count++;
 			continue;
 		}
 	}
-	if (ack_count < quorum) {
-		t.quorum = quorum;
-		t.target_lsn = target_lsn;
-		t.replica_id = lead_id;
-		t.ack_count = ack_count;
-		t.waiter = fiber();
-		trigger_create(&t.base, box_quorum_on_ack_f, NULL, NULL);
-		trigger_add(&replicaset.on_ack, &t.base);
-		double deadline = ev_monotonic_now(loop()) + timeout;
-		do {
-			if (fiber_yield_deadline(deadline))
-				break;
-		} while (!fiber_is_cancelled() && t.ack_count < t.quorum);
-		trigger_clear(&t.base);
-		ack_count = t.ack_count;
-	}
-	/*
-	 * No point to proceed after cancellation even if got the quorum. The
-	 * quorum is waited by limbo clear function. Emptying the limbo involves
-	 * a pair of blocking WAL writes, making the fiber sleep even longer,
-	 * which isn't appropriate when it's canceled.
-	 */
-	if (fiber_is_cancelled()) {
-		diag_set(FiberIsCancelled);
-		return -1;
-	}
-	if (ack_count < quorum) {
-		diag_set(TimedOut);
-		return -1;
-	}
-	return 0;
+	return ack_count;
 }
 
 /**
@@ -3006,7 +2965,6 @@ box_wait_limbo_acked(double timeout)
 		return txn_limbo.confirmed_lsn;
 
 	uint64_t promote_term = txn_limbo.promote_greatest_term;
-	int quorum = replication_synchro_quorum;
 	struct txn_limbo_entry *last_entry;
 	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
 	/* Wait for the last entries WAL write. */
@@ -3019,7 +2977,8 @@ box_wait_limbo_acked(double timeout)
 		if (txn_limbo_is_empty(&txn_limbo))
 			return txn_limbo.confirmed_lsn;
 		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
-			diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+			diag_set(ClientError, ER_QUORUM_WAIT,
+				 replication_synchro_quorum,
 				 "new synchronous transactions appeared");
 			return -1;
 		}
@@ -3027,8 +2986,49 @@ box_wait_limbo_acked(double timeout)
 	assert(last_entry->lsn > 0);
 	int64_t wait_lsn = last_entry->lsn;
 
-	if (box_wait_quorum(txn_limbo.owner_id, wait_lsn, quorum, timeout) != 0)
-		return -1;
+#ifndef NDEBUG
+	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
+#endif
+	struct synchro_quorum_trigger t;
+	memset(&t, 0, sizeof(t));
+	vclock_create(&t.vclock);
+	int ack_count = box_ack_count(txn_limbo.owner_id, wait_lsn, &t.vclock);
+	if (ack_count < replication_synchro_quorum) {
+		if (replicaset.registered_count < replication_synchro_quorum)
+			say_warn("replication_synchro_quorum is higher than number of "
+				 "registered replicas. The node will be in RO state "
+				 "because it can't collect acks for synchronous queue");
+		t.target_lsn = wait_lsn;
+		t.replica_id = txn_limbo.owner_id;
+		t.ack_count = ack_count;
+		t.waiter = fiber();
+		trigger_create(&t.base, synchro_quorum_on_ack_f, NULL, NULL);
+		trigger_add(&replicaset.on_ack, &t.base);
+		double deadline = ev_monotonic_now(loop()) + timeout;
+		while (!fiber_is_cancelled() &&
+		       t.ack_count < replication_synchro_quorum) {
+			if (fiber_cond_wait_deadline(&txn_limbo.wait_cond,
+						     deadline) == -1)
+				break;
+		}
+		trigger_clear(&t.base);
+		ack_count = t.ack_count;
+		/*
+		 * No point to proceed after cancellation even if got the
+		 * quorum. The quorum is waited by limbo clear function.
+		 * Emptying the limbo involves a pair of blocking WAL
+		 * writes, making the fiber sleep even longer, which
+		 * isn't appropriate when it's canceled.
+		 */
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		if (ack_count < replication_synchro_quorum) {
+			diag_set(TimedOut);
+			return -1;
+		}
+	}
 
 	if (box_check_promote_term_intact(promote_term) != 0)
 		return -1;
@@ -3036,13 +3036,9 @@ box_wait_limbo_acked(double timeout)
 	if (txn_limbo_is_empty(&txn_limbo))
 		return txn_limbo.confirmed_lsn;
 
-	if (quorum < replication_synchro_quorum) {
-		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
-			 "quorum was increased while waiting");
-		return -1;
-	}
 	if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
-		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+		diag_set(ClientError, ER_QUORUM_WAIT,
+			 replication_synchro_quorum,
 			 "new synchronous transactions appeared");
 		return -1;
 	}
