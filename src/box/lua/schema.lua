@@ -3169,7 +3169,10 @@ local function privilege_check(privilege, object_type, level)
            bit.band(priv_hex, priv_object_combo[object_type] or 0) ~= priv_hex then
         box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege, level + 1)
     end
-    return priv_hex
+    -- Cast to uint64_t to force bit library to use unsigned 64 bit arithmetics.
+    -- Otherwise box.priv.ALL == 2^32 - 1 would be treated as signed 32-bit
+    -- integer == -1. See https://bitop.luajit.org/semantics.html#range.
+    return priv_hex + 0ULL
 end
 
 local function privilege_name(privilege)
