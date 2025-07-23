@@ -1,6 +1,7 @@
 -- tags: parallel
 
 local t = require('luatest')
+local fiber = require('fiber')
 local fun = require('fun')
 local treegen = require('luatest.treegen')
 local server = require('luatest.server')
@@ -1220,5 +1221,87 @@ g.test_closes_unused_connections = function()
         -- Check connpool needed to open new connections.
         connpool.call('box.info', nil, {mode = 'ro'})
         t.assert_equals(_G.connects, 4)
+    end)
+end
+
+g.test_tries_to_reconnect = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.myuser',
+            {password =  'secret',
+             roles = { 'replication' },
+             privileges = {{permissions = {'execute'}, universe = true}}})
+        :set_global_option('iproto.advertise.peer.login', 'myuser')
+        :add_instance('i-001', { database = { mode = 'rw' } })
+        :add_instance('i-002', {})
+        :config()
+
+    local cluster = cluster:new(config)
+
+    -- The reconnect after interval for connpool is hardcoded in
+    -- connpool and equals to 3 seconds.
+    local reconnect_after = 3
+
+    -- Add a counter to count netbox.connect() calls.
+    treegen.write_file(cluster._dir, 'override/net/box.lua',
+        string.dump(function()
+            local loaders = require('internal.loaders')
+
+            rawset(_G, 'connects', 0)
+
+            local builtin_netbox = loaders.builtin['net.box']
+            local builtin_connect = builtin_netbox.connect
+            builtin_netbox.connect = function(...)
+                _G.connects = _G.connects + 1
+                return builtin_connect(...)
+            end
+
+            return builtin_netbox
+        end))
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        connpool.call('box.info', nil, {mode = 'ro'})
+        t.assert_equals(_G.connects, 2)
+
+        -- Save a connection to i-002.
+        rawset(_G, 'i2_conn', connpool.connect('i-002'))
+    end)
+
+    cluster['i-002']:stop()
+
+    -- The connpool should try to reconnect.
+    -- Let's skip the first attempt to make sure it tries
+    -- more than once.
+    fiber.sleep(reconnect_after + 1)
+
+    cluster['i-001']:exec(function()
+        local reconnect_after = 3
+        -- Check the saved connection is broken since i-002
+        -- has been stopped.
+        t.helpers.retrying({timeout = reconnect_after + 1}, t.assert_equals,
+                           _G.i2_conn.state, 'error')
+    end)
+
+    cluster['i-002']:start()
+    fiber.sleep(reconnect_after + 1)
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+        local reconnect_after = 3
+
+        -- Check reconnecting has been done in the background
+        -- and no new connections has been created.
+        local cur_connects = _G.connects
+        t.helpers.retrying({timeout = reconnect_after + 1}, connpool.call,
+                           'box.info', nil, {mode = 'ro'})
+        t.assert_equals(_G.connects, cur_connects)
+
+        -- A new connection to i-002 is active but the saved
+        -- one should still remain broken.
+        t.assert_equals(connpool.connect('i-002').state, 'active')
+        t.assert_equals(_G.i2_conn.state, 'error')
     end)
 end
