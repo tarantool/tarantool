@@ -75,6 +75,73 @@ function pool_methods._unused_connection_watchdog_wake(self)
     self._unused_connection_watchdog_fiber = f
 end
 
+function pool_methods._failed_connection_watchdog_step(self)
+    local now = clock.monotonic()
+    local until_next_reconnect = math.huge
+    local instance_names_to_reconnect = {}
+
+    for name, conn in pairs(self._connections) do
+        if conn._reconnect ~= nil then
+            local until_reconnect = conn._reconnect - now
+
+            if until_reconnect <= 0 then
+                table.insert(instance_names_to_reconnect, name)
+            elseif until_reconnect < until_next_reconnect then
+                until_next_reconnect = until_reconnect
+            end
+        end
+    end
+
+    local reconnect_after = config:get('connpool.reconnect_after')
+    for _, instance_name in ipairs(instance_names_to_reconnect) do
+        local old_conn = self._connections[instance_name]
+        local opts = {
+            ttl = 0,
+            wait_connected = false,
+            fetch_schema = old_conn.opts.fetch_schema,
+        }
+
+        if not is_connection_valid(old_conn, opts) then
+            local new_conn = self:connect(instance_name, opts)
+            new_conn._reconnect = now + reconnect_after
+            if until_next_reconnect > reconnect_after then
+                until_next_reconnect = reconnect_after
+            end
+        else
+            old_conn._reconnect = nil
+        end
+    end
+
+    return until_next_reconnect
+end
+
+function pool_methods._failed_connection_watchdog_loop(self)
+    while true do
+        local until_next_reconnect = self:_failed_connection_watchdog_step()
+
+        if until_next_reconnect == math.huge then
+            break
+        end
+
+        if not self._failed_connection_watchdog.fired then
+            self._failed_connection_watchdog.cond:wait(until_next_reconnect)
+        end
+        self._failed_connection_watchdog.fired = false
+    end
+end
+
+function pool_methods._failed_connection_watchdog_wake(self)
+    local f = self._failed_connection_watchdog_fiber
+    if f ~= nil and f:status() ~= 'dead' then
+        self._failed_connection_watchdog.fired = true
+        self._failed_connection_watchdog.cond:signal()
+        return
+    end
+
+    f = fiber.new(self._failed_connection_watchdog_loop, self)
+    self._failed_connection_watchdog_fiber = f
+end
+
 --- Connect to an instance or receive a cached connection by
 --- name.
 ---
@@ -91,6 +158,7 @@ function pool_methods.connect(self, instance_name, opts)
 
     local conn = self._connections[instance_name]
     local old_deadline = (conn or {})._deadline
+    local old_reconnect = (conn or {})._reconnect
     if not is_connection_valid(conn, opts) then
         local uri = config:instance_uri('peer', {instance = instance_name})
         if uri == nil then
@@ -118,11 +186,18 @@ function pool_methods.connect(self, instance_name, opts)
         end
         conn.mode = mode
         conn._deadline = old_deadline
+        conn._reconnect = old_reconnect
         local function watch_status(_key, value)
             conn._mode = value.is_ro and 'ro' or 'rw'
             self._connection_mode_update_cond:broadcast()
         end
         conn:watch('box.status', watch_status)
+        local function on_disconnect()
+            local reconnect_after = config:get('connpool.reconnect_after')
+            conn._reconnect = clock.monotonic() + reconnect_after
+            self:_failed_connection_watchdog_wake()
+        end
+        conn:on_disconnect(on_disconnect)
     end
 
     local idle_timeout = opts.ttl or self._idle_timeout
@@ -223,6 +298,13 @@ local function create_pool()
         -- Unused connection management
         _unused_connection_watchdog_fiber = nil,
         _unused_connection_watchdog = {
+            fired = false,
+            cond = fiber.cond(),
+        },
+
+        -- Failed connection management
+        _failed_connection_watchdog_fiber = nil,
+        _failed_connection_watchdog = {
             fired = false,
             cond = fiber.cond(),
         },

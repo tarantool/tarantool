@@ -2187,6 +2187,10 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             default = 60,
         }),
+        reconnect_after = schema.scalar({
+            type = 'number',
+            default = 3,
+        }),
     }),
 }), {
     methods = {
