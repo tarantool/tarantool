@@ -131,7 +131,7 @@ lbox_session_euid(struct lua_State *L)
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, current_session()->credentials.uid);
+	lua_pushnumber(L, current_session()->credentials.auth_uid);
 	return 1;
 }
 
@@ -139,7 +139,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_by_id(current_session()->credentials.uid);
+	struct user *user = user_by_id(current_session()->credentials.auth_uid);
 	if (user)
 		lua_pushstring(L, user->def->name);
 	else

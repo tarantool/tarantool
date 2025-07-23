@@ -131,7 +131,7 @@ box.schema.user.grant('rich', 'create', 'function')
 session.su('rich')
 ---
 ...
-uid = session.uid()
+uid = session.euid()
 ---
 ...
 box.schema.func.create('dummy')
@@ -226,12 +226,12 @@ session.effective_user()
 ...
 session.su('admin', function() return session.user(), session.effective_user() end)
 ---
-- tester
+- admin
 - admin
 ...
 session.user()
 ---
-- tester
+- admin
 ...
 session.effective_user()
 ---
@@ -240,18 +240,17 @@ session.effective_user()
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
 ---
-- error: 'Failed to drop user or role ''tester'': the user is active in the current
-    session'
 ...
 session.user()
 ---
-- tester
+- admin
 ...
 session.su('admin')
 ---
 ...
 box.schema.user.drop('tester')
 ---
+- error: User 'tester' is not found
 ...
 session.user()
 ---
@@ -1138,7 +1137,7 @@ box.session.su('guest')
 ...
 uids()
 ---
-- uid: 0
+- uid: 1
   euid: 0
 ...
 box.session.su('admin')
@@ -1365,7 +1364,7 @@ obj_type, obj_name, op_type
 euid, auid
 ---
 - 32
-- 32
+- 1
 ...
 seq:set(1)
 ---
@@ -1380,7 +1379,7 @@ obj_type, obj_name, op_type
 euid, auid
 ---
 - 32
-- 32
+- 1
 ...
 box.session.su("admin")
 ---
@@ -1436,7 +1435,7 @@ obj_type, obj_name, op_type
 euid, auid
 ---
 - 32
-- 32
+- 1
 ...
 box.session.su("admin")
 ---
@@ -1652,7 +1651,7 @@ box.session.su("guest")
 ...
 box.session.user()
 ---
-- guest
+- admin
 ...
 box.session.effective_user()
 ---
@@ -1663,7 +1662,7 @@ box.session.su("admin", test_admin)
 ...
 box.session.user()
 ---
-- guest
+- admin
 ...
 box.session.effective_user()
 ---
