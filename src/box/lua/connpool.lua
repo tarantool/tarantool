@@ -90,6 +90,7 @@ function pool_methods.connect(self, instance_name, opts)
     opts = opts or {}
 
     local conn = self._connections[instance_name]
+    local old_deadline = (conn or {})._deadline
     if not is_connection_valid(conn, opts) then
         local uri = config:instance_uri('peer', {instance = instance_name})
         if uri == nil then
@@ -116,6 +117,7 @@ function pool_methods.connect(self, instance_name, opts)
             return nil
         end
         conn.mode = mode
+        conn._deadline = old_deadline
         local function watch_status(_key, value)
             conn._mode = value.is_ro and 'ro' or 'rw'
             self._connection_mode_update_cond:broadcast()
@@ -125,9 +127,8 @@ function pool_methods.connect(self, instance_name, opts)
 
     local idle_timeout = opts.ttl or self._idle_timeout
     local new_deadline = clock.monotonic() + idle_timeout
-    local old_deadline = conn._deadline or 0
 
-    if new_deadline > old_deadline then
+    if old_deadline == nil or new_deadline > old_deadline then
         conn._deadline = new_deadline
         self:_unused_connection_watchdog_wake()
     end
