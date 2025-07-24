@@ -214,7 +214,7 @@ gap_error:
 	if (!r->wal_dir.force_recovery)
 		throw e;
 	/* Ignore missing WALs if force_recovery is set. */
-	e->log();
+	error_log(e);
 	say_warn("ignoring a gap in LSN");
 	goto out;
 }
@@ -503,7 +503,7 @@ hot_standby_f(va_list ap)
 				recover_remaining_wals(r, stream, NULL,
 						       scan_dir);
 			} catch (Exception *e) {
-				e->log();
+				error_log(e);
 			}
 			end = vclock_sum(&r->vclock);
 			/*

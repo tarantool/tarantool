@@ -411,10 +411,9 @@ test_run:cmd('start server replica with wait_load=False, wait=False, crash_expec
  | ---
  | - true
  | ...
-test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support registration of non%-anonymous nodes.', nil, 10)
+test_run:wait_log('replica', 'Anonymous replica does not support registration of non%-anonymous nodes.', nil, 10)
  | ---
- | - 'ER_UNSUPPORTED: Anonymous replica does not support registration of non-anonymous
- |   nodes.'
+ | - Anonymous replica does not support registration of non-anonymous nodes.
  | ...
 test_run:cmd('stop server replica')
  | ---
@@ -455,9 +454,9 @@ test_run:cmd('set variable repl_source to "replica_anon1.listen"')
 box.cfg{replication=repl_source}
  | ---
  | ...
-test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support non.anonymous followers.', nil, 10)
+test_run:wait_log('replica', 'Anonymous replica does not support non.anonymous followers.', nil, 10)
  | ---
- | - 'ER_UNSUPPORTED: Anonymous replica does not support non-anonymous followers.'
+ | - Anonymous replica does not support non-anonymous followers.
  | ...
 test_run:cmd('switch default')
  | ---

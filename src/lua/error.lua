@@ -1,9 +1,9 @@
 -- error.lua (internal file)
 
 local ffi = require('ffi')
-local json = require('json')
 local msgpack = require('msgpack')
 local compat = require('compat')
+local buffer = require('buffer')
 
 local mp_decode = msgpack.decode_unchecked
 
@@ -31,7 +31,6 @@ struct error_payload {
 struct error {
     error_f _destroy;
     error_f _raise;
-    error_f _log;
     const struct type_info *_type;
     int64_t _refs;
     int _saved_errno;
@@ -65,6 +64,9 @@ error_unref(struct error *e);
 
 const struct error_field *
 error_find_field(const struct error *e, const char *name);
+
+int
+error_to_string(const struct error *e, char *buf, int size);
 ]]
 
 local function error_base_type(err)
@@ -257,18 +259,6 @@ local function error_concat(lhs, rhs)
 end
 
 --
--- Convert error to its string representation without accounting for the
--- error's cause.
--- @param err error object
--- @return error's string representation
-local function error_to_string_wo_prev(err)
-    local err_unpacked = error_unpack(err)
-    err_unpacked.message = nil
-    err_unpacked.prev = nil
-    return string.format('%s %s', err.message, json.encode(err_unpacked))
-end
-
---
 -- Convert an error to its string representation accounting for the whole error
 -- stack.
 -- @param err error object
@@ -278,13 +268,17 @@ local function error_to_string(err)
         return error_message(err)
     end
 
-    local cur = err
-    local error_stack = {}
-    while cur ~= nil do
-        table.insert(error_stack, 1, error_to_string_wo_prev(cur))
-        cur = cur.prev
+    local ibuf = buffer.internal.cord_ibuf_take()
+    ibuf:reserve(ibuf:capacity())
+    local len = ffi.C.error_to_string(err, ibuf.wpos, ibuf:capacity())
+    if len + 1 > ibuf:capacity() then
+        ibuf:reserve(len + 1)
+        len = ffi.C.error_to_string(err, ibuf.wpos, ibuf:capacity())
+        assert(len + 1 <= ibuf:capacity())
     end
-    return table.concat(error_stack, '\n')
+    local str = ffi.string(ibuf.rpos, len)
+    buffer.internal.cord_ibuf_put(ibuf)
+    return str
 end
 
 local error_mt = {

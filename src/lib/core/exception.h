@@ -82,7 +82,6 @@ public:
 	const char *get_errmsg() const { return errmsg; }
 
 	NORETURN virtual void raise() = 0;
-	virtual void log() const;
 	virtual ~Exception();
 
 	Exception(const Exception &) = delete;
@@ -175,7 +174,6 @@ public:
 	{
 	}
 
-	virtual void log() const;
 	virtual void raise() { throw this; }
 };
 

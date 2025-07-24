@@ -805,6 +805,7 @@ say_logger_free(void)
 {
 	if (say_logger_initialized())
 		log_destroy(&log_std);
+	log_default = &log_boot;
 }
 
 /** {{{ Formatters */

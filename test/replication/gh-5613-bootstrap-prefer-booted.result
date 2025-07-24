@@ -50,7 +50,7 @@ test_run:cmd('start server replica2 with wait=False, crash_expected=True')
 opts = {filename = 'gh-5613-replica2.log'}
  | ---
  | ...
-assert(test_run:wait_log(nil, 'ER_READONLY', nil, nil, opts) ~= nil)
+assert(test_run:wait_log(nil, 'READONLY', nil, nil, opts) ~= nil)
  | ---
  | - true
  | ...

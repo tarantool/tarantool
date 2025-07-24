@@ -19,7 +19,7 @@ test_run:switch('default')
 test_run:cmd('create server replica2 with script="replication/gh-5613-replica2.lua"')
 test_run:cmd('start server replica2 with wait=False, crash_expected=True')
 opts = {filename = 'gh-5613-replica2.log'}
-assert(test_run:wait_log(nil, 'ER_READONLY', nil, nil, opts) ~= nil)
+assert(test_run:wait_log(nil, 'READONLY', nil, nil, opts) ~= nil)
 
 test_run:cmd('stop server replica2')
 test_run:cmd('delete server replica2')

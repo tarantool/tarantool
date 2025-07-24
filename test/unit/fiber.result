@@ -1,5 +1,3 @@
-#gh-1238: log uncaught errors
-OutOfMemory: Failed to allocate 42 bytes in allocator for exception
 	*** fiber_name_test ***
 # name of a new fiber: main.
 

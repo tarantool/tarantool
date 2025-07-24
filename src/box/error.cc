@@ -281,13 +281,6 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 	return e;
 }
 
-void
-ClientError::log() const
-{
-	say_file_line(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(code));
-}
-
-
 uint32_t
 ClientError::get_errcode(const struct error *e)
 {
@@ -393,13 +386,6 @@ CustomError::CustomError(const char *file, unsigned int line,
 	:ClientError(&type_CustomError, file, line, errcode)
 {
 	error_set_str(this, "custom_type", custom_type);
-}
-
-void
-CustomError::log() const
-{
-	say_file_line(S_ERROR, file, line, errmsg,
-		      "Custom type %s", custom_type());
 }
 
 struct error *

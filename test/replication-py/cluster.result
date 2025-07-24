@@ -203,14 +203,14 @@ JOIN replica to read-only master
 box.cfg { read_only = true }
 ---
 ...
-'ER_READONLY' exists in server log
+'READONLY' exists in server log
 box.cfg { read_only = false }
 ---
 ...
 -------------------------------------------------------------
 JOIN replica with different replica set UUID
 -------------------------------------------------------------
-'ER_REPLICASET_UUID_MISMATCH' exists in server log
+'REPLICASET_UUID_MISMATCH' exists in server log
 -------------------------------------------------------------
 Cleanup
 -------------------------------------------------------------
