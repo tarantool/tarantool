@@ -45,7 +45,7 @@ g.test_nil_uuid = function(cg)
     luatest.helpers.retrying({}, function()
         -- Pass log filepath manually, because box.cfg.log is not available.
         local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
-        luatest.assert(cg.server:grep_log('ER_NIL_UUID', 1024, {
+        luatest.assert(cg.server:grep_log('NIL_UUID', 1024, {
             filename = log}), 'Error detected')
     end)
 end

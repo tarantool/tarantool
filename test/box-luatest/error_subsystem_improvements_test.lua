@@ -5,6 +5,7 @@ local json = require('json')
 local yaml = require('yaml')
 local tarantool = require('tarantool')
 local server = require('luatest.server')
+local buffer = require('buffer')
 
 local g = t.group()
 
@@ -236,28 +237,33 @@ g.test_increased_error_string_conversion_verbosity = function()
     t.assert_equals(compat.box_error_serialize_verbose.default, 'old')
     compat.box_error_serialize_verbose = 'new'
 
-    local prevprev_unpacked = prevprev:unpack()
-    prevprev_unpacked.message = nil
-    prevprev_unpacked = json.encode(prevprev_unpacked)
-    t.assert_equals(tostring(prevprev),
-                    string.format("%s %s",
-                                  prevprev.message, prevprev_unpacked))
+    local hide_line = function(str)
+        return string.gsub(str, '"line":%d+', '"line":0')
+    end
 
-    local prev_unpacked = prev:unpack()
-    prev_unpacked.message = nil
-    prev_unpacked.prev = nil
-    prev_unpacked = json.encode(prev_unpacked)
-    local cur_unpacked = cur:unpack()
-    cur_unpacked.message = nil
-    cur_unpacked.prev = nil
-    cur_unpacked = json.encode(cur_unpacked)
-    t.assert_equals(tostring(cur),
-                    string.format("%s %s\n" ..
-                                  "%s %s\n" ..
-                                  "%s %s",
-                                  prevprev.message, prevprev_unpacked,
-                                  prev.message, prev_unpacked,
-                                  cur.message, cur_unpacked))
+    t.assert_equals(hide_line(tostring(prevprev)),
+                'prevprev {"type":"ClientError","name":"UNKNOWN",' ..
+                '"trace":[{"file":"...l/test/box-luatest/' ..
+                'error_subsystem_improvements_test.lua","line":0}]}')
+    t.assert_equals(hide_line(tostring(cur)),
+                'cur {"type":"ClientError","name":"UNKNOWN",' ..
+                '"trace":[{"file":"...l/test/box-luatest/' ..
+                'error_subsystem_improvements_test.lua","line":0}]}\n' ..
+                'Caused by: prev {"type":"ClientError","name":"UNKNOWN",' ..
+                '"trace":[{"file":"...l/test/box-luatest/' ..
+                'error_subsystem_improvements_test.lua","line":0}]}\n' ..
+                'Caused by: prevprev {"type":"ClientError","name":"UNKNOWN",' ..
+                '"trace":[{"file":"...l/test/box-luatest/' ..
+                'error_subsystem_improvements_test.lua","line":0}]}')
+    -- Test error which does not fit into ibuf capacity.
+    local ibuf = buffer.internal.cord_ibuf_take()
+    local large = string.rep('#', ibuf:capacity())
+    buffer.internal.cord_ibuf_put(ibuf)
+    local e = box.error.new({reason = large})
+    local expected = '%s {"type":"ClientError","name":"UNKNOWN",' ..
+                     '"trace":[{"file":"...l/test/box-luatest/' ..
+                     'error_subsystem_improvements_test.lua","line":0}]}'
+    t.assert_equals(hide_line(tostring(e)), string.format(expected, large))
 end
 
 g.after_test('test_increased_error_string_conversion_verbosity', function()

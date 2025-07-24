@@ -13,7 +13,7 @@ test_run:cmd('start server master2')
 test_run:switch('master2')
 replication = test_run:eval('default', 'return box.cfg.listen')[1]
 box.cfg{replication = {replication}}
-assert(test_run:grep_log('master2', 'ER_REPLICASET_UUID_MISMATCH'))
+assert(test_run:grep_log('master2', 'REPLICASET_UUID_MISMATCH'))
 info = box.info
 repl_info = info.replication[1]
 assert(not repl_info.downstream and not repl_info.upstream)

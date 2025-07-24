@@ -57,7 +57,7 @@ s:insert({4, '4'})
 -- Wait for error to trigger
 test_run:cmd('switch replica_slave')
 fiber = require('fiber')
-while test_run:grep_log('replica_slave', 'ER_INJECTION:[^\n]*') == nil do fiber.sleep(0.1) end
+while test_run:grep_log('replica_slave', 'INJECTION') == nil do fiber.sleep(0.1) end
 
 ----
 ---- Such error cause the applier to be

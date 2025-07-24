@@ -43,7 +43,7 @@ test_run:cmd('stop server test')
 os.execute(string.format("rm %s", on_shutdownlib))
 os.execute(string.format("grep -r \"stop module fiber\" on_shutdown.log"))
 os.execute(string.format("grep -r \"join module fiber\" on_shutdown.log"))
-os.execute(string.format("grep -r \"TimedOut: timed out\" on_shutdown.log"))
+os.execute(string.format("grep -r \"E> timed out\" on_shutdown.log"))
 
 test_run:cmd('cleanup server test')
 test_run:cmd('delete server test')

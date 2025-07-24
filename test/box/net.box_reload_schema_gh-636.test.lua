@@ -42,5 +42,5 @@ _ = fiber.create(
    end
 );
 test_run:cmd("setopt delimiter ''");
-test_run:wait_log('default', 'ER_NO_SUCH_PROC', nil, 10)
+test_run:wait_log('default', 'NO_SUCH_PROC', nil, 10)
 box.schema.user.revoke('guest', 'execute', 'universe')

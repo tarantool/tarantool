@@ -30,6 +30,7 @@
  */
 #include "diag.h"
 #include "fiber.h"
+#include "msgpuck.h"
 
 /** True if the error message was dynamically allocated. */
 static bool
@@ -122,13 +123,11 @@ error_set_prev(struct error *e, struct error *prev)
 }
 
 void
-error_create(struct error *e,
-	     error_f destroy, error_f raise, error_f log,
+error_create(struct error *e, error_f destroy, error_f raise,
 	     const struct type_info *type, const char *file, unsigned line)
 {
 	e->destroy = destroy;
 	e->raise = raise;
-	e->log = log;
 	e->type = type;
 	e->refs = 0;
 	e->saved_errno = 0;
@@ -209,4 +208,73 @@ error_vformat_msg(struct error *e, const char *format, va_list ap)
 		VERIFY(new_len == len);
 	}
 	va_end(ap_copy);
+}
+
+/**
+ * Prints representation of error without causes into the buffer.
+ * It has format '<error message> <JSON of other error fields>'.
+ */
+static int
+error_encode_frame(char *buf, int size, const struct error *e)
+{
+	/*
+	 * What error fields are printed and corner cases are aligned with
+	 * error serialization in Lua.
+	 */
+	int total = 0;
+	const char *custom_type = error_get_str(e, "custom_type");
+	SNPRINT(total, snprintf, buf, size, "%s {", e->errmsg);
+	SNPRINT(total, snprintf, buf, size, "\"type\":\"");
+	SNPRINT(total, json_escape, buf, size,
+		custom_type != NULL ? custom_type : e->type->name);
+	SNPRINT(total, snprintf, buf, size, "\"");
+	if (e->code != 0)
+		SNPRINT(total, snprintf, buf, size, ",\"code\":%d", e->code);
+	if (e->saved_errno != 0)
+		SNPRINT(total, snprintf, buf, size, ",\"errno\":%d",
+			e->saved_errno);
+	for (int i = 0; i < e->payload.count; i++) {
+		if (strcmp(e->payload.fields[i]->name, "custom_type") == 0)
+			continue;
+		SNPRINT(total, snprintf, buf, size, ",\"");
+		SNPRINT(total, json_escape, buf, size,
+			e->payload.fields[i]->name);
+		SNPRINT(total, snprintf, buf, size, "\":");
+		SNPRINT(total, mp_snprint, buf, size,
+			e->payload.fields[i]->data);
+	}
+	SNPRINT(total, snprintf, buf, size, ",\"trace\":[{");
+	if (e->file[0] != '\0') {
+		SNPRINT(total, snprintf, buf, size, "\"file\":\"");
+		SNPRINT(total, json_escape, buf, size, e->file);
+		SNPRINT(total, snprintf, buf, size, "\",\"line\":%u", e->line);
+	}
+	SNPRINT(total, snprintf, buf, size, "}]}");
+	return total;
+}
+
+int
+error_to_string(const struct error *e, char *buf, int size)
+{
+	int total = 0;
+	const struct error *b = e;
+	while (e != NULL) {
+		if (e != b)
+			SNPRINT(total, snprintf, buf, size, "\nCaused by: ");
+		SNPRINT(total, error_encode_frame, buf, size, e);
+		e = e->cause;
+	}
+	return total;
+}
+
+void
+error_log(const struct error *e)
+{
+	/*
+	 * The size is aligned with buffer in logger. Larger error string
+	 * will be truncated in logger anyway.
+	 */
+	static __thread char buf[16 * 1024];
+	error_to_string(e, buf, sizeof(buf));
+	say_file_line(S_ERROR, e->file, e->line, NULL, "%s", buf);
 }

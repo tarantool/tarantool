@@ -285,10 +285,20 @@ box.info.replication[1].upstream.status -- follow
 ---
 - follow
 ...
-test_run:wait_log("replica", "ER_CFG.*", nil, 200)
+test_run:cmd("setopt delimiter ';'")
 ---
-- 'ER_CFG: Incorrect value for option ''replication'': duplicate connection with the
-  same replica UUID'
+- true
+...
+test_run:wait_log("replica",
+                  "Incorrect value for option 'replication': " ..
+                  "duplicate connection with the same replica UUID", nil, 200);
+---
+- 'Incorrect value for option ''replication'': duplicate connection with the same
+  replica UUID'
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
 ...
 test_run:cmd("switch default")
 ---

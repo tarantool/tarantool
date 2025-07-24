@@ -271,11 +271,10 @@ g.test_error_on_multiple_rw_on_startup = function()
     -- Verify the exit code and the error reported to stderr.
     local exp_err = 'replication.autoexpel.enabled = true doesn\'t support ' ..
         'the multi-master configuration'
-    t.assert_covers(res, {
-        exit_code = 1,
-        stderr = ('LuajitError: %s\nfatal error, exiting the event loop')
-            :format(exp_err),
-    })
+    exp_err = exp_err:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+              '.*\nfatal error, exiting the event loop'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_matches(res.stderr, exp_err)
 end
 
 -- Similar to the previous one, but checks the error on the

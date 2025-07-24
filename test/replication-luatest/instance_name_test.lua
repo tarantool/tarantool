@@ -532,7 +532,7 @@ g.test_instance_name_new_uuid = function(lg)
                                  new_replica.alias .. '.log')
     t.helpers.retrying({}, function()
         assert(new_replica:grep_log(
-               'ER_INSTANCE_NAME_DUPLICATE: Duplicate replica name '..
+               'E> Duplicate replica name '..
                'replica%-name, already occupied', 1024, {filename = logfile}))
     end)
     new_replica:drop()

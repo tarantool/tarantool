@@ -531,12 +531,14 @@ g.test_bootstrap_leader = function(g)
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: The "bootstrap_leader" option cannot be set '..
+    local exp = 'The "bootstrap_leader" option cannot be set '..
                 'for replicaset "replicaset-001" because '..
                 '"bootstrap_strategy" for instance "instance-001" is not '..
-                '"config"\nfatal error, exiting the event loop'
+                '"config"'
+    exp = exp:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+          '.*\nfatal error, exiting the event loop'
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     config = [[
         credentials:
@@ -561,12 +563,12 @@ g.test_bootstrap_leader = function(g)
     ]]
     treegen.write_file(dir, 'config.yaml', config)
     res = justrun.tarantool(dir, env, args, opts)
-    exp = 'LuajitError: The \"bootstrap_leader\" option cannot be empty for '..
+    exp = 'The "bootstrap_leader" option cannot be empty for '..
           'replicaset "replicaset-001" because "bootstrap_strategy" for '..
-          'instance "instance-001" is "config"'..
-          '\nfatal error, exiting the event loop'
+          'instance "instance-001" is "config"'
+    exp = exp:gsub('%-', '%%-') .. '.*\nfatal error, exiting the event loop'
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     config = [[
         credentials:
@@ -592,12 +594,13 @@ g.test_bootstrap_leader = function(g)
     ]]
     treegen.write_file(dir, 'config.yaml', config)
     res = justrun.tarantool(dir, env, args, opts)
-    exp = 'LuajitError: "bootstrap_leader" = "instance-002" option is set '..
+    exp = '"bootstrap_leader" = "instance-002" option is set '..
           'for replicaset "replicaset-001" of group "group-001", but '..
-          'instance "instance-002" is not found in this replicaset'..
-          '\nfatal error, exiting the event loop'
+          'instance "instance-002" is not found in this replicaset'
+    exp = exp:gsub('%-', '%%-') ..
+          '.*\nfatal error, exiting the event loop'
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     config = [[
         credentials:
@@ -997,12 +1000,12 @@ g.test_failover_config = function()
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: replicaset replicaset-002 specified in the ' ..
-                'failover configuration doesn\'t exist\nfatal error, ' ..
-                'exiting the event loop'
+    local exp = 'replicaset replicaset-002 specified in the ' ..
+                'failover configuration doesn\'t exist'
+    exp = exp:gsub('%-', '%%-') .. '.*\nfatal error, exiting the event loop'
 
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     local config = [[
         credentials:
@@ -1035,12 +1038,14 @@ g.test_failover_config = function()
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: instance instance-004 from replicaset ' ..
+    local exp = 'instance instance-004 from replicaset ' ..
                 'replicaset-001 specified in the failover.replicasets ' ..
-                'section doesn\'t exist\nfatal error, exiting the event loop'
+                'section doesn\'t exist'
+    exp = exp:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+          '.*\nfatal error, exiting the event loop'
 
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     local config = [[
         credentials:
@@ -1075,13 +1080,14 @@ g.test_failover_config = function()
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: instance instance-003 from replicaset ' ..
+    local exp = 'instance instance-003 from replicaset ' ..
                 'replicaset-002 is specified in the wrong replicaset ' ..
                 'replicaset-001 in the failover.replicasets configuration '..
-                'section\nfatal error, exiting the event loop'
+                'section'
+    exp = exp:gsub('%-', '%%-') .. '.*\nfatal error, exiting the event loop'
 
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     local config = [[
         credentials:
@@ -1114,12 +1120,14 @@ g.test_failover_config = function()
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: instance instance-004 from replicaset ' ..
+    local exp = 'instance instance-004 from replicaset ' ..
                 'replicaset-001 specified in the failover.replicasets ' ..
-                'section doesn\'t exist\nfatal error, exiting the event loop'
+                'section doesn\'t exist'
+    exp = exp:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+          '.*\nfatal error, exiting the event loop'
 
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 
     local config = [[
         credentials:
@@ -1154,13 +1162,15 @@ g.test_failover_config = function()
     local args = {'--name', 'instance-001', '--config', config_file}
     local opts = {nojson = true, stderr = true}
     local res = justrun.tarantool(dir, env, args, opts)
-    local exp = 'LuajitError: instance instance-003 from replicaset ' ..
+    local exp = 'instance instance-003 from replicaset ' ..
                 'replicaset-002 is specified in the wrong replicaset ' ..
                 'replicaset-001 in the failover.replicasets configuration '..
-                'section\nfatal error, exiting the event loop'
+                'section'
+    exp = exp:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+          '.*\nfatal error, exiting the event loop'
 
     t.assert_equals(res.exit_code, 1)
-    t.assert_equals(res.stderr, exp)
+    t.assert_str_matches(res.stderr, exp)
 end
 
 g.test_failover_bootstrap_leader_considers_priorities = function()

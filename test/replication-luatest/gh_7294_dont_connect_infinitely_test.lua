@@ -29,7 +29,7 @@ g.test_no_infinite_connection = function(cg)
     luatest.helpers.retrying({}, function()
         -- Pass log filepath manually, because box.cfg.log is not available.
         local log = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
-        luatest.assert(cg.server:grep_log('applier/192.0.2.0:3301 .* TimedOut',
+        luatest.assert(cg.server:grep_log('applier/192.0.2.0:3301 .*TimedOut',
                                           1024, {filename = log}),
                        'Timeout happened')
     end)
