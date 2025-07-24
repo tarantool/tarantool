@@ -162,8 +162,12 @@ journal_queue_wait(struct journal_entry *entry)
 	}
 	/* Take this request and all the next ones. */
 	struct stailq rollback;
-	stailq_cut_tail(&journal_queue.requests, &prev_entry->fifo,
-			&rollback);
+	struct stailq_entry *prev_link = NULL;
+	if (journal_first_entry() != entry) {
+		prev_link = &prev_entry->fifo;
+		assert(stailq_next_entry(prev_entry, fifo) == entry);
+	}
+	stailq_cut_tail(&journal_queue.requests, prev_link, &rollback);
 	/* Cascade rollback them all. */
 	stailq_reverse(&rollback);
 	struct journal_entry *req, *next;

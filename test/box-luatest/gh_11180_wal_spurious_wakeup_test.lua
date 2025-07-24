@@ -113,3 +113,52 @@ g.test_wal_cancel_first_waiting = function(cg)
         s:drop()
     end)
 end
+
+--
+-- gh-11712: txns standing in the journal queue for the sake of cascading
+-- rollback must know the position of the previous entry in the queue, so they
+-- could cut the entire tail of the list (including themselves) and roll it all
+-- back on an error. The problem is that the previous entry might be already
+-- gone from the queue by the time when the next entry wants to make a rollback.
+-- The entries, before cutting themselves from the prev entry, must make sure
+-- there is still a previous entry.
+--
+g.test_wal_cancel_waiting_non_first_becoming_first = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        local function make_txn_fiber(id)
+            return _G.fiber.create(function()
+                _G.fiber.self():set_joinable(true)
+                s:replace{id, _G.test_data}
+            end)
+        end
+        -- Txn 1 is in WAL.
+        local f1 = make_txn_fiber(0)
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+        -- Txn 2-4 wait for space in the WAL queue.
+        local f2 = make_txn_fiber(1)
+        local f3 = make_txn_fiber(2)
+        local f4 = make_txn_fiber(3)
+        -- Txn-1 is committed, txn-2 goes to WAL, 3-4 wait for
+        -- space. The txn-3 becomes the first one in the
+        -- space-wait-queue.
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({timeout = _G.test_timeout}, function()
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+        end)
+        t.assert((f1:join()))
+        -- The txn3 should cascading-roll the txn4 back.
+        f3:cancel()
+        _G.join_with_error(f3, {type = 'FiberIsCancelled'})
+        t.assert(box.error.CASCADE_ROLLBACK)
+        _G.join_with_error(f4, {code = box.error.CASCADE_ROLLBACK})
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert((f2:join()))
+        s:drop()
+    end)
+end
