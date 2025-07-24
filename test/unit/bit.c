@@ -29,6 +29,7 @@ test_ctz_clz(void)
 
 		uint64_t val64 = vals[i];
 		uint32_t val32 = (uint32_t) vals[i];
+		uint8_t val8 = (uint8_t)vals[i];
 
 		printf("bit_ctz_u64(%" PRIu64 ") => %d\n", val64,
 			bit_ctz_u64(val64));
@@ -42,6 +43,42 @@ test_ctz_clz(void)
 			bit_ctz_u32(val32));
 		printf("bit_clz_u32(%" PRIu32 ") => %d\n", val32,
 			bit_clz_u32(val32));
+
+		if (vals[i] > UINT8_MAX)
+			continue;
+
+		printf("bit_ctz_u8(%" PRIu8 ") => %d\n", val8,
+		       bit_ctz_u8(val32));
+	}
+
+	footer();
+}
+
+static void
+test_clz_least_significant(void)
+{
+	header();
+
+	for (int i = 1; i < 4; i++) {
+		uint8_t *val = xcalloc(i, sizeof(val[0]));
+		for (int j = 0; j < i * CHAR_BIT; j++) {
+			val[j / CHAR_BIT] |= 0x1 << (j % CHAR_BIT);
+			for (int k = 0; k < i * CHAR_BIT; k++) {
+				printf("bit_clz_least_significant({");
+				for (int n = 0; n < i; n++) {
+					printf("0x%02x", (int)val[n]);
+					if (n < i - 1)
+						printf(", ");
+				}
+				printf("}, %d, %d", k, (i * CHAR_BIT) - k);
+				printf(") => %zu\n",
+				       bit_clz_least_significant(
+						val, k,
+						(i * CHAR_BIT) - k));
+			}
+			val[j / CHAR_BIT] ^= val[j / CHAR_BIT];
+		}
+		free(val);
 	}
 
 	footer();
@@ -404,6 +441,7 @@ main(void)
 	srand(time(NULL));
 
 	test_ctz_clz();
+	test_clz_least_significant();
 	test_count();
 	test_rotl_rotr();
 	test_bswap();

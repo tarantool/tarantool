@@ -83,6 +83,9 @@ extern inline void
 bit_set_range(void *data, size_t pos, size_t count, bool val);
 
 extern inline int
+bit_ctz_u8(uint8_t x);
+
+extern inline int
 bit_ctz_u32(uint32_t x);
 
 extern inline int
