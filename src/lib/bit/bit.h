@@ -549,6 +549,21 @@ bit_copy_range(uint8_t *restrict dst, size_t dst_i, const uint8_t *restrict src,
  * @return the number trailing 0-bits
  */
 inline int
+bit_ctz_u8(uint8_t x)
+{
+#if defined(HAVE_BUILTIN_CTZ)
+	return __builtin_ctz(x);
+#elif defined(HAVE_FFSL)
+	return ffsl(x) - 1;
+#else
+	CTZ_NAIVE(x, sizeof(uint8_t) * CHAR_BIT);
+#endif
+}
+
+/**
+ * @copydoc bit_ctz_u8
+ */
+inline int
 bit_ctz_u32(uint32_t x)
 {
 #if defined(HAVE_BUILTIN_CTZ)
@@ -561,7 +576,7 @@ bit_ctz_u32(uint32_t x)
 }
 
 /**
- * @copydoc bit_ctz_u32
+ * @copydoc bit_ctz_u8
  */
 inline int
 bit_ctz_u64(uint64_t x)
@@ -604,6 +619,19 @@ bit_ctz_u64(uint64_t x)
  * @return the number of leading 0-bits
  */
 inline int
+bit_clz_u8(uint8_t x)
+{
+#if defined(HAVE_BUILTIN_CLZ)
+	return __builtin_clz(x);
+#else /* !defined(HAVE_BUILTIN_CLZ) */
+	CLZ_NAIVE(x, sizeof(uint8_t) * CHAR_BIT);
+#endif
+}
+
+/**
+ * @copydoc bit_clz_u8
+ */
+inline int
 bit_clz_u32(uint32_t x)
 {
 #if   defined(HAVE_BUILTIN_CLZ)
@@ -614,7 +642,7 @@ bit_clz_u32(uint32_t x)
 }
 
 /**
- * @copydoc bit_clz_u32
+ * @copydoc bit_clz_u8
  */
 inline int
 bit_clz_u64(uint64_t x)
@@ -624,6 +652,65 @@ bit_clz_u64(uint64_t x)
 #else /* !defined(HAVE_BUILTIN_CLZLL) */
 	CLZ_NAIVE(x, sizeof(uint64_t) * CHAR_BIT);
 #endif
+}
+
+/**
+ * @brief Count Leading Zeros.
+ * Returns the number of leading 0-bits in @a x, starting at bit number
+ * @a offset and ending at bit number @a offset + @a count.
+ * @param x byte array
+ * @param offset bit number to start counting leading 0-bits from
+ * @param count number of bits to take into account while counting the
+ *    number of leading 0-bits.
+ * @return the number of leading 0-bits
+ */
+static inline size_t
+bit_clz(uint8_t *x, size_t offset, size_t count)
+{
+	size_t lz_cnt = 0;
+	if (count == 0)
+		return 0;
+
+	/*
+	 * We can have:
+	 * - a head of bits in the start;
+	 * - a bunch of whole bytes in the middle;
+	 * - a tail of bits in the end.
+	 */
+	size_t x_nth_byte = offset / CHAR_BIT;
+	size_t x_nth_bit = offset % CHAR_BIT;
+
+	/* The head may be the only byte to inspect. */
+	size_t x_head_size = x_nth_bit + count < CHAR_BIT ?
+			       count : CHAR_BIT - x_nth_bit;
+	size_t x_rest_size = count - x_head_size;    /* Can be 0. */
+	size_t x_body_size = x_rest_size / CHAR_BIT; /* In bytes. */
+	size_t x_tail_size = x_rest_size % CHAR_BIT; /* In bits. */
+
+	size_t x_head_byte_tz_cnt = x[x_nth_byte] == 0 ? CHAR_BIT :
+				    bit_ctz_u8(x[x_nth_byte]);
+	size_t x_head_lz_cnt = x_head_byte_tz_cnt >= x_head_size ?
+			       x_head_size : 0;
+	if (x_head_lz_cnt == 0)
+		return 0;
+	lz_cnt += x_head_lz_cnt;
+
+	for (size_t i = x_nth_byte + 1;
+	     i < x_nth_byte + 1 + x_body_size;
+	     i++) {
+		if (x[i] != 0)
+			return lz_cnt;
+		lz_cnt += CHAR_BIT;
+	}
+
+	size_t x_tail_byte = x_nth_byte + 1 + x_body_size + 1;
+	size_t x_tail_byte_lz_cnt = x[x_tail_byte] == 0 ? CHAR_BIT :
+				    bit_clz_u8(x_tail_byte);
+	size_t x_tail_lz_cnt = x_tail_byte_lz_cnt > x_tail_size ?
+			       x_tail_size : x_tail_byte_lz_cnt;
+	lz_cnt += x_tail_lz_cnt;
+
+	return lz_cnt;
 }
 
 #undef CLZ_NAIVE
