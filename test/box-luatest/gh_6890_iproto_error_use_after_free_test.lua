@@ -28,5 +28,5 @@ g.test_iproto_error_use_after_free = function()
     t.assert_equals(s:write(d), #d)
     s:close()
     -- Check that the server logs the proper error.
-    t.assert(g.server:grep_log('ER_INVALID_MSGPACK'))
+    t.assert(g.server:grep_log('Invalid MsgPack - '))
 end

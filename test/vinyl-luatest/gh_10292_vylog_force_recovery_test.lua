@@ -42,10 +42,10 @@ g.test_force_recovery = function(cg)
     cg.server:restart({box_cfg = {force_recovery = true}})
     local patterns = {
         'failed to process vylog record: drop_lsm{lsm_id=100501, }',
-        'INVALID_VYLOG_FILE.* LSM tree 100501 deleted but not registered',
+        'Invalid VYLOG file: LSM tree 100501 deleted but not registered',
         'failed to decode vylog record: %[15, {0: 100502, 6: 12345}%]',
-        'INVALID_VYLOG_FILE.* Bad record: missing key definition',
-        'INVALID_VYLOG_FILE.* LSM tree 12345/0 prepared twice',
+        'Invalid VYLOG file: Bad record: missing key definition',
+        'Invalid VYLOG file: LSM tree 12345/0 prepared twice',
         'skipping invalid vylog record',
     }
     for _, pattern in ipairs(patterns) do

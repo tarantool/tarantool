@@ -241,13 +241,13 @@ applier_thread_writer_f(va_list ap)
 			 * the reader fiber will reconnect for us
 			 * and signal our cond afterwards.
 			 */
-			e->log();
+			error_log(e);
 		} catch (Exception *e) {
 			/*
 			 * Out of memory encoding the message, ignore
 			 * and try again after an interval.
 			 */
-			e->log();
+			error_log(e);
 		}
 	}
 	return 0;

@@ -53,7 +53,7 @@ g.test_auto_rejoin = function(cg)
 
     local logfile = fio.pathjoin(cg.instance_2.workdir, 'instance_2.log')
     t.helpers.retrying({}, function()
-        t.assert(cg.instance_2:grep_log('ER_UNSUPPORTED', nil,
+        t.assert(cg.instance_2:grep_log('UNSUPPORTED', nil,
             {filename = logfile}), 'Anonymous replica does not support'..
             'registration of non-anonymous nodes.')
         t.assert(cg.instance_2:grep_log('rebootstrap failed, will '..

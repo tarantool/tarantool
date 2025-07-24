@@ -222,6 +222,7 @@ decimal_unpack
 error_find_field
 error_ref
 error_set_prev
+error_to_string
 error_unpack
 error_unref
 fiber_attr_delete

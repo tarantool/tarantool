@@ -227,8 +227,6 @@ public:
 		throw this;
 	}
 
-	virtual void log() const;
-
 	int
 	errcode() const
 	{
@@ -256,7 +254,7 @@ public:
 		: ClientError(file, line, errcode, args...)
 	{
 		/* TODO: actually calls ClientError::log */
-		log();
+		error_log(this);
 	}
 };
 
@@ -348,8 +346,6 @@ public:
 		:ClientError(&type_CustomError, NULL, 0, 0)
 	{
 	}
-
-	virtual void log() const;
 
 	const char*
 	custom_type() const

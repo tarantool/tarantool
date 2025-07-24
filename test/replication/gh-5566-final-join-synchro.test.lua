@@ -42,7 +42,7 @@ test_run:cmd('create server replica with rpl_master=default,\
                                          script="replication/replica.lua"')
 test_run:cmd('start server replica with wait=False')
 
-test_run:wait_log('replica', 'ER_SYNC_QUORUM_TIMEOUT', nil, 60)
+test_run:wait_log('replica', 'SYNC_QUORUM_TIMEOUT', nil, 60)
 -- Remove the trigger to let the replica connect.
 box.space._cluster:on_replace(nil, trig)
 
