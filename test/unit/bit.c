@@ -48,6 +48,36 @@ test_ctz_clz(void)
 }
 
 static void
+test_clz_least_significant(void)
+{
+	header();
+
+	for (int i = 1; i < 4; i++) {
+		uint8_t *val = xcalloc(i, sizeof(val[0]));
+		for (int j = 0; j < i * CHAR_BIT; j++) {
+			val[j / CHAR_BIT] |= 0x1 << (j % CHAR_BIT);
+			for (int k = 0; k < i * CHAR_BIT; k++) {
+				printf("bit_clz_least_significant({");
+				for (int n = 0; n < i; n++) {
+					printf("0x%02x", (int)val[n]);
+					if (n < i - 1)
+						printf(", ");
+				}
+				printf("}, %d, %d", k, (i * CHAR_BIT) - k);
+				printf(") => %zu\n",
+				       bit_clz_least_significant(
+						val, k,
+						(i * CHAR_BIT) - k));
+			}
+			val[j / CHAR_BIT] ^= val[j / CHAR_BIT];
+		}
+		free(val);
+	}
+
+	footer();
+}
+
+static void
 test_count(void)
 {
 	header();
@@ -404,6 +434,7 @@ main(void)
 	srand(time(NULL));
 
 	test_ctz_clz();
+	test_clz_least_significant();
 	test_count();
 	test_rotl_rotr();
 	test_bswap();
