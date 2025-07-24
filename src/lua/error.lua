@@ -1,9 +1,9 @@
 -- error.lua (internal file)
 
 local ffi = require('ffi')
-local json = require('json')
 local msgpack = require('msgpack')
 local compat = require('compat')
+local buffer = require('buffer')
 
 local mp_decode = msgpack.decode_unchecked
 
@@ -65,6 +65,9 @@ error_unref(struct error *e);
 
 const struct error_field *
 error_find_field(const struct error *e, const char *name);
+
+int
+error_to_string(const struct error *e, char *buf, int size);
 ]]
 
 local function error_base_type(err)
@@ -257,34 +260,21 @@ local function error_concat(lhs, rhs)
 end
 
 --
--- Convert error to its string representation without accounting for the
--- error's cause.
--- @param err error object
--- @return error's string representation
-local function error_to_string_wo_prev(err)
-    local err_unpacked = error_unpack(err)
-    err_unpacked.message = nil
-    err_unpacked.prev = nil
-    return string.format('%s %s', err.message, json.encode(err_unpacked))
-end
-
---
 -- Convert an error to its string representation accounting for the whole error
 -- stack.
 -- @param err error object
 -- @return error's string representation
 local function error_to_string(err)
-    if compat.box_error_serialize_verbose:is_old() then
-        return error_message(err)
+    local ibuf = buffer.internal.cord_ibuf_take()
+    local len = ffi.C.error_to_string(err, ibuf.wpos, ibuf:capacity())
+    if len + 1 > ibuf:capacity() then
+        ibuf:reserve(len + 1)
+        len = ffi.C.error_to_string(err, ibuf.wpos, ibuf:capacity())
+        assert(len + 1 <= ibuf:capacity())
     end
-
-    local cur = err
-    local error_stack = {}
-    while cur ~= nil do
-        table.insert(error_stack, 1, error_to_string_wo_prev(cur))
-        cur = cur.prev
-    end
-    return table.concat(error_stack, '\n')
+    local str = ffi.string(ibuf.rpos)
+    buffer.internal.cord_ibuf_put(ibuf)
+    return str
 end
 
 local error_mt = {

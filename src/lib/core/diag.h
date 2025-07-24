@@ -285,6 +285,24 @@ error_vformat_msg(struct error *e, const char *format, va_list ap);
 void
 error_append_msg(struct error *e, const char *format, ...);
 
+/*
+ * Print error string representation into the buffer. If string
+ * does not fit into the buffer then it is truncated and
+ * zero terminated.
+ *
+ * Return the size of the string (without trancation, 0-termination
+ * is not accounted).
+ */
+int
+error_to_string(const struct error *e, char *buf, int size);
+
+/*
+ * Return error string representation. If it does not fit into
+ * internal static buffer then it is truncated and zero terminated.
+ */
+const char *
+error_to_string_static(const struct error *e);
+
 /**
  * Diagnostics Area - a container for errors
  */
