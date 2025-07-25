@@ -261,23 +261,31 @@ function pool_methods.connect_to_multiple(self, instances, opts)
     local timeout = opts.timeout or WATCHER_TIMEOUT
     local connect_deadline = clock.monotonic() + timeout
 
+    local candidate_instances = {}
     for _, instance_name in pairs(instances) do
-        self:connect(instance_name, {wait_connected = false})
+        local conn = self._connections[instance_name]
+        if conn == nil then
+            self:connect(instance_name, {wait_connected = false})
+            table.insert(candidate_instances, instance_name)
+        elseif is_connection_valid(conn,
+            {fetch_schema = (conn.opts or {}).fetch_schema}) then
+            table.insert(candidate_instances, instance_name)
+        end
     end
 
     local connected_instances = {}
     while clock.monotonic() < connect_deadline do
-        connected_instances = fun.iter(instances)
+        connected_instances = fun.iter(candidate_instances)
             :filter(is_instance_connected)
             :totable()
 
         if opts.any then
-            if fun.iter(instances):any(opts.any) then
+            if fun.iter(candidate_instances):any(opts.any) then
                 break
             end
         end
 
-        if fun.iter(instances):all(is_instance_checked) then
+        if fun.iter(candidate_instances):all(is_instance_checked) then
             break
         end
 
