@@ -114,6 +114,8 @@ struct memtx_engine {
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Save and load the sort data. */
+	bool sort_data_enabled;
 	/**
 	 * A callback run once memtx engine builds secondary indexes for the
 	 * data.
@@ -169,6 +171,13 @@ struct memtx_engine {
 	int sort_threads;
 	/** Set of extents allocated using malloc. */
 	struct mh_ptr_t *malloc_extents;
+	/** The fields that are only used on .snap recovery. */
+	struct {
+		/** ID of the space the last insert is performed into. */
+		uint32_t last_space_id;
+		/** The memtx index sort data reader. */
+		struct memtx_sort_data_reader *sort_data_reader;
+	} recovery;
 };
 
 struct memtx_gc_task;
@@ -223,6 +232,12 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 int
 memtx_engine_set_memory(struct memtx_engine *memtx, size_t size);
 
+/**
+ * The box.cfg.memtx_sort_data_enabled field update handler.
+ */
+void
+memtx_engine_set_sort_data_enabled(struct memtx_engine *memtx, bool value);
+
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
 
@@ -241,6 +256,17 @@ enum {
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
+
+/**
+ * End building indexes of a previously recovered space
+ * and begin the current space build if required.
+ */
+int
+memtx_space_on_replace_build_next(struct space *space);
+
+/** Check if the given index definition support the MemTX sort data. */
+bool
+memtx_index_def_supports_sort_data(struct index_def *def);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,

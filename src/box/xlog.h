@@ -93,6 +93,9 @@ extern const struct xlog_opts xlog_opts_default;
  */
 #define inprogress_suffix ".inprogress"
 
+typedef void
+(*xlog_remove_cb_f)(const char *filename);
+
 /**
  * A handle for a data directory with write ahead logs, snapshots,
  * vylogs.
@@ -153,6 +156,11 @@ struct xdir {
 	 * Directory path.
 	 */
 	char dirname[PATH_MAX];
+	/**
+	 * The callback called on the xdir garbage
+	 * collection with the deleted file name passed.
+	 */
+	xlog_remove_cb_f gc_cb;
 };
 
 /**
@@ -252,7 +260,9 @@ enum {
 };
 
 /**
- * Remove files whose signature is less than specified.
+ * Remove files whose signature is less than specified. Calls the xdir GC
+ * callback on each removed file name.
+ *
  * For possible values of @flags see XDIR_GC_*.
  */
 void
