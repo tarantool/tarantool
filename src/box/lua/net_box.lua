@@ -263,7 +263,7 @@ local function new_sm(uri_or_fd, opts)
         fd = uri_or_fd
     end
     local user, password = opts.user, opts.password; opts.password = nil
-    local last_reconnect_error
+    local last_err_code, last_err_name, last_err_cause_code
     local remote = {
         host = host,
         port = port,
@@ -277,7 +277,10 @@ local function new_sm(uri_or_fd, opts)
         end
         if what == 'state_changed' then
             local state, err = ...
-            remote.state, remote.error = state, err
+            remote.state = state
+            if err then
+                remote.error = err:name()
+            end
             local was_connected = remote._is_connected
             if state == 'active' then
                 if not was_connected then
@@ -303,14 +306,36 @@ local function new_sm(uri_or_fd, opts)
                 remote._shutdown_pending = nil
             end
             if state == 'error_reconnect' then
-                -- Repeat the same error in verbose log only.
-                -- Else the error clogs the log. See gh-3175.
-                if err ~= last_reconnect_error then
-                    log.warn('%s:%s: %s', host or "", port or "", err)
-                    last_reconnect_error = err
-                else
-                    log.verbose('%s:%s: %s', host or "", port or "", err)
+                local function display_warning()
+                    log.warn('%s:%s: %s', host or "", port or "", err:name())
+                    if string.match(err:name(), "Connection refused") then
+                        log.warn(string.format('will retry every %.2f second',
+                                               remote.opts.reconnect_after))
+                    end
                 end
+                -- We display error in "warning" mode only if
+                -- 1) This error is the first one in netbox session.
+                -- 2) Current and previous error has different types (codes).
+                -- 3) Current and previous error has different messages and
+                --    different types of parent error.
+                -- Otherwise, current error will be repeated in "verbose" mode
+                if not last_err_name then
+                    display_warning()
+                else
+                    if err:code() ~= last_err_code then
+                        display_warning()
+                    else
+                        if err:name() ~= last_err_name and
+                           err:cause_code() ~= last_err_cause_code then
+                            display_warning()
+                        else
+                            log.verbose('%s:%s: %s', host or "",
+                                        port or "", err:name())
+                        end
+                    end
+                end
+                last_err_name, last_err_code, last_err_cause_code =
+                    err:name(), err:code(), err:cause_code()
             end
             remote._state_cond:broadcast()
         elseif what == 'handshake' then
