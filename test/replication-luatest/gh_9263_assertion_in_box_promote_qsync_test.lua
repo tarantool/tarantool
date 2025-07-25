@@ -146,6 +146,8 @@ g.test_is_in_box_promote = function(cg)
     cg.replica:wait_for_election_state('leader')
     cg.replica_proxy:resume()
     local ok, err = ff:join()
-    t.assert_equals(err, nil)
-    t.assert(ok)
+    t.assert_not(ok)
+    -- ER_QUORUM_WAIT due to reconfiguring replication_synchro_quorum
+    -- during box_wait_quorum.
+    t.assert(err)
 end

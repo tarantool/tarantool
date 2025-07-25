@@ -171,6 +171,8 @@ static bool is_storage_initialized = false;
 static bool is_storage_shutdown = false;
 static bool is_ro = true;
 static fiber_cond ro_cond;
+/* A condition which triggers when replication_synchro_quorum is changed */
+static fiber_cond synchro_quorum_cond;
 
 /**
  * The following flag is set if the instance failed to
@@ -2494,6 +2496,7 @@ box_update_replication_synchro_quorum(void)
 	txn_limbo_on_parameters_change(&txn_limbo);
 	box_raft_update_election_quorum();
 	replicaset_on_health_change();
+	fiber_cond_broadcast(&synchro_quorum_cond);
 }
 
 int
@@ -2832,10 +2835,19 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 		trigger_create(&t.base, box_quorum_on_ack_f, NULL, NULL);
 		trigger_add(&replicaset.on_ack, &t.base);
 		double deadline = ev_monotonic_now(loop()) + timeout;
-		do {
-			if (fiber_yield_deadline(deadline))
+		while (!fiber_is_cancelled() && t.ack_count < t.quorum) {
+			if (fiber_cond_wait_deadline(&synchro_quorum_cond,
+						     deadline) == -1) {
 				break;
-		} while (!fiber_is_cancelled() && t.ack_count < t.quorum);
+			}
+
+			if (quorum != replication_synchro_quorum) {
+				diag_set(ClientError, ER_QUORUM_WAIT, quorum,
+					 "replication_synchro_quorum was changed while waiting");
+				trigger_clear(&t.base);
+				return -1;
+			}
+		}
 		trigger_clear(&t.base);
 		ack_count = t.ack_count;
 	}
@@ -6664,6 +6676,7 @@ box_init(void)
 	txn_event_trigger_init();
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
+	fiber_cond_create(&synchro_quorum_cond);
 	auth_init();
 	security_init();
 	space_cache_init();
