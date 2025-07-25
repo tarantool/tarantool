@@ -14,6 +14,7 @@
 #include "ssl_error.h"
 #include "vclock/vclock.h"
 #include "box/tuple.h"
+#include "core/tweaks.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -655,6 +656,99 @@ test_client_error_name(void)
 	footer();
 }
 
+static void
+test_logging(void)
+{
+	header();
+	plan(6);
+
+	char path[] = "/tmp/XXXXXX";
+	mktemp(path);
+	note("logging to %s", path);
+	say_logger_init(path, S_ERROR, false, "plain");
+	FILE *f = fopen(path, "r+");
+	char *buf = (char *)static_alloc(SMALL_STATIC_SIZE);
+	int size = SMALL_STATIC_SIZE;
+	struct error *e;
+
+	/* Check old behaviour. */
+	e = BuildTimedOut("filename", 303);
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	char *expected = "E> TimedOut: timed out";
+	char *found = strstr(buf, expected);
+	ok(found != NULL && found[strlen(expected)] == '\n');
+
+	struct tweak *t = tweak_find("error_to_string_as_json");
+	fail_unless(t != NULL);
+	struct tweak_value v = {.type = TWEAK_VALUE_BOOL, .bval = true};
+	fail_unless(tweak_set(t, &v) == 0);
+
+	/* Some of basic errors. */
+	e = BuildTimedOut("filename", 303);
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> TimedOut: timed out "
+		  "{\"type\":\"TimedOut\",\"errno\":110,"
+		  "\"trace\":[{\"file\":\"filename\",\"line\":303}]}") != NULL);
+
+	/* ClientError plus payload plus some escaping. */
+	e = BuildClientError("\"filename\"", 707, ER_READONLY);
+	/* Check json escaping payload name and data. */
+	error_set_str(e, "\"f1\"", "\"p1\"");
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> ER_READONLY: Can't modify data on a read-only instance "
+		  "{\"type\":\"ClientError\",\"code\":7,"
+		  "\"name\":\"READONLY\","
+		  "\"\\\"f1\\\"\":\"\\\"p1\\\"\","
+		  "\"trace\":[{\"file\":\"\\\"filename\\\"\",\"line\":707}]}"
+		  ) != NULL);
+
+	/* CustomError plus some unusual branches. */
+	/* 1. Check json escaping custom type. */
+	/* 2. Check no trace. */
+	/* 3. Check zero code. */
+	e = BuildCustomError("", 505, "\"typo\"", 0);
+	e->errmsg = "some message";
+	/* 4. Check errno. */
+	e->saved_errno = 11;
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> Custom type \"typo\": some message "
+		  "{\"type\":\"\\\"typo\\\"\",\"errno\":11,"
+		  "\"trace\":[{}]}") != NULL);
+
+	/* Check stacked error. */
+	struct error *e1 = BuildCustomError("", 101, "level_1", 0);
+	e1->errmsg = "message 1";
+	struct error *e2 = BuildCustomError("", 202, "level_2", 0);
+	e2->errmsg = "message 2";
+	struct error *e3 = BuildCustomError("", 303, "level_3", 0);
+	e3->errmsg = "message 3";
+	error_set_prev(e1, e2);
+	error_set_prev(e2, e3);
+	error_log(e2);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> Custom type level_2: message 3 "
+		  "{\"type\":\"level_3\","
+		  "\"trace\":[{}]}") != NULL);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strcmp(buf,
+		  "message 2 "
+		  "{\"type\":\"level_2\","
+		  "\"trace\":[{}]}") != 0);
+
+	fclose(f);
+	say_logger_free();
+	check_plan();
+	footer();
+}
+
 #ifdef TEST_BUILD
 
 /* Test ClientError arguments become payload fields (gh-9109). */
@@ -888,9 +982,9 @@ main(void)
 {
 	header();
 #ifdef TEST_BUILD
-	plan(16);
+	plan(17);
 #else
-	plan(15);
+	plan(16);
 #endif
 
 	random_init();
@@ -913,6 +1007,7 @@ main(void)
 	test_pthread();
 	test_undefined_error_code();
 	test_client_error_name();
+	test_logging();
 #ifdef TEST_BUILD
 	test_client_error_creation();
 #endif

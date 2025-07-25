@@ -112,7 +112,8 @@ Exception::Exception(const struct type_info *type_arg, const char *file,
 void
 Exception::log() const
 {
-	say_file_line(S_ERROR, file, line, errmsg, "%s", type->name);
+	say_file_line(S_ERROR, file, line, error_to_string_static(this),
+		      "%s", type->name);
 }
 
 const struct type_info type_SystemError =

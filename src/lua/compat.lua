@@ -277,7 +277,7 @@ local options = {
         default = 'old',
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
-        action = function() end,
+        action = tweak_action('error_to_string_as_json', false, true),
     },
     box_consider_system_spaces_synchronous = {
       default = 'old',

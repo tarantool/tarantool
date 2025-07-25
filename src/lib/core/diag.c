@@ -30,6 +30,13 @@
  */
 #include "diag.h"
 #include "fiber.h"
+#include "msgpuck.h"
+#include "small/static.h"
+#include "tweaks.h"
+
+/** Whether error_to_string() should return error details in JSON. */
+static bool error_to_string_as_json;
+TWEAK_BOOL(error_to_string_as_json);
 
 /** True if the error message was dynamically allocated. */
 static bool
@@ -209,4 +216,90 @@ error_vformat_msg(struct error *e, const char *format, va_list ap)
 		VERIFY(new_len == len);
 	}
 	va_end(ap_copy);
+}
+
+/**
+ * Prints JSON representation of error into the buffer.
+ */
+static int
+error_encode_json_one(char *buf, int size, const struct error *e)
+{
+	/*
+	 * What error fields are printed and corner cases are aligned with
+	 * error serialization in Lua.
+	 */
+	int total = 0;
+	const char *custom_type = error_get_str(e, "custom_type");
+	SNPRINT(total, snprintf, buf, size, "%s {", e->errmsg);
+	SNPRINT(total, snprintf, buf, size, "\"type\":\"");
+	SNPRINT(total, json_escape, buf, size,
+		custom_type != NULL ? custom_type : e->type->name);
+	SNPRINT(total, snprintf, buf, size, "\"");
+	if (e->code != 0)
+		SNPRINT(total, snprintf, buf, size, ",\"code\":%d", e->code);
+	if (e->saved_errno != 0)
+		SNPRINT(total, snprintf, buf, size, ",\"errno\":%d",
+			e->saved_errno);
+	for (int i = 0; i < e->payload.count; i++) {
+		if (strcmp(e->payload.fields[i]->name, "custom_type") == 0)
+			continue;
+		SNPRINT(total, snprintf, buf, size, ",\"");
+		SNPRINT(total, json_escape, buf, size,
+			e->payload.fields[i]->name);
+		SNPRINT(total, snprintf, buf, size, "\":");
+		SNPRINT(total, mp_snprint, buf, size,
+			e->payload.fields[i]->data);
+	}
+	SNPRINT(total, snprintf, buf, size, ",\"trace\":[{");
+	if (e->file[0] != '\0') {
+		SNPRINT(total, snprintf, buf, size, "\"file\":\"");
+		SNPRINT(total, json_escape, buf, size, e->file);
+		SNPRINT(total, snprintf, buf, size, "\",\"line\":%u", e->line);
+	}
+	SNPRINT(total, snprintf, buf, size, "}]}");
+	return total;
+}
+
+/**
+ * Prints JSON representation of error into the buffer. All chain of causes
+ * is printed.
+ */
+static int
+error_encode_json(char *buf, int size, const struct error *err)
+{
+	const struct error *b = err;
+	while (b->cause != NULL)
+		b = b->cause;
+
+	int total = 0;
+	const struct error *e = b;
+	while (e != err->effect) {
+		if (e != b)
+			SNPRINT(total, snprintf, buf, size, "\n");
+		SNPRINT(total, error_encode_json_one, buf, size, e);
+		e = e->effect;
+	}
+	return total;
+}
+
+int
+error_to_string(const struct error *e, char *buf, int size)
+{
+	if (error_to_string_as_json)
+		return error_encode_json(buf, size, e);
+	else
+		return strlcpy(buf, e->errmsg, size);
+}
+
+const char *
+error_to_string_static(const struct error *e)
+{
+	if (error_to_string_as_json) {
+		char *buf = (char *)static_alloc(SMALL_STATIC_SIZE);
+		int size = SMALL_STATIC_SIZE;
+		error_encode_json(buf, size, e);
+		return buf;
+	} else {
+		return e->errmsg;
+	}
 }
