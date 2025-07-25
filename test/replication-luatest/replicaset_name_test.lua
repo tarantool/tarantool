@@ -274,11 +274,13 @@ g.test_replicaset_name_bootstrap_mismatch = function(lg)
     new_replica:start({wait_until_ready = false})
     local logfile = fio.pathjoin(new_replica.workdir,
                                  new_replica.alias .. '.log')
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(new_replica:grep_log(
+            'Replicaset name mismatch: name \'test%-name\' provided in ' ..
+            'config confilcts with the instance one \'<no%-name>\'', 1023,
+            {filename = logfile}))
+    end)
     wait_for_death(new_replica)
-    t.assert(new_replica:grep_log(
-        'Replicaset name mismatch: name \'test%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1023,
-        {filename = logfile}))
     new_replica:drop()
     --
     -- Both master and replica have replicaset names. But different ones.
@@ -299,11 +301,13 @@ g.test_replicaset_name_bootstrap_mismatch = function(lg)
     })
     new_replica:start({wait_until_ready = false})
     logfile = fio.pathjoin(new_replica.workdir, new_replica.alias .. '.log')
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(new_replica:grep_log(
+            'Replicaset name mismatch: name \'new%-name\' provided in ' ..
+            'config confilcts with the instance one \'test%-name\'', 1024,
+            {filename = logfile}))
+    end)
     wait_for_death(new_replica)
-    t.assert(new_replica:grep_log(
-        'Replicaset name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
     new_replica:drop()
     lg.master:exec(function(replica_id)
         local own_id = box.info.id
@@ -329,11 +333,13 @@ g.test_replicaset_name_recovery_mismatch = function(lg)
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
     local logfile = fio.pathjoin(lg.replica.workdir, lg.replica.alias .. '.log')
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.replica:grep_log(
+            'Replicaset name mismatch: name \'new%-name\' provided in ' ..
+            'config confilcts with the instance one \'test%-name\'', 1024,
+            {filename = logfile}))
+    end)
     wait_for_death(lg.replica)
-    t.assert(lg.replica:grep_log(
-        'Replicaset name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
     --
     -- Has name in WAL, no name in cfg. Then the replica uses the saved name, no
     -- conflict.
@@ -368,11 +374,13 @@ g.test_replicaset_name_recovery_mismatch = function(lg)
     lg.replica:restart({
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.replica:grep_log(
+            'Replicaset name mismatch: name \'new%-name\' provided in ' ..
+            'config confilcts with the instance one \'<no%-name>\'', 1024,
+            {filename = logfile}))
+    end)
     wait_for_death(lg.replica)
-    t.assert(lg.replica:grep_log(
-        'Replicaset name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1024,
-        {filename = logfile}))
     box_cfg.replicaset_name = nil
     box_cfg.force_recovery = nil
     lg.replica:restart({
@@ -400,11 +408,13 @@ g.test_replicaset_name_recovery_mismatch = function(lg)
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
     logfile = fio.pathjoin(lg.master.workdir, lg.master.alias .. '.log')
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.master:grep_log(
+            'Replicaset name mismatch: name \'new%-name\' provided in ' ..
+            'config confilcts with the instance one \'test%-name\'', 1024,
+            {filename = logfile}))
+        end)
     wait_for_death(lg.master)
-    t.assert(lg.master:grep_log(
-        'Replicaset name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
     --
     -- No name in WAL, has name in cfg.
     --
@@ -427,11 +437,13 @@ g.test_replicaset_name_recovery_mismatch = function(lg)
     lg.master:restart({
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.master:grep_log(
+            'Replicaset name mismatch: name \'new%-name\' provided in ' ..
+            'config confilcts with the instance one \'<no%-name>\'', 1024,
+            {filename = logfile}))
+    end)
     wait_for_death(lg.master)
-    t.assert(lg.master:grep_log(
-        'Replicaset name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1024,
-        {filename = logfile}))
     box_cfg.replicaset_name = nil
     -- Has to be forced or it won't be able to sync with the replica because of
     -- their replicaset name mismatch.
