@@ -241,10 +241,12 @@ end
 --- This method connects to the specified instances and returns
 --- the set of successfully connected ones.
 ---
---- Specifying a callback accepting an instance name and returning
---- a boolean value in `opts.any` changes the behavior to connect
---- to multiple instances until there is at least one satisfying
---- the condition or the timeout occurs.
+--- If a callback accepting an instance name and returning a
+--- boolean value is provided in `opts.any` the method connects
+--- to multiple instances and try to find one satisfying the
+--- callback. It lasts until all of the instances are known to
+--- be unsuitable (either failed or not satisfying the callback)
+--- or the timeout is reached.
 function pool_methods.connect_to_multiple(self, instances, opts)
     checks('table', 'table', {
         any = '?function',
@@ -291,10 +293,10 @@ function pool_methods.connect_to_multiple(self, instances, opts)
             if fun.iter(instances):any(opts.any) then
                 break
             end
-        else
-            if fun.iter(instances):all(is_instance_checked) then
-                break
-            end
+        end
+
+        if fun.iter(instances):all(is_instance_checked) then
+            break
         end
 
         self._connection_mode_update_cond:wait(delay)
