@@ -48,6 +48,34 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
 
+static inline struct txn_limbo_entry *
+txn_limbo_first_entry(struct txn_limbo *limbo)
+{
+	return rlist_first_entry(&limbo->queue, struct txn_limbo_entry,
+				 in_queue);
+}
+
+static inline struct txn_limbo_entry *
+txn_limbo_last_entry(struct txn_limbo *limbo)
+{
+	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
+				in_queue);
+}
+
+static inline bool
+txn_limbo_is_full(struct txn_limbo *limbo)
+{
+	return limbo->size >= limbo->max_size;
+}
+
+double
+txn_limbo_age(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	return fiber_clock() - txn_limbo_first_entry(limbo)->insertion_time;
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
@@ -177,7 +205,32 @@ txn_limbo_is_ro(struct txn_limbo *limbo)
 		txn_limbo_is_frozen(limbo));
 }
 
-void
+/** Decrease queue size once write request is complete. */
+static inline void
+txn_limbo_on_remove(struct txn_limbo *limbo,
+		    const struct txn_limbo_entry *entry)
+{
+	bool limbo_was_full = txn_limbo_is_full(limbo);
+	limbo->size -= entry->approx_len;
+	assert(limbo->size >= 0);
+	limbo->len--;
+	assert(limbo->len >= 0);
+	/* Wake up all fibers waiting to add a new limbo entry. */
+	if (limbo_was_full && !txn_limbo_is_full(limbo))
+		fiber_cond_broadcast(&limbo->wait_cond);
+}
+
+/** Pop the first entry. */
+static inline void
+txn_limbo_pop_first(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	assert(!rlist_empty(&entry->in_queue));
+	assert(txn_limbo_first_entry(limbo) == entry);
+	rlist_del_entry(entry, in_queue);
+	txn_limbo_on_remove(limbo, entry);
+}
+
+static void
 txn_limbo_complete(struct txn *txn, bool is_success)
 {
 	/*
@@ -211,6 +264,46 @@ txn_limbo_complete(struct txn *txn, bool is_success)
 	fiber_set_session(fiber(), orig_session);
 }
 
+/** Complete the given limbo entry with a failure and the given reason. */
+static void
+txn_limbo_complete_fail(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
+			int signature)
+{
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED ||
+	       entry->state == TXN_LIMBO_ENTRY_VOLATILE);
+	struct txn *this_txn = in_txn();
+	fiber_set_txn(fiber(), NULL);
+
+	struct txn *txn = entry->txn;
+	txn->signature = signature;
+	txn->limbo_entry = NULL;
+	txn_limbo_abort(limbo, entry);
+	txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+	txn_limbo_complete(txn, false);
+
+	fiber_set_txn(fiber(), this_txn);
+}
+
+/** Complete the given limbo entry with a success. */
+static void
+txn_limbo_complete_success(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
+	struct txn *txn = entry->txn;
+	entry->state = TXN_LIMBO_ENTRY_COMMIT;
+	if (txn_has_flag(txn, TXN_WAIT_ACK))
+		limbo->confirm_lag = fiber_clock() - entry->insertion_time;
+	txn->limbo_entry = NULL;
+	txn_limbo_pop_first(limbo, entry);
+	txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+	/*
+	 * Should be written to WAL by now. Confirm is always written after the
+	 * affected transactions.
+	 */
+	assert(txn->signature >= 0);
+	txn_limbo_complete(txn, true);
+}
+
 struct txn_limbo_entry *
 txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 {
@@ -227,27 +320,49 @@ static inline void
 txn_limbo_on_append(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
+	assert(entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
 	limbo->size += entry->approx_len;
 	limbo->len++;
 }
 
-/** Decrease queue size once write request is complete. */
-static inline void
-txn_limbo_on_remove(struct txn_limbo *limbo,
-		    const struct txn_limbo_entry *entry)
+/** Cascade-rollback all the entries from the newest to the given one. */
+static void
+txn_limbo_rollback_volatile_up_to(struct txn_limbo *limbo,
+				  struct txn_limbo_entry *last)
 {
-	bool limbo_was_full = txn_limbo_is_full(limbo);
-	limbo->size -= entry->approx_len;
-	assert(limbo->size >= 0);
-	limbo->len--;
-	assert(limbo->len >= 0);
-	/* Wake up all fibers waiting to add a new limbo entry. */
-	if (limbo_was_full && !txn_limbo_is_full(limbo))
-		fiber_cond_broadcast(&limbo->wait_cond);
+	assert(last == NULL || last->state == TXN_LIMBO_ENTRY_VOLATILE);
+	while (!txn_limbo_is_empty(limbo)) {
+		struct txn_limbo_entry *e = txn_limbo_last_entry(limbo);
+		if (e == last || e->state != TXN_LIMBO_ENTRY_VOLATILE)
+			break;
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_CASCADE);
+	}
 }
 
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
+{
+	txn_limbo_rollback_volatile_up_to(limbo, NULL);
+}
+
+bool
+txn_limbo_would_block(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_full(limbo))
+		return true;
+	if (txn_limbo_is_empty(limbo))
+		return false;
+	/*
+	 * Might be not full, but still have a volatile entry in the end. Could
+	 * be caused by some spurious wakeups of the entries' fibers in an
+	 * unexpected order. Either way, the new submission will have to wait
+	 * until the previous one gets submitted.
+	 */
+	return txn_limbo_last_entry(limbo)->state == TXN_LIMBO_ENTRY_VOLATILE;
+}
+
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
@@ -269,13 +384,13 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 * it should be done right now. See in the limbo comments why.
 		 */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return NULL;
+		return -1;
 	}
 	if (id == 0)
 		id = instance_id;
 	if  (limbo->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
-		return NULL;
+		return -1;
 	} else if (limbo->owner_id != id && !txn_is_fully_local(txn)) {
 		if (txn_limbo_is_empty(limbo)) {
 			diag_set(ClientError, ER_SYNC_QUEUE_FOREIGN,
@@ -284,7 +399,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->owner_id);
 		}
-		return NULL;
+		return -1;
 	}
 	size_t size;
 	struct txn_limbo_entry *e = region_alloc_object(&txn->region,
@@ -296,53 +411,186 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 	}
 	if (e == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object", "e");
-		return NULL;
+		return -1;
 	}
 	e->txn = txn;
 	e->approx_len = approx_len;
 	e->lsn = -1;
-	e->is_commit = false;
-	e->is_rollback = false;
 	e->insertion_time = fiber_clock();
+	txn->limbo_entry = e;
+	bool would_block = txn_limbo_would_block(limbo);
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
+	if (!would_block)
+		goto success;
+	e->state = TXN_LIMBO_ENTRY_VOLATILE;
+	while (true) {
+		int rc = fiber_cond_wait(&limbo->wait_cond);
+		if (e->state == TXN_LIMBO_ENTRY_ROLLBACK) {
+			/* Cascading rollback. */
+			fiber_set_txn(fiber(), NULL);
+			diag_set(ClientError, ER_SYNC_ROLLBACK);
+			return -1;
+		}
+		if (rc != 0) {
+			txn_limbo_rollback_volatile_up_to(limbo, e);
+			txn_limbo_complete_fail(limbo, e,
+						TXN_SIGNATURE_CANCELLED);
+			assert(e->state == TXN_LIMBO_ENTRY_ROLLBACK);
+			fiber_set_txn(fiber(), NULL);
+			diag_set(ClientError, ER_SYNC_ROLLBACK);
+			return -1;
+		}
+		/* Could be a spurious wakeup. */
+		if (txn_limbo_is_full(limbo))
+			continue;
+		if (txn_limbo_first_entry(limbo) == e)
+			break;
+		struct txn_limbo_entry *prev = rlist_prev_entry(e, in_queue);
+		/*
+		 * Could again be a spurious wakeup, when there is space to
+		 * submit more entries into the journal, but this entry isn't
+		 * the first volatile one in the queue. Submission into the
+		 * journal must be the same order as the addition to the queue.
+		 */
+		if (prev->state == TXN_LIMBO_ENTRY_VOLATILE)
+			continue;
+		/*
+		 * The previous one can't be ROLLBACK or COMMIT. Or it wouldn't
+		 * be in the limbo already.
+		 */
+		assert(prev->state == TXN_LIMBO_ENTRY_SUBMITTED);
+		break;
+	}
+	assert(e->state == TXN_LIMBO_ENTRY_VOLATILE);
+	if (txn_limbo_last_entry(limbo) != e) {
+		/*
+		 * Wake the next one up so it would check if it can also be
+		 * submitted.
+		 */
+		struct txn_limbo_entry *next = rlist_next_entry(e, in_queue);
+		assert(next->state == TXN_LIMBO_ENTRY_VOLATILE);
+		fiber_wakeup(next->txn->fiber);
+	}
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
+		/*
+		 * Could be an asynchronous transaction which was trying to get
+		 * into the limbo only because there were some synchro txns in
+		 * it. Then those got confirmed and suddenly this txn doesn't
+		 * need the limbo anymore.
+		 */
+		txn->limbo_entry = NULL;
+		e->txn = NULL;
+		assert(txn_limbo_first_entry(limbo) == e);
+		rlist_del_entry(e, in_queue);
+		return 0;
+	}
+success:
+	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
 	txn_limbo_on_append(limbo, e);
-	return e;
+	return 0;
 }
 
-static inline void
-txn_limbo_remove(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+int
+txn_limbo_flush(struct txn_limbo *limbo)
 {
-	assert(!rlist_empty(&entry->in_queue));
-	assert(txn_limbo_first_entry(limbo) == entry);
-	rlist_del_entry(entry, in_queue);
-	txn_limbo_on_remove(limbo, entry);
-}
-
-static inline void
-txn_limbo_pop(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
-{
-	assert(!rlist_empty(&entry->in_queue));
-	assert(txn_limbo_last_entry(limbo) == entry);
-	assert(entry->is_rollback);
-
-	rlist_del_entry(entry, in_queue);
-	txn_limbo_on_remove(limbo, entry);
-	++limbo->rollback_count;
+	/* Fast path. */
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	if (txn_limbo_last_entry(limbo)->state != TXN_LIMBO_ENTRY_VOLATILE)
+		return 0;
+	/*
+	 * Slow path.
+	 * The limbo queue guarantees that if a txn is trying to be submitted
+	 * into it, then the submission would return right after all the
+	 * previous txns are sent to the journal and before any newer txns do
+	 * the same.
+	 *
+	 * Which means a flush could be done as simple as just doing a txn
+	 * submission. As soon as submit returns - all the older entries are
+	 * sent to the journal.
+	 *
+	 * To conveniently reuse the submission logic the flush creates a nop
+	 * txn to ride on it through the limbo queue.
+	 */
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	if (txn_prepare(txn) != 0)
+		unreachable();
+	txn->fiber = fiber();
+	txn_set_flags(txn, TXN_WAIT_SYNC);
+	int rc = txn_limbo_submit(limbo, limbo->owner_id, txn, 0);
+	if (rc == 0) {
+		assert(!txn_has_flag(txn, TXN_IS_DONE));
+		/*
+		 * The limbo entry might be already removed, if all the previous
+		 * txns got not just sent to WAL, but also covered by a confirm.
+		 *
+		 * Can happen, for example, if there was a sync txn in the
+		 * limbo and an async txn waiting for limbo space. Then this
+		 * flush would stand after the async txn.
+		 *
+		 * Then if the sync txn gets confirmed, it is committed. And all
+		 * the following non-sync txns are confirmed too. Even if they
+		 * aren't written to WAL yet, they just become non-synchronous
+		 * anymore.
+		 *
+		 * Including the mentioned waiting async txn and this flush-txn.
+		 */
+		if (txn->limbo_entry != NULL) {
+			/*
+			 * The worst part of this code is that the "fake" nop
+			 * txn must be removed from the middle of the limbo. It
+			 * can't stay there. Such behaviour doesn't fit neither
+			 * commit nor rollback, but the ability to reuse
+			 * submission for flushing the limbo justifies this.
+			 */
+			assert(txn->limbo_entry != limbo->entry_to_confirm);
+			rlist_del_entry(txn->limbo_entry, in_queue);
+			txn->limbo_entry = NULL;
+		}
+	} else {
+		assert(txn->limbo_entry == NULL);
+	}
+	/*
+	 * Roll the nop txn back. In theory it shouldn't matter if it is
+	 * committed or rolled back as it is nop anyway. But the rollback should
+	 * help to catch any issues if some code would accidentally find this
+	 * txn in the limbo and hang on-commit/rollback triggers on it. For
+	 * instance, to wait for the "last txn to be committed". Using the nop
+	 * txn for that would be wrong. The rollback would highlight such
+	 * misusage.
+	 */
+	if (!txn_has_flag(txn, TXN_IS_DONE)) {
+		txn->signature = TXN_SIGNATURE_ROLLBACK;
+		txn_complete_fail(txn);
+	}
+	assert(in_txn() == NULL || in_txn() == txn);
+	fiber_set_txn(fiber(), NULL);
+	txn_free(txn);
+	return rc;
 }
 
 void
 txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
-	entry->is_rollback = true;
-	if (entry == limbo->entry_to_confirm)
-		limbo->entry_to_confirm = NULL;
+	assert(!rlist_empty(&entry->in_queue));
 	/*
 	 * The simple rule about rollback/commit order applies
 	 * here as well: commit always in the order of WAL write,
 	 * rollback in the reversed order. Rolled back transaction
 	 * is always the last.
 	 */
-	txn_limbo_pop(limbo, entry);
+	assert(txn_limbo_last_entry(limbo) == entry);
+	bool was_volatile = entry->state == TXN_LIMBO_ENTRY_VOLATILE;
+	assert(was_volatile || entry->state == TXN_LIMBO_ENTRY_SUBMITTED);
+	entry->state = TXN_LIMBO_ENTRY_ROLLBACK;
+	if (entry == limbo->entry_to_confirm)
+		limbo->entry_to_confirm = NULL;
+	rlist_del_entry(entry, in_queue);
+	++limbo->rollback_count;
+	if (!was_volatile)
+		txn_limbo_on_remove(limbo, entry);
 }
 
 void
@@ -468,11 +716,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	struct txn_limbo_entry *tmp;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
-		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		txn_limbo_complete(e->txn, false);
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_QUORUM_TIMEOUT);
 		if (e == entry)
 			break;
 	}
@@ -496,7 +740,7 @@ complete:
 	 * The first tx to be rolled back already performed all
 	 * the necessary cleanups for us.
 	 */
-	if (entry->is_rollback) {
+	if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
 		return -1;
 	}
@@ -588,8 +832,14 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
-	struct txn_limbo_entry *e, *tmp;
-	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, tmp) {
+	assert(limbo->confirmed_lsn <= lsn);
+	/*
+	 * Track CONFIRM lsn on replica in order to detect split-brain by
+	 * comparing existing confirm_lsn with the one arriving from a remote
+	 * instance.
+	 */
+	struct txn_limbo_entry *e, *next;
+	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, next) {
 		/*
 		 * Check if it is an async transaction last in the queue. When
 		 * it is last, it does not depend on a not finished sync
@@ -606,6 +856,22 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 */
 			if (e->lsn == -1)
 				break;
+			if (!rlist_empty(&e->txn->on_commit)) {
+				/*
+				 * Bump the confirmed LSN right now, do not
+				 * batch with any newer txns. So on-commit
+				 * triggers would see the confirmation LSN
+				 * matching this txn exactly. Making an illusion
+				 * like each txn has its own confirmation.
+				 */
+				if (limbo->confirmed_lsn < e->lsn) {
+					limbo->confirmed_lsn = e->lsn;
+					vclock_follow(&limbo->confirmed_vclock,
+						      limbo->owner_id, e->lsn);
+				} else {
+					assert(limbo->confirmed_lsn == lsn);
+				}
+			}
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
 			/*
 			 * A transaction might be covered by the CONFIRM even if
@@ -624,7 +890,19 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * created in the applier.
 			 */
 			txn_clear_flags(e->txn, TXN_WAIT_SYNC);
-			txn_limbo_remove(limbo, e);
+			if (e->state == TXN_LIMBO_ENTRY_VOLATILE) {
+				if (e == txn_limbo_last_entry(limbo))
+					continue;
+				/*
+				 * The invariant is that if found a volatile
+				 * txn, then all newer txns are also volatile.
+				 */
+				assert(rlist_next_entry(e, in_queue) == next);
+				assert(next->state == TXN_LIMBO_ENTRY_VOLATILE);
+				continue;
+			}
+			assert(e->state == TXN_LIMBO_ENTRY_SUBMITTED);
+			txn_limbo_pop_first(limbo, e);
 			/*
 			 * The limbo entry now should not be used by the owner
 			 * transaction since it just became a plain one. Nullify
@@ -635,24 +913,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			e->txn = NULL;
 			continue;
 		}
-		e->is_commit = true;
-		if (txn_has_flag(e->txn, TXN_WAIT_ACK))
-			limbo->confirm_lag = fiber_clock() - e->insertion_time;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_remove(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
-		/*
-		 * Should be written to WAL by now. Confirm is always written
-		 * after the affected transactions.
-		 */
-		assert(e->txn->signature >= 0);
-		txn_limbo_complete(e->txn, true);
+		txn_limbo_complete_success(limbo, e);
 	}
-	/*
-	 * Track CONFIRM lsn on replica in order to detect split-brain by
-	 * comparing existing confirm_lsn with the one arriving from a remote
-	 * instance.
-	 */
 	if (limbo->confirmed_lsn < lsn) {
 		limbo->confirmed_lsn = lsn;
 		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
@@ -702,16 +964,12 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	if (last_rollback == NULL)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
-		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_ACK);
 		/*
 		 * Should be written to WAL by now. Rollback is always written
 		 * after the affected transactions.
 		 */
 		assert(e->txn->signature >= 0);
-		e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
-		e->txn->limbo_entry = NULL;
-		txn_limbo_complete(e->txn, false);
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_SYNC_ROLLBACK);
 		if (e == last_rollback)
 			break;
 	}
@@ -946,7 +1204,7 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 	trigger_create(&on_complete, txn_commit_cb, &cwp, NULL);
 	struct trigger on_rollback;
 	trigger_create(&on_rollback, txn_rollback_cb, &cwp, NULL);
-	struct txn_limbo_entry *tle = txn_limbo_last_entry(limbo);
+	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
 	double deadline = fiber_clock() + timeout;
@@ -969,25 +1227,6 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 	trigger_clear(&on_complete);
 	trigger_clear(&on_rollback);
 	return rc;
-}
-
-int
-txn_limbo_wait_confirm(struct txn_limbo *limbo)
-{
-	if (txn_limbo_is_empty(limbo))
-		return 0;
-	bool is_rollback;
-	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
-				    replication_synchro_timeout) != 0) {
-		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-		return -1;
-	}
-	if (is_rollback) {
-		/* The transaction has been rolled back. */
-		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return -1;
-	}
-	return 0;
 }
 
 int
@@ -1102,90 +1341,6 @@ txn_limbo_filter_generic(struct txn_limbo *limbo,
 }
 
 /**
- * A common filter for all synchro requests, checking that request operates
- * over a valid lsn range.
- */
-static int
-txn_limbo_filter_queue_boundaries(struct txn_limbo *limbo,
-				  const struct synchro_request *req)
-{
-	int64_t lsn = req->lsn;
-	/*
-	 * Easy case - processed LSN matches the new one which comes inside
-	 * request, everything is consistent. This is allowed only for
-	 * PROMOTE/DEMOTE.
-	 */
-	if (limbo->confirmed_lsn == lsn) {
-		if (iproto_type_is_promote_request(req->type)) {
-			return 0;
-		} else {
-			say_error("%s. Duplicate request with confirmed lsn "
-				  "%lld = request lsn %lld", reject_str(req),
-				  (long long)limbo->confirmed_lsn,
-				  (long long)lsn);
-			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-				 "Duplicate CONFIRM/ROLLBACK request");
-			return -1;
-		}
-	}
-
-	/*
-	 * Explicit split brain situation. Request comes in with an old LSN
-	 * which we've already processed.
-	 */
-	if (limbo->confirmed_lsn > lsn) {
-		say_error("%s. confirmed lsn %lld > request lsn %lld",
-			  reject_str(req), (long long)limbo->confirmed_lsn,
-			  (long long)lsn);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request with lsn from an already "
-			 "processed range");
-		return -1;
-	}
-
-	/*
-	 * The last case requires a few subcases.
-	 */
-	assert(limbo->confirmed_lsn < lsn);
-
-	if (txn_limbo_is_empty(limbo)) {
-		/*
-		 * Transactions are rolled back already,
-		 * since the limbo is empty.
-		 */
-		say_error("%s. confirmed lsn %lld < request lsn %lld "
-			  "and empty limbo", reject_str(req),
-			  (long long)limbo->confirmed_lsn,
-			  (long long)lsn);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request mentioning future lsn");
-		return -1;
-	} else {
-		/*
-		 * Some entries are present in the limbo, we need to make sure
-		 * that request lsn lays inside limbo [first; last] range.
-		 * So that the request has some queued data to process,
-		 * otherwise it means the request comes from split brained node.
-		 */
-		int64_t first_lsn = txn_limbo_first_entry(limbo)->lsn;
-		int64_t last_lsn = txn_limbo_last_synchro_entry(limbo)->lsn;
-
-		if (lsn < first_lsn || last_lsn < lsn) {
-			say_error("%s. request lsn %lld out of range "
-				  "[%lld; %lld]", reject_str(req),
-				  (long long)lsn,
-				  (long long)first_lsn,
-				  (long long)last_lsn);
-			diag_set(ClientError, ER_SPLIT_BRAIN,
-				 "got a request lsn out of queue range");
-			return -1;
-		}
-	}
-
-	return 0;
-}
-
-/**
  * Filter CONFIRM and ROLLBACK packets.
  */
 static int
@@ -1194,6 +1349,7 @@ txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
 {
 	assert(latch_is_locked(&limbo->promote_latch));
 	assert(limbo->do_validate);
+	(void)limbo;
 	assert(req->type == IPROTO_RAFT_CONFIRM ||
 	       req->type == IPROTO_RAFT_ROLLBACK);
 	/*
@@ -1205,8 +1361,7 @@ txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
 			 "zero LSN for CONFIRM/ROLLBACK");
 		return -1;
 	}
-
-	return txn_limbo_filter_queue_boundaries(limbo, req);
+	return 0;
 }
 
 /** A filter PROMOTE and DEMOTE packets. */
@@ -1241,8 +1396,61 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 			 "got a PROMOTE/DEMOTE with an obsolete term");
 		return -1;
 	}
-
-	return txn_limbo_filter_queue_boundaries(limbo, req);
+	/*
+	 * Explicit split brain situation. Request comes in with an old LSN
+	 * which we've already processed.
+	 */
+	if (limbo->confirmed_lsn > req->lsn) {
+		say_error("%s. confirmed lsn %lld > request lsn %lld",
+			  reject_str(req), (long long)limbo->confirmed_lsn,
+			  (long long)req->lsn);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request with lsn from an already "
+			 "processed range");
+		return -1;
+	}
+	/*
+	 * Easy case - processed LSN matches the new one which comes inside
+	 * request, everything is consistent. This is allowed only for
+	 * PROMOTE/DEMOTE.
+	 */
+	if (limbo->confirmed_lsn >= req->lsn)
+		return 0;
+	/*
+	 * The last case requires a few subcases.
+	 */
+	if (txn_limbo_is_empty(limbo)) {
+		/*
+		 * Transactions are rolled back already,
+		 * since the limbo is empty.
+		 */
+		say_error("%s. confirmed lsn %lld < request lsn %lld "
+			  "and empty limbo", reject_str(req),
+			  (long long)limbo->confirmed_lsn,
+			  (long long)req->lsn);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request mentioning future lsn");
+		return -1;
+	}
+	/*
+	 * Some entries are present in the limbo, we need to make sure that
+	 * request lsn lays inside limbo [first; last] range. So that the
+	 * request has some queued data to process, otherwise it means the
+	 * request comes from split brained node.
+	 */
+	int64_t first_lsn = txn_limbo_first_entry(limbo)->lsn;
+	int64_t last_lsn = txn_limbo_last_synchro_entry(limbo)->lsn;
+	if (req->lsn < first_lsn || last_lsn < req->lsn) {
+		say_error("%s. request lsn %lld out of range "
+			  "[%lld; %lld]", reject_str(req),
+			  (long long)req->lsn,
+			  (long long)first_lsn,
+			  (long long)last_lsn);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request lsn out of queue range");
+		return -1;
+	}
+	return 0;
 }
 
 /** A fine-grained filter checking specific request type constraints. */
@@ -1499,16 +1707,6 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	latch_lock(&limbo->promote_latch);
 	limbo->do_validate = false;
 	latch_unlock(&limbo->promote_latch);
-}
-
-int
-txn_limbo_wait_for_space(struct txn_limbo *limbo)
-{
-	while (txn_limbo_is_full(limbo)) {
-		if (fiber_cond_wait(&limbo->wait_cond) != 0)
-			return -1;
-	}
-	return 0;
 }
 
 void
