@@ -263,7 +263,7 @@ local function new_sm(uri_or_fd, opts)
         fd = uri_or_fd
     end
     local user, password = opts.user, opts.password; opts.password = nil
-    local last_reconnect_error
+    local last_err_code, last_err_name, last_prev_err_code
     local remote = {
         host = host,
         port = port,
@@ -277,7 +277,8 @@ local function new_sm(uri_or_fd, opts)
         end
         if what == 'state_changed' then
             local state, err = ...
-            remote.state, remote.error = state, err
+            remote.state = state
+            remote.error = err and err.message
             local was_connected = remote._is_connected
             if state == 'active' then
                 if not was_connected then
@@ -303,14 +304,23 @@ local function new_sm(uri_or_fd, opts)
                 remote._shutdown_pending = nil
             end
             if state == 'error_reconnect' then
-                -- Repeat the same error in verbose log only.
-                -- Else the error clogs the log. See gh-3175.
-                if err ~= last_reconnect_error then
-                    log.warn('%s:%s: %s', host or "", port or "", err)
-                    last_reconnect_error = err
+                -- We display error in "warning" mode only if
+                -- 1) This error is the first one in netbox session.
+                -- 2) Current and previous error has different types (codes).
+                -- 3) Current and previous error has different messages and
+                --    different types of parent error.
+                -- Otherwise, current error will be repeated in "verbose" mode
+                local prev_err_code = err.prev and err.prev.code
+                if (err.code ~= last_err_code) or
+                   (err.message ~= last_err_name and
+                    prev_err_code ~= last_prev_err_code) then
+                    log.warn("%s:%s: %s", host or "", port or "", err.message)
                 else
-                    log.verbose('%s:%s: %s', host or "", port or "", err)
+                    log.verbose("%s:%s: %s", host or "", port or "",
+                                err.message)
                 end
+                last_err_name, last_err_code, last_prev_err_code =
+                    err.message, err.code, prev_err_code
             end
             remote._state_cond:broadcast()
         elseif what == 'handshake' then
