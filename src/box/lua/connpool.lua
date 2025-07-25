@@ -159,6 +159,11 @@ function pool_methods._failed_connection_watchdog_wake(self)
     self._failed_connection_watchdog_fiber = f
 end
 
+--- Get a cached connection to instance. Might be nil.
+function pool_methods.get_connection(self, instance_name)
+    return self._connections[instance_name]
+end
+
 --- Connect to an instance or receive a cached connection by
 --- name.
 ---
@@ -443,7 +448,7 @@ local function is_mode_match(mode, instance_name)
     if mode == nil then
         return true
     end
-    local conn = pool:connect(instance_name, {wait_connected = false})
+    local conn = pool:get_connection(instance_name)
     assert(conn ~= nil and conn:mode() ~= nil)
     return conn:mode() == mode
 end
@@ -451,7 +456,7 @@ end
 local function is_candidate_match_dynamic(instance_name, opts)
     assert(opts ~= nil and type(opts) == 'table')
 
-    local conn = pool:connect(instance_name, {wait_connected = false})
+    local conn = pool:get_connection(instance_name)
     if not conn or conn:mode() == nil then
         return
     end
@@ -623,7 +628,7 @@ local function get_connection(opts)
         local mode = opts.mode == 'prefer_ro' and 'ro' or 'rw'
         local weight_mode = 2
         for _, instance_name in pairs(candidates) do
-            local conn = pool:connect(instance_name, {wait_connected = false})
+            local conn = pool:get_connection(instance_name)
             assert(conn ~= nil)
             if conn:mode() == mode then
                 weights[instance_name] = weights[instance_name] + weight_mode
@@ -656,8 +661,7 @@ local function get_connection(opts)
         while #preferred_candidates > 0 do
             local n = math.random(#preferred_candidates)
             local instance_name = table.remove(preferred_candidates, n)
-            local conn = pool:connect(instance_name,
-                                      {wait_connected = false})
+            local conn = pool:get_connection(instance_name)
             if conn:wait_connected() then
                 return conn
             end
