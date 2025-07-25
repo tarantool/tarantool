@@ -906,6 +906,38 @@ role_revoke(struct user *grantee, struct user *role)
 	return 0;
 }
 
+/**
+ * Check if a role is granted to a user or role with the given auth token.
+ */
+bool
+role_is_granted(struct user *role, uint8_t auth_token)
+{
+	/* Check if the role is granted directly. */
+	if (user_map_is_set(&role->users, auth_token))
+		return true;
+
+	/* Check if the role is granted transitively. */
+	struct user_map transitive_closure = user_map_nil;
+	struct user_map current_layer = user_map_nil;
+	user_map_union(&current_layer, &role->users);
+	while (!user_map_is_empty(&current_layer)) {
+		/*
+		 * There's no loops in the role graph (this is guaranteed
+		 * by the role_check), so we're are bound to end at some
+		 * point in a layer with no incoming edges.
+		 */
+		struct user_map next_layer = user_map_nil;
+		struct user_map_iterator it;
+		user_map_iterator_init(&it, &current_layer);
+		struct user *transitive_role;
+		while ((transitive_role = user_map_iterator_next(&it)))
+			user_map_union(&next_layer, &transitive_role->users);
+		user_map_union(&transitive_closure, &next_layer);
+		current_layer = next_layer;
+	}
+	return user_map_is_set(&transitive_closure, auth_token);
+}
+
 int
 priv_grant(struct user *grantee, struct priv_def *priv,
 	   struct txn_stmt *rolled_back_stmt)
