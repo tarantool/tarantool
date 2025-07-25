@@ -239,7 +239,8 @@ function pool_methods.connect(self, instance_name, opts)
 end
 
 --- This method connects to the specified instances and returns
---- the set of successfully connected ones.
+--- the set of successfully connected ones. Instances that are
+--- known to have been recently unavailable are skipped.
 ---
 --- If a callback accepting an instance name and returning a
 --- boolean value is provided in `opts.any` the method connects
@@ -279,23 +280,54 @@ function pool_methods.connect_to_multiple(self, instances, opts)
     local timeout = opts.timeout or WATCHER_TIMEOUT
     local connect_deadline = clock.monotonic() + timeout
 
+    -- We divide instances into three categories.
+    -- * Available ones: these instances are already connected.
+    --   Nothing to do with them apart from returning them.
+    -- * Failed: the pool assumes an instance failed if it has
+    --   been recently accessed but the connection has failed.
+    --   Such instances are not returned and not waited. The pool
+    --   tries to automatically reconnect to them in the
+    --   background guaranteeing the failed status is relatively
+    --   actual.
+    -- * Unknown: these are either or the ones that have been
+    --   flushed because they have not been needed for a while
+    --   (see idle timeout and related logic) or the ones not
+    --   accessed since startup. The pool connects to them and
+    --   waits for success/fail.
+    local candidate_instances = {}
     for _, instance_name in pairs(instances) do
-        self:connect(instance_name, {wait_connected = false})
+        local conn = self._connections[instance_name]
+
+        -- If instance has not been accessed recently (it has
+        -- unknown state) start connecting to it. The call assume
+        -- it is a candidate and will wait for the connection to
+        -- fail/succeed.
+        if conn == nil then
+            self:connect(instance_name, {wait_connected = false})
+            table.insert(candidate_instances, instance_name)
+        -- If the connection is already ok it is likely it should
+        -- be returned as is.
+        elseif is_connection_valid(conn,
+            {fetch_schema = (conn.opts or {}).fetch_schema}) then
+            table.insert(candidate_instances, instance_name)
+        -- The remaining connections are the failed ones that has
+        -- been checked rather recently. Skip them.
+        end
     end
 
     local connected_instances = {}
     while clock.monotonic() < connect_deadline do
-        connected_instances = fun.iter(instances)
+        connected_instances = fun.iter(candidate_instances)
             :filter(is_instance_connected)
             :totable()
 
         if opts.any then
-            if fun.iter(instances):any(opts.any) then
+            if fun.iter(candidate_instances):any(opts.any) then
                 break
             end
         end
 
-        if fun.iter(instances):all(is_instance_checked) then
+        if fun.iter(candidate_instances):all(is_instance_checked) then
             break
         end
 
