@@ -458,6 +458,7 @@ g.test_defaults = function()
         },
         connpool = {
             idle_timeout = 60,
+            reconnect_after = 3,
         },
     }
 

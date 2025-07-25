@@ -663,6 +663,15 @@ I['connpool.idle_timeout'] = format_text([[
     connection object.
 ]])
 
+I['connpool.reconnect_after'] = format_text([[
+    Tarantool connection pool automatically tries reconnecting to recently
+    used instances in case of a network error. This option controls an interval
+    (in seconds) between the reconnect attempts.
+
+    If an instance is not accessed for a while the connpool stops reconnecting
+    to it.
+]])
+
 -- }}} connpool configuration
 
 -- {{{ console configuration

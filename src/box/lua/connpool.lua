@@ -75,6 +75,78 @@ function pool_methods._unused_connection_watchdog_wake(self)
     self._unused_connection_watchdog_fiber = f
 end
 
+function pool_methods._failed_connection_watchdog_step(self)
+    local now = clock.monotonic()
+    local until_next_reconnect = math.huge
+    local instance_names_to_reconnect = {}
+
+    for name, conn in pairs(self._connections) do
+        if conn._reconnect ~= nil then
+            local until_reconnect = conn._reconnect - now
+
+            if until_reconnect <= 0 then
+                table.insert(instance_names_to_reconnect, name)
+            elseif until_reconnect < until_next_reconnect then
+                until_next_reconnect = until_reconnect
+            end
+        end
+    end
+
+    local reconnect_after = config:get('connpool.reconnect_after')
+    for _, instance_name in ipairs(instance_names_to_reconnect) do
+        local old_conn = self._connections[instance_name]
+        local opts = {
+            ttl = 0,
+            wait_connected = false,
+            fetch_schema = old_conn.opts.fetch_schema,
+        }
+
+        if not is_connection_valid(old_conn, opts) then
+            local new_conn = self:connect(instance_name, opts)
+            new_conn._reconnect = now + reconnect_after
+            if until_next_reconnect > reconnect_after then
+                until_next_reconnect = reconnect_after
+            end
+        else
+            old_conn._reconnect = nil
+        end
+    end
+
+    return until_next_reconnect
+end
+
+function pool_methods._failed_connection_watchdog_loop(self)
+    while true do
+        local until_next_reconnect = self:_failed_connection_watchdog_step()
+
+        if until_next_reconnect == math.huge then
+            break
+        end
+
+        if not self._failed_connection_watchdog.fired then
+            self._failed_connection_watchdog.cond:wait(until_next_reconnect)
+        end
+        self._failed_connection_watchdog.fired = false
+    end
+end
+
+function pool_methods._failed_connection_watchdog_wake(self)
+    local f = self._failed_connection_watchdog_fiber
+    if f ~= nil and f:status() ~= 'dead' then
+        self._failed_connection_watchdog.fired = true
+        self._failed_connection_watchdog.cond:signal()
+        return
+    end
+
+    f = fiber.new(self._failed_connection_watchdog_loop, self)
+    self._failed_connection_watchdog_fiber = f
+end
+
+--- Get a cached connection to instance. Might be nil.
+function pool_methods.get_connection(self, instance_name)
+    return self._connections[instance_name]
+end
+
 --- Connect to an instance or receive a cached connection by
 --- name.
 ---
@@ -90,6 +162,8 @@ function pool_methods.connect(self, instance_name, opts)
     opts = opts or {}
 
     local conn = self._connections[instance_name]
+    local old_deadline = (conn or {})._deadline
+    local old_reconnect = (conn or {})._reconnect
     if not is_connection_valid(conn, opts) then
         local uri = config:instance_uri('peer', {instance = instance_name})
         if uri == nil then
@@ -116,18 +190,25 @@ function pool_methods.connect(self, instance_name, opts)
             return nil
         end
         conn.mode = mode
+        conn._deadline = old_deadline
+        conn._reconnect = old_reconnect
         local function watch_status(_key, value)
             conn._mode = value.is_ro and 'ro' or 'rw'
             self._connection_mode_update_cond:broadcast()
         end
         conn:watch('box.status', watch_status)
+        local function on_disconnect()
+            local reconnect_after = config:get('connpool.reconnect_after')
+            conn._reconnect = clock.monotonic() + reconnect_after
+            self:_failed_connection_watchdog_wake()
+        end
+        conn:on_disconnect(on_disconnect)
     end
 
     local idle_timeout = opts.ttl or self._idle_timeout
     local new_deadline = clock.monotonic() + idle_timeout
-    local old_deadline = conn._deadline or 0
 
-    if new_deadline > old_deadline then
+    if old_deadline == nil or new_deadline > old_deadline then
         conn._deadline = new_deadline
         self:_unused_connection_watchdog_wake()
     end
@@ -180,24 +261,32 @@ function pool_methods.connect_to_multiple(self, instances, opts)
     local timeout = opts.timeout or WATCHER_TIMEOUT
     local connect_deadline = clock.monotonic() + timeout
 
+    local candidate_instances = {}
     for _, instance_name in pairs(instances) do
-        self:connect(instance_name, {wait_connected = false})
+        local conn = self._connections[instance_name]
+        if conn == nil then
+            self:connect(instance_name, {wait_connected = false})
+            table.insert(candidate_instances, instance_name)
+        elseif is_connection_valid(conn,
+            {fetch_schema = (conn.opts or {}).fetch_schema}) then
+            table.insert(candidate_instances, instance_name)
+        end
     end
 
     local connected_instances = {}
     while clock.monotonic() < connect_deadline do
-        connected_instances = fun.iter(instances)
+        connected_instances = fun.iter(candidate_instances)
             :filter(is_instance_connected)
             :totable()
 
         if opts.any then
-            if fun.iter(instances):any(opts.any) then
+            if fun.iter(candidate_instances):any(opts.any) then
                 break
             end
-        else
-            if fun.iter(instances):all(is_instance_checked) then
-                break
-            end
+        end
+
+        if fun.iter(candidate_instances):all(is_instance_checked) then
+            break
         end
 
         self._connection_mode_update_cond:wait(delay)
@@ -222,6 +311,13 @@ local function create_pool()
         -- Unused connection management
         _unused_connection_watchdog_fiber = nil,
         _unused_connection_watchdog = {
+            fired = false,
+            cond = fiber.cond(),
+        },
+
+        -- Failed connection management
+        _failed_connection_watchdog_fiber = nil,
+        _failed_connection_watchdog = {
             fired = false,
             cond = fiber.cond(),
         },
@@ -344,7 +440,7 @@ local function is_mode_match(mode, instance_name)
     if mode == nil then
         return true
     end
-    local conn = pool:connect(instance_name, {wait_connected = false})
+    local conn = pool:get_connection(instance_name)
     assert(conn ~= nil and conn:mode() ~= nil)
     return conn:mode() == mode
 end
@@ -352,7 +448,7 @@ end
 local function is_candidate_match_dynamic(instance_name, opts)
     assert(opts ~= nil and type(opts) == 'table')
 
-    local conn = pool:connect(instance_name, {wait_connected = false})
+    local conn = pool:get_connection(instance_name)
     if not conn or conn:mode() == nil then
         return
     end
@@ -524,7 +620,7 @@ local function get_connection(opts)
         local mode = opts.mode == 'prefer_ro' and 'ro' or 'rw'
         local weight_mode = 2
         for _, instance_name in pairs(candidates) do
-            local conn = pool:connect(instance_name, {wait_connected = false})
+            local conn = pool:get_connection(instance_name)
             assert(conn ~= nil)
             if conn:mode() == mode then
                 weights[instance_name] = weights[instance_name] + weight_mode
@@ -557,8 +653,7 @@ local function get_connection(opts)
         while #preferred_candidates > 0 do
             local n = math.random(#preferred_candidates)
             local instance_name = table.remove(preferred_candidates, n)
-            local conn = pool:connect(instance_name,
-                                      {wait_connected = false})
+            local conn = pool:get_connection(instance_name)
             if conn:wait_connected() then
                 return conn
             end
