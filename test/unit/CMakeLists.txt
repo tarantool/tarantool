@@ -326,6 +326,10 @@ create_unit_test(PREFIX trigger
                  SOURCES trigger.c core_test_utils.c
                  LIBRARIES unit core
 )
+create_unit_test(PREFIX trivia
+                 SOURCES trivia.c
+                 LIBRARIES unit
+)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV

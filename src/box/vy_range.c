@@ -31,6 +31,7 @@
 #include "vy_range.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -330,8 +331,8 @@ vy_range_update_compaction_priority(struct vy_range *range,
 	 *
 	 * So to calculate the target size of the first level, we
 	 * divide the size of the oldest run by run_size_ratio until
-	 * it exceeds the size of the newest run. Note, DIV_ROUND_UP
-	 * is important here, because if we used integral division,
+	 * it exceeds the size of the newest run. Note, ceil() is
+	 * important here, because if we used division with rounding down,
 	 * then after descending to the last level we would get a
 	 * value slightly less than the last run size, not slightly
 	 * greater, as we wanted to, which could increase space
@@ -347,7 +348,7 @@ vy_range_update_compaction_priority(struct vy_range *range,
 	slice = rlist_first_entry(&range->slices, struct vy_slice, in_range);
 	do {
 		target_run_size = size;
-		size = DIV_ROUND_UP(target_run_size, opts->run_size_ratio);
+		size = ceil(target_run_size / opts->run_size_ratio);
 	} while (size > (uint64_t)MAX(slice->count.bytes, 1));
 
 	rlist_foreach_entry(slice, &range->slices, in_range) {
