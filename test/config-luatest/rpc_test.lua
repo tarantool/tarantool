@@ -1305,3 +1305,80 @@ g.test_tries_to_reconnect = function()
         t.assert_equals(_G.i2_conn.state, 'error')
     end)
 end
+
+g.test_does_not_wait_if_recently_checked = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.myuser',
+            {password =  'secret',
+             roles = { 'replication' },
+             privileges = {{permissions = {'execute'}, universe = true}}})
+        :set_global_option('iproto.advertise.peer.login', 'myuser')
+        :add_instance('i-001', { database = { mode = 'rw' } })
+        :add_instance('i-002', {})
+        :config()
+
+    local cluster = cluster:new(config)
+
+    -- The reconnect after interval for connpool is hardcoded in
+    -- connpool and equals to 3 seconds.
+    local reconnect_after = 3
+
+    -- Add a counter to count netbox.connect() calls.
+    treegen.write_file(cluster._dir, 'override/net/box.lua',
+        string.dump(function()
+            local loaders = require('internal.loaders')
+
+            rawset(_G, 'connects', 0)
+
+            local builtin_netbox = loaders.builtin['net.box']
+            local builtin_connect = builtin_netbox.connect
+            builtin_netbox.connect = function(...)
+                _G.connects = _G.connects + 1
+                return builtin_connect(...)
+            end
+
+            return builtin_netbox
+        end))
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        connpool.call('box.info', nil, {mode = 'ro'})
+        t.assert_equals(_G.connects, 2)
+
+        -- Save a connection to i-002.
+        rawset(_G, 'i2_conn', connpool.connect('i-002'))
+    end)
+
+    cluster['i-002']:stop()
+
+    -- The connpool might try to reconnect. Let's wait
+    -- for one attempt.
+    fiber.sleep(reconnect_after + 1)
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+        local clock = require('clock')
+
+        -- The connection timeout for filter() is hardcoded in
+        -- connpool and equals to 10 seconds.
+        local CONNECT_TIMEOUT = 10
+
+        -- Check no new connection attempts has been done
+        -- and the call has quickly failed due to no candidates.
+        local timestamp_before_call = clock.monotonic()
+        local cur_connects = _G.connects
+
+        local exp_err = 'no candidates are available with these conditions'
+        local opts = {mode = 'ro'}
+        t.assert_error_msg_contains(exp_err, connpool.call, 'box.info', nil,
+                                    opts)
+
+        local elapsed_time = clock.monotonic() - timestamp_before_call
+
+        t.assert_equals(_G.connects, cur_connects)
+        t.assert_lt(elapsed_time, CONNECT_TIMEOUT)
+    end)
+end
