@@ -46,10 +46,6 @@ end
 
 -- Checks that recovery of unsupported MVCC features fails.
 g.test_recovery_with_unsupported_features = function(cg)
-    local server_log_path = g.server:exec(function()
-        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
-    end)
-
     -- Check functional multikey index.
     cg.server:restart({box_cfg = {memtx_use_mvcc_engine = false}})
     cg.server:exec(function()
@@ -75,7 +71,7 @@ g.test_recovery_with_unsupported_features = function(cg)
     t.helpers.retrying({}, function()
         t.assert(g.server:grep_log(
             "F> can't initialize storage: Memtx MVCC engine does not support" ..
-            " functional multikey indexes", nil, {filename = server_log_path}))
+            " functional multikey indexes"))
     end)
 
     -- Check regular multikey index.
@@ -95,7 +91,7 @@ g.test_recovery_with_unsupported_features = function(cg)
     t.helpers.retrying({}, function()
         t.assert(g.server:grep_log(
             "F> can't initialize storage: Memtx MVCC engine does not support" ..
-            " multikey indexes", nil, {filename = server_log_path}))
+            " multikey indexes"))
     end)
 
     cg.server:restart({box_cfg = {memtx_use_mvcc_engine = false}})

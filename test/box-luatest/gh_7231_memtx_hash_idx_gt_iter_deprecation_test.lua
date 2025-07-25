@@ -30,13 +30,10 @@ g.test_memtx_hash_idx_iter_gt_deprecation = function(cg)
                                 "deprecated since Tarantool 2.11 and should " ..
                                 "not be used. It will be removed in a " ..
                                 "future Tarantool release."
-    t.assert_is_not(cg.server:grep_log(deprecation_warning, 256), nil)
-    local log_file = g.server:exec(function()
-        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
-    end)
-    fio.truncate(log_file)
+    t.assert_is_not(cg.server:grep_log(deprecation_warning, 1024), nil)
+    fio.truncate(g.server.log_file)
     cg.server:exec(function()
         box.space.s:select({}, {iterator = 'GT'})
     end)
-    t.assert_is(cg.server:grep_log(deprecation_warning, 256), nil)
+    t.assert_is(cg.server:grep_log(deprecation_warning, 1024), nil)
 end

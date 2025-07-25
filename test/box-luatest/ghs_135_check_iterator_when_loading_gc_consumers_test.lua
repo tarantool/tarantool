@@ -14,10 +14,6 @@ g.after_all(function(cg)
 end)
 
 g.test_check_iterator_when_loading_gc_consumers = function(cg)
-    local server_log_path = g.server:exec(function()
-        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
-    end)
-
     -- Inject error after recovery - right before WAL GC consumers are loaded.
     local run_before_cfg = [[
         local trigger = require('trigger')
@@ -34,10 +30,8 @@ g.test_check_iterator_when_loading_gc_consumers = function(cg)
     }, {wait_until_ready = false})
     t.helpers.retrying({}, function()
         -- Check if the application panics.
-        t.assert(g.server:grep_log("F> can't initialize storage", nil,
-            {filename = server_log_path}))
+        t.assert(g.server:grep_log("F> can't initialize storage"))
         -- Check if loading WAL GC consumers is the reason.
-        t.assert(g.server:grep_log("Failed to recover WAL GC consumers", nil,
-            {filename = server_log_path}))
+        t.assert(g.server:grep_log("Failed to recover WAL GC consumers"))
     end)
 end
