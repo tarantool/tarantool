@@ -275,10 +275,10 @@ function pool_methods.connect_to_multiple(self, instances, opts)
             if fun.iter(instances):any(opts.any) then
                 break
             end
-        else
-            if fun.iter(instances):all(is_instance_checked) then
-                break
-            end
+        end
+
+        if fun.iter(instances):all(is_instance_checked) then
+            break
         end
 
         self._connection_mode_update_cond:wait(delay)
