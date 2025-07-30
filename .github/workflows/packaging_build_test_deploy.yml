@@ -153,11 +153,18 @@ jobs:
 
       - name: Install test dependencies
         run: |
+          # FIXME(tarantool/setup-tarantool#58): We set up the tarantool
+          # repository in order to install tt. Ideally, this should be done
+          # by the setup-tarantool action.
+          curl -L https://tarantool.io/release/2/installer.sh | sudo bash
           ${{ env.PACKAGE_MANAGER }} -y install \
             python3 \
             python3-gevent \
             python3-${{ env.PACKAGE_MANAGER == 'apt' &&  'yaml' || 'pyyaml' }} \
-            tzdata
+            tzdata \
+            tt \
+            unzip
+          tt rocks install luatest 1.2.0
 
       - name: Run tests
         run: |
