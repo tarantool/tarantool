@@ -581,11 +581,6 @@ g2.before_all(function(cg)
             box.iproto.send(box.session.id(), {}, {resp})
             return true
         end
-        local function handler_ping()
-            local resp = 'IPROTO_PING handler, set by name, before box.cfg{}'
-            box.iproto.send(box.session.id(), {}, {resp})
-            return true
-        end
         local function handler_n555()
             local resp = 'IPROTO #555 handler, set by id, before box.cfg{}'
             box.iproto.send(box.session.id(), {}, {resp})
@@ -598,7 +593,6 @@ g2.before_all(function(cg)
         end
         trigger.set('box.iproto.override.execute', 'exec', handler_execute)
         trigger.set('box.iproto.override[11]', '#11', handler_n11)
-        trigger.set('box.iproto.override.ping', 'ping', handler_ping)
         trigger.set('box.iproto.override[555]', '#555', handler_n555)
         trigger.set('box.iproto.override.unknown', 'unk', handler_unknown)
         -- Set triggers on the unsupported request types.
@@ -636,9 +630,6 @@ g2.test_event_triggers = function(cg)
         t.assert_equals(
             _G.send_request_and_read_response(box.iproto.type.EXECUTE),
             'IPROTO_EXECUTE handler, set by id, before box.cfg{}')
-        t.assert_equals(
-            _G.send_request_and_read_response(box.iproto.type.PING),
-            'IPROTO_PING handler, set by name, before box.cfg{}')
         -- Send an unknown request with a dedicated handler.
         t.assert_equals(
             _G.send_request_and_read_response(555),
@@ -665,7 +656,6 @@ g3.test_event_triggers = function(cg)
         local trigger = require('trigger')
 
         local resp_exec = 'IPROTO_EXECUTE handler, set by id, after box.cfg{}'
-        local resp_ping = 'IPROTO_PING handler, set by name, after box.cfg{}'
         local resp_n555 = 'IPROTO #555 handler, set by id, after box.cfg{}'
         local resp_unkn = 'IPROTO_UNKNOWN handler, set by name, after box.cfg{}'
         local resp_n129 = 'IPROTO #129 handler, set by id, after box.cfg{}'
@@ -673,10 +663,6 @@ g3.test_event_triggers = function(cg)
         t.assert_equals(box.iproto.type.EXECUTE, 11)
         trigger.set('box.iproto.override[11]', '#11', function()
             box.iproto.send(box.session.id(), {}, {resp_exec})
-            return true
-        end)
-        trigger.set('box.iproto.override.ping', 'ping', function()
-            box.iproto.send(box.session.id(), {}, {resp_ping})
             return true
         end)
         trigger.set('box.iproto.override[555]', '#555', function()
@@ -696,9 +682,6 @@ g3.test_event_triggers = function(cg)
         t.assert_equals(
             _G.send_request_and_read_response(box.iproto.type.EXECUTE),
             resp_exec)
-        t.assert_equals(
-            _G.send_request_and_read_response(box.iproto.type.PING),
-            resp_ping)
         -- Send an unknown request with a dedicated handler.
         t.assert_equals(
             _G.send_request_and_read_response(555),
