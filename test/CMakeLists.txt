@@ -53,13 +53,35 @@ string(RANDOM LENGTH 9 ALPHABET 0123456789 RANDOM_SEED)
 message(STATUS "Random seed is ${RANDOM_SEED}")
 set(TEST_PARAM_DELIM ":")
 
-list(APPEND LUATEST_COMMAND_WITH_FLAGS
-    ${PROJECT_SOURCE_DIR}/test-run/bin/luatest
-    --no-clean
-    --verbose
-    --no-capture
-    --output tap
-)
+function(add_luatest_test suite_name test_name test_env shuffle)
+    set(test_title "test/${suite_name}/${test_name}")
+    set(test_log "${VARDIR}/${suite_name}-${test_name}.log")
+    if(shuffle)
+        set(shuffle_mode "all:${RANDOM_SEED}")
+    else()
+        set(shuffle_mode "none")
+    endif()
+    add_test(NAME ${test_title}
+        COMMAND ${TARANTOOL_BIN}
+            # Disable stdout buffering,
+            # see https://github.com/tarantool/test-run/issues/119.
+            -e "io.stdout:setvbuf('no')"
+            ${PROJECT_SOURCE_DIR}/test-run/bin/luatest
+            --log ${test_log}
+            --no-clean
+            --verbose
+            --output tap
+            --shuffle ${shuffle_mode}
+            ${test_title}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+    set_tests_properties(${test_title} PROPERTIES
+        ENVIRONMENT "${test_env}"
+        LABELS "${suite_name};regression;"
+        DEPENDS ${suite_name}-deps
+        FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
+    )
+endfunction()
 
 tarantool_make_lua_path(LUATEST_LUA_PATH
   PATHS
