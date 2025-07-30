@@ -51,6 +51,8 @@ extern void cord_on_yield(void);
 
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
 
+int64_t fiber_max_count = 29500;
+
 /**
  * ASAN build is slow. Turn slice check off to suppress noisy failures
  * on exceeding slice limit in this case.
@@ -1550,14 +1552,65 @@ fiber_gc_checker_init(struct fiber *fiber)
 #endif
 }
 
+int
+read_max_map_count(void)
+{
+#ifdef __linux__
+	FILE *fp = fopen("/proc/sys/vm/max_map_count", "r");
+	if (fp == NULL) {
+		say_error("Cannot read /proc/sys/vm/max_map_count");
+		return -1;
+	}
+	int max_map_count;
+	if (fscanf(fp, "%d", &max_map_count) != 1) {
+		fclose(fp);
+		say_error("Failed to parse max_map_count");
+		return -1;
+	}
+	fclose(fp);
+	return max_map_count;
+#elif __APPLE__
+	#include <sys/sysctl.h>
+	int max_proc;
+	size_t len = sizeof(max_proc);
+	if (sysctlbyname("kern.maxproc", &max_proc, &len, NULL, 0) == -1) {
+		say_error("Cannot read kern.maxproc from sysctl");
+		return -1;
+	}
+	return max_proc;
+#else
+	return -1;
+#endif
+}
+
+void
+fiber_set_client_limit(int limit)
+{
+	if (limit > 0) {
+		fiber_max_count = limit;
+	} else {
+		int max_map_count = read_max_map_count();
+		fiber_max_count = (max_map_count / 2) * 0.9;
+	}
+}
+
 struct fiber *
-fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
-	     fiber_func f)
+fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr, fiber_func f)
 {
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
+
+	int total_fibers = mh_size(cord->fiber_registry);
+	int is_client_fiber = !(fiber_attr->flags & FIBER_IS_SYSTEM);
+
+	if (is_client_fiber) {
+		if (total_fibers >= fiber_max_count) {
+			diag_set(FiberCountIsExceeded);
+			return NULL;
+		}
+	}
 
 	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM)) {
 		diag_set(FiberIsCancelled);
@@ -2256,6 +2309,17 @@ check_stack_direction(void *prev_stack_frame)
 }
 
 void
+init_fiber_limit(void)
+{
+	int max_map_count = read_max_map_count();
+	if (max_map_count > 0) {
+		fiber_max_count = (max_map_count / 2) * 0.9;
+	} else {
+		fiber_max_count = 29500;
+	}
+}
+
+void
 fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
 	page_size = small_getpagesize();
@@ -2267,6 +2331,7 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 		panic("can't init event loop");
 	cord_create(&main_cord, "main");
 	fiber_signal_init();
+	init_fiber_limit();
 }
 
 void

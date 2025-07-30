@@ -57,6 +57,8 @@ extern const struct type_info type_RaftError;
 extern const struct type_info type_FileFormatError;
 /* type_info for FiberSliceIsExceeded exception */
 extern const struct type_info type_FiberSliceIsExceeded;
+/* type_info for iberCountIsExceeded exception */
+extern const struct type_info type_FiberCountIsExceeded;
 /* type_info for EncodeError exception */
 extern const struct type_info type_EncodeError;
 /* type_info for DecodeError exception */
@@ -189,6 +191,18 @@ public:
 
 	FiberSliceIsExceeded()
 		: Exception(&type_FiberSliceIsExceeded, NULL, 0)
+	{
+	}
+
+	virtual void raise() { throw this; }
+};
+
+class FiberCountIsExceeded : public Exception {
+public:
+	FiberCountIsExceeded(const char *file, unsigned line);
+
+	FiberCountIsExceeded()
+	: Exception(&type_FiberCountIsExceeded, NULL, 0)
 	{
 	}
 

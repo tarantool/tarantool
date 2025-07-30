@@ -211,6 +211,15 @@ FiberSliceIsExceeded::FiberSliceIsExceeded(const char *file, unsigned line)
 	error_format_msg(this, "fiber slice is exceeded");
 }
 
+const struct type_info type_FiberCountIsExceeded =
+	make_type("FiberCountIsExceeded", &type_Exception);
+
+FiberCountIsExceeded::FiberCountIsExceeded(const char *file, unsigned line)
+	: Exception(&type_FiberCountIsExceeded, file, line)
+{
+	error_format_msg(this, "fiber count is exceeded");
+}
+
 const struct type_info type_LuajitError =
 	make_type("LuajitError", &type_Exception);
 
@@ -352,6 +361,12 @@ struct error *
 BuildFiberSliceIsExceeded(const char *file, unsigned line)
 {
 	return new FiberSliceIsExceeded(file, line);
+}
+
+struct error *
+BuildFiberCountIsExceeded(const char *file, unsigned line)
+{
+	return new FiberCountIsExceeded(file, line);
 }
 
 struct error *
