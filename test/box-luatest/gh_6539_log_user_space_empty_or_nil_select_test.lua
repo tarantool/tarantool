@@ -115,9 +115,6 @@ for _, eng in pairs{'memtx', 'vinyl'} do
                          'set'):format(eng))
         end
 
-        local log_file = g.server:exec(function()
-            return rawget(_G, 'box_cfg_log_file') or box.cfg.log
-        end)
         for _, call_fmt in pairs(dangerous_call_fmts) do
             local call = call_fmt:format(space)
             g.server:eval(call)
@@ -126,7 +123,7 @@ for _, eng in pairs{'memtx', 'vinyl'} do
                          ('log must contain a critical entry ' ..
                           'about `%s` call on a %s user space'):format(call, eng))
             end)
-            fio.truncate(log_file)
+            fio.truncate(g.server.log_file)
         end
     end
 end

@@ -5,14 +5,20 @@ description: Install build and test dependencies on Debian-based systems
 runs:
   using: composite
   steps:
+    - uses: tarantool/setup-tarantool@v4
+      with:
+        tarantool-version: 2.11
     - run: |
+        # FIXME(tarantool/setup-tarantool#58): We set up the tarantool
+        # repository in order to install tt. Ideally, this should be done
+        # by the setup-tarantool action.
+        curl -L https://tarantool.io/release/2/installer.sh | sudo bash
         apt-get --allow-releaseinfo-change update
         apt-get -y -f install \
           build-essential \
           ninja-build \
           cmake \
           lua5.1 \
-          luarocks \
           lcov \
           ruby-dev \
           liblz4-dev \
@@ -20,8 +26,9 @@ runs:
           autoconf \
           automake \
           libtool \
-          util-linux
-
-        luarocks install luacheck 0.26.1
+          util-linux \
+          tt
+        tt rocks install luatest 1.2.0
+        tt rocks install luacheck 0.26.0
         gem install coveralls-lcov
       shell: bash
