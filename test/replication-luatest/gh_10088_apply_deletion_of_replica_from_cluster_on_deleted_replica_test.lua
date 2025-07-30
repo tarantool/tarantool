@@ -37,10 +37,7 @@ end)
 -- Also test the behaviour of the deleted replica after recovery.
 g_two_member_cluster.test_deletion = function(cg)
     local replica_id = cg.replica:get_instance_id()
-    local log_file = cg.master:exec(function()
-        return rawget(_G, 'box_cfg_log_file') or box.cfg.log
-    end)
-    fio.truncate(log_file)
+    fio.truncate(cg.master.log_file)
     cg.master:exec(function(replica_id)
         t.assert(box.space._cluster:delete{replica_id})
     end, {replica_id})

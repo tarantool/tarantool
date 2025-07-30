@@ -53,7 +53,7 @@ string(RANDOM LENGTH 9 ALPHABET 0123456789 RANDOM_SEED)
 message(STATUS "Random seed is ${RANDOM_SEED}")
 
 list(APPEND LUATEST_COMMAND_WITH_FLAGS
-    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/bin/luatest
+    ${PROJECT_SOURCE_DIR}/test-run/bin/luatest
     --no-clean
     --verbose
     --no-capture
@@ -66,9 +66,6 @@ tarantool_make_lua_path(LUATEST_LUA_PATH
     # another test suites.
     ${PROJECT_SOURCE_DIR}/?.lua
     ${PROJECT_SOURCE_DIR}/?/init.lua
-    ${PROJECT_SOURCE_DIR}/test-run/lib/checks/?.lua
-    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/?/init.lua
-    ${PROJECT_SOURCE_DIR}/test-run/lib/luatest/?.lua
 )
 
 add_subdirectory(app)
