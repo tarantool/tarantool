@@ -678,6 +678,39 @@ tree_g.test_gh_8403_gh_8404_invalid_after = function(cg)
     end)
 end
 
+tree_g.test_gh_11648_large_key = function(cg)
+    cg.server:exec(function()
+        local key = string.rep('a', 100)
+        local s = box.space.s
+        s:create_index('primary', {parts = {{1, 'string'}, {2, 'unsigned'}}})
+        s:insert({key, 1})
+        s:insert({key, 2})
+        s:insert({'b', 3})
+        s:insert({'c', 4})
+        s:insert({'d', 5})
+
+        local tuples
+        -- Select
+        tuples = s:select(key, {iterator = 'eq', after = box.NULL, limit = 1})
+        t.assert_equals(tuples, {{key, 1}})
+        tuples = s:select(key, {iterator = 'eq', after = tuples[1], limit = 1})
+        t.assert_equals(tuples, {{key, 2}})
+        tuples = s:select(key, {iterator = 'eq', after = tuples[1], limit = 1})
+        t.assert_equals(tuples, {})
+
+        -- Pairs
+        tuples = s:pairs(key, {iterator = 'eq', after = box.NULL, limit = 1})
+            :take(1):totable()
+        t.assert_equals(tuples, {{key, 1}})
+        tuples = s:pairs(key, {iterator = 'eq', after = tuples[1], limit = 1})
+            :take(1):totable()
+        t.assert_equals(tuples, {{key, 2}})
+        tuples = s:pairs(key, {iterator = 'eq', after = tuples[1], limit = 1})
+            :take(1):totable()
+        t.assert_equals(tuples, {})
+    end)
+end
+
 -- Tests for memtx tree features, such as functional index
 local func_g = t.group('Memtx tree func index tests')
 
