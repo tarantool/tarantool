@@ -1,4 +1,3 @@
-local fio = require('fio')
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 local t = require('luatest')
@@ -275,13 +274,12 @@ g.test_cluster_name_bootstrap_mismatch = function(lg)
         box_cfg = box_cfg,
     })
     new_replica:start({wait_until_ready = false})
-    local logfile = fio.pathjoin(new_replica.workdir,
-                                 new_replica.alias .. '.log')
     wait_for_death(new_replica)
-    t.assert(new_replica:grep_log(
-        'Cluster name mismatch: name \'test%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1024,
-        {filename = logfile}))
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(new_replica:grep_log(
+            'Cluster name mismatch: name \'test%-name\' provided in config ' ..
+            'confilcts with the instance one \'<no%-name>\'', 1024))
+    end)
     new_replica:drop()
     --
     -- Both master and replica have cluster names. But different ones.
@@ -301,13 +299,13 @@ g.test_cluster_name_bootstrap_mismatch = function(lg)
         box_cfg = box_cfg,
     })
     new_replica:start({wait_until_ready = false})
-    logfile = fio.pathjoin(new_replica.workdir, new_replica.alias .. '.log')
     wait_for_death(new_replica)
-    t.assert(new_replica:grep_log(
-        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
-    new_replica:drop()
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(new_replica:grep_log(
+            'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+            'confilcts with the instance one \'test%-name\'', 1024))
+        new_replica:drop()
+    end)
     lg.master:exec(function(replica_id)
         local own_id = box.info.id
         local _cluster = box.space._cluster
@@ -331,12 +329,12 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     lg.replica:restart({
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
-    local logfile = fio.pathjoin(lg.replica.workdir, lg.replica.alias .. '.log')
     wait_for_death(lg.replica)
-    t.assert(lg.replica:grep_log(
-        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.replica:grep_log(
+            'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+            'confilcts with the instance one \'test%-name\'', 1024))
+    end)
     --
     -- Has name in WAL, no name in cfg. Then the replica uses the saved name, no
     -- conflict.
@@ -372,10 +370,11 @@ g.test_cluster_name_recovery_mismatch = function(lg)
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
     wait_for_death(lg.replica)
-    t.assert(lg.replica:grep_log(
-        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1024,
-        {filename = logfile}))
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.replica:grep_log(
+            'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+            'confilcts with the instance one \'<no%-name>\'', 1024))
+    end)
     box_cfg.cluster_name = nil
     box_cfg.force_recovery = nil
     lg.replica:restart({
@@ -402,12 +401,12 @@ g.test_cluster_name_recovery_mismatch = function(lg)
     lg.master:restart({
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
-    logfile = fio.pathjoin(lg.master.workdir, lg.master.alias .. '.log')
     wait_for_death(lg.master)
-    t.assert(lg.master:grep_log(
-        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'test%-name\'', 1024,
-        {filename = logfile}))
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.master:grep_log(
+            'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+            'confilcts with the instance one \'test%-name\'', 1024))
+    end)
     --
     -- No name in WAL, has name in cfg.
     --
@@ -431,10 +430,11 @@ g.test_cluster_name_recovery_mismatch = function(lg)
         box_cfg = box_cfg,
     }, {wait_until_ready = false})
     wait_for_death(lg.master)
-    t.assert(lg.master:grep_log(
-        'Cluster name mismatch: name \'new%-name\' provided in config ' ..
-        'confilcts with the instance one \'<no%-name>\'', 1024,
-        {filename = logfile}))
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(lg.master:grep_log(
+            'Cluster name mismatch: name \'new%-name\' provided in config ' ..
+            'confilcts with the instance one \'<no%-name>\'', 1024))
+    end)
     box_cfg.cluster_name = nil
     box_cfg.force_recovery = nil
     lg.master:restart({
