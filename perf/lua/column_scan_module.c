@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bit/bit.h"
 #include "trivia/config.h"
 #include "trivia/util.h"
 #include "arrow/abi.h"
@@ -75,6 +76,7 @@ arrow_schema_create(struct ArrowSchema *schema, int column_count,
 		*schema->children[i] = (struct ArrowSchema) {
 			.format = i == 0 ? "L" : format,
 			.name = xstrdup(name),
+			.flags = i == 0 ? 0 : ARROW_FLAG_NULLABLE,
 			.release = arrow_schema_destroy,
 		};
 	};
@@ -113,6 +115,7 @@ arrow_array_create(struct ArrowArray *array, int column_count, int row_count,
 		array->children[i] = xmalloc(sizeof(*array->children[i]));
 		*array->children[i] = (struct ArrowArray) {
 			.length = row_count,
+			.null_count = i == 0 ? 0 : -1,
 			.n_buffers = i == 0 ? 2 : n_buffers,
 			.buffers = xcalloc(n_buffers, sizeof(void *)),
 			.release = arrow_array_destroy,
@@ -121,15 +124,45 @@ arrow_array_create(struct ArrowArray *array, int column_count, int row_count,
 }
 
 static void
-arrow_array_fill_str(struct ArrowArray *array, int column, int row_count,
-		     int row_offset, int len_min, int len_max)
+arrow_array_fill_validity(struct ArrowArray *array, int count,
+			  double fill_ratio)
 {
+	bool bits[count];
+	memset(bits, 0, sizeof(bits));
+	for (int i = 0; i < count * fill_ratio; i++)
+		bits[i] = true;
+
+	/* Fisher-Yates Shuffle. */
+	for (int i = count - 1; i > 0; i--) {
+		int j = rand() % (i + 1);
+		SWAP(bits[i], bits[j]);
+	}
+
+	uint8_t *validity = xaligned_alloc(DIV_ROUND_UP(count, 8), 64);
+	array->buffers[0] = validity;
+	memset(validity, 0, DIV_ROUND_UP(count, 8));
+	for (int i = 0; i < count; i++) {
+		if (bits[i])
+			bit_set(validity, i);
+	}
+}
+
+static void
+arrow_array_fill_str(struct ArrowArray *array, int column, int row_count,
+		     int row_offset, int len_min, int len_max,
+		     double fill_ratio)
+{
+	arrow_array_fill_validity(array->children[column], row_count,
+				  fill_ratio);
 	int32_t *offsets =
 		xaligned_alloc(ROUND_UP((row_count + 1) * 4, 64), 64);
 	array->children[column]->buffers[1] = offsets;
 	offsets[0] = 0;
 	for (int i = 0; i < row_count; i++) {
-		int len = rand() % (len_max + 1 - len_min) + len_min;
+		const uint8_t *validity = array->children[column]->buffers[0];
+		int len = 0;
+		if (bit_test(validity, i))
+			len = rand() % (len_max + 1 - len_min) + len_min;
 		offsets[i + 1] = offsets[i] + len;
 	}
 
@@ -145,9 +178,12 @@ arrow_array_fill_str(struct ArrowArray *array, int column, int row_count,
 
 static void
 arrow_array_fill_int(struct ArrowArray *array, int column_count, int row_count,
-		     int row_offset, int total_row_count)
+		     int row_offset, int total_row_count, double fill_ratio)
 {
 	for (int i = 0; i < column_count; i++) {
+		if (i > 0)
+			arrow_array_fill_validity(array->children[i], row_count,
+						  fill_ratio);
 		uint64_t *data = xaligned_alloc(row_count * 8, 64);
 		for (int j = 0; j < row_count; j++) {
 			int val = row_offset + j + 1;
@@ -169,6 +205,7 @@ gen_arrow_lua_func(struct lua_State *L)
 	const char *field_type = lua_tolstring(L, 4, NULL);
 	int str_len_min = luaL_checkinteger(L, 5);
 	int str_len_max = luaL_checkinteger(L, 6);
+	double fill_ratio = lua_tonumber(L, 7);
 
 	bool is_string = strcmp(field_type, "string") == 0;
 	int pct_complete = 0;
@@ -184,14 +221,14 @@ gen_arrow_lua_func(struct lua_State *L)
 		if (is_string) {
 			arrow_array_fill_int(
 				&array, 1, batch_row_count, row_offset,
-				row_count);
+				row_count, fill_ratio);
 			arrow_array_fill_str(
 				&array, 1, batch_row_count, row_offset,
-				str_len_min, str_len_max);
+				str_len_min, str_len_max, fill_ratio);
 		} else {
 			arrow_array_fill_int(
 				&array, column_count, batch_row_count,
-				row_offset, row_count);
+				row_offset, row_count, fill_ratio);
 		}
 		if (box_insert_arrow(space_id, &array, &schema) != 0)
 			return luaT_error(L);
@@ -226,17 +263,21 @@ sum_iterator_lua_func(struct lua_State *L)
 		if (rc != 0 || tuple == NULL)
 			break;
 		const char *data = box_tuple_field(tuple, field_no);
-		if (unlikely(data == NULL || mp_typeof(*data) != MP_UINT)) {
+		if (unlikely(data == NULL || (mp_typeof(*data) != MP_UINT &&
+					      mp_typeof(*data) != MP_NIL))) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
 			break;
 		}
+		if (mp_typeof(*data) == MP_NIL)
+			continue;
 		sum += mp_decode_uint(&data);
 	}
 	box_iterator_free(iter);
 	if (rc != 0)
 		return luaT_error(L);
-	luaL_pushuint64(L, sum);
-	return 1;
+	lua_pushboolean(L, true); /* Test parameters are supported. */
+	luaL_pushuint64(L, sum); /* To avoid optimizing out by the compiler. */
+	return 2;
 }
 
 static int
@@ -260,20 +301,22 @@ str_iterator_lua_func(struct lua_State *L)
 	if (iter == NULL)
 		return luaT_error(L);
 	int rc = 0;
-	int64_t k = 0;
-	while (true) {
+	for (int64_t k = 0; true; k++) {
 		box_tuple_t *tuple;
 		rc = box_iterator_next(iter, &tuple);
 		if (rc != 0 || tuple == NULL)
 			break;
 		const char *data = box_tuple_field(tuple, field_no);
-		if (unlikely(data == NULL || mp_typeof(*data) != MP_STR)) {
+		if (unlikely(data == NULL || (mp_typeof(*data) != MP_STR &&
+					      mp_typeof(*data) != MP_NIL))) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
 			break;
 		}
+		if (mp_typeof(*data) == MP_NIL)
+			continue;
 		uint32_t len;
 		const char *str = mp_decode_str(&data, &len);
-		if (unlikely(len == 0 || str[0] != 'a' + k++ % 26)) {
+		if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
 			break;
 		}
@@ -322,13 +365,16 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 		}
 		for (int i = 0; i < (int)field_no; i++)
 			mp_next(&data);
+		if (mp_typeof(*data) == MP_NIL)
+			continue;
 		sum += mp_decode_uint(&data);
 	}
 	box_raw_read_view_iterator_destroy(&iter);
 	if (rc != 0)
 		return luaT_error(L);
-	luaL_pushuint64(L, sum);
-	return 1;
+	lua_pushboolean(L, true); /* Test parameters are supported. */
+	luaL_pushuint64(L, sum); /* To avoid optimizing out by the compiler. */
+	return 2;
 }
 
 static int
@@ -361,8 +407,7 @@ str_iterator_rv_lua_func(struct lua_State *L)
 					      key, key_end) != 0)
 		return luaT_error(L);
 	int rc = 0;
-	int64_t k = 0;
-	while (true) {
+	for (int64_t k = 0; true; k++) {
 		uint32_t size;
 		const char *data;
 		rc = box_raw_read_view_iterator_next(&iter, &data, &size);
@@ -375,9 +420,11 @@ str_iterator_rv_lua_func(struct lua_State *L)
 		}
 		for (int i = 0; i < (int)field_no; i++)
 			mp_next(&data);
+		if (mp_typeof(*data) == MP_NIL)
+			continue;
 		uint32_t len;
 		const char *str = mp_decode_str(&data, &len);
-		if (unlikely(len == 0 || str[0] != 'a' + k++ % 26)) {
+		if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
 			break;
 		}
@@ -416,9 +463,12 @@ sum_arrow_lua_func(struct lua_State *L)
 		rc = stream.get_next(&stream, &array);
 		if (rc != 0 || array.n_children != 1)
 			break;
-		uint64_t *values = (uint64_t *)array.children[0]->buffers[1];
-		for (int i = 0; i < (int)array.children[0]->length; i++)
-			sum += values[i];
+		const uint8_t *validity = array.children[0]->buffers[0];
+		const uint64_t *values = array.children[0]->buffers[1];
+		for (int i = 0; i < (int)array.children[0]->length; i++) {
+			if (validity == NULL || bit_test(validity, i))
+				sum += values[i];
+		}
 		if (array.release != NULL)
 			array.release(&array);
 	}
@@ -428,8 +478,9 @@ sum_arrow_lua_func(struct lua_State *L)
 		array.release(&array);
 	if (rc != 0)
 		return luaT_error(L);
-	luaL_pushuint64(L, sum);
-	return 1;
+	lua_pushboolean(L, true); /* Test parameters are supported. */
+	luaL_pushuint64(L, sum); /* To avoid optimizing out by the compiler. */
+	return 2;
 }
 
 static int
@@ -475,9 +526,12 @@ str_arrow_lua_func(struct lua_State *L)
 			break;
 		if (touch_string) {
 			int64_t count = array.children[0]->length;
+			const uint8_t *validity = array.children[0]->buffers[0];
 			const int32_t *offsets = array.children[0]->buffers[1];
 			const char *values = array.children[0]->buffers[2];
 			for (int64_t i = 0; i < count; i++, k++) {
+				if (validity != NULL && !bit_test(validity, i))
+					continue;
 				int32_t pos = offsets[i];
 				/* Load first char of a string. */
 				if (unlikely(values[pos] != 'a' + k % 26)) {
@@ -539,9 +593,12 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 		rc = stream.get_next(&stream, &array);
 		if (rc != 0 || array.n_children != 1)
 			break;
-		uint64_t *values = (uint64_t *)array.children[0]->buffers[1];
-		for (int i = 0; i < (int)array.children[0]->length; i++)
-			sum += values[i];
+		const uint8_t *validity = array.children[0]->buffers[0];
+		const uint64_t *values = array.children[0]->buffers[1];
+		for (int i = 0; i < (int)array.children[0]->length; i++) {
+			if (validity == NULL || bit_test(validity, i))
+				sum += values[i];
+		}
 		if (array.release != NULL)
 			array.release(&array);
 	}
@@ -551,8 +608,9 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 		array.release(&array);
 	if (rc != 0)
 		return luaT_error(L);
-	luaL_pushuint64(L, sum);
-	return 1;
+	lua_pushboolean(L, true); /* Test parameters are supported. */
+	luaL_pushuint64(L, sum); /* To avoid optimizing out by the compiler. */
+	return 2;
 }
 
 static int
@@ -607,9 +665,12 @@ str_arrow_rv_lua_func(struct lua_State *L)
 			break;
 		const struct ArrowArray *column = array.children[0];
 		if (touch_string && !use_view_types) {
+			const uint8_t *validity = column->buffers[0];
 			const int32_t *offsets = column->buffers[1];
 			const char *values = column->buffers[2];
 			for (int64_t i = 0; i < column->length; i++, k++) {
+				if (validity != NULL && !bit_test(validity, i))
+					continue;
 				int32_t pos = offsets[i];
 				/* Load first char of a string. */
 				if (unlikely(values[pos] != 'a' + k % 26)) {
@@ -620,8 +681,11 @@ str_arrow_rv_lua_func(struct lua_State *L)
 				}
 			}
 		} else if (touch_string && use_view_types) {
+			const uint8_t *validity = column->buffers[0];
 			const struct arrow_string *strings = column->buffers[1];
 			for (int64_t i = 0; i < column->length; i++, k++) {
+				if (validity != NULL && !bit_test(validity, i))
+					continue;
 				const struct arrow_string *str = &strings[i];
 				/* Load first char of a string. */
 				char c;
