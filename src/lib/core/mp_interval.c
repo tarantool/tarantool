@@ -109,12 +109,11 @@ interval_unpack(const char **data, uint32_t len, struct interval *itv)
 
 	const char *end = *data + len;
 	uint32_t count = mp_load_u8(data);
-	len -= sizeof(uint8_t);
-	if (count > 0 && len < 2)
-		return NULL;
 
 	memset(itv, 0, sizeof(*itv));
 	for (uint32_t i = 0; i < count; ++i) {
+		if (end - *data < 2)
+			return NULL;
 		uint32_t field = mp_load_u8(data);
 		int64_t value;
 		enum mp_type type = mp_typeof(**data);
@@ -127,35 +126,47 @@ interval_unpack(const char **data, uint32_t len, struct interval *itv)
 		} else {
 			return NULL;
 		}
-		if (mp_read_int64(data, &value) != 0)
-			return NULL;
 		switch (field) {
 		case FIELD_YEAR:
-			itv->year = value;
+			if (mp_read_int32(data, &itv->year) != 0)
+				return NULL;
 			break;
 		case FIELD_MONTH:
-			itv->month = value;
+			if (mp_read_int32(data, &itv->month) != 0)
+				return NULL;
 			break;
 		case FIELD_WEEK:
-			itv->week = value;
+			if (mp_read_int32(data, &itv->week) != 0)
+				return NULL;
 			break;
 		case FIELD_DAY:
+			if (mp_read_int64(data, &value) != 0)
+				return NULL;
 			itv->day = value;
 			break;
 		case FIELD_HOUR:
+			if (mp_read_int64(data, &value) != 0)
+				return NULL;
 			itv->hour = value;
 			break;
 		case FIELD_MINUTE:
+			if (mp_read_int64(data, &value) != 0)
+				return NULL;
 			itv->min = value;
 			break;
 		case FIELD_SECOND:
+			if (mp_read_int64(data, &value) != 0)
+				return NULL;
 			itv->sec = value;
 			break;
 		case FIELD_NANOSECOND:
-			itv->nsec = value;
+			if (mp_read_int32(data, &itv->nsec) != 0)
+				return NULL;
 			break;
 		case FIELD_ADJUST:
-			if (value > (int64_t)DT_SNAP)
+			if (mp_read_int64(data, &value) != 0)
+				return NULL;
+			if (value < 0 || value > DT_SNAP)
 				return NULL;
 			itv->adjust = (dt_adjust_t)value;
 			break;
