@@ -100,11 +100,16 @@ struct datetime {
  * We add/subtract interval components separately, and rebase upon resultant
  * date only at the moment when we apply them to the datetime object, at this
  * time all leap seconds/leap year logic taken into consideration.
+ *
  * Datetime supports range of values -5879610..5879611, thus interval should be
  * able to support positive and negative increments covering full distance from
  * minimum to maximum i.e. 11759221. Such years, months, and weeks values might
  * be handled by 32-bit integer, but should be extended to 64-bit once we need
  * to handle corresponding days, hours and seconds values.
+ *
+ * The structure is exported to Lua via FFI. Thus double and int32_t
+ * types are used as they exported as number. double is used for fields
+ * with range larger than int32_t range.
  */
 struct interval {
 	/** Duration in seconds. */
