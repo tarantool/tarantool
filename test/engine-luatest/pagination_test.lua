@@ -896,7 +896,6 @@ end
 local no_sup = t.group('Unsupported pagination', {
             {engine = 'memtx', type = 'hash'},
             {engine = 'memtx', type = 'bitset'},
-            {engine = 'memtx', type = 'rtree'},
 })
 
 no_sup.before_all(function(cg)
@@ -926,14 +925,11 @@ no_sup.after_each(function(cg)
 end)
 
 no_sup.test_unsupported_pagination = function(cg)
-    cg.server:exec(function(index_type)
+    cg.server:exec(function()
         t.assert_error_msg_contains('does not support pagination',
                 box.space.s.index.sk.select, box.space.s.index.sk,
                 nil, {fullscan=true, fetch_pos=true})
         local tuple = {0, 0}
-        if index_type == 'rtree' then
-            tuple = {0, {0, 0}}
-        end
         t.assert_error_msg_contains('does not support pagination',
                 box.space.s.index.sk.select, box.space.s.index.sk,
                 nil, {fullscan=true, after=tuple})
