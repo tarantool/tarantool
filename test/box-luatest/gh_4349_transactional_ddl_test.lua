@@ -197,6 +197,8 @@ g2.test_drop_optionally_empty_space = function(cg)
     cg.server:exec(function(empty)
         assert(empty == true or empty == false)
 
+        require('fiber').set_max_slice(600)
+
         box.begin()
 
         local s = box.schema.space.create('s')
