@@ -98,12 +98,9 @@ tuple_to_mpstream_as_ext(struct tuple *tuple, struct mpstream *stream)
 int
 mp_validate_tuple(const char *data, uint32_t len)
 {
-	/*
-	 * MsgPack extensions have length greater or equal than 1 by
-	 * specification.
-	 */
-	assert(len > 0);
 	const char *end = data + len;
+	if (data == end)
+		return -1;
 	enum mp_type type = mp_typeof(*data);
 	if (type != MP_UINT || mp_check_uint(data, end) > 0)
 		return -1;
