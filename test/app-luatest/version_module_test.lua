@@ -1,6 +1,7 @@
 local t = require('luatest')
 local version = require('version')
 local ffi = require('ffi')
+local fiber = require('fiber')
 
 local g = t.group()
 
@@ -262,6 +263,10 @@ g.test_order = function()
             t.assert(ver ~= prev.ver, ('%d'):format(i))
             t.assert(ver ~= prev.str, ('%d'):format(i))
         end
+
+        -- FIXME(gh-11728): Yield to let luatest process logs issued by
+        -- assertion checks. Without this ctest hangs.
+        fiber.yield()
     end
 end
 
