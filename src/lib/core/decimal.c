@@ -479,15 +479,11 @@ static_assert(DECIMAL_DIGIT_CAPACITY % 2 == 1 ||
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 {
-	/*
-	 * MsgPack extensions have length greater or equal than 1 by
-	 * specification.
-	 */
-	assert(len > 0);
-
 	int32_t scale;
 	const char *end = *data + len;
 	const char *svp = *data;
+	if (len < 1)
+		return NULL;
 	enum mp_type type = mp_typeof(**data);
 	if (type == MP_UINT) {
 		if (mp_check_uint(*data, end) > 0)
