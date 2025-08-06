@@ -74,8 +74,11 @@ g.test_malloc_small = function()
     local info1 = box.malloc.info()
     for i = 1, count do
         p[i] = malloc(size)
-        t.assert_not_equals(p[i], nil)
+        if p[i] == nil then
+            break
+        end
     end
+    t.assert_equals(#p, count)
     local info2 = box.malloc.info()
     for i = 1, count, 2 do
         free(p[i])
