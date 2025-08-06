@@ -1,3 +1,4 @@
+local fiber = require('fiber')
 local yaml = require('yaml')
 
 local t = require('luatest')
@@ -11,6 +12,10 @@ g.test_decode_code_1 = function()
         local ok, result = pcall(yaml.decode, input)
         t.assert(ok, msg)
         t.assert_equals(string.hex(result), string.hex(expected), msg)
+
+        -- FIXME(gh-11728): Yield to let luatest process logs issued by
+        -- assertion checks. Without this ctest hangs.
+        fiber.yield()
     end
 end
 
@@ -28,6 +33,10 @@ g.test_decode_code_2 = function()
             t.assert(ok, msg)
             t.assert_equals(string.hex(result), string.hex(expected), msg)
         end
+
+        -- FIXME(gh-11728): Yield to let luatest process logs issued by
+        -- assertion checks. Without this ctest hangs.
+        fiber.yield()
     end
 end
 
@@ -46,5 +55,9 @@ g.test_decode_code_4 = function()
             t.assert(ok, msg)
             t.assert_equals(string.hex(result), string.hex(expected), msg)
         end
+
+        -- FIXME(gh-11728): Yield to let luatest process logs issued by
+        -- assertion checks. Without this ctest hangs.
+        fiber.yield()
     end
 end

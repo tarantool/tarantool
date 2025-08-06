@@ -1,5 +1,6 @@
 local t = require('luatest')
 local config = require('config')
+local fiber = require('fiber')
 
 local g = t.group()
 
@@ -38,6 +39,10 @@ local function check_config_description(schema, ctx)
         check_config_description(schema.items, ctx)
         table.remove(ctx.path)
     end
+
+    -- FIXME(gh-11728): Yield to let luatest process logs issued by
+    -- assertion checks. Without this ctest hangs.
+    fiber.yield()
 end
 
 g.test_cluster_config_schema_description_completeness = function()
