@@ -361,17 +361,11 @@ for case_name, case in pairs({
         local opts = {nojson = true, stderr = true}
         local res = justrun.tarantool(dir, env, args, opts)
 
-        local exp_stderr = table.concat({
-            ('LuajitError: %s'):format(case.exp_err),
-            'fatal error, exiting the event loop',
-        }, '\n')
-        t.assert_equals({
-            exit_code = res.exit_code,
-            stderr = last_n_lines(res.stderr, count_lines(exp_stderr)),
-        }, {
-            exit_code = 1,
-            stderr = exp_stderr,
-        })
+        local exp_stderr = case.exp_err:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+                           '.*\nfatal error, exiting the event loop'
+        local stderr = last_n_lines(res.stderr, count_lines(exp_stderr))
+        t.assert_equals(res.exit_code, 1)
+        t.assert_str_matches(stderr, exp_stderr)
     end
 end
 

@@ -39,7 +39,6 @@ g.test_iproto_id_error = function(cg)
             t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         end)
     end, {g.master.net_box_uri})
-    t.assert(g.replica:grep_log(
-        'ER_UNKNOWN_REQUEST_TYPE: Unknown request type 73'))
+    t.assert(g.replica:grep_log('E> Unknown request type 73'))
     t.assert(g.replica:grep_log('IPROTO_ID failed'))
 end

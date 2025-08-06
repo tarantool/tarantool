@@ -71,7 +71,6 @@ typedef void (*error_f)(struct error *e);
 struct error {
 	error_f destroy;
 	error_f raise;
-	error_f log;
 	const struct type_info *type;
 	/**
 	 * Reference counting is basically required since
@@ -261,17 +260,13 @@ error_unlink_effect(struct error *e)
 int
 error_set_prev(struct error *e, struct error *prev);
 
-static inline void
-error_log(struct error *e)
-{
-	e->log(e);
-}
+/** Log error. */
+void
+error_log(const struct error *e);
 
 void
-error_create(struct error *e,
-	     error_f create, error_f raise, error_f log,
-	     const struct type_info *type, const char *file,
-	     unsigned line);
+error_create(struct error *e, error_f create, error_f raise,
+	     const struct type_info *type, const char *file, unsigned line);
 
 void
 error_set_location(struct error *e, const char *file, int line);
@@ -284,6 +279,17 @@ error_vformat_msg(struct error *e, const char *format, va_list ap);
 
 void
 error_append_msg(struct error *e, const char *format, ...);
+
+/*
+ * Print error string representation into the buffer. If string
+ * does not fit into the buffer then it is truncated and
+ * zero terminated.
+ *
+ * Return the size of the string (without trancation, 0-termination
+ * is not accounted).
+ */
+int
+error_to_string(const struct error *e, char *buf, int size);
 
 /**
  * Diagnostics Area - a container for errors

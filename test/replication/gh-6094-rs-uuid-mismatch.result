@@ -31,9 +31,9 @@ replication = test_run:eval('default', 'return box.cfg.listen')[1]
 box.cfg{replication = {replication}}
  | ---
  | ...
-assert(test_run:grep_log('master2', 'ER_REPLICASET_UUID_MISMATCH'))
+assert(test_run:grep_log('master2', 'REPLICASET_UUID_MISMATCH'))
  | ---
- | - ER_REPLICASET_UUID_MISMATCH
+ | - REPLICASET_UUID_MISMATCH
  | ...
 info = box.info
  | ---

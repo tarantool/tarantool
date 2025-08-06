@@ -218,10 +218,9 @@ g.test_name_failure = function()
         if exp_err:match('%%q') then
             exp_err = exp_err:format(case.name)
         end
-        local exp_err = table.concat({
-            ('LuajitError: [--name] %s'):format(exp_err),
-            'fatal error, exiting the event loop',
-        }, '\n')
+        exp_err = '%[--name%] ' .. exp_err
+        exp_err = exp_err:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+                  '.*\nfatal error, exiting the event loop'
 
         -- Common options.
         local opts = {nojson = true, stderr = true, quote_args = true}
@@ -230,12 +229,12 @@ g.test_name_failure = function()
         local args = {'--name', case.name}
         local res = justrun.tarantool('.', {}, args, opts)
         t.assert_not_equals(res.exit_code, 0)
-        t.assert_equals(res.stderr, exp_err)
+        t.assert_str_matches(res.stderr, exp_err)
 
         -- Run TT_INSTANCE_NAME=<...> tarantool.
         local env = {['TT_INSTANCE_NAME'] = case.name}
         local res = justrun.tarantool('.', env, {}, opts)
         t.assert_not_equals(res.exit_code, 0)
-        t.assert_equals(res.stderr, exp_err)
+        t.assert_str_matches(res.stderr, exp_err)
     end
 end

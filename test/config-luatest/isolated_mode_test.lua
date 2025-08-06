@@ -68,11 +68,10 @@ g.test_startup_no_snap = function()
         'The isolated mode is enabled and the instance "i-003" has no local ' ..
         'snapshot. An attempt to bootstrap the instance would lead to the ' ..
         'split-brain situation.'
-    t.assert_covers(res, {
-        exit_code = 1,
-        stderr = ('LuajitError: %s\nfatal error, exiting the event loop')
-            :format(exp_err),
-    })
+    exp_err = exp_err:gsub('%.', '%%.'):gsub('%-', '%%-') ..
+              '.*\nfatal error, exiting the event loop'
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_matches(res.stderr, exp_err)
 end
 
 -- The opposite to the previous test case: verify that an instance

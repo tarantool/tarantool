@@ -121,7 +121,7 @@ os.execute(string.format("grep -r \"join module fiber\" on_shutdown.log"))
  | ---
  | - 0
  | ...
-os.execute(string.format("grep -r \"TimedOut: timed out\" on_shutdown.log"))
+os.execute(string.format("grep -r \"E> timed out\" on_shutdown.log"))
  | ---
  | - 0
  | ...

@@ -237,7 +237,7 @@ failed.name = "failed"
 
 failed.deploy(True, wait=False)
 failed.crash_expected = True
-line = "ER_READONLY"
+line = "READONLY"
 if failed.logfile_pos.seek_wait(line):
     print("'{}' exists in server log".format(line))
 
@@ -259,7 +259,7 @@ failed.crash_expected = True
 try:
     failed.deploy()
 except Exception as e:
-    line = "ER_REPLICASET_UUID_MISMATCH"
+    line = "REPLICASET_UUID_MISMATCH"
     if failed.logfile_pos.seek_once(line) >= 0:
         print("'{}' exists in server log".format(line))
 

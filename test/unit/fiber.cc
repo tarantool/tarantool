@@ -176,9 +176,25 @@ fiber_join_test()
 		note("exception propagated");
 	}
 
-	fputs("#gh-1238: log uncaught errors\n", stderr);
+	/** Test uncaught errors are logged. */
+	char path[] = "/tmp/tarantool.test.unit.fiber.XXXXXX";
+	mkstemp(path);
+	say_logger_init(path, S_ERROR, false, "plain");
+	FILE *f = fopen(path, "r+");
+	unlink(path);
+	fail_unless(f != NULL);
+
 	fiber = fiber_new_xc("exception", exception_f);
 	fiber_wakeup(fiber);
+	fiber_sleep(0);
+	char buf[1024];
+	fail_unless(fgets(buf, sizeof(buf), f) != NULL);
+	fail_unless(strstr(buf,
+			   "Failed to allocate 42 bytes in allocator "
+			   "for exception") != NULL);
+
+	fclose(f);
+	say_logger_free();
 
 	/*
 	 * A fiber which is using exception should not

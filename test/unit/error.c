@@ -500,7 +500,7 @@ test_error_format_msg(void)
 
 	char msg[DIAG_ERRMSG_MAX + 1];
 	struct error e;
-	error_create(&e, error_destroy, NULL, NULL, NULL, NULL, 0);
+	error_create(&e, error_destroy, NULL, NULL, NULL, 0);
 	error_ref(&e);
 
 	/* Test largest message that fits into statically allocated buffer. */
@@ -541,7 +541,7 @@ test_error_append_msg(void)
 
 	char msg[DIAG_ERRMSG_MAX];
 	struct error e;
-	error_create(&e, error_destroy, NULL, NULL, NULL, NULL, 0);
+	error_create(&e, error_destroy, NULL, NULL, NULL, 0);
 	error_ref(&e);
 
 	error_format_msg(&e, "Message");
@@ -651,6 +651,94 @@ test_client_error_name(void)
 	const char *s = error_get_str(e, "name");
 	ok(s != NULL && strcmp(s, "UNSUPPORTED") == 0);
 
+	check_plan();
+	footer();
+}
+
+static void
+test_logging(void)
+{
+	header();
+	plan(5);
+
+	char path[] = "/tmp/tarantool.test.unit.error.XXXXXX";
+	mkstemp(path);
+	say_logger_init(path, S_ERROR, false, "plain");
+	FILE *f = fopen(path, "r+");
+	unlink(path);
+	char *buf = (char *)static_alloc(SMALL_STATIC_SIZE);
+	int size = SMALL_STATIC_SIZE;
+	struct error *e;
+
+	/* Some of basic errors. */
+	e = BuildTimedOut("filename", 303);
+	error_ref(e);
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> timed out "
+		  "{\"type\":\"TimedOut\",\"errno\":110,"
+		  "\"trace\":[{\"file\":\"filename\",\"line\":303}]}") != NULL);
+	error_unref(e);
+
+	/* ClientError plus payload plus some escaping. */
+	e = BuildClientError("\"filename\"", 707, ER_READONLY);
+	error_ref(e);
+	/* Check json escaping payload name and data. */
+	error_set_str(e, "\"f1\"", "\"p1\"");
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> Can't modify data on a read-only instance "
+		  "{\"type\":\"ClientError\",\"code\":7,"
+		  "\"name\":\"READONLY\","
+		  "\"\\\"f1\\\"\":\"\\\"p1\\\"\","
+		  "\"trace\":[{\"file\":\"\\\"filename\\\"\",\"line\":707}]}"
+		  ) != NULL);
+	error_unref(e);
+
+	/* CustomError plus some unusual branches. */
+	/* 1. Check json escaping custom type. */
+	/* 2. Check no trace. */
+	/* 3. Check zero code. */
+	e = BuildCustomError("", 505, "\"typo\"", 0);
+	error_ref(e);
+	strcpy(e->errmsg_buf, "some message");
+	/* 4. Check errno. */
+	e->saved_errno = 11;
+	error_log(e);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> some message "
+		  "{\"type\":\"\\\"typo\\\"\",\"errno\":11,"
+		  "\"trace\":[{}]}") != NULL);
+	error_unref(e);
+
+	/* Check stacked error. */
+	struct error *e1 = BuildCustomError("", 101, "level_1", 0);
+	error_ref(e1);
+	strcpy(e1->errmsg_buf, "message 1");
+	struct error *e2 = BuildCustomError("", 202, "level_2", 0);
+	strcpy(e2->errmsg_buf, "message 2");
+	struct error *e3 = BuildCustomError("", 303, "level_3", 0);
+	strcpy(e3->errmsg_buf, "message 3");
+	error_set_prev(e1, e2);
+	error_set_prev(e2, e3);
+	error_log(e2);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strstr(buf,
+		  "E> message 2 "
+		  "{\"type\":\"level_2\","
+		  "\"trace\":[{}]}") != NULL);
+	fail_unless(fgets(buf, size, f) != NULL);
+	ok(strcmp(buf,
+		  "Caused by: message 3 "
+		  "{\"type\":\"level_3\","
+		  "\"trace\":[{}]}") != 0);
+	error_unref(e1);
+
+	fclose(f);
+	say_logger_free();
 	check_plan();
 	footer();
 }
@@ -888,9 +976,9 @@ main(void)
 {
 	header();
 #ifdef TEST_BUILD
-	plan(16);
+	plan(17);
 #else
-	plan(15);
+	plan(16);
 #endif
 
 	random_init();
@@ -913,6 +1001,7 @@ main(void)
 	test_pthread();
 	test_undefined_error_code();
 	test_client_error_name();
+	test_logging();
 #ifdef TEST_BUILD
 	test_client_error_creation();
 #endif

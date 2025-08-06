@@ -2694,8 +2694,8 @@ box_set_instance_name(void)
 		try {
 			box_restart_replication();
 			replicaset_follow();
-		} catch (Exception *exc) {
-			exc->log();
+		} catch (Exception *e) {
+			error_log(e);
 		} catch (...) {
 			panic("Unknown exception on instance name set failure");
 		}
@@ -6310,7 +6310,7 @@ box_cfg(void)
 	try {
 		box_cfg_xc();
 	} catch (Exception *e) {
-		e->log();
+		error_log(e);
 		panic("can't initialize storage: %s", e->get_errmsg());
 	}
 }

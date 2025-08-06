@@ -39,7 +39,7 @@ g.test_ro_bootstrap = function(cg)
     -- result in an error (net_box is not connected).
     local logfile = fio.pathjoin(cg.replica.workdir, 'replica.log')
     t.helpers.retrying({}, function()
-        t.assert(cg.replica:grep_log('ER_READONLY', nil, {filename = logfile}),
+        t.assert(cg.replica:grep_log('READONLY', nil, {filename = logfile}),
                  'Replica receives the ER_READONLY error')
     end)
     cg.master:exec(function()

@@ -53,13 +53,6 @@ exception_raise(struct error *error)
 	e->raise();
 }
 
-static void
-exception_log(struct error *error)
-{
-	Exception *e = (Exception *) error;
-	e->log();
-}
-
 const char *
 exception_get_string(struct error *e, const struct method_info *method)
 {
@@ -105,14 +98,8 @@ Exception::~Exception()
 Exception::Exception(const struct type_info *type_arg, const char *file,
 		     unsigned line)
 {
-	error_create(this, exception_destroy, exception_raise,
-		     exception_log, type_arg, file, line);
-}
-
-void
-Exception::log() const
-{
-	say_file_line(S_ERROR, file, line, errmsg, "%s", type->name);
+	error_create(this, exception_destroy, exception_raise, type_arg,
+		     file, line);
 }
 
 const struct type_info type_SystemError =
@@ -192,14 +179,6 @@ FiberIsCancelled::FiberIsCancelled(const char *file, unsigned line)
 	: Exception(&type_FiberIsCancelled, file, line)
 {
 	error_format_msg(this, "fiber is cancelled");
-}
-
-void
-FiberIsCancelled::log() const
-{
-	say_info("fiber `%s' has been cancelled",
-		 fiber_name(fiber()));
-	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
 
 const struct type_info type_FiberSliceIsExceeded =

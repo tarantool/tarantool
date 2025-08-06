@@ -147,7 +147,11 @@ box.cfg{replication = replication}
 box.info.status -- running
 box.info.ro -- false
 box.info.replication[1].upstream.status -- follow
-test_run:wait_log("replica", "ER_CFG.*", nil, 200)
+test_run:cmd("setopt delimiter ';'")
+test_run:wait_log("replica",
+                  "Incorrect value for option 'replication': " ..
+                  "duplicate connection with the same replica UUID", nil, 200);
+test_run:cmd("setopt delimiter ''");
 
 test_run:cmd("switch default")
 box.error.injection.set('ERRINJ_RELAY_EXIT_DELAY', 0)

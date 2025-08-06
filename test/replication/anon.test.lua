@@ -147,7 +147,7 @@ test_run:cmd('delete server replica_anon2')
 test_run:cmd([[create server replica with rpl_master=replica_anon1,\
              script="replication/replica.lua"]])
 test_run:cmd('start server replica with wait_load=False, wait=False, crash_expected=True')
-test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support registration of non%-anonymous nodes.', nil, 10)
+test_run:wait_log('replica', 'Anonymous replica does not support registration of non%-anonymous nodes.', nil, 10)
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 
@@ -161,7 +161,7 @@ test_run:wait_upstream(1, {status='follow'})
 box.info.id
 test_run:cmd('set variable repl_source to "replica_anon1.listen"')
 box.cfg{replication=repl_source}
-test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support non.anonymous followers.', nil, 10)
+test_run:wait_log('replica', 'Anonymous replica does not support non.anonymous followers.', nil, 10)
 test_run:cmd('switch default')
 
 -- Cleanup.

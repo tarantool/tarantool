@@ -949,7 +949,7 @@ end)
 -- assigned as bootstrap leaders.
 g_supervised.test_early_leader_several_leaders = function(cg)
     cg.replica_set:start({wait_until_ready = false})
-    local query = 'ER_REPLICASET_UUID_MISMATCH'
+    local query = 'REPLICASET_UUID_MISMATCH'
     t.helpers.retrying({}, function()
         local found = grep_log(cg.server1, query) or
                       grep_log(cg.server2, query)
