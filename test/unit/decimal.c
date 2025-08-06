@@ -407,10 +407,22 @@ test_mp_print(void)
 	check_plan();
 }
 
+static void
+test_mp_validate(void)
+{
+	plan(1);
+	header();
+
+	ok(mp_validate_decimal("", 0) != 0, "reading scale type is checked");
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(312);
+	plan(313);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -476,6 +488,7 @@ main(void)
 
 	test_mp_decimal();
 	test_mp_print();
+	test_mp_validate();
 
 	test_strtodec("15.e", 'e', success);
 	test_strtodec("15.e+", 'e', success);
