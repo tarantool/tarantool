@@ -913,16 +913,17 @@ end
 
 local function index_arrow_stream_op(space, idx, fields, key)
     local mpkey = msgpack.encode(key)
-    local batch_size
+    local options = {}
     if oneof({true, false}) then
         -- We want to read small batches often, so limit max batch size
         -- with 50% probability.
         local max_batch_size = oneof({10, 10^6})
-        batch_size = math.random(1, max_batch_size)
+        local batch_size = math.random(1, max_batch_size)
         log.info('ARROW_STREAM: explicitly set batch size to ' .. batch_size)
+        options.row_count = batch_size
     end
     local stream = arrow.box_index_arrow_stream(space.id, idx.id, fields, mpkey,
-                                                batch_size)
+                                                options)
     while true do
         if math.random(1, 20) == 1 then
             log.info('ARROW_STREAM: finish early')
