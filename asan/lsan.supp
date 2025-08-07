@@ -78,3 +78,9 @@ leak:box_tuple_iterator
 leak:box_index_iterator_after
 leak:ibuf_reserve_slow
 leak:box_check_slice
+
+# FIXME(gh-10701)
+leak:fiber_gc_checker_init
+
+# FIXME(gh-11740)
+leak:iproto_thread_accept
