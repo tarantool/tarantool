@@ -5,10 +5,18 @@
 void
 cord_on_yield(void) {}
 
+static void
+fuzz_check_on_error(const struct mp_check_error *mperr)
+{
+	/* Dummy error. */
+	diag_set(ClientError, ER_INVALID_MSGPACK, "dummy");
+}
+
 __attribute__((constructor))
 static void
 setup(void)
 {
+	mp_check_on_error = fuzz_check_on_error;
 	memory_init();
 }
 
