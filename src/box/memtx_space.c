@@ -884,6 +884,11 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "'layout' option");
 		return -1;
 	}
+	if (index_def->opts.aggregates != NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "memtx",
+			 "'aggregates' option");
+		return -1;
+	}
 
 	/* Checks for memtx MVCC unsupported features. */
 	if (memtx_tx_manager_use_mvcc_engine) {

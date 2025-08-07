@@ -55,6 +55,7 @@ const struct index_opts index_opts_default = {
 	/* .covered_fields      = */ NULL,
 	/* .covered_field_count = */ 0,
 	/* .layout              = */ NULL,
+	/* .aggregates          = */ NULL,
 };
 
 /**
@@ -133,6 +134,37 @@ index_opts_parse_layout(const char **data, void *opts, struct region *region)
 	return 0;
 }
 
+/**
+ * Parse index 'aggregates' option given as MsgPack in 'data' into 'opts'.
+ * The MsgPack is copied to a memory allocated on 'region'.
+ */
+static int
+index_opts_parse_aggregates(const char **data, void *opts,
+			    struct region *region)
+{
+	struct index_opts *index_opts = (struct index_opts *)opts;
+	const char *aggregates = *data;
+	if (mp_typeof(**data) != MP_ARRAY) {
+		diag_set(IllegalParams, "'aggregates' must be array");
+		return -1;
+	}
+	uint32_t aggregate_count = mp_decode_array(data);
+	if (aggregate_count == 0)
+		return 0;
+
+	for (uint32_t i = 0; i < aggregate_count; i++) {
+		if (mp_typeof(**data) != MP_MAP) {
+			diag_set(IllegalParams,
+				 "'aggregates' elements must be map");
+			return -1;
+		}
+		mp_next(data);
+	}
+	index_opts->aggregates = xregion_alloc(region, *data - aggregates);
+	memcpy(index_opts->aggregates, aggregates, *data - aggregates);
+	return 0;
+}
+
 const struct opt_def index_opts_reg[] = {
 	OPT_DEF("unique", OPT_BOOL, struct index_opts, is_unique),
 	OPT_DEF("dimension", OPT_INT64, struct index_opts, dimension),
@@ -149,6 +181,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
 	OPT_DEF_CUSTOM("layout", index_opts_parse_layout),
+	OPT_DEF_CUSTOM("aggregates", index_opts_parse_aggregates),
 	OPT_END,
 };
 
@@ -160,14 +193,11 @@ const struct opt_def index_opts_reg[] = {
  *
  * The implicitly covered fields are the fields of index key and pk index key.
  *
- * The result is allocated with malloc.
+ * The result is allocated with malloc, old `covered_fields` array is freed.
  */
 static void
 index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
-	if (opts->layout != NULL)
-		opts->layout = xstrdup(opts->layout);
-
 	if (opts->covered_field_count == 0)
 		return;
 	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
@@ -179,12 +209,33 @@ index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 	}
 	qsort(fields, j, sizeof(*fields), cmp_u32);
 	opts->covered_field_count = j;
+	free(opts->covered_fields);
 	if (opts->covered_field_count != 0) {
 		opts->covered_fields = fields;
 	} else {
 		opts->covered_fields = NULL;
 		free(fields);
 	}
+}
+
+/** Duplicate index options. */
+static void
+index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
+{
+	*dup = *opts;
+	if (dup->covered_fields != NULL) {
+		uint32_t *fields = dup->covered_fields;
+		dup->covered_fields =
+			xmalloc(dup->covered_field_count *
+				sizeof(*dup->covered_fields));
+		memcpy(dup->covered_fields, fields,
+		       dup->covered_field_count *
+		       sizeof(*dup->covered_fields));
+	}
+	if (dup->layout != NULL)
+		dup->layout = xstrdup(dup->layout);
+	if (dup->aggregates != NULL)
+		dup->aggregates = mp_dup(dup->aggregates);
 }
 
 struct index_def *
@@ -218,27 +269,9 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
-	def->opts = *opts;
+	index_opts_dup(opts, &def->opts);
 	index_opts_normalize(&def->opts, def->cmp_def);
 	return def;
-}
-
-/** Duplicate index options. */
-static void
-index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
-{
-	*dup = *opts;
-	if (dup->covered_fields != NULL) {
-		uint32_t *fields = dup->covered_fields;
-		dup->covered_fields =
-			xmalloc(dup->covered_field_count *
-				sizeof(*dup->covered_fields));
-		memcpy(dup->covered_fields, fields,
-		       dup->covered_field_count *
-		       sizeof(*dup->covered_fields));
-	}
-	if (dup->layout != NULL)
-		dup->layout = xstrdup(dup->layout);
 }
 
 struct index_def *
