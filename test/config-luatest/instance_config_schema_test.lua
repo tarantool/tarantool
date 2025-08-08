@@ -988,6 +988,7 @@ g.test_memtx = function()
             min_tuple_size = 1,
             max_tuple_size = 1,
             sort_threads = 1,
+            use_sort_data = true,
         },
     }
     instance_config:validate(iconfig)
@@ -1001,6 +1002,7 @@ g.test_memtx = function()
         min_tuple_size = 16,
         max_tuple_size = 1048576,
         sort_threads = box.NULL,
+        use_sort_data = false,
     }
     local res = instance_config:apply_default({}).memtx
     t.assert_equals(res, exp)

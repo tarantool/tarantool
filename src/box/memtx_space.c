@@ -46,6 +46,7 @@
 #include "sequence.h"
 #include "memtx_space_upgrade.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_sort_data.h"
 #include "schema.h"
 #include "small/region.h"
 
@@ -150,6 +151,27 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 			       enum dup_replace_mode mode,
 			       struct tuple **result)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	if (memtx->recovery.last_space_id != space->def->id) {
+		/* Build PK and possibly SKs of the previous space. */
+		if (memtx->recovery.last_space_id != BOX_ID_NIL &&
+		    memtx_end_build_snapshot_space(
+				memtx, memtx->recovery.last_space_id) != 0)
+			return -1;
+
+		/* Use the sort data for secondary keys if required. */
+		if (memtx->recovery.sort_data_reader != NULL &&
+		    memtx_sort_data_reader_space_init(
+				memtx->recovery.sort_data_reader,
+				space->def->id) != 0)
+			return -1;
+
+		/* Start building the new space's PK. */
+		index_begin_build(space->index[0]);
+
+		memtx->recovery.last_space_id = space->def->id;
+	}
+
 	assert(old_tuple == NULL);
 	/*
 	 * If before_replace trigger changes tuple, the request is updated
@@ -169,6 +191,14 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
+
+	/* Deal with the MemTX sort data if enabled. */
+	if (memtx->recovery.sort_data_reader != NULL &&
+	    memtx_sort_data_reader_pk_add_tuple(
+			memtx->recovery.sort_data_reader, new_tuple) != 0)
+		return -1;
+
+	/* Add the tuple to the PK to be built. */
 	if (index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
 	memtx_space_update_tuple_stat(space, NULL, new_tuple);
@@ -973,7 +1003,6 @@ memtx_space_add_primary_key(struct space *space)
 		panic("can't create a new space before snapshot recovery");
 		break;
 	case MEMTX_INITIAL_RECOVERY:
-		index_begin_build(space->index[0]);
 		memtx_space->replace = memtx_space_replace_build_next;
 		break;
 	case MEMTX_FINAL_RECOVERY:
