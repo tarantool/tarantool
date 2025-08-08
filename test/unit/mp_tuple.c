@@ -100,7 +100,7 @@ test_tuple_to_mpstream_as_ext(void)
 static int
 test_mp_validate_tuple(void)
 {
-	plan(8);
+	plan(9);
 	header();
 
 	char buf[1024];
@@ -182,6 +182,9 @@ test_mp_validate_tuple(void)
 	ext_len = mp_decode_extl(&r, &unused);
 	isnt(mp_validate_tuple(r, ext_len), 0,
 	     "MP_TUPLE validation works correctly for invalid tuple");
+
+	isnt(mp_validate_tuple(buf, 0), 0,
+	     "MP_TUPLE validation works correctly for 0 length data");
 
 	footer();
 	return check_plan();

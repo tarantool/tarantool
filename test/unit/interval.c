@@ -161,7 +161,11 @@ static void
 test_interval_validate(void)
 {
 	header();
-	plan(24);
+	plan(25);
+
+	/* Check reading count is checked. */
+	ok(mp_validate_interval("", 0) != 0,
+	   "reading count is checked");
 
 	/* Check reading field key is checked. */
 	ok(mp_validate_interval("\x02", 1) != 0,

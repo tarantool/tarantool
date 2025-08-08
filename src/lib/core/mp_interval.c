@@ -101,13 +101,9 @@ interval_pack(char *data, const struct interval *itv)
 struct interval *
 interval_unpack(const char **data, uint32_t len, struct interval *itv)
 {
-	/*
-	 * MsgPack extensions have length greater or equal than 1 by
-	 * specification.
-	 */
-	assert(len > 0);
-
 	const char *end = *data + len;
+	if (end - *data < 1)
+		return NULL;
 	uint32_t count = mp_load_u8(data);
 
 	memset(itv, 0, sizeof(*itv));
