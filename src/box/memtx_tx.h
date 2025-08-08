@@ -183,28 +183,68 @@ void
 memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
 
 /**
- * @brief Add a statement to transaction manager's history.
+ * Notify transaction manager about insertion of new tuple into space.
+ */
+void
+memtx_tx_history_add_new_tuple(struct txn_stmt *stmt, struct tuple *new_tuple);
+
+/**
+ * Notify transaction manager about insertion of a tuple to index.
  * Until unlinking or releasing the space could internally contain
  * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
  * With that clarifying the statement will be visible to current transaction,
  * but invisible to all others.
- * Follows signature of @sa memtx_space_replace_all_keys .
+ * Follows signature of @sa memtx_space_replace_all_keys. Just for
+ * understanding, the specific insertion operations might be:
+ * REPLACE, and old_tuple is NULL because it is unknown yet.
+ * INSERT, and old_tuple is NULL because there's no such tuple.
+ * UPDATE, and old_tuple is not NULL and is the updated tuple.
  *
  * NB: can trigger story garbage collection.
  *
  * @param stmt current statement.
- * @param old_tuple the tuple that should be removed (can be NULL).
- * @param new_tuple the tuple that should be inserted (can be NULL).
- * @param mode      dup_replace_mode, used only if new_tuple is not
- *                  NULL and old_tuple is NULL, and only for the
- *                  primary key.
+ * @param index the index where the replace happened in.
+ * @param old_tuple the tuple that was removed (can be NULL).
+ * @param new_tuple the tuple that was inserted.
+ * @param mode      conflict mode for duplicate check.
  * @param result - old or replaced tuple.
  * @return 0 on success, -1 on error (diag is set).
  */
 int
-memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result);
+memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt, struct index *index,
+				 struct tuple *old_tuple,
+				 struct tuple *new_tuple,
+				 enum dup_replace_mode mode,
+				 struct tuple **result,
+				 struct tuple *successor);
+
+/**
+ * Notify transaction manager about deletion of a tuple from index.
+ *
+ * @param stmt current statement.
+ * @param index index deletion happened in.
+ * @param old_tuple the tuple that was removed.
+ * @param result - old or replaced tuple.
+ * @return 0 on success, -1 on error (diag is set).
+ */
+void
+memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt, struct index *index,
+				 struct tuple *old_tuple,
+				 struct tuple **result);
+
+/**
+ * Notify transaction manager about insertion failure on index @iid.
+ * (effectively rolls back a series of `memtx_tx_history_add_insert`).
+ */
+void
+memtx_tx_history_undo_adding_stmt(struct txn_stmt *stmt, uint32_t iid);
+
+/**
+ * Notify transaction manager about failure of inserting new tuple into space.
+ */
+void
+memtx_tx_history_undo_adding_new_tuple(struct txn_stmt *stmt,
+				       struct tuple *new_tuple);
 
 /**
  * @brief Rollback (undo) a statement from transaction manager's history.
