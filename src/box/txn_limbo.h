@@ -44,6 +44,20 @@ extern "C" {
 struct txn;
 struct synchro_request;
 
+enum txn_limbo_entry_state {
+	/**
+	 * Is saved in the limbo, but isn't accounted yet and isn't persisted
+	 * anywhere.
+	 */
+	TXN_LIMBO_ENTRY_VOLATILE,
+	/** Is saved and accounted in the limbo. */
+	TXN_LIMBO_ENTRY_SUBMITTED,
+	/** Committed, not in the limbo anymore. */
+	TXN_LIMBO_ENTRY_COMMIT,
+	/** Rolled back, not in the limbo anymore. */
+	TXN_LIMBO_ENTRY_ROLLBACK,
+};
+
 /**
  * Transaction and its quorum metadata, to be stored in limbo.
  */
@@ -62,13 +76,8 @@ struct txn_limbo_entry {
 	 * written to WAL yet.
 	 */
 	int64_t lsn;
-	/**
-	 * Result flags. Only one of them can be true. But both
-	 * can be false if the transaction is still waiting for
-	 * its resolution.
-	 */
-	bool is_commit;
-	bool is_rollback;
+	/** State of this entry. */
+	enum txn_limbo_entry_state state;
 	/** When this entry was added to the queue. */
 	double insertion_time;
 };
@@ -76,7 +85,7 @@ struct txn_limbo_entry {
 static inline bool
 txn_limbo_entry_is_complete(const struct txn_limbo_entry *e)
 {
-	return e->is_commit || e->is_rollback;
+	return e->state > TXN_LIMBO_ENTRY_SUBMITTED;
 }
 
 /**
@@ -278,34 +287,22 @@ struct txn_limbo {
  */
 extern struct txn_limbo txn_limbo;
 
+/** Get the age of the oldest non-confirmed limbo entry. */
+double
+txn_limbo_age(struct txn_limbo *limbo);
+
 static inline bool
 txn_limbo_is_empty(struct txn_limbo *limbo)
 {
 	return rlist_empty(&limbo->queue);
 }
 
-static inline bool
-txn_limbo_is_full(struct txn_limbo *limbo)
-{
-	return limbo->size >= limbo->max_size;
-}
+/** See if submission to the limbo would yield if done right now. */
+bool
+txn_limbo_would_block(struct txn_limbo *limbo);
 
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo);
-
-static inline struct txn_limbo_entry *
-txn_limbo_first_entry(struct txn_limbo *limbo)
-{
-	return rlist_first_entry(&limbo->queue, struct txn_limbo_entry,
-				 in_queue);
-}
-
-static inline struct txn_limbo_entry *
-txn_limbo_last_entry(struct txn_limbo *limbo)
-{
-	return rlist_last_entry(&limbo->queue, struct txn_limbo_entry,
-				in_queue);
-}
 
 /**
  * Return the latest term as seen in PROMOTE requests from instance with id
@@ -338,9 +335,25 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * Allocate, create, and append a new transaction to the limbo.
  * The limbo entry is allocated on the transaction's region.
  */
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len);
+
+/**
+ * Wait until all the limbo entries existing at the moment of calling are fully
+ * submitted into the limbo.
+ *
+ * It is guaranteed that if this function returns success, then all those limbo
+ * entries have been submitted to WAL. And the caller, for example, might do a
+ * journal sync right away to find out the vclock at the moment of the last
+ * limbo entry journal write.
+ *
+ * Any limbo entries added during the waiting are not going to be waited for.
+ * And are guaranteed not to be sent to the journal yet after this function
+ * returns success, until the next yield of the caller fiber.
+ */
+int
+txn_limbo_flush(struct txn_limbo *limbo);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
@@ -493,6 +506,16 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo);
 
+/**
+ * Rollback all the volatile txns. That is, the ones waiting for space in the
+ * limbo and not yet sent to the journal. It is supposed to happen when some
+ * older txn wants to get rolled back. For example, when its WAL write fails.
+ * The it must cascading-rollback all the newer txns, including the ones not yet
+ * visible to the journal.
+ */
+void
+txn_limbo_rollback_all_volatile(struct txn_limbo *limbo);
+
 /** Start filtering incoming syncrho requests. */
 void
 txn_limbo_filter_enable(struct txn_limbo *limbo);
@@ -545,10 +568,6 @@ txn_limbo_shutdown(void);
 /** Set maximal limbo size in bytes. */
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size);
-
-/** Wait for space in the limbo to add a new entry. */
-int
-txn_limbo_wait_for_space(struct txn_limbo *limbo);
 
 #if defined(__cplusplus)
 }

@@ -35,7 +35,14 @@
 #include "watcher.h"
 #include "xrow.h"
 
+static void
+journal_on_cascading_rollback_nop(void)
+{
+}
+
 struct journal *current_journal = NULL;
+journal_on_cascading_rollback_f journal_on_cascading_rollback =
+	journal_on_cascading_rollback_nop;
 
 struct journal_queue journal_queue = {
 	.max_size = 16 * 1024 * 1024, /* 16 megabytes */
@@ -85,8 +92,7 @@ diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 
 struct journal_entry *
 journal_entry_new(size_t n_rows, struct region *region,
-		  journal_write_async_f write_async_cb,
-		  void *complete_data)
+		  journal_on_write_f on_write, void *complete_data)
 {
 	struct journal_entry *entry;
 
@@ -99,9 +105,7 @@ journal_entry_new(size_t n_rows, struct region *region,
 		diag_set(OutOfMemory, size, "region", "struct journal_entry");
 		return NULL;
 	}
-
-	journal_entry_create(entry, n_rows, 0, write_async_cb,
-			     complete_data);
+	journal_entry_create(entry, n_rows, 0, on_write, complete_data);
 	return entry;
 }
 
@@ -159,6 +163,7 @@ journal_queue_wait(struct journal_entry *entry)
 		journal_queue_wakeup();
 		return 0;
 	}
+	journal_on_cascading_rollback();
 	/* Take this request and all the next ones. */
 	struct stailq rollback;
 	struct stailq_entry *prev_link = NULL;
@@ -176,7 +181,7 @@ journal_queue_wait(struct journal_entry *entry)
 		else
 			req->res = JOURNAL_ENTRY_ERR_CASCADE;
 		req->is_complete = true;
-		req->write_async_cb(req);
+		req->on_write(req);
 	}
 	diag_set(FiberIsCancelled);
 	return -1;
@@ -200,6 +205,7 @@ journal_queue_flush(void)
 void
 journal_queue_rollback(void)
 {
+	journal_on_cascading_rollback();
 	struct stailq rollback;
 	stailq_create(&rollback);
 	stailq_concat(&rollback, &journal_queue.requests);
@@ -208,7 +214,7 @@ journal_queue_rollback(void)
 	stailq_foreach_entry(req, &rollback, fifo) {
 		req->res = JOURNAL_ENTRY_ERR_CASCADE;
 		req->is_complete = true;
-		req->write_async_cb(req);
+		req->on_write(req);
 	}
 }
 

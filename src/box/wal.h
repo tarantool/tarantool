@@ -211,15 +211,6 @@ wal_clear_watcher(struct wal_watcher *watcher,
 enum wal_mode
 wal_mode(void);
 
-/**
- * Wait until all submitted writes are successfully flushed
- * to disk. Returns 0 on success, -1 if write failed.
- * Corresponding vclock is returned in @a vclock unless it is
- * NULL.
- */
-int
-wal_sync(struct vclock *vclock);
-
 struct wal_checkpoint {
 	struct cbus_call_msg base;
 	/**
