@@ -12,7 +12,7 @@ macro(libxxhash_build)
     # Remaining properties are the same as for zstd
     # (see cmake/BuildZSTD.cmake).
     set_source_files_properties(${xxhash_src}
-            PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS} -Ofast -DXXH_NAMESPACE=tnt_")
+            PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS} -O3 -ffast-math -DXXH_NAMESPACE=tnt_")
 
     add_library(xxhash STATIC ${xxhash_src})
     set(XXHASH_LIBRARIES xxhash)
