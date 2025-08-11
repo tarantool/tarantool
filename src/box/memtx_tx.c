@@ -1801,24 +1801,26 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
  * added or deleted) by `stmt`'s transaction.
  */
 static int
-check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
-	  struct tuple **directly_replaced, struct tuple **old_tuple,
-	  enum dup_replace_mode mode, bool *is_own_change)
+check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
+	  struct tuple **old_tuple, enum dup_replace_mode mode)
 {
 	struct space *space = stmt->space;
 	struct txn *txn = stmt->txn;
+	struct memtx_story *add_story = stmt->add_story;
+	assert(add_story != NULL);
+	struct tuple *new_tuple = add_story->tuple;
 
 	struct tuple *visible_replaced;
 	if (directly_replaced[0] == NULL ||
 	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
-		*is_own_change = false;
+		stmt->is_own_change = false;
 		visible_replaced = directly_replaced[0];
 	} else {
 		struct memtx_story *story =
 			memtx_tx_story_get(directly_replaced[0]);
-		memtx_tx_story_find_visible_tuple(story, txn, 0, true,
-						  &visible_replaced,
-						  is_own_change);
+		memtx_tx_story_find_visible_tuple(
+			story, txn, 0, true, &visible_replaced,
+			&stmt->is_own_change);
 	}
 
 	if (index_check_dup(space->index[0], *old_tuple, new_tuple,
@@ -1999,6 +2001,12 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	assert(new_tuple != NULL);
 	struct space *space = stmt->space;
 
+	/* Create story to make the tuple dirty during replace. */
+	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
+
+	/* Link add_story. */
+	memtx_tx_story_link_added_by(add_story, stmt);
+
 	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
@@ -2024,16 +2032,9 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	directly_replaced_count = space->index_count;
 
 	/* Check overwritten tuple. */
-	bool is_own_change = false;
-	int rc = check_dup(stmt, new_tuple, directly_replaced,
-			   &old_tuple, mode, &is_own_change);
+	int rc = check_dup(stmt, directly_replaced, &old_tuple, mode);
 	if (rc != 0)
 		goto fail;
-	stmt->is_own_change = is_own_change;
-
-	/* Create add_story. */
-	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
-	memtx_tx_story_link_added_by(add_story, stmt);
 
 	/* Create next story in the primary index if necessary. */
 	struct tuple *next_pk = directly_replaced[0];
@@ -2094,7 +2095,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	 * transaction can interfere with insert: due to serialization the
 	 * previous delete statement guarantees that the insert will not fail.
 	 */
-	if (!is_own_change &&
+	if (!stmt->is_own_change &&
 	    (mode == DUP_INSERT ||
 	     space_has_before_replace_triggers(stmt->space) ||
 	     space_has_on_replace_triggers(stmt->space))) {
@@ -2121,6 +2122,10 @@ fail:
 		}
 	}
 
+	/* Unlink add_story. */
+	memtx_tx_story_unlink_added_by(add_story, stmt);
+
+	memtx_tx_story_delete(add_story);
 	return -1;
 }
 
