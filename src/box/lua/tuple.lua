@@ -108,6 +108,7 @@ local encode_array = msgpackffi.internal.encode_array
 local encode_r = msgpackffi.internal.encode_r
 
 local tuple_encode = function(tmpbuf, obj, level)
+    local used = tmpbuf:size()
     if obj == nil then
         encode_fix(tmpbuf, 0x90, 0)  -- empty array
     elseif is_tuple(obj) then
@@ -126,7 +127,7 @@ local tuple_encode = function(tmpbuf, obj, level)
         encode_fix(tmpbuf, 0x90, 1)  -- array of one element
         encode_r(tmpbuf, obj, 1, level and level + 1)
     end
-    return tmpbuf.rpos, tmpbuf.wpos
+    return tmpbuf.rpos + used, tmpbuf.wpos
 end
 
 local tuple_gc = function(tuple)
