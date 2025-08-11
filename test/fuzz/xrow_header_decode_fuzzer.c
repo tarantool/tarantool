@@ -1,5 +1,6 @@
 #include "box/iproto_constants.h"
 #include "box/xrow.h"
+#include "box/error.h"
 #include "memory.h"
 
 void
