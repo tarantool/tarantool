@@ -70,8 +70,7 @@ g.test_startup_no_snap = function()
         'split-brain situation.'
     t.assert_covers(res, {
         exit_code = 1,
-        stderr = ('LuajitError: %s\nfatal error, exiting the event loop')
-            :format(exp_err),
+        stderr = exp_err,
     })
 end
 
