@@ -2188,22 +2188,20 @@ base_index_mt.quantile = function(index, level, begin_key, end_key)
     end
     -- Encode the keys on cord ibuf. Note, since the ibuf may be
     -- reallocated when we encode end_key, we can't use the pointers
-    -- returned by tuple_encode(). Instead we remember the begin_key
-    -- size and set the pointers after all allocations are done.
+    -- returned by tuple_encode(begin_key), so we set its pointers after
+    -- all allocations are done.
     local ibuf = cord_ibuf_take()
     tuple_encode(ibuf, begin_key, 2)
-    local begin_key_size = ibuf:size()
-    tuple_encode(ibuf, end_key, 2)
-    local end_key_size = ibuf:size() - begin_key_size
+    local end_key, end_key_end = tuple_encode(ibuf, end_key, 2)
     begin_key = ibuf.rpos
-    end_key = ibuf.rpos + begin_key_size
+    local begin_key_end = end_key
     -- Call the C API function.
     local quantile_key = ffi.new('const char *[1]')
     local quantile_key_end = ffi.new('const char *[1]')
     local region_svp = builtin.box_region_used()
     local ok = builtin.box_index_quantile(index.space_id, index.id, level,
-                                          begin_key, begin_key + begin_key_size,
-                                          end_key, end_key + end_key_size,
+                                          begin_key, begin_key_end,
+                                          end_key, end_key_end,
                                           quantile_key, quantile_key_end) == 0
     cord_ibuf_put(ibuf)
     if not ok then
