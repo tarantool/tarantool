@@ -383,7 +383,7 @@ function methods._set_status_based_on_alerts(self)
     broadcast(self)
 end
 
-function methods._startup(self, instance_name, config_file)
+function methods._startup_impl(self, instance_name, config_file)
     assert(self._status == 'uninitialized')
 
     local ok, err = cluster_config:validate_name(instance_name)
@@ -435,6 +435,14 @@ function methods._startup(self, instance_name, config_file)
     end
     if extras ~= nil then
         extras.post_apply(self)
+    end
+end
+
+function methods._startup(self, instance_name, config_file)
+    local ok, err = pcall(self._startup_impl, self, instance_name, config_file)
+    if not ok then
+        log.error(err)
+        os.exit(1)
     end
 end
 

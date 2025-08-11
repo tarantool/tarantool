@@ -218,10 +218,7 @@ g.test_name_failure = function()
         if exp_err:match('%%q') then
             exp_err = exp_err:format(case.name)
         end
-        local exp_err = table.concat({
-            ('LuajitError: [--name] %s'):format(exp_err),
-            'fatal error, exiting the event loop',
-        }, '\n')
+        local exp_err = ('[--name] %s'):format(exp_err)
 
         -- Common options.
         local opts = {nojson = true, stderr = true, quote_args = true}
