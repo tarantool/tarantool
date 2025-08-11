@@ -2090,6 +2090,78 @@ memtx_tx_abort_story_readers(struct memtx_story *story)
 		memtx_tx_abort_with_conflict(tracker->reader);
 }
 
+/**
+ * After the last prepared story in a chain is modified (either when another
+ * story becomes last or when the del_psn of the last story becomes 0), some
+ * subsequent transactions may become duplicates. This function aborts all
+ * in-progress transactions that would lead to duplicates.
+ *
+ * @param story - the story that became the last prepared/committed in the
+ * chain.
+ * @return a top story in chain of @a story by index @a ind.
+ */
+static struct memtx_story *
+memtx_tx_handle_dups_in_secondary_index(
+	struct memtx_story *story, uint32_t ind)
+{
+	if (story == NULL)
+		return NULL;
+
+	/* The last prepared/committed story in the chain. */
+	assert(story->add_psn != 0 || story->add_stmt == NULL);
+	assert(story->link[ind].newer_story == NULL ||
+	       (story->link[ind].newer_story->add_psn == 0 &&
+		story->link[ind].newer_story->add_stmt != NULL));
+
+	struct txn_stmt *stmt = story->add_stmt;
+
+	/* Handle conflicts in the secondary indexes. */
+	assert(ind > 0);
+	/*
+	 * Handle secondary cross-write conflict. This case is too
+	 * complicated and deserves an explanation with example.
+	 * Imagine a space with primary index (pk) by the first field
+	 * and secondary index (sk) by the second field.
+	 * Imagine then three in-progress transactions that executes
+	 * replaces {1, 1, 1}, {2, 1, 2} and {1, 1, 3} correspondingly.
+	 * What must happen when the first transaction commits?
+	 * Both other transactions intersect the current in the sk.
+	 * But the second transaction with {2, 1, 2} must be aborted
+	 * (or sent to read view) because of conflict: it now introduces
+	 * duplicate insertion to the sk.
+	 * On the other hand the third transactions with {1, 1, 3} has
+	 * a right to live since it tends to overwrite {1, 1, 1} in
+	 * both pk and sk.
+	 * To handle those conflicts in general we must scan chains
+	 * towards the top and check insert statements.
+	 */
+	struct memtx_story *newer_story = story;
+	while (newer_story->link[ind].newer_story != NULL) {
+		newer_story = newer_story->link[ind].newer_story;
+		struct txn_stmt *test_stmt = newer_story->add_stmt;
+		/* Don't conflict own changes. */
+		if (stmt != NULL && test_stmt->txn == stmt->txn)
+			continue;
+		assert(test_stmt->txn->psn == 0);
+		/*
+		 * Ignore case when other TX executes insert after
+		 * precedence delete.
+		 */
+		if (newer_story->link[ind].is_own_change &&
+		    test_stmt->del_story == NULL)
+			continue;
+		/*
+		 * Ignore the case when other TX overwrites in both
+		 * primary and secondary index.
+		 */
+		if (test_stmt->del_story == story)
+			continue;
+		memtx_tx_abort_with_conflict(test_stmt->txn);
+	}
+
+	return newer_story;
+}
+
 /*
  * Rollback addition of story by statement.
  */
@@ -2485,48 +2557,14 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		memtx_tx_handle_conflict_gap_readers(top_story, 0, stmt->txn);
 	}
 
-	/* Handle conflicts in the secondary indexes. */
+	/* Finally set PSNs in stories to mark them add/delete as prepared. */
+	stmt->add_story->add_psn = stmt->txn->psn;
+	if (stmt->del_story != NULL)
+		stmt->del_story->del_psn = stmt->txn->psn;
+
 	for (uint32_t i = 1; i < story->index_count; i++) {
-		/*
-		 * Handle secondary cross-write conflict. This case is too
-		 * complicated and deserves an explanation with example.
-		 * Imagine a space with primary index (pk) by the first field
-		 * and secondary index (sk) by the second field.
-		 * Imagine then three in-progress transactions that executes
-		 * replaces {1, 1, 1}, {2, 1, 2} and {1, 1, 3} correspondingly.
-		 * What must happen when the first transaction commits?
-		 * Both other transactions intersect the current in the sk.
-		 * But the second transaction with {2, 1, 2} must be aborted
-		 * (or sent to read view) because of conflict: it now introduces
-		 * duplicate insertion to the sk.
-		 * On the other hand the third transactions with {1, 1, 3} has
-		 * a right to live since it tends to overwrite {1, 1, 1} in
-		 * both pk and sk.
-		 * To handle those conflicts in general we must scan chains
-		 * towards the top and check insert statements.
-		 */
-		struct memtx_story *newer_story = story;
-		while (newer_story->link[i].newer_story != NULL) {
-			newer_story = newer_story->link[i].newer_story;
-			struct txn_stmt *test_stmt = newer_story->add_stmt;
-			/* Don't conflict own changes. */
-			if (test_stmt->txn == stmt->txn)
-				continue;
-			/*
-			 * Ignore case when other TX executes insert after
-			 * precedence delete.
-			 */
-			if (newer_story->link[i].is_own_change &&
-			    test_stmt->del_story == NULL)
-				continue;
-			/*
-			 * Ignore the case when other TX overwrites in both
-			 * primary and secondary index.
-			 */
-			if (test_stmt->del_story == story)
-				continue;
-			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
-		}
+		struct memtx_story *top_story =
+			memtx_tx_handle_dups_in_secondary_index(story, i);
 		/*
 		 * We have already checked gap readers before for the case
 		 * of insertion to the primary index.
@@ -2536,13 +2574,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * Note that newer_story is in top of chain due to previous
 		 * manipulations.
 		 */
-		memtx_tx_handle_conflict_gap_readers(newer_story, i, stmt->txn);
+		memtx_tx_handle_conflict_gap_readers(top_story, i, stmt->txn);
 	}
-
-	/* Finally set PSNs in stories to mark them add/delete as prepared. */
-	stmt->add_story->add_psn = stmt->txn->psn;
-	if (stmt->del_story != NULL)
-		stmt->del_story->del_psn = stmt->txn->psn;
 }
 
 /**
