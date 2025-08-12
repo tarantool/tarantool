@@ -446,8 +446,11 @@ end)
 
 -- Test error has 'name' field with error name.
 g.test_error_name = function()
-    local e = box.error.new(box.error.ILLEGAL_PARAMS, 'foo')
-    t.assert_equals(e.name, 'ILLEGAL_PARAMS')
+    local e = box.error.new(box.error.UNSUPPORTED, 'foo', 'bar')
+    t.assert_equals(e.name, 'UNSUPPORTED')
+
+    local e = box.error.new({code = box.error.UNSUPPORTED})
+    t.assert_equals(e.name, 'UNSUPPORTED')
 end
 
 g.test_dml_key_validation_errors = function(cg)

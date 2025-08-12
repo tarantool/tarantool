@@ -91,8 +91,8 @@ class SystemError: public Exception {
 public:
 	virtual void raise() { throw this; }
 
-	SystemError(const char *file, unsigned line,
-		    const char *format, ...);
+	SystemError(const char *file, unsigned line, const char *format,
+		    va_list ap);
 
 	SystemError()
 		:Exception(&type_SystemError, NULL, 0)
@@ -100,14 +100,15 @@ public:
 	}
 
 protected:
-	SystemError(const struct type_info *type, const char *file, unsigned line);
+	SystemError(const struct type_info *type, const char *file,
+		    unsigned line);
 };
 
 extern const struct type_info type_SocketError;
 class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, const char *socketname,
-		    const char *format, ...);
+		    const char *format, va_list ap);
 
 	SocketError()
 		:SystemError(&type_SocketError, NULL, 0)
@@ -206,7 +207,8 @@ public:
 
 class IllegalParams: public Exception {
 public:
-	IllegalParams(const char *file, unsigned line, const char *format, ...);
+	IllegalParams(const char *file, unsigned line, const char *format,
+		      va_list ap);
 
 	IllegalParams()
 		:Exception(&type_IllegalParams, NULL, 0)
@@ -219,7 +221,7 @@ public:
 class CollationError: public Exception {
 public:
 	CollationError(const char *file, unsigned line, const char *format,
-		       ...);
+		       va_list ap);
 
 	CollationError()
 		:Exception(&type_CollationError, NULL, 0)
@@ -231,7 +233,8 @@ public:
 
 class SwimError: public Exception {
 public:
-	SwimError(const char *file, unsigned line, const char *format, ...);
+	SwimError(const char *file, unsigned line, const char *format,
+		  va_list ap);
 
 	SwimError()
 		:Exception(&type_SwimError, NULL, 0)
@@ -243,7 +246,8 @@ public:
 
 class CryptoError: public Exception {
 public:
-	CryptoError(const char *file, unsigned line, const char *format, ...);
+	CryptoError(const char *file, unsigned line, const char *format,
+		    va_list ap);
 
 	CryptoError()
 		:Exception(&type_CryptoError, NULL, 0)
@@ -255,31 +259,28 @@ public:
 
 class RaftError: public Exception {
 public:
-	RaftError(const char *file, unsigned line, const char *format, ...);
+	RaftError(const char *file, unsigned line, const char *format,
+		  va_list ap);
+
 	virtual void raise() { throw this; }
 };
 
 class FileFormatError: public Exception {
 public:
-	FileFormatError(const char *file, unsigned line,
-			const char *format, ...);
+	FileFormatError(const char *file, unsigned line, const char *format,
+			va_list ap);
 
 	FileFormatError()
 		: Exception(&type_FileFormatError, NULL, 0)
 	{
 	}
+
 	virtual void raise() { throw this; }
 };
 
-#define tnt_error(class, ...) ({					\
-	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	class *e = new class(__FILE__, __LINE__, ##__VA_ARGS__);	\
-	diag_set_error(diag_get(), e);					\
-	e;								\
-})
-
 #define tnt_raise(...) do {						\
-	throw tnt_error(__VA_ARGS__);					\
+	diag_set(__VA_ARGS__);						\
+	diag_raise();							\
 } while (0)
 
 #endif /* defined(__cplusplus) */
