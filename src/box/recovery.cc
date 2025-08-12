@@ -171,7 +171,6 @@ recovery_close_log(struct recovery *r)
 static void
 recovery_open_log(struct recovery *r, const struct vclock *vclock)
 {
-	XlogGapError *e;
 	struct xlog_meta meta = r->cursor.meta;
 	enum xlog_cursor_state state = r->cursor.state;
 
@@ -213,10 +212,10 @@ out:
 	return;
 
 gap_error:
-	e = tnt_error(XlogGapError, &r->vclock, vclock);
+	diag_set(XlogGapError, &r->vclock, vclock);
 	if (!(r->flags & RECOVERY_IGNORE_ERRORS))
-		throw e;
-	error_log(e);
+		diag_raise();
+	diag_log();
 	say_warn("ignoring a gap in LSN");
 	goto out;
 }
