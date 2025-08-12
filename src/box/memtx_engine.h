@@ -48,6 +48,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct index;
+struct index_def;
 struct index_read_view;
 struct info_handler;
 struct iterator;

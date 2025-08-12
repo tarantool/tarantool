@@ -1182,20 +1182,15 @@ generic_index_read_view_iterator_position(struct index_read_view_iterator *it,
 void
 generic_index_read_view_iterator_destroy(struct index_read_view_iterator *it);
 
+/** Helper to build ER_UNSUPPORTED_INDEX_FEATURE error from index definition. */
+struct error *
+BuildUnsupportedIndexFeature(const char *file, unsigned line,
+			     struct index_def *index_def, const char *what);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 #include "diag.h"
-
-/*
- * A wrapper for ClientError(ER_UNSUPPORTED_INDEX_FEATURE, ...) to format
- * nice error messages (see gh-1042). You never need to catch this class.
- */
-class UnsupportedIndexFeature: public ClientError {
-public:
-	UnsupportedIndexFeature(const char *file, unsigned line,
-				struct index_def *index_def, const char *what);
-};
 
 struct IteratorGuard
 {
