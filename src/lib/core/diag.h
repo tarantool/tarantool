@@ -446,11 +446,6 @@ BuildRaftError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildFileFormatError(const char *file, unsigned line, const char *format, ...);
 
-struct index_def;
-
-struct error *
-BuildUnsupportedIndexFeature(const char *file, unsigned line,
-			     struct index_def *index_def, const char *what);
 struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...);

@@ -620,7 +620,7 @@ test_mp_print(void)
 
 	struct error *e1 = BuildClientError("file1", 1, 0);
 	error_ref(e1);
-	struct error *e2 = BuildCustomError("file2", 4, "type", 5);
+	struct error *e2 = BuildCustomError("file2", 4, "type", 5, "");
 	struct error *e3 = BuildAccessDeniedError("file3", 6, "field1",
 						  "field2", "field3", "field4");
 	error_set_prev(e1, e2);
