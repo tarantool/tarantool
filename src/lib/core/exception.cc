@@ -125,14 +125,11 @@ SystemError::SystemError(const struct type_info *type,
 	saved_errno = errno;
 }
 
-SystemError::SystemError(const char *file, unsigned line,
-			 const char *format, ...)
+SystemError::SystemError(const char *file, unsigned line, const char *format,
+			 va_list ap)
 	: SystemError(&type_SystemError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 	error_append_msg(this, ": %s", tt_strerror(saved_errno));
 }
 
@@ -140,14 +137,10 @@ const struct type_info type_SocketError =
 	make_type("SocketError", &type_SystemError);
 
 SocketError::SocketError(const char *file, unsigned line,
-			 const char *socketname,
-			 const char *format, ...)
+			 const char *socketname, const char *format, va_list ap)
 	: SystemError(&type_SocketError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 	error_append_msg(this, ", called on %s: %s", socketname,
 			 tt_strerror(saved_errno));
 }
@@ -225,101 +218,83 @@ const struct type_info type_IllegalParams =
 	make_type("IllegalParams", &type_Exception);
 
 IllegalParams::IllegalParams(const char *file, unsigned line,
-				     const char *format, ...)
+			     const char *format, va_list ap)
 	: Exception(&type_IllegalParams, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_CollationError =
 	make_type("CollationError", &type_Exception);
 
 CollationError::CollationError(const char *file, unsigned line,
-			       const char *format, ...)
+			       const char *format, va_list ap)
 	: Exception(&type_CollationError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_SwimError = make_type("SwimError", &type_Exception);
 
-SwimError::SwimError(const char *file, unsigned line, const char *format, ...)
+SwimError::SwimError(const char *file, unsigned line, const char *format,
+		     va_list ap)
 	: Exception(&type_SwimError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_CryptoError =
 	make_type("CryptoError", &type_Exception);
 
-CryptoError::CryptoError(const char *file, unsigned line,
-			 const char *format, ...)
+CryptoError::CryptoError(const char *file, unsigned line, const char *format,
+			 va_list ap)
 	: Exception(&type_CryptoError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_RaftError =
 	make_type("RaftError", &type_Exception);
 
-RaftError::RaftError(const char *file, unsigned line, const char *format, ...)
+RaftError::RaftError(const char *file, unsigned line, const char *format,
+		     va_list ap)
 	: Exception(&type_RaftError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_FileFormatError =
 	make_type("FileFormatError", &type_Exception);
 
 FileFormatError::FileFormatError(const char *file, unsigned line,
-				 const char *format, ...)
+				 const char *format, va_list ap)
 	: Exception(&type_FileFormatError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
-	va_end(ap);
 }
 
 const struct type_info type_EncodeError =
 	make_type("EncodeError", &type_Exception);
 
 EncodeError::EncodeError(const char *file, unsigned line, const char *format,
-			 ...)
+			 const char *details)
 	: Exception(&type_EncodeError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
-	error_vformat_msg(this, format, ap);
-	va_end(ap);
+	error_format_msg(this, "%s encode error: %s", format, details);
+	error_set_str(this, "format", format);
+	error_set_str(this, "details", details);
 }
 
 const struct type_info type_DecodeError =
 	make_type("DecodeError", &type_Exception);
 
 DecodeError::DecodeError(const char *file, unsigned line, const char *format,
-			 ...)
+			 const char *details)
 	: Exception(&type_DecodeError, file, line)
 {
-	va_list ap;
-	va_start(ap, format);
-	error_vformat_msg(this, format, ap);
-	va_end(ap);
+	error_format_msg(this, "%s decode error: %s", format, details);
+	error_set_str(this, "format", format);
+	error_set_str(this, "details", details);
 }
 
 struct error *
@@ -363,10 +338,9 @@ BuildLuajitError(const char *file, unsigned line, const char *msg)
 struct error *
 BuildIllegalParams(const char *file, unsigned line, const char *format, ...)
 {
-	IllegalParams *e = new IllegalParams(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	IllegalParams *e = new IllegalParams(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -374,22 +348,19 @@ BuildIllegalParams(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...)
 {
-	SystemError *e = new SystemError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	SystemError *e = new SystemError(file, line, format, ap);
 	va_end(ap);
-	error_append_msg(e, ": %s", tt_strerror(e->saved_errno));
 	return e;
 }
 
 struct error *
 BuildCollationError(const char *file, unsigned line, const char *format, ...)
 {
-	CollationError *e = new CollationError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	CollationError *e = new CollationError(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -397,10 +368,9 @@ BuildCollationError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildSwimError(const char *file, unsigned line, const char *format, ...)
 {
-	SwimError *e = new SwimError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	SwimError *e = new SwimError(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -408,10 +378,9 @@ BuildSwimError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildCryptoError(const char *file, unsigned line, const char *format, ...)
 {
-	CryptoError *e = new CryptoError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	CryptoError *e = new CryptoError(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -420,23 +389,19 @@ struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...)
 {
-	SocketError *e = new SocketError(file, line, socketname, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	SocketError *e = new SocketError(file, line, socketname, format, ap);
 	va_end(ap);
-	error_append_msg(e, ", called on %s: %s", socketname,
-			 tt_strerror(e->saved_errno));
 	return e;
 }
 
 struct error *
 BuildRaftError(const char *file, unsigned line, const char *format, ...)
 {
-	RaftError *e = new RaftError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	RaftError *e = new RaftError(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -444,10 +409,9 @@ BuildRaftError(const char *file, unsigned line, const char *format, ...)
 struct error *
 BuildFileFormatError(const char *file, unsigned line, const char *format, ...)
 {
-	FileFormatError *e = new FileFormatError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
-	error_vformat_msg(e, format, ap);
+	FileFormatError *e = new FileFormatError(file, line, format, ap);
 	va_end(ap);
 	return e;
 }
@@ -456,20 +420,12 @@ struct error *
 BuildEncodeError(const char *file, unsigned line, const char *format,
 		 const char *details)
 {
-	EncodeError *e = new EncodeError(file, line, "%s encode error: %s",
-					 format, details);
-	error_payload_set_str(&e->payload, "format", format);
-	error_payload_set_str(&e->payload, "details", details);
-	return e;
+	return new EncodeError(file, line, format, details);
 }
 
 struct error *
 BuildDecodeError(const char *file, unsigned line, const char *format,
 		 const char *details)
 {
-	DecodeError *e = new DecodeError(file, line, "%s decode error: %s",
-					 format, details);
-	error_payload_set_str(&e->payload, "format", format);
-	error_payload_set_str(&e->payload, "details", details);
-	return e;
+	return new DecodeError(file, line, format, details);
 }

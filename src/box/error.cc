@@ -73,37 +73,29 @@ box_error_clear(void)
 	diag_clear(&fiber()->diag);
 }
 
-int
-box_error_set(const char *file, unsigned line, uint32_t code,
-		const char *fmt, ...)
-{
-	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
-	ClientError *client_error = type_cast(ClientError, e);
-	client_error->code = code;
-	va_list ap;
-	va_start(ap, fmt);
-	error_vformat_msg(e, fmt, ap);
-	va_end(ap);
-	diag_set_error(&fiber()->diag, e);
-	return -1;
-}
-
+/** Creates new error based on code and custom_type. */
 static struct error *
 box_error_new_va(const char *file, unsigned line, uint32_t code,
 		 const char *custom_type, const char *fmt, va_list ap)
 {
-	struct error *e;
-	if (custom_type != NULL) {
-		e = BuildCustomError(file, line, custom_type, code);
-	} else if (code == ER_ILLEGAL_PARAMS) {
-		e = BuildIllegalParams(file, line, "");
-	} else {
-		e = BuildClientError(file, line, ER_UNKNOWN);
-		ClientError *client_error = type_cast(ClientError, e);
-		client_error->code = code;
-	}
-	error_vformat_msg(e, fmt, ap);
-	return e;
+	if (custom_type != NULL)
+		return new CustomError(file, line, custom_type, code, fmt, ap);
+	else if (code == ER_ILLEGAL_PARAMS)
+		return new IllegalParams(file, line, fmt, ap);
+	else
+		return new ClientError(file, line, code, fmt, ap);
+}
+
+int
+box_error_set(const char *file, unsigned line, uint32_t code,
+	      const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	struct error *e = box_error_new_va(file, line, code, NULL, fmt, ap);
+	va_end(ap);
+	diag_set_error(&fiber()->diag, e);
+	return -1;
 }
 
 struct error *
@@ -154,14 +146,38 @@ const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
 	"ERROR"
 };
 
-/** Format client error with arguments in `ap` according to error format. */
-static void
-client_error_create(struct error *e, va_list ap)
+const struct type_info type_ClientError =
+	make_type("ClientError", &type_Exception);
+
+ClientError::ClientError(const type_info *type, const char *file, unsigned line,
+			 uint32_t errcode)
+	: Exception(type, file, line)
 {
-	const struct errcode_record *r = tnt_errcode_record(e->code);
+	code = errcode;
+	if (rmean_error)
+		rmean_collect(rmean_error, RMEAN_ERROR, 1);
+}
+
+ClientError::ClientError(const char *file, unsigned line, uint32_t errcode,
+			 va_list ap)
+	: ClientError(file, line, errcode, /*fmt=*/NULL, ap)
+{
+}
+
+ClientError::ClientError(const char *file, unsigned line, uint32_t errcode,
+			 const char *fmt, va_list ap)
+	: ClientError(&type_ClientError, file, line, errcode)
+{
+	const struct errcode_record *r = tnt_errcode_record(code);
+	assert(strncmp("ER_", r->errstr, 3) == 0);
+	error_set_str(this, "name", r->errstr + 3);
+	if (fmt != NULL) {
+		error_vformat_msg(this, fmt, ap);
+		return;
+	}
 	va_list ap_copy;
 	va_copy(ap_copy, ap);
-	error_vformat_msg(e, r->errdesc, ap_copy);
+	error_vformat_msg(this, r->errdesc, ap_copy);
 	va_end(ap_copy);
 	for (int i = 0; i < r->errfields_count; i++) {
 		const char *name = r->errfields[i].name;
@@ -170,49 +186,49 @@ client_error_create(struct error *e, va_list ap)
 		case ERRCODE_FIELD_TYPE_CHAR: {
 			char buf[2] = {(char)va_arg(ap, int), '\0'};
 			if (set_payload)
-				error_set_str(e, name, buf);
+				error_set_str(this, name, buf);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_INT: {
 			int v = va_arg(ap, int);
 			if (set_payload)
-				error_set_int(e, name, v);
+				error_set_int(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_UINT: {
 			unsigned v = va_arg(ap, unsigned);
 			if (set_payload)
-				error_set_uint(e, name, v);
+				error_set_uint(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_LONG: {
 			long v = va_arg(ap, long);
 			if (set_payload)
-				error_set_int(e, name, v);
+				error_set_int(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_ULONG: {
 			unsigned long v = va_arg(ap, unsigned long);
 			if (set_payload)
-				error_set_uint(e, name, v);
+				error_set_uint(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_LLONG: {
 			long long v = va_arg(ap, long long);
 			if (set_payload)
-				error_set_int(e, name, v);
+				error_set_int(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_ULLONG: {
 			unsigned long long v = va_arg(ap, unsigned long long);
 			if (set_payload)
-				error_set_uint(e, name, v);
+				error_set_uint(this, name, v);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_STRING: {
 			const char *s = va_arg(ap, const char *);
 			if (set_payload && s != NULL)
-				error_set_str(e, name, s);
+				error_set_str(this, name, s);
 			break;
 		}
 		case ERRCODE_FIELD_TYPE_MSGPACK: {
@@ -221,7 +237,7 @@ client_error_create(struct error *e, va_list ap)
 			assert(set_payload);
 			if (mp != NULL) {
 				mp_next(&mp_end);
-				error_set_mp(e, name, mp, mp_end - mp);
+				error_set_mp(this, name, mp, mp_end - mp);
 			}
 			break;
 		}
@@ -229,7 +245,7 @@ client_error_create(struct error *e, va_list ap)
 			struct tuple *tuple = va_arg(ap, struct tuple *);
 			assert(set_payload);
 			if (tuple != NULL)
-				error_set_mp(e, name, tuple_data(tuple),
+				error_set_mp(this, name, tuple_data(tuple),
 					     tuple_bsize(tuple));
 			break;
 		}
@@ -237,30 +253,6 @@ client_error_create(struct error *e, va_list ap)
 			assert(false);
 		}
 	}
-	assert(strncmp("ER_", r->errstr, 3) == 0);
-	error_set_str(e, "name", r->errstr + 3);
-}
-
-const struct type_info type_ClientError =
-	make_type("ClientError", &type_Exception);
-
-ClientError::ClientError(const type_info *type, const char *file, unsigned line,
-			 uint32_t errcode)
-	:Exception(type, file, line)
-{
-	code = errcode;
-	if (rmean_error)
-		rmean_collect(rmean_error, RMEAN_ERROR, 1);
-}
-
-ClientError::ClientError(const char *file, unsigned line,
-			 uint32_t errcode, ...)
-	:ClientError(&type_ClientError, file, line, errcode)
-{
-	va_list ap;
-	va_start(ap, errcode);
-	client_error_create(this, ap);
-	va_end(ap);
 }
 
 struct error *
@@ -272,11 +264,9 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 	assert(errcode != ER_SSL); /* use SSLError */
 	assert(errcode != ER_XLOG_GAP); /* use XlogGapError */
 	assert(errcode != ER_ACCESS_DENIED); /* use AccessDeniedError */
-	ClientError *e = new ClientError(file, line, ER_UNKNOWN);
 	va_list ap;
 	va_start(ap, errcode);
-	e->code = errcode;
-	client_error_create(e, ap);
+	ClientError *e = new ClientError(file, line, errcode, ap);
 	va_end(ap);
 	return e;
 }
@@ -389,9 +379,11 @@ const struct type_info type_CustomError =
 	make_type("CustomError", &type_ClientError);
 
 CustomError::CustomError(const char *file, unsigned int line,
-			 const char *custom_type, uint32_t errcode)
+			 const char *custom_type, uint32_t errcode,
+			 const char *fmt, va_list ap)
 	:ClientError(&type_CustomError, file, line, errcode)
 {
+	error_vformat_msg(this, fmt, ap);
 	error_set_str(this, "custom_type", custom_type);
 }
 
@@ -404,7 +396,12 @@ CustomError::log() const
 
 struct error *
 BuildCustomError(const char *file, unsigned int line, const char *custom_type,
-		 uint32_t errcode)
+		 uint32_t errcode, const char *format, ...)
 {
-	return new CustomError(file, line, custom_type, errcode);
+	va_list ap;
+	va_start(ap, format);
+	CustomError *e = new CustomError(file, line, custom_type, errcode,
+					 format, ap);
+	va_end(ap);
+	return e;
 }
