@@ -47,26 +47,14 @@ struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 
 /* {{{ Utilities. **********************************************/
 
-UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
-	unsigned line, struct index_def *index_def, const char *what)
-	: ClientError(file, line, ER_UNKNOWN)
-{
-	code = ER_UNSUPPORTED_INDEX_FEATURE;
-	error_format_msg(this, tnt_errcode_desc(code), index_def->name,
-			 index_type_strs[index_def->type],
-			 index_def->space_name, index_def->engine_name, what);
-	error_set_str(this, "index", index_def->name);
-	error_set_str(this, "index_type", index_type_strs[index_def->type]);
-	error_set_str(this, "space", index_def->space_name);
-	error_set_str(this, "engine", index_def->engine_name);
-	error_set_str(this, "feature", what);
-}
-
 struct error *
 BuildUnsupportedIndexFeature(const char *file, unsigned line,
 			     struct index_def *index_def, const char *what)
 {
-	return new UnsupportedIndexFeature(file, line, index_def, what);
+	return BuildClientError(
+			file, line, ER_UNSUPPORTED_INDEX_FEATURE,
+			index_def->name, index_type_strs[index_def->type],
+			index_def->space_name, index_def->engine_name, what);
 }
 
 /**
