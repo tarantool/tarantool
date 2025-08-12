@@ -580,11 +580,11 @@ test_pthread_f(void *arg)
 {
 	(void)arg;
 	is(box_error_last(), NULL, "last error before set");
-	box_error_raise(ER_ILLEGAL_PARAMS, "Test %d", 42);
+	box_error_raise(ER_UNSUPPORTED, "Test %d", 42);
 	box_error_t *err = box_error_last();
 	isnt(err, NULL, "last error after set");
 	is(strcmp(box_error_type(err), "ClientError"), 0, "last error type");
-	is(box_error_code(err), ER_ILLEGAL_PARAMS, "last error code");
+	is(box_error_code(err), ER_UNSUPPORTED, "last error code");
 	is(strcmp(box_error_message(err), "Test 42"), 0, "last error message");
 	box_error_clear();
 	is(box_error_last(), NULL, "last error after clear");
@@ -644,12 +644,28 @@ static void
 test_client_error_name(void)
 {
 	header();
-	plan(1);
+	plan(4);
 
 	diag_set(ClientError, ER_UNSUPPORTED, "foo", "bar");
 	struct error *e = diag_last_error(diag_get());
 	const char *s = error_get_str(e, "name");
 	ok(s != NULL && strcmp(s, "UNSUPPORTED") == 0);
+
+	box_error_set("", 0, ER_TUPLE_FOUND, "foo");
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "TUPLE_FOUND") == 0);
+
+	box_error_add("", 0, ER_MEMORY_ISSUE, NULL, "bar");
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "MEMORY_ISSUE") == 0);
+
+	e = box_error_new("", 0, ER_READONLY, NULL, "foo");
+	error_ref(e);
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "READONLY") == 0);
+	error_unref(e);
 
 	check_plan();
 	footer();
