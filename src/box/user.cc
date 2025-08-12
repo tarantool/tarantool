@@ -30,6 +30,7 @@
  */
 #include "user.h"
 #include "assoc.h"
+#include "error.h"
 #include "schema.h"
 #include "space.h"
 #include "func.h"
@@ -557,7 +558,9 @@ auth_token_get(void)
 		 * Check for BOX_USER_MAX to cover case when
 		 * USER_MAP_BITS > BOX_USER_MAX.
 		 */
-		tnt_raise(LoggedError, ER_USER_MAX, BOX_USER_MAX);
+		diag_set(ClientError, ER_USER_MAX, BOX_USER_MAX);
+		diag_log();
+		diag_raise();
 	}
         /*
          * find-first-set returns bit index starting from 1,

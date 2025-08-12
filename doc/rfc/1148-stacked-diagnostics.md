@@ -43,9 +43,7 @@ Type of error is represented by a few C++ classes (all are inherited from
 Exception class). For instance hierarchy for ClientError is following:
 ```
 ClientError
- | LoggedError
  | AccessDeniedError
- | UnsupportedIndexFeature
 ```
 
 All codes and names of ClientError class are available in box.error.

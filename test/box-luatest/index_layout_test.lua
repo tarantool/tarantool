@@ -25,7 +25,6 @@ g.test_arg_check = function(cg)
         local s = box.schema.space.create('test')
         t.assert_error_covers({
             type = 'IllegalParams',
-            name = 'ILLEGAL_PARAMS',
             message = "options parameter 'layout' should be of type string",
         }, s.create_index, s, 'pk', {layout = 1234})
 

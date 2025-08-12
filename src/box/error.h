@@ -55,7 +55,7 @@ BuildXlogGapError(const char *file, unsigned line,
 
 struct error *
 BuildCustomError(const char *file, unsigned int line, const char *custom_type,
-		 uint32_t errcode);
+		 uint32_t errcode, const char *format, ...);
 
 /** \cond public */
 
@@ -235,7 +235,10 @@ public:
 		return code;
 	}
 
-	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
+	ClientError(const char *file, unsigned line, uint32_t errcode,
+		    va_list ap);
+	ClientError(const char *file, unsigned line, uint32_t errcode,
+		    const char *fmt, va_list ap);
 
 	ClientError()
 		:Exception(&type_ClientError, NULL, 0)
@@ -246,18 +249,6 @@ public:
 protected:
 	ClientError(const type_info *type, const char *file, unsigned line,
 		    uint32_t errcode);
-};
-
-class LoggedError: public ClientError
-{
-public:
-	template <typename ... Args>
-	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
-		: ClientError(file, line, errcode, args...)
-	{
-		/* TODO: actually calls ClientError::log */
-		log();
-	}
 };
 
 /**
@@ -342,7 +333,8 @@ class CustomError: public ClientError
 {
 public:
 	CustomError(const char *file, unsigned int line,
-		    const char *custom_type, uint32_t errcode);
+		    const char *custom_type, uint32_t errcode, const char *fmt,
+		    va_list ap);
 
 	CustomError()
 		:ClientError(&type_CustomError, NULL, 0, 0)
