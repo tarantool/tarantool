@@ -84,3 +84,6 @@ leak:fiber_gc_checker_init
 
 # FIXME(gh-11740)
 leak:iproto_thread_accept
+
+# FIXME(tarantool/tarantool-ee#1407)
+leak:Curl_http_write_resp
