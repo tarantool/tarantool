@@ -541,7 +541,7 @@ relay_final_join(struct replica *replica, struct iostream *io, uint64_t sync,
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
 	vclock_copy_ignore0(&relay->last_recv_ack.vclock, start_vclock);
-	relay->r = recovery_new(wal_dir(), false, start_vclock);
+	relay->r = recovery_new(wal_dir(), 0, start_vclock);
 	vclock_copy(&relay->stop_vclock, stop_vclock);
 
 	struct cord cord;
@@ -1115,7 +1115,8 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
 	vclock_copy_ignore0(&relay->last_recv_ack.vclock, start_vclock);
-	relay->r = recovery_new(wal_dir(), false, start_vclock);
+	relay->r = recovery_new(wal_dir(), RECOVERY_SUPPRESS_LOGGING,
+				start_vclock);
 	vclock_copy_ignore0(&relay->tx.vclock, start_vclock);
 	relay->version_id = replica_version_id;
 	relay->id_filter |= replica_id_filter;

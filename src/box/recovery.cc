@@ -81,7 +81,7 @@
  * Throws an exception in  case of error.
  */
 struct recovery *
-recovery_new(const char *wal_dirname, bool force_recovery,
+recovery_new(const char *wal_dirname, unsigned flags,
 	     const struct vclock *vclock)
 {
 	struct recovery *r = (struct recovery *)
@@ -98,9 +98,11 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 
 	xdir_create(&r->wal_dir, wal_dirname, "XLOG", &INSTANCE_UUID,
 		    &xlog_opts_default);
-	r->wal_dir.force_recovery = force_recovery;
+	if (flags & RECOVERY_IGNORE_ERRORS)
+		r->wal_dir.force_recovery = true;
 
 	vclock_copy(&r->vclock, vclock);
+	r->flags = flags;
 
 	/**
 	 * Avoid scanning WAL dir before we recovered
@@ -156,7 +158,8 @@ recovery_close_log(struct recovery *r)
 	if (!xlog_cursor_is_open(&r->cursor))
 		return;
 	if (xlog_cursor_is_eof(&r->cursor)) {
-		say_info("done `%s'", r->cursor.name);
+		if (!(r->flags & RECOVERY_SUPPRESS_LOGGING))
+			say_info("done `%s'", r->cursor.name);
 	} else {
 		say_warn("file `%s` wasn't correctly closed",
 			 r->cursor.name);
@@ -211,9 +214,8 @@ out:
 
 gap_error:
 	e = tnt_error(XlogGapError, &r->vclock, vclock);
-	if (!r->wal_dir.force_recovery)
+	if (!(r->flags & RECOVERY_IGNORE_ERRORS))
 		throw e;
-	/* Ignore missing WALs if force_recovery is set. */
 	error_log(e);
 	say_warn("ignoring a gap in LSN");
 	goto out;
@@ -250,11 +252,12 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	struct xrow_header row;
 	bool is_sending_tx = false;
 	while (xlog_cursor_next_xc(&r->cursor, &row,
-				   r->wal_dir.force_recovery) == 0) {
+				   (r->flags & RECOVERY_IGNORE_ERRORS)) == 0) {
 		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
 			xstream_yield(stream);
 		}
-		if (stream->row_count % 100000 == 0) {
+		if (stream->row_count % 100000 == 0 &&
+		    !(r->flags & RECOVERY_SUPPRESS_LOGGING)) {
 			say_info_ratelimited("%.1fM rows processed",
 					     stream->row_count / 1e6);
 		}
@@ -303,7 +306,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		}
 		is_sending_tx = !row.is_commit;
 		if (xstream_write(stream, &row) != 0) {
-			if (!r->wal_dir.force_recovery)
+			if (!(r->flags & RECOVERY_IGNORE_ERRORS))
 				diag_raise();
 
 			say_error("skipping row {%u: %lld}",
@@ -367,8 +370,8 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 
 		recovery_open_log(r, clock);
 
-		say_info("recover from `%s'", r->cursor.name);
-
+		if (!(r->flags & RECOVERY_SUPPRESS_LOGGING))
+			say_info("recover from `%s'", r->cursor.name);
 recover_current_wal:
 		recover_xlog(r, stream, stop_vclock);
 	}
