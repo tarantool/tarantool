@@ -43,11 +43,28 @@ extern "C" {
 struct xrow_header;
 struct xstream;
 
+enum recovery_flag {
+	/**
+	 * Do not abort recovery if a recovery error occurs. Instead log
+	 * the error and proceed. This flag is set if the force_recovery
+	 * configuration option is used.
+	 */
+	RECOVERY_IGNORE_ERRORS = 1 << 0,
+	/**
+	 * Do not print informational log messages.
+	 */
+	RECOVERY_SUPPRESS_LOGGING = 1 << 1,
+};
+
 struct recovery {
+	/** Current recovery vclock. */
 	struct vclock vclock;
 	/** The WAL cursor we're currently reading/writing from/to. */
 	struct xlog_cursor cursor;
+	/** Directory that contains WAL files. */
 	struct xdir wal_dir;
+	/** Recovery flags. See recovery_flag enum for available flags. */
+	unsigned flags;
 	/**
 	 * This fiber is used in local hot standby mode.
 	 * It looks for changes in the wal_dir and applies
@@ -59,7 +76,7 @@ struct recovery {
 };
 
 struct recovery *
-recovery_new(const char *wal_dirname, bool force_recovery,
+recovery_new(const char *wal_dirname, unsigned flags,
 	     const struct vclock *vclock);
 
 void

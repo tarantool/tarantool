@@ -5838,8 +5838,11 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		wal_stream_abort(&wal_stream);
 		wal_stream_destroy(&wal_stream);
 	});
-	struct recovery *recovery = recovery_new(
-		wal_dir(), box_is_force_recovery, checkpoint_vclock);
+	unsigned recovery_flags = 0;
+	if (box_is_force_recovery)
+		recovery_flags |= RECOVERY_IGNORE_ERRORS;
+	struct recovery *recovery = recovery_new(wal_dir(), recovery_flags,
+						 checkpoint_vclock);
 	/*
 	 * Make sure we report the actual recovery position
 	 * in box.info while local recovery is in progress.
