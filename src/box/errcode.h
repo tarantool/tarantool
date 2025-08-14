@@ -252,7 +252,7 @@ struct errcode_record {
 	_(ER_WRONG_SCHEMA_VERSION, 109,		"Wrong schema version, current: %d, in request: %llu", "actual", ULLONG, "expected", ULLONG) \
 	_(ER_MEMTX_MAX_TUPLE_SIZE, 110,		"Failed to allocate %u bytes for tuple: tuple is too large. Check 'memtx_max_tuple_size' configuration option.", "value", ULLONG, "max", ULLONG) \
 	_(ER_WRONG_SPACE_OPTIONS, 111,		"Wrong space options: %s", "details", STRING) \
-	_(ER_UNSUPPORTED_INDEX_FEATURE, 112,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
+	_(ER_UNSUPPORTED_INDEX_FEATURE, 112,	"Index '%s' (%s) of space '%s' (%s) does not support %s", "index", STRING, "index_type", STRING, "space", STRING, "engine", STRING, "feature", STRING) \
 	_(ER_VIEW_IS_RO, 113,			"View '%s' is read-only", "space", STRING) \
 	_(ER_NO_TRANSACTION, 114,		"No active transaction") \
 	_(ER_SYSTEM, 115,			"%s") \

@@ -40,8 +40,7 @@ u.trace[1].line = nil
  | ...
 u
  | ---
- | - name: ILLEGAL_PARAMS
- |   code: 0
+ | - code: 0
  |   base_type: IllegalParams
  |   type: IllegalParams
  |   message: foo

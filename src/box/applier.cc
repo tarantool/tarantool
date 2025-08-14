@@ -366,15 +366,23 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 		diag_raise();
 
 	/* Decode instance version and name from greeting */
-	if (greeting_decode(greetingbuf, greeting) != 0)
-		tnt_raise(LoggedError, ER_PROTOCOL, "Invalid greeting");
+	if (greeting_decode(greetingbuf, greeting) != 0) {
+		diag_set(ClientError, ER_PROTOCOL, "Invalid greeting");
+		diag_log();
+		diag_raise();
+	}
 
 	if (strcmp(greeting->protocol, "Binary") != 0) {
-		tnt_raise(LoggedError, ER_PROTOCOL,
-			  "Unsupported protocol for replication");
+		diag_set(ClientError, ER_PROTOCOL,
+			 "Unsupported protocol for replication");
+		diag_log();
+		diag_raise();
 	}
-	if (tt_uuid_is_nil(&greeting->uuid))
-		tnt_raise(LoggedError, ER_NIL_UUID);
+	if (tt_uuid_is_nil(&greeting->uuid)) {
+		diag_set(ClientError, ER_NIL_UUID);
+		diag_log();
+		diag_raise();
+	}
 }
 
 /**

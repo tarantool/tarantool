@@ -580,11 +580,11 @@ test_pthread_f(void *arg)
 {
 	(void)arg;
 	is(box_error_last(), NULL, "last error before set");
-	box_error_raise(ER_ILLEGAL_PARAMS, "Test %d", 42);
+	box_error_raise(ER_UNSUPPORTED, "Test %d", 42);
 	box_error_t *err = box_error_last();
 	isnt(err, NULL, "last error after set");
 	is(strcmp(box_error_type(err), "ClientError"), 0, "last error type");
-	is(box_error_code(err), ER_ILLEGAL_PARAMS, "last error code");
+	is(box_error_code(err), ER_UNSUPPORTED, "last error code");
 	is(strcmp(box_error_message(err), "Test 42"), 0, "last error message");
 	box_error_clear();
 	is(box_error_last(), NULL, "last error after clear");
@@ -644,12 +644,28 @@ static void
 test_client_error_name(void)
 {
 	header();
-	plan(1);
+	plan(4);
 
 	diag_set(ClientError, ER_UNSUPPORTED, "foo", "bar");
 	struct error *e = diag_last_error(diag_get());
 	const char *s = error_get_str(e, "name");
 	ok(s != NULL && strcmp(s, "UNSUPPORTED") == 0);
+
+	box_error_set("", 0, ER_TUPLE_FOUND, "foo");
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "TUPLE_FOUND") == 0);
+
+	box_error_add("", 0, ER_MEMORY_ISSUE, NULL, "bar");
+	e = diag_last_error(diag_get());
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "MEMORY_ISSUE") == 0);
+
+	e = box_error_new("", 0, ER_READONLY, NULL, "foo");
+	error_ref(e);
+	s = error_get_str(e, "name");
+	ok(s != NULL && strcmp(s, "READONLY") == 0);
+	error_unref(e);
 
 	check_plan();
 	footer();
@@ -701,9 +717,8 @@ test_logging(void)
 	/* 1. Check json escaping custom type. */
 	/* 2. Check no trace. */
 	/* 3. Check zero code. */
-	e = BuildCustomError("", 505, "\"typo\"", 0);
+	e = BuildCustomError("", 505, "\"typo\"", 0, "some message");
 	error_ref(e);
-	strcpy(e->errmsg_buf, "some message");
 	/* 4. Check errno. */
 	e->saved_errno = 11;
 	error_log(e);
@@ -715,13 +730,10 @@ test_logging(void)
 	error_unref(e);
 
 	/* Check stacked error. */
-	struct error *e1 = BuildCustomError("", 101, "level_1", 0);
+	struct error *e1 = BuildCustomError("", 101, "level_1", 0, "message 1");
 	error_ref(e1);
-	strcpy(e1->errmsg_buf, "message 1");
-	struct error *e2 = BuildCustomError("", 202, "level_2", 0);
-	strcpy(e2->errmsg_buf, "message 2");
-	struct error *e3 = BuildCustomError("", 303, "level_3", 0);
-	strcpy(e3->errmsg_buf, "message 3");
+	struct error *e2 = BuildCustomError("", 202, "level_2", 0, "message 2");
+	struct error *e3 = BuildCustomError("", 303, "level_3", 0, "message 3");
 	error_set_prev(e1, e2);
 	error_set_prev(e2, e3);
 	error_log(e2);
