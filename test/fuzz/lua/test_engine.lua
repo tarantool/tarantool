@@ -1825,7 +1825,10 @@ local function run_test(num_workers, test_duration, test_dir,
     local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
     local deadline = os.clock() + test_duration
 
-    local test_gen = fun.cycle(fun.iter(keys(ops)))
+    local op_keys = keys(ops)
+    local test_gen = fun.rands(1, table.getn(op_keys)):map(function(x)
+        return op_keys[x]
+    end)
     local f
     for id = 1, num_workers do
         f = fiber.new(worker_func, id, space, test_gen, deadline)
