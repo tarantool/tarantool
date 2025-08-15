@@ -355,6 +355,10 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 		errinj(ERRINJ_TUPLE_FIELD_COUNT_LIMIT, ERRINJ_INT);
 	if (err_inj != NULL && err_inj->iparam > 0) {
 		tuple_field_cnt_lim = err_inj->iparam;
+		if (size >= tuple_field_cnt_lim) {
+			diag_set(ClientError, ER_TUPLE_FIELD_COUNT_LIMIT);
+			return -1;
+		}
 	}
 	assert(size <= tuple_field_cnt_lim);
 	if (size == tuple_field_cnt_lim) {
