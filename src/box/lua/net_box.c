@@ -3125,10 +3125,23 @@ netbox_worker_f(va_list ap)
 		}
 		if (fiber_is_cancelled())
 			break;
-		netbox_transport_set_error(transport);
 		transport->state = (reconnect_after > 0 ?
 				    NETBOX_ERROR_RECONNECT : NETBOX_ERROR);
+		if (transport->last_error == NULL) {
+			netbox_transport_set_error(transport);
+		} else {
+			char *prev_errmsg = transport->last_error->errmsg;
+			char *curr_errmsg = diag_last_error(diag_get())->errmsg;
+			if (strstr(prev_errmsg, "Connection refused") != NULL &&
+			    strstr(curr_errmsg, "Connection refused") != NULL)
+				goto reconnect;
+			netbox_transport_set_error(transport);
+		}
 		netbox_transport_on_state_change_pcall(transport, L);
+		if (strstr(transport->last_error->errmsg, "Connection refused") != NULL)
+			say_info("will retry every %.2lf second",
+				 reconnect_after);
+reconnect:
 		if (reconnect_after > 0) {
 			fiber_sleep(reconnect_after);
 		} else {
