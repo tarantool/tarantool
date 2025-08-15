@@ -227,8 +227,9 @@ local RTREE_MAX_DIMENSION = 20
 
 local RTREE_DIMENSION = math.random(RTREE_MAX_DIMENSION)
 
--- RTREE is a single index that support arrays, length of arrays
--- depends on a RTREE's dimension.
+-- RTREE and multikey TREE are the only indexes that support arrays.
+-- For the sake of simplicity, let's always generate arrays depending
+-- on a RTREE's dimension.
 local function random_array()
     local n = RTREE_DIMENSION * 2
     local arr = {}
@@ -510,6 +511,7 @@ local tarantool_indices = {
             'REQ',
         },
         data_type = {
+            ['array'] = true, -- only for multikey indices
             ['boolean'] = true,
             ['datetime'] = true,
             ['decimal'] = true,
@@ -637,6 +639,16 @@ local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
+-- A helper that returns true if the index is multikey.
+local function index_is_multikey(idx)
+    for _, part in ipairs(idx.parts) do
+        if part.path ~= nil and string.find(part.path, '[*]') ~= nil then
+            return true
+        end
+    end
+    return false
+end
+
 local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('SETUP')
     assert(engine_name == 'memtx' or
@@ -757,8 +769,16 @@ local function index_opts(space, is_primary)
                   true or
                   tarantool_indices[opts.type].is_unique_support
 
-    -- 'hint' is only reasonable with memtx tree index.
-    if space.engine == 'memtx' and
+    -- Multikey indexes are supported by vinyl and memtx without MVCC engine.
+    local space_supports_multikey = space.engine == 'vinyl' or
+        (space.engine == 'memtx' and not box.cfg.memtx_use_mvcc_engine)
+    local is_multikey = false
+    if not is_primary and opts.type == 'TREE' and space_supports_multikey then
+        is_multikey = oneof({true, false})
+    end
+
+    -- 'hint' is only reasonable with non-multikey memtx tree index.
+    if space.engine == 'memtx' and not is_multikey and
        opts.type == 'TREE' then
         opts.hint = true
     end
@@ -775,6 +795,10 @@ local function index_opts(space, is_primary)
         function(x)
             -- Primary index must be not nullable.
             if is_primary and x.is_nullable then
+                return nil
+            end
+            -- Array fields are not supported by non-multikey tree.
+            if idx == 'TREE' and x.type == 'array' and not is_multikey then
                 return nil
             end
             if tarantool_indices[idx].data_type[x.type] == true then
@@ -799,16 +823,24 @@ local function index_opts(space, is_primary)
         end
 
         local exclude_null = oneof({false, is_nullable})
-        table.insert(opts.parts, {
+        local part = {
             field.name, is_nullable = is_nullable,
-            exclude_null = exclude_null,
-        })
+            exclude_null = exclude_null
+        }
+        -- All the arrays have unsigned values now, so the type
+        -- is fixed here. Also, note that arrays never contain
+        -- null values currently, but let's create nullable
+        -- multikey indexes anyway.
+        if is_multikey and field.type == 'array' then
+            part.path = '[*]'
+            part.type = 'unsigned'
+        end
+        table.insert(opts.parts, part)
         if not tarantool_indices[opts.type].is_multipart and
            i == 1 then
             break
         end
     end
-
     return opts
 end
 
@@ -903,7 +935,8 @@ local function index_pagination_op(_space, idx, key)
         opts.after = pos
         idx:select(key, opts)
     end
-    if #tuples > 0 then
+    -- Multikey index doesn't support pagination by tuple.
+    if #tuples > 0 and not index_is_multikey(idx) then
         opts.after = oneof(tuples)
         idx:select(key, opts)
     end
