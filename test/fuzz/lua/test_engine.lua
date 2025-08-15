@@ -126,7 +126,6 @@ local err_pat_whitelist = {
     "fiber is cancelled",
     "fiber slice is exceeded",
     "Can not perform index build in a multi%-statement transaction",
-    "Index '[%w_]+' %(HASH%) of space '[%w_]+' %(memtx%) does not support pagination",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': primary key must be unique",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': hint is only reasonable with memtx tree index",
     "Get%(%) doesn't support partial keys and non%-unique indexes",
@@ -141,7 +140,6 @@ local err_pat_whitelist = {
     "Failed to write to disk",
     "WAL has a rollback in progress",
     -- MEMCS-specific errors.
-    "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
     "Arrow stream does not support field type '[%w_]+'",
     "box_insert_arrow: field [%d]+ has unsupported type",
     "Engine 'memcs' does not support variable field count",
@@ -476,6 +474,7 @@ local tarantool_indices = {
         is_non_unique_support = false,
         is_primary_key_support = true,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     BITSET = {
         iterator_type = {
@@ -498,6 +497,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     TREE = {
         iterator_type = {
@@ -530,6 +530,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = true,
         is_partial_search_support = true,
+        is_pagination_support = true,
     },
     RTREE = {
         iterator_type = {
@@ -553,6 +554,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = true,
+        is_pagination_support = false,
     },
 }
 
@@ -579,7 +581,7 @@ local function select_opts(idx_type)
         after = box.NULL,
         -- If true, the select method returns the position of
         -- the last selected tuple as the second value.
-        fetch_pos = oneof({true, false}),
+        fetch_pos = false,
     }
     return opts
 end
@@ -886,6 +888,25 @@ local function index_select_op(_space, idx, key)
     assert(key)
     local opts = select_opts(idx.type)
     idx:select(key, opts)
+end
+
+local function index_pagination_op(_space, idx, key)
+    assert(idx)
+    assert(key)
+    if not tarantool_indices[idx.type].is_pagination_support then
+        return
+    end
+    local opts = select_opts(idx.type)
+    opts.fetch_pos = oneof({true, false})
+    local tuples, pos = idx:select(key, opts)
+    if pos ~= nil then
+        opts.after = pos
+        idx:select(key, opts)
+    end
+    if #tuples > 0 then
+        opts.after = oneof(tuples)
+        idx:select(key, opts)
+    end
 end
 
 local function index_count_op(_, idx)
@@ -1204,6 +1225,15 @@ local ops = {
             local idx = space.index[idx_n]
             return idx, random_key(space, idx)
         end,
+    },
+    INDEX_PAGINATION_OP = {
+        func = index_pagination_op,
+        args = function(space)
+            local idx_n = oneof(keys(space.index))
+            local idx = space.index[idx_n]
+            return idx, random_key(space, idx)
+        end,
+        engines = {'memtx', 'vinyl'},
     },
     INDEX_MIN_OP = {
         func = index_min_op,
