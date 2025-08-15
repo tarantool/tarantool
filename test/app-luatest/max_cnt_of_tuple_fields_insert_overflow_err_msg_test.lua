@@ -20,3 +20,14 @@ g.test_tuple_field_count_limit_overflow = function()
         tuple:update{{'!', #tuple, 1}}
     end)
 end
+
+-- Checks that an invalid value of `ERRINJ_TUPLE_FIELD_COUNT_LIMIT` is handled
+-- correctly (gh-10033).
+g.test_invalid_tuple_field_count_limit_errinj = function()
+    local tuple = box.tuple.new{0, 0}
+    box.error.injection.set('ERRINJ_TUPLE_FIELD_COUNT_LIMIT', 1)
+    local msg = 'Tuple field count limit reached: see box.schema.FIELD_MAX'
+    t.assert_error_msg_equals(msg, function()
+        tuple:update{{'!', #tuple, 1}}
+    end)
+end
