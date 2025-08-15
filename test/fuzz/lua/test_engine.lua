@@ -126,7 +126,6 @@ local err_pat_whitelist = {
     "fiber is cancelled",
     "fiber slice is exceeded",
     "Can not perform index build in a multi%-statement transaction",
-    "Index '[%w_]+' %(HASH%) of space '[%w_]+' %(memtx%) does not support pagination",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': primary key must be unique",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': hint is only reasonable with memtx tree index",
     "Get%(%) doesn't support partial keys and non%-unique indexes",
@@ -141,7 +140,6 @@ local err_pat_whitelist = {
     "Failed to write to disk",
     "WAL has a rollback in progress",
     -- MEMCS-specific errors.
-    "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
     "Arrow stream does not support field type '[%w_]+'",
     "box_insert_arrow: field [%d]+ has unsupported type",
     "Engine 'memcs' does not support variable field count",
@@ -476,6 +474,7 @@ local tarantool_indices = {
         is_non_unique_support = false,
         is_primary_key_support = true,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     BITSET = {
         iterator_type = {
@@ -498,6 +497,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     TREE = {
         iterator_type = {
@@ -530,6 +530,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = true,
         is_partial_search_support = true,
+        is_pagination_support = true,
     },
     RTREE = {
         iterator_type = {
@@ -553,6 +554,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = true,
+        is_pagination_support = false,
     },
 }
 
@@ -567,8 +569,8 @@ local isolation_levels = {
     'read-confirmed',
 }
 
-local function select_op(space, idx_type, key)
-    local select_opts = {
+local function select_opts(idx_type)
+    local opts = {
         iterator = oneof(tarantool_indices[idx_type].iterator_type),
         -- The maximum number of tuples.
         limit = math.random(100, 500),
@@ -579,9 +581,14 @@ local function select_op(space, idx_type, key)
         after = box.NULL,
         -- If true, the select method returns the position of
         -- the last selected tuple as the second value.
-        fetch_pos = oneof({true, false}),
+        fetch_pos = false,
     }
-    space:select(key, select_opts)
+    return opts
+end
+
+local function select_op(space, idx_type, key)
+    local opts = select_opts(idx_type)
+    space:select(key, opts)
 end
 
 local function get_op(space, key)
@@ -628,6 +635,84 @@ end
 
 local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
+end
+
+-- Func names for functional indexes.
+local func_index_func_single = 'func_index_func_single'
+local func_index_func_multi = 'func_index_func_multi'
+-- Length of all func indexes, will be set on setup.
+local func_index_key_len
+local func_index_key_parts
+local func_index_key_types
+
+local function setup_funcs(engine_name)
+    func_index_key_len = math.random(1, 10)
+    func_index_key_parts = {}
+    func_index_key_types = {}
+    for i = 1, func_index_key_len do
+        table.insert(func_index_key_parts, math.random(1, 100))
+        table.insert(func_index_key_types, oneof{'unsigned', 'string'})
+    end
+    local func_string_template = 'tostring(tuple[%d %% #tuple] or "nil")'
+    local func_unsigned_template = 'string.byte(tostring(tuple[%d %% #tuple] or "nil"))'
+
+    local func_index_func_single_body = 'function(tuple) return {'
+    for i = 1, func_index_key_len do
+        local part = func_index_key_parts[i]
+        local template = func_index_key_types[i] == 'string' and
+                         func_string_template or func_unsigned_template
+        local delim = i < func_index_key_len and ', ' or '} end'
+        func_index_func_single_body = func_index_func_single_body ..
+                                      string.format(template, part) .. delim
+    end
+    log.error('Generated func %s', func_index_func_single_body)
+
+    box.schema.func.create(func_index_func_single, {
+        is_deterministic = true, is_sandboxed = true,
+        body = func_index_func_single_body
+    })
+
+    local func_index_func_multi_body = [[function(tuple)
+        local ret = {}
+        for i = 1, string.byte(tostring(tuple[0])) % 10 + 1 do
+            local value = {i,
+    ]]
+    for i = 1, func_index_key_len do
+        local part = func_index_key_parts[i]
+        local template = func_index_key_types[i] == 'string' and
+                         func_string_template or func_unsigned_template
+        local delim = i < func_index_key_len and ', ' or '}'
+        func_index_func_multi_body = func_index_func_multi_body ..
+                                     string.format(template, part) .. delim
+    end
+    func_index_func_multi_body = func_index_func_multi_body .. [[
+                table.insert(ret, value)
+        end
+        return ret
+    end]]
+    log.error('Generated func %s', func_index_func_multi_body)
+
+    box.schema.func.create(func_index_func_multi, {
+        is_deterministic = true, is_sandboxed = true, is_multikey = true,
+        body = func_index_func_multi_body
+    })
+end
+
+local function func_index_gen_parts(func_name)
+    assert(func_name == func_index_func_single or
+           func_name == func_index_func_multi)
+
+    local parts = {}
+    local base = 0
+    if func_name == func_index_func_multi then
+        table.insert(parts, {1, 'unsigned'})
+        base = 1
+    end
+
+    for i = 1, func_index_key_len do
+        table.insert(parts, {base + i, func_index_key_types[i]})
+    end
+    return parts
 end
 
 local function setup(engine_name, space_id_func, test_dir, verbose)
@@ -682,6 +767,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     box.cfg(box_cfg_options)
     log.info('FINISH BOX.CFG')
 
+    setup_funcs()
+
     log.info('CREATE A SPACE')
     local space_format = random_space_format(engine_name)
     -- TODO: support `constraint`.
@@ -730,7 +817,6 @@ local function index_opts(space, is_primary)
     local opts = {
         if_not_exists = false,
         -- TODO: support `sequence`,
-        -- TODO: support functional indices.
     }
 
     local indices = fun.iter(keys(tarantool_indices)):filter(
@@ -750,15 +836,36 @@ local function index_opts(space, is_primary)
                   true or
                   tarantool_indices[opts.type].is_unique_support
 
-    -- 'hint' is only reasonable with memtx tree index.
     if space.engine == 'memtx' and
-       opts.type == 'TREE' then
-        opts.hint = true
+       opts.type == 'TREE' and
+       not is_primary then
+        -- Turn secondary tree index into functional with 33% probability.
+        local is_func = oneof({true, false, false})
+        if is_func then
+            opts.func = func_index_func_single
+            -- Multikey func index is not supported by memtx MVCC.
+            local func_multikey_is_supported = not box.cfg.memtx_use_mvcc_engine
+            if oneof({false, func_multikey_is_supported}) then
+                opts.func = func_index_func_multi
+            end
+        end
+    end
+
+    -- 'hint' is only reasonable with non-functional memtx tree index.
+    if space.engine == 'memtx' and
+       opts.type == 'TREE' and
+       opts.func == nil then
+        opts.hint = oneof({true, false})
     end
 
     if opts.type == 'RTREE' then
         opts.distance = oneof({'euclid', 'manhattan'})
         opts.dimension = RTREE_DIMENSION
+    end
+
+    if opts.func ~= nil then
+        opts.parts = func_index_gen_parts(opts.func)
+        return opts
     end
 
     opts.parts = {}
@@ -879,7 +986,21 @@ end
 local function index_select_op(_space, idx, key)
     assert(idx)
     assert(key)
-    idx:select(key)
+    local opts = select_opts(idx.type)
+    idx:select(key, opts)
+end
+
+local function index_pagination_op(_space, idx, key, start_pos)
+    assert(idx)
+    assert(key)
+    local opts = select_opts(idx.type)
+    opts.fetch_pos = true
+    opts.after = start_pos
+    local _, pos = idx:select(key, opts)
+    if pos ~= nil then
+        opts.after = pos
+        idx:select(key, opts)
+    end
 end
 
 local function index_count_op(_, idx)
@@ -1197,6 +1318,15 @@ local ops = {
             local idx_n = oneof(keys(space.index))
             local idx = space.index[idx_n]
             return idx, random_key(space, idx)
+        end,
+    },
+    INDEX_PAGINATION_OP = {
+        func = index_pagination_op,
+        args = function(space)
+            local idx_n = oneof(keys(space.index))
+            local idx = space.index[idx_n]
+            local start_pos = oneof({box.NULL, random_tuple(space:format())})
+            return idx, random_key(space, idx), start_pos
         end,
     },
     INDEX_MIN_OP = {
