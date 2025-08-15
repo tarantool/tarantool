@@ -637,6 +637,26 @@ local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
+local function gen_multikey_index_part(space_format, is_nullable_support)
+    local possible_fields = fun.iter(space_format):filter(
+        function(x)
+            return x.type == 'array'
+        end):totable()
+    local field_no = math.random(1, table.getn(possible_fields))
+    local field = possible_fields[field_no]
+    local is_nullable = oneof({is_nullable_support, false})
+    local exclude_null = oneof({false, is_nullable})
+    -- All the arrays have unsigned values now, so the type
+    -- is fixed here. Also, note that arrays never contain
+    -- null values currently, but let's create nullable indexes
+    -- anyway.
+    local part = {
+        field.name, path = '[*]', type = 'unsigned',
+        is_nullable = is_nullable, exclude_null = exclude_null,
+    }
+    return part
+end
+
 local function setup(engine_name, space_id_func, test_dir, verbose)
     log.info('SETUP')
     assert(engine_name == 'memtx' or
@@ -757,6 +777,11 @@ local function index_opts(space, is_primary)
                   true or
                   tarantool_indices[opts.type].is_unique_support
 
+    local is_multikey = false
+    if not is_primary and opts.type == 'TREE' and space.engine ~= 'memcs' then
+        is_multikey = oneof({true, false})
+    end
+
     -- 'hint' is only reasonable with memtx tree index.
     if space.engine == 'memtx' and
        opts.type == 'TREE' then
@@ -808,7 +833,12 @@ local function index_opts(space, is_primary)
             break
         end
     end
-
+    if is_multikey then
+        -- Overwrite one of the fields with a multikey one.
+        local mk_field_no = math.random(1, #opts.parts)
+        opts.parts[mk_field_no] =
+            gen_multikey_index_part(space:format(), is_nullable_support)
+    end
     return opts
 end
 
