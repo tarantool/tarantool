@@ -66,6 +66,18 @@ enum memtx_rtree_reserve_extents_num {
 
 /* {{{ Utilities. *************************************************/
 
+/** Callback for sorting neighbors with same distance. */
+int tie_cmp_cb(const struct rtree_neighbor *a,
+	       const struct rtree_neighbor *b)
+{
+	struct index *index = (struct index *)a->cmp_ctx;
+	return tuple_compare((struct tuple *)a->child,
+                    	     HINT_NONE,
+                    	     (struct tuple *)b->child,
+                    	     HINT_NONE,
+                    	     index->def->pk_def);
+}
+
 static inline int
 mp_decode_num(const char **data, uint32_t fieldno, double *ret)
 {
@@ -381,6 +393,7 @@ memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
 	it->base.next = memtx_iterator_next;
 	it->base.position = generic_iterator_position;
 	it->base.free = index_rtree_iterator_free;
+	it->impl.tie_cmp = tie_cmp_cb;
 	rtree_iterator_init(&it->impl);
 	/*
 	 * We don't care if rtree_search() does or does not find anything

@@ -80,10 +80,11 @@ neighbor_cmp(const struct rtree_neighbor *a, const struct rtree_neighbor *b)
 {
 	return a->distance < b->distance ? -1 :
 	       a->distance > b->distance ? 1 :
-	       a->level < b->level ? -1 :
-	       a->level > b->level ? 1 :
-	       a < b ? -1 : a > b ? 1 : 0;
-	return 0;
+	       a->level > b->level ? -1 :
+	       a->level < b->level ? 1 :
+	       a->level > 0 ? (a < b ? -1 : a > b ? 1 : 0) :
+	       a->tie_cmp != NULL ? a->tie_cmp(a, b) :
+	       (a < b ? -1 : a > b ? 1 : 0);
 }
 
 rb_gen(, rtnt_, rtnt_t, struct rtree_neighbor, link, neighbor_cmp);
@@ -840,6 +841,11 @@ rtree_iterator_new_neighbor(struct rtree_iterator *itr,
 	n->child = child;
 	n->distance = distance;
 	n->level = level;
+	if (itr->tie_cmp != NULL) {
+		n->cmp_ctx = itr->cmp_ctx;
+	} else {
+		n->cmp_ctx = NULL;
+	}
 	return n;
 }
 

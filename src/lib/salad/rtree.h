@@ -60,6 +60,8 @@ struct rtree_neighbor {
 	void *child;
 	int level;
 	sq_coord_t distance;
+	/* Is used for sorting neighbors with same distence */
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
 };
 
 typedef rb_tree(struct rtree_neighbor) rtnt_t;
@@ -177,6 +179,9 @@ struct rtree_iterator
 	struct rtree_neighbor_page *page_list;
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
+
+	/* Is used for sorting neighbors with same distence */
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
 
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
