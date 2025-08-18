@@ -237,33 +237,35 @@ g.test_increased_error_string_conversion_verbosity = function()
     t.assert_equals(compat.box_error_serialize_verbose.default, 'old')
     compat.box_error_serialize_verbose = 'new'
 
-    local hide_line = function(str)
-        return string.gsub(str, '"line":%d+', '"line":0')
+    local function hide_volatile(str)
+        -- Drop the changeable line number and the project
+        -- directory's last character.
+        return str:gsub('"line":%d+', '"line":0'):gsub('%.%.%..', '...')
     end
 
-    t.assert_equals(hide_line(tostring(prevprev)),
+    t.assert_equals(hide_volatile(tostring(prevprev)),
                 'prevprev {"type":"ClientError","name":"UNKNOWN",' ..
-                '"trace":[{"file":"...l/test/box-luatest/' ..
+                '"trace":[{"file":".../test/box-luatest/' ..
                 'error_subsystem_improvements_test.lua","line":0}]}')
-    t.assert_equals(hide_line(tostring(cur)),
+    t.assert_equals(hide_volatile(tostring(cur)),
                 'cur {"type":"ClientError","name":"UNKNOWN",' ..
-                '"trace":[{"file":"...l/test/box-luatest/' ..
+                '"trace":[{"file":".../test/box-luatest/' ..
                 'error_subsystem_improvements_test.lua","line":0}]}\n' ..
                 'Caused by: prev {"type":"ClientError","name":"UNKNOWN",' ..
-                '"trace":[{"file":"...l/test/box-luatest/' ..
+                '"trace":[{"file":".../test/box-luatest/' ..
                 'error_subsystem_improvements_test.lua","line":0}]}\n' ..
                 'Caused by: prevprev {"type":"ClientError","name":"UNKNOWN",' ..
-                '"trace":[{"file":"...l/test/box-luatest/' ..
+                '"trace":[{"file":".../test/box-luatest/' ..
                 'error_subsystem_improvements_test.lua","line":0}]}')
     -- Test error which does not fit into ibuf capacity.
     local ibuf = buffer.internal.cord_ibuf_take()
     local large = string.rep('#', ibuf:capacity())
     buffer.internal.cord_ibuf_put(ibuf)
     local e = box.error.new({reason = large})
-    local expected = '%s {"type":"ClientError","name":"UNKNOWN",' ..
-                     '"trace":[{"file":"...l/test/box-luatest/' ..
+    local expected = large .. ' {"type":"ClientError","name":"UNKNOWN",' ..
+                     '"trace":[{"file":".../test/box-luatest/' ..
                      'error_subsystem_improvements_test.lua","line":0}]}'
-    t.assert_equals(hide_line(tostring(e)), string.format(expected, large))
+    t.assert_equals(hide_volatile(tostring(e)), expected)
 end
 
 g.after_test('test_increased_error_string_conversion_verbosity', function()
