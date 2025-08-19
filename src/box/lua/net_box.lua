@@ -10,6 +10,7 @@ local utils    = require('internal.utils')
 
 local this_module
 
+local min               = math.min
 local max               = math.max
 local fiber_clock       = fiber.clock
 
@@ -24,6 +25,8 @@ local ibuf_t = ffi.typeof('struct ibuf')
 local is_tuple = box.tuple.is
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
+
+local NO_ACTIVITY_CHECK_DELAY = 1
 
 -- select errors from box.error
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
@@ -66,6 +69,7 @@ local CONNECT_OPTION_TYPES = {
     auth_type                   = "string",
     required_protocol_version   = "number",
     required_protocol_features  = "table",
+    no_activity_timeout         = "number",
     _disable_graceful_shutdown  = "boolean",
 }
 
@@ -457,6 +461,9 @@ local function new_sm(uri_or_fd, opts)
                 graceful_shutdown(remote)
             end
         end)
+    end
+    if opts.no_activity_timeout ~= nil then
+        remote:_run_no_activity_worker(opts.no_activity_timeout)
     end
     transport:start()
     if opts.wait_connected ~= false then
@@ -874,6 +881,40 @@ function remote_methods:wait_connected(timeout)
     return self:wait_state('active', timeout)
 end
 
+function remote_methods:bump_activity(no_activity_timeout)
+    check_remote_arg(self, 'bump_activity')
+
+    if no_activity_timeout ~= nil then
+        self._no_activity_timeout = no_activity_timeout
+    end
+
+    self._no_activity_deadline = max(fiber_clock() +
+                                     self._no_activity_timeout,
+                                     self._no_activity_deadline or 0)
+
+    -- TODO: Probably, return something?
+end
+
+function remote_methods:_is_active()
+    -- The connection considered active in these cases:
+    -- - There was a request attempt during the `_no_activity_interval.
+    -- - There exists non-daemon watcher (TBD: specify).
+    return fiber_clock() < self._no_activity_deadline --or
+           --self.watcher_count > 0
+end
+function remote_methods:_run_no_activity_worker(no_activity_timeout)
+    self._no_activity_timeout = no_activity_timeout
+    self:bump_activity()
+    self._no_activity_fiber = fiber.new(function()
+        self._no_activity_fiber = fiber.new(function()
+            while self:_is_active() do
+                fiber.sleep(NO_ACTIVITY_CHECK_DELAY)
+            end
+            self:close()
+        end)
+    end, self)
+end
+
 --
 -- Make a request, which throws an exception in case of critical errors
 -- (e.g. wrong API usage) and returns nil,err if there's connection related
@@ -919,6 +960,7 @@ function remote_methods:_request_impl(method, opts, format, stream_id, ...)
     local res, err = transport:perform_request(timeout, buffer, skip_header,
                                                return_raw, on_push, on_push_ctx,
                                                format, stream_id, method, ...)
+    self:bump_activity()
     -- Try to wait until a schema is reloaded if needed.
     -- Regardless of reloading result, the main response is
     -- returned, since it does not depend on any schema things.
