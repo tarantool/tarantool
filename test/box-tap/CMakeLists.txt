@@ -60,7 +60,6 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set_tests_properties(
     # See test/box-tap/suite.ini.
     test/box-tap/errinj_set_with_enviroment_vars.test.lua
-    test/box-tap/gh-6198-max-cnt-of-tuple-fields-insert-overflow-err-msg.test.lua
     PROPERTIES DISABLED TRUE
   )
 endif()
