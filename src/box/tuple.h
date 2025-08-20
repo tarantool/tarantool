@@ -31,9 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "say.h"
 #include "diag.h"
-#include "error.h"
 #include "tt_static.h"
 #include "tt_uuid.h"
 #include "tuple_format.h"
@@ -571,6 +569,47 @@ tuple_can_be_compact(uint16_t data_offset, uint32_t bsize)
 }
 
 /**
+ * Partially initializes a tuple, without touching `data_offset_bsize_raw' and
+ * `bsize_bulky'.
+ *
+ * @param tuple - Tuple to initialize.
+ * @param refs - initial reference count to set.
+ * @param format_id - see member description in struct tuple.
+ */
+static inline void
+tuple_create_base(struct tuple *tuple, uint8_t refs, uint16_t format_id)
+{
+	tuple->local_refs = refs;
+	tuple->flags = 0;
+	tuple->format_id = format_id;
+}
+
+/**
+ * Initializes `data_offset_bsize_raw' and `bsize_bulky' of a tuple.
+ *
+ * @param tuple - Tuple to initialize.
+ * @param data_offset - see member description in struct tuple.
+ * @param bsize - see member description in struct tuple.
+ * @param make_compact - construct compact tuple, see description in tuple.
+ */
+static inline void
+tuple_set_data_offset_bsize(struct tuple *tuple, uint16_t data_offset,
+			    uint32_t bsize, bool make_compact)
+{
+	assert(data_offset <= INT16_MAX);
+	if (make_compact) {
+		assert(tuple_can_be_compact(data_offset, bsize));
+		uint16_t combined = 0x8000;
+		combined |= data_offset << 8;
+		combined |= bsize;
+		tuple->data_offset_bsize_raw = combined;
+	} else {
+		tuple->data_offset_bsize_raw = data_offset;
+		tuple->bsize_bulky = bsize;
+	}
+}
+
+/**
  * Initialize a tuple. Must be called right after allocation of a new tuple.
  * Should only be called for newly created uninitialized tuples.
  * If the tuple copied from another tuple and only initialization of reference
@@ -583,26 +622,13 @@ tuple_can_be_compact(uint16_t data_offset, uint32_t bsize)
  * @param data_offset - see member description in struct tuple.
  * @param bsize - see member description in struct tuple.
  * @param make_compact - construct compact tuple, see description in tuple.
- * @return 0 on success, -1 on error (diag is set).
  */
 static inline void
 tuple_create(struct tuple *tuple, uint8_t refs, uint16_t format_id,
 	     uint16_t data_offset, uint32_t bsize, bool make_compact)
 {
-	assert(data_offset <= INT16_MAX);
-	tuple->local_refs = refs;
-	tuple->flags = 0;
-	tuple->format_id = format_id;
-	if (make_compact) {
-		assert(tuple_can_be_compact(data_offset, bsize));
-		uint16_t combined = 0x8000;
-		combined |= data_offset << 8;
-		combined |= bsize;
-		tuple->data_offset_bsize_raw = combined;
-	} else {
-		tuple->data_offset_bsize_raw = data_offset;
-		tuple->bsize_bulky = bsize;
-	}
+	tuple_create_base(tuple, refs, format_id);
+	tuple_set_data_offset_bsize(tuple, data_offset, bsize, make_compact);
 }
 
 /**

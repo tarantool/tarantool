@@ -1990,6 +1990,7 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
+	struct memtx_block *block;
 	struct tuple *tuple = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
@@ -2032,18 +2033,20 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		goto end;
 	}
 
-	while ((tuple = MemtxAllocator<ALLOC>::alloc_tuple(total)) == NULL) {
+	while ((block = MemtxAllocator<ALLOC>::alloc(tuple_len, data_offset,
+						     make_compact)) == NULL) {
 		bool stop;
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop)
 			break;
 	}
-	if (tuple == NULL) {
+	if (block == NULL) {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
 	}
-	tuple_create(tuple, 0, tuple_format_id(format),
-		     data_offset, tuple_len, make_compact);
+
+	tuple = memtx_block_to_tuple(block);
+	tuple_create_base(tuple, 0, tuple_format_id(format));
 	if (format->is_temporary)
 		tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
 	tuple_format_ref(format);
@@ -2067,7 +2070,9 @@ static void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	assert(tuple_is_unreferenced(tuple));
-	MemtxAllocator<ALLOC>::free_tuple(tuple);
+	struct memtx_block *block = memtx_block_from_tuple(tuple);
+	bool is_temporary = tuple_has_flag(tuple, TUPLE_IS_TEMPORARY);
+	MemtxAllocator<ALLOC>::free(block, is_temporary);
 	tuple_format_unref(format);
 }
 
@@ -2083,18 +2088,18 @@ memtx_tuple_info<SmallAlloc>(struct tuple_format *format, struct tuple *tuple,
 			     struct tuple_info *info)
 {
 	(void)format;
-	size_t size = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
 	size_t header_size = sizeof(struct tuple);
 	if (tuple_is_compact(tuple))
 		header_size -= TUPLE_COMPACT_SAVINGS;
 
-	struct memtx_tuple *memtx_tuple = container_of(
-		tuple, struct memtx_tuple, base);
+	struct memtx_block *block = memtx_block_from_tuple(tuple);
+	size_t size = memtx_block_size(block);
+
 	struct small_alloc_info alloc_info;
-	SmallAlloc::get_alloc_info(memtx_tuple, size, &alloc_info);
+	SmallAlloc::get_alloc_info(block, size, &alloc_info);
 
 	info->data_size = tuple_bsize(tuple);
-	info->header_size = header_size + offsetof(struct memtx_tuple, base);
+	info->header_size = header_size + offsetof(struct memtx_block, header);
 	info->field_map_size = tuple_data_offset(tuple) - header_size;
 	if (alloc_info.is_large) {
 		info->waste_size = 0;
@@ -2116,7 +2121,7 @@ memtx_tuple_info<SysAlloc>(struct tuple_format *format, struct tuple *tuple,
 		header_size -= TUPLE_COMPACT_SAVINGS;
 
 	info->data_size = tuple_bsize(tuple);
-	info->header_size = header_size + offsetof(struct memtx_tuple, base);
+	info->header_size = header_size + offsetof(struct memtx_block, header);
 	info->field_map_size = tuple_data_offset(tuple) - header_size;
 	info->waste_size = 0;
 	info->arena_type = TUPLE_ARENA_MALLOC;

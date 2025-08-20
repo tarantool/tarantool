@@ -32,10 +32,10 @@ test_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	assert(end == NULL);
 	(void)data;
 	(void)end;
-	size_t size = sizeof(struct tuple);
-	struct tuple *tuple = MemtxAllocator<SmallAlloc>::alloc_tuple(size);
-	tuple_create(tuple, /*local_refs=*/0, tuple_format_id(format),
-		     /*data_offset=*/size, /*bsize=*/0, /*make_compact=*/true);
+	struct memtx_block *block = MemtxAllocator<SmallAlloc>::alloc(0);
+	struct tuple *tuple = memtx_block_to_tuple(block);
+	fail_unless((char *)tuple == (char *)block + 4);
+	tuple_create_base(tuple, /*refs=*/0, tuple_format_id(format));
 	return tuple;
 }
 
@@ -45,7 +45,9 @@ test_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(format == test_tuple_format);
 	(void)format;
 	assert(tuple_is_unreferenced(tuple));
-	MemtxAllocator<SmallAlloc>::free_tuple(tuple);
+	struct memtx_block *block = memtx_block_from_tuple(tuple);
+	bool is_temporary = tuple_has_flag(tuple, TUPLE_IS_TEMPORARY);
+	MemtxAllocator<SmallAlloc>::free(block, is_temporary);
 }
 
 static void
@@ -502,9 +504,8 @@ test_mem_used()
 	is(stats.used_rv, 0, "used_rv init");
 	is(stats.used_gc, 0, "used_gc init");
 
-	size_t tuple_size = sizeof(struct tuple) +
-			    offsetof(struct memtx_tuple, base);
 	struct tuple *tuple = alloc_tuple();
+	size_t tuple_size = memtx_block_size(memtx_block_from_tuple(tuple));
 
 	struct tuple *tuple1 = alloc_tuple();
 	struct read_view_opts opts;
@@ -560,10 +561,65 @@ test_mem_used()
 	check_plan();
 }
 
+static void
+test_alloc_block()
+{
+	plan(6);
+	header();
+
+	struct read_view_opts opts;
+	read_view_opts_create(&opts);
+	struct memtx_block *block = MemtxAllocator<SmallAlloc>::alloc(0);
+	isnt(block, nullptr, "zero data size is ok");
+	is(memtx_block_size(block), 14, "total size of empty block");
+	is(memtx_block_data(block), (char *)block + 14, "data offset");
+	is(MemtxAllocator<SmallAlloc>::in_read_view(block), false, "not in rv");
+	memtx_allocators_read_view rv = memtx_allocators_open_read_view(&opts);
+	is(MemtxAllocator<SmallAlloc>::in_read_view(block), true, "in rv");
+	memtx_allocators_close_read_view(rv);
+	is(MemtxAllocator<SmallAlloc>::in_read_view(block), false, "not in rv");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	footer();
+	check_plan();
+}
+
+static void
+test_alloc_block_aligned()
+{
+	plan(6);
+	header();
+
+	struct memtx_block *block;
+	block = MemtxAllocator<SmallAlloc>::alloc_aligned(111, 1);
+	is(memtx_block_size(block), 14 + 111, "alignment 1 - total size");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	block = MemtxAllocator<SmallAlloc>::alloc_aligned(0, 2);
+	is((uintptr_t)memtx_block_data(block) & 1, 0, "alignment 2");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	block = MemtxAllocator<SmallAlloc>::alloc_aligned(333, 4);
+	is((uintptr_t)memtx_block_data(block) & 3, 0, "alignment 4");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	block = MemtxAllocator<SmallAlloc>::alloc_aligned(0, 8);
+	is((uintptr_t)memtx_block_data(block) & 7, 0, "alignment 8");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	block = MemtxAllocator<SmallAlloc>::alloc_aligned(555, 64);
+	is((uintptr_t)memtx_block_data(block) & 63, 0, "alignment 64");
+	is(memtx_block_size(block), 14 + 555 + 63, "alignment 64 - total size");
+	MemtxAllocator<SmallAlloc>::free(block);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main()
 {
-	plan(9);
+	plan(11);
 	header();
 
 	test_alloc_stats();
@@ -575,6 +631,8 @@ test_main()
 	test_temp_tuple_gc();
 	test_reuse_read_view();
 	test_mem_used();
+	test_alloc_block();
+	test_alloc_block_aligned();
 
 	footer();
 	return check_plan();
