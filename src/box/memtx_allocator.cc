@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2025, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,15 +31,15 @@
 #include "memtx_allocator.h"
 #include "trivia/tuple.h"
 
-struct memtx_tuple_rv *
-memtx_tuple_rv_new(uint32_t version, struct rlist *list)
+struct memtx_block_rv *
+memtx_block_rv_new(uint32_t version, struct rlist *list)
 {
 	assert(version > 0);
 	/* Reuse the last read view if its version matches. */
-	struct memtx_tuple_rv *last_rv = rlist_empty(list) ? nullptr :
-		rlist_last_entry(list, struct memtx_tuple_rv, link);
+	struct memtx_block_rv *last_rv = rlist_empty(list) ? nullptr :
+		rlist_last_entry(list, struct memtx_block_rv, link);
 	if (last_rv != nullptr) {
-		uint32_t last_version = memtx_tuple_rv_version(last_rv);
+		uint32_t last_version = memtx_block_rv_version(last_rv);
 		assert(last_version <= version);
 		assert(last_rv->refs > 0);
 		if (last_version == version) {
@@ -49,20 +49,20 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 	}
 	/* Proceed to creation of a new read view. */
 	int count = 1;
-	struct memtx_tuple_rv *rv;
+	struct memtx_block_rv *rv;
 	rlist_foreach_entry(rv, list, link)
 		count++;
-	struct memtx_tuple_rv *new_rv = (struct memtx_tuple_rv *)xmalloc(
+	struct memtx_block_rv *new_rv = (struct memtx_block_rv *)xmalloc(
 			sizeof(*new_rv) + count * sizeof(*new_rv->lists));
 	new_rv->count = count;
 	/* Create one list per each open read view. */
-	struct memtx_tuple_rv_list *l = &new_rv->lists[0];
+	struct memtx_block_rv_list *l = &new_rv->lists[0];
 	uint32_t prev_version = 0;
 	rlist_foreach_entry(rv, list, link) {
-		l->version = memtx_tuple_rv_version(rv);
+		l->version = memtx_block_rv_version(rv);
 		/* List must be sorted by read view version. */
 		assert(l->version > prev_version);
-		stailq_create(&l->tuples);
+		stailq_create(&l->blocks);
 		l->mem_used = 0;
 		prev_version = l->version;
 		l++;
@@ -72,7 +72,7 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 	l->version = version;
 	assert(l->version > prev_version);
 	(void)prev_version;
-	stailq_create(&l->tuples);
+	stailq_create(&l->blocks);
 	l->mem_used = 0;
 	rlist_add_tail_entry(list, new_rv, link);
 	new_rv->refs = 1;
@@ -80,33 +80,33 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 }
 
 void
-memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
-		      struct stailq *tuples_to_free, size_t *mem_freed)
+memtx_block_rv_delete(struct memtx_block_rv *rv, struct rlist *list,
+		      struct stailq *blocks_to_free, size_t *mem_freed)
 {
 	*mem_freed = 0;
 	assert(rv->refs > 0);
 	if (--rv->refs > 0)
 		return;
-	struct memtx_tuple_rv *prev_rv = rlist_prev_entry_safe(rv, list, link);
+	struct memtx_block_rv *prev_rv = rlist_prev_entry_safe(rv, list, link);
 	uint32_t prev_version = prev_rv == nullptr ? 0 :
-				memtx_tuple_rv_version(prev_rv);
+				memtx_block_rv_version(prev_rv);
 	/*
-	 * Move tuples from lists with version <= prev_version to the list of
-	 * the previous read view and delete all other tuples.
+	 * Move blocks from lists with version <= prev_version to the list of
+	 * the previous read view and delete all other blocks.
 	 */
 	int i = 0;
 	int j = 0;
 	while (i < rv->count) {
-		struct memtx_tuple_rv_list *src = &rv->lists[i];
+		struct memtx_block_rv_list *src = &rv->lists[i];
 		if (src->version <= prev_version) {
 			/*
-			 * The tuples were allocated before the previous read
+			 * The blocks were allocated before the previous read
 			 * view was opened. Move them to the previous read
 			 * view's list.
 			 */
 			assert(prev_rv != nullptr);
 			assert(j < prev_rv->count);
-			struct memtx_tuple_rv_list *dst = &prev_rv->lists[j];
+			struct memtx_block_rv_list *dst = &prev_rv->lists[j];
 			/*
 			 * The previous read view may have more lists, because
 			 * some read views could have been closed by the time
@@ -117,16 +117,16 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 				assert(j < prev_rv->count);
 				dst = &prev_rv->lists[j];
 			}
-			stailq_concat(&dst->tuples, &src->tuples);
+			stailq_concat(&dst->blocks, &src->blocks);
 			dst->mem_used += src->mem_used;
 			j++;
 		} else {
 			/*
-			 * The tuples were allocated after the previous read
+			 * The blocks were allocated after the previous read
 			 * view was opened and freed before the next read view
 			 * was opened. Free them immediately.
 			 */
-			stailq_concat(tuples_to_free, &src->tuples);
+			stailq_concat(blocks_to_free, &src->blocks);
 			*mem_freed += src->mem_used;
 		}
 		i++;
@@ -136,20 +136,20 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 }
 
 void
-memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple,
+memtx_block_rv_add(struct memtx_block_rv *rv, struct memtx_block *block,
 		   size_t mem_used)
 {
 	/*
 	 * Binary search the list with min version such that
-	 * list->version > tuple->version.
+	 * list->version > block->version.
 	 */
 	int begin = 0;
 	int end = rv->count;
-	struct memtx_tuple_rv_list *found = nullptr;
+	struct memtx_block_rv_list *found = nullptr;
 	while (begin != end) {
 		int middle = begin + (end - begin) / 2;
-		struct memtx_tuple_rv_list *l = &rv->lists[middle];
-		if (l->version <= tuple->version) {
+		struct memtx_block_rv_list *l = &rv->lists[middle];
+		if (l->version <= block->version) {
 			begin = middle + 1;
 		} else {
 			found = l;
@@ -157,7 +157,7 @@ memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple,
 		}
 	}
 	assert(found != nullptr);
-	stailq_add_entry(&found->tuples, tuple, in_gc);
+	stailq_add_entry(&found->blocks, block, in_gc);
 	found->mem_used += mem_used;
 }
 
