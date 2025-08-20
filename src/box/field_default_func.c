@@ -5,7 +5,7 @@
  */
 #include "func.h"
 #include "port.h"
-#include "engine.h"
+#include "box.h"
 #include "tt_static.h"
 #include "tuple_format.h"
 #include "field_default_func.h"
@@ -114,7 +114,7 @@ field_default_func_init(struct field_default_func *default_func)
 		diag_set(ClientError, ER_NO_SUCH_FUNCTION,
 			 int2str(default_func->id));
 	}
-	if (func == NULL && recovery_state <= INITIAL_RECOVERY) {
+	if (func == NULL && recovery_state == INITIAL_RECOVERY) {
 		/*
 		 * That's an initial recovery and func space is not loaded yet,
 		 * we have to leave it and return to it after.

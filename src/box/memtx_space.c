@@ -48,6 +48,7 @@
 #include "memtx_tuple_compression.h"
 #include "schema.h"
 #include "small/region.h"
+#include "box.h"
 
 /*
  * Yield every 1K tuples while building a new index or checking

@@ -486,14 +486,6 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 	/* End of the fast path: loaded the primary key. */
 	space_foreach(memtx_end_build_primary_key, memtx);
 
-	/* Complete space initialization. */
-	int rc = space_foreach(space_on_initial_recovery_complete, NULL);
-	/* If failed - the snapshot has inconsistent data. We cannot start. */
-	if (rc != 0) {
-		diag_log();
-		panic("Failed to complete recovery from snapshot!");
-	}
-
 	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
 		/*
 		 * Fast start path: "play out" WAL
@@ -554,13 +546,6 @@ memtx_engine_end_recovery(struct engine *engine)
 		memtx->on_indexes_built_cb();
 	}
 	xdir_remove_temporary_files(&memtx->snap_dir);
-
-	/* Complete space initialization. */
-	int rc = space_foreach(space_on_final_recovery_complete, NULL);
-	if (rc != 0) {
-		diag_log();
-		panic("Failed to complete recovery from WAL!");
-	}
 	return 0;
 }
 
@@ -749,13 +734,6 @@ memtx_engine_bootstrap(struct engine *engine)
 	if (rc < 0)
 		return -1;
 	memtx->on_indexes_built_cb();
-
-	/* Complete space initialization. */
-	rc = space_foreach(space_on_bootstrap_complete, NULL);
-	if (rc != 0) {
-		diag_log();
-		panic("Failed to complete bootstrap!");
-	}
 	return 0;
 }
 

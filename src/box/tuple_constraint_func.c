@@ -8,7 +8,7 @@
 
 #include "tuple_constraint_func.h"
 
-#include "engine.h"
+#include "box.h"
 #include "func.h"
 #include "space.h"
 #include "func_cache.h"
@@ -176,7 +176,7 @@ tuple_constraint_func_init(struct tuple_constraint *constr,
 	assert(constr->def.type == CONSTR_FUNC);
 	constr->space = space;
 	struct func *func = tuple_constraint_func_find(constr);
-	if (func == NULL && recovery_state <= INITIAL_RECOVERY) {
+	if (func == NULL && recovery_state == INITIAL_RECOVERY) {
 		/*
 		 * That's an initial recovery and func space is not loaded yet,
 		 * we have to leave it and return to it after.

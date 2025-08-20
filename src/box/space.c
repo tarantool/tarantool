@@ -553,6 +553,29 @@ space_remove_temporary_triggers(struct space *space)
 	}
 }
 
+/** Callback for space on recovery_state trigger. */
+static int
+space_on_recovery_state(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct space *space = (struct space *)trigger->data;
+	switch (recovery_state) {
+	case FINAL_RECOVERY:
+		if (space_init_constraints(space) != 0)
+			return -1;
+		if (space_init_defaults(space) != 0)
+			return -1;
+		return 0;
+	case FINISHED_RECOVERY:
+		space_reset_events(space);
+		space_set_events(space, false);
+		space_upgrade_run(space);
+		return 0;
+	default:
+		unreachable();
+	}
+}
+
 int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,
@@ -658,6 +681,9 @@ space_create(struct space *space, struct engine *engine,
 	                        space_is_system(space) &&
 	                        system_space_is_sync(space) &&
 	                        txn_limbo_has_owner(&txn_limbo));
+	trigger_create(&space->on_recovery_state, space_on_recovery_state,
+		       space, NULL);
+	trigger_add(&on_recovery_state, &space->on_recovery_state);
 	return 0;
 
 fail_free_indexes:
@@ -676,36 +702,6 @@ fail:
 	tuple_format_unref(space->format);
 	space_unpin_collations(space);
 	return -1;
-}
-
-int
-space_on_initial_recovery_complete(struct space *space, void *nothing)
-{
-	(void)nothing;
-	if (space_init_constraints(space) != 0)
-		return -1;
-	if (space_init_defaults(space) != 0)
-		return -1;
-	return 0;
-}
-
-int
-space_on_final_recovery_complete(struct space *space, void *nothing)
-{
-	(void)nothing;
-	space_reset_events(space);
-	space_set_events(space, false);
-	space_upgrade_run(space);
-	return 0;
-}
-
-int
-space_on_bootstrap_complete(struct space *space, void *nothing)
-{
-	(void)nothing;
-	space_reset_events(space);
-	space_set_events(space, false);
-	return 0;
 }
 
 struct space *
@@ -747,6 +743,7 @@ space_delete(struct space *space)
 	space_unpin_collations(space);
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
+	trigger_clear(&space->on_recovery_state);
 	sql_trigger_delete_all(space->sql_triggers);
 	space_reset_events(space);
 	if (space->upgrade != NULL)

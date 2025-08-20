@@ -38,7 +38,6 @@
 #include "fiber.h"
 
 struct engine *engines[MAX_ENGINE_COUNT + 1];
-enum recovery_state recovery_state = RECOVERY_NOT_STARTED;
 
 /** Number of registered engines. */
 static int engine_count;
@@ -87,20 +86,17 @@ engine_free(void)
 int
 engine_bootstrap(void)
 {
-	recovery_state = INITIAL_RECOVERY;
 	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->vtab->bootstrap(engine) != 0)
 			return -1;
 	}
-	recovery_state = FINISHED_RECOVERY;
 	return 0;
 }
 
 int
 engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 {
-	recovery_state = INITIAL_RECOVERY;
 	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->vtab->begin_initial_recovery(engine,
@@ -113,7 +109,6 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 int
 engine_begin_final_recovery(void)
 {
-	recovery_state = FINAL_RECOVERY;
 	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->vtab->begin_final_recovery(engine) != 0)
@@ -136,7 +131,6 @@ engine_begin_hot_standby(void)
 int
 engine_end_recovery(void)
 {
-	recovery_state = FINISHED_RECOVERY;
 	/*
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.

@@ -45,6 +45,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "txn.h"
+#include "box.h"
 
 /**
  * Whenever we update a request, we must update its header as well.

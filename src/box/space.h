@@ -300,6 +300,8 @@ struct space {
 		 */
 		bool is_sync;
 	} state;
+	/** Trigger on recovery state changed. */
+	struct trigger on_recovery_state;
 };
 
 /** Space alter statement. */
@@ -360,38 +362,6 @@ int
 space_create(struct space *space, struct engine *engine,
 	     const struct space_vtab *vtab, struct space_def *def,
 	     struct rlist *key_list, struct tuple_format *format);
-
-/**
- * Finish space initialization after finishing initial recovery. If a space was
- * created during initial recovery some parts of its initialization was skipped
- * because they were not possible yet.
- * For example, all funcs are loaded after loading of all spaces, so if a space
- * depend on some func in initialization, we have skip that part and come back
- * later and call this function after initial recovery is finished.
- * Actually, for simplicity, that function should be called with every @a space
- * despite of its state, it will do no harm in any case. @a nothing argument
- * is not used.
- * Return 0 on success, -1 on error (diag is set) which actually means that
- * we cannot start - something is broken in snapshot.
- */
-int
-space_on_initial_recovery_complete(struct space *space, void *nothing);
-
-/**
- * Finish space initialization after finishing final recovery.
- * See the comment to space_on_initial_recovery_complete() for
- * the function semantics and rationale.
- */
-int
-space_on_final_recovery_complete(struct space *space, void *nothing);
-
-/**
- * Finish space initialization after finishing bootstrap.
- * See the comment to space_on_initial_recovery_complete() for
- * the function semantics and rationale.
- */
-int
-space_on_bootstrap_complete(struct space *space, void *nothing);
 
 /** Get space ordinal number. */
 static inline uint32_t

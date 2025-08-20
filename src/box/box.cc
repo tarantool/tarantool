@@ -142,6 +142,10 @@ bool box_is_force_recovery = false;
 waiting_for_own_rows_trigger
 	box_check_waiting_for_own_rows_trigger;
 
+enum recovery_state recovery_state;
+
+struct rlist on_recovery_state = RLIST_HEAD_INITIALIZER(on_recovery_state);
+
 /**
  * If backup is in progress, this points to the gc reference
  * object that prevents the garbage collector from deleting
@@ -213,49 +217,6 @@ struct event *box_on_recovery_state_event;
 /** Cached event 'tarantool.trigger.on_change'. */
 static struct event *tarantool_trigger_on_change_event;
 
-/**
- * Recovery states supported by on_recovery_state triggers.
- * Are positioned in the order of appearance during initial box.cfg().
- * The only exception are WAL_RECOVERED and INDEXES_BUILT, which might come in
- * any order, since the moment when secondary indexes are built depends on
- * box.cfg.force_recovery and box.cfg.memtx_use_mvcc_engine.
- */
-enum box_recovery_state {
-	/**
-	 * The node has either recovered the snapshot from the disk, received
-	 * the snapshot from the remote master as part of initial join stage or
-	 * has bootstrapped the cluster.
-	 */
-	RECOVERY_STATE_SNAPSHOT_RECOVERED,
-	/**
-	 * The node has either recovered the local WAL files, received the WALs
-	 * from the remote master as part of final join or has bootstrapped the
-	 * cluster.
-	 */
-	RECOVERY_STATE_WAL_RECOVERED,
-	/**
-	 * The node has built secondary indexes for memtx spaces.
-	 */
-	RECOVERY_STATE_INDEXES_BUILT,
-	/**
-	 * The node has synced with remote peers. IOW, it has transitioned from
-	 * "orphan" to "running".
-	 */
-	RECOVERY_STATE_SYNCED,
-	box_recovery_state_MAX,
-};
-
-static const char *box_recovery_state_strs[box_recovery_state_MAX] = {
-	/* [RECOVERY_STATE_SNAPSHOT_RECOVERED] = */
-	"snapshot_recovered",
-	/* [RECOVERY_STATE_WAL_RECOVERED] = */
-	"wal_recovered",
-	/* [RECOVERY_STATE_INDEXES_BUILT] = */
-	"indexes_built",
-	/* [RECOVERY_STATE_SYNCED] = */
-	"synced",
-};
-
 /** Whether the triggers for "synced" recovery stage have already run. */
 static bool recovery_state_synced_is_reached;
 
@@ -288,17 +249,40 @@ TWEAK_DOUBLE(box_shutdown_timeout);
 static double box_fiber_pool_idle_timeout = FIBER_POOL_IDLE_TIMEOUT;
 TWEAK_DOUBLE(box_fiber_pool_idle_timeout);
 
+/** Run triggers from registry for 'box.ctl.on_recovery_state' event. */
 static int
-box_run_on_recovery_state(enum box_recovery_state state)
+box_run_on_recovery_state(const char *state)
 {
-	assert(state >= 0 && state < box_recovery_state_MAX);
-	const char *state_str = box_recovery_state_strs[state];
 	struct port args;
 	port_c_create(&args);
-	port_c_add_str0(&args, state_str);
+	port_c_add_str0(&args, state);
 	int rc = event_run_triggers(box_on_recovery_state_event, &args);
 	port_destroy(&args);
 	return rc;
+}
+
+/** Set new recovery state. */
+static void
+box_set_recovery_state(enum recovery_state state)
+{
+	assert(state - recovery_state == 1);
+	const char *event;
+	switch (state) {
+	case FINAL_RECOVERY:
+		event = "snapshot_recovered";
+		break;
+	case FINISHED_RECOVERY:
+		event = "wal_recovered";
+		break;
+	default:
+		unreachable();
+	}
+	recovery_state = state;
+	if (trigger_run(&on_recovery_state, NULL) != 0) {
+		diag_log();
+		panic("Recovery failed");
+	}
+	box_run_on_recovery_state(event);
 }
 
 static void
@@ -643,7 +627,7 @@ box_do_set_orphan(bool orphan)
 	is_orphan = orphan;
 	box_update_ro_summary();
 	if (!is_orphan && !recovery_state_synced_is_reached) {
-		box_run_on_recovery_state(RECOVERY_STATE_SYNCED);
+		box_run_on_recovery_state("synced");
 		recovery_state_synced_is_reached = true;
 	}
 }
@@ -3552,12 +3536,6 @@ box_set_replication_synchro_queue_max_size(void)
 	int64_t size = box_check_replication_synchro_queue_max_size();
 	if (size < 0)
 		return -1;
-	if (size != INT64_MAX && recovery_state != FINISHED_RECOVERY) {
-		say_info("The option replication_synchro_queue_max_size will "
-			 "actually take effect after the recovery is finished");
-		txn_limbo_set_max_size(&txn_limbo, INT64_MAX);
-		return 0;
-	}
 	txn_limbo_set_max_size(&txn_limbo, size);
 	return 0;
 }
@@ -5390,7 +5368,7 @@ box_populate_schema_space(void)
 static void
 box_on_indexes_built(void)
 {
-	box_run_on_recovery_state(RECOVERY_STATE_INDEXES_BUILT);
+	box_run_on_recovery_state("indexes_built");
 }
 
 /**
@@ -5587,8 +5565,6 @@ bootstrap_master(void)
 		is_graceful_supervised_bootstrap_requested = false;
 	}
 	engine_bootstrap_xc();
-	if (box_set_replication_synchro_queue_max_size() != 0)
-		diag_raise();
 
 	uint32_t replica_id = 1;
 	box_insert_replica_record(replica_id, &INSTANCE_UUID,
@@ -5607,10 +5583,10 @@ bootstrap_master(void)
 		diag_raise();
 	}
 
-	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
-	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
+	box_set_recovery_state(FINAL_RECOVERY);
+	box_set_recovery_state(FINISHED_RECOVERY);
 	assert(!recovery_state_synced_is_reached);
-	box_run_on_recovery_state(RECOVERY_STATE_SYNCED);
+	box_run_on_recovery_state("synced");
 	recovery_state_synced_is_reached = true;
 }
 
@@ -5676,8 +5652,7 @@ bootstrap_from_master(struct replica *master)
 					APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
-
-	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
+	box_set_recovery_state(FINAL_RECOVERY);
 
 	/*
 	 * Process final data (WALs).
@@ -5691,8 +5666,6 @@ bootstrap_from_master(struct replica *master)
 	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
-	if (box_set_replication_synchro_queue_max_size() != 0)
-		diag_raise();
 
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
@@ -5717,8 +5690,7 @@ bootstrap_from_master(struct replica *master)
 		diag_raise();
 	}
 
-	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
-
+	box_set_recovery_state(FINISHED_RECOVERY);
 	return true;
 }
 
@@ -5918,7 +5890,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 * other engines.
 	 */
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
-	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
+	box_set_recovery_state(FINAL_RECOVERY);
 	/*
 	 * Xlog starts after snapshot. Hence recovery vclock must point at the
 	 * end of snapshot (= checkpoint vclock).
@@ -6023,12 +5995,10 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		diag_raise();
 
 	engine_end_recovery_xc();
-	if (box_set_replication_synchro_queue_max_size() != 0)
-		diag_raise();
 
 	if (check_global_ids_integrity() != 0)
 		diag_raise();
-	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
+	box_set_recovery_state(FINISHED_RECOVERY);
 }
 
 static void
@@ -6107,8 +6077,6 @@ box_cfg_xc(void)
 	if (box_set_replication_synchro_timeout() != 0)
 		diag_raise();
 	if (box_set_txn_synchro_timeout() != 0)
-		diag_raise();
-	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 	box_set_replication_sync_timeout();
 	if (box_check_instance_name(cfg_instance_name) != 0)
@@ -6250,6 +6218,8 @@ box_cfg_xc(void)
 	 * that time.
 	 */
 	if (box_set_election_mode() != 0)
+		diag_raise();
+	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
 
 	/*

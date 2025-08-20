@@ -6,7 +6,7 @@
 
 #include "tuple_constraint_fkey.h"
 
-#include "engine.h"
+#include "box.h"
 #include "space.h"
 #include "space_cache.h"
 #include "tuple.h"

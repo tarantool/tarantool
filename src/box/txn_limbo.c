@@ -126,7 +126,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->is_frozen_until_promotion = true;
 	limbo->do_validate = false;
 	limbo->confirm_lag = 0;
-	limbo->max_size = 0;
+	limbo->max_size = INT64_MAX;
 	limbo->size = 0;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
 					 txn_limbo_worker_f);

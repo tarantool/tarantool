@@ -45,6 +45,20 @@ extern "C" {
  * subsystem of Tarantool.
  */
 
+/**
+ * Recovery state of entire tarantool. Apart from memtx recovery state,
+ * which is internal recovery optimization status, this enum describers
+ * real sequence of recovery actions.
+ */
+enum recovery_state {
+	/** Recovery from snapshot file. */
+	INITIAL_RECOVERY,
+	/** Recovery from WAL file(s). */
+	FINAL_RECOVERY,
+	/** Recovery from WAL file(s). */
+	FINISHED_RECOVERY,
+};
+
 struct port;
 struct request;
 struct xrow_header;
@@ -128,6 +142,17 @@ extern struct waiting_for_own_rows_trigger {
 	/** Target LSN to wait for. */
 	int64_t target_lsn;
 } box_check_waiting_for_own_rows_trigger;
+
+/**
+ * The one and only recovery status of entire tarantool.
+ * See enum recovery_state description.
+ */
+extern enum recovery_state recovery_state;
+
+/**
+ * List of triggers called when `recovery_state` is changed.
+ */
+extern struct rlist on_recovery_state;
 
 /*
  * Initialize box library

@@ -71,6 +71,7 @@
 #include "column_mask.h"
 #include "trigger.h"
 #include "wal.h" /* wal_mode() */
+#include "box.h"
 
 /**
  * Yield after iterating over this many objects (e.g. ranges).

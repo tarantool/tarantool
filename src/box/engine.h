@@ -72,28 +72,6 @@ struct engine_join_ctx;
 extern struct engine *engines[];
 
 /**
- * Recovery state of entire tarantool. Apart from memtx recovery state,
- * which is internal recovery optimization status, this enum describers
- * real sequence of recovery actions.
- */
-enum recovery_state {
-	/** Recovery have not been started yet. */
-	RECOVERY_NOT_STARTED,
-	/** Recovery from snapshot file. */
-	INITIAL_RECOVERY,
-	/** Recovery from WAL file(s). */
-	FINAL_RECOVERY,
-	/** Recovery from WAL file(s). */
-	FINISHED_RECOVERY,
-};
-
-/**
- * The one and only recovery status of entire tarantool.
- * See enum recovery_state description.
- */
-extern enum recovery_state recovery_state;
-
-/**
  * Aggregated memory statistics. Used by box.info.memory().
  */
 struct engine_memory_stat {
