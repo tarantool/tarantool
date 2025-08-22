@@ -9,8 +9,10 @@
 #include "small/mempool.h"
 #include "txn.h"
 
+bool txn_event_is_enabled;
+
 /** Global events, i.e. triggered by all transactions. */
-struct event *txn_global_events[txn_event_id_MAX];
+static struct event *txn_global_events[txn_event_id_MAX];
 
 /**
  * Data used to create txn iterators.
@@ -347,6 +349,8 @@ static int
 run_triggers(struct txn *txn, struct txn_stmt *stmt, int event_id,
 	     bool can_abort)
 {
+	if (!txn_event_is_enabled)
+		return 0;
 	/*
 	 * Run triggers, set on spaces that are modified by the transaction.
 	 */

@@ -12,6 +12,11 @@
 extern "C" {
 #endif
 
+/**
+ * Whether txn events should be disabled.
+ */
+extern bool txn_event_is_enabled;
+
 /** ID of a transactional event. */
 enum txn_event_id {
 	TXN_EVENT_BEFORE_COMMIT = 0,

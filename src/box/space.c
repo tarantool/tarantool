@@ -71,6 +71,8 @@
 bool box_consider_system_spaces_synchronous;
 TWEAK_BOOL(box_consider_system_spaces_synchronous);
 
+bool space_event_is_enabled;
+
 #define SYNC_SYSTEM_SPACE_MEMBER(name, id, is_sync) \
 	is_sync ? BOX_ ## name ## _ID : BOX_ID_NIL,
 
@@ -925,6 +927,10 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 	/** Return early if event has no triggers or if txn can't continue. */
 	if (!event_has_triggers(event))
 		return 0;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt != NULL);
+	if (stmt->space->run_recovery_triggers)
+		say_warn_once("space on recovery triggers are deprecated");
 	int rc = txn_check_can_continue(txn);
 	if (rc != 0)
 		return -1;
@@ -964,9 +970,6 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		rc = txn_check_can_continue(txn);
 		if (rc != 0)
 			goto out;
-		struct txn_stmt *stmt = txn_current_stmt(txn);
-		assert(stmt != NULL);
-
 		/*
 		 * Pop the returned value.
 		 * See the function description for details.
@@ -1022,6 +1025,8 @@ out:
 int
 space_on_replace(struct space *space, struct txn *txn)
 {
+	if (!space_event_is_enabled)
+		return trigger_run(&space->on_replace, txn);
 	/*
 	 * Since the triggers can yield, a space can be dropped
 	 * while executing one of the trigger lists and all the events will be
@@ -1276,22 +1281,27 @@ after_old_tuple_lookup:;
 	stmt->new_tuple = new_tuple;
 	stmt->row = request->header;
 
-	struct event *events[] = {
-		space->before_replace_event.by_id,
-		space->before_replace_event.by_name,
-	};
-	/*
-	 * Since the triggers can yield, a space can be dropped
-	 * while executing one of the trigger lists and all the events will be
-	 * unreferenced - reference them to prevent use-after-free.
-	 */
-	for (size_t i = 0; i < lengthof(events); ++i)
-		event_ref(events[i]);
-	int rc = trigger_run(&space->before_replace, txn);
-	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
-		rc = space_run_replace_triggers(events[i], txn, true);
-	for (size_t i = 0; i < lengthof(events); ++i)
-		event_unref(events[i]);
+	int rc;
+	if (!space_event_is_enabled) {
+		rc = trigger_run(&space->before_replace, txn);
+	} else {
+		struct event *events[] = {
+			space->before_replace_event.by_id,
+			space->before_replace_event.by_name,
+		};
+		/*
+		 * Since the triggers can yield, a space can be dropped while
+		 * executing one of the trigger lists and all the events will
+		 * be unreferenced - reference them to prevent use-after-free.
+		 */
+		for (size_t i = 0; i < lengthof(events); ++i)
+			event_ref(events[i]);
+		rc = trigger_run(&space->before_replace, txn);
+		for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
+			rc = space_run_replace_triggers(events[i], txn, true);
+		for (size_t i = 0; i < lengthof(events); ++i)
+			event_unref(events[i]);
+	}
 
 	/*
 	 * BEFORE triggers cannot change the old tuple,

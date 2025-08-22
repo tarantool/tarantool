@@ -58,6 +58,11 @@ struct tuple_format;
 struct space_upgrade;
 struct space_wal_ext;
 
+/**
+ * Whether space events should be disabled.
+ */
+extern bool space_event_is_enabled;
+
 struct space_vtab {
 	/** Free a space instance. */
 	void (*destroy)(struct space *);
