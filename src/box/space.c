@@ -71,6 +71,11 @@
 bool box_consider_system_spaces_synchronous;
 TWEAK_BOOL(box_consider_system_spaces_synchronous);
 
+/**
+ * Whether space events should be disabled.
+ */
+static bool space_events_enabled = true;
+
 #define SYNC_SYSTEM_SPACE_MEMBER(name, id, is_sync) \
 	is_sync ? BOX_ ## name ## _ID : BOX_ID_NIL,
 
@@ -922,9 +927,15 @@ static int
 space_run_replace_triggers(struct event *event, struct txn *txn,
 			   bool update_tuple)
 {
+	if (!space_events_enabled)
+		return 0;
 	/** Return early if event has no triggers or if txn can't continue. */
 	if (!event_has_triggers(event))
 		return 0;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt != NULL);
+	if (stmt->space->run_recovery_triggers)
+		say_warn_once("space on recovery triggers are deprecated");
 	int rc = txn_check_can_continue(txn);
 	if (rc != 0)
 		return -1;
@@ -964,9 +975,6 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		rc = txn_check_can_continue(txn);
 		if (rc != 0)
 			goto out;
-		struct txn_stmt *stmt = txn_current_stmt(txn);
-		assert(stmt != NULL);
-
 		/*
 		 * Pop the returned value.
 		 * See the function description for details.
@@ -1529,6 +1537,12 @@ extern void
 system_spaces_update_is_sync_state_from_compat(void)
 {
 	system_spaces_update_is_sync_state(txn_limbo_has_owner(&txn_limbo));
+}
+
+void
+space_events_enable(bool value)
+{
+	space_events_enabled = value;
 }
 
 /* {{{ Virtual method stubs */

@@ -282,6 +282,14 @@ I['compat.box_info_cluster_meaning'] = format_text([[
     - `old` (2.x default): `box.info.cluster` shows info about the replica set
 ]])
 
+I['compat.box_recovery_triggers_deprecation'] = format_text([[
+    Whether to trigger space and transactional events during local recovery
+    or join:
+
+    - `new` (4.x default): do not trigger events
+    - `old` (3.x default): trigger events
+]])
+
 I['compat.box_session_push_deprecation'] = format_text([[
     Whether to raise errors on attempts to call the deprecated function
     `box.session.push`:

@@ -766,6 +766,10 @@ error_set_space(struct error *error, struct space_def *def)
 void
 space_cleanup_constraints(struct space *space);
 
+/** Enable/disable space events. */
+void
+space_events_enable(bool value);
+
 /*
  * Virtual method stubs.
  */

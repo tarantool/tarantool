@@ -2165,6 +2165,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        box_recovery_triggers_deprecation = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
