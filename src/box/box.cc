@@ -155,6 +155,12 @@ static struct gc_checkpoint_ref *backup_gc;
 bool box_read_ffi_is_disabled;
 
 /**
+ * Whether triggers during recovery should be disabled.
+ */
+static bool box_recovery_triggers_disabled;
+TWEAK_BOOL(box_recovery_triggers_disabled);
+
+/**
  * Counter behind box_read_ffi_is_disabled: FFI is re-enabled
  * when it hits zero.
  */
@@ -6159,6 +6165,10 @@ box_cfg_xc(void)
 	});
 
 	bool is_bootstrap_leader = false;
+	if (box_recovery_triggers_disabled) {
+		space_events_enable(false);
+		txn_events_enable(false);
+	}
 	if (checkpoint != NULL) {
 		/* Recover the instance from the local directory */
 		local_recovery(&checkpoint->vclock);
@@ -6166,6 +6176,8 @@ box_cfg_xc(void)
 		/* Bootstrap a new instance */
 		bootstrap(&is_bootstrap_leader);
 	}
+	space_events_enable(true);
+	txn_events_enable(true);
 	/*
 	 * During bootstrap from a remote master try not to ignore the
 	 * conflicts, neither during snapshot fetch, not join.

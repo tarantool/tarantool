@@ -164,6 +164,13 @@ gc-checkpointing.
 https://tarantool.io/compat/replication_synchro_timeout
 ]]
 
+local BOX_RECOVERY_TRIGGERS_DEPRECATION_BRIEF = [[
+On recovery triggers are deprecated. The new behavior is to do not trigger
+space and transactional events during local recovery or join.
+
+https://tarantool.io/compat/box_recovery_triggers_deprecation
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -300,6 +307,13 @@ local options = {
         brief = REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
         action = tweak_action(
             'replication_synchro_timeout_rollback_enabled', true, false),
+    },
+    box_recovery_triggers_deprecation = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_RECOVERY_TRIGGERS_DEPRECATION_BRIEF,
+        action = tweak_action(
+            'box_recovery_triggers_disabled', false, true),
     },
 }
 
