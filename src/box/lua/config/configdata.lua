@@ -274,8 +274,46 @@ function methods.bootstrap_leader_name(self)
     return self._bootstrap_leader_name
 end
 
--- Calculate an instance configuration for each instance of the
--- given cluster.
+-- Calculate an instance configuration for the given instance
+-- object.
+local function build_iconfig(instance_def)
+    -- Build config for each instance from the cluster
+    -- config. Build a config with applied defaults as well.
+    local iconfig = cluster_config:instantiate(instance_def.cconfig,
+        instance_def.instance_name)
+    local iconfig_def = instance_config:apply_default(iconfig)
+
+    -- Substitute variables according to the instance,
+    -- replicaset, group names.
+    local vars = {
+        instance_name = instance_def.instance_name,
+        replicaset_name = instance_def.replicaset_name,
+        group_name = instance_def.group_name,
+    }
+    instance_def.iconfig = instance_config:apply_vars(iconfig, vars)
+    instance_def.iconfig_def = instance_config:apply_vars(iconfig_def, vars)
+end
+
+-- Instance object metatable.
+--
+-- Implements lazy configuration evaluation.
+--
+-- NB: Once the fields are assigned in the table, the __index
+-- metamethod is not called for them.
+local instance_def_mt = {
+    __index = function(self, field)
+        if field == 'iconfig' then
+            build_iconfig(self)
+            return self.iconfig
+        elseif field == 'iconfig_def' then
+            build_iconfig(self)
+            return self.iconfig_def
+        end
+    end,
+}
+
+-- Create an instance definition object that provides access to
+-- instance properties and configuration.
 local function build_instances(cconfig)
     assert(type(cconfig) == 'table')
 
@@ -286,27 +324,16 @@ local function build_instances(cconfig)
             for instance_name, _ in pairs(replicaset.instances or {}) do
                 assert(res[instance_name] == nil)
 
-                -- Build config for each instance from the cluster
-                -- config. Build a config with applied defaults as well.
-                local iconfig = cluster_config:instantiate(cconfig,
-                    instance_name)
-                local iconfig_def = instance_config:apply_default(iconfig)
-
-                -- Substitute variables according to the instance,
-                -- replicaset, group names.
-                local vars = {
+                res[instance_name] = setmetatable({
+                    cconfig = cconfig,
                     instance_name = instance_name,
                     replicaset_name = replicaset_name,
                     group_name = group_name,
-                }
-                iconfig = instance_config:apply_vars(iconfig, vars)
-                iconfig_def = instance_config:apply_vars(iconfig_def, vars)
-
-                res[instance_name] = {
-                    replicaset_name = replicaset_name,
-                    iconfig = iconfig,
-                    iconfig_def = iconfig_def,
-                }
+                    -- Instance configuration is evaluated lazily,
+                    -- on access to these fields.
+                    iconfig = nil,
+                    iconfig_def = nil,
+                }, instance_def_mt)
             end
         end
     end
