@@ -104,6 +104,8 @@ include(BuildLuaTests)
 string(JOIN ";" LUZER_TESTS
   csv_load_test.lua
   decimal_new_test.lua
+  misc_memprof_test.lua
+  misc_sysprof_test.lua
   msgpack_decode_test.lua
   msgpack_itv_test.lua
   pickle_unpack_test.lua
