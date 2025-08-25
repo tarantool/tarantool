@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include <math.h>
 
 /*------------------------------------------------------------------------- */
 /* R-tree internal structures definition */
@@ -171,6 +172,84 @@ rtree_rect_neigh_distance2(const struct rtree_rect *rect,
 			sq_coord_t diff = (sq_coord_t)(neigh_coord - coords[1]);
 			result += diff * diff;
 		}
+	}
+	return result;
+}
+
+/**
+ * Calculates diff.
+ * Is used for calculating max distance.
+ * For manhattan and euclid distances.
+ */
+static sq_coord_t
+rtree_rect_neigh_distance_diff(
+	const coord_t *coords, coord_t neigh_coord,
+	bool *flag_between_points, size_t *counter)
+{
+	if (neigh_coord < coords[0]) {
+		return (sq_coord_t)(coords[1] - neigh_coord);
+	} else if (neigh_coord > coords[1]) {
+		return (sq_coord_t)(neigh_coord - coords[0]);
+	} else if ((neigh_coord - coords[0]) >
+		   (coords[1] - neigh_coord)) {
+		(*counter)++;
+		*flag_between_points = true;
+		return (sq_coord_t)(neigh_coord - coords[0]);
+	} else {
+		(*counter)++;
+		*flag_between_points = true;
+		return (sq_coord_t)(coords[1] - neigh_coord);
+	}
+}
+
+/**
+ * Max distance of neighbor.
+ * Is used for pagintion optimisation.
+ * Euclid distance.
+ */
+static sq_coord_t
+rtree_rect_neigh_distance2_max(
+	const struct rtree_rect *rect,
+	const struct rtree_rect *neigh_rect,
+	unsigned dimension)
+{
+	sq_coord_t result = 0;
+	size_t counter = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		bool flag_between_points = false;
+		sq_coord_t diff = rtree_rect_neigh_distance_diff(
+			coords, neigh_coord,
+			&flag_between_points, &counter);
+
+		result += diff * diff;
+	}
+	return result;
+}
+
+/**
+ * Max distance of neighbor.
+ * Is used for pagintion optimisation.
+ * Manhattan distance.
+ */
+static sq_coord_t
+rtree_rect_neigh_distance_max(
+	const struct rtree_rect *rect,
+	const struct rtree_rect *neigh_rect,
+	unsigned dimension)
+{
+	sq_coord_t result = 0, result2 = 0;
+	size_t counter = 0;
+	for (int i = dimension; --i >= 0; ) {
+		const coord_t *coords = &rect->coords[2 * i];
+		coord_t neigh_coord = neigh_rect->coords[2 * i];
+		bool flag_between_points = false;
+		sq_coord_t diff = rtree_rect_neigh_distance_diff(
+			coords, neigh_coord,
+			&flag_between_points, &counter);
+
+		result += diff;
 	}
 	return result;
 }
@@ -831,7 +910,8 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 
 static struct rtree_neighbor *
 rtree_iterator_new_neighbor(struct rtree_iterator *itr,
-			    void *child, sq_coord_t distance, int level)
+			    void *child, sq_coord_t distance,
+			    int level, sq_coord_t distance_max)
 {
 	struct rtree_neighbor *n = itr->neigh_free_list;
 	if (n == NULL)
@@ -841,10 +921,13 @@ rtree_iterator_new_neighbor(struct rtree_iterator *itr,
 	n->child = child;
 	n->distance = distance;
 	n->level = level;
+	n->distance_max = distance_max;
 	if (itr->tie_cmp != NULL) {
 		n->cmp_ctx = itr->cmp_ctx;
+		n->tie_cmp = itr->tie_cmp;
 	} else {
 		n->cmp_ctx = NULL;
+		n->tie_cmp = NULL;
 	}
 	return n;
 }
@@ -879,16 +962,26 @@ rtree_iterator_process_neigh(struct rtree_iterator *itr,
 	for (int i = 0, n = pg->n; i < n; i++) {
 		struct rtree_page_branch *b;
 		b = rtree_branch_get(itr->tree, pg, i);
-		coord_t distance;
-		if (itr->tree->distance_type == RTREE_EUCLID)
-			distance = rtree_rect_neigh_distance2(&b->rect,
-							      &itr->rect, d);
-		else
-			distance = rtree_rect_neigh_distance(&b->rect,
-							     &itr->rect, d);
+		coord_t distance, distance_max = 0;
+		if (itr->tree->distance_type == RTREE_EUCLID) {
+			distance = rtree_rect_neigh_distance2(
+				&b->rect, &itr->rect, d);
+			if (level > 0) {
+				distance_max = rtree_rect_neigh_distance2_max(
+					&b->rect, &itr->rect, d);
+			}
+		} else { /* RTREE_MANHATTAN */
+			distance = rtree_rect_neigh_distance(
+				&b->rect, &itr->rect, d);
+			if (level > 0) {
+				distance_max = rtree_rect_neigh_distance_max(
+					&b->rect, &itr->rect, d);
+			}
+		}
 		struct rtree_neighbor *neigh =
-			rtree_iterator_new_neighbor(itr, b->data.page,
-						    distance, level - 1);
+			rtree_iterator_new_neighbor(
+				itr, b->data.page, distance,
+				level - 1, distance_max);
 		rtnt_insert(&itr->neigh_tree, neigh);
 	}
 }
@@ -940,6 +1033,47 @@ rtree_iterator_next(struct rtree_iterator *itr)
 	}
 	itr->eof = true;
 	return NULL;
+}
+
+record_t *
+rtree_skip_neighbors_equal_distance(struct rtree_iterator *itr,
+				    sq_coord_t pos_distance,
+				    bool *is_upper_distance)
+{
+	while (true) {
+		struct rtree_neighbor *neighbor =
+			rtnt_first(&itr->neigh_tree);
+		if (neighbor == NULL) {
+			return NULL;
+		}
+		if (neighbor->level == 0) {
+			if (neighbor->distance < pos_distance - 0.000001f) {
+				rtnt_remove(&itr->neigh_tree, neighbor);
+				rtree_iterator_free_neighbor(itr, neighbor);
+				continue;
+			}
+			if (fabs(neighbor->distance - pos_distance) < 0.000001f) {
+				rtnt_remove(&itr->neigh_tree, neighbor);
+				rtree_iterator_free_neighbor(itr, neighbor);
+				*is_upper_distance = false;
+				return (record_t *)neighbor->child;
+			}
+			if (neighbor->distance > pos_distance + 0.000001f) {
+				rtnt_remove(&itr->neigh_tree, neighbor);
+				rtree_iterator_free_neighbor(itr, neighbor);
+				*is_upper_distance = true;
+				return (record_t *)neighbor->child;
+			}
+			rtnt_remove(&itr->neigh_tree, neighbor);
+			rtree_iterator_free_neighbor(itr, neighbor);
+		} else {
+			rtnt_remove(&itr->neigh_tree, neighbor);
+			/* Optimization. */
+			if (neighbor->distance_max < pos_distance - 0.000001f)
+				continue;
+			rtree_iterator_process_neigh(itr, neighbor);
+		}
+	}
 }
 
 /*------------------------------------------------------------------------- */
@@ -1101,19 +1235,27 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 		if (tree->root) {
 			struct rtree_rect cover;
 			rtree_page_cover(tree, tree->root, &cover);
-			sq_coord_t distance;
-			if (tree->distance_type == RTREE_EUCLID)
+			coord_t distance, distance_max = 0;
+			if (tree->distance_type == RTREE_EUCLID) {
 				distance =
 				rtree_rect_neigh_distance2(&cover, rect,
 							   tree->dimension);
-			else
+				distance_max =
+				rtree_rect_neigh_distance2_max(&cover, rect,
+							       tree->dimension);
+			} else {
 				distance =
 				rtree_rect_neigh_distance(&cover, rect,
 							  tree->dimension);
+				distance_max =
+				rtree_rect_neigh_distance_max(&cover, rect,
+							      tree->dimension);
+			}
 			struct rtree_neighbor *n =
 				rtree_iterator_new_neighbor(itr, tree->root,
 							    distance,
-							    tree->height);
+							    tree->height,
+							    distance_max);
 			rtnt_insert(&itr->neigh_tree, n);
 			return true;
 		} else {
