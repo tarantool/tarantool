@@ -1,128 +1,9 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
-local g_sk_types = t.group('memtx_sort_data_test-sk-types', {
-    {pk_type = 'TREE', sk = {hint = true}},
-    {pk_type = 'TREE', sk = {hint = false}},
-    {pk_type = 'TREE', sk = {path = 'array[*]'}},
-    {pk_type = 'TREE', sk = {is_nullable = true}},
-    {pk_type = 'TREE', sk = {is_nullable = true,
-                             exclude_null = true}},
-    {pk_type = 'HASH', sk = {}},
-})
 local g_generic = t.group('memtx_sort_data_test-generic')
 local g_invalid_file = t.group('memtx_sort_data_test-invalid_file')
-local g_mvcc = t.group('memtx_sort_data_test-mvcc',
-                       {{pk_type = 'TREE'}, {pk_type = 'HASH'}})
-local g_graceful_shutdown = t.group('memtx_sort_data_test-snapshot')
-
-
-g_sk_types.before_all(function(cg)
-    cg.server = server:new({
-        box_cfg = {memtx_use_sort_data = true,
-                   checkpoint_count  = 3},
-        alias = 'master'
-    })
-    cg.server:start()
-end)
-
-g_sk_types.after_all(function(cg)
-    cg.server:stop()
-end)
-
-g_sk_types.after_each(function(cg)
-    cg.server:exec(function()
-        if box.space.test then
-            box.space.test:drop()
-        end
-    end)
-end)
-
--- Test that the SK sort using the sort data is correct.
-g_sk_types.test_memtx_sort_data = function(cg)
-    -- Create the space and indexes and write snapshot with sort data.
-    cg.server:exec(function(pk_type, sk)
-        local s = box.schema.create_space('test')
-        s:create_index('pk', {type = pk_type, parts = {1, 'unsigned'}})
-        s:create_index('sk', {type = 'tree', hint = sk.hint, unique = false,
-                              parts = {2, 'unsigned', path = sk.path,
-                                       is_nullable = sk.is_nullable,
-                                       exclude_null = sk.exclude_null}})
-
-        local function sk_object()
-            local max = 1000000
-            if sk.path ~= nil then
-                local count = math.random(1, 3)
-                local array = {}
-                for i = 1, count do -- luacheck: no unused
-                    table.insert(array, math.random(1, max))
-                end
-                return {array = array, scalar = math.random(1, max)}
-            else
-                -- 1/3 of nulls.
-                if sk.is_nullable and math.random(1, 3) == 1 then
-                    return box.NULL
-                else
-                    return math.random(1, max)
-                end
-            end
-        end
-
-        for i = 1, 100 do
-            s:insert({i, sk_object()})
-        end
-
-        box.snapshot()
-    end, {cg.params.pk_type, cg.params.sk})
-
-    -- Start using the sort data.
-    cg.server:restart()
-    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
-                                'index \'sk\' of space \'test\''))
-
-    -- Check the order of tuples in SK.
-    cg.server:exec(function(sk_is_mk, nulls_excluded)
-        local fiber = require('fiber')
-        local s = box.space.test
-        t.assert_equals(s.index.pk:len(), 100)
-
-        if sk_is_mk then
-            t.assert_ge(s.index.sk:len(), 100)
-            local processed = 0
-            for _, tuple in s.index.sk:pairs() do
-                -- Can't verify tuple order, only access
-                -- its fields and verify to have no crash.
-                t.assert(tuple[2].array ~= nil)
-                processed = processed + 1
-                if processed % 100 == 0 then
-                    fiber.yield()
-                end
-            end
-            t.assert_equals(processed, s.index.sk:len())
-            return
-        end
-
-        if not nulls_excluded then
-            t.assert_equals(s.index.sk:len(), 100)
-        else
-            t.assert_lt(s.index.sk:len(), 100)
-        end
-        local key_def = require('key_def')
-        local kd = key_def.new(s.index.sk.parts)
-        local prev = nil
-        local processed = 0
-        for _, tuple in s.index.sk:pairs() do
-            if processed > 0 then
-                t.assert_ge(kd:compare(tuple, prev), 0)
-            end
-            prev = tuple
-            processed = processed + 1
-        end
-        t.assert_equals(processed, s.index.sk:len())
-        fiber.yield()
-    end, {cg.params.sk.path ~= nil and string.find(cg.params.sk.path, '*'),
-          cg.params.sk.exclude_null})
-end
+local g_mvcc = t.group('memtx_sort_data_test-mvcc')
 
 -- Create a space with data, primary and secondary key.
 local function create_test_space(cg)
@@ -151,303 +32,381 @@ g_generic.after_each(function(cg)
     cg.server:drop()
 end)
 
--- Test that functional indexes aren't affected.
-g_generic.test_func_index = function(cg)
-    create_test_space(cg)
-
-    -- Create a functional key and a snapshot with sort data file.
+-- Test the sort data machinery works appropriately.
+g_generic.test_index_build = function(cg)
+    -- Create the space and indexes and write snapshot with sort data.
     cg.server:exec(function()
-        local s = box.space.test
+        -- Space with TREE primary key.
+        local s = box.schema.create_space('test')
+        s:create_index('pk', {parts = {1, 'unsigned'}})
+
+        -- Tree with hints.
+        s:create_index('i1', {hint = true, unique = false,
+                              parts = {2, 'unsigned'}})
+
+        -- Tree without hints.
+        s:create_index('i2', {hint = false, unique = false,
+                              parts = {2, 'unsigned'}})
+
+        -- Nullable part.
+        s:create_index('i3', {unique = false,
+                              parts = {3, 'unsigned', is_nullable = true}})
+
+        -- Nullable with nulls excluded.
+        s:create_index('i4', {unique = false,
+                              parts = {3, 'unsigned', is_nullable = true,
+                                       exclude_null = true}})
+
+        -- Empty nullable with nulls excluded.
+        s:create_index('i4e', {unique = false,
+                               parts = {4, 'unsigned', is_nullable = true,
+                                        exclude_null = true}})
+
+
+        -- Multikey index.
+        s:create_index('i5', {unique = false,
+                              parts = {5, 'unsigned', path = 'array[*]'}})
+
+        -- Multikey with nullable part.
+        s:create_index('i6', {unique = false,
+                              parts = {6, 'unsigned', path = 'array[*]',
+                                       is_nullable = true}})
+
+        -- Multikey with nullable part and excluded nulls.
+        s:create_index('i7', {unique = false,
+                              parts = {6, 'unsigned', path = 'array[*]',
+                                       is_nullable = true,
+                                       exclude_null = true}})
+
+        -- Functional key.
         local func_lua_code = 'function(tuple) return {tuple[1]} end'
         box.schema.func.create('func', {body = func_lua_code,
                                         is_deterministic = true,
                                         is_sandboxed = true})
-        s:create_index('fk', {type = 'tree', unique = false, func = 'func',
+        s:create_index('fk', {func = 'func',
                               parts = {1, 'unsigned', sort_order = 'desc'}})
+
+        -- Fill the space with corresponding data.
+        for i = 1, 50 do
+            local random_value = math.random(1000)
+            -- ~33% of nulls.
+            local nullable_value =
+                math.random(1, 3) == 1 and box.NULL or math.random(1000)
+            local random_array = {math.random(1000), math.random(1000)}
+            local nullable_array = {
+                math.random(1, 3) == 1 and box.NULL or math.random(1000),
+                math.random(1, 3) == 1 and box.NULL or math.random(1000),
+            }
+            s:insert({i, random_value, nullable_value, nil,
+                      {array = random_array}, {array = nullable_array}})
+        end
+
+        -- Space with HASH primary key.
+        local s2 = box.schema.create_space('test2')
+        s2:create_index('pk', {type = 'HASH'})
+        s2:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+        for i = 1, 50 do
+            s2:insert({i, math.random(1000)})
+        end
+
+        -- Local space.
+        local s3 = box.schema.create_space('test_local', {is_local = true})
+        s3:create_index('pk')
+        s3:create_index('sk', {parts = {1, 'unsigned', sort_order = 'desc'}})
+        for i = 1, 50 do
+            s3:insert({i})
+        end
+
+        -- Vinyl space.
+        local s4 = box.schema.create_space('test_vinyl', {engine = 'vinyl'})
+        s4:create_index('pk')
+        s4:create_index('sk')
+        for i = 1, 50 do
+            s4:insert({i})
+        end
+
+        -- Create snapshot.
         box.snapshot()
+
+        -- Create WAL.
+        for i = 1, 50 do
+            s3:insert({50 + i})
+        end
     end)
 
-    -- Start using the sort data file.
+    -- Start using the sort data.
     cg.server:restart()
-
-    -- Must use the sort data on a regular SK.
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'sk\' of space \'test\'') ~= nil)
-
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i1\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i2\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i3\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i4\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i4e\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i5\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i6\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i7\' of space \'test\''))
     -- Must NOT use the sort data on a functional SK.
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'fk\' of space \'test\'') == nil)
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'fk\' of space \'test\'') == nil)
 
-    -- Check the functional key order (which is descending).
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'sk\' of space \'test2\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'sk\' of space \'test_local\''))
+    -- Must NOT use the sort data on a vinyl index.
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'sk\' of space \'test_vinyl\'') == nil)
+
+    -- Check the order of tuples in SK.
     cg.server:exec(function()
         local fiber = require('fiber')
-        local i = 100
-        for _, tuple in box.space.test.index.fk:pairs() do
+        local s = box.space.test
+        local s2 = box.space.test2
+        local s3 = box.space.test_local
+        local s4 = box.space.test_vinyl
+
+        -- Check PK.
+        t.assert_equals(s.index.pk:len(), 50)
+
+        -- Check SK with hints.
+        t.assert_equals(s.index.i1:len(), 50)
+        local prev_value = nil
+        for _, tuple in s.index.i1:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[2], prev_value)
+            end
+            prev_value = tuple[2]
+        end
+        fiber.yield()
+
+        -- Check SK without hints.
+        t.assert_equals(s.index.i2:len(), 50)
+        prev_value = nil
+        for _, tuple in s.index.i2:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[2], prev_value)
+            end
+            prev_value = tuple[2]
+        end
+        fiber.yield()
+
+        -- Check nullable SK.
+        t.assert_equals(s.index.i3:len(), 50)
+        prev_value = nil
+        for _, tuple in s.index.i3:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[3], prev_value)
+            end
+            -- First ~33% values expected to be nulls.
+            prev_value = tuple[3]
+        end
+        fiber.yield()
+
+        -- Check nullable SK with nulls excluded.
+        t.assert_lt(s.index.i4:len(), 50)
+        prev_value = nil
+        for _, tuple in s.index.i4:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[3], prev_value)
+            end
+            prev_value = tuple[3]
+        end
+        fiber.yield()
+
+        -- Check the empty nullable SK with nulls excluded.
+        t.assert_equals(s.index.i4e:len(), 0)
+
+        -- Check multikey SK. Multikey checks aren't precise.
+        t.assert_le(s.index.i5:len(), 100)
+        local prev_value = nil
+        for _, tuple in s.index.i5:pairs() do
+            if prev_value ~= nil then
+                local elem_1_is_ge = tuple[5].array[1] >= prev_value
+                local elem_2_is_ge = tuple[5].array[2] >= prev_value
+                t.assert(elem_1_is_ge or elem_2_is_ge)
+                if elem_1_is_ge ~= elem_2_is_ge then
+                    -- Only one is greater or equal - the MAX one.
+                    prev_value = math.max(tuple[5].array[1], tuple[5].array[2])
+                else
+                    -- Both are greater or equal, peek the smallest.
+                    prev_value = math.min(tuple[5].array[1], tuple[5].array[2])
+                end
+            else
+                prev_value = math.min(tuple[5].array[1], tuple[5].array[2])
+            end
+        end
+        fiber.yield()
+
+        -- GE check with nulls.
+        local function cmp(a, b)
+            if a ~= nil and b ~= nil then
+                -- Compare regular numbers.
+                return a - b
+            elseif a == nil and b == nil then
+                -- Both nulls (equal).
+                return 0
+            else
+                -- If a not nil then it's greater than b (nil)
+                assert((a == nil) ~= (b == nil))
+                return a ~= nil and 1 or -1
+            end
+        end
+
+        -- Check nullable multikey SK.
+        t.assert_le(s.index.i6:len(), 100)
+        local prev_value = nil
+        for _, tuple in s.index.i6:pairs() do
+            local elem_1_is_ge = cmp(tuple[6].array[1], prev_value) >= 0
+            local elem_2_is_ge = cmp(tuple[6].array[2], prev_value) >= 0
+            local elem_max = cmp(tuple[6].array[1], tuple[6].array[2]) > 0
+                             and tuple[6].array[1] or tuple[6].array[2]
+            local elem_min = cmp(tuple[6].array[1], tuple[6].array[2]) < 0
+                             and tuple[6].array[1] or tuple[6].array[2]
+            t.assert(elem_1_is_ge or elem_2_is_ge)
+            if elem_1_is_ge ~= elem_2_is_ge then
+                -- Only one is greater or equal - the MAX one.
+                prev_value = elem_max
+            else
+                -- Both are greater or equal, peek the smallest.
+                prev_value = elem_min
+            end
+        end
+        fiber.yield()
+
+        -- Check nullable multikey SK with nulls excluded.
+        t.assert_le(s.index.i7:len(), 100)
+        local prev_value = nil
+        for _, tuple in s.index.i7:pairs() do
+            local elem_1_is_ge = cmp(tuple[6].array[1], prev_value) >= 0
+            local elem_2_is_ge = cmp(tuple[6].array[2], prev_value) >= 0
+            local elem_max = cmp(tuple[6].array[1], tuple[6].array[2]) > 0
+                             and tuple[6].array[1] or tuple[6].array[2]
+            local elem_min = cmp(tuple[6].array[1], tuple[6].array[2]) < 0
+                             and tuple[6].array[1] or tuple[6].array[2]
+            t.assert(elem_1_is_ge or elem_2_is_ge)
+            if elem_1_is_ge ~= elem_2_is_ge then
+                -- Only one is greater or equal - the MAX one.
+                prev_value = elem_max
+            else
+                -- Both are greater or equal, peek the smallest.
+                prev_value = elem_min
+            end
+        end
+        fiber.yield()
+
+        -- Check functional key.
+        t.assert_equals(s.index.fk:len(), 50)
+        local i = 50
+        for _, tuple in s.index.fk:pairs() do
             t.assert_equals(tuple[1], i)
             i = i - 1
         end
         t.assert_equals(i, 0)
         fiber.yield()
-    end)
-end
 
--- Test that local spaces are handled as expected.
-g_generic.test_local_space = function(cg)
-    -- Create a local space with data and primary and secondary keys.
-    cg.server:exec(function()
-        box.space._space:alter({}) -- No-op to update the VClock.
-        local s = box.schema.create_space('test', {is_local = true})
-        s:create_index('pk')
-        s:create_index('sk', {parts = {1, 'unsigned', sort_order = 'desc'}})
-        for i = 1, 100 do
-            s:insert({i})
+        -- Check HASH PK and the space SK.
+        t.assert_equals(s2.index.pk:len(), 50)
+        t.assert_equals(s2.index.sk:len(), 50)
+        local prev_value = nil
+        for _, tuple in s2.index.sk:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[2], prev_value)
+            end
+            prev_value = tuple[2]
         end
-        box.space._space:alter({}) -- No-op to update the VClock.
-        box.snapshot()
-    end)
-
-    -- Start using the sort data file.
-    cg.server:restart()
-
-    -- Must use the sort data on the SK.
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'sk\' of space \'test\'') ~= nil)
-
-    -- Check the SK order (which is descending).
-    cg.server:exec(function()
-        local fiber = require('fiber')
-        local i = 100
-        for _, tuple in box.space.test.index.sk:pairs() do
-            t.assert_equals(tuple[1], i)
-            i = i - 1
-        end
-        t.assert_equals(i, 0)
         fiber.yield()
-    end)
-end
 
--- Test that empty sort data for an index is handled appropriately.
-g_generic.test_empty_sort_data = function(cg)
-    -- Create a space with data and indexes.
-    cg.server:exec(function()
-        local s = box.schema.create_space('test', {is_local = true})
-        s:create_index('pk')
-        s:create_index('sk1')
-        s:create_index('sk2', {parts = {2, 'unsigned', is_nullable = true,
-                                        exclude_null = true}})
-        s:create_index('sk3', {parts = {1, 'unsigned', sort_order = 'desc'}})
-        for i = 1, 100 do
-            s:insert({i, box.NULL})
-        end
-        box.snapshot()
-    end)
-
-    -- Start using the sort data file.
-    cg.server:restart()
-
-    -- Must use the sort data on secondary keys.
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'sk1\' of space \'test\'') ~= nil)
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'sk2\' of space \'test\'') ~= nil)
-    t.assert(cg.server:grep_log('Using MemTX sort data for building' ..
-                                ' index \'sk3\' of space \'test\'') ~= nil)
-
-    -- Check SK orders.
-    cg.server:exec(function()
-        local fiber = require('fiber')
+        -- Check local space.
+        t.assert_equals(s3.index.pk:len(), 100)
+        t.assert_equals(s3.index.sk:len(), 100)
         local i = 100
-        t.assert_equals(box.space.test.index.sk3:len(), box.space.test:count())
-        for _, tuple in box.space.test.index.sk3:pairs() do
+        for _, tuple in s3.index.sk:pairs() do
             t.assert_equals(tuple[1], i)
             i = i - 1
         end
         fiber.yield()
+
+        -- Check vinyl space.
+        t.assert_equals(s4.index.pk:len(), 50)
+        t.assert_equals(s4.index.sk:len(), 50)
         t.assert_equals(i, 0)
-        t.assert_equals(box.space.test.index.sk1:len(), box.space.test:count())
-        for _, tuple in box.space.test.index.sk1:pairs() do
+        for _, tuple in s4.index.sk:pairs() do
             i = i + 1
             t.assert_equals(tuple[1], i)
         end
+        t.assert_equals(i, 50)
         fiber.yield()
-        t.assert_equals(i, 100)
-        t.assert_equals(box.space.test.index.sk2:len(), 0)
     end)
 end
 
--- Test that a before_replace trigger on the test space prevent using sort data.
-g_generic.test_before_replace = function(cg)
+-- Test recovery conditions prohibiting using the new SK build
+-- approach (e. g. triggers set, no sort data file exists).
+g_generic.test_fallback_cases = function(cg)
+    -- Create a space and dump a snapshot and sort data file.
     create_test_space(cg)
-
-    -- Create a snapshot and sort data file.
     cg.server:exec(function()
         box.snapshot()
     end)
 
     -- Load it with the _index.before_recovery_replace trigger set up.
-    local register_before_recovery_replace = [[
+    -- Must not use the sort data because of the trigger.
+    cg.server:restart({env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = [[
         local trigger = require('trigger')
         trigger.set('box.space.test.before_recovery_replace', 'test_trigger',
                     function(old, new, space, req, header, body)
                         return new
                     end)
-    ]]
-    cg.server:restart({
-        env = {
-            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = register_before_recovery_replace,
-        }
-    })
+    ]]}})
+    local success_msg = 'Using MemTX sort data for building' ..
+                        ' index \'sk\' of space \'test\''
+    t.assert(cg.server:grep_log(success_msg) == nil)
 
-    -- Must not use the sort data because of the trigger.
-    local msg = 'Using MemTX sort data for building' ..
-                ' index \'sk\' of space \'test\''
-    t.assert(cg.server:grep_log(msg) == nil)
-
-    -- Now load it with a regular test.before_replace trigger set up.
-    local register_before_replace = [[
+    -- Now load it with a regular test.before_replace trigger set up. It should
+    -- use the sort data file (the regular before_replace trigger does not fire
+    -- on recovery so it should not affect the ability to use it).
+    cg.server:restart({env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = [[
         local trigger = require('trigger')
         trigger.set('box.space.test.before_replace', 'test_trigger',
                     function(old, new, space, req, header, body)
                         return new
                     end)
-    ]]
-    cg.server:restart({
-        env = {
-            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = register_before_replace,
-        }
-    })
+    ]]}})
+    t.assert(cg.server:grep_log(success_msg))
 
-    -- Now it should use the sort data file (the regular before_replace trigger
-    -- does not fire on recovery so it should not affect the ability to use it).
-    t.assert(cg.server:grep_log(msg) ~= nil)
-end
-
--- Test that a before_replace trigger on _index space prevent using sort data.
-g_generic.test_index_before_replace = function(cg)
-    create_test_space(cg)
-
-    -- Create a snapshot and sort data file.
-    cg.server:exec(function()
-        box.snapshot()
-    end)
-
-    -- Load it with the _index.before_recovery_replace trigger set up.
-    local register_before_recovery_replace = [[
+    -- Now run with the _index.before_recovery_replace trigger set up.
+    -- Must not use the sort data because of the trigger.
+    cg.server:restart({env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = [[
         local trigger = require('trigger')
         trigger.set('box.space._index.before_recovery_replace', 'test_trigger',
                     function(old, new, space, req, header, body)
                         return new
                     end)
-    ]]
-    cg.server:restart({
-        env = {
-            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = register_before_recovery_replace,
-        }
-    })
+    ]]}})
+    t.assert(cg.server:grep_log('memtx_use_sort_data = true but no memtx ' ..
+                                'sort data used: the _index space has ' ..
+                                'before_replace triggers'))
 
-    -- Must not use the sort data because of the trigger.
-    local msg = 'memtx_use_sort_data = true but no memtx sort data used:' ..
-                ' the _index space has before_replace triggers'
-    t.assert(cg.server:grep_log(msg))
-
-    -- Now load it with a regular _index.before_replace trigger set up.
-    local register_before_replace = [[
+    -- Now load it with a regular _index.before_replace trigger set up. It
+    -- should use the sort data file (the regular before_replace trigger does
+    -- not fire on recovery so it should not affect the ability to use it).
+    cg.server:restart({env = {['TARANTOOL_RUN_BEFORE_BOX_CFG'] = [[
         local trigger = require('trigger')
         trigger.set('box.space._index.before_replace', 'test_trigger',
                     function(old, new, space, req, header, body)
                         return new
                     end)
-    ]]
-    cg.server:restart({
-        env = {
-            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = register_before_replace,
-        }
-    })
+    ]]}})
+    t.assert(cg.server:grep_log(success_msg))
 
-    -- Now it should use the sort data file (the regular before_replace trigger
-    -- does not fire on recovery so it should not affect the ability to use it).
-    t.assert(cg.server:grep_log('using the memtx sort data from'))
-end
-
--- Test that the sort data works for multiple spaces.
-g_generic.test_multiple_spaces = function(cg)
-    create_test_space(cg)
-
-    -- Create the second space with data, save a snapshot and load it.
+    -- Test recovery without sort data file if memtx_use_sort_data = true.
     cg.server:exec(function()
-        local s = box.schema.create_space('test2')
-        s:create_index('pk')
-        s:create_index('sk')
-        for i = 1, 100 do
-            s:insert({i})
-        end
-        box.snapshot()
-    end)
-    cg.server:restart()
-
-    -- We must both spaces loaded using the sort data.
-    local log_format = 'Using MemTX sort data for building ' ..
-                       'index \'sk\' of space \'%s\''
-    local log_test = string.format(log_format, 'test')
-    local log_test2 = string.format(log_format, 'test2')
-    t.assert(cg.server:grep_log(log_test))
-    t.assert(cg.server:grep_log(log_test2))
-end
-
--- Test that existence of vinyl spaces does not break the recovery.
-g_generic.test_vinyl_space_ignored = function(cg)
-    create_test_space(cg)
-
-    -- Create a vinyl space with data, save a snapshot and load it.
-    cg.server:exec(function()
-        local s = box.schema.create_space('test_vinyl', {engine = 'vinyl'})
-        s:create_index('pk')
-        s:create_index('sk')
-        for i = 1, 100 do
-            s:insert({i})
-        end
-        box.snapshot()
-    end)
-    cg.server:restart()
-
-    -- We must have memtx space loaded using the sort data.
-    local log_format = 'Using MemTX sort data for building ' ..
-                       'index \'sk\' of space \'%s\''
-    local log_memtx = string.format(log_format, 'test')
-    local log_vinyl = string.format(log_format, 'test_vinyl')
-    t.assert(cg.server:grep_log(log_memtx) ~= nil)
-    t.assert(cg.server:grep_log(log_vinyl) == nil)
-end
-
--- Test recovery using both snapshot and WAL.
-g_generic.test_recover_with_wal = function(cg)
-    create_test_space(cg)
-
-    cg.server:exec(function()
-        -- Create a snapshot and sort data file.
-        box.snapshot()
-
-        -- Perform more operations to create a WAL log.
-        for i = 1, 100 do
-            box.space.test:insert({1000 + i})
-        end
-    end)
-
-    -- Recover from the snapshot and WAL.
-    cg.server:restart()
-    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
-                                'index \'sk\' of space \'test\''))
-    t.assert(cg.server:grep_log('entering the event loop'))
-end
-
--- Test recovery without sort data file if memtx_use_sort_data = true.
-g_generic.test_recover_without_sort_data = function(cg)
-    create_test_space(cg)
-
-    cg.server:exec(function()
-        -- Create a snapshot and sort data file.
-        box.snapshot()
-
         -- Remove all sort data files.
         local fio = require('fio')
         local glob = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
@@ -457,8 +416,6 @@ g_generic.test_recover_without_sort_data = function(cg)
             fio.unlink(file)
         end
     end)
-
-    -- Recover without a sort data file using the regular SK build.
     cg.server:restart()
     t.assert(cg.server:grep_log('memtx_use_sort_data = true but' ..
                                 ' no memtx sort data file found'))
@@ -466,116 +423,66 @@ g_generic.test_recover_without_sort_data = function(cg)
     t.assert(cg.server:grep_log('entering the event loop'))
 end
 
--- Test that the sort data file is not recreated on box.snapshot after removal.
-g_generic.test_remove_sortdata_keep_snap = function(cg)
+-- Test the snapshot creation when sort data used.
+g_generic.test_checkpoint = function(cg)
     create_test_space(cg)
 
     cg.server:exec(function()
-        -- Create a snapshot and sort data file.
-        box.snapshot()
-
-        -- Remove all sort data files.
-        local fio = require('fio')
-        local glob = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
-        local files = fio.glob(glob)
-        t.assert(#files > 0) -- a sort data file must have been created
-        for _, file in pairs(files) do
-            fio.unlink(file)
-        end
-
-        -- Call box.snapshot() once again: sort data file not recreated.
-        box.snapshot()
-        t.assert_equals(#fio.glob(glob), 0)
-    end)
-end
-
--- Test that checkpoint fails if a sort data file exists already.
-g_generic.test_remove_snap_keep_sortdata = function(cg)
-    create_test_space(cg)
-
-    cg.server:exec(function()
-        -- Remove all snapshots and sort data files.
         local fio = require('fio')
         local glob_snap = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
         local glob_sortdata = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
-        local snapshots = fio.glob(glob_snap)
-        local sort_data_files = fio.glob(glob_sortdata)
-        t.assert(#snapshots > 0)
-        t.assert(#sort_data_files > 0)
-        for _, file in pairs(snapshots) do
-            fio.unlink(file)
-        end
-        for _, file in pairs(sort_data_files) do
-            fio.unlink(file)
+
+        local function remove_all(glob)
+            local files = fio.glob(glob)
+            t.assert(#files > 0)
+            for _, file in pairs(files) do
+                fio.unlink(file)
+            end
         end
 
-        -- Create a snapshot and sort data file.
-        box.snapshot()
-        t.assert(#fio.glob(glob_snap) == 1)
-        t.assert(#fio.glob(glob_sortdata) == 1)
-
-        -- Remove the .snap file.
-        fio.unlink(fio.glob(glob_snap)[1])
-        t.assert(#fio.glob(glob_snap) == 0)
-
-        -- Call to box.snapshot() fails: the sort data file exists already.
-        t.assert_error_msg_contains('.sortdata\': File exists', box.snapshot)
-        t.assert(#fio.glob(glob_snap) == 0)
-        t.assert(#fio.glob(glob_sortdata) == 1)
-    end)
-end
-
--- Test that both snapshot and sort data file recreated if are absent.
-g_generic.test_remove_snap_and_sortdata = function(cg)
-    create_test_space(cg)
-
-    cg.server:exec(function()
-        -- Create a snapshot and sort data file.
+        -- Initial snapshot.
         box.snapshot()
 
-        -- Remove all snapshots and sort data files.
-        local fio = require('fio')
-        local glob_snap = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
-        local glob_sortdata = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
-        local snapshots = fio.glob(glob_snap)
-        local sort_data_files = fio.glob(glob_sortdata)
-        t.assert(#snapshots > 0)
-        t.assert(#sort_data_files > 0)
-        for _, file in pairs(snapshots) do
-            fio.unlink(file)
-        end
-        for _, file in pairs(sort_data_files) do
-            fio.unlink(file)
-        end
+        -- Sort data file is not recreated after removal.
+        remove_all(glob_sortdata)
+        box.snapshot()
+        t.assert_ge(#fio.glob(glob_snap), 1)
+        t.assert_equals(#fio.glob(glob_sortdata), 0)
 
-        -- Call box.snapshot() once again: both files recreated.
+        -- Both files recreated if are absent.
+        remove_all(glob_snap)
         box.snapshot()
         t.assert_equals(#fio.glob(glob_snap), 1)
+        t.assert_equals(#fio.glob(glob_sortdata), 1)
+
+        -- Checkpoint fails if only .snap is absent.
+        remove_all(glob_snap)
+        t.assert_error_msg_contains('.sortdata\': File exists', box.snapshot)
+        t.assert_equals(#fio.glob(glob_snap), 0)
         t.assert_equals(#fio.glob(glob_sortdata), 1)
     end)
 end
 
--- Test that .snap file creation failure is handled correctly.
-g_generic.test_snap_create_error = function(cg)
+-- Test various failures during the checkpoint.
+g_generic.test_checkpoint_failures = function(cg)
+    t.tarantool.skip_if_not_debug()
     create_test_space(cg)
 
+    -- Test that .snap file creation failure is handled correctly.
     cg.server:exec(function()
         -- One way to fail the .snap file creation is to create a
         -- filesystem entry with the name of an in-progress snapshot.
         local fio = require('fio')
-        fio.mkdir(fio.pathjoin(box.cfg.memtx_dir,
-                               string.format('%020d.snap.inprogress',
-                                             box.info.signature)))
-
-        -- The checkpoint is aborted successfully.
-        local msg = '.snap.inprogress\': File exists'
-        t.assert_error_msg_contains(msg, box.snapshot)
+        local snap_filename = string.format('%020d.snap.inprogress',
+                                             box.info.signature)
+        local snap_path = fio.pathjoin(box.cfg.memtx_dir, snap_filename)
+        fio.mkdir(snap_path)
+        t.assert_error_msg_contains('.snap.inprogress\': File exists',
+                                    box.snapshot)
+        fio.rmdir(snap_path)
     end)
-end
 
--- Test that checkpoint abortion discards the written .sortdata file.
-g_generic.test_snapshot_abort_discards_sortdata_file = function(cg)
-    t.tarantool.skip_if_not_debug()
+    -- Test that checkpoint abortion discards the written .sortdata file.
     cg.server:exec(function()
         local fio = require('fio')
         local fiber = require('fiber')
@@ -636,6 +543,43 @@ g_generic.test_snapshot_abort_discards_sortdata_file = function(cg)
     end)
 end
 
+-- Test shutdown does not hang due to memtx space snapshot in progress.
+g_generic.test_checkpoint_graceful_shutdown = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        box.schema.create_space('test')
+        box.space.test:create_index('pk')
+        box.space.test:create_index('sk')
+        fiber.set_slice(100)
+        box.begin()
+        for i = 1, 30000 do
+            box.space.test:insert{i}
+        end
+        box.commit()
+        box.error.injection.set('ERRINJ_SORTDATA_WRITE_TIMEOUT', 0.01)
+        fiber.create(function()
+            box.snapshot()
+        end)
+    end)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('saving snapshot'))
+    end)
+
+    -- Make random delay to check we are able to shutdown
+    -- with snapshot in progress at any time.
+    local fiber = require('fiber')
+    fiber.sleep(math.random() * 3)
+
+    -- Wait for the instance to shutdown.
+    local channel = fiber.channel()
+    fiber.create(function()
+        server:stop()
+        channel:put('finished')
+    end)
+    t.assert(channel:get(60) ~= nil)
+end
+
 -- Test that the .sortdata files are garbage-collected.
 g_generic.test_gc = function(cg)
     create_test_space(cg)
@@ -662,6 +606,7 @@ g_generic.test_gc = function(cg)
         end
 
         -- Create checkpoints and verify the .sortdata file count is valid.
+        assert(box.cfg.checkpoint_count == 2) -- The expected default value.
         for i = 1, box.cfg.checkpoint_count * 2 do -- luacheck: no unused
             box.space._space:alter({}) -- No-op to update the VClock.
             box.snapshot()
@@ -761,184 +706,218 @@ g_generic.test_box_backup = function(cg)
     end)
 end
 
-g_invalid_file.before_each(function(cg)
-    -- Run the server with memtx sort data enabled.
-    cg.server = server:new({
-        box_cfg = {memtx_use_sort_data = true},
-        alias = 'master'
-    })
-    cg.server:start()
-end)
-
-g_invalid_file.after_each(function(cg)
-    -- Drop the server.
-    cg.server:drop()
-end)
-
 -- Test that an invalid sort data file is handled correctly.
-g_invalid_file.test_invalid_file = function(cg)
-    local function recreate_sort_data_file(file)
-        -- Drop the last sort data file created.
-        local fio = require('fio')
-        local glob = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
-        local files = fio.glob(glob)
-        t.assert(#files > 0)
-        table.sort(files)
-        local last_sort_data = files[#files]
-        fio.unlink(last_sort_data)
-
-        -- First create the file header.
-        local header = ''
-        header = header .. ((file.file_magic or 'SORTDATA') .. '\n')
-        header = header .. ((file.file_version or '1') .. '\n')
-        header = header .. ((file.version or
-                ('Version: ' .. box.info.version)) .. '\n')
-        header = header .. ((file.instance or
-                ('Instance: ' .. box.info.uuid)) .. '\n')
-        header = header .. ((file.vclock or
-                ('VClock: {1: ' .. box.info.vclock[1] .. '}')) .. '\n')
-        header = header .. '\n'
-        local header_size = #header
-
-        -- Then create the entry list.
-        local entries_fmt = (file.entries or 'Entries: 0000000002') .. '\n' ..
-                            '%010d/%010u: %016x, %016x, %20d\n' ..
-                            '%010d/%010u: %016x, %016x, %20d\n' ..
-                            '\n'
-        local entries_size = #string.format(entries_fmt, 0, 0, 0, 0, 0,
-                                                         0, 0, 0, 0, 0)
-        local pk_data = file.pk_ptrs or '0000000100000002' -- PK tuple pointers.
-        local sk_data = file.sk_ptrs or '0000000100000002' -- The same order.
-        local pk_data_size = #pk_data
-        local sk_data_size = #sk_data
-        local pk_data_offset = header_size + entries_size
-        local sk_data_offset = pk_data_offset + pk_data_size
-        local entries = string.format(entries_fmt,
-                                      512, 0, pk_data_offset, pk_data_size, 2,
-                                      512, 1, sk_data_offset, sk_data_size, 2)
-        assert(#entries == entries_size)
-
-        -- Create the file.
-        local f = fio.open(last_sort_data, {'O_WRONLY', 'O_CREAT'})
-        f:write(header)
-        f:write(entries)
-        f:write(pk_data)
-        f:write(sk_data)
-        f:close()
-    end
-
-    local function expect_success()
-        cg.server:restart({})
-        t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+g_invalid_file.test_invalid_file = function()
+    local function expect_success(server)
+        server:wait_until_ready()
+        t.assert(server:grep_log('Using MemTX sort data for building ' ..
                                     'index \'sk\' of space \'test\''))
-        t.assert(cg.server:grep_log('entering the event loop'))
+        t.assert(server:grep_log('entering the event loop'))
     end
 
-    local function expect_fail(msg)
-        -- Recover using the new sort data file.
-        cg.server:restart({})
-        t.assert(cg.server:grep_log(msg))
-        t.assert(cg.server:grep_log('Adding 2 keys to TREE index \'sk\' ...'))
-        t.assert(cg.server:grep_log('entering the event loop'))
+    local function expect_fail(server, msg)
+        server:wait_until_ready()
+        t.assert(server:grep_log(msg))
+        t.assert(server:grep_log('Adding 2 keys to TREE index \'sk\' ...'))
+        t.assert(server:grep_log('entering the event loop'))
     end
 
-    local function expect_panic(msg)
-        -- Recover using the new invalid data file.
-        cg.server:restart({}, {wait_until_ready = false})
+    local function expect_panic(server, msg)
         local fio = require('fio')
         t.helpers.retrying({}, function()
-            local filename = fio.pathjoin(cg.server.workdir,
-                                          cg.server.alias .. '.log')
-            t.assert(cg.server:grep_log(msg, nil, {filename = filename}))
-        end)
-
-        -- Drop the invalid sort data, restart appropriately and
-        -- create a new snapshot (with a valid sort data file).
-        local glob = fio.pathjoin(cg.server.workdir, '*.sortdata')
-        local files = fio.glob(glob)
-        t.assert(#files > 0)
-        table.sort(files)
-        fio.unlink(files[#files])
-        cg.server:restart({})
-        cg.server:exec(function()
-            box.space._space:alter({}) -- No-op to update the VClock.
-            box.snapshot()
+            local filename = fio.pathjoin(server.workdir,
+                                          server.alias .. '.log')
+            t.assert(server:grep_log(msg, nil, {filename = filename}))
         end)
     end
 
-    -- Create a space with data and a snapshot.
-    cg.server:exec(function()
-        local s = box.schema.create_space('test')
-        s:create_index('pk')
-        s:create_index('sk', {hint = false})
-        s:insert({1})
-        s:insert({2})
-        box.snapshot()
-    end)
+    -- Create a space with data, checkpoint and update the sort data file.
+    local function test_init(server, file_config)
+        server:wait_until_ready()
+        server:exec(function(file)
+            -- Create a test space and checkpoint.
+            local s = box.schema.create_space('test')
+            s:create_index('pk')
+            s:create_index('sk', {hint = false})
+            s:insert({1})
+            s:insert({2})
+            box.snapshot()
 
-    cg.server:exec(recreate_sort_data_file, {{file_magic = 'Invalid'}})
-    expect_fail('file header read failed')
+            -- Drop the last sort data file created.
+            local fio = require('fio')
+            local glob = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
+            local files = fio.glob(glob)
+            t.assert(#files > 0)
+            table.sort(files)
+            local last_sort_data = files[#files]
+            fio.unlink(last_sort_data)
 
-    cg.server:exec(recreate_sort_data_file, {{file_version = 'Invalid'}})
-    expect_fail('file header read failed')
+            -- First create the file header.
+            local header = ''
+            header = header .. ((file.file_magic or 'SORTDATA') .. '\n')
+            header = header .. ((file.file_version or '1') .. '\n')
+            header = header .. ((file.version or
+                    ('Version: ' .. box.info.version)) .. '\n')
+            header = header .. ((file.instance or
+                ('Instance: ' .. box.info.uuid)) .. '\n')
+            header = header .. ((file.vclock or
+                    ('VClock: {1: ' .. box.info.vclock[1] .. '}')) .. '\n')
+            header = header .. '\n'
+            local header_size = #header
 
-    cg.server:exec(recreate_sort_data_file, {{version = 'Invalid version key'}})
-    expect_fail('file header read failed')
+            -- Then create the entry list.
+            local entries_fmt = (file.entries or 'Entries: 0000000002') ..
+                                '\n%010d/%010u: %016x, %016x, %20d\n' ..
+                                '%010d/%010u: %016x, %016x, %20d\n\n'
+            local entries_size = #string.format(entries_fmt, 0, 0, 0, 0, 0,
+                                                             0, 0, 0, 0, 0)
+            local pk_data = file.pk_ptrs or '0000000100000002' -- PK pointers.
+            local sk_data = file.sk_ptrs or '0000000100000002' -- Same order.
+            local pk_data_size = #pk_data
+            local sk_data_size = #sk_data
+            local pk_data_offset = header_size + entries_size
+            local sk_data_offset = pk_data_offset + pk_data_size
+            local entries = string.format(
+                entries_fmt,
+                s.id, s.index.pk.id, pk_data_offset, pk_data_size, 2,
+                s.id, s.index.sk.id, sk_data_offset, sk_data_size, 2)
+            assert(#entries == entries_size)
 
-    cg.server:exec(recreate_sort_data_file, {{instance = 'Invalid uuid key'}})
-    expect_fail('file header read failed')
+            -- Create the file.
+            local f = fio.open(last_sort_data, {'O_WRONLY', 'O_CREAT'})
+            f:write(header)
+            f:write(entries)
+            f:write(pk_data)
+            f:write(sk_data)
+            f:close()
+        end, {file_config})
+    end
 
-    cg.server:exec(recreate_sort_data_file, {{instance = 'Instance: invalid'}})
-    expect_fail('invalid UUID')
+    local tests = {
+        {
+            file = {file_magic = 'Invalid'},
+            check = expect_fail,
+            check_arg = 'file header read failed',
+        },
+        {
+            file = {file_version = 'Invalid'},
+            check = expect_fail,
+            check_arg = 'file header read failed',
+        },
+        {
+            file = {version = 'Invalid version key'},
+            check = expect_fail,
+            check_arg = 'file header read failed',
+        },
+        {
+            file = {instance = 'Invalid uuid key'},
+            check = expect_fail,
+            check_arg = 'file header read failed',
+        },
+        {
+            file = {instance = 'Instance: invalid'},
+            check = expect_fail,
+            check_arg = 'invalid UUID',
+        },
+        {
+            file = {
+                instance = 'Instance: 00000000-0000-0000-0000-000000000000'
+            },
+            check = expect_fail,
+            check_arg = 'unmatched UUID',
+        },
+        {
+            file = {vclock = 'Invalid VClock key'},
+            check = expect_fail,
+            check_arg = 'file header read failed',
+        },
+        {
+            file = {vclock = 'VClock: invalid'},
+            check = expect_fail,
+            check_arg = 'invalid VClock',
+        },
+        {
+            file = {vclock = 'VClock: {1: 42}'},
+            check = expect_fail,
+            check_arg = 'unmatched VClock',
+        },
+        {
+            file = {entries = 'Invalid entries key'},
+            check = expect_fail,
+            check_arg = 'invalid entry count',
+        },
+        {
+            file = {entries = 'Entries: invalid'},
+            check = expect_fail,
+            check_arg = 'invalid entry count',
+        },
+        {
+            -- Incomplete PK data.
+            file = {pk_ptrs = '00000001'},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- Incomplete SK data.
+            file = {sk_ptrs = '00000001'},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- No SK data.
+            file = {sk_ptrs = ''},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- Incomplete PK and unexistng SK.
+            file = {pk_ptrs = '00000001', sk_ptrs = ''},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- No data.
+            file = {pk_ptrs = '', sk_ptrs = ''},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- Unexisting pointer.
+            file = {sk_ptrs = '1111111100000002'},
+            check = expect_panic,
+            check_arg = 'Invalid MemTX sort data file',
+        },
+        {
+            -- OK.
+            file = {},
+            check = expect_success,
+            check_arg = nil,
+        },
+    }
 
-    cg.server:exec(recreate_sort_data_file, {
-        {instance = 'Instance: 00000000-0000-0000-0000-000000000000'}
-    })
-    expect_fail('unmatched UUID')
+    -- Run test servers concurrently.
+    for i, test in ipairs(tests) do
+        test.server = server:new({
+            box_cfg = {memtx_use_sort_data = true},
+            alias = 'invalid_file_tester_' .. i,
+        })
+        test.server:start({wait_until_ready = false})
+    end
 
-    cg.server:exec(recreate_sort_data_file, {{vclock = 'Invalid VClock key'}})
-    expect_fail('file header read failed')
+    -- Initialize the servers and update their sort data files.
+    for i, test in ipairs(tests) do -- luacheck: no unused
+        test_init(test.server, test.file)
+    end
 
-    cg.server:exec(recreate_sort_data_file, {{vclock = 'VClock: invalid'}})
-    expect_fail('invalid VClock')
+    -- Restart servers concurrently.
+    for i, test in ipairs(tests) do -- luacheck: no unused
+        test.server:restart({}, {wait_until_ready = false})
+    end
 
-    cg.server:exec(recreate_sort_data_file, {{vclock = 'VClock: {1: 42}'}})
-    expect_fail('unmatched VClock')
-
-    cg.server:exec(recreate_sort_data_file, {{entries = 'Invalid entries key'}})
-    expect_fail('invalid entry count')
-
-    cg.server:exec(recreate_sort_data_file, {{entries = 'Entries: invalid'}})
-    expect_fail('invalid entry count')
-
-    -- Incomplete PK data.
-    cg.server:exec(recreate_sort_data_file, {{pk_ptrs = '00000001'}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- Incomplete SK data.
-    cg.server:exec(recreate_sort_data_file, {{sk_ptrs = '00000001'}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- No SK data.
-    cg.server:exec(recreate_sort_data_file, {{sk_ptrs = ''}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- Incomplete PK and unexistng SK.
-    cg.server:exec(recreate_sort_data_file, {{pk_ptrs = '00000001',
-                                              sk_ptrs = ''}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- No data.
-    cg.server:exec(recreate_sort_data_file, {{pk_ptrs = '', sk_ptrs = ''}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- Unexisting pointer.
-    cg.server:exec(recreate_sort_data_file, {{sk_ptrs = '1111111100000002'}})
-    expect_panic('Invalid MemTX sort data file')
-
-    -- OK.
-    cg.server:exec(recreate_sort_data_file, {{}})
-    expect_success()
+    -- Check the test results.
+    for i, test in ipairs(tests) do -- luacheck: no unused
+        test.check(test.server, test.check_arg)
+    end
 end
 
 g_mvcc.before_each(function(cg)
@@ -957,12 +936,18 @@ end)
 -- Test that the snapshot written does not contain dirty data.
 g_mvcc.test_snapshot = function(cg)
     -- Create the space and indexes and write snapshot with sort data.
-    cg.server:exec(function(pk_type)
-        local s = box.schema.create_space('test')
-        assert(pk_type == 'TREE' or pk_type == 'HASH')
-        s:create_index('pk', {type = pk_type, parts = {1, 'unsigned'}})
-        s:create_index('sk', {type = 'TREE', parts = {2, 'unsigned'},
-                              unique = false})
+    cg.server:exec(function()
+        -- Create a space with TREE primary key.
+        local s1 = box.schema.create_space('tree')
+        s1:create_index('pk', {type = 'TREE', parts = {1, 'unsigned'}})
+        s1:create_index('sk', {type = 'TREE', parts = {2, 'unsigned'},
+                               unique = false})
+
+        -- Create a space with HASH primary key.
+        local s2 = box.schema.create_space('hash')
+        s2:create_index('pk', {type = 'HASH', parts = {1, 'unsigned'}})
+        s2:create_index('sk', {type = 'TREE', parts = {2, 'unsigned'},
+                               unique = false})
 
         local txn_proxy = require('test.box.lua.txn_proxy')
         local tx1 = txn_proxy.new()
@@ -978,12 +963,16 @@ g_mvcc.test_snapshot = function(cg)
 
             -- Only insert even keys by TX1.
             if random_sk_part_value % 2 == 0 then
-                tx1(string.format('box.space.test:insert({%d, %d})',
+                tx1(string.format('box.space.tree:insert({%d, %d})',
+                                  i, random_sk_part_value))
+                tx1(string.format('box.space.hash:insert({%d, %d})',
                                   i, random_sk_part_value))
             end
 
             -- Insert everything by TX2.
-            tx2(string.format('box.space.test:replace({%d, %d})',
+            tx2(string.format('box.space.tree:replace({%d, %d})',
+                              i, random_sk_part_value))
+            tx2(string.format('box.space.hash:replace({%d, %d})',
                               i, random_sk_part_value))
         end
 
@@ -991,71 +980,29 @@ g_mvcc.test_snapshot = function(cg)
         tx1:commit()
 
         -- Create a snapshot
-        tx1('box.snapshot()')
+        box.snapshot()
 
         -- Get rid of tx2 changes after the checkpoint is done.
         tx2:rollback()
-    end, {cg.params.pk_type})
+    end)
 
     -- Start using the sort data.
     cg.server:restart()
     t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
-                                'index \'sk\' of space \'test\''))
+                                'index \'sk\' of space \'tree\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'sk\' of space \'hash\''))
 
-    -- Check that we only have tx1 changes saved into the snapshot.
+    -- Check that only tx1 changes (odd keys) saved into the snapshot.
     cg.server:exec(function()
         local fiber = require('fiber')
-        for _, tuple in box.space.test.index.sk:pairs() do
-            -- Check that only odd keys are written.
+        for _, tuple in box.space.tree.index.sk:pairs() do
+            t.assert(tuple[2] % 2 == 0)
+        end
+        fiber.yield()
+        for _, tuple in box.space.hash.index.sk:pairs() do
             t.assert(tuple[2] % 2 == 0)
         end
         fiber.yield()
     end)
-end
-
-g_graceful_shutdown.before_each(function(cg)
-    cg.server = server:new({box_cfg = {memtx_use_sort_data = true}})
-    cg.server:start()
-end)
-
-g_graceful_shutdown.after_each(function(cg)
-    if cg.server ~= nil then
-        cg.server:drop()
-    end
-end)
-
--- Test shutdown does not hang due to memtx space snapshot in progress.
-g_graceful_shutdown.test_shutdown_during_memtx_snapshot = function(cg)
-    t.tarantool.skip_if_not_debug()
-    cg.server:exec(function()
-        local fiber = require('fiber')
-        box.schema.create_space('test')
-        box.space.test:create_index('pk')
-        fiber.set_slice(100)
-        box.begin()
-        for i= 1, 30000 do
-            box.space.test:insert{i}
-        end
-        box.commit()
-        box.error.injection.set('ERRINJ_SORTDATA_WRITE_TIMEOUT', 0.01)
-        fiber.create(function()
-            box.snapshot()
-        end)
-    end)
-    t.helpers.retrying({}, function()
-        t.assert(cg.server:grep_log('saving snapshot'))
-    end)
-
-    -- Make random delay to check we are able to shutdown
-    -- with snapshot in progress at any time.
-    local fiber = require('fiber')
-    fiber.sleep(math.random() * 3)
-
-    -- Wait for the instance to shutdown.
-    local channel = fiber.channel()
-    fiber.create(function()
-        server:stop()
-        channel:put('finished')
-    end)
-    t.assert(channel:get(60) ~= nil)
 end
