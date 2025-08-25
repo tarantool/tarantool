@@ -1,128 +1,9 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
-local g_sk_types = t.group('memtx_sort_data_test-sk-types', {
-    {pk_type = 'TREE', sk = {hint = true}},
-    {pk_type = 'TREE', sk = {hint = false}},
-    {pk_type = 'TREE', sk = {path = 'array[*]'}},
-    {pk_type = 'TREE', sk = {is_nullable = true}},
-    {pk_type = 'TREE', sk = {is_nullable = true,
-                             exclude_null = true}},
-    {pk_type = 'HASH', sk = {}},
-})
 local g_generic = t.group('memtx_sort_data_test-generic')
-local g_invalid_file = t.group('memtx_sort_data_test-invalid_file')
 local g_mvcc = t.group('memtx_sort_data_test-mvcc',
                        {{pk_type = 'TREE'}, {pk_type = 'HASH'}})
-local g_graceful_shutdown = t.group('memtx_sort_data_test-snapshot')
-
-
-g_sk_types.before_all(function(cg)
-    cg.server = server:new({
-        box_cfg = {memtx_use_sort_data = true,
-                   checkpoint_count  = 3},
-        alias = 'master'
-    })
-    cg.server:start()
-end)
-
-g_sk_types.after_all(function(cg)
-    cg.server:stop()
-end)
-
-g_sk_types.after_each(function(cg)
-    cg.server:exec(function()
-        if box.space.test then
-            box.space.test:drop()
-        end
-    end)
-end)
-
--- Test that the SK sort using the sort data is correct.
-g_sk_types.test_memtx_sort_data = function(cg)
-    -- Create the space and indexes and write snapshot with sort data.
-    cg.server:exec(function(pk_type, sk)
-        local s = box.schema.create_space('test')
-        s:create_index('pk', {type = pk_type, parts = {1, 'unsigned'}})
-        s:create_index('sk', {type = 'tree', hint = sk.hint, unique = false,
-                              parts = {2, 'unsigned', path = sk.path,
-                                       is_nullable = sk.is_nullable,
-                                       exclude_null = sk.exclude_null}})
-
-        local function sk_object()
-            local max = 1000000
-            if sk.path ~= nil then
-                local count = math.random(1, 3)
-                local array = {}
-                for i = 1, count do -- luacheck: no unused
-                    table.insert(array, math.random(1, max))
-                end
-                return {array = array, scalar = math.random(1, max)}
-            else
-                -- 1/3 of nulls.
-                if sk.is_nullable and math.random(1, 3) == 1 then
-                    return box.NULL
-                else
-                    return math.random(1, max)
-                end
-            end
-        end
-
-        for i = 1, 100 do
-            s:insert({i, sk_object()})
-        end
-
-        box.snapshot()
-    end, {cg.params.pk_type, cg.params.sk})
-
-    -- Start using the sort data.
-    cg.server:restart()
-    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
-                                'index \'sk\' of space \'test\''))
-
-    -- Check the order of tuples in SK.
-    cg.server:exec(function(sk_is_mk, nulls_excluded)
-        local fiber = require('fiber')
-        local s = box.space.test
-        t.assert_equals(s.index.pk:len(), 100)
-
-        if sk_is_mk then
-            t.assert_ge(s.index.sk:len(), 100)
-            local processed = 0
-            for _, tuple in s.index.sk:pairs() do
-                -- Can't verify tuple order, only access
-                -- its fields and verify to have no crash.
-                t.assert(tuple[2].array ~= nil)
-                processed = processed + 1
-                if processed % 100 == 0 then
-                    fiber.yield()
-                end
-            end
-            t.assert_equals(processed, s.index.sk:len())
-            return
-        end
-
-        if not nulls_excluded then
-            t.assert_equals(s.index.sk:len(), 100)
-        else
-            t.assert_lt(s.index.sk:len(), 100)
-        end
-        local key_def = require('key_def')
-        local kd = key_def.new(s.index.sk.parts)
-        local prev = nil
-        local processed = 0
-        for _, tuple in s.index.sk:pairs() do
-            if processed > 0 then
-                t.assert_ge(kd:compare(tuple, prev), 0)
-            end
-            prev = tuple
-            processed = processed + 1
-        end
-        t.assert_equals(processed, s.index.sk:len())
-        fiber.yield()
-    end, {cg.params.sk.path ~= nil and string.find(cg.params.sk.path, '*'),
-          cg.params.sk.exclude_null})
-end
 
 -- Create a space with data, primary and secondary key.
 local function create_test_space(cg)
@@ -150,6 +31,125 @@ g_generic.after_each(function(cg)
     -- Drop the server.
     cg.server:drop()
 end)
+
+-- Test the supported PK and SK types.
+g_generic.test_supported_indexes = function(cg)
+    -- Create the space and indexes and write snapshot with sort data.
+    cg.server:exec(function()
+        -- Space with TREE primary key.
+        local s = box.schema.create_space('test')
+        s:create_index('pk', {parts = {1, 'unsigned'}})
+
+        -- Tree with hints.
+        s:create_index('i1', {hint = true, unique = false,
+                              parts = {2, 'unsigned'}})
+
+        -- Tree without hints.
+        s:create_index('i2', {hint = false, unique = false,
+                              parts = {2, 'unsigned'}})
+
+        -- Nullable part.
+        s:create_index('i3', {unique = false,
+                              parts = {3, 'unsigned', is_nullable = true}})
+
+        -- Nullable with nulls excluded.
+        s:create_index('i4', {unique = false,
+                              parts = {3, 'unsigned', is_nullable = true,
+                                       exclude_null = true}})
+
+        -- Multikey index.
+        s:create_index('i5', {unique = false,
+                              parts = {4, 'unsigned', path = 'array[*]'}})
+
+        -- Multikey with nullable part.
+        s:create_index('i6', {unique = false,
+                              parts = {5, 'unsigned', path = 'array[*]',
+                                       is_nullable = true}})
+
+        -- Multikey with nullable part and excluded nulls.
+        s:create_index('i7', {unique = false,
+                              parts = {5, 'unsigned', path = 'array[*]',
+                                       is_nullable = true,
+                                       exclude_null = true}})
+
+        -- Fill the space with corresponding data.
+        for i = 1, 50 do
+            local random_value = math.random(1000)
+            -- 1/3 of nulls.
+            local nullable_value =
+                math.random(1, 3) == 1 and box.NULL or math.random(1000)
+            local random_array = {math.random(1000), math.random(1000)}
+            local nullable_array = {
+                math.random(1, 3) == 1 and box.NULL or math.random(1000),
+                math.random(1, 3) == 1 and box.NULL or math.random(1000),
+            }
+            s:insert({i, random_value, nullable_value,
+                      {array = random_array}, {array = nullable_array}})
+        end
+
+        -- Space with HASH primary key.
+        local s2 = box.schema.create_space('test2')
+        s2:create_index('pk', {type = 'HASH'})
+        s2:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+        for i = 1, 50 do
+            s2:insert({i, math.random(1000)})
+        end
+
+        box.snapshot()
+    end)
+
+    -- Start using the sort data.
+    cg.server:restart()
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i1\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i2\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i3\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i4\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i5\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i6\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'i7\' of space \'test\''))
+    t.assert(cg.server:grep_log('Using MemTX sort data for building ' ..
+                                'index \'sk\' of space \'test2\''))
+
+    -- Check the order of tuples in SK.
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local key_def = require('key_def')
+        local s = box.space.test
+        local s2 = box.space.test2
+
+        -- Check PK.
+        t.assert_equals(s.index.pk:len(), 50)
+
+        -- Check SK with hints.
+        t.assert_equals(s.index.i1:len(), 50)
+        local prev_value = nil
+        for _, tuple in s.index.i1:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[2], prev_value)
+            end
+            prev_value = tuple[2]
+        end
+        fiber.yield()
+
+        -- Check SK without hints.
+        t.assert_equals(s.index.i2:len(), 50)
+        prev_value = nil
+        for _, tuple in s.index.i2:pairs() do
+            if prev_value ~= nil then
+                t.assert_ge(tuple[2], prev_value)
+            end
+            prev_value = tuple[2]
+        end
+        fiber.yield()
+    end)
+end
 
 -- Test that functional indexes aren't affected.
 g_generic.test_func_index = function(cg)
@@ -761,22 +761,8 @@ g_generic.test_box_backup = function(cg)
     end)
 end
 
-g_invalid_file.before_each(function(cg)
-    -- Run the server with memtx sort data enabled.
-    cg.server = server:new({
-        box_cfg = {memtx_use_sort_data = true},
-        alias = 'master'
-    })
-    cg.server:start()
-end)
-
-g_invalid_file.after_each(function(cg)
-    -- Drop the server.
-    cg.server:drop()
-end)
-
 -- Test that an invalid sort data file is handled correctly.
-g_invalid_file.test_invalid_file = function(cg)
+g_generic.test_invalid_file = function(cg)
     local function recreate_sort_data_file(file)
         -- Drop the last sort data file created.
         local fio = require('fio')
@@ -1013,19 +999,8 @@ g_mvcc.test_snapshot = function(cg)
     end)
 end
 
-g_graceful_shutdown.before_each(function(cg)
-    cg.server = server:new({box_cfg = {memtx_use_sort_data = true}})
-    cg.server:start()
-end)
-
-g_graceful_shutdown.after_each(function(cg)
-    if cg.server ~= nil then
-        cg.server:drop()
-    end
-end)
-
 -- Test shutdown does not hang due to memtx space snapshot in progress.
-g_graceful_shutdown.test_shutdown_during_memtx_snapshot = function(cg)
+g_generic.test_shutdown_during_memtx_snapshot = function(cg)
     t.tarantool.skip_if_not_debug()
     cg.server:exec(function()
         local fiber = require('fiber')
