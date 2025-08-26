@@ -789,7 +789,7 @@ local function index_opts(space, is_primary)
     end
 
     opts.parts = {}
-    local space_format = space:format()
+    local space_format = space.format_object:totable()
     local idx = opts.type
     local possible_fields = fun.iter(space_format):filter(
         function(x)
@@ -1041,7 +1041,7 @@ end
 --    apply to.
 --  - value (lua_value) – what value will be applied.
 local function random_tuple_operations(space)
-    local space_format = space:format()
+    local space_format = space.format_object:totable()
     local num_fields = math.random(table.getn(space_format))
     local tuple_ops = {}
     local id = unique_ids(num_fields)
@@ -1072,7 +1072,7 @@ end
 -- they are not ordered and may be repeated.
 -- NB: indexes are zero-based.
 local function random_space_field_ids(space)
-    local format_size = #space:format()
+    local format_size = #space.format_object:totable()
     local fields = {}
     local fields_num_max = format_size * 2
     local fields_num = math.random(fields_num_max)
@@ -1119,7 +1119,7 @@ end
 -- {{field_name1, {<values>}}, {field_name2, {<values>}}, ...}.
 -- Fields are not repeated, nullable ones can be skipped.
 local function random_batch(space)
-    local format_size = #space:format()
+    local format_size = #space.format_object:totable()
     local batch = {}
     -- Randomly choose between small and big batch
     local max_batch_size = oneof({10, 100})
@@ -1127,7 +1127,7 @@ local function random_batch(space)
     local id = unique_ids(format_size)
     for _ = 1, format_size do
         local i = id()
-        local field = space:format()[i]
+        local field = space.format_object:totable()[i]
         local values = {}
         -- Skip the field only if it is nullable.
         local skip_field = oneof({false, field.is_nullable})
@@ -1164,7 +1164,9 @@ local ops = {
     },
     INSERT_OP = {
         func = insert_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     SELECT_OP = {
         func = select_op,
@@ -1179,11 +1181,15 @@ local ops = {
     },
     PUT_OP = {
         func = put_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     REPLACE_OP = {
         func = replace_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     UPDATE_OP = {
         func = update_op,
@@ -1195,7 +1201,8 @@ local ops = {
     UPSERT_OP = {
         func = upsert_op,
         args = function(space)
-            return random_tuple(space:format()), random_tuple_operations(space)
+            return random_tuple(space.format_object:totable()),
+                   random_tuple_operations(space)
         end,
         engines = {'memtx', 'vinyl'},
     },
