@@ -996,10 +996,7 @@ txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
 	 * instance id in the first row.
 	 */
 	uint32_t origin_id = req->rows[0]->replica_id;
-	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-	if (txn->limbo_entry == NULL)
-		return -1;
-	return 0;
+	return txn_limbo_submit(&txn_limbo, origin_id, txn);
 }
 
 static int

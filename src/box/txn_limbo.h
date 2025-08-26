@@ -291,8 +291,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo);
  * Allocate, create, and append a new transaction to the limbo.
  * The limbo entry is allocated on the transaction's region.
  */
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn);
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn);
 
 /** Remove the entry from the limbo, mark as rolled back. */
 void
