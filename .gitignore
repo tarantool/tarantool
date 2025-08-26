@@ -64,6 +64,7 @@ extra/dist/tarantool@.service
 extra/dist/tarantool.tmpfiles.conf
 extra/dist/tarantool-generator
 extra/exports.*
+extra/exports_libfuzzer
 cmake_install.cmake
 config.mk
 config.guess
