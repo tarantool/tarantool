@@ -176,8 +176,8 @@ txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 	return NULL;
 }
 
-struct txn_limbo_entry *
-txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
+int
+txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 {
 	assert(txn_has_flag(txn, TXN_WAIT_SYNC));
 	assert(limbo == &txn_limbo);
@@ -198,13 +198,13 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 		 * it should be done right now. See in the limbo comments why.
 		 */
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return NULL;
+		return -1;
 	}
 	if (id == 0)
 		id = instance_id;
 	if  (limbo->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
-		return NULL;
+		return -1;
 	} else if (limbo->owner_id != id && !txn_is_fully_local(txn)) {
 		if (txn_limbo_is_empty(limbo)) {
 			diag_set(ClientError, ER_SYNC_QUEUE_FOREIGN,
@@ -213,7 +213,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 			diag_set(ClientError, ER_UNCOMMITTED_FOREIGN_SYNC_TXNS,
 				 limbo->owner_id);
 		}
-		return NULL;
+		return -1;
 	}
 	size_t size;
 	struct txn_limbo_entry *e = region_alloc_object(&txn->region,
@@ -225,14 +225,15 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	}
 	if (e == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object", "e");
-		return NULL;
+		return -1;
 	}
 	e->txn = txn;
 	e->lsn = -1;
 	e->state = TXN_LIMBO_ENTRY_SUBMITTED;
+	txn->limbo_entry = e;
 	rlist_add_tail_entry(&limbo->queue, e, in_queue);
 	limbo->len++;
-	return e;
+	return 0;
 }
 
 void
@@ -492,6 +493,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * CONFIRM was being written to WAL.
 			 */
 			assert(e->txn->status == TXN_PREPARED);
+			assert(e->state == TXN_LIMBO_ENTRY_SUBMITTED);
 			/*
 			 * Let it complete normally as a plain transaction. It
 			 * is important to remove the limbo entry, because the
