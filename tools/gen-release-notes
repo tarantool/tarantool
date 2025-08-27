@@ -77,18 +77,18 @@ version.
 
 // }}} 2.11
 
-Please, consider the full list of user-visible changes below.
+Please consider the full list of user-visible changes below.
 """.strip()  # noqa: E501 line too long
 
 COMPATIBILITY_TEMPLATE = """
 ## Compatibility
 
 Tarantool 2.x and 3.x are compatible in the binary data layout, client-server
-protocol, and replication protocol. It means that the updating may be performed
-with zero downtime for read requests and the-order-of-network-lag downtime for
-write requests.
+protocol, and replication protocol. It means upgrade may be performed with zero
+downtime for read requests and the order-of-network-lag downtime for write
+requests.
 
-Please, follow the [upgrade procedure][upgrade] to plan your update actions.
+Please follow the [upgrade procedure][upgrade] to plan your update actions.
 
 // {{{ 3.x
 
