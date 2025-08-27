@@ -1,0 +1,22 @@
+credentials:
+  users:
+    guest:
+      roles: [super]
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          instance-001: {}
+
+wasm:
+  components:
+    hello:
+      path: ./hello.wasm
+      autorun: true
+      env:
+        vars:
+          GREETING: 'Tarantool'
+      stdio:
+        stdout_path: ./hello.log
