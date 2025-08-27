@@ -582,28 +582,42 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 		diag_set(ClientError, ER_ALIEN_ENGINE, space->engine->name);
 		goto log_request;
 	}
-	struct txn *txn;
-	txn = txn_begin();
-	if (txn == NULL)
-		goto log_request;
-	if (txn_begin_stmt(txn, space, request.type) != 0)
-		goto rollback;
-	/* no access checks here - applier always works with admin privs */
 	struct tuple *unused;
-	if (space_execute_dml(space, txn, &request, &unused) != 0)
-		goto rollback_stmt;
-	if (txn_commit_stmt(txn, &request) != 0)
-		goto rollback;
-	/*
-	 * Snapshot rows are confirmed by definition. They don't need to go to
-	 * the synchronous transactions limbo.
-	 */
-	txn_set_flags(txn, TXN_FORCE_ASYNC);
-	return txn_commit(txn);
+	assert((space_events_are_enabled() && txn_events_are_enabled()) ||
+	       (!space_events_are_enabled() && !txn_events_are_enabled()));
+	if (*state < DONE_RECOVERING_SYSTEM_SPACES ||
+	    space_events_are_enabled()) {
+		if (*state == DONE_RECOVERING_SYSTEM_SPACES)
+			say_warn_once(
+				"snapshot recovery performance is better with"
+				" new value of"
+				" compat.box_recovery_triggers_deprecation");
+		struct txn *txn = txn_begin();
+		if (txn == NULL)
+			goto log_request;
+		if (txn_begin_stmt(txn, space, request.type) != 0)
+			goto rollback;
+		if (space_execute_dml(space, txn, &request, &unused) != 0)
+			goto rollback_stmt;
+		if (txn_commit_stmt(txn, &request) != 0)
+			goto rollback;
+		/*
+		 * Snapshot rows are confirmed by definition. They don't need
+		 * to go to the synchronous transactions limbo.
+		 */
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
+		return txn_commit(txn);
 rollback_stmt:
-	txn_rollback_stmt(txn);
+		txn_rollback_stmt(txn);
 rollback:
-	txn_abort(txn);
+		txn_abort(txn);
+		goto log_request;
+	} else {
+		if (space->vtab->execute_replace(space, /*txn=*/NULL,
+						 &request, &unused) != 0)
+			goto log_request;
+		return 0;
+	}
 log_request:
 	say_error("error at request: %s", request_str(&request));
 	return -1;
