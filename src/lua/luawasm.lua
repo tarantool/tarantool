@@ -10,6 +10,9 @@ if not ok then
             error("WASM module not found. Please " ..
                   "ensure 'wasm.so' is available.")
         end,
+        load_components = function()
+            return {}
+        end,
     }
 end
 
@@ -331,6 +334,35 @@ function M:new(opts)
             return internal[k]
         end
     })
+end
+
+-- Helper that loads all components described in configuration.
+function M.load_components(components)
+    local registry = {}
+    if type(components) ~= 'table' then
+        return registry
+    end
+
+    for name, opts in pairs(components) do
+        local comp_opts = {
+            name = name,
+            config = opts,
+        }
+
+        if fio.path.is_dir(opts.path) then
+            comp_opts.dir = opts.path
+        else
+            comp_opts.wasm = opts.path
+        end
+
+        local comp = M:new(comp_opts)
+        registry[name] = comp
+        if opts.autorun then
+            comp:run()
+        end
+    end
+
+    return registry
 end
 
 return M

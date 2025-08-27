@@ -40,6 +40,7 @@ lua_source(lua_sources lua/config/applier/mkdir.lua        config_applier_mkdir_
 lua_source(lua_sources lua/config/applier/roles.lua        config_applier_roles_lua)
 lua_source(lua_sources lua/config/applier/sharding.lua     config_applier_sharding_lua)
 lua_source(lua_sources lua/config/applier/box_status.lua   config_applier_box_status_lua)
+lua_source(lua_sources lua/config/applier/wasm.lua         config_applier_wasm_lua)
 lua_source(lua_sources lua/config/cluster_config.lua       config_cluster_config_lua)
 lua_source(lua_sources lua/config/configdata.lua           config_configdata_lua)
 lua_source(lua_sources lua/config/descriptions.lua         config_descriptions_lua)
