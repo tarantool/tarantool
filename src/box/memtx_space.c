@@ -325,9 +325,6 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 		return -1;
 	assert(pk->def->opts.is_unique);
 
-	/* Replace must be done in transaction, except ephemeral spaces. */
-	assert(space->def->opts.is_ephemeral ||
-	       (in_txn() != NULL && txn_current_stmt(in_txn()) != NULL));
 	/*
 	 * Don't use MVCC engine for ephemeral in any case.
 	 * MVCC engine requires txn to be present as a storage for
@@ -337,7 +334,8 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 * Since modification of ephemeral spaces are allowed without txn,
 	 * we must not use MVCC for those spaces even if txn is present now.
 	 */
-	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
+	if (memtx_tx_manager_use_mvcc_engine &&
+	    !space->def->opts.is_ephemeral && in_txn() != NULL) {
 		struct txn_stmt *stmt = txn_current_stmt(in_txn());
 		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
 						 mode, result);
@@ -416,17 +414,21 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 				      mode, &result);
 	if (rc != 0)
 		goto finish;
-	txn_stmt_prepare_rollback_info(stmt, result, new_tuple);
-	stmt->engine_savepoint = stmt;
-	stmt->new_tuple = orig_new_tuple;
-	stmt->old_tuple = result;
-	if (stmt->old_tuple != NULL) {
-		struct tuple *orig_old_tuple = stmt->old_tuple;
-		stmt->old_tuple = memtx_tuple_decompress(stmt->old_tuple);
-		if (stmt->old_tuple == NULL)
-			return -1;
-		tuple_ref(stmt->old_tuple);
-		tuple_unref(orig_old_tuple);
+	assert(stmt != NULL || (old_tuple == NULL && result == NULL));
+	if (stmt) {
+		txn_stmt_prepare_rollback_info(stmt, result, new_tuple);
+		stmt->engine_savepoint = stmt;
+		stmt->new_tuple = orig_new_tuple;
+		stmt->old_tuple = result;
+		if (stmt->old_tuple != NULL) {
+			struct tuple *orig_old_tuple = stmt->old_tuple;
+			stmt->old_tuple =
+				memtx_tuple_decompress(stmt->old_tuple);
+			if (stmt->old_tuple == NULL)
+				return -1;
+			tuple_ref(stmt->old_tuple);
+			tuple_unref(orig_old_tuple);
+		}
 	}
 	if (space->upgrade != NULL && new_tuple != NULL)
 		memtx_space_upgrade_track_tuple(space->upgrade, new_tuple);
@@ -447,7 +449,9 @@ static int
 memtx_space_execute_replace(struct space *space, struct txn *txn,
 			    struct request *request, struct tuple **result)
 {
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = NULL;
+	if (txn != NULL)
+		stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(space->format, request->tuple,
@@ -463,7 +467,7 @@ memtx_space_execute_replace(struct space *space, struct txn *txn,
 		tuple_unref(new_tuple);
 		return -1;
 	}
-	*result = stmt->new_tuple;
+	*result = new_tuple;
 	return 0;
 }
 
