@@ -379,6 +379,7 @@ struct netbox_method_encode_ctx {
 
 static const char netbox_transport_typename[] = "net.box.transport";
 static const char netbox_request_typename[] = "net.box.request";
+static const char netbox_error_typename[] = "net.box.error";
 
 /**
  * We keep a reference to each C function that is frequently called with
@@ -1116,6 +1117,7 @@ static int
 netbox_transport_connect(struct netbox_transport *transport)
 {
 	struct error *e;
+	va_list ap;
 	struct iostream *io = &transport->io;
 	assert(!iostream_is_initialized(io));
 	ev_tstamp start, delay;
@@ -1155,7 +1157,8 @@ netbox_transport_connect(struct netbox_transport *transport)
 io_error:
 	assert(!diag_is_empty(diag_get()));
 	e = diag_last_error(diag_get());
-	box_error_raise(ER_NO_CONNECTION, "%s", e->errmsg);
+	diag_add(ClientError, ER_NO_CONNECTION);
+	error_vformat_msg(diag_last_error(diag_get()), e->errmsg, ap);
 error:
 	if (iostream_is_initialized(io))
 		iostream_close(io);
@@ -2376,6 +2379,76 @@ luaT_netbox_request_pairs(struct lua_State *L)
 	return 3;
 }
 
+/*
+ * Prepares a meta-table for the current error object
+ */
+static int
+luaT_netbox_error_index(struct lua_State *L)
+{
+	luaL_checkudata(L, 1, netbox_error_typename);
+	lua_getmetatable(L, 1);
+	lua_insert(L, 2);
+	lua_rawget(L, 2);
+	return 1;
+}
+
+/*
+ * Frees the current error object
+ */
+static int
+luaT_netbox_error_gc(struct lua_State *L)
+{
+	error_unref(luaL_checkudata(L, 1, netbox_error_typename));
+	return 0;
+}
+
+/*
+ * Returns the current error message or the nil value
+ */
+static int
+luaT_netbox_error_get_name(struct lua_State *L)
+{
+	struct error *err = luaL_checkudata(L, 1, netbox_error_typename);
+	if (err != NULL)
+		lua_pushstring(L, err->errmsg);
+
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+/*
+ * Returns the current error code or the nil value
+ */
+static int
+luaT_netbox_error_get_code(struct lua_State *L)
+{
+	struct error *err = luaL_checkudata(L, 1, netbox_error_typename);
+	if (err != NULL)
+		lua_pushinteger(L, err->code);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+/*
+ * Returns the parent (err->cause) error code or the nil value
+ */
+static int
+luaT_netbox_error_get_cause_code(struct lua_State *L)
+{
+	struct error *err = luaL_checkudata(L, 1, netbox_error_typename);
+	if (err != NULL) {
+		struct error *cause_err = err->cause;
+		if (cause_err != NULL) {
+			lua_pushinteger(L, cause_err->code);
+			return 1;
+		}
+	}
+	lua_pushnil(L);
+	return 1;
+}
+
 /**
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
  * Takes the following arguments: uri (string or table) or fd (number),
@@ -2631,8 +2704,12 @@ netbox_transport_on_state_change(struct netbox_transport *transport,
 	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
 	lua_pushliteral(L, "state_changed");
 	lua_pushstring(L, netbox_state_str[state]);
-	if (error != NULL)
-		lua_pushstring(L, error->errmsg);
+	if (error != NULL) {
+		struct error *stacked_err = lua_newuserdata(L, sizeof(*error));
+		*stacked_err = *error;
+		luaL_getmetatable(L, netbox_error_typename);
+		lua_setmetatable(L, -2);
+	}
 	lua_call(L, error != NULL ? 3 : 2, 0);
 }
 
@@ -3324,6 +3401,16 @@ luaopen_net_box(struct lua_State *L)
 		{ NULL, NULL }
 	};
 	luaL_register_type(L, netbox_request_typename, netbox_request_meta);
+
+	static const struct luaL_Reg netbox_error_meta[] = {
+		{ "__index", luaT_netbox_error_index },
+		{ "__gc", luaT_netbox_error_gc },
+		{ "name", luaT_netbox_error_get_name },
+		{ "code", luaT_netbox_error_get_code },
+		{ "cause_code", luaT_netbox_error_get_cause_code },
+		{ NULL, NULL }
+	};
+	luaL_register_type(L, netbox_error_typename, netbox_error_meta);
 
 	static const luaL_Reg net_box_lib[] = {
 		{ "new_transport",  luaT_netbox_new_transport },
