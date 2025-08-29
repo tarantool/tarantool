@@ -1,0 +1,11 @@
+package example:hello@0.1.0;
+
+world hello {
+  export say-hello: func(name: string) -> string;
+  export wasi:cli/run@0.2.3;
+}
+package wasi:cli@0.2.3 {
+  interface run {
+    run: func() -> result;
+  }
+}
