@@ -46,7 +46,7 @@
 #include "box/memtx_engine.h"
 #include "box/raft.h"
 #include "box/security.h"
-#include "box/wal.h"
+#include "box/journal.h"
 
 #include "core/event.h"
 
@@ -180,7 +180,7 @@ lbox_ctl_set_iproto_lockdown(struct lua_State *L)
 static int
 lbox_ctl_wal_sync(struct lua_State *L)
 {
-	if (wal_sync(NULL))
+	if (journal_sync(NULL))
 		return luaT_error(L);
 	return 0;
 }
