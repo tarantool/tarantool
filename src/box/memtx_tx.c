@@ -2343,6 +2343,37 @@ memtx_tx_handle_dups_in_secondary_index(
 	return newer_story;
 }
 
+/**
+ * Abort with conflict all transactions that have read the absence of the key
+ * corresponding to the @top_story->link[@ind] chain.
+ */
+static void
+memtx_tx_abort_gap_readers_on_rollback(
+	struct memtx_story *top_story, uint32_t ind);
+
+/**
+ * A rollback helper that combines the abortion of duplicates in secondary
+ * indexes and gap readers.
+ *
+ * @param story - the story that became the last prepared/committed in the
+ * chain after a rollback.
+ */
+static void
+memtx_tx_handle_dups_and_gaps_on_rollback(struct memtx_story *story)
+{
+	struct memtx_story *top_story = memtx_tx_story_find_top(story, 0);
+	memtx_tx_abort_gap_readers_on_rollback(top_story, 0);
+
+	for (uint32_t i = 1; i < story->index_count; i++) {
+		top_story = memtx_tx_handle_dups_in_secondary_index(story, i);
+		/*
+		 * If a transaction managed to read absence this story it must
+		 * be aborted.
+		 */
+		memtx_tx_abort_gap_readers_on_rollback(top_story, i);
+	}
+}
+
 /*
  * Rollback addition of story by statement.
  */
@@ -2416,10 +2447,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 		if (del_story != NULL) {
 			del_story->del_psn = 0;
 
-			for (uint32_t i = 1; i < del_story->index_count; i++) {
-				memtx_tx_handle_dups_in_secondary_index(
-					del_story, i);
-			}
+			memtx_tx_handle_dups_and_gaps_on_rollback(del_story);
 		}
 
 		/*
@@ -2437,10 +2465,6 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
-/**
- * Abort with conflict all transactions that have read the absence of the key
- * corresponding to the @top_story->link[@ind] chain.
- */
 static void
 memtx_tx_abort_gap_readers_on_rollback(
 	struct memtx_story *top_story, uint32_t ind)
@@ -2502,19 +2526,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
 		}
 
-		struct memtx_story *top_story =
-			memtx_tx_story_find_top(del_story, 0);
-		memtx_tx_abort_gap_readers_on_rollback(top_story, 0);
-
-		for (uint32_t i = 1; i < del_story->index_count; i++) {
-			top_story = memtx_tx_handle_dups_in_secondary_index(
-				del_story, i);
-			/*
-			 * If a transaction managed to read absence this story
-			 * it must be aborted.
-			 */
-			memtx_tx_abort_gap_readers_on_rollback(top_story, i);
-		}
+		memtx_tx_handle_dups_and_gaps_on_rollback(del_story);
 
 		/* Revert psn assignment. */
 		del_story->del_psn = 0;
