@@ -2537,6 +2537,12 @@ memtx_tx_handle_dups_in_secondary_indexes(struct memtx_story *story)
 }
 
 /*
+ * Abort with conflict all transactions that have read absence of @a story.
+ */
+static void
+memtx_tx_abort_gap_readers_on_rollback(struct memtx_story *story);
+
+/*
  * Rollback addition of story by statement.
  */
 static void
@@ -2600,6 +2606,13 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			}
 		}
 
+		/*
+		 * If a transaction managed to read absence this story it must
+		 * be aborted.
+		 */
+		if (del_story != NULL)
+			memtx_tx_abort_gap_readers_on_rollback(del_story);
+
 		memtx_tx_handle_dups_in_secondary_indexes(del_story);
 
 		/* Revert psn assignment. */
@@ -2622,9 +2635,6 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
-/*
- * Abort with conflict all transactions that have read absence of @a story.
- */
 static void
 memtx_tx_abort_gap_readers_on_rollback(struct memtx_story *story)
 {
