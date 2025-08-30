@@ -2498,6 +2498,9 @@ memtx_tx_handle_dups_in_secondary_indexes(struct memtx_story *story)
 	}
 }
 
+static void
+memtx_tx_abort_gap_readers(struct memtx_story *story);
+
 /*
  * Rollback addition of story by statement.
  */
@@ -2561,6 +2564,13 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 							       test_stmt);
 			}
 		}
+
+		/*
+		 * If a transaction managed to read absence deleted story it must
+		 * be aborted.
+		 */
+		if (del_story != NULL)
+			memtx_tx_abort_gap_readers(del_story);
 
 		memtx_tx_handle_dups_in_secondary_indexes(del_story);
 
