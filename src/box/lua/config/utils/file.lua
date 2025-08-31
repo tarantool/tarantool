@@ -2,6 +2,7 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 local fio = require('fio')
 local yaml = require('yaml')
+local loaders = require('internal.loaders')
 
 -- Read the file block by block till EOF.
 local function stream_read(fh)
@@ -214,6 +215,11 @@ local function get_file_metadata(file_name)
 end
 
 local function get_module_metadata(module_name)
+    -- Builtin modules have no metadata.
+    if loaders.builtin[module_name] ~= nil then
+        return {}
+    end
+
     local ok, res = pcall(package.search, module_name)
     if not ok then
         error(('Unable to locate package %q: %s'):format(module_name, res), 0)
