@@ -161,13 +161,14 @@ create_perf_test(NAME light
 )
 create_perf_test_target(TARGET light)
 
-create_perf_test_target(TARGET small)
-
 create_perf_test(NAME memtx
                  SOURCES memtx.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
                  LIBRARIES core box server ${BENCHMARK_LIBRARIES}
 )
 create_perf_test_target(TARGET memtx)
+
+create_perf_test_target(TARGET small)
+create_perf_test_target(TARGET msgpuck)
 
 add_custom_target(test-c-perf
                   COMMAND ${CMAKE_CTEST_COMMAND}
