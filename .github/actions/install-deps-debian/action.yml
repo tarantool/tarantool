@@ -28,7 +28,7 @@ runs:
           libtool \
           util-linux \
           tt
-        tt rocks install luatest 1.2.0
+        tt rocks install luatest 1.2.1
         tt rocks install luacheck 0.26.0
         gem install coveralls-lcov
       shell: bash
