@@ -252,6 +252,12 @@ struct gap_item_base {
 struct inplace_gap_item {
 	/** Base class. */
 	struct gap_item_base base;
+	/**
+	 * This flag controls whether the transaction that read this gap should
+	 * be aborted during rollback. Some gap readers should only be aborted
+	 * while preparing a replace/insert statement.
+	 */
+	bool abort_on_rollback;
 };
 
 /**
@@ -318,7 +324,7 @@ gap_item_base_create(struct gap_item_base *item, enum gap_item_type type,
  * Note that in_read_gaps base member must be initialized later.
  */
 static struct inplace_gap_item *
-memtx_tx_inplace_gap_item_new(struct txn *txn);
+memtx_tx_inplace_gap_item_new(struct txn *txn, bool abort_on_rollback);
 
 /**
  * Allocate and create nearby gap item.
@@ -2085,7 +2091,8 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 {
 	assert(story->link[ind].newer_story == NULL);
 	assert(txn != NULL);
-	struct inplace_gap_item *item = memtx_tx_inplace_gap_item_new(txn);
+	struct inplace_gap_item *item =
+		memtx_tx_inplace_gap_item_new(txn, true);
 	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
 }
 
@@ -2506,7 +2513,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
  * Abort with conflict all transactions that have read absence of @a story.
  */
 static void
-memtx_tx_abort_gap_readers(struct memtx_story *story)
+memtx_tx_abort_gap_readers_on_rollback(struct memtx_story *story)
 {
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		/*
@@ -2514,12 +2521,16 @@ memtx_tx_abort_gap_readers(struct memtx_story *story)
 		 * top story of history chain.
 		 */
 		struct memtx_story *top = memtx_tx_story_find_top(story, i);
-		struct gap_item_base *item, *tmp;
-		rlist_foreach_entry_safe(item, &top->link[i].read_gaps,
+		struct gap_item_base *item_base, *tmp;
+		rlist_foreach_entry_safe(item_base, &top->link[i].read_gaps,
 					 in_read_gaps, tmp) {
-			if (item->type != GAP_INPLACE)
+			if (item_base->type != GAP_INPLACE)
 				continue;
-			txn_abort_with_conflict(item->txn);
+			struct inplace_gap_item *item =
+				(struct inplace_gap_item *)item_base;
+			if (!item->abort_on_rollback)
+				continue;
+			txn_abort_with_conflict(item_base->txn);
 		}
 	}
 }
@@ -2568,7 +2579,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 		 * If a transaction managed to read absence this story it must
 		 * be aborted.
 		 */
-		memtx_tx_abort_gap_readers(del_story);
+		memtx_tx_abort_gap_readers_on_rollback(del_story);
 	}
 
 	/* Unlink the story from the statement. */
@@ -3574,11 +3585,12 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
  * Note that in_read_gaps base member must be initialized later.
  */
 static struct inplace_gap_item *
-memtx_tx_inplace_gap_item_new(struct txn *txn)
+memtx_tx_inplace_gap_item_new(struct txn *txn, bool abort_on_rollback)
 {
 	struct memtx_tx_mempool *pool = &txm.inplace_gap_item_mempoool;
 	struct inplace_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
 	gap_item_base_create(&item->base, GAP_INPLACE, txn);
+	item->abort_on_rollback = abort_on_rollback;
 	return item;
 }
 
