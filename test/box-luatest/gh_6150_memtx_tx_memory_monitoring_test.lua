@@ -15,7 +15,7 @@ local SIZE_OF_XROW = 163
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 80
-local SIZE_OF_INPLACE_GAP_TRACKER = 48
+local SIZE_OF_INPLACE_GAP_TRACKER = 56
 local SIZE_OF_NEARBY_GAP_TRACKER = 88
 
 local current_stat = {}
