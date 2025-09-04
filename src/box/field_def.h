@@ -248,6 +248,17 @@ field_mp_is_in_fixed_int_range(enum field_type type, const char *data,
 			       char *mp_min, char *mp_max,
 			       const char **details);
 
+/**
+ * Check if MsgPack value fits into fixed point decimal.
+ * @param type - fixed point decimal type.
+ * @param scale - fixed point decimal scale.
+ * @param data - MsgPack value.
+ * @retval true if fits and false otherwise.
+ */
+bool
+field_mp_fits_fixed_point_decimal(enum field_type type, int64_t scale,
+				  const char *data);
+
 static inline bool
 action_is_nullable(enum on_conflict_action nullable_action)
 {

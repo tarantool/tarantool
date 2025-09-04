@@ -43,6 +43,7 @@
 #include "tuple_format.h"
 #include "salad/grp_alloc.h"
 #include "small/region.h"
+#include "mp_decimal.h"
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",
@@ -591,6 +592,20 @@ field_mp_is_in_fixed_int_range(enum field_type type, const char *data,
 }
 
 #undef ERROR_MSG
+
+bool
+field_mp_fits_fixed_point_decimal(enum field_type type, int64_t scale,
+				  const char *data)
+{
+	assert(field_type_is_fixed_decimal[type]);
+	decimal_t dec;
+	enum mp_type mp_type = mp_typeof(*data);
+	if (mp_type == MP_NIL)
+		return true;
+	VERIFY(mp_decode_decimal(&data, &dec) != NULL);
+	int precision = field_type_decimal_precision[type];
+	return decimal_fits_fixed_point(&dec, precision, scale);
+}
 
 /**
  * Parse default field value from msgpack.
