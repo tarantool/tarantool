@@ -376,3 +376,39 @@ g.test_key_part_encode_decode = function(cg)
         box.snapshot()
     end)
 end
+
+g.test_mp_null_values = function(cg)
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        -- Inserting into decimal with plain format.
+        local s = box.schema.create_space('test', {format = {
+            {'a', 'unsigned'},
+            {'b', 'decimal32', scale = 2, is_nullable = true},
+        }})
+        s:create_index('pk')
+        s:insert({1, box.NULL})
+        s:drop()
+        -- Inserting into decimal with JSON format.
+        local s = box.schema.create_space('test', {format = {
+            {'a', 'unsigned'},
+            {'b', 'map'},
+        }})
+        s:create_index('pk')
+        s:create_index('sk', {parts = {
+            {field = 'b.x', type = 'decimal32', scale = 2, is_nullable = true},
+        }})
+        s:insert({1, {x = box.NULL, y = 1}})
+        s:drop()
+        -- Checking decimal key.
+        local s = box.schema.create_space('test', {format = {
+            {'a', 'unsigned'},
+            {'b', 'decimal32', scale = 2, is_nullable = true},
+        }})
+        s:create_index('pk')
+        s:create_index('sk', {parts = {2}})
+        s:insert({1, decimal.new(1.01)})
+        s:insert({2, box.NULL})
+        -- Check is in the select.
+        t.assert_equals(s.index.sk:select({box.NULL}), {{2, box.NULL}})
+    end)
+end

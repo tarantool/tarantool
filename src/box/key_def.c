@@ -40,8 +40,6 @@
 #include "small/region.h"
 #include "coll/coll.h"
 #include "fiber.h"
-#include "core/decimal.h"
-#include "core/mp_decimal.h"
 
 const char *sort_order_strs[] = { "asc", "desc", "undef" };
 static_assert(lengthof(sort_order_strs) == sort_order_MAX,
@@ -1297,18 +1295,12 @@ key_part_validate(enum field_type key_type,
 			return -1;
 		}
 	}
-	if (field_type_is_fixed_decimal[key_type]) {
-		assert(type_params != NULL);
-		decimal_t dec;
-		const char *mp = key;
-		VERIFY(mp_decode_decimal(&mp, &dec) != NULL);
-		int precision = field_type_decimal_precision[key_type];
-		if (!decimal_fits_fixed_point(&dec, precision,
-					      type_params->scale)) {
-			diag_set(ClientError, ER_KEY_PART_IRREPRESENTABLE_VALUE,
-				 field_no, key);
-			return -1;
-		}
+	if (field_type_is_fixed_decimal[key_type] &&
+	    !field_mp_fits_fixed_point_decimal(key_type, type_params->scale,
+					       key)) {
+		diag_set(ClientError, ER_KEY_PART_IRREPRESENTABLE_VALUE,
+			 field_no, key);
+		return -1;
 	}
 	return 0;
 }
