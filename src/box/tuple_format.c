@@ -40,7 +40,6 @@
 #include "field_default_func.h"
 #include "tt_static.h"
 #include "mpstream/mpstream.h"
-#include "mp_decimal.h"
 
 #include <PMurHash.h>
 
@@ -1070,17 +1069,13 @@ tuple_field_validate(struct tuple_format *format, struct tuple_field *field,
 			return -1;
 		}
 	}
-	if (field_type_is_fixed_decimal[field->type]) {
-		decimal_t value;
-		const char *mp = mp_data;
-		VERIFY(mp_decode_decimal(&mp, &value) != NULL);
-		int precision = field_type_decimal_precision[field->type];
-		if (!decimal_fits_fixed_point(&value, precision,
-					      field->type_params.scale)) {
-			diag_set(ClientError, ER_FIELD_IRREPRESENTABLE_VALUE,
-				 tuple_field_path(field, format), mp_data);
-			return -1;
-		}
+	if (field_type_is_fixed_decimal[field->type] &&
+	    !field_mp_fits_fixed_point_decimal(field->type,
+					       field->type_params.scale,
+					       mp_data)) {
+		diag_set(ClientError, ER_FIELD_IRREPRESENTABLE_VALUE,
+			 tuple_field_path(field, format), mp_data);
+		return -1;
 	}
 	if (tuple_field_check_constraint(field, mp_data, mp_data_end) != 0)
 		return -1;
