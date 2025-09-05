@@ -210,12 +210,22 @@ local function fill_uribuf_params(uribuf, uri)
     uribuf.params = ffi.new("struct uri_param[?]", uribuf.param_count)
     local i = 0
     for param_name, param in pairs(uri.params) do
-        uribuf.params[i].value_count = #param
+        if type(param) == "table" then
+            uribuf.params[i].value_count = #param
+        elseif param == nil then
+            uribuf.params[i].value_count = 0
+        else
+            uribuf.params[i].value_count = 1
+        end
         uribuf.params[i].name = param_name
         uribuf.params[i].values =
             ffi.new("const char *[?]", uribuf.params[i].value_count)
         for j = 1, uribuf.params[i].value_count do
-            uribuf.params[i].values[j - 1] = param[j]
+            if type(param) == "table" then
+                uribuf.params[i].values[j - 1] = param[j]
+            else
+                uribuf.params[i].values[j - 1] = param
+            end
         end
         i = i + 1
     end
