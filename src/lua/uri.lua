@@ -210,12 +210,19 @@ local function fill_uribuf_params(uribuf, uri)
     uribuf.params = ffi.new("struct uri_param[?]", uribuf.param_count)
     local i = 0
     for param_name, param in pairs(uri.params) do
-        uribuf.params[i].value_count = #param
         uribuf.params[i].name = param_name
-        uribuf.params[i].values =
-            ffi.new("const char *[?]", uribuf.params[i].value_count)
-        for j = 1, uribuf.params[i].value_count do
-            uribuf.params[i].values[j - 1] = param[j]
+        if type(param) == "table" then
+            uribuf.params[i].value_count = #param
+            uribuf.params[i].values = ffi.new("const char *[?]", #param)
+            for j = 1, uribuf.params[i].value_count do
+                uribuf.params[i].values[j - 1] = param[j]
+            end
+        elseif param == nil then
+            uribuf.params[i].value_count = 0
+        else
+            uribuf.params[i].value_count = 1
+            uribuf.params[i].values = ffi.new("const char *[?]", 1)
+            uribuf.params[i].values[0] = param
         end
         i = i + 1
     end
@@ -244,7 +251,8 @@ local function format(uri, write_password)
     fill_uribuf_params(uribuf, uri)
     local ibuf = cord_ibuf_take()
     local str = ibuf:alloc(1024)
-    local len = builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)
+    local len = builtin.uri_format(str, 1024, uribuf,
+                                   write_password and 1 or 0)
     uri_stash_put(uribuf)
     str = ffi.string(str, len)
     cord_ibuf_put(ibuf)
