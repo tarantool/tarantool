@@ -290,30 +290,40 @@ uri_format_param(char *str, int len, const struct uri_param *param)
 	return total;
 }
 
+/**
+ * A function which displays uri parameters according to
+ * write_sensitive option.
+ */
 static int
-uri_format_params(char *str, int len, const struct uri *uri)
+uri_format_params(char *str, int len, const struct uri *uri,
+		  bool write_sensitive)
 {
 	if (uri->param_count == 0)
 		return 0;
 	int total = 0;
+	bool no_params_printed = true;
 	SNPRINT(total, snprintf, str, len, "?");
 	for (int i = 0; i < uri->param_count; i++) {
-		SNPRINT(total, uri_format_param, str, len, &uri->params[i]);
-		if (i != uri->param_count - 1)
+		if (!write_sensitive &&
+		    strncmp(uri->params[i].name, "ssl_", 4) == 0)
+			continue;
+		if (!no_params_printed)
 			SNPRINT(total, snprintf, str, len, "&");
+		SNPRINT(total, uri_format_param, str, len, &uri->params[i]);
+		no_params_printed = false;
 	}
 	return total;
 }
 
 int
-uri_format(char *str, int len, const struct uri *uri, bool write_password)
+uri_format(char *str, int len, const struct uri *uri, bool write_sensitive)
 {
 	int total = 0;
 	if (uri->scheme != NULL)
 		SNPRINT(total, snprintf, str, len, "%s://", uri->scheme);
 	if (uri->login != NULL) {
 		SNPRINT(total, snprintf, str, len, "%s", uri->login);
-		if (uri->password != NULL && write_password) {
+		if (uri->password != NULL && write_sensitive) {
 			SNPRINT(total, snprintf, str, len, ":%s",
 				uri->password);
 		}
@@ -336,7 +346,8 @@ uri_format(char *str, int len, const struct uri *uri, bool write_password)
 		SNPRINT(total, snprintf, str, len, "%s", uri->path);
 	}
 	if (uri->params != NULL) {
-		SNPRINT(total, uri_format_params, str, len, uri);
+		SNPRINT(total, uri_format_params, str, len, uri,
+			write_sensitive);
 	}
 	if (uri->fragment != NULL) {
 		SNPRINT(total, snprintf, str, len, "#%s", uri->fragment);
