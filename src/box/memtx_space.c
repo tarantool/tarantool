@@ -228,6 +228,43 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 }
 
 /**
+ * Wrapper around `index_replace` that handles transaction management, if
+ * needed. In case of failure, it is guaranteed that all the replace actions for
+ * this index are rolled back.
+ */
+static int
+memtx_index_replace_with_txm(struct index *index, struct txn_stmt *stmt,
+			     struct tuple *old_tuple, struct tuple *new_tuple,
+			     enum dup_replace_mode mode, struct tuple **result)
+{
+	struct tuple *successor;
+	if (stmt == NULL)
+		return index_replace(index, old_tuple, new_tuple, mode,
+				     result, &successor);
+	if (new_tuple == NULL) {
+		memtx_tx_history_add_delete_stmt(stmt, index, old_tuple,
+						 result);
+		return 0;
+	}
+	if (index_replace(index, NULL, new_tuple, DUP_REPLACE_OR_INSERT, result,
+			  &successor) != 0)
+		return -1;
+	if (memtx_tx_history_add_insert_stmt(stmt, index, old_tuple,
+					     new_tuple, mode, result,
+					     successor) != 0) {
+		struct tuple *delete;
+		if (index_replace(index, new_tuple, *result, DUP_INSERT,
+				  &delete, &successor) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *
  * @param space space
@@ -337,39 +374,39 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 * Since modification of ephemeral spaces are allowed without txn,
 	 * we must not use MVCC for those spaces even if txn is present now.
 	 */
-	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
-		struct txn_stmt *stmt = txn_current_stmt(in_txn());
-		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
-						 mode, result);
-	}
-
+	bool needs_txm = memtx_tx_manager_use_mvcc_engine &&
+			 !space->def->opts.is_ephemeral;
+	struct txn_stmt *stmt = needs_txm ? txn_current_stmt(in_txn()) : NULL;
+	memtx_tx_history_add_new_tuple(stmt, new_tuple);
 	/*
 	 * If old_tuple is not NULL, the index has to
 	 * find and delete it, or return an error.
 	 */
-	struct tuple *successor;
-	if (index_replace(pk, old_tuple, new_tuple, mode,
-			  &old_tuple, &successor) != 0)
-		return -1;
+	if (memtx_index_replace_with_txm(pk, stmt, old_tuple, new_tuple, mode,
+					 &old_tuple) != 0)
+		goto rollback;
 	assert(old_tuple || new_tuple);
 
 	/* Update secondary keys. */
 	for (i++; i < space->index_count; i++) {
 		struct tuple *delete;
-		struct tuple *successor;
 		struct index *index = space->index[i];
-		if (index_replace(index, old_tuple, new_tuple,
-				  DUP_INSERT, &delete, &successor) != 0)
+		if (memtx_index_replace_with_txm(index, stmt, old_tuple,
+						 new_tuple, DUP_INSERT,
+						 &delete) != 0)
 			goto rollback;
 	}
 
-	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
-	if (new_tuple != NULL)
-		tuple_ref(new_tuple);
+	if (!needs_txm) {
+		memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
+		if (new_tuple != NULL)
+			tuple_ref(new_tuple);
+	}
 	*result = old_tuple;
 	return 0;
 
 rollback:
+	memtx_tx_history_undo_adding_stmt(stmt, i);
 	for (; i > 0; i--) {
 		struct tuple *delete;
 		struct tuple *successor;
@@ -382,6 +419,7 @@ rollback:
 			panic("failed to rollback change");
 		}
 	}
+	memtx_tx_history_undo_adding_new_tuple(stmt, new_tuple);
 	return -1;
 }
 
