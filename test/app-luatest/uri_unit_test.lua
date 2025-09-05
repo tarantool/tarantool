@@ -204,3 +204,31 @@ g.test_display_of_uri_params = function(_)
     t.assert_equals(formatted_uri_with_table_param,
                     "localhost:3301?param=value1&param=value2")
 end
+
+g.test_display_of_sensitive_uri_data = function(_)
+    local base_uri_table = {login = "user", host = "localhost",
+                            service = "3301"}
+    local ssl_params = {transport = "ssl", ssl_password = "ssl_P4ssw0rd",
+                        ssl_key_file = "KEY_FILE", ssl_cert_file = "CERT_FILE",
+                        ssl_ca_file = "CA_FILE"}
+
+    base_uri_table.password = "P4ssw0rd"
+    local formatted_uri_with_password = uri.format(base_uri_table, true)
+    local formatted_uri_without_password = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_password,
+                    "user:P4ssw0rd@localhost:3301")
+    t.assert_equals(formatted_uri_without_password, "user@localhost:3301")
+
+    base_uri_table.password = nil
+    base_uri_table.params = table.deepcopy(ssl_params)
+    base_uri_table.params.not_sensitive_ssl_param = "value"
+    local formatted_uri_with_ssl_data = uri.format(base_uri_table, true)
+    local formatted_uri_without_ssl_data = uri.format(base_uri_table)
+    for ssl_key, ssl_value in pairs(ssl_params) do
+        t.assert(string.match(formatted_uri_with_ssl_data, ssl_key))
+        t.assert(string.match(formatted_uri_with_ssl_data, ssl_value))
+    end
+    t.assert_equals(formatted_uri_without_ssl_data,
+                    "user@localhost:3301?transport=ssl&" ..
+                    "not_sensitive_ssl_param=value")
+end
