@@ -129,3 +129,33 @@ g.test_uri_unescape_plus_disabled = function(_)
     }
     t.assert_equals(uri.unescape("+", opts), "+")
 end
+
+g.test_display_of_uri_params = function(_)
+    local base_uri_table = { host = "localhost", service = "3301"}
+    local formatted_uri_without_params = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_without_params, "localhost:3301")
+
+    base_uri_table.params = {}
+    local formatted_uri_with_empty_params = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_empty_params, "localhost:3301")
+
+    base_uri_table.params = {first_param = "value1"}
+    local formatted_uri_with_one_param = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_one_param,
+                    "localhost:3301?first_param=value1")
+
+    base_uri_table.params = {first_param = "value1", second_param = "value2"}
+    local formatted_uri_with_several_params = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_several_params,
+                    "localhost:3301?first_param=value1&second_param=value2")
+
+    base_uri_table.params = {a = box.NULL}
+    local formatted_uri_with_null_param = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_null_param,
+                    "localhost:3301?a")
+
+    base_uri_table.params = {param = {"value1", "value2"}}
+    local formatted_uri_with_table_param = uri.format(base_uri_table)
+    t.assert_equals(formatted_uri_with_table_param,
+                    "localhost:3301?param=value1&param=value2")
+end
