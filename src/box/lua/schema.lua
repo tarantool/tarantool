@@ -444,7 +444,7 @@ local function atomic_tail(level, options, status, ...)
     else
         -- Keep original trace and append trace of level + 1 as
         -- in case of box.error.
-        error(tostring(err), level + 1)
+        error(err, level + 1)
     end
 end
 
