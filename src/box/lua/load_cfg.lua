@@ -435,45 +435,49 @@ local modify_cfg = {
     instance_name      = normalize_node_name,
 }
 
-local function purge_password_from_uri(uri)
+local function purge_sensitive_data_from_uri(uri)
     local parsed = urilib.parse(uri)
-    if parsed ~= nil and parsed.password ~= nil then
+    if parsed ~= nil then
         return urilib.format(parsed, false)
     end
     return uri
 end
 
-local function purge_password_from_uris(uri)
+local function purge_sensitive_data_from_uris(uri)
     if uri == nil then
         return nil
     end
     if type(uri) == 'table' then
+        uri = purge_sensitive_data_from_uri(uri)
+        if type(uri) == 'string' then
+            return uri
+        end
         local new_table = {}
         for k, v in pairs(uri) do
-            new_table[k] = purge_password_from_uri(v)
+            new_table[k] = purge_sensitive_data_from_uris(v)
         end
         return new_table
     end
-    return purge_password_from_uri(uri)
+    return purge_sensitive_data_from_uri(uri)
 end
 
-local function purge_password_from_listen_options_uri(uri)
+local function purge_sensitive_data_from_listen_options_uri(uri)
     if uri == nil or type(uri) == "table" then
-        return purge_password_from_uris(uri)
+        return purge_sensitive_data_from_uris(uri)
     end
 
     local parts = {}
     for sub_uri in string.gmatch(uri, "[^, ]+") do
-        table.insert(parts, purge_password_from_uri(sub_uri))
+        table.insert(parts, purge_sensitive_data_from_uri(sub_uri))
     end
     return table.concat(parts, ", ")
 end
 
 -- options that require modification for logging
 local log_cfg_option = {
-    listen = purge_password_from_listen_options_uri,
-    replication = purge_password_from_uris,
-    bootstrap_leader = purge_password_from_uris,
+    listen = purge_sensitive_data_from_listen_options_uri,
+    replication = purge_sensitive_data_from_uris,
+    bootstrap_leader = purge_sensitive_data_from_uris,
 }
 
 
