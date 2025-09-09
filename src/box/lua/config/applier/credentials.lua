@@ -9,6 +9,7 @@ local version = require('version')
 local config
 
 local PRIV_OPTS_FIELD_ID = 6
+local USER_OPTS_FIELD_ID = 8
 local CONFIG_ORIGIN = 'config'
 
 -- {{{ Sync helpers
@@ -504,9 +505,14 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
 
     -- Try to apply the action immediately. If the object doesn't exist,
     -- the sync will be applied inside the trigger on object creation/rename.
+    local opts = {_origin = CONFIG_ORIGIN}
+    if grant_or_revoke == 'grant' then
+        opts.if_not_exists = true
+    else
+        opts.if_exists = true
+    end
     local ok, err = pcall(box.schema[role_or_user][grant_or_revoke],
-                          name, privs, obj_type, obj_name,
-                          {_origin = CONFIG_ORIGIN})
+                          name, privs, obj_type, obj_name, opts)
 
     if ok then
         log.verbose('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
@@ -707,8 +713,11 @@ local function create_role(role_name)
         log.verbose('credentials.apply: role %q already exists', role_name)
     else
         log.verbose('credentials.apply: create role %q', role_name)
-        box.schema.role.create(role_name)
     end
+    box.schema.role.create(role_name, {
+        if_not_exists = true,
+        _origin = CONFIG_ORIGIN,
+    })
 end
 
 local function create_roles(role_map)
@@ -728,8 +737,11 @@ local function create_user(user_name)
         log.verbose('credentials.apply: user %q already exists', user_name)
     else
         log.verbose('credentials.apply: create user %q', user_name)
-        box.schema.user.create(user_name)
     end
+    box.schema.user.create(user_name, {
+        if_not_exists = true,
+        _origin = CONFIG_ORIGIN,
+    })
 end
 
 local function set_password(user_name, password)
@@ -834,6 +846,42 @@ end
 
 -- }}} Create users
 
+-- {{{ Drop absent users and roles
+
+local function drop_users_not_in_config(user_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'user' and tuple[USER_OPTS_FIELD_ID] ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins[CONFIG_ORIGIN] and
+           (user_map or {})[tuple.name] == nil then
+            table.insert(to_drop, tuple.name)
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.info('credentials.apply: drop user %q', name)
+        box.schema.user.drop(name, {_origin = CONFIG_ORIGIN, if_exists = true})
+    end
+end
+
+local function drop_roles_not_in_config(role_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'role' and tuple[USER_OPTS_FIELD_ID] ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins[CONFIG_ORIGIN] and
+           (role_map or {})[tuple.name] == nil then
+            table.insert(to_drop, tuple.name)
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.info('credentials.apply: drop role %q', name)
+        box.schema.role.drop(name, {_origin = CONFIG_ORIGIN, if_exists = true})
+    end
+end
+
+-- }}} Drop absent users and roles
+
 -- {{{ Applier
 
 -- Objects that are inside the config must be registered in target_object_map,
@@ -883,6 +931,8 @@ local function sync_object(obj_to_sync)
         register_objects(credentials.users)
 
         box.atomic(function()
+            drop_roles_not_in_config(credentials.roles)
+            drop_users_not_in_config(credentials.users)
             create_roles(credentials.roles)
             create_users(credentials.users)
 
@@ -949,6 +999,10 @@ local triggers_are_set
 
 local function apply(config_module)
     config = config_module
+
+    if config._configdata:get('credentials') == nil then
+        return true
+    end
 
     -- Create a fiber channel for scheduled tasks for sync worker.
     if not sync_tasks then
