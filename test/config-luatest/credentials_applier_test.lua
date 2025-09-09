@@ -429,12 +429,6 @@ g.test_set_password = function()
 end
 
 g.test_remove_user_role = function(g)
-    -- Verify that when user or role is removed from the config,
-    -- it is not being deleted.
-
-    -- Whole removed user/role configuration is expected to be left
-    -- as is after the reload, so verification functions for before/after
-    -- reload are the same.
     local verify = function()
         local ok, err = pcall(box.schema.user.info, 'myuser')
         t.assert(ok, err)
@@ -452,6 +446,21 @@ g.test_remove_user_role = function(g)
         local role_perm = internal.privileges_from_box('myrole')
         t.assert(role_perm['universe'][''].read)
         t.assert(role_perm['universe'][''].write)
+    end
+
+    -- Since gh-11828 users and roles defined in `credentials`
+    -- are now synchronized with the config. If removed from config,
+    -- they are also dropped from box.
+    local verify_2 = function()
+        local ok, err = pcall(box.schema.user.info, 'myuser')
+        t.assert_not(ok, err)
+        ok, err = pcall(box.schema.role.info, 'myrole')
+        t.assert_not(ok, err)
+        local internal =
+                require('internal.config.applier.credentials')._internal
+
+        local guest_perm = internal.privileges_from_box('guest')
+        t.assert(guest_perm['role']['super'].execute)
     end
 
     helpers.reload_success_case(g, {
@@ -493,7 +502,9 @@ g.test_remove_user_role = function(g)
                 }
             }
         },
-        verify_2 = verify,
+        -- Legacy behavior: before gh-11828, removing a user or role
+        -- from the config did NOT delete it from box.
+        verify_2 = verify_2,
     })
 end
 
