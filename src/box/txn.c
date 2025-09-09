@@ -341,6 +341,18 @@ txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
 		tuple_ref(stmt->rollback_info.new_tuple);
 }
 
+void
+txn_stmt_set_tuples(struct txn_stmt *stmt, struct tuple *old_tuple,
+		    struct tuple *new_tuple)
+{
+	stmt->old_tuple = old_tuple;
+	if (stmt->old_tuple != NULL)
+		tuple_ref(stmt->old_tuple);
+	stmt->new_tuple = new_tuple;
+	if (stmt->new_tuple != NULL)
+		tuple_ref(stmt->new_tuple);
+}
+
 /*
  * Run the statement's rollback triggers and undo changes done by the statement.
  *
