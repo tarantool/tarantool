@@ -22,6 +22,7 @@ local DEFAULT_ORIGIN = ''
 -- We use the field ID instead of the field name so we don't need to upgrade
 -- the schema to use _origins option.
 local PRIV_OPTS_FIELD_ID = 6
+local USER_OPTS_FIELD_ID = 8
 
 local function setmap(table)
     return setmetatable(table, { __serialize = 'map' })
@@ -3684,15 +3685,65 @@ box.schema.user.passwd = function(name, new_password)
     end
 end
 
+-- Return origins for user/role from the given tuple.
+local function user_origins_from_tuple(tuple)
+    if tuple[USER_OPTS_FIELD_ID] == nil or
+       tuple[USER_OPTS_FIELD_ID].origins == nil then
+        return {[DEFAULT_ORIGIN] = true}
+    end
+    return tuple[USER_OPTS_FIELD_ID].origins
+end
+
+-- Return opts field for user/role based on origins map.
+local function user_opts_from_origins(origins)
+    if origins[DEFAULT_ORIGIN] ~= nil and
+       next(origins, next(origins)) == nil then
+        return nil
+    end
+    return {origins = origins}
+end
+
+local function user_add_origin(uid, origin)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple = _user:get{uid}
+    local origins = user_origins_from_tuple(tuple)
+    if origins[origin] then
+        return
+    end
+    origins[origin] = true
+    local opts_field = user_opts_from_origins(origins)
+    if opts_field ~= nil then
+        _user:update(uid, {{'=', USER_OPTS_FIELD_ID, opts_field}})
+    else
+        if tuple[USER_OPTS_FIELD_ID] ~= nil then
+            _user:update(uid, {{'=', USER_OPTS_FIELD_ID, box.NULL}})
+        end
+    end
+end
+
 box.schema.user.create = atomic_wrapper(function(name, opts)
     utils.box_check_configured(2)
     local uid = user_or_role_resolve(name)
     opts = opts or {}
-    local template = {password = 'string', if_not_exists = 'boolean'}
+    local template = {password = 'string', if_not_exists = 'boolean',
+                      _origin = 'string'}
     check_param_table(opts, template, 2)
+    local origin = opts._origin or DEFAULT_ORIGIN
+    local _user = box.space[box.schema.USER_ID]
     if uid then
-        if not opts.if_not_exists then
-            box.error(box.error.USER_EXISTS, name, 2)
+        local tuple = _user:get{uid}
+        local origins = user_origins_from_tuple(tuple)
+
+        -- If the user already has the given origin,
+        -- then respect if_not_exists option.
+        if origins[origin] ~= nil then
+            if not opts.if_not_exists then
+                box.error(box.error.USER_EXISTS, name, 2)
+            end
+        else
+            -- User exists, but without this origin.
+            -- Extend the origin map instead of erroring.
+            user_add_origin(uid, origin)
         end
         return
     end
@@ -3703,9 +3754,9 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
     else
         auth_list = setmap({})
     end
-    local _user = box.space[box.schema.USER_ID]
+    local opts_field = user_opts_from_origins({[origin] = true})
     uid = _user:auto_increment{session.euid(), name, 'user', auth_list, {},
-                               math.floor(fiber.time())}.id
+                               math.floor(fiber.time()), opts_field}.id
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
     -- Grant privilege 'alter' on itself, so that it can
@@ -3718,13 +3769,33 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
                    nil, {if_not_exists=true})
 end)
 
-box.schema.user.exists = function(name)
+-- Note: we intentionally keep the semantics that `box.schema.*.exists(name)`
+-- returns `true` if the user/role exists in any origin. This avoids a
+-- surprising situation where a user/role defined only in the config
+-- origin would make exists(...) return `false` (if `opts = nil` implied
+-- `DEFAULT_ORIGIN`). In other words, without opts we check for existence
+-- globally, not only in the default origin.
+-- Use opts = { _origin = <...> } to check for a specific origin.
+box.schema.user.exists = function(name, opts)
     utils.box_check_configured(2)
-    if user_resolve(name, 2) then
-        return true
-    else
+    local origin
+    if opts ~= nil then
+        check_param_table(opts, { _origin = 'string' }, 2)
+        origin = opts._origin
+    end
+    local uid = user_resolve(name, 2)
+    if uid == nil then
         return false
     end
+    if origin == nil then
+        return true
+    end
+    local tuple = box.space[box.schema.USER_ID]:get{uid}
+    if tuple == nil then
+        return false
+    end
+    local origins = user_origins_from_tuple(tuple)
+    return origins[origin] ~= nil
 end
 
 -- Return expanded origins from the given tuple.
@@ -3938,8 +4009,9 @@ local function revoke(level, uid, name, privilege, object_type, object_name,
     end
 end
 
-local function drop(uid, level)
+local function full_drop(uid)
     -- recursive delete of user data
+    local _priv = box.space[box.schema.PRIV_ID]
     local _vpriv = box.space[box.schema.VPRIV_ID]
     local spaces = box.space[box.schema.VSPACE_ID].index.owner:select{uid}
     for _, tuple in pairs(spaces) do
@@ -3952,7 +4024,7 @@ local function drop(uid, level)
     -- if this is a role, revoke this role from whoever it was granted to
     local grants = _vpriv.index.object:select{'role', uid}
     for _, tuple in pairs(grants) do
-        revoke(level + 1, tuple.grantee, tuple.grantee, uid)
+        _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
     end
     local sequences = box.space[box.schema.VSEQUENCE_ID].index.owner:select{uid}
     for _, tuple in pairs(sequences) do
@@ -3967,13 +4039,73 @@ local function drop(uid, level)
     end
     local privs = _vpriv.index.primary:select{uid}
 
-    for _, tuple in pairs(privs) do
-        -- we need an additional box.session.su() here, because of
-        -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
-        box.session.su("admin", revoke, level + 2, uid, uid, tuple.privilege,
-                       tuple.object_type, tuple.object_id)
-    end
+    -- we need an additional box.session.su() here, because of
+    -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+    box.session.su('admin', function()
+        for _, tuple in pairs(privs) do
+            _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
+        end
+    end)
+
     box.space[box.schema.USER_ID]:delete{uid}
+end
+
+-- Drop a user/role only for the given origin.
+-- If the object has multiple origins (e.g. created manually and from config),
+-- we only remove privileges and ownership entries that belong to the specified
+-- origin. Other origins remain intact. If this was the last origin, do a full
+-- drop via full_drop().
+local function drop(uid, level, opts)
+    opts = opts or {}
+    local origin = opts._origin or DEFAULT_ORIGIN
+    local tuple = box.space[box.schema.USER_ID]:get{uid}
+    local origins = user_origins_from_tuple(tuple)
+    if origins[origin] == nil then
+        if opts.if_exists then
+            return
+        end
+        local err
+        if tuple.type == 'role' then
+            err = box.error.NO_SUCH_ROLE
+        else
+            err = box.error.NO_SUCH_USER
+        end
+        box.error(err, tuple.name, level + 1)
+    end
+    origins[origin] = nil
+    if next(origins) == nil then
+        full_drop(uid)
+        return
+    end
+    local _vpriv = box.space[box.schema.VPRIV_ID]
+    for _, t in pairs(_vpriv.index.primary:select{uid}) do
+        local priv = 0
+        if t[PRIV_OPTS_FIELD_ID] ~= nil
+            and t[PRIV_OPTS_FIELD_ID].origins ~= nil then
+            -- New-style entry with per-origin privileges.
+            -- Revoke only the part that belongs to the given origin.
+            priv = t[PRIV_OPTS_FIELD_ID].origins[origin] or 0
+        elseif origin == DEFAULT_ORIGIN then
+            -- Legacy entry without origins map: treat it as belonging to the
+            -- default `DEFAULT_ORIGIN` origin and revoke the whole privilege.
+            priv = t.privilege
+        end
+        if priv ~= 0 then
+            -- we need an additional box.session.su() here, because of
+            -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+            box.session.su('admin', revoke, level + 2, uid, uid, priv,
+                           t.object_type, t.object_id,
+                           {_origin = origin, if_exists = true})
+        end
+    end
+    local opts_field = user_opts_from_origins(origins)
+    if opts_field ~= nil then
+        box.space[box.schema.USER_ID]:update(uid,
+            {{'=', USER_OPTS_FIELD_ID, opts_field}})
+    else
+        box.space[box.schema.USER_ID]:update(uid,
+            {{'=', USER_OPTS_FIELD_ID, box.NULL}})
+    end
 end
 
 box.schema.user.grant = function(user_name, ...)
@@ -4006,7 +4138,7 @@ end
 
 box.schema.user.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' }, 2)
+    check_param_table(opts, { if_exists = 'boolean', _origin = 'string' }, 2)
     local uid = user_resolve(name, 2)
     if uid ~= nil then
         if uid >= box.schema.SYSTEM_USER_ID_MIN and
@@ -4019,7 +4151,7 @@ box.schema.user.drop = atomic_wrapper(function(name, opts)
             box.error(box.error.DROP_USER, name,
                       "the user is active in the current session", 2)
         end
-        return drop(uid, 1)
+        return drop(uid, 1, opts)
     end
     if not opts.if_exists then
         box.error(box.error.NO_SUCH_USER, name, 2)
@@ -4056,35 +4188,68 @@ end
 
 box.schema.role = {}
 
-box.schema.role.exists = function(name)
+-- Note: we intentionally keep the semantics that `box.schema.*.exists(name)`
+-- returns `true` if the user/role exists in any origin. This avoids a
+-- surprising situation where a user/role defined only in the config
+-- origin would make exists(...) return `false` (if `opts = nil` implied
+-- `DEFAULT_ORIGIN`). In other words, without opts we check for existence
+-- globally, not only in the default origin.
+-- Use opts = { _origin = <...> } to check for a specific origin.
+box.schema.role.exists = function(name, opts)
     utils.box_check_configured(2)
-    if role_resolve(name) then
-        return true
-    else
+    local origin
+    if opts ~= nil then
+        check_param_table(opts, { _origin = 'string' }, 2)
+        origin = opts._origin
+    end
+    local uid = role_resolve(name, 2)
+    if uid == nil then
         return false
     end
+    if origin == nil then
+        return true
+    end
+    local tuple = box.space[box.schema.USER_ID]:get{uid}
+    if tuple == nil then
+        return false
+    end
+    local origins = user_origins_from_tuple(tuple)
+    return origins[origin] ~= nil
 end
 
 box.schema.role.create = function(name, opts)
     utils.box_check_configured(2)
     opts = opts or {}
-    check_param_table(opts, { if_not_exists = 'boolean' }, 2)
+    check_param_table(opts, { if_not_exists = 'boolean', _origin = 'string' }, 2)
     local uid = user_or_role_resolve(name)
+    local origin = opts._origin or DEFAULT_ORIGIN
+    local _user = box.space[box.schema.USER_ID]
     if uid then
-        if not opts.if_not_exists then
-            box.error(box.error.ROLE_EXISTS, name, 2)
+        local tuple = _user:get{uid}
+        local origins = user_origins_from_tuple(tuple)
+
+        -- If the role already has the given origin,
+        -- then respect if_not_exists option.
+        if origins[origin] ~= nil then
+            if not opts.if_not_exists then
+                box.error(box.error.ROLE_EXISTS, name, 2)
+            end
+        else
+            -- Role exists, but without this origin.
+            -- Extend the origin map instead of erroring.
+            user_add_origin(uid, origin)
         end
         return
     end
-    local _user = box.space[box.schema.USER_ID]
+    local opts_field = user_opts_from_origins({[origin] = true})
     call_at(2, _user.auto_increment, _user,
             {session.euid(), name, 'role', setmap({}), {},
-             math.floor(fiber.time())})
+             math.floor(fiber.time()), opts_field})
 end
 
 box.schema.role.drop = atomic_wrapper(function(name, opts)
     opts = opts or {}
-    check_param_table(opts, { if_exists = 'boolean' }, 2)
+    check_param_table(opts, { if_exists = 'boolean', _origin = 'string' }, 2)
     local uid = role_resolve(name)
     if uid == nil then
         if not opts.if_exists then
@@ -4098,7 +4263,7 @@ box.schema.role.drop = atomic_wrapper(function(name, opts)
         box.error(box.error.DROP_USER, name,
                   "the user or the role is a system", 2)
     end
-    return drop(uid, 1)
+    return drop(uid, 1, opts)
 end)
 
 local function role_check_grant_revoke_of_sys_priv(level, priv)

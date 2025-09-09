@@ -429,12 +429,6 @@ g.test_set_password = function()
 end
 
 g.test_remove_user_role = function(g)
-    -- Verify that when user or role is removed from the config,
-    -- it is not being deleted.
-
-    -- Whole removed user/role configuration is expected to be left
-    -- as is after the reload, so verification functions for before/after
-    -- reload are the same.
     local verify = function()
         local ok, err = pcall(box.schema.user.info, 'myuser')
         t.assert(ok, err)
@@ -452,6 +446,21 @@ g.test_remove_user_role = function(g)
         local role_perm = internal.privileges_from_box('myrole')
         t.assert(role_perm['universe'][''].read)
         t.assert(role_perm['universe'][''].write)
+    end
+
+    -- Since gh-11828 users and roles defined in `credentials`
+    -- are now synchronized with the config. If removed from config,
+    -- they are also dropped from box.
+    local verify_2 = function()
+        local ok, err = pcall(box.schema.user.info, 'myuser')
+        t.assert_not(ok, err)
+        ok, err = pcall(box.schema.role.info, 'myrole')
+        t.assert_not(ok, err)
+        local internal =
+                require('internal.config.applier.credentials')._internal
+
+        local guest_perm = internal.privileges_from_box('guest')
+        t.assert(guest_perm['role']['super'].execute)
     end
 
     helpers.reload_success_case(g, {
@@ -493,7 +502,11 @@ g.test_remove_user_role = function(g)
                 }
             }
         },
-        verify_2 = verify,
+        -- Before gh-11827, removing a user or role from the config
+        -- did NOT delete it from box, and this test verified that.
+        -- After gh-11827 the behavior changed: users/roles are now
+        -- dropped on reload, so the test was updated accordingly.
+        verify_2 = verify_2,
     })
 end
 
@@ -1517,7 +1530,11 @@ g.test_set_user_instead_of_role = function(g)
     -- Verify that the alert is still present after creating user 'role_two'
     -- instead of role 'role_two'.
     cluster['i-001']:exec(function()
-        box.schema.user.create('role_two')
+        -- Note: we add `_origin = 'config'` when creating/dropping the
+        -- user here, so that it is tracked as coming from config. Without
+        -- this, we would get an additional "orphan user" alert introduced
+        -- in gh-11827.
+        box.schema.user.create('role_two', {_origin = 'config'})
         local info = require('config'):info()
         local exp = 'box.schema.user.grant("user_one", "execute", "role", ' ..
             '"role_two") has failed because either the object has not been ' ..
@@ -1531,8 +1548,8 @@ g.test_set_user_instead_of_role = function(g)
 
     -- Verify that the alert is dropped after 'role_two' is created.
     cluster['i-001']:exec(function()
-        box.schema.user.drop('role_two')
-        box.schema.role.create('role_two')
+        box.schema.user.drop('role_two', {_origin = 'config'})
+        box.schema.role.create('role_two', {_origin = 'config'})
         local info = require('config'):info()
         t.assert_equals(info.status, 'ready')
         t.assert_equals(#info.alerts, 0)
