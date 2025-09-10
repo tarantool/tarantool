@@ -4,10 +4,6 @@
 /.github/    @tarantool/devx
 /.test.mk    @tarantool/devx
 /test-run/   @tarantool/devx
-# Alexander Turenko wants to track all the activities around the
-# declarative configuration.
-/src/box/lua/config/  @Totktonada
-/test/config-luatest/ @Totktonada
 # Sergey Bronnikov wants to track all the activities around the
 # fuzzing tests.
 /test/fuzz/ @ligurio
