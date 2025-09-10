@@ -1116,6 +1116,7 @@ static int
 netbox_transport_connect(struct netbox_transport *transport)
 {
 	struct error *e;
+	va_list ap;
 	struct iostream *io = &transport->io;
 	assert(!iostream_is_initialized(io));
 	ev_tstamp start, delay;
@@ -1155,7 +1156,8 @@ netbox_transport_connect(struct netbox_transport *transport)
 io_error:
 	assert(!diag_is_empty(diag_get()));
 	e = diag_last_error(diag_get());
-	box_error_raise(ER_NO_CONNECTION, "%s", e->errmsg);
+	diag_add(ClientError, ER_NO_CONNECTION);
+	error_vformat_msg(diag_last_error(diag_get()), e->errmsg, ap);
 error:
 	if (iostream_is_initialized(io))
 		iostream_close(io);
@@ -2632,7 +2634,7 @@ netbox_transport_on_state_change(struct netbox_transport *transport,
 	lua_pushliteral(L, "state_changed");
 	lua_pushstring(L, netbox_state_str[state]);
 	if (error != NULL)
-		lua_pushstring(L, error->errmsg);
+		luaT_pusherror(L, error);
 	lua_call(L, error != NULL ? 3 : 2, 0);
 }
 
