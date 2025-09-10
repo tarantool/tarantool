@@ -90,6 +90,15 @@ int
 memtx_space_replace_all_keys(struct space *, struct tuple *, struct tuple *,
 			     enum dup_replace_mode, struct tuple **);
 
+/**
+ * Execute IPROTO_INSERT request during recovery from snapshot.
+ *
+ * Transactional context is not required.
+ */
+int
+memtx_space_recovery_execute_insert(struct space *space,
+				    struct request *request);
+
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list);

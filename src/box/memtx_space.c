@@ -142,16 +142,14 @@ memtx_space_replace_no_keys(struct space *space, struct tuple *old_tuple,
 }
 
 /**
- * A short-cut version of replace() used during bulk load
- * from snapshot.
+ * Add tuple to space in MEMTX_INITIAL_RECOVERY state, when primary
+ * index is populated using build.
  */
-int
-memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
-			       struct tuple *new_tuple,
-			       enum dup_replace_mode mode,
-			       struct tuple **result)
+static int
+memtx_space_build_next(struct space *space, struct tuple *tuple)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	assert(memtx->state == MEMTX_INITIAL_RECOVERY);
 	if (memtx->recovery.last_space_id != space->def->id) {
 		/* Build PK and possibly SKs of the previous space. */
 		if (memtx->recovery.last_space_id != BOX_ID_NIL &&
@@ -172,16 +170,33 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 		memtx->recovery.last_space_id = space->def->id;
 	}
 
-	assert(old_tuple == NULL);
-	/*
-	 * If before_replace trigger changes tuple, the request is updated
-	 * and request type is changed to REPLACE, so we can meet
-	 * DUP_REPLACE_OR_INSERT here.
-	 */
-	assert(mode == DUP_INSERT || mode == DUP_REPLACE_OR_INSERT);
+	/* Deal with the MemTX sort data if enabled. */
+	if (memtx->recovery.sort_data_reader != NULL &&
+	    memtx_sort_data_reader_pk_add_tuple(
+			memtx->recovery.sort_data_reader, tuple) != 0)
+		return -1;
+
+	/* Add the tuple to the PK to be built. */
+	if (index_build_next(space->index[0], tuple) != 0)
+		return -1;
+	memtx_space_update_tuple_stat(space, NULL, tuple);
+	tuple_ref(tuple);
+	return 0;
+}
+
+/**
+ * A short-cut version of replace() used during bulk load
+ * from snapshot.
+ */
+int
+memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
+			       struct tuple *new_tuple,
+			       enum dup_replace_mode mode,
+			       struct tuple **result)
+{
 	(void)mode;
 	*result = NULL;
-	if (old_tuple) {
+	if (old_tuple != NULL) {
 		/*
 		 * Called from txn_rollback() In practice
 		 * is impossible: all possible checks for tuple
@@ -191,19 +206,7 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 		panic("Failed to commit transaction when loading "
 		      "from snapshot");
 	}
-
-	/* Deal with the MemTX sort data if enabled. */
-	if (memtx->recovery.sort_data_reader != NULL &&
-	    memtx_sort_data_reader_pk_add_tuple(
-			memtx->recovery.sort_data_reader, new_tuple) != 0)
-		return -1;
-
-	/* Add the tuple to the PK to be built. */
-	if (index_build_next(space->index[0], new_tuple) != 0)
-		return -1;
-	memtx_space_update_tuple_stat(space, NULL, new_tuple);
-	tuple_ref(new_tuple);
-	return 0;
+	return memtx_space_build_next(space, new_tuple);
 }
 
 /**
@@ -441,6 +444,69 @@ finish:
 	if (was_referenced)
 		tuple_unref(new_tuple);
 	return rc;
+}
+
+/**
+ * Add tuple to space during recovery in MEMTX_OK state, when all indexes
+ * are built.
+ */
+static int
+memtx_space_recovery_insert(struct space *space, struct tuple *tuple)
+{
+	struct index *pk = index_find(space, 0);
+	assert(pk != NULL);
+	struct tuple *successor;
+	struct tuple *old_tuple;
+	if (index_replace(pk, /*old_tuple=*/NULL, tuple, DUP_INSERT,
+			  &old_tuple, &successor) != 0)
+		return -1;
+	assert(old_tuple == NULL);
+	for (uint32_t i = 1; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		if (index_replace(index, /*old_tuple=*/NULL, tuple,
+				  DUP_INSERT, &old_tuple, &successor) != 0)
+			return -1;
+		assert(old_tuple == NULL);
+	}
+	assert(old_tuple == NULL);
+	memtx_space_update_tuple_stat(space, /*old_tuple=*/NULL, tuple);
+	tuple_ref(tuple);
+	return 0;
+}
+
+int
+memtx_space_recovery_execute_insert(struct space *space,
+				    struct request *request)
+{
+	struct tuple *tuple =
+		space->format->vtab.tuple_new(space->format, request->tuple,
+					      request->tuple_end);
+	if (tuple == NULL)
+		return -1;
+	if (space->format->is_compressed) {
+		struct tuple *compressed_tuple = memtx_tuple_compress(tuple);
+		if (compressed_tuple == NULL)
+			goto error;
+		tuple_delete(tuple);
+		tuple = compressed_tuple;
+	}
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
+	switch (memtx->state) {
+	case MEMTX_INITIAL_RECOVERY:
+		if (memtx_space_build_next(space, tuple) != 0)
+			goto error;
+		break;
+	case MEMTX_OK:
+		if (memtx_space_recovery_insert(space, tuple) != 0)
+			goto error;
+		break;
+	default:
+		unreachable();
+	}
+	return 0;
+error:
+	tuple_delete(tuple);
+	return -1;
 }
 
 static int

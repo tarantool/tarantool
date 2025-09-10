@@ -1545,6 +1545,12 @@ space_events_enable(bool value)
 	space_events_enabled = value;
 }
 
+bool
+space_events_are_enabled(void)
+{
+	return space_events_enabled;
+}
+
 /* {{{ Virtual method stubs */
 
 size_t
