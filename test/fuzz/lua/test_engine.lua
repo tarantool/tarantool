@@ -126,7 +126,6 @@ local err_pat_whitelist = {
     "fiber is cancelled",
     "fiber slice is exceeded",
     "Can not perform index build in a multi%-statement transaction",
-    "Index '[%w_]+' %(HASH%) of space '[%w_]+' %(memtx%) does not support pagination",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': primary key must be unique",
     "Can't create or modify index '[%w_]+' in space '[%w_]+': hint is only reasonable with memtx tree index",
     "Get%(%) doesn't support partial keys and non%-unique indexes",
@@ -141,7 +140,6 @@ local err_pat_whitelist = {
     "Failed to write to disk",
     "WAL has a rollback in progress",
     -- MEMCS-specific errors.
-    "Index '[%w_]+' %(TREE%) of space '[%w_]+' %(memcs%) does not support pagination",
     "Arrow stream does not support field type '[%w_]+'",
     "box_insert_arrow: field [%d]+ has unsupported type",
     "Engine 'memcs' does not support variable field count",
@@ -476,6 +474,7 @@ local tarantool_indices = {
         is_non_unique_support = false,
         is_primary_key_support = true,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     BITSET = {
         iterator_type = {
@@ -498,6 +497,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = false,
+        is_pagination_support = false,
     },
     TREE = {
         iterator_type = {
@@ -530,6 +530,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = true,
         is_partial_search_support = true,
+        is_pagination_support = true,
     },
     RTREE = {
         iterator_type = {
@@ -553,6 +554,7 @@ local tarantool_indices = {
         is_non_unique_support = true,
         is_primary_key_support = false,
         is_partial_search_support = true,
+        is_pagination_support = false,
     },
 }
 
@@ -567,8 +569,8 @@ local isolation_levels = {
     'read-confirmed',
 }
 
-local function select_op(space, idx_type, key)
-    local select_opts = {
+local function select_opts(idx_type)
+    local opts = {
         iterator = oneof(tarantool_indices[idx_type].iterator_type),
         -- The maximum number of tuples.
         limit = math.random(100, 500),
@@ -579,9 +581,14 @@ local function select_op(space, idx_type, key)
         after = box.NULL,
         -- If true, the select method returns the position of
         -- the last selected tuple as the second value.
-        fetch_pos = oneof({true, false}),
+        fetch_pos = false,
     }
-    space:select(key, select_opts)
+    return opts
+end
+
+local function select_op(space, idx_type, key)
+    local opts = select_opts(idx_type)
+    space:select(key, opts)
 end
 
 local function get_op(space, key)
@@ -628,6 +635,26 @@ end
 
 local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
+end
+
+local function gen_multikey_index_part(space_format, is_nullable_support)
+    local possible_fields = fun.iter(space_format):filter(
+        function(x)
+            return x.type == 'array'
+        end):totable()
+    local field_no = math.random(1, table.getn(possible_fields))
+    local field = possible_fields[field_no]
+    local is_nullable = oneof({is_nullable_support, false})
+    local exclude_null = oneof({false, is_nullable})
+    -- All the arrays have unsigned values now, so the type
+    -- is fixed here. Also, note that arrays never contain
+    -- null values currently, but let's create nullable indexes
+    -- anyway.
+    local part = {
+        field.name, path = '[*]', type = 'unsigned',
+        is_nullable = is_nullable, exclude_null = exclude_null,
+    }
+    return part
 end
 
 local function setup(engine_name, space_id_func, test_dir, verbose)
@@ -750,6 +777,11 @@ local function index_opts(space, is_primary)
                   true or
                   tarantool_indices[opts.type].is_unique_support
 
+    local is_multikey = false
+    if not is_primary and opts.type == 'TREE' and space.engine ~= 'memcs' then
+        is_multikey = oneof({true, false})
+    end
+
     -- 'hint' is only reasonable with memtx tree index.
     if space.engine == 'memtx' and
        opts.type == 'TREE' then
@@ -762,7 +794,7 @@ local function index_opts(space, is_primary)
     end
 
     opts.parts = {}
-    local space_format = space:format()
+    local space_format = space.format_object:totable()
     local idx = opts.type
     local possible_fields = fun.iter(space_format):filter(
         function(x)
@@ -801,7 +833,12 @@ local function index_opts(space, is_primary)
             break
         end
     end
-
+    if is_multikey then
+        -- Overwrite one of the fields with a multikey one.
+        local mk_field_no = math.random(1, #opts.parts)
+        opts.parts[mk_field_no] = gen_multikey_index_part(
+            space.format_object:totable(), is_nullable_support)
+    end
     return opts
 end
 
@@ -879,7 +916,21 @@ end
 local function index_select_op(_space, idx, key)
     assert(idx)
     assert(key)
-    idx:select(key)
+    local opts = select_opts(idx.type)
+    idx:select(key, opts)
+end
+
+local function index_pagination_op(_space, idx, key, start_pos)
+    assert(idx)
+    assert(key)
+    local opts = select_opts(idx.type)
+    opts.fetch_pos = true
+    opts.after = start_pos
+    local _, pos = idx:select(key, opts)
+    if pos ~= nil then
+        opts.after = pos
+        idx:select(key, opts)
+    end
 end
 
 local function index_count_op(_, idx)
@@ -981,7 +1032,7 @@ end
 --    apply to.
 --  - value (lua_value) – what value will be applied.
 local function random_tuple_operations(space)
-    local space_format = space:format()
+    local space_format = space.format_object:totable()
     local num_fields = math.random(table.getn(space_format))
     local tuple_ops = {}
     local id = unique_ids(num_fields)
@@ -1012,7 +1063,7 @@ end
 -- they are not ordered and may be repeated.
 -- NB: indexes are zero-based.
 local function random_space_field_ids(space)
-    local format_size = #space:format()
+    local format_size = #space.format_object:totable()
     local fields = {}
     local fields_num_max = format_size * 2
     local fields_num = math.random(fields_num_max)
@@ -1059,7 +1110,7 @@ end
 -- {{field_name1, {<values>}}, {field_name2, {<values>}}, ...}.
 -- Fields are not repeated, nullable ones can be skipped.
 local function random_batch(space)
-    local format_size = #space:format()
+    local format_size = #space.format_object:totable()
     local batch = {}
     -- Randomly choose between small and big batch
     local max_batch_size = oneof({10, 100})
@@ -1067,7 +1118,7 @@ local function random_batch(space)
     local id = unique_ids(format_size)
     for _ = 1, format_size do
         local i = id()
-        local field = space:format()[i]
+        local field = space.format_object:totable()[i]
         local values = {}
         -- Skip the field only if it is nullable.
         local skip_field = oneof({false, field.is_nullable})
@@ -1104,7 +1155,9 @@ local ops = {
     },
     INSERT_OP = {
         func = insert_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     SELECT_OP = {
         func = select_op,
@@ -1119,11 +1172,15 @@ local ops = {
     },
     PUT_OP = {
         func = put_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     REPLACE_OP = {
         func = replace_op,
-        args = function(space) return random_tuple(space:format()) end,
+        args = function(space)
+            return random_tuple(space.format_object:totable())
+        end,
     },
     UPDATE_OP = {
         func = update_op,
@@ -1135,7 +1192,7 @@ local ops = {
     UPSERT_OP = {
         func = upsert_op,
         args = function(space)
-            return random_tuple(space:format()), random_tuple_operations(space)
+            return random_tuple(space.format_object:totable())
         end,
         engines = {'memtx', 'vinyl'},
     },
@@ -1197,6 +1254,16 @@ local ops = {
             local idx_n = oneof(keys(space.index))
             local idx = space.index[idx_n]
             return idx, random_key(space, idx)
+        end,
+    },
+    INDEX_PAGINATION_OP = {
+        func = index_pagination_op,
+        args = function(space)
+            local idx_n = oneof(keys(space.index))
+            local idx = space.index[idx_n]
+            local start_pos =
+                oneof({box.NULL, random_tuple(space.format_object:totable())})
+            return idx, random_key(space, idx), start_pos
         end,
     },
     INDEX_MIN_OP = {
@@ -1765,7 +1832,10 @@ local function run_test(num_workers, test_duration, test_dir,
     local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
     local deadline = os.clock() + test_duration
 
-    local test_gen = fun.cycle(fun.iter(keys(ops)))
+    local op_keys = keys(ops)
+    local test_gen = fun.rands(1, table.getn(op_keys) + 1):map(function(x)
+        return op_keys[x]
+    end)
     local f
     for id = 1, num_workers do
         f = fiber.new(worker_func, id, space, test_gen, deadline)
