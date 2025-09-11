@@ -851,6 +851,12 @@ include (cmake/rpm.cmake)
 
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
+if(ENABLE_FUZZER)
+  add_compile_flags("C;CXX"
+    "-fsanitize=fuzzer-no-link"
+  )
+endif()
+
 add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(proofs/tla/test)
