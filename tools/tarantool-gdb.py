@@ -1552,7 +1552,7 @@ class ListLut(object):
         if not hasattr(cls, '_containers_map'):
             cls._containers_map = cls.__build_containers_map(cls._containers)
 
-    __symbol_re = re.compile('(\w+)(?:\s*\+\s*(\d+))?')
+    __symbol_re = re.compile(r'(\w+)(?:\s*\+\s*(\d+))?')
 
     @classmethod
     def lookup_entry_info(cls, address):
@@ -2573,16 +2573,14 @@ def fiber():
 
 
 class Cord(object):
-    __main_cord_fibers = gdb.parse_and_eval('main_cord.alive')
-    __list_entry_info = RlistLut.lookup_entry_info(__main_cord_fibers.address)
-
     def __init__(self):
         self.__cord_ptr = cord()
 
     def fibers(self):
         fibers = self.__cord_ptr['alive']
         fibers = Rlist(fibers.address)
-        fibers = map(lambda x: self.__class__.__list_entry_info.container_from_field(x), fibers)
+        list_entry_info = RlistLut.lookup_entry_info_by_container(ContainerFieldInfo("cord::alive"))
+        fibers = map(lambda x: list_entry_info.container_from_field(x), fibers)
         return itertools.chain(fibers, [self.__cord_ptr['sched'].address])
 
     def fiber(self, fid):
