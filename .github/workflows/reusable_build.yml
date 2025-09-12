@@ -16,7 +16,7 @@ on:
         type: string
       dist:
         description: 'The version of the OS'
-        default: focal
+        default: noble
         required: false
         type: string
       submodule:
@@ -34,7 +34,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       OS: ${{ inputs.os }}
