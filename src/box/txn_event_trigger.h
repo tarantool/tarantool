@@ -99,6 +99,10 @@ txn_event_on_rollback_to_svp_run_triggers(struct txn *txn,
 void
 txn_events_enable(bool value);
 
+/** Whether txn events are enabled. */
+bool
+txn_events_are_enabled(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

@@ -817,6 +817,41 @@ memtx_space_ephemeral_rowid_next(struct space *space, uint64_t *rowid)
 	return 0;
 }
 
+int
+memtx_space_recover_snapshot_row(struct space *space, struct request *request)
+{
+	assert(request->type == IPROTO_INSERT);
+	int rc = -1;
+	struct tuple *new_tuple =
+		space->format->vtab.tuple_new(space->format, request->tuple,
+					      request->tuple_end);
+	if (new_tuple == NULL) {
+		error_set_space(diag_last_error(diag_get()), space->def);
+		return -1;
+	}
+	tuple_ref(new_tuple);
+	struct tuple *new_index_tuple = memtx_space_prepare_index_tuple(
+						space->format, new_tuple);
+	if (new_index_tuple == NULL)
+		goto out;
+	tuple_ref(new_index_tuple);
+	struct tuple *old_index_tuple;
+	if (memtx_space_replace_build_next(space, /*old_tuple=*/NULL,
+					   new_index_tuple, DUP_INSERT,
+					   &old_index_tuple) != 0)
+		goto out;
+	assert(old_index_tuple == NULL);
+	if (space->upgrade != NULL)
+		memtx_space_upgrade_track_tuple(space->upgrade,
+						new_index_tuple);
+	rc = 0;
+out:
+	tuple_unref(new_tuple);
+	if (new_index_tuple != NULL)
+		tuple_unref(new_index_tuple);
+	return rc;
+}
+
 /* }}} DML */
 
 /* {{{ DDL */

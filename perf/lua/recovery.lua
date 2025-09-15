@@ -13,8 +13,10 @@ local HELP = [[
    wal_replace_count <number, 0> - the amount of replaced tuples in the WAL
    column_count <number, 1>      - the amount of fields in a single tuple
    memtx_sort_threads            - the amount of threads used for MemTX key sort
-   memtx_sort_data <boolean>     - enable the MemTX sort data
+   memtx_sort_data <boolean, false>
+                                 - enable the MemTX sort data
    recovery_count <number, 1>    - the amount of recoveries to perform
+   preload_script <string, ''>   - script string executed before recovery
    help (same as -h)             - print this message
 ]]
 
@@ -30,6 +32,7 @@ local parsed_params = {
     {'memtx_sort_threads', 'number'},
     {'memtx_sort_data', 'boolean'},
     {'recovery_count', 'number'},
+    {'preload_script', 'string'},
 }
 
 local params = benchmark.argparse(arg, parsed_params, HELP)
@@ -75,6 +78,9 @@ params.memtx_sort_threads = params.memtx_sort_threads or nil
 -- Whether to enable the MemTX sort data or not.
 params.memtx_sort_data = params.memtx_sort_data or false
 
+-- Script executed before preload.
+params.preload_script = params.preload_script or ''
+
 local WORK_DIR = string.format('recovery,engine=%s,index=%s,nohint=%s,' ..
                                'sk_count=%d,column_count=%d,row_count=%d,' ..
                                'wal_row_count=%d,wal_replace_count=%d',
@@ -96,7 +102,7 @@ local script = string.format([[
     params.wal_replace_count)
 
 local function run_tarantool()
-    local cmd = {arg[-1], '-e', script}
+    local cmd = {arg[-1], '-e', params.preload_script, '-e', script}
     local std_redirect = {
         stdin = popen.opts.PIPE,
         stdout = popen.opts.PIPE,
