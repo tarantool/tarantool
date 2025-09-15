@@ -851,9 +851,15 @@ include (cmake/rpm.cmake)
 
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
 
+option(ENABLE_CBMC_PROOFS "Enable building CBMC proofs" OFF)
+
 add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(proofs/tla/test)
+if (ENABLE_CBMC_PROOFS)
+    add_subdirectory(proofs/cbmc)
+endif ()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(AUTHOR_WARNING "Benchmarks are available only in release build")
 else ()
