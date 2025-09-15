@@ -90,6 +90,14 @@ int
 memtx_space_replace_all_keys(struct space *, struct tuple *, struct tuple *,
 			     enum dup_replace_mode, struct tuple **);
 
+/**
+ * Recover snapshot row.
+ *
+ * Does not support force recovery.
+ */
+int
+memtx_space_recover_snapshot_row(struct space *space, struct request *request);
+
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list);

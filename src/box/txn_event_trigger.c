@@ -402,3 +402,9 @@ txn_events_enable(bool value)
 {
 	txn_events_enabled = value;
 }
+
+bool
+txn_events_are_enabled(void)
+{
+	return txn_events_enabled;
+}

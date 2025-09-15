@@ -770,6 +770,10 @@ space_cleanup_constraints(struct space *space);
 void
 space_events_enable(bool value);
 
+/** Whether space events are enabled. */
+bool
+space_events_are_enabled(void);
+
 /*
  * Virtual method stubs.
  */

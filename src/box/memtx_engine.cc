@@ -394,7 +394,8 @@ enum snapshot_recovery_state {
  * @retval 0 success
  */
 static int
-memtx_engine_recover_snapshot_row(struct xrow_header *row,
+memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
+				  struct xrow_header *row,
 				  enum snapshot_recovery_state *state);
 
 int
@@ -456,7 +457,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
-		rc = memtx_engine_recover_snapshot_row(&row, &state);
+		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
 		if (state == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
@@ -552,7 +553,8 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 }
 
 static int
-memtx_engine_recover_snapshot_row(struct xrow_header *row,
+memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
+				  struct xrow_header *row,
 				  enum snapshot_recovery_state *state)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
@@ -582,28 +584,45 @@ memtx_engine_recover_snapshot_row(struct xrow_header *row,
 		diag_set(ClientError, ER_ALIEN_ENGINE, space->engine->name);
 		goto log_request;
 	}
-	struct txn *txn;
-	txn = txn_begin();
-	if (txn == NULL)
-		goto log_request;
-	if (txn_begin_stmt(txn, space, request.type) != 0)
-		goto rollback;
-	/* no access checks here - applier always works with admin privs */
 	struct tuple *unused;
-	if (space_execute_dml(space, txn, &request, &unused) != 0)
-		goto rollback_stmt;
-	if (txn_commit_stmt(txn, &request) != 0)
-		goto rollback;
 	/*
-	 * Snapshot rows are confirmed by definition. They don't need to go to
-	 * the synchronous transactions limbo.
+	 * We use transaction in case of force recovery merely to
+	 * simplify the code.
 	 */
-	txn_set_flags(txn, TXN_FORCE_ASYNC);
-	return txn_commit(txn);
+	if (*state < DONE_RECOVERING_SYSTEM_SPACES ||
+	    space_events_are_enabled() || txn_events_are_enabled() ||
+	    memtx->force_recovery) {
+		if (*state == DONE_RECOVERING_SYSTEM_SPACES &&
+		    !memtx->force_recovery)
+			say_warn_once(
+				"snapshot recovery performance is better with"
+				" new value of"
+				" compat.box_recovery_triggers_deprecation");
+		struct txn *txn = txn_begin();
+		if (txn == NULL)
+			goto log_request;
+		if (txn_begin_stmt(txn, space, request.type) != 0)
+			goto rollback;
+		if (space_execute_dml(space, txn, &request, &unused) != 0)
+			goto rollback_stmt;
+		if (txn_commit_stmt(txn, &request) != 0)
+			goto rollback;
+		/*
+		 * Snapshot rows are confirmed by definition. They don't need
+		 * to go to the synchronous transactions limbo.
+		 */
+		txn_set_flags(txn, TXN_FORCE_ASYNC);
+		return txn_commit(txn);
 rollback_stmt:
-	txn_rollback_stmt(txn);
+		txn_rollback_stmt(txn);
 rollback:
-	txn_abort(txn);
+		txn_abort(txn);
+		goto log_request;
+	} else {
+		if (memtx_space_recover_snapshot_row(space, &request) != 0)
+			goto log_request;
+		return 0;
+	}
 log_request:
 	say_error("error at request: %s", request_str(&request));
 	return -1;
@@ -910,7 +929,7 @@ memtx_engine_bootstrap(struct engine *engine)
 	struct xrow_header row;
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = memtx_engine_recover_snapshot_row(&row, &state);
+		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
 		if (rc < 0)
 			break;
 	}
