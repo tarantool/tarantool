@@ -1182,7 +1182,11 @@ int
 txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			double timeout)
 {
-	assert(!txn_limbo_is_empty(limbo));
+	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
+	if (tle == NULL) {
+		*is_rollback = false;
+		return 0;
+	}
 
 	/* initialization of a waitpoint. */
 	struct confirm_waitpoint cwp;
@@ -1195,7 +1199,6 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 	trigger_create(&on_complete, txn_commit_cb, &cwp, NULL);
 	struct trigger on_rollback;
 	trigger_create(&on_rollback, txn_rollback_cb, &cwp, NULL);
-	struct txn_limbo_entry *tle = txn_limbo_last_synchro_entry(limbo);
 	txn_on_commit(tle->txn, &on_complete);
 	txn_on_rollback(tle->txn, &on_rollback);
 	double deadline = fiber_clock() + timeout;

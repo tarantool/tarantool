@@ -3119,10 +3119,7 @@ box_wait_linearization_point(double timeout)
 	 */
 	bool is_rollback;
 	timeout = deadline - ev_monotonic_now(loop());
-	if (!txn_limbo_is_empty(&txn_limbo) &&
-	    txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout) != 0)
-		return -1;
-	return 0;
+	return txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout);
 }
 
 /**
