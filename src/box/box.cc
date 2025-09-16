@@ -475,12 +475,6 @@ box_ro_reason(void)
 }
 
 int
-box_check_slice_slow(void)
-{
-	return fiber_check_slice();
-}
-
-int
 box_check_writable(void)
 {
 	if (!is_ro_summary)
