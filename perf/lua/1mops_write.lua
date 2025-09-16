@@ -169,7 +169,7 @@ print(string.format([[
 
 box.cfg{
     log_level = 0,
-    listen = 0,
+    listen = '127.0.0.1:0',
     read_only = false,
     memtx_memory = 2*1024*1024*1024,
     work_dir = test_dir,
