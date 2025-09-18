@@ -46,7 +46,7 @@ void
 uri_set_destroy(struct uri_set *uri_set);
 
 int
-uri_format(char *str, size_t len, struct uri *uri, bool write_password);
+uri_format(char *str, size_t len, struct uri *uri, bool write_sensitive);
 
 size_t
 uri_escape(const char *src, size_t src_size, char *dst,
@@ -210,18 +210,28 @@ local function fill_uribuf_params(uribuf, uri)
     uribuf.params = ffi.new("struct uri_param[?]", uribuf.param_count)
     local i = 0
     for param_name, param in pairs(uri.params) do
-        uribuf.params[i].value_count = #param
+        if type(param) == "table" then
+            uribuf.params[i].value_count = #param
+        elseif param == nil then
+            uribuf.params[i].value_count = 0
+        else
+            uribuf.params[i].value_count = 1
+        end
         uribuf.params[i].name = param_name
         uribuf.params[i].values =
             ffi.new("const char *[?]", uribuf.params[i].value_count)
-        for j = 1, uribuf.params[i].value_count do
-            uribuf.params[i].values[j - 1] = param[j]
+        if type(param) == "table" then
+            for j = 1, uribuf.params[i].value_count do
+                uribuf.params[i].values[j - 1] = param[j]
+            end
+        else
+            uribuf.params[i].values[0] = param
         end
         i = i + 1
     end
 end
 
-local function format(uri, write_password)
+local function format(uri, write_sensitive)
     local uribuf = uri_stash_take()
     uribuf.scheme = uri.scheme
     uribuf.login = uri.login
@@ -244,7 +254,8 @@ local function format(uri, write_password)
     fill_uribuf_params(uribuf, uri)
     local ibuf = cord_ibuf_take()
     local str = ibuf:alloc(1024)
-    local len = builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)
+    local len = builtin.uri_format(str, 1024, uribuf,
+                                   write_sensitive and 1 or 0)
     uri_stash_put(uribuf)
     str = ffi.string(str, len)
     cord_ibuf_put(ibuf)
