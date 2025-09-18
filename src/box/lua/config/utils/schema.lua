@@ -1264,16 +1264,55 @@ end
 
 -- {{{ <schema object>:map()
 
+local function map_schemaless(old, f, ctx)
+    ctx.schemaless_visited = ctx.schemaless_visited or {}
+    -- `visited` (new -> res) prevents infinite recursion on cycles
+    -- (e.g. YAML anchors) and keeps aliases as the same table, not copies.
+    local visited = ctx.schemaless_visited
+
+    local w = {
+        path = table.copy(ctx.path),
+        error = walkthrough_error_capture(ctx),
+    }
+
+    local new = f(old, w, ctx.f_ctx)
+    if new == nil or type(new) ~= 'table' then
+        return new
+    end
+
+    if visited[new] ~= nil then
+        return visited[new]
+    end
+
+    local res = {}
+    visited[new] = res
+
+    for k, v in pairs(new) do
+        walkthrough_enter(ctx, k)
+        local new_key = map_schemaless(k, f, ctx)
+        local new_value = map_schemaless(v, f, ctx)
+        res[new_key] = new_value
+        walkthrough_leave(ctx)
+    end
+
+    return res
+end
+
 local function map_impl(schema, data, f, ctx)
-    -- Call the user-provided transformation function.
-    --
-    -- It is called on a current node before its descandants,
-    -- implementing the pre-order traversal.
+    if is_scalar(schema) and schema.type == 'any' then
+        return map_schemaless(data, f, ctx)
+    end
+
     local w = {
         schema = schema,
         path = table.copy(ctx.path),
         error = walkthrough_error_capture(ctx),
     }
+
+    -- Call the user-provided transformation function.
+    --
+    -- It is called on a current node before its descandants,
+    -- implementing the pre-order traversal.
     data = f(data, w, ctx.f_ctx)
 
     if is_scalar(schema) then
@@ -1433,6 +1472,10 @@ local function apply_default_f(data, w)
     --
     -- box.NULL is assumed as a missed value.
     if data ~= nil then
+        return data
+    end
+
+    if w.schema == nil then
         return data
     end
 

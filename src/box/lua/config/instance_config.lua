@@ -188,8 +188,7 @@ local function instance_uri(self, iconfig, advertise_type, opts)
 end
 
 local function apply_vars_f(data, w, vars)
-    if w.schema.type == 'string' and data ~= nil then
-        assert(type(data) == 'string')
+    if data ~= nil and type(data) == 'string' then
         return (data:gsub('{{ *(.-) *}}', function(var_name)
             if vars[var_name] ~= nil then
                 return vars[var_name]
