@@ -1,5 +1,6 @@
 local ffi = require('ffi')
 local fun = require('fun')
+local yaml = require('yaml')
 local schema = require('experimental.config.utils.schema')
 local t = require('luatest')
 
@@ -2293,23 +2294,29 @@ end
 
 -- A simple function to pass into <schema object>:map().
 --
--- It substitutes ${x} patterns in string values with given
--- variables.
+-- It substitutes ${x} or {{ x }} patterns in string values
+-- with the given variables.
 local function apply_vars(data, w, vars)
-    if w.schema.no_transform then
+    if data == nil or type(data) ~= 'string' then
         return data
     end
 
-    if w.schema.type == 'string' and data ~= nil then
-        assert(type(data) ~= nil)
-        return (data:gsub('%${(.-)}', function(var_name)
-            if vars[var_name] ~= nil then
-                return vars[var_name]
-            end
-            w.error(('Unknown variable %q'):format(var_name))
-        end))
+    local schema = w and w.schema or nil
+    if schema and (schema.no_transform or schema.type ~= 'string') then
+        return data
     end
-    return data
+
+    local function lookup(var_name)
+        if vars[var_name] ~= nil then
+            return vars[var_name]
+        end
+        w.error(('Unknown variable %q'):format(var_name))
+    end
+
+    local out = data:gsub('%${%s*(.-)%s*}', lookup)
+        :gsub('{{%s*(.-)%s*}}', lookup)
+
+    return out
 end
 
 -- Another function to pass into <schema object>:map().
@@ -2678,6 +2685,116 @@ g.test_map_map_itself = function()
         bar = 'bar',
         baz = 'baz',
     })
+end
+
+g.test_map_any_traverses_tables = function()
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+
+    local vars = {
+        foo = 'bar',
+        instance_name = 'instance-001',
+    }
+
+    local data = {
+        plain = '{{ foo }}',
+        nested = {
+            value = '{{ foo }}',
+            deeper = {'{{ foo }}', 42, box.NULL},
+        },
+        list = {1, '{{ foo }}', {['{{ instance_name }}'] = '{{ foo }}'}},
+        map_with_key = {
+            ['{{ instance_name }}'] = '{{ foo }}',
+        },
+        flag = true,
+    }
+
+    local res = s:map(data, apply_vars, vars)
+
+    t.assert_equals(res.plain, 'bar')
+    t.assert_equals(res.nested.value, 'bar')
+    t.assert_equals(res.nested.deeper[1], 'bar')
+    t.assert_equals(res.nested.deeper[2], 42)
+    t.assert_equals(res.nested.deeper[3], box.NULL)
+    t.assert_equals(res.list[1], 1)
+    t.assert_equals(res.list[2], 'bar')
+    t.assert(res.list[3] ~= data.list[3])
+    t.assert_equals(res.list[3]['instance-001'], 'bar')
+    t.assert_equals(res.list[3]['{{ inst }}'], nil)
+    t.assert_equals(res.map_with_key['instance-001'], 'bar')
+    t.assert_equals(res.map_with_key['{{ inst }}'], nil)
+    t.assert(res.map_with_key ~= data.map_with_key)
+    t.assert_equals(res.flag, true)
+
+    local exp_err_msg = '[myschema] {{ unknown_key_var }}: Unknown ' ..
+        'variable "unknown_key_var"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {['{{ unknown_key_var }}'] = 42}
+        s:map(data, apply_vars, {})
+    end)
+
+    exp_err_msg = '[myschema] var: Unknown ' ..
+        'variable "unknown_value_var"'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        local data = {var = '{{ unknown_value_var }}'}
+        s:map(data, apply_vars, {})
+    end)
+end
+
+g.test_cycle_under_any_tables = function()
+    local config_yaml = [[
+app:
+  cfg: &cfg_anchor
+    title: '{{ instance_name }}'
+    loop: *cfg_anchor
+groups:
+  g:
+    replicasets:
+      r:
+        instances:
+          i-001: {}
+]]
+
+    local cconfig = yaml.decode(config_yaml)
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+    local expanded = s:map(cconfig, apply_vars, { instance_name = 'i-001'})
+
+    t.assert_equals(expanded.app.cfg.title, 'i-001')
+    t.assert(expanded.app.cfg.loop == expanded.app.cfg,
+        'app.cfg.loop must alias app.cfg (cycle preserved)')
+
+    t.assert_type(expanded.groups, 'table')
+    t.assert_type(expanded.groups.g.replicasets.r.instances['i-001'], 'table')
+end
+
+g.test_anchor_reuse_under_any_tables = function()
+    local config_yaml = [[
+app:
+  cfg:
+    title: '{{ instance_name }}'
+roles_cfg:
+  foo: &shared_role
+    title: '{{ instance_name }}'
+  bar: *shared_role
+groups:
+  g:
+    replicasets:
+      r:
+        instances:
+          i-001: {}
+]]
+
+    local cconfig = yaml.decode(config_yaml)
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+    local expanded = s:map(cconfig, apply_vars, { instance_name = 'i-001'})
+
+    t.assert_equals(expanded.roles_cfg.foo.title, 'i-001')
+    t.assert_equals(expanded.roles_cfg.bar.title, 'i-001')
+
+    t.assert(expanded.roles_cfg.foo == expanded.roles_cfg.bar,
+        'roles_cfg.bar must alias roles_cfg.foo (anchor preserved)')
+
+    t.assert_equals(expanded.app.cfg.title, 'i-001')
+    t.assert_type(expanded.groups.g.replicasets.r.instances['i-001'], 'table')
 end
 
 -- Verify :map() method on a schema with an array.
