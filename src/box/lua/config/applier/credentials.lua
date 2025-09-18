@@ -9,6 +9,7 @@ local version = require('version')
 local config
 
 local PRIV_OPTS_FIELD_ID = 6
+local USER_OPTS_FIELD_ID = 8
 local CONFIG_ORIGIN = 'config'
 
 -- {{{ Sync helpers
@@ -342,12 +343,7 @@ end
 -- default users and roles configuration, if they are missing.
 local function get_credentials(config)
     local configdata = config._configdata
-    local credentials = configdata:get('credentials')
-
-    -- If credentials section in config is empty, skip applier.
-    if credentials == nil then
-        return {}
-    end
+    local credentials = configdata:get('credentials') or {}
 
     -- Tarantool has the following roles and users present by default on every
     -- instance:
@@ -703,11 +699,11 @@ end
 -- {{{ Create roles
 
 local function create_role(role_name)
-    if box.schema.role.exists(role_name) then
+    if box.schema.role.exists(role_name, {_origin = CONFIG_ORIGIN}) then
         log.verbose('credentials.apply: role %q already exists', role_name)
     else
         log.verbose('credentials.apply: create role %q', role_name)
-        box.schema.role.create(role_name)
+        box.schema.role.create(role_name, {_origin = CONFIG_ORIGIN})
     end
 end
 
@@ -724,11 +720,11 @@ end
 -- {{{ Create users
 
 local function create_user(user_name)
-    if box.schema.user.exists(user_name) then
+    if box.schema.user.exists(user_name, {_origin = CONFIG_ORIGIN}) then
         log.verbose('credentials.apply: user %q already exists', user_name)
     else
         log.verbose('credentials.apply: create user %q', user_name)
-        box.schema.user.create(user_name)
+        box.schema.user.create(user_name, {_origin = CONFIG_ORIGIN})
     end
 end
 
@@ -834,6 +830,42 @@ end
 
 -- }}} Create users
 
+-- {{{ Drop absent users and roles
+
+local function drop_users_not_in_config(user_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'user' and tuple[USER_OPTS_FIELD_ID] ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins[CONFIG_ORIGIN] and
+           (user_map or {})[tuple.name] == nil then
+            table.insert(to_drop, tuple.name)
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.verbose('credentials.apply: drop user %q', name)
+        box.schema.user.drop(name, {_origin = CONFIG_ORIGIN})
+    end
+end
+
+local function drop_roles_not_in_config(role_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'role' and tuple[USER_OPTS_FIELD_ID] ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins ~= nil and
+           tuple[USER_OPTS_FIELD_ID].origins[CONFIG_ORIGIN] and
+           (role_map or {})[tuple.name] == nil then
+            table.insert(to_drop, tuple.name)
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.verbose('credentials.apply: drop role %q', name)
+        box.schema.role.drop(name, {_origin = CONFIG_ORIGIN})
+    end
+end
+
+-- }}} Drop absent users and roles
+
 -- {{{ Applier
 
 -- Objects that are inside the config must be registered in target_object_map,
@@ -883,6 +915,8 @@ local function sync_object(obj_to_sync)
         register_objects(credentials.users)
 
         box.atomic(function()
+            drop_roles_not_in_config(credentials.roles)
+            drop_users_not_in_config(credentials.users)
             create_roles(credentials.roles)
             create_users(credentials.users)
 
