@@ -120,17 +120,15 @@ static int
 index_opts_parse_layout(const char **data, void *opts, struct region *region)
 {
 	struct index_opts *index_opts = (struct index_opts *)opts;
-	if (mp_typeof(**data) != MP_STR) {
-		diag_set(IllegalParams, "'layout' must be string");
+	if (mp_typeof(**data) != MP_STR && mp_typeof(**data) != MP_MAP) {
+		diag_set(IllegalParams, "'layout' must be string or map");
 		return -1;
 	}
-	uint32_t len = 0;
-	const char *str = mp_decode_str(data, &len);
-	if (len > 0) {
-		index_opts->layout = xregion_alloc(region, len + 1);
-		memcpy(index_opts->layout, str, len);
-		index_opts->layout[len] = '\0';
-	}
+
+	const char *layout = *data;
+	mp_next(data);
+	index_opts->layout = xregion_alloc(region, *data - layout);
+	memcpy(index_opts->layout, layout, *data - layout);
 	return 0;
 }
 
@@ -233,7 +231,7 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 		       sizeof(*dup->covered_fields));
 	}
 	if (dup->layout != NULL)
-		dup->layout = xstrdup(dup->layout);
+		dup->layout = mp_dup(dup->layout);
 	if (dup->aggregates != NULL)
 		dup->aggregates = mp_dup(dup->aggregates);
 }
