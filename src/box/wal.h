@@ -211,41 +211,6 @@ wal_clear_watcher(struct wal_watcher *watcher,
 enum wal_mode
 wal_mode(void);
 
-struct wal_checkpoint {
-	struct cbus_call_msg base;
-	/**
-	 * VClock of the last record written to the rotated WAL.
-	 * This is the vclock that is supposed to be used to
-	 * identify the new checkpoint.
-	 */
-	struct vclock vclock;
-	/**
-	 * Size of WAL files written since the last checkpoint.
-	 * Used to reset the corresponding WAL counter upon
-	 * successful checkpoint creation.
-	 */
-	int64_t wal_size;
-};
-
-/**
- * Prepare WAL for checkpointing.
- *
- * This function flushes all pending changes and rotates the
- * current WAL. Checkpoint info is returned in @checkpoint.
- * It is supposed to be passed to wal_commit_checkpoint()
- * upon successful checkpoint creation.
- */
-int
-wal_begin_checkpoint(struct wal_checkpoint *checkpoint);
-
-/**
- * This function is called upon successful checkpoint creation.
- * It updates the WAL thread's version of the last checkpoint
- * vclock.
- */
-void
-wal_commit_checkpoint(struct wal_checkpoint *checkpoint);
-
 /**
  * Set the WAL size threshold exceeding which will trigger
  * checkpointing in TX.
