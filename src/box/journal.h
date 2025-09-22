@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "salad/stailq.h"
+#include "vclock/vclock.h"
 #include "fiber.h"
 
 #if defined(__cplusplus)
@@ -41,8 +42,8 @@ extern "C" {
 
 struct xrow_header;
 struct journal;
+struct journal_checkpoint;
 struct journal_entry;
-struct vclock;
 
 typedef void
 (*journal_on_write_f)(struct journal_entry *entry);
@@ -52,6 +53,14 @@ typedef int
 
 typedef int
 (*journal_sync_f)(struct journal *journal, struct vclock *out);
+
+typedef int
+(*journal_begin_checkpoint_f)(struct journal *journal,
+			      struct journal_checkpoint *out);
+
+typedef void
+(*journal_commit_checkpoint_f)(struct journal *journal,
+			       const struct journal_checkpoint *out);
 
 enum {
 	/** Entry didn't attempt a journal write. */
@@ -129,6 +138,25 @@ struct journal_entry {
 	struct xrow_header *rows[];
 };
 
+/**
+ * Journal checkpoint corresponds to a persisted consistent state of the whole
+ * instance which it can be recovered from.
+ */
+struct journal_checkpoint {
+	/**
+	 * VClock of the last record written to the journal at the moment of the
+	 * checkpoint creation.
+	 */
+	struct vclock vclock;
+	/**
+	 * Total size of journal entries written since the last checkpoint. In
+	 * an on-disk implementation of the journal it can be used, for
+	 * instance, for seeing how far away has the storage progressed since
+	 * the last checkpoint.
+	 */
+	int64_t tail_size;
+};
+
 struct region;
 
 /**
@@ -188,6 +216,10 @@ struct journal {
 	journal_submit_f submit;
 	/** Ensure all the currently queued requests are written. */
 	journal_sync_f sync;
+	/** Begin a journal checkpoint. */
+	journal_begin_checkpoint_f begin_checkpoint;
+	/** Finish a journal checkpoint. */
+	journal_commit_checkpoint_f commit_checkpoint;
 };
 
 /** Wake the journal queue up. */
@@ -303,6 +335,18 @@ journal_sync(struct vclock *out)
 	return current_journal->sync(current_journal, out);
 }
 
+static inline int
+journal_begin_checkpoint(struct journal_checkpoint *out)
+{
+	return current_journal->begin_checkpoint(current_journal, out);
+}
+
+static inline void
+journal_commit_checkpoint(const struct journal_checkpoint *c)
+{
+	current_journal->commit_checkpoint(current_journal, c);
+}
+
 /**
  * Change the current implementation of the journaling API.
  * Happens during life cycle of an instance:
@@ -332,10 +376,13 @@ journal_set(struct journal *new_journal)
 
 static inline void
 journal_create(struct journal *journal, journal_submit_f submit,
-	       journal_sync_f sync)
+	       journal_sync_f sync, journal_begin_checkpoint_f begin_checkpoint,
+	       journal_commit_checkpoint_f commit_checkpoint)
 {
 	journal->submit = submit;
 	journal->sync = sync;
+	journal->begin_checkpoint = begin_checkpoint;
+	journal->commit_checkpoint = commit_checkpoint;
 }
 
 static inline bool
