@@ -527,7 +527,7 @@ static int
 gc_do_checkpoint(bool is_scheduled)
 {
 	int rc;
-	struct wal_checkpoint checkpoint;
+	struct journal_checkpoint checkpoint;
 	int64_t limbo_rollback_count = txn_limbo.rollback_count;
 
 	assert(!gc.checkpoint_is_in_progress);
@@ -543,7 +543,7 @@ gc_do_checkpoint(bool is_scheduled)
 	rc = txn_limbo_flush(&txn_limbo);
 	if (rc != 0)
 		goto out;
-	rc = wal_begin_checkpoint(&checkpoint);
+	rc = journal_begin_checkpoint(&checkpoint);
 	if (rc != 0)
 		goto out;
 	/*
@@ -567,7 +567,7 @@ gc_do_checkpoint(bool is_scheduled)
 	rc = engine_commit_checkpoint(&checkpoint.vclock);
 	if (rc != 0)
 		goto out;
-	wal_commit_checkpoint(&checkpoint);
+	journal_commit_checkpoint(&checkpoint);
 
 	/*
 	 * Finally, track the newly created checkpoint in the garbage
