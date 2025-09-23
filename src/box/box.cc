@@ -3199,7 +3199,6 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		is_in_box_promote = false;
 		return box_raft_try_promote();
 	default:
 		unreachable();
@@ -5914,8 +5913,6 @@ box_cfg_xc(void)
 	/* Follow replica */
 	replicaset_follow();
 
-	is_box_configured = true;
-	box_broadcast_ballot();
 	/*
 	 * Fill in leader election parameters after bootstrap. Before it is not
 	 * possible - there may be relevant data to recover from WAL and
@@ -5949,6 +5946,8 @@ box_cfg_xc(void)
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
 
+	is_box_configured = true;
+	box_broadcast_ballot();
 	title("running");
 	say_info("ready to accept requests");
 
