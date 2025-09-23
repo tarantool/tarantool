@@ -521,7 +521,13 @@ done:
 int
 box_raft_try_promote(void)
 {
+	static bool is_in_raft_promote = false;
+	if (is_in_raft_promote) {
+		diag_set(ClientError, ER_IN_ANOTHER_PROMOTE);
+		return -1;
+	}
 	struct raft *raft = box_raft();
+	is_in_raft_promote = true;
 	assert(raft->is_enabled);
 	assert(box_election_mode == ELECTION_MODE_MANUAL ||
 	       box_election_mode == ELECTION_MODE_CANDIDATE);
@@ -554,6 +560,7 @@ box_raft_try_promote(void)
 		 * Otherwise it can lead to memory leaks.
 		 */
 		diag_destroy(&ctx.diag);
+		is_in_raft_promote = false;
 		return 0;
 	}
 
@@ -566,6 +573,7 @@ box_raft_try_promote(void)
 	}
 
 	raft_restore(raft);
+	is_in_raft_promote = false;
 	return -1;
 }
 
