@@ -178,8 +178,8 @@ g_common.test_follower_demote = function(g)
         'Demoting follower with elections on is always successful: %s', err))
 end
 
--- Promoting current RAFT leader should succeed,
--- even if he doesn't own synchro queue with elections enabled.
+-- Promoting current RAFT leader that has not finished promotion should fail,
+-- since concurrent invocation of `box.ctl.promote` is prohibited.
 g_common.test_raft_leader_promote = function(g)
     box_cfg_update({g.server_1}, {election_mode = 'manual'})
 
@@ -194,9 +194,11 @@ g_common.test_raft_leader_promote = function(g)
     local ok, err = g.server_1:exec(function()
         return pcall(box.ctl.promote)
     end)
-    luatest.assert(ok, string.format(
-        'Promoting current RAFT leader succeeds: %s', err))
-
+    luatest.assert_not(ok, string.format(
+        'Promoting current RAFT leader that has not finished promotion fails'))
+    local msg = 'box.ctl.promote/demote does not support simultaneous ' ..
+                    'invocations'
+    luatest.assert_equals(err.message, msg)
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)
     g.server_1:wait_for_synchro_queue_term(term + 1)
