@@ -1437,3 +1437,55 @@ g_graceful_supervised.test_after_box_cfg_read_only = function(cg)
     local found = grep_log(cg.server1, exp_msg)
     t.assert(found)
 end
+
+local g_make_bootstrap_leader_during_recovery =
+    t.group('gh-11704-make-bootstrap-leader-error-during-recovery')
+
+g_make_bootstrap_leader_during_recovery.after_each(function(cg)
+    cg.replica_set:drop()
+end)
+
+g_make_bootstrap_leader_during_recovery.before_test('test_error', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+    cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
+end)
+
+-- Check that `box.ctl.make_bootstrap_leader` is handled correctly during
+-- recovery.
+g_make_bootstrap_leader_during_recovery.test_error = function(cg)
+    cg.box_cfg.bootstrap_strategy = 'supervised'
+    cg.server2:restart({box_cfg = cg.box_cfg}, {wait_until_ready = false})
+    -- During recovery, the fiber executing `box.cfg` will set the instance UUID
+    -- from the snapshot and yield because of `iproto_do_cfg`, but this will
+    -- happen before the bootstrap strategy is set.
+    local run_before_cfg = [[
+        rawset(_G, "make_bootstrap_leader_ok", false)
+        require('fiber').new(function()
+            local ok = pcall(box.ctl.make_bootstrap_leader)
+            _G.make_bootstrap_leader_ok = ok
+        end)
+    ]]
+    cg.server1:restart({box_cfg = cg.box_cfg,
+                        env = {
+        ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg,
+    }},
+    {wait_until_ready = true})
+    cg.server1:exec(function()
+        t.assert(_G.make_bootstrap_leader_ok)
+    end)
+end
