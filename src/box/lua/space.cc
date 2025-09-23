@@ -990,6 +990,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "GUEST_ID");
 	lua_pushnumber(L, PUBLIC);
 	lua_setfield(L, -2, "PUBLIC_ROLE_ID");
+	lua_pushnumber(L, REPLICATION);
+	lua_setfield(L, -2, "REPLICATION_ROLE_ID");
 	lua_pushnumber(L, SUPER);
 	lua_setfield(L, -2, "SUPER_ROLE_ID");
 	lua_pushnumber(L, BOX_INDEX_MAX);
