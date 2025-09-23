@@ -2253,9 +2253,14 @@ box_make_bootstrap_leader(void)
 			 "promoting this instance before box.cfg() is called");
 		return -1;
 	}
-	/* Bootstrap strategy is read by the time instance uuid is known. */
-	assert(bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID);
-	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED) {
+	/*
+	 * If the bootstrap strategy is not yet set by `box.cfg`
+	 * (`BOOTSTRAP_STRATEGY_INVALID`), we proceed further, since the
+	 * configuration changes below will be discarded when the bootstrap
+	 * strategy is going to be set if it is not `supervised`.
+	 */
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 tt_sprintf("bootstrap_strategy = '%s'",
 				    cfg_gets("bootstrap_strategy")),
@@ -2263,6 +2268,7 @@ box_make_bootstrap_leader(void)
 			 "box.ctl.make_bootstrap_leader()");
 		return -1;
 	}
+
 	if (is_box_configured) {
 		if (box_check_writable() != 0)
 			return -1;
