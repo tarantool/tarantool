@@ -375,6 +375,12 @@ box.schema.role.drop('public')
 delete_user('public')
 delete_user(box.schema.PUBLIC_ROLE_ID)
 #box.schema.role.info('public') > 0
+-- gh-11848 replication role must be treated as system
+box.schema.role.drop('replication')
+box.schema.user.drop('replication')
+delete_user('replication')
+delete_user(box.schema.REPLICATION_ROLE_ID)
+#box.schema.role.info('replication') > 0
 box.schema.role.drop('super')
 box.schema.user.drop('super')
 delete_user('super')

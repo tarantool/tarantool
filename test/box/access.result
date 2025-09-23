@@ -915,6 +915,27 @@ delete_user(box.schema.PUBLIC_ROLE_ID)
 ---
 - true
 ...
+-- gh-11848 replication role must be treated as system
+box.schema.role.drop('replication')
+---
+- error: 'Failed to drop user or role ''replication'': the user or the role is a system'
+...
+box.schema.user.drop('replication')
+---
+- error: User 'replication' is not found
+...
+delete_user('replication')
+---
+- error: 'Failed to drop user or role ''replication'': the user or the role is a system'
+...
+delete_user(box.schema.REPLICATION_ROLE_ID)
+---
+- error: 'Failed to drop user or role ''replication'': the user or the role is a system'
+...
+#box.schema.role.info('replication') > 0
+---
+- true
+...
 box.schema.role.drop('super')
 ---
 - error: 'Failed to drop user or role ''super'': the user or the role is a system'
