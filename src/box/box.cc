@@ -2430,10 +2430,14 @@ box_make_bootstrap_leader_nongraceful(void)
 int
 box_make_bootstrap_leader(bool graceful)
 {
-	/* Bootstrap strategy is read by the time instance uuid is known. */
-	if (!tt_uuid_is_nil(&INSTANCE_UUID) &&
-	    bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED) {
-		assert(bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID);
+	/*
+	 * If the bootstrap strategy is not yet set by `box.cfg`
+	 * (`BOOTSTRAP_STRATEGY_INVALID`), we proceed further, since the
+	 * configuration changes below will be discarded when the bootstrap
+	 * strategy is going to be set if it is not `supervised`.
+	 */
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
+	    bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 tt_sprintf("bootstrap_strategy = '%s'",
 				    cfg_gets("bootstrap_strategy")),
