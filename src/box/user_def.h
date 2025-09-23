@@ -185,9 +185,10 @@ enum {
 	BOX_SYSTEM_USER_ID_MIN = 0,
 	GUEST = 0,
 	ADMIN =  1,
-	PUBLIC = 2, /* role */
-	SUPER = 31, /* role */
-	BOX_SYSTEM_USER_ID_MAX = PUBLIC
+	PUBLIC = 2,      /* role */
+	REPLICATION = 3, /* role */
+	SUPER = 31,      /* role */
+	BOX_SYSTEM_USER_ID_MAX = REPLICATION
 };
 
 #if defined(__cplusplus)
