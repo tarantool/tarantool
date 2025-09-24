@@ -22,12 +22,12 @@ struct box_checkpoint {
 	 * Full descriptor of the Raft state machine collected exactly when the
 	 * last known synchronous txn was confirmed.
 	 */
-	struct raft_request raft_remote_checkpoint;
+	struct raft_request raft_remote;
 	/**
 	 * Full descriptor of the txn limbo collected exactly when the last
 	 * known synchronous txn was confirmed.
 	 */
-	struct synchro_request limbo_checkpoint;
+	struct synchro_request limbo;
 	/** VClock of the limbo's state. */
 	struct vclock limbo_vclock;
 };
