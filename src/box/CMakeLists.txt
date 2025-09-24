@@ -238,8 +238,8 @@ set(box_sources
     schema_def.c
     session.c
     port.c
+    checkpoint.c
     txn.c
-    txn_checkpoint.c
     txn_limbo.c
     txn_event_trigger.c
     raft.c
