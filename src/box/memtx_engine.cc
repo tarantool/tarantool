@@ -36,11 +36,11 @@
 
 #include "fiber.h"
 #include "errinj.h"
+#include "checkpoint.h"
 #include "coio_task.h"
 #include "info/info.h"
 #include "tuple.h"
 #include "txn.h"
-#include "txn_checkpoint.h"
 #include "memtx_tx.h"
 #include "memtx_tree.h"
 #include "iproto_constants.h"
