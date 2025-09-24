@@ -1,4 +1,4 @@
-#include "txn_checkpoint.h"
+#include "checkpoint.h"
 #include "txn_limbo.h"
 #include "raft.h"
 #include "txn.h"

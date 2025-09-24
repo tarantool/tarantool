@@ -66,10 +66,10 @@
 #include "index.h"
 #include "port.h"
 #include "txn.h"
-#include "txn_checkpoint.h"
 #include "txn_limbo.h"
 #include "user.h"
 #include "cfg.h"
+#include "checkpoint.h"
 #include "coio.h"
 #include "replication.h" /* replica */
 #include "title.h"
