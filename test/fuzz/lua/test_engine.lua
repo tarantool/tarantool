@@ -1567,6 +1567,11 @@ local errinj_set = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
     },
+    -- Set to true to fail index operations due to OOM.
+    ERRINJ_INDEX_OOM = {
+        enable = enable_errinj_boolean,
+        disable = disable_errinj_boolean,
+    },
     -- Set to number of passes before starting to fail primitive index data
     -- operations.
     ERRINJ_INDEX_OOM_COUNTDOWN = {
@@ -1604,10 +1609,22 @@ local errinj_set = {
         enable = enable_errinj_timeout,
         disable = disable_errinj_timeout,
     },
+    -- Set to timeout in seconds to inject before dumping a portion of
+    -- sort data.
+    ERRINJ_SORTDATA_WRITE_TIMEOUT = {
+        enable = enable_errinj_timeout,
+        disable = disable_errinj_timeout,
+    },
     -- Set to true to fail index select.
     ERRINJ_TESTING = {
         enable = enable_errinj_boolean,
         disable = disable_errinj_boolean,
+    },
+    -- Set to timeout in seconds to inject while checking whether
+    -- data is presorted.
+    ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY = {
+        enable = enable_errinj_timeout,
+        disable = disable_errinj_timeout,
     },
     -- Set to true to fail allocation of memtx tuple.
     ERRINJ_TUPLE_ALLOC = {
@@ -1736,6 +1753,15 @@ local errinj_set = {
     },
     -- Set to number of passes before failing allocation of vinyl tuple.
     ERRINJ_VY_STMT_ALLOC_COUNTDOWN = {
+        enable = function()
+            return math.random(10)
+        end,
+        disable = function()
+            return -1
+        end,
+    },
+    -- Set to number of passes before failing vinyl statement decode.
+    ERRINJ_VY_STMT_DECODE_COUNTDOWN = {
         enable = function()
             return math.random(10)
         end,
