@@ -152,11 +152,19 @@ engine_end_recovery(void)
 int
 engine_begin_checkpoint(const struct engine_checkpoint_params *params)
 {
+	int csw = fiber()->csw;
 	struct engine *engine;
 	engine_foreach(engine) {
 		if (engine->vtab->begin_checkpoint(engine, params) < 0)
 			return -1;
 	}
+	/*
+	 * No yields are allowed. Otherwise something might be changed in any
+	 * of the spaces or in a global state of any sort by another fiber, and
+	 * the engines would suddenly be building their checkpoint on different
+	 * states of the instance.
+	 */
+	VERIFY(fiber()->csw == csw);
 	return 0;
 }
 
