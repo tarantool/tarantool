@@ -11,7 +11,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /** Data collected precisely when all the prepared txns are committed. */
-struct txn_checkpoint {
+struct box_checkpoint {
 	/**
 	 * VClock taken when the last known prepared txn was written to WAL. For
 	 * non-synchronous txns it is equal to their commit moment.
@@ -34,7 +34,7 @@ struct txn_checkpoint {
  * global transaction-related data at this exact moment.
  */
 int
-txn_checkpoint_build(struct txn_checkpoint *out);
+box_checkpoint_build(struct box_checkpoint *out);
 
 /**
  * Wait until all the prepared txns have been successfully written to the
