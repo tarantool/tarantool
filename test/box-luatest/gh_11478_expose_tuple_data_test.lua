@@ -3,6 +3,7 @@ local t = require("luatest")
 local g = t.group()
 
 g.test_expose_tuple_data_api = function()
+    -- Comment message to test new CI.
     local ffi = require('ffi')
     local msgpack = require('msgpack')
     local test_tuple_table = {true, 2, "test"}
