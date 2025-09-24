@@ -1480,8 +1480,8 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
 
-	struct txn_checkpoint txn_cp;
-	if (txn_checkpoint_build(&txn_cp) != 0)
+	struct box_checkpoint txn_cp;
+	if (box_checkpoint_build(&txn_cp) != 0)
 		return -1;
 	vclock_copy(arg->vclock, &txn_cp.journal_vclock);
 	struct raft_request *raft_checkpoint = &txn_cp.raft_remote_checkpoint;
