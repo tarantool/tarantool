@@ -4,9 +4,9 @@
 #include "txn.h"
 
 /** Data of the in-progress checkpoint to carry into the triggers. */
-struct txn_checkpoint_context {
+struct box_checkpoint_context {
 	/** The checkpoint to be created. */
-	struct txn_checkpoint *checkpoint;
+	struct box_checkpoint *checkpoint;
 	/** The owner fiber sleeping on the result. */
 	struct fiber *owner;
 	/** If is committed. */
@@ -16,7 +16,7 @@ struct txn_checkpoint_context {
 };
 
 static void
-txn_checkpoint_collect(struct txn_checkpoint *c)
+box_checkpoint_collect(struct box_checkpoint *c)
 {
 	txn_limbo_checkpoint(&txn_limbo, &c->limbo_checkpoint);
 	box_raft_checkpoint_remote(&c->raft_remote_checkpoint);
@@ -27,9 +27,9 @@ static int
 txn_commit_cb(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct txn_checkpoint_context *ctx = trigger->data;
+	struct box_checkpoint_context *ctx = trigger->data;
 	ctx->is_commit = true;
-	txn_checkpoint_collect(ctx->checkpoint);
+	box_checkpoint_collect(ctx->checkpoint);
 	fiber_wakeup(ctx->owner);
 	return 0;
 }
@@ -39,19 +39,19 @@ static int
 txn_rollback_cb(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct txn_checkpoint_context *ctx = trigger->data;
+	struct box_checkpoint_context *ctx = trigger->data;
 	ctx->is_rollback = true;
 	fiber_wakeup(ctx->owner);
 	return 0;
 }
 
 int
-txn_checkpoint_build(struct txn_checkpoint *out)
+box_checkpoint_build(struct box_checkpoint *out)
 {
 	struct txn_limbo *limbo = &txn_limbo;
 	/* Fast path. */
 	if (txn_limbo_is_empty(limbo)) {
-		txn_checkpoint_collect(out);
+		box_checkpoint_collect(out);
 		return txn_persist_all_prepared(&out->journal_vclock);
 	}
 	/*
@@ -67,7 +67,7 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	 * might result into more synchro txns getting confirmed and moving the
 	 * limbo state forward. Making the collected checkpoint "too new".
 	 */
-	struct txn_checkpoint_context ctx = {
+	struct box_checkpoint_context ctx = {
 		.checkpoint = out,
 		.owner = fiber(),
 		.is_commit = false,
