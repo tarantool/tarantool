@@ -822,10 +822,11 @@ struct checkpoint {
 	struct xdir dir;
 	/** New snapshot file. */
 	struct xlog snap;
-	/** Raft request to be written to the snapshot file. */
-	struct raft_request raft;
-	/** Synchro request to be written to the snapshot file. */
-	struct synchro_request synchro_state;
+	/**
+	 * Global engine-agnostic checkpoint having some control states that
+	 * need to go into the snapshot file.
+	 */
+	const struct box_checkpoint *box;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -896,7 +897,8 @@ is_tuple_temporary(const char *data, uint32_t space_id,
 }
 
 static struct checkpoint *
-checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
+checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit,
+	       const struct box_checkpoint *box)
 {
 	struct checkpoint *ckpt = (struct checkpoint *)malloc(sizeof(*ckpt));
 	if (ckpt == NULL) {
@@ -921,8 +923,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
 	xlog_clear(&ckpt->snap);
 	vclock_create(&ckpt->vclock);
-	box_raft_checkpoint_local(&ckpt->raft);
-	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state);
+	ckpt->box = box;
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -1097,8 +1098,9 @@ checkpoint_f(va_list ap)
 		 * during checkpoint join.
 		 */
 		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
-			rc = checkpoint_write_system_data(snap, &ckpt->raft,
-							  &ckpt->synchro_state);
+			rc = checkpoint_write_system_data(
+				snap, &ckpt->box->raft_local,
+				&ckpt->box->limbo);
 			if (rc != 0)
 				break;
 			is_synchro_written = true;
@@ -1166,8 +1168,8 @@ checkpoint_f(va_list ap)
 	 * of the checkpoint.
 	 */
 	if (!is_synchro_written &&
-	    checkpoint_write_system_data(snap, &ckpt->raft,
-					 &ckpt->synchro_state) != 0)
+	    checkpoint_write_system_data(snap, &ckpt->box->raft_local,
+					 &ckpt->box->limbo) != 0)
 		goto fail;
 	goto done;
 done:
@@ -1184,12 +1186,11 @@ static int
 memtx_engine_begin_checkpoint(struct engine *engine,
 			      const struct engine_checkpoint_params *params)
 {
-	(void)params;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-
 	assert(memtx->checkpoint == NULL);
 	memtx->checkpoint = checkpoint_new(memtx->snap_dir.dirname,
-					   memtx->snap_io_rate_limit);
+					   memtx->snap_io_rate_limit,
+					   params->box);
 	if (memtx->checkpoint == NULL)
 		return -1;
 	return 0;
