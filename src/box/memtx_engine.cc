@@ -1480,8 +1480,8 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	if (box_checkpoint_build_in_memory(&txn_cp) != 0)
 		return -1;
 	vclock_copy(arg->vclock, &txn_cp.journal.vclock);
-	struct raft_request *raft_checkpoint = &txn_cp.raft_remote_checkpoint;
-	struct synchro_request *synchro_checkpoint = &txn_cp.limbo_checkpoint;
+	struct raft_request *raft_checkpoint = &txn_cp.raft_remote;
+	struct synchro_request *synchro_checkpoint = &txn_cp.limbo;
 
 	/* See raft_process_recovery, why these fields are not needed. */
 	raft_checkpoint->state = 0;
