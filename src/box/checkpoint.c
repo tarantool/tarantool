@@ -47,6 +47,12 @@ txn_rollback_cb(struct trigger *trigger, void *event)
 }
 
 int
+txn_persist_all_prepared(struct vclock *out)
+{
+	return journal_sync(out);
+}
+
+int
 box_checkpoint_build_in_memory(struct box_checkpoint *out)
 {
 	struct txn_limbo *limbo = &txn_limbo;
@@ -159,10 +165,4 @@ out:
 	if (rc != 0)
 		engine_abort_checkpoint();
 	return rc;
-}
-
-int
-txn_persist_all_prepared(struct vclock *out)
-{
-	return journal_sync(out);
 }
