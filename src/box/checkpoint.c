@@ -18,8 +18,8 @@ struct box_checkpoint_context {
 static void
 box_checkpoint_collect(struct box_checkpoint *c)
 {
-	txn_limbo_checkpoint(&txn_limbo, &c->limbo_checkpoint);
-	box_raft_checkpoint_remote(&c->raft_remote_checkpoint);
+	txn_limbo_checkpoint(&txn_limbo, &c->limbo);
+	box_raft_checkpoint_remote(&c->raft_remote);
 }
 
 /** On commit of the limbo txn. */
