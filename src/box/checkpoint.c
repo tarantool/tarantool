@@ -122,7 +122,11 @@ box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled)
 	 * Rotate WAL and call engine callbacks to create a checkpoint on disk
 	 * for each registered engine.
 	 */
-	rc = engine_begin_checkpoint(is_scheduled);
+	struct engine_checkpoint_params engine_params = {
+		.is_scheduled = is_scheduled,
+		.box = out,
+	};
+	rc = engine_begin_checkpoint(&engine_params);
 	if (rc != 0)
 		goto out;
 	rc = txn_limbo_flush(&txn_limbo);
