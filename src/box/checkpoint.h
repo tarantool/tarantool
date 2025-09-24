@@ -24,6 +24,11 @@ struct box_checkpoint {
 	 */
 	struct raft_request raft_remote;
 	/**
+	 * Remote and local Raft checkpoints are intended for different things
+	 * and have slightly different data.
+	 */
+	struct raft_request raft_local;
+	/**
 	 * Full descriptor of the txn limbo collected exactly when the last
 	 * known synchronous txn was confirmed.
 	 */
