@@ -1000,10 +1000,11 @@ struct checkpoint {
 	struct xlog snap;
 	/** New sort data file writer. */
 	struct memtx_sort_data_writer *sort_data_writer;
-	/** Raft request to be written to the snapshot file. */
-	struct raft_request raft;
-	/** Synchro request to be written to the snapshot file. */
-	struct synchro_request synchro_state;
+	/**
+	 * Global engine-agnostic checkpoint having some control states that
+	 * need to go into the snapshot file.
+	 */
+	const struct box_checkpoint *box;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -1113,7 +1114,7 @@ checkpoint_dump_sort_data(
 }
 
 static struct checkpoint *
-checkpoint_new(struct memtx_engine *memtx)
+checkpoint_new(struct memtx_engine *memtx, const struct box_checkpoint *box)
 {
 	struct checkpoint *ckpt = (struct checkpoint *)malloc(sizeof(*ckpt));
 	if (ckpt == NULL) {
@@ -1139,12 +1140,9 @@ checkpoint_new(struct memtx_engine *memtx)
 		    "SNAP", &INSTANCE_UUID, &opts);
 	xlog_clear(&ckpt->snap);
 	vclock_create(&ckpt->vclock);
-	box_raft_checkpoint_local(&ckpt->raft);
-	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state);
-
 	ckpt->sort_data_writer = memtx->use_sort_data ?
 				 memtx_sort_data_writer_new() : NULL;
-
+	ckpt->box = box;
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -1335,8 +1333,8 @@ checkpoint_f(va_list ap)
 		 */
 		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
 			if (checkpoint_write_system_data(
-					snap, &ckpt->raft,
-					&ckpt->synchro_state) != 0)
+					snap, &ckpt->box->raft_local,
+					&ckpt->box->limbo) != 0)
 				return -1;
 			is_synchro_written = true;
 		}
@@ -1461,8 +1459,8 @@ checkpoint_f(va_list ap)
 	 * of the checkpoint.
 	 */
 	if (!is_synchro_written &&
-	    checkpoint_write_system_data(snap, &ckpt->raft,
-					 &ckpt->synchro_state) != 0)
+	    checkpoint_write_system_data(snap, &ckpt->box->raft_local,
+					 &ckpt->box->limbo) != 0)
 		return -1;
 	goto done;
 done:
@@ -1480,11 +1478,9 @@ static int
 memtx_engine_begin_checkpoint(struct engine *engine,
 			      const struct engine_checkpoint_params *params)
 {
-	(void)params;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-
 	assert(memtx->checkpoint == NULL);
-	memtx->checkpoint = checkpoint_new(memtx);
+	memtx->checkpoint = checkpoint_new(memtx, params->box);
 	if (memtx->checkpoint == NULL)
 		return -1;
 	return 0;
