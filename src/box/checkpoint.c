@@ -20,6 +20,7 @@ box_checkpoint_collect(struct box_checkpoint *c)
 {
 	txn_limbo_checkpoint(&txn_limbo, &c->limbo, &c->limbo_vclock);
 	box_raft_checkpoint_remote(&c->raft_remote);
+	box_raft_checkpoint_local(&c->raft_local);
 }
 
 /** On commit of the limbo txn. */
@@ -115,6 +116,7 @@ int
 box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled)
 {
 	memset(out, 0, sizeof(*out));
+	box_checkpoint_collect(out);
 	int rc;
 	int64_t limbo_rollback_count = txn_limbo.rollback_count;
 	/*
