@@ -1219,25 +1219,6 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 }
 
 int
-txn_limbo_wait_confirm(struct txn_limbo *limbo)
-{
-	if (txn_limbo_is_empty(limbo))
-		return 0;
-	bool is_rollback;
-	if (txn_limbo_wait_last_txn(limbo, &is_rollback,
-				    replication_synchro_timeout) != 0) {
-		diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-		return -1;
-	}
-	if (is_rollback) {
-		/* The transaction has been rolled back. */
-		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return -1;
-	}
-	return 0;
-}
-
-int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 {
 	if (txn_limbo_is_empty(limbo))
