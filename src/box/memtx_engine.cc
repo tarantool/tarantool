@@ -1801,9 +1801,9 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	ctx->stream = stream;
 
 	struct box_checkpoint txn_cp;
-	if (box_checkpoint_build(&txn_cp) != 0)
+	if (box_checkpoint_build_in_memory(&txn_cp) != 0)
 		return -1;
-	vclock_copy(arg->vclock, &txn_cp.journal_vclock);
+	vclock_copy(arg->vclock, &txn_cp.journal.vclock);
 	struct raft_request *raft_checkpoint = &txn_cp.raft_remote_checkpoint;
 	struct synchro_request *synchro_checkpoint = &txn_cp.limbo_checkpoint;
 

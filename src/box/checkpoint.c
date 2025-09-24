@@ -47,13 +47,14 @@ txn_rollback_cb(struct trigger *trigger, void *event)
 }
 
 int
-box_checkpoint_build(struct box_checkpoint *out)
+box_checkpoint_build_in_memory(struct box_checkpoint *out)
 {
 	struct txn_limbo *limbo = &txn_limbo;
+	out->journal.tail_size = 0;
 	/* Fast path. */
 	if (txn_limbo_is_empty(limbo)) {
 		box_checkpoint_collect(out);
-		return txn_persist_all_prepared(&out->journal_vclock);
+		return txn_persist_all_prepared(&out->journal.vclock);
 	}
 	/*
 	 * Slow path. When the limbo is not empty, it is relatively complicated
@@ -88,7 +89,7 @@ box_checkpoint_build(struct box_checkpoint *out)
 	 * For async txns the persistence means commit. For sync txns need to
 	 * wait for their confirmation explicitly.
 	 */
-	if (txn_persist_all_prepared(&out->journal_vclock) != 0)
+	if (txn_persist_all_prepared(&out->journal.vclock) != 0)
 		return -1;
 	/*
 	 * The synchronous transactions, persisted above, might still be not
@@ -109,6 +110,53 @@ box_checkpoint_build(struct box_checkpoint *out)
 		return -1;
 	}
 	return 0;
+}
+
+int
+box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled)
+{
+	memset(out, 0, sizeof(*out));
+	int rc;
+	int64_t limbo_rollback_count = txn_limbo.rollback_count;
+	/*
+	 * Rotate WAL and call engine callbacks to create a checkpoint on disk
+	 * for each registered engine.
+	 */
+	rc = engine_begin_checkpoint(is_scheduled);
+	if (rc != 0)
+		goto out;
+	rc = txn_limbo_flush(&txn_limbo);
+	if (rc != 0)
+		goto out;
+	rc = journal_begin_checkpoint(&out->journal);
+	if (rc != 0)
+		goto out;
+	/*
+	 * Check if the checkpoint contains rolled back data. That makes the
+	 * checkpoint not self-sufficient - it needs the xlog file with
+	 * ROLLBACK. Drop it.
+	 */
+	if (txn_limbo.rollback_count != limbo_rollback_count) {
+		rc = -1;
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
+		goto out;
+	}
+	/*
+	 * Wait the confirms on all "sync" transactions before create a
+	 * snapshot.
+	 */
+	rc = txn_limbo_wait_confirm(&txn_limbo);
+	if (rc != 0)
+		goto out;
+
+	rc = engine_commit_checkpoint(&out->journal.vclock);
+	if (rc != 0)
+		goto out;
+	journal_commit_checkpoint(&out->journal);
+out:
+	if (rc != 0)
+		engine_abort_checkpoint();
+	return rc;
 }
 
 int
