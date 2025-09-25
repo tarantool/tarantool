@@ -691,10 +691,12 @@ test_logging(void)
 	error_ref(e);
 	error_log(e);
 	fail_unless(fgets(buf, size, f) != NULL);
-	ok(strstr(buf,
-		  "E> timed out "
-		  "{\"type\":\"TimedOut\",\"errno\":110,"
-		  "\"trace\":[{\"file\":\"filename\",\"line\":303}]}") != NULL);
+	char pattern[1024];
+	snprintf(pattern, sizeof(pattern), "E> timed out "
+		 "{\"type\":\"TimedOut\",\"errno\":%d,"
+		 "\"trace\":[{\"file\":\"filename\",\"line\":303}]}",
+		 ETIMEDOUT);
+	ok(strstr(buf, pattern) != NULL);
 	error_unref(e);
 
 	/* ClientError plus payload plus some escaping. */
