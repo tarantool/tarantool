@@ -1292,45 +1292,6 @@ struct memtx_join_ctx {
 	struct xstream *stream;
 };
 
-/** Respond to the JOIN request with the current vclock. */
-static void
-send_join_header(struct xstream *stream, const struct vclock *vclock)
-{
-	struct xrow_header row;
-	/* Encoding replication request uses fiber()->gc region. */
-	RegionGuard region_guard(&fiber()->gc);
-	/*
-	 * Vclock is encoded with 0th component, as in case of checkpoint
-	 * join it corresponds to the vclock of the checkpoint, where 0th
-	 * component is essential, as otherwise signature won't be correct.
-	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
-	 * continue fetching from the same checkpoint.
-	 */
-	xrow_encode_vclock(&row, vclock);
-	xstream_write(stream, &row);
-}
-
-static void
-send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
-	       const struct synchro_request *synchro_req)
-{
-	struct xrow_header row;
-	/* Encoding raft request uses fiber()->gc region. */
-	RegionGuard region_guard(&fiber()->gc);
-
-	/* Mark the beginning of the metadata stream. */
-	xrow_encode_type(&row, IPROTO_JOIN_META);
-	xstream_write(stream, &row);
-
-	xrow_encode_raft(&row, &fiber()->gc, raft_req);
-	xstream_write(stream, &row);
-
-	char body[XROW_BODY_LEN_MAX];
-	xrow_encode_synchro(&row, body, synchro_req);
-	row.replica_id = synchro_req->replica_id;
-	xstream_write(stream, &row);
-}
-
 #if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
 #include "memtx_checkpoint_join.cc"
 #else /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
@@ -1457,27 +1418,6 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
-
-	struct box_checkpoint txn_cp;
-	if (box_checkpoint_build_in_memory(&txn_cp) != 0)
-		return -1;
-	vclock_copy(arg->vclock, &txn_cp.journal.vclock);
-	struct raft_request *raft_checkpoint = &txn_cp.raft_remote;
-	struct synchro_request *synchro_checkpoint = &txn_cp.limbo;
-
-	/* See raft_process_recovery, why these fields are not needed. */
-	raft_checkpoint->state = 0;
-
-	/* Respond with vclock and JOIN_META. */
-	send_join_header(stream, arg->vclock);
-	if (arg->send_meta) {
-		send_join_meta(stream, raft_checkpoint, synchro_checkpoint);
-		struct xrow_header row;
-		/* Mark the beginning of the data stream. */
-		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
-		xstream_write(stream, &row);
-	}
-
 	/*
 	 * Memtx snapshot iterators are safe to use from another
 	 * thread and so we do so as not to consume too much of
