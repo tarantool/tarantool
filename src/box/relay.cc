@@ -38,7 +38,7 @@
 #include "fiber.h"
 #include "memory.h"
 #include "say.h"
-
+#include "checkpoint.h"
 #include "coio.h"
 #include "coio_task.h"
 #include "engine.h"
@@ -458,6 +458,45 @@ relay_check_flush(struct relay *relay)
 	return 0;
 }
 
+/** Respond to the JOIN request with the current vclock. */
+static void
+send_join_header(struct xstream *stream, const struct vclock *vclock)
+{
+	struct xrow_header row;
+	/* Encoding replication request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+	/*
+	 * Vclock is encoded with 0th component, as in case of checkpoint
+	 * join it corresponds to the vclock of the checkpoint, where 0th
+	 * component is essential, as otherwise signature won't be correct.
+	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
+	 * continue fetching from the same checkpoint.
+	 */
+	xrow_encode_vclock(&row, vclock);
+	xstream_write(stream, &row);
+}
+
+/** Send join metadata to the given stream. */
+static void
+send_join_meta(struct xstream *stream, const struct box_checkpoint *ckpt)
+{
+	struct xrow_header row;
+	/* Encoding raft request uses fiber()->gc region. */
+	RegionGuard region_guard(&fiber()->gc);
+
+	/* Mark the beginning of the metadata stream. */
+	xrow_encode_type(&row, IPROTO_JOIN_META);
+	xstream_write(stream, &row);
+
+	xrow_encode_raft(&row, &fiber()->gc, &ckpt->raft_remote);
+	xstream_write(stream, &row);
+
+	char body[XROW_BODY_LEN_MAX];
+	xrow_encode_synchro(&row, body, &ckpt->limbo);
+	row.replica_id = ckpt->limbo.replica_id;
+	xstream_write(stream, &row);
+}
+
 void
 relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   uint32_t replica_version_id,
@@ -477,23 +516,40 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	/* Freeze a read view in engines. */
 	struct engine_join_ctx ctx;
 	memset(&ctx, 0, sizeof(ctx));
-	/*
-	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
-	 * All these versions know of additional META stage of initial join.
-	 */
-	ctx.send_meta = replica_version_id > 0;
 	ctx.cursor = cursor;
-	/*
-	 * If cursor is passed, we should respond with its vclock because
-	 * it will actually be vclock of a last sent row.
-	 */
-	ctx.vclock = cursor != NULL ? cursor->vclock : vclock;
 	engine_prepare_join_xc(&ctx);
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);
 	});
-
-	/* Send read view to the replica. */
+	struct box_checkpoint box_ckpt;
+	if (cursor != NULL) {
+		/*
+		 * Sending from a cursor (from disk) is implemented in a
+		 * different way. It doesn't need all these in-memory steps.
+		 */
+		vclock_copy(vclock, cursor->vclock);
+		if (box_checkpoint_build_from_snapshot(&box_ckpt, vclock) != 0)
+			diag_raise();
+	} else {
+		if (box_checkpoint_build_in_memory(&box_ckpt) != 0)
+			diag_raise();
+	}
+	/* See raft_process_recovery, why these fields are not needed. */
+	box_ckpt.raft_remote.state = 0;
+	send_join_header(&relay->stream, &box_ckpt.journal.vclock);
+	/*
+	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1. All these
+	 * versions know of additional META stage of initial join.
+	 */
+	if (replica_version_id > 0) {
+		send_join_meta(&relay->stream, &box_ckpt);
+		struct xrow_header row;
+		/* Mark the beginning of the data stream. */
+		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
+		xstream_write(&relay->stream, &row);
+	}
+	vclock_copy(vclock, &box_ckpt.journal.vclock);
+	ctx.vclock = vclock;
 	engine_join_xc(&ctx, &relay->stream);
 	if (relay_flush(relay) < 0)
 		diag_raise();
