@@ -180,3 +180,18 @@ out:
 		engine_abort_checkpoint();
 	return rc;
 }
+
+#if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
+#include "checkpoint_from_snapshot.c"
+#else
+int
+box_checkpoint_build_from_snapshot(struct box_checkpoint *out,
+				   const struct vclock *vclock)
+{
+	(void)out;
+	(void)vclock;
+	diag_set(ClientError, ER_UNSUPPORTED, "Community edition",
+		 "checkpoint from snapshot");
+	return -1;
+}
+#endif
