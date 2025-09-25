@@ -55,6 +55,14 @@ int
 box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled);
 
 /**
+ * Extract the checkpoint data from the snapshot having exactly the provided
+ * vclock.
+ */
+int
+box_checkpoint_build_from_snapshot(struct box_checkpoint *out,
+				   const struct vclock *vclock);
+
+/**
  * Wait until all the prepared txns have been successfully written to the
  * journal. However there is not guarantee that they are going to be committed.
  * For synchronous txns just a journal write isn't enough.
