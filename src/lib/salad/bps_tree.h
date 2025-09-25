@@ -3182,7 +3182,7 @@ bps_tree_garbage_pop(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 	if (tree->garbage_head_id != (bps_tree_block_id_t)(-1)) {
 		*id = tree->garbage_head_id;
 		struct bps_garbage *result = (struct bps_garbage *)
-		bps_tree_touch_block(tree, tree->garbage_head_id);
+			matras_get(tree->matras, tree->garbage_head_id);
 		tree->garbage_head_id = result->next_id;
 		tree->garbage_count--;
 		return (struct bps_block *) result;
@@ -3199,10 +3199,8 @@ bps_tree_create_leaf(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 {
 	struct bps_leaf *res = (struct bps_leaf *)
 			       bps_tree_garbage_pop(tree, id);
-	if (!res)
-		res = (struct bps_leaf *)matras_alloc(tree->matras, id);
-	if (!res)
-		return NULL;
+	/* We must have reserved blocks. */
+	assert(res != NULL);
 	res->header.type = BPS_TREE_BT_LEAF;
 	tree->leaf_count++;
 	return res;
@@ -3216,7 +3214,8 @@ bps_tree_create_inner(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 {
 	struct bps_inner *res = (struct bps_inner *)
 				bps_tree_garbage_pop(tree, id);
-	assert(res != NULL); /* We must have reserved blocks. */
+	/* We must have reserved blocks. */
+	assert(res != NULL);
 	res->header.type = BPS_TREE_BT_INNER;
 	tree->inner_count++;
 	return res;
@@ -5809,6 +5808,10 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 
 	struct bps_tree_common *tree = &t->common;
 	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
+		/* Reserve max blocks to create new root. */
+		if (!bps_tree_reserve_blocks(tree, 1))
+			return -1;
+
 		int rc = bps_tree_insert_first_elem(tree, new_elem);
 
 		if (inserted_iterator != NULL) {
