@@ -992,6 +992,93 @@ I['failover.log.to'] = format_text([[
     - `file`: write logs to a file defined in `failover.log.file`
 ]])
 
+I['failover.http'] = format_text([[
+    The `failover.http` subsection configures HTTP listeners for the
+    failover coordinator API. This functionality is available only in
+    Tarantool Enterprise. It allows the failover coordinator to expose
+    HTTP endpoints that provide monitoring metrics and health checks.
+]])
+
+I['failover.http.listen'] = format_text([[
+    A list of HTTP endpoints that should be started for the failover
+    coordinator. Each entry must describe a listener bound to a
+    `localhost:<port>` URI. These endpoints are used to expose metrics
+    and other health check information about the failover coordinator.
+]])
+
+I['failover.http.listen.*'] = format_text([[
+    This entry configures an individual HTTP listener for the failover
+    coordinator. You can specify the URI and parameters for the listener.
+]])
+
+I['failover.http.listen.*.uri'] = format_text([[
+    A URI in the `<host>:<port>` format that defines where the
+    failover coordinator listens for HTTP requests.
+]])
+
+I['failover.http.listen.*.params'] = I['<uri>.params']
+
+I['failover.http.listen.*.params.transport'] =
+    I['<uri>.params.transport']
+
+I['failover.http.listen.*.params.ssl_key_file'] =
+    I['<uri>.params.ssl_key_file']
+
+I['failover.http.listen.*.params.ssl_cert_file'] =
+    I['<uri>.params.ssl_cert_file']
+
+I['failover.http.listen.*.params.ssl_ca_file'] =
+    I['<uri>.params.ssl_ca_file']
+
+I['failover.http.listen.*.params.ssl_ciphers'] =
+    I['<uri>.params.ssl_ciphers']
+
+I['failover.http.listen.*.params.ssl_password'] =
+    I['<uri>.params.ssl_password']
+
+I['failover.http.listen.*.params.ssl_password_file'] =
+    I['<uri>.params.ssl_password_file']
+
+I['failover.http.listen.*.params.ssl_verify_client'] = format_text([[
+    Controls whether the failover coordinator verifies client SSL certificates.
+
+    The option accepts the following values:
+
+    - `off` (default): client certificates are not verified.
+    - `on`: the server requires and verifies client certificates.
+    - `optional`: the server verifies client certificates only if they are
+      provided by the client.
+]])
+
+I['failover.metrics'] = format_text([[
+    The `failover.metrics` subsection configures metrics exporters for the
+    failover coordinator. This functionality is available only in
+    Tarantool Enterprise. It allows the failover coordinator to expose
+    monitoring metrics through various formats like Prometheus, JSON, etc.
+]])
+
+I['failover.metrics.exporters'] = format_text([[
+    A list of endpoints that expose the failover coordinator metrics. Each
+    exporter corresponds to an HTTP endpoint and a specific format for the
+    exported metrics.
+]])
+
+I['failover.metrics.exporters.*'] = format_text([[
+    This entry configures an individual exporter. You can specify the
+    URI path and the format for the metrics.
+]])
+
+I['failover.metrics.exporters.*.path'] = format_text([[
+    A URI path that should be used to serve metrics. For example,
+    `/metrics/prometheus`, `/metrics/json`, etc.
+]])
+
+I['failover.metrics.exporters.*.format'] = format_text([[
+    A format of the exported metrics. Supported values are `prometheus`,
+    `zabbix`, `telegraf`, and `json`. Each exporter will serve metrics in
+    the specified format.
+]])
+
 I['failover.probe_interval'] = format_text([[
     A time interval (in seconds) that specifies how often a monitoring service
     of the failover coordinator polls an instance for its status.

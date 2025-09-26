@@ -1853,6 +1853,32 @@ g.test_failover = function()
         }
     }
 
+    if is_enterprise then
+        iconfig.failover.http = {
+            listen = {{
+                uri = '127.0.0.1:8080',
+                params = {
+                    transport = 'ssl',
+                    ssl_key_file = 'five',
+                    ssl_cert_file = 'six',
+                    ssl_ca_file = 'seven',
+                    ssl_ciphers = 'eight',
+                    ssl_password = 'nine',
+                    ssl_password_file = 'ten',
+                    ssl_verify_client = 'on',
+                },
+            }},
+        }
+        iconfig.failover.metrics = {
+            exporters = {
+                {
+                    path = '/metrics',
+                    format = 'prometheus',
+                },
+            },
+        }
+    end
+
     instance_config:validate(iconfig)
     validate_fields(iconfig.failover, instance_config.schema.fields.failover)
 
