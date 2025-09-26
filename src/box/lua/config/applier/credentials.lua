@@ -1,5 +1,6 @@
 local expression = require('internal.config.utils.expression')
 local log = require('internal.config.utils.log')
+local textutils = require('internal.config.utils.textutils')
 local loaders = require('internal.loaders')
 local digest = require('digest')
 local fiber = require('fiber')
@@ -9,7 +10,9 @@ local version = require('version')
 local config
 
 local PRIV_OPTS_FIELD_ID = 6
+local USER_OPTS_FIELD_ID = 8
 local CONFIG_ORIGIN = 'config'
+local DEFAULT_ORIGIN = ''
 
 -- {{{ Sync helpers
 
@@ -267,6 +270,14 @@ local function privileges_subtract(target, current)
     return lacking
 end
 
+local function user_origins_from_tuple(tuple)
+    if tuple[USER_OPTS_FIELD_ID] == nil or
+       tuple[USER_OPTS_FIELD_ID].origins == nil then
+        return {[DEFAULT_ORIGIN] = true}
+    end
+    return tuple[USER_OPTS_FIELD_ID].origins
+end
+
 --
 -- Create a credential sharding role if it is assigned to any user or role and
 -- has not been declared in 'credentials.roles'.
@@ -338,8 +349,8 @@ local function sharding_role(configdata)
     }
 end
 
--- Get the latest credentials configuration from the config and add empty
--- default users and roles configuration, if they are missing.
+-- Get the latest credentials configuration from the config and
+-- ensure that the semi-default 'sharding' role is always present.
 local function get_credentials(config)
     local configdata = config._configdata
     local credentials = configdata:get('credentials')
@@ -349,36 +360,11 @@ local function get_credentials(config)
         return {}
     end
 
-    -- Tarantool has the following roles and users present by default on every
-    -- instance:
-    --
-    -- Default roles:
-    -- * super
-    -- * public
-    -- * replication
-    --
-    -- Default users:
-    -- * guest
-    -- * admin
-    --
-    -- These roles and users have according privileges pre-granted by design.
-    -- These roles are added to the credentials to ensure that if a default
-    -- user or a default role was granted some privileges by the config,
-    -- those privileges would be dropped when the role/user is removed from
-    -- the config.
-
     credentials.roles = credentials.roles or {}
-    credentials.roles['super'] = credentials.roles['super'] or {}
-    credentials.roles['public'] = credentials.roles['public'] or {}
-    credentials.roles['replication'] = credentials.roles['replication'] or {}
 
     -- Add a semi-default role 'sharding'.
     credentials.roles['sharding'] = credentials.roles['sharding'] or
                                     sharding_role(configdata)
-
-    credentials.users = credentials.users or {}
-    credentials.users['guest'] = credentials.users['guest'] or {}
-    credentials.users['admin'] = credentials.users['admin'] or {}
 
     return credentials
 end
@@ -703,11 +689,11 @@ end
 -- {{{ Create roles
 
 local function create_role(role_name)
-    if box.schema.role.exists(role_name) then
+    if box.schema.role.exists(role_name, {_origin = CONFIG_ORIGIN}) then
         log.verbose('credentials.apply: role %q already exists', role_name)
     else
         log.verbose('credentials.apply: create role %q', role_name)
-        box.schema.role.create(role_name)
+        box.schema.role.create(role_name, {_origin = CONFIG_ORIGIN})
     end
 end
 
@@ -724,11 +710,11 @@ end
 -- {{{ Create users
 
 local function create_user(user_name)
-    if box.schema.user.exists(user_name) then
+    if box.schema.user.exists(user_name, {_origin = CONFIG_ORIGIN}) then
         log.verbose('credentials.apply: user %q already exists', user_name)
     else
         log.verbose('credentials.apply: create user %q', user_name)
-        box.schema.user.create(user_name)
+        box.schema.user.create(user_name, {_origin = CONFIG_ORIGIN})
     end
 end
 
@@ -834,6 +820,95 @@ end
 
 -- }}} Create users
 
+-- {{{ Drop absent users and roles
+
+local function is_system_user_or_role(tuple)
+    return tuple.id <= box.schema.SYSTEM_USER_ID_MAX or
+        tuple.id == box.schema.SUPER_ROLE_ID
+end
+
+local function drop_users_not_in_config(user_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'user' and not is_system_user_or_role(tuple) then
+            local origins = user_origins_from_tuple(tuple)
+            if origins[CONFIG_ORIGIN] and
+               (user_map or {})[tuple.name] == nil then
+                table.insert(to_drop, tuple.name)
+            end
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.verbose('credentials.apply: drop user %q', name)
+        box.schema.user.drop(name, {_origin = CONFIG_ORIGIN})
+    end
+end
+
+local function drop_roles_not_in_config(role_map)
+    local to_drop = {}
+    for _, tuple in box.space._user:pairs() do
+        if tuple.type == 'role' and not is_system_user_or_role(tuple) then
+            local origins = user_origins_from_tuple(tuple)
+            if origins[CONFIG_ORIGIN] and
+               (role_map or {})[tuple.name] == nil then
+                table.insert(to_drop, tuple.name)
+            end
+        end
+    end
+    for _, name in ipairs(to_drop) do
+        log.verbose('credentials.apply: drop role %q', name)
+        box.schema.role.drop(name, {_origin = CONFIG_ORIGIN})
+    end
+end
+
+-- }}} Drop absent users and roles
+
+-- {{{ Manual cleanup alerts
+
+local function has_unmanaged_subjects()
+    for _, tuple in box.space._user:pairs() do
+        if not is_system_user_or_role(tuple) then
+            local origins = user_origins_from_tuple(tuple)
+            if origins[DEFAULT_ORIGIN] then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function refresh_unmanaged_subjects_alert()
+    local orphan_users_alert_key = 'credentials_orphan_users'
+
+    if has_unmanaged_subjects() then
+        local script_url =
+            'https://raw.githubusercontent.com/tarantool/tarantool/' ..
+            'refs/heads/master/tools/find-orphan-users.lua'
+
+        local msg = textutils.dedent(([[
+            Found users/roles authored from Lua and not managed by
+            the YAML configuration.
+
+            Use the helper script `find-orphan-users.lua` to list
+            duplicates/orphans and print commands for transferring
+            ownership to the YAML configuration.
+
+            dofile('/path/to/find-orphan-users.lua')
+            -- or fetch the latest version:
+            -- %s
+        ]]):format(script_url)) .. '\n'
+
+        config._aboard:set({
+            type = 'warn',
+            message = msg,
+        }, {key = orphan_users_alert_key})
+    else
+        config._aboard:drop(orphan_users_alert_key)
+    end
+end
+
+-- }}} Manual cleanup alerts
+
 -- {{{ Applier
 
 -- Objects that are inside the config must be registered in target_object_map,
@@ -883,6 +958,8 @@ local function sync_object(obj_to_sync)
         register_objects(credentials.users)
 
         box.atomic(function()
+            drop_roles_not_in_config(credentials.roles)
+            drop_users_not_in_config(credentials.users)
             create_roles(credentials.roles)
             create_users(credentials.users)
 
@@ -894,6 +971,7 @@ local function sync_object(obj_to_sync)
 
         box.atomic(sync_privileges, credentials, obj_to_sync)
     end
+    refresh_unmanaged_subjects_alert()
 end
 
 -- The worker gets synchronization commands from sync_tasks.
