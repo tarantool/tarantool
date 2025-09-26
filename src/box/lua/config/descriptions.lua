@@ -992,6 +992,51 @@ I['failover.log.to'] = format_text([[
     - `file`: write logs to a file defined in `failover.log.file`
 ]])
 
+I['failover.http'] = format_text([[
+    The `failover.http` subsection configures HTTP listeners for the
+    failover coordinator API. This functionality is available only in
+    Tarantool Enterprise.
+]])
+
+I['failover.http.listen'] = format_text([[
+    A list of HTTP endpoints that should be started for the failover
+    coordinator. Each entry must describe a listener bound to a
+    `localhost:<port>` URI.
+]])
+
+I['failover.http.listen.*'] = format_text([[
+    ...
+]])
+
+I['failover.http.listen.*.uri'] = format_text([[
+    A URI in the `localhost:<port>` format that defines where the
+    failover coordinator listens for HTTP requests.
+]])
+
+I['failover.metrics'] = format_text([[
+    The `failover.metrics` subsection configures metrics exporters for the
+    failover coordinator. This functionality is available only in
+    Tarantool Enterprise.
+]])
+
+I['failover.metrics.exporters'] = format_text([[
+    A list of endpoints that expose the failover coordinator metrics.
+]])
+
+I['failover.metrics.exporters.*'] = format_text([[
+    ...
+]])
+
+I['failover.metrics.exporters.*.path'] = format_text([[
+    A URI path that should be used to serve metrics, for example,
+    `/metrics/prometheus`.
+]])
+
+I['failover.metrics.exporters.*.format'] = format_text([[
+    A format of the exported metrics. Supported values are `prometheus`,
+    `zabbix`, `telegraf`, and `json`.
+]])
+
 I['failover.probe_interval'] = format_text([[
     A time interval (in seconds) that specifies how often a monitoring service
     of the failover coordinator polls an instance for its status.

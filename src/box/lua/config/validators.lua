@@ -181,6 +181,57 @@ M['failover'] = function(_data, w)
     validate_scope(w, {'global'})
 end
 
+M['failover.http'] = function(_data, w)
+    validate_scope(w, {'global'})
+end
+
+M['failover.http.listen.*.uri'] = function(data, w)
+    local uri, err = urilib.parse(data)
+    if uri == nil then
+        w.error('Unable to parse an URI: %s', err)
+    end
+    if uri.scheme ~= nil then
+        w.error('URI scheme is not supported for failover HTTP listeners')
+    end
+    if uri.login ~= nil then
+        w.error('Login cannot be set as part of the URI')
+    end
+    if uri.password ~= nil then
+        w.error('Password cannot be set as part of the URI')
+    end
+    if uri.params ~= nil then
+        w.error('URI parameters should be described in the ' ..
+            '"params" field, not as part of the URI')
+    end
+    local host = uri.host or uri.ipv4 or uri.ipv6
+    if host ~= 'localhost' then
+        w.error('Only localhost URIs are allowed for failover HTTP listeners')
+    end
+    if uri.service == nil then
+        w.error('A TCP port must be specified for failover HTTP listeners')
+    end
+    if not uri.service:match('^%d+$') then
+        w.error('The port must be a number')
+    end
+    local port = tonumber(uri.service)
+    if port == nil or port < 1 or port > 65535 then
+        w.error('The port must be in range 1..65535')
+    end
+    if uri.path ~= nil and uri.path ~= '' then
+        w.error('Path component is not supported for failover HTTP listeners')
+    end
+end
+
+M['failover.metrics'] = function(_data, w)
+    validate_scope(w, {'global'})
+end
+
+M['failover.metrics.exporters.*.path'] = function(data, w)
+    if data:sub(1, 1) ~= '/' then
+        w.error('The path must start with "/"')
+    end
+end
+
 M['failover.log'] = function(data, w)
     if data.to == 'file' and data.file == nil then
         w.error('log.file must be specified when log.to is "file"')

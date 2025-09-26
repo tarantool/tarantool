@@ -2033,6 +2033,39 @@ return schema.new('instance_config', schema.record({
         }, {
             validate = validators['failover.log'],
         }),
+        http = enterprise_edition(schema.record({
+            listen = schema.array({
+                items = schema.record({
+                    uri = schema.scalar({
+                        type = 'string',
+                        validate = validators['failover.http.listen.*.uri'],
+                    }),
+                }),
+            }),
+        }, {
+            validate = validators['failover.http'],
+        })),
+        metrics = enterprise_edition(schema.record({
+            exporters = schema.array({
+                items = schema.record({
+                    path = schema.scalar({
+                        type = 'string',
+                        validate =
+                            validators['failover.metrics.exporters.*.path'],
+                    }),
+                    format = schema.enum({
+                        'prometheus',
+                        'zabbix',
+                        'telegraf',
+                        'json',
+                    }, {
+                        default = 'prometheus',
+                    }),
+                }),
+            }),
+        }, {
+            validate = validators['failover.metrics'],
+        })),
     }, {
         validate = validators['failover'],
     }),
