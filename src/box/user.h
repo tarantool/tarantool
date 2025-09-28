@@ -84,7 +84,7 @@ struct user
 	 * An id in privileges array to quickly find a
 	 * respective privilege.
 	 */
-	uint8_t auth_token;
+	auth_token_t auth_token;
 	/** List of users or roles this role has been granted to */
 	struct user_map users;
 	/** List of roles granted to this role or user. */
@@ -118,7 +118,7 @@ user_find(uint32_t uid);
 
 /* Find a user by authentication token. */
 struct user *
-user_find_by_token(uint8_t auth_token);
+user_find_by_token(auth_token_t auth_token);
 
 /** Create a cache of user's privileges in @a cr. */
 void
@@ -172,7 +172,7 @@ access_lua_call_find(const char *name, uint32_t name_len,
  * Check if a role is granted to a user or role with the given auth_token.
  */
 bool
-role_is_granted(struct user *role, uint8_t auth_token);
+role_is_granted(struct user *role, auth_token_t auth_token);
 
 #if defined(__cplusplus)
 } /* extern "C" */

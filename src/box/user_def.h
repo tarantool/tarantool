@@ -29,7 +29,7 @@ typedef uint64_t auth_token_t;
  */
 struct credentials {
 	/** A look up key to quickly find session user. */
-	uint8_t auth_token;
+	auth_token_t auth_token;
 	/**
 	 * Cached global grants, to avoid an extra look up
 	 * when checking global grants.
@@ -142,7 +142,10 @@ struct access {
  * The collection of accesses granted to users.
  */
 struct accesses {
-	struct access access[BOX_USER_MAX];
+	/* Accesses of users that had an access defined. */
+	struct access *access;
+	/* The size of the array above. */
+	size_t count;
 };
 
 /**

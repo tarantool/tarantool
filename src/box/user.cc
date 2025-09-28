@@ -60,16 +60,16 @@ enum {
 /* {{{ user_map */
 
 static inline int
-user_map_calc_idx(uint8_t auth_token, uint8_t *bit_no)
+user_map_calc_idx(auth_token_t auth_token, uint8_t *bit_no)
 {
-	*bit_no = auth_token & (UMAP_INT_BITS - 1);
+	*bit_no = auth_token % UMAP_INT_BITS;
 	return auth_token / UMAP_INT_BITS;
 }
 
 
 /** Set a bit in the user map - add a user. */
 static inline void
-user_map_set(struct user_map *map, uint8_t auth_token)
+user_map_set(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -78,7 +78,7 @@ user_map_set(struct user_map *map, uint8_t auth_token)
 
 /** Clear a bit in the user map - remove a user. */
 static inline void
-user_map_clear(struct user_map *map, uint8_t auth_token)
+user_map_clear(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -87,7 +87,7 @@ user_map_clear(struct user_map *map, uint8_t auth_token)
 
 /* Check if a bit is set in the user map. */
 static inline bool
-user_map_is_set(struct user_map *map, uint8_t auth_token)
+user_map_is_set(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -168,7 +168,7 @@ rb_gen(, privset_, privset_t, struct priv_def, link, priv_def_compare);
 /** {{{ user */
 
 static void
-user_create(struct user *user, uint8_t auth_token)
+user_create(struct user *user, auth_token_t auth_token)
 {
 	assert(user->auth_token == 0);
 	user->auth_token = auth_token;
@@ -550,10 +550,10 @@ static int min_token_idx = 0;
  * Raise an exception when the maximal number of users
  * is reached (and we're out of tokens).
  */
-uint8_t
+auth_token_t
 auth_token_get(void)
 {
-	uint8_t bit_no = 0;
+	int bit_no = 0;
 	while (min_token_idx < USER_MAP_SIZE) {
                 bit_no = __builtin_ffs(tokens[min_token_idx]);
 		if (bit_no)
@@ -575,8 +575,7 @@ auth_token_get(void)
          */
 	bit_no--;
 	tokens[min_token_idx] ^= ((umap_int_t) 1) << bit_no;
-	int auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
-	assert(auth_token < UINT8_MAX);
+	auth_token_t auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
 	return auth_token;
 }
 
@@ -585,7 +584,7 @@ auth_token_get(void)
  * tokens.
  */
 void
-auth_token_put(uint8_t auth_token)
+auth_token_put(auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -603,7 +602,7 @@ user_cache_replace(struct user_def *def)
 {
 	struct user *user = user_by_id(def->uid);
 	if (user == NULL) {
-		uint8_t auth_token = auth_token_get();
+		auth_token_t auth_token = auth_token_get();
 		user = users + auth_token;
 		user_create(user, auth_token);
 		struct mh_i32ptr_node_t node = { def->uid, user };
@@ -658,7 +657,7 @@ user_find(uint32_t uid)
 
 /* Find a user by authentication token. */
 struct user *
-user_find_by_token(uint8_t auth_token)
+user_find_by_token(auth_token_t auth_token)
 {
     return &users[auth_token];
 }
@@ -922,7 +921,7 @@ role_revoke(struct user *grantee, struct user *role)
  * Check if a role is granted to a user or role with the given auth token.
  */
 bool
-role_is_granted(struct user *role, uint8_t auth_token)
+role_is_granted(struct user *role, auth_token_t auth_token)
 {
 	/* Check if the role is granted directly. */
 	if (user_map_is_set(&role->users, auth_token))

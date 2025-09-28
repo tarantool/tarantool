@@ -1639,7 +1639,7 @@ vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
 	 */
 	int key_reg = sqlGetTempRange(parser, 4);
 	bool had_grants = false;
-	for (uint8_t token = 0; token < BOX_USER_MAX; ++token) {
+	for (auth_token_t token = 0; token < BOX_USER_MAX; ++token) {
 		if (!accesses_get(accesses, token).granted)
 			continue;
 		had_grants = true;
