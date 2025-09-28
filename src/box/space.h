@@ -188,7 +188,7 @@ struct space {
 	/** Virtual function table. */
 	const struct space_vtab *vtab;
 	/** Cached runtime access information. */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 	/** Engine used by this space. */
 	struct engine *engine;
 	/** Triggers fired before executing a request. */

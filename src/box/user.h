@@ -42,13 +42,13 @@ extern "C" {
 /** Global grants. */
 struct universe {
 	/** Global privileges this user has on the universe. */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 	/** Privileges to execute any global Lua function with IPROTO_CALL. */
-	struct access access_lua_call[BOX_USER_MAX];
+	struct accesses accesses_lua_call;
 	/** Privileges to execute any Lua expression with IPROTO_EVAL. */
-	struct access access_lua_eval[BOX_USER_MAX];
+	struct accesses accesses_lua_eval;
 	/** Privileges to execute SQL requests with IPROTO_EXECUTE. */
-	struct access access_sql[BOX_USER_MAX];
+	struct accesses accesses_sql;
 };
 
 /** A single instance of the universe. */
@@ -102,7 +102,7 @@ struct user
 	 */
 	struct rlist credentials_list;
 	/** Cached runtime access imformation. */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 };
 
 /** Find user by id. */
@@ -164,8 +164,9 @@ extern struct user *guest_user, *admin_user;
  * Returns cached runtime access information for the given Lua function name.
  * If it doesn't exist, returns NULL.
  */
-struct access *
-access_lua_call_find(const char *name, uint32_t name_len);
+bool
+access_lua_call_find(const char *name, uint32_t name_len,
+		     auth_token_t auth_token, struct access *result);
 
 /**
  * Check if a role is granted to a user or role with the given auth_token.

@@ -39,6 +39,25 @@ priv_name(user_access_t access)
 	return "Any";
 }
 
+void
+accesses_init(struct accesses *accesses)
+{
+	memset(accesses->access, 0, sizeof(accesses->access));
+}
+
+struct access
+accesses_get(const struct accesses *accesses, auth_token_t auth_token)
+{
+	return accesses->access[auth_token];
+}
+
+void
+accesses_set(struct accesses *accesses, auth_token_t auth_token,
+	     struct access access)
+{
+	accesses->access[auth_token] = access;
+}
+
 struct user_def *
 user_def_new(uint32_t uid, uint32_t owner, enum schema_object_type type,
 	     const char *name, uint32_t name_len)

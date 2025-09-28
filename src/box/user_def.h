@@ -19,6 +19,8 @@ extern "C" {
 struct authenticator;
 
 typedef uint16_t user_access_t;
+typedef uint64_t auth_token_t;
+
 /**
  * Effective session user. A cache of user data
  * and access stored in session and fiber local storage.
@@ -135,6 +137,32 @@ struct access {
 	 */
 	user_access_t effective;
 };
+
+/**
+ * The collection of accesses granted to users.
+ */
+struct accesses {
+	struct access access[BOX_USER_MAX];
+};
+
+/**
+ * Initialize an empty access rights collection.
+ */
+void
+accesses_init(struct accesses *accesses);
+
+/**
+ * Get user access rights by auth_token.
+ */
+struct access
+accesses_get(const struct accesses *accesses, auth_token_t auth_token);
+
+/**
+ * Set user access rights by auth_token.
+ */
+void
+accesses_set(struct accesses *accesses, auth_token_t auth_token,
+	     struct access access);
 
 /**
  * A cache entry for an existing user. Entries for all existing

@@ -71,7 +71,8 @@ access_check_sql(void)
 	access &= ~cr->universal_access;
 	if (access == 0)
 		return 0;
-	access &= ~universe.access_sql[cr->auth_token].effective;
+	access &= ~accesses_get(&universe.accesses_sql,
+				cr->auth_token).effective;
 	if (access == 0)
 		return 0;
 	struct user *user = user_find(cr->uid);
