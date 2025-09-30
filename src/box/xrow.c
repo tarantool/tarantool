@@ -200,6 +200,8 @@ xrow_decode(struct xrow_header *header, const char **pos,
 	header->header_end = tmp;
 	bool has_tsn = false;
 	uint32_t flags = 0;
+	uint64_t lsn = 0;
+	uint64_t tsn = 0;
 
 	uint32_t size = mp_decode_map(pos);
 	for (uint32_t i = 0; i < size; i++) {
@@ -223,7 +225,7 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			header->group_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
-			header->lsn = mp_decode_uint(pos);
+			lsn = mp_decode_uint(pos);
 			break;
 		case IPROTO_TIMESTAMP:
 			header->tm = mp_decode_double(pos);
@@ -233,7 +235,7 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			break;
 		case IPROTO_TSN:
 			has_tsn = true;
-			header->tsn = mp_decode_uint(pos);
+			tsn = mp_decode_uint(pos);
 			break;
 		case IPROTO_FLAGS:
 			flags = mp_decode_uint(pos);
@@ -256,7 +258,8 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		header->is_commit = true;
 	}
 	/* Restore transaction id from lsn and transaction serial number. */
-	header->tsn = header->lsn - header->tsn;
+	header->lsn = lsn;
+	header->tsn = lsn - tsn;
 
 	if (*pos == end) {
 		/* No body, nothing to validate. */
