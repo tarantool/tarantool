@@ -8,6 +8,7 @@
 #include "diag.h"
 #include "small/region.h"
 #include "nanoarrow/nanoarrow_ipc.h"
+#include "tt_strerror.h"
 
 int
 arrow_ipc_encode(struct ArrowArray *array, struct ArrowSchema *schema,

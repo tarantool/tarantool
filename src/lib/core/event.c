@@ -12,6 +12,7 @@
 #include "trivia/util.h"
 #include "func_adapter.h"
 #include "trigger.h"
+#include "say.h"
 
 /** Registry of all events: name -> event. */
 static struct mh_strnptr_t *event_registry;

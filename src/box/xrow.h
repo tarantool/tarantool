@@ -41,6 +41,7 @@
 #include "node_name.h"
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
+#include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
