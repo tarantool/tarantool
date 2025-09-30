@@ -232,11 +232,13 @@ error:
  * this function.
  *
  * We skip this for ASAN because it installs its own signal stack.
+ * We skip this for WASM because it loses the fiber stack pointer
+ * during execution.
  */
 static void
 signal_stack_init(void)
 {
-#ifndef ENABLE_ASAN
+#if !defined(TARANTOOL_WASM) && !defined(ENABLE_ASAN)
 	stack_t stack;
 	stack.ss_flags = 0;
 	/* SIGSTKSZ doesn't seem to be enough for libunwind. */
@@ -255,7 +257,7 @@ signal_stack_init(void)
 static void
 signal_stack_free(void)
 {
-#ifndef ENABLE_ASAN
+#if !defined(TARANTOOL_WASM) && !defined(ENABLE_ASAN)
 	stack_t stack;
 	if (sigaltstack(NULL, &stack) != 0) {
 		say_syserror("sigaltstack");
