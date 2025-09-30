@@ -39,6 +39,7 @@
 #include <trivia/util.h>
 #include "exception.h"
 #include "iostream.h"
+#include "say.h"
 #include "tt_strerror.h"
 #include "uri/uri.h"
 

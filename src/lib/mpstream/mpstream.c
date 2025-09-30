@@ -17,6 +17,7 @@
 #include "mp_uuid.h"
 #include "mp_datetime.h"
 #include "mp_interval.h"
+#include "say.h"
 
 void
 mpstream_panic_cb(void *error_ctx)

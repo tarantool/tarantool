@@ -29,14 +29,16 @@
  * SUCH DAMAGE.
  */
 
-#include "coll.h"
 #include <PMurHash.h>
-#include "diag.h"
-#include "assoc.h"
 #include <unicode/ucol.h>
 #include <unicode/ucnv.h>
 #include <unicode/ucasemap.h>
+
+#include "coll.h"
+#include "diag.h"
+#include "assoc.h"
 #include "tt_static.h"
+#include "say.h"
 
 struct UCaseMap *icu_ucase_default_map = NULL;
 struct UConverter *icu_utf8_conv = NULL;

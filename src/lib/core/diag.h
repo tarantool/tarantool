@@ -36,9 +36,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "error_payload.h"
-#include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -465,7 +465,6 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 #define diag_set_detailed(file, line, class, ...) ({			\
 	/* Preserve the original errno. */                              \
 	int save_errno = errno;                                         \
-	say_debug("%s at %s:%i", #class, file, line);			\
 	struct error *e;						\
 	e = Build##class(file, line, ##__VA_ARGS__);			\
 	diag_set_error(diag_get(), e);					\
@@ -479,7 +478,6 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 
 #define diag_add(class, ...) ({						\
 	int save_errno = errno;						\
-	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	struct error *e;						\
 	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
 	diag_add_error(diag_get(), e);					\
