@@ -791,13 +791,65 @@ test_xrow_decode_error_gh_9136(void)
 	footer();
 }
 
+static void
+test_xrow_decode_gh_10587(void)
+{
+	header();
+	plan(12);
+
+	struct xrow_header row;
+	struct error *e;
+	char buf[128];
+	const char *p;
+	const char *end;
+
+	p = buf;
+	end = buf + mp_format(buf, sizeof(buf), "{%u%" PRIu64 "}",
+			      IPROTO_LSN, ((uint64_t)INT64_MAX + 1));
+	ok(xrow_decode(&row, &p, end, /*end_is_exact=*/true) != 0,
+	   "lsn overflow decode");
+	e = diag_last_error(diag_get());
+	fail_unless(e != NULL);
+	is(e->type, &type_ClientError, "lsn overflow error type");
+	is(e->code, ER_INVALID_MSGPACK, "lsn overflow error code");
+	is(strcmp(e->errmsg, "Invalid MsgPack - lsn overflow"), 0,
+	   "lsn overflow error message");
+
+	p = buf;
+	end = buf + mp_format(buf, sizeof(buf), "{%u%" PRIu64 "}",
+			      IPROTO_TSN, ((uint64_t)INT64_MAX + 1));
+	ok(xrow_decode(&row, &p, end, /*end_is_exact=*/true) != 0,
+	   "tsn overflow decode");
+	e = diag_last_error(diag_get());
+	fail_unless(e != NULL);
+	is(e->type, &type_ClientError, "dsn overflow error type");
+	is(e->code, ER_INVALID_MSGPACK, "dsn overflow error code");
+	is(strcmp(e->errmsg, "Invalid MsgPack - tsn overflow"), 0,
+	   "dsn overflow error message");
+
+	p = buf;
+	end = buf + mp_format(buf, sizeof(buf), "{%u%u%u%u}",
+			      IPROTO_LSN, 1, IPROTO_TSN, 2);
+	ok(xrow_decode(&row, &p, end, /*end_is_exact=*/true) != 0,
+	   "unexpected tsn decode");
+	e = diag_last_error(diag_get());
+	fail_unless(e != NULL);
+	is(e->type, &type_ClientError, "unexpected tsn error type");
+	is(e->code, ER_INVALID_MSGPACK, "unexpected tsn error code");
+	is(strcmp(e->errmsg, "Invalid MsgPack - unexpected tsn"), 0,
+	   "unexpected tsn error message");
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(13);
+	plan(14);
 
 	random_init();
 
@@ -815,6 +867,7 @@ main(void)
 	test_xrow_decode_error_gh_9098();
 	test_xrow_decode_error_gh_9136();
 	test_xrow_decode_synchro_types();
+	test_xrow_decode_gh_10587();
 
 	random_free();
 	fiber_free();

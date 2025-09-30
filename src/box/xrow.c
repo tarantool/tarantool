@@ -222,19 +222,33 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		case IPROTO_GROUP_ID:
 			header->group_id = mp_decode_uint(pos);
 			break;
-		case IPROTO_LSN:
-			header->lsn = mp_decode_uint(pos);
+		case IPROTO_LSN: {
+			uint64_t lsn = mp_decode_uint(pos);
+			if (unlikely(lsn > INT64_MAX)) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "lsn overflow");
+				goto dump;
+			}
+			header->lsn = lsn;
 			break;
+		}
 		case IPROTO_TIMESTAMP:
 			header->tm = mp_decode_double(pos);
 			break;
 		case IPROTO_SCHEMA_VERSION:
 			header->schema_version = mp_decode_uint(pos);
 			break;
-		case IPROTO_TSN:
+		case IPROTO_TSN: {
+			uint64_t tsn = mp_decode_uint(pos);
+			if (unlikely(tsn > INT64_MAX)) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "tsn overflow");
+				goto dump;
+			}
+			header->tsn = tsn;
 			has_tsn = true;
-			header->tsn = mp_decode_uint(pos);
 			break;
+		}
 		case IPROTO_FLAGS:
 			flags = mp_decode_uint(pos);
 			header->flags = flags;
@@ -254,6 +268,11 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		 * transaction.
 		 */
 		header->is_commit = true;
+	}
+	if (unlikely(header->lsn < header->tsn)) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "unexpected tsn");
+		goto dump;
 	}
 	/* Restore transaction id from lsn and transaction serial number. */
 	header->tsn = header->lsn - header->tsn;
