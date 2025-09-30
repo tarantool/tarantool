@@ -99,18 +99,100 @@ index_opts_parse_covered_fields(const char **data, void *opts,
 					    typeof(*index_opts->covered_fields),
 					    index_opts->covered_field_count);
 	for (uint32_t i = 0; i < index_opts->covered_field_count; i++) {
-		if (mp_typeof(**data) != MP_UINT) {
+		if (mp_typeof(**data) != MP_UINT ||
+		    mp_typeof(**data) != MP_ARRAY) {
 			diag_set(IllegalParams,
-				 "'covers' elements must be unsigned");
+				 "'covers' elements must be unsigned or array");
 			return -1;
 		}
-		uint64_t fieldno = mp_decode_uint(data);
-		if (fieldno > UINT32_MAX) {
-			diag_set(IllegalParams,
-				 "'covers' elements must be unsigned");
-			return -1;
+		index_opts->covered_fields[i].layout = NULL;
+		if (mp_typeof(**data) == MP_UINT) {
+			uint64_t fieldno = mp_decode_uint(data);
+			if (fieldno > UINT32_MAX) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned "
+					 "or array");
+				return -1;
+			}
+			index_opts->covered_fields[i].field = fieldno;
+		} else {
+			uint32_t array_size = mp_decode_array(data);
+			if (array_size < 1) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned "
+					 "or array containing at least 1 "
+					 "element");
+				return -1;
+			}
+			if (array_size > 2) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned "
+					 "or array containing at max 2 "
+					 "elements");
+				return -1;
+			}
+			if (mp_typeof(**data) != MP_UINT) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned "
+					 "or arrays containing unsigned as "
+					 "first element");
+				return -1;
+			}
+			uint64_t fieldno = mp_decode_uint(data);
+			if (fieldno > UINT32_MAX) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned "
+					 "or arrays containing unsigned as "
+					 "first element");
+				return -1;
+			}
+			index_opts->covered_fields[i].field = fieldno;
+			if (array_size < 2) {
+				continue;
+			}
+			if (mp_typeof(**data) != MP_MAP) {
+				diag_set(IllegalParams,
+					 "if 'covers' element is an array of "
+					 "2 elements it should contain a map "
+					 "as its second element");
+				return -1;
+			}
+			uint32_t map_size = mp_decode_map(data);
+			if (map_size != 1) {
+				diag_set(IllegalParams,
+					 "if 'covers' element is an array of "
+					 "2 elements its second element should "
+					 "be a map containing a single key");
+				return -1;
+			}
+			if (mp_typeof(**data) != MP_STR) {
+				diag_set(IllegalParams, "key must be a string");
+				return -1;
+			}
+			uint32_t key_len;
+			const char *key = mp_decode_str(data, &key_len);
+			if (strncmp(key, "layout", key_len) != 0) {
+				diag_set(IllegalParams,
+					 "if 'covers' element is an array of "
+					 "2 elements its second element should "
+					 "be a map containing a single key "
+					 "called 'layout'");
+				return -1;
+			}
+			if (mp_typeof(**data) != MP_STR) {
+				diag_set(IllegalParams,
+					 "'layout' must be a string");
+				return -1;
+			}
+			uint32_t layout_len;
+			const char *layout = mp_decode_str(data, &layout_len);
+			index_opts->covered_fields[i].layout =
+				xregion_alloc(region, layout_len + 1);
+			strlcpy(index_opts->covered_fields[i].layout, layout,
+				layout_len);
+			index_opts->covered_fields[i].layout[layout_len] =
+				'\0';
 		}
-		index_opts->covered_fields[i] = fieldno;
 	}
 	return 0;
 }
@@ -185,6 +267,14 @@ const struct opt_def index_opts_reg[] = {
 	OPT_END,
 };
 
+static int
+cmp_covered_field(const void *_a, const void *_b)
+{
+	const struct covered_field *a = (const struct covered_field *)_a,
+				   *b = (const struct covered_field *)_b;
+	return COMPARE_RESULT(a->field, b->field);
+}
+
 /**
  * Normalize index options:
  *
@@ -200,14 +290,23 @@ index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
 	if (opts->covered_field_count == 0)
 		return;
-	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
+	struct covered_field *fields =
+		xmalloc(sizeof(*fields) * opts->covered_field_count);
 	uint32_t j = 0;
 	for (uint32_t i = 0; i < opts->covered_field_count; i++) {
 		if (key_def_find_by_fieldno(
-				cmp_def, opts->covered_fields[i]) == NULL)
-			fields[j++] = opts->covered_fields[i];
+				cmp_def, opts->covered_fields[i].field) ==
+				NULL) {
+			fields[j].field = opts->covered_fields[j].field;
+			if (opts->covered_fields[j].layout == NULL)
+				fields[j].layout = NULL;
+			else
+				fields[j].layout =
+					xstrdup(opts->covered_fields[j].layout);
+			j++;
+		}
 	}
-	qsort(fields, j, sizeof(*fields), cmp_u32);
+	qsort(fields, j, sizeof(*fields), cmp_covered_field);
 	opts->covered_field_count = j;
 	free(opts->covered_fields);
 	if (opts->covered_field_count != 0) {
@@ -224,13 +323,18 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 {
 	*dup = *opts;
 	if (dup->covered_fields != NULL) {
-		uint32_t *fields = dup->covered_fields;
+		struct covered_field *fields = dup->covered_fields;
 		dup->covered_fields =
 			xmalloc(dup->covered_field_count *
 				sizeof(*dup->covered_fields));
-		memcpy(dup->covered_fields, fields,
-		       dup->covered_field_count *
-		       sizeof(*dup->covered_fields));
+		for (uint32_t i = 0; i < dup->covered_field_count; i++) {
+			dup->covered_fields[i].field = fields[i].field;
+			if (fields[i].layout == NULL)
+				dup->covered_fields[i].layout = NULL;
+			else
+				dup->covered_fields[i].layout =
+					xstrdup(fields[i].layout);
+		}
 	}
 	if (dup->layout != NULL)
 		dup->layout = xstrdup(dup->layout);

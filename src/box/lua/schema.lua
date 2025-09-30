@@ -1662,6 +1662,19 @@ local function normalize_fields(fields, format, what, level)
     return result
 end
 
+local function normalize_covers(covers, format, what, level)
+    local result = {}
+    for i, field in ipairs(covers) do
+        if type(field) == 'table' then
+            result[i] = table.deepcopy(field)
+            result[i][1] = normalize_field(field[1], format, what, i, level + 1)
+        else
+            result[i] = normalize_field(field, format, what, i, level + 1)
+        end
+    end
+    return result
+end
+
 -- Normalize array of aggregates `aggregates`: all fields are normalized.
 local function normalize_aggregates(aggregates, format, what, level)
     -- Do not much care if opts.aggregates is something strange like
@@ -1792,7 +1805,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
     if index_opts.covers ~= nil then
-        index_opts.covers = normalize_fields(index_opts.covers, format,
+        index_opts.covers = normalize_covers(index_opts.covers, format,
                                              'options.covers', 2)
     end
     if index_opts.aggregates ~= nil then
@@ -1941,7 +1954,7 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
         index_opts.func = func_id_by_name(options.func, 2)
     end
     if options.covers ~= nil then
-        index_opts.covers = normalize_fields(options.covers, format,
+        index_opts.covers = normalize_covers(options.covers, format,
                                              'options.covers', 2)
     end
     if options.aggregates ~= nil then

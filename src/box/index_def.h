@@ -67,6 +67,14 @@ enum rtree_index_distance_type {
 };
 extern const char *rtree_index_distance_type_strs[];
 
+/** Covered field attributes. */
+struct covered_field {
+	/** Fieldno of covered field. */
+	uint32_t field;
+	/** Layout of covered field. */
+	char *layout;
+};
+
 /** Index options */
 struct index_opts {
 	/**
@@ -116,7 +124,7 @@ struct index_opts {
 	 * index key and primary index key. The latter fields are always
 	 * covered. Sorted in ascending order.
 	 */
-	uint32_t *covered_fields;
+	struct covered_field *covered_fields;
 	/**
 	 * Number of covered fields.
 	 */
@@ -183,8 +191,17 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 	if (o1->covered_field_count != o2->covered_field_count)
 		return false;
 	for (uint32_t i = 0; i < o1->covered_field_count; i++) {
-		if (o1->covered_fields[i] != o2->covered_fields[i])
+		if (o1->covered_fields[i].field != o2->covered_fields[i].field)
 			return false;
+		if (o1->covered_fields[i].layout != NULL &&
+		    o2->covered_fields[i].layout != NULL) {
+			if (strcmp(o1->covered_fields[i].layout,
+				   o2->covered_fields[i].layout) != 0)
+				return false;
+		} else if (o1->covered_fields[i].layout != NULL ||
+			   o2->covered_fields[i].layout != NULL) {
+			return false;
+		}
 	}
 	if (o1->layout != NULL && o2->layout != NULL) {
 		if (strcmp(o1->layout, o2->layout) != 0)
