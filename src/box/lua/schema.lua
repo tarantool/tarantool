@@ -1649,15 +1649,24 @@ local function normalize_field(field, format, what, index, level)
     return idx - 1
 end
 
--- Normalize array of fields `fields`:
+-- Normalize array of covers fields, which may be field-names/fieldnos or
+-- tables containing field-name/fieldno and layout option: all fields are
+-- normalized.
 -- - fields referenced as name are resolved to 0-based field number.
 -- - fields referenced as 1-based field number are converted to 0-based.
-local function normalize_fields(fields, format, what, level)
-    -- Do not much care if opts.covers is something strange like
+local function normalize_covers(covers, format, what, level)
+    -- Do not care much if opts.covers is something strange like
     -- sparse array or map with keys.
     local result = {}
-    for i, field in ipairs(fields) do
-        result[i] = normalize_field(field, format, what, i, level + 1)
+    for i, field in ipairs(covers) do
+        if type(field) == 'table' then
+            result[i] = table.deepcopy(field)
+            result[i][1] = normalize_field(field[1], format,
+                                           what .. "[" .. i .. "]",
+                                           1, level + 2)
+        else
+            result[i] = normalize_field(field, format, what, i, level + 1)
+        end
     end
     return result
 end
@@ -1792,7 +1801,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
     if index_opts.covers ~= nil then
-        index_opts.covers = normalize_fields(index_opts.covers, format,
+        index_opts.covers = normalize_covers(index_opts.covers, format,
                                              'options.covers', 2)
     end
     if index_opts.aggregates ~= nil then
@@ -1941,7 +1950,7 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
         index_opts.func = func_id_by_name(options.func, 2)
     end
     if options.covers ~= nil then
-        index_opts.covers = normalize_fields(options.covers, format,
+        index_opts.covers = normalize_covers(options.covers, format,
                                              'options.covers', 2)
     end
     if options.aggregates ~= nil then
