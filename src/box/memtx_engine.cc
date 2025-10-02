@@ -65,6 +65,7 @@
 #include "tt_sort.h"
 #include "assoc.h"
 #include "scoped_guard.h"
+#include "xlog_reader.h"
 
 #include <type_traits>
 
@@ -395,8 +396,12 @@ enum snapshot_recovery_state {
  */
 static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row,
-				  enum snapshot_recovery_state *state);
+				  struct xlog_entry *entry,
+				  enum snapshot_recovery_state state);
+
+static int
+snapshot_recovery_state_update(enum snapshot_recovery_state *state,
+			       bool is_system_space_request);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -409,8 +414,8 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 						    signature);
 
 	say_info("recovering from `%s'", filename);
-	struct xlog_cursor cursor;
-	if (xlog_cursor_open(&cursor, filename) < 0)
+	struct xlog_reader *reader = xlog_reader_new(filename);
+	if (reader == NULL)
 		return -1;
 
 	/*
@@ -450,16 +455,44 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 		}
 	}
 
-	int rc;
-	struct xrow_header row;
+	int rc = 0;
 	uint64_t row_count = 0;
 	bool force_recovery = false;
 	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
-	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
-		row.lsn = signature;
-		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
+	while (true) {
+		struct xlog_entry *entry;
+		enum xlog_reader_result result =
+					xlog_reader_next(reader, &entry);
+		if (result == XLOG_READER_ERROR) {
+			struct error *e = diag_last_error(diag_get());
+			if (force_recovery && e->type == &type_XlogError) {
+				diag_log();
+				continue;
+			}
+			rc = -1;
+			break;
+		}
+		/* EOF */
+		if (entry == NULL)
+			break;
+		bool is_system_space_request = false;
+		if (entry->header.type == IPROTO_INSERT &&
+		    result == XLOG_READER_OK)
+			is_system_space_request =
+				space_id_is_system(entry->dml.space_id);
+		rc = snapshot_recovery_state_update(&state,
+						    is_system_space_request);
+		if (rc != 0)
+			break;
 		if (state == DONE_RECOVERING_SYSTEM_SPACES)
 			force_recovery = memtx->force_recovery;
+		if (result == XLOG_READER_OK) {
+			entry->header.lsn = signature;
+			rc = memtx_engine_recover_snapshot_row(memtx, entry,
+							       state);
+		} else {
+			rc = -1;
+		}
 		if (rc < 0) {
 			if (!force_recovery)
 				break;
@@ -473,21 +506,9 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 			fiber_yield_timeout(0);
 		}
 	}
-	xlog_cursor_close(&cursor, false);
+	xlog_reader_delete(reader);
 	if (rc < 0)
 		return -1;
-
-	/**
-	 * We should never try to read snapshots with no EOF
-	 * marker - such snapshots are very likely corrupted and
-	 * should not be trusted.
-	 */
-	if (!xlog_cursor_is_eof(&cursor)) {
-		if (!memtx->force_recovery)
-			panic("snapshot `%s' has no EOF marker", cursor.name);
-		else
-			say_error("snapshot `%s' has no EOF marker", cursor.name);
-	}
 
 	/*
 	 * Snapshot entries are ordered by the space id, it means that if there
@@ -499,34 +520,6 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	}
 
 	return 0;
-}
-
-static int
-memtx_engine_recover_raft(const struct xrow_header *row)
-{
-	assert(row->type == IPROTO_RAFT);
-	struct raft_request req;
-	/* Vclock is never persisted in WAL by Raft. */
-	if (xrow_decode_raft(row, &req, NULL) != 0)
-		return -1;
-	box_raft_recover(&req);
-	return 0;
-}
-
-static int
-memtx_engine_recover_synchro(const struct xrow_header *row)
-{
-	assert(row->type == IPROTO_RAFT_PROMOTE);
-	struct synchro_request req;
-	struct vclock synchro_vclock;
-	if (xrow_decode_synchro(row, &req, &synchro_vclock) != 0)
-		return -1;
-	/*
-	 * Origin id cannot be deduced from row.replica_id in a checkpoint,
-	 * because all its rows have a zero replica_id.
-	 */
-	req.origin_id = req.replica_id;
-	return txn_limbo_process(&txn_limbo, &req);
 }
 
 /** Checks and updates the snapshot recovery state. */
@@ -554,29 +547,31 @@ snapshot_recovery_state_update(enum snapshot_recovery_state *state,
 
 static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row,
-				  enum snapshot_recovery_state *state)
+				  struct xlog_entry *entry,
+				  enum snapshot_recovery_state state)
 {
-	assert(row->bodycnt == 1); /* always 1 for read */
-	if (row->type != IPROTO_INSERT) {
-		if (snapshot_recovery_state_update(state, false) != 0)
-			return -1;
-		if (row->type == IPROTO_RAFT)
-			return memtx_engine_recover_raft(row);
-		if (row->type == IPROTO_RAFT_PROMOTE)
-			return memtx_engine_recover_synchro(row);
+	uint32_t type = entry->header.type;
+	if (type != IPROTO_INSERT) {
+		if (type == IPROTO_RAFT) {
+			box_raft_recover(&entry->raft);
+			return 0;
+		}
+		if (type == IPROTO_RAFT_PROMOTE) {
+			/*
+			 * Origin id cannot be deduced from row.replica_id in
+			 * a checkpoint, because all its rows have a zero
+			 * replica_id.
+			 */
+			entry->synchro.origin_id = entry->synchro.replica_id;
+			return txn_limbo_process(&txn_limbo, &entry->synchro);
+		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			 (uint32_t) row->type);
+			 (uint32_t)type);
 		return -1;
 	}
-	struct request request;
 	RegionGuard region_guard(&fiber()->gc);
-	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
-		return -1;
-	bool is_system_space_request = space_id_is_system(request.space_id);
-	if (snapshot_recovery_state_update(state, is_system_space_request) != 0)
-		return -1;
-	struct space *space = space_cache_find(request.space_id);
+	struct request *request = &entry->dml;
+	struct space *space = space_cache_find(request->space_id);
 	if (space == NULL)
 		goto log_request;
 	/* memtx snapshot must contain only memtx spaces */
@@ -589,10 +584,10 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 * We use transaction in case of force recovery merely to
 	 * simplify the code.
 	 */
-	if (*state < DONE_RECOVERING_SYSTEM_SPACES ||
+	if (state < DONE_RECOVERING_SYSTEM_SPACES ||
 	    space_events_are_enabled() || txn_events_are_enabled() ||
 	    memtx->force_recovery) {
-		if (*state == DONE_RECOVERING_SYSTEM_SPACES &&
+		if (state == DONE_RECOVERING_SYSTEM_SPACES &&
 		    !memtx->force_recovery)
 			say_warn_once(
 				"snapshot recovery performance is better with"
@@ -601,11 +596,11 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		struct txn *txn = txn_begin();
 		if (txn == NULL)
 			goto log_request;
-		if (txn_begin_stmt(txn, space, request.type) != 0)
+		if (txn_begin_stmt(txn, space, request->type) != 0)
 			goto rollback;
-		if (space_execute_dml(space, txn, &request, &unused) != 0)
+		if (space_execute_dml(space, txn, request, &unused) != 0)
 			goto rollback_stmt;
-		if (txn_commit_stmt(txn, &request) != 0)
+		if (txn_commit_stmt(txn, request) != 0)
 			goto rollback;
 		/*
 		 * Snapshot rows are confirmed by definition. They don't need
@@ -619,12 +614,12 @@ rollback:
 		txn_abort(txn);
 		goto log_request;
 	} else {
-		if (memtx_space_recover_snapshot_row(space, &request) != 0)
+		if (memtx_space_recover_snapshot_row(space, request) != 0)
 			goto log_request;
 		return 0;
 	}
 log_request:
-	say_error("error at request: %s", request_str(&request));
+	say_error("error at request: %s", request_str(request));
 	return -1;
 }
 
@@ -920,20 +915,32 @@ memtx_engine_bootstrap(struct engine *engine)
 
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
-	struct xlog_cursor cursor;
-	if (xlog_cursor_openmem(&cursor, (const char *)bootstrap_bin,
+	struct xlog_cursor raw_cursor;
+	struct xlog_entry_cursor cursor;
+	if (xlog_cursor_openmem(&raw_cursor, (const char *)bootstrap_bin,
 				sizeof(bootstrap_bin), "bootstrap") < 0)
 		return -1;
+	xlog_entry_cursor_create(&cursor, &raw_cursor);
 
 	int rc;
-	struct xrow_header row;
-	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
-	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
+	enum snapshot_recovery_state state = RECOVERING_SYSTEM_SPACES;
+	struct xlog_batch batch;
+	while ((rc = xlog_entry_cursor_next_batch(&cursor, &batch)) == 0) {
+		for (size_t i = 0; i < batch.entry_count; i++) {
+			struct xlog_entry *entry;
+			rc = xlog_batch_get(&batch, i, &entry);
+			if (rc < 0)
+				break;
+			rc = memtx_engine_recover_snapshot_row(
+						memtx, entry, state);
+			if (rc < 0)
+				break;
+		}
+		xlog_batch_destroy(&batch);
 		if (rc < 0)
 			break;
 	}
-	xlog_cursor_close(&cursor, false);
+	xlog_entry_cursor_destroy(&cursor);
 	if (rc < 0)
 		return -1;
 	memtx->on_indexes_built_cb();

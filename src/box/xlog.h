@@ -35,12 +35,14 @@
 #include <sys/stat.h>
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
+#include "xrow.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
 
 #include "small/ibuf.h"
 #include "small/obuf.h"
+#include "small/mempool.h"
 
 struct iovec;
 struct xrow_header;
@@ -770,6 +772,13 @@ int
 xlog_cursor_next_tx(struct xlog_cursor *cursor);
 
 /**
+ * Same as @xlog_cursor_next_tx, but no tx cursor is created. Tx is returned
+ * in @a buf.
+ */
+int
+xlog_cursor_next_tx_raw(struct xlog_cursor *i, struct ibuf *buf);
+
+/**
  * Fetch next xrow from current xlog tx
  *
  * @retval 0 for Ok
@@ -898,6 +907,110 @@ extern xlog_remove_file_impl_f xlog_remove_file_impl;
  */
 bool
 xlog_remove_file(const char *filename, unsigned flags);
+
+/** xlog row with parsed body. */
+struct xlog_entry {
+	/** Row header. */
+	struct xrow_header header;
+	union {
+		/** DML request. */
+		struct request dml;
+		/** RAFT request. */
+		struct raft_request raft;
+		struct {
+			/** Synchro request. */
+			struct synchro_request synchro;
+			/** Storage for vclock of synchro . */
+			struct vclock synchro_vclock;
+		};
+	};
+
+	/** Internal field. Should not be accessed directly. */
+	struct error *error;
+};
+
+/** Cursor to read `struct xlog_entry`. */
+struct
+xlog_entry_cursor {
+	/** Cursor used to get raw batch data. */
+	struct xlog_cursor *raw_cursor;
+	/** Pool for `struct xlog_entry *` objects. */
+	struct mempool entry_pool;
+	/** Set if last batch reading failed. */
+	bool search_magic;
+	/** Set if EOF is reached. */
+	bool eof;
+	/** Set if last batch was partially read. */
+	struct error *error;
+};
+
+/** Batch of `struct xlog_entry`. */
+struct xlog_batch {
+	/** The cursor this batch is read from. */
+	struct xlog_entry_cursor *cursor;
+	/** Raw batch data. */
+	struct ibuf data;
+	/** Buffer holding array of `struct xlog_entry *`. */
+	struct ibuf entries;
+	/** Number of entries. */
+	size_t entry_count;
+};
+
+/**
+ * Get xlog entry at `index` from the `batch`.
+ *
+ * Returns:
+ *  0 - success.
+ * -1 - the entry body is not decoded, diag is set to XlogError,
+ *      entry output argument is still set, but only it's header is valid.
+ */
+static inline int
+xlog_batch_get(struct xlog_batch *batch, size_t index,
+	       struct xlog_entry **entry)
+{
+	assert(index < batch->entry_count);
+	struct xlog_entry **entries = (struct xlog_entry **)batch->entries.rpos;
+	*entry = entries[index];
+	if ((*entry)->error != NULL) {
+		diag_set_error(diag_get(), (*entry)->error);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Destroys the batch.
+ *
+ * The batch should be destroyed before the cursor from which it is read from
+ * is destroyed.
+ */
+void
+xlog_batch_destroy(struct xlog_batch *batch);
+
+/** Creates cursor. Takes own of `raw_cursor`. */
+void
+xlog_entry_cursor_create(struct xlog_entry_cursor *cursor,
+			 struct xlog_cursor *raw_cursor);
+
+/** Destroys cursor. */
+void
+xlog_entry_cursor_destroy(struct xlog_entry_cursor *cursor);
+
+/**
+ * Fetches next batch of xlog entries.
+ *
+ * The batch is managed by caller and should be destroyed when not needed.
+ *
+ * If error is XlogError then reading can be continued, otherwise it is UB.
+ *
+ * Returns:
+ *   0 - success.
+ *   1 - EOF, batch is not initialized.
+ *  -1 - error, diag is set, batch is not initialized.
+ */
+int
+xlog_entry_cursor_next_batch(struct xlog_entry_cursor *cursor,
+			     struct xlog_batch *batch);
 
 /** }}} */
 
