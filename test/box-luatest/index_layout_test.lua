@@ -25,13 +25,13 @@ g.test_arg_check = function(cg)
         local s = box.schema.space.create('test')
         t.assert_error_covers({
             type = 'IllegalParams',
-            message = "options parameter 'layout' should be of type string",
+            message = "options parameter 'layout' should be one of types: string,map",
         }, s.create_index, s, 'pk', {layout = 1234})
 
         t.assert_error_covers({
             type = 'ClientError',
             name = 'WRONG_INDEX_OPTIONS',
-            message = "Wrong index options: 'layout' must be string",
+            message = "Wrong index options: 'layout' must be string or map",
         }, box.space._index.insert, box.space._index, {
             s.id, 0, 'pk', 'tree', {layout = 1234}, {{[0] = 'unsigned'}}
         })
