@@ -102,6 +102,7 @@ string(JOIN ";" LUZER_TESTS
   msgpack_itv_test.lua
   net_box_call_test.lua
   pickle_unpack_test.lua
+  test_engine.lua
   uri_escape_test.lua
   uri_parse_test.lua
   uuid_frombin_test.lua

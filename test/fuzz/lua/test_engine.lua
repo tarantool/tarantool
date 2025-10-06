@@ -21,6 +21,7 @@ local ffi = require('ffi')
 local fun = require('fun')
 local json = require('json')
 local log = require('log')
+local has_luzer, luzer = pcall(require, 'luzer')
 local math = require('math')
 
 -- Tarantool datatypes.
@@ -374,7 +375,8 @@ local tarantool_type = {
     },
     ['uint64'] = {
         generator = function()
-            local v = math.random(0, 2^64 - 1)
+            -- FIXME:
+            local v = math.random(0, 2^62 - 1)
             return ffi.cast('uint64_t', v)
         end,
         operations = {'+', '-', '&', '|', '^'},
@@ -431,7 +433,9 @@ local function random_space_format(engine)
         table.insert(space_format, {
             name =('field_%d'):format(i),
             type = datatype,
-            is_nullable = oneof({true, false}),
+            -- XXX: Fix, otherwise `possible_fields` in
+            -- `index_opts` is empty.
+            is_nullable = false,
         })
     end
     for i = min_num_fields - 1, num_fields - min_num_fields - 1 do
@@ -631,13 +635,13 @@ local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
-local function setup(engine_name, space_id_func, test_dir, verbose)
-    log.info('SETUP')
-    assert(engine_name == 'memtx' or
-           engine_name == 'vinyl' or
-           engine_name == 'memcs')
+local function setup_box(test_dir, verbose)
+    if box_cfg then
+        return
+    end
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
+    box_cfg = true
 
     local vinyl_range_size = oneof({1, 4, 16, 128}) * 1024
     local vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024
@@ -668,7 +672,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_write_threads = math.random(2, 10),
         wal_cleanup_delay = 14400,
         wal_dir_rescan_delay = math.random(1, 20),
-        wal_max_size = math.random(1024 * 1024 * 1024),
+        -- FIXME:
+        wal_max_size = math.random(2, 1024 * 1024 * 1024),
         wal_mode = oneof({'write', 'fsync'}),
         wal_queue_max_size = 16777216,
         work_dir = test_dir,
@@ -682,6 +687,13 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     end
     box.cfg(box_cfg_options)
     log.info('FINISH BOX.CFG')
+end
+
+local function setup_space(engine_name, space_name)
+    log.info('SETUP')
+    assert(engine_name == 'memtx' or
+           engine_name == 'vinyl' or
+           engine_name == 'memcs')
 
     log.info('CREATE A SPACE')
     local space_format = random_space_format(engine_name)
@@ -701,7 +713,6 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
     end
-    local space_name = ('test_%d'):format(space_id_func())
     local space = box.schema.space.create(space_name, space_opts)
     index_create_op(space)
     index_create_op(space)
@@ -807,6 +818,9 @@ local function index_opts(space, is_primary)
 end
 
 function index_create_op(space)
+    -- if not index_id_func then
+    --     index_id_func = counter()
+    -- end
     local idx_id = index_id_func()
     local idx_name = 'idx_' .. idx_id
     local is_primary = idx_id == 1
@@ -1339,6 +1353,9 @@ local function worker_func(id, space, test_gen, deadline)
     while os.clock() <= deadline do
         local operation_name
         state, operation_name = gen(param, shared_gen_state)
+        if not operation_name then
+            break
+        end
         if state == nil then
             break
         end
@@ -1759,6 +1776,7 @@ local function run_test(num_workers, test_duration, test_dir,
     else
         fio.mkdir(test_dir)
     end
+    index_id_func = counter()
 
     local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
     console.listen(socket_path)
@@ -1766,7 +1784,9 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local fibers = {}
     local space_id_func = counter()
-    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+    setup_box(test_dir, verbose_mode)
+    local space_name = ('test_%d'):format(space_id_func())
+    local space = setup_space(engine_name, space_name)
     local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
@@ -1800,6 +1820,82 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local exit_code = process_errors(error_messages) and 1 or 0
     os.exit(exit_code)
+end
+
+local space_id_func
+
+local function TestOneInput(buf)
+    -- Suppress logging by the test and tarantool, libFuzzer
+    -- output is more informative.
+    log.cfg({ level = "warn" })
+    local verbose_mode = false
+    local test_dir = DEFAULT_TEST_DIR
+    local fdp = luzer.FuzzedDataProvider(buf)
+    local math_random = function(fdp)
+        assert(fdp ~= nil)
+        return function(n1, n2)
+            if not n2 then
+                if not n1 then
+                    return fdp:consume_number(0, 1)
+                end
+                n2 = n1
+                n1 = 1
+            end
+            return fdp:consume_integer(n1, n2)
+        end
+    end
+    math.random = math_random(fdp)
+    local seed = fdp:consume_integer(1, 1000)
+    math.randomseed(seed)
+
+    index_id_func = counter()
+    local engine_name = fdp:oneof({ 'memtx', 'vinyl' })
+    local space_id = space_id_func()
+    setup_box(test_dir, verbose_mode)
+    local space_name = ('space_%d'):format(space_id)
+    local space = setup_space(engine_name, space_name)
+    local MAX_OPS = fdp:consume_integer(10, 50)
+    local num_workers = fdp:consume_integer(1, 200)
+    local deadline = os.clock() + fdp:consume_integer(1, 1000)
+    local test_gen = fun.cycle(fun.iter(keys(ops))):take_n(MAX_OPS)
+
+    local fibers = {}
+    for id = 1, num_workers do
+        local f = fiber.new(worker_func, id, space, test_gen, deadline)
+        f:set_joinable(true)
+        f:name('WRK #' .. id)
+        table.insert(fibers, f)
+    end
+
+    local fault_injection = fdp:consume_boolean()
+    if fault_injection then
+        local f = start_error_injections(space, deadline)
+        table.insert(fibers, f)
+    end
+
+    for _, fb in ipairs(fibers) do
+        local ok, res = fiber.join(fb)
+        if not ok then
+            log.warn('ERROR: %s', json.encode(res))
+        end
+    end
+    teardown(space)
+end
+
+if has_luzer then
+    if fio.path.exists(DEFAULT_TEST_DIR) then
+        cleanup_dir(DEFAULT_TEST_DIR)
+    end
+    if not fio.path.exists(DEFAULT_TEST_DIR) then
+        fio.mkdir(DEFAULT_TEST_DIR)
+    end
+    local args = {
+        artifact_prefix = "test_engine_",
+    }
+    index_id_func = counter()
+    space_id_func = counter()
+    luzer.Fuzz(TestOneInput, nil, args)
+    os.exit()
 end
 
 local args = parse_args()
