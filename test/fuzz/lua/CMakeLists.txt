@@ -55,7 +55,7 @@ function(create_luzer_test)
   cmake_parse_arguments(
     FUZZ
     ""
-    "FILENAME"
+    "FILENAME;TEST_TITLE"
     "TEST_ENV;LABELS"
     ""
     ${ARGN}
@@ -71,12 +71,15 @@ function(create_luzer_test)
   if(EXISTS ${corpus_path})
     set(libfuzzer_opts_effective "${libfuzzer_opts_effective} ${corpus_path}")
   endif()
-
-  add_test(NAME ${test_name}
+  set(test_title ${test_name})
+  if (NOT ${FUZZ_TEST_TITLE})
+    set(test_title ${FUZZ_TEST_TITLE})
+  endif()
+  add_test(NAME ${test_title}
     COMMAND ${BASH} -c "${LUAJIT_TEST_BINARY} ${FUZZ_FILENAME} ${libfuzzer_opts_effective}"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
-  set_tests_properties(${test_name} PROPERTIES
+  set_tests_properties(${test_title} PROPERTIES
     LABELS "${FUZZ_LABELS}"
     ENVIRONMENT "${FUZZ_TEST_ENV}"
     DEPENDS ${LUAJIT_TEST_BINARY}
@@ -137,4 +140,21 @@ set_tests_properties(
   # To be enabled in scope tarantool/security#151.
   uri_parse_test
   PROPERTIES DISABLED TRUE
+)
+
+set(test_title
+  "${test_path}/test_engine.lua${TEST_PARAM_DELIM}memtx${TEST_PARAM_DELIM}luzer")
+create_luzer_test(
+  FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
+  TEST_TITLE ${test_title}
+  TEST_ENV "${TEST_ENV};TEST_ENGINE=memtx"
+  LABELS "fuzzing;${TEST_SUITE_NAME}"
+)
+set(test_title
+  "${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl${TEST_PARAM_DELIM}luzer")
+create_luzer_test(
+  FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
+  TEST_TITLE ${test_title}
+  TEST_ENV "${TEST_ENV};TEST_ENGINE=vinyl"
+  LABELS "fuzzing;${TEST_SUITE_NAME}"
 )
