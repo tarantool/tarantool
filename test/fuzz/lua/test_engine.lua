@@ -10,6 +10,19 @@ a current directory. Custom test directory can be specified with
 option `--test_dir`. The script will clean up the directory before
 testing if it exists.
 
+The test has two modes: blackbox and greybox. In a first one test
+blindly generates parameters and executes DDL and DML operations
+with high concurrency. In a second mode test uses coverage-guided
+fuzzing engine - generated test parameters will maximize code
+coverage. This mode is implemented using luzer, a coverage-guided,
+native Lua fuzzing engine. luzer is not a standalone fuzzing
+engine, under the hood it use a well-known and popular fuzzing
+engine libFuzzer. By default, blackbox mode is used, but it uses
+greybox mode when luzer Lua module is available. However, one can
+set environment variable `DISABLE_LUZER` and use the test in a
+blackbox mode even luzer is available. Environment variable
+`TEST_ENGINE` is used for setting storage engine from outiside.
+
 Usage: tarantool test_engine.lua
 ]]
 
@@ -21,6 +34,8 @@ local ffi = require('ffi')
 local fun = require('fun')
 local json = require('json')
 local log = require('log')
+-- The test can be used with or without using the luzer engine.
+local has_luzer, luzer = pcall(require, 'luzer')
 local math = require('math')
 
 -- Tarantool datatypes.
@@ -670,12 +685,11 @@ local function index_is_multikey(idx)
     return false
 end
 
-local function setup(engine_name, space_id_func, test_dir, verbose)
+local function setup_box(engine_name, test_dir, verbose)
     log.info('SETUP')
     assert(SUPPORTED_ENGINES_SET[engine_name], 'engine is not supported')
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
-
     local vinyl_range_size = oneof({1, 4, 16, 128}) * 1024
     local vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024
     -- vinyl_page_size must be in range (0, vinyl_range_size].
@@ -705,7 +719,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_write_threads = math.random(2, 10),
         wal_cleanup_delay = 14400,
         wal_dir_rescan_delay = math.random(1, 20),
-        wal_max_size = math.random(1024 * 1024 * 1024),
+        -- wal_max_size must be > 1.
+        wal_max_size = math.random(2, 1024 * 1024 * 1024),
         wal_mode = oneof({'write', 'fsync'}),
         wal_queue_max_size = 16777216,
         work_dir = test_dir,
@@ -719,8 +734,11 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     end
     box.cfg(box_cfg_options)
     log.info('FINISH BOX.CFG')
+end
 
+local function setup_space(engine_name, space_name)
     log.info('CREATE A SPACE')
+    assert(SUPPORTED_ENGINES_SET[engine_name], 'engine is not supported')
     local space_format = random_space_format(engine_name)
     -- TODO: support `constraint`.
     -- TODO: support `foreign_key`.
@@ -738,7 +756,6 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
     end
-    local space_name = ('test_%d'):format(space_id_func())
     local space = box.schema.space.create(space_name, space_opts)
     index_create_op(space)
     index_create_op(space)
@@ -824,6 +841,19 @@ local function index_opts(space, is_primary)
                 return x
             end
         end):totable()
+    -- In some cases fields in generated space format does not
+    -- satisfy constrains and `possible_fields` become empty.
+    -- We need at least one field in a table `possible_fields` and
+    -- code below add such field. Field types passed to `oneof()`
+    -- is a set of types supported by all indices except `RTREE`.
+    if (table.getn(possible_fields) == 0) then
+        local field = {
+            type = idx ~= 'RTREE' and
+                   oneof({'string', 'unsigned', 'varbinary'}) or 'array',
+            name = 'field_1',
+        }
+        table.insert(possible_fields, field)
+    end
     local n_parts = math.random(1, table.getn(possible_fields))
     local id = unique_ids(n_parts)
     local is_nullable_support = not is_primary and
@@ -1853,6 +1883,7 @@ local function run_test(num_workers, test_duration, test_dir,
     else
         fio.mkdir(test_dir)
     end
+    index_id_func = counter()
 
     local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
     console.listen(socket_path)
@@ -1860,7 +1891,9 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local fibers = {}
     local space_id_func = counter()
-    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+    setup_box(engine_name, test_dir, verbose_mode)
+    local space_name = ('test_%d'):format(space_id_func())
+    local space = setup_space(engine_name, space_name)
     local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
@@ -1894,6 +1927,124 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local exit_code = process_errors(error_messages) and 1 or 0
     os.exit(exit_code)
+end
+
+local space_id_func
+
+-- FDP-based `math.random()` [1] implementation.
+-- When called without arguments, returns a uniform pseudo-random
+-- real number in the range [0,1). When called with an integer
+-- number `m`, `math.random()` returns a uniform pseudo-random
+-- integer in the range [1, m]. When called with two integer
+-- numbers `m` and `n`, `math.random()` returns a uniform
+-- pseudo-random integer in the range [m, n].
+--
+-- 1. https://www.lua.org/manual/5.1/manual.html#pdf-math.random
+local math_random = function(fdp)
+    assert(fdp ~= nil)
+    return function(m, n)
+        if not n then
+            if not m then
+                return fdp:consume_number(0, 1)
+            end
+            m, n = 1, m
+        end
+        -- XXX: `math.random()` should return a uniform
+        -- pseudo-random *integer* in the range [m, n]. However,
+        -- `consume_integer()` is implemented using lua_Integer
+        -- (ptrdiff_t for compatibility with Lua 5.1) and
+        -- PTRDIFF_MAX on a 64-bit system is 0x7FFFFFFFFFFFFFFF
+        -- (2^63 - 1). So `consume_number()` with `math.floor()`
+        -- is used.
+        return math.floor(fdp:consume_number(m, n))
+    end
+end
+
+local function TestOneInput(buf)
+    local engine_name = os.getenv('TEST_ENGINE') or DEFAULT_ENGINE
+    -- libFuzzer output is more informative in a greybox mode,
+    -- redirect test-specific messages to a file.
+    local log_file = ('test_engine_%s.log'):format(engine_name)
+    log.cfg({
+        log = log_file,
+    })
+    -- Enable enhanced logging, helpful for a further debugging.
+    local verbose_mode = true
+    local test_dir = DEFAULT_TEST_DIR
+    local fdp = luzer.FuzzedDataProvider(buf)
+    -- In a blackbox mode `math.random()` is used for generating
+    -- all test parameters. In a greybox mode test parameters must
+    -- depend on `buf` passed to `TestOneInput()`. Usually this is
+    -- achieved using FuzzingDataProvider (FDP). The code below
+    -- override `math.random()` function by the function with the
+    -- same interface but based on FDP, because we want to support
+    -- both modes simultaneously.
+    math.random = math_random(fdp)
+    local seed = fdp:consume_integer(1, 1e9)
+    math.randomseed(seed)
+
+    index_id_func = counter()
+    -- We set all test parameters in random fashion, but it is
+    -- desired to specify test engine externally, because the
+    -- implementation is very different and it is better to test
+    -- each of them separately.
+    local space_id = space_id_func()
+    -- Box initialization takes time, so it is done only once.
+    if not box_cfg then
+        setup_box(engine_name, test_dir, verbose_mode)
+        box_cfg = true
+    end
+    local space_name = ('space_%d'):format(space_id)
+    local space = setup_space(engine_name, space_name)
+    local MAX_OPS = fdp:consume_integer(10, 50)
+    log.info('Maximum number of operations: %d', MAX_OPS)
+    local num_workers = fdp:consume_integer(1, 200)
+    log.info('Number of workers: %d', num_workers)
+    local deadline = os.clock() + fdp:consume_integer(1, 1000)
+    local test_gen = fun.cycle(fun.iter(keys(ops))):take_n(MAX_OPS)
+
+    local fibers = {}
+    for id = 1, num_workers do
+        local f = fiber.new(worker_func, id, space, test_gen, deadline)
+        f:set_joinable(true)
+        f:name('WRK #' .. id)
+        table.insert(fibers, f)
+    end
+
+    local fault_injection = fdp:consume_boolean()
+    if fault_injection then
+        local f = start_error_injections(space, deadline)
+        table.insert(fibers, f)
+    end
+
+    for _, fb in ipairs(fibers) do
+        local ok, res = fiber.join(fb)
+        if not ok then
+            log.warn('ERROR: %s', json.encode(res))
+        end
+    end
+    teardown(space)
+end
+
+if has_luzer and not os.getenv('DISABLE_LUZER') then
+    log.info('luzer is available, test is running in greybox mode')
+    if fio.path.exists(DEFAULT_TEST_DIR) then
+        cleanup_dir(DEFAULT_TEST_DIR)
+    end
+    if not fio.path.exists(DEFAULT_TEST_DIR) then
+        fio.mkdir(DEFAULT_TEST_DIR)
+    end
+    local args = {
+        artifact_prefix = 'test_engine_',
+    }
+    index_id_func = counter()
+    space_id_func = counter()
+    -- The main test loop is inside a fuzzing engine. It generates
+    -- `buf` and pass it to the function `TestOneInput`, then
+    -- mutate a `buf` and repeat. By default the loop is endless,
+    -- it can be limited by `-runs` option for libFuzzer.
+    luzer.Fuzz(TestOneInput, nil, args)
+    os.exit(0, true)
 end
 
 local args = parse_args()
