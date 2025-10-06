@@ -55,7 +55,7 @@ function(create_luzer_test)
   cmake_parse_arguments(
     FUZZ
     ""
-    "FILENAME"
+    "FILENAME;TEST_TITLE"
     "TEST_ENV;LABELS"
     ""
     ${ARGN}
@@ -72,8 +72,12 @@ function(create_luzer_test)
     set(libfuzzer_opts_effective "${libfuzzer_opts_effective} ${corpus_path}")
   endif()
 
+  set(test_title ${FUZZ_FILENAME})
+  if (NOT ${FUZZ_TEST_TITLE})
+    set(test_title ${FUZZ_TEST_TITLE})
+  endif()
   string(REGEX REPLACE "^${PROJECT_SOURCE_DIR}/" "" test_title
-    "${FUZZ_FILENAME}")
+    "${test_title}")
   add_test(NAME ${test_title}
     COMMAND ${BASH} -c "${LUAJIT_TEST_BINARY} ${FUZZ_FILENAME} ${libfuzzer_opts_effective}"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -142,4 +146,21 @@ set_tests_properties(
   # To be enabled in scope tarantool/security#153.
   test/fuzz/lua/console_eval_test.lua
   PROPERTIES DISABLED TRUE
+)
+
+set(test_title
+  "test/fuzz/lua/test_engine.lua${TEST_PARAM_DELIM}memtx${TEST_PARAM_DELIM}luzer")
+create_luzer_test(
+  FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
+  TEST_TITLE ${test_title}
+  TEST_ENV "${TEST_ENV};TEST_ENGINE=memtx"
+  LABELS "fuzzing;${TEST_SUITE_NAME}"
+)
+set(test_title
+  "test/fuzz/lua/test_engine.lua${TEST_PARAM_DELIM}vinyl${TEST_PARAM_DELIM}luzer")
+create_luzer_test(
+  FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/test_engine.lua
+  TEST_TITLE ${test_title}
+  TEST_ENV "${TEST_ENV};TEST_ENGINE=vinyl"
+  LABELS "fuzzing;${TEST_SUITE_NAME}"
 )
