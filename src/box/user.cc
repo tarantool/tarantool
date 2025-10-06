@@ -299,6 +299,12 @@ access_lua_call_delete_if_empty(struct access *object)
 	free(node);
 }
 
+user_access_t
+universe_access_get(uint8_t auth_token)
+{
+	return universe.access[auth_token].effective;
+}
+
 /**
  * Find the corresponding access structure for the given privilege.
  * Must be released with access_put() after use.

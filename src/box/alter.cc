@@ -83,18 +83,23 @@ static int
 access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
 		 enum schema_object_type type, enum priv_type priv_type)
 {
+	/* Get the user accesses. */
 	struct credentials *cr = effective_user();
-	user_access_t has_access = cr->universal_access;
+	user_access_t object_access = object != NULL ?
+				      object[cr->auth_token].effective : 0;
+	user_access_t entity_access = entity_access_get(type) != NULL ?
+		entity_access_get(type)[cr->auth_token].effective : 0;
+	user_access_t universe_access = cr->universal_access;
 
+	/* Check if unversal accesses cover the required set. */
 	user_access_t access = ((PRIV_U | (user_access_t) priv_type) &
-				~has_access);
-	bool is_owner = owner_uid == cr->uid || cr->uid == ADMIN;
+				~universe_access);
 	if (access == 0)
 		return 0; /* Access granted. */
+
 	/* Check for specific entity access. */
-	struct access *entity = entity_access_get(type);
-	if (entity != NULL)
-		access &= ~entity[cr->auth_token].effective;
+	access &= ~entity_access;
+
 	/*
 	 * Only the owner of the object or someone who has
 	 * specific DDL privilege on the object can execute
@@ -104,6 +109,10 @@ access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
 	 * the owner of the object, but this should be ignored --
 	 * CREATE privilege is required.
 	 */
+	bool is_owner = owner_uid == cr->uid ||
+			(object_access & PRIV_OWNER) ||
+			(entity_access & PRIV_OWNER) ||
+			(universe_access & PRIV_OWNER);
 	if (access == 0 || (is_owner && !(access & (PRIV_U | PRIV_C))))
 		return 0; /* Access granted. */
 	/*
@@ -111,8 +120,7 @@ access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
 	 */
 	if (!(access & PRIV_U)) {
 		/* Check for privileges on a single object. */
-		if (object != NULL)
-			access &= ~object[cr->auth_token].effective;
+		access &= ~object_access;
 		if (access == 0)
 			return 0; /* Access granted. */
 	}
@@ -3934,6 +3942,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	const char *name = "";
 	struct access *object = NULL;
+	struct access *entity = entity_access_get(priv->object_type);
+	bool grantor_is_entity_owner = entity != NULL ?
+		entity[grantor->auth_token].effective & PRIV_OWNER : false;
+	bool grantor_is_universe_owner =
+		universe_access_get(grantor->auth_token) & PRIV_OWNER;
 	switch (priv->object_type) {
 	case SC_SPACE:
 	{
@@ -3945,7 +3958,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = space_name(space);
 		object = space->access;
 		if (space->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
+		    !(object[grantor->auth_token].effective & PRIV_OWNER) &&
+		    !grantor_is_entity_owner && !grantor_is_universe_owner) {
 			diag_set(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_SPACE), name,
@@ -3971,7 +3985,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = func->def->name;
 		object = func->access;
 		if (func->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
+		    !(object[grantor->auth_token].effective & PRIV_OWNER) &&
+		    !grantor_is_entity_owner && !grantor_is_universe_owner) {
 			diag_set(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_FUNCTION), name,
@@ -3992,7 +4007,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = seq->def->name;
 		object = seq->access;
 		if (seq->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
+		    !(object[grantor->auth_token].effective & PRIV_OWNER) &&
+		    !grantor_is_entity_owner && !grantor_is_universe_owner) {
 			diag_set(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_SEQUENCE), name,
@@ -4015,11 +4031,12 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = role->def->name;
 		object = role->access;
 		/*
-		 * Only the creator of the role can grant or revoke it.
+		 * Only the owner of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
 		 */
 		if (role->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN &&
+		    !(object[grantor->auth_token].effective & PRIV_OWNER) &&
+		    !grantor_is_entity_owner && !grantor_is_universe_owner &&
 		    (role->def->uid != PUBLIC || priv->access != PRIV_X)) {
 			diag_set(AccessDeniedError,
 				  priv_name(priv_type),
@@ -4046,7 +4063,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = user->def->name;
 		object = user->access;
 		if (user->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
+		    !(object[grantor->auth_token].effective & PRIV_OWNER) &&
+		    !grantor_is_entity_owner && !grantor_is_universe_owner) {
 			diag_set(AccessDeniedError,
 				  priv_name(priv_type),
 				  schema_object_name(SC_USER), name,
@@ -4058,8 +4076,9 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	default:
 		break;
 	}
-	/* Only admin may grant privileges on an entire entity. */
-	if (object == NULL && grantor->def->uid != ADMIN) {
+	/* Only owner may grant privileges on an entire entity. */
+	if (object == NULL &&
+	    !grantor_is_entity_owner && !grantor_is_universe_owner) {
 		diag_set(AccessDeniedError, priv_name(priv_type),
 			 schema_object_name(priv->object_type), name,
 			 grantor->def->name);

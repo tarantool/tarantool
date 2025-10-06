@@ -114,17 +114,23 @@ access_check_space(struct space *space, user_access_t access)
 	 * since ADMIN has universal access.
 	 */
 	user_access_t space_access = access & ~cr->universal_access;
+	user_access_t entity_access =
+		entity_access_get(SC_SPACE)[cr->auth_token].effective;
+	bool cr_is_entity_owner = entity_access & PRIV_OWNER;
+	bool cr_is_universe_owner = cr->universal_access & PRIV_OWNER;
 	/*
 	 * Similarly to global access, subtract entity-level access
 	 * (access to all spaces) if it is present.
 	 */
-	space_access &= ~entity_access_get(SC_SPACE)[cr->auth_token].effective;
+	space_access &= ~entity_access;
 
 	if (space_access &&
 	    /* Check for missing USAGE access, ignore owner rights. */
 	    (space_access & PRIV_U ||
 	     /* Check for missing specific access, respect owner rights. */
 	    (space->def->uid != cr->uid &&
+	     !(space->access[cr->auth_token].effective & PRIV_OWNER) &&
+	     !cr_is_entity_owner && !cr_is_universe_owner &&
 	     space_access & ~space->access[cr->auth_token].effective))) {
 		/*
 		 * Report access violation. Throw "no such user"

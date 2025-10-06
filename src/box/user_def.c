@@ -30,6 +30,7 @@ priv_name(user_access_t access)
 		"Insert",
 		"Update",
 		"Delete",
+		"Owner",
 		"Grant",
 		"Revoke",
 	};

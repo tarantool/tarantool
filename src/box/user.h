@@ -168,6 +168,12 @@ struct access *
 access_lua_call_find(const char *name, uint32_t name_len);
 
 /**
+ * Returns the effective universal access of a user or role.
+ */
+user_access_t
+universe_access_get(uint8_t auth_token);
+
+/**
  * Check if a role is granted to a user or role with the given auth_token.
  */
 bool

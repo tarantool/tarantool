@@ -273,12 +273,18 @@ access_check_sequence(struct sequence *seq)
 
 	user_access_t access = PRIV_U | PRIV_W;
 	user_access_t sequence_access = access & ~cr->universal_access;
-	sequence_access &= ~entity_access_get(SC_SEQUENCE)[cr->auth_token].effective;
+	user_access_t entity_access =
+		entity_access_get(SC_SEQUENCE)[cr->auth_token].effective;
+	bool cr_is_entity_owner = entity_access & PRIV_OWNER;
+	bool cr_is_universe_owner = cr->universal_access & PRIV_OWNER;
+	sequence_access &= ~entity_access;
 	if (sequence_access &&
 	    /* Check for missing Usage access, ignore owner rights. */
 	    (sequence_access & PRIV_U ||
 	     /* Check for missing specific access, respect owner rights. */
 	     (seq->def->uid != cr->uid &&
+	      !(seq->access[cr->auth_token].effective & PRIV_OWNER) &&
+	      !cr_is_entity_owner && !cr_is_universe_owner &&
 	      sequence_access & ~seq->access[cr->auth_token].effective))) {
 
 		/* Access violation, report error. */

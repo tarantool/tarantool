@@ -1713,7 +1713,7 @@ f = nil
 -- now sudo can be used here since nested sudo is fixed
 box.session.su("tester", box.schema.user.drop, "test")
 ---
-- error: Drop access to user 'test' is denied for user 'tester'
+- error: Revoke access to user 'test' is denied for user 'tester'
 ...
 box.session.su("tester", box.schema.func.drop, "test")
 ---
@@ -1722,7 +1722,7 @@ box.session.su("tester", box.schema.func.drop, "test")
 box.session.su("admin")
 ---
 ...
-box.schema.user.grant("tester", "drop", "universe")
+box.schema.user.grant("tester", "owner", "universe")
 ---
 ...
 -- successful drop

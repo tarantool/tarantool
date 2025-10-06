@@ -276,16 +276,17 @@ vspace_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop or alter privileges for universe.
+	 * Allow access for a user with read, write, drop or
+	 * alter privileges for universe, or a universe owner.
 	 */
-	if (PRIV_WRDA & cr->universal_access)
+	if ((PRIV_WRDA | PRIV_OWNER) & cr->universal_access)
 		return true;
 	/* Allow access for a user with space privileges. */
-	if (PRIV_WRDA & entity_access_get(SC_SPACE)[cr->auth_token].effective)
+	if ((PRIV_WRDA | PRIV_OWNER) &
+	    entity_access_get(SC_SPACE)[cr->auth_token].effective)
 		return true;
-	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to _space space */
+	if ((PRIV_R | PRIV_OWNER) & source->access[cr->auth_token].effective)
+		return true; /* reader or owner of the _space space */
 	uint32_t space_id;
 	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &space_id) != 0)
 		return false;
@@ -297,8 +298,8 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	 * Allow access for space owners and users with any
 	 * privilege for the space.
 	 */
-	return (PRIV_WRDA & effective ||
-	       space->def->uid == cr->uid);
+	return space->def->uid == cr->uid ||
+	       ((PRIV_WRDA | PRIV_OWNER) & effective);
 }
 
 static bool
@@ -306,13 +307,13 @@ vuser_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop or alter privileges for universe.
+	 * Allow access for a user with read, write, drop or
+	 * alter privileges for universe, or a universe owner.
 	 */
-	if (PRIV_WRDA & cr->universal_access)
+	if ((PRIV_WRDA | PRIV_OWNER) & cr->universal_access)
 		return true;
-	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to _user space */
+	if ((PRIV_R | PRIV_OWNER) & source->access[cr->auth_token].effective)
+		return true; /* reader or owner of the _user space */
 
 	uint32_t uid;
 	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
@@ -321,13 +322,19 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &owner_id) != 0)
 		return false;
 
-	/* Allow access for self, childs or public user. */
-	if (uid == cr->uid || owner_id == cr->uid || uid == PUBLIC)
+	/* Allow access for a user with user/role privileges. */
+	struct user *user = user_by_id(uid);
+	if (PRIV_OWNER &
+	    entity_access_get(user->def->type)[cr->auth_token].effective)
+		return true;
+
+	/* Allow access for self, children, public or owned user. */
+	if (uid == cr->uid || owner_id == cr->uid || uid == PUBLIC ||
+	    user->access[cr->auth_token].effective & PRIV_OWNER)
 		return true;
 
 	/* Allow access to a role granted to the effective user. */
-	struct user *role = user_by_id(uid);
-	if (role->def->type == SC_ROLE && role_is_granted(role, cr->auth_token))
+	if (user->def->type == SC_ROLE && role_is_granted(user, cr->auth_token))
 		return true;
 
 	return false;
@@ -338,13 +345,13 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop or alter privileges for universe.
+	 * Allow access for a user with read, write, drop or
+	 * alter privileges for universe, or a universe owner.
 	 */
-	if (PRIV_WRDA & cr->universal_access)
+	if ((PRIV_WRDA | PRIV_OWNER) & cr->universal_access)
 		return true;
-	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to _priv space */
+	if ((PRIV_R | PRIV_OWNER) & source->access[cr->auth_token].effective)
+		return true; /* reader or owner of the _priv space */
 
 	uint32_t grantor_id;
 	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &grantor_id) != 0)
@@ -352,8 +359,18 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 	uint32_t grantee_id;
 	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_UID, &grantee_id) != 0)
 		return false;
-	/* Allow access for privilege grantor or grantee. */
-	return grantor_id == cr->uid || grantee_id == cr->uid;
+	/* Allow access for a user with user/role privileges. */
+	struct user *grantor = user_by_id(grantor_id);
+	struct user *grantee = user_by_id(grantee_id);
+	if (PRIV_OWNER &
+	    entity_access_get(grantor->def->type)[cr->auth_token].effective ||
+	    PRIV_OWNER &
+	    entity_access_get(grantee->def->type)[cr->auth_token].effective)
+		return true;
+	/* Allow access for privilege grantor, grantee and their owners. */
+	return grantor_id == cr->uid || grantee_id == cr->uid ||
+	       grantor->access[cr->auth_token].effective & PRIV_OWNER ||
+	       grantee->access[cr->auth_token].effective & PRIV_OWNER;
 }
 
 static bool
@@ -361,17 +378,17 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop, alter or execute privileges for universe.
+	 * Allow access for a user with read, write, drop, alter
+	 * or execute privileges for universe, or a universe owner.
 	 */
-	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
+	if ((PRIV_WRDA | PRIV_X | PRIV_OWNER) & cr->universal_access)
 		return true;
 	/* Allow access for a user with function privileges. */
-	if ((PRIV_WRDA | PRIV_X) &
+	if ((PRIV_WRDA | PRIV_X | PRIV_OWNER) &
 	    entity_access_get(SC_FUNCTION)[cr->auth_token].effective)
 		return true;
-	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to _func space */
+	if ((PRIV_R | PRIV_OWNER) & source->access[cr->auth_token].effective)
+		return true; /* reader or owner of the _func space */
 
 	uint32_t name_len;
 	const char *name = tuple_field_str(tuple, BOX_FUNC_FIELD_NAME,
@@ -382,7 +399,7 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	assert(func != NULL);
 	user_access_t effective = func->access[cr->auth_token].effective;
 	return func->def->uid == cr->uid ||
-	       ((PRIV_WRDA | PRIV_X) & effective);
+	       ((PRIV_WRDA | PRIV_X | PRIV_OWNER) & effective);
 }
 
 static bool
@@ -390,17 +407,17 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop, alter or execute privileges for universe.
+	 * Allow access for a user with read, write, drop, alter
+	 * or execute privileges for universe, or a universe owner.
 	 */
-	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
+	if ((PRIV_WRDA | PRIV_X | PRIV_OWNER) & cr->universal_access)
 		return true;
 	/* Allow access for a user with sequence privileges. */
-	if ((PRIV_WRDA | PRIV_X) &
+	if ((PRIV_WRDA | PRIV_X | PRIV_OWNER) &
 	    entity_access_get(SC_SEQUENCE)[cr->auth_token].effective)
 		return true;
-	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to _sequence space */
+	if ((PRIV_R | PRIV_OWNER) & source->access[cr->auth_token].effective)
+		return true; /* reader or owner of the _sequence space */
 
 	uint32_t id;
 	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &id) != 0)
@@ -410,7 +427,7 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 		return false;
 	user_access_t effective = sequence->access[cr->auth_token].effective;
 	return sequence->def->uid == cr->uid ||
-	       ((PRIV_WRDA | PRIV_X) & effective);
+	       ((PRIV_WRDA | PRIV_X | PRIV_OWNER) & effective);
 }
 
 static bool

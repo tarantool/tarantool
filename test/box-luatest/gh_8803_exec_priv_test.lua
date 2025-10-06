@@ -42,15 +42,29 @@ g_common.test_unsupported_privs = function(cg)
     end, {cg.params.obj_type})
 end
 
--- Checks that global execute access may be granted only by admin.
+-- Checks that global execute access may only be granted by a superuser.
 g_common.test_grant = function(cg)
     cg.server:exec(function(obj_type)
-        box.session.su('admin', box.schema.user.grant, 'test', 'super')
+        -- Make it able to grant anything.
+        box.session.su('admin', box.schema.user.grant, 'test',
+                       'read,write,create,drop,alter', 'universe')
+
+        -- Grant the global execute access as a regular user.
         t.assert_error_msg_equals(
             string.format("Grant access to %s '' is denied for user 'test'",
                           obj_type),
             box.session.su, 'test', box.schema.user.grant, 'test', 'execute',
             obj_type)
+
+        -- Try again as a universe owner.
+        box.session.su('admin', box.schema.user.grant,
+                       'test', 'owner', 'universe')
+        box.session.su('test', box.schema.user.grant,
+                       'test', 'execute', obj_type)
+        box.session.su('test', box.schema.user.revoke,
+                       'test', 'execute', obj_type)
+        box.session.su('admin', box.schema.user.revoke,
+                       'test', 'owner', 'universe')
     end, {cg.params.obj_type})
 end
 

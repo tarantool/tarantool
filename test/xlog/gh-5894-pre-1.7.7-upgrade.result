@@ -54,7 +54,7 @@ box.space._space:format()
  | ...
 box.schema.user.info('admin')
  | ---
- | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete,owner
  |     - universe
  |     - 
  | ...
@@ -196,7 +196,7 @@ box.space._space:format()
  | ...
 box.schema.user.info('admin')
  | ---
- | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete,owner
  |     - universe
  |     - 
  | ...
@@ -298,7 +298,7 @@ box.space._space:format()
  | ...
 box.schema.user.info('admin')
  | ---
- | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete,owner
  |     - universe
  |     - 
  | ...
@@ -400,7 +400,7 @@ box.space._space:format()
  | ...
 box.schema.user.info('admin')
  | ---
- | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete,owner
  |     - universe
  |     - 
  | ...
