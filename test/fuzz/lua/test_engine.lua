@@ -32,17 +32,6 @@ local uuid = require('uuid')
 local test_dir_name = 'test_engine_dir'
 local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
 
-local params = require('internal.argparse').parse(arg, {
-    { 'engine', 'string' },
-    { 'fault_injection', 'boolean' },
-    { 'h', 'boolean' },
-    { 'seed', 'number' },
-    { 'test_duration', 'number' },
-    { 'test_dir', 'string' },
-    { 'verbose', 'boolean' },
-    { 'workers', 'number' },
-})
-
 local function counter()
     local i = 0
     return function()
@@ -53,8 +42,20 @@ end
 
 local index_id_func = counter()
 
-if params.help or params.h then
-    print(([[
+local box_cfg = false
+
+local arg_options = {
+    { 'engine', 'string' },
+    { 'fault_injection', 'boolean' },
+    { 'h', 'boolean' },
+    { 'seed', 'number' },
+    { 'test_duration', 'number' },
+    { 'test_dir', 'string' },
+    { 'verbose', 'boolean' },
+    { 'workers', 'number' },
+}
+
+local USAGE_STRING = [[
 
  Usage: tarantool test_engine.lua [options]
 
@@ -69,38 +70,47 @@ if params.help or params.h then
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
    help (same as -h)                     - print this message
-]]):format(test_dir_name))
-    os.exit(0)
-end
+]]
 
--- Number of workers.
-local arg_num_workers = params.workers or 50
+local function parse_args()
+    local params = require('internal.argparse').parse(arg, arg_options)
 
--- Test duration time.
-local arg_test_duration = params.test_duration or 2*60
-
--- Test directory.
-local arg_test_dir = params.test_dir or DEFAULT_TEST_DIR
-
--- Tarantool engine.
-local arg_engine = params.engine or 'vinyl'
-
-local arg_verbose = params.verbose or false
-
-local arg_fault_injection = params.fault_injection or false
-
-local seed = params.seed or os.time()
-math.randomseed(seed)
-log.info('Random seed: %d', seed)
-
--- MEMCS engine requires Tarantool Enterprise and a Lua C module:
--- `arrow_c_api_wrapper`.
-if arg_engine == 'memcs' then
-    local tarantool = require('tarantool')
-    if tarantool.package ~= 'Tarantool Enterprise' then
-        error('Engine ' .. arg_engine .. ' requires Tarantool Enterprise')
+    if params.help or params.h then
+        print((USAGE_STRING):format(test_dir_name))
+        os.exit(0)
     end
-    arrow = require('arrow_c_api_wrapper')
+
+    local args = {}
+
+    -- Number of workers.
+    args.num_workers = params.workers or 50
+
+    -- Test duration time.
+    args.test_duration = params.test_duration or 2*60
+
+    -- Test directory.
+    args.test_dir = params.test_dir or DEFAULT_TEST_DIR
+
+    -- Tarantool engine.
+    args.engine = params.engine or 'vinyl'
+
+    args.verbose = params.verbose or false
+
+    args.fault_injection = params.fault_injection or false
+
+    args.seed = params.seed or os.time()
+
+    -- MEMCS engine requires Tarantool Enterprise and a Lua C module:
+    -- `arrow_c_api_wrapper`.
+    if args.engine == 'memcs' then
+        local tarantool = require('tarantool')
+        if tarantool.package ~= 'Tarantool Enterprise' then
+            error('Engine ' .. args.engine .. ' requires Tarantool Enterprise')
+        end
+        arrow = require('arrow_c_api_wrapper')
+    end
+
+    return args
 end
 
 -- The table contains a whitelist of errors that will be ignored
@@ -1826,7 +1836,10 @@ local function start_error_injections(space, deadline)
 end
 
 local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode, fault_injection)
+                        engine_name, verbose_mode, fault_injection, seed)
+    math.randomseed(seed)
+    log.info('Random seed: %d', seed)
+
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
@@ -1875,5 +1888,7 @@ local function run_test(num_workers, test_duration, test_dir,
     os.exit(exit_code)
 end
 
-run_test(arg_num_workers, arg_test_duration, arg_test_dir,
-         arg_engine, arg_verbose, arg_fault_injection)
+local args = parse_args()
+
+run_test(args.num_workers, args.test_duration, args.test_dir,
+         args.engine, args.verbose, args.fault_injection, args.seed)
