@@ -281,7 +281,68 @@ function namespace_methods.clear(self)
     end)
 end
 
+local function get_system_namespace(aboard)
+    local mt = {}
+
+    local function selfcheck(self, method_name)
+        if type(self) ~= 'table' or getmetatable(self) ~= mt then
+            local fmt_str = 'Use alerts_namespace:%s(<...>) ' ..
+                            'instead of alerts_namespace.%s(<...>)'
+            error(fmt_str:format(method_name, method_name), 0)
+        end
+    end
+
+    mt = {
+        __index = {
+            get = function(self, key)
+                selfcheck(self, 'get')
+                assert(type(key) == 'string', 'alert key must be a string')
+                local alert = aboard_get(self._aboard, key)
+                return copy_public_fields(alert)
+            end,
+
+            alerts = function(self)
+                selfcheck(self, 'alerts')
+
+                local alerts = {}
+                local next_idx = 1
+                for key, alert in pairs(self._aboard._alerts) do
+                    if alert._namespace == nil then
+                        if type(key) ~= 'string' then
+                            key = next_idx
+                            next_idx = next_idx + 1
+                        end
+
+                        alerts[key] = copy_public_fields(alert)
+                    end
+                end
+
+                return alerts
+            end,
+
+            count = function(self)
+                selfcheck(self, 'count')
+
+                local count = 0
+                for _, alert in pairs(self._aboard._alerts) do
+                    if alert._namespace == nil then
+                        count = count + 1
+                    end
+                end
+
+                return count
+            end,
+        }
+    }
+
+    return setmetatable({_aboard = aboard}, mt)
+end
+
 local function namespace_new(self, name)
+    if name == nil then
+        return get_system_namespace(self)
+    end
+
     assert(type(name) == 'string', 'namespace name must be a string')
     assert(not name:find(':'), 'namespace name cannot contain a colon')
 

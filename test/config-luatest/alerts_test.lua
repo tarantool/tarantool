@@ -339,6 +339,121 @@ g.test_alerts_return_copies = function(g)
     })
 end
 
+-- Ensure that system namespace provides get and alerts methods.
+g.test_system_alerts_api = function(g)
+    local verify = function()
+        local config = require('config')
+        local system_alerts = config:new_alerts_namespace()
+
+        -- Check that the system alerts namespace object
+        -- has only get, alerts and count methods.
+        local system_alerts_mt = getmetatable(system_alerts)
+        local method_count = 0
+        for _, _ in pairs(system_alerts_mt.__index) do
+            method_count = method_count + 1
+        end
+        t.assert_equals(method_count, 3)
+        t.assert(system_alerts_mt.__index.get)
+        t.assert(system_alerts_mt.__index.alerts)
+        t.assert(system_alerts_mt.__index.count)
+
+        t.assert_equals(system_alerts:count(), 0)
+        t.assert_equals(#box.info.config.alerts, 0)
+
+        local key = 'my_key'
+        local alert_1 = {
+            message = 'Test alert 1',
+            type = 'warn',
+            my_field = 'my_value_1',
+        }
+        local alert_2 = {
+            message = 'Test alert 2',
+            type = 'error',
+            my_field = 'my_value_2',
+        }
+
+        config._aboard:set(alert_1, {key = key})
+        t.assert_covers(system_alerts:get(key), alert_1)
+        t.assert_equals(system_alerts:count(), 1)
+        t.assert_covers(system_alerts:alerts()[key], alert_1)
+        t.assert_equals(#box.info.config.alerts, 1)
+        -- Check that allert doesn't contain private fields.
+        for k, _ in pairs(system_alerts:get(key)) do
+            t.assert_not_equals(k[1], '_')
+        end
+
+        config._aboard:set(alert_2)
+        t.assert_covers(system_alerts:get(key), alert_1)
+        t.assert_equals(system_alerts:count(), 2)
+        t.assert_covers(system_alerts:alerts()[key], alert_1)
+        t.assert_covers(system_alerts:alerts()[1], alert_2)
+        t.assert_equals(#box.info.config.alerts, 2)
+
+
+        config._aboard:clean()
+        t.assert_equals(system_alerts:get(key), nil)
+        t.assert_equals(system_alerts:count(), 0)
+        t.assert_equals(#box.info.config.alerts, 0)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
+-- Ensure that system alerts returned by get and alerts methods are copies.
+-- Modifying them does not affect the stored alerts.
+g.test_system_alerts_return_copies = function(g)
+    local verify = function()
+        local config = require('config')
+        local system_alerts = config:new_alerts_namespace()
+        t.assert_equals(system_alerts:count(), 0)
+        t.assert_equals(#box.info.config.alerts, 0)
+
+        local key = 'my_key'
+        local alert = {
+            message = 'Test alert',
+            type = 'warn',
+            my_field = 'my_value',
+        }
+
+        config._aboard:set(alert, {key = key})
+        t.assert_covers(system_alerts:get(key), alert)
+        t.assert_equals(system_alerts:count(), 1)
+        t.assert_covers(system_alerts:alerts()[key], alert)
+        t.assert_equals(#box.info.config.alerts, 1)
+        t.assert_covers(box.info.config.alerts[1], alert)
+
+        -- Modify the returned alert from get method.
+        local got_alert = system_alerts:get(key)
+        got_alert.message = 'Modified message'
+        got_alert.new_field = 'new_value'
+
+        -- Check that the stored alert is not affected.
+        t.assert_covers(system_alerts:get(key), alert)
+        t.assert_equals(system_alerts:count(), 1)
+        t.assert_covers(system_alerts:alerts()[key], alert)
+        t.assert_equals(#box.info.config.alerts, 1)
+        t.assert_covers(box.info.config.alerts[1], alert)
+
+        -- Modify the returned alerts from alerts method.
+        local got_alerts = system_alerts:alerts()
+        got_alerts[key].message = 'Modified message'
+        got_alerts[key].new_field = 'new_value'
+
+        -- Check that the stored alert is not affected.
+        t.assert_covers(system_alerts:get(key), alert)
+        t.assert_equals(system_alerts:count(), 1)
+        t.assert_covers(system_alerts:alerts()[key], alert)
+        t.assert_equals(#box.info.config.alerts, 1)
+        t.assert_covers(box.info.config.alerts[1], alert)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
 -- Ensure that all faults are caught and reported correctly.
 local errorneous_cases = {
     {
@@ -470,6 +585,38 @@ local errorneous_cases = {
         script = [[
             local config = require('config')
             local alerts = config:new_alerts_namespace('my_alerts')
+            alerts:get(123)
+        ]],
+        err = 'alert key must be a string',
+    },
+    {
+        script = [[
+            local config = require('config')
+            local alerts = config:new_alerts_namespace()
+            alerts.get('my_key')
+        ]],
+        err = 'Use alerts_namespace:get',
+    },
+    {
+        script = [[
+            local config = require('config')
+            local alerts = config:new_alerts_namespace()
+            alerts.alerts()
+        ]],
+        err = 'Use alerts_namespace:alerts',
+    },
+    {
+        script = [[
+            local config = require('config')
+            local alerts = config:new_alerts_namespace()
+            alerts.count()
+        ]],
+        err = 'Use alerts_namespace:count',
+    },
+    {
+        script = [[
+            local config = require('config')
+            local alerts = config:new_alerts_namespace()
             alerts:get(123)
         ]],
         err = 'alert key must be a string',
