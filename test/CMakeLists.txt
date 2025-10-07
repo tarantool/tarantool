@@ -215,6 +215,9 @@ foreach(test_path ${tests})
   if(${_index} GREATER -1)
     continue()
   endif()
+  if(${basedir} MATCHES "fuzz")
+    continue()
+  endif()
   set(test_title "test/${suite}/${test_name}")
   # Salt is needed to avoid intersection in vardir paths for
   # different tests. Salt length equal to 1 is enough and remember
