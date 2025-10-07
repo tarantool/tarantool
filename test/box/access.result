@@ -100,7 +100,7 @@ end;
 ...
 usermax();
 ---
-- error: 'A limit on the total number of users has been reached: 32'
+- error: 'A limit on the total number of users has been reached: 4096'
 ...
 function usermax()
     local i = 1
@@ -113,7 +113,7 @@ end;
 ...
 usermax();
 ---
-- error: User 'user27' is not found
+- error: User 'user4091' is not found
 ...
 test_run:cmd("setopt delimiter ''");
 ---
