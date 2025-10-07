@@ -49,7 +49,7 @@ set(FUZZ_TEST_TARGETS "")
 
 set(DEFAULT_RUNS_NUMBER 10)
 
-list(APPEND LIBFUZZER_OPTS
+string(JOIN " " LIBFUZZER_OPTS
   -mutate_depth=20
   -print_final_stats=1
   -print_pcs=1
@@ -86,17 +86,17 @@ function(create_fuzz_test)
   set(LIBFUZZER_OPTS_EFFECTIVE ${LIBFUZZER_OPTS})
   set(dict_path ${PROJECT_SOURCE_DIR}/test/static/${FUZZ_PREFIX}.dict)
   if(EXISTS ${dict_path})
-    list(APPEND LIBFUZZER_OPTS_EFFECTIVE "-dict=${dict_path}")
+    set(LIBFUZZER_OPTS_EFFECTIVE "${LIBFUZZER_OPTS_EFFECTIVE} -dict=${dict_path}")
   endif()
   set(corpus_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${FUZZ_PREFIX})
   if(EXISTS ${corpus_path})
-    list(APPEND LIBFUZZER_OPTS_EFFECTIVE "${corpus_path}")
+    set(LIBFUZZER_OPTS_EFFECTIVE "${LIBFUZZER_OPTS_EFFECTIVE} ${corpus_path}")
   endif()
   set(test_title test/fuzz/${FUZZ_PREFIX}_test)
+  set(test_command "$<TARGET_FILE:${FUZZ_PREFIX}_fuzzer> \
+        -artifact_prefix=${FUZZ_PREFIX}_ ${LIBFUZZER_OPTS_EFFECTIVE}")
   add_test(NAME ${test_title}
-           COMMAND $<TARGET_FILE:${FUZZ_PREFIX}_fuzzer>
-                   -artifact_prefix=${FUZZ_PREFIX}_
-                   ${LIBFUZZER_OPTS_EFFECTIVE}
+           COMMAND ${BASH} -c "${test_command}"
   )
   set_tests_properties(${test_title} PROPERTIES
     LABELS "${TEST_SUITE_NAME};fuzzing;"
