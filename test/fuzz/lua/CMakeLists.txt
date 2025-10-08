@@ -102,6 +102,7 @@ include(BuildLuaTests)
 
 # test_engine.lua supports luzer, but test_mvcc.lua is not.
 string(JOIN ";" LUZER_TESTS
+  console_eval_test.lua
   csv_load_test.lua
   decimal_new_test.lua
   misc_memprof_test.lua
@@ -141,5 +142,7 @@ set_tests_properties(
   test/fuzz/lua/uri_parse_test.lua
   # To be enabled in scope tarantool/tarantool#12063.
   test/fuzz/lua/pickle_unpack_test.lua
+  # To be enabled in scope tarantool/security#153.
+  test/fuzz/lua/console_eval_test.lua
   PROPERTIES DISABLED TRUE
 )
