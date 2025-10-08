@@ -3364,6 +3364,54 @@ test_fiber_basic_api(lua_State *L)
 	return 1;
 }
 
+static int
+test_box_txn_begin(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 0);
+	int rc = box_txn_begin();
+	lua_pushboolean(L, rc == 0);
+	return 1;
+}
+
+static int
+test_box_txn_commit(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 0);
+	int rc = box_txn_commit();
+	lua_pushboolean(L, rc == 0);
+	return 1;
+}
+
+static int
+test_box_txn_rollback(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 0);
+	int rc = box_txn_rollback();
+	lua_pushboolean(L, rc == 0);
+	return 1;
+}
+
+static int
+test_box_txn_savepoint(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 0);
+	box_txn_savepoint_t *svp = box_txn_savepoint();
+	if (svp == NULL)
+		return 0;
+	lua_pushlightuserdata(L, svp);
+	return 1;
+}
+
+static int
+test_box_txn_rollback_to_savepoint(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	box_txn_savepoint_t *svp = lua_touserdata(L, 1);
+	int rc = box_txn_rollback_to_savepoint(svp);
+	lua_pushboolean(L, rc == 0);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3422,6 +3470,12 @@ luaopen_module_api(lua_State *L)
 		{"box_iproto_send", test_box_iproto_send},
 		{"box_iproto_override_set", test_box_iproto_override_set},
 		{"box_iproto_override_reset", test_box_iproto_override_reset},
+		{"box_txn_begin", test_box_txn_begin},
+		{"box_txn_commit", test_box_txn_commit},
+		{"box_txn_rollback", test_box_txn_rollback},
+		{"box_txn_savepoint", test_box_txn_savepoint},
+		{"box_txn_rollback_to_savepoint",
+			test_box_txn_rollback_to_savepoint},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
