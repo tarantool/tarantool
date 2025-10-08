@@ -676,8 +676,35 @@ local function test_box_insert_arrow(test, module)
             "box_insert_arrow API")
 end
 
+local function test_box_txn(test, module)
+    test:plan(12)
+    local svp = module.box_txn_savepoint()
+    test:is(svp, nil, "box_txn_savepoint without active txn")
+
+    test:ok(module.box_txn_begin(), "box_txn_begin")
+    test:is(module.box_txn_begin(), false, "begin with active transaction")
+
+    svp = module.box_txn_savepoint()
+    test:isnt(svp, nil, "box_txn_savepoint")
+
+    -- Two times to check if checkpoint can be used several times.
+    for _ = 1, 2 do
+        box.space.test:insert({1984})
+        test:ok(module.box_txn_rollback_to_savepoint(svp),
+                "box_txn_rollback_to_savepoint")
+        test:is(box.space.test:get(1984), nil)
+    end
+
+    box.space.test:insert({1984})
+    test:ok(module.box_txn_rollback(), "box_txn_rollback")
+    test:is(box.space.test:get(1984), nil)
+
+    test:ok(module.box_txn_begin(), "box_txn_begin")
+    test:ok(module.box_txn_commit(), "box_txn_commit")
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(54)
+    test:plan(55)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -716,6 +743,7 @@ require('tap').test("module_api", function(test)
     test:test("box_iproto_override", test_box_iproto_override, module)
     test:test("box_ibuf", test_box_ibuf, module)
     test:test("box_insert_arrow", test_box_insert_arrow, module)
+    test:test("box_txn", test_box_txn, module)
 
     space:drop()
 end)
