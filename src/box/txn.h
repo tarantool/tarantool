@@ -1160,6 +1160,31 @@ box_txn_commit(void);
 API_EXPORT int
 box_txn_rollback(void);
 
+/** Savepoint. */
+typedef struct txn_savepoint box_txn_savepoint_t;
+
+/**
+ * Create a new savepoint.
+ * @retval not NULL Savepoint object.
+ * @retval     NULL Client or memory error.
+ */
+API_EXPORT box_txn_savepoint_t *
+box_txn_savepoint(void);
+
+/**
+ * Rollback to @a savepoint. Rollback all statements newer than a
+ * saved statement. @a savepoint can be rolled back multiple
+ * times. All existing savepoints, newer than @a savepoint, are
+ * deleted and can not be used.
+ * @a savepoint must be from a current transaction, else the
+ * rollback crashes. To validate savepoints store transaction id
+ * together with @a savepoint.
+ * @retval  0 Success.
+ * @retval -1 Client error.
+ */
+API_EXPORT int
+box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
+
 /**
  * Allocate memory on txn memory pool.
  * The memory is automatically deallocated when the transaction
@@ -1203,30 +1228,6 @@ box_txn_make_sync(void);
 /** Commit the current txn with the chosen wait mode. */
 int
 box_txn_commit_ex(enum txn_commit_wait_mode wait_mode);
-
-typedef struct txn_savepoint box_txn_savepoint_t;
-
-/**
- * Create a new savepoint.
- * @retval not NULL Savepoint object.
- * @retval     NULL Client or memory error.
- */
-API_EXPORT box_txn_savepoint_t *
-box_txn_savepoint(void);
-
-/**
- * Rollback to @a savepoint. Rollback all statements newer than a
- * saved statement. @A savepoint can be rolled back multiple
- * times. All existing savepoints, newer than @a savepoint, are
- * deleted and can not be used.
- * @A savepoint must be from a current transaction, else the
- * rollback crashes. To validate savepoints store transaction id
- * together with @a savepoint.
- * @retval  0 Success.
- * @retval -1 Client error.
- */
-API_EXPORT int
-box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
 #if defined(__cplusplus)
 } /* extern "C" */
