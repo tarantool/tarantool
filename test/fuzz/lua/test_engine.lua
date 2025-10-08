@@ -1,10 +1,11 @@
 --[[
 The test for Tarantool allows you to randomly generate DDL and DML
-operations for spaces uses vinyl and memtx engines and toggle
-random error injections. All random operations and settings depend
-on the seed, which is generated at the very beginning of the test.
+operations for spaces that use vinyl, memtx and memcs engines and
+toggle random error injections. All random operations and settings
+depend on the seed, which is generated at the very beginning of
+the test.
 
-by default the script uses a directory `test_engine_dir` in
+By default the script uses a directory `test_engine_dir` in
 a current directory. Custom test directory can be specified with
 option `--test_dir`. The script will clean up the directory before
 testing if it exists.
