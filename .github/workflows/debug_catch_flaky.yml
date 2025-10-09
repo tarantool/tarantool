@@ -1,7 +1,10 @@
 name: debug_catch_flaky
 
 on:
-  pull_request
+  pull_request:
+    paths:
+      - 'test/*/*.lua'
+      - 'test/unit/*.c*'
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
