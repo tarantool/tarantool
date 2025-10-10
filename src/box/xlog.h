@@ -35,12 +35,14 @@
 #include <sys/stat.h>
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
+#include "xrow.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
 
 #include "small/ibuf.h"
 #include "small/obuf.h"
+#include "small/mempool.h"
 
 struct iovec;
 struct xrow_header;
@@ -636,79 +638,6 @@ xlog_materialize(struct xlog *l);
 void
 xlog_discard(struct xlog *l);
 
-/* {{{ xlog_tx_cursor - iterate over rows in xlog transaction */
-
-/**
- * xlog tx iterator
- */
-struct xlog_tx_cursor
-{
-	/** rows buffer */
-	struct ibuf rows;
-	/** tx size */
-	size_t size;
-};
-
-/**
- * Create xlog tx iterator from memory data.
- * *data will be adjusted to end of tx
- *
- * @retval 0 for Ok
- * @retval -1 for error
- * @retval >0 how many additional bytes should be read to parse tx
- */
-ssize_t
-xlog_tx_cursor_create(struct xlog_tx_cursor *cursor,
-		      const char **data, const char *data_end,
-		      ZSTD_DStream *zdctx);
-
-/**
- * Destroy xlog tx cursor and free all associated memory
- * including parsed xrows
- */
-int
-xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor);
-
-/**
- * Fetch next xrow from xlog tx cursor
- *
- * @retval 0 for Ok
- * @retval 1 if current tx is done
- * @retval -1 for error
- */
-int
-xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor, struct xrow_header *xrow);
-
-/**
- * Fetch next xrow from current xlog tx cursor.
- *
- * This function is similar to xlog_tx_cursor_next_row() except it doesn't
- * parse the xrow nor does it advance the data pointer.
- *
- * @param cursor cursor
- * @param[out] data pointer to the position in the internal buffer where
- *                  the next xrow is stored
- * @param[out] end end of the buffer
- *
- * @retval 0 for Ok
- * @retval 1 if current tx is done
- */
-int
-xlog_tx_cursor_next_row_raw(struct xlog_tx_cursor *cursor,
-			    const char ***data, const char **end);
-
-/**
- * Return current tx cursor position
- *
- * @param tx_cursor tx_cursor
- * @retval current tx cursor position
- */
-static inline off_t
-xlog_tx_cursor_pos(struct xlog_tx_cursor *tx_cursor)
-{
-	return tx_cursor->size - ibuf_used(&tx_cursor->rows);
-}
-
 /**
  * A conventional helper to decode rows from the raw tx buffer.
  * Decodes fixheader, checks crc32 and length, decompresses rows.
@@ -724,8 +653,6 @@ int
 xlog_tx_decode(const char *data, const char *data_end,
 	       char *rows, char *rows_end,
 	       ZSTD_DStream *zdctx);
-
-/* }}} */
 
 /* {{{ xlog_cursor - read rows from a log file */
 
@@ -765,7 +692,7 @@ struct xlog_cursor {
 	/** file read position */
 	off_t read_offset;
 	/** cursor for current tx */
-	struct xlog_tx_cursor tx_cursor;
+	struct ibuf tx_cursor;
 	/** ZSTD context for decompression */
 	ZSTD_DStream *zdctx;
 };
@@ -845,6 +772,13 @@ int
 xlog_cursor_next_tx(struct xlog_cursor *cursor);
 
 /**
+ * Same as @xlog_cursor_next_tx, but no tx cursor is created. Tx is returned
+ * in @a buf.
+ */
+int
+xlog_cursor_next_tx_raw(struct xlog_cursor *i, struct ibuf *buf);
+
+/**
  * Fetch next xrow from current xlog tx
  *
  * @retval 0 for Ok
@@ -915,7 +849,7 @@ xlog_cursor_pos(struct xlog_cursor *cursor)
 static inline off_t
 xlog_cursor_tx_pos(struct xlog_cursor *cursor)
 {
-	return xlog_tx_cursor_pos(&cursor->tx_cursor);
+	return ibuf_pos(&cursor->tx_cursor);
 }
 /* }}} */
 
@@ -973,6 +907,110 @@ extern xlog_remove_file_impl_f xlog_remove_file_impl;
  */
 bool
 xlog_remove_file(const char *filename, unsigned flags);
+
+/** xlog row with parsed body. */
+struct xlog_entry {
+	/** Row header. */
+	struct xrow_header header;
+	union {
+		/** DML request. */
+		struct request dml;
+		/** RAFT request. */
+		struct raft_request raft;
+		struct {
+			/** Synchro request. */
+			struct synchro_request synchro;
+			/** Storage for vclock of synchro . */
+			struct vclock synchro_vclock;
+		};
+	};
+
+	/** Internal field. Should not be accessed directly. */
+	struct error *error;
+};
+
+/** Cursor to read `struct xlog_entry`. */
+struct
+xlog_entry_cursor {
+	/** Cursor used to get raw batch data. */
+	struct xlog_cursor *raw_cursor;
+	/** Pool for `struct xlog_entry *` objects. */
+	struct mempool entry_pool;
+	/** Set if last batch reading failed. */
+	bool search_magic;
+	/** Set if EOF is reached. */
+	bool eof;
+	/** Set if last batch was partially read. */
+	struct error *error;
+};
+
+/** Batch of `struct xlog_entry`. */
+struct xlog_batch {
+	/** The cursor this batch is read from. */
+	struct xlog_entry_cursor *cursor;
+	/** Raw batch data. */
+	struct ibuf data;
+	/** Buffer holding array of `struct xlog_entry *`. */
+	struct ibuf entries;
+	/** Number of entries. */
+	size_t entry_count;
+};
+
+/**
+ * Get xlog entry at `index` from the `batch`.
+ *
+ * Returns:
+ *  0 - success.
+ * -1 - the entry body is not decoded, diag is set to XlogError,
+ *      entry output argument is still set, but only it's header is valid.
+ */
+static inline int
+xlog_batch_get(struct xlog_batch *batch, size_t index,
+	       struct xlog_entry **entry)
+{
+	assert(index < batch->entry_count);
+	struct xlog_entry **entries = (struct xlog_entry **)batch->entries.rpos;
+	*entry = entries[index];
+	if ((*entry)->error != NULL) {
+		diag_set_error(diag_get(), (*entry)->error);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Destroys the batch.
+ *
+ * The batch should be destroyed before the cursor from which it is read from
+ * is destroyed.
+ */
+void
+xlog_batch_destroy(struct xlog_batch *batch);
+
+/** Creates cursor. Takes own of `raw_cursor`. */
+void
+xlog_entry_cursor_create(struct xlog_entry_cursor *cursor,
+			 struct xlog_cursor *raw_cursor);
+
+/** Destroys cursor. */
+void
+xlog_entry_cursor_destroy(struct xlog_entry_cursor *cursor);
+
+/**
+ * Fetches next batch of xlog entries.
+ *
+ * The batch is managed by caller and should be destroyed when not needed.
+ *
+ * If error is XlogError then reading can be continued, otherwise it is UB.
+ *
+ * Returns:
+ *   0 - success.
+ *   1 - EOF, batch is not initialized.
+ *  -1 - error, diag is set, batch is not initialized.
+ */
+int
+xlog_entry_cursor_next_batch(struct xlog_entry_cursor *cursor,
+			     struct xlog_batch *batch);
 
 /** }}} */
 
