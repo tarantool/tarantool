@@ -55,8 +55,8 @@
 #include "cbus.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
+#include "checkpoint.h"
 #include "checkpoint_schedule.h"
-#include "txn_limbo.h"
 #include "tt_uuid.h"
 #include "tt_static.h"
 #include "box.h"
@@ -527,58 +527,17 @@ gc_add_checkpoint(const struct vclock *vclock, double timestamp)
 static int
 gc_do_checkpoint(bool is_scheduled)
 {
-	int rc;
-	struct wal_checkpoint checkpoint;
-	int64_t limbo_rollback_count = txn_limbo.rollback_count;
-
 	assert(!gc.checkpoint_is_in_progress);
 	gc.checkpoint_is_in_progress = true;
-
-	/*
-	 * Rotate WAL and call engine callbacks to create a checkpoint
-	 * on disk for each registered engine.
-	 */
-	rc = engine_begin_checkpoint(is_scheduled);
-	if (rc != 0)
-		goto out;
-	rc = txn_limbo_flush(&txn_limbo);
-	if (rc != 0)
-		goto out;
-	rc = wal_begin_checkpoint(&checkpoint);
-	if (rc != 0)
-		goto out;
-	/*
-	 * Check if the checkpoint contains rolled back data. That makes the
-	 * checkpoint not self-sufficient - it needs the xlog file with
-	 * ROLLBACK. Drop it.
-	 */
-	if (txn_limbo.rollback_count != limbo_rollback_count) {
-		rc = -1;
-		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		goto out;
+	struct box_checkpoint checkpoint;
+	int rc = box_checkpoint_build_on_disk(&checkpoint, is_scheduled);
+	if (rc == 0) {
+		/*
+		 * Finally, track the newly created checkpoint in the garbage
+		 * collector state.
+		 */
+		gc_add_checkpoint(&checkpoint.journal.vclock, ev_time());
 	}
-	/*
-	 * Wait the confirms on all "sync" transactions before
-	 * create a snapshot.
-	 */
-	rc = txn_limbo_wait_confirm(&txn_limbo);
-	if (rc != 0)
-		goto out;
-
-	rc = engine_commit_checkpoint(&checkpoint.vclock);
-	if (rc != 0)
-		goto out;
-	wal_commit_checkpoint(&checkpoint);
-
-	/*
-	 * Finally, track the newly created checkpoint in the garbage
-	 * collector state.
-	 */
-	gc_add_checkpoint(&checkpoint.vclock, ev_time());
-out:
-	if (rc != 0)
-		engine_abort_checkpoint();
-
 	gc.checkpoint_is_in_progress = false;
 	return rc;
 }

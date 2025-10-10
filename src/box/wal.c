@@ -77,6 +77,30 @@ wal_write_none_async(struct journal *, struct journal_entry *);
 static int
 wal_sync(struct journal *journal, struct vclock *vclock);
 
+/** Nop implementation of checkpoint when WAL is disabled. */
+static int
+wal_begin_checkpoint_none(struct journal *j, struct journal_checkpoint *out);
+
+/**
+ * Flush all the queued journal entries and rotate WAL. All newer entries will
+ * be written to newer files.
+ */
+static int
+wal_begin_checkpoint(struct journal *j, struct journal_checkpoint *out);
+
+/** Nop implementation of checkpoint when WAL is disabled. */
+static void
+wal_commit_checkpoint_none(struct journal *j,
+			   const struct journal_checkpoint *point);
+
+/**
+ * Notify WAL thread about a successfully created on-disk checkpoint. All the
+ * prior xlog files then can be considered covered by that checkpoint.
+ */
+static void
+wal_commit_checkpoint(struct journal *j,
+		      const struct journal_checkpoint *point);
+
 /*
  * WAL writer - maintain a Write Ahead Log for every change
  * in the data state.
@@ -442,9 +466,11 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	if (wal_mode == WAL_NONE) {
 		journal_create(&writer->base, wal_write_none_async,
-			       wal_sync_none);
+			       wal_sync_none, wal_begin_checkpoint_none,
+			       wal_commit_checkpoint_none);
 	} else {
-		journal_create(&writer->base, wal_write_async, wal_sync);
+		journal_create(&writer->base, wal_write_async, wal_sync,
+			       wal_begin_checkpoint, wal_commit_checkpoint);
 	}
 
 	struct xlog_opts opts = xlog_opts_default;
@@ -708,9 +734,27 @@ wal_xlog_close(struct xlog *xlog)
 }
 
 static int
+wal_begin_checkpoint_none(struct journal *j, struct journal_checkpoint *out)
+{
+	(void)j;
+	struct wal_writer *writer = &wal_writer_singleton;
+	assert(writer->wal_mode == WAL_NONE);
+	vclock_copy(&out->vclock, &writer->vclock);
+	out->tail_size = 0;
+	return 0;
+}
+
+/** CBus message to carry parameters between TX and WAL threads. */
+struct wal_begin_checkpoint_msg {
+	/** The carrier message. */
+	struct cbus_call_msg base;
+	/** The checkpoint to fill with resulting data. */
+	struct journal_checkpoint *out;
+};
+
+static int
 wal_begin_checkpoint_f(struct cbus_call_msg *data)
 {
-	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->is_in_rollback) {
 		/*
@@ -734,21 +778,19 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 		 * The next WAL will be created on the first write.
 		 */
 	}
-	vclock_copy(&msg->vclock, &writer->vclock);
-	msg->wal_size = writer->checkpoint_wal_size;
+	struct wal_begin_checkpoint_msg *msg = (void *)data;
+	vclock_copy(&msg->out->vclock, &writer->vclock);
+	msg->out->tail_size = writer->checkpoint_wal_size;
 	ERROR_INJECT_SLEEP(ERRINJ_WAL_DELAY);
 	return 0;
 }
 
-int
-wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
+static int
+wal_begin_checkpoint(struct journal *j, struct journal_checkpoint *out)
 {
+	(void)j;
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->wal_mode == WAL_NONE) {
-		vclock_copy(&checkpoint->vclock, &writer->vclock);
-		checkpoint->wal_size = 0;
-		return 0;
-	}
+	assert(writer->wal_mode != WAL_NONE);
 	if (!stailq_empty(&writer->rollback)) {
 		/*
 		 * If cascading rollback is in progress, in-memory
@@ -762,14 +804,34 @@ wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 	}
 	if (journal_queue_flush() != 0)
 		return -1;
+	struct wal_begin_checkpoint_msg msg;
+	msg.out = out;
 	return cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-			 &checkpoint->base, wal_begin_checkpoint_f);
+			 &msg.base, wal_begin_checkpoint_f);
 }
+
+static void
+wal_commit_checkpoint_none(struct journal *j,
+			   const struct journal_checkpoint *point)
+{
+	(void)j;
+	struct wal_writer *writer = &wal_writer_singleton;
+	assert(writer->wal_mode == WAL_NONE);
+	vclock_copy(&writer->checkpoint_vclock, &point->vclock);
+}
+
+/** CBus message to carry parameters between TX and WAL threads. */
+struct wal_commit_checkpoint_msg {
+	/** The carrier message. */
+	struct cbus_call_msg base;
+	/** The info about a completed checkpoint to use. */
+	const struct journal_checkpoint *point;
+};
 
 static int
 wal_commit_checkpoint_f(struct cbus_call_msg *data)
 {
-	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
+	struct wal_commit_checkpoint_msg *msg = (void *)data;
 	struct wal_writer *writer = &wal_writer_singleton;
 	/*
 	 * Now, once checkpoint has been created, we can update
@@ -781,22 +843,22 @@ wal_commit_checkpoint_f(struct cbus_call_msg *data)
 	 * when checkpointing started from the current value
 	 * rather than just setting it to 0.
 	 */
-	vclock_copy(&writer->checkpoint_vclock, &msg->vclock);
-	assert(writer->checkpoint_wal_size >= msg->wal_size);
-	writer->checkpoint_wal_size -= msg->wal_size;
+	vclock_copy(&writer->checkpoint_vclock, &msg->point->vclock);
+	assert(writer->checkpoint_wal_size >= msg->point->tail_size);
+	writer->checkpoint_wal_size -= msg->point->tail_size;
 	writer->checkpoint_triggered = false;
 	return 0;
 }
 
-void
-wal_commit_checkpoint(struct wal_checkpoint *checkpoint)
+static void
+wal_commit_checkpoint(struct journal *j, const struct journal_checkpoint *point)
 {
+	(void)j;
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (writer->wal_mode == WAL_NONE) {
-		vclock_copy(&writer->checkpoint_vclock, &checkpoint->vclock);
-		return;
-	}
-	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &checkpoint->base,
+	assert(writer->wal_mode != WAL_NONE);
+	struct wal_commit_checkpoint_msg msg;
+	msg.point = point;
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
 		  wal_commit_checkpoint_f);
 }
 
