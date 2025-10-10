@@ -57,6 +57,9 @@ string(JOIN " " LIBFUZZER_OPTS
   -reload=1
   -report_slow_units=5
   -seed=${RANDOM_SEED}
+  -use_cmp=1
+  -use_counters=1
+  -use_memmem=1
   -use_value_profile=1
   -workers=${CMAKE_BUILD_PARALLEL_LEVEL}
   # Shell parameter expansion,
