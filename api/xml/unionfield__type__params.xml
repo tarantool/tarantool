@@ -17,7 +17,7 @@
         </detaileddescription>
         <inbodydescription>
         </inbodydescription>
-        <location file="src/module.h" line="2289" column="9" bodyfile="src/module.h" bodystart="2289" bodyend="-1"/>
+        <location file="src/module.h" line="2314" column="9" bodyfile="src/module.h" bodystart="2314" bodyend="-1"/>
       </memberdef>
     </sectiondef>
     <briefdescription>
@@ -25,7 +25,7 @@
     </briefdescription>
     <detaileddescription>
     </detaileddescription>
-    <location file="src/module.h" line="2287" column="1" bodyfile="src/module.h" bodystart="2287" bodyend="2290"/>
+    <location file="src/module.h" line="2312" column="1" bodyfile="src/module.h" bodystart="2312" bodyend="2315"/>
     <listofallmembers>
       <member refid="unionfield__type__params_1a3754993008ced0f6a10f690ebb40d145" prot="public" virt="non-virtual"><scope>field_type_params</scope><name>scale</name></member>
     </listofallmembers>

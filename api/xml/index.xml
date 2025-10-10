@@ -460,6 +460,7 @@
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
     <member refid="module_8h_1abba432143f6c7876ea8704638e9c9e5d" kind="typedef"><name>tnt_tx_func_f</name></member>
     <member refid="module_8h_1ae1cb16b1acef0772ea4192316f742aa8" kind="typedef"><name>box_ibuf_t</name></member>
+    <member refid="module_8h_1a729a453eff09fc507eb67edc89484b6c" kind="typedef"><name>box_txn_savepoint_t</name></member>
     <member refid="module_8h_1ab230ff08fb24d580407126fc905cc271" kind="typedef"><name>box_tuple_format_t</name></member>
     <member refid="module_8h_1a880c3e1e8e63b9a12353853fb6aefa3f" kind="typedef"><name>box_tuple_t</name></member>
     <member refid="module_8h_1aa289ab037764b9f065d4b683cb186bda" kind="typedef"><name>box_tuple_iterator_t</name></member>
@@ -558,6 +559,8 @@
     <member refid="module_8h_1a88346fff21ac55ecf5e8e7e8750093ce" kind="function"><name>box_txn_begin</name></member>
     <member refid="module_8h_1a541c69864552de6ae21c4edce2bbf949" kind="function"><name>box_txn_commit</name></member>
     <member refid="module_8h_1a59188d28eb2a8cd892d48f74041fec45" kind="function"><name>box_txn_rollback</name></member>
+    <member refid="module_8h_1ac235e2cd54017e1e18c9e6ea41fbf993" kind="function"><name>box_txn_savepoint</name></member>
+    <member refid="module_8h_1ad1746c958580f3ff89e5b9b193ed3847" kind="function"><name>box_txn_rollback_to_savepoint</name></member>
     <member refid="module_8h_1a6d157a0b9ff004736c655db785486447" kind="function"><name>box_txn_alloc</name></member>
     <member refid="module_8h_1a3e930976f6e8e73e213f701c3761fce4" kind="function"><name>box_txn_set_timeout</name></member>
     <member refid="module_8h_1a8a24686e9b0f80d53ded039aa69dfd33" kind="function"><name>box_txn_set_isolation</name></member>

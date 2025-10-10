@@ -10,5 +10,6 @@ var searchData=
   ['box_5flatch_5ft_7',['box_latch_t',['../module_8h.html#a923d13f137e4bdb8c852ea04637da58d',1,'module.h']]],
   ['box_5ftuple_5fformat_5ft_8',['box_tuple_format_t',['../module_8h.html#ab230ff08fb24d580407126fc905cc271',1,'module.h']]],
   ['box_5ftuple_5fiterator_5ft_9',['box_tuple_iterator_t',['../module_8h.html#aa289ab037764b9f065d4b683cb186bda',1,'module.h']]],
-  ['box_5ftuple_5ft_10',['box_tuple_t',['../module_8h.html#a880c3e1e8e63b9a12353853fb6aefa3f',1,'module.h']]]
+  ['box_5ftuple_5ft_10',['box_tuple_t',['../module_8h.html#a880c3e1e8e63b9a12353853fb6aefa3f',1,'module.h']]],
+  ['box_5ftxn_5fsavepoint_5ft_11',['box_txn_savepoint_t',['../module_8h.html#a729a453eff09fc507eb67edc89484b6c',1,'module.h']]]
 ];
