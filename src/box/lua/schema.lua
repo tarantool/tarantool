@@ -197,8 +197,9 @@ ffi.cdef[[
         PRIV_INSERT = 1024,
         PRIV_UPDATE = 2048,
         PRIV_DELETE = 4096,
-        PRIV_GRANT = 8192,
-        PRIV_REVOKE = 16384,
+        PRIV_OWNER = 8192,
+        PRIV_GRANT = 16384,
+        PRIV_REVOKE = 32768,
         PRIV_ALL  = 4294967295
     };
 
@@ -218,6 +219,7 @@ box.priv = {
     ["INSERT"] = builtin.PRIV_INSERT,
     ["UPDATE"] = builtin.PRIV_UPDATE,
     ["DELETE"] = builtin.PRIV_DELETE,
+    ["OWNER"] = builtin.PRIV_OWNER,
     ["GRANT"]= builtin.PRIV_GRANT,
     ["REVOKE"] = builtin.PRIV_REVOKE,
     ["ALL"] = builtin.PRIV_ALL
@@ -3191,7 +3193,8 @@ local function privilege_parse(privs)
         trigger   = box.priv.TRIGGER,
         insert    = box.priv.INSERT,
         update    = box.priv.UPDATE,
-        delete    = box.priv.DELETE
+        delete    = box.priv.DELETE,
+        owner     = box.priv.OWNER
     }
     local privs_cp = string.lower(privs):gsub('^[%A]*', '')
 
@@ -3238,15 +3241,15 @@ local priv_object_combo = {
                            box.priv.C, box.priv.D, box.priv.A,
                            box.priv.REFERENCE, box.priv.TRIGGER,
                            box.priv.INSERT, box.priv.UPDATE,
-                           box.priv.DELETE),
+                           box.priv.DELETE, box.priv.OWNER),
     ["sequence"] = bit.bor(box.priv.R, box.priv.W, box.priv.U,
-                           box.priv.C, box.priv.A, box.priv.D),
+                           box.priv.C, box.priv.A, box.priv.D, box.priv.OWNER),
     ["function"] = bit.bor(box.priv.X, box.priv.U,
-                           box.priv.C, box.priv.D),
+                           box.priv.C, box.priv.D, box.priv.OWNER),
     ["role"]     = bit.bor(box.priv.X, box.priv.U,
-                           box.priv.C, box.priv.D),
+                           box.priv.C, box.priv.D, box.priv.OWNER),
     ["user"]     = bit.bor(box.priv.C, box.priv.A,
-                           box.priv.D),
+                           box.priv.D, box.priv.OWNER),
 }
 
 local BOX_SPACE_EXECUTE_PRIV_BRIEF = [[
@@ -3330,6 +3333,9 @@ local function privilege_name(privilege)
     end
     if bit.band(privilege, box.priv.DELETE) ~= 0 then
         table.insert(names, "delete")
+    end
+    if bit.band(privilege, box.priv.OWNER) ~= 0 then
+        table.insert(names, "owner")
     end
     return table.concat(names, ",")
 end
@@ -4021,8 +4027,9 @@ local function full_drop(uid)
     for _, tuple in pairs(funcs) do
         box.schema.func.drop(tuple.id)
     end
-    -- if this is a role, revoke this role from whoever it was granted to
-    local grants = _vpriv.index.object:select{'role', uid}
+    -- revoke accesses for this object from whoever it was granted to
+    local user_type = box.space._vuser:get{uid}.type
+    local grants = _vpriv.index.object:select{user_type, uid}
     for _, tuple in pairs(grants) do
         _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
     end
@@ -4033,7 +4040,7 @@ local function full_drop(uid)
     -- xxx: hack, we have to revoke session and usage privileges
     -- of a user using a setuid function in absence of create/drop
     -- privileges and grant option
-    if box.space._vuser:get{uid}.type == 'user' then
+    if user_type == 'user' then
         box.session.su('admin', box.schema.user.revoke, uid,
                        'session,usage', 'universe', nil, {if_exists = true})
     end
