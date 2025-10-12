@@ -204,12 +204,13 @@ test-coverage: build run-luajit-test run-test
 test-debug-flaky: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
                                  -DTEST_BUILD=ON
 test-debug-flaky: LUA_PATTERN = "./*/*test.lua"
-test-debug-flaky: UNITTEST_PATTERN = "./unit/*.test.c*"
+test-debug-flaky: UNITTEST_PATTERN = "./unit/*.c*"
 
 test-debug-flaky: build install-test-deps
 	cd test && \
 	TESTS=$$(git diff --relative=test --name-only \
-	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN}) && \
+	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN} | \
+	         sed 's/\.\(c\|cpp\|cc\)$$//' | grep . | sort -u) && \
 	(([ -n "$${TESTS}" ] && ${TEST_RUN_ENV} \
 	  ./test-run.py --force \
 	                --vardir ${VARDIR} \
