@@ -1299,9 +1299,9 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		map_size++;
 	}
 
-	if (req->confirmed_vclock != NULL) {
+	if (vclock_is_set(&req->confirmed_vclock)) {
 		pos = mp_encode_uint(pos, IPROTO_VCLOCK);
-		pos = mp_encode_vclock_ignore0(pos, req->confirmed_vclock);
+		pos = mp_encode_vclock_ignore0(pos, &req->confirmed_vclock);
 		map_size++;
 	}
 
@@ -1317,8 +1317,7 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 }
 
 int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
-		    struct vclock *vclock)
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -1334,6 +1333,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
 	}
 
 	memset(req, 0, sizeof(*req));
+	vclock_clear(&req->confirmed_vclock);
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		enum mp_type type = mp_typeof(*d);
@@ -1361,11 +1361,9 @@ bad_msgpack:
 			req->term = mp_decode_uint(&d);
 			break;
 		case IPROTO_VCLOCK:
-			if (vclock == NULL)
-				mp_next(&d);
-			else if (mp_decode_vclock_ignore0(&d, vclock) != 0)
+			if (mp_decode_vclock_ignore0(
+					&d, &req->confirmed_vclock) != 0)
 				goto bad_msgpack;
-			req->confirmed_vclock = vclock;
 			break;
 		default:
 			mp_next(&d);
@@ -1409,10 +1407,10 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 		size += mp_sizeof_uint(IPROTO_RAFT_IS_LEADER_SEEN) +
 			mp_sizeof_bool(r->is_leader_seen);
 	}
-	if (r->vclock != NULL) {
+	if (vclock_is_set(&r->vclock)) {
 		++map_size;
 		size += mp_sizeof_uint(IPROTO_RAFT_VCLOCK) +
-			mp_sizeof_vclock_ignore0(r->vclock);
+			mp_sizeof_vclock_ignore0(&r->vclock);
 	}
 	size += mp_sizeof_map(map_size);
 
@@ -1443,16 +1441,15 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 		buf = mp_encode_uint(buf, IPROTO_RAFT_IS_LEADER_SEEN);
 		buf = mp_encode_bool(buf, true);
 	}
-	if (r->vclock != NULL) {
+	if (vclock_is_set(&r->vclock)) {
 		buf = mp_encode_uint(buf, IPROTO_RAFT_VCLOCK);
-		buf = mp_encode_vclock_ignore0(buf, r->vclock);
+		buf = mp_encode_vclock_ignore0(buf, &r->vclock);
 	}
 	row->body[0].iov_len = buf - begin;
 }
 
 int
-xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
-		 struct vclock *vclock)
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r)
 {
 	if (row->type != IPROTO_RAFT)
 		goto bad_msgpack;
@@ -1462,6 +1459,7 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 		return -1;
 	}
 	memset(r, 0, sizeof(*r));
+	vclock_clear(&r->vclock);
 
 	r->group_id = row->group_id;
 	const char *pos = row->body[0].iov_base;
@@ -1498,10 +1496,7 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 			r->is_leader_seen = mp_decode_bool(&pos);
 			break;
 		case IPROTO_RAFT_VCLOCK:
-			r->vclock = vclock;
-			if (r->vclock == NULL)
-				mp_next(&pos);
-			else if (mp_decode_vclock_ignore0(&pos, vclock) != 0)
+			if (mp_decode_vclock_ignore0(&pos, &r->vclock) != 0)
 				goto bad_msgpack;
 			break;
 		default:
