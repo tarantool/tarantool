@@ -382,7 +382,7 @@ struct synchro_request {
 	 * Confirmed lsns of all the previous limbo owners. Only used for
 	 * PROMOTE and DEMOTE requests.
 	 */
-	struct vclock *confirmed_vclock;
+	struct vclock confirmed_vclock;
 };
 
 /**
@@ -399,25 +399,41 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
  * Decode synchronous replication request.
  * @param row xrow header.
  * @param[out] req Request parameters.
- * @param[out] vclock Storage for request vclock.
  * @retval -1 on error.
  * @retval 0 success.
  */
 int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
-		    struct vclock *vclock);
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req);
 
 /**
  * Raft request. It repeats Raft message to the letter, but can be extended in
  * future not depending on the Raft library.
  */
 struct raft_request {
+	/** Term of the instance. */
 	uint64_t term;
+	/**
+	 * Instance ID of the instance this node voted for in the current term.
+	 * 0 means the node didn't vote in this term.
+	 */
 	uint32_t vote;
+	/**
+	 * Instance id of the current term leader. Can be 0 when leader is
+	 * unknown.
+	 */
 	uint32_t leader_id;
+	/** Whether the node has a direct connection to the leader. */
 	bool is_leader_seen;
+	/**
+	 * State of the instance. Can be 0 if the state does not matter for the
+	 * message. For instance, when the message is sent to disk.
+	 */
 	uint64_t state;
-	const struct vclock *vclock;
+	/**
+	 * Vclock of the instance. Can be NULL, if the node is not a candidate.
+	 * Also is omitted when does not matter (when the message is for disk).
+	 */
+	struct vclock vclock;
 	/** Replication group identifier. 0 - replicaset, 1 - replica-local. */
 	enum group_id group_id;
 };
@@ -426,9 +442,15 @@ void
 xrow_encode_raft(struct xrow_header *row, struct region *region,
 		 const struct raft_request *r);
 
+/**
+ * Decode raft request.
+ * @param row xrow header.
+ * @param[out] req raft request.
+ * @retval -1 on error.
+ * @retval 0 success.
+ */
 int
-xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
-		 struct vclock *vclock);
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r);
 
 /**
  * CALL/EVAL request.
