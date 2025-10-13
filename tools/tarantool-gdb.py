@@ -52,6 +52,18 @@ def find_value(sym):
     except Exception as exc:
         return None
 
+def find(predicate, iterable, default=None):
+    return next(filter(predicate, iterable), default)
+
+def enumval_name(type, val, default):
+    assert type.code == gdb.TYPE_CODE_ENUM, "enumval_name expects enum type \
+        but type of code {} was given".format(type.code)
+    enumval_attr = 'enumval'
+    if not hasattr(type.fields()[0], 'enumval'):
+        enumval_attr = 'bitpos'
+    field = find(lambda x: getattr(x, enumval_attr) == val, type.fields())
+    return default if field is None else field.name
+
 def cast_ptr(dest_type, ptr, offset):
     dest_ptr = ptr.cast(gdb.lookup_type('char').pointer()) + offset
     return dest_ptr.cast(dest_type.pointer())
@@ -1423,7 +1435,16 @@ class TuplePrinter(object):
                 child_name = str()
                 child_val = (self.val.address.cast(self.ptr_char) + field.bitpos // 8).cast(field.type.pointer()).dereference()
             elif field.name == 'flags':
-                child_val = '0x{:02x}'.format(int(self.val['flags']))
+                flags_val = self.val['flags']
+                child_val = '0x{:02x}'.format(int(flags_val))
+                bits_set = []
+                for bit in range(flags_val.type.sizeof * 8):
+                    if int(flags_val) & (1 << bit) != 0:
+                        tuple_flag_type = gdb.lookup_type('tuple_flag')
+                        bits_set.append(enumval_name(tuple_flag_type,
+                                                     bit, '*unknown*'))
+                if len(bits_set) != 0:
+                    child_val += ' ({})'.format(', '.join(bits_set))
             else:
                 child_val = self.val[field.name]
             yield child_name, child_val
