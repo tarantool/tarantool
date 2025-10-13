@@ -27,8 +27,6 @@ struct txn_checkpoint {
 	 * known synchronous txn was confirmed.
 	 */
 	struct synchro_request limbo_checkpoint;
-	/** VClock of the limbo's state. */
-	struct vclock limbo_vclock;
 };
 
 /**
