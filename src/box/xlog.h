@@ -35,6 +35,7 @@
 #include <sys/stat.h>
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
+#include "xrow.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
@@ -652,6 +653,54 @@ xlog_tx_decode(const char *data, const char *data_end,
 	       char *rows, char *rows_end,
 	       ZSTD_DStream *zdctx);
 
+/* {{{ xlog_batch - batch of parsed xlog entries */
+
+/** xlog row with parsed body. */
+struct xlog_entry {
+	/** Row header. */
+	struct xrow_header header;
+	union {
+		/** DML request. */
+		struct request dml;
+		/** Raft request. */
+		struct raft_request raft;
+		/** Synchro request. */
+		struct synchro_request synchro;
+	};
+	/**
+	 * Request decode error, set if request decode failed. In this
+	 * case request fields are not valid, but `header` is valid.
+	 */
+	struct error *error;
+};
+
+/** Batch of `struct xlog_entry`. */
+struct xlog_batch {
+	/** Raw batch data. */
+	struct ibuf data;
+	/** Buffer holding array of `struct xlog_entry`. */
+	struct ibuf entries;
+	/** Number of entries. */
+	size_t entry_count;
+};
+
+/**
+ * Returns xlog entry at `index` from the `batch`.
+ */
+static inline struct xlog_entry *
+xlog_batch_get(struct xlog_batch *batch, size_t index)
+{
+	assert(index < batch->entry_count);
+	struct xlog_entry *entries = (struct xlog_entry *)batch->entries.rpos;
+	return &entries[index];
+}
+
+/** Destroys the batch. */
+void
+xlog_batch_destroy(struct xlog_batch *batch);
+
+/* }}} */
+
 /* {{{ xlog_cursor - read rows from a log file */
 
 enum xlog_cursor_state {
@@ -693,6 +742,10 @@ struct xlog_cursor {
 	struct ibuf tx_cursor;
 	/** ZSTD context for decompression */
 	ZSTD_DStream *zdctx;
+	/** Set if last batch reading failed. */
+	bool search_magic;
+	/** Set if last batch was partially read. */
+	struct error *error;
 };
 
 /**
@@ -842,6 +895,24 @@ xlog_cursor_tx_pos(struct xlog_cursor *cursor)
 {
 	return ibuf_pos(&cursor->tx_cursor);
 }
+
+/**
+ * Read next xlog tx and return it as a batch of parsed xlog entries.
+ *
+ * The batch is managed by caller and should be destroyed when not needed.
+ *
+ * If error is XlogError then reading can be continued, otherwise it is UB.
+ *
+ * @param cursor xlog cursor
+ * @param[out] batch initialized with entries read
+ *
+ * @retval 0 for Ok
+ * @retval 1 for EOF, batch is not initialized
+ * @retval -1 for error, diag is set, batch is not initialized
+ */
+int
+xlog_cursor_read_tx(struct xlog_cursor *cursor, struct xlog_batch *batch);
+
 /* }}} */
 
 /** {{{ miscellaneous log io functions. */
