@@ -143,12 +143,13 @@ public:
 	{
 		struct memtx_engine *memtx = MemtxEngine::instance().engine();
 
-		std::vector<char[sizeof("f999")]> names(FIELD_COUNT);
+		constexpr size_t max_name_size = sizeof("f999");
+		std::vector<std::array<char, max_name_size>> names(FIELD_COUNT);
 		std::vector<struct field_def> fields(FIELD_COUNT);
 		for (size_t i = 0; i < FIELD_COUNT; i++) {
-			sprintf(names[i], "f%03zu", i);
+			snprintf(names[i].data(), max_name_size, "f%03zu", i);
 			fields[i] = field_def_default;
-			fields[i].name = names[i];
+			fields[i].name = names[i].data();
 			fields[i].type = FIELD_TYPE_UNSIGNED;
 			fields[i].is_nullable = true;
 			fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
@@ -472,7 +473,8 @@ tuple_access_data(benchmark::State& state)
 			i = 0;
 		}
 		struct tuple *t = data.tuples[i++];
-		benchmark::DoNotOptimize(*tuple_data(t));
+		char data = *tuple_data(t);
+		benchmark::DoNotOptimize(data);
 	}
 	total_count += i;
 	state.SetItemsProcessed(total_count);
@@ -495,7 +497,8 @@ tuple_access_data_range(benchmark::State& state)
 		}
 		struct tuple *t = data.tuples[i++];
 		uint32_t size;
-		benchmark::DoNotOptimize(*tuple_data_range(t, &size));
+		char data = *tuple_data_range(t, &size);
+		benchmark::DoNotOptimize(data);
 		benchmark::DoNotOptimize(size);
 	}
 	total_count += i;
@@ -518,7 +521,8 @@ tuple_access_unindexed_field(benchmark::State& state)
 			i = 0;
 		}
 		struct tuple *t = data.tuples[i++];
-		benchmark::DoNotOptimize(*tuple_field(t, 3));
+		char data = *tuple_field(t, 3);
+		benchmark::DoNotOptimize(data);
 	}
 	total_count += i;
 	state.SetItemsProcessed(total_count);
@@ -540,7 +544,8 @@ tuple_access_indexed_field(benchmark::State& state)
 			i = 0;
 		}
 		struct tuple *t = data.tuples[i];
-		benchmark::DoNotOptimize(*tuple_field(t, 4));
+		char data = *tuple_field(t, 4);
+		benchmark::DoNotOptimize(data);
 		++i;
 	}
 	total_count += i;
