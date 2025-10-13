@@ -39,8 +39,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	row.bodycnt = 1;
 
 	struct raft_request request = {0};
-	struct vclock vclock = {0};
-	xrow_decode_raft(&row, &request, &vclock);
+	xrow_decode_raft(&row, &request);
 
 	return 0;
 }

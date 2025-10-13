@@ -505,8 +505,7 @@ memtx_engine_recover_raft(const struct xrow_header *row)
 {
 	assert(row->type == IPROTO_RAFT);
 	struct raft_request req;
-	/* Vclock is never persisted in WAL by Raft. */
-	if (xrow_decode_raft(row, &req, NULL) != 0)
+	if (xrow_decode_raft(row, &req) != 0)
 		return -1;
 	box_raft_recover(&req);
 	return 0;
@@ -517,8 +516,7 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 {
 	assert(row->type == IPROTO_RAFT_PROMOTE);
 	struct synchro_request req;
-	struct vclock synchro_vclock;
-	if (xrow_decode_synchro(row, &req, &synchro_vclock) != 0)
+	if (xrow_decode_synchro(row, &req) != 0)
 		return -1;
 	/*
 	 * Origin id cannot be deduced from row.replica_id in a checkpoint,
@@ -999,8 +997,6 @@ struct checkpoint {
 	struct raft_request raft;
 	/** Synchro request to be written to the snapshot file. */
 	struct synchro_request synchro_state;
-	/** The limbo confirmed vclock at the moment of checkpoint creation. */
-	struct vclock synchro_vclock;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -1137,8 +1133,7 @@ checkpoint_new(struct memtx_engine *memtx)
 	xlog_clear(&ckpt->snap);
 	vclock_create(&ckpt->vclock);
 	box_raft_checkpoint_local(&ckpt->raft);
-	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state,
-			     &ckpt->synchro_vclock);
+	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state);
 
 	ckpt->sort_data_writer = memtx->use_sort_data ?
 				 memtx_sort_data_writer_new() : NULL;
@@ -1790,7 +1785,6 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 
 	/* See raft_process_recovery, why these fields are not needed. */
 	raft_checkpoint->state = 0;
-	raft_checkpoint->vclock = NULL;
 
 	/* Respond with vclock and JOIN_META. */
 	send_join_header(stream, arg->vclock);
