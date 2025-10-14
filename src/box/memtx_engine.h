@@ -50,6 +50,7 @@ extern "C" {
 struct index;
 struct index_def;
 struct index_read_view;
+struct index_vtab;
 struct info_handler;
 struct iterator;
 struct fiber;
@@ -351,6 +352,16 @@ memtx_iterator_next(struct iterator *it, struct tuple **ret);
  */
 int
 memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple);
+
+void
+memtx_index_create(struct index *index, struct engine *engine,
+		   const struct index_vtab *vtab, struct index_def *def);
+
+void
+memtx_index_free(struct index *index);
+
+struct rlist *
+memtx_index_read_gaps(struct index *index);
 
 #if defined(__cplusplus)
 } /* extern "C" */
