@@ -2529,8 +2529,7 @@ memtx_tx_handle_dups_in_secondary_index(
 		 * Ignore case when other TX executes insert after
 		 * precedence delete.
 		 */
-		if (newer_story->link[ind].is_own_change &&
-		    test_stmt->del_story == NULL)
+		if (newer_story->link[ind].is_own_change)
 			continue;
 		/*
 		 * Ignore the case when other TX overwrites in both
