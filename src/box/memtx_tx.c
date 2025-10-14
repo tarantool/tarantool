@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tx.h"
+#include "memtx_engine.h"
 #include "memtx_space.h"
 
 #include <assert.h>
@@ -2022,10 +2023,10 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 	assert(story->link[ind].newer_story == NULL || !is_insert);
 
 	struct index *index = space->index[ind];
+	struct rlist *read_gaps = memtx_index_read_gaps(index);
 
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, &index->read_gaps,
-				 in_read_gaps, tmp) {
+	rlist_foreach_entry_safe(item_base, read_gaps, in_read_gaps, tmp) {
 		if (item_base->type != GAP_COUNT)
 			continue;
 
@@ -2170,9 +2171,9 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 	assert(story->link[ind].newer_story == NULL);
 	struct tuple *tuple = story->tuple;
 	struct index *index = space->index[ind];
+	struct rlist *read_gaps = memtx_index_read_gaps(index);
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, &index->read_gaps,
-				 in_read_gaps, tmp) {
+	rlist_foreach_entry_safe(item_base, read_gaps, in_read_gaps, tmp) {
 		if (item_base->type != GAP_FULL_SCAN)
 			continue;
 		memtx_tx_track_story_gap(item_base->txn, story, ind);
@@ -2180,7 +2181,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return; /* no gap records */
 
-	struct rlist *list = &index->read_gaps;
+	struct rlist *list = memtx_index_read_gaps(index);
 	if (successor != NULL) {
 		assert(tuple_has_flag(successor, TUPLE_IS_DIRTY));
 		struct memtx_story *succ_story = memtx_tx_story_get(successor);
@@ -3378,9 +3379,9 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 	/* Abort all gap-without-successor readers. */
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
+		struct rlist *read_gaps = memtx_index_read_gaps(index);
 		struct gap_item_base *item, *tmp;
-		rlist_foreach_entry_safe(item, &index->read_gaps,
-					 in_read_gaps, tmp) {
+		rlist_foreach_entry_safe(item, read_gaps, in_read_gaps, tmp) {
 			if (item->txn != ddl_owner)
 				txn_abort_with_conflict(item->txn);
 		}
@@ -3512,9 +3513,10 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 	 */
 	for (size_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		while (!rlist_empty(&index->read_gaps)) {
+		struct rlist *read_gaps = memtx_index_read_gaps(index);
+		while (!rlist_empty(read_gaps)) {
 			struct gap_item_base *item =
-				rlist_first_entry(&index->read_gaps,
+				rlist_first_entry(read_gaps,
 						  struct gap_item_base,
 						  in_read_gaps);
 			memtx_tx_delete_gap(item);
@@ -3840,7 +3842,8 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		rlist_add(&story->link[index->dense_id].read_gaps,
 			  &item->base.in_read_gaps);
 	} else {
-		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+		struct rlist *index_read_gaps = memtx_index_read_gaps(index);
+		rlist_add(index_read_gaps, &item->base.in_read_gaps);
 	}
 }
 
@@ -3852,9 +3855,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 static bool
 memtx_tx_index_full_count_recorded_already(struct index *index, struct txn *txn)
 {
+	struct rlist *read_gaps = memtx_index_read_gaps(index);
 	struct gap_item_base *item_base;
-	rlist_foreach_entry_reverse(item_base, &index->read_gaps,
-				    in_read_gaps) {
+	rlist_foreach_entry_reverse(item_base, read_gaps, in_read_gaps) {
 		/* Not a count item = no full count items expected next. */
 		if (item_base->type != GAP_COUNT)
 			break;
@@ -3918,6 +3921,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
 			txn, type, key, part_count, until, until_hint);
+		struct rlist *read_gaps = memtx_index_read_gaps(index);
 		/*
 		 * Empty key count trackers are inserted in the end of the index
 		 * gap list, so we can search for an existing empty key gap item
@@ -3925,10 +3929,9 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 		 * be a duplicate.
 		 */
 		if (part_count == 0 && until == NULL) {
-			rlist_add_tail(&index->read_gaps,
-				       &item->base.in_read_gaps);
+			rlist_add_tail(read_gaps, &item->base.in_read_gaps);
 		} else {
-			rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+			rlist_add(read_gaps, &item->base.in_read_gaps);
 		}
 	}
 
@@ -3982,7 +3985,8 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 		return;
 
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
-	rlist_add(&index->read_gaps, &item->base.in_read_gaps);
+	struct rlist *read_gaps = memtx_index_read_gaps(index);
+	rlist_add(read_gaps, &item->base.in_read_gaps);
 }
 
 /**

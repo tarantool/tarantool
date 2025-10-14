@@ -1942,6 +1942,48 @@ memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
 	return rc;
 }
 
+/**
+ * Memtx-specific index data.
+ */
+struct memtx_index_data {
+	/**
+	 * List of MVCC gap_item's describing gap reads in the index with NULL
+	 * successor, full scan and count gaps, see enum gap_item_type for
+	 * more info.
+	 *
+	 * NB: do not add items to the end of the list - it is reserved for
+	 * full count items.
+	 */
+	struct rlist read_gaps;
+};
+
+void
+memtx_index_create(struct index *index, struct engine *engine,
+		   const struct index_vtab *vtab, struct index_def *def)
+{
+	index_create(index, engine, vtab, def);
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	rlist_create(&data->read_gaps);
+}
+
+void
+memtx_index_free(struct index *index)
+{
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	assert(rlist_empty(&data->read_gaps));
+	free(index);
+}
+
+struct rlist *
+memtx_index_read_gaps(struct index *index)
+{
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	return &data->read_gaps;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,

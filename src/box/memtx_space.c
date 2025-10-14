@@ -1585,6 +1585,26 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	return rc;
 }
 
+void
+memtx_space_swap_index(struct space *old_space, struct space *new_space,
+		       uint32_t old_index_id, uint32_t new_index_id)
+{
+	struct index *old_index = old_space->index_map[old_index_id];
+	struct index *new_index = new_space->index_map[new_index_id];
+
+	generic_space_swap_index(old_space, new_space, old_index_id,
+				 new_index_id);
+
+	/*
+	 * Swap read gaps back - they belong to the old space. It is important
+	 * since the old space is going to be invalidated and transactional
+	 * metadata is required to do it correctly.
+	 */
+	struct rlist *old_read_gaps = memtx_index_read_gaps(old_index);
+	struct rlist *new_read_gaps = memtx_index_read_gaps(new_index);
+	SWAP(old_read_gaps, new_read_gaps);
+}
+
 static int
 memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -1661,7 +1681,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
 	/* .check_format  = */ memtx_space_check_format,
 	/* .build_index = */ memtx_space_build_index,
-	/* .swap_index = */ generic_space_swap_index,
+	/* .swap_index = */ memtx_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .finish_alter = */ memtx_space_finish_alter,
 	/* .prepare_upgrade = */ memtx_space_prepare_upgrade,
