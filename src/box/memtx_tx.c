@@ -261,6 +261,8 @@ struct inplace_gap_item {
 struct nearby_gap_item {
 	/** Base class. */
 	struct gap_item_base base;
+	/** Comparison definition from corresponding index. */
+	struct key_def *cmp_def;
 	/** The key. Can be NULL. */
 	const char *key;
 	uint32_t key_len;
@@ -285,6 +287,8 @@ struct full_scan_gap_item {
 struct count_gap_item {
 	/** Base class. */
 	struct gap_item_base base;
+	/** Comparison definition from corresponding index. */
+	struct key_def *cmp_def;
 	/** The key. Can be NULL. */
 	const char *key;
 	/* Length of the key. */
@@ -327,7 +331,8 @@ memtx_tx_inplace_gap_item_new(struct txn *txn);
  */
 static struct nearby_gap_item *
 memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
-			     const char *key, uint32_t part_count);
+			     const char *key, uint32_t part_count,
+			     struct key_def *cmp_def);
 
 /**
  * Allocate and create full scan gap item.
@@ -343,7 +348,8 @@ memtx_tx_full_scan_gap_item_new(struct txn *txn);
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    const char *key, uint32_t part_count,
-			    struct tuple *until, hint_t until_hint);
+			    struct tuple *until, hint_t until_hint,
+			    struct key_def *cmp_def);
 
 /**
  * Destroy and free any kind of gap item.
@@ -2160,7 +2166,8 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 				memtx_tx_nearby_gap_item_new(item_base->txn,
 							     item->type,
 							     item->key,
-							     item->part_count);
+							     item->part_count,
+							     index->def->cmp_def);
 
 			rlist_add(&story->link[ind].read_gaps,
 				  &copy->base.in_read_gaps);
@@ -3614,7 +3621,8 @@ memtx_tx_save_key(struct txn *txn, const char *key, uint32_t part_count,
  */
 static struct nearby_gap_item *
 memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
-			     const char *key, uint32_t part_count)
+			     const char *key, uint32_t part_count,
+			     struct key_def *cmp_def)
 {
 	struct memtx_tx_mempool *pool = &txm.nearby_gap_item_mempoool;
 	struct nearby_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
@@ -3624,6 +3632,7 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 	item->part_count = part_count;
 	item->key = memtx_tx_save_key(txn, key, part_count, item->short_key,
 				      sizeof(item->short_key), &item->key_len);
+	item->cmp_def = cmp_def;
 	return item;
 }
 
@@ -3638,7 +3647,8 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    const char *key, uint32_t part_count,
-			    struct tuple *until, hint_t until_hint)
+			    struct tuple *until, hint_t until_hint,
+			    struct key_def *cmp_def)
 {
 	assert(until == NULL || tuple_has_flag(until, TUPLE_IS_DIRTY));
 
@@ -3653,6 +3663,7 @@ memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 	item->until = until;
 	item->until_hint = until_hint;
 
+	item->cmp_def = cmp_def;
 	return item;
 }
 
@@ -3686,7 +3697,8 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		return;
 
 	struct nearby_gap_item *item =
-		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
+		memtx_tx_nearby_gap_item_new(txn, type, key, part_count,
+					     index->def->cmp_def);
 
 	if (successor != NULL) {
 		struct memtx_story *story;
@@ -3778,7 +3790,7 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
-			txn, type, key, part_count, until, until_hint);
+			txn, type, key, part_count, until, until_hint, cmp_def);
 		struct rlist *read_gaps = memtx_index_read_gaps(index);
 		/*
 		 * Empty key count trackers are inserted in the end of the index
