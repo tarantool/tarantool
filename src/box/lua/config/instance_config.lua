@@ -1682,6 +1682,7 @@ return schema.new('instance_config', schema.record({
             'clock',
             'event_loop',
             'cpu_extended',
+            'schema',
         }),
         exclude = schema.set({
             'all',
@@ -1702,6 +1703,7 @@ return schema.new('instance_config', schema.record({
             'clock',
             'event_loop',
             'cpu_extended',
+            'schema',
         }),
         labels = schema.map({
             key = schema.scalar({type = 'string'}),
