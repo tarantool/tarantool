@@ -2313,6 +2313,10 @@ local function bootstrap()
     box.snapshot()
 end
 
+box.schema.needs_upgrade = function()
+    utils.box_check_configured()
+    return builtin.box_schema_needs_upgrade()
+end
 box.schema.upgrade = upgrade
 box.schema.downgrade_versions = function()
     return table.copy(downgrade_versions)
@@ -2326,7 +2330,6 @@ end
 box.internal.bootstrap = function()
     run_upgrade(bootstrap)
 end
-box.internal.schema_needs_upgrade = builtin.box_schema_needs_upgrade
 box.internal.get_snapshot_version = get_snapshot_version;
 box.internal.set_recovery_triggers = set_recovery_triggers;
 box.internal.clear_recovery_triggers = clear_recovery_triggers;

@@ -647,8 +647,8 @@ local on_schema_replace_trigger_is_set = false
 
 -- The flag indicates if the schema is upgraded to the latest
 -- version. It's impossible to use the internal call
--- `box.internal.schema_needs_upgrade()` because at the moment
--- we are granting/revoking privileges its value isn't updated.
+-- `box.schema.needs_upgrade()` because at the moment we
+-- are granting/revoking privileges its value isn't updated.
 local schema_is_upgraded = false
 
 -- The conditional is broadcasted when the schema was upgraded to

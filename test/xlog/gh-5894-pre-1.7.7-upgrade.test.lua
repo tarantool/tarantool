@@ -7,7 +7,7 @@ test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
 box.schema.upgrade()
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
 box.space._space:format()
@@ -43,7 +43,7 @@ test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
 box.schema.upgrade()
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
 box.space._space:format()
@@ -63,7 +63,7 @@ test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
 box.schema.upgrade()
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
 box.space._space:format()
@@ -83,7 +83,7 @@ test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
 box.schema.upgrade()
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
 box.space._space:format()
