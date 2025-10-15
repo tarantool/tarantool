@@ -605,7 +605,7 @@ memtx_tx_manager_init()
 	rlist_create(&txm.read_view_txs);
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
 		size_t item_size = sizeof(struct memtx_story) +
-				   i * sizeof(struct memtx_story_link);
+				   (i + 1) * sizeof(struct memtx_story_link);
 		mempool_create(&txm.memtx_tx_story_pool[i],
 			       cord_slab_cache(), item_size);
 	}
@@ -806,7 +806,8 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 static inline size_t
 memtx_story_size(struct memtx_story *story)
 {
-	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
+	assert(story->index_count > 0);
+	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count - 1];
 	return pool->objsize;
 }
 
@@ -913,8 +914,8 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	uint32_t index_count = space->index_count;
-	assert(index_count < BOX_INDEX_MAX);
-	struct mempool *pool = &txm.memtx_tx_story_pool[index_count];
+	assert(index_count > 0 && index_count <= BOX_INDEX_MAX);
+	struct mempool *pool = &txm.memtx_tx_story_pool[index_count - 1];
 	struct memtx_story *story = (struct memtx_story *)xmempool_alloc(pool);
 	story->tuple = tuple;
 
@@ -978,7 +979,8 @@ memtx_tx_story_delete(struct memtx_story *story)
 	tuple_clear_flag(story->tuple, TUPLE_IS_DIRTY);
 	tuple_unref(story->tuple);
 
-	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
+	assert(story->index_count > 0);
+	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count - 1];
 	mempool_free(pool, story);
 }
 
