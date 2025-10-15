@@ -520,6 +520,60 @@ func_key_storage_key_equal(const struct func_key_storage_key *key,
 #define MH_SOURCE
 #include "salad/mhash.h"
 
+/** Key for search in `dels`. */
+struct dels_key {
+	struct memtx_story *story;
+	struct txn *txn;
+};
+
+/** Hash calculator for key of `dels`. */
+static uint32_t
+dels_key_hash(const struct dels_key *key)
+{
+	static_assert(sizeof(uintptr_t) > sizeof(uint32_t),
+		      "The following code relies on it");
+	uintptr_t u1 = (uintptr_t)key->story;
+	u1 ^= (u1 >> 32);
+	uintptr_t u2 = (uintptr_t)key->txn;
+	u2 ^= (u2 >> 32);
+	return (u1 ^ u2);
+}
+
+/** An element of `dels`. */
+struct dels_item {
+	struct dels_key key;
+	struct txn_stmt *stmt;
+	/** Hash of the item. */
+	uint32_t hash;
+};
+
+/** Comparator for element and key of `dels`. */
+static int
+dels_key_equal(const struct dels_key *key, const struct dels_item *object)
+{
+	return key->story != object->key.story ||
+		key->txn != object->key.txn;
+}
+
+/** Comparator for elements of `dels`. */
+static int
+dels_equal(const struct dels_item *obj1, const struct dels_item *obj2)
+{
+	return obj1->key.story != obj2->key.story ||
+		obj1->key.txn != obj2->key.txn;
+}
+
+#define mh_name _dels
+#define mh_key_t struct dels_key *
+#define mh_node_t struct dels_item
+#define mh_arg_t int
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) dels_key_hash(a)
+#define mh_cmp(a, b, arg) dels_equal((a), (b))
+#define mh_cmp_key(a, b, arg) dels_key_equal((a), (b))
+#define MH_SOURCE
+#include "salad/mhash.h"
+
 /**
  * Collect an allocation to memtx_tx_stats.
  */
@@ -712,6 +766,8 @@ struct tx_manager
 	 * here - it will be created on demand.
 	 */
 	struct mh_func_key_storage_t *func_key_storage;
+
+	struct mh_dels_t *dels;
 	/** Mempool for point_hole_item objects. */
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
@@ -1277,6 +1333,18 @@ memtx_tx_story_link_deleted_by(struct memtx_story *story,
 	stmt->del_story = story;
 	stmt->next_in_del_list = story->del_stmt;
 	story->del_stmt = stmt;
+
+	struct dels_key key = {
+		.story = story,
+		.txn = stmt->txn,
+	};
+	struct dels_item item = {
+		.key = key,
+		.stmt = stmt,
+		.hash = dels_key_hash(&key),
+	};
+	mh_int_t pos = mh_dels_put(txm.dels, &item, NULL, 0);
+	VERIFY(pos != mh_end(txm.dels));
 }
 
 /**
@@ -1298,6 +1366,14 @@ memtx_tx_story_unlink_deleted_by(struct memtx_story *story,
 	*ptr = stmt->next_in_del_list;
 	stmt->next_in_del_list = NULL;
 	stmt->del_story = NULL;
+
+	struct dels_key key = {
+		.story = story,
+		.txn = stmt->txn,
+	};
+	mh_int_t pos = mh_dels_find(txm.dels, &key, 0);
+	VERIFY(pos != mh_end(txm.dels));
+	mh_dels_del(txm.dels, pos, 0);
 }
 
 /**
@@ -2529,8 +2605,18 @@ memtx_tx_handle_dups_in_secondary_index(
 		 * Ignore case when other TX executes insert after
 		 * precedence delete.
 		 */
-		if (newer_story->link[ind].is_own_change)
-			continue;
+		struct dels_key key = {
+			.story = story,
+			.txn = test_stmt->txn,
+		};
+		mh_int_t pos = mh_dels_find(txm.dels, &key, 0);
+		if (pos != mh_end(txm.dels)) {
+			struct txn_stmt *del_stmt =
+				mh_dels_node(txm.dels, pos)->stmt;
+			assert(del_stmt != NULL);
+			if (del_stmt != test_stmt)
+				continue;
+		}
 		/*
 		 * Ignore the case when other TX overwrites in both
 		 * primary and secondary index.
@@ -4079,6 +4165,7 @@ memtx_tx_manager_init(void)
 				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes = mh_point_holes_new();
 	txm.func_key_storage = mh_func_key_storage_new();
+	txm.dels = mh_dels_new();
 	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
 				sizeof(struct inplace_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
@@ -4118,6 +4205,8 @@ memtx_tx_manager_free(void)
 	mh_history_delete(txm.history);
 	assert(mh_size(txm.func_key_storage) == 0);
 	mh_func_key_storage_delete(txm.func_key_storage);
+	assert(mh_size(txm.dels) == 0);
+	mh_dels_delete(txm.dels);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	assert(mh_size(txm.point_holes) == 0);
 	mh_point_holes_delete(txm.point_holes);
