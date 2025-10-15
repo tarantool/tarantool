@@ -2561,6 +2561,19 @@ applier_f(va_list ap)
 				 * is retrying final join.
 				 */
 				applier_register(applier, was_anon);
+				/*
+				 * It's hard to catch the exact moment when
+				 * instance id settles, for example, it could
+				 * change multiple times during register, but we
+				 * have to configure raft with it before
+				 * `applier_subscribe` starts, because we'll
+				 * start receiving raft messages there.
+				 */
+				if (was_anon) {
+					assert(instance_id != 0);
+					raft_cfg_instance_id(box_raft(),
+							     instance_id);
+				}
 			}
 			applier_subscribe(applier);
 			/*
