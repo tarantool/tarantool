@@ -687,7 +687,7 @@ struct tx_manager
 	 * It's the only case when we use bare mempool in memtx_tx because
 	 * we cannot account story allocation to any particular txn.
 	 */
-	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
+	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX + 1];
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
 	/**
@@ -1126,7 +1126,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	uint32_t index_count = space->index_count;
-	assert(index_count < BOX_INDEX_MAX);
+	assert(index_count <= BOX_INDEX_MAX);
 	struct mempool *pool = &txm.memtx_tx_story_pool[index_count];
 	struct memtx_story *story = (struct memtx_story *)xmempool_alloc(pool);
 	story->tuple = tuple;
@@ -4001,7 +4001,7 @@ void
 memtx_tx_manager_init(void)
 {
 	rlist_create(&txm.read_view_txs);
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++) {
+	for (size_t i = 0; i <= BOX_INDEX_MAX; i++) {
 		size_t item_size = sizeof(struct memtx_story) +
 				   i * sizeof(struct memtx_story_link);
 		mempool_create(&txm.memtx_tx_story_pool[i],
@@ -4046,7 +4046,7 @@ memtx_tx_manager_free(void)
 		memtx_tx_story_delete(story);
 	}
 
-	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
+	for (size_t i = 0; i <= BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
 	assert(mh_size(txm.history) == 0);
 	mh_history_delete(txm.history);
