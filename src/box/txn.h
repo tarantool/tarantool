@@ -349,12 +349,8 @@ struct txn_stmt {
 	struct xrow_header *row;
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
-	/*
-	 * Flag that shows whether this DELETE statement removes a story
-	 * that was added by its own transaction. This value is false
-	 * if it's not a DELETE statement.
-	 */
-	bool is_own_delete;
+
+	bool is_own_change;
 	/**
 	* Request type - IPROTO type code
 	*/
