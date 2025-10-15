@@ -68,11 +68,11 @@ g.after_all(function(lg)
     if lg.params.on_2_11_1 then
         lg.master:exec(function()
             box.schema.upgrade()
-            t.assert_not(box.internal.schema_needs_upgrade())
+            t.assert_not(box.schema.needs_upgrade())
         end)
         lg.replica:wait_for_vclock_of(lg.master)
         lg.replica:exec(function()
-            t.assert_not(box.internal.schema_needs_upgrade())
+            t.assert_not(box.schema.needs_upgrade())
         end)
     end
     lg.replica_set:drop()

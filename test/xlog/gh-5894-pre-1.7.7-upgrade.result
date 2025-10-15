@@ -21,7 +21,7 @@ test_run:switch('upgrade')
 box.schema.upgrade()
  | ---
  | ...
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
  | ---
  | - true
  | ...
@@ -163,7 +163,7 @@ test_run:switch('upgrade')
 box.schema.upgrade()
  | ---
  | ...
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
  | ---
  | - true
  | ...
@@ -265,7 +265,7 @@ test_run:switch('upgrade')
 box.schema.upgrade()
  | ---
  | ...
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
  | ---
  | - true
  | ...
@@ -367,7 +367,7 @@ test_run:switch('upgrade')
 box.schema.upgrade()
  | ---
  | ...
-assert(not box.internal.schema_needs_upgrade())
+assert(not box.schema.needs_upgrade())
  | ---
  | - true
  | ...
