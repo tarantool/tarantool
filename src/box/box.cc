@@ -66,10 +66,10 @@
 #include "index.h"
 #include "port.h"
 #include "txn.h"
-#include "txn_checkpoint.h"
 #include "txn_limbo.h"
 #include "user.h"
 #include "cfg.h"
+#include "checkpoint.h"
 #include "coio.h"
 #include "replication.h" /* replica */
 #include "title.h"
@@ -754,7 +754,7 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write, NULL);
+	journal_create(&journal.base, recovery_journal_write, NULL, NULL, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -6159,7 +6159,8 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, bootstrap_journal_write, NULL);
+	journal_create(&bootstrap_journal, bootstrap_journal_write, NULL, NULL,
+		       NULL);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);

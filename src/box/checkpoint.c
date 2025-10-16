@@ -1,12 +1,12 @@
-#include "txn_checkpoint.h"
+#include "checkpoint.h"
 #include "txn_limbo.h"
 #include "raft.h"
 #include "txn.h"
 
 /** Data of the in-progress checkpoint to carry into the triggers. */
-struct txn_checkpoint_context {
+struct box_checkpoint_context {
 	/** The checkpoint to be created. */
-	struct txn_checkpoint *checkpoint;
+	struct box_checkpoint *checkpoint;
 	/** The owner fiber sleeping on the result. */
 	struct fiber *owner;
 	/** If is committed. */
@@ -16,11 +16,11 @@ struct txn_checkpoint_context {
 };
 
 static void
-txn_checkpoint_collect(struct txn_checkpoint *c)
+box_checkpoint_collect(struct box_checkpoint *c)
 {
-	txn_limbo_checkpoint(&txn_limbo, &c->limbo_checkpoint,
-			     &c->limbo_vclock);
-	box_raft_checkpoint_remote(&c->raft_remote_checkpoint);
+	txn_limbo_checkpoint(&txn_limbo, &c->limbo, &c->limbo_vclock);
+	box_raft_checkpoint_remote(&c->raft_remote);
+	box_raft_checkpoint_local(&c->raft_local);
 }
 
 /** On commit of the limbo txn. */
@@ -28,9 +28,9 @@ static int
 txn_commit_cb(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct txn_checkpoint_context *ctx = trigger->data;
+	struct box_checkpoint_context *ctx = trigger->data;
 	ctx->is_commit = true;
-	txn_checkpoint_collect(ctx->checkpoint);
+	box_checkpoint_collect(ctx->checkpoint);
 	fiber_wakeup(ctx->owner);
 	return 0;
 }
@@ -40,20 +40,60 @@ static int
 txn_rollback_cb(struct trigger *trigger, void *event)
 {
 	(void)event;
-	struct txn_checkpoint_context *ctx = trigger->data;
+	struct box_checkpoint_context *ctx = trigger->data;
 	ctx->is_rollback = true;
 	fiber_wakeup(ctx->owner);
 	return 0;
 }
 
+static int
+txn_journal_flush(struct journal_checkpoint *out, bool do_journal_rotation)
+{
+	/*
+	 * All the txns after preparation until all the journal write follow the
+	 * same path:
+	 * - The limbo volatile queue.
+	 * - The journal volatile queue.
+	 * - The journal write.
+	 *
+	 * Some steps might be skipped (for instance, the limbo might be if the
+	 * txn is force-async or just async and the limbo is empty). But the
+	 * order never changes.
+	 *
+	 * It means, that if one would want to closely follow the latest known
+	 * prepared txn until it reaches WAL, then following this path the
+	 * needed txn will be surely found before any new txn is added (except
+	 * for force-async, which might skip the volatile limbo queue and go
+	 * directly to the journal).
+	 */
+	if (txn_limbo_flush(&txn_limbo) != 0)
+		return -1;
+	if (do_journal_rotation)
+		return journal_begin_checkpoint(out);
+	memset(out, 0, sizeof(*out));
+	return journal_sync(&out->vclock);
+}
+
 int
-txn_checkpoint_build(struct txn_checkpoint *out)
+txn_persist_all_prepared(struct vclock *out)
+{
+	struct journal_checkpoint journal;
+	if (txn_journal_flush(&journal, false /* do journal rotation */) != 0)
+		return -1;
+	if (out != NULL)
+		vclock_copy(out, &journal.vclock);
+	return 0;
+}
+
+/** Build a checkpoint of all the transaction-related global states. */
+static int
+txn_checkpoint_build(struct box_checkpoint *out, bool do_journal_rotation)
 {
 	struct txn_limbo *limbo = &txn_limbo;
 	/* Fast path. */
 	if (txn_limbo_is_empty(limbo)) {
-		txn_checkpoint_collect(out);
-		return txn_persist_all_prepared(&out->journal_vclock);
+		box_checkpoint_collect(out);
+		return txn_journal_flush(&out->journal, do_journal_rotation);
 	}
 	/*
 	 * Slow path. When the limbo is not empty, it is relatively complicated
@@ -68,7 +108,7 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	 * might result into more synchro txns getting confirmed and moving the
 	 * limbo state forward. Making the collected checkpoint "too new".
 	 */
-	struct txn_checkpoint_context ctx = {
+	struct box_checkpoint_context ctx = {
 		.checkpoint = out,
 		.owner = fiber(),
 		.is_commit = false,
@@ -88,7 +128,7 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 	 * For async txns the persistence means commit. For sync txns need to
 	 * wait for their confirmation explicitly.
 	 */
-	if (txn_persist_all_prepared(&out->journal_vclock) != 0)
+	if (txn_journal_flush(&out->journal, do_journal_rotation) != 0)
 		return -1;
 	/*
 	 * The synchronous transactions, persisted above, might still be not
@@ -112,26 +152,31 @@ txn_checkpoint_build(struct txn_checkpoint *out)
 }
 
 int
-txn_persist_all_prepared(struct vclock *out)
+box_checkpoint_build_in_memory(struct box_checkpoint *out)
 {
-	/*
-	 * All the txns after preparation until all the journal write follow the
-	 * same path:
-	 * - The limbo volatile queue.
-	 * - The journal volatile queue.
-	 * - The journal write.
-	 *
-	 * Some steps might be skipped (for instance, the limbo might be if the
-	 * txn is force-async or just async and the limbo is empty). But the
-	 * order never changes.
-	 *
-	 * It means, that if one would want to closely follow the latest known
-	 * prepared txn until it reaches WAL, then following this path the
-	 * needed txn will be surely found before any new txn is added (except
-	 * for force-async, which might skip the volatile limbo queue and go
-	 * directly to the journal).
-	 */
-	if (txn_limbo_flush(&txn_limbo) != 0)
-		return -1;
-	return journal_sync(out);
+	return txn_checkpoint_build(out, false /* do journal rotation */);
+}
+
+int
+box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled)
+{
+	int rc;
+	struct engine_checkpoint_params engine_params = {
+		.is_scheduled = is_scheduled,
+		.box = out,
+	};
+	rc = engine_begin_checkpoint(&engine_params);
+	if (rc != 0)
+		goto out;
+	rc = txn_checkpoint_build(out, true /* do journal rotation */);
+	if (rc != 0)
+		goto out;
+	rc = engine_commit_checkpoint(&out->journal.vclock);
+	if (rc != 0)
+		goto out;
+	journal_commit_checkpoint(&out->journal);
+out:
+	if (rc != 0)
+		engine_abort_checkpoint();
+	return rc;
 }

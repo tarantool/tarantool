@@ -36,11 +36,11 @@
 
 #include "fiber.h"
 #include "errinj.h"
+#include "checkpoint.h"
 #include "coio_task.h"
 #include "info/info.h"
 #include "tuple.h"
 #include "txn.h"
-#include "txn_checkpoint.h"
 #include "memtx_tx.h"
 #include "memtx_tree.h"
 #include "iproto_constants.h"
@@ -1014,12 +1014,11 @@ struct checkpoint {
 	struct xlog snap;
 	/** New sort data file writer. */
 	struct memtx_sort_data_writer *sort_data_writer;
-	/** Raft request to be written to the snapshot file. */
-	struct raft_request raft;
-	/** Synchro request to be written to the snapshot file. */
-	struct synchro_request synchro_state;
-	/** The limbo confirmed vclock at the moment of checkpoint creation. */
-	struct vclock synchro_vclock;
+	/**
+	 * Global engine-agnostic checkpoint having some control states that
+	 * need to go into the snapshot file.
+	 */
+	const struct box_checkpoint *box;
 	/**
 	 * Do nothing, just touch the snapshot file - the
 	 * checkpoint already exists.
@@ -1129,7 +1128,7 @@ checkpoint_dump_sort_data(
 }
 
 static struct checkpoint *
-checkpoint_new(struct memtx_engine *memtx)
+checkpoint_new(struct memtx_engine *memtx, const struct box_checkpoint *box)
 {
 	struct checkpoint *ckpt = (struct checkpoint *)malloc(sizeof(*ckpt));
 	if (ckpt == NULL) {
@@ -1155,13 +1154,9 @@ checkpoint_new(struct memtx_engine *memtx)
 		    "SNAP", &INSTANCE_UUID, &opts);
 	xlog_clear(&ckpt->snap);
 	vclock_create(&ckpt->vclock);
-	box_raft_checkpoint_local(&ckpt->raft);
-	txn_limbo_checkpoint(&txn_limbo, &ckpt->synchro_state,
-			     &ckpt->synchro_vclock);
-
 	ckpt->sort_data_writer = memtx->use_sort_data ?
 				 memtx_sort_data_writer_new() : NULL;
-
+	ckpt->box = box;
 	ckpt->touch = false;
 	return ckpt;
 }
@@ -1352,8 +1347,8 @@ checkpoint_f(va_list ap)
 		 */
 		if (!is_synchro_written && !space_id_is_system(space_rv->id)) {
 			if (checkpoint_write_system_data(
-					snap, &ckpt->raft,
-					&ckpt->synchro_state) != 0)
+					snap, &ckpt->box->raft_local,
+					&ckpt->box->limbo) != 0)
 				return -1;
 			is_synchro_written = true;
 		}
@@ -1478,8 +1473,8 @@ checkpoint_f(va_list ap)
 	 * of the checkpoint.
 	 */
 	if (!is_synchro_written &&
-	    checkpoint_write_system_data(snap, &ckpt->raft,
-					 &ckpt->synchro_state) != 0)
+	    checkpoint_write_system_data(snap, &ckpt->box->raft_local,
+					 &ckpt->box->limbo) != 0)
 		return -1;
 	goto done;
 done:
@@ -1494,13 +1489,12 @@ done:
 }
 
 static int
-memtx_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
+memtx_engine_begin_checkpoint(struct engine *engine,
+			      const struct engine_checkpoint_params *params)
 {
-	(void) is_scheduled;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-
 	assert(memtx->checkpoint == NULL);
-	memtx->checkpoint = checkpoint_new(memtx);
+	memtx->checkpoint = checkpoint_new(memtx, params->box);
 	if (memtx->checkpoint == NULL)
 		return -1;
 	return 0;
@@ -1634,45 +1628,6 @@ struct memtx_join_ctx {
 	struct xstream *stream;
 };
 
-/** Respond to the JOIN request with the current vclock. */
-static void
-send_join_header(struct xstream *stream, const struct vclock *vclock)
-{
-	struct xrow_header row;
-	/* Encoding replication request uses fiber()->gc region. */
-	RegionGuard region_guard(&fiber()->gc);
-	/*
-	 * Vclock is encoded with 0th component, as in case of checkpoint
-	 * join it corresponds to the vclock of the checkpoint, where 0th
-	 * component is essential, as otherwise signature won't be correct.
-	 * Client sends this vclock in IPROTO_CURSOR, when he wants to
-	 * continue fetching from the same checkpoint.
-	 */
-	xrow_encode_vclock(&row, vclock);
-	xstream_write(stream, &row);
-}
-
-static void
-send_join_meta(struct xstream *stream, const struct raft_request *raft_req,
-	       const struct synchro_request *synchro_req)
-{
-	struct xrow_header row;
-	/* Encoding raft request uses fiber()->gc region. */
-	RegionGuard region_guard(&fiber()->gc);
-
-	/* Mark the beginning of the metadata stream. */
-	xrow_encode_type(&row, IPROTO_JOIN_META);
-	xstream_write(stream, &row);
-
-	xrow_encode_raft(&row, &fiber()->gc, raft_req);
-	xstream_write(stream, &row);
-
-	char body[XROW_BODY_LEN_MAX];
-	xrow_encode_synchro(&row, body, synchro_req);
-	row.replica_id = synchro_req->replica_id;
-	xstream_write(stream, &row);
-}
-
 #if defined(ENABLE_FETCH_SNAPSHOT_CURSOR)
 #include "memtx_checkpoint_join.cc"
 #else /* !defined(ENABLE_FETCH_SNAPSHOT_CURSOR) */
@@ -1799,28 +1754,6 @@ memtx_engine_join(struct engine *engine, struct engine_join_ctx *arg,
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)arg->data[engine->id];
 	ctx->stream = stream;
-
-	struct txn_checkpoint txn_cp;
-	if (txn_checkpoint_build(&txn_cp) != 0)
-		return -1;
-	vclock_copy(arg->vclock, &txn_cp.journal_vclock);
-	struct raft_request *raft_checkpoint = &txn_cp.raft_remote_checkpoint;
-	struct synchro_request *synchro_checkpoint = &txn_cp.limbo_checkpoint;
-
-	/* See raft_process_recovery, why these fields are not needed. */
-	raft_checkpoint->state = 0;
-	raft_checkpoint->vclock = NULL;
-
-	/* Respond with vclock and JOIN_META. */
-	send_join_header(stream, arg->vclock);
-	if (arg->send_meta) {
-		send_join_meta(stream, raft_checkpoint, synchro_checkpoint);
-		struct xrow_header row;
-		/* Mark the beginning of the data stream. */
-		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
-		xstream_write(stream, &row);
-	}
-
 	/*
 	 * Memtx snapshot iterators are safe to use from another
 	 * thread and so we do so as not to consume too much of
