@@ -60,6 +60,11 @@ struct rtree_neighbor {
 	void *child;
 	int level;
 	sq_coord_t distance;
+	/* Is used for sorting neighbors with same distence */
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
+	/* Is uesd for neighbor pagination */
+	void *cmp_ctx;
+	sq_coord_t distance_max;
 };
 
 typedef rb_tree(struct rtree_neighbor) rtnt_t;
@@ -178,6 +183,14 @@ struct rtree_iterator
 	/* Position of ready-to-use list entry in allocated page */
 	unsigned page_pos;
 
+	/* Is used for sorting neighbors with same distence */
+	int (*tie_cmp)(const struct rtree_neighbor *a, const struct rtree_neighbor *b);
+
+	/* Is used for neighbor pagination */
+	void *cmp_ctx;
+	sq_coord_t pos_distance;
+	const char *pr_key_pos;
+
 	/* Comparators for comparison rectagnle of the iterator with
 	 * rectangles of tree nodes. If the comparator returns true,
 	 * the node is accepted; if false - skipped.
@@ -273,6 +286,18 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
  */
 void
 rtree_insert(struct rtree *tree, struct rtree_rect *rect, record_t obj);
+
+/**
+ * @brief Skip neighbors for neighbor pagination
+ * @param itr - pointer to iterator (must be initialized earlier),
+ *  iterator itr should be used for accessing found record
+ * @param pos_distance min distance of last fetched rect
+ * @param is_upper_distance flag
+ */
+record_t *
+rtree_skip_neighbors_equal_distance(struct rtree_iterator *itr,
+				    sq_coord_t pos_distance,
+				    bool *is_upper_distance);
 
 /**
  * @brief Remove the record from a tree
