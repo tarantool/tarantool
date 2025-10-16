@@ -42,7 +42,7 @@ endif()
 # Check supported standards
 #
 if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
-   (NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
+   (NOT HAVE_STD_CXX17 AND NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
     set(CMAKE_REQUIRED_FLAGS "-std=c11")
     check_c_source_compiles("
     /*
@@ -54,6 +54,8 @@ if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
     " HAVE_STD_C11)
     set(CMAKE_REQUIRED_FLAGS "-std=gnu99")
     check_c_source_compiles("int main(void) { return 0; }" HAVE_STD_GNU99)
+    set(CMAKE_REQUIRED_FLAGS "-std=c++17")
+    check_cxx_source_compiles("int main(void) { return 0; }" HAVE_STD_CXX17)
     set(CMAKE_REQUIRED_FLAGS "-std=c++11")
     check_cxx_source_compiles("int main(void) { return 0; }" HAVE_STD_CXX11)
     set(CMAKE_REQUIRED_FLAGS "-std=gnu++0x")
@@ -61,11 +63,11 @@ if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
     set(CMAKE_REQUIRED_FLAGS "")
 endif()
 if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
-   (NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
+   (NOT HAVE_STD_CXX17 AND NOT HAVE_STD_CXX11 AND NOT HAVE_STD_GNUXX0X))
     message (FATAL_ERROR
         "${CMAKE_C_COMPILER} should support -std=c11 or -std=gnu99. "
-        "${CMAKE_CXX_COMPILER} should support -std=c++11 or -std=gnu++0x. "
-        "Please consider upgrade to gcc 4.5+ or clang 3.2+.")
+        "${CMAKE_CXX_COMPILER} should support -std=c++17 or -std=c++11 or "
+        "-std=gnu++0x. Please consider upgrade to gcc 4.5+ or clang 3.2+.")
 endif()
 
 #
@@ -217,7 +219,9 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("C" "-std=gnu99")
     endif()
 
-    if (HAVE_STD_CXX11)
+    if (HAVE_STD_CXX17)
+        add_compile_flags("CXX" "-std=c++17")
+    elseif (HAVE_STD_CXX11)
         add_compile_flags("CXX" "-std=c++11")
     else()
         add_compile_flags("CXX" "-std=gnu++0x")
@@ -318,7 +322,7 @@ macro(enable_tnt_compile_flags)
     # Only add -Werror if it's a debug build, done by developers.
     # Release builds should not cause extra trouble.
     if ((${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        AND HAVE_STD_C11 AND HAVE_STD_CXX11)
+        AND HAVE_STD_C11 AND (HAVE_STD_CXX11 OR HAVE_STD_CXX17))
         add_compile_flags("C;CXX" "-Werror")
     endif()
 
