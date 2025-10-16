@@ -431,8 +431,8 @@ luaT_push_covered_fields(struct lua_State *L, struct index_def *def)
 			       def->cmp_def->part_count;
 	uint32_t *fields = xregion_alloc_array(gc, typeof(*fields),
 					       field_count);
-	memcpy(fields, def->opts.covered_fields,
-	       sizeof(*fields) * def->opts.covered_field_count);
+	for (uint32_t i = 0; i < def->opts.covered_field_count; i++)
+		fields[i] = def->opts.covered_fields[i].field;
 	for (uint32_t i = 0; i < def->cmp_def->part_count; i++)
 		fields[i + def->opts.covered_field_count] =
 					def->cmp_def->parts[i].fieldno;

@@ -55,7 +55,8 @@ g.test_covers_validation = function(cg)
         }, s.create_index, s, 'sk', {covers = 1})
         t.assert_error_covers({
             type = 'IllegalParams',
-            message = "options.covers[1]: field (name or number) is expected",
+            message = "options.covers[1][1]: field (name or number) is" ..
+                      " expected",
         }, s.create_index, s, 'sk', {covers = {{}}})
         t.assert_error_covers({
             type = 'IllegalParams',
@@ -73,8 +74,49 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array",
         }, s.create_index, s, 'sk', {covers = {1.1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing at max 2 elements",
+        }, s.create_index, s, 'sk', {covers = {{1, {layout = 'null_rle'}, 2}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing unsigned as first" ..
+                      " element",
+        }, s.create_index, s, 'sk', {covers = {{1.1, {layout = 'null_rle'}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements it should contain a map as its second" ..
+                      " element",
+        }, s.create_index, s, 'sk', {covers = {{1, 1.1}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key",
+        }, s.create_index, s, 'sk', {covers = {{1, {layout = 'plain',
+                                                    elems_per_block = 512}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key called 'layout'",
+        }, s.create_index, s, 'sk', {covers = {{1, {elems_per_block = 512}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'layout' must be a string",
+        }, s.create_index, s, 'sk', {covers = {{1, {layout = 1}}}})
         --
         -- Test index:alter
         --
@@ -85,7 +127,8 @@ g.test_covers_validation = function(cg)
         }, sk.alter, sk, {covers = 1})
         t.assert_error_covers({
             type = 'IllegalParams',
-            message = "options.covers[1]: field (name or number) is expected",
+            message = "options.covers[1][1]: field (name or number) is" ..
+                      " expected",
         }, sk.alter, sk, {covers = {{}}})
         t.assert_error_covers({
             type = 'IllegalParams',
@@ -103,8 +146,49 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array",
         }, sk.alter, sk, {covers = {1.1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing at max 2 elements",
+        }, sk.alter, sk, {covers = {{1, {layout = 'null_rle'}, 2}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing unsigned as first" ..
+                      " element",
+        }, sk.alter, sk, {covers = {{1.1, {layout = 'null_rle'}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements it should contain a map as its second" ..
+                      " element",
+        }, sk.alter, sk, {covers = {{1, 1.1}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key",
+        }, sk.alter, sk, {covers = {{1, {layout = 'plain',
+                                         elems_per_block = 512}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key called 'layout'",
+        }, sk.alter, sk, {covers = {{1, {elems_per_block = 512}}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'layout' must be a string",
+        }, sk.alter, sk, {covers = {{1, {layout = 1}}}})
         s.index.sk:drop()
         --
         -- Test box.space._index:insert.
@@ -120,7 +204,8 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {-1}},
             {{0, 'unsigned'}}
@@ -128,7 +213,8 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {1.1}},
             {{0, 'unsigned'}}
@@ -136,7 +222,8 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {2^32}},
             {{0, 'unsigned'}}
@@ -147,6 +234,80 @@ g.test_covers_validation = function(cg)
             message = "Wrong index options: 'covers' has duplicates",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {1, 1}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing at max 2 elements",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{1, {layout = 'null_rle'}, 2}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing unsigned as first" ..
+                      " element",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{1.1, {layout = 'null_rle'}}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or array containing unsigned as first" ..
+                      " element",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{2^32, {layout = 'null_rle'}}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements it should contain a map as its second" ..
+                      " element",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true, covers = {{1, 1.1}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{1, {layout = 'plain',
+                                                   elems_per_block = 512}}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: if 'covers' element is an array" ..
+                      " of 2 elements its second element should be a map" ..
+                      " containing a single key called 'layout'",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{1, {elems_per_block = 512}}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'layout' must be a string",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true,
+                                    covers = {{1, {layout = 1}}}},
             {{0, 'unsigned'}}
         })
     end)
