@@ -355,19 +355,23 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 	while (true) {
 		uint32_t size;
 		const char *data;
+		size_t region_svp = box_region_used();
 		rc = box_raw_read_view_iterator_next(&iter, &data, &size);
-		if (rc != 0 || data == NULL)
+		if (rc != 0 || data == NULL) {
+			box_region_truncate(region_svp);
 			break;
+		}
 		if (unlikely(mp_typeof(*data) != MP_ARRAY ||
 			     mp_decode_array(&data) <= field_no)) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			box_region_truncate(region_svp);
 			break;
 		}
 		for (int i = 0; i < (int)field_no; i++)
 			mp_next(&data);
-		if (mp_typeof(*data) == MP_NIL)
-			continue;
-		sum += mp_decode_uint(&data);
+		if (mp_typeof(*data) != MP_NIL)
+			sum += mp_decode_uint(&data);
+		box_region_truncate(region_svp);
 	}
 	box_raw_read_view_iterator_destroy(&iter);
 	if (rc != 0)
@@ -410,24 +414,31 @@ str_iterator_rv_lua_func(struct lua_State *L)
 	for (int64_t k = 0; true; k++) {
 		uint32_t size;
 		const char *data;
+		size_t region_svp = box_region_used();
 		rc = box_raw_read_view_iterator_next(&iter, &data, &size);
-		if (rc != 0 || data == NULL)
+		if (rc != 0 || data == NULL) {
+			box_region_truncate(region_svp);
 			break;
+		}
 		if (unlikely(mp_typeof(*data) != MP_ARRAY ||
 			     mp_decode_array(&data) <= field_no)) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
+			box_region_truncate(region_svp);
 			break;
 		}
 		for (int i = 0; i < (int)field_no; i++)
 			mp_next(&data);
-		if (mp_typeof(*data) == MP_NIL)
-			continue;
-		uint32_t len;
-		const char *str = mp_decode_str(&data, &len);
-		if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
-			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
-			break;
+		if (mp_typeof(*data) != MP_NIL) {
+			uint32_t len;
+			const char *str = mp_decode_str(&data, &len);
+			if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
+				rc = box_error_raise(ER_PROC_LUA,
+						     "unexpected result");
+				box_region_truncate(region_svp);
+				break;
+			}
 		}
+		box_region_truncate(region_svp);
 	}
 	box_raw_read_view_iterator_destroy(&iter);
 	if (rc != 0)
