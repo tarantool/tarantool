@@ -249,9 +249,12 @@ sum_iterator_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	bool reverse = lua_toboolean(L, 4);
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
-	box_iterator_t *iter = box_index_iterator(space_id, index_id, ITER_ALL,
+	enum iterator_type type = reverse ? ITER_LE : ITER_GE;
+	box_iterator_t *iter = box_index_iterator(space_id, index_id, type,
 						  key, key_end);
 	if (iter == NULL)
 		return luaT_error(L);
@@ -286,22 +289,25 @@ str_iterator_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
-	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
-		return luaT_error(L);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	luaL_checktype(L, 5, LUA_TBOOLEAN);
+	luaL_checktype(L, 6, LUA_TBOOLEAN);
 	bool use_view_types = lua_toboolean(L, 4);
 	bool touch_string = lua_toboolean(L, 5);
+	bool reverse = lua_toboolean(L, 6);
 	if (use_view_types || !touch_string) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
-	box_iterator_t *iter = box_index_iterator(space_id, index_id, ITER_ALL,
+	enum iterator_type type = reverse ? ITER_LE : ITER_GE;
+	box_iterator_t *iter = box_index_iterator(space_id, index_id, type,
 						  key, key_end);
 	if (iter == NULL)
 		return luaT_error(L);
 	int rc = 0;
-	for (int64_t k = 0; true; k++) {
+	while (true) {
 		box_tuple_t *tuple;
 		rc = box_iterator_next(iter, &tuple);
 		if (rc != 0 || tuple == NULL)
@@ -316,7 +322,7 @@ str_iterator_lua_func(struct lua_State *L)
 			continue;
 		uint32_t len;
 		const char *str = mp_decode_str(&data, &len);
-		if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
+		if (unlikely(len == 0 || str[0] < 'a' || str[0] >= 'a' + 26)) {
 			rc = box_error_raise(ER_PROC_LUA, "unexpected result");
 			break;
 		}
@@ -336,6 +342,8 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	bool reverse = lua_toboolean(L, 4);
 	box_raw_read_view_space_t *space =
 		box_raw_read_view_space_by_id(rv, space_id);
 	if (space == NULL)
@@ -346,8 +354,9 @@ sum_iterator_rv_lua_func(struct lua_State *L)
 		return luaT_error(L);
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
+	enum iterator_type type = reverse ? ITER_LE : ITER_GE;
 	box_raw_read_view_iterator_t iter;
-	if (box_raw_read_view_iterator_create(&iter, index, ITER_ALL,
+	if (box_raw_read_view_iterator_create(&iter, index, type,
 					      key, key_end) != 0)
 		return luaT_error(L);
 	int rc = 0;
@@ -388,10 +397,12 @@ str_iterator_rv_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
-	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
-		return luaT_error(L);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	luaL_checktype(L, 5, LUA_TBOOLEAN);
+	luaL_checktype(L, 6, LUA_TBOOLEAN);
 	bool use_view_types = lua_toboolean(L, 4);
 	bool touch_string = lua_toboolean(L, 5);
+	bool reverse = lua_toboolean(L, 6);
 	if (use_view_types || !touch_string) {
 		lua_pushboolean(L, false);
 		return 1;
@@ -406,12 +417,13 @@ str_iterator_rv_lua_func(struct lua_State *L)
 		return luaT_error(L);
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
+	enum iterator_type type = reverse ? ITER_LE : ITER_GE;
 	box_raw_read_view_iterator_t iter;
-	if (box_raw_read_view_iterator_create(&iter, index, ITER_ALL,
+	if (box_raw_read_view_iterator_create(&iter, index, type,
 					      key, key_end) != 0)
 		return luaT_error(L);
 	int rc = 0;
-	for (int64_t k = 0; true; k++) {
+	while (true) {
 		uint32_t size;
 		const char *data;
 		size_t region_svp = box_region_used();
@@ -431,7 +443,8 @@ str_iterator_rv_lua_func(struct lua_State *L)
 		if (mp_typeof(*data) != MP_NIL) {
 			uint32_t len;
 			const char *str = mp_decode_str(&data, &len);
-			if (unlikely(len == 0 || str[0] != 'a' + k % 26)) {
+			if (unlikely(len == 0 || str[0] < 'a' ||
+				     str[0] >= 'a' + 26)) {
 				rc = box_error_raise(ER_PROC_LUA,
 						     "unexpected result");
 				box_region_truncate(region_svp);
@@ -455,12 +468,15 @@ sum_arrow_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	bool reverse = lua_toboolean(L, 4);
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
 	uint32_t fields[] = {field_no};
 	uint32_t field_count = lengthof(fields);
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
+	box_arrow_options_set_reverse(options, reverse);
 	struct ArrowArrayStream stream;
 	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
 					key, key_end, options, &stream);
@@ -500,10 +516,12 @@ str_arrow_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
-	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
-		return luaT_error(L);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	luaL_checktype(L, 5, LUA_TBOOLEAN);
+	luaL_checktype(L, 6, LUA_TBOOLEAN);
 	bool use_view_types = lua_toboolean(L, 4);
 	bool touch_string = lua_toboolean(L, 5);
+	bool reverse = lua_toboolean(L, 6);
 	char key[8];
 	char *key_end = mp_encode_array(key, 0);
 	uint32_t fields[] = {field_no};
@@ -511,6 +529,7 @@ str_arrow_lua_func(struct lua_State *L)
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
 	box_arrow_options_set_force_view_types(options, use_view_types);
+	box_arrow_options_set_reverse(options, reverse);
 	struct ArrowArrayStream stream;
 	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
 					key, key_end, options, &stream);
@@ -545,7 +564,8 @@ str_arrow_lua_func(struct lua_State *L)
 					continue;
 				int32_t pos = offsets[i];
 				/* Load first char of a string. */
-				if (unlikely(values[pos] != 'a' + k % 26)) {
+				if (unlikely(values[pos] < 'a' ||
+					     values[pos] >= 'a' + 26)) {
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
@@ -578,6 +598,8 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	bool reverse = lua_toboolean(L, 4);
 	box_raw_read_view_space_t *space =
 		box_raw_read_view_space_by_id(rv, space_id);
 	if (space == NULL)
@@ -592,6 +614,7 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 	uint32_t field_count = lengthof(fields);
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
+	box_arrow_options_set_reverse(options, reverse);
 	struct ArrowArrayStream stream;
 	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
 						key, key_end, options, &stream);
@@ -632,10 +655,12 @@ str_arrow_rv_lua_func(struct lua_State *L)
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	uint32_t index_id = luaL_checkinteger(L, 2);
 	uint32_t field_no = luaL_checkinteger(L, 3);
-	if (!lua_isboolean(L, 4) || !lua_isboolean(L, 5))
-		return luaT_error(L);
+	luaL_checktype(L, 4, LUA_TBOOLEAN);
+	luaL_checktype(L, 5, LUA_TBOOLEAN);
+	luaL_checktype(L, 6, LUA_TBOOLEAN);
 	bool use_view_types = lua_toboolean(L, 4);
 	bool touch_string = lua_toboolean(L, 5);
+	bool reverse = lua_toboolean(L, 6);
 	box_raw_read_view_space_t *space =
 		box_raw_read_view_space_by_id(rv, space_id);
 	if (space == NULL)
@@ -651,6 +676,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
 	box_arrow_options_set_force_view_types(options, use_view_types);
+	box_arrow_options_set_reverse(options, reverse);
 	struct ArrowArrayStream stream;
 	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
 						key, key_end, options, &stream);
@@ -685,7 +711,8 @@ str_arrow_rv_lua_func(struct lua_State *L)
 					continue;
 				int32_t pos = offsets[i];
 				/* Load first char of a string. */
-				if (unlikely(values[pos] != 'a' + k % 26)) {
+				if (unlikely(values[pos] < 'a' ||
+					     values[pos] >= 'a' + 26)) {
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
@@ -717,7 +744,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 							str->buf_index];
 					c = buf[str->offset];
 				}
-				if (unlikely(c != 'a' + k % 26)) {
+				if (unlikely(c < 'a' || c >= 'a' + 26)) {
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
