@@ -460,7 +460,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	xdir_set_retention_period(&writer->wal_dir, wal_retention_period);
 	xlog_clear(&writer->current_wal);
 	if (wal_mode == WAL_FSYNC)
-		writer->wal_dir.open_wflags |= O_SYNC;
+		writer->wal_dir.open_wflags |= WAL_SYNC_FLAG;
 
 	stailq_create(&writer->rollback);
 	writer->is_in_rollback = false;
