@@ -45,7 +45,7 @@ struct sockaddr;
 int
 coio_connect(const char *host, const char *service, int host_hint,
 	     struct sockaddr *addr, socklen_t *addr_len,
-	     ev_tstamp timeout);
+	     ev_tstamp timeout, const char *iface);
 
 int
 coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
