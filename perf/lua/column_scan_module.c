@@ -549,13 +549,14 @@ str_arrow_lua_func(struct lua_State *L)
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
-					break;
+					goto out;
 				}
 			}
 		}
 		if (array.release != NULL)
 			array.release(&array);
 	}
+out:
 	stream.release(&stream);
 	box_arrow_options_delete(options);
 	if (array.release != NULL)
@@ -688,7 +689,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
-					break;
+					goto out;
 				}
 			}
 		} else if (touch_string && use_view_types) {
@@ -709,7 +710,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 						rc = box_error_raise(
 							ER_PROC_LUA,
 							"unexpected result");
-						break;
+						goto out;
 					}
 					const char *buf =
 						column->buffers[2 +
@@ -720,13 +721,14 @@ str_arrow_rv_lua_func(struct lua_State *L)
 					rc = box_error_raise(
 						ER_PROC_LUA,
 						"unexpected result");
-					break;
+					goto out;
 				}
 			}
 		}
 		if (array.release != NULL)
 			array.release(&array);
 	}
+out:
 	stream.release(&stream);
 	box_arrow_options_delete(options);
 	if (array.release != NULL)
