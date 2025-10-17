@@ -43,17 +43,9 @@ struct iostream;
 struct sockaddr;
 
 int
-coio_connect_timeout(const char *host, const char *service, int host_hint,
-		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout);
-
-static inline int
 coio_connect(const char *host, const char *service, int host_hint,
-	     struct sockaddr *addr, socklen_t *addr_len)
-{
-	return coio_connect_timeout(host, service, host_hint, addr, addr_len,
-				    TIMEOUT_INFINITY);
-}
+	     struct sockaddr *addr, socklen_t *addr_len,
+	     ev_tstamp timeout);
 
 int
 coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
