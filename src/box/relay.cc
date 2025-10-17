@@ -100,7 +100,6 @@ struct relay_raft_msg {
 	struct cmsg base;
 	struct cmsg_hop route[2];
 	struct raft_request req;
-	struct vclock vclock;
 	struct relay *relay;
 };
 
@@ -1219,10 +1218,6 @@ relay_push_raft(struct relay *relay, const struct raft_request *req)
 	 * is saved.
 	 */
 	msg->req = *req;
-	if (req->vclock != NULL) {
-		msg->req.vclock = &msg->vclock;
-		vclock_copy(&msg->vclock, req->vclock);
-	}
 	msg->route[0].f = relay_raft_msg_push;
 	msg->route[0].pipe = &relay->tx_pipe;
 	msg->route[1].f = tx_raft_msg_return;
@@ -1294,7 +1289,7 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 	 */
 	if (iproto_type_is_promote_request(packet->type)) {
 		struct synchro_request req;
-		if (xrow_decode_synchro(packet, &req, NULL) != 0)
+		if (xrow_decode_synchro(packet, &req) != 0)
 			diag_raise();
 		while (relay->sent_raft_term < req.term) {
 			if (fiber_is_cancelled()) {

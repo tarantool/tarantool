@@ -100,9 +100,12 @@ box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req,
 		.leader_id = msg->leader_id,
 		.is_leader_seen = msg->is_leader_seen,
 		.state = msg->state,
-		.vclock = msg->vclock,
 		.group_id = group_id,
 	};
+	if (msg->vclock != NULL)
+		vclock_copy(&req->vclock, msg->vclock);
+	else
+		vclock_clear(&req->vclock);
 }
 
 static void
@@ -114,7 +117,7 @@ box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
 		.leader_id = req->leader_id,
 		.is_leader_seen = req->is_leader_seen,
 		.state = req->state,
-		.vclock = req->vclock,
+		.vclock = vclock_is_set(&req->vclock) ? &req->vclock : NULL,
 	};
 }
 

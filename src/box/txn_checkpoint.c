@@ -18,8 +18,7 @@ struct txn_checkpoint_context {
 static void
 txn_checkpoint_collect(struct txn_checkpoint *c)
 {
-	txn_limbo_checkpoint(&txn_limbo, &c->limbo_checkpoint,
-			     &c->limbo_vclock);
+	txn_limbo_checkpoint(&txn_limbo, &c->limbo_checkpoint);
 	box_raft_checkpoint_remote(&c->raft_remote_checkpoint);
 }
 

@@ -49,6 +49,7 @@
 #include "salad/grp_alloc.h"
 #include "trivia/util.h"
 #include "retention_period.h"
+#include "iproto_constants.h"
 
 /*
  * FALLOC_FL_KEEP_SIZE flag has existed since fallocate() was
@@ -1794,10 +1795,9 @@ xlog_tx_decode(const char *data, const char *data_end,
  * @retval 0 success
  * @retval >0 how many bytes we will have for continue
  */
-ssize_t
-xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
-		      const char **data, const char *data_end,
-		      ZSTD_DStream *zdctx)
+static ssize_t
+xlog_read_tx(const char **data, const char *data_end, ZSTD_DStream *zdctx,
+	     struct ibuf *buf)
 {
 	const char *rpos = *data;
 	struct xlog_fixheader fixheader;
@@ -1811,7 +1811,8 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 		return fixheader.len - (data_end - rpos);
 
 	ERROR_INJECT(ERRINJ_XLOG_GARBAGE, {
-		*((char *)rpos + fixheader.len / 2) = ~*((char *)rpos + fixheader.len / 2);
+		*((char *)rpos + fixheader.len / 2) =
+				~*((char *)rpos + fixheader.len / 2);
 	});
 
 	/* Validate checksum */
@@ -1821,20 +1822,12 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	}
 	data_end = rpos + fixheader.len;
 
-	ibuf_create(&tx_cursor->rows, &cord()->slabc,
-		    XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	ibuf_create(buf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	if (fixheader.magic == row_marker) {
-		void *dst = ibuf_alloc(&tx_cursor->rows, fixheader.len);
-		if (dst == NULL) {
-			diag_set(OutOfMemory, fixheader.len,
-				 "runtime", "xlog rows buffer");
-			ibuf_destroy(&tx_cursor->rows);
-			return -1;
-		}
+		void *dst = xibuf_alloc(buf, fixheader.len);
 		memcpy(dst, rpos, fixheader.len);
 		*data = (char *)rpos + fixheader.len;
 		assert(*data <= data_end);
-		tx_cursor->size = ibuf_used(&tx_cursor->rows);
 		return 0;
 	};
 
@@ -1842,60 +1835,14 @@ xlog_tx_cursor_create(struct xlog_tx_cursor *tx_cursor,
 	ZSTD_initDStream(zdctx);
 	int rc;
 	do {
-		if (ibuf_reserve(&tx_cursor->rows,
-				 XLOG_TX_AUTOCOMMIT_THRESHOLD) == NULL) {
-			diag_set(OutOfMemory, XLOG_TX_AUTOCOMMIT_THRESHOLD,
-				  "runtime", "xlog output buffer");
-			ibuf_destroy(&tx_cursor->rows);
-			return -1;
-		}
-	} while ((rc = xlog_cursor_decompress(&tx_cursor->rows.wpos,
-					      tx_cursor->rows.end, &rpos,
+		xibuf_reserve(buf, XLOG_TX_AUTOCOMMIT_THRESHOLD);
+	} while ((rc = xlog_cursor_decompress(&buf->wpos, buf->end, &rpos,
 					      data_end, zdctx)) == 1);
 	if (rc != 0)
 		return -1;
 
 	*data = rpos;
 	assert(*data <= data_end);
-	tx_cursor->size = ibuf_used(&tx_cursor->rows);
-	return 0;
-}
-
-int
-xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
-		        struct xrow_header *xrow)
-{
-	if (ibuf_used(&tx_cursor->rows) == 0)
-		return 1;
-	/* Return row from xlog tx buffer */
-	int rc = xrow_decode(xrow, (const char **)&tx_cursor->rows.rpos,
-			     (const char *)tx_cursor->rows.wpos, false);
-	if (rc != 0) {
-		diag_set(XlogError, "can't parse row");
-		/* Discard remaining row data */
-		ibuf_reset(&tx_cursor->rows);
-		return -1;
-	}
-
-	return 0;
-}
-
-int
-xlog_tx_cursor_next_row_raw(struct xlog_tx_cursor *tx_cursor,
-			    const char ***data, const char **end)
-{
-	if (ibuf_used(&tx_cursor->rows) == 0)
-		return 1;
-	*data = (const char **)&tx_cursor->rows.rpos;
-	*end = (const char *)tx_cursor->rows.wpos;
-	return 0;
-}
-
-int
-xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor)
-{
-	assert(tx_cursor->rows.slabc == &cord()->slabc);
-	ibuf_destroy(&tx_cursor->rows);
 	return 0;
 }
 
@@ -1926,15 +1873,15 @@ xlog_cursor_find_tx_magic(struct xlog_cursor *i)
 	return 0;
 }
 
-int
-xlog_cursor_next_tx(struct xlog_cursor *i)
+/**
+ * Same as @xlog_cursor_next_tx, but no tx cursor is created. Tx is returned
+ * in @a buf.
+ */
+static int
+xlog_cursor_next_tx_impl(struct xlog_cursor *i, struct ibuf *buf)
 {
 	int rc;
 	assert(xlog_cursor_is_open(i));
-	if (i->state == XLOG_CURSOR_TX) {
-		i->state = XLOG_CURSOR_ACTIVE;
-		xlog_tx_cursor_destroy(&i->tx_cursor);
-	}
 	/* load at least magic to check eof */
 	rc = xlog_cursor_ensure(i, sizeof(log_magic_t));
 	if (rc < 0)
@@ -1947,9 +1894,8 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 	}
 
 	ssize_t to_load;
-	while ((to_load = xlog_tx_cursor_create(&i->tx_cursor,
-						(const char **)&i->rbuf.rpos,
-						i->rbuf.wpos, i->zdctx)) > 0) {
+	while ((to_load = xlog_read_tx((const char **)&i->rbuf.rpos,
+				       i->rbuf.wpos, i->zdctx, buf)) > 0) {
 		/* not enough data in read buffer */
 		int rc = xlog_cursor_ensure(i, ibuf_used(&i->rbuf) + to_load);
 		if (rc < 0)
@@ -1960,7 +1906,6 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 	if (to_load < 0)
 		return -1;
 
-	i->state = XLOG_CURSOR_TX;
 	return 0;
 eof_found:
 	/*
@@ -1982,12 +1927,38 @@ eof_found:
 }
 
 int
+xlog_cursor_next_tx(struct xlog_cursor *cursor)
+{
+	if (cursor->state == XLOG_CURSOR_TX) {
+		cursor->state = XLOG_CURSOR_ACTIVE;
+		ibuf_destroy(&cursor->tx_cursor);
+	}
+	int rc = xlog_cursor_next_tx_impl(cursor, &cursor->tx_cursor);
+	if (rc != 0)
+		return rc;
+	cursor->state = XLOG_CURSOR_TX;
+	return 0;
+}
+
+int
 xlog_cursor_next_row(struct xlog_cursor *cursor, struct xrow_header *xrow)
 {
 	assert(xlog_cursor_is_open(cursor));
 	if (cursor->state != XLOG_CURSOR_TX)
 		return 1;
-	return xlog_tx_cursor_next_row(&cursor->tx_cursor, xrow);
+	if (ibuf_used(&cursor->tx_cursor) == 0)
+		return 1;
+	/* Return row from xlog tx buffer */
+	int rc = xrow_decode(xrow, (const char **)&cursor->tx_cursor.rpos,
+			     (const char *)cursor->tx_cursor.wpos, false);
+	if (rc != 0) {
+		diag_set(XlogError, "can't parse row");
+		/* Discard remaining row data */
+		ibuf_reset(&cursor->tx_cursor);
+		return -1;
+	}
+
+	return 0;
 }
 
 int
@@ -1997,7 +1968,11 @@ xlog_cursor_next_row_raw(struct xlog_cursor *cursor,
 	assert(xlog_cursor_is_open(cursor));
 	if (cursor->state != XLOG_CURSOR_TX)
 		return 1;
-	return xlog_tx_cursor_next_row_raw(&cursor->tx_cursor, data, end);
+	if (ibuf_used(&cursor->tx_cursor) == 0)
+		return 1;
+	*data = (const char **)&cursor->tx_cursor.rpos;
+	*end = (const char *)cursor->tx_cursor.wpos;
+	return 0;
 }
 
 int
@@ -2068,6 +2043,8 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 		goto error;
 	}
 	i->state = XLOG_CURSOR_ACTIVE;
+	i->search_magic = false;
+	i->error = NULL;
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -2125,6 +2102,8 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 		goto error;
 	}
 	i->state = XLOG_CURSOR_ACTIVE;
+	i->search_magic = false;
+	i->error = NULL;
 	return 0;
 error:
 	ibuf_destroy(&i->rbuf);
@@ -2140,10 +2119,12 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 	assert(i->rbuf.slabc == &cord()->slabc);
 	ibuf_destroy(&i->rbuf);
 	if (i->state == XLOG_CURSOR_TX)
-		xlog_tx_cursor_destroy(&i->tx_cursor);
+		ibuf_destroy(&i->tx_cursor);
 	ZSTD_freeDStream(i->zdctx);
 	i->state = (i->state == XLOG_CURSOR_EOF ?
 		    XLOG_CURSOR_EOF_CLOSED : XLOG_CURSOR_CLOSED);
+	if (i->error != NULL)
+		error_unref(i->error);
 	/*
 	 * Do not trash the cursor object since the caller might
 	 * still want to access its state and/or meta information.
@@ -2264,6 +2245,103 @@ bool
 xlog_remove_file(const char *filename, unsigned flags)
 {
 	return xlog_do_remove_file(filename, flags, NULL);
+}
+
+void
+xlog_batch_destroy(struct xlog_batch *batch)
+{
+	for (size_t i = 0; i < batch->entry_count; i++) {
+		struct xlog_entry *entry = xlog_batch_get(batch, i);
+		if (entry->error != NULL)
+			error_unref(entry->error);
+	}
+	ibuf_destroy(&batch->data);
+	ibuf_destroy(&batch->entries);
+	TRASH(batch);
+}
+
+/** Decode entry body from entry->header. */
+static int
+xlog_entry_decode(struct xlog_entry *entry)
+{
+	if (iproto_type_is_dml(entry->header.type)) {
+		return xrow_decode_dml(
+				&entry->header, &entry->dml,
+				dml_request_key_map(entry->header.type));
+	} else if (iproto_type_is_synchro_request(entry->header.type)) {
+		return xrow_decode_synchro(&entry->header, &entry->synchro);
+	} else if (iproto_type_is_raft_request(entry->header.type)) {
+		if (xrow_decode_raft(&entry->header, &entry->raft) != 0)
+			return -1;
+		/* Vclock is never persisted in WAL by Raft entry. */
+		vclock_clear(&entry->raft.vclock);
+		return 0;
+	}
+	diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+		 (uint32_t)entry->header.type);
+	return -1;
+}
+
+int
+xlog_cursor_read_tx(struct xlog_cursor *cursor, struct xlog_batch *batch)
+{
+	if (cursor->error != NULL) {
+		diag_set_error(diag_get(), cursor->error);
+		error_unref(cursor->error);
+		cursor->error = NULL;
+		return -1;
+	}
+	int rc = 0;
+	if (cursor->search_magic)
+		rc = xlog_cursor_find_tx_magic(cursor);
+	if (rc == 0) {
+		rc = xlog_cursor_next_tx_impl(cursor, &batch->data);
+		cursor->search_magic = rc == -1;
+	}
+	if (rc != 0)
+		return rc;
+	batch->entry_count = 0;
+	ibuf_create(&batch->entries, &cord()->slabc,
+		    /*start_capacity=*/16 * 1024);
+	while (ibuf_used(&batch->data) != 0) {
+		/* Sic: alignment should be correct here. */
+		struct xlog_entry *entry =
+			ibuf_alloc(&batch->entries, sizeof(*entry));
+		rc = xrow_decode(&entry->header,
+				 (const char **)&batch->data.rpos,
+				 (const char *)batch->data.wpos,
+				 /*end_is_exact=*/false);
+		if (rc != 0) {
+			diag_add(XlogError, "can't parse row");
+			if (batch->entry_count == 0) {
+				xlog_batch_destroy(batch);
+				return -1;
+			}
+			cursor->error = diag_last_error(diag_get());
+			error_ref(cursor->error);
+			diag_clear(diag_get());
+			break;
+		}
+		batch->entry_count++;
+		entry->error = NULL;
+		if (xlog_entry_decode(entry) != 0) {
+			entry->error = diag_last_error(diag_get());
+			error_ref(entry->error);
+			diag_clear(diag_get());
+		}
+	}
+	/*
+	 * DML has header reference that may become invalid due to
+	 * reallocations during parsing the batch. Fix header reference.
+	 */
+	for (size_t i = 0; i < batch->entry_count; i++) {
+		struct xlog_entry *entries =
+			(struct xlog_entry *)batch->entries.rpos;
+		struct xlog_entry *entry = &entries[i];
+		if (iproto_type_is_dml(entry->header.type))
+			entry->dml.header = &entry->header;
+	}
+	return 0;
 }
 
 /* }}} */

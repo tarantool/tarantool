@@ -35,6 +35,7 @@
 #include <sys/stat.h>
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
+#include "xrow.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
@@ -636,79 +637,6 @@ xlog_materialize(struct xlog *l);
 void
 xlog_discard(struct xlog *l);
 
-/* {{{ xlog_tx_cursor - iterate over rows in xlog transaction */
-
-/**
- * xlog tx iterator
- */
-struct xlog_tx_cursor
-{
-	/** rows buffer */
-	struct ibuf rows;
-	/** tx size */
-	size_t size;
-};
-
-/**
- * Create xlog tx iterator from memory data.
- * *data will be adjusted to end of tx
- *
- * @retval 0 for Ok
- * @retval -1 for error
- * @retval >0 how many additional bytes should be read to parse tx
- */
-ssize_t
-xlog_tx_cursor_create(struct xlog_tx_cursor *cursor,
-		      const char **data, const char *data_end,
-		      ZSTD_DStream *zdctx);
-
-/**
- * Destroy xlog tx cursor and free all associated memory
- * including parsed xrows
- */
-int
-xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor);
-
-/**
- * Fetch next xrow from xlog tx cursor
- *
- * @retval 0 for Ok
- * @retval 1 if current tx is done
- * @retval -1 for error
- */
-int
-xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor, struct xrow_header *xrow);
-
-/**
- * Fetch next xrow from current xlog tx cursor.
- *
- * This function is similar to xlog_tx_cursor_next_row() except it doesn't
- * parse the xrow nor does it advance the data pointer.
- *
- * @param cursor cursor
- * @param[out] data pointer to the position in the internal buffer where
- *                  the next xrow is stored
- * @param[out] end end of the buffer
- *
- * @retval 0 for Ok
- * @retval 1 if current tx is done
- */
-int
-xlog_tx_cursor_next_row_raw(struct xlog_tx_cursor *cursor,
-			    const char ***data, const char **end);
-
-/**
- * Return current tx cursor position
- *
- * @param tx_cursor tx_cursor
- * @retval current tx cursor position
- */
-static inline off_t
-xlog_tx_cursor_pos(struct xlog_tx_cursor *tx_cursor)
-{
-	return tx_cursor->size - ibuf_used(&tx_cursor->rows);
-}
-
 /**
  * A conventional helper to decode rows from the raw tx buffer.
  * Decodes fixheader, checks crc32 and length, decompresses rows.
@@ -724,6 +652,50 @@ int
 xlog_tx_decode(const char *data, const char *data_end,
 	       char *rows, char *rows_end,
 	       ZSTD_DStream *zdctx);
+
+/* {{{ xlog_batch - batch of parsed xlog entries */
+
+/** xlog row with parsed body. */
+struct xlog_entry {
+	/** Row header. */
+	struct xrow_header header;
+	union {
+		/** DML request. */
+		struct request dml;
+		/** RAFT request. */
+		struct raft_request raft;
+		/** Synchro request. */
+		struct synchro_request synchro;
+	};
+
+	/** Internal field. Should not be accessed directly. */
+	struct error *error;
+};
+
+/** Batch of `struct xlog_entry`. */
+struct xlog_batch {
+	/** Raw batch data. */
+	struct ibuf data;
+	/** Buffer holding array of `struct xlog_entry`. */
+	struct ibuf entries;
+	/** Number of entries. */
+	size_t entry_count;
+};
+
+/**
+ * Returns xlog entry at `index` from the `batch`.
+ */
+static inline struct xlog_entry *
+xlog_batch_get(struct xlog_batch *batch, size_t index)
+{
+	assert(index < batch->entry_count);
+	struct xlog_entry *entries = (struct xlog_entry *)batch->entries.rpos;
+	return &entries[index];
+}
+
+/** Destroys the batch. */
+void
+xlog_batch_destroy(struct xlog_batch *batch);
 
 /* }}} */
 
@@ -765,9 +737,13 @@ struct xlog_cursor {
 	/** file read position */
 	off_t read_offset;
 	/** cursor for current tx */
-	struct xlog_tx_cursor tx_cursor;
+	struct ibuf tx_cursor;
 	/** ZSTD context for decompression */
 	ZSTD_DStream *zdctx;
+	/** Set if last batch reading failed. */
+	bool search_magic;
+	/** Set if last batch was partially read. */
+	struct error *error;
 };
 
 /**
@@ -915,8 +891,26 @@ xlog_cursor_pos(struct xlog_cursor *cursor)
 static inline off_t
 xlog_cursor_tx_pos(struct xlog_cursor *cursor)
 {
-	return xlog_tx_cursor_pos(&cursor->tx_cursor);
+	return ibuf_pos(&cursor->tx_cursor);
 }
+
+/**
+ * Read next xlog tx and return it as a batch of parsed xlog entries.
+ *
+ * The batch is managed by caller and should be destroyed when not needed.
+ *
+ * If error is XlogError then reading can be continued, otherwise it is UB.
+ *
+ * @param cursor xlog cursor
+ * @param[out] batch initialized with entries read
+ *
+ * @retval 0 for Ok
+ * @retval 1 for EOF, batch is not initialized
+ * @retval -1 for error, diag is set, batch is not initialized
+ */
+int
+xlog_cursor_read_tx(struct xlog_cursor *cursor, struct xlog_batch *batch);
+
 /* }}} */
 
 /** {{{ miscellaneous log io functions. */

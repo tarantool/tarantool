@@ -443,14 +443,13 @@ raft_process_recovery(struct raft *raft, const struct raft_msg *req)
 	 * anyway.
 	 */
 	assert(req->state == 0);
+	/* Raft is not enabled until recovery is finished. */
+	assert(!raft_is_enabled(raft));
 	/*
 	 * Vclock is always persisted by some other subsystem - WAL, snapshot.
 	 * It is used only to decide to whom to give the vote during election,
-	 * as a part of the volatile state.
+	 * as a part of the volatile state. So we ignore it.
 	 */
-	assert(req->vclock == NULL);
-	/* Raft is not enabled until recovery is finished. */
-	assert(!raft_is_enabled(raft));
 }
 
 void

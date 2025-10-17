@@ -383,7 +383,7 @@ struct synchro_request {
 	 * Confirmed lsns of all the previous limbo owners. Only used for
 	 * PROMOTE and DEMOTE requests.
 	 */
-	struct vclock *confirmed_vclock;
+	struct vclock confirmed_vclock;
 };
 
 /**
@@ -400,13 +400,11 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
  * Decode synchronous replication request.
  * @param row xrow header.
  * @param[out] req Request parameters.
- * @param[out] vclock Storage for request vclock.
  * @retval -1 on error.
  * @retval 0 success.
  */
 int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req,
-		    struct vclock *vclock);
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req);
 
 /**
  * Raft request. It repeats Raft message to the letter, but can be extended in
@@ -418,7 +416,7 @@ struct raft_request {
 	uint32_t leader_id;
 	bool is_leader_seen;
 	uint64_t state;
-	const struct vclock *vclock;
+	struct vclock vclock;
 	/** Replication group identifier. 0 - replicaset, 1 - replica-local. */
 	enum group_id group_id;
 };
@@ -428,8 +426,7 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 		 const struct raft_request *r);
 
 int
-xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
-		 struct vclock *vclock);
+xrow_decode_raft(const struct xrow_header *row, struct raft_request *r);
 
 /**
  * CALL/EVAL request.
