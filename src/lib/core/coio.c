@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/tcp.h>
+#include <ifaddrs.h>
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -42,7 +43,120 @@
 #include "coio_task.h" /* coio_resolve() */
 #include "uri/uri.h"
 
+/* Unique Local IPv6 Unicast Addresses (see RFC 4193, section 3.1). */
+#ifndef IN6_IS_ADDR_UNIQUE_LOCAL
+#define IN6_IS_ADDR_UNIQUE_LOCAL(sin6_addr) \
+	(((sin6_addr)->s6_addr[0] == 0xfc) || ((sin6_addr)->s6_addr[0] == 0xfd))
+#endif
+
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
+
+enum ipv6_scope {
+	IPV6_SCOPE_GLOBAL,
+	IPV6_SCOPE_LINKLOCAL,
+	IPV6_SCOPE_NODELOCAL,
+	IPV6_SCOPE_SITELOCAL,
+	IPV6_SCOPE_UNIQUELOCAL,
+};
+
+/**
+ * Get the IPv6 address scope.
+ */
+enum ipv6_scope
+ipv6_scope(const struct sockaddr *addr)
+{
+	if (addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)addr;
+		if (IN6_IS_ADDR_UNIQUE_LOCAL(&addr6->sin6_addr))
+			return IPV6_SCOPE_UNIQUELOCAL;
+		if (IN6_IS_ADDR_SITELOCAL(&addr6->sin6_addr))
+			return IPV6_SCOPE_SITELOCAL;
+		if (IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr))
+			return IPV6_SCOPE_LINKLOCAL;
+		if (IN6_IS_ADDR_LOOPBACK(&addr6->sin6_addr))
+			return IPV6_SCOPE_NODELOCAL;
+	}
+	return IPV6_SCOPE_GLOBAL;
+}
+
+/**
+ * Bind the given socket fd stream to the given interface (by name). The
+ * interface IP is selected based on the given address family and IPv6
+ * scope (if the address family is IPv6).
+ *
+ * @retval 0 success
+ * @retval -1 error
+ */
+static int
+coio_bind_iface(int fd, const char *ifname, int remote_af,
+		enum ipv6_scope remote_scope)
+{
+	struct ifaddrs *iface, *head;
+	struct sockaddr *bind_addr = NULL;
+	socklen_t bind_addr_len;
+	if (getifaddrs(&head) < 0) {
+		diag_set(SocketError, sio_socketname(fd), "getifaddrs");
+		return -1;
+	}
+	for (iface = head; iface != NULL; iface = iface->ifa_next) {
+		/* Sanity check. */
+		if (iface->ifa_addr == NULL)
+			continue;
+		/* Address family check. */
+		if (iface->ifa_addr->sa_family != remote_af)
+			continue;
+		/* Interface name check. */
+		if (strcmp(iface->ifa_name, ifname) != 0)
+			continue;
+		if (remote_af == AF_INET) {
+			struct sockaddr_in *sin =
+				(struct sockaddr_in *)iface->ifa_addr;
+			bind_addr_len = sizeof(*sin);
+			bind_addr = iface->ifa_addr;
+			sin->sin_port = htons(0); /* Bind to any port. */
+		} else {
+			assert(remote_af == AF_INET6);
+			/*
+			 * We are interested only in interface addresses whose
+			 * scope matches the remote address we want to connect
+			 * to: global for global, link-local for link-local...
+			 * That is, the local IP address for which the remote
+			 * one is reachable.
+			 */
+			enum ipv6_scope interface_scope =
+				ipv6_scope(iface->ifa_addr);
+			if (interface_scope != remote_scope)
+				continue;
+			/*
+			 * The sin6_scope_id check is skipped as there's no way
+			 * to specify an IPv6 address with a zone ID specified
+			 * in Tarantool (see the URI parser in src/lib/uri).
+			 */
+			struct sockaddr_in6 *sin6 =
+				(struct sockaddr_in6 *)iface->ifa_addr;
+			bind_addr_len = sizeof(*sin6);
+			bind_addr = iface->ifa_addr;
+			sin6->sin6_port = htons(0); /* Bind to any port. */
+		}
+		break;
+	}
+	if (bind_addr == NULL) {
+		/*
+		 * The SocketError is considered retriable whereas this error
+		 * is not, so let's raise the IllegalParams exception instead.
+		 */
+		diag_set(IllegalParams, "%s: suitable interface not found: %s",
+			 sio_socketname(fd), ifname);
+		freeifaddrs(head);
+		return -1;
+	}
+	if (sio_bind(fd, bind_addr, bind_addr_len) != 0) {
+		freeifaddrs(head);
+		return -1;
+	}
+	freeifaddrs(head);
+	return 0;
+}
 
 /**
  * Connect to a host with a specified timeout.
@@ -50,11 +164,21 @@ typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
  * @retval -1 error
  */
 static int
-coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
+coio_connect_addr(const struct sockaddr *addr, socklen_t len,
+		  ev_tstamp timeout, const char *iface)
 {
+	if (addr->sa_family != AF_INET &&
+	    addr->sa_family != AF_INET6 && iface != NULL) {
+		diag_set(IllegalParams,
+			 "interface is specified for non-IP connection");
+		return -1;
+	}
 	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -1;
+	if (iface != NULL && coio_bind_iface(fd, iface, addr->sa_family,
+					     ipv6_scope(addr)) != 0)
+		goto err;
 	if (evio_setsockopt_client(fd, addr->sa_family, SOCK_STREAM) != 0)
 		goto err;
 	if (sio_connect(fd, addr, len) == 0)
@@ -111,6 +235,8 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 		addr->sin6_family = AF_INET6;
 		addr->sin6_port = htons((uint16_t)atoi(service));
 		rc = inet_pton(AF_INET6, host, &addr->sin6_addr);
+		addr->sin6_scope_id = 0; /* Unspecified. */
+		addr->sin6_flowinfo = 0; /* Unspecified. */
 	}
 	if (rc != 1) {
 		free(ai_local->ai_addr);
@@ -123,7 +249,9 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 
 /**
  * Resolve \a host and \a service with optional \a host_hint and connect to
- * the first available address with a specified timeout.
+ * the first available address with a specified timeout through the specified
+ * interface (the interface is given by name, only affects the `src` field of
+ * packets on GNU/Linux).
  *
  * If \a addr is not NULL the function provides resolved address on success.
  * In this case, \a addr_len is a value-result argument. It should be
@@ -142,7 +270,7 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 int
 coio_connect(const char *host, const char *service, int host_hint,
 	     struct sockaddr *addr, socklen_t *addr_len,
-	     ev_tstamp timeout)
+	     ev_tstamp timeout, const char *iface)
 {
 	int fd = -1;
 	/* try to resolve a hostname */
@@ -157,7 +285,7 @@ coio_connect(const char *host, const char *service, int host_hint,
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
 		un.sun_family = AF_UNIX;
 		fd = coio_connect_addr((struct sockaddr *)&un, sizeof(un),
-				       delay);
+				       delay, iface);
 		if (fd < 0)
 			return -1;
 		if (addr != NULL) {
@@ -191,7 +319,8 @@ coio_connect(const char *host, const char *service, int host_hint,
 	evio_timeout_update(loop(), &start, &delay);
 	coio_timeout_init(&start, &delay, timeout);
 	while (ai) {
-		fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen, delay);
+		fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen,
+				       delay, iface);
 		if (fd >= 0) {
 			if (addr != NULL) {
 				assert(addr_len != NULL);
