@@ -173,3 +173,30 @@ g.test_include_all_has_cpu_extended = function()
 
     assert_cpu_extended_presents(default_metrics)
 end
+
+g.test_metrics_1_6_0 = function()
+    t.skip_if(jit.os ~= 'Linux', "Linux-specific")
+
+    local default_metrics = g.server:exec(function()
+        box.cfg{
+            metrics = {
+                include = 'all',
+            },
+        }
+
+        return require('metrics').collect{invoke_callbacks = true}
+    end)
+
+    local tnt_memory = utils.find_metric('tnt_memory', default_metrics)
+    t.assert(tnt_memory)
+    t.assert_gt(tnt_memory[1].value, 0)
+
+    local tnt_memory_virt = utils.find_metric('tnt_memory_virt',
+        default_metrics)
+    t.assert(tnt_memory_virt)
+    t.assert_gt(tnt_memory_virt[1].value, 0)
+
+    local tnt_schema_needs_upgrade = utils.find_metric(
+        'tnt_schema_needs_upgrade', default_metrics)
+    t.assert_equals(tnt_schema_needs_upgrade[1].value, 0)
+end
