@@ -1125,11 +1125,11 @@ netbox_transport_connect(struct netbox_transport *transport)
 		plain_iostream_create(io, fd);
 	} else {
 		assert(!uri_is_nil(&transport->opts.uri));
-		fd = coio_connect_timeout(transport->opts.uri.host,
-					  transport->opts.uri.service,
-					  transport->opts.uri.host_hint,
-					  /*addr=*/NULL, /*addr_len=*/NULL,
-					  delay);
+		fd = coio_connect(transport->opts.uri.host,
+				  transport->opts.uri.service,
+				  transport->opts.uri.host_hint,
+				  /*addr=*/NULL, /*addr_len=*/NULL,
+				  delay);
 		coio_timeout_update(&start, &delay);
 		if (fd < 0)
 			goto io_error;

@@ -140,9 +140,9 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
  * @retval -1 error
  */
 int
-coio_connect_timeout(const char *host, const char *service, int host_hint,
-		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout)
+coio_connect(const char *host, const char *service, int host_hint,
+	     struct sockaddr *addr, socklen_t *addr_len,
+	     ev_tstamp timeout)
 {
 	int fd = -1;
 	/* try to resolve a hostname */

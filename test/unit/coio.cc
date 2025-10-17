@@ -127,11 +127,11 @@ test_connect(void)
 	header();
 	plan(4);
 	int rc;
-	rc = coio_connect("~~~", "12345", 1, NULL, NULL);
+	rc = coio_connect("~~~", "12345", 1, NULL, NULL, TIMEOUT_INFINITY);
 	ok(rc < 0, "bad ipv4 host name - error");
 	ok(strcmp(diag_get()->last->errmsg, "Invalid host name: ~~~") == 0,
 	   "bad ipv4 host name - error message");
-	rc = coio_connect("~~~", "12345", 2, NULL, NULL);
+	rc = coio_connect("~~~", "12345", 2, NULL, NULL, TIMEOUT_INFINITY);
 	ok(rc < 0, "bad ipv6 host name - error");
 	ok(strcmp(diag_get()->last->errmsg, "Invalid host name: ~~~") == 0,
 	   "bad ipv6 host name - error message");
