@@ -3386,7 +3386,6 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		is_in_box_promote = false;
 		return box_raft_try_promote();
 	default:
 		unreachable();
@@ -6291,7 +6290,7 @@ box_cfg_xc(void)
 	if (!is_bootstrap_leader) {
 		replicaset_sync();
 	} else if (box_election_mode == ELECTION_MODE_CANDIDATE ||
-		   box_election_mode == ELECTION_MODE_MANUAL) {
+		    box_election_mode == ELECTION_MODE_MANUAL) {
 		/*
 		 * When the cluster is just bootstrapped and this instance is a
 		 * leader, it makes no sense to wait for a leader appearance.
