@@ -70,10 +70,12 @@ enum priv_type {
 	PRIV_UPDATE = 2048,
 	/* DELETE - required by ANSI - not implemented */
 	PRIV_DELETE = 4096,
+	/* Owner's access. */
+	PRIV_OWNER = 8192,
 	/* This is never granted, but used internally. */
-	PRIV_GRANT = 8192,
+	PRIV_GRANT = 16384,
 	/* Never granted, but used internally. */
-	PRIV_REVOKE = 16384,
+	PRIV_REVOKE = 32768,
 	/* all bits */
 	PRIV_ALL  = ~((user_access_t) 0),
 };
