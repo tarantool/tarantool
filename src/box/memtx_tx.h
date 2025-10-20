@@ -183,16 +183,16 @@ void
 memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
 
 /**
- * @brief Add a statement to transaction manager's history.
- * Until unlinking or releasing the space could internally contain
- * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
- * With that clarifying the statement will be visible to current transaction,
- * but invisible to all others.
- * Follows signature of @sa memtx_space_replace_all_keys .
+ * @brief Add a statement to the memtx transaction manager.
+ * Performs physical updates in the @a space's indexes and statistics. If MVCC
+ * is enabled, additionally handles concurrency control of the read/write
+ * set of the transaction and multi-versioning logic for the updated tuple's
+ * state.
+ * Follows signature of @sa memtx_space_replace_all_keys.
  *
  * NB: can trigger story garbage collection.
  *
- * @param stmt current statement.
+ * @param space	    the space to which the statement is applied.
  * @param old_tuple the tuple that should be removed (can be NULL).
  * @param new_tuple the tuple that should be inserted (can be NULL).
  * @param mode      dup_replace_mode, used only if new_tuple is not
@@ -202,9 +202,9 @@ memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
  * @return 0 on success, -1 on error (diag is set).
  */
 int
-memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result);
+memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
+		  struct tuple *new_tuple, enum dup_replace_mode mode,
+		  struct tuple **result);
 
 /**
  * @brief Rollback (undo) a statement from transaction manager's history.
