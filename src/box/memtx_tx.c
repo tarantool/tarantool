@@ -2279,41 +2279,24 @@ static int
 memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple *new_tuple,
+				 struct tuple **directly_replaced,
+				 struct tuple **direct_successor,
 				 enum dup_replace_mode mode,
 				 struct tuple **result)
 {
 	assert(new_tuple != NULL);
 	struct space *space = stmt->space;
 
-	/* Create story to make the tuple dirty during replace. */
-	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
-
 	/* Link add_story. */
+	struct memtx_story *add_story = memtx_tx_story_get(new_tuple);
 	memtx_tx_story_link_added_by(add_story, stmt);
 
-	/* Process replacement in indexes. */
-	struct tuple *directly_replaced[space->index_count];
-	struct tuple *direct_successor[space->index_count];
-	uint32_t directly_replaced_count = 0;
-	for (uint32_t i = 0; i < space->index_count; i++) {
-		struct index *index = space->index[i];
-		struct tuple **replaced = &directly_replaced[i];
-		struct tuple **successor = &direct_successor[i];
-		*replaced = *successor = NULL;
-		if (index_replace(index, NULL, new_tuple,
-				  DUP_REPLACE_OR_INSERT,
-				  replaced, successor) != 0)
-		{
-			directly_replaced_count = i;
-			goto fail;
-		}
-	}
-	directly_replaced_count = space->index_count;
-
 	/* Check overwritten tuple. */
-	int rc = check_dup(stmt, directly_replaced, &old_tuple, mode);
-	if (rc != 0)
-		goto fail;
+	if (check_dup(stmt, directly_replaced, &old_tuple, mode) != 0) {
+		/* Unlink add_story. */
+		memtx_tx_story_unlink_added_by(add_story, stmt);
+		return -1;
+	}
 
 	/* Create next story in the primary index if necessary. */
 	struct tuple *next_pk = directly_replaced[0];
@@ -2391,24 +2374,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	/* Finalize the result. */
 	memtx_tx_history_add_stmt_prepare_result(old_tuple, result);
 	return 0;
-
-fail:
-	for (uint32_t i = directly_replaced_count - 1; i + 1 > 0; i--) {
-		struct index *index = space->index[i];
-		struct tuple *unused;
-		if (index_replace(index, new_tuple, directly_replaced[i],
-				  DUP_INSERT, &unused, &unused) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
-	}
-
-	/* Unlink add_story. */
-	memtx_tx_story_unlink_added_by(add_story, stmt);
-
-	memtx_tx_story_delete(add_story);
-	return -1;
 }
 
 /**
@@ -2461,23 +2426,140 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 }
 
 int
-memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result)
+memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
+		  struct tuple *new_tuple, enum dup_replace_mode mode,
+		  struct tuple **result)
 {
-	assert(stmt != NULL);
-	assert(stmt->space != NULL && !stmt->space->def->opts.is_ephemeral);
-	assert(new_tuple != NULL || old_tuple != NULL);
-	assert(new_tuple == NULL || !tuple_has_flag(new_tuple, TUPLE_IS_DIRTY));
+	/* Update the primary key */
+	struct index *pk = index_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	assert(pk->def->opts.is_unique);
 
-	memtx_tx_story_gc();
-	if (new_tuple != NULL)
-		return memtx_tx_history_add_insert_stmt(stmt, old_tuple,
-							new_tuple, mode,
-							result);
-	else
-		return memtx_tx_history_add_delete_stmt(stmt, old_tuple,
-							result);
+	/* Replace must be done in transaction, except ephemeral spaces. */
+	assert(space->def->opts.is_ephemeral ||
+	       (in_txn() != NULL && txn_current_stmt(in_txn()) != NULL));
+	/*
+	 * Don't use MVCC engine for ephemeral in any case.
+	 * MVCC engine requires txn to be present as a storage for
+	 * reads/writes/conflicts.
+	 * Also, now there's no way to turn MVCC engine off: once MVCC engine
+	 * starts to manage a space - direct access to it must be prohibited.
+	 * Since modification of ephemeral spaces are allowed without txn,
+	 * we must not use MVCC for those spaces even if txn is present now.
+	 */
+	bool use_mvcc = memtx_tx_manager_use_mvcc_engine &&
+			!space->def->opts.is_ephemeral;
+	struct txn_stmt *stmt = use_mvcc ? txn_current_stmt(in_txn()) : NULL;
+	if (use_mvcc && new_tuple == NULL) {
+		/*
+		 * With MVCC, we do not physically modify the indexes. Instead,
+		 * we mark the tuple as deleted, track `old_tuple`, determine
+		 * `result` tuple and return early.
+		 */
+		memtx_tx_history_add_delete_stmt(stmt, old_tuple, result);
+		return 0;
+	}
+
+	/*
+	 * Create story to make `new_tuple` dirty during replace.
+	 */
+	if (use_mvcc)
+		memtx_tx_story_new(stmt->space, new_tuple);
+
+	/*
+	 * Save directly replaced and successor tuples per each `index_replace`
+	 * to track read and write sets in transaction manager.
+	 */
+	static_assert(BOX_INDEX_MAX == 128, "size of `directly_replaced` and "
+		      "`direct_successor` arrays on the stack");
+	struct tuple *directly_replaced[space->index_count];
+	struct tuple *direct_successor[space->index_count];
+
+	/*
+	 * Update primary index.
+	 * Without MVCC, we need to delete `old_tuple`, if any, from the index,
+	 * and insert `new_tuple`, if any, respecting the conflict resolution
+	 * `mode` for duplicates.
+	 * With MVCC, we do not delete `old_tuple`, since it can be read by
+	 * other transactions, and we also do not care whether a duplicate of
+	 * `new_tuple` exists, since we keep the `directly_replaced` tuple and
+	 * defer conflict resolution to `memtx_tx_add_insert_stmt`.
+	 */
+	uint32_t i = 0;
+	if (index_replace(pk, use_mvcc ? NULL : old_tuple, new_tuple,
+			  use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
+			  &directly_replaced[i],
+			  &direct_successor[i]) != 0)
+		goto rollback;
+	assert(directly_replaced[i] || new_tuple);
+
+	/*
+	 * Update secondary indexes.
+	 * Without MVCC, we need to delete the tuple that we replaced in the
+	 * primary index, if any, from the index, and insert `new_tuple`, if
+	 * any, failing if find a duplicate.
+	 * With MVCC, we do not delete any tuple from the index, since it can be
+	 * read by other transactions, and we also do not care whether a
+	 * duplicate of `new_tuple` exists, since we save `directly_replaced`
+	 * tuple and defer conflict resolution to `memtx_tx_add_insert_stmt`.
+	 */
+	for (i++; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		if (index_replace(index, use_mvcc ? NULL : directly_replaced[0],
+				  new_tuple,
+				  use_mvcc ? DUP_REPLACE_OR_INSERT : DUP_INSERT,
+				  &directly_replaced[i],
+				  &direct_successor[i]) != 0)
+			goto rollback;
+	}
+
+	if (use_mvcc) {
+		/*
+		 * With MVCC, we perform late conflict resolution, determine
+		 * `result` tuple and track `old_tuple`, `new_tuple`,
+		 * `directly_replaced`, `direct_successor` tuples.
+		 */
+		if (memtx_tx_history_add_insert_stmt(stmt, old_tuple, new_tuple,
+						     directly_replaced,
+						     direct_successor, mode,
+						     result) != 0)
+			goto rollback;
+	} else {
+		/*
+		 * Without MVCC, we update the engine stats, reference
+		 * `new_tuple` and set `result` tuples using the tuple that we
+		 * replaced in the primary index.
+		 */
+		memtx_space_update_tuple_stat(space, directly_replaced[0],
+					      new_tuple);
+		if (new_tuple != NULL)
+			tuple_ref(new_tuple);
+		*result = directly_replaced[0];
+	}
+	return 0;
+
+rollback:
+	/*
+	 * Rollback index changes.
+	 */
+	for (; i > 0; i--) {
+		struct tuple *delete;
+		struct tuple *successor;
+		struct index *index = space->index[i - 1];
+		if (index_replace(index, new_tuple, directly_replaced[i - 1],
+				  DUP_INSERT, &delete, &successor) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+	}
+	/*
+	 * Delete story created for `new_tuple`.
+	 */
+	if (use_mvcc)
+		memtx_tx_story_delete(memtx_tx_story_get(new_tuple));
+	return -1;
 }
 
 /*
