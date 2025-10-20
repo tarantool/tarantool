@@ -102,6 +102,18 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 	return rc;
 }
 
+/**
+ * Implementation of `position` iterator method for this engine. Simply calls
+ * the same method of the source iterator.
+ */
+static int
+sysview_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+{
+	assert(it->free == sysview_iterator_free);
+	struct sysview_iterator *sysview_it = sysview_iterator(it);
+	return iterator_position(sysview_it->source, pos, size);
+}
+
 static void
 sysview_index_destroy(struct index *index)
 {
@@ -140,6 +152,7 @@ sysview_index_create_iterator(struct index *base, enum iterator_type type,
 	it->pool = &sysview->iterator_pool;
 	it->base.next = sysview_iterator_next;
 	it->base.free = sysview_iterator_free;
+	it->base.position = sysview_iterator_position;
 
 	it->source = index_create_iterator_after(pk, type, key, part_count,
 						 pos);
