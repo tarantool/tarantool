@@ -523,35 +523,39 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	auto join_guard = make_scoped_guard([&] {
 		engine_complete_join(&ctx);
 	});
+	struct box_checkpoint box_ckpt;
+	struct raft_request *ckpt_raft = NULL;
 	if (cursor != NULL) {
 		/*
 		 * Sending from a cursor (from disk) is implemented in a
 		 * different way. It doesn't need all these in-memory steps.
 		 */
 		vclock_copy(vclock, cursor->vclock);
-		goto send_snapshot;
+		if (box_checkpoint_build_from_snapshot(&box_ckpt, vclock) != 0)
+			diag_raise();
+		ckpt_raft = &box_ckpt.raft_local;
+	} else {
+		if (box_checkpoint_build_in_memory(&box_ckpt) != 0)
+			diag_raise();
+		ckpt_raft = &box_ckpt.raft_remote;
 	}
-	struct box_checkpoint box_ckpt;
-	if (box_checkpoint_build_in_memory(&box_ckpt) != 0)
-		diag_raise();
 	/* See raft_process_recovery, why these fields are not needed. */
-	box_ckpt.raft_remote.state = 0;
-	box_ckpt.raft_remote.vclock = NULL;
+	ckpt_raft->state = 0;
+	ckpt_raft->vclock = NULL;
 	send_join_header(&relay->stream, &box_ckpt.journal.vclock);
 	/*
 	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1. All these
 	 * versions know of additional META stage of initial join.
 	 */
 	if (replica_version_id > 0) {
-		send_join_meta(&relay->stream, &box_ckpt.raft_remote,
-			       &box_ckpt.limbo);
+		send_join_meta(&relay->stream, ckpt_raft, &box_ckpt.limbo);
 		struct xrow_header row;
 		/* Mark the beginning of the data stream. */
 		xrow_encode_type(&row, IPROTO_JOIN_SNAPSHOT);
 		xstream_write(&relay->stream, &row);
 	}
 	vclock_copy(vclock, &box_ckpt.journal.vclock);
-send_snapshot:
+	ctx.vclock = vclock;
 	engine_join_xc(&ctx, &relay->stream);
 	if (relay_flush(relay) < 0)
 		diag_raise();
