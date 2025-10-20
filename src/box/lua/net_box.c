@@ -1129,7 +1129,8 @@ netbox_transport_connect(struct netbox_transport *transport)
 				  transport->opts.uri.service,
 				  transport->opts.uri.host_hint,
 				  /*addr=*/NULL, /*addr_len=*/NULL,
-				  delay, NULL);
+				  delay, uri_param(&transport->opts.uri,
+						   "interface", 0));
 		coio_timeout_update(&start, &delay);
 		if (fd < 0)
 			goto io_error;
