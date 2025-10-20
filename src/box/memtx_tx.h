@@ -188,11 +188,10 @@ memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
  * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
  * With that clarifying the statement will be visible to current transaction,
  * but invisible to all others.
- * Follows signature of @sa memtx_space_replace_all_keys .
  *
  * NB: can trigger story garbage collection.
  *
- * @param stmt current statement.
+ * @param space the space in which the replace has happened.
  * @param old_tuple the tuple that should be removed (can be NULL).
  * @param new_tuple the tuple that should be inserted (can be NULL).
  * @param mode      dup_replace_mode, used only if new_tuple is not
@@ -202,7 +201,7 @@ memtx_tx_send_to_read_view(struct txn *txn, int64_t psn);
  * @return 0 on success, -1 on error (diag is set).
  */
 int
-memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
+memtx_tx_history_add_stmt(struct space *space, struct tuple *old_tuple,
 			  struct tuple *new_tuple, enum dup_replace_mode mode,
 			  struct tuple **result);
 
