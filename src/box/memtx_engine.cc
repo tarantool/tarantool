@@ -674,6 +674,11 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	if (space->upgrade != NULL && new_tuple != NULL)
 		memtx_space_upgrade_untrack_tuple(space->upgrade, new_tuple);
 
+	/*
+	 * With MVCC, we do not physically rollback the state of the indexes.
+	 * Instead, we mark the `new_tuple`, if any, as deleted and `old_tuple`,
+	 * if any, as visible again.
+	 */
 	if (memtx_tx_manager_use_mvcc_engine)
 		return memtx_tx_history_rollback_stmt(stmt);
 

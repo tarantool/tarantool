@@ -287,72 +287,7 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			     enum dup_replace_mode mode,
 			     struct tuple **result)
 {
-	uint32_t i = 0;
-
-	/* Update the primary key */
-	struct index *pk = index_find(space, 0);
-	if (pk == NULL)
-		return -1;
-	assert(pk->def->opts.is_unique);
-
-	/* Replace must be done in transaction, except ephemeral spaces. */
-	assert(space->def->opts.is_ephemeral ||
-	       (in_txn() != NULL && txn_current_stmt(in_txn()) != NULL));
-	/*
-	 * Don't use MVCC engine for ephemeral in any case.
-	 * MVCC engine requires txn to be present as a storage for
-	 * reads/writes/conflicts.
-	 * Also, now there's no way to turn MVCC engine off: once MVCC engine
-	 * starts to manage a space - direct access to it must be prohibited.
-	 * Since modification of ephemeral spaces are allowed without txn,
-	 * we must not use MVCC for those spaces even if txn is present now.
-	 */
-	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
-		struct txn_stmt *stmt = txn_current_stmt(in_txn());
-		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
-						 mode, result);
-	}
-
-	/*
-	 * If old_tuple is not NULL, the index has to
-	 * find and delete it, or return an error.
-	 */
-	struct tuple *successor;
-	if (index_replace(pk, old_tuple, new_tuple, mode,
-			  &old_tuple, &successor) != 0)
-		return -1;
-	assert(old_tuple || new_tuple);
-
-	/* Update secondary keys. */
-	for (i++; i < space->index_count; i++) {
-		struct tuple *delete;
-		struct tuple *successor;
-		struct index *index = space->index[i];
-		if (index_replace(index, old_tuple, new_tuple,
-				  DUP_INSERT, &delete, &successor) != 0)
-			goto rollback;
-	}
-
-	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
-	if (new_tuple != NULL)
-		tuple_ref(new_tuple);
-	*result = old_tuple;
-	return 0;
-
-rollback:
-	for (; i > 0; i--) {
-		struct tuple *delete;
-		struct tuple *successor;
-		struct index *index = space->index[i - 1];
-		/* Rollback must not fail. */
-		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &delete, &successor) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
-	}
-	return -1;
+	return memtx_tx_add_stmt(space, old_tuple, new_tuple, mode, result);
 }
 
 static inline enum dup_replace_mode
