@@ -67,6 +67,7 @@ local CONNECT_OPTION_TYPES = {
     required_protocol_version   = "number",
     required_protocol_features  = "table",
     _disable_graceful_shutdown  = "boolean",
+    interface                   = "string",
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.
@@ -445,7 +446,7 @@ local function new_sm(uri_or_fd, opts)
     local transport = internal.new_transport(
             uri_or_fd, user, password, weak_callback,
             opts.connect_timeout, opts.reconnect_after,
-            opts.fetch_schema, opts.auth_type)
+            opts.fetch_schema, opts.auth_type, opts.interface)
     weak_refs.transport = transport
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
