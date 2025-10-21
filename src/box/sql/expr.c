@@ -3221,8 +3221,16 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 	 */
 	if (is_neg && value != INT64_MIN)
 		value = -value;
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *) &value,
-			  is_neg ? P4_INT64 : P4_UINT64);
+
+    /* NEW OPTIMIZATION: Use OP_Integer for values that fit in 32 bits */
+	/* For signed: -2147483648 to 2147483647 */
+	/* For unsigned: 0 to UINT32_MAX (4294967295) when !is_neg */
+    if ((is_neg && value >= -2147483648 && value <= 2147483647) || 
+        (!is_neg && value >= 0 && value <= UINT32_MAX)) {
+        sqlVdbeAddOp2(v, OP_Integer, (int)value, mem);
+    } else {
+        sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *) &value, is_neg ? P4_INT64 : P4_UINT64);
+    }
 }
 
 static void
