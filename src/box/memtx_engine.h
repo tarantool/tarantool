@@ -360,7 +360,7 @@ memtx_index_create(struct index *index, struct engine *engine,
 void
 memtx_index_free(struct index *index);
 
-struct rlist *
+void *
 memtx_index_read_gaps(struct index *index);
 
 #if defined(__cplusplus)

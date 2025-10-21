@@ -1961,7 +1961,7 @@ memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
 }
 
 struct memtx_index_data {
-	struct rlist read_gaps;
+	void *read_gaps;
 };
 
 void
@@ -1971,7 +1971,7 @@ memtx_index_create(struct index *index, struct engine *engine,
 	index_create(index, engine, vtab, def);
 	struct memtx_index_data *data =
 		(struct memtx_index_data *)index->engine_specific_data;
-	rlist_create(&data->read_gaps);
+	memtx_tx_init_index_read_gaps(&data->read_gaps);
 }
 
 void
@@ -1979,16 +1979,16 @@ memtx_index_free(struct index *index)
 {
 	struct memtx_index_data *data =
 		(struct memtx_index_data *)index->engine_specific_data;
-	assert(rlist_empty(&data->read_gaps));
+	memtx_tx_destroy_index_read_gaps(data->read_gaps);
 	free(index);
 }
 
-struct rlist *
+void *
 memtx_index_read_gaps(struct index *index)
 {
 	struct memtx_index_data *data =
 		(struct memtx_index_data *)index->engine_specific_data;
-	return &data->read_gaps;
+	return data->read_gaps;
 }
 
 struct memtx_engine *

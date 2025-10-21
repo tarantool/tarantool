@@ -560,6 +560,12 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 void
 memtx_tx_story_gc_step(void);
 
+void
+memtx_tx_init_index_read_gaps(void **read_gaps);
+
+void
+memtx_tx_destroy_index_read_gaps(void *read_gaps);
+
 #if defined(ENABLE_READ_VIEW)
 # include "memtx_tx_read_view.h"
 #endif /* defined(ENABLE_READ_VIEW) */
