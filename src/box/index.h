@@ -693,7 +693,7 @@ struct index_vtab {
 	void (*end_build)(struct index *index);
 };
 
-#define INDEX_ENGINE_SPECIFIC_DATA_SIZE 16
+#define INDEX_ENGINE_SPECIFIC_DATA_SIZE 8
 
 struct index {
 	/** Virtual function table. */

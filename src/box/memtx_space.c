@@ -1600,9 +1600,7 @@ memtx_space_swap_index(struct space *old_space, struct space *new_space,
 	 * since the old space is going to be invalidated and transactional
 	 * metadata is required to do it correctly.
 	 */
-	struct rlist *old_read_gaps = memtx_index_read_gaps(old_index);
-	struct rlist *new_read_gaps = memtx_index_read_gaps(new_index);
-	SWAP(old_read_gaps, new_read_gaps);
+	memtx_index_swap_read_gaps(old_index, new_index);
 }
 
 static int

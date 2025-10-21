@@ -7,7 +7,7 @@ local g = t.group()
 -- Please update them, if you changed the relevant structures.
 local SIZE_OF_STMT = 160
 -- Size of story with one link (for spaces with 1 index).
-local SIZE_OF_STORY = 152
+local SIZE_OF_STORY = 144
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
@@ -15,8 +15,8 @@ local SIZE_OF_XROW = 163
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 80
-local SIZE_OF_INPLACE_GAP_TRACKER = 56
-local SIZE_OF_NEARBY_GAP_TRACKER = 96
+local SIZE_OF_INPLACE_GAP_TRACKER = 64
+local SIZE_OF_NEARBY_GAP_TRACKER = 104
 
 local current_stat = {}
 

@@ -367,10 +367,17 @@ void
 memtx_index_free(struct index *index);
 
 /**
- * Getter for the list of gap reads in the index, used by MVCC.
+ * Getter for the set of gap reads in the index, used by MVCC.
+ * Returns `gap_item_set_t *` (see `memtx_tx.h`).
  */
-struct rlist *
+void *
 memtx_index_read_gaps(struct index *index);
+
+/**
+ * Swaps read gaps of two memtx indexes, needed for DDL.
+ */
+void
+memtx_index_swap_read_gaps(struct index *index1, struct index *index2);
 
 #if defined(__cplusplus)
 } /* extern "C" */

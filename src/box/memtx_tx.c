@@ -34,9 +34,12 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "iterator_type.h"
+#include "key_def.h"
 #include "key_list.h"
 #include "schema_def.h"
 #include "small/mempool.h"
@@ -52,6 +55,17 @@ enum {
 
 static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
 	      "There must be a range for TX manager's internal use");
+
+#define gap_item_set_foreach_safe(set, item, next) \
+	for (item = gap_item_set_first(set); \
+	     item != NULL && ((next = gap_item_set_next(set, item)) || 1); \
+	     item = next)
+
+#define gap_item_set_foreach_with_key_safe(set, item, key, next) \
+	for (item = gap_item_set_psearch(set, key); \
+	     item != NULL && gap_item_set_cmp_with_key(key, item) == 0 && \
+	     ((next = gap_item_set_next(set, item)) || 1); \
+	     item = next)
 
 /**
  * Link that connects a memtx_story with older and newer stories of the same
@@ -75,7 +89,7 @@ struct memtx_story_link {
 	/** Story that was happened before that story was started. */
 	struct memtx_story *older_story;
 	/** List of gap items @sa gap_item. */
-	struct rlist read_gaps;
+	gap_item_set_t read_gaps;
 	/**
 	 * If the tuple of story is physically in index, here the pointer
 	 * to that index is stored.
@@ -251,8 +265,10 @@ enum gap_item_type {
 struct gap_item_base {
 	/** Type of gap record. */
 	enum gap_item_type type;
-	/** A link in memtx_story_link::read_gaps OR index::read_gaps. */
-	struct rlist in_read_gaps;
+	/** Set this item belongs to. Needed for deletion. */
+	gap_item_set_t *gap_item_set;
+	/** A node of memtx_story_link::read_gaps OR index::read_gaps. */
+	rb_node(struct gap_item_base) in_gap_item_set;
 	/** Link in txn->gap_list. */
 	struct rlist in_gap_list;
 	/** The transaction that read it. */
@@ -324,6 +340,297 @@ struct count_gap_item {
 };
 
 /**
+ * Destroy and free any kind of gap item.
+ */
+static void
+memtx_tx_delete_gap(struct gap_item_base *item);
+
+static inline int
+gap_item_set_iterator_type_class(enum iterator_type type)
+{
+	switch (type) {
+	case ITER_LE:
+	case ITER_LT:
+		return 0;
+	case ITER_GE:
+	case ITER_GT:
+		return 1;
+	case ITER_EQ:
+	case ITER_REQ:
+		return 2;
+	default:
+		unreachable();
+	}
+}
+
+static inline int
+gap_item_set_cmp_key(const char *key_a, uint32_t part_count_a,
+		     enum iterator_type type_a, const char *key_b,
+		     uint32_t part_count_b, enum iterator_type type_b,
+                     struct key_def *cmp_def)
+{
+	/* Two straight range iterators are always equal. */
+	if ((type_a == ITER_GE || type_a == ITER_GT) &&
+	    (type_b == ITER_GE || type_b == ITER_GT))
+		return 0;
+
+	/* Two reverse range iterators are always equal. */
+	if ((type_a == ITER_LE || type_a == ITER_LT) &&
+	    (type_b == ITER_LE || type_b == ITER_LT))
+		return 0;
+
+	/*
+	 * Two equality iterators are equal if their keys are equal
+	 * and have the same part count. If part count differs, they
+	 * belong to different classes of equivalence.
+	 */
+	if ((type_a == ITER_EQ || type_a == ITER_REQ) &&
+	    (type_b == ITER_EQ || type_b == ITER_REQ)) {
+		if (part_count_a == part_count_b)
+			return key_compare(key_a, part_count_a, HINT_NONE,
+					   key_b, part_count_b, HINT_NONE,
+					   cmp_def);
+		else {
+			return COMPARE_RESULT(part_count_a, part_count_b);
+		}
+	}
+
+	int class_a = gap_item_set_iterator_type_class(type_a);
+	int class_b = gap_item_set_iterator_type_class(type_b);
+	assert(class_a != class_b);
+	return COMPARE_RESULT(class_a, class_b);
+}
+
+static inline int
+gap_item_set_cmp_range(const char *key_a, uint32_t part_count_a,
+		       struct tuple *until_a, hint_t hint_a,
+		       enum iterator_type type_a, const char *key_b,
+		       uint32_t part_count_b, struct tuple *until_b,
+		       hint_t hint_b, enum iterator_type type_b,
+		       struct key_def *cmp_def)
+{
+	if (until_a == NULL && until_b == NULL)
+		return gap_item_set_cmp_key(
+			key_a, part_count_a, type_a, key_b, part_count_b,
+			type_b, cmp_def);
+
+	if (until_a == NULL)
+		return 1;
+	if (until_b == NULL)
+		return -1;
+	int class_a = gap_item_set_iterator_type_class(type_a);
+	int class_b = gap_item_set_iterator_type_class(type_b);
+	if (class_a != class_b)
+		return COMPARE_RESULT(class_a, class_b);
+	int cmp = key_compare(key_a, part_count_a, HINT_NONE,
+			      key_b, part_count_b, HINT_NONE,
+			      cmp_def);
+	if (cmp != 0)
+		return cmp;
+	return tuple_compare(until_a, hint_a, until_b, hint_b, cmp_def);
+}
+
+/** Explain the order. */
+/** TODO: make sure that the order is transitive. */
+static inline int
+gap_item_set_cmp(const struct gap_item_base *a,
+		 const struct gap_item_base *b)
+{
+	if (a->type != b->type)
+		return COMPARE_RESULT(a->type, b->type);
+	if (a->txn != b->txn)
+		return COMPARE_RESULT(a->txn, b->txn);
+	switch(a->type) {
+	case GAP_INPLACE:
+	case GAP_FULL_SCAN:
+		return 0;
+	case GAP_NEARBY: {
+		struct nearby_gap_item *nearby_item_a =
+			(struct nearby_gap_item *)a;
+		struct nearby_gap_item *nearby_item_b =
+			(struct nearby_gap_item *)b;
+		assert(nearby_item_a->cmp_def == nearby_item_b->cmp_def);
+		return gap_item_set_cmp_key(
+			nearby_item_a->key, nearby_item_a->part_count,
+			nearby_item_a->type, nearby_item_b->key,
+			nearby_item_b->part_count, nearby_item_b->type,
+			nearby_item_a->cmp_def);
+	}
+	case GAP_COUNT: {
+		struct count_gap_item *count_item_a =
+			(struct count_gap_item *)a;
+		struct count_gap_item *count_item_b =
+			(struct count_gap_item *)b;
+		assert(count_item_a->cmp_def == count_item_b->cmp_def);
+		return gap_item_set_cmp_range(
+			count_item_a->key, count_item_a->part_count,
+			count_item_a->until, count_item_a->until_hint,
+			count_item_a->type, count_item_b->key,
+			count_item_b->part_count, count_item_b->until,
+			count_item_b->until_hint, count_item_b->type,
+			count_item_a->cmp_def);
+	}
+	default:
+		unreachable();
+	};
+}
+
+struct gap_item_set_search_key {
+	enum gap_item_type type;
+	struct gap_item_base *item;
+};
+
+int
+gap_item_set_cmp_with_key(struct gap_item_set_search_key key,
+		          struct gap_item_base *item)
+{
+	if (key.item != NULL)
+		return gap_item_set_cmp(key.item, item);
+	return COMPARE_RESULT(key.type, item->type);
+}
+
+rb_gen_ext_key(MAYBE_UNUSED, gap_item_set_, gap_item_set_t,
+	       struct gap_item_base, in_gap_item_set, gap_item_set_cmp,
+	       struct gap_item_set_search_key, gap_item_set_cmp_with_key);
+/**
+ * Merges `new_item` into `item` is possible.
+ * On success, returns true and the new item can be deleted.
+ */
+static bool
+gap_item_needs_swap(const char *key, uint32_t part_count,
+		    enum iterator_type type, const char *new_key,
+		    uint32_t new_part_count, enum iterator_type new_type,
+        	    struct key_def *cmp_def)
+{
+	if ((type == ITER_EQ || type == ITER_REQ) &&
+	    (new_type == ITER_EQ || new_type == ITER_REQ)) {
+		/* Equality queries are completely identical. */
+		assert(part_count == new_part_count);
+		return false;
+	} else {
+		/* Range queries - one of them covers another one. */
+		assert(type == ITER_LT || type == ITER_LE ||
+		       type == ITER_GE || type == ITER_GT);
+		int cmp = key_compare(
+			key, part_count, HINT_NONE,
+			new_key, new_part_count, HINT_NONE,
+			cmp_def);
+		cmp *= iterator_direction(type);
+		if (cmp < 0) {
+			/* The new item is covered by the old item. */
+			return false;
+		} else if (cmp > 0) {
+			/* The old item is covered by the new item. */
+			return true;
+		} else {
+			/* The new item is covered by the old item. */
+			if ((type == ITER_LE && new_type == ITER_LT) ||
+			    (type == ITER_GE && new_type == ITER_GT))
+				return false;
+			/* The old item is covered by the new item. */
+			if ((type == ITER_LT && new_type == ITER_LE) ||
+			    (type == ITER_GT && new_type == ITER_GE))
+				return true;
+			assert(type == new_type);
+			/* Item with lower part count covers another one. */
+			if (new_part_count < part_count)
+				return true;
+			return false;
+		}
+	}
+}
+
+#define gap_item_swap(a, b) ({ \
+	SWAP(a->key, b->key); \
+	SWAP(a->key_len, b->key_len); \
+	SWAP(a->part_count, b->part_count); \
+	SWAP(a->type, b->type); \
+	char tmp[sizeof(a->short_key)]; \
+	memcpy(tmp, a->short_key, sizeof(a->short_key)); \
+	memcpy(a->short_key, b->short_key, sizeof(b->short_key)); \
+	memcpy(b->short_key, tmp, sizeof(tmp)); \
+})
+
+/**
+ * Merging strategy:
+ * 1. Sort by type.
+ * 2. Then sort by txn.
+ * 3. Then sort by key.
+ * Think about: how to handle empty read gaps (count nothing)?
+ * TODO: binary search somehow???
+ */
+static void
+gap_item_add(gap_item_set_t *set, struct gap_item_base *item)
+{
+	struct gap_item_set_search_key key = {
+		.type = item->type,
+		.item = item,
+	};
+	struct gap_item_base *old_item = gap_item_set_search(set, key);
+	if (old_item == NULL) {
+		gap_item_set_insert(set, item);
+		item->gap_item_set = set;
+		return;
+	}
+	assert(old_item->type == item->type);
+	switch(item->type) {
+	case GAP_INPLACE:
+	case GAP_FULL_SCAN:
+		break;
+	case GAP_NEARBY: {
+		struct nearby_gap_item *nearby_old_item =
+			(struct nearby_gap_item *)old_item;
+		struct nearby_gap_item *nearby_item =
+			(struct nearby_gap_item *)item;
+		if (gap_item_needs_swap(
+				nearby_old_item->key,
+				nearby_old_item->part_count,
+				nearby_old_item->type,
+				nearby_item->key,
+				nearby_item->part_count,
+				nearby_item->type,
+				nearby_item->cmp_def))
+			gap_item_swap(nearby_old_item, nearby_item);
+		break;
+	}
+	case GAP_COUNT: {
+		struct count_gap_item *count_old_item =
+			(struct count_gap_item *)old_item;
+		struct count_gap_item *count_item =
+			(struct count_gap_item *)item;
+		assert((count_old_item->until == NULL) ==
+		       (count_item->until == NULL));
+		/*
+		 * Only completely identical bounded ranges
+		 * may appear here.
+		 */
+		if (count_old_item->until != NULL)
+			break;
+		if (gap_item_needs_swap(
+				count_old_item->key,
+				count_old_item->part_count,
+				count_old_item->type,
+				count_item->key,
+				count_item->part_count,
+				count_item->type,
+				count_item->cmp_def))
+			gap_item_swap(count_item, count_old_item);
+		break;
+	}
+	default:
+		unreachable();
+	}
+	memtx_tx_delete_gap(item);
+}
+
+static void
+gap_item_remove(gap_item_set_t *set, struct gap_item_base *item)
+{
+	gap_item_set_remove(set, item);
+	item->gap_item_set = NULL;
+}
+
+/**
  * Initialize common part of gap item, except for in_read_gaps member,
  * which initialization is specific for gap item type.
  */
@@ -334,6 +641,7 @@ gap_item_base_create(struct gap_item_base *item, enum gap_item_type type,
 	item->type = type;
 	item->txn = txn;
 	rlist_add(&txn->gap_list, &item->in_gap_list);
+	item->gap_item_set = NULL;
 }
 
 /**
@@ -1173,7 +1481,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	for (uint32_t i = 0; i < index_count; i++) {
 		story->link[i].is_own_change = false;
 		story->link[i].newer_story = story->link[i].older_story = NULL;
-		rlist_create(&story->link[i].read_gaps);
+		gap_item_set_new(&story->link[i].read_gaps);
 		story->link[i].in_index = space->index[i];
 	}
 	return story;
@@ -1191,7 +1499,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		assert(story->link[i].newer_story == NULL);
 		assert(story->link[i].older_story == NULL);
-		assert(rlist_empty(&story->link[i].read_gaps));
+		assert(gap_item_set_empty(&story->link[i].read_gaps));
 	}
 
 	/* Clear associated functional keys only if there are any. */
@@ -1429,7 +1737,12 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	}
 
 	/* Rebind gap records to the top of the list */
-	rlist_splice(&new_link->read_gaps, &old_link->read_gaps);
+	struct gap_item_base *item, *next;
+	gap_item_set_foreach_safe(&old_link->read_gaps, item, next) {
+		gap_item_remove(&old_link->read_gaps, item);
+		gap_item_add(&new_link->read_gaps, item);
+	}
+	assert(gap_item_set_empty(&old_link->read_gaps));
 }
 
 /**
@@ -1508,14 +1821,11 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 	 * is going to be deleted.
 	 */
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct rlist *read_gaps = &story->link[i].read_gaps;
-		while (!rlist_empty(&story->link[i].read_gaps)) {
-			struct gap_item_base *item =
-				rlist_first_entry(read_gaps,
-						  struct gap_item_base,
-						  in_read_gaps);
+		gap_item_set_t *read_gaps = &story->link[i].read_gaps;
+		/* TODO: optimize deletion (get rid of rebalancing). */
+		struct gap_item_base *item, *next;
+		gap_item_set_foreach_safe(read_gaps, item, next)
 			memtx_tx_delete_gap(item);
-		}
 	}
 	/*
 	 * Remove all read trackers since they point to the story that
@@ -1692,7 +2002,7 @@ memtx_tx_story_gc_step()
 						  MEMTX_TX_STORY_USED);
 			return;
 		}
-		if (!rlist_empty(&link->read_gaps)) {
+		if (!gap_item_set_empty(&link->read_gaps)) {
 			memtx_tx_story_set_status(story,
 						  MEMTX_TX_STORY_TRACK_GAP);
 			/* The story is used for gap tracking. */
@@ -2022,13 +2332,15 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 	assert(story->link[ind].newer_story == NULL || !is_insert);
 
 	struct index *index = space->index[ind];
-	struct rlist *read_gaps = memtx_index_read_gaps(index);
+	gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
 
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, read_gaps, in_read_gaps, tmp) {
-		if (item_base->type != GAP_COUNT)
-			continue;
-
+	struct gap_item_set_search_key key = {
+		.type = GAP_COUNT,
+		.item = NULL,
+	};
+	gap_item_set_foreach_with_key_safe(read_gaps, item_base, key, tmp) {
+		assert(item_base->type == GAP_COUNT);
 		struct count_gap_item *item =
 			(struct count_gap_item *)item_base;
 
@@ -2156,7 +2468,7 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
 		!memtx_tx_story_is_deleted_by_txn(story, txn, &unused);
 	struct inplace_gap_item *item =
 		memtx_tx_inplace_gap_item_new(txn, abort_on_rollback);
-	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
+	gap_item_add(&story->link[ind].read_gaps, &item->base);
 }
 
 /**
@@ -2170,27 +2482,30 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 	assert(story->link[ind].newer_story == NULL);
 	struct tuple *tuple = story->tuple;
 	struct index *index = space->index[ind];
-	struct rlist *read_gaps = memtx_index_read_gaps(index);
+	gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, read_gaps, in_read_gaps, tmp) {
-		if (item_base->type != GAP_FULL_SCAN)
-			continue;
+	struct gap_item_set_search_key key = {
+		.type = GAP_FULL_SCAN,
+		.item = NULL,
+	};
+	gap_item_set_foreach_with_key_safe(read_gaps, item_base, key, tmp) {
+		assert(item_base->type == GAP_FULL_SCAN);
 		memtx_tx_track_story_gap(item_base->txn, story, ind);
 	}
 	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return; /* no gap records */
 
-	struct rlist *list = memtx_index_read_gaps(index);
+	gap_item_set_t *list = memtx_index_read_gaps(index);
 	if (successor != NULL) {
 		assert(tuple_has_flag(successor, TUPLE_IS_DIRTY));
 		struct memtx_story *succ_story = memtx_tx_story_get(successor);
 		assert(ind < succ_story->index_count);
 		list = &succ_story->link[ind].read_gaps;
-		assert(list->next != NULL && list->prev != NULL);
+		// assert(list->next != NULL && list->prev != NULL);
 	}
-	rlist_foreach_entry_safe(item_base, list, in_read_gaps, tmp) {
-		if (item_base->type != GAP_NEARBY)
-			continue;
+	key.type = GAP_NEARBY;
+	gap_item_set_foreach_with_key_safe(list, item_base, key, tmp) {
+		assert(item_base->type == GAP_NEARBY);
 		struct nearby_gap_item *item =
 			(struct nearby_gap_item *)item_base;
 		int cmp = 0;
@@ -2232,13 +2547,12 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 							     item->part_count,
 							     index->def->cmp_def);
 
-			rlist_add(&story->link[ind].read_gaps,
-				  &copy->base.in_read_gaps);
+			/* TODO: probably, split is not needed. */
+			gap_item_add(&story->link[ind].read_gaps, &copy->base);
 		} else if (need_move) {
 			/* The tracker must be moved to the left gap. */
-			rlist_del(&item->base.in_read_gaps);
-			rlist_add(&story->link[ind].read_gaps,
-				  &item->base.in_read_gaps);
+			gap_item_remove(list, &item->base);
+			gap_item_add(&story->link[ind].read_gaps, &item->base);
 		} else {
 			assert((dir > 0 && cmp < 0) ||
 			       (cmp < 0 && item->type == ITER_REQ) ||
@@ -2695,11 +3009,14 @@ memtx_tx_abort_gap_readers_on_rollback(
 	 */
 	assert(top_story->link[ind].newer_story == NULL);
 
+	gap_item_set_t *read_gaps = &top_story->link[ind].read_gaps;
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, &top_story->link[ind].read_gaps,
-				 in_read_gaps, tmp) {
-		if (item_base->type != GAP_INPLACE)
-			continue;
+	struct gap_item_set_search_key key = {
+		.type = GAP_INPLACE,
+		.item = NULL,
+	};
+	gap_item_set_foreach_with_key_safe(read_gaps, item_base, key, tmp) {
+		assert(item_base->type == GAP_INPLACE);
 		struct inplace_gap_item *item =
 			(struct inplace_gap_item *)item_base;
 		if (!item->abort_on_rollback)
@@ -2853,10 +3170,15 @@ memtx_tx_handle_conflict_gap_readers(struct memtx_story *top_story,
 				     uint32_t ind, struct txn *writer)
 {
 	assert(top_story->link[ind].newer_story == NULL);
+	gap_item_set_t *read_gaps = &top_story->link[ind].read_gaps;
 	struct gap_item_base *item, *tmp;
-	rlist_foreach_entry_safe(item, &top_story->link[ind].read_gaps,
-				 in_read_gaps, tmp) {
-		if (item->txn == writer || item->type != GAP_INPLACE)
+	struct gap_item_set_search_key key = {
+		.type = GAP_INPLACE,
+		.item = NULL,
+	};
+	gap_item_set_foreach_with_key_safe(read_gaps, item, key, tmp) {
+		assert(item->type == GAP_INPLACE);
+		if (item->txn == writer)
 			continue;
 		txn_send_to_read_view(item->txn, writer->psn);
 	}
@@ -3323,8 +3645,9 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
 static void
 memtx_tx_delete_gap(struct gap_item_base *item)
 {
+	if (item->gap_item_set != NULL)
+		gap_item_remove(item->gap_item_set, item);
 	rlist_del(&item->in_gap_list);
-	rlist_del(&item->in_read_gaps);
 	struct memtx_tx_mempool *pool;
 	switch (item->type) {
 	case GAP_INPLACE:
@@ -3367,9 +3690,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 			if (story->link[i].newer_story != NULL)
 				continue;
 			struct gap_item_base *item, *tmp;
-			rlist_foreach_entry_safe(item,
-						 &story->link[i].read_gaps,
-						 in_read_gaps, tmp) {
+			gap_item_set_foreach_safe(&story->link[i].read_gaps, item, tmp) {
 				if (item->txn != ddl_owner)
 					txn_abort_with_conflict(item->txn);
 			}
@@ -3379,9 +3700,9 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 	/* Abort all gap-without-successor readers. */
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		struct rlist *read_gaps = memtx_index_read_gaps(index);
+		gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
 		struct gap_item_base *item, *tmp;
-		rlist_foreach_entry_safe(item, read_gaps, in_read_gaps, tmp) {
+		gap_item_set_foreach_safe(read_gaps, item, tmp) {
 			if (item->txn != ddl_owner)
 				txn_abort_with_conflict(item->txn);
 		}
@@ -3513,14 +3834,10 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 	 */
 	for (size_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		struct rlist *read_gaps = memtx_index_read_gaps(index);
-		while (!rlist_empty(read_gaps)) {
-			struct gap_item_base *item =
-				rlist_first_entry(read_gaps,
-						  struct gap_item_base,
-						  in_read_gaps);
+		gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
+		struct gap_item_base *item, *tmp;
+		gap_item_set_foreach_safe(read_gaps, item, tmp)
 			memtx_tx_delete_gap(item);
-		}
 	}
 }
 
@@ -3844,47 +4161,12 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		}
 		assert(index->dense_id < story->index_count);
 		assert(story->link[index->dense_id].in_index != NULL);
-		rlist_add(&story->link[index->dense_id].read_gaps,
-			  &item->base.in_read_gaps);
+		gap_item_add(&story->link[index->dense_id].read_gaps,
+			     &item->base);
 	} else {
-		struct rlist *index_read_gaps = memtx_index_read_gaps(index);
-		rlist_add(index_read_gaps, &item->base.in_read_gaps);
+		gap_item_set_t *index_read_gaps = memtx_index_read_gaps(index);
+		gap_item_add(index_read_gaps, &item->base);
 	}
-}
-
-/**
- * Check if a full count had been performed by the @a txn in @a index and
- * recorded in the MVCC already. See the @a memtx_tx_track_count_until_slow
- * for more details on how such a gap item is inserted into the index gap list.
- */
-static bool
-memtx_tx_index_full_count_recorded_already(struct index *index, struct txn *txn)
-{
-	struct rlist *read_gaps = memtx_index_read_gaps(index);
-	struct gap_item_base *item_base;
-	rlist_foreach_entry_reverse(item_base, read_gaps, in_read_gaps) {
-		/* Not a count item = no full count items expected next. */
-		if (item_base->type != GAP_COUNT)
-			break;
-
-		/* Skip if not gap item of the current transaction. */
-		if (item_base->txn != txn)
-			continue;
-
-		/* Not a full count = no full count items expected next. */
-		struct count_gap_item *item =
-			(struct count_gap_item *)item_base;
-		if (item->part_count != 0)
-			break;
-
-		/* Same if not a full count without `until` specified. */
-		if (item->until != NULL)
-			break;
-
-		/* Found a full count gap item of the txn created previously. */
-		return true;
-	}
-	return false;
 }
 
 /**
@@ -3915,29 +4197,11 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 				      type == ITER_REQ ? ITER_LE :
 				      type, key, part_count));
 
-	/* Check if a full index count happened previously by the txn. */
-	if (txn != NULL && part_count == 0 && until == NULL &&
-	    memtx_tx_index_full_count_recorded_already(index, txn)) {
-		return memtx_tx_index_invisible_count_matching_until(
-			txn, space, index, type, key,
-			part_count, until, until_hint);
-	}
-
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
 			txn, type, key, part_count, until, until_hint, cmp_def);
-		struct rlist *read_gaps = memtx_index_read_gaps(index);
-		/*
-		 * Empty key count trackers are inserted in the end of the index
-		 * gap list, so we can search for an existing empty key gap item
-		 * without traversing the whole list and check if a new one will
-		 * be a duplicate.
-		 */
-		if (part_count == 0 && until == NULL) {
-			rlist_add_tail(read_gaps, &item->base.in_read_gaps);
-		} else {
-			rlist_add(read_gaps, &item->base.in_read_gaps);
-		}
+		gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
+		gap_item_add(read_gaps, &item->base);
 	}
 
 	/*
@@ -3990,8 +4254,8 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 		return;
 
 	struct full_scan_gap_item *item = memtx_tx_full_scan_gap_item_new(txn);
-	struct rlist *read_gaps = memtx_index_read_gaps(index);
-	rlist_add(read_gaps, &item->base.in_read_gaps);
+	gap_item_set_t *read_gaps = memtx_index_read_gaps(index);
+	gap_item_add(read_gaps, &item->base);
 }
 
 /**
