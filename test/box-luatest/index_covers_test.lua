@@ -56,7 +56,7 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "options.covers[1]: field (name or number) is expected",
-        }, s.create_index, s, 'sk', {covers = {{}}})
+        }, s.create_index, s, 'sk', {covers = {true}})
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "options.covers[1]: field (number) must be one-based",
@@ -73,8 +73,40 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' element 'field' value" ..
+                      " must be unsigned",
         }, s.create_index, s, 'sk', {covers = {1.1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element 'field' value" ..
+                      " must be unsigned",
+        }, s.create_index, s, 'sk', {covers = {2^32 + 1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element must contain" ..
+                      " at least a 'field' key",
+        }, s.create_index, s, 'sk', {covers = {{}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element map key must" ..
+                      " be string",
+        }, s.create_index, s, 'sk', {covers = {{1, 'null_rle'}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: unexpected 'covers' element map" ..
+                      " key",
+        }, s.create_index, s, 'sk', {covers = {{1, layout = 'null_rle',
+                                                dummy_key = 'dummy'}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element 'layout' value" ..
+                      " must be string",
+        }, s.create_index, s, 'sk', {covers = {{1, layout = 2}}})
         --
         -- Test index:alter
         --
@@ -86,7 +118,7 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "options.covers[1]: field (name or number) is expected",
-        }, sk.alter, sk, {covers = {{}}})
+        }, sk.alter, sk, {covers = {true}})
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "options.covers[1]: field (number) must be one-based",
@@ -103,8 +135,40 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' element 'field' value" ..
+                      " must be unsigned",
         }, sk.alter, sk, {covers = {1.1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element 'field' value" ..
+                      " must be unsigned",
+        }, sk.alter, sk, {covers = {2^32 + 1}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element must contain" ..
+                      " at least a 'field' key",
+        }, sk.alter, sk, {covers = {{}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element map key must" ..
+                      " be string",
+        }, sk.alter, sk, {covers = {{1, 'null_rle'}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: unexpected 'covers' element map" ..
+                      " key",
+        }, sk.alter, sk, {covers = {{1, layout = 'null_rle',
+                                     dummy_key = 'dummy'}}})
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element 'layout' value" ..
+                      " must be string",
+        }, sk.alter, sk, {covers = {{1, layout = 2}}})
         s.index.sk:drop()
         --
         -- Test box.space._index:insert.
@@ -120,7 +184,17 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or map",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true, covers = {true}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or map",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {-1}},
             {{0, 'unsigned'}}
@@ -128,7 +202,8 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or map",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {1.1}},
             {{0, 'unsigned'}}
@@ -136,7 +211,17 @@ g.test_covers_validation = function(cg)
         t.assert_error_covers({
             type = 'ClientError',
             code = box.error.WRONG_INDEX_OPTIONS,
-            message = "Wrong index options: 'covers' elements must be unsigned",
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned or map",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {unique = true, covers = {{1, 'null_rle'}}},
+            {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' elements must be" ..
+                      " unsigned",
         }, box.space._index.insert, box.space._index, {
             s.id, 1, 'sk', 'tree', {unique = true, covers = {2^32}},
             {{0, 'unsigned'}}
@@ -146,8 +231,32 @@ g.test_covers_validation = function(cg)
             code = box.error.WRONG_INDEX_OPTIONS,
             message = "Wrong index options: 'covers' has duplicates",
         }, box.space._index.insert, box.space._index, {
-            s.id, 1, 'sk', 'tree', {unique = true, covers = {1, 1}},
+            s.id, 1, 'sk', 'tree', {unique = true, covers = {1,1}},
             {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: unexpected 'covers' element map" ..
+                      " key",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {
+                unique = true, covers = {
+                    {field = 1, layout = 'null_rle', dummy_key = 'dummy'},
+                },
+            }, {{0, 'unsigned'}}
+        })
+        t.assert_error_covers({
+            type = 'ClientError',
+            code = box.error.WRONG_INDEX_OPTIONS,
+            message = "Wrong index options: 'covers' element 'layout' value" ..
+                      " must be string",
+        }, box.space._index.insert, box.space._index, {
+            s.id, 1, 'sk', 'tree', {
+                unique = true, covers = {
+                    {field = 1, layout = 2},
+                },
+            }, {{0, 'unsigned'}}
         })
     end)
 end

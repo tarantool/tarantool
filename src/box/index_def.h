@@ -67,6 +67,14 @@ enum rtree_index_distance_type {
 };
 extern const char *rtree_index_distance_type_strs[];
 
+/** Covered field attributes. */
+struct covered_field_def {
+	/** Fieldno of covered field. */
+	uint32_t fieldno;
+	/** Layout of covered field. */
+	char *layout;
+};
+
 /** Index options */
 struct index_opts {
 	/**
@@ -116,7 +124,7 @@ struct index_opts {
 	 * index key and primary index key. The latter fields are always
 	 * covered. Sorted in ascending order.
 	 */
-	uint32_t *covered_fields;
+	struct covered_field_def *covered_fields;
 	/**
 	 * Number of covered fields.
 	 */
@@ -151,6 +159,8 @@ index_opts_create(struct index_opts *opts)
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
+	for (uint32_t i = 0; i < opts->covered_field_count ; i++)
+		free(opts->covered_fields[i].layout);
 	free(opts->covered_fields);
 	free(opts->layout);
 	free(opts->aggregates);
@@ -183,8 +193,18 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 	if (o1->covered_field_count != o2->covered_field_count)
 		return false;
 	for (uint32_t i = 0; i < o1->covered_field_count; i++) {
-		if (o1->covered_fields[i] != o2->covered_fields[i])
+		if (o1->covered_fields[i].fieldno !=
+		    o2->covered_fields[i].fieldno)
 			return false;
+		if (o1->covered_fields[i].layout != NULL &&
+		    o2->covered_fields[i].layout != NULL) {
+			if (strcmp(o1->covered_fields[i].layout,
+				   o2->covered_fields[i].layout) != 0)
+				return false;
+		} else if (o1->covered_fields[i].layout != NULL ||
+			   o2->covered_fields[i].layout != NULL) {
+			return false;
+		}
 	}
 	if (o1->layout != NULL && o2->layout != NULL) {
 		if (strcmp(o1->layout, o2->layout) != 0)
@@ -314,6 +334,19 @@ index_def_list_add(struct rlist *index_def_list, struct index_def *index_def)
 		rlist_add_entry(index_def_list, index_def, link);
 	else
 		rlist_add_tail_entry(index_def_list, index_def, link);
+}
+
+/**
+ * Compare covered fields by their fieldnos.
+ */
+static inline int
+covered_field_def_cmp(const void *_a, const void *_b)
+{
+	const struct covered_field_def *a =
+		(const struct covered_field_def *)_a,
+				       *b =
+		(const struct covered_field_def *)_b;
+	return COMPARE_RESULT(a->fieldno, b->fieldno);
 }
 
 /**
