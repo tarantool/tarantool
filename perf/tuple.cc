@@ -4,8 +4,10 @@
 #include "memtx_engine.h"
 #include <allocator.h>
 
+#include <array>
 #include <benchmark/benchmark.h>
 #include <random>
+#include <vector>
 
 static const size_t NUM_TEST_TUPLES = 4096;
 
