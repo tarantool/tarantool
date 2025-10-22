@@ -183,6 +183,11 @@ struct field_def {
 	size_t default_value_size;
 	/** ID of the field default function. */
 	uint32_t default_func_id;
+	/**
+	 * 0-terminated layout of a field within index if engine supports
+	 * multiple layouts.
+	 */
+	char *layout;
 	/** Compression type for this field. */
 	enum compression_type compression_type;
 	/** Array of constraints. Can be NULL if constraints_count == 0. */
