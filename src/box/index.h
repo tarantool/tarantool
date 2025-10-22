@@ -414,7 +414,8 @@ iterator_position_unpack(const char *packed_pos, const char *packed_pos_end,
 int
 iterator_position_validate(const char *pos, uint32_t pos_part_count,
 			   const char *key, uint32_t key_part_count,
-			   struct key_def *cmp_def, enum iterator_type type);
+			   struct index_def *index_def,
+			   enum iterator_type type);
 
 /**
  * Get position of iterator - extracted cmp_def of last fetched
