@@ -253,8 +253,8 @@ index_opts_validate(struct index_opts *opts)
 		uint32_t *fields = xregion_alloc_array(
 						gc, typeof(*fields),
 						opts->covered_field_count);
-		memcpy(fields, opts->covered_fields,
-		       opts->covered_field_count * sizeof(*fields));
+		for (uint32_t i = 0; i < opts->covered_field_count; i++)
+			fields[i] = opts->covered_fields[i].fieldno;
 		qsort(fields, opts->covered_field_count, sizeof(*fields),
 		      cmp_u32);
 		for (uint32_t i = 0; i < opts->covered_field_count; i++) {
