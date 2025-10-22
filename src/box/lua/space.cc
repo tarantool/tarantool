@@ -429,18 +429,27 @@ luaT_push_covered_fields(struct lua_State *L, struct index_def *def)
 	size_t gc_svp = region_used(gc);
 	uint32_t field_count = def->opts.covered_field_count +
 			       def->cmp_def->part_count;
-	uint32_t *fields = xregion_alloc_array(gc, typeof(*fields),
-					       field_count);
+	struct covered_field_def *fields =
+		xregion_alloc_array(gc, typeof(*fields), field_count);
 	memcpy(fields, def->opts.covered_fields,
 	       sizeof(*fields) * def->opts.covered_field_count);
-	for (uint32_t i = 0; i < def->cmp_def->part_count; i++)
-		fields[i + def->opts.covered_field_count] =
+	for (uint32_t i = 0; i < def->cmp_def->part_count; i++) {
+		fields[i + def->opts.covered_field_count].fieldno =
 					def->cmp_def->parts[i].fieldno;
-	qsort(fields, field_count, sizeof(*fields), cmp_u32);
+		fields[i + def->opts.covered_field_count].layout = NULL;
+	}
+	qsort(fields, field_count, sizeof(*fields),
+	      covered_field_def_cmp);
 	lua_newtable(L);
 	for (uint32_t i = 0; i < field_count; i++) {
 		lua_pushnumber(L, i + 1);
-		lua_pushnumber(L, fields[i] + 1);
+		lua_newtable(L);
+		lua_pushnumber(L, fields[i].fieldno + 1);
+		lua_setfield(L, -2, "field");
+		if (fields[i].layout != NULL) {
+			lua_pushstring(L, fields[i].layout);
+			lua_setfield(L, -2, "layout");
+		}
 		lua_settable(L, -3);
 	}
 	region_truncate(gc, gc_svp);
