@@ -1566,7 +1566,7 @@ local index_options = {
     func = 'number, string',
     hint = 'boolean',
     covers = 'table',
-    layout = 'string',
+    layout = 'string,map',
     aggregates = 'table',
 }
 
