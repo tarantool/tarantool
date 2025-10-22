@@ -3,6 +3,25 @@
 local datetime = require('datetime')
 local log = require('internal.config.utils.log')
 
+-- Creates a shallow copy of the table `t` without fields that start with
+-- an underscore character.
+local function copy_public_fields(t)
+    if t == nil then
+        return nil
+    end
+
+    assert(type(t) == 'table')
+
+    local res = {}
+    for k, v in pairs(t) do
+        if not k:startswith('_') then
+            res[k] = v
+        end
+    end
+
+    return res
+end
+
 -- Set an alert.
 --
 -- Optional `opts.key` declares an unique identifier of the alert.
@@ -118,13 +137,7 @@ local function aboard_alerts(self)
     -- Don't return alert keys.
     local alerts = {}
     for _, alert in pairs(self._alerts) do
-        -- Don't show fields that start from an underscore.
-        local serialized = {}
-        for k, v in pairs(alert) do
-            if not k:startswith('_') then
-                serialized[k] = v
-            end
-        end
+        local serialized = copy_public_fields(alert)
         table.insert(alerts, serialized)
     end
     -- Sort by timestamps.
@@ -183,15 +196,9 @@ local function process_alert(namespace, alert)
     assert(alert.type == nil or alert.type == 'warn',
            'alert.type must be nil or "warn"')
 
-    local a = table.copy(alert)
+    local a = copy_public_fields(alert)
+
     a.type = 'warn'
-
-    for k, _ in pairs(a) do
-        if k:startswith('_') then
-            a[k] = nil
-        end
-    end
-
     a._namespace = namespace._name
 
     return a
@@ -209,6 +216,51 @@ function namespace_methods.add(self, alert)
     namespace_selfcheck(self, 'add')
     local a = process_alert(self, alert)
     self._aboard:set(a)
+end
+
+function namespace_methods.get(self, key)
+    namespace_selfcheck(self, 'get')
+    assert(type(key) == 'string', 'alert key must be a string')
+    local alert = self._aboard:get(process_key(self, key))
+
+    return copy_public_fields(alert)
+end
+
+function namespace_methods.alerts(self)
+    namespace_selfcheck(self, 'alerts')
+    local alerts = {}
+
+    local next_idx = 1
+    for key, alert in pairs(self._aboard._alerts) do
+        if alert._namespace == self._name then
+            if type(key) == 'string' then
+                -- Remove the namespace prefix from the key.
+                local prefix = self._name .. ':'
+                assert(key:startswith(prefix))
+                key = key:sub(#prefix + 1)
+            else
+                key = next_idx
+                next_idx = next_idx + 1
+            end
+
+            alerts[key] = copy_public_fields(alert)
+        end
+    end
+
+    return alerts
+end
+
+namespace_methods.count = function(self)
+    namespace_selfcheck(self, 'count')
+
+    local count = 0
+    for _, alert in pairs(self._aboard._alerts) do
+        if alert._namespace == self._name then
+            count = count + 1
+        end
+    end
+
+    return count
 end
 
 function namespace_methods.set(self, key, alert)
@@ -229,7 +281,68 @@ function namespace_methods.clear(self)
     end)
 end
 
+local function get_system_namespace(aboard)
+    local mt = {}
+
+    local function selfcheck(self, method_name)
+        if type(self) ~= 'table' or getmetatable(self) ~= mt then
+            local fmt_str = 'Use alerts_namespace:%s(<...>) ' ..
+                            'instead of alerts_namespace.%s(<...>)'
+            error(fmt_str:format(method_name, method_name), 0)
+        end
+    end
+
+    mt = {
+        __index = {
+            get = function(self, key)
+                selfcheck(self, 'get')
+                assert(type(key) == 'string', 'alert key must be a string')
+                local alert = aboard_get(self._aboard, key)
+                return copy_public_fields(alert)
+            end,
+
+            alerts = function(self)
+                selfcheck(self, 'alerts')
+
+                local alerts = {}
+                local next_idx = 1
+                for key, alert in pairs(self._aboard._alerts) do
+                    if alert._namespace == nil then
+                        if type(key) ~= 'string' then
+                            key = next_idx
+                            next_idx = next_idx + 1
+                        end
+
+                        alerts[key] = copy_public_fields(alert)
+                    end
+                end
+
+                return alerts
+            end,
+
+            count = function(self)
+                selfcheck(self, 'count')
+
+                local count = 0
+                for _, alert in pairs(self._aboard._alerts) do
+                    if alert._namespace == nil then
+                        count = count + 1
+                    end
+                end
+
+                return count
+            end,
+        }
+    }
+
+    return setmetatable({_aboard = aboard}, mt)
+end
+
 local function namespace_new(self, name)
+    if name == nil then
+        return get_system_namespace(self)
+    end
+
     assert(type(name) == 'string', 'namespace name must be a string')
     assert(not name:find(':'), 'namespace name cannot contain a colon')
 
