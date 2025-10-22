@@ -141,7 +141,7 @@ function methods._instance_sharding(self, opts)
                 return false
             end
             for _, role_name in pairs(roles) do
-                if role_name == 'sharding' then
+                if role_name == 'sharding' or role_name == 'super' then
                     return true
                 end
             end
