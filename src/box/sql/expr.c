@@ -3222,9 +3222,16 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 	if (is_neg && value != INT64_MIN)
 		value = -value;
 
-    /* NEW OPTIMIZATION: Use OP_Integer for values that fit in 32 bits */
-	/* For signed: -2147483648 to 2147483647 */
-	/* For unsigned: 0 to UINT32_MAX (4294967295) when !is_neg */
+    /*
+     * Use OP_Integer for integer literals that fit in 32-bit signed
+     * range to avoid unnecessary memory allocations. This optimization
+     * applies to values in range -2147483648 to 2147483647.
+     * Note: We use the same upper bound (2147483647) for both signed
+     * and unsigned cases because OP_Integer can only store signed
+     * 32-bit values. Values larger than INT32_MAX must use OP_Int64
+     * even if they would fit in unsigned 32-bit range, since the
+     * VDBE register system uses signed integers.
+     */ 
     if ((is_neg && value >= -2147483648 && value <= 2147483647) || 
         (!is_neg && value >= 0 && value <= 2147483647)) {
         sqlVdbeAddOp2(v, OP_Integer, (int)value, mem);
