@@ -931,12 +931,17 @@ no_sup.test_unsupported_pagination = function(cg)
                 box.space.s.index.sk.select, box.space.s.index.sk,
                 nil, {fullscan=true, fetch_pos=true})
         local tuple = {0, 0}
+        local key = {0}
         if index_type == 'rtree' then
             tuple = {0, {0, 0}}
+            key = {0, 0}
         end
         t.assert_error_msg_contains('does not support pagination',
                 box.space.s.index.sk.select, box.space.s.index.sk,
                 nil, {fullscan=true, after=tuple})
+        t.assert_error_msg_contains('does not support pagination',
+                box.space.s.index.sk.select, box.space.s.index.sk,
+                key, {fullscan=true, after=tuple})
         -- tuple_pos works everywhere instead of func and multikey indexes
         local pos = box.space.s.index.sk:tuple_pos(tuple)
         t.assert_error_msg_contains('does not support pagination',
