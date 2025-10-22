@@ -55,6 +55,7 @@ struct space;
 struct vclock;
 struct key_def;
 struct ballot;
+struct index_def;
 
 /**
  * Pointer to TX thread local vclock.
@@ -464,7 +465,7 @@ box_iterator_position_pack(const char *pos, const char *pos_end,
 int
 box_iterator_position_unpack(const char *packed_pos,
 			     const char *packed_pos_end,
-			     struct key_def *cmp_def, const char *key,
+			     struct index_def *index_def, const char *key,
 			     uint32_t key_part_count, int iterator,
 			     const char **pos, const char **pos_end);
 
