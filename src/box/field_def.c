@@ -492,6 +492,7 @@ static const struct opt_def field_def_reg[] = {
 		     compression_type, NULL),
 	OPT_DEF_CUSTOM("default", field_def_parse_default_value),
 	OPT_DEF("default_func", OPT_UINT32, struct field_def, default_func_id),
+	OPT_DEF("layout", OPT_STRPTR, struct field_def, layout),
 	OPT_DEF_CUSTOM("constraint", field_def_parse_constraint),
 	OPT_DEF_CUSTOM("foreign_key", field_def_parse_foreign_key),
 	OPT_END,
@@ -512,6 +513,7 @@ const struct field_def field_def_default = {
 	.default_value = NULL,
 	.default_value_size = 0,
 	.default_func_id = 0,
+	.layout = NULL,
 	.constraint_count = 0,
 	.constraint_def = NULL,
 };
@@ -817,6 +819,8 @@ field_def_array_dup(const struct field_def *fields, uint32_t field_count)
 	grp_alloc_reserve_data(&all, sizeof(*fields) * field_count);
 	for (uint32_t i = 0; i < field_count; i++) {
 		grp_alloc_reserve_str0(&all, fields[i].name);
+		if (fields[i].layout != NULL)
+			grp_alloc_reserve_str0(&all, fields[i].layout);
 		grp_alloc_reserve_data(&all, fields[i].default_value_size);
 	}
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
@@ -825,6 +829,9 @@ field_def_array_dup(const struct field_def *fields, uint32_t field_count)
 	for (uint32_t i = 0; i < field_count; ++i) {
 		copy[i] = fields[i];
 		copy[i].name = grp_alloc_create_str0(&all, fields[i].name);
+		if (fields[i].layout != NULL)
+			copy[i].layout =
+				grp_alloc_create_str0(&all, fields[i].layout);
 		if (fields[i].default_value != NULL) {
 			size_t size = fields[i].default_value_size;
 			char *buf = grp_alloc_create_data(&all, size);
