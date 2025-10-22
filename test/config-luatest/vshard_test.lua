@@ -504,6 +504,16 @@ g.test_no_sharding_credentials_role_success = function(g)
         },
         verify = function() end,
     })
+
+    helpers.success_case(g, {
+        options = {
+            ['credentials.users.storage.roles'] = {'super'},
+            ['credentials.users.storage.password'] = 'storage',
+            ['sharding.roles'] = {'storage', 'router'},
+            ['iproto.advertise.sharding'] = {login = 'storage'},
+        },
+        verify = function() end,
+    })
 end
 
 g.test_no_sharding_credentials_role_error = function()
@@ -515,7 +525,7 @@ g.test_no_sharding_credentials_role_error = function()
         guest:
           roles: [super]
         storage:
-          roles: [super]
+          roles: []
           password: "storage"
 
     iproto:
