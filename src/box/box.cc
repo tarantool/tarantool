@@ -4107,7 +4107,7 @@ box_iterator_position_pack(const char *pos, const char *pos_end,
 int
 box_iterator_position_unpack(const char *packed_pos,
 			     const char *packed_pos_end,
-			     struct key_def *cmp_def, const char *key,
+			     struct index_def *index_def, const char *key,
 			     uint32_t key_part_count, int iterator,
 			     const char **pos, const char **pos_end)
 {
@@ -4125,7 +4125,7 @@ box_iterator_position_unpack(const char *packed_pos,
 		uint32_t pos_part_count = mp_decode_array(pos);
 		enum iterator_type type = (enum iterator_type)iterator;
 		if (iterator_position_validate(*pos, pos_part_count, key,
-					       key_part_count, cmp_def,
+					       key_part_count, index_def,
 					       type) != 0)
 			return -1;
 	} else {
@@ -4170,7 +4170,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 		return -1;
 	const char *pos, *pos_end;
 	if (box_iterator_position_unpack(*packed_pos, *packed_pos_end,
-					 index->def->cmp_def, key, part_count,
+					 index->def, key, part_count,
 					 type, &pos, &pos_end) != 0)
 		return -1;
 

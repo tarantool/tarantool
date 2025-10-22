@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "index_def.h"
 #include "tuple.h"
 #include "say.h"
 #include "schema.h"
@@ -653,7 +654,7 @@ box_index_iterator_with_offset(uint32_t space_id, uint32_t index_id, int type,
 				runtime_memory_free(pos_buf, pos_buf_size);
 		});
 	if (box_iterator_position_unpack(packed_pos, packed_pos_end,
-					 index->def->cmp_def, key, part_count,
+					 index->def, key, part_count,
 					 type, &pos, &pos_end) != 0)
 		return NULL;
 	if (pos != NULL) {
@@ -866,22 +867,30 @@ fail:
 int
 iterator_position_validate(const char *pos, uint32_t pos_part_count,
 			   const char *key, uint32_t key_part_count,
-			   struct key_def *cmp_def, enum iterator_type type)
+			   struct index_def *index_def,
+			   enum iterator_type type)
 {
 	int cmp;
 	/* Position must be compatible with the index. */
-	if (cmp_def->part_count != pos_part_count)
+	if (index_def->cmp_def->part_count != pos_part_count)
 		goto fail;
 	const char *pos_end;
-	if (key_validate_parts(cmp_def, pos, pos_part_count, true, &pos_end) != 0)
+	if (key_validate_parts(index_def->cmp_def, pos, pos_part_count, true,
+			       &pos_end) != 0)
 		goto fail;
-	/* Position msut meet the search criteria. */
-	cmp = key_compare(pos, pos_part_count, HINT_NONE,
-			  key, key_part_count, HINT_NONE, cmp_def);
-	if (iterator_direction(type) * cmp < 0)
-		goto fail;
-	if ((type == ITER_EQ || type == ITER_REQ) && cmp != 0)
-		goto fail;
+	/*
+	 * Position must meet the search criteria.
+	 * This check makes sense only for TREE index.
+	 */
+	if (index_def->type == TREE) {
+		cmp = key_compare(pos, pos_part_count, HINT_NONE,
+				  key, key_part_count, HINT_NONE,
+				  index_def->cmp_def);
+		if (iterator_direction(type) * cmp < 0)
+			goto fail;
+		if ((type == ITER_EQ || type == ITER_REQ) && cmp != 0)
+			goto fail;
+	}
 	return 0;
 fail:
 	diag_set(ClientError, ER_ITERATOR_POSITION);
