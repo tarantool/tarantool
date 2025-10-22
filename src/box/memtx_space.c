@@ -1168,6 +1168,15 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 {
 	struct txn *txn = in_txn();
 
+	struct tuple_field *field;
+	json_tree_foreach_entry_preorder(field, &format->fields.root,
+					 struct tuple_field, token) {
+		if (field->layout != NULL) {
+			diag_set(ClientError, ER_UNSUPPORTED, "memtx",
+				 "'layout' option");
+			return -1;
+		}
+	}
 	if (tuple_format1_can_store_format2_tuples(format, space->format))
 		return 0;
 	if (space->index_count == 0)
