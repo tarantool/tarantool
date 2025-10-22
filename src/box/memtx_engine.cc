@@ -719,6 +719,22 @@ memtx_engine_end_recovery(struct engine *engine)
 	return 0;
 }
 
+/**
+ * Validate that a memtx space definition is correct.
+ */
+static int
+memtx_engine_check_space_def(struct space_def *def)
+{
+	for (uint32_t i = 0; i < def->field_count; i++) {
+		if (def->fields[i].layout != NULL) {
+			diag_set(ClientError, ER_UNSUPPORTED, "memtx",
+				 "'layout' option");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static struct space *
 memtx_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
@@ -1805,7 +1821,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .backup = */ memtx_engine_backup,
 	/* .memory_stat = */ memtx_engine_memory_stat,
 	/* .reset_stat = */ generic_engine_reset_stat,
-	/* .check_space_def = */ generic_engine_check_space_def,
+	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 
 /**
