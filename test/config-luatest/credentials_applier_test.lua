@@ -1138,6 +1138,24 @@ g.test_delayed_grant_alert = function(g)
     })
 end
 
+g.test_unsupported_privilege_fails_blocking_sync = function()
+    helpers.failure_case({
+        options = {
+            ['credentials.users.someone'] = {
+                privileges = {
+                    {
+                        permissions = {'execute'},
+                        spaces = {'first'},
+                    },
+                },
+            },
+        },
+        exp_err = 'credentials.apply: box.schema.user.grant("someone", ' ..
+            '"execute", "space", "first") failed: Unsupported space ' ..
+            'privilege \'execute\'',
+    })
+end
+
 -- Verify that an alert regarding a delayed privilege granting
 -- (due to lack of a space/function/sequence) is dropped, when the
 -- privilege is finally granted.

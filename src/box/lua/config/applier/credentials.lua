@@ -925,6 +925,15 @@ local function register_objects(users_or_roles_config)
     end
 end
 
+local function first_error_alert_message()
+    local alerts = config._aboard:alerts()
+    for _, alert in ipairs(alerts) do
+        if alert.type == 'error' then
+            return alert.message
+        end
+    end
+end
+
 -- Fiber channel for resulting message to block execution
 -- of main fiber in case of 'BLOCKING_FULL_SYNC'.
 local wait_sync
@@ -1006,13 +1015,22 @@ local function sync_credentials_worker()
     while true do
         local obj_to_sync = sync_tasks:get()
 
-        local _, err = pcall(sync_object, obj_to_sync)
+        local ok, err = pcall(sync_object, obj_to_sync)
 
         fiber.testcancel()
 
+        if ok and config._aboard:status() == 'check_errors' then
+            err = first_error_alert_message()
+            assert(err ~= nil)
+        end
+
         if obj_to_sync.type == 'BLOCKING_FULL_SYNC' then
             wait_sync:put(err or 'Done')
-        elseif err then
+
+        -- There are two possible cases when `err` is not nil:
+        -- * `ok == false` -- an extra error log message should be issued.
+        -- * `ok == true` -- the error has already been reported as an alert.
+        elseif not ok and err then
             log.error(err)
         end
     end
