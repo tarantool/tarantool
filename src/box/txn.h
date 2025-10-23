@@ -349,13 +349,7 @@ struct txn_stmt {
 	struct xrow_header *row;
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
-	/*
-	 * Flag that shows whether this statement overwrites own transaction
-	 * statement. For example if a transaction makes two replaces of the
-	 * same key, the second statement will be with is_own_change = true.
-	 * Or if a transaction deletes some key and then inserts that key,
-	 * the insertion statement will be with is_own_change = true.
-	 */
+
 	bool is_own_change;
 	/**
 	* Request type - IPROTO type code
