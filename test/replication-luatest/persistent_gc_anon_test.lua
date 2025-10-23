@@ -278,8 +278,8 @@ g.test_checkpoint_join = function(g)
     local h, b = socket_read(g.s)
     t.assert_equals(h[key.REQUEST_TYPE],
                     type.TYPE_ERROR + box.error.UNSUPPORTED)
-    t.assert_equals(b[key.ERROR_24],
-                    'Community edition does not support checkpoint join')
+    t.assert_equals(b[key.ERROR_24], 'Community edition does not support '..
+                    'checkpoint from snapshot')
 end
 
 g = t.group('Expiration of anonymous replicas')

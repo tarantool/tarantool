@@ -54,6 +54,7 @@ enum {
 	MAX_TX_ENGINE_COUNT = 4,
 };
 
+struct box_checkpoint;
 struct engine;
 struct engine_read_view;
 struct txn;
@@ -105,6 +106,14 @@ struct engine_memory_stat {
 	size_t cache;
 	/** Size of memory used by active transactions. */
 	size_t tx;
+};
+
+/** Parameters passed to the engines on checkpoint start. */
+struct engine_checkpoint_params {
+	/** Flag whether the checkpoint is scheduled or explicitly requested. */
+	bool is_scheduled;
+	/** Global engine-agnostic control states of the instance. */
+	const struct box_checkpoint *box;
 };
 
 typedef int
@@ -230,7 +239,8 @@ struct engine_vtab {
 	 * engine (snapshot is a memtx idea of a checkpoint).
 	 * Must not yield.
 	 */
-	int (*begin_checkpoint)(struct engine *, bool is_scheduled);
+	int (*begin_checkpoint)(struct engine *e,
+				const struct engine_checkpoint_params *p);
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
@@ -353,10 +363,8 @@ struct checkpoint_cursor {
 };
 
 struct engine_join_ctx {
-	/** Vclock to respond with. */
-	struct vclock *vclock;
-	/** Whether sending JOIN_META stage is required. */
-	bool send_meta;
+	/** Journal vclock. */
+	const struct vclock *vclock;
 	/** Checkpoint join cursor. */
 	struct checkpoint_cursor *cursor;
 	/** Array of engine join contexts, one per each engine. */
@@ -514,8 +522,9 @@ engine_join(struct engine_join_ctx *ctx, struct xstream *stream);
 void
 engine_complete_join(struct engine_join_ctx *ctx);
 
+/** Begin checkpoint in all engines. */
 int
-engine_begin_checkpoint(bool is_scheduled);
+engine_begin_checkpoint(const struct engine_checkpoint_params *params);
 
 /**
  * Create a checkpoint.
@@ -563,7 +572,8 @@ int generic_engine_begin_initial_recovery(struct engine *,
 int generic_engine_begin_final_recovery(struct engine *);
 int generic_engine_begin_hot_standby(struct engine *);
 int generic_engine_end_recovery(struct engine *);
-int generic_engine_begin_checkpoint(struct engine *, bool);
+int generic_engine_begin_checkpoint(
+	struct engine *, const struct engine_checkpoint_params *params);
 int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_commit_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_abort_checkpoint(struct engine *);
