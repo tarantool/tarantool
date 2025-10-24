@@ -1089,7 +1089,13 @@ raft_checkpoint_remote(const struct raft *raft, struct raft_msg *req)
 	req->vote = raft->vote;
 	req->state = raft->state;
 	req->leader_id = raft->leader;
-	req->is_leader_seen = raft_is_leader_seen(raft);
+	/*
+	 * Disabled nodes must report is_leader_seen=false to allow candidates
+	 * to clear witness map bits for non-participating nodes. Otherwise
+	 * candidates wait indefinitely for disabled nodes during elections,
+	 * causing deadlock.
+	 */
+	req->is_leader_seen = raft->is_enabled && raft_is_leader_seen(raft);
 	/*
 	 * Raft does not own vclock, so it always expects it passed externally.
 	 * Vclock is sent out only by candidate instances.
