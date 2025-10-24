@@ -82,6 +82,50 @@ compare(type_t a, type_t b);
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
 
+/* the same tree with extent size x1 of block size */
+#define bx1_TREE_EXTENT_SIZE SMALL_BLOCK_SIZE
+#define BPS_TREE_NAME test_bx1
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE
+#define BPS_TREE_EXTENT_SIZE bx1_TREE_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
+#define bps_tree_elem_t type_t
+#define bps_tree_key_t type_t
+#define bps_tree_arg_t int
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
+/* the same tree with extent size x4 of block size */
+#define bx4_TREE_EXTENT_SIZE (SMALL_BLOCK_SIZE * 4)
+#define BPS_TREE_NAME test_bx4
+#define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE
+#define BPS_TREE_EXTENT_SIZE bx4_TREE_EXTENT_SIZE
+#define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
+#define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
+#define bps_tree_elem_t type_t
+#define bps_tree_key_t type_t
+#define bps_tree_arg_t int
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IS_IDENTICAL
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
 struct elem_t {
 	long info;
 	long marker;
@@ -179,11 +223,10 @@ static bool extent_alloc_failure = false;
 static void *
 extent_alloc(struct matras_allocator *allocator)
 {
-	(void)allocator;
 	if (extent_alloc_failure)
 		return NULL;
 	++extents_count;
-	return xmalloc(BPS_TREE_EXTENT_SIZE);
+	return xmalloc(allocator->extent_size);
 }
 
 static void
@@ -966,7 +1009,6 @@ gh_11788_oom_on_first_insertion_test()
 	test tree;
 	test_view view;
 	type_t replaced;
-	struct test_iterator iterator;
 
 	test_create(&tree, 0, &allocator, NULL);
 	test_insert(&tree, 0, &replaced, NULL);
@@ -974,13 +1016,9 @@ gh_11788_oom_on_first_insertion_test()
 	test_view_create(&view, &tree);
 
 	extent_alloc_failure = true;
-	fail_unless(test_insert(&tree, 0, &replaced, NULL) == 0);
+	fail_unless(test_insert(&tree, 0, &replaced, NULL) != 0);
+	fail_unless(test_size(&tree) == 0);
 	debug_check(&tree);
-	fail_unless(test_size(&tree) == 1);
-	iterator = test_first(&tree);
-	type_t *v = test_iterator_get_elem(&tree, &iterator);
-	fail_unless(v != NULL && *v == 0);
-	fail_unless(test_iterator_next(&tree, &iterator) == false);
 	extent_alloc_failure = false;
 
 	test_view_destroy(&view);
@@ -992,10 +1030,150 @@ gh_11788_oom_on_first_insertion_test()
 	check_plan();
 }
 
+static void
+gh_11979_oom_on_insertion_test()
+{
+	plan(4);
+	header();
+
+	test_bx1 tree;
+	test_bx1_view view;
+
+	/* Create the test-specific allocator. */
+	struct matras_allocator bx1_allocator;
+	matras_allocator_create(&bx1_allocator, bx1_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
+	/* Couldn't create a new block. */
+	fail_unless(bx1_allocator.num_reserved_extents == 0);
+	test_bx1_create(&tree, 0, &bx1_allocator, NULL);
+	extent_alloc_failure = true;
+	fail_unless(test_bx1_insert(&tree, 0, NULL, NULL) != 0);
+	fail_unless(test_bx1_size(&tree) == 0);
+	extent_alloc_failure = false;
+	fail_unless(test_bx1_debug_check(&tree) == 0);
+	test_bx1_destroy(&tree);
+	ok(true, "OOM on bps_vec_reserve_blocks (first insert)");
+
+	/* Couldn't touch the garbage block existed. */
+	fail_unless(bx1_allocator.num_reserved_extents == 0);
+	test_bx1_create(&tree, 0, &bx1_allocator, NULL);
+	test_bx1_insert(&tree, 0, NULL, NULL);
+	test_bx1_delete(&tree, 0, NULL);
+	fail_unless(test_bx1_size(&tree) == 0);
+	fail_unless(tree.common.garbage_count == 1);
+	test_bx1_view_create(&view, &tree);
+	extent_alloc_failure = true;
+	fail_unless(test_bx1_insert(&tree, 0, NULL, NULL) != 0);
+	fail_unless(test_bx1_size(&tree) == 0);
+	extent_alloc_failure = false;
+	fail_unless(test_bx1_debug_check(&tree) == 0);
+	test_bx1_view_destroy(&view);
+	test_bx1_destroy(&tree);
+	ok(true, "OOM on matras_touch_reserve (first insert)");
+
+	/* Couldn't allocate a block for non-first insert. */
+	fail_unless(bx1_allocator.num_reserved_extents == 0);
+	test_bx1_create(&tree, 0, &bx1_allocator, NULL);
+	fail_unless(test_bx1_insert(&tree, 0, NULL, NULL) == 0);
+	fail_unless(test_bx1_size(&tree) == 1);
+	test_bx1_view_create(&view, &tree);
+	extent_alloc_failure = true;
+	fail_unless(test_bx1_insert(&tree, 1, NULL, NULL) != 0);
+	fail_unless(test_bx1_size(&tree) == 1);
+	extent_alloc_failure = false;
+	fail_unless(test_bx1_debug_check(&tree) == 0);
+	test_bx1_view_destroy(&view);
+	test_bx1_destroy(&tree);
+	ok(true, "OOM on bps_vec_reserve_blocks (non-first insert)");
+
+	/*
+	 * Identical test but with more memory available: now the
+	 * garbage block reserve succeeds, but touch reserve fails.
+	 */
+	fail_unless(bx1_allocator.num_reserved_extents == 0);
+	matras_allocator_reserve(&bx1_allocator, 5);
+	test_bx1_create(&tree, 0, &bx1_allocator, NULL);
+	fail_unless(test_bx1_insert(&tree, 0, NULL, NULL) == 0);
+	fail_unless(test_bx1_size(&tree) == 1);
+	test_bx1_view_create(&view, &tree);
+	extent_alloc_failure = true;
+	fail_unless(test_bx1_insert(&tree, 1, NULL, NULL) != 0);
+	fail_unless(test_bx1_size(&tree) == 1);
+	extent_alloc_failure = false;
+	fail_unless(test_bx1_debug_check(&tree) == 0);
+	test_bx1_view_destroy(&view);
+	test_bx1_destroy(&tree);
+	ok(true, "OOM on matras_touch_reserve (non-first insert)");
+
+	/* Destroy the test-specific allocator. */
+	matras_allocator_destroy(&bx1_allocator);
+
+	footer();
+	check_plan();
+}
+
+static void
+gh_11979_head_view_changes_test()
+{
+	plan(1);
+	header();
+
+	/* Create the test-specific allocator. */
+	struct matras_allocator bx4_allocator;
+	matras_allocator_create(&bx4_allocator, bx4_TREE_EXTENT_SIZE,
+				extent_alloc, extent_free);
+
+	test_bx4 tree;
+	test_bx4_view view;
+	struct test_bx4_iterator iterator;
+
+	test_bx4_create(&tree, 0, &bx4_allocator, NULL);
+	const int max_count_in_leaf = BPS_TREE_test_bx4_MAX_COUNT_IN_LEAF;
+	/* Four leafs initially. */
+	const int init_size = max_count_in_leaf * 4;
+	/* Insert into the third leaf for the test. */
+	const int to_insert = max_count_in_leaf * 2 + (max_count_in_leaf / 2);
+	type_t init_data[init_size];
+	/* Fill the tree of 4 leafs, but skip the value to be inserted. */
+	for (int i = 0; i < init_size; i++) {
+		if (i < to_insert)
+			init_data[i] = i;
+		else
+			init_data[i] = i + 1;
+	}
+	fail_unless(test_bx4_build(&tree, init_data, init_size) == 0);
+	/* Create a view so we have to CoW on block touch. */
+	test_bx4_view_create(&view, &tree);
+	/*
+	 * Create another leaf in the head. This invokes a bug:
+	 * 1. We create a new leaf without touching garbage block and acquire
+	 *    pointer to it.
+	 * 2. We CoW the existing leaf to link it with the new block. As the
+	 *    existing block and the new one are located in the same extent,
+	 *    this also CoWs the one created above, so the pointer we have
+	 *    acquired above became outdated, it points to the view data now.
+	 * 3. So we update the `next_id` field of the read view block instead
+	 *    of the actual head, so the ID in head is invalid and the next
+	 *    debug check fails with the corresponding error.
+	 */
+	test_bx4_insert(&tree, to_insert, NULL, NULL);
+	fail_unless(test_bx4_debug_check(&tree) == 0);
+	test_bx4_view_destroy(&view);
+	test_bx4_destroy(&tree);
+	ok(true, "head view changes");
+
+	/* Destroy the test-specific allocator. */
+	matras_allocator_destroy(&bx4_allocator);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(14);
+	plan(16);
 	header();
 
 	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
@@ -1021,6 +1199,9 @@ main(void)
 	gh_11326_oom_on_insertion_test();
 	gh_11788_oom_on_first_insertion_test();
 	matras_allocator_destroy(&allocator);
+
+	gh_11979_oom_on_insertion_test();
+	gh_11979_head_view_changes_test();
 
 	footer();
 	return check_plan();
