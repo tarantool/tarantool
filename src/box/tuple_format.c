@@ -144,6 +144,14 @@ tuple_format_cmp(const struct tuple_format *format1,
 			return (int)field_a->default_value.func.id -
 			       (int)field_b->default_value.func.id;
 		}
+		if ((field_a->layout == NULL && field_b->layout != NULL) ||
+		    (field_a->layout != NULL && field_b->layout == NULL))
+			return field_a->layout == NULL ? -1 : 1;
+		if (field_a->layout != NULL && field_b->layout != NULL) {
+			int cmp = strcmp(field_a->layout, field_b->layout);
+			if (cmp != 0)
+				return cmp;
+		}
 	}
 
 	return tuple_dictionary_cmp(format1->dict, format2->dict);
@@ -175,6 +183,12 @@ tuple_format_hash(struct tuple_format *format)
 				   (int)f->default_value.size);
 		size += f->default_value.size;
 		TUPLE_FIELD_MEMBER_HASH(f, default_value.func.id, h, carry, size)
+		if (f->layout != NULL) {
+			size_t layout_size = strlen(f->layout);
+			PMurHash32_Process(&h, &carry, f->layout,
+					   (int)layout_size);
+			size += layout_size;
+		}
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
 	size += tuple_dictionary_hash_process(format->dict, &h, &carry);
@@ -224,6 +238,7 @@ tuple_field_delete(struct tuple_field *field)
 	free(field->constraint);
 	field_default_func_destroy(&field->default_value.func);
 	free(field->default_value.data);
+	free(field->layout);
 	free(field);
 }
 
@@ -565,6 +580,9 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			field->default_value.size = size;
 			format->default_field_count = i + 1;
 		}
+		field->layout = NULL;
+		if (fields[i].layout != NULL)
+			field->layout = xstrdup(fields[i].layout);
 	}
 
 	int current_slot = 0;

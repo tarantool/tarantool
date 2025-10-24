@@ -80,6 +80,68 @@ index_opts_parse_hint(const char **data, void *opts, struct region *region)
 }
 
 /**
+ * Parse index covers option element as a MsgPack map containing at max 2
+ * keys - a mandatory 'field' key and an optional 'layout' key. Store the
+ * results in @a covered. Allocate 'layout' value on @a region.
+ */
+static int
+index_opts_parse_covered_field_map(const char **data,
+				   struct covered_field *covered,
+				   struct region *region)
+{
+	uint32_t map_size = mp_decode_map(data);
+	bool map_contains_field_key = false;
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(**data) != MP_STR) {
+			diag_set(IllegalParams,
+				 "'covers' element map key must be string");
+			return -1;
+		}
+		uint32_t key_len;
+		const char *key = mp_decode_str(data, &key_len);
+		if (key_len == strlen("field") &&
+		    strncmp(key, "field", key_len) == 0) {
+			if (mp_typeof(**data) != MP_UINT) {
+				diag_set(IllegalParams,
+					 "'field' must be unsigned");
+				return -1;
+			}
+			uint64_t field = mp_decode_uint(data);
+			if (field > UINT32_MAX) {
+				diag_set(IllegalParams,
+					 "'field' must be "
+					 "unsigned");
+				return -1;
+			}
+			covered->field = field;
+			map_contains_field_key = true;
+		} else if (key_len == strlen("layout") &&
+			   strncmp(key, "layout", key_len) == 0) {
+			if (mp_typeof(**data) != MP_STR) {
+				diag_set(IllegalParams,
+					 "'layout' must be string");
+				return -1;
+			}
+			uint32_t layout_len;
+			const char *layout = mp_decode_str(data, &layout_len);
+			covered->layout = xregion_alloc(region, layout_len + 1);
+			strlcpy(covered->layout, layout, layout_len + 1);
+		} else {
+			diag_set(IllegalParams,
+				 "unexpected 'covers' element map key");
+			return -1;
+		}
+	}
+	if (!map_contains_field_key) {
+		diag_set(IllegalParams,
+			 "'covers' element must contain at least a 'field' "
+			 "key");
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * Parse index covers options given as MsgPack in `data' into `opts'. Covered
  * fields array is allocated on `region'.
  */
@@ -99,18 +161,27 @@ index_opts_parse_covered_fields(const char **data, void *opts,
 					    typeof(*index_opts->covered_fields),
 					    index_opts->covered_field_count);
 	for (uint32_t i = 0; i < index_opts->covered_field_count; i++) {
-		if (mp_typeof(**data) != MP_UINT) {
+		if (mp_typeof(**data) != MP_UINT &&
+		    mp_typeof(**data) != MP_MAP) {
 			diag_set(IllegalParams,
-				 "'covers' elements must be unsigned");
+				 "'covers' elements must be unsigned or map");
 			return -1;
 		}
-		uint64_t fieldno = mp_decode_uint(data);
-		if (fieldno > UINT32_MAX) {
-			diag_set(IllegalParams,
-				 "'covers' elements must be unsigned");
-			return -1;
+		index_opts->covered_fields[i].layout = NULL;
+		if (mp_typeof(**data) == MP_UINT) {
+			uint64_t field = mp_decode_uint(data);
+			if (field > UINT32_MAX) {
+				diag_set(IllegalParams,
+					 "'covers' elements must be unsigned");
+				return -1;
+			}
+			index_opts->covered_fields[i].field = field;
+		} else {
+			if (index_opts_parse_covered_field_map(
+					data, &index_opts->covered_fields[i],
+					region) != 0)
+				return -1;
 		}
-		index_opts->covered_fields[i] = fieldno;
 	}
 	return 0;
 }
@@ -200,14 +271,21 @@ index_opts_normalize(struct index_opts *opts, const struct key_def *cmp_def)
 {
 	if (opts->covered_field_count == 0)
 		return;
-	uint32_t *fields = xmalloc(sizeof(*fields) * opts->covered_field_count);
+	struct covered_field *fields =
+		xmalloc(sizeof(*fields) * opts->covered_field_count);
 	uint32_t j = 0;
 	for (uint32_t i = 0; i < opts->covered_field_count; i++) {
 		if (key_def_find_by_fieldno(
-				cmp_def, opts->covered_fields[i]) == NULL)
-			fields[j++] = opts->covered_fields[i];
+				cmp_def, opts->covered_fields[i].field) ==
+				NULL) {
+			memcpy(&fields[j], &opts->covered_fields[i],
+			       sizeof(opts->covered_fields[i]));
+			j++;
+		} else {
+			free(opts->covered_fields[i].layout);
+		}
 	}
-	qsort(fields, j, sizeof(*fields), cmp_u32);
+	qsort(fields, j, sizeof(*fields), index_def_cmp_covered_field);
 	opts->covered_field_count = j;
 	free(opts->covered_fields);
 	if (opts->covered_field_count != 0) {
@@ -224,13 +302,18 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 {
 	*dup = *opts;
 	if (dup->covered_fields != NULL) {
-		uint32_t *fields = dup->covered_fields;
+		struct covered_field *fields = dup->covered_fields;
 		dup->covered_fields =
 			xmalloc(dup->covered_field_count *
 				sizeof(*dup->covered_fields));
-		memcpy(dup->covered_fields, fields,
-		       dup->covered_field_count *
-		       sizeof(*dup->covered_fields));
+		for (uint32_t i = 0; i < dup->covered_field_count; i++) {
+			dup->covered_fields[i].field = fields[i].field;
+			if (fields[i].layout == NULL)
+				dup->covered_fields[i].layout = NULL;
+			else
+				dup->covered_fields[i].layout =
+					xstrdup(fields[i].layout);
+		}
 	}
 	if (dup->layout != NULL)
 		dup->layout = xstrdup(dup->layout);

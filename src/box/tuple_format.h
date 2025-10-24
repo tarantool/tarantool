@@ -168,6 +168,11 @@ struct tuple_field {
 	uint32_t constraint_count;
 	/** Tuple field default value. */
 	struct field_default_value default_value;
+	/**
+	 * 0-terminated layout of index corresponding to a field
+	 * if engine supports multiple layouts.
+	 */
+	char *layout;
 };
 
 /**
