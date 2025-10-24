@@ -1297,7 +1297,7 @@ raft_test_death_timeout(void)
 static void
 raft_test_enable_disable(void)
 {
-	raft_start_test(11);
+	raft_start_test(13);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -1317,6 +1317,14 @@ raft_test_enable_disable(void)
 		0 /* Volatile vote. */,
 		"{0: 1}" /* Vclock. */
 	), "leader is seen");
+
+	/* Disabled node should not report is_leader_seen during checkpoint. */
+
+	struct raft_msg msg;
+	raft_checkpoint_remote(&node.raft, &msg);
+	ok(!msg.is_leader_seen, "disabled node reports is_leader_seen=false "
+	   "in checkpoint");
+	ok(node.raft.leader == 2, "leader is still tracked");
 
 	/* When re-enabled, the leader death timer is started. */
 
