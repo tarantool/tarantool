@@ -3181,8 +3181,25 @@ bps_tree_garbage_pop(struct bps_tree_common *tree, bps_tree_block_id_t *id)
 {
 	if (tree->garbage_head_id != (bps_tree_block_id_t)(-1)) {
 		*id = tree->garbage_head_id;
+		/*
+		 * There's no need to touch a garbage block as it's not
+		 * accessible in any way in read views. But we have to
+		 * do it as the block can be colocated with some another
+		 * block in an extent, and touch of that block can lead
+		 * to invalidating the pointer to this one.
+		 *
+		 * This can happen in insertion into leaf, where we first
+		 * pop a block from garbage to create a new leaf, then CoW
+		 * an existing leaf to link it with the new one, and then
+		 * update the new leaf's `next_id` (which updates data of
+		 * the read view by the pointer returned here instead of
+		 * new CoWed data). This case is easily fixable but let's
+		 * fix it here the same way as it was fixed in BPS vector,
+		 * as keeping this function non-CoW makes its usage error-
+		 * prone.
+		 */
 		struct bps_garbage *result = (struct bps_garbage *)
-			matras_get(tree->matras, tree->garbage_head_id);
+			bps_tree_touch_block(tree, tree->garbage_head_id);
 		tree->garbage_head_id = result->next_id;
 		tree->garbage_count--;
 		return (struct bps_block *) result;
@@ -3244,11 +3261,19 @@ bps_tree_dispose_inner(struct bps_tree_common *tree, struct bps_inner *inner,
 }
 
 /**
- * @brief Reserve a number of block, return false if failed.
+ * @brief Reserve the required amount of garbage blocks.
+ * @param tree - the tree to reserve blocks in.
+ * @param count - the amount of blocks required.
+ * @param[out] garbage_blocks_existed - the amount of garbage blocks
+ *   that has existed before this call and will be touched on reuse.
+ * @return true on success, false if a memory allocation failed.
  */
 static inline bool
-bps_tree_reserve_blocks(struct bps_tree_common *tree, bps_tree_block_id_t count)
+bps_tree_reserve_blocks(struct bps_tree_common *tree, bps_tree_block_id_t count,
+			bps_tree_block_id_t *garbage_blocks_existed)
 {
+	if (garbage_blocks_existed != NULL)
+		*garbage_blocks_existed = MIN(tree->garbage_count, count);
 	while (tree->garbage_count < count) {
 		bps_tree_block_id_t id;
 		struct bps_block *block = (struct bps_block *)
@@ -4754,8 +4779,6 @@ bps_tree_process_insert_leaf(struct bps_tree_common *tree,
 	struct bps_leaf *new_leaf = bps_tree_create_leaf(tree, &new_block_id);
 	assert(new_leaf != NULL); /* We've reserved blocks in the caller. */
 
-	bps_tree_touch_leaf(tree, leaf_path_elem);
-
 	if (leaf_path_elem->block->next_id != (bps_tree_block_id_t)(-1)) {
 		struct bps_leaf *next_leaf = (struct bps_leaf *)
 		bps_tree_touch_block(tree, leaf_path_elem->block->next_id);
@@ -5808,8 +5831,11 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 
 	struct bps_tree_common *tree = &t->common;
 	if (tree->root_id == (bps_tree_block_id_t)(-1)) {
-		/* Reserve max blocks to create new root. */
-		if (!bps_tree_reserve_blocks(tree, 1))
+		/* Reserve one block to create new root. */
+		if (!bps_tree_reserve_blocks(tree, 1, NULL))
+			return -1;
+		/* Reserve touch of the block. */
+		if (matras_touch_reserve(tree->matras, 1) != 0)
 			return -1;
 
 		int rc = bps_tree_insert_first_elem(tree, new_elem);
@@ -5823,11 +5849,21 @@ bps_tree_insert_impl(struct bps_tree *t, bps_tree_elem_t new_elem,
 	}
 
 	/* Reserve max blocks to create (1 per level + new root). */
-	if (!bps_tree_reserve_blocks(tree, tree->depth + 1))
+	bps_tree_block_id_t max_garbage_touch_count;
+	if (!bps_tree_reserve_blocks(tree, tree->depth + 1,
+				     &max_garbage_touch_count))
 		return -1;
 
-	/* Reserve space for max blocks to touch: root + 3 per next level. */
-	if (matras_touch_reserve(tree->matras, 1 + (tree->depth - 1) * 3) != 0)
+	/*
+	 * Reserve max memory for CoW: root + up to 3 per each next level + the
+	 * touches required for reusing garbage blocks +1 if any new block had
+	 * been allocated on reserve, as the CoW might be required once after
+	 * it, see the `matras_needs_touch` function for more info (do the +1
+	 * unconditionally for simplicity).
+	 */
+	const int max_touch_count = 1 + 3 * (tree->depth - 1) +
+				    max_garbage_touch_count + 1;
+	if (matras_touch_reserve(tree->matras, max_touch_count) != 0)
 		return -1;
 
 	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
