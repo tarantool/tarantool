@@ -1089,7 +1089,7 @@ raft_checkpoint_remote(const struct raft *raft, struct raft_msg *req)
 	req->vote = raft->vote;
 	req->state = raft->state;
 	req->leader_id = raft->leader;
-	req->is_leader_seen = raft_is_leader_seen(raft);
+	req->is_leader_seen = raft->is_enabled && raft_is_leader_seen(raft);
 	/*
 	 * Raft does not own vclock, so it always expects it passed externally.
 	 * Vclock is sent out only by candidate instances.
