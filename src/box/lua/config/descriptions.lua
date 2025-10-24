@@ -1013,6 +1013,29 @@ I['failover.http.listen.*.uri'] = format_text([[
     failover coordinator listens for HTTP requests.
 ]])
 
+I['failover.http.listen.*.params'] = I['<uri>.params']
+
+I['failover.http.listen.*.params.transport'] =
+    I['<uri>.params.transport']
+
+I['failover.http.listen.*.params.ssl_key_file'] =
+    I['<uri>.params.ssl_key_file']
+
+I['failover.http.listen.*.params.ssl_cert_file'] =
+    I['<uri>.params.ssl_cert_file']
+
+I['failover.http.listen.*.params.ssl_ca_file'] =
+    I['<uri>.params.ssl_ca_file']
+
+I['failover.http.listen.*.params.ssl_ciphers'] =
+    I['<uri>.params.ssl_ciphers']
+
+I['failover.http.listen.*.params.ssl_password'] =
+    I['<uri>.params.ssl_password']
+
+I['failover.http.listen.*.params.ssl_password_file'] =
+    I['<uri>.params.ssl_password_file']
+
 I['failover.metrics'] = format_text([[
     The `failover.metrics` subsection configures metrics exporters for the
     failover coordinator. This functionality is available only in

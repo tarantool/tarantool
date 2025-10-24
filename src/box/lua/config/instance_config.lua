@@ -2040,6 +2040,30 @@ return schema.new('instance_config', schema.record({
                         type = 'string',
                         validate = validators['failover.http.listen.*.uri'],
                     }),
+                    params = schema.record({
+                        transport = schema.enum({
+                            'plain',
+                            'ssl',
+                        }),
+                        ssl_key_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_cert_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ca_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ciphers = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                    }),
                 }),
             }),
         }, {
