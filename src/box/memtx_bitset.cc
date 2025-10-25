@@ -230,7 +230,7 @@ memtx_bitset_index_destroy(struct index *base)
 	matras_destroy(index->id_to_tuple);
 	free(index->id_to_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-	free(index);
+	memtx_index_free(&index->base);
 }
 
 static ssize_t
@@ -540,8 +540,8 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 
 	struct memtx_bitset_index *index =
 		(struct memtx_bitset_index *)xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_bitset_index_vtab, def);
+	memtx_index_create(&index->base, (struct engine *)memtx,
+			   &memtx_bitset_index_vtab, def);
 
 #ifndef OLD_GOOD_BITSET
 	index->spare_id = SPARE_ID_END;

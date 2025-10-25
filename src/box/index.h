@@ -693,6 +693,8 @@ struct index_vtab {
 	void (*end_build)(struct index *index);
 };
 
+#define INDEX_ENGINE_SPECIFIC_DATA_SIZE 16
+
 struct index {
 	/** Virtual function table. */
 	const struct index_vtab *vtab;
@@ -706,15 +708,8 @@ struct index {
 	uint32_t space_cache_version;
 	/** Compact ID - index in space->index array. */
 	uint32_t dense_id;
-	/**
-	 * List of gap_item's describing gap reads in the index with NULL
-	 * successor, full scan and count gaps, see enum gap_item_type for
-	 * more info.
-	 *
-	 * NB: do not add items to the end of the list - it is reserved for
-	 * full count items.
-	 */
-	struct rlist read_gaps;
+	/** Padding for storing engine-specific data. */
+	char engine_specific_data[INDEX_ENGINE_SPECIFIC_DATA_SIZE];
 };
 
 /**

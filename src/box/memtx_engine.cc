@@ -1942,6 +1942,37 @@ memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
 	return rc;
 }
 
+struct memtx_index_data {
+	void *read_gaps;
+};
+
+void
+memtx_index_create(struct index *index, struct engine *engine,
+		   const struct index_vtab *vtab, struct index_def *def)
+{
+	index_create(index, engine, vtab, def);
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	memtx_tx_init_index_read_gaps(&data->read_gaps);
+}
+
+void
+memtx_index_free(struct index *index)
+{
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	memtx_tx_destroy_index_read_gaps(data->read_gaps);
+	free(index);
+}
+
+void *
+memtx_index_read_gaps(struct index *index)
+{
+	struct memtx_index_data *data =
+		(struct memtx_index_data *)index->engine_specific_data;
+	return data->read_gaps;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
