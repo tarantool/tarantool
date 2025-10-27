@@ -561,12 +561,7 @@ xdir_scan(struct xdir *dir, bool is_dir_required)
 		if (s_count == s_capacity) {
 			s_capacity = s_capacity > 0 ? 2 * s_capacity : 16;
 			size_t size = sizeof(*signatures) * s_capacity;
-			signatures = (int64_t *) realloc(signatures, size);
-			if (signatures == NULL) {
-				diag_set(OutOfMemory,
-					  size, "realloc", "signatures array");
-				goto exit;
-			}
+			signatures = xrealloc(signatures, size);
 		}
 		signatures[s_count++] = signature;
 	}
@@ -592,15 +587,10 @@ xdir_scan(struct xdir *dir, bool is_dir_required)
 		} else if (s_old > s_new) {
 			/** Add a new file. */
 			if (xdir_index_file(dir, s_new) != 0) {
-				/*
-				 * force_recovery must not affect OOM
-				 */
-				struct error *e = diag_last_error(&fiber()->diag);
-				if (!dir->force_recovery ||
-				    type_assignable(&type_OutOfMemory, e->type))
+				if (!dir->force_recovery)
 					goto exit;
 				/** Skip a corrupted file */
-				error_log(e);
+				diag_log();
 			}
 			i++;
 		} else {
@@ -1138,13 +1128,7 @@ xlog_tx_write_plain(struct xlog *log)
 static off_t
 xlog_tx_write_zstd(struct xlog *log)
 {
-	char *fixheader = (char *)obuf_alloc(&log->zbuf,
-					     XLOG_FIXHEADER_SIZE);
-	if (fixheader == NULL) {
-		diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE, "runtime arena",
-			 "compression buffer");
-		goto error;
-	}
+	char *fixheader = (char *)xobuf_alloc(&log->zbuf, XLOG_FIXHEADER_SIZE);
 	uint32_t crc32c = 0;
 	struct iovec *iov;
 	/* 3 is compression level. */
@@ -1154,12 +1138,7 @@ xlog_tx_write_zstd(struct xlog *log)
 		/* Estimate max output buffer size. */
 		size_t zmax_size = ZSTD_compressBound(iov->iov_len - offset);
 		/* Allocate a destination buffer. */
-		void *zdst = obuf_reserve(&log->zbuf, zmax_size);
-		if (!zdst) {
-			diag_set(OutOfMemory, zmax_size, "runtime arena",
-				  "compression buffer");
-			goto error;
-		}
+		void *zdst = xobuf_reserve(&log->zbuf, zmax_size);
 		size_t (*fcompress)(ZSTD_CCtx *, void *, size_t,
 				    const void *, size_t);
 		/*
@@ -1330,13 +1309,8 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	 * the first row in * a log. The fixheader is populated
 	 * at write. @sa xlog_tx_write().
 	 */
-	if (obuf_size(&log->obuf) == 0) {
-		if (!obuf_alloc(&log->obuf, XLOG_FIXHEADER_SIZE)) {
-			diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE,
-				  "runtime arena", "xlog tx output buffer");
-			return -1;
-		}
-	}
+	if (obuf_size(&log->obuf) == 0)
+		xobuf_alloc(&log->obuf, XLOG_FIXHEADER_SIZE);
 
 	struct obuf_svp svp = obuf_create_svp(&log->obuf);
 	size_t page_offset = obuf_size(&log->obuf);
@@ -1357,14 +1331,7 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 			region_truncate(&fiber()->gc, region_svp);
 			return -1;
 		};
-		if (obuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len) <
-		    iov[i].iov_len) {
-			diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE,
-				  "runtime arena", "xlog tx output buffer");
-			obuf_rollback_to_svp(&log->obuf, &svp);
-			region_truncate(&fiber()->gc, region_svp);
-			return -1;
-		}
+		xobuf_dup(&log->obuf, iov[i].iov_base, iov[i].iov_len);
 	}
 	region_truncate(&fiber()->gc, region_svp);
 	assert(iovcnt <= XROW_IOVMAX);
@@ -1571,12 +1538,7 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 	size_t to_load = count - ibuf_used(&cursor->rbuf);
 	to_load += cursor->read_ahead;
 
-	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
-	if (dst == NULL) {
-		diag_set(OutOfMemory, to_load, "runtime",
-			 "xlog cursor read buffer");
-		return -1;
-	}
+	void *dst = xibuf_reserve(&cursor->rbuf, to_load);
 	ssize_t readen;
 	readen = fio_pread(cursor->fd, dst, to_load,
 			   cursor->read_offset);
@@ -2076,12 +2038,7 @@ xlog_cursor_openmem(struct xlog_cursor *i, const char *data, size_t size,
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
-	void *dst = ibuf_alloc(&i->rbuf, size);
-	if (dst == NULL) {
-		diag_set(OutOfMemory, size, "runtime",
-			  "xlog cursor read buffer");
-		goto error;
-	}
+	void *dst = xibuf_alloc(&i->rbuf, size);
 	memcpy(dst, data, size);
 	i->read_offset = size;
 	int rc;
@@ -2306,7 +2263,7 @@ xlog_cursor_read_tx(struct xlog_cursor *cursor, struct xlog_batch *batch)
 	while (ibuf_used(&batch->data) != 0) {
 		/* Sic: alignment should be correct here. */
 		struct xlog_entry *entry =
-			ibuf_alloc(&batch->entries, sizeof(*entry));
+			xibuf_alloc(&batch->entries, sizeof(*entry));
 		rc = xrow_decode(&entry->header,
 				 (const char **)&batch->data.rpos,
 				 (const char *)batch->data.wpos,
