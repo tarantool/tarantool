@@ -563,11 +563,17 @@ func_access_check(struct func *func)
 	    (PRIV_X | PRIV_U))
 		return 0;
 	user_access_t access = PRIV_X | PRIV_U;
+	user_access_t entity_access = entity_access_get(SC_FUNCTION)
+		[credentials->auth_token].effective;
+	bool cr_is_entity_owner = entity_access & PRIV_OWNER;
+	bool cr_is_universe_owner = credentials->universal_access & PRIV_OWNER;
 	/* Check access for all functions. */
-	access &= ~entity_access_get(SC_FUNCTION)[credentials->auth_token].effective;
+	access &= ~entity_access;
 	user_access_t func_access = access & ~credentials->universal_access;
 	if ((func_access & PRIV_U) != 0 ||
 	    (func->def->uid != credentials->uid &&
+	     !(func->access[credentials->auth_token].effective & PRIV_OWNER) &&
+	     !cr_is_entity_owner && !cr_is_universe_owner &&
 	     func_access & ~func->access[credentials->auth_token].effective)) {
 		if (func->def->language == FUNC_LANGUAGE_LUA &&
 		    func->def->body == NULL)
