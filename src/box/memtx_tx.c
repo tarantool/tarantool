@@ -67,6 +67,13 @@ static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
 	     ((next = gap_item_set_next(set, item)) || 1); \
 	     item = next)
 
+typedef rb_tree(struct tx_read_tracker) read_tracker_set_t;
+
+#define read_tracker_set_foreach_safe(set, item, next) \
+	for (item = read_tracker_set_first(set); \
+	     item != NULL && ((next = read_tracker_set_next(set, item)) || 1); \
+	     item = next)
+
 /**
  * Link that connects a memtx_story with older and newer stories of the same
  * key in index.
@@ -132,9 +139,9 @@ struct memtx_story {
 	 */
 	int64_t del_psn;
 	/**
-	 * List of trackers - transactions that has read this tuple.
+	 * Set of trackers - transactions that has read this tuple.
 	 */
-	struct rlist reader_list;
+	read_tracker_set_t reader_set;
 	/**
 	 * Link in tx_manager::all_stories
 	 */
@@ -199,10 +206,28 @@ struct tx_read_tracker {
 	/** The story that was read by reader. */
 	struct memtx_story *story;
 	/** Link in story->reader_list. */
-	struct rlist in_reader_list;
+	rb_node(struct tx_read_tracker) in_reader_set;
 	/** Link in reader->read_set. */
 	struct rlist in_read_set;
 };
+
+static int
+read_tracker_set_cmp(const struct tx_read_tracker *a,
+		     const struct tx_read_tracker *b)
+{
+	return a->reader - b->reader;
+}
+
+static int
+read_tracker_set_cmp_with_key(struct txn *txn, struct tx_read_tracker *tracker)
+{
+	return txn - tracker->reader;
+}
+
+rb_gen_ext_key(MAYBE_UNUSED static inline, read_tracker_set_,
+	       read_tracker_set_t, struct tx_read_tracker, in_reader_set,
+	       read_tracker_set_cmp, struct txn *,
+	       read_tracker_set_cmp_with_key);
 
 /**
  * An element that stores the fact that some transaction have read
@@ -1475,7 +1500,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	story->add_psn = 0;
 	story->del_stmt = NULL;
 	story->del_psn = 0;
-	rlist_create(&story->reader_list);
+	read_tracker_set_new(&story->reader_set);
 	rlist_add_tail(&txm.all_stories, &story->in_all_stories);
 	rlist_add(&space->memtx_stories, &story->in_space_stories);
 	for (uint32_t i = 0; i < index_count; i++) {
@@ -1495,7 +1520,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 {
 	assert(story->add_stmt == NULL);
 	assert(story->del_stmt == NULL);
-	assert(rlist_empty(&story->reader_list));
+	assert(read_tracker_set_empty(&story->reader_set));
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		assert(story->link[i].newer_story == NULL);
 		assert(story->link[i].older_story == NULL);
@@ -1827,16 +1852,9 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 		gap_item_set_foreach_safe(read_gaps, item, next)
 			memtx_tx_delete_gap(item);
 	}
-	/*
-	 * Remove all read trackers since they point to the story that
-	 * is going to be deleted.
-	 */
-	while (!rlist_empty(&story->reader_list)) {
-		struct tx_read_tracker *tracker =
-			rlist_first_entry(&story->reader_list,
-					  struct tx_read_tracker,
-					  in_reader_list);
-		rlist_del(&tracker->in_reader_list);
+	struct tx_read_tracker *tracker, *tmp;
+	read_tracker_set_foreach_safe(&story->reader_set, tracker, tmp) {
+		read_tracker_set_remove(&story->reader_set, tracker);
 		rlist_del(&tracker->in_read_set);
 	}
 }
@@ -1964,7 +1982,7 @@ memtx_tx_story_gc_step()
 	 * see description of enum memtx_tx_story_status.
 	 */
 	if (story->add_stmt != NULL || story->del_stmt != NULL ||
-	    !rlist_empty(&story->reader_list)) {
+	    !read_tracker_set_empty(&story->reader_set)) {
 		memtx_tx_story_set_status(story, MEMTX_TX_STORY_USED);
 		/* The story is used directly by some transactions. */
 		return;
@@ -2097,15 +2115,8 @@ memtx_tx_story_is_deleted_by_txn(struct memtx_story *story, struct txn *txn,
 			 * successfully, and in that case no other transaction
 			 * will delete or replace @story.
 			 */
-			*is_own_change = false;
-			struct tx_read_tracker *tracker;
-			rlist_foreach_entry(tracker, &story->reader_list,
-					    in_reader_list) {
-				if (tracker->reader == txn) {
-					*is_own_change = true;
-					break;
-				}
-			}
+			*is_own_change = read_tracker_set_search(
+				&story->reader_set, txn) != NULL;
 			return true;
 		}
 		dels = dels->next_in_del_list;
@@ -2800,8 +2811,7 @@ static void
 memtx_tx_abort_story_readers(struct memtx_story *story)
 {
 	struct tx_read_tracker *tracker, *tmp;
-	rlist_foreach_entry_safe(tracker, &story->reader_list,
-				 in_reader_list, tmp)
+	read_tracker_set_foreach_safe(&story->reader_set, tracker, tmp)
 		txn_abort_with_conflict(tracker->reader);
 }
 
@@ -3153,8 +3163,7 @@ memtx_tx_handle_conflict_story_readers(struct memtx_story *story,
 				       struct txn *writer)
 {
 	struct tx_read_tracker *tracker, *tmp;
-	rlist_foreach_entry_safe(tracker, &story->reader_list,
-				 in_reader_list, tmp) {
+	read_tracker_set_foreach_safe(&story->reader_set, tracker, tmp) {
 		if (tracker->reader == writer)
 			continue;
 		txn_send_to_read_view(tracker->reader, writer->psn);
@@ -3680,8 +3689,7 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 	struct memtx_story *story;
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
 		struct tx_read_tracker *tracker, *tmp;
-		rlist_foreach_entry_safe(tracker, &story->reader_list,
-					 in_reader_list, tmp) {
+		read_tracker_set_foreach_safe(&story->reader_set, tracker, tmp) {
 			if (tracker->reader != ddl_owner)
 				txn_abort_with_conflict(tracker->reader);
 		}
@@ -3868,33 +3876,10 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 		return;
 	(void)space;
 	assert(story != NULL);
-	struct tx_read_tracker *tracker = NULL;
-
-	struct rlist *r1 = story->reader_list.next;
-	struct rlist *r2 = txn->read_set.next;
-	while (r1 != &story->reader_list && r2 != &txn->read_set) {
-		tracker = rlist_entry(r1, struct tx_read_tracker,
-				      in_reader_list);
-		assert(tracker->story == story);
-		if (tracker->reader == txn)
-			break;
-		tracker = rlist_entry(r2, struct tx_read_tracker,
-				      in_read_set);
-		assert(tracker->reader == txn);
-		if (tracker->story == story)
-			break;
-		tracker = NULL;
-		r1 = r1->next;
-		r2 = r2->next;
-	}
-	if (tracker != NULL) {
-		/* Move to the beginning of a list for faster further lookups.*/
-		rlist_del(&tracker->in_reader_list);
-		rlist_del(&tracker->in_read_set);
-	} else {
-		tracker = tx_read_tracker_new(txn, story);
-	}
-	rlist_add(&story->reader_list, &tracker->in_reader_list);
+	if (read_tracker_set_search(&story->reader_set, txn) != NULL)
+		return;
+	struct tx_read_tracker *tracker = tx_read_tracker_new(txn, story);
+	read_tracker_set_insert(&story->reader_set, tracker);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
 }
 
@@ -3918,7 +3903,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 		struct memtx_story *story = memtx_tx_story_new(space, tuple);
 		struct tx_read_tracker *tracker;
 		tracker = tx_read_tracker_new(txn, story);
-		rlist_add(&story->reader_list, &tracker->in_reader_list);
+		read_tracker_set_insert(&story->reader_set, tracker);
 		rlist_add(&txn->read_set, &tracker->in_read_set);
 	}
 }
@@ -4282,7 +4267,7 @@ memtx_tx_clear_txn_read_lists(struct txn *txn)
 	struct tx_read_tracker *tracker, *tmp;
 	rlist_foreach_entry_safe(tracker, &txn->read_set,
 				 in_read_set, tmp) {
-		rlist_del(&tracker->in_reader_list);
+		read_tracker_set_remove(&tracker->story->reader_set, tracker);
 		rlist_del(&tracker->in_read_set);
 	}
 	assert(rlist_empty(&txn->read_set));
