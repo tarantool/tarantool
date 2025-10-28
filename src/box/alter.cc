@@ -3922,6 +3922,7 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static int
 priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 {
+	bool on_revoke = (priv_type == PRIV_REVOKE);
 	struct user *grantor = user_find(priv->grantor_id);
 	if (grantor == NULL)
 		return -1;
@@ -4073,6 +4074,12 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			  "the grant tuple has no privileges");
 		return -1;
 	}
+	if (grantee->auth_token == ADMIN && priv->object_type == SC_UNIVERSE &&
+	    (priv->access != (user_access_t)PRIV_ALL || on_revoke)) {
+		diag_set(ClientError, ER_GRANT,
+			 "can't revoke universe from the admin user");
+		return -1;
+	}
 	return 0;
 }
 
@@ -4081,32 +4088,27 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
  * data. For the purpose of the rolled back statement, please refer to
  * `user_reload_privs`.
  */
-static int
+static void
 grant_or_revoke(struct priv_def *priv, struct txn_stmt *rolled_back_stmt)
 {
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
-		return 0;
-	/*
-	 * Grant a role to a user only when privilege type is 'execute'
-	 * and the role is specified.
-	 */
-	if (priv->object_type == SC_ROLE && !(priv->access & ~PRIV_X)) {
+		return;
+	/* Manage the role if required. */
+	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->def->type != SC_ROLE)
-			return 0;
-		if (priv->access) {
-			if (role_grant(grantee, role) != 0)
-				return -1;
-		} else {
-			if (role_revoke(grantee, role) != 0)
-				return -1;
+		if (role != NULL && role->def->type == SC_ROLE) {
+			if (priv->access & PRIV_X)
+				role_grant(grantee, role);
+			else
+				role_revoke(grantee, role);
+			/* The rest is regular rights. */
+			priv->access &= ~PRIV_X;
 		}
-	} else {
-		if (priv_grant(grantee, priv, rolled_back_stmt) != 0)
-			return -1;
 	}
-	return 0;
+	/* Manage the rest of the rights and apply the changes. */
+	priv_grant(grantee, priv);
+	rebuild_effective_grants(grantee, rolled_back_stmt);
 }
 
 /** A trigger called on rollback of grant. */
@@ -4118,8 +4120,7 @@ revoke_priv(struct trigger *trigger, void *event)
 	if (priv_def_create_from_tuple(&priv, tuple) != 0)
 		return -1;
 	priv.access = 0;
-	if (grant_or_revoke(&priv, (struct txn_stmt *)event) != 0)
-		return -1;
+	grant_or_revoke(&priv, (struct txn_stmt *)event);
 	return 0;
 }
 
@@ -4129,9 +4130,9 @@ modify_priv(struct trigger *trigger, void *event)
 {
 	struct tuple *tuple = (struct tuple *)trigger->data;
 	struct priv_def priv;
-	if (priv_def_create_from_tuple(&priv, tuple) != 0 ||
-	    grant_or_revoke(&priv, (struct txn_stmt *)event) != 0)
+	if (priv_def_create_from_tuple(&priv, tuple) != 0)
 		return -1;
+	grant_or_revoke(&priv, (struct txn_stmt *)event);
 	return 0;
 }
 
@@ -4150,9 +4151,9 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv, NULL) != 0)
+		    priv_def_check(&priv, PRIV_GRANT) != 0)
 			return -1;
+		grant_or_revoke(&priv, NULL);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(revoke_priv, new_tuple);
 		if (on_rollback == NULL)
@@ -4164,8 +4165,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		    priv_def_check(&priv, PRIV_REVOKE) != 0)
 			return -1;
 		priv.access = 0;
-		if (grant_or_revoke(&priv, NULL) != 0)
-			return -1;
+		grant_or_revoke(&priv, NULL);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);
 		if (on_rollback == NULL)
@@ -4173,9 +4173,9 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {                                       /* modify */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv, NULL) != 0)
+		    priv_def_check(&priv, PRIV_GRANT) != 0)
 			return -1;
+		grant_or_revoke(&priv, NULL);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);
 		if (on_rollback == NULL)
