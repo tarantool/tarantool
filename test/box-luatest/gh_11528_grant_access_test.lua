@@ -59,3 +59,27 @@ g.test_fail_on_rebuild_effective_grants = function(cg)
             box.session.su, 'u', box.schema.space.create, 's')
     end)
 end
+
+-- Test that the dropped grants don't remain on the role.
+g.test_dropped_grants = function(cg)
+    cg.server:exec(function()
+        -- Create a user and make it able to do DDL.
+        box.schema.user.create('u')
+        box.session.su('admin', box.schema.user.grant,
+                       'u', 'read,write', 'universe')
+
+        -- Create a role.
+        box.schema.role.create('r')
+
+        -- Allow and disallow the user to drop the role.
+        box.schema.user.grant('u', 'drop', 'role', 'r')
+        box.schema.user.revoke('u', 'drop', 'role', 'r')
+
+        -- Drop the role by the user (this should be disallowed).
+        t.assert_error_msg_equals(
+            "Drop access to role 'r' is denied for user 'u'",
+            box.session.su, 'u', box.schema.role.drop, 'r')
+
+        t.assert(box.schema.role.exists('r'))
+    end)
+end
