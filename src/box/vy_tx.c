@@ -618,14 +618,6 @@ vy_tx_prepare(struct vy_tx *tx)
 		return 0;
 	assert(!vy_tx_is_in_read_view(tx));
 	assert(tx->read_view == &xm->global_read_view);
-
-	/** Send to read view read intersection and abort write intersection. */
-	struct txv *v;
-	struct write_set_iterator it;
-	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&it)) != NULL)
-		vy_tx_send_readers_to_read_view(tx, v);
-
 	/*
 	 * Flush transactional changes to the LSM tree.
 	 * Sic: the loop below must not yield after recovery.
@@ -633,6 +625,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	/* repsert - REPLACE/UPSERT */
 	struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
+	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		struct vy_lsm *lsm = v->lsm;
 		if (lsm->index_id == 0) {
@@ -716,6 +709,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		if (vy_lsm_set(lsm, v->mem, v->entry, region_stmt) != 0)
 			return -1;
 		v->region_stmt = *region_stmt;
+		vy_tx_send_readers_to_read_view(tx, v);
 	}
 	assert(rlist_empty(&tx->in_prepared));
 	rlist_add_tail_entry(&xm->prepared, tx, in_prepared);
@@ -785,15 +779,10 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 			entry.stmt = v->region_stmt;
 			entry.hint = v->entry.hint;
 			vy_lsm_rollback_stmt(v->lsm, v->mem, entry);
+			vy_tx_abort_readers(tx, v);
 		}
 		if (v->mem != NULL)
 			vy_mem_unpin(v->mem);
-	}
-
-	struct write_set_iterator it;
-	write_set_ifirst(&tx->write_set, &it);
-	while ((v = write_set_inext(&it)) != NULL) {
-		vy_tx_abort_readers(tx, v);
 	}
 }
 
