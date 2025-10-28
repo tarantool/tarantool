@@ -72,7 +72,7 @@ struct func {
 	/**
 	 * Cached runtime access information.
 	 */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 };
 
 /**

@@ -443,7 +443,7 @@ func_new(const struct func_def *def)
 	func->def = func_def_dup(def);
 	rlist_create(&func->func_cache_pin_list);
 	/** Nobody has access to the function but the owner. */
-	memset(func->access, 0, sizeof(func->access));
+	accesses_init(&func->accesses);
 	/*
 	 * Do not initialize the privilege cache right away since
 	 * when loading up a function definition during recovery,
@@ -564,11 +564,13 @@ func_access_check(struct func *func)
 		return 0;
 	user_access_t access = PRIV_X | PRIV_U;
 	/* Check access for all functions. */
-	access &= ~entity_access_get(SC_FUNCTION)[credentials->auth_token].effective;
+	access &= ~entity_access_get(SC_FUNCTION,
+				     credentials->auth_token).effective;
 	user_access_t func_access = access & ~credentials->universal_access;
 	if ((func_access & PRIV_U) != 0 ||
 	    (func->def->uid != credentials->uid &&
-	     func_access & ~func->access[credentials->auth_token].effective)) {
+	     func_access & ~accesses_get(&func->accesses,
+					 credentials->auth_token).effective)) {
 		if (func->def->language == FUNC_LANGUAGE_LUA &&
 		    func->def->body == NULL)
 			return access_check_lua_call(func->def->name,
