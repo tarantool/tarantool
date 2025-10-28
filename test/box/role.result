@@ -707,7 +707,7 @@ box.schema.user.grant('grantee', 'public')
 --
 box.schema.user.revoke('grantee', 'public')
 ---
-- error: Revoke access to role 'public' is denied for user 'john'
+- error: Grant access to role 'public' is denied for user 'john'
 ...
 box.session.su('admin')
 ---

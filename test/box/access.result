@@ -1722,7 +1722,7 @@ box.session.su("tester", box.schema.func.drop, "test")
 box.session.su("admin")
 ---
 ...
-box.schema.user.grant("tester", "drop", "universe")
+box.schema.user.grant("tester", "drop,grant", "universe")
 ---
 ...
 -- successful drop

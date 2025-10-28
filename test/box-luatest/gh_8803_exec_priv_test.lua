@@ -18,12 +18,14 @@ end)
 g_common.before_each(function(cg)
     cg.server:exec(function()
         box.session.su('admin', box.schema.user.create, 'test')
+        box.session.su('admin', box.schema.user.create, 'test2')
     end)
 end)
 
 g_common.after_each(function(cg)
     cg.server:exec(function()
         box.session.su('admin', box.schema.user.drop, 'test')
+        box.session.su('admin', box.schema.user.drop, 'test2')
     end)
 end)
 
@@ -42,15 +44,31 @@ g_common.test_unsupported_privs = function(cg)
     end, {cg.params.obj_type})
 end
 
--- Checks that global execute access may be granted only by admin.
+-- Checks that global execute access may be granted if have "grant" access.
 g_common.test_grant = function(cg)
     cg.server:exec(function(obj_type)
-        box.session.su('admin', box.schema.user.grant, 'test', 'super')
+        -- Make the user able to do DDLs required for the test.
+        box.session.su('admin', box.schema.user.grant,
+                       'test', 'write', 'space', '_priv')
+        box.session.su('admin', box.schema.user.grant,
+                       'test', 'read', 'space', '_user')
+
+        -- Check the grantablility on absence of the "grant" privilege.
         t.assert_error_msg_equals(
             string.format("Grant access to %s '' is denied for user 'test'",
                           obj_type),
-            box.session.su, 'test', box.schema.user.grant, 'test', 'execute',
+            box.session.su, 'test', box.schema.user.grant, 'test2', 'execute',
             obj_type)
+
+        -- Check the grantability when the privilege exists on universe.
+        box.session.su('admin', box.schema.user.grant,
+                       'test', 'grant', 'universe')
+        box.session.su('test', box.schema.user.grant,
+                       'test2', 'execute', obj_type)
+        box.session.su('test', box.schema.user.revoke,
+                       'test2', 'execute', obj_type)
+        box.session.su('admin', box.schema.user.revoke,
+                       'test', 'grant', 'universe')
     end, {cg.params.obj_type})
 end
 

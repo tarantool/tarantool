@@ -198,7 +198,7 @@ ffi.cdef[[
         PRIV_UPDATE = 2048,
         PRIV_DELETE = 4096,
         PRIV_GRANT = 8192,
-        PRIV_REVOKE = 16384,
+        PRIV_METAGRANT = 16384,
         PRIV_ALL  = 4294967295
     };
 
@@ -218,8 +218,8 @@ box.priv = {
     ["INSERT"] = builtin.PRIV_INSERT,
     ["UPDATE"] = builtin.PRIV_UPDATE,
     ["DELETE"] = builtin.PRIV_DELETE,
-    ["GRANT"]= builtin.PRIV_GRANT,
-    ["REVOKE"] = builtin.PRIV_REVOKE,
+    ["GRANT"] = builtin.PRIV_GRANT,
+    ["METAGRANT"] = builtin.PRIV_METAGRANT,
     ["ALL"] = builtin.PRIV_ALL
 }
 
@@ -3191,7 +3191,9 @@ local function privilege_parse(privs)
         trigger   = box.priv.TRIGGER,
         insert    = box.priv.INSERT,
         update    = box.priv.UPDATE,
-        delete    = box.priv.DELETE
+        delete    = box.priv.DELETE,
+        grant     = box.priv.GRANT,
+        metagrant = box.priv.METAGRANT
     }
     local privs_cp = string.lower(privs):gsub('^[%A]*', '')
 
@@ -3330,6 +3332,12 @@ local function privilege_name(privilege)
     end
     if bit.band(privilege, box.priv.DELETE) ~= 0 then
         table.insert(names, "delete")
+    end
+    if bit.band(privilege, box.priv.GRANT) ~= 0 then
+        table.insert(names, "grant")
+    end
+    if bit.band(privilege, box.priv.METAGRANT) ~= 0 then
+        table.insert(names, "metagrant")
     end
     return table.concat(names, ",")
 end
@@ -4040,7 +4048,7 @@ local function full_drop(uid)
     local privs = _vpriv.index.primary:select{uid}
 
     -- we need an additional box.session.su() here, because of
-    -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+    -- unnecessary check for privilege PRIV_GRANT in priv_def_check()
     box.session.su('admin', function()
         for _, tuple in pairs(privs) do
             _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
@@ -4092,7 +4100,7 @@ local function drop(uid, level, opts)
         end
         if priv ~= 0 then
             -- we need an additional box.session.su() here, because of
-            -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+            -- unnecessary check for privilege PRIV_GRANT in priv_def_check()
             box.session.su('admin', revoke, level + 2, uid, uid, priv,
                            t.object_type, t.object_id,
                            {_origin = origin, if_exists = true})
