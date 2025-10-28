@@ -1406,6 +1406,17 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	}
 	if (!match) {
 		/*
+		 * If the primary index statement deleting the target
+		 * key from the secondary index hasn't been confirmed,
+		 * we must track it in the transaction read set because
+		 * it may still be rolled back due to a WAL error, in which
+		 * case the overwritten tuple matching the secondary index
+		 * key can be reinstantiated.
+		 */
+		if (tx != NULL && pk_entry.stmt != NULL &&
+		    vy_stmt_is_prepared(pk_entry.stmt))
+			vy_tx_track_point(tx, lsm->pk, pk_entry);
+		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
 		 * primary index, it must have been overwritten or
