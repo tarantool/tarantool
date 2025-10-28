@@ -4087,26 +4087,26 @@ grant_or_revoke(struct priv_def *priv, struct txn_stmt *rolled_back_stmt)
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
 		return 0;
-	/*
-	 * Grant a role to a user only when privilege type is 'execute'
-	 * and the role is specified.
-	 */
-	if (priv->object_type == SC_ROLE && !(priv->access & ~PRIV_X)) {
+	/* Manage the role if required. */
+	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->def->type != SC_ROLE)
-			return 0;
-		if (priv->access) {
-			if (role_grant(grantee, role) != 0)
-				return -1;
-		} else {
-			if (role_revoke(grantee, role) != 0)
-				return -1;
+		if (role != NULL && role->def->type == SC_ROLE) {
+			if (priv->access & PRIV_X) {
+				if (role_grant(grantee, role) != 0)
+					return -1;
+			} else {
+				if (role_revoke(grantee, role) != 0)
+					return -1;
+			}
+			/* The rest is regular rights. */
+			priv->access &= ~PRIV_X;
 		}
-	} else {
-		if (priv_grant(grantee, priv, rolled_back_stmt) != 0)
-			return -1;
 	}
-	return 0;
+	/* Manage the rest of the rights. */
+	if (priv_grant(grantee, priv) != 0)
+		return -1;
+	/* Apply the changes. */
+	return rebuild_effective_grants(grantee, rolled_back_stmt);
 }
 
 /** A trigger called on rollback of grant. */
