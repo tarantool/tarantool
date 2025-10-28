@@ -680,7 +680,7 @@ box.session.su("tester", box.schema.user.drop, "test")
 box.session.su("tester", box.schema.func.drop, "test")
 
 box.session.su("admin")
-box.schema.user.grant("tester", "drop", "universe")
+box.schema.user.grant("tester", "drop,grant", "universe")
 -- successful drop
 box.session.su("tester", s.drop, s)
 box.session.su("tester", seq.drop, seq)

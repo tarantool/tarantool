@@ -81,13 +81,12 @@ box_schema_version_bump(void)
  */
 static int
 access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
-		 enum schema_object_type type, enum priv_type priv_type)
+		 enum schema_object_type type, user_access_t access_required)
 {
 	struct credentials *cr = effective_user();
 	user_access_t has_access = cr->universal_access;
 
-	user_access_t access = ((PRIV_U | (user_access_t) priv_type) &
-				~has_access);
+	user_access_t access = ((PRIV_U | access_required) & ~has_access);
 	bool is_owner = owner_uid == cr->uid || cr->uid == ADMIN;
 	if (access == 0)
 		return 0; /* Access granted. */
@@ -3920,9 +3919,8 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
  * In the future we must protect grant/revoke with a logical lock.
  */
 static int
-priv_def_check(struct priv_def *priv, enum priv_type priv_type)
+priv_def_check(struct priv_def *priv, bool on_revoke)
 {
-	bool on_revoke = (priv_type == PRIV_REVOKE);
 	struct user *grantor = user_find(priv->grantor_id);
 	if (grantor == NULL)
 		return -1;
@@ -3935,6 +3933,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	const char *name = "";
 	struct access *object = NULL;
+	uint32_t owner = BOX_ID_NIL;
 	switch (priv->object_type) {
 	case SC_SPACE:
 	{
@@ -3945,14 +3944,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		name = space_name(space);
 		object = space->access;
-		if (space->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_SPACE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = space->def->uid;
 		if (space_is_temporary(space)) {
 			diag_set(ClientError, ER_UNSUPPORTED,
 				 "temporary space", "privileges");
@@ -3971,14 +3963,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = func->def->name;
 		object = func->access;
-		if (func->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_FUNCTION), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = func->def->uid;
 		break;
 	}
 	case SC_SEQUENCE:
@@ -3992,14 +3977,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = seq->def->name;
 		object = seq->access;
-		if (seq->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_SEQUENCE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = seq->def->uid;
 		break;
 	}
 	case SC_ROLE:
@@ -4016,18 +3994,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = role->def->name;
 		object = role->access;
 		/*
-		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
+		 * So pretend the grantor is the owner.
 		 */
-		if (role->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN &&
-		    (role->def->uid != PUBLIC || priv->access != PRIV_X)) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_ROLE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = (role->def->uid == PUBLIC && priv->access == PRIV_X) ?
+			grantor->def->uid : role->def->owner;
 		/* Not necessary to do during revoke, but who cares. */
 		if (role_check(grantee, role) != 0)
 			return -1;
@@ -4046,29 +4017,48 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = user->def->name;
 		object = user->access;
-		if (user->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_USER), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = user->def->owner;
 		break;
 	}
 	default:
 		break;
 	}
-	/* Only admin may grant privileges on an entire entity. */
-	if (object == NULL && grantor->def->uid != ADMIN) {
-		diag_set(AccessDeniedError, priv_name(priv_type),
-			 schema_object_name(priv->object_type), name,
-			 grantor->def->name);
+	/*
+	 * Grant of any privilege except for "grant" and "metagrant" requires
+	 * the "grant" access. Grant of "grant" and "metagrant" require the
+	 * "metagrant" access.
+	 */
+	user_access_t metagrant_mask = PRIV_GRANT | PRIV_METAGRANT;
+	user_access_t grant_mask = ~metagrant_mask;
+	user_access_t access_required =
+		(priv->access & grant_mask ? PRIV_GRANT : 0) |
+		(priv->access & metagrant_mask ? PRIV_METAGRANT : 0);
+	/*
+	 * Check the effective user has the ability to grant: he is the object
+	 * owner or someone having the privileges required. Please note that the
+	 * "admin" user has all possible privileges set.
+	 */
+	if (access_check_ddl(name, owner, object,
+			     priv->object_type, access_required) != 0)
+		return -1;
+	/*
+	 * The idea of the "grant" privilege is granularity: a user must be able
+	 * to grant, but no other operation is allowed with the priv. So making
+	 * him able to grant privileges oneself breaks the concept. We need to
+	 * prohibit granting a privilege oneself in case if it's not allowed by
+	 * being the "admin" user nor by being an owner of the object.
+	 *
+	 * Ignore the rule during the schema upgrade and downgrade (and so, the
+	 * replication and WAL recovery) so that we can alter user grants during
+	 * the procedure.
+	 */
+	uint32_t effective_user_id = effective_user()->uid;
+	if (!dd_check_is_disabled() && effective_user_id == grantee->def->uid &&
+	    effective_user_id != ADMIN && effective_user_id != owner) {
+		diag_set(ClientError, ER_GRANT,
+			 "only object owner or admin can grant oneself");
 		return -1;
 	}
-	if (access_check_ddl(name, grantor->def->uid, object,
-			     priv->object_type, priv_type) != 0)
-		return -1;
 	if (priv->access == 0) {
 		diag_set(ClientError, ER_GRANT,
 			  "the grant tuple has no privileges");
@@ -4151,7 +4141,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0)
+		    priv_def_check(&priv, false) != 0)
 			return -1;
 		grant_or_revoke(&priv, NULL);
 		struct trigger *on_rollback =
@@ -4162,7 +4152,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		if (priv_def_create_from_tuple(&priv, old_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_REVOKE) != 0)
+		    priv_def_check(&priv, true) != 0)
 			return -1;
 		priv.access = 0;
 		grant_or_revoke(&priv, NULL);
@@ -4173,7 +4163,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {                                       /* modify */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0)
+		    priv_def_check(&priv, false) != 0)
 			return -1;
 		grant_or_revoke(&priv, NULL);
 		struct trigger *on_rollback =

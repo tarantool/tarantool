@@ -273,7 +273,7 @@ sysview_space_execute_upsert(struct space *space, struct txn *txn,
 /*
  * System view filters.
  * Filter gives access to an object, if one of the following conditions is true:
- * 1. User has read, write, drop or alter access to universe.
+ * 1. User has read, write, drop, alter or grant access to universe.
  * 2. User has read access to according system space.
  * 3. User has read, write, drop or alter access to the object.
  * 4. User is a owner of the object.
@@ -283,16 +283,17 @@ sysview_space_execute_upsert(struct space *space, struct txn *txn,
  */
 
 const uint32_t PRIV_WRDA = PRIV_W | PRIV_D | PRIV_A | PRIV_R;
+const uint32_t PRIV_WRDAG = PRIV_WRDA | PRIV_GRANT;
 
 static bool
 vspace_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop or alter privileges for universe.
+	 * Allow access for a user with read, write, drop or
+	 * alter privileges for universe, or a universe grantor.
 	 */
-	if (PRIV_WRDA & cr->universal_access)
+	if (PRIV_WRDAG & cr->universal_access)
 		return true;
 	/* Allow access for a user with space privileges. */
 	if (PRIV_WRDA & entity_access_get(SC_SPACE)[cr->auth_token].effective)
@@ -319,10 +320,10 @@ vuser_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop or alter privileges for universe.
+	 * Allow access for a user with read, write, drop or
+	 * alter privileges for universe, or a universe grantor.
 	 */
-	if (PRIV_WRDA & cr->universal_access)
+	if (PRIV_WRDAG & cr->universal_access)
 		return true;
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to _user space */
@@ -379,10 +380,10 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop, alter or execute privileges for universe.
+	 * Allow access for a user with read, write, drop, alter
+	 * or execute privileges for universe, or a universe owner.
 	 */
-	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
+	if ((PRIV_WRDAG | PRIV_X) & cr->universal_access)
 		return true;
 	/* Allow access for a user with function privileges. */
 	if ((PRIV_WRDA | PRIV_X) &
@@ -408,10 +409,10 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	/*
-	 * Allow access for a user with read, write,
-	 * drop, alter or execute privileges for universe.
+	 * Allow access for a user with read, write, drop, alter
+	 * or execute privileges for universe, or a universe owner.
 	 */
-	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
+	if ((PRIV_WRDAG | PRIV_X) & cr->universal_access)
 		return true;
 	/* Allow access for a user with sequence privileges. */
 	if ((PRIV_WRDA | PRIV_X) &
