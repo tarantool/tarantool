@@ -718,10 +718,16 @@ Clear: 0, 1, 2, 4, 5, 6, 7, 8, 10, 12, 13, 14, 15, 19, 20, 21, 23, 26, 28, 30, 3
 	*** test_bit_set_range ***
 	*** test_bit_set_range: done ***
 	*** test_bit_copy_range ***
-Source value: true
+Reverse: false, source value: true
 	*** test_bit_copy_range: done ***
 	*** test_bit_copy_range ***
-Source value: false
+Reverse: false, source value: false
+	*** test_bit_copy_range: done ***
+	*** test_bit_copy_range ***
+Reverse: true, source value: true
+	*** test_bit_copy_range: done ***
+	*** test_bit_copy_range ***
+Reverse: true, source value: false
 	*** test_bit_copy_range: done ***
 	*** test_bit_count ***
 	*** test_bit_count: done ***

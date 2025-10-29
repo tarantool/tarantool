@@ -341,8 +341,8 @@ bit_copy_range(uint8_t *restrict dst, size_t dst_i, const uint8_t *restrict src,
 		return;
 
 	/* Assure the buffers are non-overlapping. */
-	assert(src > dst + DIV_ROUND_UP(dst_i + count, CHAR_BIT) - 1 ||
-	       dst > src + DIV_ROUND_UP(src_i + count, CHAR_BIT) - 1);
+	assert(src > dst + (dst_i + count - 1) / CHAR_BIT ||
+	       dst > src + (src_i + count - 1) / CHAR_BIT);
 
 	/*
 	 * We can have:
@@ -538,6 +538,154 @@ bit_copy_range(uint8_t *restrict dst, size_t dst_i, const uint8_t *restrict src,
 			dst[dst_curr] = (dst[dst_curr] & ~dst_tail_mask) |
 					((carry | (src_0 << shift)) &
 					 dst_tail_mask);
+		}
+	}
+}
+
+void
+bit_copy_range_reverse(uint8_t *restrict dst, size_t dst_i,
+		       const uint8_t *restrict src, size_t src_i, size_t count)
+{
+	if (count == 0)
+		return;
+
+	assert(src_i >= count - 1);
+	/*
+	 * Assure the buffers [src, src_i] and [dst, dst_i + count] are
+	 * non-overlapping.
+	 */
+	assert(src > dst + (dst_i + count - 1) / CHAR_BIT ||
+	       dst > src + (src_i) / CHAR_BIT);
+
+	/*
+	 * The code structure is same as in the forward copy. Note that
+	 * bit position in source is counted from the byte end. This
+	 * allows to follow same logic as in the forward case.
+	 */
+	size_t dst_i_byte = dst_i / CHAR_BIT;
+	size_t dst_i_bit = dst_i % CHAR_BIT;
+	size_t src_i_byte = src_i / CHAR_BIT;
+	size_t src_i_bit_end = CHAR_BIT - 1 - src_i % CHAR_BIT;
+
+	/* We select shift directions based on this. */
+	ssize_t diff_bit = dst_i_bit - src_i_bit_end;
+
+	/* The head may be the only byte to copy to. */
+	size_t dst_head_size = dst_i_bit + count < CHAR_BIT ?
+			       count : CHAR_BIT - dst_i_bit;
+	size_t dst_rest_size = count - dst_head_size;	 /* Can be 0. */
+	size_t dst_body_size = dst_rest_size / CHAR_BIT; /* In bytes. */
+	size_t dst_tail_size = dst_rest_size % CHAR_BIT; /* In bits. */
+
+	size_t dst_head_mask = ((1 << dst_head_size) - 1) << dst_i_bit;
+	size_t dst_tail_mask = (1 << dst_tail_size) - 1;
+
+	if (diff_bit <= 0) {
+		size_t shift0 = -diff_bit;
+		size_t shift1 = CHAR_BIT - shift0;
+		/*
+		 * To understand why it works first let's consider case when
+		 * diff_bit == 0. In this case due to src_i_bit_end is counted
+		 * from byte end after reversing bytes bits from src_0 will
+		 * be right in the place.
+		 *
+		 * Example, src_i_bit_end = 5, dst_i_bit = 5, shift0 = 0.
+		 *
+		 * dst: - - - - - 1 2 3
+		 *                          src_0: 3 2 1 - - - - -
+		 *                          src_0: - - - - - 1 2 3 (reversed)
+		 *
+		 * Now consider diff_bit < 0. Then to make src_0 bits stand
+		 * in right position before reverse we need to shift them left
+		 * in `shift0' positions first. And for src_1 bits we need
+		 * to shift them right in `shift1' positions before reverse.
+		 *
+		 * Example, src_i_bit_end = 5, dst_i_bit = 3, shift0 = 2,
+		 *          shift1 = 6.
+		 *
+		 * dst: - - - 1 2 3 4 5
+		 *                          src_0: 3 2 1 - - - - -
+		 *                          src_0: . . 3 2 1 - - - (shifted)
+		 *                          src_0: - - - 1 2 3 . . (reversed)
+		 *
+		 *                          src_1: - - - - - - 5 4
+		 *                          src_1: 5 4 . . . . . . (shifted)
+		 *                          src_1: . . . . . . 4 5 (reversed)
+		 *
+		 *  Similar logic is applied for copying body, tail and
+		 *  for the case when diff_bit > 0.
+		 */
+		unsigned src_0 = src[src_i_byte];
+		bool can_read_src1 = src_i_bit_end + count > CHAR_BIT;
+		unsigned src_1 = can_read_src1 ? src[src_i_byte - 1] : 0;
+		/* Copy the head bits. */
+		dst[dst_i_byte] =
+			(dst[dst_i_byte] & ~dst_head_mask) |
+			(bit_reverse_u8((src_0 << shift0) |
+					(src_1 >> shift1)) & dst_head_mask);
+
+		/* Copy the body bytes. */
+		for (size_t i = 0; i < dst_body_size; i++) {
+			size_t dst_curr = dst_i_byte + 1 + i;
+			size_t src_curr = src_i_byte - 1 - i;
+			unsigned src_0 = src[src_curr];
+			bool can_read_src1 = shift0 != 0;
+			unsigned src_1 = can_read_src1 ? src[src_curr - 1] : 0;
+			dst[dst_curr] = bit_reverse_u8((src_0 << shift0) |
+						       (src_1 >> shift1));
+		}
+
+		/* Copy the tail bits. */
+		if (dst_tail_size > 0) {
+			size_t dst_curr = dst_i_byte + 1 + dst_body_size;
+			size_t src_curr = src_i_byte - 1 - dst_body_size;
+			/*
+			 * The src_0 after shift and reverse has only
+			 * CHAR_BIT - shift0 bits due to shift. So if
+			 * dst_tail_size is bigger then we should take it
+			 * some bits from src_1.
+			 */
+			bool can_read_src1 = dst_tail_size >
+							(CHAR_BIT - shift0);
+			unsigned src_0 = src[src_curr];
+			unsigned src_1 = can_read_src1 ? src[src_curr - 1] : 0;
+			dst[dst_curr] =
+				(dst[dst_curr] & ~dst_tail_mask) |
+				(bit_reverse_u8((src_0 << shift0) |
+						(src_1 >> shift1)) &
+								dst_tail_mask);
+		}
+	} else {
+		size_t shift0 = diff_bit;
+		size_t shift1 = CHAR_BIT - shift0;
+
+		unsigned src_0 = src[src_i_byte];
+		/* Copy the head bits. */
+		dst[dst_i_byte] = (dst[dst_i_byte] & ~dst_head_mask) |
+				  (bit_reverse_u8(src_0 >> shift0) &
+								dst_head_mask);
+
+		/* Copy the body bytes. */
+		for (size_t i = 0; i < dst_body_size; i++) {
+			size_t dst_curr = dst_i_byte + 1 + i;
+			size_t src_curr = src_i_byte - 1 - i;
+			unsigned carry = src[src_curr + 1] << shift1;
+			unsigned src_0 = src[src_curr];
+			dst[dst_curr] = bit_reverse_u8(carry |
+						       (src_0 >> shift0));
+		}
+
+		/* Copy the tail bits. */
+		if (dst_tail_size > 0) {
+			size_t dst_curr = dst_i_byte + 1 + dst_body_size;
+			size_t src_curr = src_i_byte - 1 - dst_body_size;
+			unsigned carry = src[src_curr + 1] << shift1;
+			bool can_read_last = shift0 < dst_tail_size;
+			unsigned src_0 = can_read_last ? src[src_curr] : 0;
+			dst[dst_curr] =
+				(dst[dst_curr] & ~dst_tail_mask) |
+				(bit_reverse_u8(carry | (src_0 >> shift0)) &
+								dst_tail_mask);
 		}
 	}
 }

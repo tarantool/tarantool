@@ -126,6 +126,13 @@ test_bswap(void)
 	footer();
 }
 
+static void
+test_bit_reverse_u8(void)
+{
+	for (int i = 0; i < 8; i++)
+		fail_unless(bit_reverse_u8(1 << i) == (1 << (7 - i)));
+}
+
 static inline void
 test_index_print(const int *start, const int *end)
 {
@@ -294,12 +301,13 @@ test_bit_set_range(void)
  * Check all possible valid inputs of `bit_copy_range()`.
  */
 static inline void
-test_bit_copy_range(bool src_val)
+test_bit_copy_range(bool reverse, bool src_val)
 {
 	header();
-	printf("Source value: %s\n", src_val ? "true" : "false");
+	printf("Reverse: %s, source value: %s\n", reverse ? "true" : "false",
+	       src_val ? "true" : "false");
 
-	const size_t data_size = 64; /* In bytes. */
+	const size_t data_size = 8; /* In bytes. */
 	const size_t data_count = data_size * CHAR_BIT; /* In bits. */
 	const uint8_t src_byte = src_val ? 0xff : 0x00;
 	const uint8_t dst_byte = src_val ? 0x00 : 0xff;
@@ -308,7 +316,8 @@ test_bit_copy_range(bool src_val)
 	memset(src, src_byte, sizeof(src));
 	for (size_t src_i = 0; src_i < data_count; src_i++) {
 		for (size_t dst_i = 0; dst_i < data_count; dst_i++) {
-			size_t src_max = data_count - src_i;
+			size_t src_max = reverse ? src_i + 1 :
+						   data_count - src_i;
 			size_t dst_max = data_count - dst_i;
 			for (size_t c = 1; c <= src_max && c <= dst_max; c++) {
 				uint8_t dst[data_size];
@@ -320,7 +329,12 @@ test_bit_copy_range(bool src_val)
 				memset(ref, dst_byte, sizeof(ref));
 				bit_set_range(ref, dst_i, c, src_val);
 				/* The function under test. */
-				bit_copy_range(dst, dst_i, src, src_i, c);
+				if (reverse)
+					bit_copy_range_reverse(
+						dst, dst_i, src, src_i, c);
+				else
+					bit_copy_range(
+						dst, dst_i, src, src_i, c);
 				/* Compare results. */
 				fail_if(memcmp(dst, ref, sizeof(dst)) != 0);
 			}
@@ -407,13 +421,16 @@ main(void)
 	test_count();
 	test_rotl_rotr();
 	test_bswap();
+	test_bit_reverse_u8();
 	test_index();
 	test_bit_iter();
 	test_bit_iter_empty();
 	test_bit_iter_fractional();
 	test_bitmap_size();
 	test_bit_set_range();
-	test_bit_copy_range(true);
-	test_bit_copy_range(false);
+	test_bit_copy_range(/*reverse=*/false, /*src_val=*/true);
+	test_bit_copy_range(/*reverse=*/false, /*src_val=*/false);
+	test_bit_copy_range(/*reverse=*/true, /*src_val=*/true);
+	test_bit_copy_range(/*reverse=*/true, /*src_val=*/false);
 	test_bit_count();
 }
