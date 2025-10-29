@@ -86,6 +86,15 @@ struct func *
 func_by_id(uint32_t fid);
 
 /**
+ * Find if a function with the given ID already exists.
+ */
+inline bool
+func_is_id_occupied(uint32_t fid)
+{
+	return func_by_id(fid) != NULL;
+}
+
+/**
  * Find function by name or return NULL if not found.
  * @param name Name of function object.
  * @param name_len Length of the name of function object.
