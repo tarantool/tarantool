@@ -2942,30 +2942,27 @@ case OP_Sequence: {           /* out2 */
 	break;
 }
 
-/* Opcode: NextSystemSpaceId P1 P2 P3 * *
- * Synopsis: r[P2]=New ID of space P1.
+/**
+ * Opcode: NextSequenceId * P2 * * *
+ * Synopsis: r[P2]=New sequence ID.
  *
- * Place the next value of the primary key of the _sequence or _func space into
- * register P2. P1 is the system space identifier. P3 is fieldno of primary key.
+ * Place the next value of the primary key of the _sequence space into register
+ * P2.
  */
-case OP_NextSystemSpaceId: {
-	assert(pOp->p1 >= 0 && pOp->p3 >= 0);
-	uint32_t space_id = pOp->p1;
-	assert(space_id == BOX_SEQUENCE_ID || space_id == BOX_FUNC_ID);
+case OP_NextSequenceId: {
 	struct Mem *res = &p->aMem[pOp->p2];
 	char key[1];
 	struct tuple *tuple;
 	char *key_end = mp_encode_array(key, 0);
 	assert(key_end - key == 1);
-	if (box_index_max(space_id, 0, key, key_end, &tuple) != 0)
+	if (box_index_max(BOX_SEQUENCE_ID, 0, key, key_end, &tuple) != 0)
 		goto abort_due_to_error;
 	if (tuple == NULL) {
 		mem_set_uint(res, 1);
 		break;
 	}
-	uint32_t fieldno = pOp->p3;
 	uint64_t id;
-	if (tuple_field_u64(tuple, fieldno, &id) != 0)
+	if (tuple_field_u64(tuple, BOX_SEQUENCE_FIELD_ID, &id) != 0)
 		goto abort_due_to_error;
 	mem_set_uint(res, id + 1);
 	break;
@@ -4368,6 +4365,23 @@ case OP_Init: {          /* jump */
 	}
 	pOp->p1++;
 	goto jump_to_p2;
+}
+
+/**
+ * Opcode: GenFuncId P1 P2 * * *
+ * Synopsis: r[P2]=new ID for a func named r[P1]
+ *
+ * Generate unique id for a new function and store it into register P2.
+ */
+case OP_GenFuncId: {
+	assert(pOp->p2 > 0);
+	const char *func_name = aMem[pOp->p1].z;
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	uint32_t u;
+	if (box_generate_func_id(&u, func_name) != 0)
+		goto abort_due_to_error;
+	mem_set_uint(pOut, u);
+	break;
 }
 
 /* Opcode: GenSpaceid P1 * * * *

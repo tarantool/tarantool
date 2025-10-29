@@ -373,6 +373,22 @@ lbox_generate_space_id(lua_State *L)
 	return 1;
 }
 
+/**
+ * Takes function name and generates unique id for a function.
+ * Raises Lua error if all ids are already occupied.
+ */
+static int
+lbox_generate_func_id(lua_State *L)
+{
+	size_t func_name_len;
+	const char *func_name = luaL_checklstring(L, 1, &func_name_len);
+	uint32_t ret;
+	if (box_generate_func_id(&ret, tt_cstr(func_name, func_name_len)) != 0)
+		return luaT_error(L);
+	lua_pushnumber(L, ret);
+	return 1;
+}
+
 /* }}} */
 
 /** {{{ Helper that generates user auth data. **/
@@ -557,6 +573,7 @@ box_lua_misc_init(struct lua_State *L)
 		{"read_view_list", lbox_read_view_list},
 		{"read_view_status", lbox_read_view_status},
 		{"generate_space_id", lbox_generate_space_id},
+		{"generate_func_id", lbox_generate_func_id},
 		{NULL, NULL}
 	};
 
