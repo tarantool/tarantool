@@ -86,6 +86,13 @@ struct func *
 func_by_id(uint32_t fid);
 
 /**
+ * Find minimal unused id, which is greater than cur_id.
+ * If there is no available id, id_range_end is returned.
+ */
+uint32_t
+func_cache_find_next_unused_id(uint32_t cur_id, uint32_t id_range_end);
+
+/**
  * Find function by name or return NULL if not found.
  * @param name Name of function object.
  * @param name_len Length of the name of function object.

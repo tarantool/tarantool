@@ -3481,8 +3481,9 @@ box.schema.func.create = function(name, opts)
     if opts.takes_raw_args then
         opts.opts.takes_raw_args = opts.takes_raw_args
     end
-    call_at(2, _func.auto_increment, _func,
-            {session.euid(), name, opts.setuid, opts.language,
+    local id = call_at(2, internal.generate_func_id, name)
+    call_at(2, _func.insert, _func,
+            {id, session.euid(), name, opts.setuid, opts.language,
              opts.body, opts.routine_type, opts.param_list,
              opts.returns, opts.aggregate, opts.sql_data_access,
              opts.is_deterministic, opts.is_sandboxed,
