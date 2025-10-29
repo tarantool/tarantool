@@ -38,7 +38,6 @@
 #include "user.h"
 #include "session.h"
 #include "txn.h"
-#include "memtx_tx.h"
 #include "tuple.h"
 #include "xrow_update.h"
 #include "request.h"

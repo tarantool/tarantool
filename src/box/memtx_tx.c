@@ -960,13 +960,6 @@ memtx_tx_register_txn(struct txn *tx)
 	       sizeof(*tx->memtx_tx_alloc_stats) * MEMTX_TX_ALLOC_TYPE_MAX);
 }
 
-void
-memtx_tx_acquire_ddl(struct txn *tx)
-{
-	tx->is_schema_changed = true;
-	(void) txn_can_yield(tx, false);
-}
-
 /**
  * Clean and clear all read lists of @a txn.
  */

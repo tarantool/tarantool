@@ -38,7 +38,6 @@
 #include "txn.h"
 #include "rmean.h"
 #include "info/info.h"
-#include "memtx_tx.h"
 #include "box.h"
 #include "base64.h"
 #include "scoped_guard.h"

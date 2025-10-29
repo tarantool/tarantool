@@ -160,15 +160,6 @@ void
 memtx_tx_manager_free();
 
 /**
- * Transaction providing DDL changes is disallowed to yield after
- * modifications of internal caches (i.e. after ALTER operation finishes).
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_acquire_ddl(struct txn *tx);
-
-/**
  * Implementation of engine_send_to_read_view callback.
  * Do not use directly.
  */
