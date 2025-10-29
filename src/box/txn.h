@@ -1028,6 +1028,13 @@ bool
 txn_can_yield(struct txn *txn, bool set);
 
 /**
+ * Transaction providing DDL changes is disallowed to yield after
+ * modifications of internal caches (i.e. after ALTER operation finishes).
+ */
+void
+txn_acquire_ddl(struct txn *txn);
+
+/**
  * Returns true if the transaction has a single statement.
  * Supposed to be used from a space on_replace trigger to
  * detect transaction boundaries.

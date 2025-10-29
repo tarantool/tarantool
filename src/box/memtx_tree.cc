@@ -971,7 +971,7 @@ memtx_tree_index_free(struct memtx_tree_index<USE_HINT> *index)
 {
 	memtx_tree_destroy(&index->tree);
 	free(index->build_array);
-	free(index);
+	memtx_index_free(&index->base);
 }
 
 template <bool USE_HINT>
@@ -2733,7 +2733,7 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)
 		xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx, vtab, def);
+	memtx_index_create(&index->base, (struct engine *)memtx, vtab, def);
 
 	/* See comment to memtx_tree_index_update_def(). */
 	struct key_def *cmp_def;
