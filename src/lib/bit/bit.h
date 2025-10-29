@@ -313,6 +313,20 @@ bit_copy_range(uint8_t *restrict dst, size_t dst_i, const uint8_t *restrict src,
 	       size_t src_i, size_t count);
 
 /**
+ * @brief Copy \a count bits from memory chunk \a src starting from bit \a src_i
+ *  in backward order into \a dst starting from bit \a dst_i in forward order.
+ * @param dst - the memory chunk to copy bits into.
+ * @param dst_i - the position to copy bits into.
+ * @param count - the amount of bits to copy.
+ * @param src - the memory chunk to copy bits from.
+ * @param src_i - the position to copy bits from.
+ * @pre the bit buffers do not overlap.
+ */
+void
+bit_copy_range_reverse(uint8_t *restrict dst, size_t dst_i,
+		       const uint8_t *restrict src, size_t src_i, size_t count);
+
+/**
  * @cond false
  * @brief Naive implementation of ctz.
  */
@@ -592,6 +606,20 @@ bswap_u64(uint64_t x)
 		( (x >> 40) & UINT64_C(0x000000000000ff00)) |
 		( (x >> 56) & UINT64_C(0x00000000000000ff));
 #endif
+}
+
+/**
+ * @brief Reverse bits in \a x.
+ * @param x value
+ * @return value with bits reversed
+ */
+static inline uint8_t
+bit_reverse_u8(uint8_t x)
+{
+	x = ((x & 0x55) << 1) | ((x >> 1) & 0x55);
+	x = ((x & 0x33) << 2) | ((x >> 2) & 0x33);
+	x = (x << 4) | (x >> 4);
+	return x;
 }
 
 /**
