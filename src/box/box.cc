@@ -6576,6 +6576,21 @@ box_generate_unique_id(uint32_t space_id, uint32_t index_id,
 		       uint32_t *new_id);
 
 int
+box_generate_func_id(uint32_t *new_func_id, const char *func_name)
+{
+	uint32_t id_range_end = BOX_FUNCTION_MAX + 1;
+	int ret = box_generate_unique_id(BOX_FUNC_ID, 0, 0, id_range_end,
+					 func_cache_find_next_unused_id,
+					 new_func_id);
+	if (*new_func_id == BOX_FUNCTION_MAX + 1) {
+		diag_set(ClientError, ER_CREATE_FUNCTION, func_name,
+			 "Max function count is reached");
+		return -1;
+	}
+	return ret;
+}
+
+int
 box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 {
 	uint32_t id_range_begin = !is_temporary ?
