@@ -3230,9 +3230,9 @@ end
 -- allowed combination of privilege bits for object
 local priv_object_combo = {
     ["universe"] = box.priv.ALL,
-    ["lua_call"] = bit.bor(box.priv.X, box.priv.U),
-    ["lua_eval"] = bit.bor(box.priv.X, box.priv.U),
-    ["sql"]      = bit.bor(box.priv.X, box.priv.U),
+    ["lua_call"] = bit.bor(box.priv.X, box.priv.U, box.priv.GRANT),
+    ["lua_eval"] = bit.bor(box.priv.X, box.priv.U, box.priv.GRANT),
+    ["sql"]      = bit.bor(box.priv.X, box.priv.U, box.priv.GRANT),
     ["space"]    = bit.bor(box.priv.R, box.priv.W, box.priv.U,
                            box.priv.C, box.priv.D, box.priv.A,
                            box.priv.REFERENCE, box.priv.TRIGGER,

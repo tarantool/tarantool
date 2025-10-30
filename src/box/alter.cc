@@ -3947,6 +3947,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		return -1;
 	}
 	const char *name = "";
+	auto free_name = make_scoped_guard([&] { free((char *)name); }, false);
 	struct access *object = NULL;
 	uint32_t owner = BOX_ID_NIL;
 	switch (priv->object_type) {
@@ -4035,6 +4036,17 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		owner = user->def->owner;
 		break;
 	}
+	case SC_LUA_CALL:
+		if (priv->is_entity_access)
+			break;
+		name = (char *)xstrndup(priv->object_name,
+					priv->object_name_len);
+		free_name.is_active = true;
+		object = access_lua_call_find(priv->object_name,
+					      priv->object_name_len);
+		/* Object can be NULL if no access had been granted yet. */
+		/* Also, no ownership check here. */
+		break;
 	default:
 		break;
 	}
