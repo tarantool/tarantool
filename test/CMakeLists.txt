@@ -129,10 +129,19 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
 add_custom_target(symlink_libsmall_test_binaries ALL
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small)
 
+if (ENABLE_ASAN)
+    list(APPEND TEST_RUN_PARAMS
+        --test-timeout 620
+        --no-output-timeout 630
+        --server-start-timeout 610)
+endif()
+
 add_custom_target(test-unit
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             ${UNIT_TEST_TARGETS}
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR}
         small/
         unit/)
@@ -140,20 +149,26 @@ add_custom_target(test-unit
 add_custom_target(test-unit-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             ${UNIT_TEST_TARGETS}
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR}
         --force
         small/
         unit/)
 
 add_custom_target(test-func
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/)
 
 add_custom_target(test-func-force
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/
@@ -163,14 +178,18 @@ add_custom_target(test-all
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR})
 
 add_custom_target(test-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
-    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+    COMMAND ${CMAKE_COMMAND} -E env ${TARANTOOL_ASAN_OPTIONS}
+        ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_PARAMS}
         --builddir=${PROJECT_BINARY_DIR}
         --force)
 

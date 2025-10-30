@@ -8,11 +8,6 @@ STATIC_DIR = static-build
 STATIC_BIN_DIR = ${STATIC_DIR}/tarantool-prefix/src/tarantool-build
 LUAJIT_TEST_BUILD_DIR = ${BUILD_DIR}
 
-# `nproc`                   - for Linux
-# `sysctl -n hw.logicalcpu` - for OSX
-# `sysctl -n hw.ncpu`       - for FreeBSD (deprecated in OSX)
-NPROC ?= $(shell nproc || sysctl -n hw.logicalcpu || sysctl -n hw.ncpu)
-
 MAX_PROCS ?= 2048
 MAX_FILES ?= 4096
 
@@ -20,10 +15,9 @@ N_TRIALS ?= 128
 COMMIT_RANGE ?= master..HEAD
 
 VARDIR ?= /tmp/t
-TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
 
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
-CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
+CMAKE_BUILD = cmake --build ${BUILD_DIR} --parallel
 
 .PHONY: configure
 configure:
@@ -45,7 +39,7 @@ build: configure
 
 .PHONY: run-luajit-test
 run-luajit-test:
-	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel ${NPROC} --target LuaJIT-test
+	${LUAJIT_TEST_ENV} cmake --build ${LUAJIT_TEST_BUILD_DIR} --parallel --target LuaJIT-test
 
 .PHONY: install-test-deps
 install-test-deps:
@@ -53,11 +47,11 @@ install-test-deps:
 
 .PHONY: run-test
 run-test: install-test-deps
-	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
+	cmake --build ${BUILD_DIR} --parallel --target test-force
 
 .PHONY: run-test-ctest
 run-test-ctest:
-	cmake --build ${STATIC_BIN_DIR} --target test-force-ctest
+	cmake --build ${BUILD_DIR} --target test-force-ctest
 
 .PHONY: run-perf-test
 run-perf-test:
@@ -95,27 +89,6 @@ CMAKE_PARAMS_ASAN = -DENABLE_WERROR=ON \
                     -DENABLE_ASAN=ON \
                     -DENABLE_UB_SANITIZER=ON \
                     -DTEST_BUILD=ON
-# Some checks are temporary suppressed in the scope of the issue
-# https://github.com/tarantool/tarantool/issues/4360:
-#   - ASAN: to suppress failures of memory error checks caught while tests run, the asan/asan.supp
-#     file is used. It is set as a value for the `-fsanitize-blacklist` option at the build time in
-#     the cmake/profile.cmake file.
-#   - LSAN: to suppress failures of memory leak checks caught while tests run, the asan/lsan.supp
-#     file is used.
-TEST_RUN_ENV_ASAN = ASAN=ON \
-                    LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
-                    ASAN_OPTIONS=heap_profile=0:unmap_shadow_on_exit=1:$\
-                                 detect_invalid_pointer_pairs=1:symbolize=1:$\
-                                 detect_leaks=1:dump_instruction_bytes=1:$\
-                                 print_suppressions=0
-LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
-                       ASAN_OPTIONS=detect_invalid_pointer_pairs=1:$\
-                                    detect_leaks=1:$\
-                                    dump_instruction_bytes=1:$\
-                                    heap_profile=0:$\
-                                    print_suppressions=0:$\
-                                    symbolize=1:$\
-                                    unmap_shadow_on_exit=1
 
 # Release ASAN build
 
@@ -131,8 +104,6 @@ LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
 test-release-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
                                   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                   -DFIBER_STACK_SIZE=640Kb
-test-release-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
-test-release-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
 test-release-asan: build run-luajit-test run-test
 
 # Debug ASAN build
@@ -143,13 +114,6 @@ test-release-asan: build run-luajit-test run-test
 test-debug-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
                                 -DCMAKE_BUILD_TYPE=Debug \
                                 -DFIBER_STACK_SIZE=1280Kb
-test-debug-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
-test-debug-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
-# Increase timeouts as some tests in ASAN debug build take quite a lot
-# of time to finish.
-test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
-                                    --no-output-timeout 630 \
-                                    --server-start-timeout 610
 test-debug-asan: build run-luajit-test run-test
 
 # Debug build
@@ -171,8 +135,6 @@ test-static: build run-luajit-test run-test
 # Static build (cmake)
 
 .PHONY: test-static-cmake
-test-static-cmake: SRC_DIR = ${STATIC_DIR}
-test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
 test-static-cmake: build run-test-ctest
 
@@ -255,7 +217,6 @@ test-osx-static-cmake: SRC_DIR = ${STATIC_DIR}
 test-osx-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-osx-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
 test-osx-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
-test-osx-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
 
 ##############################
