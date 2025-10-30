@@ -3949,6 +3949,10 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	const char *name = "";
 	struct access *object = NULL;
 	uint32_t owner = BOX_ID_NIL;
+	auto lua_call_cleanup = make_scoped_guard([&] {
+		free((char *)name);
+		access_lua_call_delete_if_empty(object);
+	}, false);
 	switch (priv->object_type) {
 	case SC_SPACE:
 	{
@@ -4035,6 +4039,16 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		owner = user->def->owner;
 		break;
 	}
+	case SC_LUA_CALL:
+		if (priv->is_entity_access)
+			break;
+		name = (char *)xstrndup(priv->object_name,
+					priv->object_name_len);
+		object = access_lua_call_find_or_create(
+			priv->object_name, priv->object_name_len);
+		lua_call_cleanup.is_active = true;
+		/* No owner for the object. */
+		break;
 	default:
 		break;
 	}

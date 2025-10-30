@@ -136,6 +136,7 @@ g.test_grant_access = function(cg)
             is_deterministic = true, is_sandboxed = true
         })
         sudo(box.schema.sequence.create, 'seq')
+        rawset(_G, 'lf', function() return true end)
 
         -- Neighbouring objects.
         sudo(box.schema.space.create, 's2')
@@ -143,6 +144,7 @@ g.test_grant_access = function(cg)
         sudo(box.schema.role.create, 'r2')
         sudo(box.schema.func.create, 'f2', {body = 'function() end'})
         sudo(box.schema.sequence.create, 'seq2')
+        rawset(_G, 'lf2', function() return true end)
 
         -- Create the test users and make someone able to DDLs required.
         sudo(box.schema.user.create, 'uu')
@@ -187,7 +189,9 @@ g.test_grant_access = function(cg)
         sudo(box.schema.user.grant, 'uu', 'grant', 'role', 'r')
         sudo(box.schema.user.grant, 'uu', 'grant', 'function', 'f')
         sudo(box.schema.user.grant, 'uu', 'grant', 'sequence', 'seq')
+        sudo(box.schema.user.grant, 'uu', 'grant', 'lua_call', 'lf')
         check_visibility({{'grant', 'function', 'f'},
+                          {'grant', 'lua_call', 'lf'},
                           {'execute', 'role', 'public'},
                           {'grant', 'role', 'r'},
                           {'grant', 'sequence', 'seq'},
@@ -202,17 +206,22 @@ g.test_grant_access = function(cg)
         check_ok('create,drop,execute,usage,grant', 'role', 'r')
         check_ok('create,drop,execute,usage,grant', 'function', 'f')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence', 'seq')
+        check_ok('execute,usage,grant', 'lua_call', 'lf')
         check_fail('read,write,create,alter,drop,grant', 'space', 's2')
         check_fail('create,alter,drop,grant', 'user', 'u2')
         check_fail('create,drop,execute,usage,grant', 'role', 'r2')
         check_fail('create,drop,execute,usage,grant', 'function', 'f2')
         check_fail('read,write,usage,create,alter,drop,grant',
                    'sequence', 'seq2')
+        check_fail('execute,usage,grant', 'lua_call', 'lf2')
         check_fail('read,write,create,alter,drop,grant', 'space')
         check_fail('create,alter,drop,grant', 'user')
         check_fail('create,drop,execute,usage,grant', 'role')
         check_fail('create,drop,execute,usage,grant', 'function')
         check_fail('read,write,usage,create,alter,drop,grant', 'sequence')
+        check_fail('execute,usage,grant', 'lua_call')
+        check_fail('execute,usage,grant', 'lua_eval')
+        check_fail('execute,usage,grant', 'sql')
         check_fail('read,write,execute,session,usage,create,drop,alter,' ..
                    'trigger,insert,update,delete,grant', 'universe')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'space', 's')
@@ -220,6 +229,7 @@ g.test_grant_access = function(cg)
         sudo(box.schema.user.revoke, 'uu', 'grant', 'role', 'r')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'function', 'f')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'sequence', 'seq')
+        sudo(box.schema.user.revoke, 'uu', 'grant', 'lua_call', 'lf')
 
         -- Check entity access.
         sudo(box.schema.user.grant, 'uu', 'grant', 'space')
@@ -227,13 +237,19 @@ g.test_grant_access = function(cg)
         sudo(box.schema.user.grant, 'uu', 'grant', 'role')
         sudo(box.schema.user.grant, 'uu', 'grant', 'function')
         sudo(box.schema.user.grant, 'uu', 'grant', 'sequence')
+        sudo(box.schema.user.grant, 'uu', 'grant', 'lua_call')
+        sudo(box.schema.user.grant, 'uu', 'grant', 'lua_eval')
+        sudo(box.schema.user.grant, 'uu', 'grant', 'sql')
         check_visibility({{'grant', 'function', ''},
+                          {'grant', 'lua_call', ''},
+                          {'grant', 'lua_eval', ''},
                           {'execute', 'role', 'public'},
                           {'grant', 'role', ''},
                           {'grant', 'sequence', ''},
                           {'read', 'space', '_user'},
                           {'write', 'space', '_priv'},
                           {'grant', 'space', ''},
+                          {'grant', 'sql', ''},
                           {'session,usage', 'universe', ''},
                           {'alter', 'user', 'uu'},
                           {'grant', 'user', ''}})
@@ -247,11 +263,16 @@ g.test_grant_access = function(cg)
         check_ok('create,drop,execute,usage,grant', 'function', 'f2')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence', 'seq')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence', 'seq2')
+        check_ok('execute,usage,grant', 'lua_call', 'lf')
+        check_ok('execute,usage,grant', 'lua_call', 'lf2')
         check_ok('read,write,create,alter,drop,grant', 'space')
         check_ok('create,alter,drop,grant', 'user')
         check_ok('create,drop,execute,usage,grant', 'role')
         check_ok('create,drop,execute,usage,grant', 'function')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence')
+        check_ok('execute,usage,grant', 'lua_call')
+        check_ok('execute,usage,grant', 'lua_eval')
+        check_ok('execute,usage,grant', 'sql')
         check_fail('read,write,execute,session,usage,create,drop,alter,' ..
                    'trigger,insert,update,delete,grant', 'universe')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'space')
@@ -259,6 +280,9 @@ g.test_grant_access = function(cg)
         sudo(box.schema.user.revoke, 'uu', 'grant', 'role')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'function')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'sequence')
+        sudo(box.schema.user.revoke, 'uu', 'grant', 'lua_call')
+        sudo(box.schema.user.revoke, 'uu', 'grant', 'lua_eval')
+        sudo(box.schema.user.revoke, 'uu', 'grant', 'sql')
 
         -- Check universal access.
         sudo(box.schema.user.grant, 'uu', 'grant', 'universe')
@@ -277,11 +301,16 @@ g.test_grant_access = function(cg)
         check_ok('create,drop,execute,usage,grant', 'function', 'f2')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence', 'seq')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence', 'seq2')
+        check_ok('execute,usage,grant', 'lua_call', 'lf')
+        check_ok('execute,usage,grant', 'lua_call', 'lf2')
         check_ok('read,write,create,alter,drop,grant', 'space')
         check_ok('create,alter,drop,grant', 'user')
         check_ok('create,drop,execute,usage,grant', 'role')
         check_ok('create,drop,execute,usage,grant', 'function')
         check_ok('read,write,usage,create,alter,drop,grant', 'sequence')
+        check_ok('execute,usage,grant', 'lua_call')
+        check_ok('execute,usage,grant', 'lua_eval')
+        check_ok('execute,usage,grant', 'sql')
         check_ok('read,write,execute,session,usage,create,drop,alter,' ..
                  'trigger,insert,update,delete,grant', 'universe')
         sudo(box.schema.user.revoke, 'uu', 'grant', 'universe')

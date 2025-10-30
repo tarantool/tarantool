@@ -168,6 +168,20 @@ struct access *
 access_lua_call_find(const char *name, uint32_t name_len);
 
 /**
+ * Returns cached runtime access information for the given Lua function name.
+ * Creates one if it doesn't exist.
+ */
+struct access *
+access_lua_call_find_or_create(const char *name, uint32_t name_len);
+
+/**
+ * Deletes cached runtime access information for a Lua function if it's empty
+ * (i.e. grants no access to any user).
+ */
+void
+access_lua_call_delete_if_empty(struct access *object);
+
+/**
  * Check if a role is granted to a user or role with the given auth_token.
  */
 bool

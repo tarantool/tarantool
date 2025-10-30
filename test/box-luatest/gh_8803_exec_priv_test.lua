@@ -69,6 +69,16 @@ g_common.test_grant = function(cg)
                        'test2', 'execute', obj_type)
         box.session.su('admin', box.schema.user.revoke,
                        'test', 'grant', 'universe')
+
+        -- Check the grantability when the privilege exists on entity.
+        box.session.su('admin', box.schema.user.grant,
+                       'test', 'grant', obj_type)
+        box.session.su('test', box.schema.user.grant,
+                       'test2', 'execute', obj_type)
+        box.session.su('test', box.schema.user.revoke,
+                       'test2', 'execute', obj_type)
+        box.session.su('admin', box.schema.user.revoke,
+                       'test', 'grant', obj_type)
     end, {cg.params.obj_type})
 end
 

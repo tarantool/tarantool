@@ -246,11 +246,7 @@ access_lua_call_find(const char *name, uint32_t name_len)
 	return NULL;
 }
 
-/**
- * Returns cached runtime access information for the given Lua function name.
- * Creates one if it doesn't exist.
- */
-static struct access *
+struct access *
 access_lua_call_find_or_create(const char *name, uint32_t name_len)
 {
 	uint32_t name_hash = mh_strn_hash(name, name_len);
@@ -277,11 +273,7 @@ access_lua_call_find_or_create(const char *name, uint32_t name_len)
 	return node->access;
 }
 
-/**
- * Deletes cached runtime access information for a Lua function if it's empty
- * (i.e. grants no access to any user).
- */
-static void
+void
 access_lua_call_delete_if_empty(struct access *object)
 {
 	for (int i = 0; i < BOX_USER_MAX; ++i) {
