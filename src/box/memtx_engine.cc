@@ -601,11 +601,11 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		struct txn *txn = txn_begin();
 		if (txn == NULL)
 			goto log_request;
-		if (txn_begin_stmt(txn, space, request.type) != 0)
+		if (txn_begin_stmt(txn, space, &request) != 0)
 			goto rollback;
 		if (space_execute_dml(space, txn, &request, &unused) != 0)
 			goto rollback_stmt;
-		if (txn_commit_stmt(txn, &request) != 0)
+		if (txn_commit_stmt(txn/*, &request*/) != 0)
 			goto rollback;
 		/*
 		 * Snapshot rows are confirmed by definition. They don't need

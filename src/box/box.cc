@@ -560,7 +560,7 @@ box_process_rw(struct request *request, struct space *space,
 	rmean_collect(rmean_box, request->type, 1);
 	if (access_check_space(space, PRIV_W) != 0)
 		goto rollback;
-	if (txn_begin_stmt(txn, space, request->type) != 0)
+	if (txn_begin_stmt(txn, space, request) != 0)
 		goto rollback;
 	if (space_execute_dml(space, txn, request, &tuple) != 0) {
 		txn_rollback_stmt(txn);
@@ -579,7 +579,7 @@ box_process_rw(struct request *request, struct space *space,
 		tuple_ref(tuple);
 	}
 
-	if (txn_commit_stmt(txn, request))
+	if (txn_commit_stmt(txn/*, request*/))
 		goto rollback;
 
 	if (is_autocommit && txn_commit(txn) < 0)
@@ -923,9 +923,9 @@ wal_stream_apply_dml_row(struct wal_stream *stream, struct xrow_header *row)
 			goto end_diag_request;
 		}
 	} else {
-		if (txn_begin_stmt(txn, NULL, request.type) != 0)
+		if (txn_begin_stmt(txn, NULL, &request) != 0)
 			goto end_diag_request;
-		if (txn_commit_stmt(txn, &request))
+		if (txn_commit_stmt(txn/*, &request*/))
 			goto end_diag_request;
 
 	}

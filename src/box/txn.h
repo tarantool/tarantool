@@ -364,6 +364,8 @@ struct txn_stmt {
 	/** Commit/rollback triggers associated with this statement. */
 	struct rlist on_commit;
 	struct rlist on_rollback;
+
+	struct alter_space *alter;
 };
 
 /**
@@ -882,7 +884,7 @@ txn_n_rows(struct txn *txn)
  * Start a new statement in @a space with requst @a type (IPROTO_ constant).
  */
 int
-txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type);
+txn_begin_stmt(struct txn *txn, struct space *space, struct request *request);
 
 int
 txn_begin_in_engine(struct engine *engine, struct txn *txn);
@@ -992,7 +994,7 @@ txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt);
  * the statement and return -1.
  */
 int
-txn_commit_stmt(struct txn *txn, struct request *request);
+txn_commit_stmt(struct txn *txn/*, struct request *request*/);
 
 /**
  * Rollback a statement. In autocommit mode,
@@ -1094,6 +1096,9 @@ tx_region_acquire(struct txn *txn);
  */
 void
 tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type);
+
+int
+txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request);
 
 /*
  * Free txn memory and return it to a cache.

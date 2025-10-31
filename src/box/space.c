@@ -1279,10 +1279,8 @@ after_old_tuple_lookup:;
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(stmt->old_tuple == NULL && stmt->new_tuple == NULL);
-	assert(stmt->row == NULL);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
-	stmt->row = request->header;
 
 	struct event *events[] = {
 		space->before_replace_event.by_id,
@@ -1310,7 +1308,6 @@ after_old_tuple_lookup:;
 	assert(stmt->old_tuple == old_tuple);
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
-	stmt->row = NULL;
 
 	if (rc != 0)
 		goto out;

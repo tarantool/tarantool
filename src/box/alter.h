@@ -34,8 +34,11 @@
 
 extern struct trigger before_replace_schema;
 
+extern struct trigger alter_space_before_replace_space; //
 extern struct trigger alter_space_on_replace_space;
+extern struct trigger alter_space_before_replace_index; //
 extern struct trigger alter_space_on_replace_index;
+extern struct trigger before_replace_truncate; //
 extern struct trigger on_replace_truncate;
 extern struct trigger on_replace_schema;
 extern struct trigger on_replace_user;
@@ -47,6 +50,7 @@ extern struct trigger on_replace_sequence;
 extern struct trigger on_replace_sequence_data;
 extern struct trigger on_replace_space_sequence;
 extern struct trigger on_replace_trigger;
+extern struct trigger before_replace_func_index; //
 extern struct trigger on_replace_func_index;
 
 #endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */

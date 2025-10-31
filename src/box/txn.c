@@ -242,7 +242,7 @@ txn_set_timeout(struct txn *txn, double timeout)
 	txn->timeout = timeout;
 }
 
-static int
+int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
 	/* Create a redo log row. */
@@ -315,6 +315,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->has_triggers = false;
 	stmt->is_own_change = false;
 	stmt->type = type;
+	stmt->alter = NULL;
 	return stmt;
 }
 
@@ -618,7 +619,7 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 }
 
 int
-txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
+txn_begin_stmt(struct txn *txn, struct space *space, struct request *request)
 {
 	assert(txn == in_txn());
 	assert(txn != NULL);
@@ -634,7 +635,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
 
-	struct txn_stmt *stmt = txn_stmt_new(txn, type);
+	struct txn_stmt *stmt = txn_stmt_new(txn, request->type);
 	if (stmt == NULL)
 		return -1;
 
@@ -656,8 +657,21 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 	if (engine_begin_statement(engine, txn) != 0)
 		goto fail;
 
+	/*
+	 * Create WAL record for the write requests in
+	 * non-data-temporary spaces. stmt->space can be NULL for
+	 * IRPOTO_NOP or IPROTO_RAFT_CONFIRM.
+	 */
+	if (stmt->space == NULL || !space_is_data_temporary(stmt->space)) {
+		if (txn_add_redo(txn, stmt, request) != 0)
+			goto fail;
+		assert(stmt->row != NULL);
+		txn_update_row_counts(txn, stmt, 1);
+	}
+
 	stmt->engine = engine;
 	stmt->space = space;
+
 	return 0;
 fail:
 	txn_rollback_stmt(txn);
@@ -681,7 +695,7 @@ txn_is_distributed(struct txn *txn)
  * End a statement.
  */
 int
-txn_commit_stmt(struct txn *txn, struct request *request)
+txn_commit_stmt(struct txn *txn/*, struct request *request*/)
 {
 	assert(txn->in_sub_stmt > 0);
 	assert(!txn_has_flag(txn, TXN_STMT_ROLLBACK));
@@ -690,18 +704,6 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * of tuples in the trigger.
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-
-	/*
-	 * Create WAL record for the write requests in
-	 * non-data-temporary spaces. stmt->space can be NULL for
-	 * IRPOTO_NOP or IPROTO_RAFT_CONFIRM.
-	 */
-	if (stmt->space == NULL || !space_is_data_temporary(stmt->space)) {
-		if (txn_add_redo(txn, stmt, request) != 0)
-			goto fail;
-		assert(stmt->row != NULL);
-		txn_update_row_counts(txn, stmt, 1);
-	}
 	/*
 	 * If there are transactional event triggers set on `stmt->space', save
 	 * them in the `txn' for further running, to avoid another loop through

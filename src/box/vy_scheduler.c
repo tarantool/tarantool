@@ -904,7 +904,7 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 	tuple_unref(delete);
 
 	struct txn *txn = in_txn();
-	if (txn_begin_stmt(txn, deferred_delete_space, request.type) != 0)
+	if (txn_begin_stmt(txn, deferred_delete_space, &request) != 0)
 		goto cleanup;
 
 	struct tuple *unused;
@@ -913,7 +913,7 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 		txn_rollback_stmt(txn);
 		goto cleanup;
 	}
-	ret = txn_commit_stmt(txn, &request);
+	ret = txn_commit_stmt(txn/*, &request*/);
 cleanup:
 	region_truncate(&fiber()->gc, region_svp);
 	return ret;
