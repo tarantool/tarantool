@@ -242,7 +242,7 @@ txn_set_timeout(struct txn *txn, double timeout)
 	txn->timeout = timeout;
 }
 
-static int
+int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
 	/* Create a redo log row. */
@@ -315,6 +315,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->has_triggers = false;
 	stmt->is_own_delete = false;
 	stmt->type = type;
+	stmt->alter = NULL;
 	return stmt;
 }
 

@@ -223,7 +223,8 @@ static void
 sc_space_new(uint32_t id, const char *name,
 	     struct key_part_def *key_parts,
 	     uint32_t key_part_count,
-	     struct trigger *replace_trigger)
+	     struct trigger *before_replace_trigger,
+	     struct trigger *on_replace_trigger)
 {
 	struct space_def *def =
 		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
@@ -251,8 +252,10 @@ sc_space_new(uint32_t id, const char *name,
 	rlist_add_entry(&key_list, index_def, link);
 	struct space *space = space_new_xc(def, &key_list);
 	space_cache_replace(NULL, space);
-	if (replace_trigger)
-		trigger_add(&space->on_replace, replace_trigger);
+	if (before_replace_trigger)
+		trigger_add(&space->before_replace, before_replace_trigger);
+	if (on_replace_trigger)
+		trigger_add(&space->on_replace, on_replace_trigger);
 	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
 	trigger_create(t, on_replace_dd_system_space, NULL, (trigger_f0) free);
 	trigger_add(&space->on_replace, t);
@@ -357,7 +360,7 @@ schema_init(void)
 	key_parts[0].fieldno = 0;
 	key_parts[0].type = FIELD_TYPE_STRING;
 	sc_space_new(BOX_SCHEMA_ID, "_schema", key_parts, 1,
-		     &on_replace_schema);
+		     NULL, &on_replace_schema);
 	struct space *schema = space_by_id(BOX_SCHEMA_ID);
 	assert(schema != NULL);
 	trigger_add(&schema->before_replace, &before_replace_schema);
@@ -366,50 +369,53 @@ schema_init(void)
 	key_parts[0].fieldno = 0;
 	key_parts[0].type = FIELD_TYPE_UNSIGNED;
 	sc_space_new(BOX_COLLATION_ID, "_collation", key_parts, 1,
-		     &on_replace_collation);
+		     NULL, &on_replace_collation);
 
 	/* _space - home for all spaces. */
 	sc_space_new(BOX_SPACE_ID, "_space", key_parts, 1,
-		     &alter_space_on_replace_space);
+		     &alter_space_before_replace_space, &alter_space_on_replace_space);
 
 	/* _truncate - auxiliary space for triggering space truncation. */
 	sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_parts, 1,
-		     &on_replace_truncate);
+		     &before_replace_truncate, &on_replace_truncate);
 
 	/* _sequence - definition of all sequence objects. */
 	sc_space_new(BOX_SEQUENCE_ID, "_sequence", key_parts, 1,
-		     &on_replace_sequence);
+		     NULL, &on_replace_sequence);
 
 	/* _sequence_data - current sequence value. */
 	sc_space_new(BOX_SEQUENCE_DATA_ID, "_sequence_data", key_parts, 1,
-		     &on_replace_sequence_data);
+		     NULL, &on_replace_sequence_data);
 
 	/* _space_seq - association space <-> sequence. */
 	sc_space_new(BOX_SPACE_SEQUENCE_ID, "_space_sequence", key_parts, 1,
-		     &on_replace_space_sequence);
+		     NULL, &on_replace_space_sequence);
 
 	/* _user - all existing users */
-	sc_space_new(BOX_USER_ID, "_user", key_parts, 1, &on_replace_user);
+	sc_space_new(BOX_USER_ID, "_user", key_parts, 1,
+		     NULL, &on_replace_user);
 
 	/* _func - all executable objects on which one can have grants */
-	sc_space_new(BOX_FUNC_ID, "_func", key_parts, 1, &on_replace_func);
+	sc_space_new(BOX_FUNC_ID, "_func", key_parts, 1,
+		     NULL, &on_replace_func);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	sc_space_new(BOX_PRIV_ID, "_priv", key_parts, 1, &on_replace_priv);
+	sc_space_new(BOX_PRIV_ID, "_priv", key_parts, 1,
+		     NULL, &on_replace_priv);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
 	sc_space_new(BOX_CLUSTER_ID, "_cluster", key_parts, 1,
-		     &on_replace_cluster);
+		     NULL, &on_replace_cluster);
 
 	/* _trigger - all existing SQL triggers. */
 	key_parts[0].fieldno = 0;
 	key_parts[0].type = FIELD_TYPE_STRING;
 	sc_space_new(BOX_TRIGGER_ID, "_trigger", key_parts, 1,
-		     &on_replace_trigger);
+		     NULL, &on_replace_trigger);
 
 	/* _index - definition of all space indexes. */
 	key_parts[0].fieldno = 0; /* space id */
@@ -417,7 +423,7 @@ schema_init(void)
 	key_parts[1].fieldno = 1; /* index id */
 	key_parts[1].type = FIELD_TYPE_UNSIGNED;
 	sc_space_new(BOX_INDEX_ID, "_index", key_parts, 2,
-		     &alter_space_on_replace_index);
+		     &alter_space_before_replace_index, &alter_space_on_replace_index);
 
 	/* _fk_сonstraint - foreign keys constraints. */
 	key_parts[0].fieldno = 0; /* constraint name */
@@ -425,7 +431,7 @@ schema_init(void)
 	key_parts[1].fieldno = 1; /* child space */
 	key_parts[1].type = FIELD_TYPE_UNSIGNED;
 	sc_space_new(BOX_FK_CONSTRAINT_ID, "_fk_constraint", key_parts, 2,
-		     NULL);
+		     NULL, NULL);
 
 	/* _ck_сonstraint - check constraints. */
 	key_parts[0].fieldno = 0; /* space id */
@@ -433,7 +439,7 @@ schema_init(void)
 	key_parts[1].fieldno = 1; /* constraint name */
 	key_parts[1].type = FIELD_TYPE_STRING;
 	sc_space_new(BOX_CK_CONSTRAINT_ID, "_ck_constraint", key_parts, 2,
-		     NULL);
+		     NULL, NULL);
 
 	/* _func_index - check constraints. */
 	key_parts[0].fieldno = 0; /* space id */
@@ -441,7 +447,7 @@ schema_init(void)
 	key_parts[1].fieldno = 1; /* index id */
 	key_parts[1].type = FIELD_TYPE_UNSIGNED;
 	sc_space_new(BOX_FUNC_INDEX_ID, "_func_index", key_parts, 2,
-		     &on_replace_func_index);
+		     &before_replace_func_index, &on_replace_func_index);
 
 	/*
 	 * _vinyl_deferred_delete - blackhole that is needed

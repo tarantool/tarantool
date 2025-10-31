@@ -1282,7 +1282,9 @@ after_old_tuple_lookup:;
 	assert(stmt->row == NULL);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
-	stmt->row = request->header;
+	int rc = txn_add_redo(txn, stmt, request);
+	if (rc != 0)
+		goto out;
 
 	struct event *events[] = {
 		space->before_replace_event.by_id,
@@ -1295,7 +1297,7 @@ after_old_tuple_lookup:;
 	 */
 	for (size_t i = 0; i < lengthof(events); ++i)
 		event_ref(events[i]);
-	int rc = trigger_run(&space->before_replace, txn);
+	rc = trigger_run(&space->before_replace, txn);
 	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
 		rc = space_run_replace_triggers(events[i], txn, true);
 	for (size_t i = 0; i < lengthof(events); ++i)
