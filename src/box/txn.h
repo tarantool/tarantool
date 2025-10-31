@@ -364,6 +364,8 @@ struct txn_stmt {
 	/** Commit/rollback triggers associated with this statement. */
 	struct rlist on_commit;
 	struct rlist on_rollback;
+
+	struct alter_space *alter;
 };
 
 /**
@@ -1094,6 +1096,9 @@ tx_region_acquire(struct txn *txn);
  */
 void
 tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type);
+
+int
+txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request);
 
 /*
  * Free txn memory and return it to a cache.

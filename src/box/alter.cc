@@ -757,6 +757,8 @@ txn_alter_trigger_new(trigger_f run, void *data)
  */
 static RLIST_HEAD(alter_space_list);
 
+class AlterSpaceLock;
+
 struct alter_space {
 	/** Link in alter_space_list. */
 	struct rlist in_list;
@@ -791,6 +793,10 @@ struct alter_space {
 	 * xlog in sync with vylog, see alter_space_commit().
 	 */
 	int n_rows;
+
+	AlterSpaceLock *lock;
+	struct trigger *on_commit;
+	struct trigger *on_rollback;
 };
 
 /**
@@ -818,31 +824,10 @@ alter_space_new(struct space *old_space)
 	alter->space_def = space_def_dup(alter->old_space->def);
 	alter->new_min_field_count = old_space->format->min_field_count;
 	alter->n_rows = txn_n_rows(txn);
+	alter->lock = NULL;
+	alter->on_commit = NULL;
+	alter->on_rollback = NULL;
 	return alter;
-}
-
-/** Destroy alter. */
-static void
-alter_space_delete(struct alter_space *alter)
-{
-	fiber_cond_broadcast(&alter_space_delete_cond);
-	rlist_del_entry(alter, in_list);
-	/* Destroy the ops. */
-	while (! rlist_empty(&alter->ops)) {
-		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
-						     AlterSpaceOp, link);
-		delete op;
-	}
-	/* Delete the new space, if any. */
-	if (alter->new_space)
-		space_delete(alter->new_space);
-	space_def_delete(alter->space_def);
-}
-
-AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
-{
-	/* Add to the tail: operations must be processed in order. */
-	rlist_add_tail_entry(&alter->ops, this, link);
 }
 
 /**
@@ -902,6 +887,32 @@ public:
 };
 
 struct mh_i32_t *AlterSpaceLock::registry;
+
+/** Destroy alter. */
+static void
+alter_space_delete(struct alter_space *alter)
+{
+	fiber_cond_broadcast(&alter_space_delete_cond);
+	rlist_del_entry(alter, in_list);
+	/* Destroy the ops. */
+	while (! rlist_empty(&alter->ops)) {
+		AlterSpaceOp *op = rlist_shift_entry(&alter->ops,
+						     AlterSpaceOp, link);
+		delete op;
+	}
+	/* Delete the new space, if any. */
+	if (alter->new_space)
+		space_delete(alter->new_space);
+	if (alter->lock)
+		delete alter->lock;
+	space_def_delete(alter->space_def);
+}
+
+AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
+{
+	/* Add to the tail: operations must be processed in order. */
+	rlist_add_tail_entry(&alter->ops, this, link);
+}
 
 /**
  * Commit the alter.
@@ -990,38 +1001,8 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
-/**
- * alter_space_do() - do all the work necessary to
- * create a new space.
- *
- * If something may fail during alter, it must be done here,
- * before a record is written to the Write Ahead Log.  Only
- * trivial and infallible actions are left to the commit phase
- * of the alter.
- *
- * The implementation of this function follows "Template Method"
- * pattern, providing a skeleton of the alter, while all the
- * details are encapsulated in AlterSpaceOp methods.
- *
- * These are the major steps of alter defining the structure of
- * the algorithm and performed regardless of what is altered:
- *
- * - a copy of the definition of the old space is created
- * - the definition of the old space is altered, to get
- *   definition of a new space
- * - an instance of the new space is created, according to the new
- *   definition; the space is so far empty
- * - data structures of the new space are built; sometimes, it
- *   doesn't need to happen, e.g. when alter only changes the name
- *   of a space or an index, or other accidental property.
- *   If any data structure needs to be built, e.g. a new index,
- *   only this index is built, not the entire space with all its
- *   indexes.
- * - at commit, the new space is coalesced with the old one.
- *   On rollback, the new space is deleted.
- */
 static void
-alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
+alter_space_do_before_replace(struct txn_stmt *stmt, struct alter_space *alter)
 {
 	struct space_alter_stmt alter_stmt;
 	alter_stmt.old_tuple = stmt->old_tuple;
@@ -1037,16 +1018,18 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * another DDL operation while this one is in progress so
 	 * we lock out all concurrent DDL for this space.
 	 */
-	AlterSpaceLock lock(alter);
+	assert(alter->lock == NULL);
+	alter->lock = new AlterSpaceLock(alter);
 	/*
 	 * Prepare triggers while we may fail. Note, we don't have to
 	 * free them in case of failure, because they are allocated on
 	 * the region.
 	 */
-	struct trigger *on_commit, *on_rollback;
-	on_commit = txn_alter_trigger_new(alter_space_commit, alter);
-	on_rollback = txn_alter_trigger_new(alter_space_rollback, alter);
-	if (on_commit == NULL || on_rollback == NULL)
+	//assert(alter->on_commit == NULL);
+	alter->on_commit = txn_alter_trigger_new(alter_space_commit, alter);
+	//assert(alter->on_rollback == NULL);
+	alter->on_rollback = txn_alter_trigger_new(alter_space_rollback, alter);
+	if (alter->on_commit == NULL || alter->on_rollback == NULL)
 		diag_raise();
 
 	/* Create a definition of the new space. */
@@ -1086,12 +1069,44 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 */
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->prepare(alter);
+}
 
-	/*
-	 * This function must not throw exceptions or yield after
-	 * this point.
-	 */
+/**
+ * alter_space_do() - do all the work necessary to
+ * create a new space.
+ *
+ * If something may fail during alter, it must be done here,
+ * before a record is written to the Write Ahead Log.  Only
+ * trivial and infallible actions are left to the commit phase
+ * of the alter.
+ *
+ * The implementation of this function follows "Template Method"
+ * pattern, providing a skeleton of the alter, while all the
+ * details are encapsulated in AlterSpaceOp methods.
+ *
+ * These are the major steps of alter defining the structure of
+ * the algorithm and performed regardless of what is altered:
+ *
+ * - a copy of the definition of the old space is created
+ * - the definition of the old space is altered, to get
+ *   definition of a new space
+ * - an instance of the new space is created, according to the new
+ *   definition; the space is so far empty
+ * - data structures of the new space are built; sometimes, it
+ *   doesn't need to happen, e.g. when alter only changes the name
+ *   of a space or an index, or other accidental property.
+ *   If any data structure needs to be built, e.g. a new index,
+ *   only this index is built, not the entire space with all its
+ *   indexes.
+ * - at commit, the new space is coalesced with the old one.
+ *   On rollback, the new space is deleted.
+ */
+static void
+alter_space_do_on_replace(struct txn_stmt *stmt, struct alter_space *alter)
+{
+	/* This function must not throw exceptions or yield. */
 
+	class AlterSpaceOp *op;
 	/* Move old indexes, update space format. */
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->alter(alter);
@@ -1119,8 +1134,12 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * finish or rollback the DDL depending on the results of
 	 * writing to WAL.
 	 */
-	txn_stmt_on_commit(stmt, on_commit);
-	txn_stmt_on_rollback(stmt, on_rollback);
+	txn_stmt_on_commit(stmt, alter->on_commit);
+	txn_stmt_on_rollback(stmt, alter->on_rollback);
+
+	assert(alter->lock != NULL);
+	delete alter->lock;
+	alter->lock = NULL;
 }
 
 /* }}}  */
@@ -1138,6 +1157,8 @@ public:
 		:AlterSpaceOp(alter) {}
 	virtual void prepare(struct alter_space *alter);
 };
+
+
 
 /**
  * The object is used to grant ability to yield with RAII approach.
@@ -2183,7 +2204,7 @@ filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
  * clumsy, so it is simply not done.
  */
 static int
-on_replace_dd_space(struct trigger * /* trigger */, void *event)
+before_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -2495,12 +2516,25 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		try {
 			/* Remember to update schema_version. */
 			(void) new UpdateSchemaVersion(alter);
-			alter_space_do(stmt, alter);
+			alter_space_do_before_replace(stmt, alter);
 		} catch (Exception *e) {
 			return -1;
 		}
 		alter_guard.is_active = false;
+		assert(stmt->alter == NULL);
+		stmt->alter = alter;
 	}
+	return 0;
+}
+
+static int
+on_replace_dd_space(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct alter_space *alter = stmt->alter;
+	if (alter != NULL)
+		alter_space_do_on_replace(stmt, alter);
 	return 0;
 }
 
@@ -2541,7 +2575,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
  *   are modified.
  */
 static int
-on_replace_dd_index(struct trigger * /* trigger */, void *event)
+before_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -2755,11 +2789,24 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	try {
 		/* Add an op to update schema_version on commit. */
 		(void) new UpdateSchemaVersion(alter);
-		alter_space_do(stmt, alter);
+		alter_space_do_before_replace(stmt, alter);
 	} catch (Exception *e) {
 		return -1;
 	}
 	scoped_guard.is_active = false;
+	assert(stmt->alter == NULL);
+	stmt->alter = alter;
+	return 0;
+}
+
+static int
+on_replace_dd_index(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct alter_space *alter = stmt->alter;
+	if (alter != NULL)
+		alter_space_do_on_replace(stmt, alter);
 	return 0;
 }
 
@@ -2775,7 +2822,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
  * rollback of all transactions following this one.
  */
 static int
-on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
+before_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
@@ -2812,8 +2859,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	 */
 	bool is_temp = space_is_data_temporary(old_space) ||
 		       space_is_local(old_space);
-	if (!is_temp && stmt->row->replica_id == 0 &&
-	    box_check_writable() != 0)
+	if (!is_temp && stmt->row->replica_id == 0 && box_check_writable() != 0)
 		return -1;
 
 	/*
@@ -2870,11 +2916,24 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 			(void) new TruncateIndex(alter, old_index->def->iid);
 		}
 
-		alter_space_do(stmt, alter);
+		alter_space_do_before_replace(stmt, alter);
 	} catch (Exception *e) {
 		return -1;
 	}
 	scoped_guard.is_active = false;
+	assert(stmt->alter == NULL);
+	stmt->alter = alter;
+	return 0;
+}
+
+static int
+on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct alter_space *alter = stmt->alter;
+	if (alter != NULL)
+		alter_space_do_on_replace(stmt, alter);
 	return 0;
 }
 
@@ -5628,7 +5687,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 
 /** A trigger invoked on replace in the _func_index space. */
 static int
-on_replace_dd_func_index(struct trigger *trigger, void *event)
+before_replace_dd_func_index(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
@@ -5741,17 +5800,33 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		return -1;
 	try {
 		(void) new UpdateSchemaVersion(alter);
-		alter_space_do(stmt, alter);
+		alter_space_do_before_replace(stmt, alter);
 	} catch (Exception *e) {
 		return -1;
 	}
 
 	scoped_guard.is_active = false;
+	assert(stmt->alter == NULL);
+	stmt->alter = alter;
 	return 0;
 }
 
+static int
+on_replace_dd_func_index(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct alter_space *alter = stmt->alter;
+	if (alter != NULL)
+		alter_space_do_on_replace(stmt, alter);
+	return 0;
+}
+
+TRIGGER(alter_space_before_replace_space, before_replace_dd_space); //
 TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
+TRIGGER(alter_space_before_replace_index, before_replace_dd_index); //
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
+TRIGGER(before_replace_truncate, before_replace_dd_truncate); //
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
 TRIGGER(on_replace_schema, on_replace_dd_schema);
 TRIGGER(before_replace_schema, before_replace_dd_schema);
@@ -5764,5 +5839,6 @@ TRIGGER(on_replace_sequence, on_replace_dd_sequence);
 TRIGGER(on_replace_sequence_data, on_replace_dd_sequence_data);
 TRIGGER(on_replace_space_sequence, on_replace_dd_space_sequence);
 TRIGGER(on_replace_trigger, on_replace_dd_trigger);
+TRIGGER(before_replace_func_index, before_replace_dd_func_index); //
 TRIGGER(on_replace_func_index, on_replace_dd_func_index);
 /* vim: set foldmethod=marker */
