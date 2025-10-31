@@ -476,7 +476,7 @@ sum_arrow_lua_func(struct lua_State *L)
 	uint32_t field_count = lengthof(fields);
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
-	box_arrow_options_set_reverse(options, reverse);
+	box_arrow_options_set_iterator(options, reverse ? ITER_LE : ITER_GE);
 	struct ArrowArrayStream stream;
 	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
 					key, key_end, options, &stream);
@@ -529,7 +529,7 @@ str_arrow_lua_func(struct lua_State *L)
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
 	box_arrow_options_set_force_view_types(options, use_view_types);
-	box_arrow_options_set_reverse(options, reverse);
+	box_arrow_options_set_iterator(options, reverse ? ITER_LE : ITER_GE);
 	struct ArrowArrayStream stream;
 	int rc = box_index_arrow_stream(space_id, index_id, field_count, fields,
 					key, key_end, options, &stream);
@@ -614,7 +614,7 @@ sum_arrow_rv_lua_func(struct lua_State *L)
 	uint32_t field_count = lengthof(fields);
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
-	box_arrow_options_set_reverse(options, reverse);
+	box_arrow_options_set_iterator(options, reverse ? ITER_LE : ITER_GE);
 	struct ArrowArrayStream stream;
 	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
 						key, key_end, options, &stream);
@@ -676,7 +676,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 	box_arrow_options_t *options = box_arrow_options_new();
 	box_arrow_options_set_batch_row_count(options, 4096);
 	box_arrow_options_set_force_view_types(options, use_view_types);
-	box_arrow_options_set_reverse(options, reverse);
+	box_arrow_options_set_iterator(options, reverse ? ITER_LE : ITER_GE);
 	struct ArrowArrayStream stream;
 	int rc = box_raw_read_view_arrow_stream(index, field_count, fields,
 						key, key_end, options, &stream);
