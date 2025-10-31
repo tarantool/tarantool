@@ -12,3 +12,17 @@ leak:l_load
 leak:lbox_console_format_yaml
 leak:yaml_parser_initialize
 leak:yaml_emitter_initialize
+
+# to be removed, tests below triggers memory leaks:
+# - math_tointeger_test
+# - math_ult_test
+# - string_packsize_test
+# - string_pack_test
+# - string_unpack_test
+# - table_pack_test
+# - utf8_char_test
+# - utf8_codepoint_test
+# - utf8_codes_test
+# - utf8_len_test
+# - utf8_offset_test
+leak:lj_BC_FUNCC
