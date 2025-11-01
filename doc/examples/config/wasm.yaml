@@ -1,0 +1,40 @@
+credentials:
+  users:
+    guest:
+      roles: [super]
+
+iproto:
+  listen:
+  - uri: 'unix/:./{{ instance_name }}.iproto'
+
+groups:
+  group-001:
+    replicasets:
+      replicaset-001:
+        instances:
+          instance-001: {}
+
+wasm:
+  components:
+    hello:
+      path: ./hello.wasm
+      autorun: true
+      limits:
+        max_instructions: 50000000
+        memory_limit: 16777216
+      env:
+        inherit_env: false
+        vars:
+          GREETING: 'Tarantool'
+      args:
+        value: ['--verbose']
+      stdio:
+        stdout_path: ./hello.log
+      network:
+        allowed_ips: ['127.0.0.1']
+        allowed_ports: [8080]
+      fs:
+        preopened_dirs:
+          - host_path: ~/data
+            guest_path: /data
+            perms: ro
