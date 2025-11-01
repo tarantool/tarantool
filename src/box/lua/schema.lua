@@ -1650,15 +1650,31 @@ local function normalize_field(field, format, what, index, level)
     return idx - 1
 end
 
--- Normalize array of fields `fields`:
--- - fields referenced as name are resolved to 0-based field number.
--- - fields referenced as 1-based field number are converted to 0-based.
-local function normalize_fields(fields, format, what, level)
-    -- Do not much care if opts.covers is something strange like
+-- Normalize array of covers fields:
+--  - Convert array of unsigned to array of maps if necessary.
+--  - If a covers field is a mix of an array and map, convert
+--    the first element of the array to be the 'field' key of
+--    the final map.
+--  - Normalize the value of the 'field' key, aka field reference
+--    (see normalize_field()).
+local function normalize_covers(covers, format, what, level)
+    -- Do not care much if opts.covers is something strange like
     -- sparse array or map with keys.
     local result = {}
-    for i, field in ipairs(fields) do
-        result[i] = normalize_field(field, format, what, i, level + 1)
+    for i, field in ipairs(covers) do
+        result[i] = setmetatable({}, { __serialize = 'map' })
+        if type(field) == 'table' then
+            for k, v in pairs(field) do
+                if k == 1 or k == 'field' then
+                    result[i].field = normalize_field(
+                        v, format, what, i, level + 1)
+                else
+                    result[i][k] = v
+                end
+            end
+        else
+            result[i].field = normalize_field(field, format, what, i, level + 1)
+        end
     end
     return result
 end
@@ -1793,7 +1809,7 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
         index_opts.func = func_id_by_name(index_opts.func, 2)
     end
     if index_opts.covers ~= nil then
-        index_opts.covers = normalize_fields(index_opts.covers, format,
+        index_opts.covers = normalize_covers(index_opts.covers, format,
                                              'options.covers', 2)
     end
     if index_opts.aggregates ~= nil then
@@ -1942,7 +1958,7 @@ box.schema.index.alter = atomic_wrapper(function(space_id, index_id, options)
         index_opts.func = func_id_by_name(options.func, 2)
     end
     if options.covers ~= nil then
-        index_opts.covers = normalize_fields(options.covers, format,
+        index_opts.covers = normalize_covers(options.covers, format,
                                              'options.covers', 2)
     end
     if options.aggregates ~= nil then

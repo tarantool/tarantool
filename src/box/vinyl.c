@@ -586,6 +586,11 @@ vinyl_engine_check_space_def(struct space_def *def)
 				 "Vinyl", "compression");
 			return -1;
 		}
+		if (def->fields[i].layout != NULL) {
+			diag_set(ClientError, ER_UNSUPPORTED, "vinyl",
+				 "'layout' option");
+			return -1;
+		}
 	}
 	if (space_opts_is_data_temporary(&def->opts)) {
 		diag_set(ClientError, ER_ALTER_SPACE,
