@@ -1051,6 +1051,8 @@ static void
 txn_limbo_confirm(struct txn_limbo *limbo)
 {
 	assert(txn_limbo_is_owned_by_current_instance(limbo));
+	if (txn_limbo_is_frozen(limbo))
+		return;
 	if (limbo->is_in_rollback)
 		return;
 	if (limbo->entry_to_confirm == NULL ||
