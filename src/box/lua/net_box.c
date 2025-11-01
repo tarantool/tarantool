@@ -178,6 +178,8 @@ struct netbox_options {
 	 * Flag that determines is it required to fetch server schema or not.
 	 */
 	 bool fetch_schema;
+	/** The local interface to bind the connection to. */
+	char *interface;
 };
 
 /**
@@ -524,6 +526,7 @@ netbox_options_create(struct netbox_options *opts)
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
 	opts->fetch_schema = true;
+	opts->interface = NULL;
 }
 
 static void
@@ -533,6 +536,7 @@ netbox_options_destroy(struct netbox_options *opts)
 	free(opts->user);
 	free(opts->password);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, opts->callback_ref);
+	free(opts->interface);
 }
 
 static void
@@ -1125,11 +1129,11 @@ netbox_transport_connect(struct netbox_transport *transport)
 		plain_iostream_create(io, fd);
 	} else {
 		assert(!uri_is_nil(&transport->opts.uri));
-		fd = coio_connect_timeout(transport->opts.uri.host,
-					  transport->opts.uri.service,
-					  transport->opts.uri.host_hint,
-					  /*addr=*/NULL, /*addr_len=*/NULL,
-					  delay);
+		fd = coio_connect(transport->opts.uri.host,
+				  transport->opts.uri.service,
+				  transport->opts.uri.host_hint,
+				  /*addr=*/NULL, /*addr_len=*/NULL,
+				  delay, transport->opts.interface);
 		coio_timeout_update(&start, &delay);
 		if (fd < 0)
 			goto io_error;
@@ -2386,7 +2390,7 @@ luaT_netbox_request_pairs(struct lua_State *L)
 static int
 luaT_netbox_new_transport(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 8);
+	assert(lua_gettop(L) == 9);
 	/* Create a transport object. */
 	struct netbox_transport *transport;
 	transport = lua_newuserdata(L, sizeof(*transport));
@@ -2432,6 +2436,8 @@ luaT_netbox_new_transport(struct lua_State *L)
 			return luaT_error(L);
 		}
 	}
+	if (!lua_isnil(L, 9))
+		opts->interface = xstrdup(luaL_checkstring(L, 9));
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");

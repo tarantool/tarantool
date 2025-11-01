@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/tcp.h>
+#include <ifaddrs.h>
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -45,17 +46,73 @@
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
 /**
+ * Bind the given socket fd stream to the given interface (by name). The
+ * bind parameters are selected based on the given destination address.
+ */
+static int
+coio_bind_iface(int fd, const char *ifname, const struct sockaddr *addr)
+{
+	int af = addr->sa_family;
+	struct ifaddrs *iface, *head;
+	struct sockaddr *bind_addr = NULL;
+	socklen_t bind_addr_len;
+	if (getifaddrs(&head) < 0) {
+		diag_set(SocketError, sio_socketname(fd), "getifaddrs");
+		return -1;
+	}
+	for (iface = head; iface != NULL; iface = iface->ifa_next) {
+		if (iface->ifa_addr == NULL)
+			continue;
+		if (iface->ifa_addr->sa_family != af)
+			continue;
+		if (strcmp(iface->ifa_name, ifname) != 0)
+			continue;
+		char ipstr[64];
+		if (af == AF_INET) {
+			struct sockaddr_in *sin = (void *)iface->ifa_addr;
+			bind_addr_len = sizeof(sin);
+			bind_addr = xmalloc(bind_addr_len);
+			memcpy(bind_addr, sin, bind_addr_len);
+			inet_ntop(af, &sin->sin_addr, ipstr, sizeof(ipstr));
+		} else {
+			assert(af == AF_INET6);
+			struct sockaddr_in6 *sin6 = (void *)iface->ifa_addr;
+			bind_addr_len = sizeof(sin6);
+			bind_addr = xmalloc(bind_addr_len);
+			memcpy(bind_addr, sin6, bind_addr_len);
+			inet_ntop(af, &sin6->sin6_addr, ipstr, sizeof(ipstr));
+			assert(0); /* TODO: IPv6 scope comparison. */
+		}
+		fprintf(stderr, "@@@ interface IPv6: %s\n", ipstr);
+		break;
+	}
+	freeifaddrs(head);
+
+	if (bind_addr != NULL && sio_bind(fd, bind_addr, bind_addr_len) != 0) {
+		free(bind_addr);
+		return -1;
+	}
+	free(bind_addr);
+	return 0;
+}
+
+/**
  * Connect to a host with a specified timeout.
  * @retval socket fd
  * @retval -1 error
  */
 static int
-coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
+coio_connect_addr(const struct sockaddr *addr, socklen_t len,
+		  ev_tstamp timeout, const char *iface)
 {
+	assert(iface == NULL ||
+	       (addr->sa_family == AF_INET || addr->sa_family == AF_INET6));
 	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -1;
 	if (evio_setsockopt_client(fd, addr->sa_family, SOCK_STREAM) != 0)
+		goto err;
+	if (iface != NULL && coio_bind_iface(fd, iface, addr))
 		goto err;
 	if (sio_connect(fd, addr, len) == 0)
 		return fd;
@@ -123,7 +180,9 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 
 /**
  * Resolve \a host and \a service with optional \a host_hint and connect to
- * the first available address with a specified timeout.
+ * the first available address with a specified timeout through the specified
+ * interface (the interface is given by name, only affects the `src` field of
+ * packets on GNU/Linux).
  *
  * If \a addr is not NULL the function provides resolved address on success.
  * In this case, \a addr_len is a value-result argument. It should be
@@ -140,10 +199,11 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
  * @retval -1 error
  */
 int
-coio_connect_timeout(const char *host, const char *service, int host_hint,
-		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout)
+coio_connect(const char *host, const char *service, int host_hint,
+	     struct sockaddr *addr, socklen_t *addr_len,
+	     ev_tstamp timeout, const char *iface)
 {
+	(void)iface;
 	int fd = -1;
 	/* try to resolve a hostname */
 	struct ev_loop *loop = loop();
@@ -157,7 +217,7 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
 		un.sun_family = AF_UNIX;
 		fd = coio_connect_addr((struct sockaddr *)&un, sizeof(un),
-				       delay);
+				       delay, NULL);
 		if (fd < 0)
 			return -1;
 		if (addr != NULL) {
@@ -191,7 +251,8 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	evio_timeout_update(loop(), &start, &delay);
 	coio_timeout_init(&start, &delay, timeout);
 	while (ai) {
-		fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen, delay);
+		fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen,
+				       delay, iface);
 		if (fd >= 0) {
 			if (addr != NULL) {
 				assert(addr_len != NULL);
