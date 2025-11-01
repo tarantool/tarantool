@@ -23,6 +23,7 @@ g.before_all(function(g)
         box_cfg = {
             replication = full_replication,
             replication_synchro_quorum = 4,
+            replication_synchro_timeout = 1000,
             replication_timeout = 0.5,
         },
     })
@@ -38,7 +39,6 @@ g.before_all(function(g)
     g.replicaset:start()
     g.replicaset:wait_for_fullmesh()
     g.server1:exec(function()
-        require('compat').replication_synchro_timeout = 'new'
         box.schema.create_space("s", {is_sync = true}):create_index("p")
     end)
 end)
@@ -64,7 +64,9 @@ local function capture_synchro_queue_and_push_sync_transaction(server)
         t.assert_equals(box.info.election.state, "follower")
         t.assert_equals(box.info.synchro.queue.owner, box.info.id)
         t.assert_equals(box.info.synchro.queue.len, 0)
-        box.atomic({wait = "submit"}, function() box.space.s:replace{0} end)
+        fiber.create(function()
+            box.space.s:replace{0}
+        end)
         t.assert_equals(box.info.synchro.queue.len, 1)
         -- So that we have the opportunity to perform some actions during
         -- hang in box_wait_quorum, we wrap the last box.ctl.promote into
