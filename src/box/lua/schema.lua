@@ -198,7 +198,6 @@ ffi.cdef[[
         PRIV_UPDATE = 2048,
         PRIV_DELETE = 4096,
         PRIV_GRANT = 8192,
-        PRIV_REVOKE = 16384,
         PRIV_ALL  = 4294967295
     };
 
@@ -219,7 +218,6 @@ box.priv = {
     ["UPDATE"] = builtin.PRIV_UPDATE,
     ["DELETE"] = builtin.PRIV_DELETE,
     ["GRANT"]= builtin.PRIV_GRANT,
-    ["REVOKE"] = builtin.PRIV_REVOKE,
     ["ALL"] = builtin.PRIV_ALL
 }
 
@@ -3191,7 +3189,8 @@ local function privilege_parse(privs)
         trigger   = box.priv.TRIGGER,
         insert    = box.priv.INSERT,
         update    = box.priv.UPDATE,
-        delete    = box.priv.DELETE
+        delete    = box.priv.DELETE,
+        grant     = box.priv.GRANT
     }
     local privs_cp = string.lower(privs):gsub('^[%A]*', '')
 
@@ -3238,15 +3237,16 @@ local priv_object_combo = {
                            box.priv.C, box.priv.D, box.priv.A,
                            box.priv.REFERENCE, box.priv.TRIGGER,
                            box.priv.INSERT, box.priv.UPDATE,
-                           box.priv.DELETE),
+                           box.priv.DELETE, box.priv.GRANT),
     ["sequence"] = bit.bor(box.priv.R, box.priv.W, box.priv.U,
-                           box.priv.C, box.priv.A, box.priv.D),
+                           box.priv.C, box.priv.A, box.priv.D,
+                           box.priv.GRANT),
     ["function"] = bit.bor(box.priv.X, box.priv.U,
-                           box.priv.C, box.priv.D),
+                           box.priv.C, box.priv.D, box.priv.GRANT),
     ["role"]     = bit.bor(box.priv.X, box.priv.U,
-                           box.priv.C, box.priv.D),
+                           box.priv.C, box.priv.D, box.priv.GRANT),
     ["user"]     = bit.bor(box.priv.C, box.priv.A,
-                           box.priv.D),
+                           box.priv.D, box.priv.GRANT),
 }
 
 local BOX_SPACE_EXECUTE_PRIV_BRIEF = [[
@@ -3330,6 +3330,9 @@ local function privilege_name(privilege)
     end
     if bit.band(privilege, box.priv.DELETE) ~= 0 then
         table.insert(names, "delete")
+    end
+    if bit.band(privilege, box.priv.GRANT) ~= 0 then
+        table.insert(names, "grant")
     end
     return table.concat(names, ",")
 end
@@ -3427,7 +3430,7 @@ local function object_name(object_type, object_id, level)
     if object_type == 'space' then
         space = box.space._vspace
     elseif object_type == 'sequence' then
-        space = box.space._sequence
+        space = box.space._vsequence
     elseif object_type == 'function' then
         space = box.space._vfunc
     elseif object_type == 'role' or object_type == 'user' then
@@ -4021,8 +4024,9 @@ local function full_drop(uid)
     for _, tuple in pairs(funcs) do
         box.schema.func.drop(tuple.id)
     end
-    -- if this is a role, revoke this role from whoever it was granted to
-    local grants = _vpriv.index.object:select{'role', uid}
+    -- revoke accesses for this object from whoever it was granted to
+    local user_type = box.space._vuser:get{uid}.type
+    local grants = _vpriv.index.object:select{user_type, uid}
     for _, tuple in pairs(grants) do
         _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
     end
@@ -4033,14 +4037,14 @@ local function full_drop(uid)
     -- xxx: hack, we have to revoke session and usage privileges
     -- of a user using a setuid function in absence of create/drop
     -- privileges and grant option
-    if box.space._vuser:get{uid}.type == 'user' then
+    if user_type == 'user' then
         box.session.su('admin', box.schema.user.revoke, uid,
                        'session,usage', 'universe', nil, {if_exists = true})
     end
     local privs = _vpriv.index.primary:select{uid}
 
     -- we need an additional box.session.su() here, because of
-    -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+    -- unnecessary check for privilege PRIV_GRANT in priv_def_check()
     box.session.su('admin', function()
         for _, tuple in pairs(privs) do
             _priv:delete{tuple.grantee, tuple.object_type, tuple.object_id}
@@ -4092,7 +4096,7 @@ local function drop(uid, level, opts)
         end
         if priv ~= 0 then
             -- we need an additional box.session.su() here, because of
-            -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+            -- unnecessary check for privilege PRIV_GRANT in priv_def_check()
             box.session.su('admin', revoke, level + 2, uid, uid, priv,
                            t.object_type, t.object_id,
                            {_origin = origin, if_exists = true})

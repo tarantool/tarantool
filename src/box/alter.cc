@@ -3934,6 +3934,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	const char *name = "";
 	struct access *object = NULL;
+	uint32_t owner = BOX_ID_NIL;
 	switch (priv->object_type) {
 	case SC_SPACE:
 	{
@@ -3944,14 +3945,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		name = space_name(space);
 		object = space->access;
-		if (space->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_SPACE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = space->def->uid;
 		if (space_is_temporary(space)) {
 			diag_set(ClientError, ER_UNSUPPORTED,
 				 "temporary space", "privileges");
@@ -3970,14 +3964,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = func->def->name;
 		object = func->access;
-		if (func->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_FUNCTION), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = func->def->uid;
 		break;
 	}
 	case SC_SEQUENCE:
@@ -3991,14 +3978,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = seq->def->name;
 		object = seq->access;
-		if (seq->def->uid != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_SEQUENCE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = seq->def->uid;
 		break;
 	}
 	case SC_ROLE:
@@ -4015,18 +3995,11 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		name = role->def->name;
 		object = role->access;
 		/*
-		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
+		 * So pretend the grantor is the owner.
 		 */
-		if (role->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN &&
-		    (role->def->uid != PUBLIC || priv->access != PRIV_X)) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_ROLE), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = (role->def->uid == PUBLIC && priv->access == PRIV_X) ?
+			grantor->def->uid : role->def->owner;
 		/* Not necessary to do during revoke, but who cares. */
 		if (role_check(grantee, role) != 0)
 			return -1;
@@ -4045,27 +4018,13 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		name = user->def->name;
 		object = user->access;
-		if (user->def->owner != grantor->def->uid &&
-		    grantor->def->uid != ADMIN) {
-			diag_set(AccessDeniedError,
-				  priv_name(priv_type),
-				  schema_object_name(SC_USER), name,
-				  grantor->def->name);
-			return -1;
-		}
+		owner = user->def->owner;
 		break;
 	}
 	default:
 		break;
 	}
-	/* Only admin may grant privileges on an entire entity. */
-	if (object == NULL && grantor->def->uid != ADMIN) {
-		diag_set(AccessDeniedError, priv_name(priv_type),
-			 schema_object_name(priv->object_type), name,
-			 grantor->def->name);
-		return -1;
-	}
-	if (access_check_ddl(name, grantor->def->uid, object,
+	if (access_check_ddl(name, owner, object,
 			     priv->object_type, priv_type) != 0)
 		return -1;
 	if (priv->access == 0) {
@@ -4087,26 +4046,26 @@ grant_or_revoke(struct priv_def *priv, struct txn_stmt *rolled_back_stmt)
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
 		return 0;
-	/*
-	 * Grant a role to a user only when privilege type is 'execute'
-	 * and the role is specified.
-	 */
-	if (priv->object_type == SC_ROLE && !(priv->access & ~PRIV_X)) {
+	/* Manage the role if required. */
+	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
-		if (role == NULL || role->def->type != SC_ROLE)
-			return 0;
-		if (priv->access) {
-			if (role_grant(grantee, role) != 0)
-				return -1;
-		} else {
-			if (role_revoke(grantee, role) != 0)
-				return -1;
+		if (role != NULL && role->def->type == SC_ROLE) {
+			if (priv->access & PRIV_X) {
+				if (role_grant(grantee, role) != 0)
+					return -1;
+			} else {
+				if (role_revoke(grantee, role) != 0)
+					return -1;
+			}
+			/* The rest is regular rights. */
+			priv->access &= ~PRIV_X;
 		}
-	} else {
-		if (priv_grant(grantee, priv, rolled_back_stmt) != 0)
-			return -1;
 	}
-	return 0;
+	/* Manage the rest of the rights. */
+	if (priv_grant(grantee, priv) != 0)
+		return -1;
+	/* Apply the changes. */
+	return rebuild_effective_grants(grantee, rolled_back_stmt);
 }
 
 /** A trigger called on rollback of grant. */
@@ -4161,7 +4120,7 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		if (priv_def_create_from_tuple(&priv, old_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_REVOKE) != 0)
+		    priv_def_check(&priv, PRIV_GRANT) != 0)
 			return -1;
 		priv.access = 0;
 		if (grant_or_revoke(&priv, NULL) != 0)
