@@ -342,8 +342,21 @@ txn_limbo_rollback_all_volatile(struct txn_limbo *limbo)
 bool
 txn_limbo_would_block(struct txn_limbo *limbo)
 {
-	if (txn_limbo_is_full(limbo))
-		return true;
+	if (txn_limbo_is_full(limbo)) {
+		/*
+		 * On replicas the limbo can't get blocked on max size. Because
+		 * if the size is lower than on the master, the replica would
+		 * become unable to read new xrows after the local max
+		 * size is reached. Because the applier would be just waiting on
+		 * the limbo to get some free space first. This would make the
+		 * applier also unable to read CONFIRM, which in turn is
+		 * necessary to make free space in the limbo. And this is a
+		 * deadlock. The only way is to make the replica ignore its max
+		 * size when it comes to applying new txns.
+		 */
+		if (txn_limbo_is_owned_by_current_instance(limbo))
+			return true;
+	}
 	if (txn_limbo_is_empty(limbo))
 		return false;
 	/*
