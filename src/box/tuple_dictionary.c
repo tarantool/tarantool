@@ -41,10 +41,6 @@ field_name_hash_f field_name_hash;
 static inline void
 tuple_dictionary_delete_hash(struct mh_strnu32_t *hash)
 {
-	while (mh_size(hash)) {
-		mh_int_t i = mh_first(hash);
-		mh_strnu32_del(hash, i, NULL);
-	}
 	mh_strnu32_delete(hash);
 }
 
