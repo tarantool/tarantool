@@ -84,6 +84,10 @@ create_perf_lua_test(NAME column_insert
                      DEPENDS column_insert_module
 )
 
+if(ENABLE_READ_VIEW)
+  create_perf_lua_test(NAME read_view_open_close)
+endif()
+
 add_custom_target(test-lua-perf
                   COMMAND ${CMAKE_CTEST_COMMAND}
                           ${TARANTOOL_PERF_CTEST_FLAGS}
