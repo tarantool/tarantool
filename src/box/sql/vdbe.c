@@ -208,6 +208,24 @@ allocateCursor(
 	return pCx;
 }
 
+void sqlVdbeAddOp4Int64(Vdbe *p, int op, int p1, int p2, int p3, i64 value) {
+    int addr = sqlVdbeAddOp4(p, op, p1, p2, p3, 0, 0);
+    p->aOp[addr].p4.i64 = value;
+    p->aOp[addr].p4type = P4_INT64_DIRECT;
+}
+
+void sqlVdbeAddOp4UInt64(Vdbe *p, int op, int p1, int p2, int p3, u64 value) {
+    int addr = sqlVdbeAddOp4(p, op, p1, p2, p3, 0, 0);
+    p->aOp[addr].p4.u64 = value;
+    p->aOp[addr].p4type = P4_UINT64_DIRECT;
+}
+
+void sqlVdbeAddOp4Real(Vdbe *p, int op, int p1, int p2, int p3, double value) {
+    int addr = sqlVdbeAddOp4(p, op, p1, p2, p3, 0, 0);
+    p->aOp[addr].p4.real = value;
+    p->aOp[addr].p4type = P4_REAL_DIRECT;
+}
+
 #ifdef SQL_DEBUG
 #  define REGISTER_TRACE(P,R,M)					\
 	if ((P->sql_flags & SQL_VdbeTrace) != 0)		\
@@ -724,8 +742,14 @@ case OP_Bool: {         /* out2 */
  */
 case OP_Int64: {           /* out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	assert(pOp->p4.pI64!=0);
-	mem_set_int_with_sign(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
+    if (pOp->p4type == P4_INT64_DIRECT) {
+        mem_set_int_with_sign(pOut, pOp->p4.i64, false); /* signed value stored directly */
+    } else if (pOp->p4type == P4_UINT64_DIRECT) {
+       mem_set_int_with_sign(pOut, pOp->p4.u64, true); /* unsigned value stored directly */
+    } else {
+       assert(pOp->p4.pI64 != 0);
+       mem_set_int_with_sign(pOut, *pOp->p4.pI64, pOp->p4type == P4_INT64);
+    }
 	break;
 }
 
@@ -737,8 +761,12 @@ case OP_Int64: {           /* out2 */
  */
 case OP_Real: {            /* same as TK_FLOAT, out2 */
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	assert(!sqlIsNaN(*pOp->p4.pReal));
-	mem_set_double(pOut, *pOp->p4.pReal);
+    if (pOp->p4type == P4_REAL_DIRECT) {
+        mem_set_double(pOut, pOp->p4.real);
+    } else {
+	    assert(!sqlIsNaN(*pOp->p4.pReal));
+	    mem_set_double(pOut, *pOp->p4.pReal);
+    }
 	break;
 }
 
