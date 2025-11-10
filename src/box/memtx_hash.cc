@@ -188,7 +188,7 @@ static void
 memtx_hash_index_free(struct memtx_hash_index *index)
 {
 	light_index_destroy(&index->hash_table);
-	free(index);
+	memtx_index_free(&index->base);
 }
 
 static void
@@ -750,8 +750,8 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	struct memtx_hash_index *index =
 		(struct memtx_hash_index *)xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_hash_index_vtab, def);
+	memtx_index_create(&index->base, (struct engine *)memtx,
+			   &memtx_hash_index_vtab, def);
 
 	light_index_create(&index->hash_table, index->base.def->key_def,
 			   &memtx->index_extent_allocator,
