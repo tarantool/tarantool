@@ -493,6 +493,14 @@ g.test_iproto_enterprise = function()
             threads = 1,
             net_msg_max = 1,
             readahead = 1,
+            ssl = {
+                ssl_key = 'one',
+                ssl_cert = 'two',
+                ca_file = 'three',
+                ssl_ciphers = 'four',
+                ssl_password = 'five',
+                ssl_password_file = 'six',
+            },
         },
     }
     instance_config:validate(iconfig)
@@ -1317,6 +1325,7 @@ g.test_box_cfg_coverage = function()
         metrics = true,
         audit_log = true,
         audit_filter = true,
+        listen = true,
 
         -- Controlled by the leader and database.mode options,
         -- handled by the box_cfg applier.

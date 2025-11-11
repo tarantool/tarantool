@@ -142,8 +142,18 @@ function methods.sync(self, _config_module, _iconfig)
     -- They can be handled separately if there is a demand.
     if self.name == 'env (default)' then
         for _, w in instance_config:pairs() do
+            -- Listen is really special since it is also handled
+            -- separately in the box.cfg and do not have the
+            -- box_cfg annotation.
+            local is_listen = #w.path == 2 and w.path[1] == 'iproto' and
+                              w.path[2] == 'listen'
             if w.schema.box_cfg ~= nil then
                 local value = box_cfg_env_var(w.schema.box_cfg)
+                if value ~= nil then
+                    instance_config:set(values, w.path, value)
+                end
+            elseif is_listen then
+                local value = box_cfg_env_var('listen')
                 if value ~= nil then
                     instance_config:set(values, w.path, value)
                 end
