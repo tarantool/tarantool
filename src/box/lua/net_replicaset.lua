@@ -326,7 +326,6 @@ local function connect_by_rs_name(replicaset_name, cfg)
     cfg = cfg or {}
     check_options(cfg, connect_by_name_cfg_template, 'connect cfg')
     local config = require('config')
-    local instance_config = require('internal.config.instance_config')
 
     local connect_cfg = {
         name = replicaset_name,
@@ -336,8 +335,8 @@ local function connect_by_rs_name(replicaset_name, cfg)
     for _, instance_info in pairs(config:instances()) do
         if instance_info.replicaset_name == replicaset_name then
             local instance_name = instance_info.instance_name
-            local iconfig = config:get('', {instance = instance_name})
-            local endpoint = instance_config:instance_uri(iconfig, 'sharding')
+            local endpoint = config:instance_uri('sharding',
+                                                 {instance = instance_name})
             connect_cfg.instances[instance_name] = {endpoint = endpoint}
         end
     end
