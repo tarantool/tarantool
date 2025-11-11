@@ -32,6 +32,7 @@ struct uri {
     int params_capacity;
     int param_count;
     struct uri_param *params;
+    char *interface;
 };
 
 struct uri_set {
@@ -149,6 +150,9 @@ local function parse_uribuf(uribuf)
                     ffi.string(param.values[val_idx])
             end
         end
+    end
+    if uribuf.interface ~= nil then
+        result.interface = ffi.string(uribuf.interface)
     end
     if uribuf.host_hint == 1 then
         result.ipv4 = result.host

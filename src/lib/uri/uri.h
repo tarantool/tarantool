@@ -38,6 +38,8 @@ struct uri {
 	int param_count;
 	/** Different URI parameters */
 	struct uri_param *params;
+	/** Interface to bind requests to the uri to. */
+	char *interface;
 };
 
 struct uri_set {
@@ -67,6 +69,10 @@ uri_remove_param(struct uri *uri, const char *name);
 /** Set @a login and @a password in the @a uri. */
 void
 uri_set_credentials(struct uri *uri, const char *login, const char *password);
+
+/** Set @a interface to bind requests to the uri to. */
+void
+uri_set_interface(struct uri *uri, const char *interface);
 
 /**
  * Copy constructor for @a dst URI. Copies all fiels from
