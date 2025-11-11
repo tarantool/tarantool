@@ -49,7 +49,8 @@ local function peer_uris(configdata)
         local isolated = instance_config:get(iconfig_def, 'isolated')
         if not is_anon and not isolated then
             local uri = instance_config:instance_uri(iconfig_def, 'peer',
-                {log_prefix = "replicaset dataflow configuration: "})
+                {log_prefix = "replicaset dataflow configuration: ",
+                 self_iconfig = configdata._iconfig_def})
             if uri == nil then
                 log.info('%s: instance %q has no iproto.advertise.peer or ' ..
                     'iproto.listen URI suitable to create a client socket',
@@ -67,6 +68,25 @@ local function peer_uris(configdata)
     end
 
     return uris
+end
+
+local function set_listen(configdata, box_cfg)
+    -- Construct box_cfg.listen.
+    if box_cfg.listen == nil then
+        local configured_listen =
+            configdata:get('iproto.listen', {use_default = true})
+        local listen = box.NULL
+
+        if configured_listen ~= nil then
+            listen = {}
+
+            for _, uri in ipairs(configured_listen) do
+                table.insert(listen, configdata:_enhance_uri_ssl_params(uri))
+            end
+        end
+
+        box_cfg.listen = listen
+    end
 end
 
 -- Modify box-level configuration values and perform other actions
@@ -565,6 +585,8 @@ local function apply(config)
     -- TODO: drop this when default for array value will be supported.
     if configdata:get('iproto.listen') == nil then
         box_cfg.listen = box.NULL
+    else
+        set_listen(configdata, box_cfg)
     end
 
     -- Construct box_cfg.replication.
