@@ -347,7 +347,8 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 	int fd = coio_connect(uri->host != NULL ? uri->host : "",
 			      uri->service != NULL ? uri->service : "",
 			      uri->host_hint, addr, addr_len,
-			      replication_disconnect_timeout(), NULL);
+			      replication_disconnect_timeout(),
+			      uri_param(uri, "interface", 0));
 	if (fd < 0)
 		diag_raise();
 	if (iostream_create(io, fd, io_ctx) != 0) {
