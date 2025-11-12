@@ -181,6 +181,41 @@ M['failover'] = function(_data, w)
     validate_scope(w, {'global'})
 end
 
+M['failover.http'] = function(data, w)
+    if data == nil or next(data) == nil then
+        return
+    end
+    local listen = data.listen or {}
+    if next(listen) == nil then
+        w.error('failover.http.listen must define at least one listener')
+    end
+
+    if #listen > 1 then
+        w.error('failover.http.listen must define only one URI')
+    end
+end
+
+M['failover.http.listen.*.uri'] = function(value, w)
+    validate_uri_field(false, false)(value, w)
+    local parsed = urilib.parse(value)
+    if parsed.service == nil then
+        w.error('failover.http.listen.uri must include a port: %q', value)
+    end
+end
+
+M['failover.metrics'] = function(data, w)
+    if data == nil then
+        w.error("failover.metrics must define at least one exporter")
+    end
+end
+
+M['failover.metrics.exporters.*.path'] = function(value, w)
+    if not value:startswith('/') then
+        w.error('failover.metrics.exporters.path must start with "/": %q',
+                value)
+    end
+end
+
 M['failover.log'] = function(data, w)
     if data.to == 'file' and data.file == nil then
         w.error('log.file must be specified when log.to is "file"')
