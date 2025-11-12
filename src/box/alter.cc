@@ -762,6 +762,8 @@ struct alter_space {
 	struct rlist in_list;
 	/** Transaction doing this alter. */
 	struct txn *txn;
+
+	struct txn_stmt *stmt;
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
@@ -814,6 +816,7 @@ alter_space_new(struct space *old_space)
 	rlist_create(&alter->ops);
 	rlist_add_entry(&alter_space_list, alter, in_list);
 	alter->txn = in_txn();
+	alter->stmt = txn_current_stmt(alter->txn);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
 	alter->new_min_field_count = old_space->format->min_field_count;
@@ -952,6 +955,37 @@ alter_space_commit(struct trigger *trigger, void *event)
 	return 0;
 }
 
+void
+alter_prepare_rollback_info(struct alter_space *alter)
+{
+	uint32_t space_id = alter->old_space->def->id;
+	struct txn_stmt *stmt = alter->stmt;
+
+	struct alter_space *another_alter;
+	rlist_foreach_entry(another_alter, &alter_space_list, in_list) {
+		if (another_alter->old_space->def->id != space_id ||
+		    another_alter->stmt->space->def->id !=
+		    stmt->space->def->id)
+			continue;
+		if (another_alter->txn != in_txn()) {
+			assert(stmt->rollback_info.new_tuple ==
+			       another_alter->stmt->rollback_info.old_tuple);
+
+			struct tuple *old_tuple =
+				stmt->rollback_info.old_tuple;
+			struct tuple *new_tuple =
+				another_alter->stmt->rollback_info.new_tuple;
+
+			txn_stmt_prepare_rollback_info(
+				another_alter->stmt, old_tuple, new_tuple);
+			/* nopify current rollback */
+			txn_stmt_prepare_rollback_info(
+				stmt, new_tuple, new_tuple);
+		}
+		break;
+	}
+}
+
 /**
  * Rollback all effects of space alter. This is
  * a transaction trigger, and it fires most likely
@@ -986,6 +1020,8 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_pin_defaults(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
+	if (!memtx_tx_manager_use_mvcc_engine)
+		alter_prepare_rollback_info(alter);
 	alter_space_delete(alter);
 	return 0;
 }

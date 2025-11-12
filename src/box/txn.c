@@ -339,12 +339,18 @@ void
 txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
 			       struct tuple *new_tuple)
 {
-	stmt->rollback_info.old_tuple = old_tuple;
+	if (old_tuple != NULL)
+		tuple_ref(old_tuple);
+	if (new_tuple != NULL)
+		tuple_ref(new_tuple);
+
 	if (stmt->rollback_info.old_tuple != NULL)
-		tuple_ref(stmt->rollback_info.old_tuple);
-	stmt->rollback_info.new_tuple = new_tuple;
+		tuple_unref(stmt->rollback_info.old_tuple);
 	if (stmt->rollback_info.new_tuple != NULL)
-		tuple_ref(stmt->rollback_info.new_tuple);
+		tuple_unref(stmt->rollback_info.new_tuple);
+
+	stmt->rollback_info.old_tuple = old_tuple;
+	stmt->rollback_info.new_tuple = new_tuple;
 }
 
 void
