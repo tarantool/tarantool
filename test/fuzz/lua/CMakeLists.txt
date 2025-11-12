@@ -48,6 +48,94 @@ set_tests_properties(
   ${test_path}/test_mvcc.lua
   PROPERTIES
     ENVIRONMENT "LUA_PATH=${LUATEST_LUA_PATH};${LUA_PATH}"
-    LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${TEST_SUITE_NAME}-deps
+)
+
+function(create_luzer_test)
+  cmake_parse_arguments(
+    FUZZ
+    ""
+    "FILENAME"
+    "TEST_ENV;LABELS"
+    ""
+    ${ARGN}
+  )
+  get_filename_component(test_name ${FUZZ_FILENAME} NAME_WE)
+  string(REPLACE "_test" "" test_prefix ${test_name})
+  set(dict_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix}.dict)
+  set(libfuzzer_opts_effective ${LIBFUZZER_OPTS})
+  if(EXISTS ${dict_path})
+    set(libfuzzer_opts_effective "${libfuzzer_opts_effective} -dict=${dict_path}")
+  endif()
+  set(corpus_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix})
+  if(EXISTS ${corpus_path})
+    set(libfuzzer_opts_effective "${libfuzzer_opts_effective} ${corpus_path}")
+  endif()
+
+  add_test(NAME ${test_name}
+    COMMAND ${BASH} -c "${LUAJIT_TEST_BINARY} ${FUZZ_FILENAME} ${libfuzzer_opts_effective}"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  set_tests_properties(${test_name} PROPERTIES
+    LABELS "${FUZZ_LABELS}"
+    ENVIRONMENT "${FUZZ_TEST_ENV}"
+    DEPENDS ${LUAJIT_TEST_BINARY}
+  )
+endfunction()
+
+# Set LUZER_LUA_PATH and LUZER_LUA_CPATH.
+include(BuildLuzer)
+
+# Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
+include(BuildLuaTests)
+
+# test_engine.lua supports luzer, but test_mvcc.lua is not.
+string(JOIN ";" LUZER_TESTS
+  box_execute_test.lua
+  console_eval_test.lua
+  csv_load_test.lua
+  decimal_new_test.lua
+  json_decode_test.lua
+  misc_memprof_test.lua
+  misc_sysprof_test.lua
+  msgpack_decode_test.lua
+  msgpack_itv_test.lua
+  net_box_call_test.lua
+  pickle_unpack_test.lua
+  test_engine.lua
+  uri_escape_test.lua
+  uri_parse_test.lua
+  uuid_frombin_test.lua
+  yaml_decode_test.lua
+)
+
+make_lua_path(FUZZ_LUA_PATH
+  PATHS
+  ${LUZER_LUA_PATH}
+  ${CMAKE_CURRENT_SOURCE_DIR}/?.lua
+)
+list(APPEND TEST_ENV
+  "LUA_PATH=${FUZZ_LUA_PATH};"
+  "LUA_CPATH=${LUZER_LUA_CPATH};"
+)
+if (ENABLE_ASAN)
+  list(APPEND TEST_ENV
+    "LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/asan/lsan.supp;"
+  )
+endif()
+foreach(test_name ${LUZER_TESTS})
+  create_luzer_test(
+    FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/${test_name}
+    TEST_ENV "${TEST_ENV}"
+    LABELS "fuzzing;${TEST_SUITE_NAME}"
+  )
+endforeach()
+set_tests_properties(
+  # To be enabled in scope tarantool/tarantool#11897.
+  box_execute_test
+  # To be enabled in scope tarantool/tarantool#11898.
+  json_decode_test
+  # To be enabled in scope tarantool/security#151.
+  uri_parse_test
+  PROPERTIES DISABLED TRUE
 )

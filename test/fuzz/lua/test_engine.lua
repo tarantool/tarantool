@@ -1,10 +1,11 @@
 --[[
 The test for Tarantool allows you to randomly generate DDL and DML
-operations for spaces uses vinyl and memtx engines and toggle
-random error injections. All random operations and settings depend
-on the seed, which is generated at the very beginning of the test.
+operations for spaces uses vinyl, memtx and memcs engines and
+toggle random error injections. All random operations and settings
+depend on the seed, which is generated at the very beginning of
+the test.
 
-by default the script uses a directory `test_engine_dir` in
+By default the script uses a directory `test_engine_dir` in
 a current directory. Custom test directory can be specified with
 option `--test_dir`. The script will clean up the directory before
 testing if it exists.
@@ -20,6 +21,7 @@ local ffi = require('ffi')
 local fun = require('fun')
 local json = require('json')
 local log = require('log')
+local has_luzer, luzer = pcall(require, 'luzer')
 local math = require('math')
 
 -- Tarantool datatypes.
@@ -31,17 +33,6 @@ local uuid = require('uuid')
 local test_dir_name = 'test_engine_dir'
 local DEFAULT_TEST_DIR = fio.pathjoin(fio.cwd(), test_dir_name)
 
-local params = require('internal.argparse').parse(arg, {
-    { 'engine', 'string' },
-    { 'fault_injection', 'boolean' },
-    { 'h', 'boolean' },
-    { 'seed', 'number' },
-    { 'test_duration', 'number' },
-    { 'test_dir', 'string' },
-    { 'verbose', 'boolean' },
-    { 'workers', 'number' },
-})
-
 local function counter()
     local i = 0
     return function()
@@ -52,8 +43,20 @@ end
 
 local index_id_func = counter()
 
-if params.help or params.h then
-    print(([[
+local box_cfg = false
+
+local arg_options = {
+    { 'engine', 'string' },
+    { 'fault_injection', 'boolean' },
+    { 'h', 'boolean' },
+    { 'seed', 'number' },
+    { 'test_duration', 'number' },
+    { 'test_dir', 'string' },
+    { 'verbose', 'boolean' },
+    { 'workers', 'number' },
+}
+
+local USAGE_STRING = [[
 
  Usage: tarantool test_engine.lua [options]
 
@@ -68,38 +71,37 @@ if params.help or params.h then
    seed <number>                         - set a PRNG seed
    verbose <boolean, false>              - enable verbose logging
    help (same as -h)                     - print this message
-]]):format(test_dir_name))
-    os.exit(0)
-end
+]]
 
--- Number of workers.
-local arg_num_workers = params.workers or 50
+local function parse_args()
+    local params = require('internal.argparse').parse(arg, arg_options)
 
--- Test duration time.
-local arg_test_duration = params.test_duration or 2*60
-
--- Test directory.
-local arg_test_dir = params.test_dir or DEFAULT_TEST_DIR
-
--- Tarantool engine.
-local arg_engine = params.engine or 'vinyl'
-
-local arg_verbose = params.verbose or false
-
-local arg_fault_injection = params.fault_injection or false
-
-local seed = params.seed or os.time()
-math.randomseed(seed)
-log.info('Random seed: %d', seed)
-
--- MEMCS engine requires Tarantool Enterprise and a Lua C module:
--- `arrow_c_api_wrapper`.
-if arg_engine == 'memcs' then
-    local tarantool = require('tarantool')
-    if tarantool.package ~= 'Tarantool Enterprise' then
-        error('Engine ' .. arg_engine .. ' requires Tarantool Enterprise')
+    if params.help or params.h then
+        print((USAGE_STRING):format(test_dir_name))
+        os.exit(0)
     end
-    arrow = require('arrow_c_api_wrapper')
+
+    local args = {}
+
+    -- Number of workers.
+    args.num_workers = params.workers or 50
+
+    -- Test duration time.
+    args.test_duration = params.test_duration or 2*60
+
+    -- Test directory.
+    args.test_dir = params.test_dir or DEFAULT_TEST_DIR
+
+    -- Tarantool engine.
+    args.engine = params.engine or 'vinyl'
+
+    args.verbose = params.verbose or false
+
+    args.fault_injection = params.fault_injection or false
+
+    args.seed = params.seed or os.time()
+
+    return args
 end
 
 -- The table contains a whitelist of errors that will be ignored
@@ -373,7 +375,8 @@ local tarantool_type = {
     },
     ['uint64'] = {
         generator = function()
-            local v = math.random(0, 2^64 - 1)
+            -- FIXME:
+            local v = math.random(0, 2^62 - 1)
             return ffi.cast('uint64_t', v)
         end,
         operations = {'+', '-', '&', '|', '^'},
@@ -430,7 +433,9 @@ local function random_space_format(engine)
         table.insert(space_format, {
             name =('field_%d'):format(i),
             type = datatype,
-            is_nullable = oneof({true, false}),
+            -- XXX: Fix, otherwise `possible_fields` in
+            -- `index_opts` is empty.
+            is_nullable = false,
         })
     end
     for i = min_num_fields - 1, num_fields - min_num_fields - 1 do
@@ -630,13 +635,13 @@ local function insert_arrow_op(space, batch)
     arrow.box_insert_arrow(space.id, batch)
 end
 
-local function setup(engine_name, space_id_func, test_dir, verbose)
-    log.info('SETUP')
-    assert(engine_name == 'memtx' or
-           engine_name == 'vinyl' or
-           engine_name == 'memcs')
+local function setup_box(test_dir, verbose)
+    if box_cfg then
+        return
+    end
     -- Configuration reference (box.cfg),
     -- https://www.tarantool.io/en/doc/latest/reference/configuration/
+    box_cfg = true
 
     local vinyl_range_size = oneof({1, 4, 16, 128}) * 1024
     local vinyl_page_size = oneof({1, 4, 16, 128, 512}) * 1024
@@ -667,7 +672,8 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
         vinyl_write_threads = math.random(2, 10),
         wal_cleanup_delay = 14400,
         wal_dir_rescan_delay = math.random(1, 20),
-        wal_max_size = math.random(1024 * 1024 * 1024),
+        -- FIXME:
+        wal_max_size = math.random(2, 1024 * 1024 * 1024),
         wal_mode = oneof({'write', 'fsync'}),
         wal_queue_max_size = 16777216,
         work_dir = test_dir,
@@ -681,6 +687,13 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     end
     box.cfg(box_cfg_options)
     log.info('FINISH BOX.CFG')
+end
+
+local function setup_space(engine_name, space_name)
+    log.info('SETUP')
+    assert(engine_name == 'memtx' or
+           engine_name == 'vinyl' or
+           engine_name == 'memcs')
 
     log.info('CREATE A SPACE')
     local space_format = random_space_format(engine_name)
@@ -700,7 +713,6 @@ local function setup(engine_name, space_id_func, test_dir, verbose)
     if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
     end
-    local space_name = ('test_%d'):format(space_id_func())
     local space = box.schema.space.create(space_name, space_opts)
     index_create_op(space)
     index_create_op(space)
@@ -806,6 +818,9 @@ local function index_opts(space, is_primary)
 end
 
 function index_create_op(space)
+    -- if not index_id_func then
+    --     index_id_func = counter()
+    -- end
     local idx_id = index_id_func()
     local idx_name = 'idx_' .. idx_id
     local is_primary = idx_id == 1
@@ -1338,6 +1353,9 @@ local function worker_func(id, space, test_gen, deadline)
     while os.clock() <= deadline do
         local operation_name
         state, operation_name = gen(param, shared_gen_state)
+        if not operation_name then
+            break
+        end
         if state == nil then
             break
         end
@@ -1749,12 +1767,16 @@ local function start_error_injections(space, deadline)
 end
 
 local function run_test(num_workers, test_duration, test_dir,
-                        engine_name, verbose_mode, fault_injection)
+                        engine_name, verbose_mode, fault_injection, seed)
+    math.randomseed(seed)
+    log.info('Random seed: %d', seed)
+
     if fio.path.exists(test_dir) then
         cleanup_dir(test_dir)
     else
         fio.mkdir(test_dir)
     end
+    index_id_func = counter()
 
     local socket_path = fio.pathjoin(fio.abspath(test_dir), 'console.sock')
     console.listen(socket_path)
@@ -1762,7 +1784,9 @@ local function run_test(num_workers, test_duration, test_dir,
 
     local fibers = {}
     local space_id_func = counter()
-    local space = setup(engine_name, space_id_func, test_dir, verbose_mode)
+    setup_box(test_dir, verbose_mode)
+    local space_name = ('test_%d'):format(space_id_func())
+    local space = setup_space(engine_name, space_name)
     local deadline = os.clock() + test_duration
 
     local test_gen = fun.cycle(fun.iter(keys(ops)))
@@ -1798,5 +1822,92 @@ local function run_test(num_workers, test_duration, test_dir,
     os.exit(exit_code)
 end
 
-run_test(arg_num_workers, arg_test_duration, arg_test_dir,
-         arg_engine, arg_verbose, arg_fault_injection)
+local space_id_func
+
+local function TestOneInput(buf)
+    -- Suppress logging by the test and tarantool, libFuzzer
+    -- output is more informative.
+    log.cfg({ level = "warn" })
+    local verbose_mode = false
+    local test_dir = DEFAULT_TEST_DIR
+    local fdp = luzer.FuzzedDataProvider(buf)
+    local math_random = function(fdp)
+        assert(fdp ~= nil)
+        return function(n1, n2)
+            if not n2 then
+                if not n1 then
+                    return fdp:consume_number(0, 1)
+                end
+                n2 = n1
+                n1 = 1
+            end
+            return fdp:consume_integer(n1, n2)
+        end
+    end
+    math.random = math_random(fdp)
+    local seed = fdp:consume_integer(1, 1000)
+    math.randomseed(seed)
+
+    index_id_func = counter()
+    local engine_name = fdp:oneof({ 'memtx', 'vinyl' })
+    local space_id = space_id_func()
+    setup_box(test_dir, verbose_mode)
+    local space_name = ('space_%d'):format(space_id)
+    local space = setup_space(engine_name, space_name)
+    local MAX_OPS = fdp:consume_integer(10, 50)
+    local num_workers = fdp:consume_integer(1, 200)
+    local deadline = os.clock() + fdp:consume_integer(1, 1000)
+    local test_gen = fun.cycle(fun.iter(keys(ops))):take_n(MAX_OPS)
+
+    local fibers = {}
+    for id = 1, num_workers do
+        local f = fiber.new(worker_func, id, space, test_gen, deadline)
+        f:set_joinable(true)
+        f:name('WRK #' .. id)
+        table.insert(fibers, f)
+    end
+
+    local fault_injection = fdp:consume_boolean()
+    if fault_injection then
+        local f = start_error_injections(space, deadline)
+        table.insert(fibers, f)
+    end
+
+    for _, fb in ipairs(fibers) do
+        local ok, res = fiber.join(fb)
+        if not ok then
+            log.warn('ERROR: %s', json.encode(res))
+        end
+    end
+    teardown(space)
+end
+
+if has_luzer then
+    if fio.path.exists(DEFAULT_TEST_DIR) then
+        cleanup_dir(DEFAULT_TEST_DIR)
+    end
+    if not fio.path.exists(DEFAULT_TEST_DIR) then
+        fio.mkdir(DEFAULT_TEST_DIR)
+    end
+    local args = {
+        artifact_prefix = "test_engine_",
+    }
+    index_id_func = counter()
+    space_id_func = counter()
+    luzer.Fuzz(TestOneInput, nil, args)
+    os.exit()
+end
+
+local args = parse_args()
+-- MEMCS engine requires Tarantool Enterprise and a Lua C module:
+-- `arrow_c_api_wrapper`.
+if args.engine == 'memcs' then
+    local tarantool = require('tarantool')
+    if tarantool.package ~= 'Tarantool Enterprise' then
+        error('Engine ' .. args.engine .. ' requires Tarantool Enterprise')
+    end
+    arrow = require('arrow_c_api_wrapper')
+end
+
+run_test(args.num_workers, args.test_duration, args.test_dir,
+         args.engine, args.verbose, args.fault_injection, args.seed)
