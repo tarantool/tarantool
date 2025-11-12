@@ -209,6 +209,14 @@ uri_set_credentials(struct uri *uri, const char *login, const char *password)
 }
 
 void
+uri_set_interface(struct uri *uri, const char *interface)
+{
+	assert(interface != NULL);
+	free(uri->interface);
+	uri->interface = xstrdup(interface);
+}
+
+void
 uri_copy(struct uri *dst, const struct uri *src)
 {
 	dst->scheme = XSTRDUP(src->scheme);
@@ -226,6 +234,7 @@ uri_copy(struct uri *dst, const struct uri *src)
 		       xmalloc(src->params_capacity * sizeof(*dst->params)));
 	for (int i = 0; i < src->param_count; i++)
 		uri_param_copy(&dst->params[i], &src->params[i]);
+	dst->interface = XSTRDUP(src->interface);
 }
 
 void
@@ -247,6 +256,7 @@ uri_destroy(struct uri *uri)
 	free(uri->path);
 	free(uri->query);
 	free(uri->fragment);
+	free(uri->interface);
 	TRASH(uri);
 }
 
@@ -537,6 +547,7 @@ uri_is_equal(const struct uri *a, const struct uri *b)
 	    !fields_are_equal(a->login, b->login) ||
 	    !fields_are_equal(a->password, b->password) ||
 	    !fields_are_equal(a->fragment, b->fragment) ||
+	    !fields_are_equal(a->interface, b->interface) ||
 	    !uri_addr_is_equal(a, b))
 		return false;
 	if (a->param_count != b->param_count)

@@ -49,29 +49,64 @@ uri_creds_g.test_creads = function(cg)
     t.assert_equals(res.password, cg.params.res.password)
 end
 
-local uri_creds_errors_g = t.group("uri_creds_errors", {
+local uri_interface_g = t.group("uri_interface")
+
+uri_interface_g.test_interface = function()
+    -- A single URI with an interface.
+    local res = uri.parse({3301, interface = 'lo'})
+    t.assert_equals(res.interface, 'lo')
+
+    -- Multiple URIs with a default interface.
+    res = uri.parse_many({3301, 3302, default_interface = 'lo'})
+    t.assert_equals(res[1].interface, 'lo')
+    t.assert_equals(res[2].interface, 'lo')
+
+    -- Multiple URIs with a default interface and interface overrides.
+    res = uri.parse_many({{uri = 3301, interface = 'eth0'},
+                          {uri = 3302}, {uri = 3303},
+                          {uri = 3304, interface = 'eth1'},
+                          default_interface = 'lo'})
+    t.assert_equals(res[1].interface, 'eth0')
+    t.assert_equals(res[2].interface, 'lo')
+    t.assert_equals(res[3].interface, 'lo')
+    t.assert_equals(res[4].interface, 'eth1')
+end
+
+local uri_errors_g = t.group("uri_errors", {
+    {tab = {uri = 'localhost:3301', default_params = {foo = 'bar'}},
+     err = 'Default URI parameters or interface not allowed for single URI'},
+    {tab = {uri = 'localhost:3301', default_interface = 'lo'},
+     err = 'Default URI parameters or interface not allowed for single URI'},
     {tab = {uri = 'localhost:3301', login = 1, password = 'two'},
      err = 'Invalid URI table: expected type for login is string'},
     {tab = {uri = 'localhost:3301', login = 'one', password = 2},
      err = 'Invalid URI table: expected type for password is string'},
     {tab = {uri = 'alpha:qwe@localhost:3301', password = 'two'},
      err = 'Invalid URI table: login required if password is set'},
+    {tab = {uri = 'localhost:3301', interface = false},
+     err = 'Invalid URI table: expected type for interface is string'},
 })
 
-uri_creds_errors_g.test_creads_errors = function(cg)
+uri_errors_g.test_errors = function(cg)
     local res, err = uri.parse(cg.params.tab)
     t.assert(res == nil)
     t.assert_equals(err.message, cg.params.err)
 end
 
-local uri_set_creds_errors_g = t.group("uri_set_creds_errors", {
+local uri_set_errors_g = t.group("uri_set_errors", {
+    {tab = {'localhost:3301', 'localhost:3302', params = {foo = 'bar'}},
+     err = 'URI parameters are not allowed for multiple URIs'},
+    {tab = {'localhost:3301', 'localhost:3302', interface = 'lo'},
+     err = 'URI interface is not allowed for multiple URIs'},
     {tab = {'localhost:3301', 'localhost:3302', login = 'one'},
      err = 'URI login is not allowed for multiple URIs'},
     {tab = {'localhost:3301', 'localhost:3302', password = 'two'},
      err = 'URI password is not allowed for multiple URIs'},
+    {tab = {'localhost:3301', 'localhost:3302', default_interface = false},
+     err = 'Incorrect type for default_interface: should be a string'},
 })
 
-uri_set_creds_errors_g.test_set_creds_errors = function(cg)
+uri_set_errors_g.test_set_errors = function(cg)
     local res, err = uri.parse_many(cg.params.tab)
     t.assert(res == nil)
     t.assert_equals(err.message, cg.params.err)

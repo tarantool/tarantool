@@ -128,13 +128,13 @@ test_error_message(uri_table, errmsg)
 -- with size equal to one
 -- Several URIs is banned in the same table.
 uri_table = {uri = unix_socket_path, unix_sock_path}
-errmsg = "Invalid URI table: expected {uri = string, params = table} or " ..
-         "{string, params = table}"
+errmsg = "Invalid URI table: expected {uri = string, params = table," ..
+         " interface = string} or {string, params = table, interface = string}"
 test_error_message(uri_table, errmsg)
 
 -- Default params is banned for single URI
 uri_table = {unix_sock_path, default_params = {q = "v"}}
-errmsg = "Default URI parameters are not allowed for single URI"
+errmsg = "Default URI parameters or interface not allowed for single URI"
 test_error_message(uri_table, errmsg)
 
 -- Incorrect URI: expected host:service or /unix.socket
@@ -192,25 +192,25 @@ test_error_message(uri_table, errmsg)
 -- Tests for nested tables
 -- Several URIs in nested table is not allowed
 uri_table = {unix_sock_path, {unix_sock_path, unix_sock_path}}
-errmsg = "Invalid URI table: expected {uri = string, params = table} " ..
-         "or {string, params = table}"
+errmsg = "Invalid URI table: expected {uri = string, params = table," ..
+         " interface = string} or {string, params = table, interface = string}"
 test_error_message(uri_table, errmsg)
 
 -- Same as previous but with "uri=" syntax
 uri_table = {unix_sock_path, {unix_sock_path, uri = unix_sock_path}}
-errmsg = "Invalid URI table: expected {uri = string, params = table} " ..
-         "or {string, params = table}"
+errmsg = "Invalid URI table: expected {uri = string, params = table," ..
+         " interface = string} or {string, params = table, interface = string}"
 test_error_message(uri_table, errmsg)
 
 -- Missing URI is not allowed in ensted table
 uri_table = {unix_sock_path, {}}
-errmsg = "Invalid URI table: expected {uri = string, params = table} " ..
-         "or {string, params = table}"
+errmsg = "Invalid URI table: expected {uri = string, params = table," ..
+         " interface = string} or {string, params = table, interface = string}"
 test_error_message(uri_table, errmsg)
 
 -- Default params is not allowed in nested table
 uri_table = {unix_sock_path, {unix_sock_path, default_params = {q = "v"}}}
-errmsg = "Default URI parameters are not allowed for single URI"
+errmsg = "Default URI parameters or interface not allowed for single URI"
 test_error_message(uri_table, errmsg)
 
 -- Invalid URI in nested table
@@ -257,8 +257,8 @@ test_error_message(uri_table, errmsg)
 
 -- Invalid URI table
 uri_table = {unix_sock_path, unix_sock_path, uri = unix_sock_path}
-errmsg = "Invalid URI table: expected {uri = string, params = table} " ..
-         "or {string, params = table}"
+errmsg = "Invalid URI table: expected {uri = string, params = table," ..
+         " interface = string} or {string, params = table, interface = string}"
 test_error_message(uri_table, errmsg)
 
 -- URI parameters arenot allowed for multiple URIs

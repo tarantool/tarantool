@@ -128,15 +128,16 @@ uri_create_from_lua_table(struct lua_State *L, int idx, struct uri *uri)
 	int size = lua_objlen(L, idx);
 	int uri_count = size + is_field_present(L, idx, "uri");
 	if (uri_count != 1) {
-		diag_set(IllegalParams, "Invalid URI table: "
-			 "expected {uri = string, params = table} "
-			 "or {string, params = table}");
+		diag_set(IllegalParams, "Invalid URI table: expected"
+			 " {uri = string, params = table, interface = string}"
+			 " or {string, params = table, interface = string}");
 		return -1;
 	}
-	/* Table "default_params" is not allowed for single URI */
-	if (is_field_present(L, idx, "default_params")) {
-		diag_set(IllegalParams, "Default URI parameters are "
-			 "not allowed for single URI");
+	/* No "default_params" nor "default_interface" allowed for single URI */
+	if (is_field_present(L, idx, "default_params") ||
+	    is_field_present(L, idx, "default_interface")) {
+		diag_set(IllegalParams, "Default URI parameters or"
+			 " interface not allowed for single URI");
 		return -1;
 	}
 	int rc = 0;
@@ -193,8 +194,22 @@ uri_create_from_lua_table(struct lua_State *L, int idx, struct uri *uri)
 	lua_rawget(L, idx);
 	rc = uri_add_params_from_lua(uri, L, true);
 	lua_pop(L, 1);
-	if (rc == 0)
-		return 0;
+	if (rc != 0)
+		goto error;
+
+	lua_pushstring(L, "interface");
+	lua_rawget(L, idx);
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		uri_set_interface(uri, lua_tostring(L, -1));
+	} else if (lua_type(L, -1) != LUA_TNIL) {
+		diag_set(IllegalParams, "Invalid URI table: expected type for "
+			 "interface is string");
+		rc = -1;
+	}
+	lua_pop(L, 1);
+	if (rc != 0)
+		goto error;
+	return 0;
 error:
 	uri_destroy(uri);
 	return rc;
@@ -272,11 +287,16 @@ uri_set_create_from_lua_table(struct lua_State *L, int idx,
 		goto fail;
 
 	/*
-	 * Here we are only in case when it is an URI array, so it
-	 * shouldn't be "params", "login" and "password" fields here.
+	 * Here we are only in case when it is an URI array, so it shouldn't
+	 * be "params", "interface", "login" and "password" fields here.
 	 */
 	if (is_field_present(L, idx, "params")) {
 		diag_set(IllegalParams, "URI parameters are "
+			 "not allowed for multiple URIs");
+		goto fail;
+	}
+	if (is_field_present(L, idx, "interface")) {
+		diag_set(IllegalParams, "URI interface is "
 			 "not allowed for multiple URIs");
 		goto fail;
 	}
@@ -299,6 +319,23 @@ uri_set_create_from_lua_table(struct lua_State *L, int idx,
 			rc = uri_add_params_from_lua(uri, L, false);
 			assert(rc == 0 || !diag_is_empty(diag_get()));
 		}
+	}
+	lua_pop(L, 1);
+	if (rc != 0)
+		goto fail;
+
+	lua_pushstring(L, "default_interface");
+	lua_rawget(L, idx);
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		for (int i = 0; i < uri_set->uri_count; i++) {
+			struct uri *uri = &uri_set->uris[i];
+			if (uri->interface == NULL)
+				uri_set_interface(uri, lua_tostring(L, -1));
+		}
+	} else if (lua_type(L, -1) != LUA_TNIL) {
+		diag_set(IllegalParams, "Incorrect type for"
+			 " default_interface: should be a string");
+		rc = -1;
 	}
 	lua_pop(L, 1);
 	if (rc != 0)
