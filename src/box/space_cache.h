@@ -139,11 +139,13 @@ space_by_name0(const char *name)
 }
 
 /**
- * Find minimal unused id, which is greater than cur_id.
- * If there is no available id, BOX_SPACE_MAX + 1 is returned.
+ * Find if a space with given id already exists.
  */
-uint32_t
-space_cache_find_next_unused_id(uint32_t cur_id);
+static inline bool
+space_is_id_occupied(uint32_t id)
+{
+	return space_by_id(id) != NULL;
+}
 
 /**
  * Find a space by given ID. Return NULL and set diag if not found.
