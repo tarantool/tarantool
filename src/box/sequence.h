@@ -83,7 +83,7 @@ struct sequence {
 	/** Set if the sequence is automatically generated. */
 	bool is_generated;
 	/** Cached runtime access information. */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 };
 
 static inline size_t

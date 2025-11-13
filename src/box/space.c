@@ -118,14 +118,15 @@ access_check_space(struct space *space, user_access_t access)
 	 * Similarly to global access, subtract entity-level access
 	 * (access to all spaces) if it is present.
 	 */
-	space_access &= ~entity_access_get(SC_SPACE)[cr->auth_token].effective;
+	space_access &= ~entity_access_get(SC_SPACE, cr->auth_token).effective;
 
 	if (space_access &&
 	    /* Check for missing USAGE access, ignore owner rights. */
 	    (space_access & PRIV_U ||
 	     /* Check for missing specific access, respect owner rights. */
 	    (space->def->uid != cr->uid &&
-	     space_access & ~space->access[cr->auth_token].effective))) {
+	     space_access & ~accesses_get(&space->accesses,
+					  cr->auth_token).effective))) {
 		/*
 		 * Report access violation. Throw "no such user"
 		 * error if there is no user with this id.

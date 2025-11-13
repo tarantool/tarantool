@@ -177,14 +177,17 @@ access_check_lua_call(const char *name, uint32_t name_len)
 	if (access == 0)
 		return 0;
 	/* Check for entity access. Don't allow to call built-ins. */
-	access &= ~universe.access_lua_call[cr->auth_token].effective;
+	access &= ~accesses_get(&universe.accesses_lua_call,
+				cr->auth_token).effective;
 	if (access == 0 && !tarantool_lua_is_builtin_global(name, name_len))
 		return 0;
 	/* Check for function access if the user has usage access. */
 	if ((access & PRIV_U) == 0) {
-		struct access *object = access_lua_call_find(name, name_len);
-		if (object != NULL &&
-		    (object[cr->auth_token].effective & PRIV_X) != 0)
+		struct access object;
+		bool object_exists = access_lua_call_find(name, name_len,
+							  cr->auth_token,
+							  &object);
+		if (object_exists && (object.effective & PRIV_X) != 0)
 			return 0;
 	}
 	struct user *user = user_find(cr->uid);
@@ -210,7 +213,8 @@ access_check_lua_eval(void)
 	access &= ~cr->universal_access;
 	if (access == 0)
 		return 0;
-	access &= ~universe.access_lua_eval[cr->auth_token].effective;
+	access &= ~accesses_get(&universe.accesses_lua_eval,
+				cr->auth_token).effective;
 	if (access == 0)
 		return 0;
 	struct user *user = user_find(cr->uid);
