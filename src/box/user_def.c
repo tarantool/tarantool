@@ -31,7 +31,6 @@ priv_name(user_access_t access)
 		"Update",
 		"Delete",
 		"Grant",
-		"Revoke",
 	};
 	int bit_no = __builtin_ffs((int) access);
 	if (bit_no > 0 && bit_no <= (int) lengthof(priv_name_strs))

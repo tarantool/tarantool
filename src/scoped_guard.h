@@ -38,8 +38,8 @@ struct ScopedGuard {
 	Functor f;
 	bool is_active;
 
-	explicit ScopedGuard(const Functor& fun)
-		: f(fun), is_active(true) {
+	explicit ScopedGuard(const Functor &fun, bool is_active_arg)
+		: f(fun), is_active(is_active_arg) {
 		/* nothing */
 	}
 
@@ -62,9 +62,9 @@ private:
 
 template <typename Functor>
 inline ScopedGuard<Functor>
-make_scoped_guard(Functor guard)
+make_scoped_guard(Functor guard, bool is_active = true)
 {
-	return ScopedGuard<Functor>(guard);
+	return ScopedGuard<Functor>(guard, is_active);
 }
 
 #endif /* TARANTOOL_SCOPED_GUARD_H_INCLUDED */
