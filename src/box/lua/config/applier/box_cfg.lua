@@ -61,7 +61,8 @@ local function peer_uris(configdata)
         -- least.
         local isolated = instance_config:get(iconfig_def, 'isolated')
         if not is_anon and not isolated then
-            local uri = instance_config:instance_uri(iconfig_def, 'peer',
+            local uri = instance_config:instance_uri(iconfig_def,
+                configdata._iconfig_def, 'peer',
                 {log_prefix = "replicaset dataflow configuration: "})
             if uri == nil then
                 log.info('%s: instance %q has no iproto.advertise.peer or ' ..
@@ -80,6 +81,21 @@ local function peer_uris(configdata)
     end
 
     return uris
+end
+
+local function set_listen(configdata, box_cfg)
+    -- Construct box_cfg.listen.
+    if box_cfg.listen == nil then
+        local configured_listen =
+            configdata:get('iproto.listen', {use_default = true})
+        local listen = {}
+
+        for _, uri in ipairs(configured_listen) do
+            table.insert(listen, configdata:_enhance_uri_ssl_params(uri))
+        end
+
+        box_cfg.listen = listen
+    end
 end
 
 local function set_replication_peers(configdata, box_cfg)
@@ -1362,6 +1378,7 @@ local function apply(config)
     local configdata = config._configdata
 
     local box_cfg = collect_by_box_cfg_annotation(configdata)
+    set_listen(configdata, box_cfg)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)

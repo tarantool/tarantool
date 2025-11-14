@@ -1610,6 +1610,75 @@ I['iproto.readahead'] = format_text([[
     leave this setting at its default.
 ]])
 
+I['iproto.ssl'] = format_text([[
+    SSL parameters required for encrypted connections. These parameters would be
+    used to set up an SSL IProto socket and to connect to other instances which
+    require certificate authority (CA).
+]])
+
+I['iproto.ssl.ca_file'] = format_text([[
+    (Optional) A path to a trusted certificate authorities (CA) file. If not
+    set, the peer won't be checked for authenticity.
+
+    Both a server and a client can use the ssl_ca_file parameter:
+
+    - If it's on the server side, the server verifies the client.
+    - If it's on the client side, the client verifies the server.
+    - If both sides have the CA files, the server and the client verify each
+      other.
+]])
+
+I['iproto.ssl.ssl_cert'] = format_text([[
+    A path to an SSL certificate file:
+
+    - For a server, it's mandatory.
+    - For a client, it's mandatory if the ssl_ca_file parameter is set for a
+      server; otherwise, optional.
+]])
+
+I['iproto.ssl.ssl_ciphers'] = format_text([[
+    (Optional) A colon-separated (:) list of SSL cipher suites the connection
+    can use. Note that the list is not validated: if a cipher suite is unknown,
+    Tarantool ignores it, doesn't establish the connection, and writes to the
+    log that no shared cipher was found.
+]])
+
+I['iproto.ssl.ssl_key'] = format_text([[
+    A path to a private SSL key file:
+
+    - For a server, it's mandatory.
+    - For a client, it's mandatory if the `ssl_ca_file` parameter is set for a
+      server; otherwise, optional.
+
+    If the private key is encrypted, provide a password for it in the
+    `ssl_password` or `ssl_password_file` parameter
+]])
+
+I['iproto.ssl.ssl_password'] = format_text([[
+    (Optional) A password for an encrypted private SSL key provided using
+    `ssl_key_file`. Alternatively, the password can be provided in
+    `ssl_password_file`.
+
+    Tarantool applies the `ssl_password` and `ssl_password_file` parameters in
+    the following order:
+
+    - If `ssl_password` is provided, Tarantool tries to decrypt the
+      private key with it.
+    - If `ssl_password` is incorrect or isn't provided, Tarantool
+      tries all passwords from `ssl_password_file` one by one in the
+      order they are written.
+    - If `ssl_password` and all passwords from `ssl_password_file`
+      are incorrect, or none of them is provided, Tarantool treats
+      the private key as unencrypted.
+]])
+
+I['iproto.ssl.ssl_password_file'] = format_text([[
+    (Optional) A text file with one or more passwords for encrypted private
+    SSL keys provided using `ssl_key_file` (each on a separate line).
+    Alternatively, the password can be provided in `ssl_password`.
+]])
+
+
 I['iproto.threads'] = format_text([[
     The number of network threads. There can be unusual workloads where the
     network thread is 100% loaded and the transaction processor thread is not,

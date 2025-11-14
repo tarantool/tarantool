@@ -147,8 +147,36 @@ local function find_password(self, iconfig, username)
     return nil
 end
 
-local function instance_uri(self, iconfig, advertise_type, opts)
-    assert(advertise_type == 'peer' or advertise_type == 'sharding')
+local function enhance_uri_ssl_params(self, iconfig, uri)
+    if uri.params == nil or uri.params.transport ~= 'ssl' then
+        return uri
+    end
+
+    local uri = table.copy(uri)
+    uri.params = table.copy(uri.params)
+
+    local ssl = self:get(iconfig, 'iproto.ssl') or {}
+    local ssl_params = {
+        ssl_ca_file = ssl.ca_file,
+        ssl_key_file = ssl.ssl_key,
+        ssl_cert_file = ssl.ssl_cert,
+        ssl_ciphers = ssl.ssl_ciphers,
+        ssl_password = ssl.ssl_password,
+        ssl_password_file = ssl.ssl_password_file,
+    }
+
+    for k, v in pairs(ssl_params) do
+        if uri.params[k] == nil then
+            uri.params[k] = v
+        end
+    end
+
+    return uri
+end
+
+local function instance_uri(self, iconfig, self_iconfig, advertise_type, opts)
+    assert(advertise_type == 'peer' or advertise_type == 'sharding' or
+           advertise_type == 'listen')
 
     -- An effective value of iproto.advertise.sharding defaults to
     -- iproto.advertise.peer.
@@ -184,7 +212,8 @@ local function instance_uri(self, iconfig, advertise_type, opts)
         uri = table.copy(uri)
         uri.password = find_password(self, iconfig, uri.login)
     end
-    return uri
+
+    return enhance_uri_ssl_params(self, self_iconfig, uri)
 end
 
 local function apply_vars_f(data, w, vars)
@@ -672,7 +701,6 @@ return schema.new('instance_config', schema.record({
             }, {
                 validate = validators['iproto.listen.*'],
             }),
-            box_cfg = 'listen',
             default = box.NULL,
         }),
         -- URIs for clients to let them know where to connect.
@@ -832,6 +860,26 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'readahead',
             default = 16320,
         }),
+        ssl = enterprise_edition(schema.record({
+            ca_file = schema.scalar({
+                type = 'string',
+            }),
+            ssl_cert = schema.scalar({
+                type = 'string',
+            }),
+            ssl_ciphers = schema.scalar({
+                type = 'string',
+            }),
+            ssl_key = schema.scalar({
+                type = 'string',
+            }),
+            ssl_password = schema.scalar({
+                type = 'string',
+            }),
+            ssl_password_file = schema.scalar({
+                type = 'string',
+            }),
+        })),
     }),
     database = schema.record({
         instance_uuid = schema.scalar({
@@ -2214,6 +2262,7 @@ return schema.new('instance_config', schema.record({
         apply_vars = apply_vars,
         base_dir = base_dir,
         prepare_file_path = prepare_file_path,
+        enhance_uri_ssl_params = enhance_uri_ssl_params,
     },
     _extra_annotations = {
         descriptions = descriptions.instance_descriptions,

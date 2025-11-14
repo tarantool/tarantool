@@ -85,8 +85,12 @@ end
 
 function methods._instance_uri(self, uri_type, opts, log_opts)
     assert(uri_type == 'peer' or uri_type == 'sharding')
-    return instance_config:instance_uri(choose_iconfig(self, opts), uri_type,
-                                        log_opts)
+    return instance_config:instance_uri(choose_iconfig(self, opts),
+                                        self._iconfig_def, uri_type, log_opts)
+end
+
+function methods._enhance_uri_ssl_params(self, uri)
+    return instance_config:enhance_uri_ssl_params(self._iconfig_def, uri)
 end
 
 -- Generate a part of a vshard configuration that relates to
