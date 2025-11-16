@@ -1768,6 +1768,7 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 				return -1;
 			}
 		}
+		*result = old_tuple;
 	}
 	return 0;
 }
