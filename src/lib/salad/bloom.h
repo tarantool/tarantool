@@ -68,57 +68,60 @@ struct bloom_block {
 };
 
 /**
- * Bloom filter data structure
+ * Bloom filter definition, data is stored separately: all the methods accept
+ * a pointer to the data buffer along with the bloom filter definition.
+ * Size of the data buffer can be calculated with bloom_data_size() function.
+ * In order to initialize bloom filter data, fill it with zero bytes.
  */
 struct bloom {
 	/* Number of buckets (blocks) in the table */
 	uint32_t table_size;
 	/* Number of hash function per value */
 	uint16_t hash_count;
-	/* Bit field table */
-	struct bloom_block *table;
 };
 
 /* {{{ API declaration */
 
 /**
- * Allocate and initialize an instance of bloom filter
+ * Initialize a bloom filter definition.
  *
  * @param bloom - structure to initialize
  * @param number_of_values - estimated number of values to be added
  * @param false_positive_rate - desired false positive rate
- * @return 0 - OK, -1 - memory error
  */
-int
+void
 bloom_create(struct bloom *bloom, uint32_t number_of_values,
 	     double false_positive_rate);
 
 /**
- * Free resources of the bloom filter
- *
- * @param bloom - the bloom filter
+ * Calculate size of a buffer that is needed for storing bloom table
+ * @param bloom - the bloom filter to store
+ * @return - Exact size
  */
-void
-bloom_destroy(struct bloom *bloom);
+size_t
+bloom_data_size(const struct bloom *bloom);
 
 /**
  * Add a value into the data set
- * @param bloom - the bloom filter
+ * @param bloom - the bloom filter definition
+ * @param bloom_data - the bloom filter data
  * @param hash - hash of the value
  */
 static void
-bloom_add(struct bloom *bloom, bloom_hash_t hash);
+bloom_add(const struct bloom *bloom, void *bloom_data, bloom_hash_t hash);
 
 /**
  * Query for presence of a value in the data set
- * @param bloom - the bloom filter
+ * @param bloom - the bloom filter definition
+ * @param bloom_data - the bloom filter data
  * @param hash - hash of the value
  * @return true - the value could be in data set; false - the value is
  *  definitively not in data set
  *
  */
 static bool
-bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash);
+bloom_maybe_has(const struct bloom *bloom, const void *bloom_data,
+		bloom_hash_t hash);
 
 /**
  * Return the expected false positive rate of a bloom filter.
@@ -130,40 +133,20 @@ double
 bloom_fpr(const struct bloom *bloom, uint32_t number_of_values);
 
 /**
- * Calculate size of a buffer that is needed for storing bloom table
- * @param bloom - the bloom filter to store
- * @return - Exact size
+ * Merge two bloom filters with the same definition into one.
+ * @param bloom - the bloom filter definition.
+ * @param dst_data - data of bloom filter which be modified.
+ * @param src_data - data of another bloom filter.
  */
-size_t
-bloom_store_size(const struct bloom *bloom);
-
-/**
- * Store bloom filter table to the given buffer
- * Other struct bloom members must be stored manually.
- * @param bloom - the bloom filter to store
- * @param table - buffer to store to
- * #return - end of written buffer
- */
-char *
-bloom_store(const struct bloom *bloom, char *table);
-
-/**
- * Allocate table and load it from given buffer.
- * Other struct bloom members must be loaded manually.
- *
- * @param bloom - structure to load to
- * @param table - data to load
- * @return 0 - OK, -1 - memory error
- */
-int
-bloom_load_table(struct bloom *bloom, const char *table);
+void
+bloom_merge(const struct bloom *bloom, void *dst_data, const void *src_data);
 
 /* }}} API declaration */
 
 /* {{{ API definition */
 
 static inline void
-bloom_add(struct bloom *bloom, bloom_hash_t hash)
+bloom_add(const struct bloom *bloom, void *bloom_data, bloom_hash_t hash)
 {
 	/* Using lower part of the has for finding a block */
 	bloom_hash_t pos = hash % bloom->table_size;
@@ -173,9 +156,10 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash)
 	/* bit_no in block is less than bloom_block_bits (512).
 	 * split the given hash into independent lower part and high part. */
 	bloom_hash_t hash2 = hash / bloom_block_bits + 1;
+	struct bloom_block *table = (struct bloom_block *)bloom_data;
 	for (bloom_hash_t i = 0; i < bloom->hash_count; i++) {
 		bloom_hash_t bit_no = hash % bloom_block_bits;
-		bit_set(bloom->table[pos].bits, bit_no);
+		bit_set(table[pos].bits, bit_no);
 		/* Combine two hashes to create required number of hashes */
 		/* Add i**2 for better distribution */
 		hash += hash2 + i * i;
@@ -183,7 +167,8 @@ bloom_add(struct bloom *bloom, bloom_hash_t hash)
 }
 
 static inline bool
-bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash)
+bloom_maybe_has(const struct bloom *bloom, const void *bloom_data,
+		bloom_hash_t hash)
 {
 	/* Using lower part of the has for finding a block */
 	bloom_hash_t pos = hash % bloom->table_size;
@@ -193,9 +178,11 @@ bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash)
 	/* bit_no in block is less than bloom_block_bits (512).
 	 * split the given hash into independent lower part and high part. */
 	bloom_hash_t hash2 = hash / bloom_block_bits + 1;
+	const struct bloom_block *table =
+		(const struct bloom_block *)bloom_data;
 	for (bloom_hash_t i = 0; i < bloom->hash_count; i++) {
 		bloom_hash_t bit_no = hash % bloom_block_bits;
-		if (!bit_test(bloom->table[pos].bits, bit_no))
+		if (!bit_test(table[pos].bits, bit_no))
 			return false;
 		/* Combine two hashes to create required number of hashes */
 		/* Add i**2 for better distribution */

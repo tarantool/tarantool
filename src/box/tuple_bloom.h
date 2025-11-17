@@ -55,6 +55,14 @@ enum tuple_bloom_version {
 	TUPLE_BLOOM_VERSION_V3,
 };
 
+/** Holder for bloom filter definition along with its data. */
+struct tuple_bloom_part {
+	/* Definition of the bloom filter. */
+	struct bloom bloom;
+	/* Data of the bloom filter. */
+	char *data;
+};
+
 /**
  * Tuple bloom filter.
  *
@@ -69,7 +77,7 @@ struct tuple_bloom {
 	/** Number of key parts. */
 	uint32_t part_count;
 	/** Array of bloom filters, one per each partial key. */
-	struct bloom parts[0];
+	struct tuple_bloom_part parts[0];
 };
 
 /**
@@ -162,7 +170,7 @@ tuple_bloom_builder_add_key(struct tuple_bloom_builder *builder,
  * Create a new tuple bloom filter.
  * @param builder - bloom filter builder
  * @param fpr - desired false positive rate
- * @return bloom filter on success or NULL on OOM
+ * @return bloom filter, never fails (never returns NULL)
  */
 struct tuple_bloom *
 tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr);
@@ -223,7 +231,7 @@ tuple_bloom_encode(const struct tuple_bloom *bloom, char *buf);
  * @param data - pointer to buffer storing encoded bloom filter;
  *  on success it is advanced by the number of decoded bytes
  * @param version - how to interpret the data.
- * @return the decoded bloom on success or NULL on OOM
+ * @return the decoded bloom, never fails (never returns NULL)
  */
 struct tuple_bloom *
 tuple_bloom_decode(const char **data, enum tuple_bloom_version version);

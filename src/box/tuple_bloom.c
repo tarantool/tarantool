@@ -264,13 +264,8 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 {
 	uint32_t part_count = builder->part_count;
 	size_t size = sizeof(struct tuple_bloom) +
-			part_count * sizeof(struct bloom);
-	struct tuple_bloom *bloom = malloc(size);
-	if (bloom == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "tuple bloom");
-		return NULL;
-	}
-
+			part_count * sizeof(struct tuple_bloom_part);
+	struct tuple_bloom *bloom = xmalloc(size);
 	bloom->version = TUPLE_BLOOM_VERSION_V3;
 	bloom->part_count = 0;
 
@@ -287,17 +282,17 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 		 */
 		double part_fpr = fpr;
 		for (uint32_t j = 0; j < i; j++)
-			part_fpr /= bloom_fpr(&bloom->parts[j], count);
+			part_fpr /= bloom_fpr(&bloom->parts[j].bloom,
+					      count);
 		part_fpr = MIN(part_fpr, 0.5);
-		if (bloom_create(&bloom->parts[i], count, part_fpr) != 0) {
-			diag_set(OutOfMemory, 0, "bloom_create",
-				 "tuple bloom part");
-			tuple_bloom_delete(bloom);
-			return NULL;
-		}
+		bloom_create(&bloom->parts[i].bloom, count, part_fpr);
+		bloom->parts[i].data = xcalloc(
+			1, bloom_data_size(&bloom->parts[i].bloom));
 		bloom->part_count++;
 		for (uint32_t k = 0; k < count; k++)
-			bloom_add(&bloom->parts[i], hash_arr->values[k]);
+			bloom_add(&bloom->parts[i].bloom,
+				  bloom->parts[i].data,
+				  hash_arr->values[k]);
 	}
 	return bloom;
 }
@@ -306,7 +301,7 @@ void
 tuple_bloom_delete(struct tuple_bloom *bloom)
 {
 	for (uint32_t i = 0; i < bloom->part_count; i++)
-		bloom_destroy(&bloom->parts[i]);
+		free(bloom->parts[i].data);
 	free(bloom);
 }
 
@@ -317,7 +312,8 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
 	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
-		return bloom_maybe_has(&bloom->parts[0],
+		return bloom_maybe_has(&bloom->parts[0].bloom,
+				       bloom->parts[0].data,
 				       tuple_hash(tuple, key_def));
 	}
 
@@ -332,7 +328,9 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 				&h, &carry, tuple, &key_def->parts[i],
 				multikey_idx);
 			uint32_t hash = PMurHash32_Result(h, carry, total_size);
-			if (!bloom_maybe_has(&bloom->parts[i], hash))
+			if (!bloom_maybe_has(&bloom->parts[i].bloom,
+					     bloom->parts[i].data,
+					     hash))
 				return false;
 		}
 		return true;
@@ -343,7 +341,9 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 						  &key_def->parts[i],
 						  multikey_idx);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
-		if (!bloom_maybe_has(&bloom->parts[i], hash))
+		if (!bloom_maybe_has(&bloom->parts[i].bloom,
+				     bloom->parts[i].data,
+				     hash))
 			return false;
 	}
 	return true;
@@ -357,7 +357,8 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 	if (bloom->version == TUPLE_BLOOM_VERSION_V1) {
 		if (part_count < key_def->part_count)
 			return true;
-		return bloom_maybe_has(&bloom->parts[0],
+		return bloom_maybe_has(&bloom->parts[0].bloom,
+				       bloom->parts[0].data,
 				       key_hash(key, key_def));
 	}
 
@@ -373,7 +374,8 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 				&h, &carry, &key, key_def->parts[i].type,
 				key_def->parts[i].coll);
 			uint32_t hash = PMurHash32_Result(h, carry, total_size);
-			if (!bloom_maybe_has(&bloom->parts[i], hash))
+			if (!bloom_maybe_has(&bloom->parts[i].bloom,
+					     bloom->parts[i].data, hash))
 				return false;
 		}
 		return true;
@@ -383,51 +385,50 @@ tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 		total_size += tuple_hash_field(&h, &carry, &key,
 					       key_def->parts[i].coll);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
-		if (!bloom_maybe_has(&bloom->parts[i], hash))
+		if (!bloom_maybe_has(&bloom->parts[i].bloom,
+				     bloom->parts[i].data, hash))
 			return false;
 	}
 	return true;
 }
 
+/** Returns amount of bytes required to encode the part to MsgPack. */
 static size_t
-tuple_bloom_sizeof_part(const struct bloom *part)
+tuple_bloom_sizeof_part(const struct tuple_bloom_part *part)
 {
 	size_t size = 0;
 	size += mp_sizeof_array(3);
-	size += mp_sizeof_uint(part->table_size);
-	size += mp_sizeof_uint(part->hash_count);
-	size += mp_sizeof_bin(bloom_store_size(part));
+	size += mp_sizeof_uint(part->bloom.table_size);
+	size += mp_sizeof_uint(part->bloom.hash_count);
+	size += mp_sizeof_bin(bloom_data_size(&part->bloom));
 	return size;
 }
 
+/** Encodes the part to MsgPack. */
 static char *
-tuple_bloom_encode_part(const struct bloom *part, char *buf)
+tuple_bloom_encode_part(const struct tuple_bloom_part *part, char *buf)
 {
 	buf = mp_encode_array(buf, 3);
-	buf = mp_encode_uint(buf, part->table_size);
-	buf = mp_encode_uint(buf, part->hash_count);
-	buf = mp_encode_binl(buf, bloom_store_size(part));
-	buf = bloom_store(part, buf);
+	buf = mp_encode_uint(buf, part->bloom.table_size);
+	buf = mp_encode_uint(buf, part->bloom.hash_count);
+	buf = mp_encode_bin(buf, part->data, bloom_data_size(&part->bloom));
 	return buf;
 }
 
-static int
-tuple_bloom_decode_part(struct bloom *part, const char **data)
+/** Decodes the part from MsgPack. */
+static void
+tuple_bloom_decode_part(struct tuple_bloom_part *part, const char **data)
 {
 	memset(part, 0, sizeof(*part));
 	if (mp_decode_array(data) != 3)
 		unreachable();
-	part->table_size = mp_decode_uint(data);
-	part->hash_count = mp_decode_uint(data);
+	part->bloom.table_size = mp_decode_uint(data);
+	part->bloom.hash_count = mp_decode_uint(data);
 	size_t store_size = mp_decode_binl(data);
-	assert(store_size == bloom_store_size(part));
-	if (bloom_load_table(part, *data) != 0) {
-		diag_set(OutOfMemory, store_size, "bloom_load_table",
-			 "tuple bloom part");
-		return -1;
-	}
+	assert(store_size == bloom_data_size(&part->bloom));
+	part->data = xmalloc(store_size);
+	memcpy(part->data, *data, store_size);
 	*data += store_size;
-	return 0;
 }
 
 size_t
@@ -453,14 +454,8 @@ struct tuple_bloom *
 tuple_bloom_decode(const char **data, enum tuple_bloom_version version)
 {
 	uint32_t part_count = mp_decode_array(data);
-	struct tuple_bloom *bloom = malloc(sizeof(*bloom) +
-			part_count * sizeof(*bloom->parts));
-	if (bloom == NULL) {
-		diag_set(OutOfMemory, sizeof(*bloom) +
-			 part_count * sizeof(*bloom->parts),
-			 "malloc", "tuple bloom");
-		return NULL;
-	}
+	struct tuple_bloom *bloom =
+		xmalloc(sizeof(*bloom) + part_count * sizeof(*bloom->parts));
 	bloom->version = version;
 	switch (version) {
 	case TUPLE_BLOOM_VERSION_V1:
@@ -469,27 +464,20 @@ tuple_bloom_decode(const char **data, enum tuple_bloom_version version)
 			unreachable();
 		if (mp_decode_uint(data) != 0) /* version */
 			unreachable();
-		bloom->parts[0].table_size = mp_decode_uint(data);
-		bloom->parts[0].hash_count = mp_decode_uint(data);
+		bloom->parts[0].bloom.table_size = mp_decode_uint(data);
+		bloom->parts[0].bloom.hash_count = mp_decode_uint(data);
 		size_t store_size = mp_decode_binl(data);
-		assert(store_size == bloom_store_size(&bloom->parts[0]));
-		if (bloom_load_table(&bloom->parts[0], *data) != 0) {
-			diag_set(OutOfMemory, store_size, "bloom_load_table",
-				 "tuple bloom part");
-			free(bloom);
-			return NULL;
-		}
+		assert(store_size ==
+		       bloom_data_size(&bloom->parts[0].bloom));
+		bloom->parts[0].data = xmalloc(store_size);
+		memcpy(bloom->parts[0].data, *data, store_size);
 		*data += store_size;
 		break;
 	case TUPLE_BLOOM_VERSION_V2:
 	case TUPLE_BLOOM_VERSION_V3:
 		bloom->part_count = 0;
 		for (uint32_t i = 0; i < part_count; i++) {
-			if (tuple_bloom_decode_part(&bloom->parts[i],
-						    data) != 0) {
-				tuple_bloom_delete(bloom);
-				return NULL;
-			}
+			tuple_bloom_decode_part(&bloom->parts[i], data);
 			bloom->part_count++;
 		}
 		break;

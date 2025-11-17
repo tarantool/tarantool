@@ -276,7 +276,7 @@ create_unit_test(PREFIX light_view
 )
 create_unit_test(PREFIX bloom
                  SOURCES bloom.cc
-                 LIBRARIES salad
+                 LIBRARIES salad unit
 )
 create_unit_test(PREFIX vclock
                  SOURCES vclock.cc core_test_utils.c
