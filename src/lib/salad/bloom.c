@@ -39,7 +39,7 @@
 #include <assert.h>
 #include <string.h>
 
-int
+void
 bloom_create(struct bloom *bloom, uint32_t number_of_values,
 	     double false_positive_rate)
 {
@@ -49,19 +49,8 @@ bloom_create(struct bloom *bloom, uint32_t number_of_values,
 	uint32_t block_bits = CHAR_BIT * sizeof(struct bloom_block);
 	uint32_t block_count = (bit_count + block_bits - 1) / block_bits;
 
-	bloom->table = calloc(block_count, sizeof(*bloom->table));
-	if (bloom->table == NULL)
-		return -1;
-
 	bloom->table_size = block_count;
 	bloom->hash_count = hash_count;
-	return 0;
-}
-
-void
-bloom_destroy(struct bloom *bloom)
-{
-	free(bloom->table);
 }
 
 double
@@ -78,26 +67,17 @@ bloom_fpr(const struct bloom *bloom, uint32_t number_of_values)
 }
 
 size_t
-bloom_store_size(const struct bloom *bloom)
+bloom_data_size(const struct bloom *bloom)
 {
 	return bloom->table_size * sizeof(struct bloom_block);
 }
 
-char *
-bloom_store(const struct bloom *bloom, char *table)
-{
-	size_t store_size = bloom_store_size(bloom);
-	memcpy(table, bloom->table, store_size);
-	return table + store_size;
-}
-
-int
-bloom_load_table(struct bloom *bloom, const char *table)
+void
+bloom_merge(const struct bloom *bloom, void *dst_data, const void *src_data)
 {
 	size_t size = bloom->table_size * sizeof(struct bloom_block);
-	bloom->table = malloc(size);
-	if (bloom->table == NULL)
-		return -1;
-	memcpy(bloom->table, table, size);
-	return 0;
+	uint8_t *dst = (uint8_t *)dst_data;
+	const uint8_t *src = (const uint8_t *)src_data;
+	for (size_t i = 0; i < size; i++)
+		dst[i] |= src[i];
 }
