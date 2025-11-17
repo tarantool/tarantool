@@ -233,8 +233,8 @@ local RTREE_DIMENSION = math.random(RTREE_MAX_DIMENSION)
 local function random_array()
     local n = RTREE_DIMENSION * 2
     local arr = {}
-    for i = 1, n do
-        table.insert(arr, i)
+    for _ = 1, n do
+        table.insert(arr, math.random(1, 1000000))
     end
     return arr
 end
