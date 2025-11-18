@@ -6551,25 +6551,72 @@ box_read_ffi_enable(void)
 		box_read_ffi_is_disabled = false;
 }
 
+/**
+ * Generate a unique integer id in a given index in a given space within a
+ * given range, or set new_id to id_range_end if it is not possible.
+ * \param space_id id of the space
+ * \param index_id id of the index in the space
+ * \param id_range_begin min index in the search range (inclusive)
+ * \param id_range_end max index in the search range (exclusive)
+ * \param find_next_unused_id pointer to the function that finds unused id in
+ * the space in the range [cur_id, id_range_end)
+ * \new_id pointer to result
+ * \retval -1 on error (and set the diag)
+ * \retval 0 on success (new_id is set to either a value within the range or
+ * id_range_end on overflow)
+ */
+static int
+box_generate_unique_id(uint32_t space_id, uint32_t index_id,
+		       uint32_t id_range_begin, uint32_t id_range_end,
+		       uint32_t (*find_next_unused_id)(uint32_t cur_id,
+						       uint32_t id_range_end),
+		       uint32_t *new_id);
+
 int
 box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 {
-	assert(new_space_id != NULL);
 	uint32_t id_range_begin = !is_temporary ?
 		BOX_SYSTEM_ID_MAX + 1 : BOX_SPACE_ID_TEMPORARY_MIN;
 	uint32_t id_range_end = !is_temporary ?
 		(uint32_t)BOX_SPACE_ID_TEMPORARY_MIN :
 		(uint32_t)BOX_SPACE_MAX + 1;
-	char key_buf[16];
-	char *key_end = key_buf;
-	key_end = mp_encode_array(key_end, 1);
-	key_end = mp_encode_uint(key_end, id_range_end);
+	/* Admin credentials are used for backward compatibility. */
 	struct credentials *orig_credentials = effective_user();
 	fiber_set_user(fiber(), &admin_credentials);
 	auto guard = make_scoped_guard([=] {
 		fiber_set_user(fiber(), orig_credentials);
 	});
-	box_iterator_t *it = box_index_iterator(BOX_SPACE_ID, 0, ITER_LT,
+	if (box_generate_unique_id(BOX_SPACE_ID, 0, id_range_begin,
+				   id_range_end,
+				   space_cache_find_next_unused_id,
+				   new_space_id) != 0)
+		return -1;
+	if (*new_space_id == id_range_end) {
+		/*
+		 * All ids are occupied. This situation cannot happen in real
+		 * world with limited memory, and its pretty hard to test it,
+		 * so let's just panic.
+		 */
+		panic("Space id limit is reached");
+	}
+	return 0;
+}
+
+static int
+box_generate_unique_id(uint32_t space_id, uint32_t index_id,
+		       uint32_t id_range_begin, uint32_t id_range_end,
+		       uint32_t (*find_next_unused_id)(uint32_t cur_id,
+						       uint32_t id_range_end),
+		       uint32_t *new_id)
+{
+	assert(new_id != NULL);
+
+	*new_id = id_range_end;
+	char key_buf[16];
+	char *key_end = key_buf;
+	key_end = mp_encode_array(key_end, 1);
+	key_end = mp_encode_uint(key_end, id_range_end);
+	box_iterator_t *it = box_index_iterator(space_id, index_id, ITER_LT,
 						key_buf, key_end);
 	if (it == NULL)
 		return -1;
@@ -6583,21 +6630,11 @@ box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 	rc = tuple_field_u32(res, 0, &max_id);
 	assert(rc == 0);
 	if (max_id < id_range_begin)
-		max_id = id_range_begin - 1;
-	*new_space_id = space_cache_find_next_unused_id(max_id);
+		max_id = id_range_begin;
+	*new_id = find_next_unused_id(max_id, id_range_end);
 	/* Try again if overflowed. */
-	if (*new_space_id >= id_range_end) {
-		*new_space_id =
-			space_cache_find_next_unused_id(id_range_begin - 1);
-		/*
-		 * The second overflow means all ids are occupied.
-		 * This situation cannot happen in real world with limited
-		 * memory, and its pretty hard to test it, so let's just panic
-		 * if we've run out of ids.
-		 */
-		if (*new_space_id >= id_range_end)
-			panic("Space id limit is reached");
-	}
+	if (*new_id == id_range_end)
+		*new_id = find_next_unused_id(id_range_begin, id_range_end);
 	return 0;
 }
 
