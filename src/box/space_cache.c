@@ -82,9 +82,9 @@ space_by_name(const char *name, uint32_t len)
 }
 
 uint32_t
-space_cache_find_next_unused_id(uint32_t cur_id)
+space_cache_find_next_unused_id(uint32_t cur_id, uint32_t id_range_end)
 {
-	for (cur_id++; cur_id <= BOX_SPACE_MAX; cur_id++)
+	for (; cur_id < id_range_end; cur_id++)
 		if (space_by_id(cur_id) == NULL)
 			break;
 	return cur_id;
