@@ -591,7 +591,7 @@ box_process_rw(struct request *request, struct space *space,
 	return 0;
 
 rollback:
-	if (is_autocommit)
+	if (is_autocommit && !txn_has_flag(txn, TXN_IS_ROLLED_BACK))
 		txn_abort(txn);
 error:
 	if (return_tuple)
