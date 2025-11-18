@@ -6583,11 +6583,6 @@ box_generate_space_id(uint32_t *new_space_id, bool is_temporary)
 	uint32_t id_range_end = !is_temporary ?
 		(uint32_t)BOX_SPACE_ID_TEMPORARY_MIN :
 		(uint32_t)BOX_SPACE_MAX + 1;
-	struct credentials *orig_credentials = effective_user();
-	fiber_set_user(fiber(), &admin_credentials);
-	auto guard = make_scoped_guard([=] {
-		fiber_set_user(fiber(), orig_credentials);
-	});
 	int ret = box_generate_unique_id(BOX_SPACE_ID, 0, id_range_begin,
 					 id_range_end,
 					 space_cache_find_next_unused_id,

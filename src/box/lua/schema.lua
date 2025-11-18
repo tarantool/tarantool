@@ -883,7 +883,8 @@ box.schema.space.create = function(name, options)
     end
     local id = options.id
     if not id then
-        id = internal.generate_space_id(options.type == 'temporary')
+        id = call_at(2, internal.generate_space_id,
+                     options.type == 'temporary')
     end
     local uid = session.euid()
     if options.user then
