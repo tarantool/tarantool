@@ -1522,8 +1522,8 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 */
 	row = &stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	uint64_t term = txn_limbo_replica_term(&txn_limbo, row->replica_id);
-	assert(term <= txn_limbo.promote_greatest_term);
-	bool is_current_term = term == txn_limbo.promote_greatest_term;
+	assert(term <= txn_limbo.term);
+	bool is_current_term = term == txn_limbo.term;
 	struct applier_tx_row *item;
 	if (iproto_type_is_dml(row->type)) {
 		if (is_current_term)
