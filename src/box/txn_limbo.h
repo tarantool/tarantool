@@ -40,6 +40,34 @@ extern "C" {
 struct raft;
 struct synchro_request;
 
+/** Limbo state. */
+enum txn_limbo_state {
+	/**
+	 * The limbo has no owner and is empty. It makes no effect on this
+	 * instance.
+	 */
+	TXN_LIMBO_STATE_INACTIVE,
+	/**
+	 * The limbo is actively and fully owned by the current instance right
+	 * now and is writable.
+	 */
+	TXN_LIMBO_STATE_LEADER,
+	/**
+	 * The limbo is owned by somebody (even perhaps by this instance), but
+	 * this instance can't put new transactions into it.
+	 *
+	 * The case of it being owned by another node is clear - that other node
+	 * will put transactions into the queue and this instance will apply
+	 * them.
+	 *
+	 * But it can also be that the queue is owned by the current instance in
+	 * a term mismatching the Raft elections. Technically, the ownership is
+	 * with the current instance, but actually it can't be fully exercised
+	 * yet / already.
+	 */
+	TXN_LIMBO_STATE_REPLICA,
+};
+
 /**
  * Limbo is a place where transactions are stored, which are
  * finished, but not committed nor rolled back. These are
@@ -51,6 +79,8 @@ struct synchro_request;
  *     as they wouldn't depend on each other directly.
  */
 struct txn_limbo {
+	/** Limbo state. */
+	enum txn_limbo_state state;
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
@@ -98,42 +128,27 @@ struct txn_limbo {
 	 */
 	bool is_in_rollback;
 	/**
+	 * If there is an ongoing PROMOTE being applied. It is not immediate at
+	 * least because it needs to be written into the journal.
+	 */
+	bool is_transition_in_progress;
+	/**
 	 * If the limbo is being recovered right now and isn't serving new
 	 * requests. Only re-applying old ones. This is used in order to
 	 * distinguish between old and new promotion.
 	 */
 	bool is_in_recovery;
 	/**
+	 * If the limbo has seen a fresh promote after recovery was finished.
+	 * A node can't be a leader until it sees / makes a newly made promote
+	 * since its restart.
+	 */
+	bool saw_promote;
+	/**
 	 * Savepoint of confirmed LSN. To rollback to in case the current
 	 * synchro command (promote/demote/...) fails.
 	 */
 	int64_t svp_confirmed_lsn;
-	union {
-		/**
-		 * Whether the limbo is frozen. This mode prevents CONFIRMs and
-		 * ROLLBACKs being written by this instance. This, in turn,
-		 * helps to prevent split-brain situations, when a node
-		 * finalizes some transaction before knowing that the
-		 * transaction was already finalized by someone else.
-		 */
-		uint8_t frozen_reasons;
-		struct {
-			/*
-			 * This mode is turned on when quorum is lost if this
-			 * instance is the current RAFT leader and fencing is
-			 * enabled. Instance leaves this mode when it becomes
-			 * leader again or PROMOTE/DEMOTE arrives from some
-			 * remote instance.
-			 */
-			bool is_frozen_due_to_fencing : 1;
-			/*
-			 * This mode is always on upon node start and is turned
-			 * off by any new PROMOTE arriving either via
-			 * replication or issued by the node.
-			 */
-			bool is_frozen_until_promotion : 1;
-		};
-	};
 	/**
 	 * Whether this instance validates incoming synchro requests. When the
 	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
@@ -182,6 +197,13 @@ txn_limbo_unlock(struct txn_limbo *limbo)
 {
 	latch_unlock(&limbo->state_latch);
 }
+
+/**
+ * Make the limbo actualize its state in case any conditions affecting it have
+ * been changed.
+ */
+void
+txn_limbo_update_state(struct txn_limbo *limbo);
 
 /** See if submission to the limbo would yield if done right now. */
 bool
@@ -368,18 +390,6 @@ txn_limbo_filter_enable(struct txn_limbo *limbo);
 /** Stop filtering incoming synchro requests. */
 void
 txn_limbo_filter_disable(struct txn_limbo *limbo);
-
-/**
- * Freeze limbo. Prevent CONFIRMs and ROLLBACKs until limbo is unfrozen.
- */
-void
-txn_limbo_fence(struct txn_limbo *limbo);
-
-/**
- * Unfreeze limbo. Continue limbo processing as usual.
- */
-void
-txn_limbo_unfence(struct txn_limbo *limbo);
 
 /** Tell the limbo that the recovery is finished. */
 void
