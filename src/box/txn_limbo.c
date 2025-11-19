@@ -76,6 +76,12 @@ synchro_request_write_or_panic(const struct synchro_request *req)
 	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
 }
 
+static void
+txn_limbo_assert_locked(struct txn_limbo *limbo)
+{
+	VERIFY(latch_is_locked(&limbo->state_latch));
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
@@ -83,6 +89,7 @@ synchro_request_write_or_panic(const struct synchro_request *req)
 static int
 txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
+	txn_limbo_assert_locked(limbo);
 	assert(lsn > limbo->queue.confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	struct synchro_request req = {
@@ -101,6 +108,7 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
+	txn_limbo_assert_locked(limbo);
 	assert(lsn > limbo->queue.confirmed_lsn);
 	assert(!limbo->is_in_rollback);
 	limbo->is_in_rollback = true;
@@ -117,6 +125,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 static int
 txn_limbo_worker_bump_confirmed_lsn(struct txn_limbo *limbo)
 {
+	txn_limbo_assert_locked(limbo);
 	struct txn_limbo_queue *queue = &limbo->queue;
 	assert(queue->volatile_confirmed_lsn >= queue->confirmed_lsn);
 	while (txn_limbo_queue_is_owned_by_current_instance(queue) &&
@@ -145,7 +154,10 @@ txn_limbo_worker_f(va_list args)
 	while (!fiber_is_cancelled()) {
 		fiber_check_gc();
 		ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_WORKER_DELAY);
-		if (txn_limbo_worker_bump_confirmed_lsn(limbo) != 0)
+		txn_limbo_lock(limbo);
+		int rc = txn_limbo_worker_bump_confirmed_lsn(limbo);
+		txn_limbo_unlock(limbo);
+		if (rc != 0)
 #ifdef TEST_BUILD
 			fiber_sleep(0.01);
 #else
@@ -163,7 +175,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	memset(limbo, 0, sizeof(*limbo));
 	txn_limbo_queue_create(&limbo->queue);
 	vclock_create(&limbo->promote_term_map);
-	latch_create(&limbo->promote_latch);
+	latch_create(&limbo->state_latch);
 	limbo->svp_confirmed_lsn = -1;
 	limbo->is_frozen_until_promotion = true;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
@@ -295,11 +307,14 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		}
 		return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
 	}
+	txn_limbo_lock(limbo);
+	assert(!txn_limbo_entry_is_complete(entry));
 	txn_limbo_write_rollback(limbo, entry->lsn);
 	txn_limbo_queue_apply_rollback(&limbo->queue, entry->lsn,
 				       TXN_SIGNATURE_QUORUM_TIMEOUT);
 	assert(txn_limbo_entry_is_complete(entry));
 	assert(entry->state == TXN_LIMBO_ENTRY_ROLLBACK);
+	txn_limbo_unlock(limbo);
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 }
@@ -318,7 +333,7 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	/*
 	 * We make sure that promote is only written once everything this
 	 * instance has may be confirmed.
@@ -348,7 +363,7 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 int
 txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
 	assert(e == NULL || e->lsn <= lsn);
 	(void)e;
@@ -431,8 +446,7 @@ static int
 txn_limbo_filter_generic(struct txn_limbo *limbo,
 			 const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
-
+	txn_limbo_assert_locked(limbo);
 	if (!limbo->do_validate)
 		return 0;
 
@@ -471,7 +485,7 @@ static int
 txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
 				  const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	assert(limbo->do_validate);
 	(void)limbo;
 	assert(req->type == IPROTO_RAFT_CONFIRM ||
@@ -493,7 +507,7 @@ static int
 txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 				const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	assert(limbo->do_validate);
 	assert(iproto_type_is_promote_request(req->type));
 	/*
@@ -583,6 +597,7 @@ static int
 txn_limbo_filter_request(struct txn_limbo *limbo,
 			 const struct synchro_request *req)
 {
+	txn_limbo_assert_locked(limbo);
 	if (!limbo->do_validate)
 		return 0;
 	/*
@@ -611,6 +626,7 @@ txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
 					     const struct synchro_request *req,
 					     bool is_rollback)
 {
+	txn_limbo_assert_locked(limbo);
 	/* Do not enable synchronous replication during bootstrap. */
 	if (req->origin_id == REPLICA_ID_NIL)
 		return;
@@ -636,8 +652,7 @@ int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
-
+	txn_limbo_assert_locked(limbo);
 	if (txn_limbo_filter_generic(limbo, req) < 0)
 		return -1;
 
@@ -686,7 +701,7 @@ void
 txn_limbo_req_rollback(struct txn_limbo *limbo,
 		       const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
@@ -713,6 +728,7 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 static inline void
 txn_limbo_unfreeze_on_first_promote(struct txn_limbo *limbo)
 {
+	txn_limbo_assert_locked(limbo);
 	if (box_is_configured()) {
 		limbo->is_frozen_until_promotion = false;
 		box_update_ro_summary();
@@ -722,7 +738,7 @@ txn_limbo_unfreeze_on_first_promote(struct txn_limbo *limbo)
 void
 txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 {
-	assert(latch_is_locked(&limbo->promote_latch));
+	txn_limbo_assert_locked(limbo);
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
@@ -828,17 +844,17 @@ txn_limbo_unfence(struct txn_limbo *limbo)
 void
 txn_limbo_filter_enable(struct txn_limbo *limbo)
 {
-	latch_lock(&limbo->promote_latch);
+	txn_limbo_lock(limbo);
 	limbo->do_validate = true;
-	latch_unlock(&limbo->promote_latch);
+	txn_limbo_unlock(limbo);
 }
 
 void
 txn_limbo_filter_disable(struct txn_limbo *limbo)
 {
-	latch_lock(&limbo->promote_latch);
+	txn_limbo_lock(limbo);
 	limbo->do_validate = false;
-	latch_unlock(&limbo->promote_latch);
+	txn_limbo_unlock(limbo);
 }
 
 void
