@@ -1108,23 +1108,12 @@ txn_limbo_confirm(struct txn_limbo *limbo)
 void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
+	assert(txn_limbo_is_owned_by_current_instance(limbo));
 	if (rlist_empty(&limbo->queue))
 		return;
 	if (txn_limbo_is_frozen(limbo))
 		return;
 	assert(!txn_limbo_is_ro(limbo));
-	/*
-	 * If limbo is currently writing a rollback, it means that the whole
-	 * queue will be rolled back. Because rollback is written only for
-	 * timeout. Timeout always happens first for the oldest entry, i.e.
-	 * first entry in the queue. The rollback will clear all the newer
-	 * entries. So in total the whole queue is dead already. Would be
-	 * strange to write CONFIRM for rolled back LSNs. Even though
-	 * probably it wouldn't break anything. Would be just 2 conflicting
-	 * decisions for the same LSNs.
-	 */
-	if (limbo->is_in_rollback)
-		return;
 	assert(limbo->owner_id != REPLICA_ID_NIL);
 	int64_t prev_lsn = vclock_get(&limbo->vclock, replica_id);
 	assert(lsn >= prev_lsn);
