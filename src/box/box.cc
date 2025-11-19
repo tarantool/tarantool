@@ -401,10 +401,10 @@ box_ro_state_msg(char *buf, int size)
 			SNPRINT(total, snprintf, buf, size, " (%s)",
 				tt_uuid_str(&r->uuid));
 		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
-			if (txn_limbo.is_frozen_due_to_fencing)
+			if (txn_limbo.term < raft->volatile_term)
 				SNPRINT(total, snprintf, buf, size,
 					" and is frozen due to fencing");
-			else if (txn_limbo.is_frozen_until_promotion)
+			else
 				SNPRINT(total, snprintf, buf, size,
 					" and is frozen until promotion");
 		}
@@ -3358,12 +3358,9 @@ box_promote(void)
 	 * Currently active leader (the instance that is seen as leader by both
 	 * raft and txn_limbo) can't issue another PROMOTE.
 	 */
-	bool is_leader =
-		txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term &&
-		txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
-		!txn_limbo.is_frozen_until_promotion;
-	if (box_election_mode != ELECTION_MODE_OFF)
-		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
+	bool is_leader = txn_limbo.state == TXN_LIMBO_STATE_LEADER;
+	if (box_election_mode != ELECTION_MODE_OFF && is_leader)
+		VERIFY(raft->state == RAFT_STATE_LEADER);
 
 	if (is_leader)
 		return 0;
@@ -3410,12 +3407,8 @@ box_demote(void)
 
 	const struct raft *raft = box_raft();
 	if (box_election_mode != ELECTION_MODE_OFF) {
-		if (txn_limbo_replica_term(&txn_limbo, instance_id) !=
-		    raft->term)
-			return 0;
-		if (!txn_limbo_is_owned_by_current_instance(&txn_limbo))
-			return 0;
-		box_raft_leader_step_off();
+		if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
+			box_raft_leader_step_off();
 		return 0;
 	}
 
@@ -3432,8 +3425,7 @@ box_demote(void)
 	 * case the user has to explicitly overthrow the old owner with
 	 * local promote(), or call demote() on the actual owner.
 	 */
-	if (txn_limbo.term == raft->term &&
-	    !txn_limbo_is_owned_by_current_instance(&txn_limbo))
+	if (txn_limbo.term == raft->term && txn_limbo.state != TXN_LIMBO_STATE_LEADER)
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
