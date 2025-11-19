@@ -214,8 +214,7 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 	 * finalizing existing synchronous transactions so that it doesn't
 	 * trigger split-brain with a new leader which will soon emerge.
 	 */
-	if (raft->volatile_term > txn_limbo.term)
-		txn_limbo_fence(&txn_limbo);
+	txn_limbo_update_state(&txn_limbo);
 	if (raft->state != RAFT_STATE_LEADER)
 		return 0;
 	/*
@@ -288,6 +287,7 @@ box_raft_cfg_election_mode(enum election_mode mode)
 		unreachable();
 	}
 	raft_cfg_is_enabled(raft, mode != ELECTION_MODE_OFF);
+	txn_limbo_update_state(&txn_limbo);
 }
 
 /**
@@ -303,8 +303,8 @@ box_raft_fence(void)
 	    box_raft_election_fencing_paused)
 		return;
 
-	txn_limbo_fence(&txn_limbo);
 	raft_resign(raft);
+	txn_limbo_update_state(&txn_limbo);
 }
 
 void
@@ -315,9 +315,9 @@ box_raft_leader_step_off(void)
 		return;
 
 	/* It will be unfenced the next time new term is written. */
-	txn_limbo_fence(&txn_limbo);
 	raft_resign(raft);
 	raft_restore(raft);
+	txn_limbo_update_state(&txn_limbo);
 }
 
 /**
@@ -670,9 +670,6 @@ box_raft_set_election_fencing_mode(enum election_fencing_mode mode)
 	default:
 		unreachable();
 	}
-
-	if (box_election_fencing_mode == ELECTION_FENCING_MODE_OFF)
-		txn_limbo_unfence(&txn_limbo);
 	replicaset_on_health_change();
 }
 
