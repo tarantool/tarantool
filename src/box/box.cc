@@ -392,7 +392,7 @@ box_ro_state_msg(char *buf, int size)
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
 		uint32_t id = txn_limbo.queue.owner_id;
-		uint64_t term = txn_limbo.promote_greatest_term;
+		uint64_t term = txn_limbo.term;
 		SNPRINT(total, snprintf, buf, size,
 			"synchro queue with term %llu belongs to %u",
 			(unsigned long long)term, (unsigned)id);
@@ -515,7 +515,7 @@ box_check_writable(void)
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
 		uint32_t id = txn_limbo.queue.owner_id;
-		uint64_t term = txn_limbo.promote_greatest_term;
+		uint64_t term = txn_limbo.term;
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
 		struct replica *r = replica_by_id(id);
@@ -3099,7 +3099,7 @@ box_wait_linearization_point(double timeout)
 static int
 box_check_promote_term_intact(uint64_t promote_term)
 {
-	if (txn_limbo.promote_greatest_term != promote_term) {
+	if (txn_limbo.term != promote_term) {
 		diag_set(ClientError, ER_INTERFERING_PROMOTE,
 			 txn_limbo.queue.owner_id);
 		return -1;
@@ -3124,7 +3124,7 @@ box_check_election_term_intact(uint64_t term)
 static int
 box_trigger_elections(void)
 {
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	raft_new_term(box_raft());
 	if (box_raft_wait_term_persisted() < 0)
 		return -1;
@@ -3135,7 +3135,7 @@ box_trigger_elections(void)
 static int
 box_try_wait_confirm(double timeout)
 {
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	txn_limbo_wait_empty(&txn_limbo, timeout);
 	return box_check_promote_term_intact(promote_term);
 }
@@ -3151,7 +3151,7 @@ box_wait_limbo_acked(double timeout)
 	if (txn_limbo_is_empty(&txn_limbo))
 		return txn_limbo.queue.confirmed_lsn;
 
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	struct txn_limbo_entry *last_entry;
 	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
 	/* Wait for the last entries WAL write. */
@@ -3240,7 +3240,7 @@ box_issue_promote(int64_t promote_lsn)
 {
 	int rc = 0;
 	uint64_t term = box_raft()->term;
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	assert(promote_lsn >= 0);
 	rc = box_check_election_term_intact(term);
 	if (rc != 0)
@@ -3274,7 +3274,7 @@ box_issue_demote(int64_t promote_lsn)
 {
 	int rc = 0;
 	uint64_t term = box_raft()->term;
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	assert(promote_lsn >= 0);
 
 	rc = box_check_election_term_intact(term);
@@ -3432,7 +3432,7 @@ box_demote(void)
 	 * case the user has to explicitly overthrow the old owner with
 	 * local promote(), or call demote() on the actual owner.
 	 */
-	if (txn_limbo.promote_greatest_term == raft->term &&
+	if (txn_limbo.term == raft->term &&
 	    !txn_limbo_is_owned_by_current_instance(&txn_limbo))
 		return 0;
 	if (box_trigger_elections() != 0)

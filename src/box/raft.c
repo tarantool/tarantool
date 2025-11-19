@@ -214,7 +214,7 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 	 * finalizing existing synchronous transactions so that it doesn't
 	 * trigger split-brain with a new leader which will soon emerge.
 	 */
-	if (raft->volatile_term > txn_limbo.promote_greatest_term)
+	if (raft->volatile_term > txn_limbo.term)
 		txn_limbo_fence(&txn_limbo);
 	if (raft->state != RAFT_STATE_LEADER)
 		return 0;

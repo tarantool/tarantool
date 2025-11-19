@@ -64,12 +64,19 @@ struct txn_limbo {
 	 * It is related to raft term, but not the same. Synchronous replication
 	 * represented by the limbo is interested only in the won elections
 	 * ended with PROMOTE request.
+	 *
 	 * It means the limbo's term might be smaller than the raft term, while
 	 * there are ongoing elections, or the leader is already known and this
-	 * instance hasn't read its PROMOTE request yet. During other times the
-	 * limbo and raft are in sync and the terms are the same.
+	 * instance hasn't read its PROMOTE request yet.
+	 *
+	 * It can also be bigger than raft's term in case the limbo has received
+	 * and persisted a PROMOTE request before raft's own messages are
+	 * delivered.
+	 *
+	 * During other times the limbo and raft are in sync and the terms are
+	 * the same.
 	 */
-	uint64_t promote_greatest_term;
+	uint64_t term;
 	/** To linearize any sort of state changes. */
 	struct latch state_latch;
 	/**

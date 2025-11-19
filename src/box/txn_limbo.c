@@ -326,7 +326,7 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 	req->type = IPROTO_RAFT_PROMOTE;
 	req->replica_id = limbo->queue.owner_id;
 	req->lsn = limbo->queue.confirmed_lsn;
-	req->term = limbo->promote_greatest_term;
+	req->term = limbo->term;
 	vclock_copy(&req->confirmed_vclock, &limbo->queue.confirmed_vclock);
 }
 
@@ -527,9 +527,9 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	 * thus been living in subdomain and its data is
 	 * no longer consistent.
 	 */
-	if (limbo->promote_greatest_term >= req->term) {
+	if (limbo->term >= req->term) {
 		say_error("%s. Max term seen is %llu", reject_str(req),
-			  (long long)limbo->promote_greatest_term);
+			  (long long)limbo->term);
 		diag_set(ClientError, ER_SPLIT_BRAIN,
 			 "got a PROMOTE/DEMOTE with an obsolete term");
 		return -1;
@@ -757,8 +757,8 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 	uint32_t origin = req->origin_id;
 	if (txn_limbo_replica_term(limbo, origin) < term) {
 		vclock_follow(&limbo->promote_term_map, origin, term);
-		if (term > limbo->promote_greatest_term) {
-			limbo->promote_greatest_term = term;
+		if (term > limbo->term) {
+			limbo->term = term;
 			if (iproto_type_is_promote_request(req->type)) {
 				if (term >= box_raft()->volatile_term)
 					txn_limbo_unfence(limbo);
