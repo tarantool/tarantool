@@ -146,7 +146,6 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->confirmed_lsn = 0;
 	limbo->volatile_confirmed_lsn = 0;
 	limbo->entry_to_confirm = NULL;
-	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
 	limbo->svp_confirmed_lsn = -1;
 	limbo->frozen_reasons = 0;
@@ -596,7 +595,6 @@ txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	if (entry == limbo->entry_to_confirm)
 		limbo->entry_to_confirm = NULL;
 	rlist_del_entry(entry, in_queue);
-	++limbo->rollback_count;
 	if (!was_volatile)
 		txn_limbo_on_remove(limbo, entry);
 }
