@@ -198,13 +198,6 @@ struct txn_limbo {
 	 */
 	int ack_count;
 	/**
-	 * Total number of performed rollbacks. It used as a guard
-	 * to do some actions assuming all limbo transactions will
-	 * be confirmed, and to check that there were no rollbacks
-	 * in the end.
-	 */
-	int64_t rollback_count;
-	/**
 	 * Whether the limbo is in rollback mode. The meaning is exactly the
 	 * same as for the similar WAL flag. In theory this should be deleted
 	 * if the limbo will be ever moved to WAL thread. It would reuse the WAL
