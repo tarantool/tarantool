@@ -70,10 +70,8 @@ struct txn_limbo {
 	 * limbo and raft are in sync and the terms are the same.
 	 */
 	uint64_t promote_greatest_term;
-	/**
-	 * To order access to the promote data.
-	 */
-	struct latch promote_latch;
+	/** To linearize any sort of state changes. */
+	struct latch state_latch;
 	/**
 	 * Whether the limbo is in rollback mode. The meaning is exactly the
 	 * same as for the similar WAL flag. In theory this should be deleted
@@ -152,6 +150,18 @@ static inline bool
 txn_limbo_is_empty(struct txn_limbo *limbo)
 {
 	return txn_limbo_queue_is_empty(&limbo->queue);
+}
+
+static inline void
+txn_limbo_lock(struct txn_limbo *limbo)
+{
+	latch_lock(&limbo->state_latch);
+}
+
+static inline void
+txn_limbo_unlock(struct txn_limbo *limbo)
+{
+	latch_unlock(&limbo->state_latch);
 }
 
 /** See if submission to the limbo would yield if done right now. */
@@ -244,21 +254,21 @@ txn_limbo_begin(struct txn_limbo *limbo)
 		e->bparam = true;
 	});
 	ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_BEGIN_DELAY);
-	latch_lock(&limbo->promote_latch);
+	txn_limbo_lock(limbo);
 }
 
 /** Commit a synchronous replication request. */
 static inline void
 txn_limbo_commit(struct txn_limbo *limbo)
 {
-	latch_unlock(&limbo->promote_latch);
+	txn_limbo_unlock(limbo);
 }
 
 /** Rollback a synchronous replication request. */
 static inline void
 txn_limbo_rollback(struct txn_limbo *limbo)
 {
-	latch_unlock(&limbo->promote_latch);
+	txn_limbo_unlock(limbo);
 }
 
 /**

@@ -723,7 +723,7 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "size");
 	lua_pushnumber(L, queue->owner_id);
 	lua_setfield(L, -2, "owner");
-	lua_pushboolean(L, latch_is_locked(&limbo->promote_latch));
+	lua_pushboolean(L, latch_is_locked(&limbo->state_latch));
 	lua_setfield(L, -2, "busy");
 	luaL_pushuint64(L, limbo->promote_greatest_term);
 	lua_setfield(L, -2, "term");

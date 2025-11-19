@@ -1511,9 +1511,9 @@ fail:
 static int
 applier_synchro_filter_tx(struct stailq *rows)
 {
-	latch_lock(&txn_limbo.promote_latch);
+	txn_limbo_lock(&txn_limbo);
 	auto guard = make_scoped_guard([] {
-		latch_unlock(&txn_limbo.promote_latch);
+		txn_limbo_unlock(&txn_limbo);
 	});
 	struct xrow_header *row;
 	/*
