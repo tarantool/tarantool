@@ -105,6 +105,7 @@ struct errinj {
 	_(ERRINJ_INDEX_OOM_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_INDEX_RESERVE, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_INDEX_ITERATOR_NEW, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INDEX_ITERATOR_NEW_ONCE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_IPROTO_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_DISABLE_WATCH, ERRINJ_BOOL, {.bparam = false}) \
@@ -302,6 +303,9 @@ void errinj_set_with_environment_vars(void);
 #define ERROR_INJECT_DOUBLE(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_DOUBLE, COND, CODE)
 #define ERROR_INJECT_SLEEP_FOR(ID) \
 	ERROR_INJECT_DOUBLE(ID, inj->dparam > 0, usleep(inj->dparam * 1000000))
+#define ERROR_INJECT_BOOL_ONCE(ID, CODE) \
+	ERROR_INJECT_COND(ID, ERRINJ_BOOL, inj->bparam, \
+			  { inj->bparam = false; } CODE)
 
 #if defined(__cplusplus)
 } /* extern "C" */

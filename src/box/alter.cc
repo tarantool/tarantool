@@ -4150,37 +4150,39 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 	if (new_tuple != NULL && old_tuple == NULL) {	/* grant */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv, NULL) != 0)
+		    priv_def_check(&priv, PRIV_GRANT) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(revoke_priv, new_tuple);
 		if (on_rollback == NULL)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
+		if (grant_or_revoke(&priv, NULL) != 0)
+			return -1;
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		if (priv_def_create_from_tuple(&priv, old_tuple) != 0 ||
 		    priv_def_check(&priv, PRIV_REVOKE) != 0)
 			return -1;
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(modify_priv, old_tuple);
+		if (on_rollback == NULL)
+			return -1;
+		txn_stmt_on_rollback(stmt, on_rollback);
 		priv.access = 0;
 		if (grant_or_revoke(&priv, NULL) != 0)
 			return -1;
-		struct trigger *on_rollback =
-			txn_alter_trigger_new(modify_priv, old_tuple);
-		if (on_rollback == NULL)
-			return -1;
-		txn_stmt_on_rollback(stmt, on_rollback);
 	} else {                                       /* modify */
 		if (priv_def_create_from_tuple(&priv, new_tuple) != 0 ||
-		    priv_def_check(&priv, PRIV_GRANT) != 0 ||
-		    grant_or_revoke(&priv, NULL) != 0)
+		    priv_def_check(&priv, PRIV_GRANT) != 0)
 			return -1;
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(modify_priv, old_tuple);
 		if (on_rollback == NULL)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
+		if (grant_or_revoke(&priv, NULL) != 0)
+			return -1;
 	}
 	return 0;
 }
