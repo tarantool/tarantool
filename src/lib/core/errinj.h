@@ -162,6 +162,8 @@ struct errinj {
 	_(ERRINJ_TXN_COMMIT_ASYNC, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TXN_LIMBO_WORKER_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_ULID_TIME_FREEZE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_ULID_RAND_OVERFLOW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL, {.bparam = false}) \

@@ -171,9 +171,17 @@ create_unit_test(PREFIX bitset_index
                  SOURCES bitset_index.c
                  LIBRARIES bitset
 )
+create_unit_test(PREFIX base32_crockford
+                 SOURCES base32_crockford.c
+                 LIBRARIES digest unit
+)
 create_unit_test(PREFIX base64
                  SOURCES base64.c
                  LIBRARIES digest unit
+)
+create_unit_test(PREFIX ulid
+                 SOURCES ulid.c core_test_utils.c
+                 LIBRARIES core unit
 )
 create_unit_test(PREFIX uuid
                  SOURCES uuid.c core_test_utils.c

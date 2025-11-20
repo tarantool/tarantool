@@ -422,6 +422,12 @@ tnt_XXH64_digest
 tnt_XXH64_reset
 tnt_XXH64_update
 tt_strerror
+tt_ulid_compare
+tt_ulid_create
+tt_ulid_from_string
+tt_ulid_is_equal
+tt_ulid_is_nil
+tt_ulid_to_string
 tt_uuid_bswap
 tt_uuid_compare
 tt_uuid_create
@@ -434,6 +440,7 @@ uri_format
 uri_set_destroy
 uri_escape
 uri_unescape
+ulid_nil
 uuid_nil
 uuid_unpack
 _say
