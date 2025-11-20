@@ -36,6 +36,7 @@ set(core_sources
     datetime.c
     iostream.c
     tt_uuid.c
+    tt_ulid.c
     mp_uuid.c
     mp_datetime.c
     mp_interval.c
