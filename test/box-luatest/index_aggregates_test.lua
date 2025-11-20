@@ -111,3 +111,13 @@ g.test_unsupported = function(cg)
         }, s.create_index, s, 'pk', {aggregates = {{field = 1}}})
     end)
 end
+
+-- Aggregates attribute is optional and mustn't appear in index object
+-- if it doesn't have it.
+g.test_index_object_aggregates = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test', {engine = 'memtx'})
+        local pk = s:create_index('pk')
+        t.assert_equals(pk.aggregates, nil)
+    end)
+end
