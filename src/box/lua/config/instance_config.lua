@@ -1999,6 +1999,10 @@ return schema.new('instance_config', schema.record({
             type = 'number',
             default = 10,
         }),
+        replication_lag_threshold = schema.scalar({
+            type = 'number',
+            default = 1,
+        }),
         -- Configure how to work with a remote storage, where
         -- failover coordinators leave its state information.
         --

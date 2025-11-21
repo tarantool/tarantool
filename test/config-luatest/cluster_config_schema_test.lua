@@ -419,6 +419,7 @@ g.test_defaults = function()
             call_timeout = 1,
             lease_interval = 30,
             renew_interval = 10,
+            replication_lag_threshold = 1,
             stateboard = {
                 enabled = true,
                 renew_interval = 2,
