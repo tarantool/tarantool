@@ -363,6 +363,10 @@ if (EXPORT_LIBCURL_SYMBOLS)
     set(exports_file_sources ${exports_file_sources}
         ${PROJECT_SOURCE_DIR}/extra/exports_libcurl)
 endif()
+if (ENABLE_FUZZER)
+    set(exports_file_sources ${exports_file_sources}
+        ${PROJECT_SOURCE_DIR}/extra/exports_libfuzzer)
+endif()
 string(REPLACE ";" " " exports_file_sources_str "${exports_file_sources}")
 
 # Exports syntax is toolchain-dependent, preprocessing is necessary
@@ -389,6 +393,12 @@ set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 
 # TODO(gh-7424): Autogenerate the list of internal symbols.
 add_library(symbols STATIC symbols.c)
+
+if (ENABLE_FUZZER)
+    include(SetLibFuzzerPath)
+    SetLibFuzzerObjFiles(LF_LIBS)
+    target_link_libraries(symbols ${LF_LIBS})
+endif()
 
 # A note about linkers:
 # [GNU linker] When linking an *executable* visibility is ignored, and
