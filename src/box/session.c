@@ -517,7 +517,8 @@ access_check_session(struct user *user)
 	 * Can't use here access_check_universe
 	 * as current_user is not assigned yet
 	 */
-	if (!(universe.access[user->auth_token].effective & PRIV_S)) {
+	if (!(accesses_get(&universe.accesses, user->auth_token).effective &
+	      PRIV_S)) {
 		diag_set(AccessDeniedError, priv_name(PRIV_S),
 			 schema_object_name(SC_UNIVERSE), "",
 			 user->def->name);

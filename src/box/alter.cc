@@ -80,7 +80,7 @@ box_schema_version_bump(void)
  * Returns 0 on success, -1 on failure.
  */
 static int
-access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
+access_check_ddl(const char *name, uint32_t owner_uid, struct accesses *object,
 		 enum schema_object_type type, enum priv_type priv_type)
 {
 	struct credentials *cr = effective_user();
@@ -92,9 +92,7 @@ access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
 	if (access == 0)
 		return 0; /* Access granted. */
 	/* Check for specific entity access. */
-	struct access *entity = entity_access_get(type);
-	if (entity != NULL)
-		access &= ~entity[cr->auth_token].effective;
+	access &= ~entity_access_get(type, cr->auth_token).effective;
 	/*
 	 * Only the owner of the object or someone who has
 	 * specific DDL privilege on the object can execute
@@ -112,7 +110,8 @@ access_check_ddl(const char *name, uint32_t owner_uid, struct access *object,
 	if (!(access & PRIV_U)) {
 		/* Check for privileges on a single object. */
 		if (object != NULL)
-			access &= ~object[cr->auth_token].effective;
+			access &= ~accesses_get(object,
+						cr->auth_token).effective;
 		if (access == 0)
 			return 0; /* Access granted. */
 	}
@@ -1075,8 +1074,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	alter->new_space->sequence = alter->old_space->sequence;
 	alter->new_space->sequence_fieldno = alter->old_space->sequence_fieldno;
 	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
-	memcpy(alter->new_space->access, alter->old_space->access,
-	       sizeof(alter->old_space->access));
+	alter->new_space->accesses = alter->old_space->accesses;
 
 	space_prepare_upgrade_xc(alter->old_space, alter->new_space);
 
@@ -2282,8 +2280,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			select_guard.is_active = false;
 		}
 	} else if (new_tuple == NULL) { /* DELETE */
-		if (access_check_ddl(old_space->def->name, old_space->def->uid,
-				     old_space->access, SC_SPACE, PRIV_D) != 0)
+		if (access_check_ddl(old_space->def->name,
+				     old_space->def->uid,
+				     &old_space->accesses,
+				     SC_SPACE, PRIV_D) != 0)
 			return -1;
 		/* Verify that the space is empty (has no indexes) */
 		if (old_space->index_count) {
@@ -2391,7 +2391,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		}
 		if (def == NULL)
 			return -1;
-		if (access_check_ddl(def->name, def->uid, old_space->access,
+		if (access_check_ddl(def->name, def->uid, &old_space->accesses,
 				     SC_SPACE, PRIV_A) != 0)
 			return -1;
 		if (def->id != space_id(old_space)) {
@@ -2568,7 +2568,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	if (old_tuple && new_tuple)
 		priv_type = PRIV_A;
 	if (access_check_ddl(old_space->def->name, old_space->def->uid,
-			     old_space->access, SC_SPACE, priv_type) != 0)
+			     &old_space->accesses, SC_SPACE, priv_type) != 0)
 		return -1;
 	struct index *old_index = space_index(old_space, iid);
 
@@ -3110,7 +3110,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		if (access_check_ddl(old_user->def->name, old_user->def->owner,
-				     old_user->access, old_user->def->type,
+				     &old_user->accesses, old_user->def->type,
 				     PRIV_D) != 0)
 			return -1;
 		/* Can't drop guest or super user */
@@ -3152,7 +3152,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		auto def_guard = make_scoped_guard([=] {
 			user_def_delete(user);
 		});
-		if (access_check_ddl(user->name, user->uid, old_user->access,
+		if (access_check_ddl(user->name, user->uid, &old_user->accesses,
 				     old_user->def->type, PRIV_A) != 0)
 			return -1;
 		try {
@@ -3527,7 +3527,8 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * Can only delete func if you're the one
 		 * who created it or a superuser.
 		 */
-		if (access_check_ddl(old_func->def->name, uid, old_func->access,
+		if (access_check_ddl(old_func->def->name,
+				     uid, &old_func->accesses,
 				     SC_FUNCTION, PRIV_D) != 0)
 			return -1;
 		/* Can only delete func if it has no grants. */
@@ -3933,7 +3934,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		return -1;
 	}
 	const char *name = "";
-	struct access *object = NULL;
+	struct accesses *object = NULL;
 	switch (priv->object_type) {
 	case SC_SPACE:
 	{
@@ -3943,7 +3944,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		if (space == NULL)
 			return -1;
 		name = space_name(space);
-		object = space->access;
+		object = &space->accesses;
 		if (space->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			diag_set(AccessDeniedError,
@@ -3969,7 +3970,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		}
 		name = func->def->name;
-		object = func->access;
+		object = &func->accesses;
 		if (func->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			diag_set(AccessDeniedError,
@@ -3990,7 +3991,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		}
 		name = seq->def->name;
-		object = seq->access;
+		object = &seq->accesses;
 		if (seq->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			diag_set(AccessDeniedError,
@@ -4013,7 +4014,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		}
 		name = role->def->name;
-		object = role->access;
+		object = &role->accesses;
 		/*
 		 * Only the creator of the role can grant or revoke it.
 		 * Everyone can grant 'PUBLIC' role.
@@ -4044,7 +4045,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 			return -1;
 		}
 		name = user->def->name;
-		object = user->access;
+		object = &user->accesses;
 		if (user->def->owner != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			diag_set(AccessDeniedError,
@@ -5096,8 +5097,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 			return -1;
 		seq = sequence_by_id(id);
 		assert(seq != NULL);
-		if (access_check_ddl(seq->def->name, seq->def->uid, seq->access,
-				     SC_SEQUENCE, PRIV_D) != 0)
+		if (access_check_ddl(seq->def->name, seq->def->uid,
+				     &seq->accesses, SC_SEQUENCE, PRIV_D) != 0)
 			return -1;
 		bool out;
 		if (space_has_data(BOX_SEQUENCE_DATA_ID, 0, id, &out) != 0)
@@ -5138,8 +5139,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 			return -1;
 		seq = sequence_by_id(new_def->id);
 		assert(seq != NULL);
-		if (access_check_ddl(seq->def->name, seq->def->uid, seq->access,
-				     SC_SEQUENCE, PRIV_A) != 0)
+		if (access_check_ddl(seq->def->name, seq->def->uid,
+				     &seq->accesses, SC_SEQUENCE, PRIV_A) != 0)
 			return -1;
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_alter_sequence_commit, seq->def);
@@ -5373,24 +5374,25 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 
 	/* Check we have the correct access type on the sequence.  * */
 	if (is_generated || !stmt->new_tuple) {
-		if (access_check_ddl(seq->def->name, seq->def->uid, seq->access,
-				     SC_SEQUENCE, priv_type) != 0)
+		if (access_check_ddl(seq->def->name, seq->def->uid,
+				     &seq->accesses, SC_SEQUENCE,
+				     priv_type) != 0)
 			return -1;
 	} else {
 		/*
 		 * In case user wants to attach an existing sequence,
 		 * check that it has read and write access.
 		 */
-		if (access_check_ddl(seq->def->name, seq->def->uid, seq->access,
-				     SC_SEQUENCE, PRIV_R) != 0)
+		if (access_check_ddl(seq->def->name, seq->def->uid,
+				     &seq->accesses, SC_SEQUENCE, PRIV_R) != 0)
 			return -1;
-		if (access_check_ddl(seq->def->name, seq->def->uid, seq->access,
-				     SC_SEQUENCE, PRIV_W) != 0)
+		if (access_check_ddl(seq->def->name, seq->def->uid,
+				     &seq->accesses, SC_SEQUENCE, PRIV_W) != 0)
 			return -1;
 	}
 	/** Check we have alter access on space. */
-	if (access_check_ddl(space->def->name, space->def->uid, space->access,
-			     SC_SPACE, PRIV_A) != 0)
+	if (access_check_ddl(space->def->name, space->def->uid,
+			     &space->accesses, SC_SPACE, PRIV_A) != 0)
 		return -1;
 
 	if (stmt->new_tuple != NULL) {			/* INSERT, UPDATE */

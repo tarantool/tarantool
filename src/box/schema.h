@@ -194,33 +194,33 @@ extern struct rlist on_alter_func;
 
 /** Global grants to classes of objects. */
 struct entity_access {
-       struct access space[BOX_USER_MAX];
-       struct access function[BOX_USER_MAX];
-       struct access user[BOX_USER_MAX];
-       struct access role[BOX_USER_MAX];
-       struct access sequence[BOX_USER_MAX];
+	struct accesses space;
+	struct accesses function;
+	struct accesses user;
+	struct accesses role;
+	struct accesses sequence;
 };
 
 /** A single instance of the global entities. */
 extern struct entity_access entity_access;
 
-static inline
-struct access *
-entity_access_get(enum schema_object_type type)
+/* Get user access for an object class. */
+static inline struct access
+entity_access_get(enum schema_object_type type, auth_token_t auth_token)
 {
 	switch (type) {
 	case SC_SPACE:
-		return entity_access.space;
+		return accesses_get(&entity_access.space, auth_token);
 	case SC_FUNCTION:
-		return entity_access.function;
+		return accesses_get(&entity_access.function, auth_token);
 	case SC_USER:
-		return entity_access.user;
+		return accesses_get(&entity_access.user, auth_token);
 	case SC_ROLE:
-		return entity_access.role;
+		return accesses_get(&entity_access.role, auth_token);
 	case SC_SEQUENCE:
-		return entity_access.sequence;
+		return accesses_get(&entity_access.sequence, auth_token);
 	default:
-		return NULL;
+		return (struct access){0, 0};
 	}
 }
 

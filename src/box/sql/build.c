@@ -1628,7 +1628,7 @@ sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
  */
 static void
 vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
-			uint32_t object_id, const struct access *access)
+			uint32_t object_id, const struct accesses *accesses)
 {
 	struct Vdbe *v = sqlGetVdbe(parser);
 	assert(v != NULL);
@@ -1639,8 +1639,8 @@ vdbe_emit_revoke_object(struct Parse *parser, const char *object_type,
 	 */
 	int key_reg = sqlGetTempRange(parser, 4);
 	bool had_grants = false;
-	for (uint8_t token = 0; token < BOX_USER_MAX; ++token) {
-		if (!access[token].granted)
+	for (auth_token_t token = 0; token < BOX_USER_MAX; ++token) {
+		if (!accesses_get(accesses, token).granted)
 			continue;
 		had_grants = true;
 		const struct user *user = user_find_by_token(token);
@@ -1676,7 +1676,7 @@ sql_code_drop_table(struct Parse *parse_context, const struct space *space,
 	 * the table being dropped.
 	 */
 	vdbe_emit_revoke_object(parse_context, "space", space->def->id,
-				space->access);
+				&space->accesses);
 	/*
 	 * Drop all triggers associated with the table being
 	 * dropped. Code is generated to remove entries from
@@ -1723,7 +1723,7 @@ sql_code_drop_table(struct Parse *parse_context, const struct space *space,
 			/* Delete entries from _priv */
 		        vdbe_emit_revoke_object(parse_context, "sequence",
 						space->sequence->def->id,
-						space->sequence->access);
+						&space->sequence->accesses);
 			/* Delete entry by id from _sequence. */
 			sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
 				      idx_rec_reg);
