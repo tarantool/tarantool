@@ -1978,6 +1978,10 @@ memtx_tree_index_create_iterator_with_offset(
 
 	canonicalize_lookup(&type, &key, part_count);
 
+	ERROR_INJECT_BOOL_ONCE(ERRINJ_INDEX_ITERATOR_NEW_ONCE, {
+		diag_set(ClientError, ER_INJECTION, "iterator fail once");
+		return NULL;
+	});
 	ERROR_INJECT(ERRINJ_INDEX_ITERATOR_NEW, {
 		diag_set(ClientError, ER_INJECTION, "iterator fail");
 		return NULL;
