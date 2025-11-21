@@ -1089,6 +1089,13 @@ I['failover.renew_interval'] = format_text([[
     sends read-write deadline renewals.
 ]])
 
+I['failover.replication_lag_threshold'] = format_text([[
+    A replication lag threshold (in seconds). If an instance's replication lag
+    exceeds this threshold, the supervised failover coordinator ignores the
+    instance when selecting a new leader if `synchro_mode` is `true` for this
+    replicaset. Default value is 1 second.
+]])
+
 I['failover.replicasets'] = format_text([[
     Failover coordinator options configured on the per-replicaset basis.
 ]])
