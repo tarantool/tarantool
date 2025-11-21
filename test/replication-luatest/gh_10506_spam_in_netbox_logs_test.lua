@@ -113,11 +113,11 @@ g.test_no_spam_in_logs_during_complex_connection_scenarios = function()
     -- "Connection refused" log.
     wait_socket_state(storage_uri, "error")
     g.router:exec(function(reconnect_after, storage_uri)
-        local netbox_f = require("fiber").create(function()
-            require("net.box").connect(storage_uri,
-                                       {reconnect_after = reconnect_after})
+        require("fiber").create(function()
+            local conn = require("net.box").connect(
+                storage_uri, {reconnect_after = reconnect_after})
+            rawset(_G, "conn", conn)
         end)
-        rawset(_G, "netbox_f", netbox_f)
     end, {g.reconnect_after, storage_uri})
     test_only_one_record_appears_in_logs(g.router, g.connection_refused_pattern,
                                          g.reconnect_after * 2)
@@ -129,6 +129,17 @@ g.test_no_spam_in_logs_during_complex_connection_scenarios = function()
         g.router:grep_log(g.connection_refused_pattern)
     g.storage:update_box_cfg({listen = storage_uri})
     wait_socket_state(storage_uri, "active")
+    -- In rare cases net.box state machine may have "error_reconnect" state
+    -- right after a successful connection to a remote node that was previously
+    -- inactive at this address (uri). It can break out test when we check that
+    -- "Connection refused" messages after storage's restart and storage's
+    -- shutdown are different. To avoid this we will manually wait until the
+    -- state of net.box connection is "active".
+    g.router:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert_equals(_G.conn.state, "active")
+        end)
+    end)
     local conn_refused_log_after_restart =
         g.router:grep_log(g.connection_refused_pattern)
     t.assert_equals(conn_refused_log_before_restart,
@@ -140,6 +151,9 @@ g.test_no_spam_in_logs_during_complex_connection_scenarios = function()
     g.storage:stop()
     wait_socket_state(storage_uri, "error")
     t.helpers.retrying({}, function()
+        -- An additional fortify that net.box connection was successfully
+        -- connected to storage.
+        t.assert(g.router:grep_log(g.peer_closed_pattern))
         local conn_refused_after_shutdown =
             g.router:grep_log(g.connection_refused_pattern)
         t.assert_not_equals(conn_refused_before_shutdown,
