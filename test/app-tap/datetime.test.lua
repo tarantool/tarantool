@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(43)
+test:plan(44)
 
 local INT_MAX = 2147483647
 
@@ -2710,6 +2710,46 @@ test:test("Parse with a custom format and format back to string", function(test)
         local buf = tc.buf
         test:is(dt_formatted, buf,
                 ('%s: format to %s'):format(tc.fmt, dt_formatted))
+    end
+end)
+
+local function error_could_not_parse_format(s, fmt)
+    return ("could not parse '%s' using '%s' format"):format(s, fmt)
+end
+
+-- Parse invalid string with a custom format, error is expected.
+test:test("Parse invalid string with a custom format", function(test)
+    local formats = {
+        {
+            buf = 'o1',
+            fmt = '%m',
+        },
+        {
+            buf = '0',
+            fmt = '%m',
+        },
+        {
+            buf = '13',
+            fmt = '%m',
+        },
+        {
+            buf = '-1',
+            fmt = '%j',
+        },
+        {
+            buf = '0',
+            fmt = '%j',
+        },
+        {
+            buf = '367',
+            fmt = '%j',
+        },
+    }
+    test:plan(#formats)
+    for _, tc in pairs(formats) do
+        assert_raises(test,
+                      error_could_not_parse_format(tc.buf, tc.fmt),
+                      function() date.parse(tc.buf, {format = tc.fmt}) end)
     end
 end)
 

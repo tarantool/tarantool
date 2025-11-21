@@ -24,7 +24,7 @@
 
 #include "fiber.h"
 
-/** floored modulo and divide */
+/** floored modulo and divide, positive only divider is supported */
 #define MOD(a, b) (unlikely((a) < 0) ? (((b) + ((a) % (b))) % (b)) : \
 		  ((a) % (b)))
 #define DIV(a, b) (unlikely((a) < 0) ? (((a) - (b) + 1) / (b)) : ((a) / (b)))
@@ -373,6 +373,7 @@ datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 	ssize_t l = parse_tz_suffix(str, len, base, tzindex, &offset);
 	if (l <= 0)
 		return l;
+	assert(offset >= INT16_MIN);
 	assert(offset <= INT16_MAX);
 	*tzoffset = offset;
 	return l;

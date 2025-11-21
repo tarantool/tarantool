@@ -191,6 +191,10 @@ create_unit_test(PREFIX datetime
                  SOURCES datetime.c
                  LIBRARIES tzcode core cdt unit
 )
+create_unit_test(PREFIX gh-11347-datetime-parse-crash
+                 SOURCES gh-11347-datetime-parse-crash.c
+                 LIBRARIES tzcode core cdt unit
+)
 create_unit_test(PREFIX error
                  SOURCES error.c core_test_utils.c
                  LIBRARIES unit core tuple box_error
