@@ -32,8 +32,7 @@ g.test_reproducer_from_issue = function(cg)
             index:alter({parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
         end
         t.assert_error_msg_content_equals(
-            "Can't modify space '512': the space was concurrently modified",
-            alter_index)
+            "WAL has a rollback in progress", alter_index)
     end)
 end
 
