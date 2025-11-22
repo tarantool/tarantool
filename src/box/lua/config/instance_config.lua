@@ -2087,6 +2087,70 @@ return schema.new('instance_config', schema.record({
         }, {
             validate = validators['failover.log'],
         }),
+        http = enterprise_edition(schema.record({
+            listen = schema.array({
+                items = schema.record({
+                    uri = schema.scalar({
+                        type = 'string',
+                        validate = validators['failover.http.listen.*.uri'],
+                    }),
+                    params = schema.record({
+                        transport = schema.enum({
+                            'plain',
+                            'ssl',
+                        }),
+                        ssl_key_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_cert_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ca_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_ciphers = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_password_file = enterprise_edition(schema.scalar({
+                            type = 'string',
+                        })),
+                        ssl_verify_client = schema.enum({
+                            'off',
+                            'on',
+                            'optional',
+                        }, {
+                            default = 'off',
+                        }),
+                    }),
+                }),
+            }),
+        }, {
+            validate = validators['failover.http'],
+        })),
+        metrics = enterprise_edition(schema.record({
+            exporters = schema.array({
+                items = schema.record({
+                    path = schema.scalar({
+                        type = 'string',
+                        validate =
+                            validators['failover.metrics.exporters.*.path'],
+                    }),
+                    format = schema.enum({
+                        'prometheus',
+                        'zabbix',
+                        'telegraf',
+                        'json',
+                    }, {
+                        default = 'prometheus',
+                    }),
+                }),
+            }),
+        }, {
+            validate = validators['failover.metrics'],
+        })),
     }, {
         validate = validators['failover'],
     }),
