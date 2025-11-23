@@ -415,6 +415,11 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 static inline void
 txn_limbo_begin(struct txn_limbo *limbo)
 {
+	ERROR_INJECT_COUNTDOWN(ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN, {
+		struct errinj *e =
+			errinj(ERRINJ_TXN_LIMBO_BEGIN_DELAY, ERRINJ_BOOL);
+		e->bparam = true;
+	});
 	ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_BEGIN_DELAY);
 	latch_lock(&limbo->promote_latch);
 }
