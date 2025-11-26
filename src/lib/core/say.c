@@ -844,6 +844,8 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		 const char *error, const char *format, va_list ap)
 {
 	int total = 0;
+	char *buf_start = buf;
+	int len_max = len;
 
 	/*
 	 * Every message written to syslog has a header that contains
@@ -884,8 +886,12 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 	if (error != NULL)
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
 
-	SNPRINT(total, snprintf, buf, len, "\n");
-	return total;
+	if (log->type != SAY_LOGGER_SYSLOG) {
+		SNPRINT(total, snprintf, buf, len, "\n");
+		return total;
+	}
+
+	return syslog_escape_inplace(buf_start, len_max);
 }
 
 /**

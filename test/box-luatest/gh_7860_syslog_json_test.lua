@@ -63,7 +63,7 @@ g.before_all(function(cg)
             '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]:%s' ..
             'main/%d+/main/test%.box%-luatest%.gh_7860_syslog_json_test%s' ..
             'gh_7860_syslog_json_test%.lua:29')
-        t.assert_equals(msg, expected_msg .. '\n')
+        t.assert_equals(msg, expected_msg)
     end
 end)
 
