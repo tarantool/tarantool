@@ -345,6 +345,12 @@ json_escape(char *buf, int size, const char *data)
 	return str_escape(buf, size, data, json_escape_char);
 }
 
+int
+json_syslog_escape(char *buf, int size, const char *data)
+{
+	return str_escape(buf, size, data, json_syslog_escape_char);
+}
+
 /**
  * Escape special characters in @a buf in-place using custom escape rules,
  * defined in @a escape_func.
@@ -417,6 +423,12 @@ int
 syslog_escape_inplace(char *buf, int size)
 {
 	return str_escape_inplace(buf, size, syslog_escape_char);
+}
+
+int
+json_syslog_escape_inplace(char *buf, int size)
+{
+	return str_escape_inplace(buf, size, json_syslog_escape_char);
 }
 
 const char *precision_fmts[] = {
