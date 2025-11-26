@@ -1098,10 +1098,8 @@ format_func_adapter(char *buf, int len, struct log *log, int level,
 }
 
 /**
- * Format the header of a log message in syslog format.
+ * Format the header of a log message in syslog format according to RFC 3164.
  *
- * See RFC 5424 and RFC 3164. RFC 3164 is compatible with RFC 5424,
- * so it is implemented.
  * Protocol:
  * <PRIORITY_VALUE>TIMESTAMP IDENTATION[PID]: CORD/FID/FIBERNAME LEVEL> MSG
  * - Priority value is encoded as message subject * 8 and bitwise
