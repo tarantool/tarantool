@@ -114,3 +114,69 @@ g.test_syslog_plain = function(cg)
     local expected = str_make_expected(str_all_bytes(), syslog_char2escape())
     syslog_check_plain(cg, expected)
 end
+
+local function syslog_check_json(cg, expected_msg)
+    local str = cg.sock:recv(16 * 1024)
+    str_check_no_prohibited_char(str)
+    local hdr, body = unpack(str:split(': ', 1))
+
+    --
+    -- Header.
+    --
+    t.assert_str_matches(
+        hdr, '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]')
+
+    --
+    -- Message. lua_cjson decodes to unicode, so compare before decode. The
+    -- first match is used for string logging, the second - for table.
+    --
+    local actual = body:match('"message"%s*:%s*"(.-)"%s*,') or
+                   body:match('\\"message\\"%s*:%s*\\"(.-)\\"%s*,')
+    t.assert_equals(actual, expected_msg)
+
+    --
+    -- Body.
+    --
+    local ok, result = pcall(json.decode, body)
+    t.assert(ok)
+    result.message = nil
+    t.assert_str_matches(
+        result.time, '%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%d%.%d%d%d[+-]%d+')
+    result.time = nil
+    t.assert_is(type(result.fiber_id), 'number')
+    result.fiber_id = nil
+    t.assert_str_matches(result.file, '.*' .. TEST_NAME .. '%.lua')
+    result.file = nil
+    t.assert_equals(result, {
+        cord_name = 'main',
+        fiber_name = 'main',
+        line = 37,
+        level = 'WARN',
+        module = 'test.box-luatest.' .. TEST_NAME,
+        pid = cg.pid,
+    })
+end
+
+local function json_char2escape()
+    local char2escape = syslog_char2escape()
+    char2escape[string.byte('"')] = '\\\"'
+    char2escape[string.byte('\\')] = '\\\\'
+    return char2escape
+end
+
+g.test_syslog_json = function(cg)
+    cg.server:exec(function() box.cfg({log_format = 'json'}) end)
+
+    log(cg, 'test plain small')
+    syslog_check_json(cg, 'test plain small')
+
+    log(cg, str_all_bytes())
+    local expected = str_make_expected(str_all_bytes(), json_char2escape())
+    syslog_check_json(cg, expected)
+
+    log(cg, {message = str_all_bytes()})
+    local expected = str_make_expected(str_all_bytes(), json_char2escape())
+    syslog_check_json(cg, expected)
+
+    cg.server:exec(function() box.cfg({log_format = 'plain'}) end)
+end

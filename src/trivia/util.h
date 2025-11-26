@@ -704,10 +704,27 @@ syslog_escape_char(char c)
 }
 
 /**
+ * Returns the escaped string if the given character should be escaped when
+ * encoded for syslog according to RFC 3164 and JSON or NULL otherwise.
+ */
+static inline const char *
+json_syslog_escape_char(char c)
+{
+	return json_escape_char(c) != NULL ?
+		json_escape_char(c) : syslog_escape_char(c);
+}
+
+/**
  * Escape special characters in @a data to @a buf
  */
 int
 json_escape(char *buf, int size, const char *data);
+
+/**
+ * Escape special characters in @a data to @a buf for JSON and syslog.
+ */
+int
+json_syslog_escape(char *buf, int size, const char *data);
 
 /**
  * Escape special characters in @a buf inplace
@@ -720,6 +737,12 @@ json_escape_inplace(char *buf, int size);
  */
 int
 syslog_escape_inplace(char *buf, int size);
+
+/**
+ * Escape characters in @a buf inplace for syslog and JSON.
+ */
+int
+json_syslog_escape_inplace(char *buf, int size);
 
 /**
  * Helper macro to handle easily snprintf() result
