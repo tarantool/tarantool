@@ -256,14 +256,17 @@ const char *const json_char2escape[256] = {
 bool json_escape_forward_slash;
 TWEAK_BOOL(json_escape_forward_slash);
 
+typedef const char *
+(*str_escape_char_t)(char c);
+
 int
-json_escape(char *buf, int size, const char *data)
+str_escape(char *buf, int size, const char *data, str_escape_char_t escape_func)
 {
 	int total = 0;
 	int data_len = strlen(data);
 	for (int i = 0; i < data_len; i++) {
 		char c = data[i];
-		const char *escstr = json_escape_char(c);
+		const char *escstr = escape_func(c);
 		if (escstr != NULL) {
 			SNPRINT(total, snprintf, buf, size, "%s", escstr);
 		} else {
@@ -274,7 +277,13 @@ json_escape(char *buf, int size, const char *data)
 }
 
 int
-json_escape_inplace(char *buf, int size)
+json_escape(char *buf, int size, const char *data)
+{
+	return str_escape(buf, size, data, json_escape_char);
+}
+
+int
+str_escape_inplace(char *buf, int size, str_escape_char_t escape_func)
 {
 	/* We need at least one byte for the null terminator later. */
 	if (buf == NULL || size <= 0)
@@ -290,7 +299,7 @@ json_escape_inplace(char *buf, int size)
 	 */
 	for (char *p = buf; p < buf + size && *p != '\0'; p++) {
 		char c = *p;
-		const char *esc_str = json_escape_char(c);
+		const char *esc_str = escape_func(c);
 		int esc_len = esc_str != NULL ? strlen(esc_str) : 1;
 
 		if (total + esc_len >= size) {
@@ -310,7 +319,7 @@ json_escape_inplace(char *buf, int size)
 	int written = 0;
 	for (char *pr = buf + data_len - 1; pr >= buf; --pr) {
 		char c = *pr;
-		const char *esc_str = json_escape_char(c);
+		const char *esc_str = escape_func(c);
 
 		if (esc_str != NULL) {
 			int esc_len = strlen(esc_str);
@@ -329,6 +338,12 @@ json_escape_inplace(char *buf, int size)
 	assert(pw <= buf);
 	assert(written == total);
 	return written;
+}
+
+int
+json_escape_inplace(char *buf, int size)
+{
+	return str_escape_inplace(buf, size, json_escape_char);
 }
 
 const char *precision_fmts[] = {
