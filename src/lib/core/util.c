@@ -342,6 +342,12 @@ json_escape(char *buf, int size, const char *data)
 }
 
 int
+json_syslog_escape(char *buf, int size, const char *data)
+{
+	return str_escape(buf, size, data, json_syslog_escape_char);
+}
+
+int
 str_escape_inplace(char *buf, int size, str_escape_char_t escape_func)
 {
 	/* We need at least one byte for the null terminator later. */
@@ -409,6 +415,12 @@ int
 syslog_escape_inplace(char *buf, int size)
 {
 	return str_escape_inplace(buf, size, syslog_escape_char);
+}
+
+int
+json_syslog_escape_inplace(char *buf, int size)
+{
+	return str_escape_inplace(buf, size, json_syslog_escape_char);
 }
 
 const char *precision_fmts[] = {
