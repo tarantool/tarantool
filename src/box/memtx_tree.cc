@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "memtx_tree.h"
+#include "index.h"
 #include "memtx_engine.h"
 #include "memtx_sort_data.h"
 #include "memtx_tuple_compression.h"
@@ -2374,6 +2375,19 @@ tree_read_view_count(struct index_read_view *rv, enum iterator_type type,
 	return generic_index_read_view_count(rv, type, key, part_count);
 }
 
+template<bool USE_HINT>
+static int
+tree_read_view_quantile(struct index_read_view *rv, double level,
+			const char *begin_key, uint32_t begin_part_count,
+			const char *end_key, uint32_t end_part_count,
+			const char **quantile_key,
+			uint32_t *quantile_key_size)
+{
+	return generic_index_read_view_quantile(
+		rv, level, begin_key, begin_part_count, end_key, end_part_count,
+		quantile_key, quantile_key_size);
+}
+
 template <bool USE_HINT>
 static int
 tree_read_view_get_raw(struct index_read_view *rv,
@@ -2533,6 +2547,7 @@ memtx_tree_index_create_read_view(struct index *base)
 	static const struct index_read_view_vtab vtab = {
 		.free = tree_read_view_free<USE_HINT>,
 		.count = tree_read_view_count<USE_HINT>,
+		.quantile = tree_read_view_quantile<USE_HINT>,
 		.get_raw = tree_read_view_get_raw<USE_HINT>,
 		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
 		.create_iterator_with_offset =
