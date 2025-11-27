@@ -190,12 +190,11 @@ jobs:
           source venv_otava/bin/activate
           curl -sSL https://install.python-poetry.org | python - --version 1.8.3
           export PATH="/root/.local/bin:$PATH"
-          git clone https://github.com/apache/otava
-          cd otava
-          # Use intermediate version until the first release,
-          # see https://github.com/apache/otava/issues/51.
-          git reset --hard 73cf53e
-          poetry install -v
+          # git clone https://github.com/apache/otava
+          # cd otava
+          # git reset --hard 0.7.0-incubating-rc3
+          # poetry install -v
+          pip install apache-otava
           export OTAVA_CONFIG=$(realpath ../otava.yaml)
           MAGNITUDE=0.2
           otava regressions --magnitude ${MAGNITUDE} tarantool
