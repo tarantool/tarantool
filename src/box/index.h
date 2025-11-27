@@ -498,6 +498,25 @@ exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
 
 /**
+ * Checks that the quantile parameters are consistent and compatible with
+ * the index type.
+ *
+ * @param index_def index definition
+ * @param level quantile level
+ * @param begin_key beginning key of the target range
+ * @param begin_part_count number of parts in @a begin_key
+ * @param end_key end key of the target range
+ * @param end_part_count number of parts in @a end_key
+ *
+ * @retval 0  The parameters are valid.
+ * @retval -1 The parameters are invalid.
+ */
+int
+quantile_validate(struct index_def *index_def, double level,
+		  const char *begin_key, uint32_t begin_part_count,
+		  const char *end_key, uint32_t end_part_count);
+
+/**
  * Having iterator @a type as ITER_NP or ITER_PP, transform initial search key
  * @a key and the @a type so that normal initial search in iterator would
  * find exactly what needed for next prefix or previous prefix iterator.
@@ -756,6 +775,11 @@ struct index_read_view_vtab {
 	/* Count the amount of tuples matching the key in the view. */
 	ssize_t (*count)(struct index_read_view *rv, enum iterator_type type,
 			 const char *key, uint32_t part_count);
+	/** See index_vtab::quantile. */
+	int (*quantile)(struct index_read_view *rv, double level,
+			const char *begin_key, uint32_t begin_part_count,
+			const char *end_key, uint32_t end_part_count,
+			const char **quantile_key, uint32_t *quantile_key_size);
 	/**
 	 * Look up a tuple by a full key in a read view.
 	 *
@@ -1146,6 +1170,17 @@ index_read_view_count(struct index_read_view *rv, enum iterator_type type,
 }
 
 static inline int
+index_read_view_quantile(
+	struct index_read_view *rv, double level, const char *begin_key,
+	uint32_t begin_part_count, const char *end_key, uint32_t end_part_count,
+	const char **quantile_key, uint32_t *quantile_key_size)
+{
+	return rv->vtab->quantile(rv, level, begin_key, begin_part_count,
+				  end_key, end_part_count, quantile_key,
+				  quantile_key_size);
+}
+
+static inline int
 index_read_view_get_raw(struct index_read_view *rv,
 			const char *key, uint32_t part_count,
 			struct read_view_tuple *result)
@@ -1254,6 +1289,10 @@ ssize_t generic_index_bsize(struct index *);
 ssize_t generic_index_size(struct index *);
 int generic_index_quantile(struct index *, double, const char *, uint32_t,
 			   const char *, uint32_t, const char **, uint32_t *);
+int generic_index_read_view_quantile(
+	struct index_read_view *rv, double level, const char *begin_key,
+	uint32_t begin_part_count, const char *end_key, uint32_t end_part_count,
+	const char **quantile_key, uint32_t *quantile_key_size);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_random(struct index *, uint32_t, struct tuple **);

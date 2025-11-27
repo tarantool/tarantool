@@ -219,6 +219,40 @@ error:
 	return -1;
 }
 
+int
+quantile_validate(struct index_def *index_def, double level,
+		  const char *begin_key, uint32_t begin_part_count,
+		  const char *end_key, uint32_t end_part_count)
+{
+	if (index_def->type != TREE) {
+		diag_set(UnsupportedIndexFeature, index_def, "quantile()");
+		return -1;
+	}
+
+	if (iterator_validate(index_def, ITER_GE,
+			      begin_key, begin_part_count) != 0)
+		return -1;
+
+	if (iterator_validate(index_def, ITER_LT,
+			      end_key, end_part_count) != 0)
+		return -1;
+
+	int cmp = key_compare(begin_key, begin_part_count, HINT_NONE,
+			      end_key, end_part_count, HINT_NONE,
+			      index_def->key_def);
+	if (cmp > 0 || (cmp == 0 &&
+			begin_part_count != 0 && end_part_count != 0 &&
+			begin_part_count >= end_part_count)) {
+		diag_set(IllegalParams, "begin_key must be < end_key");
+		return -1;
+	}
+	if (level <= 0 || level >= 1) {
+		diag_set(IllegalParams, "level must be > 0 and < 1");
+		return -1;
+	}
+	return 0;
+}
+
 bool
 prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
 			      uint32_t part_count, struct key_def *cmp_def,
@@ -431,34 +465,12 @@ box_index_quantile(uint32_t space_id, uint32_t index_id, double level,
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
 
-	if (index->def->type != TREE) {
-		diag_set(UnsupportedIndexFeature, index->def, "quantile()");
-		return -1;
-	}
-
 	uint32_t begin_part_count = mp_decode_array(&begin_key);
-	if (iterator_validate(index->def, ITER_GE,
-			      begin_key, begin_part_count) != 0)
-		return -1;
-
 	uint32_t end_part_count = mp_decode_array(&end_key);
-	if (iterator_validate(index->def, ITER_LT,
+	if (quantile_validate(index->def, level, begin_key, begin_part_count,
 			      end_key, end_part_count) != 0)
 		return -1;
 
-	int cmp = key_compare(begin_key, begin_part_count, HINT_NONE,
-			      end_key, end_part_count, HINT_NONE,
-			      index->def->key_def);
-	if (cmp > 0 || (cmp == 0 &&
-			begin_part_count != 0 && end_part_count != 0 &&
-			begin_part_count >= end_part_count)) {
-		diag_set(IllegalParams, "begin_key must be < end_key");
-		return -1;
-	}
-	if (level <= 0 || level >= 1) {
-		diag_set(IllegalParams, "level must be > 0 and < 1");
-		return -1;
-	}
 	uint32_t quantile_key_size;
 	if (index_quantile(index, level, begin_key, begin_part_count,
 			   end_key, end_part_count,
@@ -1043,6 +1055,23 @@ generic_index_quantile(struct index *index, double level,
 	(void)quantile_key;
 	(void)quantile_key_size;
 	diag_set(UnsupportedIndexFeature, index->def, "quantile()");
+	return -1;
+}
+
+int
+generic_index_read_view_quantile(
+	struct index_read_view *rv, double level, const char *begin_key,
+	uint32_t begin_part_count, const char *end_key, uint32_t end_part_count,
+	const char **quantile_key, uint32_t *quantile_key_size)
+{
+	(void)level;
+	(void)begin_key;
+	(void)begin_part_count;
+	(void)end_key;
+	(void)end_part_count;
+	(void)quantile_key;
+	(void)quantile_key_size;
+	diag_set(UnsupportedIndexFeature, rv->def, "quantile()");
 	return -1;
 }
 
