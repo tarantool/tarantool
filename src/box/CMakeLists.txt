@@ -175,7 +175,7 @@ if(ENABLE_RETENTION_PERIOD)
 endif()
 
 add_library(xlog STATIC ${xlog_sources})
-target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
+target_link_libraries(xlog core box_error digest ${ZSTD_LIBRARIES})
 
 set(box_sources
     allocator.cc
@@ -390,7 +390,7 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
     DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
         ${SQL_BIN_DIR}/opcodes.h)
 
-target_link_libraries(box box_error tuple xrow xlog vclock crc32 raft
+target_link_libraries(box box_error tuple xrow xlog vclock digest raft
     node_name ${common_libraries} ${EXTRA_BOX_LINK_LIBRARIES})
 
 add_dependencies(box build_bundled_libs generate_sql_files)

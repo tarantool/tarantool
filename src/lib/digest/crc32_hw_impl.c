@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "cpu_feature.h"
+#include "crc32_hw_impl.h"
 
 #if defined(HAVE_CPUID) && (defined (__x86_64__) || defined (__i386__))
 

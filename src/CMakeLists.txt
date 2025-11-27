@@ -166,14 +166,6 @@ if(NOT TARGET_OS_OPENBSD)
     endif()
 endif()
 
-add_library(cpu_feature STATIC cpu_feature.c)
-
-add_library(crc32 STATIC
-    crc32.c
-    ${PROJECT_SOURCE_DIR}/third_party/crc32_impl.c
-)
-target_link_libraries(crc32 cpu_feature)
-
 add_library(shutdown STATIC on_shutdown.c)
 
 set (server_sources
@@ -289,8 +281,8 @@ endif()
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 add_dependencies(server build_bundled_libs)
-target_link_libraries(server core coll http_parser bit uri swim swim_udp
-                      swim_ev crypto mpstream crc32 tzcode)
+target_link_libraries(server core coll digest http_parser bit uri swim swim_udp
+                      swim_ev crypto mpstream tzcode)
 target_include_directories(server PRIVATE ${EXTRA_SERVER_INCLUDE_DIRS})
 
 if(EMBED_LUAZLIB)

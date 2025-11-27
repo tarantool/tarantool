@@ -38,7 +38,7 @@ Files: third_party/coro/conftest.c
 Copyright: 1999-2001 Ralf S. Engelschall <rse@engelschall.com>
 License: LGPL-2.1+
 
-Files: third_party/crc32_impl.c
+Files: src/lib/digest/crc32_impl.c
 Copyright: 1986 Gary S. Brown
            2004-2006 Intel Corporation
 License: BSD-3-Clause
@@ -197,11 +197,11 @@ Files: src/lib/salad/rope.*
 Copyright: 1993-1994 by Xerox Corporation.
 License: BSD-2-Clause
 
-Files: third_party/base64.[ch]
+Files: src/lib/digest/base64.[ch]
 Copyright: Chris Venter <chris.venter@gmail.com>
 License: BSD-2-Clause
 
-Files: third_party/PMurHash.*
+Files: src/lib/digest/PMurHash.*
 Copyright: Austin Appleby
 License: Public-Domain
  MurmurHash3 was written by Austin Appleby, and is placed in the public

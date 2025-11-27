@@ -1,0 +1,6 @@
+# File format:
+#fun:*
+#src:*
+
+# to be removed in scope of gh-12086
+fun:PMurHash32_Process

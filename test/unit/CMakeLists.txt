@@ -173,7 +173,7 @@ create_unit_test(PREFIX bitset_index
 )
 create_unit_test(PREFIX base64
                  SOURCES base64.c
-                 LIBRARIES misc unit
+                 LIBRARIES digest unit
 )
 create_unit_test(PREFIX uuid
                  SOURCES uuid.c core_test_utils.c
@@ -407,7 +407,7 @@ create_unit_test(PREFIX guava
 
 create_unit_test(PREFIX crc32
                  SOURCES crc32.c
-                 LIBRARIES unit crc32
+                 LIBRARIES unit digest
 )
 
 create_unit_test(PREFIX find_path
@@ -435,7 +435,7 @@ create_unit_test(PREFIX csv
 
 create_unit_test(PREFIX json
                  SOURCES json.c
-                 LIBRARIES json unit ${ICU_LIBRARIES}
+                 LIBRARIES json digest unit ${ICU_LIBRARIES}
 )
 
 create_unit_test(PREFIX http_parser
