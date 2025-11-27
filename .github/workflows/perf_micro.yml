@@ -175,11 +175,10 @@ jobs:
         env:
           INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
           INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN_EXTRACT_RESULTS }}
-      # Beware, Apache Otava is tested against Python 3.8,
-      # 3.9, and 3.10.
+      # Otava 0.8.0 requires Python >= 3.10, see PyPI.
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - name: Run performance results analysis
         # Run on push to the 'master' and release branches or on
         # non-fork pull requests (secrets are unavailable in fork
@@ -189,14 +188,7 @@ jobs:
         run: |
           python3 -m venv venv_otava
           source venv_otava/bin/activate
-          curl -sSL https://install.python-poetry.org | python - --version 1.8.3
-          export PATH="/root/.local/bin:$PATH"
-          git clone https://github.com/apache/otava
-          cd otava
-          # Use intermediate version until the first release,
-          # see https://github.com/apache/otava/issues/51.
-          git reset --hard 73cf53e
-          poetry install -v
+          pip install -v apache-otava==0.8.0
           export OTAVA_CONFIG=$(realpath ../otava.yaml)
           MAGNITUDE=0.2
           otava regressions --magnitude ${MAGNITUDE} tarantool
