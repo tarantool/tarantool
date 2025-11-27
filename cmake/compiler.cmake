@@ -258,6 +258,7 @@ macro(enable_tnt_compile_flags)
         set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-sanitize=${UBSAN_IGNORE_OPTIONS}")
         # Print a verbose error report and exit the program.
         set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fno-sanitize-recover=undefined")
+        set(SANITIZE_FLAGS "${SANITIZE_FLAGS} -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/ubsan.supp")
         add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
     endif()
 
