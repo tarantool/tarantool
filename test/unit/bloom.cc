@@ -22,24 +22,25 @@ simple_test()
 		uint64_t false_positive = 0;
 		for (uint32_t count = 1000; count <= 10000; count *= 2) {
 			struct bloom bloom;
-			bloom_create(&bloom, count, p);
+			bloom_init(&bloom, count, p);
+			void *bloom_data = xcalloc(1, bloom_data_size(&bloom));
 			unordered_set<uint32_t> check;
 			for (uint32_t i = 0; i < count; i++) {
 				uint32_t val = rand() % (count * 10);
 				check.insert(val);
-				bloom_add(&bloom, h(val));
+				bloom_add(&bloom, bloom_data, h(val));
 			}
 			for (uint32_t i = 0; i < count * 10; i++) {
 				bool has = check.find(i) != check.end();
-				bool bloom_possible =
-					bloom_maybe_has(&bloom, h(i));
+				bool bloom_possible = bloom_maybe_has(
+					&bloom, bloom_data, h(i));
 				tests++;
 				if (has && !bloom_possible)
 					error_count++;
 				if (!has && bloom_possible)
 					false_positive++;
 			}
-			bloom_destroy(&bloom);
+			free(bloom_data);
 		}
 		double fp_rate = (double)false_positive / tests;
 		if (fp_rate > p + 0.001)
@@ -49,49 +50,57 @@ simple_test()
 	cout << "fp_rate_too_big = " << fp_rate_too_big << endl;
 }
 
-void
-store_load_test()
+static void
+merge_test()
 {
 	cout << "*** " << __func__ << " ***" << endl;
 	srand(time(0));
 	uint32_t error_count = 0;
 	uint32_t fp_rate_too_big = 0;
-	for (double p = 0.01; p < 0.5; p *= 1.5) {
-		uint64_t tests = 0;
-		uint64_t false_positive = 0;
-		for (uint32_t count = 300; count <= 3000; count *= 10) {
-			struct bloom bloom;
-			bloom_create(&bloom, count, p);
-			unordered_set<uint32_t> check;
-			for (uint32_t i = 0; i < count; i++) {
-				uint32_t val = rand() % (count * 10);
-				check.insert(val);
-				bloom_add(&bloom, h(val));
+	double p = 0.01;
+	uint32_t count = 10000;
+
+	uint64_t tests = 0;
+	uint64_t false_positive = 0;
+	for (uint32_t count = 1000; count <= 10000; count *= 2) {
+		struct bloom bloom;
+		bloom_init(&bloom, count, p);
+		void *bloom_data_a = xcalloc(1, bloom_data_size(&bloom));
+		void *bloom_data_b = xcalloc(1, bloom_data_size(&bloom));
+
+		unordered_set<uint32_t> check;
+		for (uint32_t i = 0; i < count; i++) {
+			uint32_t val = rand() % (count * 10);
+			check.insert(val);
+			uint32_t bucket = rand() % 3;
+			if (bucket == 0) {
+				bloom_add(&bloom, bloom_data_a, h(val));
+			} else if (bucket == 1) {
+				bloom_add(&bloom, bloom_data_b, h(val));
+			} else {
+				bloom_add(&bloom, bloom_data_a, h(val));
+				bloom_add(&bloom, bloom_data_b, h(val));
 			}
-			struct bloom test = bloom;
-			char *buf = (char *)malloc(bloom_store_size(&bloom));
-			bloom_store(&bloom, buf);
-			bloom_destroy(&bloom);
-			memset(&bloom, '#', sizeof(bloom));
-			bloom_load_table(&test, buf);
-			free(buf);
-			for (uint32_t i = 0; i < count * 10; i++) {
-				bool has = check.find(i) != check.end();
-				bool bloom_possible =
-					bloom_maybe_has(&test, h(i));
-				tests++;
-				if (has && !bloom_possible)
-					error_count++;
-				if (!has && bloom_possible)
-					false_positive++;
-			}
-			bloom_destroy(&test);
 		}
-		double fp_rate = (double)false_positive / tests;
-		double excess = fp_rate / p;
-		if (fp_rate > p + 0.001)
-			fp_rate_too_big++;
+
+		bloom_merge(&bloom, bloom_data_a, bloom_data_b);
+		for (uint32_t i = 0; i < count * 10; i++) {
+			bool has = check.find(i) != check.end();
+			bool bloom_possible = bloom_maybe_has(
+				&bloom, bloom_data_a, h(i));
+			tests++;
+			if (has && !bloom_possible)
+				error_count++;
+			if (!has && bloom_possible)
+				false_positive++;
+		}
+		free(bloom_data_a);
+		free(bloom_data_b);
 	}
+	double fp_rate = (double)false_positive / tests;
+	if (fp_rate > p + 0.001)
+		fp_rate_too_big++;
+
 	cout << "error_count = " << error_count << endl;
 	cout << "fp_rate_too_big = " << fp_rate_too_big << endl;
 }
@@ -100,5 +109,5 @@ int
 main(void)
 {
 	simple_test();
-	store_load_test();
+	merge_test();
 }

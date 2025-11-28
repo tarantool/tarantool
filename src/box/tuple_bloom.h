@@ -55,6 +55,14 @@ enum tuple_bloom_version {
 	TUPLE_BLOOM_VERSION_V3,
 };
 
+/** Holder for bloom filter header along with its data. */
+struct tuple_bloom_part {
+	/* Header of the bloom filter. */
+	struct bloom header;
+	/* Data of the bloom filter. */
+	char *data;
+};
+
 /**
  * Tuple bloom filter.
  *
@@ -69,7 +77,7 @@ struct tuple_bloom {
 	/** Number of key parts. */
 	uint32_t part_count;
 	/** Array of bloom filters, one per each partial key. */
-	struct bloom parts[0];
+	struct tuple_bloom_part parts[0];
 };
 
 /**
