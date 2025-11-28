@@ -92,7 +92,7 @@ foreach(test ${CAPI_TESTS})
   )
   set_tests_properties(${test_title} PROPERTIES
     LABELS "fuzzing;fuzzing-c;luajit-capi"
-    DEPENDS lua-tests
+    DEPENDS ${LUA_TESTS_TARGET_NAME}
   )
 endforeach()
 
@@ -250,7 +250,11 @@ foreach(test_name ${LAPI_TESTS_UNSUPPORTED})
   )
 endforeach()
 
-add_dependencies(lua-tests luzer-library)
+# luzer library has issues with building at OSS Fuzz environment,
+# so building the library is disabled.
+if (NOT ${OSS_FUZZ})
+  add_dependencies(${LUA_TESTS_TARGET_NAME} luzer-library)
+endif()
 
 unset(GIT_REF)
 unset(CAPI_TESTS)
