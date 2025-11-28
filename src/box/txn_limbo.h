@@ -98,6 +98,12 @@ struct txn_limbo {
 	 */
 	bool is_in_rollback;
 	/**
+	 * If the limbo is being recovered right now and isn't serving new
+	 * requests. Only re-applying old ones. This is used in order to
+	 * distinguish between old and new promotion.
+	 */
+	bool is_in_recovery;
+	/**
 	 * Savepoint of confirmed LSN. To rollback to in case the current
 	 * synchro command (promote/demote/...) fails.
 	 */
@@ -379,6 +385,10 @@ txn_limbo_fence(struct txn_limbo *limbo);
  */
 void
 txn_limbo_unfence(struct txn_limbo *limbo);
+
+/** Tell the limbo that the recovery is finished. */
+void
+txn_limbo_finish_recovery(struct txn_limbo *limbo);
 
 /** Return whether limbo has an owner. */
 static inline bool

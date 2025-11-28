@@ -173,6 +173,7 @@ static inline void
 txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 {
 	memset(limbo, 0, sizeof(*limbo));
+	limbo->is_in_recovery = true;
 	txn_limbo_queue_create(&limbo->queue);
 	vclock_create(&limbo->promote_term_map);
 	latch_create(&limbo->state_latch);
@@ -730,7 +731,7 @@ static inline void
 txn_limbo_unfreeze_on_first_promote(struct txn_limbo *limbo)
 {
 	txn_limbo_assert_locked(limbo);
-	if (box_is_configured()) {
+	if (!limbo->is_in_recovery) {
 		limbo->is_frozen_until_promotion = false;
 		box_update_ro_summary();
 	}
@@ -856,6 +857,13 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 	txn_limbo_lock(limbo);
 	limbo->do_validate = false;
 	txn_limbo_unlock(limbo);
+}
+
+void
+txn_limbo_finish_recovery(struct txn_limbo *limbo)
+{
+	assert(limbo->is_in_recovery);
+	limbo->is_in_recovery = false;
 }
 
 void
