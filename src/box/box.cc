@@ -6690,7 +6690,7 @@ box_storage_init(void)
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
-	txn_limbo_init();
+	txn_limbo_init(box_raft());
 	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
