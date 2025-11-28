@@ -19,6 +19,8 @@ extern "C" {
 struct authenticator;
 
 typedef uint16_t user_access_t;
+typedef uint64_t auth_token_t;
+
 /**
  * Effective session user. A cache of user data
  * and access stored in session and fiber local storage.
@@ -27,7 +29,7 @@ typedef uint16_t user_access_t;
  */
 struct credentials {
 	/** A look up key to quickly find session user. */
-	uint8_t auth_token;
+	auth_token_t auth_token;
 	/**
 	 * Cached global grants, to avoid an extra look up
 	 * when checking global grants.
@@ -135,6 +137,35 @@ struct access {
 	 */
 	user_access_t effective;
 };
+
+/**
+ * The collection of accesses granted to users.
+ */
+struct accesses {
+	/* Accesses of users that had an access defined. */
+	struct access *access;
+	/* The size of the array above. */
+	size_t count;
+};
+
+/**
+ * Initialize an empty access rights collection.
+ */
+void
+accesses_init(struct accesses *accesses);
+
+/**
+ * Get user access rights by auth_token.
+ */
+struct access
+accesses_get(const struct accesses *accesses, auth_token_t auth_token);
+
+/**
+ * Set user access rights by auth_token.
+ */
+void
+accesses_set(struct accesses *accesses, auth_token_t auth_token,
+	     struct access access);
 
 /**
  * A cache entry for an existing user. Entries for all existing

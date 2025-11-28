@@ -48,7 +48,7 @@ enum {
 	FIELD_TYPE_NAME_MAX = 16,
 	GRANT_NAME_MAX = 16,
 	BOX_FIELD_MAX = INT32_MAX,
-	BOX_USER_MAX = 32,
+	BOX_USER_MAX = 4096,
 	/**
 	 * A fairly arbitrary limit which is still necessary
 	 * to keep tuple_format object small.

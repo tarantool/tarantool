@@ -60,16 +60,16 @@ enum {
 /* {{{ user_map */
 
 static inline int
-user_map_calc_idx(uint8_t auth_token, uint8_t *bit_no)
+user_map_calc_idx(auth_token_t auth_token, uint8_t *bit_no)
 {
-	*bit_no = auth_token & (UMAP_INT_BITS - 1);
+	*bit_no = auth_token % UMAP_INT_BITS;
 	return auth_token / UMAP_INT_BITS;
 }
 
 
 /** Set a bit in the user map - add a user. */
 static inline void
-user_map_set(struct user_map *map, uint8_t auth_token)
+user_map_set(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -78,7 +78,7 @@ user_map_set(struct user_map *map, uint8_t auth_token)
 
 /** Clear a bit in the user map - remove a user. */
 static inline void
-user_map_clear(struct user_map *map, uint8_t auth_token)
+user_map_clear(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -87,7 +87,7 @@ user_map_clear(struct user_map *map, uint8_t auth_token)
 
 /* Check if a bit is set in the user map. */
 static inline bool
-user_map_is_set(struct user_map *map, uint8_t auth_token)
+user_map_is_set(struct user_map *map, auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -168,7 +168,7 @@ rb_gen(, privset_, privset_t, struct priv_def, link, priv_def_compare);
 /** {{{ user */
 
 static void
-user_create(struct user *user, uint8_t auth_token)
+user_create(struct user *user, auth_token_t auth_token)
 {
 	assert(user->auth_token == 0);
 	user->auth_token = auth_token;
@@ -230,28 +230,30 @@ struct access_lua_call_node {
 	/** Length of the name string. */
 	uint32_t name_len;
 	/** Cached runtime access information. */
-	struct access access[BOX_USER_MAX];
+	struct accesses accesses;
 };
 
-struct access *
-access_lua_call_find(const char *name, uint32_t name_len)
+bool
+access_lua_call_find(const char *name, uint32_t name_len,
+		     auth_token_t auth_token, struct access *result)
 {
 	struct mh_strnptr_t *h = access_lua_call_registry;
 	mh_int_t i = mh_strnptr_find_str(h, name, name_len);
 	if (i != mh_end(h)) {
 		struct access_lua_call_node *node =
 			(typeof(node))mh_strnptr_node(h, i)->val;
-		return node->access;
+		*result = accesses_get(&node->accesses, auth_token);
+		return true;
 	}
-	return NULL;
+	return false;
 }
 
 /**
  * Returns cached runtime access information for the given Lua function name.
  * Creates one if it doesn't exist.
  */
-static struct access *
-access_lua_call_find_or_create(const char *name, uint32_t name_len)
+static struct accesses *
+accesses_lua_call_find_or_create(const char *name, uint32_t name_len)
 {
 	uint32_t name_hash = mh_strn_hash(name, name_len);
 	struct mh_strnptr_t *h = access_lua_call_registry;
@@ -260,7 +262,7 @@ access_lua_call_find_or_create(const char *name, uint32_t name_len)
 	if (i != mh_end(h)) {
 		struct access_lua_call_node *node =
 			(typeof(node))mh_strnptr_node(h, i)->val;
-		return node->access;
+		return &node->accesses;
 	}
 	struct access_lua_call_node *node;
 	grp_alloc all = grp_alloc_initializer();
@@ -270,11 +272,11 @@ access_lua_call_find_or_create(const char *name, uint32_t name_len)
 	node = (typeof(node))grp_alloc_create_data(&all, sizeof(*node));
 	node->name = grp_alloc_create_str(&all, name, name_len);
 	node->name_len = name_len;
-	memset(node->access, 0, sizeof(node->access));
+	accesses_init(&node->accesses);
 	assert(grp_alloc_size(&all) == 0);
 	mh_strnptr_node_t n = {node->name, name_len, name_hash, node};
 	mh_strnptr_put(h, &n, NULL, NULL);
-	return node->access;
+	return &node->accesses;
 }
 
 /**
@@ -282,16 +284,16 @@ access_lua_call_find_or_create(const char *name, uint32_t name_len)
  * (i.e. grants no access to any user).
  */
 static void
-access_lua_call_delete_if_empty(struct access *object)
+access_lua_call_delete_if_empty(struct accesses *object)
 {
 	for (int i = 0; i < BOX_USER_MAX; ++i) {
-		struct access *access = &object[i];
-		if (access->granted != 0 || access->effective != 0)
+		struct access access = accesses_get(object, i);
+		if (access.granted != 0 || access.effective != 0)
 			return;
 	}
 	struct mh_strnptr_t *h = access_lua_call_registry;
 	struct access_lua_call_node *node = (typeof(node))(
-		(char *)object - offsetof(typeof(*node), access));
+		(char *)object - offsetof(typeof(*node), accesses));
 	mh_int_t i = mh_strnptr_find_str(h, node->name, node->name_len);
 	assert(i != mh_end(h));
 	assert(mh_strnptr_node(h, i)->val == node);
@@ -300,72 +302,75 @@ access_lua_call_delete_if_empty(struct access *object)
 }
 
 /**
- * Find the corresponding access structure for the given privilege.
- * Must be released with access_put() after use.
+ * Find the corresponding access structure for the given privilege. If the
+ * access is entity-specific and the entity does not exist - sets `exists`
+ * to false (true othervise).
+ *
+ * Must be released with priv_access_put() after use.
  */
-static struct access *
-access_get(const struct priv_def *priv)
+static struct accesses *
+priv_accesses_get(const struct priv_def *priv)
 {
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		return universe.access;
+		return &universe.accesses;
 	case SC_LUA_CALL:
 		if (priv->is_entity_access)
-			return universe.access_lua_call;
+			return &universe.accesses_lua_call;
 		/*
 		 * lua_call objects aren't persisted in the database so
 		 * we create an access struct on demand and delete it in
-		 * access_put() if it's empty.
+		 * priv_access_put() if it's empty.
 		 */
-		return access_lua_call_find_or_create(priv->object_name,
-						      priv->object_name_len);
+		return accesses_lua_call_find_or_create(priv->object_name,
+							priv->object_name_len);
 	case SC_LUA_EVAL:
-		return universe.access_lua_eval;
+		return &universe.accesses_lua_eval;
 	case SC_SQL:
-		return universe.access_sql;
+		return &universe.accesses_sql;
 	case SC_SPACE:
 	{
 		if (priv->is_entity_access)
-			return entity_access.space;
+			return &entity_access.space;
 		struct space *space = space_by_id(priv->object_id);
-		return space != NULL ? space->access : NULL;
+		return space != NULL ? &space->accesses : NULL;
 	}
 	case SC_FUNCTION:
 	{
 		if (priv->is_entity_access)
-			return entity_access.function;
+			return &entity_access.function;
 		struct func *func = func_by_id(priv->object_id);
-		return func != NULL ? func->access : NULL;
+		return func != NULL ? &func->accesses : NULL;
 	}
 	case SC_USER:
 	{
 		if (priv->is_entity_access)
-			return entity_access.user;
+			return &entity_access.user;
 		struct user *user = user_by_id(priv->object_id);
-		return user != NULL ? user->access : NULL;
+		return user != NULL ? &user->accesses : NULL;
 	}
 	case SC_ROLE:
 	{
 		if (priv->is_entity_access)
-			return entity_access.role;
+			return &entity_access.role;
 		struct user *role = user_by_id(priv->object_id);
-		return role != NULL ? role->access : NULL;
+		return role != NULL ? &role->accesses : NULL;
 	}
 	case SC_SEQUENCE:
 	{
 		if (priv->is_entity_access)
-			return entity_access.sequence;
+			return &entity_access.sequence;
 		struct sequence *seq = sequence_by_id(priv->object_id);
-		return seq != NULL ? seq->access : NULL;
+		return seq != NULL ? &seq->accesses : NULL;
 	}
 	default:
 		return NULL;
 	}
 }
 
-/** Releases an object returned by access_get(). */
+/** Releases an object returned by priv_accesses_get(). */
 static void
-access_put(const struct priv_def *priv, struct access *object)
+priv_access_put(const struct priv_def *priv, struct accesses *object)
 {
 	switch (priv->object_type) {
 	case SC_LUA_CALL:
@@ -392,13 +397,14 @@ user_set_effective_access(struct user *user)
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
 	while ((priv = privset_inext(&it)) != NULL) {
-		struct access *object = access_get(priv);
-		 /* Protect against a concurrent drop. */
+		struct accesses *object = priv_accesses_get(priv);
+		/* Protect against a concurrent drop. */
 		if (object == NULL)
 			continue;
-		struct access *access = &object[user->auth_token];
-		access->effective = access->granted | priv->access;
-		access_put(priv, object);
+		struct access access = accesses_get(object, user->auth_token);
+		access.effective = access.granted | priv->access;
+		accesses_set(object, user->auth_token, access);
+		priv_access_put(priv, object);
 	}
 }
 
@@ -520,7 +526,8 @@ next_tuple:
 	user_set_effective_access(user);
 	user->is_dirty = false;
 	struct credentials *creds;
-	user_access_t new_access = universe.access[user->auth_token].effective;
+	user_access_t new_access =
+		accesses_get(&universe.accesses, user->auth_token).effective;
 	rlist_foreach_entry(creds, &user->credentials_list, in_user)
 		creds->universal_access = new_access;
 	return 0;
@@ -543,10 +550,10 @@ static int min_token_idx = 0;
  * Raise an exception when the maximal number of users
  * is reached (and we're out of tokens).
  */
-uint8_t
+auth_token_t
 auth_token_get(void)
 {
-	uint8_t bit_no = 0;
+	int bit_no = 0;
 	while (min_token_idx < USER_MAP_SIZE) {
                 bit_no = __builtin_ffs(tokens[min_token_idx]);
 		if (bit_no)
@@ -568,8 +575,7 @@ auth_token_get(void)
          */
 	bit_no--;
 	tokens[min_token_idx] ^= ((umap_int_t) 1) << bit_no;
-	int auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
-	assert(auth_token < UINT8_MAX);
+	auth_token_t auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
 	return auth_token;
 }
 
@@ -578,7 +584,7 @@ auth_token_get(void)
  * tokens.
  */
 void
-auth_token_put(uint8_t auth_token)
+auth_token_put(auth_token_t auth_token)
 {
 	uint8_t bit_no;
 	int idx = user_map_calc_idx(auth_token, &bit_no);
@@ -596,7 +602,7 @@ user_cache_replace(struct user_def *def)
 {
 	struct user *user = user_by_id(def->uid);
 	if (user == NULL) {
-		uint8_t auth_token = auth_token_get();
+		auth_token_t auth_token = auth_token_get();
 		user = users + auth_token;
 		user_create(user, auth_token);
 		struct mh_i32ptr_node_t node = { def->uid, user };
@@ -651,7 +657,7 @@ user_find(uint32_t uid)
 
 /* Find a user by authentication token. */
 struct user *
-user_find_by_token(uint8_t auth_token)
+user_find_by_token(auth_token_t auth_token)
 {
     return &users[auth_token];
 }
@@ -723,7 +729,9 @@ user_cache_init(void)
 	 * When user_cache_init() is called, admin user access is
 	 * not loaded yet (is 0), force global access.
 	 */
-	universe.access[ADMIN].effective = USER_ACCESS_FULL;
+	struct access access = accesses_get(&universe.accesses, ADMIN);
+	access.effective = USER_ACCESS_FULL;
+	accesses_set(&universe.accesses, ADMIN, access);
 	/* ADMIN is both the auth token and user id for 'admin' user. */
 	assert(user->def->uid == ADMIN && user->auth_token == ADMIN);
 }
@@ -913,7 +921,7 @@ role_revoke(struct user *grantee, struct user *role)
  * Check if a role is granted to a user or role with the given auth token.
  */
 bool
-role_is_granted(struct user *role, uint8_t auth_token)
+role_is_granted(struct user *role, auth_token_t auth_token)
 {
 	/* Check if the role is granted directly. */
 	if (user_map_is_set(&role->users, auth_token))
@@ -945,19 +953,20 @@ int
 priv_grant(struct user *grantee, struct priv_def *priv,
 	   struct txn_stmt *rolled_back_stmt)
 {
-	struct access *object = access_get(priv);
+	struct accesses *object = priv_accesses_get(priv);
 	if (object == NULL)
 		return 0;
 	if (grantee->auth_token == ADMIN && priv->object_type == SC_UNIVERSE &&
 	    priv->access != USER_ACCESS_FULL) {
 		diag_set(ClientError, ER_GRANT,
 			 "can't revoke universe from the admin user");
-		access_put(priv, object);
+		priv_access_put(priv, object);
 		return -1;
 	}
-	struct access *access = &object[grantee->auth_token];
-	access->granted = priv->access;
-	access_put(priv, object);
+	struct access access = accesses_get(object, grantee->auth_token);
+	access.granted = priv->access;
+	accesses_set(object, grantee->auth_token, access);
+	priv_access_put(priv, object);
 	if (rebuild_effective_grants(grantee, rolled_back_stmt) != 0)
 		return -1;
 	return 0;
@@ -969,7 +978,8 @@ void
 credentials_create(struct credentials *cr, struct user *user)
 {
 	cr->auth_token = user->auth_token;
-	cr->universal_access = universe.access[user->auth_token].effective;
+	cr->universal_access =
+		accesses_get(&universe.accesses, user->auth_token).effective;
 	cr->uid = user->def->uid;
 	rlist_add_entry(&user->credentials_list, cr, in_user);
 }

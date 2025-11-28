@@ -39,6 +39,38 @@ priv_name(user_access_t access)
 	return "Any";
 }
 
+void
+accesses_init(struct accesses *accesses)
+{
+	accesses->count = 0;
+	accesses->access = NULL;
+}
+
+struct access
+accesses_get(const struct accesses *accesses, auth_token_t auth_token)
+{
+	if (auth_token >= accesses->count)
+		return (struct access){0, 0}; /* Empty. */
+	return accesses->access[auth_token];
+}
+
+void
+accesses_set(struct accesses *accesses, auth_token_t auth_token,
+	     struct access access)
+{
+	if (auth_token >= accesses->count) {
+		size_t old_count = accesses->count;
+		size_t new_count = auth_token + 1;
+		size_t diff = new_count - old_count;
+		accesses->count = new_count;
+		accesses->access = xrealloc(accesses->access,
+					    sizeof(access) * new_count);
+		/* Reset the new memory. */
+		memset(accesses->access + old_count, 0, sizeof(access) * diff);
+	}
+	accesses->access[auth_token] = access;
+}
+
 struct user_def *
 user_def_new(uint32_t uid, uint32_t owner, enum schema_object_type type,
 	     const char *name, uint32_t name_len)
