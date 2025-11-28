@@ -13,7 +13,7 @@ list(APPEND LUZER_CMAKE_FLAGS
   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
   -DLUA_INCLUDE_DIR=${PROJECT_SOURCE_DIR}/third_party/luajit/src/
-  -DLUA_LIBRARIES=${LUA_LIBRARIES}
+  -DLUA_LIBRARIES=${LUAJIT_LIBRARIES}
   -DLUAJIT_FRIENDLY_MODE=ON
   -DLUA_HAS_JIT=ON
 )
@@ -37,6 +37,7 @@ ExternalProject_Add(bundled-luzer
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
+add_dependencies(bundled-luzer libluajit_static)
 add_library(luzer-library STATIC IMPORTED GLOBAL)
 set_target_properties(luzer-library PROPERTIES
   IMPORTED_LOCATION "${LUZER_LIBRARIES}")
