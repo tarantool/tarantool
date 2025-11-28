@@ -37,6 +37,7 @@
 #include "func_cache.h"
 #include "space_cache.h"
 #include "schema_def.h"
+#include "user.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -219,6 +220,12 @@ entity_access_get(enum schema_object_type type)
 		return entity_access.role;
 	case SC_SEQUENCE:
 		return entity_access.sequence;
+	case SC_LUA_CALL:
+		return universe.access_lua_call;
+	case SC_LUA_EVAL:
+		return universe.access_lua_eval;
+	case SC_SQL:
+		return universe.access_sql;
 	default:
 		return NULL;
 	}

@@ -246,11 +246,7 @@ access_lua_call_find(const char *name, uint32_t name_len)
 	return NULL;
 }
 
-/**
- * Returns cached runtime access information for the given Lua function name.
- * Creates one if it doesn't exist.
- */
-static struct access *
+struct access *
 access_lua_call_find_or_create(const char *name, uint32_t name_len)
 {
 	uint32_t name_hash = mh_strn_hash(name, name_len);
@@ -277,11 +273,7 @@ access_lua_call_find_or_create(const char *name, uint32_t name_len)
 	return node->access;
 }
 
-/**
- * Deletes cached runtime access information for a Lua function if it's empty
- * (i.e. grants no access to any user).
- */
-static void
+void
 access_lua_call_delete_if_empty(struct access *object)
 {
 	for (int i = 0; i < BOX_USER_MAX; ++i) {
@@ -411,11 +403,11 @@ user_reload_priv(struct user *user, struct tuple *tuple)
 	struct priv_def priv;
 	if (priv_def_create_from_tuple(&priv, tuple) != 0)
 		return -1;
-	/**
-	 * Skip role grants, we're only
-	 * interested in real objects.
-	 */
-	if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
+	/* Skip role grants, we're only interested in real objects. */
+	if (priv.object_type == SC_ROLE && priv.access & PRIV_X)
+		priv.access &= ~PRIV_X;
+	/* Assign the rest of privileges if any. */
+	if (priv.access != 0)
 		user_grant_priv(user, &priv);
 	return 0;
 }
@@ -882,31 +874,29 @@ rebuild_effective_grants(struct user *grantee,
 
 /**
  * Update verges in the graph of dependencies.
- * Grant all effective privileges of the role to whoever
+ *
+ * Warning: must call `rebuild_effective_grants` after this
+ * to grant all effective privileges of the role to whoever
  * this role was granted to.
  */
-int
+void
 role_grant(struct user *grantee, struct user *role)
 {
 	user_map_set(&role->users, grantee->auth_token);
 	user_map_set(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee, NULL) != 0)
-		return -1;
-	return 0;
 }
 
 /**
  * Update the role dependencies graph.
- * Rebuild effective privileges of the grantee.
+ *
+ * Warning: must call `rebuild_effective_grants` after
+ * this to rebuild effective privileges of the grantee.
  */
-int
+void
 role_revoke(struct user *grantee, struct user *role)
 {
 	user_map_clear(&role->users, grantee->auth_token);
 	user_map_clear(&grantee->roles, role->auth_token);
-	if (rebuild_effective_grants(grantee, NULL) != 0)
-		return -1;
-	return 0;
 }
 
 /**
@@ -942,8 +932,7 @@ role_is_granted(struct user *role, uint8_t auth_token)
 }
 
 int
-priv_grant(struct user *grantee, struct priv_def *priv,
-	   struct txn_stmt *rolled_back_stmt)
+priv_grant(struct user *grantee, struct priv_def *priv)
 {
 	struct access *object = access_get(priv);
 	if (object == NULL)
@@ -958,8 +947,6 @@ priv_grant(struct user *grantee, struct priv_def *priv,
 	struct access *access = &object[grantee->auth_token];
 	access->granted = priv->access;
 	access_put(priv, object);
-	if (rebuild_effective_grants(grantee, rolled_back_stmt) != 0)
-		return -1;
 	return 0;
 }
 

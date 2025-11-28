@@ -168,6 +168,20 @@ struct access *
 access_lua_call_find(const char *name, uint32_t name_len);
 
 /**
+ * Returns cached runtime access information for the given Lua function name.
+ * Creates one if it doesn't exist.
+ */
+struct access *
+access_lua_call_find_or_create(const char *name, uint32_t name_len);
+
+/**
+ * Deletes cached runtime access information for a Lua function if it's empty
+ * (i.e. grants no access to any user).
+ */
+void
+access_lua_call_delete_if_empty(struct access *object);
+
+/**
  * Check if a role is granted to a user or role with the given auth_token.
  */
 bool
@@ -227,24 +241,40 @@ role_check(struct user *grantee, struct user *role);
 
 /**
  * Grant a role to a user or another role.
+ *
+ * Warning: must call `rebuild_effective_grants` after this
+ * to grant all effective privileges of the role to whoever
+ * this role was granted to.
  */
-int
+void
 role_grant(struct user *grantee, struct user *role);
 
 /**
  * Revoke a role from a user or another role.
+ *
+ * Warning: must call `rebuild_effective_grants` after
+ * this to rebuild effective privileges of the grantee.
  */
-int
+void
 role_revoke(struct user *grantee, struct user *role);
 
 /**
- * Grant or revoke a single privilege to a user or role and re-evaluate
- * effective access of all users of this role if this role. For the purpose of
- * the rolled back statement, please refer to `user_reload_privs`.
+ * Grant or revoke a single privilege to a user or role.
+ *
+ * Warning: must call `rebuild_effective_grants` after this
+ * to re-evaluate effective access of all users of this role
+ * if this role.rebuild effective privileges of the grantee.
  */
 int
-priv_grant(struct user *grantee, struct priv_def *priv,
-	   struct txn_stmt *rolled_back_stmt);
+priv_grant(struct user *grantee, struct priv_def *priv);
+
+/**
+ * Apply the role and privilege grants and revokes. For the purpose
+ * of the rolled back statement, please refer to `user_reload_privs`.
+ */
+int
+rebuild_effective_grants(struct user *grantee,
+			 struct txn_stmt *rolled_back_stmt);
 
 int
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
