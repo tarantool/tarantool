@@ -844,6 +844,8 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		 const char *error, const char *format, va_list ap)
 {
 	int total = 0;
+	char *buf_start = buf;
+	int len_max = len;
 
 	/*
 	 * Every message written to syslog has a header that contains
@@ -884,9 +886,18 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 	if (error != NULL)
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
 
-	SNPRINT(total, snprintf, buf, len, "\n");
-	return total;
+	if (log->type != SAY_LOGGER_SYSLOG) {
+		SNPRINT(total, snprintf, buf, len, "\n");
+		return total;
+	}
+
+	return syslog_escape_inplace(buf_start, len_max);
 }
+
+typedef int
+(*str_escape_t)(char *buf, int size, const char *data);
+typedef int
+(*str_escape_inplace_t)(char *buf, int size);
 
 /**
  * Format log message in json format:
@@ -900,7 +911,15 @@ say_format_json(struct log *log, char *buf, int len, int level,
 		const char *module, const char *filename, int line,
 		const char *error, const char *format, va_list ap)
 {
-	(void)log;
+	str_escape_t escape;
+	str_escape_inplace_t escape_inplace;
+	if (log->type != SAY_LOGGER_SYSLOG) {
+		escape = json_escape;
+		escape_inplace = json_escape_inplace;
+	} else {
+		escape = json_syslog_escape;
+		escape_inplace = json_syslog_escape_inplace;
+	}
 
 	int total = 0;
 	char *buf_end = buf + len;
@@ -938,36 +957,39 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	/* Print error, if any. */
 	if (error) {
 		SNPRINT(total, snprintf, buf, len, "\"error\": \"");
-		SNPRINT(total, json_escape, buf, len, error);
+		SNPRINT(total, escape, buf, len, error);
 		SNPRINT(total, snprintf, buf, len, "\", ");
 	}
 
 	/* Print PID, cord name, fiber id and fiber name. */
 	SNPRINT(total, snprintf, buf, len, "\"pid\": %i ", getpid());
 	SNPRINT(total, snprintf, buf, len, ", \"cord_name\": \"");
-	SNPRINT(total, json_escape, buf, len, cord()->name);
+	SNPRINT(total, escape, buf, len, cord()->name);
 	SNPRINT(total, snprintf, buf, len, "\"");
 	if (fiber() && fiber()->fid != FIBER_ID_SCHED) {
 		SNPRINT(total, snprintf, buf, len, ", \"fiber_id\": %llu, ",
 			(long long)fiber()->fid);
 		SNPRINT(total, snprintf, buf, len, "\"fiber_name\": \"");
-		SNPRINT(total, json_escape, buf, len, fiber()->name);
+		SNPRINT(total, escape, buf, len, fiber()->name);
 		SNPRINT(total, snprintf, buf, len, "\"");
 	}
 
 	/* Print filename, line and module name if any. */
 	if (filename) {
 		SNPRINT(total, snprintf, buf, len, ", \"file\": \"");
-		SNPRINT(total, json_escape, buf, len, filename);
+		SNPRINT(total, escape, buf, len, filename);
 		SNPRINT(total, snprintf, buf, len, "\", \"line\": %i", line);
 	}
 	if (module != NULL) {
 		SNPRINT(total, snprintf, buf, len, ", \"module\": \"");
-		SNPRINT(total, json_escape, buf, len, module);
+		SNPRINT(total, escape, buf, len, module);
 		SNPRINT(total, snprintf, buf, len, "\"");
 	}
 
-	SNPRINT(total, snprintf, buf, len, "}\n");
+	if (log->type != SAY_LOGGER_SYSLOG)
+		SNPRINT(total, snprintf, buf, len, "}\n");
+	else
+		SNPRINT(total, snprintf, buf, len, "}");
 
 	/*
 	 * Finished printing context for the log entry. Will move tail to the
@@ -1013,6 +1035,16 @@ say_format_json(struct log *log, char *buf, int len, int level,
 			return -1;
 		}
 
+		/**
+		 * If message was encoded with `json.encode`, it doesn't
+		 * guarantee, that it won't have characters > 126, which is
+		 * needed according to RFC 3164, so we still must escape the
+		 * message. `json_escape_inplace()` cannot be used here, since
+		 * it will escape all '/' e.g. one more time.
+		 */
+		if (log->type == SAY_LOGGER_SYSLOG)
+			msg_len = syslog_escape_inplace(msg_ptr, msg_cap);
+
 		msg_len = MIN(msg_len, msg_cap);
 		len -= msg_len;
 		total += msg_len;
@@ -1035,7 +1067,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 		vsnprintf(msg_ptr, (unsigned)msg_cap, format, ap);
 
 		/* Escape the message. */
-		int msg_len = json_escape_inplace(msg_ptr, msg_cap);
+		int msg_len = escape_inplace(msg_ptr, msg_cap);
 		len -= msg_len;
 		total += msg_len;
 		msg_ptr += msg_len;
@@ -1066,10 +1098,8 @@ format_func_adapter(char *buf, int len, struct log *log, int level,
 }
 
 /**
- * Format the header of a log message in syslog format.
+ * Format the header of a log message in syslog format according to RFC 3164.
  *
- * See RFC 5424 and RFC 3164. RFC 3164 is compatible with RFC 5424,
- * so it is implemented.
  * Protocol:
  * <PRIORITY_VALUE>TIMESTAMP IDENTATION[PID]: CORD/FID/FIBERNAME LEVEL> MSG
  * - Priority value is encoded as message subject * 8 and bitwise
