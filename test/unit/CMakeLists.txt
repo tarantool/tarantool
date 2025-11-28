@@ -602,19 +602,6 @@ create_unit_test(PREFIX merger
                  LIBRARIES unit core box
 )
 
-create_unit_test(PREFIX snap_quorum_delay
-                 SOURCES snap_quorum_delay.cc box_test_utils.c
-                 LIBRARIES box core unit
-)
-# The commit 8c50e069e31
-# ("txn: remove TXN_IS_DONE check from txn_commit()") disables
-# snap_quorum_delay.test, which uses internal API of replication
-# and txn modules assuming the journal is initialized somewhere
-# inside. But now it is not, and it can't be fixed in a sane way
-# inside the test. It will be deleted/rewritten later.
-set_tests_properties(${TEST_SUITE_PREFIX}/snap_quorum_delay.test
-                     PROPERTIES DISABLED True)
-
 create_unit_test(PREFIX raft
                  SOURCES raft.c raft_test_utils.c core_test_utils.c
                  LIBRARIES vclock unit fakesys raft_algo
