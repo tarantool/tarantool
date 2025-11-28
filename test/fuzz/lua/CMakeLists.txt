@@ -90,8 +90,12 @@ function(create_luzer_test)
   )
 endfunction()
 
-# Set LUZER_LUA_PATH and LUZER_LUA_CPATH.
-include(BuildLuzer)
+# luzer library has issues with building at OSS Fuzz environment,
+# so building the library is disabled.
+if (NOT ${OSS_FUZZ})
+  # Set LUZER_LUA_PATH and LUZER_LUA_CPATH.
+  include(BuildLuzer)
+endif()
 
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)
