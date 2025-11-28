@@ -443,6 +443,7 @@ struct errcode_record {
 	_(ER_FIELD_IRREPRESENTABLE_VALUE, 296,	"The value does not fit in field type", "field", STRING, "value", MSGPACK) \
 	_(ER_KEY_PART_IRREPRESENTABLE_VALUE, 297, "The value of key part does not fit in type", "partno", UINT, "value", MSGPACK) \
 	_(ER_INVALID_SORTDATA_FILE, 298,	"Invalid MemTX sort data file", "path", STRING, "details", STRING) \
+	_(ER_INVALID_RUN_LENGTH, 299,           "Invalid run length in run_ends arrow array at index %d for field %s, run_length should be at least 1", "run_ends_idx", UINT, "field", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
