@@ -34,7 +34,7 @@
 #include "iproto_constants.h"
 #include "journal.h"
 #include "box.h"
-#include "raft.h"
+#include "raft/raft.h"
 #include "tt_static.h"
 #include "trivia/config.h"
 
@@ -170,7 +170,7 @@ txn_limbo_worker_f(va_list args)
 }
 
 static inline void
-txn_limbo_create(struct txn_limbo *limbo)
+txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 {
 	memset(limbo, 0, sizeof(*limbo));
 	txn_limbo_queue_create(&limbo->queue);
@@ -178,6 +178,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	latch_create(&limbo->state_latch);
 	limbo->svp_confirmed_lsn = -1;
 	limbo->is_frozen_until_promotion = true;
+	limbo->raft = raft;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
 					 txn_limbo_worker_f);
 	if (limbo->worker == NULL)
@@ -760,7 +761,7 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		if (term > limbo->term) {
 			limbo->term = term;
 			if (iproto_type_is_promote_request(req->type)) {
-				if (term >= box_raft()->volatile_term)
+				if (term >= limbo->raft->volatile_term)
 					txn_limbo_unfence(limbo);
 				txn_limbo_unfreeze_on_first_promote(&txn_limbo);
 			}
@@ -858,9 +859,9 @@ txn_limbo_filter_disable(struct txn_limbo *limbo)
 }
 
 void
-txn_limbo_init(void)
+txn_limbo_init(struct raft *raft)
 {
-	txn_limbo_create(&txn_limbo);
+	txn_limbo_create(&txn_limbo, raft);
 }
 
 void
