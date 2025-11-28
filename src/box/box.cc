@@ -6279,6 +6279,7 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+	txn_limbo_finish_recovery(&txn_limbo);
 
 	is_box_configured = true;
 	box_broadcast_ballot();
