@@ -338,9 +338,14 @@ vuser_filter(struct space *source, struct tuple *tuple)
 	if (uid == cr->uid || owner_id == cr->uid || uid == PUBLIC)
 		return true;
 
+	/* Allow access for a user with user/role privileges. */
+	struct user *user = user_by_id(uid);
+	if (PRIV_WRDA &
+	    entity_access_get(user->def->type)[cr->auth_token].effective)
+		return true;
+
 	/* Allow access to a role granted to the effective user. */
-	struct user *role = user_by_id(uid);
-	if (role->def->type == SC_ROLE && role_is_granted(role, cr->auth_token))
+	if (user->def->type == SC_ROLE && role_is_granted(user, cr->auth_token))
 		return true;
 
 	return false;
