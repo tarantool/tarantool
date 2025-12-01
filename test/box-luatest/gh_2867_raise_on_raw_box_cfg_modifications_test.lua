@@ -3,16 +3,16 @@ local g = t.group()
 local server = require("luatest.server")
 
 -- Create test instance.
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'test-gh-2867'})
     g.server:start()
-end
+end)
 
 -- Stop test instance.
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
     g.server:drop()
-end
+end)
 
 g.test_box_cfg_set_known_option = function()
     t.assert_equals(g.server:eval("return box.cfg.read_only"), false)
