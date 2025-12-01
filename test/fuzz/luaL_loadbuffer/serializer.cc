@@ -442,6 +442,30 @@ ClearIdentifier(const std::string &identifier)
 	return cleared;
 }
 
+/** Drop any special symbols to avoid parser errors. */
+std::string
+ClearString(const std::string &identifier)
+{
+	std::string escaped;
+	int nbackslash = 0;
+	for (char c : identifier) {
+		if (c == '\\') {
+			nbackslash++;
+		} else {
+			if (!std::isprint(c))
+				continue;
+			nbackslash = 0;
+			if (c == '\'' || c == '\n')
+				escaped += '\\';
+		}
+		escaped += c;
+	}
+	/* Avoid escaping the ending quote. */
+	if (nbackslash & 1)
+		escaped += '\\';
+	return escaped;
+}
+
 inline std::string
 clamp(std::string s, size_t maxSize = kMaxStrLength)
 {
@@ -458,14 +482,16 @@ clamp(double number, double upper, double lower)
 }
 
 inline std::string
-ConvertToStringDefault(const std::string &s, bool sanitize = false)
+ConvertToStringDefault(const std::string &s, bool identifier = false)
 {
-	std::string ident = clamp(s);
-	if (sanitize)
-		ident = ClearIdentifier(ident);
-	if (ident.empty())
-		ident = std::string(kDefaultIdent);
-	return ident;
+	std::string str = clamp(s);
+	if (identifier)
+		str = ClearIdentifier(str);
+	else
+		str = ClearString(str);
+	if (identifier && str.empty())
+		str = std::string(kDefaultIdent);
+	return str;
 }
 
 PROTO_TOSTRING(Block, block)
