@@ -5,14 +5,14 @@ local g1 = t.group('group1')
 
 local wait_timeout = 60
 
-g1.before_all = function(lg)
+g1.before_all(function(lg)
     lg.master = server:new({alias = 'master'})
     lg.master:start()
-end
+end)
 
-g1.after_all = function(lg)
+g1.after_all(function(lg)
     lg.master:drop()
-end
+end)
 
 --
 -- When an instance failed to apply cfg{replication_anon = false}, it used to

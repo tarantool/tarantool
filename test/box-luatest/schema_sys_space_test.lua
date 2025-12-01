@@ -2,14 +2,14 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function(lg)
+g.before_all(function(lg)
     lg.server = server:new({alias = 'master'})
     lg.server:start()
-end
+end)
 
-g.after_all = function(lg)
+g.after_all(function(lg)
     lg.server:drop()
-end
+end)
 
 g.test_replicaset_uuid_update_ban = function(lg)
     lg.server:exec(function()
