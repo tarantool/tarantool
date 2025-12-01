@@ -442,6 +442,30 @@ ClearIdentifier(const std::string &identifier)
 	return cleared;
 }
 
+/** Drop any special symbols to avoid parser errors. */
+std::string
+ClearString(const std::string &str)
+{
+	std::string escaped;
+	int nbackslash = 0;
+	for (char c : str) {
+		if (c == '\\') {
+			nbackslash++;
+		} else {
+			if (!std::isprint(c))
+				continue;
+			nbackslash = 0;
+			if (c == '\'' || c == '\n')
+				escaped += '\\';
+		}
+		escaped += c;
+	}
+	/* Avoid escaping the ending quote. */
+	if (nbackslash & 1)
+		escaped += '\\';
+	return escaped;
+}
+
 inline std::string
 clamp(std::string s, size_t maxSize = kMaxStrLength)
 {
@@ -457,15 +481,21 @@ clamp(double number, double upper, double lower)
 	       number >= upper ? upper : number;
 }
 
+/**
+ * Function to sanitize strings or identifiers. For identifiers,
+ * sanitization is more stringent.
+ */
 inline std::string
-ConvertToStringDefault(const std::string &s, bool sanitize = false)
+ConvertToStringDefault(const std::string &s, bool is_identifier = false)
 {
-	std::string ident = clamp(s);
-	if (sanitize)
-		ident = ClearIdentifier(ident);
-	if (ident.empty())
-		ident = std::string(kDefaultIdent);
-	return ident;
+	std::string str = clamp(s);
+	if (is_identifier)
+		str = ClearIdentifier(str);
+	else
+		str = ClearString(str);
+	if (is_identifier && str.empty())
+		str = std::string(kDefaultIdent);
+	return str;
 }
 
 PROTO_TOSTRING(Block, block)
