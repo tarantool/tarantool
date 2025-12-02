@@ -22,33 +22,35 @@ old_synchro_timeout = box.cfg.replication_synchro_timeout
 box.cfg{replication_synchro_quorum = "aaa"}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': [string "local
- |     expr, N = ......"]:7: Expression should return a number'
+ |     expr, N, Q = ......"]:11: Expression should return a number'
  | ...
 
 -- Test out of bounds values
 box.cfg{replication_synchro_quorum = "N+1"}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 32 for replica number 31, which is out of range [1;31]'
+ |     evaluated to the quorum 32 for replica number 31, quorum 0, which is out of range
+ |     [1;31]'
  | ...
 box.cfg{replication_synchro_quorum = "N-1"}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 0 for replica number 1, which is out of range [1;31]'
+ |     evaluated to the quorum 0 for replica number 1, quorum 0, which is out of range
+ |     [1;31]'
  | ...
 
 -- Test big number value
 box.cfg{replication_synchro_quorum = '4294967296 + 1'}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 4294967297 for replica number 1, which is out of range
- |     [1;31]'
+ |     evaluated to the quorum 4294967297 for replica number 1, quorum 0, which is out
+ |     of range [1;31]'
  | ...
 box.cfg{replication_synchro_quorum = 'N + 4294967296'}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': the formula is
- |     evaluated to the quorum 4294967297 for replica number 1, which is out of range
- |     [1;31]'
+ |     evaluated to the quorum 4294967297 for replica number 1, quorum 0, which is out
+ |     of range [1;31]'
  | ...
 box.cfg{replication_synchro_quorum = 4294967297}
  | ---
