@@ -1495,21 +1495,24 @@ box_check_replication_sync_lag(void)
 }
 
 /**
- * Evaluate replication syncro quorum number from a formula.
+ * Evaluate replication synchro/linearizable quorum number from a formula
+ * and check, that it belongs to [1, 31].
  */
 static int
-box_eval_replication_synchro_quorum(int nr_replicas)
+box_eval_and_check_replication_quorum(const char *cfg_name, int nr_replicas,
+				      int synchro_quorum)
 {
 	assert(nr_replicas > 0 && nr_replicas < VCLOCK_MAX);
+	assert(synchro_quorum >= 0 && synchro_quorum < VCLOCK_MAX);
 
 	const char loadable[] =
-		"local expr, N = ...\n"
+		"local expr, N, Q = ...\n"
 		"local f, err = loadstring('return ('..expr..')')\n"
 		"if not f then "
 			"error(string.format('Failed to load \%\%s:"
 			"\%\%s', expr, err)) "
 		"end\n"
-		"setfenv(f, {N = N, math = {"
+		"local env = {N = N, math = {"
 			"ceil = math.ceil,"
 			"floor = math.floor,"
 			"abs = math.abs,"
@@ -1518,21 +1521,25 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 			"max = math.max,"
 			"sqrt = math.sqrt,"
 			"fmod = math.fmod,"
-		"}})\n"
+		"}}\n"
+		"if Q ~= 0 then\n"
+			"env.Q = Q\n"
+		"end\n"
+		"setfenv(f, env)\n"
 		"local res = f()\n"
 		"if type(res) ~= 'number' then\n"
 			"error('Expression should return a number')\n"
 		"end\n"
 		"return math.floor(res)\n";
-	const char *expr = cfg_gets("replication_synchro_quorum");
+	const char *expr = cfg_gets(cfg_name);
 
 	luaL_loadstring(tarantool_L, loadable);
 	lua_pushstring(tarantool_L, expr);
 	lua_pushinteger(tarantool_L, nr_replicas);
+	lua_pushinteger(tarantool_L, synchro_quorum);
 
-	if (lua_pcall(tarantool_L, 2, 1, 0) != 0) {
-		diag_set(ClientError, ER_CFG,
-			 "replication_synchro_quorum",
+	if (lua_pcall(tarantool_L, 3, 1, 0) != 0) {
+		diag_set(ClientError, ER_CFG, cfg_name,
 			 lua_tostring(tarantool_L, -1));
 		return -1;
 	}
@@ -1548,14 +1555,15 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 	 * return an error.
 	 */
 	if (quorum <= 0 || quorum >= VCLOCK_MAX) {
+		const char *synchro_quorum_msg = synchro_quorum > 0 ?
+			tt_sprintf(", synchro quorum %d", synchro_quorum) : "";
 		const char *msg =
-			tt_sprintf("the formula is evaluated "
-				   "to the quorum %lld for replica "
-				   "number %d, which is out of range "
-				   "[%d;%d]", (long long)quorum,
-				   nr_replicas, 1, VCLOCK_MAX - 1);
-		diag_set(ClientError, ER_CFG,
-			 "replication_synchro_quorum", msg);
+			tt_sprintf("the formula is evaluated to the quorum "
+				   "%lld for replica number %d%s, "
+				   "which is out of range [%d;%d]",
+				   (long long)quorum, nr_replicas,
+				   synchro_quorum_msg, 1, VCLOCK_MAX - 1);
+		diag_set(ClientError, ER_CFG, cfg_name, msg);
 		return -1;
 	}
 
@@ -1579,7 +1587,8 @@ box_check_replication_synchro_quorum(void)
 		 * sure that the cycle won't take too much time.
 		 */
 		for (int i = 1; i < VCLOCK_MAX; i++) {
-			if (box_eval_replication_synchro_quorum(i) < 0)
+			if (box_eval_and_check_replication_quorum(
+					"replication_synchro_quorum", i, 0) < 0)
 				return -1;
 		}
 		return 0;
@@ -2479,7 +2488,8 @@ box_update_replication_synchro_quorum(void)
 		 * "N", ie all replicas are to be synchro mode.
 		 */
 		int value = MAX(1, replicaset.registered_count);
-		quorum = box_eval_replication_synchro_quorum(value);
+		quorum = box_eval_and_check_replication_quorum(
+			"replication_synchro_quorum", value, 0);
 		say_info("update replication_synchro_quorum = %d", quorum);
 	} else {
 		quorum = cfg_geti("replication_synchro_quorum");
