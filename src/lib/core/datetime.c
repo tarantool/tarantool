@@ -288,6 +288,13 @@ static inline ssize_t
 parse_tz_suffix(const char *str, size_t len, time_t base,
 		int16_t *tzindex, int32_t *offset)
 {
+	/* Allow parsing the (UTC|GMT)[tzoffset] as tzoffset. */
+	if (len >= 5 && (str[3] == '+' || str[3] == '-') &&
+	    (str[4] >= '0' && str[4] <= '9') &&
+	    ((str[0] == 'U' && str[1] == 'T' && str[2] == 'C') ||
+	    (str[0] == 'G' && str[1] == 'M' && str[2] == 'T')))
+		goto second;
+
 	/* 1st attempt: decode as MSK */
 	const struct date_time_zone *zone;
 	long gmtoff = 0;
@@ -302,6 +309,7 @@ parse_tz_suffix(const char *str, size_t len, time_t base,
 		return l;
 	}
 
+second:
 	/* 2nd attempt: decode as +03:00 */
 	*tzindex = 0;
 	l = dt_parse_iso_zone_lenient(str, len, offset);
