@@ -683,6 +683,13 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 struct replica *
 replicaset_add_anon(const struct tt_uuid *replica_uuid);
 
+/*
+ * Find the minimal vclock which has all the data confirmed on a quorum.
+ */
+int
+replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
+				    double deadline);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
