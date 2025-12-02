@@ -1601,6 +1601,31 @@ box_check_replication_synchro_quorum(void)
 	return 0;
 }
 
+/** Check replication_synchro_quorum option validity. */
+static int
+box_check_replication_linearizable_quorum(void)
+{
+	if (cfg_isnumber("replication_linearizable_quorum")) {
+		int64_t quorum = cfg_geti64("replication_linearizable_quorum");
+		if (quorum <= 0 || quorum >= VCLOCK_MAX) {
+			diag_set(ClientError, ER_CFG,
+				 "replication_linearizable_quorum",
+				 "the value must be greater than zero and less "
+				 "than maximal number of replicas");
+			return -1;
+		}
+		return 0;
+	}
+	/* Same approach as in box_check_replication_synchro_quorum. */
+	for (int i = 1; i < VCLOCK_MAX; i++)
+		for (int j = 1; j < VCLOCK_MAX && j <= i; j++)
+			if (box_eval_replication_quorum(
+					"replication_linearizable_quorum",
+					i, j) < 0)
+				return -1;
+	return 0;
+}
+
 static double
 box_check_replication_synchro_timeout(void)
 {
@@ -2153,6 +2178,8 @@ box_check_config(void)
 	box_check_replication_reconnect_timeout();
 	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
+	if (box_check_replication_linearizable_quorum() != 0)
+		diag_raise();
 	if (box_check_replication_synchro_timeout() < 0)
 		diag_raise();
 	if (box_check_replication_threads() < 0)
@@ -2471,6 +2498,39 @@ box_set_replication_sync_lag(void)
 }
 
 void
+box_update_replication_linearizable_quorum(void)
+{
+	int quorum = -1;
+	if (!cfg_isnumber("replication_linearizable_quorum")) {
+		quorum = box_eval_replication_quorum(
+				"replication_linearizable_quorum",
+				MAX(1, replicaset.registered_count),
+				replication_synchro_quorum);
+		say_info("update replication_linearizable_quorum = %d", quorum);
+	} else {
+		quorum = cfg_geti("replication_linearizable_quorum");
+	}
+
+	/*
+	 * `replication_synchro_quorum` can be greater than the number of
+	 * registered replicas, in that case linearizable quorum should be 1
+	 * and not some negative value.
+	 */
+	quorum = MAX(1, quorum);
+	assert(quorum > 0 && quorum < VCLOCK_MAX);
+	replication_linearizable_quorum = quorum;
+}
+
+int
+box_set_replication_linearizable_quorum(void)
+{
+	if (box_check_replication_linearizable_quorum() != 0)
+		return -1;
+	box_update_replication_linearizable_quorum();
+	return 0;
+}
+
+void
 box_update_replication_synchro_quorum(void)
 {
 	int quorum = -1;
@@ -2512,6 +2572,7 @@ box_update_replication_synchro_quorum(void)
 	txn_limbo_on_parameters_change(&txn_limbo);
 	box_raft_update_election_quorum();
 	replicaset_on_health_change();
+	box_update_replication_linearizable_quorum();
 }
 
 int
@@ -5937,6 +5998,8 @@ box_cfg_xc(void)
 		box_set_replication_connect_quorum();
 	box_set_replication_sync_lag();
 	if (box_set_replication_synchro_quorum() != 0)
+		diag_raise();
+	if (box_set_replication_linearizable_quorum() != 0)
 		diag_raise();
 	if (box_set_replication_synchro_timeout() != 0)
 		diag_raise();
