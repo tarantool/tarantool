@@ -734,7 +734,12 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	--txn->in_sub_stmt;
 	return 0;
 fail:
-	txn_rollback_stmt(txn);
+	if (!txn_has_flag(txn, TXN_IS_ROLLED_BACK)) {
+		txn_rollback_stmt(txn);
+	} else {
+		assert(txn->in_sub_stmt > 0);
+		txn->in_sub_stmt--;
+	}
 	return -1;
 }
 
