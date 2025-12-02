@@ -99,7 +99,8 @@ report_error(lua_State *L, const std::string &prefix)
 	if (!verbose)
 		return;
 
-	std::string err_str = lua_tostring(L, 1);
+	const char *errmsg = lua_tostring(L, 1);
+	std::string err_str = errmsg ? errmsg : "(null)";
 	/* Pop error message from stack. */
 	lua_pop(L, 1);
 	std::cerr << prefix << " error: " << err_str << std::endl;
