@@ -198,6 +198,7 @@ local default_cfg = {
     replication_synchro_quorum = "N / 2 + 1",
     replication_synchro_timeout = 5,
     replication_synchro_queue_max_size = 16 * 1024 * 1024,
+    replication_linearizable_quorum = "N - Q + 1",
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
     replication_skip_conflict = false,
@@ -408,6 +409,7 @@ local template_cfg = {
     replication_synchro_quorum = 'string, number',
     replication_synchro_timeout = 'number',
     replication_synchro_queue_max_size = 'number',
+    replication_linearizable_quorum = "string, number",
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
@@ -576,6 +578,8 @@ local dynamic_cfg = {
     replication_synchro_timeout = private.cfg_set_replication_synchro_timeout,
     replication_synchro_queue_max_size =
         private.cfg_set_replication_synchro_queue_max_size,
+    replication_linearizable_quorum =
+        private.cfg_set_replication_linearizable_quorum,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
     replication_anon_ttl    = private.cfg_set_replication_anon_ttl,
@@ -703,6 +707,8 @@ local dynamic_cfg_order = {
     -- replication_connect_quorum. The latter might influence its value.
     bootstrap_strategy      = 175,
     bootstrap_leader        = 175,
+    -- The `linearizable_quorum` depends on `synchro_quorum`.
+    replication_linearizable_quorum = 175,
     replication             = 200,
     -- Anon is set after `replication` as a temporary workaround
     -- for the problem, that `replication` and `replication_anon`
@@ -750,6 +756,7 @@ local dynamic_cfg_skip_at_load = {
     replication_synchro_quorum = true,
     replication_synchro_timeout = true,
     replication_synchro_queue_max_size = true,
+    replication_linearizable_quorum = true,
     replication_skip_conflict = true,
     replication_anon        = true,
     txn_synchro_timeout     = true,

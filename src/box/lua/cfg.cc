@@ -413,6 +413,18 @@ lbox_cfg_set_replication_synchro_quorum(struct lua_State *L)
 	return 0;
 }
 
+/** box.cfg.replication_linearizable_quorum. */
+static int
+lbox_cfg_set_replication_linearizable_quorum(struct lua_State *L)
+{
+	try {
+		box_set_replication_linearizable_quorum();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
 static int
 lbox_cfg_set_replication_synchro_timeout(struct lua_State *L)
 {
@@ -582,6 +594,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_connect_timeout", lbox_cfg_set_replication_connect_timeout},
 		{"cfg_set_replication_sync_lag", lbox_cfg_set_replication_sync_lag},
 		{"cfg_set_replication_synchro_quorum", lbox_cfg_set_replication_synchro_quorum},
+		{"cfg_set_replication_linearizable_quorum", lbox_cfg_set_replication_linearizable_quorum},
 		{"cfg_set_replication_synchro_timeout", lbox_cfg_set_replication_synchro_timeout},
 		{"cfg_set_replication_sync_timeout", lbox_cfg_set_replication_sync_timeout},
 		{"cfg_set_replication_skip_conflict", lbox_cfg_set_replication_skip_conflict},
