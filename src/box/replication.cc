@@ -60,6 +60,7 @@ double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 int replication_synchro_quorum = 1;
+int replication_linearizable_quorum = 1;
 double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
@@ -132,8 +133,6 @@ struct sync_trigger_data {
 	struct vclock *vclock;
 	/** The request deadline. */
 	double deadline;
-	/** How many vclocks are needed. */
-	int count;
 	/** Whether the request is timed out. */
 	bool is_timed_out;
 	/** Count of fibers that are using data. */
@@ -1934,11 +1933,12 @@ check_vclock_sync_on_ack(struct trigger *trigger, void *event)
 	uint64_t sync = data->vclock_syncs[id];
 	int accounted_count = bit_count_u32(data->collected_vclock_map);
 	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&
-	    ack->vclock_sync >= sync && accounted_count < data->count) {
+	    ack->vclock_sync >= sync &&
+	    accounted_count < replication_linearizable_quorum) {
 		vclock_max_ignore0(data->vclock, ack->vclock);
 		bit_set(&data->collected_vclock_map, id);
 		++accounted_count;
-		if (accounted_count >= data->count)
+		if (accounted_count >= replication_linearizable_quorum)
 			fiber_wakeup(data->waiter);
 	}
 	return 0;
@@ -1975,17 +1975,11 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 				    double deadline)
 {
 	/*
-	 * How many vclocks we should see to be sure that at least one of them
-	 * contains all data present on any real quorum.
-	 */
-	int vclock_count = MAX(1, replicaset.registered_count) -
-			   replication_synchro_quorum + 1;
-	/*
-	 * We should check the vclock on self plus vclock_count - 1 remote
-	 * instances.
+	 * We should check the vclock on self plus
+	 * replication_linearizable_quorum - 1 remote instances.
 	 */
 	vclock_copy(confirmed_vclock, instance_vclock);
-	if (vclock_count <= 1)
+	if (replication_linearizable_quorum <= 1)
 		return 0;
 
 	struct sync_trigger_data *data = (sync_trigger_data *)
@@ -1995,7 +1989,6 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 	data->waiter = fiber();
 	data->vclock = confirmed_vclock;
 	data->deadline = deadline;
-	data->count = vclock_count;
 	data->is_timed_out = false;
 	data->ref_count = 0;
 
@@ -2031,8 +2024,9 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 		}
 	}
 
-	while (bit_count_u32(data->collected_vclock_map) < vclock_count &&
-	       !data->is_timed_out && !fiber_is_cancelled()) {
+	while (bit_count_u32(data->collected_vclock_map) <
+	       replication_linearizable_quorum && !data->is_timed_out &&
+	       !fiber_is_cancelled()) {
 		if (fiber_yield_deadline(deadline))
 			break;
 	}
@@ -2041,7 +2035,8 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 		diag_set(FiberIsCancelled);
 		return -1;
 	}
-	if (bit_count_u32(data->collected_vclock_map) < vclock_count) {
+	if (bit_count_u32(data->collected_vclock_map) <
+	    replication_linearizable_quorum) {
 		diag_set(TimedOut);
 		return -1;
 	}

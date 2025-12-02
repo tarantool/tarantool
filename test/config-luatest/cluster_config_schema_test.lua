@@ -322,6 +322,7 @@ g.test_defaults = function()
             sync_timeout = box.NULL,
             sync_lag = 10,
             synchro_quorum = 'N / 2 + 1',
+            linearizable_quorum = 'N - Q + 1',
             skip_conflict = false,
             election_mode = box.NULL,
             election_timeout = 5,

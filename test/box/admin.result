@@ -110,6 +110,8 @@ cfg_filter(box.cfg)
     - 3600
   - - replication_connect_timeout
     - 30
+  - - replication_linearizable_quorum
+    - N - Q + 1
   - - replication_skip_conflict
     - false
   - - replication_sync_lag
