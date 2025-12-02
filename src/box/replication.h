@@ -228,6 +228,12 @@ extern double replication_sync_lag;
 extern int replication_synchro_quorum;
 
 /**
+ * Minimum number of replicas a node must synchronize with before making a
+ * linearizable transaction.
+ */
+extern int replication_linearizable_quorum;
+
+/**
  * Time in seconds which the master node is able to wait for ACKs
  * for a synchronous transaction until it is rolled back.
  */

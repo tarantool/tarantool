@@ -1624,6 +1624,26 @@ box_check_replication_synchro_quorum(void)
 	return 0;
 }
 
+/** Check replication_linearizable_quorum option validity. */
+static void
+box_check_replication_linearizable_quorum(void)
+{
+	const char *cfg_name = "replication_linearizable_quorum";
+	if (cfg_isnumber(cfg_name)) {
+		int64_t quorum = cfg_geti64(cfg_name);
+		if (quorum <= 0 || quorum >= VCLOCK_MAX)
+			tnt_raise(ClientError, ER_CFG, cfg_name,
+				  "the value must be greater than zero and less "
+				  "than maximal number of replicas");
+	}
+	/* Same approach as in box_check_replication_synchro_quorum. */
+	for (int i = 1; i < VCLOCK_MAX; i++)
+		for (int j = 1; j < VCLOCK_MAX && j <= i; j++)
+			if (box_eval_and_check_replication_quorum(
+					cfg_name, i, j) < 0)
+				diag_raise();
+}
+
 static double
 box_check_replication_synchro_timeout(void)
 {
@@ -2176,6 +2196,7 @@ box_check_config(void)
 	box_check_replication_reconnect_timeout();
 	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
+	box_check_replication_linearizable_quorum();
 	if (box_check_replication_synchro_timeout() < 0)
 		diag_raise();
 	if (box_check_replication_threads() < 0)
@@ -2494,6 +2515,55 @@ box_set_replication_sync_lag(void)
 }
 
 void
+box_update_replication_linearizable_quorum(void)
+{
+	int64_t quorum = -1;
+	const char *cfg_name = "replication_linearizable_quorum";
+	if (!cfg_isnumber(cfg_name)) {
+		int nr_replicas = MAX(1, replicaset.registered_count);
+		if (box_eval_replication_quorum(cfg_name, nr_replicas,
+						replication_synchro_quorum,
+						&quorum) < 0)
+			/* Shouldn't normally happen. */
+			panic("failed to eval replication_linearizable_quorum");
+
+		if (quorum <= 0 || quorum >= VCLOCK_MAX) {
+			/*
+			 * This can happen and is expected behavior, since when
+			 * validating the formula we check only values of
+			 * Q <= N, however, in real life the synchro quorum may
+			 * be greater than N, which makes default formula
+			 * `N - Q + 1` negative. Some weird formulas as
+			 * `31 * Q / N` are also valid, when Q <= N, but when
+			 * synchro quorum becomes greater than N, the formula
+			 * can return values > 32.
+			 */
+			int new_quorum = MIN(MAX(1, quorum), VCLOCK_MAX - 1);
+			say_warn("the formula for "
+				 "replication_linearizable_quorum evaluated to "
+				 "%lld for replica number %d, synchro quorum "
+				 "%d, using %d instead", (long long)quorum,
+				 nr_replicas, replication_synchro_quorum,
+				 new_quorum);
+			quorum = new_quorum;
+		}
+		say_info("update %s = %lld", cfg_name, (long long)quorum);
+	} else {
+		quorum = cfg_geti(cfg_name);
+	}
+
+	assert(quorum > 0 && quorum < VCLOCK_MAX);
+	replication_linearizable_quorum = quorum;
+}
+
+void
+box_set_replication_linearizable_quorum(void)
+{
+	box_check_replication_linearizable_quorum();
+	box_update_replication_linearizable_quorum();
+}
+
+void
 box_update_replication_synchro_quorum(void)
 {
 	int quorum = -1;
@@ -2535,6 +2605,7 @@ box_update_replication_synchro_quorum(void)
 	txn_limbo_on_parameters_change(&txn_limbo);
 	box_raft_update_election_quorum();
 	replicaset_on_health_change();
+	box_update_replication_linearizable_quorum();
 }
 
 int
