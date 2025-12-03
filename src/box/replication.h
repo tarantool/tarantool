@@ -737,6 +737,13 @@ void
 replicaset_connect_wakeup(void);
 
 /**
+ * Wake up replicaset_collect_confirmed_vclock, so that it notices the change
+ * of replication_linearizable_quorum.
+ */
+void
+replicaset_wait_confirmed_wakeup(void);
+
+/**
  * Reload replica URIs.
  *
  * Called on reconfiguration in case the remote peer URIs are the same.

@@ -1892,6 +1892,15 @@ replica_find_new_id(uint32_t *replica_id)
 	return -1;
 }
 
+static struct fiber_cond *replicaset_wait_confirmed_wakeup_cond = NULL;
+
+void
+replicaset_wait_confirmed_wakeup(void)
+{
+	if (replicaset_wait_confirmed_wakeup_cond != NULL)
+		fiber_cond_signal(replicaset_wait_confirmed_wakeup_cond);
+}
+
 /** Let others know we need data. */
 void
 sync_trigger_data_ref(struct sync_trigger_data *data)
@@ -1982,6 +1991,9 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 	if (replication_linearizable_quorum <= 1)
 		return 0;
 
+	struct fiber_cond cond;
+	fiber_cond_create(&cond);
+	replicaset_wait_confirmed_wakeup_cond = &cond;
 	struct sync_trigger_data *data = (sync_trigger_data *)
 		xmempool_alloc(&sync_trigger_data_pool);
 	memset(data->vclock_syncs, 0, sizeof(data->vclock_syncs));
@@ -2006,6 +2018,8 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 		trigger_clear(&on_ack);
 		trigger_clear(&on_relay_thread_start);
 		sync_trigger_data_unref(data);
+		fiber_cond_destroy(&cond);
+		replicaset_wait_confirmed_wakeup_cond = NULL;
 	});
 
 	replicaset_foreach(replica) {
@@ -2027,7 +2041,7 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 	while (bit_count_u32(data->collected_vclock_map) <
 	       replication_linearizable_quorum && !data->is_timed_out &&
 	       !fiber_is_cancelled()) {
-		if (fiber_yield_deadline(deadline))
+		if (fiber_cond_wait_deadline(&cond, deadline) != 0)
 			break;
 	}
 
