@@ -2554,6 +2554,7 @@ box_update_replication_linearizable_quorum(void)
 
 	assert(quorum > 0 && quorum < VCLOCK_MAX);
 	replication_linearizable_quorum = quorum;
+	replicaset_option_update_wakeup();
 }
 
 void
