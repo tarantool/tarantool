@@ -107,3 +107,21 @@ g.test_out_bound_when_changing_synchro_quorum = function()
         _G.old_lin_quorum = nil
     end)
 end
+
+--
+-- Test, that changing the linearizable_quorum on the fly is possible.
+--
+g.test_dynamically_change_the_quorum_relay_vclock_sync = function()
+    g.server2:exec(function()
+        local default = box.cfg.replication_linearizable_quorum
+        box.cfg{replication_linearizable_quorum = 3}
+        local txn_f = require('fiber').create(function()
+            return pcall(box.begin, {txn_isolation = 'linearizable'})
+        end)
+        txn_f:set_joinable(true)
+        box.cfg{replication_linearizable_quorum = default}
+        local is_joined, ok = txn_f:join(60)
+        t.assert(is_joined)
+        t.assert(ok)
+    end)
+end
