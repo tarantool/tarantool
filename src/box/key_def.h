@@ -1171,6 +1171,14 @@ key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 	return key_def->key_hint(key, part_count, key_def);
 }
 
+/**
+ * Turns @a key without MP_ARRAY header consisting of @a part_count parts
+ * into a MsgPack array. The result is allocated on `fiber()->gc`, so the caller
+ * should clean it. Output argument @a size returns size of the result in bytes.
+ */
+char *
+array_key_from_key(const char *key, uint32_t part_count, size_t *size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
