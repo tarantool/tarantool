@@ -387,6 +387,7 @@ replication_init(int num_threads)
 	replica_hash_new(&replicaset.hash);
 	rlist_create(&replicaset.anon);
 	fiber_cond_create(&replicaset.applier.cond);
+	fiber_cond_create(&replicaset.option_update_cond);
 	latch_create(&replicaset.applier.order_latch);
 
 	vclock_create(&replicaset.applier.vclock);
@@ -482,6 +483,7 @@ replication_free(void)
 	trigger_destroy(&replicaset.on_ack);
 	trigger_destroy(&replicaset.on_relay_thread_start);
 	fiber_cond_destroy(&replicaset.applier.cond);
+	fiber_cond_destroy(&replicaset.option_update_cond);
 	latch_destroy(&replicaset.applier.order_latch);
 	applier_free();
 
@@ -1892,6 +1894,12 @@ replica_find_new_id(uint32_t *replica_id)
 	return -1;
 }
 
+void
+replicaset_option_update_wakeup(void)
+{
+	fiber_cond_broadcast(&replicaset.option_update_cond);
+}
+
 /** Let others know we need data. */
 void
 sync_trigger_data_ref(struct sync_trigger_data *data)
@@ -2024,10 +2032,11 @@ replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
 		}
 	}
 
+	struct fiber_cond *cond = &replicaset.option_update_cond;
 	while (bit_count_u32(data->collected_vclock_map) <
 	       replication_linearizable_quorum && !data->is_timed_out &&
 	       !fiber_is_cancelled()) {
-		if (fiber_yield_deadline(deadline))
+		if (fiber_cond_wait_deadline(cond, deadline) != 0)
 			break;
 	}
 

@@ -428,6 +428,11 @@ struct replicaset {
 	struct rlist on_relay_thread_start;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica *replica_by_id[VCLOCK_MAX];
+	/**
+	 * Signaled whenever a replication configuration option is changed
+	 * (currently used only for `replication_linearizable_quorum`).
+	 */
+	struct fiber_cond option_update_cond;
 };
 extern struct replicaset replicaset;
 
@@ -735,6 +740,13 @@ replicaset_connect(const struct uri_set *uris,
  */
 void
 replicaset_connect_wakeup(void);
+
+/**
+ * Wake up functions, which wait on `option_update_cond`, so that they notice
+ * configuration option change.
+ */
+void
+replicaset_option_update_wakeup(void);
 
 /**
  * Reload replica URIs.
