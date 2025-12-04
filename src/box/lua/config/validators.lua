@@ -9,6 +9,12 @@ local network = require('internal.config.utils.network')
 -- function that validates the data for that field.
 local M = {}
 
+local function validate_privilege_definition(data, w)
+    if data.permissions == nil then
+        w.error('The permissions field must be defined for a privilege')
+    end
+end
+
 local function validate_uuid_str(data, w)
     if uuid.fromstr(data) == nil then
         w.error('Unable to parse the value as a UUID: %q', data)
@@ -166,6 +172,14 @@ M['config.storage.prefix'] = function(data, w)
 end
 
 -- }}} config
+
+-- {{{ credentials
+
+M['credentials.roles.*.privileges.*'] = validate_privilege_definition
+
+M['credentials.users.*.privileges.*'] = validate_privilege_definition
+
+-- }}} credentials
 
 -- {{{ database
 

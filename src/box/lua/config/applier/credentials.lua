@@ -207,6 +207,7 @@ local function privileges_from_config(config_data)
     }
 
     for _, priv in ipairs(privileges) do
+        assert(type(priv.permissions) == 'table')
         for _, perm in ipairs(priv.permissions) do
             if priv.universe then
                 privileges_add_perm('universe', 'all', perm, intermediate)
