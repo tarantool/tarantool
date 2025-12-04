@@ -1458,6 +1458,9 @@ return schema.new('instance_config', schema.record({
                                 allowed_values = {'all'},
                             }),
                         }),
+                    }, {
+                        validate =
+                            validators['credentials.roles.*.privileges.*'],
                     }),
                 }),
                 -- The given role has all the privileges from
@@ -1523,6 +1526,9 @@ return schema.new('instance_config', schema.record({
                                 allowed_values = {'all'},
                             }),
                         }),
+                    }, {
+                        validate =
+                            validators['credentials.users.*.privileges.*'],
                     }),
                 }),
                 -- The given user has all the privileges from

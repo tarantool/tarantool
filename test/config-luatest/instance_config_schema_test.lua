@@ -1382,6 +1382,26 @@ g.test_credentials = function()
     t.assert_error_msg_equals(err, function()
         instance_config:validate(iconfig)
     end)
+
+    iconfig = {
+        credentials = {
+            users = {
+                peer = {
+                    privileges = {
+                        {
+                            lua_call = { 'all' },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    err = '[instance_config] credentials.users.peer.privileges[1]: ' ..
+          'The permissions field must be defined for a privilege'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
 end
 
 g.test_app = function()
