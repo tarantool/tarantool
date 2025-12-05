@@ -47,7 +47,7 @@ pid_file='%s', background=true, work_dir='%s', log='%s',
 
     -- Start Tarantool and check that at least a log file has been created.
     t.assert_is_not(g.ph, nil)
-    t.helpers.retrying({timeout = 2, delay = 0.01}, function(path)
+    t.helpers.retrying({}, function(path)
         assert(fio.path.exists(path) == true)
     end, g.log_path)
     g.pid = fio.open(g.pid_path):read()
@@ -62,7 +62,7 @@ g.after_test("test_background_mode_box_cfg", function(cg)
 end)
 
 g.test_background_mode_box_cfg = function(cg)
-    t.helpers.retrying({timeout = 2, delay = 0.01}, function()
+    t.helpers.retrying({}, function()
         assert(check_msg(cg.log_path, msg_opt_processing) == true)
     end, cg.log_path, cg.ph)
 end
@@ -87,7 +87,7 @@ g.before_test("test_background_mode_env_vars", function()
         env = env,
     })
     t.assert_is_not(g.ph, nil)
-    t.helpers.retrying({timeout = 2, delay = 0.01}, function(path)
+    t.helpers.retrying({}, function(path)
         assert(fio.path.exists(path) == true)
     end, g.log_path)
     g.pid = fio.open(g.pid_path):read()
@@ -102,7 +102,7 @@ g.after_test("test_background_mode_env_vars", function(cg)
 end)
 
 g.test_background_mode_env_vars = function(cg)
-    t.helpers.retrying({timeout = 2, delay = 0.01}, function()
+    t.helpers.retrying({}, function()
         assert(check_msg(cg.log_path, msg_opt_processing) == true)
     end, cg.log_path, cg.ph)
     check_msg(cg.log_path, msg_opt_processing)
