@@ -60,6 +60,7 @@ double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 int replication_synchro_quorum = 1;
+int replication_linearizable_quorum = 1;
 double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
@@ -108,6 +109,35 @@ rb_gen(MAYBE_UNUSED static, replica_hash_, replica_hash_t,
 	for (item = replica_hash_first(hash); \
 	     item != NULL && ((next = replica_hash_next(hash, item)) || 1); \
 	     item = next)
+
+/**
+ * The pool is used by replication_cc to allocate sync_trigger_data that is
+ * used in replicaset_collect_confirmed_vclock and relay_get_sync_on_start. We
+ * allocate sync_trigger_data dynamically because these functions are running
+ * in different fibers. The lifetime of sync_trigger_data is not limited by the
+ * execution time of replicaset_collect_confirmed_vclock.
+ */
+static struct mempool sync_trigger_data_pool;
+
+/** A structure holding trigger data to collect syncs. */
+struct sync_trigger_data {
+	/** Syncs to wait for. */
+	uint64_t vclock_syncs[VCLOCK_MAX];
+	/**
+	 * A bitmap holding replica ids whose vclocks were already collected.
+	 */
+	vclock_map_t collected_vclock_map;
+	/** The fiber waiting for vclock. */
+	struct fiber *waiter;
+	/** Collected vclock. */
+	struct vclock *vclock;
+	/** The request deadline. */
+	double deadline;
+	/** Whether the request is timed out. */
+	bool is_timed_out;
+	/** Count of fibers that are using data. */
+	int ref_count;
+};
 
 double
 replication_disconnect_timeout(void)
@@ -375,6 +405,8 @@ replication_init(int num_threads)
 	replicaset.healthy_count = 1;
 
 	applier_init();
+	mempool_create(&sync_trigger_data_pool, &cord()->slabc,
+		       sizeof(struct sync_trigger_data));
 }
 
 void
@@ -457,6 +489,7 @@ replication_free(void)
 		uri_destroy(&cfg_bootstrap_leader_uri);
 
 	TRASH(&replicaset);
+	mempool_destroy(&sync_trigger_data_pool);
 }
 
 int
@@ -1857,4 +1890,169 @@ replica_find_new_id(uint32_t *replica_id)
 	}
 	diag_set(ClientError, ER_REPLICA_MAX, VCLOCK_MAX);
 	return -1;
+}
+
+static struct fiber_cond *replicaset_wait_confirmed_wakeup_cond = NULL;
+
+void
+replicaset_wait_confirmed_wakeup(void)
+{
+	if (replicaset_wait_confirmed_wakeup_cond != NULL)
+		fiber_cond_signal(replicaset_wait_confirmed_wakeup_cond);
+}
+
+/** Let others know we need data. */
+void
+sync_trigger_data_ref(struct sync_trigger_data *data)
+{
+	++data->ref_count;
+}
+
+/**
+ * Let others know that we no longer need the data.
+ * If no one else needs the data, free it.
+ */
+void
+sync_trigger_data_unref(struct sync_trigger_data *data)
+{
+	--data->ref_count;
+	assert(data->ref_count >= 0);
+	if (data->ref_count == 0)
+		mempool_free(&sync_trigger_data_pool, data);
+}
+
+/**
+ * A trigger executed on each ack to collect up to date remote node vclocks.
+ * When an ack comes with requested sync for some replica id, ack vclock is
+ * accounted.
+ */
+static int
+check_vclock_sync_on_ack(struct trigger *trigger, void *event)
+{
+	struct replication_ack *ack = (struct replication_ack *)event;
+	struct sync_trigger_data *data =
+		(struct sync_trigger_data *)trigger->data;
+	uint32_t id = ack->source;
+	/*
+	 * Anonymous replica acks are not counted for synchronous transactions,
+	 * so linearizable read shouldn't count them as well.
+	 */
+	if (id == 0)
+		return 0;
+	uint64_t sync = data->vclock_syncs[id];
+	int accounted_count = bit_count_u32(data->collected_vclock_map);
+	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&
+	    ack->vclock_sync >= sync &&
+	    accounted_count < replication_linearizable_quorum) {
+		vclock_max_ignore0(data->vclock, ack->vclock);
+		bit_set(&data->collected_vclock_map, id);
+		++accounted_count;
+		if (accounted_count >= replication_linearizable_quorum)
+			fiber_wakeup(data->waiter);
+	}
+	return 0;
+}
+
+/** A trigger querying relay's next sync value once it becomes operational. */
+static int
+relay_get_sync_on_start(struct trigger *trigger, void *event)
+{
+	struct replica *replica = (struct replica *)event;
+	if (replica->anon)
+		return 0;
+	struct relay *relay = replica->relay;
+	struct sync_trigger_data *data =
+		(struct sync_trigger_data *)trigger->data;
+	uint32_t id = replica->id;
+	/* Already accounted. */
+	if (bit_test(&data->collected_vclock_map, id))
+		return 0;
+
+	sync_trigger_data_ref(data);
+	if (relay_trigger_vclock_sync(relay, &data->vclock_syncs[id],
+				      data->deadline) != 0) {
+		diag_clear(diag_get());
+		data->is_timed_out = true;
+		fiber_wakeup(data->waiter);
+	}
+	sync_trigger_data_unref(data);
+	return 0;
+}
+
+int
+replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
+				    double deadline)
+{
+	/*
+	 * We should check the vclock on self plus
+	 * replication_linearizable_quorum - 1 remote instances.
+	 */
+	vclock_copy(confirmed_vclock, instance_vclock);
+	if (replication_linearizable_quorum <= 1)
+		return 0;
+
+	struct fiber_cond cond;
+	fiber_cond_create(&cond);
+	replicaset_wait_confirmed_wakeup_cond = &cond;
+	struct sync_trigger_data *data = (sync_trigger_data *)
+		xmempool_alloc(&sync_trigger_data_pool);
+	memset(data->vclock_syncs, 0, sizeof(data->vclock_syncs));
+	data->collected_vclock_map = 0;
+	data->waiter = fiber();
+	data->vclock = confirmed_vclock;
+	data->deadline = deadline;
+	data->is_timed_out = false;
+	data->ref_count = 0;
+
+	sync_trigger_data_ref(data);
+	bit_set(&data->collected_vclock_map, instance_id);
+	struct trigger on_relay_thread_start;
+	trigger_create(&on_relay_thread_start, relay_get_sync_on_start, data,
+		       NULL);
+	trigger_add(&replicaset.on_relay_thread_start, &on_relay_thread_start);
+	struct trigger on_ack;
+	trigger_create(&on_ack, check_vclock_sync_on_ack, data, NULL);
+	trigger_add(&replicaset.on_ack, &on_ack);
+
+	auto guard = make_scoped_guard([&] {
+		trigger_clear(&on_ack);
+		trigger_clear(&on_relay_thread_start);
+		sync_trigger_data_unref(data);
+		fiber_cond_destroy(&cond);
+		replicaset_wait_confirmed_wakeup_cond = NULL;
+	});
+
+	replicaset_foreach(replica) {
+		if (relay_get_state(replica->relay) != RELAY_FOLLOW ||
+		    replica->anon) {
+			continue;
+		}
+		/* Might be already filled by on_relay_thread_start trigger. */
+		if (data->vclock_syncs[replica->id] != 0)
+			continue;
+		if (relay_trigger_vclock_sync(replica->relay,
+					      &data->vclock_syncs[replica->id],
+					      deadline) != 0) {
+			/* Timed out. */
+			return -1;
+		}
+	}
+
+	while (bit_count_u32(data->collected_vclock_map) <
+	       replication_linearizable_quorum && !data->is_timed_out &&
+	       !fiber_is_cancelled()) {
+		if (fiber_cond_wait_deadline(&cond, deadline) != 0)
+			break;
+	}
+
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	if (bit_count_u32(data->collected_vclock_map) <
+	    replication_linearizable_quorum) {
+		diag_set(TimedOut);
+		return -1;
+	}
+	return 0;
 }
