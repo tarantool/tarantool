@@ -15,15 +15,17 @@
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
-static const char sample[] = "2012-12-24T15:30Z";
-
 void
 cord_on_yield(void) {}
 
-#define S(s) {s, sizeof(s) - 1}
+#define DEFAULT_SAMPLE_EPOCH 1356363000 /* 2012-12-24T15:30Z */
+#define S(s) {s, sizeof(s) - 1, DEFAULT_SAMPLE_EPOCH}
+#define SX(s, sample_epoch) {s, sizeof(s) - 1, sample_epoch}
+#define DX(delta) (DEFAULT_SAMPLE_EPOCH + delta)
 struct {
 	const char *str;
 	size_t len;
+	double sample_epoch;
 } tests[] = {
 	S("2012-12-24 15:30Z"),
 	S("2012-12-24 15:30z"),
@@ -69,23 +71,29 @@ struct {
 	S("2012-12-24 16:30 +01:00"),
 	S("2012-12-24 14:30 -01:00"),
 	S("2012-12-24 15:30 UTC"),
-	S("2012-12-24 16:30 UTC+1"),
-	S("2012-12-24 16:30 UTC+01"),
-	S("2012-12-24 16:30 UTC+0100"),
-	S("2012-12-24 16:30 UTC+01:00"),
-	S("2012-12-24 14:30 UTC-1"),
-	S("2012-12-24 14:30 UTC-01"),
-	S("2012-12-24 14:30 UTC-01:00"),
-	S("2012-12-24 14:30 UTC-0100"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 UTC+1"),
+	 * S("2012-12-24 16:30 UTC+01"),
+	 * S("2012-12-24 16:30 UTC+0100"),
+	 * S("2012-12-24 16:30 UTC+01:00"),
+	 * S("2012-12-24 14:30 UTC-1"),
+	 * S("2012-12-24 14:30 UTC-01"),
+	 * S("2012-12-24 14:30 UTC-01:00"),
+	 * S("2012-12-24 14:30 UTC-0100"),
+	 */
 	S("2012-12-24 15:30 GMT"),
-	S("2012-12-24 16:30 GMT+1"),
-	S("2012-12-24 16:30 GMT+01"),
-	S("2012-12-24 16:30 GMT+0100"),
-	S("2012-12-24 16:30 GMT+01:00"),
-	S("2012-12-24 14:30 GMT-1"),
-	S("2012-12-24 14:30 GMT-01"),
-	S("2012-12-24 14:30 GMT-01:00"),
-	S("2012-12-24 14:30 GMT-0100"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 GMT+1"),
+	 * S("2012-12-24 16:30 GMT+01"),
+	 * S("2012-12-24 16:30 GMT+0100"),
+	 * S("2012-12-24 16:30 GMT+01:00"),
+	 * S("2012-12-24 14:30 GMT-1"),
+	 * S("2012-12-24 14:30 GMT-01"),
+	 * S("2012-12-24 14:30 GMT-01:00"),
+	 * S("2012-12-24 14:30 GMT-0100"),
+	 */
 	S("2012-12-24 14:30 -01:00"),
 	S("2012-12-24 16:30:00 +01:00"),
 	S("2012-12-24 14:30:00 -01:00"),
@@ -96,35 +104,54 @@ struct {
 	S("2012-12-24T1630+01:00"),
 	S("20121224T16:30+01"),
 	S("20121224T16:30 +01"),
+	S("20121224T16,5+0100"),
+	S("20121224T16,5+01:00"),
+	SX("20121224T16.75+0100", DX(15 * 60)),
+	SX("20121224T16.625+0100", DX(7 * 60 + 30)),
+	S("2012-12-24T16,5+01:00"),
+	SX("2012-12-24T16.75+01:00", DX(15 * 60)),
+	SX("2012-12-24T16.625+01:00", DX(7 * 60 + 30)),
+	S("20121224T1630.0+0100"),
+	SX("20121224T1630.5+0100", DX(30)),
+	S("20121224T16:30.0+0100"),
+	SX("20121224T16:30.5+0100", DX(30)),
+	SX("20121224T16:30,1+0100", DX(6)),
+	SX("20121224T16:30,01666667+0100", DX(1)),
 };
 #undef S
+#undef SX
+#undef DX
+#undef DEFAULT_SAMPLE_EPOCH
 
 static void
 datetime_test(void)
 {
 	size_t index;
-	struct datetime date_expected;
 
-	plan(497);
-	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1);
-
+	const unsigned taps_per_iter = 7;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		diag("datetime_test[%lu]", index);
+		ssize_t parse_len;
+		const char *test_str = tests[index].str;
+		size_t test_len = tests[index].len;
+		size_t test_sample_epoch = tests[index].sample_epoch;
 		struct datetime date;
-		size_t len = datetime_parse_full(&date, tests[index].str,
-						 tests[index].len);
-		is(len > 0, true, "correct parse_datetime return value "
-		   "for '%s'", tests[index].str);
-		is(date.epoch, date_expected.epoch,
+
+		parse_len = datetime_parse_full(&date, test_str, test_len);
+		is(parse_len > 0, true, "correct parse_datetime return value "
+		   "for '%s'", test_str);
+		is(date.epoch, test_sample_epoch,
 		   "correct parse_datetime output "
 		   "seconds for '%s",
-		   tests[index].str);
+		   test_str);
 
 		/*
 		 * check that stringized literal produces the same date
 		 * time fields
 		 */
 		static char buff[DT_TO_STRING_BUFSIZE];
-		len = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
+		size_t len = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
 		ok(len > 0, "strftime");
 		struct datetime date_strp;
 		len = datetime_strptime(&date_strp, buff, "%F %T%z");
@@ -133,8 +160,8 @@ datetime_test(void)
 		is(date.epoch, date_strp.epoch,
 		   "reversible seconds via datetime_strptime for '%s'", buff);
 		struct datetime date_parsed;
-		len = datetime_parse_full(&date_parsed, buff, len);
-		is(len > 0, true, "correct datetime_parse_full return value "
+		parse_len = datetime_parse_full(&date_parsed, buff, len);
+		is(parse_len > 0, true, "correct datetime_parse_full return value "
 		   "for '%s'", buff);
 		is(date.epoch, date_parsed.epoch,
 		   "reversible seconds via datetime_parse_full for '%s'", buff);
@@ -171,7 +198,8 @@ tostring_datetime_test(void)
 	};
 	size_t index;
 
-	plan(17);
+	const unsigned taps_per_iter = 1;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date = {
 			tests[index].secs,
@@ -411,7 +439,8 @@ mp_datetime_test()
 	};
 	size_t index;
 
-	plan(85);
+	const unsigned taps_per_iter = 5;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date = {
 			tests[index].secs,
@@ -481,7 +510,11 @@ mp_datetime_unpack_valid_checks(void)
 	const char *p;
 	struct datetime date;
 
-	plan(24);
+	const unsigned valid_taps_per_iter = 2;
+	const unsigned invalid_taps_per_iter = 1;
+	plan(valid_taps_per_iter * lengthof(valid_values)
+	     + invalid_taps_per_iter * lengthof(invalid_values));
+
 	for (index = 0; index < lengthof(valid_values); index++) {
 		struct binary_datetime value = valid_values[index];
 		p = (char *)&value;
@@ -491,7 +524,7 @@ mp_datetime_unpack_valid_checks(void)
 		is((int64_t)dt->epoch, value.epoch, "epoch value expected");
 	}
 
-	for (index = 0; index < lengthof(valid_values); index++) {
+	for (index = 0; index < lengthof(invalid_values); index++) {
 		struct binary_datetime value = invalid_values[index];
 		p = (char *)&value;
 		memset(&date, 0, sizeof(date));

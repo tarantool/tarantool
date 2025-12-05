@@ -283,8 +283,10 @@ dt_epoch(dt_t dt)
 /** Common timezone suffix parser */
 static inline ssize_t
 parse_tz_suffix(const char *str, size_t len, time_t base,
-		int16_t *tzindex, int32_t *offset)
+		int16_t *tzindex, int16_t *offset)
 {
+	int32_t offset32;
+
 	/* 1st attempt: decode as MSK */
 	const struct date_time_zone *zone;
 	long gmtoff = 0;
@@ -293,17 +295,21 @@ parse_tz_suffix(const char *str, size_t len, time_t base,
 		return l;
 	if (l > 0) {
 		assert(zone != NULL);
-		*offset = gmtoff / 60;
+		offset32 = gmtoff / 60;
 		*tzindex = timezone_index(zone);
-		assert(l <= (ssize_t)len);
-		return l;
+		goto out;
 	}
 
 	/* 2nd attempt: decode as +03:00 */
 	*tzindex = 0;
-	l = dt_parse_iso_zone_lenient(str, len, offset);
-	assert(l <= (ssize_t)len);
+	int int_type_offset;
+	l = dt_parse_iso_zone_lenient(str, len, &int_type_offset);
+	offset32 = int_type_offset;
 
+out:
+	assert(offset32 >= -720 && offset32 <= 840);
+	*offset = offset32;
+	assert(l <= (ssize_t)len);
 	return l;
 }
 
@@ -316,7 +322,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len)
 	char c;
 	int sec_of_day = 0, nanosecond = 0;
 	int16_t tzindex = 0;
-	int32_t offset = 0;
+	int16_t offset = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
 	if (n == 0)
@@ -369,13 +375,7 @@ ssize_t
 datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 		  int16_t *tzindex)
 {
-	int32_t offset = 0;
-	ssize_t l = parse_tz_suffix(str, len, base, tzindex, &offset);
-	if (l <= 0)
-		return l;
-	assert(offset <= INT16_MAX);
-	*tzoffset = offset;
-	return l;
+	return parse_tz_suffix(str, len, base, tzindex, tzoffset);
 }
 
 int
