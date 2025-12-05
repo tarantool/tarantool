@@ -3382,7 +3382,10 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		return box_raft_try_promote();
+		if (box_raft_try_promote() != 0)
+			return -1;
+		is_in_box_promote = false;
+		return box_wait_ro(false, replication_synchro_timeout);
 	default:
 		unreachable();
 	}
