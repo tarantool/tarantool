@@ -2,5 +2,8 @@
 #fun:*
 #src:*
 
+# This file is for undefined suppressions only.
+[undefined]
+
 # to be removed in scope of gh-12086
 fun:PMurHash32_Process
