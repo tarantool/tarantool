@@ -1304,3 +1304,20 @@ key_part_validate(enum field_type key_type,
 	}
 	return 0;
 }
+
+char *
+array_key_from_key(const char *key, uint32_t part_count, size_t *size)
+{
+	struct region *gc = &fiber()->gc;
+	const char *key_end = key;
+	for (uint32_t i = 0; i < part_count; i++)
+		mp_next(&key_end);
+	size_t key_size = key_end - key;
+	char *array_key = xregion_alloc(gc, mp_sizeof_array(part_count) +
+					key_size);
+	char *array_key_end = mp_encode_array(array_key, part_count);
+	memcpy(array_key_end, key, key_size);
+	array_key_end += key_size;
+	*size = array_key_end - array_key;
+	return array_key;
+}

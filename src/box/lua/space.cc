@@ -35,6 +35,7 @@
 #include "box/lua/tuple_format.h"
 #include "box/lua/key_def.h"
 #include "box/sql/sqlLimit.h"
+#include "lua/msgpack.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
 #include "box/box.h"
@@ -456,6 +457,29 @@ luaT_push_covered_fields(struct lua_State *L, struct index_def *def)
 }
 
 /**
+ * Push array with aggregates on Lua stack.
+ */
+static void
+luaT_push_aggregates(struct lua_State *L, struct index_def *def)
+{
+	const char *aggregates = def->opts.aggregates;
+	luamp_decode(L, luaL_msgpack_default, &aggregates);
+	/* Shift all fields to 1-indexation. */
+	int top = lua_gettop(L);
+	uint32_t count = lua_objlen(L, -1);
+	for (uint32_t i = 1; i <= count; i++) {
+		lua_pushinteger(L, i);
+		lua_gettable(L, -2);
+		assert(lua_istable(L, -1));
+		lua_getfield(L, -1, "field");
+		int field = lua_tonumber(L, -1);
+		lua_pushnumber(L, field + 1);
+		lua_setfield(L, -3, "field");
+		lua_settop(L, top);
+	}
+}
+
+/**
  * Make a single space available in Lua,
  * via box.space[] array.
  *
@@ -657,6 +681,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		if (index_def->opts.layout != NULL) {
 			lua_pushstring(L, index_def->opts.layout);
 			lua_setfield(L, -2, "layout");
+		}
+
+		if (index_def->opts.aggregates != NULL) {
+			luaT_push_aggregates(L, index_def);
+			lua_setfield(L, -2, "aggregates");
 		}
 
 		lua_pushstring(L, "sequence_id");
