@@ -1,28 +1,6 @@
-local fun = require('fun')
 local textutils = require('internal.config.utils.textutils')
 
-local function for_each_list_item(s, f)
-    return table.concat(fun.iter(s:split('\n- ')):map(f):totable(), '\n- ')
-end
-
-local function for_each_paragraph(s, f)
-    return table.concat(fun.iter(s:split('\n\n')):map(f):totable(), '\n\n')
-end
-
-local function format_text(s)
-    return for_each_paragraph(textutils.dedent(s), function(paragraph)
-        -- Strip line breaks if the paragraph is not a list.
-        if paragraph:startswith('- ') then
-            -- Strip newlines in each list item.
-            return '- ' .. for_each_list_item(paragraph:sub(3),
-                                              function(list_item)
-                return textutils.toline(list_item)
-            end)
-        else
-            return textutils.toline(paragraph)
-        end
-    end)
-end
+local format_text = textutils.format_text
 
 -- {{{ Instance descriptions
 
