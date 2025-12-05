@@ -90,6 +90,15 @@ func_by_name(const char *name, uint32_t name_len)
 	return (struct func *)mh_strnptr_node(funcs_by_name, func)->val;
 }
 
+uint32_t
+func_cache_find_next_unused_id(uint32_t cur_id, uint32_t id_range_end)
+{
+	for (; cur_id < id_range_end; cur_id++)
+		if (func_by_id(cur_id) == NULL)
+			break;
+	return cur_id;
+}
+
 void
 func_pin(struct func *func, struct func_cache_holder *holder,
 	 enum func_holder_type type)

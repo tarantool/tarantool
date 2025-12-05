@@ -1166,8 +1166,7 @@ vdbe_emit_create_function(struct Parse *parser, int reg_id, const char *name,
 					  BOX_FUNC_FIELD_NAME, name_reg, 1,
 					  ER_FUNCTION_EXISTS, name, false,
 					  OP_NoConflict);
-	sqlVdbeAddOp3(v, OP_NextSystemSpaceId, BOX_FUNC_ID,
-		      regs + BOX_FUNC_FIELD_ID, BOX_FUNC_FIELD_ID);
+	sqlVdbeAddOp2(v, OP_GenFuncId, name_reg, regs + BOX_FUNC_FIELD_ID);
 	sqlVdbeAddOp2(v, OP_Integer, effective_user()->uid,
 		      regs + BOX_FUNC_FIELD_UID);
 	sqlVdbeAddOp2(v, OP_Integer, 0, regs + BOX_FUNC_FIELD_SETUID);
@@ -1399,8 +1398,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 		int reg_seq_id = ++parse->nMem;
 		struct Vdbe *v = sqlGetVdbe(parse);
 		assert(v != NULL);
-		sqlVdbeAddOp3(v, OP_NextSystemSpaceId, BOX_SEQUENCE_ID,
-			      reg_seq_id, BOX_SEQUENCE_FIELD_ID);
+		sqlVdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
 		int reg_seq_rec = emitNewSysSequenceRecord(parse, reg_seq_id,
 							   space->def->name);
 		if (is_alter) {
