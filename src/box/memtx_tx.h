@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include "small/rb.h"
 #include "small/rlist.h"
 #include "index.h"
 #include "tuple.h"
@@ -135,6 +136,15 @@ struct memtx_tx_statistics {
 };
 
 /**
+ * Set of gap read trackers.
+ */
+struct gap_item_base;
+struct gap_item_set_search_key;
+typedef rb_tree(struct gap_item_base) gap_item_set_t;
+rb_proto_ext_key(MAYBE_UNUSED, gap_item_set_, gap_item_set_t,
+		 struct gap_item_base, struct gap_item_set_search_key);
+
+/**
  * Collect MVCC memory usage statics.
  */
 void
@@ -158,15 +168,6 @@ memtx_tx_manager_init();
  */
 void
 memtx_tx_manager_free();
-
-/**
- * Transaction providing DDL changes is disallowed to yield after
- * modifications of internal caches (i.e. after ALTER operation finishes).
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_acquire_ddl(struct txn *tx);
 
 /**
  * Implementation of engine_send_to_read_view callback.
