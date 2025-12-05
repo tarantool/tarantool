@@ -3382,7 +3382,16 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		return box_raft_try_promote();
+		if (box_raft_try_promote() != 0)
+			return -1;
+		/*
+		 * box_promote_qsync() checks 'is_in_box_promote' to prevent
+		 * concurrent promotions. We must disable this guard here to
+		 * allow box_promote_qsync() to claim the limbo while we wait
+		 * in box_wait_ro().
+		 */
+		is_in_box_promote = false;
+		return box_wait_ro(false, replication_synchro_timeout);
 	default:
 		unreachable();
 	}
