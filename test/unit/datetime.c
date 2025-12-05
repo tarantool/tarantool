@@ -116,8 +116,8 @@ datetime_test(void)
 
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date;
-		size_t len = datetime_parse_full(&date, tests[index].str,
-						 tests[index].len);
+		ssize_t len = datetime_parse_full(&date, tests[index].str,
+						  tests[index].len);
 		is(len > 0, true, "correct parse_datetime return value "
 		   "for '%s'", tests[index].str);
 		is(date.epoch, date_expected.epoch,
