@@ -1,6 +1,6 @@
-# All exceptions are under control of the issue:
-# https://github.com/tarantool/tarantool/issues/4360
-#
 # File format:
 #fun:*
 #src:*
+
+# This file is for address suppressions only.
+[address]
