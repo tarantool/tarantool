@@ -1,6 +1,7 @@
 local fun = require('fun')
 local log = require('log')
 local t = require('luatest')
+local schema_utils = require('experimental.config.utils.schema')
 local instance_config = require('internal.config.instance_config')
 
 local g = t.group()
@@ -1950,4 +1951,65 @@ end
 g.test_isolated = function()
     instance_config:validate({isolated = true})
     t.assert_equals(instance_config:apply_default({}).isolated, false)
+end
+
+g.test_schema_deprecations = function()
+    local schema = schema_utils.new('test', schema_utils.record({
+        root = schema_utils.array({
+            items = schema_utils.record({
+                opt = schema_utils.scalar({
+                    type = 'string',
+                    deprecated = {
+                        since = {'1.0.0', '1.1.0'},
+                        msg = 'Use another option',
+                        see = 'root.new_opt',
+                    },
+                }),
+            }),
+        }),
+    }))
+
+    local warnings =
+        schema:_deprecations({root = {{opt = 'foo'}, {opt = 'bar'}}})
+    t.assert_equals(warnings, {{
+        message = '`root.*.opt` is deprecated since 1.0.0, 1.1.0. Use ' ..
+                  'another option. Consider using `root.new_opt` instead.',
+    }})
+end
+
+g.test_iproto_ssl_deprecations = function()
+    if not is_enterprise then
+        t.skip('Enterprise-only options')
+    end
+
+    local iconfig = {
+        iproto = {
+            listen = {
+                {
+                    uri = 'unix/:./{{ instance_name }}.iproto',
+                    params = {
+                        transport = 'ssl',
+                        ssl_key_file = 'key.pem',
+                        ssl_cert_file = 'cert.pem',
+                    },
+                },
+            },
+        },
+    }
+
+    local warnings = instance_config:_deprecations(iconfig)
+    local warning
+    for _, v in ipairs(warnings) do
+        if v.key == 'deprecated_iproto.listen.*.params.ssl_key_file' then
+            warning = v
+            break
+        end
+    end
+
+    t.assert_not_equals(warning, nil)
+    t.assert_str_contains(warning.message,
+        '`iproto.listen.*.params.ssl_key_file` is ' ..
+        'deprecated since 3.3.4, 3.4.2, 3.5.1')
+    t.assert_str_contains(warning.message,
+                          'Consider using `iproto.ssl` instead.')
 end
