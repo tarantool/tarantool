@@ -1465,6 +1465,88 @@ end
 
 -- }}} <schema object>:map()
 
+-- {{{ <schema object>:deprecations()
+
+local function normalize_deprecated_since(since)
+    if since == nil then
+        return nil
+    end
+    if type(since) == 'string' then
+        return since
+    end
+    return table.concat(since, ', ')
+end
+
+local function format_deprecated_path(path)
+    local res = {}
+    for i, part in ipairs(path) do
+        if type(part) == 'number' then
+            res[i] = '*'
+        else
+            res[i] = tostring(part)
+        end
+    end
+    return table.concat(res, '.')
+end
+
+local function ensure_period(text)
+    if text:sub(-1) == '.' then
+        return text
+    end
+    return text .. '.'
+end
+
+local function deprecations_f(data, w, ctx)
+    if data == nil then
+        return data
+    end
+
+    local deprecated = w.schema.computed.annotations.deprecated
+    if deprecated == nil then
+        return data
+    end
+
+    local path = format_deprecated_path(w.path)
+    local since = normalize_deprecated_since(deprecated.since)
+
+    local message_parts = {('`%s` is deprecated'):format(path)}
+    if since ~= nil then
+        table.insert(message_parts, ('since %s'):format(since))
+    end
+
+    local message = table.concat(message_parts, ' ')
+    message = ensure_period(message)
+    if deprecated.msg ~= nil then
+        message = message .. ' ' .. deprecated.msg
+        message = ensure_period(message)
+    end
+    if deprecated.see ~= nil then
+        message = ensure_period(message)
+        message = message .. (' Consider using `%s` instead.'):format(deprecated.see)
+    end
+
+    local key = ('deprecated_%s'):format(path)
+    if not ctx.seen[key] then
+        ctx.seen[key] = true
+        table.insert(ctx.res, {
+            key = key,
+            message = message,
+            type = deprecated.type or 'warn',
+        })
+    end
+
+    return data
+end
+
+-- Collect deprecation warnings for the given data.
+function methods.deprecations(self, data)
+    local ctx = {res = {}, seen = {}}
+    self:map(data, deprecations_f, ctx)
+    return ctx.res
+end
+
+-- }}} <schema object>:deprecations()
+
 -- {{{ <schema object>:apply_default()
 
 local function apply_default_f(data, w)
@@ -2036,6 +2118,47 @@ end
 local function validate_schema_impl(schema, ctx)
     validate_schema_node_unique_items(schema, ctx)
 
+    if schema.deprecated ~= nil then
+        walkthrough_assert(ctx, type(schema.deprecated) == 'table',
+            'Deprecated annotation must be a table, got %s',
+            type(schema.deprecated))
+
+        if schema.deprecated.since ~= nil then
+            walkthrough_assert(ctx, type(schema.deprecated.since) == 'string' or
+                type(schema.deprecated.since) == 'table',
+                'Deprecated.since must be a string or an array of strings, got %s',
+                type(schema.deprecated.since))
+            if type(schema.deprecated.since) == 'table' then
+                for i, v in ipairs(schema.deprecated.since) do
+                    walkthrough_assert(ctx, type(v) == 'string',
+                        'Deprecated.since[%d] must be a string, got %s', i, type(v))
+                end
+            end
+        end
+
+        if schema.deprecated.see ~= nil then
+            walkthrough_assert(ctx, type(schema.deprecated.see) == 'string',
+                'Deprecated.see must be a string, got %s',
+                type(schema.deprecated.see))
+        end
+
+        if schema.deprecated.msg ~= nil then
+            walkthrough_assert(ctx, type(schema.deprecated.msg) == 'string',
+                'Deprecated.msg must be a string, got %s',
+                type(schema.deprecated.msg))
+        end
+
+        if schema.deprecated.type ~= nil then
+            walkthrough_assert(ctx, type(schema.deprecated.type) == 'string',
+                'Deprecated.type must be a string, got %s',
+                type(schema.deprecated.type))
+            walkthrough_assert(ctx, schema.deprecated.type == 'warn' or
+                schema.deprecated.type == 'error',
+                'Deprecated.type must be either "warn" or "error", got %s',
+                schema.deprecated.type)
+        end
+    end
+
     -- luacheck: ignore 542 empty if branch
     if is_scalar(schema) then
         -- Nothing to do.
@@ -2089,6 +2212,7 @@ end
 
 local function set_schema_annotations(schema, annotations)
     local descriptions = annotations.descriptions
+    local deprecations = annotations.deprecations
 
     -- Set the descriptions for the given schema node based on the field
     -- path accumulated in ctx.path.
@@ -2103,11 +2227,28 @@ local function set_schema_annotations(schema, annotations)
             schema.description = description or schema.description
     end
 
+    -- Set deprecated annotations for the given schema node based on the
+    -- field path accumulated in ctx.path.
+    local function set_deprecated(schema, ctx)
+        local field_path = table.concat(ctx.path, '.')
+        local deprecated = deprecations[field_path]
+
+        if deprecated ~= nil then
+            assert(schema.deprecated == nil,
+                string.format('Duplicate deprecated annotation for field %q',
+                field_path))
+            schema.deprecated = deprecated
+        end
+    end
+
     -- Set annotations for the given schema node based
     -- on the field path accumulated in ctx.path.
     local function set_annotations(schema, ctx)
         if descriptions ~= nil then
             set_description(schema, ctx)
+        end
+        if deprecations ~= nil then
+            set_deprecated(schema, ctx)
         end
     end
 
