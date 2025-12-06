@@ -412,7 +412,7 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 	rlist_add_entry(&key_list, index_def, link);
 
 	struct space *space = space_new_ephemeral(space_def, &key_list);
-	index_def_delete(index_def);
+	index_def_unref(index_def);
 	space_def_delete(space_def);
 	region_truncate(region, svp);
 
