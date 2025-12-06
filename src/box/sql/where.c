@@ -1158,7 +1158,7 @@ static void
 whereLoopClearUnion(WhereLoop * p)
 {
 	if ((p->wsFlags & WHERE_AUTO_INDEX) != 0 && p->index_def != NULL) {
-		index_def_delete(p->index_def);
+		index_def_unref(p->index_def);
 		p->index_def = NULL;
 	}
 }
@@ -2256,7 +2256,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		pBuilder->pRec = 0;
 	}
 	if (fake_index != NULL)
-		index_def_delete(fake_index);
+		index_def_unref(fake_index);
 	return rc;
 }
 

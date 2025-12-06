@@ -182,7 +182,7 @@ private:
 		lua_close(tarantool_L);
 		tarantool_L = NULL;
 
-		::index_def_delete(tree_idx_def);
+		::index_def_unref(tree_idx_def);
 		::space_def_delete(space_def);
 		::key_def_delete(key_def);
 

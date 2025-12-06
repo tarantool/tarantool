@@ -309,7 +309,7 @@ test_basic()
 	is(has_errors, false, "no errors happened");
 
 	vy_lsm_delete(pk);
-	index_def_delete(index_def);
+	index_def_unref(index_def);
 	tuple_format_unref(format);
 	vy_cache_destroy(&cache);
 	key_def_delete(key_def);

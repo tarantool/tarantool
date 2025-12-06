@@ -245,7 +245,7 @@ sc_space_new(uint32_t id, const char *name,
 						    &index_opts_default,
 						    key_def, NULL);
 	auto index_def_guard =
-		make_scoped_guard([=] { index_def_delete(index_def); });
+		make_scoped_guard([=] { index_def_unref(index_def); });
 	struct rlist key_list;
 	rlist_create(&key_list);
 	rlist_add_entry(&key_list, index_def, link);

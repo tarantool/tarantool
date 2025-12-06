@@ -429,7 +429,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		index_def_new(id, index_id, name, name_len, space->def->name,
 			      space->def->engine_name, type, &opts, key_def,
 			      space_index_key_def(space, 0));
-	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
+	auto index_def_guard = make_scoped_guard([=] { index_def_unref(index_def); });
 	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
 	if (space_check_index_def(space, index_def) != 0)
@@ -1453,7 +1453,7 @@ ModifyIndex::rollback(struct alter_space *alter)
 
 ModifyIndex::~ModifyIndex()
 {
-	index_def_delete(new_index_def);
+	index_def_unref(new_index_def);
 }
 
 /** CreateIndex - add a new index to the space. */
@@ -1541,7 +1541,7 @@ CreateIndex::~CreateIndex()
 	if (new_index != NULL)
 		index_abort_create(new_index);
 	if (new_index_def != NULL)
-		index_def_delete(new_index_def);
+		index_def_unref(new_index_def);
 }
 
 /**
@@ -1610,7 +1610,7 @@ RebuildIndex::~RebuildIndex()
 	if (new_index != NULL)
 		index_abort_create(new_index);
 	if (new_index_def != NULL)
-		index_def_delete(new_index_def);
+		index_def_unref(new_index_def);
 }
 
 /**
@@ -1670,7 +1670,7 @@ DisableFuncIndex::alter_def(struct alter_space *alter)
 DisableFuncIndex::~DisableFuncIndex()
 {
 	if (new_index_def != NULL)
-		index_def_delete(new_index_def);
+		index_def_unref(new_index_def);
 }
 
 /** TruncateIndex - truncate an index. */
@@ -1866,7 +1866,7 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 					old_def->type, &old_def->opts,
 					old_def->key_def, alter->pk_def);
 		index_def_update_optionality(new_def, min_field_count);
-		auto guard = make_scoped_guard([=] { index_def_delete(new_def); });
+		auto guard = make_scoped_guard([=] { index_def_unref(new_def); });
 		if (!index_def_change_requires_rebuild(old_index, new_def)) {
 			try {
 				(void) new ModifyIndex(alter, old_index, new_def);
@@ -2656,7 +2656,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		try {
 			(void) new CreateIndex(alter, def);
 		} catch (Exception *e) {
-			index_def_delete(def);
+			index_def_unref(def);
 			return -1;
 		}
 	}
@@ -2667,7 +2667,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		if (index_def == NULL)
 			return -1;
 		auto index_def_guard =
-			make_scoped_guard([=] { index_def_delete(index_def); });
+			make_scoped_guard([=] { index_def_unref(index_def); });
 		/*
 		 * To detect which key parts are optional,
 		 * min_field_count is required. But

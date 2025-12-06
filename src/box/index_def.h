@@ -261,14 +261,18 @@ struct index_def {
 	 * space and its primary index.
 	 */
 	struct key_def *pk_def;
+	/** Reference counter. */
+	int refs;
 };
 
 struct index_def *
 index_def_dup(const struct index_def *def);
 
-/* Destroy and free an index_def. */
 void
-index_def_delete(struct index_def *def);
+index_def_unref(struct index_def *index_def);
+
+void
+index_def_ref(struct index_def *index_def);
 
 /**
  * Update 'has_optional_parts' property of key definitions.

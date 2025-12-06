@@ -330,6 +330,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	assert(name_len <= BOX_NAME_MAX);
 	/* Use calloc to make index_def_delete() safe at all times. */
 	struct index_def *def = xcalloc(1, sizeof(*def));
+	def->refs = 1;
 	def->name = xstrndup(name, name_len);
 	if (space_name != NULL)
 		def->space_name = xstrdup(space_name);
@@ -391,6 +392,20 @@ index_def_delete(struct index_def *index_def)
 
 	TRASH(index_def);
 	free(index_def);
+}
+
+void
+index_def_unref(struct index_def *index_def)
+{
+	assert(index_def->refs > 0);
+	if (--index_def->refs == 0)
+		index_def_delete(index_def);
+}
+
+void
+index_def_ref(struct index_def *index_def)
+{
+	++index_def->refs;
 }
 
 bool

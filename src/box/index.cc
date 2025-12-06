@@ -937,7 +937,7 @@ index_delete(struct index *index)
 	 */
 	struct index_def *def = index->def;
 	index->vtab->destroy(index);
-	index_def_delete(def);
+	index_def_unref(def);
 }
 
 void
@@ -946,7 +946,8 @@ index_read_view_create(struct index_read_view *rv,
 		       struct index_def *def)
 {
 	rv->vtab = vtab;
-	rv->def = index_def_dup(def);
+	rv->def = def;
+	index_def_ref(def);
 	rv->space = NULL;
 }
 
@@ -955,7 +956,7 @@ index_read_view_delete(struct index_read_view *rv)
 {
 	struct index_def *def = rv->def;
 	rv->vtab->free(rv);
-	index_def_delete(def);
+	index_def_unref(def);
 }
 
 #ifndef NDEBUG

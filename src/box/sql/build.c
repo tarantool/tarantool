@@ -2997,7 +2997,7 @@ sql_create_index(struct Parse *parse) {
 	/* Clean up before exiting. */
  exit_create_index:
 	if (index != NULL && index->def != NULL)
-		index_def_delete(index->def);
+		index_def_unref(index->def);
 	sql_expr_list_delete(col_list);
 	sqlSrcListDelete(tbl_name);
 	sql_xfree(name);
