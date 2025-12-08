@@ -714,7 +714,8 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "quorum");
 
 	/* Queue information. */
-	struct txn_limbo *queue = &txn_limbo;
+	struct txn_limbo *limbo = &txn_limbo;
+	struct txn_limbo_queue *queue = &limbo->queue;
 	lua_createtable(L, 0, 7);
 	lua_pushnumber(L, queue->len);
 	lua_setfield(L, -2, "len");
@@ -722,14 +723,14 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "size");
 	lua_pushnumber(L, queue->owner_id);
 	lua_setfield(L, -2, "owner");
-	lua_pushboolean(L, latch_is_locked(&queue->promote_latch));
+	lua_pushboolean(L, latch_is_locked(&limbo->promote_latch));
 	lua_setfield(L, -2, "busy");
-	luaL_pushuint64(L, queue->promote_greatest_term);
+	luaL_pushuint64(L, limbo->promote_greatest_term);
 	lua_setfield(L, -2, "term");
 	if (queue->len == 0)
 		lua_pushnumber(L, 0);
 	else
-		lua_pushnumber(L, txn_limbo_age(queue));
+		lua_pushnumber(L, txn_limbo_queue_age(queue));
 	lua_setfield(L, -2, "age");
 	lua_pushnumber(L, queue->confirm_lag);
 	lua_setfield(L, -2, "confirm_lag");
