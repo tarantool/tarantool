@@ -929,7 +929,7 @@ txn_on_journal_write(struct journal_entry *entry)
 			fiber_wakeup(txn->fiber);
 		if (txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
 		    txn_has_flag(txn, TXN_WAIT_ACK))
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+			txn_limbo_ack(&txn_limbo, txn_limbo.queue.owner_id,
 				      txn->limbo_entry->lsn);
 	}
 finish:
