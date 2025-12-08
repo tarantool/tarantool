@@ -648,7 +648,7 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 static void
 txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
 
-int
+enum txn_limbo_wait_entry_result
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(entry->lsn > 0 || !txn_has_flag(entry->txn, TXN_WAIT_ACK));
@@ -672,7 +672,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
 		if (rc != 0 && fiber_is_cancelled())
-			return -1;
+			return TXN_LIMBO_WAIT_ENTRY_FAIL_DETACH;
 		if (txn_limbo_is_frozen(limbo))
 			goto wait;
 		if (rc != 0)
@@ -725,7 +725,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 			break;
 	}
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-	return -1;
+	return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 
 wait:
 	do {
@@ -746,9 +746,9 @@ complete:
 	 */
 	if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return -1;
+		return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 	}
-	return 0;
+	return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
 }
 
 void
