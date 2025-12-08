@@ -138,6 +138,8 @@ set(tuple_sources
     field_map.c
     tuple_format.c
     tuple_format_map.c
+    field_compression_def.c
+    field_compression.c
     tuple_constraint_def.c
     tuple_constraint.c
     tuple_builder.c

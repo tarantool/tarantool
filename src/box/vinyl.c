@@ -581,7 +581,8 @@ static int
 vinyl_engine_check_space_def(struct space_def *def)
 {
 	for (uint32_t i = 0; i < def->field_count; i++) {
-		if (def->fields[i].compression_type != COMPRESSION_TYPE_NONE) {
+		if (def->fields[i].compression_def.type !=
+		    COMPRESSION_TYPE_NONE) {
 			diag_set(ClientError, ER_UNSUPPORTED,
 				 "Vinyl", "compression");
 			return -1;

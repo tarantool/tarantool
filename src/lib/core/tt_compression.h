@@ -26,6 +26,14 @@ enum compression_type {
 
 extern const char *compression_type_strs[];
 
+/**
+ * Dummy compression options struct.
+ */
+struct compression_opts {
+	/* Expected to be COMPRESSION_TYPE_NONE. */
+	enum compression_type type;
+};
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
