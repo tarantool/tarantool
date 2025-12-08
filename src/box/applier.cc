@@ -1536,7 +1536,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 		 */
 		if (row->wait_sync)
 			goto nopify;
-		if (txn_limbo.owner_id == REPLICA_ID_NIL)
+		if (txn_limbo.queue.owner_id == REPLICA_ID_NIL)
 			return 0;
 		stailq_foreach_entry(item, rows, next) {
 			row = &item->row;
