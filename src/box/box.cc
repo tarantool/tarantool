@@ -6643,10 +6643,13 @@ box_generate_unique_id(uint32_t space_id, uint32_t index_id,
 	box_iterator_free(it);
 	if (rc != 0)
 		return -1;
-	assert(res != NULL);
 	uint32_t max_id = 0;
-	rc = tuple_field_u32(res, 0, &max_id);
-	assert(rc == 0);
+	if (res == NULL) {
+		max_id = id_range_begin;
+	} else {
+		rc = tuple_field_u32(res, 0, &max_id);
+		assert(rc == 0);
+	}
 	if (max_id < id_range_begin)
 		max_id = id_range_begin;
 	*new_id = find_next_unused_id(max_id, id_range_end);
