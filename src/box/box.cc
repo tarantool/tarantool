@@ -391,7 +391,7 @@ box_ro_state_msg(char *buf, int size)
 					tt_uuid_str(&r->uuid));
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.owner_id;
+		uint32_t id = txn_limbo.queue.owner_id;
 		uint64_t term = txn_limbo.promote_greatest_term;
 		SNPRINT(total, snprintf, buf, size,
 			"synchro queue with term %llu belongs to %u",
@@ -514,7 +514,7 @@ box_check_writable(void)
 				error_set_uuid(e, "leader_uuid", &r->uuid);
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.owner_id;
+		uint32_t id = txn_limbo.queue.owner_id;
 		uint64_t term = txn_limbo.promote_greatest_term;
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
@@ -3101,7 +3101,7 @@ box_check_promote_term_intact(uint64_t promote_term)
 {
 	if (txn_limbo.promote_greatest_term != promote_term) {
 		diag_set(ClientError, ER_INTERFERING_PROMOTE,
-			 txn_limbo.owner_id);
+			 txn_limbo.queue.owner_id);
 		return -1;
 	}
 	return 0;
@@ -3149,7 +3149,7 @@ static int64_t
 box_wait_limbo_acked(double timeout)
 {
 	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.confirmed_lsn;
+		return txn_limbo.queue.confirmed_lsn;
 
 	uint64_t promote_term = txn_limbo.promote_greatest_term;
 	struct txn_limbo_entry *last_entry;
@@ -3162,7 +3162,7 @@ box_wait_limbo_acked(double timeout)
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
-			return txn_limbo.confirmed_lsn;
+			return txn_limbo.queue.confirmed_lsn;
 		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
 			diag_set(ClientError, ER_QUORUM_WAIT,
 				 replication_synchro_quorum,
@@ -3179,14 +3179,15 @@ box_wait_limbo_acked(double timeout)
 	struct synchro_quorum_trigger t;
 	memset(&t, 0, sizeof(t));
 	vclock_create(&t.vclock);
-	int ack_count = box_ack_count(txn_limbo.owner_id, wait_lsn, &t.vclock);
+	int ack_count = box_ack_count(txn_limbo.queue.owner_id, wait_lsn,
+				      &t.vclock);
 	if (ack_count < replication_synchro_quorum) {
 		if (replicaset.registered_count < replication_synchro_quorum)
 			say_warn("replication_synchro_quorum is higher than number of "
 				 "registered replicas. The node will be in RO state "
 				 "because it can't collect acks for synchronous queue");
 		t.target_lsn = wait_lsn;
-		t.replica_id = txn_limbo.owner_id;
+		t.replica_id = txn_limbo.queue.owner_id;
 		t.ack_count = ack_count;
 		t.waiter = fiber();
 		trigger_create(&t.base, synchro_quorum_on_ack_f, NULL, NULL);
@@ -3194,7 +3195,7 @@ box_wait_limbo_acked(double timeout)
 		double deadline = ev_monotonic_now(loop()) + timeout;
 		while (!fiber_is_cancelled() &&
 		       t.ack_count < replication_synchro_quorum) {
-			if (fiber_cond_wait_deadline(&txn_limbo.wait_cond,
+			if (fiber_cond_wait_deadline(&txn_limbo.queue.cond,
 						     deadline) == -1)
 				break;
 		}
@@ -3221,7 +3222,7 @@ box_wait_limbo_acked(double timeout)
 		return -1;
 
 	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.confirmed_lsn;
+		return txn_limbo.queue.confirmed_lsn;
 
 	if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
 		diag_set(ClientError, ER_QUORUM_WAIT,
@@ -3423,7 +3424,7 @@ box_demote(void)
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
-	if (txn_limbo.owner_id == REPLICA_ID_NIL)
+	if (txn_limbo.queue.owner_id == REPLICA_ID_NIL)
 		return 0;
 	/*
 	 * If the limbo term is up to date with Raft, then it might have
