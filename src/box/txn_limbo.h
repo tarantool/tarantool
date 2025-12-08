@@ -59,6 +59,23 @@ enum txn_limbo_entry_state {
 };
 
 /**
+ * Wait-complete API in the limbo and its queue is a broken legacy which has
+ * surprisingly untrivial set of possible outcomes when it returns.
+ */
+enum txn_limbo_wait_entry_result {
+	/** Transaction is committed successfully. */
+	TXN_LIMBO_WAIT_ENTRY_SUCCESS,
+	/**
+	 * Transaction couldn't be committed, but can't be rolled back either.
+	 * It needs to be detached and will end on its own later. Can happen,
+	 * for example, when the fiber was cancelled while waiting.
+	 */
+	TXN_LIMBO_WAIT_ENTRY_FAIL_DETACH,
+	/** Transaction is rolled back due to an error. */
+	TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE,
+};
+
+/**
  * Transaction and its quorum metadata, to be stored in limbo.
  */
 struct txn_limbo_entry {
@@ -390,16 +407,8 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
 
-/**
- * Block the current fiber until the transaction in the limbo
- * entry is either committed or rolled back.
- * If timeout is reached before acks are collected, the tx is
- * rolled back as well as all the txs in the limbo following it.
- * If fiber is cancelled before acks are collected, the tx is left in limbo.
- * Returns -1 when rollback was performed and tx has to be freed.
- *          0 when tx processing can go on.
- */
-int
+/** Try to wait for the given entry's completion. */
+enum txn_limbo_wait_entry_result
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
 /**
