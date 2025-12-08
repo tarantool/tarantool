@@ -189,7 +189,10 @@ g_sync.test_fencing = function(g)
     luatest.assert_equals(limbo_len, 0)
 
     g.server_1:exec(function()
-        require('fiber').create(function() box.space.test:replace{1} end)
+        local fiber = require('fiber')
+        rawset(_G, 'test_fiber', fiber.create(function()
+            box.space.test:replace{1}
+        end))
     end)
 
     -- Enabling fencing leads to leader resign.
@@ -199,6 +202,9 @@ g_sync.test_fencing = function(g)
     -- Fenced leader must not CONFIRM/ROLLBACK unfinished synchronous
     -- transactions.
     local leader, limbo_len = g.server_1:exec(function(t)
+        -- Do a spurious wakeup. To make sure that the transaction anyway will
+        -- stay in the limbo.
+        _G.test_fiber:wakeup()
         require('fiber').sleep(t)
         return box.info.election.leader, box.info.synchro.queue.len
     end, {DEATH_TIMEOUT})
