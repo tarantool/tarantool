@@ -241,6 +241,7 @@ set(box_sources
     checkpoint.c
     txn.c
     txn_limbo.c
+    txn_limbo_queue.c
     txn_event_trigger.c
     raft.c
     box.cc
