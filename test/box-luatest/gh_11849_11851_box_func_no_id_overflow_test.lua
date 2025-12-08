@@ -16,7 +16,7 @@ g.test_function_create_drop_multiple = function(g)
     g.server:exec(function()
         local BOX_FUNCTION_MAX = 32000
         local fiber = require("fiber")
-        fiber.set_slice(60)
+        fiber.set_slice(240)
         box.begin()
         box.schema.func.create("first")
         box.schema.func.create("second")
