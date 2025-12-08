@@ -41,9 +41,37 @@
 
 struct txn_limbo txn_limbo;
 
+/** Write the request into the journal. */
 static int
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term);
+synchro_request_write(const struct synchro_request *req)
+{
+	/*
+	 * This is a synchronous commit so we can
+	 * allocate everything on a stack.
+	 */
+	char body[XROW_BODY_LEN_MAX];
+	struct xrow_header row;
+	xrow_encode_synchro(&row, body, req);
+	return journal_write_row(&row);
+}
+
+/** Write the request into the journal. */
+static void
+synchro_request_write_or_panic(const struct synchro_request *req)
+{
+	if (synchro_request_write(req) == 0)
+		return;
+	diag_log();
+	/*
+	 * XXX: the stub is supposed to be removed once it is defined what to do
+	 * when a synchro request WAL write fails. One of the possible
+	 * solutions: log the error, keep the limbo queue as is and probably put
+	 * in rollback mode. Then provide a hook to call manually when WAL
+	 * problems are fixed. Or retry automatically with some period.
+	 */
+	panic("Could not write a synchro request to WAL: lsn = %lld, "
+	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
+}
 
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn);
@@ -85,7 +113,33 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(lsn > limbo->confirmed_lsn);
 	assert(!limbo->is_in_rollback);
-	return txn_limbo_write_synchro(limbo, IPROTO_RAFT_CONFIRM, lsn, 0);
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_CONFIRM,
+		.replica_id = limbo->owner_id,
+		.lsn = lsn,
+	};
+	vclock_clear(&req.confirmed_vclock);
+	return synchro_request_write(&req);
+}
+
+/**
+ * Write a rollback message to WAL. After it's written all the transactions
+ * following the current one and waiting for confirmation must be rolled back.
+ */
+static void
+txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
+{
+	assert(lsn > limbo->confirmed_lsn);
+	assert(!limbo->is_in_rollback);
+	limbo->is_in_rollback = true;
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_ROLLBACK,
+		.replica_id = limbo->owner_id,
+		.lsn = lsn,
+	};
+	vclock_clear(&req.confirmed_vclock);
+	synchro_request_write_or_panic(&req);
+	limbo->is_in_rollback = false;
 }
 
 static int
@@ -645,9 +699,6 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
 }
 
-static void
-txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn);
-
 enum txn_limbo_wait_entry_result
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
@@ -762,71 +813,6 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 	vclock_copy(&req->confirmed_vclock, &limbo->confirmed_vclock);
 }
 
-static int
-synchro_request_write(const struct synchro_request *req)
-{
-	/*
-	 * This is a synchronous commit so we can
-	 * allocate everything on a stack.
-	 */
-	char body[XROW_BODY_LEN_MAX];
-	struct xrow_header row;
-	xrow_encode_synchro(&row, body, req);
-	return journal_write_row(&row);
-}
-
-/** Create a request for a specific limbo and write it to WAL. */
-static int
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term)
-{
-	assert(lsn >= 0);
-
-	struct synchro_request req = {
-		.type = type,
-		.replica_id = limbo->owner_id,
-		.lsn = lsn,
-		.term = term,
-	};
-	vclock_clear(&req.confirmed_vclock);
-	return synchro_request_write(&req);
-}
-
-/** Write a request to WAL or panic. */
-static void
-synchro_request_write_or_panic(const struct synchro_request *req)
-{
-	if (synchro_request_write(req) == 0)
-		return;
-	diag_log();
-	/*
-	 * XXX: the stub is supposed to be removed once it is defined what to do
-	 * when a synchro request WAL write fails. One of the possible
-	 * solutions: log the error, keep the limbo queue as is and probably put
-	 * in rollback mode. Then provide a hook to call manually when WAL
-	 * problems are fixed. Or retry automatically with some period.
-	 */
-	panic("Could not write a synchro request to WAL: lsn = %lld, "
-	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
-}
-
-/** Create a request for a specific limbo and write it to WAL or panic. */
-static void
-txn_limbo_write_synchro_or_panic(struct txn_limbo *limbo, uint16_t type,
-				 int64_t lsn, uint64_t term)
-{
-	assert(lsn >= 0);
-
-	struct synchro_request req = {
-		.type = type,
-		.replica_id = limbo->owner_id,
-		.lsn = lsn,
-		.term = term,
-	};
-	vclock_clear(&req.confirmed_vclock);
-	synchro_request_write_or_panic(&req);
-}
-
 /** Confirm all the entries <= @a lsn. */
 static void
 txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
@@ -924,21 +910,6 @@ txn_limbo_confirm_lsn(struct txn_limbo *limbo, int64_t confirm_lsn)
 	assert(confirm_lsn > limbo->volatile_confirmed_lsn);
 	limbo->volatile_confirmed_lsn = confirm_lsn;
 	fiber_wakeup(limbo->worker);
-}
-
-/**
- * Write a rollback message to WAL. After it's written all the
- * transactions following the current one and waiting for
- * confirmation must be rolled back.
- */
-static void
-txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
-{
-	assert(lsn > limbo->confirmed_lsn);
-	assert(!limbo->is_in_rollback);
-	limbo->is_in_rollback = true;
-	txn_limbo_write_synchro_or_panic(limbo, IPROTO_RAFT_ROLLBACK, lsn, 0);
-	limbo->is_in_rollback = false;
 }
 
 /** Rollback all the entries >= @a lsn. */
