@@ -73,6 +73,13 @@ enum txn_limbo_wait_entry_result {
 	TXN_LIMBO_WAIT_ENTRY_FAIL_DETACH,
 	/** Transaction is rolled back due to an error. */
 	TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE,
+	/**
+	 * Transaction is not rolled back, but it needs to be. And all the newer
+	 * ones too. This is a bad state which is not compatible with Raft and
+	 * it needs to be deleted as soon as the backward compatibility policy
+	 * allows that.
+	 */
+	TXN_LIMBO_WAIT_ENTRY_NEED_ROLLBACK,
 };
 
 /**
