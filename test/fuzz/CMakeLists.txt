@@ -102,6 +102,7 @@ function(create_fuzz_test)
            COMMAND ${BASH} -c "${test_command}"
   )
   set_tests_properties(${test_title} PROPERTIES
+    ENVIRONMENT "${TARANTOOL_ASAN_OPTIONS}"
     LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${FUZZ_PREFIX}-deps
   )
