@@ -699,8 +699,13 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
 		txn_limbo_assign_remote_lsn(limbo, entry, lsn);
 }
 
-enum txn_limbo_wait_entry_result
-txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+/**
+ * Try to wait for the given entry's completion. Do nothing besides that. No
+ * rollbacks, no commits. Only waiting and returning the result of it.
+ */
+static enum txn_limbo_wait_entry_result
+txn_limbo_wait_complete_ro(struct txn_limbo *limbo,
+			   struct txn_limbo_entry *entry)
 {
 	assert(entry->lsn > 0 || !txn_has_flag(entry->txn, TXN_WAIT_ACK));
 
@@ -724,8 +729,6 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 			goto complete;
 		if (rc != 0 && fiber_is_cancelled())
 			return TXN_LIMBO_WAIT_ENTRY_FAIL_DETACH;
-		if (txn_limbo_is_frozen(limbo))
-			goto wait;
 		if (rc != 0)
 			break;
 	}
@@ -766,17 +769,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		 */
 		goto wait;
 	}
-
-	txn_limbo_write_rollback(limbo, entry->lsn);
-	struct txn_limbo_entry *tmp;
-	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
-					 in_queue, tmp) {
-		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_QUORUM_TIMEOUT);
-		if (e == entry)
-			break;
-	}
-	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
-	return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
+	return TXN_LIMBO_WAIT_ENTRY_NEED_ROLLBACK;
 
 wait:
 	do {
@@ -800,6 +793,43 @@ complete:
 		return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 	}
 	return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
+}
+
+enum txn_limbo_wait_entry_result
+txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
+{
+	enum txn_limbo_wait_entry_result rc =
+		txn_limbo_wait_complete_ro(limbo, entry);
+	if (rc != TXN_LIMBO_WAIT_ENTRY_NEED_ROLLBACK)
+		return rc;
+	/*
+	 * XXX: this whole thing is a bug. Neither infinite waiting nor the
+	 * concept of a "rollback by timeout" should exist. Especially the
+	 * latter since it breaks Raft guarantees. This code below should be
+	 * removed in the closest major version (at the moment of writing it was
+	 * upcoming 4.x).
+	 */
+	assert(!txn_limbo_entry_is_complete(entry));
+	assert(entry->lsn >= 0);
+	if (txn_limbo_is_frozen(limbo)) {
+		do {
+			fiber_yield();
+		} while (!txn_limbo_entry_is_complete(entry));
+		if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
+			diag_set(ClientError, ER_SYNC_ROLLBACK);
+			return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
+		}
+		return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
+	}
+	txn_limbo_write_rollback(limbo, entry->lsn);
+	struct txn_limbo_entry *tmp, *e;
+	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
+		txn_limbo_complete_fail(limbo, e, TXN_SIGNATURE_QUORUM_TIMEOUT);
+		if (e == entry)
+			break;
+	}
+	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
+	return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 }
 
 void
