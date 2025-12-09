@@ -262,14 +262,10 @@ static inline void
 txn_limbo_on_remove(struct txn_limbo *limbo,
 		    const struct txn_limbo_entry *entry)
 {
-	bool limbo_was_full = txn_limbo_is_full(limbo);
 	limbo->size -= entry->approx_len;
 	assert(limbo->size >= 0);
 	limbo->len--;
 	assert(limbo->len >= 0);
-	/* Wake up all fibers waiting to add a new limbo entry. */
-	if (limbo_was_full && !txn_limbo_is_full(limbo))
-		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
 /** Pop the first entry. */
@@ -850,6 +846,7 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 	assert(limbo->owner_id != REPLICA_ID_NIL || txn_limbo_is_empty(limbo));
 	assert(limbo == &txn_limbo);
 	assert(limbo->confirmed_lsn <= lsn);
+	bool limbo_was_full = txn_limbo_is_full(limbo);
 	struct txn_limbo_entry *e, *next;
 	rlist_foreach_entry_safe(e, &limbo->queue, in_queue, next) {
 		/*
@@ -931,6 +928,8 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		limbo->confirmed_lsn = lsn;
 		vclock_follow(&limbo->confirmed_vclock, limbo->owner_id, lsn);
 	}
+	if (limbo_was_full && !txn_limbo_is_full(limbo))
+		fiber_cond_broadcast(&limbo->wait_cond);
 }
 
 /** Confirm an LSN in the limbo. */
