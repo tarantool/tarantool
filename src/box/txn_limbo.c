@@ -188,26 +188,16 @@ txn_limbo_worker_f(va_list args)
 static inline void
 txn_limbo_create(struct txn_limbo *limbo)
 {
+	memset(limbo, 0, sizeof(*limbo));
 	rlist_create(&limbo->queue);
-	limbo->len = 0;
 	limbo->owner_id = REPLICA_ID_NIL;
 	fiber_cond_create(&limbo->wait_cond);
 	vclock_create(&limbo->vclock);
 	vclock_create(&limbo->promote_term_map);
 	vclock_create(&limbo->confirmed_vclock);
-	limbo->promote_greatest_term = 0;
 	latch_create(&limbo->promote_latch);
-	limbo->confirmed_lsn = 0;
-	limbo->volatile_confirmed_lsn = 0;
-	limbo->entry_to_confirm = NULL;
-	limbo->is_in_rollback = false;
 	limbo->svp_confirmed_lsn = -1;
-	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
-	limbo->do_validate = false;
-	limbo->confirm_lag = 0;
-	limbo->max_size = 0;
-	limbo->size = 0;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
 					 txn_limbo_worker_f);
 	if (limbo->worker == NULL)
