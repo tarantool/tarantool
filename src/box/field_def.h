@@ -289,13 +289,15 @@ field_def_array_decode(const char **data, struct field_def **fields,
  * Returns NULL if zero-size array is passed.
  */
 struct field_def *
-field_def_array_dup(const struct field_def *fields, uint32_t field_count);
+field_def_array_make_shared(const struct field_def *fields, uint32_t field_count);
 
-/**
- * Frees array of fields that was allocated with field_def_array_dup().
- */
+/** Decrement reference counter for field definition array. */
 void
-field_def_array_delete(struct field_def *fields, uint32_t field_count);
+field_def_array_unref(struct field_def *fields, uint32_t field_count);
+
+/** Increment reference counter for field definition array. */
+void
+field_def_array_ref(struct field_def *fields, uint32_t field_count);
 
 #if defined(__cplusplus)
 } /* extern "C" */
