@@ -24,7 +24,10 @@
 
 #include "fiber.h"
 
-/** floored modulo and divide */
+/**
+ * Floored modulo and divide.
+ * (a < 0) & (b < 0) case isn't supported.
+ */
 #define MOD(a, b) (unlikely((a) < 0) ? (((b) + ((a) % (b))) % (b)) : \
 		  ((a) % (b)))
 #define DIV(a, b) (unlikely((a) < 0) ? (((a) - (b) + 1) / (b)) : ((a) / (b)))
