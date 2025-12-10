@@ -38,6 +38,7 @@
  */
 
 #include <sys/cdefs.h>
+#include <stdbool.h>
 
 #ifndef lint
 #ifndef NOID
@@ -107,7 +108,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	     struct tnt_tm *__restrict tm)
 {
 	char c;
-	int day_offset = -1, wday_offset;
+	int day_offset, wday_offset;
 	int week_offset;
 	int i, len;
 	int Ealternative, Oalternative;
@@ -115,6 +116,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	int century = -1;
 	int year = -1;
 	const char *ptr = fmt;
+	bool week_date = false;
 
 	static int start_of_month[2][13] = {
 		{ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 },
@@ -400,6 +402,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (i > 53)
 				return NULL;
 
+			week_date = true;
 			if (c == 'U')
 				day_offset = TM_SUNDAY;
 			else
@@ -626,14 +629,14 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 		tm->tm_year = year;
 	}
 
-	if (!(flags & FLAG_YDAY) && (flags & FLAG_YEAR)) {
+	if ((flags & (FLAG_YEAR | FLAG_YDAY)) == FLAG_YEAR) {
 		if ((flags & FLAG_MONTH) != 0 ) {
 			tm->tm_yday = start_of_month[isleap(tm->tm_year +
 							    TM_YEAR_BASE)]
 						    [tm->tm_mon] +
 				(tm->tm_mday - 1) * !!(flags & FLAG_MDAY);
 			flags |= FLAG_YDAY;
-		} else if (day_offset != -1) {
+		} else if (week_date) {
 			int tmpwday, tmpyday, fwo;
 
 			fwo = first_wday_of(tm->tm_year + TM_YEAR_BASE);
