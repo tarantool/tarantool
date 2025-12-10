@@ -203,7 +203,7 @@ _dt_to_epoch(dt_t dt)
 static void
 parse_date_test(void)
 {
-	plan(169);
+	plan(171);
 
 	static struct {
 		int64_t epoch;
@@ -400,6 +400,8 @@ parse_date_test(void)
 		{ "%j", "-1", "nondigit start" },
 		{ "%j", "0", "not valid day of year (1..366)" },
 		{ "%j", "367", "not valid day of year (1..366)" },
+		/* 2025-321 is 2025-11-17. */
+		{ "%G-%j %m", "2025-321 12", "%m %j mixed with mon diff" },
 	};
 
 	for (index = 0; index < lengthof(format_fail_tests); index++) {
