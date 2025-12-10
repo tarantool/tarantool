@@ -83,6 +83,15 @@ local function broadcast(self)
     box.broadcast('config.info', self:info())
 end
 
+local function set_deprecation_alerts(self, iconfig)
+    for _, deprecation in pairs(instance_config:deprecations(iconfig)) do
+        self._aboard:set({
+            type = deprecation.type or 'warn',
+            message = deprecation.message,
+        }, {key = deprecation.key})
+    end
+end
+
 function methods._meta(self, source_name, key, value)
     local data = self._metadata[source_name] or {}
     data[key] = value
@@ -316,6 +325,8 @@ function methods._store(self, iconfig, cconfig, source_info)
                       instance-001: {}
         ]]):format(action, self._instance_name, source_info_str), 0)
     end
+
+    set_deprecation_alerts(self, iconfig)
 
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
