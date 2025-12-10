@@ -817,6 +817,12 @@ txn_complete_success(struct txn *txn)
 		if (txn->engines[i] != NULL)
 			engine_commit(txn->engines[i], txn);
 	}
+	/*
+	 * Run before internal triggers which destroy old space if this is
+	 * DDL changing space.
+	 */
+	if (txn_event_on_commit_run_triggers(txn) != 0)
+		diag_log();
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS)) {
 		/*
 		 * Commit triggers must be run in the same order they were added
@@ -833,8 +839,6 @@ txn_complete_success(struct txn *txn)
 		/* Rollback won't happen after commit. */
 		trigger_destroy(&txn->on_rollback);
 	}
-	if (txn_event_on_commit_run_triggers(txn) != 0)
-		diag_log();
 	txn_free_or_wakeup(txn);
 	rmean_collect(rmean_box, IPROTO_COMMIT, 1);
 }
