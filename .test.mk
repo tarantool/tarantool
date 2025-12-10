@@ -17,7 +17,7 @@ MAX_PROCS ?= 2048
 MAX_FILES ?= 4096
 
 VARDIR ?= /tmp/t
-TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
+TEST_RUN_PARAMS = --builddir $(realpath ${BUILD_DIR})
 
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
 CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
