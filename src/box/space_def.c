@@ -145,7 +145,8 @@ space_def_dup(const struct space_def *src)
 	struct space_def *ret = xmalloc(size);
 	memcpy(ret, src, size);
 	memset(&ret->opts, 0, sizeof(ret->opts));
-	ret->fields = field_def_array_dup(src->fields, src->field_count);
+	ret->fields = src->fields;
+	field_def_array_ref(ret->fields, src->field_count);
 	tuple_dictionary_ref(ret->dict);
 	space_def_dup_opts(ret, &src->opts);
 	if (src->format_data != NULL) {
@@ -187,7 +188,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 
 	def->view_ref_count = 0;
 	def->field_count = field_count;
-	def->fields = field_def_array_dup(fields, field_count);
+	def->fields = field_def_array_make_shared(fields, field_count);
 	space_def_dup_opts(def, opts);
 	if (format_data != NULL) {
 		def->format_data = xmalloc(format_data_len);
@@ -223,7 +224,7 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 void
 space_def_delete(struct space_def *def)
 {
-	field_def_array_delete(def->fields, def->field_count);
+	field_def_array_unref(def->fields, def->field_count);
 	tuple_dictionary_unref(def->dict);
 	free(def->opts.sql);
 	free(def->opts.constraint_def);
