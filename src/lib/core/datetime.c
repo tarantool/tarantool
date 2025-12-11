@@ -137,6 +137,15 @@ tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
 	int wday = tm->tm_wday;
 	dt_t dt = 0;
 
+	// TODO: remove before merge
+	printf("{sec=%d, min=%d, hour=%d,"
+		" mday=%d, mon=%d, year=%d,"
+		" wday=%d, yday=%d, isdst=%d, gmtoff=%ld, tzindex=%d, epoch=%ld, nsec=%d}\n",
+		tm->tm_sec, tm->tm_min, tm->tm_hour,
+		tm->tm_mday, tm->tm_mon, tm->tm_year,
+		tm->tm_wday, tm->tm_yday, tm->tm_isdst,
+		tm->tm_gmtoff, tm->tm_tzindex, tm->tm_epoch, tm->tm_nsec
+	);
 	if ((year | mon | mday) == 0) {
 		if (yday != 0) {
 			dt = yday - 1 + DT_EPOCH_1970_OFFSET;
@@ -152,10 +161,20 @@ tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
 		if (dt_from_ymd_checked(year + 1900, mon + 1, mday, &dt) == false)
 			return false;
 	}
-	int64_t local_secs =
-		(int64_t)dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET;
-	local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
-	date->epoch = local_secs - tm->tm_gmtoff;
+
+	int64_t local_secs;
+	if (dt == 0 && (tm->tm_hour | tm->tm_min | tm->tm_sec) == 0) {
+		local_secs = tm->tm_epoch;
+	} else {
+		local_secs = (int64_t)dt * SECS_PER_DAY -
+			SECS_EPOCH_1970_OFFSET;
+		local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
+	}
+	int64_t epoch = local_secs - tm->tm_gmtoff;
+	if (epoch > MAX_EPOCH_SECS_VALUE || epoch < MIN_EPOCH_SECS_VALUE)
+		return false;
+
+	date->epoch = epoch;
 	date->nsec = tm->tm_nsec;
 	date->tzindex = tm->tm_tzindex;
 	date->tzoffset = tm->tm_gmtoff / 60;

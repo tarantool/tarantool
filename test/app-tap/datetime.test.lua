@@ -2395,10 +2395,36 @@ test:test("Parse with a custom format and format back to string", function(test)
         -- %s is replaced by the number of seconds since the
         -- Epoch, UTC (see mktime(3)).
         {
-            buf = '26-08-2024 1724630400',
-            fmt = '%d-%m-%Y %s',
+            buf = '1724630400',
+            fmt = '%s',
+            dt = date.new({timestamp = 1724630400}),
+        },
+        {
+            buf = '1724630400 +0300',
+            fmt = '%s %z',
+            dt = date.new({timestamp = 1724630400, tzoffset = 180}),
+        },
+        {
+            buf = '1724630400 MSK',
+            fmt = '%s %Z',
+            dt = date.new({timestamp = 1724630400, tz = 'MSK'}),
+        },
+        {
+            buf = '1724630400',
+            fmt = '%s',
             dt = date.new({year = 2024, month = 08, day = 26}),
         },
+        {
+            buf = '350',
+            fmt = '%s',
+            dt = date.new({min = 5, sec = 50}),
+        },
+        -- TODO: move to invalid tests (epoch with y/m/d is forbidden)
+        -- {
+        --     buf = '26-08-2024 1724630400',
+        --     fmt = '%d-%m-%Y %s',
+        --     dt = date.new({year = 2024, month = 08, day = 26}),
+        -- },
         -- %S is replaced by the second as a decimal number
         -- (00-60).
         {
