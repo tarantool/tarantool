@@ -152,10 +152,22 @@ tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
 		if (dt_from_ymd_checked(year + 1900, mon + 1, mday, &dt) == false)
 			return false;
 	}
-	int64_t local_secs =
-		(int64_t)dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET;
-	local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
-	date->epoch = local_secs - tm->tm_gmtoff;
+
+	int64_t local_secs;
+	bool use_timestamp = (dt == 0) &&
+			     (tm->tm_hour | tm->tm_min | tm->tm_sec) == 0;
+	if (use_timestamp) {
+		local_secs = tm->tm_epoch;
+	} else {
+		local_secs = (int64_t)dt * SECS_PER_DAY -
+			SECS_EPOCH_1970_OFFSET;
+		local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
+	}
+	int64_t epoch = local_secs - tm->tm_gmtoff;
+	if (epoch > MAX_EPOCH_SECS_VALUE || epoch < MIN_EPOCH_SECS_VALUE)
+		return false;
+
+	date->epoch = epoch;
 	date->nsec = tm->tm_nsec;
 	date->tzindex = tm->tm_tzindex;
 	date->tzoffset = tm->tm_gmtoff / 60;

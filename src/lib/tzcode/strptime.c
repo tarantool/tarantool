@@ -515,7 +515,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			long n;
 
 			n = strtol(buf, &cp, 10);
-			if (n == 0) {
+			if (buf == cp && n == 0) {
 				return NULL;
 			}
 			buf = cp;
@@ -695,6 +695,36 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			tm->tm_wday = wday_offset;
 			flags |= FLAG_WDAY;
 		}
+	}
+
+	const int ymd_flags = FLAG_YEAR | FLAG_MONTH | FLAG_MDAY;
+	if ((flags & FLAG_EPOCH) == 0)
+		;
+	else if ((flags & ymd_flags) != 0) {
+		/*
+		 * Forbid mix of epoch with year/mon/mday as
+		 * in datetime.new().
+		 */
+		return NULL;
+	} else if (tm->tm_hour != 0 || tm->tm_min != 0 || tm->tm_sec != 0) {
+		/*
+		 * Forbid mix of epoch with hour/min/sec as
+		 * in datetime.new().
+		 */
+		return NULL;
+	} else {
+		/*
+		 * Reset predefined nonzero values of Unix epoch
+		 * to note caller to use tm->tm_epoch.
+		 * Another way is to refactor this fn
+		 * to return set of known fields
+		 * & it's callers to use this info.
+		 */
+		tm->tm_year = 0;
+		tm->tm_mon = 0;
+		tm->tm_mday = 0;
+		tm->tm_yday = 0;
+		tm->tm_wday = 0;
 	}
 
 	return (char *)buf;
