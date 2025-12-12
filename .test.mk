@@ -20,7 +20,8 @@ N_TRIALS ?= 128
 COMMIT_RANGE ?= master..HEAD
 
 VARDIR ?= /tmp/t
-TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
+# временно (исправлено в другом тикете, но не залито):
+TEST_RUN_PARAMS = --builddir $(shell realpath ${BUILD_DIR})
 
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
 CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
