@@ -391,8 +391,8 @@ box_ro_state_msg(char *buf, int size)
 					tt_uuid_str(&r->uuid));
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.owner_id;
-		uint64_t term = txn_limbo.promote_greatest_term;
+		uint32_t id = txn_limbo.queue.owner_id;
+		uint64_t term = txn_limbo.term;
 		SNPRINT(total, snprintf, buf, size,
 			"synchro queue with term %llu belongs to %u",
 			(unsigned long long)term, (unsigned)id);
@@ -401,10 +401,10 @@ box_ro_state_msg(char *buf, int size)
 			SNPRINT(total, snprintf, buf, size, " (%s)",
 				tt_uuid_str(&r->uuid));
 		if (txn_limbo_is_owned_by_current_instance(&txn_limbo)) {
-			if (txn_limbo.is_frozen_due_to_fencing)
+			if (txn_limbo.term < raft->volatile_term)
 				SNPRINT(total, snprintf, buf, size,
 					" and is frozen due to fencing");
-			else if (txn_limbo.is_frozen_until_promotion)
+			else
 				SNPRINT(total, snprintf, buf, size,
 					" and is frozen until promotion");
 		}
@@ -514,8 +514,8 @@ box_check_writable(void)
 				error_set_uuid(e, "leader_uuid", &r->uuid);
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.owner_id;
-		uint64_t term = txn_limbo.promote_greatest_term;
+		uint32_t id = txn_limbo.queue.owner_id;
+		uint64_t term = txn_limbo.term;
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
 		struct replica *r = replica_by_id(id);
@@ -3099,9 +3099,9 @@ box_wait_linearization_point(double timeout)
 static int
 box_check_promote_term_intact(uint64_t promote_term)
 {
-	if (txn_limbo.promote_greatest_term != promote_term) {
+	if (txn_limbo.term != promote_term) {
 		diag_set(ClientError, ER_INTERFERING_PROMOTE,
-			 txn_limbo.owner_id);
+			 txn_limbo.queue.owner_id);
 		return -1;
 	}
 	return 0;
@@ -3124,7 +3124,7 @@ box_check_election_term_intact(uint64_t term)
 static int
 box_trigger_elections(void)
 {
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	raft_new_term(box_raft());
 	if (box_raft_wait_term_persisted() < 0)
 		return -1;
@@ -3135,7 +3135,7 @@ box_trigger_elections(void)
 static int
 box_try_wait_confirm(double timeout)
 {
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	txn_limbo_wait_empty(&txn_limbo, timeout);
 	return box_check_promote_term_intact(promote_term);
 }
@@ -3149,9 +3149,9 @@ static int64_t
 box_wait_limbo_acked(double timeout)
 {
 	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.confirmed_lsn;
+		return txn_limbo.queue.confirmed_lsn;
 
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	struct txn_limbo_entry *last_entry;
 	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
 	/* Wait for the last entries WAL write. */
@@ -3162,7 +3162,7 @@ box_wait_limbo_acked(double timeout)
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
-			return txn_limbo.confirmed_lsn;
+			return txn_limbo.queue.confirmed_lsn;
 		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
 			diag_set(ClientError, ER_QUORUM_WAIT,
 				 replication_synchro_quorum,
@@ -3179,14 +3179,15 @@ box_wait_limbo_acked(double timeout)
 	struct synchro_quorum_trigger t;
 	memset(&t, 0, sizeof(t));
 	vclock_create(&t.vclock);
-	int ack_count = box_ack_count(txn_limbo.owner_id, wait_lsn, &t.vclock);
+	int ack_count = box_ack_count(txn_limbo.queue.owner_id, wait_lsn,
+				      &t.vclock);
 	if (ack_count < replication_synchro_quorum) {
 		if (replicaset.registered_count < replication_synchro_quorum)
 			say_warn("replication_synchro_quorum is higher than number of "
 				 "registered replicas. The node will be in RO state "
 				 "because it can't collect acks for synchronous queue");
 		t.target_lsn = wait_lsn;
-		t.replica_id = txn_limbo.owner_id;
+		t.replica_id = txn_limbo.queue.owner_id;
 		t.ack_count = ack_count;
 		t.waiter = fiber();
 		trigger_create(&t.base, synchro_quorum_on_ack_f, NULL, NULL);
@@ -3194,7 +3195,7 @@ box_wait_limbo_acked(double timeout)
 		double deadline = ev_monotonic_now(loop()) + timeout;
 		while (!fiber_is_cancelled() &&
 		       t.ack_count < replication_synchro_quorum) {
-			if (fiber_cond_wait_deadline(&txn_limbo.wait_cond,
+			if (fiber_cond_wait_deadline(&txn_limbo.queue.cond,
 						     deadline) == -1)
 				break;
 		}
@@ -3221,7 +3222,7 @@ box_wait_limbo_acked(double timeout)
 		return -1;
 
 	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.confirmed_lsn;
+		return txn_limbo.queue.confirmed_lsn;
 
 	if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
 		diag_set(ClientError, ER_QUORUM_WAIT,
@@ -3239,7 +3240,7 @@ box_issue_promote(int64_t promote_lsn)
 {
 	int rc = 0;
 	uint64_t term = box_raft()->term;
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	assert(promote_lsn >= 0);
 	rc = box_check_election_term_intact(term);
 	if (rc != 0)
@@ -3273,7 +3274,7 @@ box_issue_demote(int64_t promote_lsn)
 {
 	int rc = 0;
 	uint64_t term = box_raft()->term;
-	uint64_t promote_term = txn_limbo.promote_greatest_term;
+	uint64_t promote_term = txn_limbo.term;
 	assert(promote_lsn >= 0);
 
 	rc = box_check_election_term_intact(term);
@@ -3357,12 +3358,9 @@ box_promote(void)
 	 * Currently active leader (the instance that is seen as leader by both
 	 * raft and txn_limbo) can't issue another PROMOTE.
 	 */
-	bool is_leader =
-		txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term &&
-		txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
-		!txn_limbo.is_frozen_until_promotion;
-	if (box_election_mode != ELECTION_MODE_OFF)
-		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
+	bool is_leader = txn_limbo.state == TXN_LIMBO_STATE_LEADER;
+	if (box_election_mode != ELECTION_MODE_OFF && is_leader)
+		VERIFY(raft->state == RAFT_STATE_LEADER);
 
 	if (is_leader)
 		return 0;
@@ -3409,12 +3407,8 @@ box_demote(void)
 
 	const struct raft *raft = box_raft();
 	if (box_election_mode != ELECTION_MODE_OFF) {
-		if (txn_limbo_replica_term(&txn_limbo, instance_id) !=
-		    raft->term)
-			return 0;
-		if (!txn_limbo_is_owned_by_current_instance(&txn_limbo))
-			return 0;
-		box_raft_leader_step_off();
+		if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
+			box_raft_leader_step_off();
 		return 0;
 	}
 
@@ -3423,7 +3417,7 @@ box_demote(void)
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
-	if (txn_limbo.owner_id == REPLICA_ID_NIL)
+	if (txn_limbo.queue.owner_id == REPLICA_ID_NIL)
 		return 0;
 	/*
 	 * If the limbo term is up to date with Raft, then it might have
@@ -3431,8 +3425,7 @@ box_demote(void)
 	 * case the user has to explicitly overthrow the old owner with
 	 * local promote(), or call demote() on the actual owner.
 	 */
-	if (txn_limbo.promote_greatest_term == raft->term &&
-	    !txn_limbo_is_owned_by_current_instance(&txn_limbo))
+	if (txn_limbo.term == raft->term && txn_limbo.state != TXN_LIMBO_STATE_LEADER)
 		return 0;
 	if (box_trigger_elections() != 0)
 		return -1;
@@ -6278,6 +6271,7 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+	txn_limbo_finish_recovery(&txn_limbo);
 
 	is_box_configured = true;
 	box_broadcast_ballot();
@@ -6689,7 +6683,7 @@ box_storage_init(void)
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
-	txn_limbo_init();
+	txn_limbo_init(box_raft());
 	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
 	iproto_init(cfg_geti("iproto_threads"));
