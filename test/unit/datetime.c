@@ -203,7 +203,7 @@ _dt_to_epoch(dt_t dt)
 static void
 parse_date_test(void)
 {
-	plan(154);
+	plan(156);
 
 	static struct {
 		int64_t epoch;
@@ -340,6 +340,8 @@ parse_date_test(void)
 		{ "%I:%M:%S %p",             "03:00:00 AM" },
 		{ "%S",                      "00" },
 		{ "%s",                      "10800" },
+		{ "%s %z",                   "10800 +0300" },
+		{ "%s %Z",                   "10800 MSK" },
 		{ "%f",                      "125" },
 		{ "%T",                      "03:00:00" },
 		{ "%H:%M:%S",                "03:00:00" },
@@ -383,6 +385,9 @@ parse_date_test(void)
 		     text, fmt, buff);
 	}
 
+	// TODO: negative tests
+	// y m d + epoch
+	// h m s + epoch
 	check_plan();
 }
 
