@@ -111,10 +111,12 @@ datetime_test(void)
 	size_t index;
 	struct datetime date_expected;
 
-	plan(385);
 	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1);
 
+	const unsigned taps_per_iter = 7;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		diag("%s[%lu]", __func__, index);
 		struct datetime date;
 		ssize_t len = datetime_parse_full(&date, tests[index].str,
 						  tests[index].len);
@@ -177,7 +179,8 @@ tostring_datetime_test(void)
 	};
 	size_t index;
 
-	plan(17);
+	const unsigned taps_per_iter = 1;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date = {
 			tests[index].secs,
@@ -417,8 +420,10 @@ mp_datetime_test()
 	};
 	size_t index;
 
-	plan(85);
+	const unsigned taps_per_iter = 5;
+	plan(taps_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		diag("%s[%lu]", __func__, index);
 		struct datetime date = {
 			tests[index].secs,
 			tests[index].nsec,
@@ -487,8 +492,13 @@ mp_datetime_unpack_valid_checks(void)
 	const char *p;
 	struct datetime date;
 
-	plan(24);
+	const unsigned valid_taps_per_iter = 2;
+	const unsigned invalid_taps_per_iter = 1;
+	plan(valid_taps_per_iter * lengthof(valid_values)
+	     + invalid_taps_per_iter * lengthof(invalid_values));
+
 	for (index = 0; index < lengthof(valid_values); index++) {
+		diag("%s valid[%lu]", __func__, index);
 		struct binary_datetime value = valid_values[index];
 		p = (char *)&value;
 		memset(&date, 0, sizeof(date));
@@ -497,7 +507,8 @@ mp_datetime_unpack_valid_checks(void)
 		is((int64_t)dt->epoch, value.epoch, "epoch value expected");
 	}
 
-	for (index = 0; index < lengthof(valid_values); index++) {
+	for (index = 0; index < lengthof(invalid_values); index++) {
+		diag("%s invalid[%lu]", __func__, index);
 		struct binary_datetime value = invalid_values[index];
 		p = (char *)&value;
 		memset(&date, 0, sizeof(date));
