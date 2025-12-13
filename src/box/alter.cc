@@ -721,15 +721,6 @@ public:
 	virtual void rollback(struct alter_space * /* alter */) {}
 
 	virtual ~AlterSpaceOp() {}
-
-	void *operator new(size_t size)
-	{
-		void *ptr = xregion_aligned_alloc(&in_txn()->region, size,
-						  alignof(uint64_t));
-		memset(ptr, 0, size);
-		return ptr;
-	}
-	void operator delete(void * /* ptr */) {}
 };
 
 /**
@@ -761,6 +752,7 @@ struct alter_space {
 	struct rlist in_list;
 	/** Transaction doing this alter. */
 	struct txn *txn;
+	struct txn_stmt *stmt;
 	/** List of alter operations */
 	struct rlist ops;
 	/** Definition of the new space - space_def. */
@@ -802,17 +794,16 @@ alter_space_new(struct space *old_space)
 {
 	struct txn *txn = in_txn();
 	size_t size = sizeof(struct alter_space);
-	struct alter_space *alter = (struct alter_space *)
-		region_aligned_alloc(&in_txn()->region, size,
-				     alignof(struct alter_space));
+	struct alter_space *alter = new alter_space;
 	if (alter == NULL) {
-		diag_set(OutOfMemory, size, "region", "struct alter_space");
+		diag_set(OutOfMemory, size, "new", "struct alter_space");
 		return NULL;
 	}
 	alter = (struct alter_space *)memset(alter, 0, size);
 	rlist_create(&alter->ops);
 	rlist_add_entry(&alter_space_list, alter, in_list);
 	alter->txn = in_txn();
+	alter->stmt = txn_current_stmt(alter->txn);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
 	alter->new_min_field_count = old_space->format->min_field_count;
@@ -836,6 +827,7 @@ alter_space_delete(struct alter_space *alter)
 	if (alter->new_space)
 		space_delete(alter->new_space);
 	space_def_delete(alter->space_def);
+	delete alter;
 }
 
 AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
@@ -951,6 +943,53 @@ alter_space_commit(struct trigger *trigger, void *event)
 	return 0;
 }
 
+void
+alter_cascading_rollback(struct alter_space *alter)
+{
+	struct alter_space *another_alter;
+	rlist_foreach_entry(another_alter, &alter_space_list, in_list) {
+		if (another_alter->old_space->def->id !=
+			alter->old_space->def->id ||
+		    another_alter->stmt->space->def->id !=
+		    alter->stmt->space->def->id)
+			continue;
+		if (another_alter->txn == in_txn())
+			break;
+
+		struct txn *txn = another_alter->txn;
+		assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
+		txn->signature = JOURNAL_ENTRY_ERR_CASCADE;
+		/*
+		 * Some rollback/commit triggers require the in_txn fiber
+		 * variable to be set.
+		 */
+		assert(in_txn() != NULL);
+		struct txn *orig_txn = in_txn();
+		fiber_set_txn(fiber(), txn);
+		/*
+		 * Use session and credentials of the original fiber for
+		 * commit/rollback triggers.
+		 */
+		struct session *orig_session = fiber_get_session(fiber());
+		struct session *session = (txn->fiber != NULL ?
+					fiber_get_session(txn->fiber) : NULL);
+		if (session != NULL)
+			fiber_set_session(fiber(), session);
+		struct credentials *orig_creds = fiber_get_user(fiber());
+		struct credentials *creds = (txn->fiber != NULL ?
+						fiber_get_user(txn->fiber) : NULL);
+		if (creds != NULL)
+			fiber_set_user(fiber(), creds);
+
+		txn_rollback(txn);
+
+		fiber_set_txn(fiber(), orig_txn);
+		fiber_set_user(fiber(), orig_creds);
+		fiber_set_session(fiber(), orig_session);
+		break;
+	}
+}
+
 /**
  * Rollback all effects of space alter. This is
  * a transaction trigger, and it fires most likely
@@ -985,6 +1024,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_pin_defaults(alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	SWAP(alter->new_space->sequence_path, alter->old_space->sequence_path);
+	alter_cascading_rollback(alter);
 	alter_space_delete(alter);
 	return 0;
 }
@@ -1174,6 +1214,14 @@ public:
 			 */
 			fiber_cond_wait(&alter_space_delete_cond);
 		}
+
+		if (txn_has_flag(in_txn(), TXN_IS_ROLLED_BACK)) {
+			assert(in_txn()->signature == JOURNAL_ENTRY_ERR_CASCADE);
+			txn_can_yield(in_txn(), false);
+			fiber_set_txn(fiber(), NULL);
+			tnt_raise(ClientError, ER_CASCADE_ROLLBACK);
+		}
+
 		/* Check if the space is still alive. */
 		if (space_by_id(space_id) != old_space) {
 			txn_can_yield(in_txn(), false);
