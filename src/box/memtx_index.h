@@ -11,6 +11,32 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/**
+ * A logical entry in a memtx index.
+ *
+ * A tuple identifies an entry in a regular index. A multikey or functional
+ * index may contain several entries for the same tuple, so the hint is part of
+ * the entry identity there. The hint is meaningful only together with the
+ * index whose operation produced the entry.
+ */
+struct memtx_index_entry {
+	/** Tuple stored in the index, or NULL for an absent entry. */
+	struct tuple *tuple;
+	/**
+	 * Index-specific entry discriminator. It is the multikey array position
+	 * for a multikey index and a referenced functional-key tuple for a
+	 * functional index. Regular entries crossing the generic memtx-index
+	 * API must keep HINT_NONE; index implementations that need comparison
+	 * hints compute them locally.
+	 */
+	hint_t hint;
+};
+
+static const struct memtx_index_entry memtx_index_entry_null = {
+	.tuple = NULL,
+	.hint = HINT_NONE,
+};
+
 /** Virtual function table for memtx-specific index operations. */
 struct memtx_index_vtab {
 	/** Base index virtual table for common index operations. */
@@ -28,33 +54,31 @@ struct memtx_index_vtab {
 			    uint32_t part_count, struct tuple **result,
 			    bool is_rw);
 	/**
-	 * Main entrance point for changing data in index. Once built and
-	 * before deletion this is the only way to insert, replace and delete
-	 * data from the index.
-	 * Insert a tuple into the index, replacing a duplicate if allowed.
+	 * Insert one physical index entry, replacing a duplicate if allowed.
 	 *
 	 * @param new_tuple must not be NULL.
 	 * @param mode - @sa dup_replace_mode description
-	 * @param result - here the replaced tuple is placed.
+	 * @param result - here the replaced entry is placed.
 	 * @param successor - if the index supports ordering, then in case of
-	 *  insert (!) here the successor tuple is returned. In other words,
-	 *  here will be stored the tuple, before which new tuple is inserted.
+	 *  insert (!) here the successor entry is returned. In other words,
+	 *  here will be stored the entry, before which new entry is inserted.
 	 *
 	 * NB: do not use the same object for @a result and @a successor - they
 	 *     are different returned values and implementation can rely on it.
 	 */
-	int (*replace_tuple)(struct index *index, struct tuple *old_tuple,
-			     struct tuple *new_tuple,
+	int (*replace_entry)(struct index *index,
+			     struct tuple *old_tuple,
+			     struct memtx_index_entry new_entry,
 			     enum dup_replace_mode mode,
-			     struct tuple **result,
-			     struct tuple **successor);
+			     struct memtx_index_entry *result,
+			     struct memtx_index_entry *successor);
 	/**
-	 * Delete a tuple from the index.
+	 * Delete one exact physical index entry and return the removed entry.
 	 *
-	 * @param result - here the deleted tuple is placed.
+	 * @param result - here the deleted entry is placed.
 	 */
-	int (*delete_tuple)(struct index *index, struct tuple *tuple,
-			    struct tuple **result);
+	int (*delete_entry)(struct index *index, struct memtx_index_entry entry,
+			    struct memtx_index_entry *result);
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
