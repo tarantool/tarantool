@@ -260,13 +260,19 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 	return 0;
 }
 
+/** Replace old tuple with new tuple in the index. */
 static int
-memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+memtx_rtree_index_replace(struct index *base, struct memtx_index_key old_key,
+			  struct memtx_index_key new_key,
+			  enum dup_replace_mode mode,
+			  struct memtx_index_key *result,
+			  struct memtx_index_key *successor)
 {
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+
+	struct tuple *old_tuple = old_key.tuple;
+	struct tuple *new_tuple = new_key.tuple;
 
 	/*
 	 * There's no allocation failure handling in the tree, so it's required
@@ -280,7 +286,8 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		return -1;
 
 	/* RTREE index doesn't support ordering. */
-	*successor = NULL;
+	*successor = memtx_index_key_null;
+	*result = memtx_index_key_null;
 
 	struct rtree_rect rect;
 	if (new_tuple) {
@@ -294,7 +301,7 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (!rtree_remove(&index->tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
 	return 0;
 }
 
