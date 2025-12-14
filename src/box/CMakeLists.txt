@@ -188,6 +188,7 @@ set(box_sources
     index_def.c
     index_weak_ref.c
     iterator_type.c
+    memtx_index.c
     memtx_hash.cc
     memtx_tree.cc
     memtx_rtree.cc

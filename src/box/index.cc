@@ -1180,20 +1180,6 @@ generic_index_get(struct index *index, const char *key,
 	return -1;
 }
 
-int
-generic_index_replace(struct index *index, struct tuple *old_tuple,
-		      struct tuple *new_tuple, enum dup_replace_mode mode,
-		      struct tuple **result, struct tuple **successor)
-{
-	(void)old_tuple;
-	(void)new_tuple;
-	(void)mode;
-	(void)result;
-	(void)successor;
-	diag_set(UnsupportedIndexFeature, index->def, "replace()");
-	return -1;
-}
-
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
 			      const char *key, uint32_t part_count,
@@ -1323,55 +1309,6 @@ void
 generic_index_reset_stat(struct index *index)
 {
 	(void)index;
-}
-
-void
-generic_index_begin_build(struct index *)
-{
-}
-
-int
-generic_index_reserve(struct index *, uint32_t)
-{
-	return 0;
-}
-
-int
-generic_index_build_next(struct index *index, struct tuple *tuple)
-{
-	struct tuple *unused;
-	/*
-	 * Note this is not no-op call in case of rtee index:
-	 * reserving 0 bytes is required during rtree recovery.
-	 * For details see memtx_rtree_index_reserve().
-	 */
-	if (index_reserve(index, 0) != 0)
-		return -1;
-	return index_replace(index, NULL, tuple, DUP_INSERT, &unused, &unused);
-}
-
-void
-generic_index_end_build(struct index *)
-{
-}
-
-int
-disabled_index_build_next(struct index *index, struct tuple *tuple)
-{
-	(void) index; (void) tuple;
-	return 0;
-}
-
-int
-disabled_index_replace(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor)
-{
-	(void) old_tuple; (void) new_tuple; (void) mode;
-	(void) index;
-	*result = NULL;
-	*successor = NULL;
-	return 0;
 }
 
 int

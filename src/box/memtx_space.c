@@ -47,6 +47,7 @@
 #include "memtx_space_upgrade.h"
 #include "memtx_tuple_compression.h"
 #include "memtx_sort_data.h"
+#include "memtx_index.h"
 #include "schema.h"
 #include "small/region.h"
 
@@ -167,7 +168,7 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 			return -1;
 
 		/* Start building the new space's PK. */
-		index_begin_build(space->index[0]);
+		memtx_index_begin_build(space->index[0]);
 
 		memtx->recovery.last_space_id = space->def->id;
 	}
@@ -199,7 +200,7 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 		return -1;
 
 	/* Add the tuple to the PK to be built. */
-	if (index_build_next(space->index[0], new_tuple) != 0)
+	if (memtx_index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
 	memtx_space_update_tuple_stat(space, NULL, new_tuple);
 	tuple_ref(new_tuple);
@@ -217,8 +218,8 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				struct tuple **result)
 {
 	struct tuple *successor;
-	if (index_replace(space->index[0], old_tuple,
-			  new_tuple, mode, &old_tuple, &successor) != 0)
+	if (memtx_index_replace(space->index[0], old_tuple, new_tuple, mode,
+				&old_tuple, &successor) != 0)
 		return -1;
 	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
@@ -965,15 +966,15 @@ sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 	if (index == NULL)
 		return NULL;
 
-	static struct index_vtab vtab;
+	static struct memtx_index_vtab vtab;
 	static bool vtab_initialized;
 	if (!vtab_initialized) {
-		vtab = *index->vtab;
-		vtab.create_read_view = sequence_data_read_view_create;
+		vtab = *(struct memtx_index_vtab *)index->vtab;
+		vtab.base.create_read_view = sequence_data_read_view_create;
 		vtab_initialized = true;
 	}
 
-	index->vtab = &vtab;
+	index->vtab = (struct index_vtab *)&vtab;
 	return index;
 }
 
@@ -1243,9 +1244,9 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
 	 * with a duplicate at a unique index, this trigger would not be called.
 	 */
-	state->rc = index_replace(state->index, stmt->new_tuple,
-				  stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-				  &delete, &successor);
+	state->rc = memtx_index_replace(state->index, stmt->new_tuple,
+					stmt->old_tuple, DUP_REPLACE_OR_INSERT,
+					&delete, &successor);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1308,8 +1309,9 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		state->index->def->opts.is_unique ? DUP_INSERT :
 						    DUP_REPLACE_OR_INSERT;
 	struct tuple *successor;
-	state->rc = index_replace(state->index, stmt->old_tuple,
-				  stmt->new_tuple, mode, &delete, &successor);
+	state->rc = memtx_index_replace(state->index, stmt->old_tuple,
+					stmt->new_tuple, mode, &delete,
+					&successor);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1456,8 +1458,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		struct tuple *old_tuple;
 		struct tuple *successor;
-		rc = index_replace(new_index, NULL, tuple,
-				   DUP_INSERT, &old_tuple, &successor);
+		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT,
+					 &old_tuple, &successor);
 		if (rc != 0)
 			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */

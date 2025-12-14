@@ -30,6 +30,7 @@
  */
 #include "memtx_tx.h"
 #include "memtx_space.h"
+#include "memtx_index.h"
 
 #include <assert.h>
 #include <limits.h>
@@ -1394,8 +1395,8 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 		/* Make the change in index. */
 		struct index *index = old_link->in_index;
 		struct tuple *removed, *unused;
-		if (index_replace(index, old_top->tuple, new_top->tuple,
-				  DUP_REPLACE, &removed, &unused) != 0) {
+		if (memtx_index_replace(index, old_top->tuple, new_top->tuple,
+					DUP_REPLACE, &removed, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rebind story in index");
@@ -1582,9 +1583,10 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 			if (story->del_psn > 0 && link->in_index != NULL) {
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
-						  &removed, &unused) != 0) {
+				if (memtx_index_replace(index, story->tuple,
+							NULL, DUP_INSERT,
+							&removed,
+							&unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
@@ -2468,8 +2470,9 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 		memtx_tx_story_new(stmt->space, new_tuple);
 
 	/*
-	 * Save directly replaced and successor tuples per each `index_replace`
-	 * to track read and write sets in transaction manager.
+	 * Save directly replaced and successor tuples per each
+	 * `memtx_index_replace` to track read and write sets in transaction
+	 * manager.
 	 */
 	static_assert(BOX_INDEX_MAX == 128, "size of `directly_replaced` and "
 		      "`direct_successor` arrays on the stack");
@@ -2487,10 +2490,10 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 * defer conflict resolution to `memtx_tx_add_insert_stmt`.
 	 */
 	uint32_t i = 0;
-	if (index_replace(pk, use_mvcc ? NULL : old_tuple, new_tuple,
-			  use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
-			  &directly_replaced[i],
-			  &direct_successor[i]) != 0)
+	if (memtx_index_replace(pk, use_mvcc ? NULL : old_tuple, new_tuple,
+				use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
+				&directly_replaced[i],
+				&direct_successor[i]) != 0)
 		goto rollback;
 	assert(directly_replaced[i] || new_tuple);
 
@@ -2506,11 +2509,13 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 */
 	for (i++; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		if (index_replace(index, use_mvcc ? NULL : directly_replaced[0],
-				  new_tuple,
-				  use_mvcc ? DUP_REPLACE_OR_INSERT : DUP_INSERT,
-				  &directly_replaced[i],
-				  &direct_successor[i]) != 0)
+		if (memtx_index_replace(index,
+					use_mvcc ? NULL : directly_replaced[0],
+					new_tuple,
+					use_mvcc ? DUP_REPLACE_OR_INSERT
+						: DUP_INSERT,
+					&directly_replaced[i],
+					&direct_successor[i]) != 0)
 			goto rollback;
 	}
 
@@ -2547,8 +2552,9 @@ rollback:
 		struct tuple *delete;
 		struct tuple *successor;
 		struct index *index = space->index[i - 1];
-		if (index_replace(index, new_tuple, directly_replaced[i - 1],
-				  DUP_INSERT, &delete, &successor) != 0) {
+		if (memtx_index_replace(index, new_tuple,
+					directly_replaced[i - 1], DUP_INSERT,
+					&delete, &successor) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
@@ -2867,9 +2873,9 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 		return;
 	for (size_t i = 0; i < stmt->space->index_count; i++) {
 		struct tuple *unused;
-		if (index_replace(stmt->space->index[i], new_tuple, old_tuple,
-				  DUP_REPLACE_OR_INSERT, &unused,
-				  &unused) != 0) {
+		if (memtx_index_replace(stmt->space->index[i], new_tuple,
+					old_tuple, DUP_REPLACE_OR_INSERT,
+					&unused, &unused) != 0) {
 			panic("failed to rebind story in index on "
 			      "rollback of statement without story");
 		}
@@ -3542,9 +3548,9 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 				continue;
 
 			struct tuple *unused;
-			if (index_replace(index, story->tuple, new_tuple,
-					  DUP_REPLACE, &unused,
-					  &unused) != 0) {
+			if (memtx_index_replace(index, story->tuple, new_tuple,
+						DUP_REPLACE, &unused,
+						&unused) != 0) {
 				diag_log();
 				unreachable();
 				panic("failed to rebind story in index on "
