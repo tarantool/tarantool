@@ -443,16 +443,20 @@ fail:
 
 /** Insert a new tuple into the index and check for duplicates. */
 static int
-memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
+memtx_hash_index_replace(struct index *base,
+			 struct tuple *old_tuple,
+			 struct memtx_index_entry new_entry,
+			 enum dup_replace_mode mode,
+			 struct memtx_index_entry *result,
+			 struct memtx_index_entry *successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	struct tuple *new_tuple = new_entry.tuple;
 	assert(new_tuple != NULL);
 
 	/* HASH index doesn't support ordering. */
-	*successor = NULL;
-	*result = NULL;
+	*successor = memtx_index_entry_null;
+	*result = memtx_index_entry_null;
 
 	struct tuple *dup_tuple;
 	uint32_t pos;
@@ -467,21 +471,21 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		return -1;
 	}
 	if (dup_tuple)
-		*result = dup_tuple;
+		result->tuple = dup_tuple;
 	return 0;
 }
 
 /** Delete one exact tuple from the index. */
 static int
-memtx_hash_index_delete(struct index *base, struct tuple *tuple,
-			struct tuple **result)
+memtx_hash_index_delete(struct index *base, struct memtx_index_entry entry,
+			struct memtx_index_entry *result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	*result = NULL;
-	assert(tuple != NULL);
-	if (memtx_hash_index_delete_value_impl(index, tuple) != 0)
+	*result = memtx_index_entry_null;
+	assert(entry.tuple != NULL);
+	if (memtx_hash_index_delete_value_impl(index, entry.tuple) != 0)
 		return -1;
-	*result = tuple;
+	*result = entry;
 	return 0;
 }
 
@@ -745,8 +749,8 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_hash_index_vtab = {
 	/* .base = */ memtx_hash_index_vtab_base,
-	/* .replace_tuple = */ memtx_hash_index_replace,
-	/* .delete_tuple = */ memtx_hash_index_delete,
+	/* .replace_entry = */ memtx_hash_index_replace,
+	/* .delete_entry = */ memtx_hash_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

@@ -262,13 +262,17 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 
 /** Insert a new tuple into the index. */
 static int
-memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+memtx_rtree_index_replace(struct index *base,
+			  struct tuple *old_tuple,
+			  struct memtx_index_entry new_entry,
+			  enum dup_replace_mode mode,
+			  struct memtx_index_entry *result,
+			  struct memtx_index_entry *successor)
 {
 	(void)mode;
 	(void)old_tuple;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+	struct tuple *new_tuple = new_entry.tuple;
 	assert(new_tuple != NULL);
 
 	/*
@@ -281,8 +285,8 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		return -1;
 
 	/* RTREE index doesn't support ordering. */
-	*successor = NULL;
-	*result = NULL;
+	*successor = memtx_index_entry_null;
+	*result = memtx_index_entry_null;
 
 	struct rtree_rect rect;
 	if (extract_rectangle(&rect, new_tuple, base->def) != 0)
@@ -293,21 +297,21 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 
 /** Delete one exact tuple from the index. */
 static int
-memtx_rtree_index_delete(struct index *base, struct tuple *tuple,
-			 struct tuple **result)
+memtx_rtree_index_delete(struct index *base, struct memtx_index_entry entry,
+			 struct memtx_index_entry *result)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	*result = NULL;
-	assert(tuple != NULL);
+	*result = memtx_index_entry_null;
+	assert(entry.tuple != NULL);
 	if (matras_allocator_reserve(&memtx->index_extent_allocator,
 				     RESERVE_EXTENTS_BEFORE_DELETE) != 0)
 		return -1;
 	struct rtree_rect rect;
-	if (extract_rectangle(&rect, tuple, base->def) != 0)
+	if (extract_rectangle(&rect, entry.tuple, base->def) != 0)
 		return -1;
-	VERIFY(rtree_remove(&index->tree, &rect, tuple));
-	*result = tuple;
+	VERIFY(rtree_remove(&index->tree, &rect, entry.tuple));
+	*result = entry;
 	return 0;
 }
 
@@ -438,8 +442,8 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .base = */ memtx_rtree_index_vtab_base,
-	/* .replace_tuple = */ memtx_rtree_index_replace,
-	/* .delete_tuple = */ memtx_rtree_index_delete,
+	/* .replace_entry = */ memtx_rtree_index_replace,
+	/* .delete_entry = */ memtx_rtree_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ memtx_rtree_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

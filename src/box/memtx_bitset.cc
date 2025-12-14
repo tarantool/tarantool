@@ -282,21 +282,21 @@ make_key(const char *field, uint32_t *key_len)
 
 /** Delete one exact tuple from the index. */
 static int
-memtx_bitset_index_delete(struct index *base, struct tuple *tuple,
-			  struct tuple **result)
+memtx_bitset_index_delete(struct index *base, struct memtx_index_entry entry,
+			  struct memtx_index_entry *result)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
-	assert(tuple != NULL);
+	assert(entry.tuple != NULL);
 #ifndef OLD_GOOD_BITSET
-	uint32_t value = memtx_bitset_index_tuple_to_value(index, tuple);
+	uint32_t value = memtx_bitset_index_tuple_to_value(index, entry.tuple);
 #else /* #ifndef OLD_GOOD_BITSET */
 	size_t value = tuple_to_value(old_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
 	VERIFY(tt_bitset_index_contains_value(&index->index, (size_t)value));
-	*result = tuple;
+	result->tuple = entry.tuple;
 	tt_bitset_index_remove_value(&index->index, value);
 #ifndef OLD_GOOD_BITSET
-	memtx_bitset_index_unregister_tuple(index, tuple);
+	memtx_bitset_index_unregister_tuple(index, entry.tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
 	return 0;
 }
@@ -310,22 +310,29 @@ memtx_bitset_index_delete(struct index *base, struct tuple *tuple,
  */
 static int
 memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
-			   struct tuple *new_tuple, enum dup_replace_mode mode,
-			   struct tuple **result, struct tuple **successor)
+			   struct memtx_index_entry new_entry,
+			   enum dup_replace_mode mode,
+			   struct memtx_index_entry *result,
+			   struct memtx_index_entry *successor)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	/* BITSET index doesn't support ordering. */
-	*successor = NULL;
+	*successor = memtx_index_entry_null;
 
 	assert(!base->def->opts.is_unique);
 	assert(!base->def->key_def->is_multikey);
+	struct tuple *new_tuple = new_entry.tuple;
 	assert(new_tuple != NULL);
 	(void) mode;
 
-	*result = NULL;
-	if (old_tuple != NULL)
-		VERIFY(memtx_bitset_index_delete(base, old_tuple, result) == 0);
+	*result = memtx_index_entry_null;
+	if (old_tuple != NULL) {
+		struct memtx_index_entry old_entry;
+		old_entry.tuple = old_tuple;
+		old_entry.hint = HINT_NONE;
+		VERIFY(memtx_bitset_index_delete(base, old_entry, result) == 0);
+	}
 
 	const char *field = tuple_field_by_part(new_tuple,
 						base->def->key_def->parts,
@@ -338,7 +345,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 		 * If the old tuple was removed, its ID is first on the spare
 		 * list and registration cannot fail.
 		 */
-		assert(*result == NULL);
+		assert(result->tuple == NULL);
 		return -1;
 	}
 	uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
@@ -539,8 +546,8 @@ static const struct index_vtab memtx_bitset_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_bitset_index_vtab = {
 	/* .base = */ memtx_bitset_index_vtab_base,
-	/* .replace_tuple = */ memtx_bitset_index_replace,
-	/* .delete_tuple = */ memtx_bitset_index_delete,
+	/* .replace_entry = */ memtx_bitset_index_replace,
+	/* .delete_entry = */ memtx_bitset_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,
