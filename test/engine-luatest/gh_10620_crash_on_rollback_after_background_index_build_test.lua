@@ -193,3 +193,57 @@ g.test_bitset_delete_of_missing_tuple_keeps_others = function(cg)
         s:drop()
     end)
 end
+
+-- A replace removing a key from the built range of a unique index lets the
+-- background index build insert another tuple with the key. A rollback of
+-- the replace must not overwrite that tuple in the index.
+g.test_rollback_of_excluded_key_replace = function(cg)
+    t.tarantool.skip_if_not_debug()
+    t.skip_if(cg.params.engine ~= 'memtx', 'the build delay is memtx only')
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local errinj = box.error.injection
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:replace{1, 10}
+        for i = 2, 2000 do
+            s:replace{i, i == 1000 and 10 or 1000 + i}
+        end
+        local builder = fiber.new(function()
+            s:create_index('sk', {
+                parts = {{2, 'unsigned', is_nullable = true,
+                          exclude_null = true}},
+            })
+        end)
+        builder:set_joinable(true)
+        -- Start the background index build.
+        fiber.yield()
+
+        -- The tuple is in the built range, so the key is removed from it.
+        errinj.set('ERRINJ_WAL_DELAY', true)
+        local replacer = fiber.new(function()
+            t.assert_error_msg_content_equals('Failed to write to disk',
+                                              s.replace, s, {1, box.NULL})
+        end)
+        replacer:set_joinable(true)
+        fiber.yield()
+        -- Let the build insert the other tuple with the key.
+        for _ = 1, 150 do
+            fiber.yield()
+        end
+        errinj.set('ERRINJ_BUILD_INDEX_DELAY', true)
+        errinj.set('ERRINJ_WAL_WRITE', true)
+        errinj.set('ERRINJ_WAL_DELAY', false)
+        replacer:join()
+        errinj.set('ERRINJ_WAL_WRITE', false)
+
+        errinj.set('ERRINJ_BUILD_INDEX_DELAY', false)
+        local ok, err = builder:join()
+        t.assert_not(ok)
+        t.assert_equals(err.message,
+                        'Duplicate key exists in unique index "sk" in ' ..
+                        'space "test" with old tuple - [1000, 10] and ' ..
+                        'new tuple - [1, 10]')
+        t.assert_equals(s.index.sk, nil)
+    end)
+end
