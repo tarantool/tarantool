@@ -44,6 +44,7 @@
 #include "txn.h"
 #include "memtx_tx.h"
 #include "memtx_engine.h"
+#include "memtx_index.h"
 
 struct memtx_bitset_index {
 	struct index base;
@@ -498,7 +499,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	return generic_index_count(base, type, key, part_count);
 }
 
-static const struct index_vtab memtx_bitset_index_vtab = {
+static const struct index_vtab memtx_bitset_index_vtab_base = {
 	/* .destroy = */ memtx_bitset_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
@@ -517,7 +518,6 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .count = */ memtx_bitset_index_count,
 	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
-	/* .replace = */ memtx_bitset_index_replace,
 	/* .create_iterator = */ memtx_bitset_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
@@ -526,10 +526,15 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
+};
+
+static const struct memtx_index_vtab memtx_bitset_index_vtab = {
+	/* .base = */ memtx_bitset_index_vtab_base,
+	/* .replace = */ memtx_bitset_index_replace,
+	/* .begin_build = */ generic_memtx_index_begin_build,
+	/* .reserve = */ generic_memtx_index_reserve,
+	/* .build_next = */ generic_memtx_index_build_next,
+	/* .end_build = */ generic_memtx_index_end_build,
 };
 
 struct index *
@@ -541,7 +546,7 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	struct memtx_bitset_index *index =
 		(struct memtx_bitset_index *)xcalloc(1, sizeof(*index));
 	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_bitset_index_vtab, def);
+		     (struct index_vtab *)&memtx_bitset_index_vtab, def);
 
 #ifndef OLD_GOOD_BITSET
 	index->spare_id = SPARE_ID_END;

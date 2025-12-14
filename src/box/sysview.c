@@ -206,7 +206,6 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .count = */ generic_index_count,
 	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ sysview_index_get,
-	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ sysview_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
@@ -215,10 +214,6 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
 };
 
 static void

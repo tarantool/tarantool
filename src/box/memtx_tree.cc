@@ -33,6 +33,7 @@
 #include "memtx_engine.h"
 #include "memtx_sort_data.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_index.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -2309,6 +2310,30 @@ memtx_tree_index_build_using_sort_data(struct index *base,
 	}
 }
 
+static int
+memtx_tree_disabled_index_build_next(struct index *index, struct tuple *tuple)
+{
+	(void)index;
+	(void)tuple;
+	return 0;
+}
+
+static int
+memtx_tree_disabled_index_replace(struct index *index, struct tuple *old_tuple,
+				  struct tuple *new_tuple,
+				  enum dup_replace_mode mode,
+				  struct tuple **result,
+				  struct tuple **successor)
+{
+	(void)index;
+	(void)old_tuple;
+	(void)new_tuple;
+	(void)mode;
+	*result = NULL;
+	*successor = NULL;
+	return 0;
+}
+
 /** Read view implementation. */
 template <bool USE_HINT>
 struct tree_read_view {
@@ -2635,7 +2660,7 @@ memtx_tree_index_read_view_dump_sort_data(
  * recovery from snapshoot in case of func_index (because
  * key defintion is not completely initialized at that moment).
  */
-static const struct index_vtab memtx_tree_disabled_index_vtab = {
+static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 	/* .destroy = */ memtx_tree_index_destroy<true>,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
@@ -2654,7 +2679,6 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .count = */ generic_index_count,
 	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
-	/* .replace = */ disabled_index_replace,
 	/* .create_iterator = */ generic_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
@@ -2663,10 +2687,15 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ disabled_index_build_next,
-	/* .end_build = */ generic_index_end_build,
+};
+
+static const struct memtx_index_vtab memtx_tree_disabled_index_vtab = {
+	/* .base = */ memtx_tree_disabled_index_vtab_base,
+	/* .replace = */ memtx_tree_disabled_index_replace,
+	/* .begin_build = */ generic_memtx_index_begin_build,
+	/* .reserve = */ generic_memtx_index_reserve,
+	/* .build_next = */ memtx_tree_disabled_index_build_next,
+	/* .end_build = */ generic_memtx_index_end_build,
 };
 
 /** Type of index in terms of different vtabs. */
@@ -2695,11 +2724,11 @@ get_memtx_tree_index_vtab(void)
 		      "Multikey and func indexes must use hints");
 
 	if (TYPE == MEMTX_TREE_VTAB_DISABLED)
-		return &memtx_tree_disabled_index_vtab;
+		return (struct index_vtab *)&memtx_tree_disabled_index_vtab;
 
 	const bool is_mk = TYPE == MEMTX_TREE_VTAB_MULTIKEY;
 	const bool is_func = TYPE == MEMTX_TREE_VTAB_FUNC;
-	static const struct index_vtab vtab = {
+	static const struct index_vtab vtab_base = {
 		/* .destroy = */ memtx_tree_index_destroy<USE_HINT>,
 		/* .commit_create = */ generic_index_commit_create,
 		/* .abort_create = */ generic_index_abort_create,
@@ -2718,9 +2747,6 @@ get_memtx_tree_index_vtab(void)
 		/* .count = */ memtx_tree_index_count<USE_HINT>,
 		/* .get_internal */ memtx_tree_index_get_internal<USE_HINT>,
 		/* .get = */ memtx_index_get,
-		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
-				 is_func ? memtx_tree_func_index_replace :
-				 memtx_tree_index_replace<USE_HINT>,
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,
 		/* .create_iterator_with_offset = */
@@ -2731,6 +2757,12 @@ get_memtx_tree_index_vtab(void)
 		/* .stat = */ generic_index_stat,
 		/* .compact = */ generic_index_compact,
 		/* .reset_stat = */ generic_index_reset_stat,
+	};
+	static const struct memtx_index_vtab vtab = {
+		/* .base = */ vtab_base,
+		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
+				 is_func ? memtx_tree_func_index_replace :
+				 memtx_tree_index_replace<USE_HINT>,
 		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
 		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
 		/* .build_next = */ is_mk ? memtx_tree_index_build_next_multikey :
@@ -2738,7 +2770,7 @@ get_memtx_tree_index_vtab(void)
 				    memtx_tree_index_build_next<USE_HINT>,
 		/* .end_build = */ memtx_tree_index_end_build<USE_HINT>,
 	};
-	return &vtab;
+	return (struct index_vtab *)&vtab;
 }
 
 template <bool USE_HINT>

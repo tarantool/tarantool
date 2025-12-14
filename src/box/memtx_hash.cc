@@ -37,6 +37,7 @@
 #include "memtx_tx.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
+#include "memtx_index.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -712,7 +713,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	return (struct index_read_view *)rv;
 }
 
-static const struct index_vtab memtx_hash_index_vtab = {
+static const struct index_vtab memtx_hash_index_vtab_base = {
 	/* .destroy = */ memtx_hash_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
 	/* .abort_create = */ generic_index_abort_create,
@@ -731,7 +732,6 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .count = */ memtx_hash_index_count,
 	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .get = */ memtx_index_get,
-	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_iterator_with_offset = */
 	generic_index_create_iterator_with_offset,
@@ -740,10 +740,15 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
+};
+
+static const struct memtx_index_vtab memtx_hash_index_vtab = {
+	/* .base = */ memtx_hash_index_vtab_base,
+	/* .replace = */ memtx_hash_index_replace,
+	/* .begin_build = */ generic_memtx_index_begin_build,
+	/* .reserve = */ generic_memtx_index_reserve,
+	/* .build_next = */ generic_memtx_index_build_next,
+	/* .end_build = */ generic_memtx_index_end_build,
 };
 
 struct index *
@@ -752,7 +757,7 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 	struct memtx_hash_index *index =
 		(struct memtx_hash_index *)xcalloc(1, sizeof(*index));
 	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_hash_index_vtab, def);
+		     (struct index_vtab *)&memtx_hash_index_vtab, def);
 
 	light_index_create(&index->hash_table, index->base.def->key_def,
 			   &memtx->index_extent_allocator,

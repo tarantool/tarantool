@@ -650,22 +650,6 @@ struct index_vtab {
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	/**
-	 * Main entrance point for changing data in index. Once built and
-	 * before deletion this is the only way to insert, replace and delete
-	 * data from the index.
-	 * @param mode - @sa dup_replace_mode description
-	 * @param result - here the replaced or deleted tuple is placed.
-	 * @param successor - if the index supports ordering, then in case of
-	 *  insert (!) here the successor tuple is returned. In other words,
-	 *  here will be stored the tuple, before which new tuple is inserted.
-	 *
-	 * NB: do not use the same object for @a result and @a successor - they
-	 *     are different returned values and implementation can rely on it.
-	 */
-	int (*replace)(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
-	/**
 	 * Create an index iterator. Iterator can be placed right after
 	 * position, passed in pos argument. Argument pos is an extracted
 	 * cmp_def without MP_ARRAY header or NULL.
@@ -699,18 +683,6 @@ struct index_vtab {
 	void (*compact)(struct index *);
 	/** Reset all incremental statistic counters. */
 	void (*reset_stat)(struct index *);
-	/**
-	 * Two-phase index creation: begin building, add tuples, finish.
-	 */
-	void (*begin_build)(struct index *);
-	/**
-	 * Optional hint, given to the index, about
-	 * the total size of the index. Called after
-	 * begin_build().
-	 */
-	int (*reserve)(struct index *index, uint32_t size_hint);
-	int (*build_next)(struct index *index, struct tuple *tuple);
-	void (*end_build)(struct index *index);
 };
 
 struct index {
@@ -1055,15 +1027,6 @@ index_get(struct index *index, const char *key,
 	return index->vtab->get(index, key, part_count, result);
 }
 
-static inline int
-index_replace(struct index *index, struct tuple *old_tuple,
-	      struct tuple *new_tuple, enum dup_replace_mode mode,
-	      struct tuple **result, struct tuple **successor)
-{
-	return index->vtab->replace(index, old_tuple, new_tuple, mode,
-				    result, successor);
-}
-
 static inline struct iterator *
 index_create_iterator_with_offset(struct index *index, enum iterator_type type,
 				  const char *key, uint32_t part_count,
@@ -1123,30 +1086,6 @@ static inline void
 index_reset_stat(struct index *index)
 {
 	index->vtab->reset_stat(index);
-}
-
-static inline void
-index_begin_build(struct index *index)
-{
-	index->vtab->begin_build(index);
-}
-
-static inline int
-index_reserve(struct index *index, uint32_t size_hint)
-{
-	return index->vtab->reserve(index, size_hint);
-}
-
-static inline int
-index_build_next(struct index *index, struct tuple *tuple)
-{
-	return index->vtab->build_next(index, tuple);
-}
-
-static inline void
-index_end_build(struct index *index)
-{
-	index->vtab->end_build(index);
 }
 
 /**
@@ -1306,16 +1245,11 @@ int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
-int generic_index_replace(struct index *, struct tuple *, struct tuple *,
-			  enum dup_replace_mode,
-			  struct tuple **, struct tuple **);
 struct index_read_view *
 generic_index_create_read_view(struct index *index);
 void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);
-void generic_index_begin_build(struct index *);
-int generic_index_reserve(struct index *, uint32_t);
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
 			      const char *key, uint32_t part_count,
@@ -1344,14 +1278,6 @@ generic_index_read_view_create_arrow_stream(
 	const char *key, uint32_t part_count,
 	const struct arrow_options *options,
 	struct ArrowArrayStream *stream);
-int generic_index_build_next(struct index *, struct tuple *);
-void generic_index_end_build(struct index *);
-int
-disabled_index_build_next(struct index *index, struct tuple *tuple);
-int
-disabled_index_replace(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
 int
 exhausted_iterator_next(struct iterator *it, struct tuple **ret);
 int

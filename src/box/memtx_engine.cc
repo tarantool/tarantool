@@ -62,6 +62,7 @@
 #include "memtx_space.h"
 #include "memtx_space_upgrade.h"
 #include "memtx_sort_data.h"
+#include "memtx_index.h"
 #include "tt_sort.h"
 #include "assoc.h"
 #include "scoped_guard.h"
@@ -141,7 +142,7 @@ memtx_end_build_primary_key(struct space *space, struct memtx_engine *memtx)
 	    memtx_space->replace == memtx_space_replace_all_keys)
 		return 0;
 
-	index_end_build(space->index[0]);
+	memtx_index_end_build(space->index[0]);
 	return 0;
 }
 
@@ -176,8 +177,8 @@ memtx_build_secondary_index_using_tt_sort(struct index *index, struct index *pk)
 		return -1;
 	uint32_t estimated_tuples = n_tuples * 1.2;
 
-	index_begin_build(index);
-	if (index_reserve(index, estimated_tuples) < 0)
+	memtx_index_begin_build(index);
+	if (memtx_index_reserve(index, estimated_tuples) < 0)
 		return -1;
 
 	if (n_tuples > 0) {
@@ -198,7 +199,7 @@ memtx_build_secondary_index_using_tt_sort(struct index *index, struct index *pk)
 			break;
 		if (tuple == NULL)
 			break;
-		rc = index_build_next(index, tuple);
+		rc = memtx_index_build_next(index, tuple);
 		if (rc != 0)
 			break;
 	}
@@ -206,7 +207,7 @@ memtx_build_secondary_index_using_tt_sort(struct index *index, struct index *pk)
 	if (rc != 0)
 		return -1;
 
-	index_end_build(index);
+	memtx_index_end_build(index);
 	return 0;
 }
 
@@ -873,8 +874,8 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		struct tuple *unused;
 		struct index *index = space->index[i];
 		/* Rollback must not fail. */
-		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &unused, &unused) != 0) {
+		if (memtx_index_replace(index, new_tuple, old_tuple, DUP_INSERT,
+					&unused, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
