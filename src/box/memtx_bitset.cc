@@ -280,22 +280,26 @@ make_key(const char *field, uint32_t *key_len)
 	}
 }
 
+/** Replace old tuple with new tuple in the index. */
 static int
-memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
-			   struct tuple *new_tuple, enum dup_replace_mode mode,
-			   struct tuple **result, struct tuple **successor)
+memtx_bitset_index_replace(struct index *base, struct memtx_index_key old_key,
+			   struct memtx_index_key new_key,
+			   enum dup_replace_mode mode,
+			   struct memtx_index_key *result,
+			   struct memtx_index_key *successor)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	/* BITSET index doesn't support ordering. */
-	*successor = NULL;
-
+	*successor = memtx_index_key_null;
+	struct tuple *old_tuple = old_key.tuple;
+	struct tuple *new_tuple = new_key.tuple;
 	assert(!base->def->opts.is_unique);
 	assert(!base->def->key_def->is_multikey);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 
-	*result = NULL;
+	*result = memtx_index_key_null;
 
 	if (old_tuple != NULL) {
 #ifndef OLD_GOOD_BITSET
@@ -305,7 +309,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 #endif /* #ifndef OLD_GOOD_BITSET */
 		if (tt_bitset_index_contains_value(&index->index,
 						   (size_t) value)) {
-			*result = old_tuple;
+			result->tuple = old_tuple;
 
 			assert(old_tuple != new_tuple);
 			tt_bitset_index_remove_value(&index->index, value);
@@ -327,7 +331,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 			 * have just deregistered the old one - it will be moved
 			 * to the spare list and reused.
 			 */
-			assert(*result == NULL);
+			assert(result->tuple == NULL);
 			return -1;
 		}
 		uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
