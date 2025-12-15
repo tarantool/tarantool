@@ -1,0 +1,9 @@
+name: Setup gcovr
+description: Setup gcovr
+runs:
+  using: composite
+  steps:
+    - name: Install gcovr and dependencies
+      run: |
+        pip3 install gcovr==6.0
+      shell: bash

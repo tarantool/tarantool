@@ -1,0 +1,122 @@
+# XXX: A single call tree for reusable workflows can't exceed the
+# total of 20 workflows, as stated in the documentation [1].
+# This workflow file was created to avoid this limitation.
+#
+# [1]: https://docs.github.com/en/actions/using-workflows/reusing-workflows#limitations
+name: 'Integration / Tarantool'
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - '**-nointegration'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-tarantool-coverage:
+    name: coverage
+    uses: tarantool/tarantool/.github/workflows/coverage.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-debug:
+    name: debug
+    uses: tarantool/tarantool/.github/workflows/debug.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-debug_aarch64:
+    name: debug aarch64
+    uses: tarantool/tarantool/.github/workflows/debug_aarch64.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-debug_asan_clang:
+    name: debug ASAN clang
+    uses: tarantool/tarantool/.github/workflows/debug_asan_clang.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-out_of_source:
+    name: out of source
+    uses: tarantool/tarantool/.github/workflows/out_of_source.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-release:
+    name: release
+    uses: tarantool/tarantool/.github/workflows/release.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-release_asan_clang:
+    name: release ASAN clang
+    uses: tarantool/tarantool/.github/workflows/release_asan_clang.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-release_clang:
+    name: release clang
+    uses: tarantool/tarantool/.github/workflows/release_clang.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-release_lto:
+    name: release lto
+    uses: tarantool/tarantool/.github/workflows/release_lto.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-release_lto_clang:
+    name: release lto clang
+    uses: tarantool/tarantool/.github/workflows/release_lto_clang.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master
+
+  test-tarantool-static_build:
+    name: static build
+    uses: tarantool/tarantool/.github/workflows/static_build.yml@master
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master

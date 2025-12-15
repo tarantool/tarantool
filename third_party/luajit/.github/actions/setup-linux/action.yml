@@ -1,0 +1,19 @@
+name: Setup CI environment on Linux
+description: Common part to tweak Linux CI runner environment
+runs:
+  using: composite
+  steps:
+    - name: Setup CI environment
+      uses: ./.github/actions/setup
+    - name: Set CMAKE_BUILD_PARALLEL_LEVEL
+      run: |
+        # Set CMAKE_BUILD_PARALLEL_LEVEL environment variable to
+        # limit the number of parallel jobs for build/test step.
+        NPROC=$(nproc)
+        echo CMAKE_BUILD_PARALLEL_LEVEL=$(($NPROC + 1)) | tee -a $GITHUB_ENV
+      shell: bash
+    - name: Install build and test dependencies
+      run: |
+        apt -y update
+        apt -y install cmake gcc make ninja-build perl
+      shell: bash

@@ -1,0 +1,23 @@
+# Determine the Linux distro id and return it in the `output`
+# variable. See https://www.linux.org/docs/man5/os-release.html
+# for details.
+macro(GetLinuxDistro output)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "GetLinuxDistro macro must be used only on Linux")
+  endif()
+  set(OS_RELEASE_FILE /etc/os-release)
+  if(NOT EXISTS ${OS_RELEASE_FILE})
+    set(OS_RELEASE_FILE /usr/lib/os-release)
+  endif()
+  file(READ ${OS_RELEASE_FILE} OS_RELEASE)
+  string(REGEX MATCH "ID=([0-9a-z._-]+)" MATCH ${OS_RELEASE})
+  if(MATCH)
+    set(${output} ${CMAKE_MATCH_1})
+  else()
+    set(${output} linux)
+  endif()
+  unset(OS_RELEASE_FILE)
+  unset(OS_RELEASE)
+  unset(MATCH)
+  unset(CMAKE_MATCH_1)
+endmacro()

@@ -1,0 +1,12 @@
+name: Setup CI environment with Valgrind on Linux
+description: Extend setup-linux with Valgrind installation
+
+runs:
+  using: composite
+  steps:
+    - name: Setup CI environment (Linux)
+      uses: ./.github/actions/setup-linux
+    - name: Install Valgrind
+      run: |
+        apt -y install valgrind
+      shell: bash

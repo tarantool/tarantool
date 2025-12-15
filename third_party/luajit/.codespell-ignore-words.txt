@@ -1,0 +1,5 @@
+fal
+fpr
+isnt
+nd
+tru

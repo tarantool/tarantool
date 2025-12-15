@@ -1,0 +1,94 @@
+name: "Build test (GNU Make)"
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  build-gnu-make:
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [ARM64, x86_64]
+        BUILDTYPE: [Debug, Release]
+        GC64: [ON, OFF]
+        OS: [Linux, macOS]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug -DLUA_USE_ASSERT=ON -DLUA_USE_APICHECK=ON
+            MAKEBUILDFLAGS: -DLUA_USE_ASSERT -DLUA_USE_APICHECK
+            # Use `CFLAGS`, because it's the last entry in
+            # `CCOPTIONS`, so we can sure that these flags are not
+            # overwritten.
+            CFLAGS: -g -O0
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          - GC64: ON
+            MAKEGC64FLAGS: -DLUAJIT_ENABLE_GC64
+        exclude:
+          - ARCH: ARM64
+            GC64: OFF
+          - OS: macOS
+            GC64: OFF
+    runs-on: [self-hosted, regular, '${{ matrix.OS }}', '${{ matrix.ARCH }}']
+    name: >
+      LuaJIT
+      (${{ matrix.OS }}/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup Linux
+        uses: ./.github/actions/setup-linux
+        if: ${{ matrix.OS == 'Linux' }}
+      - name: setup macOS
+        uses: ./.github/actions/setup-macos
+        if: ${{ matrix.OS == 'macOS' }}
+      - name: configure (CMake GNU Make)
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          ${{ matrix.CMAKEFLAGS }}
+          -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      - name: build (CMake GNU Make)
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: smoke-test (CMake GNU Make)
+        run: ./src/luajit -e 'print("CMake with GNU Make generator build succeeded")'
+        working-directory: ${{ env.BUILDDIR }}
+
+        # XXX: working directory is omitted for the next steps,
+        # since Makefile.original provides only in-source build.
+        # hence clean up is not needed for the next steps.
+
+      - name: build (Makefile.original)
+        run: >
+          make -f Makefile.original -j
+          CFLAGS='${{ matrix.CFLAGS }}'
+          XCFLAGS='${{ matrix.MAKEBUILDFLAGS }} ${{ matrix.MAKEGC64FLAGS }}'
+      - name: smoke-test (Makefile.original)
+        run: ./src/luajit -e 'print("Makefile.original build succeeded")'

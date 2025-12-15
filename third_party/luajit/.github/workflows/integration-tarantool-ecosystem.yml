@@ -1,0 +1,46 @@
+# XXX: A single call tree for reusable workflows can't exceed the
+# total of 20 workflows, as stated in the documentation [1].
+# This workflow file was created to avoid this limitation.
+#
+# [1]: https://docs.github.com/en/actions/using-workflows/reusing-workflows#limitations
+name: 'Integration / Tarantool ecosystem'
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - '**-nointegration'
+      - 'upstream-**'
+      # FIXME: Temporarily disable this workflow until it is
+      # fixed on the Tarantool's side. See also:
+      # https://github.com/tarantool/tarantool/pull/11220.
+      - '**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-tarantool-integration:
+    uses: tarantool/tarantool/.github/workflows/integration.yml@master
+    secrets: inherit
+    with:
+      submodule: luajit
+      revision: ${{ github.sha }}
+      tarantool_revision: master

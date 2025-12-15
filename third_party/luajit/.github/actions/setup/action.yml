@@ -1,0 +1,10 @@
+name: Setup CI environment
+description: Common part to tweak CI runner environment
+runs:
+  using: composite
+  steps:
+    - run: |
+        # Set BUILDDIR environment variable to specify LuaJIT
+        # build directory.
+        echo BUILDDIR=${{ runner.temp }}/build-${{ github.run_id }} | tee -a $GITHUB_ENV
+      shell: bash

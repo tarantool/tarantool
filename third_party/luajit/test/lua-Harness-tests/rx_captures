@@ -1,0 +1,13 @@
+(a.)..(..)		zzzabcdefzzz	ab\tef			basic match
+(a(b(c))(d))		abcd		abcd\tbc\tc\td		nested match
+((%w+))			abcd		abcd\tabcd		nested match
+(a*(.)%w(%s*))		aa!b c		aa!b \t!\t 		nested match
+(a?)..			abcd		a			opt
+(A?)..			abcd		''			opt
+()aa()			flaaap		3\t5			empty capture
+(.)%1			bookkeeper	o			backreference
+(%w+)%s+%1		hello hello	hello			backreference
+(.*)x			123x		123			repeated dot capture
+$(%w+)			$abc=		abc			not escaped
+
+## vim: noexpandtab tabstop=4 shiftwidth=4

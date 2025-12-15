@@ -64,3 +64,6 @@
 [submodule "third_party/metrics"]
 	path = third_party/metrics
 	url = https://github.com/tarantool/metrics.git
+[submodule "luajit"]
+	path = luajit
+	url = https://github.com/tarantool/luajit

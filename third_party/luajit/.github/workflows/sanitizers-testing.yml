@@ -1,0 +1,99 @@
+name: Sanitizers testing
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-asan:
+    strategy:
+      fail-fast: false
+      matrix:
+        # XXX: Let's start with only Linux/x86_64
+        BUILDTYPE: [Debug, Release]
+        CC: [gcc-10, clang-11]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug -DLUA_USE_ASSERT=ON -DLUA_USE_APICHECK=ON
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    runs-on: [self-hosted, regular, Linux, x86_64]
+    name: >
+      LuaJIT with ASan and UBSan (Linux/x86_64)
+      ${{ matrix.BUILDTYPE }}
+      CC:${{ matrix.CC }}
+      GC64:ON SYSMALLOC:ON
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup Linux for sanitizers
+        uses: ./.github/actions/setup-sanitizers
+        with:
+          cc_name: ${{ matrix.CC }}
+      - name: configure
+        # XXX: LuaJIT configuration requires a couple of tweaks:
+        # LUAJIT_USE_SYSMALLOC=ON: Unfortunately, internal LuaJIT
+        #   memory allocator is not instrumented yet, so to find
+        #   any memory errors it's better to build LuaJIT with
+        #   system provided memory allocator (i.e. run CMake
+        #   configuration phase with -DLUAJIT_USE_SYSMALLOC=ON).
+        #   For more info, see root CMakeLists.txt.
+        # LUAJIT_ENABLE_GC64=ON: LUAJIT_USE_SYSMALLOC cannot be
+        #   enabled on x64 without GC64, since realloc usually
+        #   doesn't return addresses in the right address range.
+        #   For more info, see root CMakeLists.txt.
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -G Ninja
+          ${{ matrix.CMAKEFLAGS }}
+          -DLUAJIT_ENABLE_GC64=ON
+          -DLUAJIT_USE_ASAN=ON
+          -DLUAJIT_USE_SYSMALLOC=ON
+          -DLUAJIT_USE_UBSAN=ON
+      - name: build
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: test
+        env:
+          # Enable as much checks as possible. See more info here:
+          # https://github.com/google/sanitizers/wiki/AddressSanitizerFlags,
+          # https://github.com/google/sanitizers/wiki/SanitizerCommonFlags.
+          ASAN_OPTIONS: "                    \
+            detect_invalid_pointer_pairs=1:  \
+            detect_leaks=1:                  \
+            detect_stack_use_after_return=1: \
+            dump_instruction_bytes=1:        \
+            heap_profile=0:                  \
+            print_suppressions=0:            \
+            symbolize=1:                     \
+            unmap_shadow_on_exit=1:          \
+          "
+          UBSAN_OPTIONS: "
+            print_stacktrace=1 \
+          "
+        run: cmake --build . --parallel --target LuaJIT-test
+        working-directory: ${{ env.BUILDDIR }}

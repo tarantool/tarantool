@@ -1,0 +1,104 @@
+name: "Exotic builds testing"
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-exotic:
+    strategy:
+      fail-fast: false
+      matrix:
+        BUILDTYPE: [Debug, Release]
+        ARCH: [ARM64, x86_64]
+        GC64: [ON, OFF]
+        FLAVOR: [checkhook, dualnum, dynamic, gdbjit, nojit, noprof, nounwind, tablebump]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug -DLUA_USE_ASSERT=ON -DLUA_USE_APICHECK=ON
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          - FLAVOR: dualnum
+            FLAVORFLAGS: -DLUAJIT_NUMMODE=2
+          - FLAVOR: dynamic
+            FLAVORFLAGS: -DBUILDMODE=dynamic
+          - FLAVOR: checkhook
+            FLAVORFLAGS: -DLUAJIT_ENABLE_CHECKHOOK=ON
+          - FLAVOR: nojit
+            FLAVORFLAGS: -DLUAJIT_DISABLE_JIT=ON
+          - FLAVOR: noprof
+            FLAVORFLAGS: -DLUAJIT_DISABLE_MEMPROF=ON -DLUAJIT_DISABLE_SYSPROF=ON
+          - FLAVOR: gdbjit
+            FLAVORFLAGS: -DLUAJIT_USE_GDBJIT=ON
+          - FLAVOR: nounwind
+            FLAVORFLAGS: -DLUAJIT_NO_UNWIND=ON
+          - FLAVOR: tablebump
+            FLAVORFLAGS: -DLUAJIT_ENABLE_TABLE_BUMP=ON
+        exclude:
+          - ARCH: ARM64
+            GC64: OFF
+          # DUALNUM is default for ARM64, no need for additional testing.
+          - FLAVOR: dualnum
+            ARCH: ARM64
+          # There is no need to test any scenarios except the most
+          # common one for the shared library build.
+          - FLAVOR: dynamic
+            ARCH: ARM64
+          - FLAVOR: dynamic
+            BUILDTYPE: Release
+          - FLAVOR: noprof
+            ARCH: ARM64
+          # With table bump optimization enabled (and due to our modification
+          # related to metrics), some offsets in GG_State stop fitting in 12bit
+          # immediate. Hence, the build failed due to the DASM error
+          # (`DASM_S_RANGE_I`).
+          - FLAVOR: tablebump
+            ARCH: ARM64
+    runs-on: [self-hosted, regular, Linux, '${{ matrix.ARCH }}']
+    name: >
+      LuaJIT ${{ matrix.FLAVOR }}
+      (Linux/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup Linux
+        uses: ./.github/actions/setup-linux
+      - name: configure
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -G Ninja
+          ${{ matrix.CMAKEFLAGS }}
+          ${{ matrix.FLAVORFLAGS }}
+          -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      - name: build
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: test
+        run: cmake --build . --parallel --target LuaJIT-test
+        working-directory: ${{ env.BUILDDIR }}

@@ -1,0 +1,64 @@
+name: "AVX512 build testing"
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-avx512:
+    name: LuaJIT AVX512 build testing
+    strategy:
+      fail-fast: false
+    runs-on: [self-hosted, regular, x86_64, Linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Detect a presence of AVX512
+        id: avx512_script
+        run: |
+          # Set the avx512_support environment variable to an exit
+          # code returned by `grep`. The exit status of `grep` is
+          # 0 if lines were found, 1 if no lines were found, and 2
+          # if an error occurred.
+          avx512_support=$(grep avx512f /proc/cpuinfo 2>&1 > /dev/null; echo $?)
+          echo "avx512_support=$avx512_support" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: setup Linux
+        uses: ./.github/actions/setup-linux
+      - name: configure
+        if: needs.avx512_script.outputs.avx512_support == 0
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS=-march=skylake-avx512
+      - name: build
+        if: needs.avx512_script.outputs.avx512_support == 0
+        run: cmake --build ${{ env.BUILDDIR }} --parallel
+      - name: run regression tests
+        if: needs.avx512_script.outputs.avx512_support == 0
+        run: cmake --build ${{ env.BUILDDIR }} --parallel --target LuaJIT-test

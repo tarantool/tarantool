@@ -1,0 +1,128 @@
+# XXX: A single call tree for reusable workflows can't exceed the
+# total of 20 workflows, as stated in the documentation [1].
+# Some other jobs are started in separate workflow files to
+# overcome the limitation. The jobs are Tarantool ecosystem
+# integration testing (tarantool-ecosystem.yml) and exotic
+# Tarantool builds (tarantool-exotic.yml).
+#
+# [1]: https://docs.github.com/en/actions/using-workflows/reusing-workflows#limitations
+name: Testing
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-luajit:
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [ARM64, x86_64]
+        BUILDTYPE: [Debug, Release]
+        GC64: [ON, OFF]
+        OS: [Linux, macOS]
+        CC: [gcc, clang]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug -DLUA_USE_ASSERT=ON -DLUA_USE_APICHECK=ON
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        exclude:
+          - ARCH: ARM64
+            GC64: OFF
+          - OS: macOS
+            GC64: OFF
+          - OS: macOS
+            CC: gcc
+          - ARCH: ARM64
+            OS: Linux
+            CC: clang
+    runs-on: [self-hosted, regular, '${{ matrix.OS }}', '${{ matrix.ARCH }}']
+    name: >
+      LuaJIT
+      (${{ matrix.OS }}/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+      CC:${{ matrix.CC }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup Linux
+        uses: ./.github/actions/setup-linux
+        if: ${{ matrix.OS == 'Linux' }}
+      - name: setup macOS
+        uses: ./.github/actions/setup-macos
+        if: ${{ matrix.OS == 'macOS' }}
+      - name: configure
+        run: >
+          CC=${{ matrix.CC }}
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -G Ninja
+          ${{ matrix.CMAKEFLAGS }}
+          -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      - name: build
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: test
+        run: cmake --build . --parallel --target LuaJIT-test
+        working-directory: ${{ env.BUILDDIR }}
+
+
+  test-tarantool:
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [ARM64, x86_64]
+        BUILDTYPE: [Debug, Release]
+        GC64: [ON, OFF]
+        OS: [Linux, macOS]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        exclude:
+          - ARCH: ARM64
+            GC64: OFF
+          - OS: macOS
+            GC64: OFF
+    name: >
+      Tarantool
+      (${{ matrix.OS }}/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+    needs: test-luajit
+    # XXX: Only LuaJIT-tests are running in this workflow.
+    uses: tarantool/tarantool/.github/workflows/luajit-integration.yml@master
+    with:
+      CMAKE_EXTRA_PARAMS: >
+        -G Ninja
+        ${{ matrix.CMAKEFLAGS }}
+        -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      arch: ${{ matrix.ARCH }}
+      os: ${{ matrix.OS }}
+      revision: ${{ github.sha }}

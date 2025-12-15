@@ -1,0 +1,110 @@
+name: Performance
+
+on:
+  push:
+    branches-ignore:
+      - '**-noperf'
+      - 'tarantool/release/**'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+  schedule:
+    # Once a day at 03:00 to avoid clashing with runs for the
+    # Tarantool benchmarks at midnight.
+    - cron: '0 3 * * *'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  performance-luajit:
+    # The 'performance' label _must_ be set only for the single
+    # runner to guarantee that results are not dependent on the
+    # machine.
+    runs-on:
+      - self-hosted
+      - Linux
+      - x86_64
+      - 'performance'
+
+    env:
+      PERF_BRANCH: ${{ github.ref_name }}
+      PERF_COMMIT: ${{ github.sha }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        GC64: [ON, OFF]
+        JOFF: [ON, OFF]
+      # Run each job sequentially.
+      max-parallel: 1
+    name: >
+      LuaJIT
+      GC64:${{ matrix.GC64 }}
+      JOFF:${{ matrix.JOFF }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup performance environment
+        uses: ./.github/actions/setup-performance
+      - name: configure
+        # The taskset alone will pin all the process threads
+        # into a single (random) isolated CPU, see
+        # https://bugzilla.kernel.org/show_bug.cgi?id=116701.
+        # The workaround is using realtime scheduler for the
+        # isolated task using chrt, e. g.:
+        # sudo taskset 0xef chrt 50.
+        # But this makes the process use non-standard, real-time
+        # round-robin scheduling mechanism.
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DLUAJIT_ENABLE_PERF=ON
+          -DLUAJIT_BENCH_INIT="taskset 0xfe chrt 50"
+          -DLUAJIT_DISABLE_JIT=${{ matrix.JOFF }}
+          -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      - name: build
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: perf
+        run: make LuaJIT-perf
+        working-directory: ${{ env.BUILDDIR }}
+      - name: aggregate benchmark results
+        run: make LuaJIT-perf-aggregate
+        working-directory: ${{ env.BUILDDIR }}
+      - name: send statistics to InfluxDB
+        # --silent -o /dev/null: Prevent dumping any reply part
+        # in the output in case of an error.
+        # --fail: Exit with the 22 error code is status >= 400.
+        # --write-out: See the reason for the failure, if any.
+        # --retry, --retry-delay: To avoid losing the results of
+        # running after such a long job, try to retry sending the
+        # results.
+        run: >
+          curl --request POST
+          "${{ secrets.INFLUXDB_URL }}/api/v2/write?org=tarantool&bucket=luajit-performance&precision=s"
+          --write-out "%{http_code}"
+          --retry 5
+          --retry-delay 5
+          --connect-timeout 120
+          --fail --silent -o /dev/null
+          --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN }}"
+          --data-binary @./perf/output/summary.txt
+        working-directory: ${{ env.BUILDDIR }}

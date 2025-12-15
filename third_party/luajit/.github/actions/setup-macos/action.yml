@@ -1,0 +1,37 @@
+name: Setup CI environment on macOS
+description: Common part to tweak macOS CI runner environment
+runs:
+  using: composite
+  steps:
+    - name: Setup CI environment
+      uses: ./.github/actions/setup
+    - name: Set CMAKE_BUILD_PARALLEL_LEVEL
+      run: |
+        # Set CMAKE_BUILD_PARALLEL_LEVEL environment variable to
+        # limit the number of parallel jobs for build/test step.
+        NPROC=$(sysctl -n hw.logicalcpu 2>/dev/null)
+        echo CMAKE_BUILD_PARALLEL_LEVEL=$(($NPROC + 1)) | tee -a $GITHUB_ENV
+      shell: bash
+    - name: Set MACOSX_DEPLOYMENT_TARGERT
+      run: |
+        # Set required MACOSX_DEPLOYMENT_TARGERT environment
+        # variable for Makefile.original build.
+        # See https://github.com/LuaJIT/LuaJIT/issues/484,
+        # https://github.com/LuaJIT/LuaJIT/issues/653.
+        echo MACOSX_DEPLOYMENT_TARGET=$(sw_vers -productVersion) | tee -a $GITHUB_ENV
+      shell: bash
+    - name: Install build and test dependencies
+      run: |
+        # Install brew using the command from Homebrew repository
+        # instructions: https://github.com/Homebrew/install.
+        # XXX: 'echo' command below is required since brew
+        # installation script obliges the one to enter a newline
+        # for confirming the installation via Ruby script.
+        brew update ||
+          echo | /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+        # Try to install the packages either upgrade it to avoid
+        # of fails if the package already exists with the previous
+        # version.
+        brew install --force cmake gcc make ninja perl ||
+          brew upgrade cmake gcc make ninja perl
+      shell: bash

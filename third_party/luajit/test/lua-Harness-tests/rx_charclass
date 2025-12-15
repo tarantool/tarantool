@@ -1,0 +1,38 @@
+[c]			abcdef		c		character class
+^[a]			abcdef		a		anchored character class
+[^e]			abcdef		a		negated character class
+^[a]?			abcdef		a		anchored optional character class
+[^e]?			abcdef		a		negated optional character class
+^[^e]			abcdef		a		anchored negated character class
+^[^a]			abcdef		nil		anchored negated character class
+[b-d]			abcdef		b		character range
+[b-d]			abxxef		b		character range
+[b-d]			axcxef		c		character range
+[b-d]			axxdef		d		character range
+[b-d]			axxxef		nil		character range
+[^b-d]			abcdef		a		negated character range
+[^b-d]			bbccdd		nil		negated character range
+[-]			ab-def		-		unescaped hyphen
+[%-]			ab-def		-		escaped hyphen
+[%-]			abcdef		nil		escaped hyphen
+[^%-]			---x--		x		negated escaped hyphen
+[^%-]			------		nil		negated escaped hyphen
+[%-+]			ab-def		-		escaped hyphen in range
+[%-+]			ab+def		+		escaped hyphen in range
+[%-+]			abcdef		nil		escaped hyphen in range
+[+%-]			ab-def		-		escaped hyphen in range
+[+%-]			ab+def		+		escaped hyphen in range
+[+%-]			abcdef		nil		escaped hyphen in range
+[^%-+]			---x--		x		negated escaped hyphen in range
+[^%-+]			------		nil		negated escaped hyphen in range
+[^+%-]			---x--		x		negated escaped hyphen in range
+[^+%-]			------		nil		negated escaped hyphen in range
+["\\]			\\		\		escaped backslash
+[%]]			]		]		escaped close bracket
+[%]			\\]]		/malformed pattern %(missing ']'%)/	unescaped backslash (or no closing brace)
+ab\\cd			ab\092cd	ab\cd		literal match with backslash
+%?			ab<?		?		literal match with question mark
+[A-Z0-9]		abcdef		nil		two enumerated ranges
+[A-Z0-9]		abcDef		D		two enumerated ranges
+
+## vim: noexpandtab tabstop=4 shiftwidth=4

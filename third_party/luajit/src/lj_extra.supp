@@ -1,0 +1,19 @@
+# Valgrind suppression file maintained by the Tarantool team.
+
+# Missed from the original suppression file.
+# Unaligned access to the string, see <lj_str.c> for the details.
+{
+   Optimized string compare
+   Memcheck:Addr4
+   fun:lj_getu32
+   fun:str_fastcmp
+}
+
+# Missed from the original suppression file.
+# `lj_str_cmp()` may read up to 3 extra bytes from the end of the
+# string. It is OK due to the aligned allocations.
+{
+   Optimized string compare
+   Memcheck:Cond
+   fun:lj_str_cmp
+}

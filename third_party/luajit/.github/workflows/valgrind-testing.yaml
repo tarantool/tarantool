@@ -1,0 +1,109 @@
+name: Valgrind testing
+
+on:
+  push:
+    branches-ignore:
+      - '**-notest'
+      - 'upstream-**'
+    tags-ignore:
+      - '**'
+
+concurrency:
+  # An update of a developer branch cancels the previously
+  # scheduled workflow run for this branch. However, the default
+  # branch, and long-term branch (tarantool/release/2.11,
+  # tarantool/release/2.10, etc) workflow runs are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow
+  # run ID' + # 'workflow run attempt' because it is a unique
+  # combination for any run. So it effectively discards grouping.
+  #
+  # XXX: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push
+  # event.
+  group: ${{ startsWith(github.ref, 'refs/heads/tarantool/')
+    && format('{0}-{1}', github.run_id, github.run_attempt)
+    || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  test-valgrind:
+    strategy:
+      fail-fast: false
+      matrix:
+        # XXX: Let's start with only Linux/x86_64.
+        # We don't test on arm64 because the address returned by
+        # the system allocator may exceed 47 bits. As a result, we
+        # are unable to allocate memory for `lua_State`.
+        # Therefore, testing on this platform is currently
+        # disabled.
+        BUILDTYPE: [Debug, Release]
+        VALGRIND_SCENARIO:
+          - full
+          - malloc-free-fill-0x00
+          - malloc-free-fill-0xff
+          - track-fds
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug -DLUA_USE_ASSERT=ON -DLUA_USE_APICHECK=ON
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          - VALGRIND_SCENARIO: full
+            VALGRIND_OPTS: --leak-check=full --show-leak-kinds=all --track-origins=yes
+            JOB_POSTFIX: "leak-check: full"
+            # The use of `0x00` and `0xFF` for memory fill helps
+            # to detect dirty reads. `0x00` mimics
+            # zero-initialized memory, which can mask some
+            # uninitialized memory usage. `0xFF` fills memory with
+            # a non-zero values to make such errors easier to
+            # spot.
+          - VALGRIND_SCENARIO: malloc-free-fill-0x00
+            VALGRIND_OPTS: --leak-check=no --malloc-fill=0x00 --free-fill=0x00
+            JOB_POSTFIX: "malloc/free-fill: 0x00"
+          - VALGRIND_SCENARIO: malloc-free-fill-0xff
+            VALGRIND_OPTS: --leak-check=no --malloc-fill=0xff --free-fill=0xff
+            JOB_POSTFIX: "malloc/free-fill: 0xff"
+          - VALGRIND_SCENARIO: track-fds
+            VALGRIND_OPTS: --leak-check=no --track-fds=yes
+            JOB_POSTFIX: "track-fds"
+    runs-on: [self-hosted, regular, Linux, x86_64]
+    name: >
+      LuaJIT with Valgrind (Linux/x86_64)
+      ${{ matrix.BUILDTYPE }}
+      CC: gcc
+      GC64:ON SYSMALLOC:ON
+      ${{ matrix.JOB_POSTFIX }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: setup Linux for Valgrind
+        uses: ./.github/actions/setup-valgrind
+      - name: configure
+        # XXX: LuaJIT configuration requires a couple of tweaks:
+        # LUAJIT_USE_SYSMALLOC=ON: Unfortunately, the internal
+        # LuaJIT memory allocator is not instrumented yet, so to
+        # find any memory errors, it's better to build LuaJIT with
+        # the system-provided memory allocator (i.e. run CMake
+        # configuration phase with -DLUAJIT_USE_SYSMALLOC=ON).
+        # For more info, see root CMakeLists.txt.
+        # LUAJIT_ENABLE_GC64=ON: LUAJIT_USE_SYSMALLOC cannot be
+        # enabled on x64 without GC64, since realloc usually
+        # doesn't return addresses in the right address range.
+        # For more info, see root CMakeLists.txt.
+        run: >
+          cmake -S . -B ${{ env.BUILDDIR }}
+          -G Ninja
+          ${{ matrix.CMAKEFLAGS }}
+          -DLUAJIT_USE_VALGRIND=ON
+          -DLUAJIT_ENABLE_GC64=ON
+          -DLUAJIT_USE_SYSMALLOC=ON
+      - name: build
+        run: cmake --build . --parallel
+        working-directory: ${{ env.BUILDDIR }}
+      - name: test
+        env:
+          VALGRIND_OPTS: ${{ matrix.VALGRIND_OPTS }}
+        run: cmake --build . --parallel --target LuaJIT-test
+        working-directory: ${{ env.BUILDDIR }}
