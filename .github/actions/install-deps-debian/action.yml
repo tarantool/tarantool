@@ -17,7 +17,6 @@ runs:
         apt-get -y -f install \
           build-essential \
           ninja-build \
-          cmake \
           lua5.1 \
           lcov \
           ruby-dev \
@@ -27,8 +26,15 @@ runs:
           automake \
           libtool \
           util-linux \
-          tt
+          tt \
+          python3-pip
         tt rocks install luatest 1.2.1
         tt rocks install luacheck 0.26.0
         gem install coveralls-lcov
+
+        apt-get purge --auto-remove cmake -y
+        # ubuntu 20.04 repos do not contain cmake 3.26.0
+        # thus we require an alternative way of installing
+        # this version
+        pip install cmake==3.26.0
       shell: bash
