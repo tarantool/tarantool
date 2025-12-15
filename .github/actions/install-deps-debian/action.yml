@@ -17,7 +17,6 @@ runs:
         apt-get -y -f install \
           build-essential \
           ninja-build \
-          cmake \
           lua5.1 \
           lcov \
           ruby-dev \
@@ -27,7 +26,12 @@ runs:
           automake \
           libtool \
           util-linux \
-          tt
+          tt \
+          python3.8-venv \
+          pipx
+        # comment
+        apt-get purge --auto-remove cmake -y
+        pipx install cmake==3.26.0 && pipx ensurepath --force
         tt rocks install luatest 1.2.1
         tt rocks install luacheck 0.26.0
         gem install coveralls-lcov
