@@ -130,12 +130,17 @@ local MAX_DATE_DAY = 11
 local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 -- -5879610-06-22
 local MIN_DATE_TEXT = ('%d-%02d-%02d'):format(MIN_DATE_YEAR, MIN_DATE_MONTH,
                                               MIN_DATE_DAY)
 -- 5879611-07-11
 local MAX_DATE_TEXT = ('%d-%02d-%02d'):format(MAX_DATE_YEAR, MAX_DATE_MONTH,
                                               MAX_DATE_DAY)
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
 local MAX_YEAR_RANGE = MAX_DATE_YEAR - MIN_DATE_YEAR
 local MAX_MONTH_RANGE = MAX_YEAR_RANGE * 12
 local MAX_WEEK_RANGE = MAX_YEAR_RANGE * AVERAGE_WEEK_YEAR
@@ -655,10 +660,12 @@ end
 
 -- Timestamp is erroneously considered as "local", not UTC (gh10363).
 -- Handle this historical case here.
-local function update_epoch(epoch, offset)
+local function check_and_update_epoch(epoch, offset)
     -- Convert "local" timestamp to UTC timestamp.
     -- Removing this adjustment will fix gh10363.
     epoch = utc_secs(epoch, offset)
+    check_range(epoch, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'timestamp',
+        nil, 1)
     return epoch
 end
 
@@ -680,7 +687,7 @@ local function datetime_new(obj)
     if epoch ~= nil then
         local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
         tzoffset, tzindex = tzoffset or 0, tzindex or 0
-        epoch = update_epoch(epoch, tzoffset)
+        epoch = check_and_update_epoch(epoch, tzoffset)
         return datetime_new_raw(epoch, nsec, tzoffset, tzindex)
     end
 
@@ -1078,7 +1085,7 @@ function datetime_set(self, obj)
     if epoch ~= nil then
         local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
         local effective_tzoffset = tzoffset or self.tzoffset
-        epoch = update_epoch(epoch, effective_tzoffset)
+        epoch = check_and_update_epoch(epoch, effective_tzoffset)
 
         self.epoch = epoch
         self.nsec = nsec
