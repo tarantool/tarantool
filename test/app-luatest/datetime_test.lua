@@ -6,6 +6,17 @@ local compat = require('compat')
 
 -- {{{ Datetime module and related helper constants.
 
+local INT_MAX = 2147483647
+local INT_MIN = -2147483648
+local SECS_PER_DAY = 86400
+
+local DAYS_EPOCH_OFFSET = 719163
+local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+
 -- Minimum supported date: -5879610-06-22.
 local MIN_DATE_YEAR = -5879610
 local MIN_DATE_MONTH = 6
@@ -24,6 +35,7 @@ local DAY_RANGE = {1, 31}
 local HOUR_RANGE = {0, 23}
 local MINUTE_RANGE = {0, 59}
 local SEC_RANGE = {0, 60}
+local TIMESTAMP_RANGE = {MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE}
 local MSEC_RANGE = {0, 1E3}
 local USEC_RANGE = {0, 1E6}
 local NSEC_RANGE = {0, 1E9}
@@ -2182,9 +2194,18 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
         return ("%s: %s expected, but received %s"):format(key, what_expected, val)
     end,
 
-    range_check_error = function(set_arg, range)
+    range_check_error_string = function(set_arg, range)
         local key, val = get_single_key_val(set_arg, true)
         return ('value %s of %s is out of allowed range [%s, %s]'):
+              format(val, key, range[1], range[2])
+    end,
+
+    -- Using %s conversion for large integer values produce
+    -- scientific-format strings. This fn is for the case,
+    -- when precise integer representation is needed.
+    range_check_error_digit = function(set_arg, range)
+        local key, val = get_single_key_val(set_arg, true)
+        return ('value %d of %s is out of allowed range [%d, %d]'):
               format(val, key, range[1], range[2])
     end,
 
@@ -2364,12 +2385,12 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
     -- Single unit range tests.
     {
         set_range = {'year', YEAR_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {YEAR_RANGE},
     },
     {
         set_range = {'month', MONTH_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {MONTH_RANGE},
     },
     {
@@ -2379,37 +2400,42 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
     },
     {
         set_range = {'hour', HOUR_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {HOUR_RANGE},
     },
     {
         set_range = {'min', MINUTE_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {MINUTE_RANGE},
     },
     {
         set_range = {'sec', SEC_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {SEC_RANGE},
     },
     {
+        set_range = {'timestamp', TIMESTAMP_RANGE},
+        err_fn = 'range_check_error_digit',
+        err_fn_args = {TIMESTAMP_RANGE},
+    },
+    {
         set_range = {'msec', MSEC_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {MSEC_RANGE},
     },
     {
         set_range = {'usec', USEC_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {USEC_RANGE},
     },
     {
         set_range = {'nsec', NSEC_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {NSEC_RANGE},
     },
     {
         set_range = {'tzoffset', TZOFFSET_RANGE},
-        err_fn = 'range_check_error',
+        err_fn = 'range_check_error_string',
         err_fn_args = {TZOFFSET_RANGE},
     },
     -- Date range tests.
