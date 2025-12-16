@@ -78,6 +78,13 @@ local function range_check_error(name, value, range)
               format(value, name, range[1], range[2])
 end
 
+-- Using %s conversion for large integer values produce scientific-format strings.
+-- This wrapper is for the case, when precise integer representation is needed.
+local function range_check_error_d(name, value, range)
+    return ('value %d of %s is out of allowed range [%d, %d]'):
+              format(value, name, range[1], range[2])
+end
+
 local function range_check_3_error(name, value, range)
     return ('value %d of %s is out of allowed range [%d, %d..%d]'):
             format(value, name, range[1], range[2], range[3])
@@ -90,6 +97,10 @@ end
 
 local function invalid_date(y, M, d)
     return ('date %d-%02d-%02d is invalid'):format(y, M, d)
+end
+
+local function invalid_timestamp(ts)
+    return range_check_error_d('UTC-timestamp', ts, {MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE})
 end
 
 local function invalid_tz_fmt_error(val)
@@ -247,7 +258,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(15)
+    test:plan(17)
     local ts
     local obj = {}
     local attribs = {
@@ -279,10 +290,14 @@ test:test("Simple date creation by attributes", function(test)
             '2021-08-30T21:31:11.000000123Z', '{timestamp.nsec}')
     test:is(tostring(date.new{timestamp = -0.1}),
             '1969-12-31T23:59:59.900Z', '{negative timestamp}')
+    test:is(tostring(date.new{timestamp = MIN_EPOCH_SECS_VALUE}),
+            '-5879610-06-22T00:00:00Z', '{MIN_EPOCH_SECS_VALUE timestamp}')
+    test:is(tostring(date.new{timestamp = MAX_EPOCH_SECS_VALUE}),
+            '5879611-07-11T00:00:00Z', '{MAX_EPOCH_SECS_VALUE timestamp}')
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(93)
+    test:plan(95)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -369,6 +384,8 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp(MIN_EPOCH_SECS_VALUE - 1), {timestamp = MIN_EPOCH_SECS_VALUE - 1}},
+        {invalid_timestamp(MAX_EPOCH_SECS_VALUE + 1), {timestamp = MAX_EPOCH_SECS_VALUE + 1}},
         {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.new()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -2928,7 +2945,7 @@ test:test("Time :set{} operations", function(test)
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(12)
+    test:plan(14)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -2963,11 +2980,23 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('negative timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+
+    obj = {timestamp = MIN_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MIN_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+
+    obj = {timestamp = MAX_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MAX_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
 end)
 
 
 test:test("Time invalid :set{} operations", function(test)
-    test:plan(94)
+    test:plan(96)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -3055,6 +3084,8 @@ test:test("Time invalid :set{} operations", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp(MIN_EPOCH_SECS_VALUE - 1), {timestamp = MIN_EPOCH_SECS_VALUE - 1}},
+        {invalid_timestamp(MAX_EPOCH_SECS_VALUE + 1), {timestamp = MAX_EPOCH_SECS_VALUE + 1}},
         {expected_str('parse_tzname()', 400), {tz = 400}},
         {table_expected('datetime.set()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.set()', 20010101), 20010101},
