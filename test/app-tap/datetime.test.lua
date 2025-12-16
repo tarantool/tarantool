@@ -11,6 +11,7 @@ local TZ = date.TZ
 test:plan(42)
 
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -30,6 +31,13 @@ local MAX_SEC_RANGE = MAX_DAY_RANGE * SECS_PER_DAY
 local MAX_NSEC_RANGE = INT_MAX
 local MAX_USEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e3)
 local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
+
+local DAYS_EPOCH_OFFSET = 719163
+local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
 
 local incompat_types = 'incompatible types for datetime comparison'
 local only_integer_msg = function(key)
@@ -220,7 +228,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(17)
+    test:plan(19)
     local ts
     local obj = {}
     local attribs = {
@@ -258,6 +266,11 @@ test:test("Simple date creation by attributes", function(test)
     d2 = date.new({timestamp = d1.timestamp, tz = 'Europe/Moscow'})
     test:is(d1.tzoffset, d2.tzoffset, '{ymd} and {timestamp} tzoffset equals')
     test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
+
+    test:is(tostring(date.new{timestamp = MIN_EPOCH_SECS_VALUE}),
+            '-5879610-06-22T00:00:00Z', '{MIN_EPOCH_SECS_VALUE timestamp}')
+    test:is(tostring(date.new{timestamp = MAX_EPOCH_SECS_VALUE}),
+            '5879611-07-11T00:00:00Z', '{MAX_EPOCH_SECS_VALUE timestamp}')
 end)
 
 test:test("Formatting limits", function(test)
@@ -2747,7 +2760,7 @@ test:test("Time :set{} operations", function(test)
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(15*2)
+    test:plan(17*2)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -2807,6 +2820,24 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
             format(tostring(ts), tostring(ts2)))
     test:is_deeply(ts:totable(), ts2:totable(),
         ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = MIN_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MIN_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+                   ':totable() equals:'..
+                   json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = MAX_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MAX_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+                   ':totable() equals:'..
+                   json.encode({ts:totable(), ts2:totable()}))
 end)
 
 test:test("Time invalid tzoffset in :set{} operations", function(test)
