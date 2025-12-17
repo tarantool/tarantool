@@ -55,6 +55,15 @@ fmt(char *fmt, ...)
 	return ret;
 }
 
+/** minimum supported date - -5879610-06-22 */
+#define MIN_DATE_YEAR -5879610
+#define MIN_DATE_MONTH 6
+#define MIN_DATE_DAY 22
+/** maximum supported date - 5879611-07-11 */
+#define MAX_DATE_YEAR 5879611
+#define MAX_DATE_MONTH 7
+#define MAX_DATE_DAY 11
+
 #define S(s) {s, sizeof(s) - 1}
 struct {
 	const char *str;
@@ -208,7 +217,7 @@ tostring_datetime_test(void)
 		{"2013-10-28T17:51:56Z",   1382982716,         0,    0},
 		{"9999-12-31T23:59:59Z", 253402300799,         0,    0},
 		{"10000-01-01T00:00:00Z", 253402300800,        0,    0},
-		{"5879611-07-11T00:00:00Z", 185480451417600,   0,    0},
+		{"5879611-07-11T00:00:00Z", MAX_EPOCH_SECS_VALUE,   0,    0},
 	};
 	size_t index;
 
@@ -240,7 +249,7 @@ parse_date_test(void)
 {
 	plan(160);
 
-	static struct {
+	struct {
 		int64_t epoch;
 		const char *string;
 		size_t len; /* expected parsed length, may be not full */
@@ -268,11 +277,21 @@ parse_date_test(void)
 		{ -62167219200, "0000-Q1-01", 10 },
 		{ -68447116800, "-200-12-31", 10 },
 		{ -377705203200, "-10000-12-31", 12 },
-		{ -185604722870400, "-5879610-06-22", 14 },
+		{
+			MIN_EPOCH_SECS_VALUE - (SECS_PER_DAY - 1),
+			fmt("%d-%02u-%02u", MIN_DATE_YEAR, MIN_DATE_MONTH,
+			    MIN_DATE_DAY),
+			0,
+		},
 		{ -185604706627200, "-5879610W521", 12 },
 		{ 253402214400, "9999-12-31", 10 },
 		{ 253402300800, "10000-01-01", 11 },
-		{ 185480451417600, "5879611-07-11", 13 },
+		{
+			MAX_EPOCH_SECS_VALUE,
+			fmt("%d-%02u-%02u", MAX_DATE_YEAR, MAX_DATE_MONTH,
+			    MAX_DATE_DAY),
+			0,
+		},
 		{ 185480434915200, "5879611Q101", 11 },
 	};
 	size_t index;
@@ -281,6 +300,8 @@ parse_date_test(void)
 		dt_t dt = 0;
 		const char *str = valid_tests[index].string;
 		size_t expected_len = valid_tests[index].len;
+		if (expected_len == 0)
+			expected_len = strlen(str);
 		int64_t expected_epoch = valid_tests[index].epoch;
 		size_t len = tnt_dt_parse_iso_date(str, expected_len, &dt);
 		int64_t epoch = _dt_to_epoch(dt);
@@ -416,6 +437,7 @@ parse_date_test(void)
 		{ "%Y-%m-%d",                "9999-01-01" },
 		{ "%Y-%m-%d",                "10000-01-01" },
 		{ "%Y-%m-%d",                "10000-01-01" },
+		/* MAX_DT_DAY_VALUE */
 		{ "%Y-%m-%d",                "5879611-07-11" },
 	};
 

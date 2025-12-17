@@ -15,8 +15,12 @@ local INT_MIN = -2147483648
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
+local MIN_DATE_MONTH = 6
+local MIN_DATE_DAY = 22
 -- maximum supported date - 5879611-07-11
 local MAX_DATE_YEAR = 5879611
+local MAX_DATE_MONTH = 7
+local MAX_DATE_DAY = 11
 
 local MIN_TZOFFSET = -12 * 60
 local MAX_TZOFFSET = 14 * 60
@@ -38,7 +42,7 @@ local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
 local DAYS_EPOCH_OFFSET = 719163
 local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
 local MIN_EPOCH_SECS_VALUE = INT_MIN * -- MIN_DT_DAY_VALUE
-      SECS_PER_DAY - SECS_EPOCH_OFFSET
+      SECS_PER_DAY + (SECS_PER_DAY - 1) - SECS_EPOCH_OFFSET
 local MAX_EPOCH_SECS_VALUE = INT_MAX * -- MAX_DT_DAY_VALUE
       SECS_PER_DAY - SECS_EPOCH_OFFSET
 
@@ -294,7 +298,7 @@ test:test("Simple date creation by attributes", function(test)
     test:is(tostring(date.new{timestamp = -0.1}),
             '1969-12-31T23:59:59.900Z', '{negative timestamp}')
     test:is(tostring(date.new{timestamp = MIN_EPOCH_SECS_VALUE}),
-            '-5879610-06-22T00:00:00Z', '{MIN_EPOCH_SECS_VALUE timestamp}')
+            '-5879610-06-22T23:59:59Z', '{MIN_EPOCH_SECS_VALUE timestamp}')
     test:is(tostring(date.new{timestamp = MAX_EPOCH_SECS_VALUE}),
             '5879611-07-11T00:00:00Z', '{MAX_EPOCH_SECS_VALUE timestamp}')
 end)
@@ -394,18 +398,18 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {range_check_3_error('day', 32, {-1, 1, 31}),
             {year = 2021, month = 6, day = 32}},
         {invalid_days_in_mon(31, 6, 2021), { year = 2021, month = 6, day = 31}},
-        {invalid_date(-5879610, 6, 21),
-            {year = -5879610, month = 6, day = 21}},
-        {invalid_date(-5879610, 1, 1),
-            {year = -5879610, month = 1, day = 1}},
+        {invalid_date(MIN_DATE_YEAR, MIN_DATE_MONTH, MIN_DATE_DAY - 1),
+            {year = MIN_DATE_YEAR, month = MIN_DATE_MONTH, day = MIN_DATE_DAY - 1}},
+        {invalid_date(MIN_DATE_YEAR, 1, 1), -- M < MIN_DATE_MONTH
+            {year = MIN_DATE_YEAR, month = 1, day = 1}},
         {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = -16009610, month = 12, day = 31}},
         {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = 16009610, month = 1, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 9, 1),
+        {invalid_date(MAX_DATE_YEAR, 9, 1), -- M > MAX_DATE_MONTH
             {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 7, 12),
-            {year = MAX_DATE_YEAR, month = 7, day = 12}},
+        {invalid_date(MAX_DATE_YEAR, MAX_DATE_MONTH, MAX_DATE_DAY + 1),
+            {year = MAX_DATE_YEAR, month = MAX_DATE_MONTH, day = MAX_DATE_DAY + 1}},
     }
     for _, row in pairs(specific_errors) do
         local err_msg, attribs = unpack(row)
@@ -608,13 +612,17 @@ end
 test:test("Check parsing of full supported years range", function(test)
     test:plan(84)
     local valid_years = {
-        -5879610, -5879000, -5800000, -2e6, -1e5, -1e4, -9999, -2000, -1000,
+        MIN_DATE_YEAR, -5879000, -5800000, -2e6, -1e5, -1e4, -9999, -2000, -1000,
         0, 1, 1000, 1900, 1970, 2000, 9999,
-        1e4, 1e6, 2e6, 5e6, 5879611
+        1e4, 1e6, 2e6, 5e6, MAX_DATE_YEAR
     }
     local fmt = '%FT%T%z'
+    -- Validity of (MIN_DATE_MONTH, MIN_DATE_DAY)
+    -- for MIN_DATE_YEAR and MAX_DATE_YEAR is expected.
+    -- For min date only the last second is in valid range.
+    local y_txt_fmt = ('%%04d-%02d-%02dT23:59:59'):format(MIN_DATE_MONTH, MIN_DATE_DAY)
     for _, y in ipairs(valid_years) do
-        local txt = ('%04d-06-22'):format(y)
+        local txt = y_txt_fmt:format(y)
         local dt, parsed_syms = date.parse(txt)
         test:is(parsed_syms, #txt, 'all characters are parsed')
         test:isnt(dt, nil, dt)
@@ -1809,9 +1817,9 @@ test:test("Parse iso8601 date - valid strings", function(test)
         {-200, 12, 31, "-200-12-31",                10 },
         {-1000,12, 31, "-1000-12-31",               11 },
         {-10000,12,31, "-10000-12-31",              12 },
-        {-5879610,6,22,"-5879610-06-22",            14 },
+        {MIN_DATE_YEAR, MIN_DATE_MONTH, MIN_DATE_DAY, "-5879610-06-22", 14 },
         {10000, 1,  1, "10000-01-01",               11 },
-        {5879611,7, 1, "5879611-07-01",             13 },
+        {MAX_DATE_YEAR, MAX_DATE_MONTH, 1, "5879611-07-01",             13 },
     }
 
     for _, value in ipairs(good) do
@@ -1855,8 +1863,8 @@ test:test("Parse iso8601 date - invalid strings", function(test)
         "2012U1234"  , -- Invalid
         "2012-1234"  , -- Invalid
         "2012-X1234" , -- Invalid
-        "-5879611-01-01",  -- Year less than 5879610-06-22
-        "5879612-01-01",  -- Year greater than 5879611-07-11
+        "-5879611-01-01",  -- Year less than 5879610-06-23 (MIN_DATE_YEAR)
+        "5879612-01-01",  -- Year greater than 5879611-07-11 (MAX_DATE_YEAR)
     }
 
     for _, str in ipairs(bad) do
@@ -2463,9 +2471,31 @@ test:test("Parse with a custom format and format back to string", function(test)
             dt = date.new({timestamp = MIN_EPOCH_SECS_VALUE}),
         },
         {
+            buf = string.format('%d -0001', MIN_EPOCH_SECS_VALUE + (-1) * 60),
+            fmt = '%s %z',
+            dt = date.new({timestamp = MIN_EPOCH_SECS_VALUE + (-1) * 60, tzoffset = -1}),
+        },
+        {
+            -- MIN_TZOFFSET = -720 = -12:00
+            buf = string.format('%d -1200', MIN_EPOCH_SECS_VALUE + MIN_TZOFFSET * 60),
+            fmt = '%s %z',
+            dt = date.new({timestamp = MIN_EPOCH_SECS_VALUE + MIN_TZOFFSET * 60, tzoffset = MIN_TZOFFSET}),
+        },
+        {
             buf = string.format('%d', MAX_EPOCH_SECS_VALUE),
             fmt = '%s',
             dt = date.new({timestamp = MAX_EPOCH_SECS_VALUE}),
+        },
+        {
+            buf = string.format('%d +0001', MAX_EPOCH_SECS_VALUE + 1 * 60),
+            fmt = '%s %z',
+            dt = date.new({timestamp = MAX_EPOCH_SECS_VALUE + 1 * 60, tzoffset = 1}),
+        },
+        {
+            -- MAX_TZOFFSET = 840 = 14:00
+            buf = string.format('%d +1400', MAX_EPOCH_SECS_VALUE + MAX_TZOFFSET * 60),
+            fmt = '%s %z',
+            dt = date.new({timestamp = MAX_EPOCH_SECS_VALUE + MAX_TZOFFSET * 60, tzoffset = MAX_TZOFFSET}),
         },
         -- %S is replaced by the second as a decimal number
         -- (00-60).
@@ -2776,9 +2806,12 @@ test:test("Parse with a custom format and format back to string", function(test)
                 ('%s: parse buffer is ok'):format(tc.fmt))
         test:is(dt, tc.dt, ('%s, resulted dt is ok'):format(tc.fmt))
         local dt_formatted = dt:format(tc.fmt)
+        -- Corner cases may lead to aborts on conversion, check it.
+        local dt_tostring = dt:format() -- for tostring
+        local dt_def_formatted = dt:format("%c %z") -- for strftime
         local buf = tc.buf
         test:is(dt_formatted, buf,
-                ('%s: format to %s'):format(tc.fmt, dt_formatted))
+                ('%s: format to %s (iso:%s)(fmt:%s)'):format(tc.fmt, dt_formatted, dt_tostring, dt_def_formatted))
     end
 end)
 
@@ -3095,18 +3128,18 @@ test:test("Time invalid :set{} operations", function(test)
         {range_check_3_error('day', 32, {-1, 1, 31}),
             {year = 2021, month = 6, day = 32}},
         {invalid_days_in_mon(31, 6, 2021), { month = 6, day = 31}},
-        {invalid_date(-5879610, 6, 21),
-            {year = -5879610, month = 6, day = 21}},
-        {invalid_date(-5879610, 1, 1),
-            {year = -5879610, month = 1, day = 1}},
+        {invalid_date(MIN_DATE_YEAR, MIN_DATE_MONTH, MIN_DATE_DAY - 1),
+            {year = MIN_DATE_YEAR, month = MIN_DATE_MONTH, day = MIN_DATE_DAY - 1}},
+        {invalid_date(MIN_DATE_YEAR, 1, 1), -- M < MIN_DATE_MONTH
+            {year = MIN_DATE_YEAR, month = 1, day = 1}},
         {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = -16009610, month = 12, day = 31}},
         {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = 16009610, month = 1, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 9, 1),
+        {invalid_date(MAX_DATE_YEAR, 9, 1), -- M > MAX_DATE_MONTH
             {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 7, 12),
-            {year = MAX_DATE_YEAR, month = 7, day = 12}},
+        {invalid_date(MAX_DATE_YEAR, MAX_DATE_MONTH, MAX_DATE_DAY + 1),
+            {year = MAX_DATE_YEAR, month = MAX_DATE_MONTH, day = MAX_DATE_DAY + 1}},
     }
     for _, row in pairs(specific_errors) do
         local err_msg, attribs = unpack(row)
