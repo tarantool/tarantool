@@ -178,7 +178,31 @@ end
 
 -- {{{ Set RO/RW
 
-local function set_ro_rw(config, box_cfg)
+local function wait_if_not_bootstrap_leader()
+    local name = 'config_set_read_only_if_not_bootstrap_leader'
+    fiber.self():name(name, {truncate = true})
+
+    -- Wait until the instance learns its id in the replicaset to
+    -- distinguish a bootstrap leader from a regular replica.
+    local TIMEOUT = 10
+    local deadline = fiber.time() + TIMEOUT
+    while box.info.id == 0 do
+        if fiber.time() > deadline then
+            error(string.format(
+                'failed to learn instance id in the replicaset within %d ' ..
+                'seconds; cannot distinguish bootstrap leader from a ' ..
+                'regular replica.', TIMEOUT))
+        end
+        fiber.sleep(0.01)
+    end
+
+    if box.info.id ~= 1 then
+        -- Not really a bootstrap leader, just a replica. Go to RO.
+        box.cfg({read_only = true})
+    end
+end
+
+local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
     local configdata = config._configdata
     -- The startup process may need a special handling and differs
     -- from the configuration reloading process.
@@ -367,16 +391,8 @@ local function set_ro_rw(config, box_cfg)
         -- If box.info.id != 1, then the replicaset was already
         -- bootstrapped and so we should go to RO.
         if am_i_bootstrap_leader then
-            fiber.new(function()
-                local name = 'config_set_read_only_if_not_bootstrap_leader'
-                fiber.self():name(name, {truncate = true})
-                box.ctl.wait_rw()
-                if box.info.id ~= 1 then
-                    -- Not really a bootstrap leader, just a
-                    -- replica. Go to RO.
-                    box.cfg({read_only = true})
-                end
-            end)
+            assert(post_box_cfg_hooks ~= nil)
+            post_box_cfg_hooks:add(wait_if_not_bootstrap_leader)
         end
     else
         assert(false)
@@ -1386,7 +1402,7 @@ local function apply(config)
     set_replication_peers(configdata, box_cfg)
     set_log(configdata, box_cfg)
     set_audit_log(configdata, box_cfg)
-    set_ro_rw(config, box_cfg)
+    set_ro_rw(config, box_cfg, post_box_cfg_hooks)
     set_supervised_failover_mode(configdata, box_cfg)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
