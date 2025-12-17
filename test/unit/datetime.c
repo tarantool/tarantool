@@ -20,6 +20,50 @@ static const char sample[] = "2012-12-24T15:30Z";
 void
 cord_on_yield(void) {}
 
+static char *
+fmt_va(char *fmt, va_list args)
+{
+    static char buf[4096];
+    static size_t buf_used = 0;
+    va_list args_copy;
+    va_copy(args_copy, args);
+
+    int32_t res = vsnprintf(NULL, 0, fmt, args);
+    assert(res >= 0);
+    size_t size = (size_t)res + 1;
+
+    assert(buf_used + size <= sizeof(buf));
+    char *str = buf + buf_used;
+    buf_used += size;
+
+    res = vsnprintf(str, size, fmt, args_copy);
+    assert((res >= 0) && (size_t)res == size - 1);
+    va_end(args_copy);
+    return str;
+}
+
+static char *
+fmt(char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static char *
+fmt(char *fmt, ...)
+{
+    va_list args;
+    char *ret;
+    va_start(args, fmt);
+    ret = fmt_va(fmt, args);
+    va_end(args);
+    return ret;
+}
+
+/** minimum supported date - -5879610-06-22 */
+#define MIN_DATE_YEAR -5879610
+#define MIN_DATE_MONTH 6
+#define MIN_DATE_DAY 22
+/** maximum supported date - 5879611-07-11 */
+#define MAX_DATE_YEAR 5879611
+#define MAX_DATE_MONTH 7
+#define MAX_DATE_DAY 11
+
 #define S(s) {s, sizeof(s) - 1}
 struct {
 	const char *str;
@@ -173,7 +217,7 @@ tostring_datetime_test(void)
 		{"2013-10-28T17:51:56Z",   1382982716,         0,    0},
 		{"9999-12-31T23:59:59Z", 253402300799,         0,    0},
 		{"10000-01-01T00:00:00Z", 253402300800,        0,    0},
-		{"5879611-07-11T00:00:00Z", 185480451417600,   0,    0},
+		{"5879611-07-11T00:00:00Z", MAX_EPOCH_SECS_VALUE,   0,    0},
 	};
 	size_t index;
 
@@ -205,7 +249,7 @@ parse_date_test(void)
 {
 	plan(158);
 
-	static struct {
+	struct {
 		int64_t epoch;
 		const char *string;
 		size_t len; /* expected parsed length, may be not full */
@@ -233,11 +277,21 @@ parse_date_test(void)
 		{ -62167219200, "0000-Q1-01", 10 },
 		{ -68447116800, "-200-12-31", 10 },
 		{ -377705203200, "-10000-12-31", 12 },
-		{ -185604722870400, "-5879610-06-22", 14 },
+		{
+			MIN_EPOCH_SECS_VALUE - (SECS_PER_DAY - 1),
+			fmt("%d-%02u-%02u", MIN_DATE_YEAR, MIN_DATE_MONTH,
+			    MIN_DATE_DAY),
+			0,
+		},
 		{ -185604706627200, "-5879610W521", 12 },
 		{ 253402214400, "9999-12-31", 10 },
 		{ 253402300800, "10000-01-01", 11 },
-		{ 185480451417600, "5879611-07-11", 13 },
+		{
+			MAX_EPOCH_SECS_VALUE,
+			fmt("%d-%02u-%02u", MAX_DATE_YEAR, MAX_DATE_MONTH,
+			    MAX_DATE_DAY),
+			0,
+		},
 		{ 185480434915200, "5879611Q101", 11 },
 	};
 	size_t index;
@@ -246,6 +300,8 @@ parse_date_test(void)
 		dt_t dt = 0;
 		const char *str = valid_tests[index].string;
 		size_t expected_len = valid_tests[index].len;
+		if (expected_len == 0)
+			expected_len = strlen(str);
 		int64_t expected_epoch = valid_tests[index].epoch;
 		size_t len = tnt_dt_parse_iso_date(str, expected_len, &dt);
 		int64_t epoch = _dt_to_epoch(dt);
@@ -373,6 +429,7 @@ parse_date_test(void)
 		{ "%Y-%m-%d",                "9999-01-01" },
 		{ "%Y-%m-%d",                "10000-01-01" },
 		{ "%Y-%m-%d",                "10000-01-01" },
+		/* MAX_DT_DAY_VALUE */
 		{ "%Y-%m-%d",                "5879611-07-11" },
 	};
 
@@ -420,13 +477,13 @@ parse_date_strptime_invalid_test(void)
 		{
 			DATETIME,
 			"%s",
-			"-185604722870401", /* MIN_EPOCH_SECS_VALUE - 1 */
+			fmt("%ld", MIN_EPOCH_SECS_VALUE - 1),
 			"timestamp < MIN_EPOCH_SECS_VALUE",
 		},
 		{
 			DATETIME,
 			"%s",
-			"185480451417601", /* MAX_EPOCH_SECS_VALUE + 1 */
+			fmt("%ld", MAX_EPOCH_SECS_VALUE + 1),
 			"timestamp > MAX_EPOCH_SECS_VALUE",
 		},
 	};

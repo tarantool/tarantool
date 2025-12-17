@@ -51,9 +51,32 @@ struct tnt_tm;
  * could safely store in our structures and then safely
  * pass to c-dt functions.
  *
- * So supported ranges will be
- * - for seconds [-185604722870400 .. 185480451417600]
- * - for dates   [-5879610-06-22T00:00Z .. 5879611-07-11T00:00Z]
+ * MIN_DT_DAY_VALUE_UTC_ONLY = INT_MIN
+ * MAX_DT_DAY_VALUE_UTC_ONLY = INT_MAX
+ * MIN_EPOCH_SECS_VALUE_UTC_ONLY = MIN_DT_DAY_VALUE_UTC_ONLY * SECS_PER_DAY -
+ *                                 SECS_EPOCH_1970_OFFSET
+ * MAX_EPOCH_SECS_VALUE_UTC_ONLY = MAX_DT_DAY_VALUE_UTC_ONLY * SECS_PER_DAY +
+ *                                 (SECS_PER_DAY - 1) -
+ *                                 SECS_EPOCH_1970_OFFSET
+ *
+ * So supported ranges for UTC-only time will be
+ * - for seconds    [-185604722870400 .. 185480451503999]
+ * - for date-times [-5879610-06-22T00:00:00Z .. 5879611-07-11T23:59:59Z]
+ *
+ * For UTC+tzoffset to local time conversions we reserve a gap.
+ * We choose it length equal to one day minus one second to keep
+ * c-dt library limits to min/max day value unchanged:
+ * MIN_DT_DAY_VALUE = INT_MIN
+ * MAX_DT_DAY_VALUE = INT_MAX
+ * MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY +
+ *                        (SECS_PER_DAY - 1) -
+ *                        SECS_EPOCH_1970_OFFSET
+ * MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY -
+ *                        SECS_EPOCH_1970_OFFSET
+ *
+ * So supported ranges for UTC and any local time will be
+ * - for seconds    [-185604722784001 .. 185480451417600]
+ * - for date-times [-5879610-06-22T23:23:59Z .. 5879611-07-11T00:00:00Z]
  */
 #define MAX_DT_DAY_VALUE (int64_t)INT_MAX
 #define MIN_DT_DAY_VALUE (int64_t)INT_MIN
@@ -61,7 +84,8 @@ struct tnt_tm;
 #define MAX_EPOCH_SECS_VALUE    \
 	(MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
 #define MIN_EPOCH_SECS_VALUE    \
-	(MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
+	((MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET) + \
+	 (SECS_PER_DAY - 1))
 
 /**
  * At the moment the range of known timezones is UTC-12:00..UTC+14:00
