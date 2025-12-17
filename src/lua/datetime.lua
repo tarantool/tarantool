@@ -7,8 +7,10 @@ local tz = require('timezones')
     values, where `dt` is a number of dates since Rata Die date (0001-01-01).
 
     `c-dt` uses 32-bit integer number to store `dt` values, so range of
-    supported dates is limited to dates from -5879610-06-22 (INT32_MIN) to
-    +5879611-07-11 (INT32_MAX).
+    supported dates is limited to dates from -5879610-06-23 (INT32_MIN + 1) to
+    +5879611-07-11 (INT32_MAX). Plus one day gap is needed for safe
+    conversions form UTC to local time. See more detailed comment
+    in `datetime.h`.
 
     For better compactness of our typical data in MessagePack stream we shift
     root of our time to the Unix Epoch date (1970-01-01), thus our 0 is
@@ -115,10 +117,15 @@ local TOSTRING_BUFSIZE  = 64
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
--- minimum supported date - -5879610-06-22
+-- at the moment the range of known timezones is UTC-12:00..UTC+14:00
+-- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
+-- minimum supported date - -5879610-06-23
 local MIN_DATE_YEAR = -5879610
 local MIN_DATE_MONTH = 6
-local MIN_DATE_DAY = 22
+local MIN_DATE_DAY = 23
 -- maximum supported date - 5879611-07-11
 local MAX_DATE_YEAR = 5879611
 local MAX_DATE_MONTH = 7
@@ -130,13 +137,13 @@ local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
 local INT_MAX = 2147483647
 local INT_MIN = -2147483648
--- -5879610-06-22
+-- -5879610-06-23
 local MIN_DATE_TEXT = ('%d-%02d-%02d'):format(MIN_DATE_YEAR, MIN_DATE_MONTH,
                                               MIN_DATE_DAY)
 -- 5879611-07-11
 local MAX_DATE_TEXT = ('%d-%02d-%02d'):format(MAX_DATE_YEAR, MAX_DATE_MONTH,
                                               MAX_DATE_DAY)
-local MIN_EPOCH_SECS_VALUE = INT_MIN * -- MIN_DT_DAY_VALUE
+local MIN_EPOCH_SECS_VALUE = (INT_MIN + 1) * -- MIN_DT_DAY_VALUE
       SECS_PER_DAY - SECS_EPOCH_OFFSET
 local MAX_EPOCH_SECS_VALUE = INT_MAX * -- MAX_DT_DAY_VALUE
       SECS_PER_DAY - SECS_EPOCH_OFFSET
@@ -593,9 +600,7 @@ local function datetime_new(obj)
     local offset = obj.tzoffset
     if offset ~= nil then
         offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     -- .year, .month, .day
@@ -923,7 +928,7 @@ local function datetime_parse_from(str, obj)
 
     if tzoffset ~= nil then
         local offset = get_timezone(tzoffset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     if tzname ~= nil then
@@ -1115,7 +1120,7 @@ function datetime_set(self, obj)
     local offset = obj.tzoffset
     if offset ~= nil then
         offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
     offset = offset or self.tzoffset
 

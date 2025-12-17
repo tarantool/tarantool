@@ -43,8 +43,11 @@ local_dt(int64_t secs)
 static int
 local_dt(int64_t secs)
 {
-	return dt_from_rdn((int)(DIV(secs, SECS_PER_DAY)) +
-			   DT_EPOCH_1970_OFFSET);
+	int64_t rd_number = DIV(secs, SECS_PER_DAY) + DT_EPOCH_1970_OFFSET;
+	printf("%s: rd_sec64:%ld rd_num64:%ld (int):%d\n", __func__, secs, rd_number, (int)rd_number);
+	assert(rd_number <= INT_MAX);
+	assert(rd_number >= INT_MIN);
+	return dt_from_rdn((int)rd_number);
 }
 
 static int64_t
@@ -136,6 +139,16 @@ tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
 	int yday = tm->tm_yday;
 	int wday = tm->tm_wday;
 	dt_t dt = 0;
+
+	// TODO: remove before merge
+	printf("tm_to_datetime: {sec=%d, min=%d, hour=%d,"
+		" mday=%d, mon=%d, year=%d,"
+		" wday=%d, yday=%d, isdst=%d, gmtoff=%ld, tzindex=%d, epoch=%ld, nsec=%d}\n",
+		tm->tm_sec, tm->tm_min, tm->tm_hour,
+		tm->tm_mday, tm->tm_mon, tm->tm_year,
+		tm->tm_wday, tm->tm_yday, tm->tm_isdst,
+		tm->tm_gmtoff, tm->tm_tzindex, tm->tm_epoch, tm->tm_nsec
+	);
 
 	if ((year | mon | mday) == 0) {
 		if (yday != 0) {
@@ -234,20 +247,16 @@ datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 {
 	int offset = date->tzoffset;
 	int tzindex = date->tzindex;
-	int64_t rd_seconds = (int64_t)date->epoch + offset * 60 +
-			     SECS_EPOCH_1970_OFFSET;
-	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
-	assert(rd_number <= INT_MAX);
-	assert(rd_number >= INT_MIN);
-	dt_t dt = dt_from_rdn((int)rd_number);
+	int64_t local_seconds = local_secs(date);
+	dt_t dt = local_dt(local_seconds);
 
 	int year, month, day, second, nanosec, sign;
 	dt_to_ymd(dt, &year, &month, &day);
 
-	rd_seconds = MOD(rd_seconds, SECS_PER_DAY);
-	int hour = (rd_seconds / 3600) % 24;
-	int minute = (rd_seconds / 60) % 60;
-	second = rd_seconds % 60;
+	local_seconds = MOD(local_seconds, SECS_PER_DAY);
+	int hour = (local_seconds / 3600) % 24;
+	int minute = (local_seconds / 60) % 60;
+	second = local_seconds % 60;
 	nanosec = date->nsec;
 
 	size_t sz = 0;
@@ -672,10 +681,10 @@ utc_secs(int64_t epoch, int tzoffset)
 	return epoch - tzoffset * 60;
 }
 
-/** minimum supported date - -5879610-06-22 */
+/** minimum supported date - -5879610-06-23 */
 #define MIN_DATE_YEAR -5879610LL
 #define MIN_DATE_MONTH 6
-#define MIN_DATE_DAY 22
+#define MIN_DATE_DAY 23
 
 /** maximum supported date - 5879611-07-11 */
 #define MAX_DATE_YEAR 5879611LL
@@ -708,7 +717,7 @@ verify_range(int64_t v, int64_t from, int64_t to)
 static inline int
 verify_dt(int64_t dt)
 {
-	return verify_range(dt, INT_MIN, INT_MAX);
+	return verify_range(dt, MIN_DT_DAY_VALUE, MAX_DT_DAY_VALUE);
 }
 
 int
