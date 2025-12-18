@@ -20,28 +20,6 @@
 extern "C" {
 #endif
 
-static inline char *
-mp_compress(char *dst, const char *src, size_t src_size,
-	    enum compression_type type)
-{
-        (void)dst;
-        (void)src;
-        (void)src_size;
-        (void)type;
-        unreachable();
-        return NULL;
-}
-
-static inline size_t
-mp_decompress(const char **src, char *dst, size_t dst_size)
-{
-        (void)src;
-        (void)dst;
-        (void)dst_size;
-        unreachable();
-        return 0;
-}
-
 static inline int
 mp_snprint_compression(char *buf, int size, const char **data, uint32_t len)
 {
