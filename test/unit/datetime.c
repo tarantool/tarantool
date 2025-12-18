@@ -15,6 +15,8 @@
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
+#define TAP_TEST_LOCATION() note("%s [%zu]", __func__, index)
+
 static const char sample[] = "2012-12-24T15:30Z";
 
 void
@@ -292,7 +294,7 @@ parse_date_test(void)
 		   str, len);
 	}
 
-	/* check strptime formats */
+	/* Check strptime valid formats. */
 	const struct {
 		const char *fmt;
 		const char *text;
@@ -381,6 +383,53 @@ parse_date_test(void)
 		tnt_strftime(buff, sizeof(buff), "%FT%T%z", &date);
 		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
 		     text, fmt, buff);
+	}
+
+	check_plan();
+}
+
+static void
+parse_date_strptime_invalid_test(void)
+{
+	/* Check strptime invalid formats. */
+	const struct {
+		const char *fmt;
+		const char *text;
+		const char *fail_case;
+	} format_fail_tests[] = {
+		/* 0000-001 is 0000-01-01. */
+		{
+			"%m%g%j",
+			"07001",
+			"%j %m both are used and their months are different"
+		},
+		/* 2025-321 is 2025-11-17. */
+		{
+			"%G-%j %m",
+			"2025-321 12",
+			"%j %m both are used and their months are different"
+		},
+	};
+
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(format_fail_tests));
+	for (size_t index = 0; index < lengthof(format_fail_tests); index++) {
+		TAP_TEST_LOCATION();
+		const char *fmt = format_fail_tests[index].fmt;
+		const char *text = format_fail_tests[index].text;
+		const char *fail_case = format_fail_tests[index].fail_case;
+
+		struct tnt_tm tm = { 0 };
+		char *ptr = tnt_strptime(text, fmt, &tm);
+		is(ptr, NULL, "tnt_strptime parse string '%s' "
+		   "using '%s' must fail on: %s",
+		   text, fmt, fail_case);
+
+		struct datetime date = { 0 };
+		size_t res = datetime_strptime(&date, text, fmt);
+		is(res, 0, "datetime_strptime fail to"
+		   " parse string '%s' using '%s'",
+		   text, fmt);
 	}
 
 	check_plan();
@@ -592,10 +641,11 @@ interval_from_map_test(void)
 int
 main(void)
 {
-	plan(7);
+	plan(8);
 	datetime_test();
 	tostring_datetime_test();
 	parse_date_test();
+	parse_date_strptime_invalid_test();
 	mp_datetime_unpack_valid_checks();
 	mp_datetime_test();
 	mp_print_test();
