@@ -683,6 +683,9 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 						      TM_YEAR_BASE)]
 					      [tm->tm_mon] +
 				1;
+			/* tm_mon is defined but mismatch month of tm_yday */
+			if (tm->tm_mday < 1 || tm->tm_mday > 31)
+				return NULL;
 			flags |= FLAG_MDAY;
 		}
 		if (!(flags & FLAG_WDAY)) {
