@@ -387,6 +387,46 @@ parse_date_test(void)
 }
 
 static void
+parse_date_strptime_invalid_test(void)
+{
+	/* Check strptime invalid formats. */
+	const struct {
+		const char *fmt;
+		const char *text;
+		const char *fail_case;
+	} format_fail_tests[] = {
+		{
+			"xxx",
+			"xxx",
+			"xxx"
+		},
+	};
+
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(format_fail_tests));
+	for (size_t index = 0; index < lengthof(format_fail_tests); index++) {
+		note("%s[%lu]", __func__, index);
+		const char *fmt = format_fail_tests[index].fmt;
+		const char *text = format_fail_tests[index].text;
+		const char *fail_case = format_fail_tests[index].fail_case;
+
+		struct tnt_tm tm = { 0 };
+		char *ptr = tnt_strptime(text, fmt, &tm);
+		is(ptr, NULL, "tnt_strptime parse string '%s' "
+		   "using '%s' must fail on: %s",
+		   text, fmt, fail_case);
+
+		struct datetime date = { 0 };
+		size_t res = datetime_strptime(&date, text, fmt);
+		is(res, 0, "datetime_strptime fail to"
+		   " parse string '%s' using '%s'",
+		   text, fmt);
+	}
+
+	check_plan();
+}
+
+static void
 mp_datetime_test()
 {
 	static struct {
@@ -592,10 +632,11 @@ interval_from_map_test(void)
 int
 main(void)
 {
-	plan(7);
+	plan(8);
 	datetime_test();
 	tostring_datetime_test();
 	parse_date_test();
+	parse_date_strptime_invalid_test();
 	mp_datetime_unpack_valid_checks();
 	mp_datetime_test();
 	mp_print_test();
