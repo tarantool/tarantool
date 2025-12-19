@@ -282,8 +282,10 @@ sysview_space_execute_upsert(struct space *space, struct txn *txn,
  * 7. User is parent for the user/role.
  */
 
-const uint32_t PRIV_WRDA = PRIV_W | PRIV_D | PRIV_A | PRIV_R;
-const uint32_t PRIV_WRDAG = PRIV_WRDA | PRIV_GRANT;
+enum {
+	PRIV_WRDA = PRIV_W | PRIV_D | PRIV_A | PRIV_R,
+	PRIV_WRDAG = PRIV_WRDA | PRIV_GRANT,
+};
 
 static bool
 vspace_filter(struct space *source, struct tuple *tuple)
