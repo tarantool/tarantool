@@ -135,6 +135,28 @@ struct mh_ptrptr_node_t {
 #include "salad/mhash.h"
 
 /*
+ * Map: (void *) => (i32)
+ */
+#define mh_name _ptri32
+#define mh_key_t void *
+
+/** The ptr to uint32_t hash node. */
+struct mh_ptri32_node_t {
+	/** Hash key. */
+	mh_key_t key;
+	/** Hash value. */
+	uint32_t value;
+};
+
+#define mh_node_t struct mh_ptri32_node_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) (mh_ptr_hash((a)->key))
+#define mh_hash_key(a, arg) (mh_ptr_hash(a))
+#define mh_cmp(a, b, arg) (((a)->key) != ((b)->key))
+#define mh_cmp_key(a, b, arg) ((a) != ((b)->key))
+#include "salad/mhash.h"
+
+/*
  * Map: (char * with length) => (void *)
  */
 enum {
