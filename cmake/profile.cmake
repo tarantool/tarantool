@@ -53,6 +53,7 @@ endif()
 option(OSS_FUZZ "Set this option to use flags by oss-fuzz" OFF)
 option(ENABLE_FUZZER "Enable fuzzing testing" OFF)
 option(FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION "Enable fuzzing-friendly mode" ${ENABLE_FUZZER})
+option(ENABLE_LIBFUZZER_STATIC_LINKAGE "Enable static libFuzzer linkage" OFF)
 if(ENABLE_FUZZER)
     if (CMAKE_COMPILER_IS_GNUCC)
         message(FATAL_ERROR

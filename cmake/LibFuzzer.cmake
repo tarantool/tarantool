@@ -20,7 +20,10 @@ function(SetLibFuzzerPath outvar)
   endif ()
 
   SetHwArchString(HW_ARCH)
-  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  # LibFuzzer library in the OSS Fuzz environment has another name.
+  if (OSS_FUZZ)
+    set(lib_name "libclang_rt.fuzzer_no_main.a")
+  elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(lib_name "libclang_rt.fuzzer_no_main-${HW_ARCH}.a")
   else()
     message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}")

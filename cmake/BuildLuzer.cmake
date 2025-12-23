@@ -19,6 +19,8 @@ list(APPEND LUZER_CMAKE_FLAGS
   -DLUA_LIBRARIES=${LUAJIT_LIBRARIES}
   -DLUAJIT_FRIENDLY_MODE=ON
   -DLUA_HAS_JIT=ON
+  # Propagates support of OSS Fuzz.
+  "-DOSS_FUZZ=${OSS_FUZZ}"
 )
 
 ExternalProject_Add(bundled-luzer
