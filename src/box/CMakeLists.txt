@@ -269,6 +269,7 @@ set(box_sources
     read_view.c
     mp_box_ctx.c
     xlog_reader.c
+    mp_arrow.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
@@ -329,6 +330,10 @@ endif()
 
 if(ENABLE_INTEGRITY)
     list(APPEND box_sources ${INTEGRITY_SOURCE})
+endif()
+
+if(ENABLE_ARROW_IPC)
+    list(APPEND box_sources ${ARROW_IPC_SOURCES})
 endif()
 
 if(ENABLE_MEMCS_ENGINE)
