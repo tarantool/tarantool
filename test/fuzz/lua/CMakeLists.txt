@@ -94,12 +94,8 @@ function(create_luzer_test)
   )
 endfunction()
 
-# luzer library is unsupported in OSS Fuzz environment, so
-# building the library is disabled.
-if (NOT ${OSS_FUZZ})
-  # Build library and set LUZER_LUA_PATH and LUZER_LUA_CPATH.
-  include(BuildLuzer)
-endif()
+# Build library and set LUZER_LUA_PATH and LUZER_LUA_CPATH.
+include(BuildLuzer)
 
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)

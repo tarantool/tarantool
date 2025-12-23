@@ -254,11 +254,7 @@ foreach(test_name ${LAPI_TESTS_UNSUPPORTED})
   )
 endforeach()
 
-# luzer library has issues with building at OSS Fuzz environment,
-# so building the library is disabled.
-if (NOT ${OSS_FUZZ})
-  add_dependencies(${LUA_TESTS_TARGET_NAME} luzer-library)
-endif()
+add_dependencies(${LUA_TESTS_TARGET_NAME} luzer-library)
 
 unset(GIT_REF)
 unset(CAPI_TESTS)
