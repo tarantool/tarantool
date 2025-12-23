@@ -811,12 +811,13 @@ field_def_array_decode(const char **data, struct field_def **fields,
 }
 
 struct field_def *
-field_def_array_dup(const struct field_def *fields, uint32_t field_count)
+field_def_array_make_shared(
+	const struct field_def *fields, uint32_t field_count)
 {
 	if (field_count == 0)
 		return NULL;
 	struct grp_alloc all = grp_alloc_initializer();
-	grp_alloc_reserve_data(&all, sizeof(*fields) * field_count);
+	grp_alloc_reserve_data(&all, sizeof(*fields) * (field_count + 1));
 	for (uint32_t i = 0; i < field_count; i++) {
 		grp_alloc_reserve_str0(&all, fields[i].name);
 		if (fields[i].layout != NULL)
@@ -824,6 +825,9 @@ field_def_array_dup(const struct field_def *fields, uint32_t field_count)
 		grp_alloc_reserve_data(&all, fields[i].default_value_size);
 	}
 	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	static_assert(sizeof(*fields) >= sizeof(uint32_t));
+	uint32_t *refs = grp_alloc_create_data(&all, sizeof(*fields));
+	*refs = 1;
 	struct field_def *copy = grp_alloc_create_data(
 		&all, sizeof(*fields) * field_count);
 	for (uint32_t i = 0; i < field_count; ++i) {
@@ -852,5 +856,24 @@ field_def_array_delete(struct field_def *fields, uint32_t field_count)
 		free(fields[i].constraint_def);
 		TRASH(&fields[i]);
 	}
-	free(fields);
+	free(fields - 1);
+}
+
+void
+field_def_array_unref(struct field_def *fields, uint32_t field_count)
+{
+	if (field_count == 0)
+		return;
+	uint32_t *refs = (uint32_t *)(fields - 1);
+	assert(*refs > 0);
+	if (--*refs == 0)
+		field_def_array_delete(fields, field_count);
+}
+
+void
+field_def_array_ref(struct field_def *fields, uint32_t field_count)
+{
+	if (field_count == 0)
+		return;
+	++*(uint32_t *)(fields - 1);
 }

@@ -472,7 +472,7 @@ parser_space_delete(struct Parse *parser)
 			i = altered_space->index_count;
 	}
 	for (; i < space->index_count; ++i)
-		index_def_delete(space->index[i]->def);
+		index_def_unref(space->index[i]->def);
 }
 
 static void *
