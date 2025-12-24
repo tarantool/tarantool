@@ -32,7 +32,7 @@ private:
 	{
 		cord_ptr = static_cast<struct cord *>(
 				xcalloc(1, sizeof(*cord_ptr)));
-		cord_create(cord_ptr, "unknown");
+		cord_create(cord_ptr, NULL);
 	}
 
 	~CordOnDemand()
