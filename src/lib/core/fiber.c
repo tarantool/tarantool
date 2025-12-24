@@ -2236,9 +2236,13 @@ cord_costart(struct cord *cord, const char *name, fiber_func f, void *arg)
 void
 cord_set_name(const char *name)
 {
-	snprintf(cord()->name, sizeof(cord()->name), "%s", name);
-	/* Main thread's name will replace process title in ps, skip it */
-	if (cord_is_main())
+	snprintf(cord()->name, sizeof(cord()->name), "%s",
+		 name != NULL ? name : "unknown");
+	/*
+	 * Main thread's name will replace process title in ps, skip it.
+	 * Also, skip anonymous cord - its thread's name is set by creator.
+	 */
+	if (cord_is_main() || name == NULL)
 		return;
 	tt_pthread_setname(name);
 }
