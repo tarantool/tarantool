@@ -42,3 +42,5 @@
 	*** fiber_test_set_system: done ***
 	*** fiber_test_shutdown: done ***
 	*** fiber_test_shutdown ***
+	*** cord_no_user_thread_rename ***
+	*** cord_no_user_thread_rename: done ***
