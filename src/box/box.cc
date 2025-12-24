@@ -1495,15 +1495,15 @@ box_check_replication_sync_lag(void)
 }
 
 /**
- * Evaluate replication synchro/linearizable quorum number from a formula
- * and check, that it belongs to [1, 31].
+ * Evaluate replication synchro/linearizable quorum number from a formula.
  */
 static int
-box_eval_and_check_replication_quorum(const char *cfg_name, int nr_replicas,
-				      int synchro_quorum)
+box_eval_replication_quorum(const char *cfg_name, int nr_replicas,
+			    int synchro_quorum, int64_t *result_quorum)
 {
 	assert(nr_replicas > 0 && nr_replicas < VCLOCK_MAX);
 	assert(synchro_quorum >= 0 && synchro_quorum < VCLOCK_MAX);
+	assert(result_quorum != NULL);
 
 	const char loadable[] =
 		"local expr, N, Q = ...\n"
@@ -1544,10 +1544,30 @@ box_eval_and_check_replication_quorum(const char *cfg_name, int nr_replicas,
 		return -1;
 	}
 
-	int64_t quorum = -1;
-	if (lua_isnumber(tarantool_L, -1))
-		quorum = luaL_toint64(tarantool_L, -1);
+	if (!lua_isnumber(tarantool_L, -1)) {
+		lua_pop(tarantool_L, 1);
+		diag_set(ClientError, ER_CFG, cfg_name,
+			 "the formula did not evaluate to a number");
+		return -1;
+	}
+
+	*result_quorum = luaL_toint64(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
+	return 0;
+}
+
+/**
+ * Evaluate replication synchro/linearizable quorum number from a formula
+ * and check, that it belongs to [1, 31].
+ */
+static int
+box_eval_and_check_replication_quorum(const char *cfg_name, int nr_replicas,
+				      int synchro_quorum)
+{
+	int64_t quorum;
+	if (box_eval_replication_quorum(cfg_name, nr_replicas, synchro_quorum,
+					&quorum) < 0)
+		return -1;
 
 	/*
 	 * At least we should have 1 node to sync, the weird
