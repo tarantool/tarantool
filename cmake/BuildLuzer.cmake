@@ -23,7 +23,7 @@ list(APPEND LUZER_CMAKE_FLAGS
 
 ExternalProject_Add(bundled-luzer
   GIT_REPOSITORY https://github.com/ligurio/luzer
-  GIT_TAG 36faf06a343c2fd5c0a03096d7272fb60d135e64
+  GIT_TAG f009fbd06f2090b061a1ff5e5e6006d5db1670a7
   GIT_PROGRESS TRUE
   GIT_SHALLOW FALSE
   SOURCE_DIR ${LUZER_DIR}/source
