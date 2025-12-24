@@ -304,6 +304,7 @@
 #cmakedefine ENABLE_FAILOVER 1
 #cmakedefine ENABLE_INTEGRITY 1
 #cmakedefine ENABLE_FETCH_SNAPSHOT_CURSOR 1
+#cmakedefine ENABLE_ARROW_IPC 1
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 

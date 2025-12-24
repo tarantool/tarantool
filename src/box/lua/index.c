@@ -37,7 +37,7 @@
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h"
 #include "small/region.h"
-#include "arrow_ipc.h"
+#include "box/arrow_ipc.h"
 #include "fiber.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
