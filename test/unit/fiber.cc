@@ -1,6 +1,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#ifdef __linux__
+#include <pthread.h>
+#endif /* __linux__ */
+
 #include "memory.h"
 #include "fiber.h"
 #include "unit.h"
@@ -742,6 +746,37 @@ fiber_test_shutdown(void)
 	header();
 }
 
+static void *
+cord_no_user_thread_rename_f(void *arg)
+{
+	(void)arg;
+#ifdef __linux__
+	const char *name = "fiber_test";
+	pthread_setname_np(pthread_self(), name);
+
+	/* Provoke creation of cord in user thread. */
+	fail_unless(strcmp(cord()->name, "unknown") == 0);
+
+	char buf[16];
+	pthread_getname_np(pthread_self(), buf, sizeof(buf));
+	fail_unless(strcmp(buf, name) == 0);
+#endif
+	return NULL;
+}
+
+static void
+cord_no_user_thread_rename(void)
+{
+	header();
+
+	pthread_t tid;
+	fail_unless(pthread_create(&tid, NULL, cord_no_user_thread_rename_f,
+				   NULL) == 0);
+	fail_unless(pthread_join(tid, NULL) == 0);
+
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -760,6 +795,7 @@ main_f(va_list ap)
 	fiber_test_client_fiber_count();
 	fiber_test_set_system();
 	fiber_test_shutdown();
+	cord_no_user_thread_rename();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
