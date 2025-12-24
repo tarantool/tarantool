@@ -3,15 +3,11 @@ local fio = require('fio')
 local socket = require('socket')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
-
-g.test_basic = function(g)
+g.test_basic = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'election')
         :set_replicaset_option('replication.bootstrap_strategy', 'supervised')
@@ -20,7 +16,7 @@ g.test_basic = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start({wait_until_ready = false})
 
     -- Connect to a text console.
@@ -71,5 +67,38 @@ g.test_basic = function(g)
     -- leader.
     cluster['i-002']:exec(function()
         t.assert_equals(box.info.id, 1)
+    end)
+end
+
+g.test_upscale_is_not_stuck = function()
+    local config_1 = cbuilder:new()
+        :use_replicaset('r-001')
+        :set_replicaset_option('replication.failover', 'supervised')
+        :set_replicaset_option('replication.bootstrap_strategy', 'auto')
+        :add_instance('i-001', {})
+        :add_instance('i-002', {})
+        :config()
+
+    local cluster = cluster:new(config_1)
+    cluster:start()
+
+    local config_2 = cbuilder:new(config_1)
+        :use_replicaset('r-001')
+        :add_instance('i-003', {})
+        :set_global_option('failover.replicasets.r-001.priority', {
+            ['i-003'] = 1,
+        })
+        :config()
+    cluster:sync(config_2)
+    cluster:start_instance('i-003')
+
+    cluster['i-003']:exec(function()
+        local config = require('config')
+        local t = require('luatest')
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_equals(config:info().status, 'ready')
+            t.assert_equals(box.info.ro, true)
+            t.assert_not_equals(box.info.id, 1)
+        end)
     end)
 end
