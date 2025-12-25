@@ -118,7 +118,6 @@
  *
  * #define BPS_TREE_NAME
  * #define BPS_TREE_BLOCK_SIZE 512
- * #define BPS_TREE_EXTENT_SIZE 16*1024
  * #define BPS_TREE_COMPARE(a, b, context) my_compare(a, b, context)
  * #define BPS_TREE_COMPARE_KEY(a, b, context) my_compare_key(a, b, context)
  * #define bps_tree_elem_t struct tuple *
@@ -216,28 +215,6 @@
  */
 #ifndef BPS_TREE_BLOCK_SIZE
 #error "BPS_TREE_BLOCK_SIZE must be defined"
-#endif
-
-/**
- * Allocation granularity. The tree allocates memory by extents of
- * that size.  Must be power of 2, i.e. log2(BPS_TREE_EXTENT_SIZE)
- * must be a whole number.
- * Two important things:
- *
- * 1) The maximal amount of memory, that particular btree instance
- *    can use, is
- *   ( (BPS_TREE_EXTENT_SIZE ^ 3) / (sizeof(void *) ^ 2) )
- *
- * 2) The first insertion of an element leads to immidiate
- *    allocation of three extents. Thus, memory overhead of almost
- *    empty tree is
- *  3 * BPS_TREE_EXTENT_SIZE
- *
- * Example:
- * #define BPS_TREE_EXTENT_SIZE 8*1024
- */
-#ifndef BPS_TREE_EXTENT_SIZE
-#error "BPS_TREE_EXTENT_SIZE must be defined"
 #endif
 
 /**
@@ -689,11 +666,7 @@ struct bps_tree_iterator {
  * @brief Tree construction. Fills struct bps_tree members.
  * @param tree - pointer to a tree
  * @param arg - user defined argument for comparator
- * @param extent_alloc_func - pointer to function that allocates extents
- *   of size BPS_TREE_EXTENT_SIZE; BPS-tree properly handles NULL result
- *   but can leak memory in case of exception.
- * @param extent_free_func - pointer to function that frees extents
- * @param alloc_ctx - argument passed to extent allocator
+ * @param allocator - the matras allocator to use
  * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
@@ -1567,11 +1540,7 @@ struct bps_leaf_path_elem {
  * @brief Tree construction. Fills struct bps_tree members.
  * @param t - pointer to a tree
  * @param arg - user defined argument for comparator
- * @param extent_alloc_func - pointer to function that allocates extents
- *   of size BPS_TREE_EXTENT_SIZE; BPS-tree properly handles NULL result
- *   but can leak memory in case of exception.
- * @param extent_free_func - pointer to function that frees extents
- * @param alloc_ctx - argument passed to extent allocator
+ * @param allocator - the matras allocator to use
  * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
@@ -1843,7 +1812,7 @@ static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree)
 {
 	size_t res = matras_extent_count(&tree->matras);
-	res *= BPS_TREE_EXTENT_SIZE;
+	res *= tree->matras.allocator->extent_size;
 	return res;
 }
 

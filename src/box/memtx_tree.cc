@@ -127,7 +127,6 @@ memtx_tree_data_is_equal(const struct memtx_tree_data_common *a,
 #define BPS_INNER_CARD
 #define BPS_TREE_NAME memtx_tree
 #define BPS_TREE_BLOCK_SIZE (512)
-#define BPS_TREE_EXTENT_SIZE MEMTX_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, arg)\
 	tuple_compare((&a)->tuple, (&a)->hint, (&b)->tuple, (&b)->hint, arg)
 #define BPS_TREE_COMPARE_KEY(a, b, arg)\
@@ -159,7 +158,6 @@ memtx_tree_data_is_equal(const struct memtx_tree_data_common *a,
 
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef BPS_TREE_IS_IDENTICAL
