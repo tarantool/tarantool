@@ -416,8 +416,22 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 */
 	if (memtx->use_sort_data) {
 		struct space *index_space = space_by_id(BOX_INDEX_ID);
+		/*
+		 * Note: the `_index` space has an internal C before_replace
+		 * trigger (`before_replace_dd_space_index`) used for yielding
+		 * DDL serialization. We intentionally don't treat such
+		 * internal triggers as a reason to disable sortdata: we only
+		 * check user-defined (event/Lua) before_replace triggers,
+		 * which may alter `_index` contents during recovery and
+		 * invalidate saved sortdata. The internal trigger is
+		 * guaranteed not to affect the use of sortdata.
+		 *
+		 * In the future this check should be removed along with
+		 * recovery triggers. They are deprecated and controlled by the
+		 * compat option `box_recovery_triggers_deprecation`.
+		 */
 		bool index_space_has_before_replace_triggers =
-			space_has_before_replace_triggers(index_space);
+			space_has_before_replace_event_triggers(index_space);
 		if (memtx->force_recovery) {
 			say_warn("memtx_use_sort_data = true but no"
 				 " memtx sort data used: force recovery");

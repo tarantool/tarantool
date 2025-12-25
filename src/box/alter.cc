@@ -882,14 +882,14 @@ class AlterSpaceLock {
 	uint32_t space_id;
 public:
 	/** Take a lock for the altered space. */
-	AlterSpaceLock(struct alter_space *alter) {
+	AlterSpaceLock(struct space *space) {
 		if (registry == NULL) {
 			registry = mh_i32_new();
 		}
-		space_id = alter->old_space->def->id;
+		space_id = space->def->id;
 		if (mh_i32_find(registry, space_id, NULL) != mh_end(registry)) {
 			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(alter->old_space),
+				  space_name(space),
 				  "the space is already being modified");
 		}
 		mh_i32_put(registry, &space_id, NULL, NULL);
@@ -1037,7 +1037,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * another DDL operation while this one is in progress so
 	 * we lock out all concurrent DDL for this space.
 	 */
-	AlterSpaceLock lock(alter);
+	AlterSpaceLock lock(alter->old_space);
 	/*
 	 * Prepare triggers while we may fail. Note, we don't have to
 	 * free them in case of failure, because they are allocated on
@@ -1139,50 +1139,68 @@ public:
 	virtual void prepare(struct alter_space *alter);
 };
 
+static bool
+alter_yield_allowed()
+{
+	return txn_is_first_statement(in_txn());
+}
+
+/*
+ * Return true if the given space is being altered in another transaction.
+ * This may happen when a previous DDL has released AlterSpaceLock, but hasn't
+ * been written to WAL yet and thus can still be rolled back.
+ */
+static bool
+alter_space_is_being_altered(uint32_t space_id)
+{
+	struct alter_space *alter;
+	rlist_foreach_entry(alter, &alter_space_list, in_list)
+		if (alter->txn != in_txn() &&
+		    alter->old_space->def->id == space_id)
+			return true;
+	return false;
+}
+
+/*
+ * The wait function that blocks execution until all previous alters will be
+ * rolled back or committed so that the space object won't be deleted right
+ * from under our feet. In the case when the previous alters were rolled back
+ * and the space was removed from space cache, this function throws an error.
+ */
+static void
+alter_space_wait_not_being_altered(struct space *old_space)
+{
+	uint32_t space_id = old_space->def->id;
+	while (true) {
+		if (!alter_space_is_being_altered(space_id))
+			break;
+		/*
+		 * Wait for deletion of any alter to check if the
+		 * space is being altered again.
+		 */
+		fiber_cond_wait(&alter_space_delete_cond);
+	}
+	/* Check if the space is still alive. */
+	if (space_by_id(space_id) != old_space) {
+		/* Cannot access the space name since it was deleted. */
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  tt_sprintf("%u", space_id),
+			  "the space was concurrently modified");
+	}
+}
+
 /**
  * The object is used to grant ability to yield with RAII approach.
  * Transaction is allowed to yield only on its first statement, so if the
  * statement is not first, it simply does nothing.
- * If it's the first statement, the guard blocks execution until all previous
- * alters will be rolled back or committed so that the space object won't be
- * deleted right from under our feet. In the case when the previous alters were
- * rolled back and the space was removed from space cache, the constructor
- * throws an error.
  */
 class AlterYieldGuard
 {
 public:
-	AlterYieldGuard(struct space *old_space) {
-		if (!txn_is_first_statement(in_txn()))
+	AlterYieldGuard() {
+		if (!alter_yield_allowed())
 			return;
 		txn_can_yield(in_txn(), true);
-		uint32_t space_id = old_space->def->id;
-		while (true) {
-			bool space_is_being_altered = false;
-			struct alter_space *alter;
-			rlist_foreach_entry(alter, &alter_space_list, in_list) {
-				if (alter->txn != in_txn() &&
-				    alter->old_space->def->id == space_id) {
-					space_is_being_altered = true;
-					break;
-				}
-			}
-			if (!space_is_being_altered)
-				break;
-			/*
-			 * Wait for deletion of any alter to check if the
-			 * space is being altered again.
-			 */
-			fiber_cond_wait(&alter_space_delete_cond);
-		}
-		/* Check if the space is still alive. */
-		if (space_by_id(space_id) != old_space) {
-			txn_can_yield(in_txn(), false);
-			/* Cannot access the space name since it was deleted. */
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  tt_sprintf("%u", space_id),
-				  "the space was concurrently modified");
-		}
 	}
 
 	~AlterYieldGuard() {
@@ -1194,7 +1212,9 @@ static inline void
 space_check_format_with_yield(struct space *space,
 			      struct tuple_format *format)
 {
-	AlterYieldGuard guard(space);
+	AlterYieldGuard guard;
+	assert(!alter_yield_allowed() ||
+	       !alter_space_is_being_altered(space->def->id));
 	space_check_format_xc(space, format);
 }
 
@@ -1484,7 +1504,9 @@ static inline void
 space_build_index_with_yield(struct space *old_space, struct space *new_space,
 			     struct index *new_index)
 {
-	AlterYieldGuard guard(old_space);
+	AlterYieldGuard guard;
+	assert(!alter_yield_allowed() ||
+	       !alter_space_is_being_altered(old_space->def->id));
 	space_build_index_xc(old_space, new_space, new_index);
 }
 
@@ -2133,6 +2155,64 @@ filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
 }
 
 /**
+ * A trigger invoked before replace in space _space/_index.
+ *
+ * This trigger is used to serialize *yielding* DDL operations on the same
+ * space.
+ *
+ * Some DDL operations (e.g. index build or format checks) may yield *before*
+ * the corresponding _space row is written to WAL but after the DDL request
+ * has already performed a replace in _space and entered the corresponding
+ * on_replace trigger (see @sa on_replace_dd_space() /
+ * @sa on_replace_dd_index()), which starts a yielding work (e.g. via
+ * space_check_format_with_yield() or space_build_index_with_yield()).
+ *
+ * While such an operation is in progress, the first DDL statement may have
+ * already updated _space in-memory, but is still uncommitted and therefore
+ * subject to rollback on WAL failure. If a second DDL updates _space for the
+ * same space concurrently, rollback of the first DDL may break the expected
+ * change order and corrupt the data dictionary.
+ *
+ * To avoid that for such yielding DDLs, we wait before performing the actual
+ * replace into _space (in this before_replace trigger) until all previous
+ * alters on the same space are finished (committed or rolled back) via
+ * @sa AlterYieldGuard.
+ */
+static int
+before_replace_dd_space_index(struct trigger *trigger, void *event)
+{
+	struct txn *txn = (struct txn *)event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	uint32_t id;
+	uint32_t fieldno;
+	if (trigger == &alter_space_before_replace_space) {
+		fieldno = BOX_SPACE_FIELD_ID;
+	} else if (trigger == &alter_space_before_replace_index) {
+		fieldno = BOX_INDEX_FIELD_SPACE_ID;
+	} else {
+		unreachable();
+	}
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    fieldno, &id) != 0)
+		return -1;
+	struct space *space = space_by_id(id);
+	if (space == NULL)
+		return 0;
+
+	try {
+		AlterSpaceLock lock(space);
+		AlterYieldGuard guard;
+		if (txn_has_flag(in_txn(), TXN_CAN_YIELD))
+			alter_space_wait_not_being_altered(space);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
+}
+
+/**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
  *
@@ -2205,9 +2285,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 * may have changed space id.
 	 */
 	uint32_t old_id;
-	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-			    BOX_SPACE_FIELD_ID, &old_id) != 0)
-		return -1;
+	/*
+	 * tuple_field_u32() can't fail here: the tuple was already validated
+	 * in before_replace_dd_space_index().
+	 */
+	VERIFY(tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			       BOX_SPACE_FIELD_ID, &old_id) == 0);
 	struct space *old_space = space_by_id(old_id);
 	struct space_def *def = NULL;
 	if (new_tuple != NULL) {
@@ -2548,9 +2631,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	uint32_t id, iid;
-	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-			    BOX_INDEX_FIELD_SPACE_ID, &id) != 0)
-		return -1;
+	/*
+	 * tuple_field_u32() can't fail here: the tuple was already validated
+	 * in before_replace_dd_space_index().
+	 */
+	VERIFY(tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			       BOX_INDEX_FIELD_SPACE_ID, &id) == 0);
 	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
 			    BOX_INDEX_FIELD_ID, &iid) != 0)
 		return -1;
@@ -5750,7 +5836,9 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
+TRIGGER(alter_space_before_replace_space, before_replace_dd_space_index);
 TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
+TRIGGER(alter_space_before_replace_index, before_replace_dd_space_index);
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
 TRIGGER(on_replace_schema, on_replace_dd_schema);
