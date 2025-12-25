@@ -571,6 +571,15 @@ space_has_before_replace_triggers(struct space *space)
 }
 
 /**
+ * Check if the space has registered user-defined before_replace triggers.
+ */
+static inline bool
+space_has_before_replace_event_triggers(struct space *space)
+{
+	return space_event_has_triggers(&space->before_replace_event);
+}
+
+/**
  * Run on_replace triggers registered for a space.
  */
 int
