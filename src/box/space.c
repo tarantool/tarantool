@@ -38,7 +38,6 @@
 #include "user.h"
 #include "session.h"
 #include "txn.h"
-#include "memtx_tx.h"
 #include "tuple.h"
 #include "xrow_update.h"
 #include "request.h"
@@ -850,13 +849,6 @@ generic_space_swap_index(struct space *old_space, struct space *new_space,
 {
 	SWAP(old_space->index_map[old_index_id],
 	     new_space->index_map[new_index_id]);
-	/*
-	 * Swap read gaps back - they belong to the old space. It is important
-	 * since the old space is going to be invalidated and transactional
-	 * metadata is required to do it correctly.
-	 */
-	rlist_swap(&old_space->index_map[old_index_id]->read_gaps,
-		   &new_space->index_map[new_index_id]->read_gaps);
 }
 
 void

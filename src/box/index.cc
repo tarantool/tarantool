@@ -39,7 +39,6 @@
 #include "txn.h"
 #include "rmean.h"
 #include "info/info.h"
-#include "memtx_tx.h"
 #include "box.h"
 #include "base64.h"
 #include "scoped_guard.h"
@@ -934,14 +933,12 @@ index_create(struct index *index, struct engine *engine,
 	index->space_cache_version = space_cache_version;
 	/* Unusable until set to proper value during space creation. */
 	index->dense_id = UINT32_MAX;
-	rlist_create(&index->read_gaps);
 }
 
 void
 index_delete(struct index *index)
 {
 	assert(index->refs == 0);
-	assert(rlist_empty(&index->read_gaps));
 	/*
 	 * Free index_def after destroying the index as
 	 * engine might still need it, e.g. to check if

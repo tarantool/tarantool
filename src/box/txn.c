@@ -1764,6 +1764,13 @@ txn_on_yield(struct trigger *trigger, void *event)
 	return 0;
 }
 
+void
+txn_acquire_ddl(struct txn *txn)
+{
+	txn->is_schema_changed = true;
+	txn_can_yield(txn, false);
+}
+
 struct txn *
 txn_detach(void)
 {

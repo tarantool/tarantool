@@ -186,7 +186,7 @@ memtx_rtree_index_destroy(struct index *base)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	rtree_destroy(&index->tree);
-	free(index);
+	memtx_index_free(&index->base);
 }
 
 static bool
@@ -457,8 +457,8 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 
 	struct memtx_rtree_index *index =
 		(struct memtx_rtree_index *)xcalloc(1, sizeof(*index));
-	index_create(&index->base, (struct engine *)memtx,
-		     &memtx_rtree_index_vtab, def);
+	memtx_index_create(&index->base, (struct engine *)memtx,
+			   &memtx_rtree_index_vtab, def);
 
 	index->dimension = def->opts.dimension;
 	rtree_init(&index->tree, index->dimension, distance_type,

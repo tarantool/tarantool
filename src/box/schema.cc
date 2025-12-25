@@ -38,13 +38,13 @@
 #include "vclock/vclock.h"
 #include "fiber.h"
 #include "session.h"
-#include "memtx_tx.h"
 #include "txn.h"
 #include "engine.h"
 #include "version.h"
 #include "event.h"
 #include "port.h"
 #include "tt_static.h"
+#include "tuple.h"
 
 /**
  * @module Data Dictionary
@@ -214,7 +214,7 @@ on_replace_dd_system_space(struct trigger *trigger, void *event)
 	 */
 	if (schema_check_feature(SCHEMA_FEATURE_DDL_BEFORE_UPGRADE) != 0)
 		return -1;
-	memtx_tx_acquire_ddl(txn);
+	txn_acquire_ddl(txn);
 	return 0;
 }
 
