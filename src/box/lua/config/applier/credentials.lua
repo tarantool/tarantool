@@ -878,8 +878,6 @@ local function has_unmanaged_subjects()
 end
 
 local function refresh_unmanaged_subjects_alert()
-    local orphan_users_alert_key = 'credentials_orphan_users'
-
     if has_unmanaged_subjects() then
         local script_url =
             'https://raw.githubusercontent.com/tarantool/tarantool/' ..
@@ -889,8 +887,13 @@ local function refresh_unmanaged_subjects_alert()
             Found users/roles authored from Lua and not managed by
             the YAML configuration.
 
-            Use the helper script `find-orphan-users.lua` to list
-            duplicates/orphans and print commands for transferring
+            It is possible that they were created by Tarantool modules (e.g.,
+            `crud`). Currently, this behavior is subject to change due
+            to security concerns.
+
+            Make sure all of your custom users are described in the
+            configuration. Use the helper script `find-orphan-users.lua`
+            to list duplicates/orphans and print commands for transferring
             ownership to the YAML configuration.
 
             dofile('/path/to/find-orphan-users.lua')
@@ -898,12 +901,9 @@ local function refresh_unmanaged_subjects_alert()
             -- %s
         ]]):format(script_url)) .. '\n'
 
-        config._aboard:set({
-            type = 'warn',
-            message = msg,
-        }, {key = orphan_users_alert_key})
-    else
-        config._aboard:drop(orphan_users_alert_key)
+        -- gh-xxx: Temporarily log as info, because libraries can create
+        -- roles outside the YAML config (for example CRUD).
+        log.warn(msg)
     end
 end
 
