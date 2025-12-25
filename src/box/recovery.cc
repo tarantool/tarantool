@@ -43,6 +43,7 @@
 #include "coio_file.h"
 #include "error.h"
 #include "iproto_constants.h"
+#include "tweaks.h"
 
 /*
  * Recovery subsystem
@@ -76,6 +77,9 @@
  */
 
 /* {{{ Initial recovery */
+
+uint64_t xlog_row_bytes_per_yield = 1 << 19;
+TWEAK_UINT(xlog_row_bytes_per_yield);
 
 /**
  * Throws an exception in  case of error.
@@ -142,7 +146,9 @@ recovery_scan(struct recovery *r, struct vclock *end_vclock,
 	struct xrow_header row;
 	while (xlog_cursor_next(&cursor, &row, true) == 0) {
 		vclock_follow_xrow(end_vclock, &row);
-		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0)
+		++stream->row_count;
+		stream->row_bytes_since_yield += xrow_approx_len(&row);
+		if (stream->row_bytes_since_yield > xlog_row_bytes_per_yield)
 			xstream_yield(stream);
 	}
 	xlog_cursor_close(&cursor, false);
@@ -250,7 +256,9 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 	bool is_sending_tx = false;
 	while (xlog_cursor_next_xc(&r->cursor, &row,
 				   r->wal_dir.force_recovery) == 0) {
-		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
+		++stream->row_count;
+		stream->row_bytes_since_yield += xrow_approx_len(&row);
+		if (stream->row_bytes_since_yield > xlog_row_bytes_per_yield) {
 			xstream_yield(stream);
 		}
 		if (stream->row_count % 100000 == 0) {

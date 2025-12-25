@@ -44,6 +44,7 @@
 #include "replication.h"
 #include "iproto_constants.h"
 #include "watcher.h"
+#include "tweaks.h"
 
 enum {
 	/**

@@ -53,6 +53,8 @@ struct xstream {
 	xstream_write_f write;
 	xstream_yield_f yield;
 	uint64_t row_count;
+	/* Number of parsed bytes since last yield. */
+	uint64_t row_bytes_since_yield;
 };
 
 static inline void
@@ -62,12 +64,14 @@ xstream_create(struct xstream *xstream, xstream_write_f write,
 	xstream->write = write;
 	xstream->yield = yield;
 	xstream->row_count = 0;
+	xstream->row_bytes_since_yield = 0;
 }
 
 static inline void
 xstream_yield(struct xstream *stream)
 {
 	stream->yield(stream);
+	stream->row_bytes_since_yield = 0;
 }
 
 static inline void
