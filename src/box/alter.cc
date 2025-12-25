@@ -1139,6 +1139,23 @@ public:
 	virtual void prepare(struct alter_space *alter);
 };
 
+bool
+alter_yield_allowed()
+{
+	return txn_is_first_statement(in_txn());
+}
+
+bool
+alter_space_is_being_altered(uint32_t space_id)
+{
+	struct alter_space *alter;
+	rlist_foreach_entry(alter, &alter_space_list, in_list)
+		if (alter->txn != in_txn() &&
+		    alter->old_space->def->id == space_id)
+			return true;
+	return false;
+}
+
 /**
  * The object is used to grant ability to yield with RAII approach.
  * Transaction is allowed to yield only on its first statement, so if the
@@ -1149,53 +1166,45 @@ public:
  * rolled back and the space was removed from space cache, the constructor
  * throws an error.
  */
-class AlterYieldGuard
-{
-public:
-	AlterYieldGuard(struct space *old_space) {
-		if (!txn_is_first_statement(in_txn()))
-			return;
-		txn_can_yield(in_txn(), true);
-		uint32_t space_id = old_space->def->id;
-		while (true) {
-			bool space_is_being_altered = false;
-			struct alter_space *alter;
-			rlist_foreach_entry(alter, &alter_space_list, in_list) {
-				if (alter->txn != in_txn() &&
-				    alter->old_space->def->id == space_id) {
-					space_is_being_altered = true;
-					break;
-				}
-			}
-			if (!space_is_being_altered)
-				break;
-			/*
-			 * Wait for deletion of any alter to check if the
-			 * space is being altered again.
-			 */
-			fiber_cond_wait(&alter_space_delete_cond);
-		}
-		/* Check if the space is still alive. */
-		if (space_by_id(space_id) != old_space) {
-			txn_can_yield(in_txn(), false);
-			/* Cannot access the space name since it was deleted. */
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  tt_sprintf("%u", space_id),
-				  "the space was concurrently modified");
-		}
+int
+alter_yield_wait(struct space *old_space) {
+	if (!alter_yield_allowed() != 0)
+		return 0;
+	VERIFY(!txn_has_flag(in_txn(), TXN_CAN_YIELD));
+	txn_can_yield(in_txn(), true);
+	uint32_t space_id = old_space->def->id;
+	while (true) {
+		if (!alter_space_is_being_altered(space_id))
+			break;
+		/*
+		 * Wait for deletion of any alter to check if the
+		 * space is being altered again.
+		 */
+		fiber_cond_wait(&alter_space_delete_cond);
 	}
-
-	~AlterYieldGuard() {
+	/* Check if the space is still alive. */
+	if (space_by_id(space_id) != old_space) {
 		txn_can_yield(in_txn(), false);
+		/* Cannot access the space name since it was deleted. */
+		diag_set(ClientError, ER_ALTER_SPACE,
+				tt_sprintf("%u", space_id),
+				"the space was concurrently modified");
+		return -1;
 	}
-};
+	txn_can_yield(in_txn(), false);
+	return 0;
+}
 
 static inline void
 space_check_format_with_yield(struct space *space,
 			      struct tuple_format *format)
 {
-	AlterYieldGuard guard(space);
+	if (alter_yield_allowed()) {
+		VERIFY(!alter_space_is_being_altered(space->def->id));
+		txn_can_yield(in_txn(), true);
+	}
 	space_check_format_xc(space, format);
+	txn_can_yield(in_txn(), false);
 }
 
 void
@@ -1484,8 +1493,12 @@ static inline void
 space_build_index_with_yield(struct space *old_space, struct space *new_space,
 			     struct index *new_index)
 {
-	AlterYieldGuard guard(old_space);
+	if (alter_yield_allowed()) {
+		VERIFY(!alter_space_is_being_altered(old_space->def->id));
+		txn_can_yield(in_txn(), true);
+	}
 	space_build_index_xc(old_space, new_space, new_index);
+	txn_can_yield(in_txn(), false);
 }
 
 /**
@@ -2132,6 +2145,28 @@ filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
 	return 0;
 }
 
+static int
+before_replace_dd_space(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+
+	uint32_t old_id;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_SPACE_FIELD_ID, &old_id) != 0)
+		return -1;
+	struct space *old_space = space_by_id(old_id);
+	if (old_space == NULL)
+		return 0;
+
+	if (new_tuple != NULL && /* UPDATE, REPLACE */
+	    alter_yield_wait(old_space) != 0)
+		return -1;
+	return 0;
+}
+
 /**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
@@ -2205,10 +2240,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	 * may have changed space id.
 	 */
 	uint32_t old_id;
-	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-			    BOX_SPACE_FIELD_ID, &old_id) != 0)
-		return -1;
+	VERIFY(tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_SPACE_FIELD_ID, &old_id) == 0);
 	struct space *old_space = space_by_id(old_id);
+
 	struct space_def *def = NULL;
 	if (new_tuple != NULL) {
 		uint32_t errcode = (old_tuple == NULL) ?
@@ -2504,6 +2539,43 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	return 0;
 }
 
+static int
+before_replace_dd_index(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	uint32_t id, iid;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_SPACE_ID, &id) != 0)
+		return -1;
+	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_ID, &iid) != 0)
+		return -1;
+	struct space *old_space = space_cache_find(id);
+	if (old_space == NULL)
+		return 0;
+
+	struct index *old_index = space_index(old_space, iid);
+
+	bool yielding = false;
+	if (old_index == NULL && new_tuple != NULL) {
+		yielding = true;
+	} else if (old_index != NULL && new_tuple != NULL) {
+		struct index_def *index_def;
+		index_def = index_def_new_from_tuple(new_tuple, old_space);
+		if (index_def == NULL)
+			return -1;
+		if (!index_def_is_equal(index_def, old_index->def))
+			yielding = true;
+		index_def_delete(index_def);
+	}
+	if (yielding && alter_yield_wait(old_space) != 0)
+		return -1;
+	return 0;
+}
+
 /**
  * Just like with _space, 3 major cases:
  *
@@ -2548,12 +2620,10 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	uint32_t id, iid;
-	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-			    BOX_INDEX_FIELD_SPACE_ID, &id) != 0)
-		return -1;
-	if (tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-			    BOX_INDEX_FIELD_ID, &iid) != 0)
-		return -1;
+	VERIFY(tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_SPACE_ID, &id) == 0);
+	VERIFY(tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+			    BOX_INDEX_FIELD_ID, &iid) == 0);
 	struct space *old_space = space_cache_find(id);
 	if (old_space == NULL)
 		return -1;
@@ -5750,7 +5820,9 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
+TRIGGER(alter_space_before_replace_space, before_replace_dd_space);
 TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
+TRIGGER(alter_space_before_replace_index, before_replace_dd_index);
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
 TRIGGER(on_replace_schema, on_replace_dd_schema);
