@@ -173,6 +173,15 @@ gc-checkpointing.
 https://tarantool.io/compat/replication_synchro_timeout
 ]]
 
+local SKIP_REPLICATION_NAMES_BRIEF = [[
+Skip applying and validating instance and replicaset names during replication
+startup. The old behavior allows a Tarantool 3.x instance configured via the
+declarative config to join a Tarantool 2.11 replicaset whose snapshot may not
+contain names yet.
+
+https://tarantool.io/compat/skip_replication_names
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -316,6 +325,12 @@ local options = {
         brief = REPLICATION_SYNCHRO_TIMEOUT_COMPAT_BRIEF,
         action = tweak_action(
             'replication_synchro_timeout_rollback_enabled', true, false),
+    },
+    skip_replication_names = {
+        default = 'new',
+        obsolete = nil,
+        brief = SKIP_REPLICATION_NAMES_BRIEF,
+        action = function() end,
     },
 }
 
