@@ -453,6 +453,7 @@ g.test_defaults = function()
             wal_cleanup_delay_deprecation = 'old',
             box_recovery_triggers_deprecation = 'old',
             datetime_setfn_timestamp_type_check = 'old',
+            skip_replication_names = 'new',
         },
         isolated = false,
         stateboard = {
