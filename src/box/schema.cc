@@ -371,6 +371,9 @@ schema_init(void)
 	/* _space - home for all spaces. */
 	sc_space_new(BOX_SPACE_ID, "_space", key_parts, 1,
 		     &alter_space_on_replace_space);
+	struct space *space = space_by_id(BOX_SPACE_ID);
+	assert(space != NULL);
+	trigger_add(&space->before_replace, &alter_space_before_replace_space);
 
 	/* _truncate - auxiliary space for triggering space truncation. */
 	sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_parts, 1,
@@ -418,6 +421,9 @@ schema_init(void)
 	key_parts[1].type = FIELD_TYPE_UNSIGNED;
 	sc_space_new(BOX_INDEX_ID, "_index", key_parts, 2,
 		     &alter_space_on_replace_index);
+	struct space *index = space_by_id(BOX_INDEX_ID);
+	assert(index != NULL);
+	trigger_add(&index->before_replace, &alter_space_before_replace_index);
 
 	/* _fk_сonstraint - foreign keys constraints. */
 	key_parts[0].fieldno = 0; /* constraint name */
