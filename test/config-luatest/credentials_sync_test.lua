@@ -203,6 +203,8 @@ local g2 = t.group("find-orphan-users")
 
 g2.test_find_orphan_users_script = function()
     local config = cbuilder:new(default_user_config)
+        :set_global_option('log.to', 'file')
+        :set_global_option('log.file', 'tarantool.log')
         :set_global_option('credentials.roles.reader', {})
         :set_global_option('credentials.roles.writer', {})
         :config()
@@ -220,18 +222,24 @@ g2.test_find_orphan_users_script = function()
 
     c:reload(config)
 
+
+    -- gh-xxx: The orphan users/roles notice is logged at info level as a
+    -- temporary workaround for libraries that create their own roles.
+    local exp_log =
+        'Found users/roles authored from Lua and not managed by'
+    local log_file = fio.pathjoin(c['i-001'].chdir, 'tarantool.log')
+    t.helpers.retrying({timeout = 60}, function()
+        t.assert(c['i-001']:grep_log(exp_log, nil, {filename = log_file}))
+    end)
+
     local find_orphan_users_script =
         fio.abspath('tools/find-orphan-users.lua')
     t.assert(fio.path.exists(find_orphan_users_script))
 
     c['i-001']:exec(function(find_orphan_users_script)
         local info = require('config'):info()
-        local exp_alert_sub =
-            'Found users/roles authored from Lua and not managed by'
-        t.assert_equals(info.status, 'check_warnings', info)
-        t.assert_equals(#info.alerts, 1, info.alerts)
-        t.assert_equals(info.alerts[1].type, 'warn')
-        t.assert_str_contains(tostring(info.alerts[1].message), exp_alert_sub)
+        t.assert_equals(info.status, 'ready', info)
+        t.assert_equals(#info.alerts, 0, info.alerts)
 
         -- Run the helper. It returns a table of lines.
         local lines = dofile(find_orphan_users_script)
