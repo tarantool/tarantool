@@ -156,6 +156,15 @@ back to the user-provided 'is_sync' space option.
 https://tarantool.io/compat/box_consider_system_spaces_synchronous
 ]]
 
+local SKIP_REPLICATION_NAMES_BRIEF = [[
+Skip applying and validating instance and replicaset names during replication
+startup. The old behavior allows a Tarantool 3.x instance configured via the
+declarative config to join a Tarantool 2.11 replicaset whose snapshot may not
+contain names yet.
+
+https://tarantool.io/compat/skip_replication_names
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -286,6 +295,12 @@ local options = {
             box_consider_system_spaces_synchronous_tweak_action(is_new)
             ffi.C.system_spaces_update_is_sync_state_from_compat()
       end
+    },
+    skip_replication_names = {
+        default = 'new',
+        obsolete = nil,
+        brief = SKIP_REPLICATION_NAMES_BRIEF,
+        action = function() end,
     },
 }
 

@@ -352,6 +352,7 @@ g.test_defaults = function()
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
             datetime_setfn_timestamp_type_check = 'old',
+            skip_replication_names = 'new',
         },
     }
     local res = cluster_config:apply_default({})
