@@ -18,6 +18,7 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party)
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 
+include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(TEST_SUITE_NAME "tarantool-unit")
