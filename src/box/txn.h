@@ -570,6 +570,7 @@ struct txn {
 	 * Nesting level of space on_replace triggers for current txn.
 	 */
 	int space_on_replace_triggers_depth;
+	bool flag;
 };
 
 static inline bool
