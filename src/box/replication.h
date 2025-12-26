@@ -228,6 +228,12 @@ extern double replication_sync_lag;
 extern int replication_synchro_quorum;
 
 /**
+ * Minimum number of replicas a node must synchronize with before making a
+ * linearizable transaction.
+ */
+extern int replication_linearizable_quorum;
+
+/**
  * Time in seconds which the master node is able to wait for ACKs
  * for a synchronous transaction until it is rolled back.
  */
@@ -683,6 +689,13 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 struct replica *
 replicaset_add_anon(const struct tt_uuid *replica_uuid);
 
+/*
+ * Find the minimal vclock which has all the data confirmed on a quorum.
+ */
+int
+replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
+				    double deadline);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -722,6 +735,13 @@ replicaset_connect(const struct uri_set *uris,
  */
 void
 replicaset_connect_wakeup(void);
+
+/**
+ * Wake up replicaset_collect_confirmed_vclock, so that it notices the change
+ * of replication_linearizable_quorum.
+ */
+void
+replicaset_wait_confirmed_wakeup(void);
 
 /**
  * Reload replica URIs.
