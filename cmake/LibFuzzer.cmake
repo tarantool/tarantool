@@ -78,7 +78,6 @@ function(BuildLibFuzzerSymbols LibFuzzerExports)
   add_custom_command(
     OUTPUT ${LibFuzzerExports}
     COMMAND ${CMAKE_NM} ${NM_OPTIONS} ${LibFuzzerPath} > ${LibFuzzerExports}
-    BYPRODUCTS ${LibFuzzerExports}
     COMMENT "Generate a file with exported libFuzzer symbols"
   )
 endfunction()
