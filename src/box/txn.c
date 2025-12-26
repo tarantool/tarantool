@@ -927,9 +927,9 @@ txn_on_journal_write(struct journal_entry *entry)
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
-		if (txn_limbo_is_owned_by_current_instance(&txn_limbo) &&
+		if (txn_limbo.state == TXN_LIMBO_STATE_LEADER &&
 		    txn_has_flag(txn, TXN_WAIT_ACK))
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+			txn_limbo_ack(&txn_limbo, txn_limbo.queue.owner_id,
 				      txn->limbo_entry->lsn);
 	}
 finish:
@@ -1193,16 +1193,16 @@ txn_commit_impl(struct txn *txn, enum txn_commit_wait_mode wait_mode)
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		struct txn_limbo_entry *limbo_entry = txn->limbo_entry;
 		assert(limbo_entry->lsn > 0);
-		int rc = txn_limbo_wait_complete(&txn_limbo, limbo_entry);
-		if (rc < 0) {
-			if (fiber_is_cancelled() ||
-			    !replication_synchro_timeout_rollback_enabled) {
-				txn->fiber = NULL;
-				return -1;
-			} else {
-				goto rollback;
-			}
+		enum txn_limbo_wait_entry_result rc =
+			txn_limbo_wait_complete(&txn_limbo, limbo_entry);
+		if (rc == TXN_LIMBO_WAIT_ENTRY_SUCCESS)
+			goto finish_done;
+		if (rc == TXN_LIMBO_WAIT_ENTRY_FAIL_DETACH) {
+			txn->fiber = NULL;
+			return -1;
 		}
+		assert(rc == TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE);
+		goto rollback;
 	}
 finish_done:
 	assert(txn_has_flag(txn, TXN_IS_DONE));
