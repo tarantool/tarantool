@@ -18,7 +18,6 @@
 #define tree_i64_key_t int64_t
 #define BPS_TREE_NAME tree_i64_t
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE tree_i64_EXTENT_SIZE
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
 #define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
@@ -27,7 +26,6 @@
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -42,7 +40,6 @@
 #define treecc_i64_key_t int64_t
 #define BPS_TREE_NAME treecc_i64_t
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE treecc_i64_EXTENT_SIZE
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
 #define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
@@ -51,7 +48,6 @@
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -67,7 +63,6 @@
 #define treeic_i64_key_t int64_t
 #define BPS_TREE_NAME treeic_i64_t
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE treeic_i64_EXTENT_SIZE
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
 #define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
@@ -76,7 +71,6 @@
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY

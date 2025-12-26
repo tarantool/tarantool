@@ -109,7 +109,6 @@ vy_cache_tree_key_cmp(struct vy_cache_node *a, struct vy_entry b,
 
 #define BPS_TREE_NAME vy_cache_tree
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE VY_CACHE_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_cache_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_cache_tree_key_cmp(a, b, cmp_def)
 #define bps_tree_elem_t struct vy_cache_node *
@@ -121,7 +120,6 @@ vy_cache_tree_key_cmp(struct vy_cache_node *a, struct vy_entry b,
 
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef bps_tree_elem_t

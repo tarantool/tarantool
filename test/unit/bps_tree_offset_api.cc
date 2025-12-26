@@ -24,9 +24,9 @@
 typedef int64_t type_t;
 #define TYPE_F "%" PRId64
 
+#define test_TREE_EXTENT_SIZE 2048
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 256
-#define BPS_TREE_EXTENT_SIZE 2048
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) ((a) - (b))
 #define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) - (b))
@@ -172,7 +172,7 @@ extent_alloc(struct matras_allocator *allocator)
 {
 	(void)allocator;
 	++extent_count;
-	return xmalloc(BPS_TREE_EXTENT_SIZE);
+	return xmalloc(test_TREE_EXTENT_SIZE);
 }
 
 static void
@@ -458,7 +458,7 @@ main(void)
 	plan(4);
 	header();
 
-	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+	matras_allocator_create(&allocator, test_TREE_EXTENT_SIZE,
 				extent_alloc, extent_free);
 
 	iterator_at();

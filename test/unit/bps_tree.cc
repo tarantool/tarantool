@@ -42,7 +42,6 @@ compare(type_t a, type_t b);
 /* check compiling with another name and settings */
 #define BPS_TREE_NAME testtest
 #define BPS_TREE_BLOCK_SIZE 512
-#define BPS_TREE_EXTENT_SIZE 16*1024
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
@@ -52,7 +51,6 @@ compare(type_t a, type_t b);
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -61,9 +59,9 @@ compare(type_t a, type_t b);
 #undef bps_tree_arg_t
 
 /* true tree with true settings */
+#define test_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
-#define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
@@ -74,7 +72,6 @@ compare(type_t a, type_t b);
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -86,7 +83,6 @@ compare(type_t a, type_t b);
 #define bx1_TREE_EXTENT_SIZE SMALL_BLOCK_SIZE
 #define BPS_TREE_NAME test_bx1
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE
-#define BPS_TREE_EXTENT_SIZE bx1_TREE_EXTENT_SIZE
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
@@ -96,7 +92,6 @@ compare(type_t a, type_t b);
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -108,7 +103,6 @@ compare(type_t a, type_t b);
 #define bx4_TREE_EXTENT_SIZE (SMALL_BLOCK_SIZE * 4)
 #define BPS_TREE_NAME test_bx4
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE
-#define BPS_TREE_EXTENT_SIZE bx4_TREE_EXTENT_SIZE
 #define BPS_TREE_IS_IDENTICAL(a, b) ((a) == (b))
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
@@ -118,7 +112,6 @@ compare(type_t a, type_t b);
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_IS_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
@@ -149,7 +142,6 @@ static int compare_key(const elem_t &a, long b)
 
 #define BPS_TREE_NAME struct_tree
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
-#define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
@@ -159,7 +151,6 @@ static int compare_key(const elem_t &a, long b)
 #include "salad/bps_tree.h"
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
-#undef BPS_TREE_EXTENT_SIZE
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef BPS_TREE_IS_IDENTICAL
@@ -170,7 +161,6 @@ static int compare_key(const elem_t &a, long b)
 /* tree for approximate_count test */
 #define BPS_TREE_NAME approx
 #define BPS_TREE_BLOCK_SIZE SMALL_BLOCK_SIZE /* small value for tests */
-#define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
 #define BPS_TREE_IS_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) (((a) >> 32) < (b) ? -1 : ((a) >> 32) > (b) ? 1 : 0)
@@ -1176,7 +1166,7 @@ main(void)
 	plan(16);
 	header();
 
-	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+	matras_allocator_create(&allocator, test_TREE_EXTENT_SIZE,
 				extent_alloc, extent_free);
 
 	simple_check();
@@ -1194,7 +1184,7 @@ main(void)
 
 	matras_allocator_destroy(&allocator);
 
-	matras_allocator_create(&allocator, BPS_TREE_EXTENT_SIZE,
+	matras_allocator_create(&allocator, test_TREE_EXTENT_SIZE,
 				extent_alloc, extent_free);
 	gh_11326_oom_on_insertion_test();
 	gh_11788_oom_on_first_insertion_test();
