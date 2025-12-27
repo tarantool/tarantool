@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_BOX_FIELD_MAP_H_INCLUDED
-#define TARANTOOL_BOX_FIELD_MAP_H_INCLUDED
 /*
  * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#pragma once
+
 #include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -254,8 +254,6 @@ field_map_build_size(struct field_map_builder *builder)
  */
 void
 field_map_build(struct field_map_builder *builder, char *buffer);
-
-#endif /* TARANTOOL_BOX_FIELD_MAP_H_INCLUDED */
 
 #if defined(__cplusplus)
 } /* extern "C" */
