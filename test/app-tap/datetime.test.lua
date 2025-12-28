@@ -18,6 +18,9 @@ local MIN_DATE_YEAR = -5879610
 -- maximum supported date - 5879611-07-11
 local MAX_DATE_YEAR = 5879611
 
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
 local SECS_PER_DAY      = 86400
 local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
@@ -309,7 +312,7 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {'usec', {0, 1e6}},
         {'msec', {0, 1e3}},
         {'nsec', {0, 1e9}},
-        {'tzoffset', {-720, 840}, str_or_num_exp},
+        {'tzoffset', {MIN_TZOFFSET, MAX_TZOFFSET}, str_or_num_exp},
     }
     local ts = date.new()
 
@@ -3008,7 +3011,7 @@ test:test("Time invalid :set{} operations", function(test)
         {'usec', {0, 1e6}},
         {'msec', {0, 1e3}},
         {'nsec', {0, 1e9}},
-        {'tzoffset', {-720, 840}, str_or_num_exp},
+        {'tzoffset', {MIN_TZOFFSET, MAX_TZOFFSET}, str_or_num_exp},
     }
     local ts = date.new()
 
@@ -3138,7 +3141,7 @@ test:test("Time invalid tzoffset in :set{} operations", function(test)
         -10000,
     }
     for _, val in ipairs(bad_numbers) do
-        assert_raises(test, range_check_error('tzoffset', val, {-720, 840}),
+        assert_raises(test, range_check_error('tzoffset', val, {MIN_TZOFFSET, MAX_TZOFFSET}),
                       function() ts:set{ tzoffset = val } end)
     end
 end)
