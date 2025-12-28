@@ -541,8 +541,8 @@ mp_datetime_unpack_ok_test(void)
 		{.epoch = MIN_EPOCH_SECS_VALUE},
 		{.nsec = MAX_NANOS_PER_SEC - 1},
 		{.nsec = 0},
-		{.tzoffset = MIN_TZOFFSET},
-		{.tzoffset = MAX_TZOFFSET},
+		{.tzoffset = TZOFFSET_MIN},
+		{.tzoffset = TZOFFSET_MAX},
 		{.tzindex = MAX_TZINDEX},
 		{.tzindex = 0},
 	};
@@ -573,8 +573,8 @@ mp_datetime_unpack_fail_test(void)
 		{.epoch = MIN_EPOCH_SECS_VALUE - 1},
 		{.nsec = MAX_NANOS_PER_SEC},
 		{.nsec = -1},
-		{.tzoffset = MIN_TZOFFSET - 1},
-		{.tzoffset = MAX_TZOFFSET + 1},
+		{.tzoffset = TZOFFSET_MIN - 1},
+		{.tzoffset = TZOFFSET_MAX + 1},
 		{.tzindex = MAX_TZINDEX + 1},
 		{.tzindex = -1},
 	};
