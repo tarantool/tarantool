@@ -67,8 +67,8 @@ struct tnt_tm;
  * At the moment the range of known timezones is UTC-12:00..UTC+14:00
  * https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
  */
-#define MAX_TZOFFSET (14L * 60)
-#define MIN_TZOFFSET (-12L * 60)
+#define TZOFFSET_MAX (14L * 60)
+#define TZOFFSET_MIN (-12L * 60)
 
 /**
  * Actually we have lesser number of generated timezones, but 1024
@@ -420,8 +420,8 @@ datetime_validate(const struct datetime *date)
 	if (unlikely(date->nsec < 0) ||
 	    unlikely(date->nsec >= MAX_NANOS_PER_SEC))
 		return false;
-	if (unlikely(date->tzoffset < MIN_TZOFFSET) ||
-	    unlikely(date->tzoffset > MAX_TZOFFSET))
+	if (unlikely(date->tzoffset < TZOFFSET_MIN) ||
+	    unlikely(date->tzoffset > TZOFFSET_MAX))
 		return false;
 	if (unlikely(date->tzindex < 0) ||
 	    unlikely(date->tzindex > MAX_TZINDEX))
