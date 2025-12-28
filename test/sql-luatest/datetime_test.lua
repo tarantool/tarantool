@@ -2294,6 +2294,9 @@ end
 --
 g.test_datetime_33_2 = function()
     g.server:exec(function()
+        local MIN_TZOFFSET = -12 * 60
+        local MAX_TZOFFSET = 14 * 60
+
         local sql = [[SELECT CAST(#v AS DATETIME);]]
 
         -- "year" cannot be more than 5879611.
@@ -2408,18 +2411,18 @@ g.test_datetime_33_2 = function()
         res = [[Type mismatch: can not convert map({"nsec": -1}) to datetime]]
         t.assert_equals(err.message, res)
 
-        -- "tzoffset" cannot be more than 840.
-        v = {tzoffset = 841}
+        -- "tzoffset" cannot be more than MAX_TZOFFSET.
+        v = {tzoffset = MAX_TZOFFSET + 1}
         _, err = box.execute(sql, {{['#v'] = v}})
-        res = [[Type mismatch: can not convert map({"tzoffset": 841}) ]]..
-              [[to datetime]]
+        res = ([[Type mismatch: can not convert map({"tzoffset": %d}) ]]
+               ):format(v.tzoffset)..[[to datetime]]
         t.assert_equals(err.message, res)
 
-        -- "tzoffset" cannot be less than -720.
-        v = {tzoffset = -721}
+        -- "tzoffset" cannot be less than MIN_TZOFFSET.
+        v = {tzoffset = MIN_TZOFFSET - 1}
         _, err = box.execute(sql, {{['#v'] = v}})
-        res = [[Type mismatch: can not convert map({"tzoffset": -721}) ]]..
-              [[to datetime]]
+        res = ([[Type mismatch: can not convert map({"tzoffset": %d}) ]]
+               ):format(v.tzoffset)..[[to datetime]]
         t.assert_equals(err.message, res)
 
         -- Only one of "msec", "usec" and "nsec" can be specified.
