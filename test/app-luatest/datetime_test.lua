@@ -26,8 +26,8 @@ local MAX_DATE_YEAR = 5879611
 local MAX_DATE_MONTH = 7
 local MAX_DATE_DAY = 11
 
-local MIN_TZOFFSET = -12 * 60
-local MAX_TZOFFSET = 14 * 60
+local TZOFFSET_MIN = -12 * 60
+local TZOFFSET_MAX = 14 * 60
 
 local YEAR_RANGE = {MIN_DATE_YEAR, MAX_DATE_YEAR}
 local MONTH_RANGE = {1, 12}
@@ -39,7 +39,7 @@ local TIMESTAMP_RANGE = {MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE}
 local MSEC_RANGE = {0, 1E3}
 local USEC_RANGE = {0, 1E6}
 local NSEC_RANGE = {0, 1E9}
-local TZOFFSET_RANGE = {MIN_TZOFFSET, MAX_TZOFFSET}
+local TZOFFSET_RANGE = {TZOFFSET_MIN, TZOFFSET_MAX}
 
 -- }}} Datetime module and related helper constants.
 

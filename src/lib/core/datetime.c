@@ -1080,7 +1080,7 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		      fields->nsec;
 	if (nsec < 0 || nsec >= MAX_NANOS_PER_SEC)
 		return -1;
-	if (fields->tzoffset < -720 || fields->tzoffset > 840)
+	if (fields->tzoffset < TZOFFSET_MIN || fields->tzoffset > TZOFFSET_MAX)
 		return -1;
 	if (fields->timestamp < (double)INT32_MIN * SECS_PER_DAY ||
 	    fields->timestamp > (double)INT32_MAX * SECS_PER_DAY)
