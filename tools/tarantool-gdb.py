@@ -1119,8 +1119,8 @@ if find_type('struct datetime') is not None:
         MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET
         MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET
 
-        MAX_TZOFFSET = 14 * 60
-        MIN_TZOFFSET = -12 * 60
+        TZOFFSET_MAX = 14 * 60
+        TZOFFSET_MIN = -12 * 60
         MAX_TZINDEX = 1024
 
         def __init__(self, val):
@@ -1131,7 +1131,7 @@ if find_type('struct datetime') is not None:
                 return False
             if self.val['nsec'] < 0 or self.val['nsec'] >= self.MAX_NANOS_PER_SEC:
                 return False
-            if self.val['tzoffset'] < self.MIN_TZOFFSET or self.val['tzoffset'] > self.MAX_TZOFFSET:
+            if self.val['tzoffset'] < self.TZOFFSET_MIN or self.val['tzoffset'] > self.TZOFFSET_MAX:
                 return False
             if self.val['tzindex'] < 0 or self.val['tzindex'] > self.MAX_TZINDEX:
                 return False
