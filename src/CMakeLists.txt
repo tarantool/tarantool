@@ -167,6 +167,12 @@ if(NOT TARGET_OS_OPENBSD)
     endif()
 endif()
 
+find_library(LZ4_LIBRARY NAMES lz4)
+if(NOT LZ4_LIBRARY)
+    message(FATAL_ERROR "lz4 library not found; install liblz4-dev")
+endif()
+set(generic_libraries ${generic_libraries} lz4)
+
 add_library(shutdown STATIC on_shutdown.c)
 
 set (server_sources
