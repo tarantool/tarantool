@@ -1330,6 +1330,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_synchro_quorum',
             default = 'N / 2 + 1',
         }),
+        linearizable_quorum = schema.scalar({
+            type = 'string, number',
+            box_cfg = 'replication_linearizable_quorum',
+            default = 'N - Q + 1',
+        }),
         skip_conflict = schema.scalar({
             type = 'boolean',
             box_cfg = 'replication_skip_conflict',

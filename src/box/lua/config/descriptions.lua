@@ -2410,6 +2410,31 @@ I['replication.synchro_quorum'] = format_text([[
     until a new master is elected.
 ]])
 
+I['replication.linearizable_quorum'] = format_text([[
+    A number of replicas to synchronize with before performing linearizable
+    transaction.
+
+    Linearizable transactions guarantee that if a write operation completes
+    before a read operation begins, then this read will always observe the
+    effects of that write. To ensure this, the node executing a linearizable
+    transaction must obtain information from enough remote peers to determine
+    the most up-to-date state of the replica set. That number of peers can be
+    configured with this option.
+
+    By default, the linearizable quorum is evaluated dynamically as `N - Q + 1`,
+    where: `N` - the current number of registered replicas in the replica set,
+    `Q` - the current value of `replication.synchro_quorum`.
+
+    This default guarantees quorum intersection between synchronous writes and
+    linearizable reads (`R + Q = N + 1`), which is a fundamental requirement for
+    linearizability.
+
+    Note:
+      To begin a linearizable transaction, the MVCC must be enabled and
+      `txn_isolation` must be set to `linearizable`, the transaction can only
+      perform requests to synchronous, local or temporary spaces.
+]])
+
 I['replication.synchro_timeout'] = format_text([[
     For synchronous replication only. Specify how many seconds to wait for a
     synchronous transaction quorum replication until it is declared failed and

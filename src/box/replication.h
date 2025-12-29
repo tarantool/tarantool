@@ -228,6 +228,12 @@ extern double replication_sync_lag;
 extern int replication_synchro_quorum;
 
 /**
+ * Minimum number of replicas a node must synchronize with before making a
+ * linearizable transaction.
+ */
+extern int replication_linearizable_quorum;
+
+/**
  * Time in seconds which the master node is able to wait for ACKs
  * for a synchronous transaction until it is rolled back.
  */
@@ -422,6 +428,11 @@ struct replicaset {
 	struct rlist on_relay_thread_start;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica *replica_by_id[VCLOCK_MAX];
+	/**
+	 * Signaled whenever a replication configuration option is changed
+	 * (currently used only for `replication_linearizable_quorum`).
+	 */
+	struct fiber_cond option_update_cond;
 };
 extern struct replicaset replicaset;
 
@@ -683,6 +694,13 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
 struct replica *
 replicaset_add_anon(const struct tt_uuid *replica_uuid);
 
+/*
+ * Find the minimal vclock which has all the data confirmed on a quorum.
+ */
+int
+replicaset_collect_confirmed_vclock(struct vclock *confirmed_vclock,
+				    double deadline);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -722,6 +740,13 @@ replicaset_connect(const struct uri_set *uris,
  */
 void
 replicaset_connect_wakeup(void);
+
+/**
+ * Wake up functions, which wait on `option_update_cond`, so that they notice
+ * configuration option change.
+ */
+void
+replicaset_option_update_wakeup(void);
 
 /**
  * Reload replica URIs.
