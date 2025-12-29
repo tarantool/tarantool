@@ -1,0 +1,503 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 0
+    },
+    "include": [
+        "./static-build/CMakePresets.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "dynamic_base_configure",
+            "displayName": "Dyncamic Base Configure",
+            "binaryDir": "${sourceDir}/build",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "dynamic_base_asan_configure",
+            "displayName": "Dynamic Base ASAN Configure",
+            "inherits": "dynamic_base_configure",
+            "hidden": true,
+            "cacheVariables": {
+                "ENABLE_WERROR": "ON",
+                "ENABLE_ASAN": "ON",
+                "ENABLE_UB_SANITIZER": "ON",
+                "FIBER_STACK_SIZE": "1280Kb",
+                "TEST_BUILD": "ON"
+            }
+        },
+        {
+            "name": "gcc_dynamic_base_configure",
+            "displayName": "GCC Dyncamic Base Configure",
+            "inherits": "dynamic_base_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "gcc_dynamic_base_asan_configure",
+            "displayName": "GCC Dynamic Base ASAN Configure",
+            "inherits": "dynamic_base_asan_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "clang_dynamic_base_configure",
+            "displayName": "Clang Dyncamic Base Configure",
+            "inherits": "dynamic_base_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "clang",
+                "CXX": "clang++"
+            }
+        },
+        {
+            "name": "clang_dynamic_base_asan_configure",
+            "displayName": "Clang Dyncamic Base ASAN Configure",
+            "hidden": true,
+            "inherits": "dynamic_base_asan_configure",
+            "environment": {
+                "CC": "clang",
+                "CXX": "clang++"
+            }
+        },
+        {
+            "name": "gcc_dynamic_debug_configure",
+            "displayName": "GCC Dynamic Debug Configure",
+            "inherits": "gcc_dynamic_base_configure"
+        },
+        {
+            "name": "gcc_static_debug_configure",
+            "displayName": "GCC Static Debug Configure",
+            "inherits": "gcc_static_base_configure"
+        },
+        {
+            "name": "gcc_dynamic_release_configure",
+            "displayName": "GCC Dynamic Release Configure",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "inherits": "gcc_dynamic_base_configure"
+        },
+        {
+            "name": "gcc_static_release_configure",
+            "displayName": "GCC Static Release Configure",
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+            },
+            "inherits": "gcc_static_base_configure"
+        },
+        {
+            "name": "gcc_dynamic_debug_asan_configure",
+            "displayName": "GCC Dynamic Debug ASAN Configure",
+            "inherits": "gcc_dynamic_base_asan_configure"
+        },
+        {
+            "name": "gcc_static_debug_asan_configure",
+            "displayName": "GCC Static Debug ASAN Configure",
+            "inherits": "gcc_static_base_asan_configure"
+        },
+        {
+            "name": "gcc_dynamic_release_asan_configure",
+            "displayName": "GCC Dynamic Release ASAN Configure",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "inherits": "gcc_dynamic_base_asan_configure"
+        },
+        {
+            "name": "gcc_static_release_asan_configure",
+            "displayName": "GCC Static Release ASAN Configure",
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DENABLE_ASAN=ON;-DENABLE_UB_SANITIZER=ON;-DFIBER_STACK_SIZE=1280Kb;-DTEST_BUILD=ON"
+            },
+            "inherits": "gcc_static_base_asan_configure"
+        },
+        {
+            "name": "clang_dynamic_debug_configure",
+            "displayName": "Clang Dynamic Debug Configure",
+            "inherits": "clang_dynamic_base_configure"
+        },
+        {
+            "name": "clang_static_debug_configure",
+            "displayName": "Clang Static Debug Configure",
+            "inherits": "clang_static_base_configure"
+        },
+        {
+            "name": "clang_dynamic_release_configure",
+            "displayName": "Clang Dynamic Release Configure",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "inherits": "clang_dynamic_base_configure"
+        },
+        {
+            "name": "clang_static_release_configure",
+            "displayName": "Clang Static Release Configure",
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+            },
+            "inherits": "clang_static_base_configure"
+        },
+        {
+            "name": "clang_dynamic_debug_asan_configure",
+            "displayName": "Clang Dynamic Debug ASAN Configure",
+            "inherits": "clang_dynamic_base_asan_configure"
+        },
+        {
+            "name": "clang_static_debug_asan_configure",
+            "displayName": "Clang Static Debug ASAN Configure",
+            "inherits": "clang_static_base_asan_configure"
+        },
+        {
+            "name": "clang_dynamic_release_asan_configure",
+            "displayName": "Clang Dynamic Release ASAN Configure",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "inherits": "clang_dynamic_base_asan_configure"
+        },
+        {
+            "name": "clang_static_release_asan_configure",
+            "displayName": "Clang Static Release ASAN Configure",
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DENABLE_ASAN=ON;-DENABLE_UB_SANITIZER=ON;-DFIBER_STACK_SIZE=1280Kb;-DTEST_BUILD=ON"
+            },
+            "inherits": "clang_static_base_asan_configure"
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "gcc_dynamic_debug_build",
+            "configurePreset": "gcc_dynamic_debug_configure",
+            "displayName": "GCC Dynamic Debug Build",
+            "description": "GCC Dynamic Debug Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_static_debug_build",
+            "configurePreset": "gcc_static_debug_configure",
+            "displayName": "GCC Static Debug Build",
+            "description": "GCC Static Debug Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_dynamic_release_build",
+            "configurePreset": "gcc_dynamic_release_configure",
+            "displayName": "GCC Dynamic Release Build",
+            "description": "GCC Dynamic Release Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_static_release_build",
+            "configurePreset": "gcc_static_release_configure",
+            "displayName": "GCC Static Release Build",
+            "description": "GCC Static Release Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_dynamic_debug_asan_build",
+            "configurePreset": "gcc_dynamic_debug_asan_configure",
+            "displayName": "GCC Dynamic Debug ASAN Build",
+            "description": "GCC Dynamic Debug ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_static_debug_asan_build",
+            "configurePreset": "gcc_static_debug_asan_configure",
+            "displayName": "GCC Static Debug ASAN Build",
+            "description": "GCC Static Debug ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_dynamic_release_asan_build",
+            "configurePreset": "gcc_dynamic_release_asan_configure",
+            "displayName": "GCC Dynamic Release ASAN Build",
+            "description": "GCC Dynamic Release ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "gcc_static_release_asan_build",
+            "configurePreset": "gcc_static_release_asan_configure",
+            "displayName": "GCC Static Release ASAN Build",
+            "description": "GCC Static Release ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_dynamic_debug_build",
+            "configurePreset": "clang_dynamic_debug_configure",
+            "displayName": "Clang Dynamic Debug Build",
+            "description": "Clang Dynamic Debug Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_static_debug_build",
+            "configurePreset": "clang_static_debug_configure",
+            "displayName": "Clang Static Debug Build",
+            "description": "Clang Static Debug Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_dynamic_release_build",
+            "configurePreset": "clang_dynamic_release_configure",
+            "displayName": "Clang Dynamic Release Build",
+            "description": "Clang Dynamic Release Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_static_release_build",
+            "configurePreset": "clang_static_release_configure",
+            "displayName": "Clang Static Release Build",
+            "description": "Clang Static Release Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_dynamic_debug_asan_build",
+            "configurePreset": "clang_dynamic_debug_asan_configure",
+            "displayName": "Clang Dynamic Debug ASAN Build",
+            "description": "Clang Dynamic Debug ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_static_debug_asan_build",
+            "configurePreset": "clang_static_debug_asan_configure",
+            "displayName": "Clang Static Debug ASAN Build",
+            "description": "Clang Static Debug ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_dynamic_release_asan_build",
+            "configurePreset": "clang_dynamic_release_asan_configure",
+            "displayName": "Clang Dynamic Release ASAN_Build",
+            "description": "Clang Dynamic Release ASAN Build using the output of the corresponding cmake configure step"
+        },
+        {
+            "name": "clang_static_release_asan_build",
+            "configurePreset": "clang_static_release_asan_configure",
+            "displayName": "Clang Static Release ASAN Build",
+            "description": "Clang Static Release ASAN Build using the output of the corresponding cmake configure step"
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "gcc_dynamic_debug_workflow",
+            "displayName": "GCC Dynamic Debug Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_dynamic_debug_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_dynamic_debug_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_static_debug_workflow",
+            "displayName": "GCC Static Debug Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_static_debug_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_static_debug_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_dynamic_release_workflow",
+            "displayName": "GCC Dynamic Release Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_dynamic_release_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_dynamic_release_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_static_release_workflow",
+            "displayName": "GCC Static Release Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_static_release_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_static_release_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_dynamic_debug_asan_workflow",
+            "displayName": "GCC Dynamic Debug ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_dynamic_debug_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_dynamic_debug_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_static_debug_asan_workflow",
+            "displayName": "GCC Static Debug ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_static_debug_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_static_debug_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_dynamic_release_asan_workflow",
+            "displayName": "GCC Dynamic Release ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_dynamic_release_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_dynamic_release_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "gcc_static_release_asan_workflow",
+            "displayName": "GCC Static Release ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "gcc_static_release_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "gcc_static_release_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_dynamic_debug_workflow",
+            "displayName": "Clang Dynamic Debug Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_dynamic_debug_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_dynamic_debug_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_static_debug_workflow",
+            "displayName": "Clang Static Debug Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_static_debug_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_static_debug_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_dynamic_release_workflow",
+            "displayName": "Clang Dynamic Release Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_dynamic_release_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_dynamic_release_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_static_release_workflow",
+            "displayName": "Clang Static Release Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_static_release_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_static_release_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_dynamic_debug_asan_workflow",
+            "displayName": "clang Dynamic Debug ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_dynamic_debug_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_dynamic_debug_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_static_debug_asan_workflow",
+            "displayName": "Clang Static Debug ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_static_debug_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_static_debug_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_dynamic_release_asan_workflow",
+            "displayName": "Clang Dynamic Release ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_dynamic_release_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_dynamic_release_asan_build"
+                }
+            ]
+        },
+        {
+            "name": "clang_static_release_asan_workflow",
+            "displayName": "Clang Static Release ASAN Workflow",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "clang_static_release_asan_configure"
+                },
+                {
+                    "type": "build",
+                    "name": "clang_static_release_asan_build"
+                }
+            ]
+        }
+    ]
+}

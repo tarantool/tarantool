@@ -1,0 +1,68 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "static_base_configure",
+            "displayName": "Static Base Configure",
+            "binaryDir": "${sourceDir}/static-build/build",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=Debug;"
+            }
+        },
+        {
+            "name": "static_base_asan_configure",
+            "displayName": "Static Base ASAN Configure",
+            "binaryDir": "${sourceDir}/static-build/build",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_TARANTOOL_ARGS": "-DCMAKE_BUILD_TYPE=Debug;-DENABLE_WERROR=ON;-DENABLE_ASAN=ON;-DENABLE_UB_SANITIZER=ON;-DFIBER_STACK_SIZE=1280Kb;-DTEST_BUILD=ON"
+            }
+        },
+        {
+            "name": "gcc_static_base_configure",
+            "displayName": "GCC Static Base Configure",
+            "inherits": "static_base_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "gcc_static_base_asan_configure",
+            "displayName": "GCC Static Base ASAN Configure",
+            "inherits": "static_base_asan_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "clang_static_base_configure",
+            "displayName": "Clang Static Base Configure",
+            "inherits": "static_base_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "clang",
+                "CXX": "clang++"
+            }
+        },
+        {
+            "name": "clang_static_base_asan_configure",
+            "displayName": "Clang Static Base ASAN Configure",
+            "inherits": "static_base_asan_configure",
+            "hidden": true,
+            "environment": {
+                "CC": "clang",
+                "CXX": "clang++"
+            }
+        }
+    ]
+}
