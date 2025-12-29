@@ -20,6 +20,41 @@ static const char sample[] = "2012-12-24T15:30Z";
 void
 cord_on_yield(void) {}
 
+static char *
+fmt_va(char *fmt, va_list args)
+{
+	static char buf[4096];
+	static size_t buf_used = 0;
+	va_list args_copy;
+	va_copy(args_copy, args);
+
+	int32_t res = vsnprintf(NULL, 0, fmt, args);
+	assert(res >= 0);
+	size_t size = (size_t)res + 1;
+
+	assert(buf_used + size <= sizeof(buf));
+	char *str = buf + buf_used;
+	buf_used += size;
+
+	res = vsnprintf(str, size, fmt, args_copy);
+	assert((res >= 0) && (size_t)res == size - 1);
+	va_end(args_copy);
+	return str;
+}
+
+static char *
+fmt(char *fmt, ...) CFORMAT(printf, 1, 2);
+static char *
+fmt(char *fmt, ...)
+{
+	va_list args;
+	char *ret;
+	va_start(args, fmt);
+	ret = fmt_va(fmt, args);
+	va_end(args);
+	return ret;
+}
+
 #define S(s) {s, sizeof(s) - 1}
 struct {
 	const char *str;
@@ -203,7 +238,7 @@ _dt_to_epoch(dt_t dt)
 static void
 parse_date_test(void)
 {
-	plan(154);
+	plan(160);
 
 	static struct {
 		int64_t epoch;
@@ -339,7 +374,19 @@ parse_date_test(void)
 		{ "%r",                      "03:00:00 AM" },
 		{ "%I:%M:%S %p",             "03:00:00 AM" },
 		{ "%S",                      "00" },
+		{ "%s",                      "0" },
 		{ "%s",                      "10800" },
+		{ "%s %3f",                  "10800 123" },
+		{ "%s %z",                   "10800 +0300" },
+		{ "%s %Z",                   "10800 MSK" },
+		{
+			"%s",
+			fmt("%ld", MIN_EPOCH_SECS_VALUE),
+		},
+		{
+			"%s",
+			fmt("%ld", MAX_EPOCH_SECS_VALUE),
+		},
 		{ "%f",                      "125" },
 		{ "%T",                      "03:00:00" },
 		{ "%H:%M:%S",                "03:00:00" },
@@ -378,9 +425,89 @@ parse_date_test(void)
 		struct tnt_tm date = { .tm_epoch = 0};
 		char *ptr = tnt_strptime(text, fmt, &date);
 		static char buff[DT_TO_STRING_BUFSIZE];
-		tnt_strftime(buff, sizeof(buff), "%FT%T%z", &date);
+		tnt_strftime(buff, sizeof(buff), "%FT%T.%f%z", &date);
 		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
 		     text, fmt, buff);
+	}
+
+	check_plan();
+}
+
+static void
+parse_date_strptime_invalid_test(void)
+{
+	/* Check tnt_strptime & datetime_strptime invalid formats. */
+	enum {
+		TNT = 1,
+		DATETIME = 2,
+		BOTH = 1 | 2,
+	};
+	const struct {
+		uint fn;
+		const char *fmt;
+		const char *text;
+		const char *fail_case;
+	} format_fail_tests[] = {
+		{
+			BOTH,
+			"%s %g-%m-%d",
+			"123 2000-01-02",
+			"mix of timestamp with y/m/d",
+		},
+		{
+			BOTH,
+			"%s %H:%M:%S",
+			"123 12:12:12",
+			"mix of timestamp with h/m/s",
+		},
+		{
+			DATETIME,
+			"%s",
+			fmt("%ld", MIN_EPOCH_SECS_VALUE - 1),
+			"timestamp < MIN_EPOCH_SECS_VALUE",
+		},
+		{
+			DATETIME,
+			"%s",
+			fmt("%ld", MAX_EPOCH_SECS_VALUE + 1),
+			"timestamp > MAX_EPOCH_SECS_VALUE",
+		},
+	};
+
+	size_t index;
+	const uint tnt_tap_tests_per_iter = 1;
+	const uint datetime_tap_tests_per_iter = 1;
+	uint p = 0;
+	for (index = 0; index < lengthof(format_fail_tests); index++) {
+		uint fn = format_fail_tests[index].fn;
+		p += tnt_tap_tests_per_iter * ((TNT & fn) != 0) +
+		     datetime_tap_tests_per_iter * ((DATETIME & fn) != 0);
+	}
+	plan(p);
+
+	for (index = 0; index < lengthof(format_fail_tests); index++) {
+		uint fn = format_fail_tests[index].fn;
+		note("%s[%lu].%x", __func__, index, fn);
+		const char *fmt = format_fail_tests[index].fmt;
+		const char *text = format_fail_tests[index].text;
+		const char *fail_case = format_fail_tests[index].fail_case;
+
+		if ((TNT & fn) == 0)
+			goto skip_tnt;
+		struct tnt_tm tm = { 0 };
+		char *ptr = tnt_strptime(text, fmt, &tm);
+		is(ptr, NULL, "tnt_strptime parse string '%s' "
+		   "using '%s' must fail on: %s",
+		   text, fmt, fail_case);
+skip_tnt:
+
+		if ((DATETIME & fn) == 0)
+			continue;
+		struct datetime date = { 0 };
+		size_t res = datetime_strptime(&date, text, fmt);
+		is(res, 0, "datetime_strptime parse string '%s' "
+		   "using '%s' must fail on: %s",
+		   text, fmt, fail_case);
 	}
 
 	check_plan();
@@ -592,10 +719,11 @@ interval_from_map_test(void)
 int
 main(void)
 {
-	plan(7);
+	plan(8);
 	datetime_test();
 	tostring_datetime_test();
 	parse_date_test();
+	parse_date_strptime_invalid_test();
 	mp_datetime_unpack_valid_checks();
 	mp_datetime_test();
 	mp_print_test();
