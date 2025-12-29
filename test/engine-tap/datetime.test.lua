@@ -5,6 +5,15 @@ package.path = "lib/?.lua;"..package.path
 local test = require('tester')
 local date = require('datetime')
 
+-- minimum supported date - -5879610-06-22
+local MIN_DATE_YEAR = -5879610
+local MIN_DATE_MONTH = 6
+local MIN_DATE_DAY = 22
+-- maximum supported date - 5879611-07-11
+local MAX_DATE_YEAR = 5879611
+local MAX_DATE_MONTH = 7
+local MAX_DATE_DAY = 11
+
 test:plan(2)
 
 local engine = test:engine()
@@ -54,7 +63,10 @@ test:test("Check order for hints overflow/underflow", function(test)
         is -208-05-13T16:27:44Z .. 6325-04-08T15:04:31Z
     ]]
     local years = {
-        {year = -5879610, month = 6, day = 22},
+        {
+            year = MIN_DATE_YEAR, month = MIN_DATE_MONTH, day = MIN_DATE_DAY,
+            hour = 23, min = 59, sec = 59,
+        },
         {year = -5000000},
         {year = -1000000},
         {year = -100000},
@@ -78,7 +90,7 @@ test:test("Check order for hints overflow/underflow", function(test)
         {year = 10000},
         {year = 1000000},
         {year = 5000000},
-        {year = 5879611, month = 7, day = 11},
+        {year = MAX_DATE_YEAR, month = MAX_DATE_MONTH, day = MAX_DATE_DAY},
     }
 
     for _, row in pairs(years) do
