@@ -8,7 +8,7 @@
 
 #include <assert.h>
 #include <string.h>
-#include "core/arrow_ipc.h"
+#include "arrow_ipc.h"
 
 int
 mp_validate_arrow(const char *data, uint32_t len)

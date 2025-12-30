@@ -167,6 +167,13 @@ create_perf_test(NAME memtx
 )
 create_perf_test_target(TARGET memtx)
 
+create_perf_test(NAME arrow_ipc
+                 SOURCES arrow_ipc.cc
+                         ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 LIBRARIES core box server ${BENCHMARK_LIBRARIES}
+)
+create_perf_test_target(TARGET arrow_ipc)
+
 create_perf_test_target(TARGET small)
 create_perf_test_target(TARGET msgpuck)
 
