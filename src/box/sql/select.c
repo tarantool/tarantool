@@ -2032,8 +2032,6 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
  * that form the result set of a SELECT statement) compute appropriate
  * column names for a table that would hold the expression list.
  *
- * All column names will be unique.
- *
  * Only the column names are computed.  Column.zType, Column.zColl,
  * and other fields of Column are zeroed.
  */
@@ -2041,10 +2039,6 @@ void
 sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 			   struct space_def *space_def)
 {
-	/* Database connection */
-	Hash ht;		/* Hash table of column names */
-
-	sqlHashInit(&ht);
 	uint32_t column_count =
 		expr_list != NULL ? (uint32_t)expr_list->nExpr : 0;
 	/*
@@ -2075,7 +2069,7 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		 * Check if the column contains an "AS <name>"
 		 * phrase.
 		 */
-		char *name = expr_list->a[i].zName;
+		const char *name = expr_list->a[i].zName;
 		if (name == NULL) {
 			struct Expr *pColExpr = expr_list->a[i].pExpr;
 			struct space_def *space_def = NULL;
@@ -2097,37 +2091,14 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		}
 		if (name == NULL) {
 			uint32_t idx = ++parse->autoname_i;
-			name = sql_xstrdup(sql_generate_column_name(idx));
-		} else {
-			name = sql_xstrdup(name);
+			name = sql_generate_column_name(idx);
 		}
 		size_t len = strlen(name);
-
-		/* Make sure the column name is unique.  If the name is not unique,
-		 * append an integer to the name so that it becomes unique.
-		 */
-		size_t cnt = 0;
-		while (sqlHashFind(&ht, name) != 0) {
-			assert(len > 0);
-			size_t j = len - 1;
-			for (; j > 0 && sqlIsdigit(name[j]); j--) {
-			};
-			size_t size = name[j] == '_' ? j : len;
-			char *tmp = sqlMPrintf("%.*s_%u", size, name, ++cnt);
-			sql_xfree(name);
-			name = tmp;
-			len = strlen(name);
-		}
 		assert(name != NULL);
-		void *field = &space_def->fields[i];
-		assert(field != NULL);
-		sqlHashInsert(&ht, name, field);
 		space_def->fields[i].name = xregion_alloc(region, len + 1);
 		memcpy(space_def->fields[i].name, name, len);
 		space_def->fields[i].name[len] = '\0';
-		sql_xfree(name);
 	}
-	sqlHashClear(&ht);
 }
 
 /*
