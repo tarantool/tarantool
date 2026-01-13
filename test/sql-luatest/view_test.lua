@@ -219,7 +219,8 @@ g.test_4104_view_access_check = function(cg)
     cg.server:exec(function()
         box.execute("CREATE TABLE supersecret(id INT PRIMARY KEY, data TEXT);")
         t.assert(box.space.supersecret ~= nil)
-        box.execute("CREATE TABLE supersecret2(id INT PRIMARY KEY, data TEXT);")
+        box.execute([[CREATE TABLE supersecret2(
+                      id_1 INT PRIMARY KEY, data_1 TEXT);]])
         t.assert(box.space.supersecret2 ~= nil)
         box.execute([[INSERT INTO supersecret VALUES(1, 'very big secret');]])
         box.execute("INSERT INTO supersecret2 VALUES(1, 'very big secret 2');")
@@ -417,5 +418,22 @@ g.test_4740_instead_of_delete_update_check = function(cg)
         box.execute('DROP VIEW v;')
         box.execute('DROP TABLE t;')
         box.execute('DROP TABLE t1;')
+    end)
+end
+
+--
+-- gh-4545: Make sure that creating a view with columns that have
+-- the same name will result in an error.
+--
+g.test_duplicate_column_error = function(cg)
+    cg.server:exec(function()
+        local exp_err = [[Space field 'a' is duplicate]]
+        local sql = [[CREATE TABLE t (a INTEGER PRIMARY KEY, a INTEGER);]]
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = [[CREATE VIEW v AS SELECT 1 AS a, 1 AS a;]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
     end)
 end
