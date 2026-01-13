@@ -205,7 +205,6 @@
 #endif
 
 
-#include "hash.h"
 #include "parse.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -976,7 +975,6 @@ struct sql {
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
 	Lookaside lookaside;	/* Lookaside malloc configuration */
-	Hash aFunc;		/* Hash table of connection functions */
 };
 
 /*
