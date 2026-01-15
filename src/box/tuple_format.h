@@ -36,6 +36,7 @@
 #include "errinj.h"
 #include "json/json.h"
 #include "tuple_dictionary.h"
+#include "tt_compression.h"
 #include "field_map.h"
 #include "index.h"
 #include "field_default_func.h"
@@ -147,8 +148,8 @@ struct tuple_field {
 	struct coll *coll;
 	/** Collation identifier. */
 	uint32_t coll_id;
-	/** Type of compression for this field. */
-	enum compression_type compression_type;
+	/** Compression options for this field. */
+	struct compression_opts compression_opts;
 	/**
 	 * Bitmap of fields that must be present in a tuple
 	 * conforming to the multikey subtree. Not NULL only

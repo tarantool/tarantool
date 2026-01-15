@@ -759,6 +759,8 @@ local function normalize_format(space_id, space_name, format, level)
                     field[k] = normalize_default_func(v,
                                                       "format[" .. i .. "]: ",
                                                       level + 1)
+                elseif k == 'compression' and type(given[k]) == 'table' then
+                    field[k] = setmap(given[k])
                 else
                     field[k] = v
                 end
