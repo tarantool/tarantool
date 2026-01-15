@@ -157,7 +157,6 @@ set(tuple_sources
     coll_id.c
     coll_id_cache.c
     field_def.c
-    opt_def.c
     identifier.c
     mp_tuple.c
 )

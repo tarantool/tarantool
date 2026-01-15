@@ -53,6 +53,7 @@ set(core_sources
     latency.c
     rmean.c
     tnt_thread.cc
+    opt_def.c
 )
 
 if (ENABLE_BACKTRACE)
