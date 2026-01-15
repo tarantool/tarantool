@@ -456,6 +456,14 @@ field_type1_contains_type2(enum field_type type1,
 }
 
 /**
+ * Callback to parse a value with 'compression' key in msgpack field definition.
+ * See function definition below.
+ */
+static int
+field_def_parse_compression(const char **data, void *opts,
+			    struct region *region);
+
+/**
  * Callback to parse a value with 'default' key in msgpack field definition.
  * See function definition below.
  */
@@ -488,8 +496,7 @@ static const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("nullable_action", on_conflict_action, struct field_def,
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
-	OPT_DEF_ENUM("compression", compression_type, struct field_def,
-		     compression_type, NULL),
+	OPT_DEF_CUSTOM("compression", field_def_parse_compression),
 	OPT_DEF_CUSTOM("default", field_def_parse_default_value),
 	OPT_DEF("default_func", OPT_UINT32, struct field_def, default_func_id),
 	OPT_DEF("layout", OPT_STRPTR, struct field_def, layout),
@@ -514,6 +521,7 @@ const struct field_def field_def_default = {
 	.default_value_size = 0,
 	.default_func_id = 0,
 	.layout = NULL,
+	.compression_opts = compression_opts_default,
 	.constraint_count = 0,
 	.constraint_def = NULL,
 };
@@ -610,6 +618,23 @@ field_mp_fits_fixed_point_decimal(enum field_type type, int64_t scale,
 }
 
 /**
+ * Parse a compression (optionally with parameters) from msgpack.
+ * Used as callback to parse a value with 'compression' key in field definition.
+ * Move @a data msgpack pointer to the end of msgpack value.
+ * By convention @a opts must point to corresponding struct field_def.
+ * Fill the field_def->compression_opts structure with the data corresponding to
+ * the compression type specified.
+ * Return 0 on success or -1 on error (diag is set to IllegalParams).
+ */
+static int
+field_def_parse_compression(const char **data, void *opts,
+			    struct region *region)
+{
+	struct field_def *def = (struct field_def *)opts;
+	return compression_opts_decode(data, &def->compression_opts, region);
+}
+
+/**
  * Parse default field value from msgpack.
  * Used as callback to parse a value with 'default' key in field definition.
  * Move @a data msgpack pointer to the end of msgpack value.
@@ -695,6 +720,11 @@ field_def_decode(struct field_def *field, const char **data,
 		return -1;
 	}
 	int count = mp_decode_map(data);
+	/*
+	 * Padding byte values are unspecified on assignment, zero the struct
+	 * so that we can compute hash and compare members as raw values.
+	 */
+	memset(field, 0, sizeof(*field));
 	*field = field_def_default;
 	field->type_params.scale = INT64_MAX;
 	bool is_action_missing = true;
@@ -758,10 +788,6 @@ field_def_decode(struct field_def *field, const char **data,
 	    field->type != FIELD_TYPE_ANY) {
 		field_def_error(fieldno, "collation is reasonable only for "
 				"'string', 'scalar', and 'any' fields");
-		return -1;
-	}
-	if (field->compression_type == compression_type_MAX) {
-		field_def_error(fieldno, "unknown compression type");
 		return -1;
 	}
 	if (field_type_is_fixed_decimal[field->type]) {

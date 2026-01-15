@@ -188,8 +188,8 @@ struct field_def {
 	 * multiple layouts.
 	 */
 	char *layout;
-	/** Compression type for this field. */
-	enum compression_type compression_type;
+	/** Compression options for this field. */
+	struct compression_opts compression_opts;
 	/** Array of constraints. Can be NULL if constraints_count == 0. */
 	struct tuple_constraint_def *constraint_def;
 	/** Number of constraints. */

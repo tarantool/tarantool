@@ -116,9 +116,11 @@ tuple_format_cmp(const struct tuple_format *format1,
 		if (field_a->is_key_part != field_b->is_key_part)
 			return (int)field_a->is_key_part -
 				(int)field_b->is_key_part;
-		if (field_a->compression_type != field_b->compression_type)
-			return (int)field_a->compression_type -
-			       (int)field_b->compression_type;
+		int cmp = memcmp(&field_a->compression_opts,
+				 &field_b->compression_opts,
+				 sizeof(field_b->compression_opts));
+		if (cmp != 0)
+			return cmp;
 		if (field_a->constraint_count != field_b->constraint_count)
 			return (int)field_a->constraint_count -
 			       (int)field_b->constraint_count;
@@ -167,7 +169,7 @@ tuple_format_hash(struct tuple_format *format)
 		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
-		TUPLE_FIELD_MEMBER_HASH(f, compression_type, h, carry, size);
+		TUPLE_FIELD_MEMBER_HASH(f, compression_opts, h, carry, size);
 		for (uint32_t i = 0; i < f->constraint_count; ++i)
 			size += tuple_constraint_hash_process(&f->constraint[i],
 							      &h, &carry);
@@ -530,8 +532,14 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 		}
 		field->coll = coll;
 		field->coll_id = cid;
-		field->compression_type = fields[i].compression_type;
-		if (field->compression_type != COMPRESSION_TYPE_NONE)
+		/*
+		 * Padding byte values are unspecified on assignment, use memcpy
+		 * so that we can compute hash and compare members as raw values
+		 * (the field def struct is zeroed on creation).
+		 */
+		memcpy(&field->compression_opts, &fields[i].compression_opts,
+		       sizeof(field->compression_opts));
+		if (field->compression_opts.type != COMPRESSION_TYPE_NONE)
 			format->is_compressed = true;
 
 		field->constraint =
@@ -937,7 +945,7 @@ tuple_format_is_compatible_with_key_def(struct tuple_format *format,
         for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
         	struct tuple_field *field =
                         tuple_format_field(format, i);
-        	if (field->compression_type == COMPRESSION_TYPE_NONE)
+		if (field->compression_opts.type == COMPRESSION_TYPE_NONE)
 			continue;
 		if (key_def_find_by_fieldno(key_def, i)) {
 			diag_set(ClientError, ER_UNSUPPORTED,
