@@ -31,7 +31,7 @@ elseif(UNIX)
         libstdc++
     )
     # See for details https://github.com/tarantool/tarantool/issues/9740
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND ENABLE_ASAN)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (ENABLE_ASAN OR OSS_FUZZ))
         set(ALLOWLIST ${ALLOWLIST} libresolv)
     endif()
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND ENABLE_ASAN)
