@@ -52,6 +52,25 @@ set_tests_properties(
     DEPENDS ${TEST_SUITE_NAME}-deps
 )
 
+LIST(APPEND BROKEN_LUZER_TESTS
+  # To be enabled in scope tarantool/tarantool#11897.
+  test/fuzz/lua/box_execute_test.lua
+  # To be enabled in scope tarantool/tarantool#11898.
+  test/fuzz/lua/json_decode_test.lua
+  # To be enabled in scope tarantool/security#151.
+  test/fuzz/lua/uri_parse_test.lua
+  # To be enabled in scope tarantool/tarantool#12063.
+  test/fuzz/lua/pickle_unpack_test.lua
+  # To be enabled in scope tarantool/security#153.
+  test/fuzz/lua/console_eval_test.lua
+)
+
+if(OSS_FUZZ)
+  set(LUZER_TESTS_DIR ${CMAKE_BINARY_DIR}/luzer_tests)
+  file(MAKE_DIRECTORY ${LUZER_TESTS_DIR})
+endif()
+set(LUZER_TESTS_OSS_FUZZ "")
+
 function(create_luzer_test)
   cmake_parse_arguments(
     FUZZ
@@ -65,6 +84,9 @@ function(create_luzer_test)
   string(REPLACE "_test" "" test_prefix ${test_name})
   set(dict_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix}.dict)
   set(libfuzzer_opts_effective ${LIBFUZZER_OPTS})
+  if(OSS_FUZZ AND NOT ${FUZZ_FILENAME} IN_LIST BROKEN_LUZER_TESTS)
+    set(LUZER_TESTS_OSS_FUZZ ${LUZER_TESTS_OSS_FUZZ} ${FUZZ_FILENAME} PARENT_SCOPE)
+  endif()
   if(EXISTS ${dict_path})
     set(libfuzzer_opts_effective "${libfuzzer_opts_effective} -dict=${dict_path}")
   endif()
@@ -92,6 +114,11 @@ function(create_luzer_test)
     ENVIRONMENT "${FUZZ_TEST_ENV}"
     DEPENDS ${LUAJIT_TEST_BINARY}
   )
+  if(${FUZZ_FILENAME} IN_LIST BROKEN_LUZER_TESTS)
+    set_tests_properties(${test_title}
+      PROPERTIES DISABLED TRUE
+    )
+  endif()
 endfunction()
 
 # luzer library is unsupported in OSS Fuzz environment, so
@@ -103,6 +130,16 @@ endif()
 
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)
+
+# Copying luzer-based tests located in different places to
+# a single directory. Needed for OSS Fuzz.
+add_custom_target(copy_tests
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${LUZER_TESTS_OSS_FUZZ}
+          ${LUZER_TESTS_DIR}
+  COMMENT "Copying luzer-based tests to a single directory"
+  DEPENDS lua-tests
+)
 
 # test_engine.lua supports luzer, but test_mvcc.lua is not.
 string(JOIN ";" LUZER_TESTS
@@ -143,19 +180,6 @@ foreach(test_name ${LUZER_TESTS})
     LABELS "fuzzing;${TEST_SUITE_NAME}"
   )
 endforeach()
-set_tests_properties(
-  # To be enabled in scope tarantool/tarantool#11897.
-  test/fuzz/lua/box_execute_test.lua
-  # To be enabled in scope tarantool/tarantool#11898.
-  test/fuzz/lua/json_decode_test.lua
-  # To be enabled in scope tarantool/security#151.
-  test/fuzz/lua/uri_parse_test.lua
-  # To be enabled in scope tarantool/tarantool#12063.
-  test/fuzz/lua/pickle_unpack_test.lua
-  # To be enabled in scope tarantool/security#153.
-  test/fuzz/lua/console_eval_test.lua
-  PROPERTIES DISABLED TRUE
-)
 
 set(test_title
   "test/fuzz/lua/test_engine.lua${TEST_PARAM_DELIM}memtx${TEST_PARAM_DELIM}luzer")
