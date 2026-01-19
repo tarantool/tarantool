@@ -47,7 +47,7 @@ endif()
 
 include(ExternalProject)
 
-set(GIT_REF "db2091f5ff131916e06ba509f418f1e0c32d1d10")
+set(GIT_REF "854eba8e865ee1ac4c602fcb71836219c5d2f046")
 # Git reference can be overridden with environment variable. It is
 # needed for checking build by project itself.
 if (DEFINED ENV{LUA_TESTS_GIT_REF})
