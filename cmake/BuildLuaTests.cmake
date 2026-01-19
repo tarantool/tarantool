@@ -56,7 +56,7 @@ endif()
 
 ExternalProject_Add(${LUA_TESTS_TARGET_NAME}
   PREFIX ${LUA_TESTS_TARGET_NAME}
-  GIT_REPOSITORY https://github.com/ligurio/lua-c-api-tests.git
+  GIT_REPOSITORY https://github.com/ligurio/lunapark.git
   GIT_TAG ${GIT_REF}
   SOURCE_DIR ${LUA_TESTS_PREFIX}/src
   BINARY_DIR ${LUA_TESTS_PREFIX}/build
@@ -84,7 +84,7 @@ add_dependencies(${LUA_TESTS_TARGET_NAME} libluajit_static)
 # number of runs is equal to 5 and can be overridden with
 # environment variable `RUNS`.
 #
-# 1. https://github.com/ligurio/lua-c-api-tests/blob/ef74f0558bb913edef85e7a774fada4ecc82247b/tests/capi/CMakeLists.txt#L46-L58
+# 1. https://github.com/ligurio/lunapark/blob/ef74f0558bb913edef85e7a774fada4ecc82247b/tests/capi/CMakeLists.txt#L46-L58
 foreach(test ${CAPI_TESTS})
   set(test_title test/fuzz/${test})
   add_test(NAME ${test_title}
@@ -100,7 +100,7 @@ foreach(test ${CAPI_TESTS})
   )
 endforeach()
 
-# The same tests as in ligurio/lua-c-api-tests, unsupported tests
+# The same tests as in ligurio/lunapark, unsupported tests
 # listed in LAPI_TESTS_UNSUPPORTED and disabled.
 string(JOIN ";" LAPI_TESTS
   bitop_arshift_test.lua
