@@ -457,14 +457,45 @@ end
 -- instance configuration sources (environment variables). The
 -- latter takes into account only cluster configuration, so the
 -- environment variables are ignored.
+--
+-- If opts.env is false, the environment variables are ignored
+-- even when opts.instance is missing. If opts.env is true and
+-- opts.instance is set, an error is raised.
 function methods.get(self, path, opts)
     selfcheck(self, 'get')
     initcheck(self, 'get', 'instance')
 
     opts = opts or {}
 
+    if type(opts) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts)), 0)
+    end
+    if opts.instance ~= nil and type(opts.instance) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.instance)), 0)
+    end
+    if opts.env ~= nil and type(opts.env) ~= 'boolean' then
+        error(('Expected boolean, got %s'):format(type(opts.env)), 0)
+    end
+    if opts.instance ~= nil and opts.env == true then
+        error('config:get: "instance" and "env = true" options can\'t be ' ..
+              'used together, because it is unknown which TT_* environment ' ..
+              'variables were passed to another instance', 0)
+    end
+
+    -- At this point, either:
+    --  * opts.env == true  => lookup in environment/global scope, instance
+    --    must be nil, or
+    --  * opts.env == false => instance-level lookup, instance may be explicitly
+    --    set or unspecified.
+    -- For instance-level lookups, default to the current instance if none is
+    -- provided.
+    local instance = opts.instance
+    if opts.env == false then
+        instance = instance or self._configdata_applied:names().instance_name
+    end
+
     return self._configdata_applied:get(path, {
-        instance = opts.instance,
+        instance = instance,
         use_default = true,
     })
 end
