@@ -197,7 +197,8 @@ httpc_request_new(struct httpc_env *env, const char *method,
 		 */
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_POST, 1L);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_POSTFIELDS, "");
-		curl_easy_setopt(req->curl_request.easy, CURLOPT_POSTFIELDSIZE, 0);
+		curl_easy_setopt(req->curl_request.easy, CURLOPT_POSTFIELDSIZE,
+				 0L);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_CUSTOMREQUEST, method);
 		req->set_accept_header = true;
 	} else {
@@ -206,8 +207,8 @@ httpc_request_new(struct httpc_env *env, const char *method,
 
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_URL, url);
 
-	curl_easy_setopt(req->curl_request.easy, CURLOPT_FOLLOWLOCATION, 1);
-	curl_easy_setopt(req->curl_request.easy, CURLOPT_SSL_VERIFYPEER, 1);
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_FOLLOWLOCATION, 1L);
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_SSL_VERIFYPEER, 1L);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_WRITEFUNCTION,
 			 curl_easy_write_cb);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_HEADERFUNCTION,
