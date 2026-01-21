@@ -115,6 +115,11 @@ local TOSTRING_BUFSIZE  = 64
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
+-- at the moment the range of known timezones is UTC-12:00..UTC+14:00
+-- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
 local MIN_DATE_MONTH = 6
@@ -129,12 +134,17 @@ local MAX_DATE_DAY = 11
 local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 -- -5879610-06-22
 local MIN_DATE_TEXT = ('%d-%02d-%02d'):format(MIN_DATE_YEAR, MIN_DATE_MONTH,
                                               MIN_DATE_DAY)
 -- 5879611-07-11
 local MAX_DATE_TEXT = ('%d-%02d-%02d'):format(MAX_DATE_YEAR, MAX_DATE_MONTH,
                                               MAX_DATE_DAY)
+local MIN_EPOCH_SECS_VALUE = INT_MIN * -- MIN_DT_DAY_VALUE
+      SECS_PER_DAY + (SECS_PER_DAY - 1) - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = INT_MAX * -- MAX_DT_DAY_VALUE
+      SECS_PER_DAY - SECS_EPOCH_OFFSET
 local MAX_YEAR_RANGE = MAX_DATE_YEAR - MIN_DATE_YEAR
 local MAX_MONTH_RANGE = MAX_YEAR_RANGE * 12
 local MAX_WEEK_RANGE = MAX_YEAR_RANGE * AVERAGE_WEEK_YEAR
@@ -584,6 +594,36 @@ local function datetime_new(obj)
     else
         nsec = 0
     end
+
+    local offset = obj.tzoffset
+    if offset ~= nil then
+        offset = get_timezone(offset, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
+    end
+
+    -- .year, .month, .day
+    if ymd then
+        y = y or 1970
+        M = M or 1
+        d = d or 1
+        if d < 0 then
+            d = builtin.tnt_dt_days_in_month(y, M)
+        elseif d > 28 then
+            local day_in_month = builtin.tnt_dt_days_in_month(y, M)
+            if d > day_in_month then
+                error(('invalid number of days %d in month %d for %d'):
+                    format(d, M, y), 3)
+            end
+        end
+        dt = dt_from_ymd_checked(y, M, d)
+    end
+
+    local tzindex = 0
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
+    end
+
     local ts = obj.timestamp
     if ts ~= nil then
         if ymd then
@@ -612,41 +652,12 @@ local function datetime_new(obj)
             error('only integer values allowed in timestamp '..
                   'if nsec, usec, or msecs provided', 2)
         end
+        local utc_s = utc_secs(s, offset or 0)
+        check_range(utc_s, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'UTC-timestamp')
         hms = true
     end
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
-    end
-
-    -- .year, .month, .day
-    if ymd then
-        y = y or 1970
-        M = M or 1
-        d = d or 1
-        if d < 0 then
-            d = builtin.tnt_dt_days_in_month(y, M)
-        elseif d > 28 then
-            local day_in_month = builtin.tnt_dt_days_in_month(y, M)
-            if d > day_in_month then
-                error(('invalid number of days %d in month %d for %d'):
-                    format(d, M, y), 3)
-            end
-        end
-        dt = dt_from_ymd_checked(y, M, d)
-    end
-
-    local tzindex = 0
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
-    end
-
-    -- .hour, .minute, .second
+    -- .hour, .min, .sec or .timestamp
     local secs = 0
     if hms then
         secs = (h or 0) * 3600 + (m or 0) * 60 + (s or 0)
@@ -915,7 +926,7 @@ local function datetime_parse_from(str, obj)
 
     if tzoffset ~= nil then
         local offset = get_timezone(tzoffset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     if tzname ~= nil then
@@ -1107,7 +1118,7 @@ function datetime_set(self, obj)
     local offset = obj.tzoffset
     if offset ~= nil then
         offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
     offset = offset or self.tzoffset
 
@@ -1146,12 +1157,16 @@ function datetime_set(self, obj)
         if usec ~= nil then
             nsec = usec * 1e3
         end
+        local tzindex = self.tzindex
         if tzname ~= nil then
-            offset, self.tzindex = parse_tzname(sec_int, tzname)
+            offset, tzindex = parse_tzname(sec_int, tzname)
         end
-        self.epoch = utc_secs(sec_int, offset)
+        local utc_s = utc_secs(sec_int, offset)
+        check_range(utc_s, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'UTC-timestamp')
+        self.epoch = utc_s
         self.nsec = nsec
         self.tzoffset = offset
+        self.tzindex = tzindex
 
         return self
     end
