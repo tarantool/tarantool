@@ -1729,10 +1729,32 @@ g.test_metrics = function()
             include = {'network', 'info', 'cpu'},
             exclude = {'info'},
             labels = {foo = 'bar'},
+            export = {
+                http = {{
+                        listen = 3301,
+                        ssl_key_file = 'five',
+                        ssl_cert_file = 'six',
+                        ssl_ca_file = 'seven',
+                        ssl_ciphers = 'eight',
+                        ssl_password = 'nine',
+                        ssl_password_file = 'ten',
+                        endpoints = {
+                            {
+                                path = '/metrics/json',
+                                format = 'json',
+                                metrics = {
+                                    enabled = true
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         }
     }
 
     instance_config:validate(iconfig)
+    iconfig.metrics.export.http[1].server = 'foo' -- maybe another solution
     validate_fields(iconfig.metrics, instance_config.schema.fields.metrics)
 end
 

@@ -168,6 +168,7 @@ extern char session_lua[],
 	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
 	config_applier_box_status_lua[],
+	config_applier_metrics_export_lua[],
 	config_cluster_config_lua[],
 	config_descriptions_lua[],
 	config_validators_lua[],
@@ -473,6 +474,10 @@ static const char *lua_sources[] = {
 	"config/applier/box_status",
 	"internal.config.applier.box_status",
 	config_applier_box_status_lua,
+
+	"config/applier/metrics_export",
+	"internal.config.applier.metrics_export",
+	config_applier_metrics_export_lua,
 
 	"config/init",
 	"config",

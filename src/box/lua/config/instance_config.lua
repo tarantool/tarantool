@@ -1772,6 +1772,47 @@ return schema.new('instance_config', schema.record({
             key = schema.scalar({type = 'string'}),
             value = schema.scalar({type = 'string'}),
         }),
+        export = schema.record({
+            http = schema.array({
+                items = schema.record({
+                    listen = schema.scalar({
+                        type = 'string, number',
+                        validate = validators['metrics.export.http.*.listen'],
+                    }),
+                    server = schema.scalar({type = 'string'}),
+                    ssl_key_file = schema.scalar({type = 'string'}),
+                    ssl_cert_file = schema.scalar({type = 'string'}),
+                    ssl_ca_file = schema.scalar({type = 'string'}),
+                    ssl_ciphers = schema.scalar({type = 'string'}),
+                    ssl_password = schema.scalar({type = 'string'}),
+                    ssl_password_file = schema.scalar({type = 'string'}),
+                    endpoints = schema.array({
+                        items = schema.record({
+                            path = schema.scalar({
+                                type = 'string',
+                                validate = validators[
+                                    'metrics.export.http.*.endpoints.*.path'],
+                            }),
+                            format = schema.enum({
+                                'prometheus',
+                                'json',
+                            }),
+                            metrics = schema.record({
+                                enabled = schema.scalar({type = 'boolean'}),
+                            }),
+                        }, {
+                            validate =
+                                validators['metrics.export.http.*.endpoints.*'],
+                        }),
+                    }),
+                }, {
+                    validate = validators['metrics.export.http.*'],
+                }),
+                validate = validators['metrics.export.http'],
+            }),
+        }, {
+            validate = validators['metrics.export'],
+        }),
     }),
     sharding = schema.record({
         -- Instance vshard options.

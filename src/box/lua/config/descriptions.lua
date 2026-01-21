@@ -2039,6 +2039,70 @@ I['metrics.labels'] = 'Global labels to be added to every observation.'
 
 I['metrics.labels.*'] = 'Label value.'
 
+I['metrics.export'] = format_text([[
+    The `metrics.export` section configures HTTP endpoints for exporting
+    metrics in supported formats (Prometheus or JSON).
+]])
+
+I['metrics.export.http'] = format_text([[
+    An array of HTTP listeners for metrics export. Each listener defines a
+    `listen` address or an existing `server` name and a list of `endpoints`.
+]])
+
+I['metrics.export.http.*'] = format_text([[
+    A single HTTP listener for metrics export.
+]])
+
+I['metrics.export.http.*.listen'] = format_text([[
+    An address to listen on for metrics HTTP endpoints. Accepts a port number
+    (for binding on all interfaces) or a string like `host:port`.
+]])
+
+I['metrics.export.http.*.server'] = format_text([[
+    A name of an HTTP server configured by the `roles.httpd` role. When omitted
+    and `listen` is not set, the default `roles.httpd` server is used.
+]])
+
+I['metrics.export.http.*.ssl_key_file'] = 'A path to the SSL private key.'
+
+I['metrics.export.http.*.ssl_cert_file'] = 'A path to the SSL certificate.'
+
+I['metrics.export.http.*.ssl_ca_file'] = 'A path to the SSL CA file.'
+
+I['metrics.export.http.*.ssl_ciphers'] =
+    'A colon-separated list of SSL ciphers.'
+
+I['metrics.export.http.*.ssl_password'] =
+    'A password for decrypting the SSL private key.'
+
+I['metrics.export.http.*.ssl_password_file'] =
+    'A file with a password for decrypting the SSL private key.'
+
+I['metrics.export.http.*.endpoints'] = format_text([[
+    An array of HTTP endpoints exposed by the listener. Each endpoint defines
+    a `path` and a `format`.
+]])
+
+I['metrics.export.http.*.endpoints.*'] = format_text([[
+    A single metrics export endpoint configuration.
+]])
+
+I['metrics.export.http.*.endpoints.*.path'] = format_text([[
+    A URL path to serve metrics, for example `/metrics` or `/metrics/json`.
+]])
+
+I['metrics.export.http.*.endpoints.*.format'] = format_text([[
+    The metrics export format. Supported values: `prometheus`, `json`.
+]])
+
+I['metrics.export.http.*.endpoints.*.metrics'] = format_text([[
+    Optional HTTP metrics settings for the endpoint.
+]])
+
+I['metrics.export.http.*.endpoints.*.metrics.enabled'] = format_text([[
+    Whether to collect HTTP handler metrics for this endpoint.
+]])
+
 -- }}} metrics configuration
 
 -- {{{ process configuration
