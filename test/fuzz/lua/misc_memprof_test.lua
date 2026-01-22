@@ -1,11 +1,11 @@
 local luzer = require("luzer")
 
-local has_memprof, memprof = pcall(require, "misc.memprof")
-if not has_memprof then
-  print("Unsupported version.")
+if not misc.memprof.available then
+  print("memprof is unsupported")
   os.exit(0)
 end
 
+local memprof = misc.memprof
 local MAX_STR_LEN = 1e5
 
 local function TestOneInput(buf)

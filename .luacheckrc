@@ -1,5 +1,12 @@
 std = "luajit"
-globals = {"box", "_TARANTOOL", "tonumber64", "utf8", "package"}
+globals = {
+    "box",
+    "misc",
+    "package",
+    "tonumber64",
+    "utf8",
+    "_TARANTOOL",
+}
 ignore = {
     -- Accessing an undefined field of a global variable <debug>.
     "143/debug",
