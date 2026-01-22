@@ -1,8 +1,8 @@
 local luzer = require("luzer")
+local sysprof = require("misc.sysprof")
 
-local has_sysprof, sysprof = pcall(require, "misc.sysprof")
-if not has_sysprof then
-  print("Unsupported version.")
+if not sysprof.available then
+  print("sysprof is unsupported")
   os.exit(0)
 end
 
