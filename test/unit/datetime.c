@@ -203,7 +203,7 @@ _dt_to_epoch(dt_t dt)
 static void
 parse_date_test(void)
 {
-	plan(154);
+	plan(169);
 
 	static struct {
 		int64_t epoch;
@@ -292,11 +292,11 @@ parse_date_test(void)
 		   str, len);
 	}
 
-	/* check strptime formats */
+	/* Check strptime valid formats. */
 	const struct {
 		const char *fmt;
 		const char *text;
-	} format_tests[] = {
+	} format_ok_tests[] = {
 		{ "%A",                      "Thursday" },
 		{ "%a",                      "Thu" },
 		{ "%B",                      "January" },
@@ -327,6 +327,10 @@ parse_date_test(void)
 		{ "%Y-%m-%d",                "1970-01-01" },
 		{ "%H",                      "03" },
 		{ "%I",                      "03" },
+		/* strptime accepts less than 3 digits: */
+		{ "%j",                      "1" },
+		/* strptime accepts less than 3 digits: */
+		{ "%j",                      "01" },
 		{ "%j",                      "001" },
 		{ "%k",                      " 3" },
 		{ "%l",                      " 3" },
@@ -370,17 +374,49 @@ parse_date_test(void)
 		{ "%Y-%m-%d",                "10000-01-01" },
 		{ "%Y-%m-%d",                "10000-01-01" },
 		{ "%Y-%m-%d",                "5879611-07-11" },
+		{ "%Y-%m-%d",                "-5879610-06-22" },
 	};
 
-	for (index = 0; index < lengthof(format_tests); index++) {
-		const char *fmt = format_tests[index].fmt;
-		const char *text = format_tests[index].text;
+	for (index = 0; index < lengthof(format_ok_tests); index++) {
+		const char *fmt = format_ok_tests[index].fmt;
+		const char *text = format_ok_tests[index].text;
 		struct tnt_tm date = { .tm_epoch = 0};
 		char *ptr = tnt_strptime(text, fmt, &date);
 		static char buff[DT_TO_STRING_BUFSIZE];
 		tnt_strftime(buff, sizeof(buff), "%FT%T%z", &date);
 		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
 		     text, fmt, buff);
+	}
+
+	/* Check strptime invalid formats. */
+	const struct {
+		const char *fmt;
+		const char *text;
+		const char *fail_case;
+	} format_fail_tests[] = {
+		{ "%m", "o1", "nondigit start" },
+		{ "%m", "0", "not valid month (1..12)" },
+		{ "%m", "13", "not valid month (1..12)" },
+		{ "%j", "-1", "nondigit start" },
+		{ "%j", "0", "not valid day of year (1..366)" },
+		{ "%j", "367", "not valid day of year (1..366)" },
+	};
+
+	for (index = 0; index < lengthof(format_fail_tests); index++) {
+		const char *fmt = format_fail_tests[index].fmt;
+		const char *text = format_fail_tests[index].text;
+		const char *fail_case = format_fail_tests[index].fail_case;
+
+		struct tnt_tm tm = { .tm_epoch = 0 };
+		char *ptr = tnt_strptime(text, fmt, &tm);
+		is(ptr, NULL, "parse string '%s' using '%s' must fail on: %s",
+		   text, fmt, fail_case);
+
+		struct datetime date = { 0 };
+		size_t res = datetime_strptime(&date, text, fmt);
+		is(res, 0, "datetime_strptime fail to"
+		   " parse string '%s' using '%s'",
+		   text, fmt);
 	}
 
 	check_plan();
