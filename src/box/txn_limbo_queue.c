@@ -608,8 +608,20 @@ txn_limbo_queue_get_lsn_range(struct txn_limbo_queue *queue, int64_t *first_lsn,
 			      int64_t *last_lsn)
 {
 	assert(!txn_limbo_queue_is_empty(queue));
-	*first_lsn = txn_limbo_queue_first_entry(queue)->lsn;
-	*last_lsn = txn_limbo_queue_last_synchro_entry(queue)->lsn;
+	struct txn_limbo_entry *first = txn_limbo_queue_first_entry(queue);
+	assert(first->lsn > 0);
+	*first_lsn = first->lsn;
+
+	struct txn_limbo_entry *last = txn_limbo_queue_last_entry(queue);
+	while (last != first) {
+		if (last->lsn > 0)
+			break;
+		assert(last->state == TXN_LIMBO_ENTRY_VOLATILE);
+		last = rlist_prev_entry(last, in_queue);
+	}
+	assert(last->state != TXN_LIMBO_ENTRY_VOLATILE);
+	assert(last->lsn > 0);
+	*last_lsn = last->lsn;
 }
 
 void
@@ -716,7 +728,12 @@ txn_limbo_queue_apply_rollback(struct txn_limbo_queue *queue, int64_t lsn,
 	rlist_foreach_entry_reverse(e, &queue->entries, in_queue) {
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK))
 			continue;
-		if (e->lsn < lsn)
+		/*
+		 * Entries with no LSN are newer than the ones with it, so they
+		 * should also be rolled back when some persisted entry is
+		 * killed.
+		 */
+		if (e->lsn > 0 && e->lsn < lsn)
 			break;
 		last_rollback = e;
 	}
@@ -889,24 +906,47 @@ txn_limbo_queue_wait_empty(struct txn_limbo_queue *queue, double timeout)
 }
 
 int
-txn_limbo_queue_wait_persisted(struct txn_limbo_queue *queue)
+txn_limbo_queue_wait_writes_finished(struct txn_limbo_queue *queue)
 {
+retry:
 	if (txn_limbo_queue_is_empty(queue))
 		return 0;
 	struct txn_limbo_entry *e = txn_limbo_queue_last_entry(queue);
-	while (e != NULL && e->lsn <= 0) {
-		struct trigger on_wal_write;
-		trigger_create(&on_wal_write, txn_write_cb, fiber(), NULL);
-		txn_on_wal_write(e->txn, &on_wal_write);
-		fiber_yield();
-		trigger_clear(&on_wal_write);
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		e = txn_limbo_queue_last_entry(queue);
+	/*
+	 * The idea is that this function is supposed to be used to make sure
+	 * all entries have valid LSNs before some sort of filtering would
+	 * happen by these LSNs by control commands such as PROMOTE/DEMOTE.
+	 *
+	 * Volatile entries can't be confirmed by any such commands, since the
+	 * author of these commands couldn't have possibly received them (since
+	 * they are not written to this instance's journal and couldn't have
+	 * been sent anywhere).
+	 *
+	 * Hence no need to wait for their LSNs. Confirming them won't be
+	 * possible, and rollback doesn't need their LSNs to abort them.
+	 */
+	while (e->state == TXN_LIMBO_ENTRY_VOLATILE) {
+		if (txn_limbo_queue_first_entry(queue) == e)
+			return 0;
+		e = rlist_prev_entry(e, in_queue);
 	}
-	return 0;
+	if (e->lsn > 0)
+		return 0;
+	struct trigger on_wal_write;
+	trigger_create(&on_wal_write, txn_write_cb, fiber(), NULL);
+	txn_on_wal_write(e->txn, &on_wal_write);
+	/*
+	 * There is no spurious wakeup. This whole function is entirely
+	 * retried anyway. It is fine to just "try to wait once" (yield)
+	 * and see what changed.
+	 */
+	fiber_yield();
+	trigger_clear(&on_wal_write);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	goto retry;
 }
 
 void
