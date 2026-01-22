@@ -1,11 +1,11 @@
 local luzer = require("luzer")
 
-local has_sysprof, sysprof = pcall(require, "misc.sysprof")
-if not has_sysprof then
-  print("Unsupported version.")
+if not misc.sysprof.available then
+  print("sysprof is unsupported")
   os.exit(0)
 end
 
+local sysprof = misc.sysprof
 local SYSPROF_DEFAULT_INTERVAL = 1 -- ms
 local MAX_STR_LEN = 1e5
 
