@@ -54,15 +54,15 @@ set_tests_properties(
 
 LIST(APPEND BROKEN_LUZER_TESTS
   # To be enabled in scope tarantool/tarantool#11897.
-  test/fuzz/lua/box_execute_test.lua
+  box_execute_test.lua
   # To be enabled in scope tarantool/tarantool#11898.
-  test/fuzz/lua/json_decode_test.lua
+  json_decode_test.lua
   # To be enabled in scope tarantool/security#151.
-  test/fuzz/lua/uri_parse_test.lua
+  uri_parse_test.lua
   # To be enabled in scope tarantool/tarantool#12063.
-  test/fuzz/lua/pickle_unpack_test.lua
+  pickle_unpack_test.lua
   # To be enabled in scope tarantool/security#153.
-  test/fuzz/lua/console_eval_test.lua
+  console_eval_test.lua
 )
 
 if(OSS_FUZZ)
@@ -75,7 +75,7 @@ function(create_luzer_test)
   cmake_parse_arguments(
     FUZZ
     ""
-    "FILENAME;TEST_TITLE"
+    "FILENAME;TEST_TITLE;DISABLED"
     "TEST_ENV;LABELS"
     ""
     ${ARGN}
@@ -84,7 +84,10 @@ function(create_luzer_test)
   string(REPLACE "_test" "" test_prefix ${test_name})
   set(dict_path ${PROJECT_SOURCE_DIR}/test/static/corpus/${test_prefix}.dict)
   set(libfuzzer_opts_effective ${LIBFUZZER_OPTS})
-  if(OSS_FUZZ AND NOT ${FUZZ_FILENAME} IN_LIST BROKEN_LUZER_TESTS)
+  if(NOT DEFINED FUZZ_DISABLED)
+    set(FUZZ_DISABLED FALSE)
+  endif()
+  if(NOT FUZZ_DISABLED)
     set(LUZER_TESTS_OSS_FUZZ ${LUZER_TESTS_OSS_FUZZ} ${FUZZ_FILENAME} PARENT_SCOPE)
   endif()
   if(EXISTS ${dict_path})
@@ -113,12 +116,8 @@ function(create_luzer_test)
     LABELS "${FUZZ_LABELS}"
     ENVIRONMENT "${FUZZ_TEST_ENV}"
     DEPENDS ${LUAJIT_TEST_BINARY}
+    DISABLED ${FUZZ_DISABLED}
   )
-  if(${FUZZ_FILENAME} IN_LIST BROKEN_LUZER_TESTS)
-    set_tests_properties(${test_title}
-      PROPERTIES DISABLED TRUE
-    )
-  endif()
 endfunction()
 
 # luzer library is unsupported in OSS Fuzz environment, so
@@ -174,10 +173,15 @@ if (ENABLE_ASAN)
   )
 endif()
 foreach(test_name ${LUZER_TESTS})
+  set(TEST_IS_DISABLED FALSE)
+  if(${test_name} IN_LIST BROKEN_LUZER_TESTS)
+    set(TEST_IS_DISABLED TRUE)
+  endif()
   create_luzer_test(
     FILENAME ${CMAKE_CURRENT_SOURCE_DIR}/${test_name}
     TEST_ENV "${TEST_ENV}"
     LABELS "fuzzing;${TEST_SUITE_NAME}"
+    DISABLED ${TEST_IS_DISABLED}
   )
 endforeach()
 
