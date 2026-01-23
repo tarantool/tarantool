@@ -227,19 +227,15 @@ if (ENABLE_ASAN)
 endif()
 
 foreach(test_name ${LAPI_TESTS})
+  set(TEST_IS_DISABLED FALSE)
+  if(${test_name} IN_LIST LAPI_TESTS_UNSUPPORTED)
+    set(TEST_IS_DISABLED TRUE)
+  endif()
   create_luzer_test(
     FILENAME ${LUA_TESTS_PREFIX}/src/tests/lapi/${test_name}
     TEST_ENV "${LAPI_TEST_ENV}"
     LABELS "fuzzing;fuzzing-lua;luajit-lapi"
-  )
-endforeach()
-
-# Disable tests unsupported by LuaJIT.
-foreach(test_name ${LAPI_TESTS_UNSUPPORTED})
-  set(test_path ${LUA_TESTS_PREFIX}/src/tests/lapi/${test_name})
-  string(REGEX REPLACE "^${PROJECT_SOURCE_DIR}/" "" test_title "${test_path}")
-  set_tests_properties(${test_title} PROPERTIES
-    DISABLED TRUE
+    DISABLED ${TEST_IS_DISABLED}
   )
 endforeach()
 
