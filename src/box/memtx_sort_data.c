@@ -9,9 +9,26 @@
 
 #include "core/assoc.h"
 #include "trivia/util.h"
+
+#include "tweaks.h"
+#include <zstd.h> 
+#include <assert.h>
 #include <lz4.h>
 
-#define MEMTX_SORT_DATA_LZ4_ACCELERATION 10
+uint64_t MEMTX_SORT_DATA_LZ4_ACCELERATION = 10;
+TWEAK_UINT(MEMTX_SORT_DATA_LZ4_ACCELERATION);
+
+uint64_t MEMTX_SORT_DATA_ZSTD_LEVEL = 3;
+TWEAK_UINT(MEMTX_SORT_DATA_ZSTD_LEVEL);
+
+enum compression{
+	LZ_4,
+	ZSTD
+};
+
+static enum compression COMPRESSION_TYPE = ZSTD;
+
+
 /**
  * Maps: (space_id, index_id) => (sort data entry information).
  */
@@ -456,7 +473,8 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 
 		if (entry->psize == 0) {
 			entry->csize = 0;
-		} else if (entry->psize > INT_MAX) {
+		} else if (COMPRESSION_TYPE == LZ_4 && entry->psize > INT_MAX) {
+			printf("LZ4: %lu", MEMTX_SORT_DATA_LZ4_ACCELERATION);
 			if (fwrite(writer->sk_buf, 1, entry->psize, writer->fp) !=
 			    (size_t)entry->psize) {
 				diag_set(SystemError, "%s: failed to write the sort data",
@@ -466,15 +484,41 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 			entry->csize = entry->psize;
 		} else {
 			int src_size = (int)entry->psize;
-			int max_dst = LZ4_compressBound(src_size);
-			char *dst = (char *)xmalloc(max_dst);
+			size_t max_dst = 0;
+			size_t dst_size = 0;
+			char *dst = NULL;
 
-			// int dst_size = LZ4_compress_default(writer->sk_buf, dst, src_size, max_dst);
+			if (COMPRESSION_TYPE == LZ_4) {
+				max_dst = (size_t)LZ4_compressBound(src_size);
+				dst = (char *)xmalloc(max_dst);
 
-			int dst_size = LZ4_compress_fast(writer->sk_buf, dst, src_size, max_dst,
-										MEMTX_SORT_DATA_LZ4_ACCELERATION);
-			if (dst_size <= 0 || dst_size > max_dst) {
+				int rc = LZ4_compress_fast(writer->sk_buf, dst,
+							   src_size, (int)max_dst,
+							   (int)MEMTX_SORT_DATA_LZ4_ACCELERATION);
+				
+				if (rc > 0 && rc <= (int)max_dst)
+					dst_size = (size_t)rc;
+				else
+					dst_size = 0;
+			} else if (COMPRESSION_TYPE == ZSTD) {
+				printf("ZSTD: %lu", MEMTX_SORT_DATA_ZSTD_LEVEL);
+				
+				max_dst = ZSTD_compressBound((size_t)src_size);
+				dst = (char *)xmalloc(max_dst);
+
+				size_t rc = ZSTD_compress(dst, max_dst,
+							  writer->sk_buf, (size_t)src_size,
+							  MEMTX_SORT_DATA_ZSTD_LEVEL);
+				
+				if (!ZSTD_isError(rc) && rc <= max_dst)
+					dst_size = rc;
+				else
+					dst_size = 0;
+			}
+			if (dst == NULL || dst_size == 0 ||
+			    dst_size >= (size_t)entry->psize) {
 				free(dst);
+				printf("Uncompressed data\n");
 				if (fwrite(writer->sk_buf, 1, entry->psize, writer->fp) !=
 				    (size_t)entry->psize) {
 					diag_set(SystemError, "%s: failed to write the sort data",
@@ -483,7 +527,8 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 				}
 				entry->csize = entry->psize;
 			} else {
-				if (fwrite(dst, 1, dst_size, writer->fp) != (size_t)dst_size) {
+				printf("Compressed data\n");
+				if (fwrite(dst, 1, dst_size, writer->fp) != dst_size) {
 					free(dst);
 					diag_set(SystemError, "%s: failed to write the sort data",
 						 writer->filename);
@@ -815,7 +860,8 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 		return -1;
 	}
 
-	if (entry->psize > INT_MAX || entry->csize > INT_MAX) {
+	if (COMPRESSION_TYPE == LZ_4 &&
+	    (entry->psize > INT_MAX || entry->csize > INT_MAX)) {
 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
 			 reader->filename, "SK block is too big for LZ4");
 		return -1;
@@ -837,20 +883,37 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 			return -1;
 		}
 	}
+	if (COMPRESSION_TYPE == LZ_4) {
+		int decoded = LZ4_decompress_safe(compressed, buffer,
+						  (int)entry->csize,
+						  (int)entry->psize);
+		free(compressed);
 
-	int decoded = LZ4_decompress_safe(compressed, buffer,
-					  (int)entry->csize,
-					  (int)entry->psize);
-	free(compressed);
+		if (decoded < 0 || decoded != (int)entry->psize) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "LZ4 decompression failed");
+			return -1;
+		}
+	} else if (COMPRESSION_TYPE == ZSTD) {
+		size_t decoded = ZSTD_decompress(buffer, (size_t)entry->psize,
+						 compressed, (size_t)entry->csize);
+		free(compressed);
 
-	if (decoded < 0 || decoded != (int)entry->psize) {
+		if (ZSTD_isError(decoded) ||
+		    decoded != (size_t)entry->psize) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "ZSTD decompression failed");
+			return -1;
+		}
+	} else {
+		free(compressed);
 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
-			 reader->filename, "LZ4 decompression failed");
+			 reader->filename, "Unknown compression type");
 		return -1;
 	}
+
 	return 0;
 }
-
 struct tuple *
 memtx_sort_data_reader_resolve_tuple(struct memtx_sort_data_reader *reader,
 				     struct tuple *old_ptr)
