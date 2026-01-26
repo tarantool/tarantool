@@ -52,6 +52,11 @@ set_tests_properties(
     DEPENDS ${TEST_SUITE_NAME}-deps
 )
 
+if(OSS_FUZZ)
+  set(LUZER_TESTS_DIR ${CMAKE_BINARY_DIR}/luzer_tests)
+  file(MAKE_DIRECTORY ${LUZER_TESTS_DIR})
+endif()
+
 function(create_luzer_test)
   cmake_parse_arguments(
     FUZZ
@@ -99,3 +104,8 @@ endif()
 
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)
+
+# Needed for OSS Fuzz.
+add_custom_target(copy_tests
+  COMMENT "Nothing is copied, Lua-based testing is not supported"
+)
