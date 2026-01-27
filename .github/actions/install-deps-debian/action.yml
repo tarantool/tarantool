@@ -37,5 +37,6 @@ runs:
         && rm cmake-3.26.0-linux-$(uname -i).tar.gz
         tt rocks install luatest 1.4.0
         tt rocks install luacheck 0.26.0
+        tt rocks install http 1.9.0
         gem install coveralls-lcov
       shell: bash
