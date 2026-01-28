@@ -620,6 +620,8 @@ wal_enable(void)
 	if (xdir_scan(&writer->wal_dir, true))
 		return -1;
 
+	xdir_collect_inprogress(&writer->wal_dir);
+
 	/* Open the most recent WAL file. */
 	if (wal_open(writer) != 0)
 		return -1;
