@@ -27,7 +27,18 @@ local function toline(s)
     return s:gsub('\n', ' '):gsub(' +', ' '):strip()
 end
 
+local function remove_side_slashes(path)
+    if path:startswith('/') then
+        path = string.lstrip(path, '/')
+    end
+    if path:endswith('/') then
+        path = string.rstrip(path, '/')
+    end
+    return '/' .. path
+end
+
 return {
     dedent = dedent,
+    remove_side_slashes = remove_side_slashes,
     toline = toline,
 }

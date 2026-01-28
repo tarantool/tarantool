@@ -2,7 +2,24 @@ local tarantool = require('tarantool')
 local urilib = require('uri')
 local uuid = require('uuid')
 local network = require('internal.config.utils.network')
+local textutils = require('internal.config.utils.textutils')
 
+local httpd_role
+
+local function get_httpd_role()
+    if httpd_role == nil then
+        local ok, role = pcall(require, 'roles.httpd')
+        if ok then
+            httpd_role = role
+        else
+            httpd_role = false
+        end
+    end
+    if httpd_role == false then
+        return nil
+    end
+    return httpd_role
+end
 
 -- Store validation functions. Each key in this table corresponds
 -- to a specific schema field path, and the associated value is a
@@ -237,6 +254,99 @@ M['failover.log'] = function(data, w)
 end
 
 -- }}} failover
+
+-- {{{ metrics export
+
+M['metrics.export.http'] = function(data, w)
+    if data == nil or next(data) == nil then
+        return
+    end
+
+    local targets = {}
+    for _, node in ipairs(data) do
+        local target
+        if node.listen ~= nil then
+            local host, port, err = network.parse_listen(node.listen)
+            if err ~= nil then
+                w.error('metrics.export.http.listen: %s', err)
+            else
+                target = ('listen_%s:%s'):format(host, tostring(port))
+            end
+        else
+            local server_name = node.server
+            if server_name == nil then
+                local role = get_httpd_role()
+                if role ~= nil then
+                    server_name = role.DEFAULT_SERVER_NAME
+                else
+                    w.error('metrics.export.http.server requires roles.httpd')
+                end
+            end
+            if server_name ~= nil then
+                target = ('httpd_%s'):format(server_name)
+            end
+        end
+
+        if target ~= nil then
+            if targets[target] then
+                w.error('metrics.export.http entries must be unique')
+            end
+            targets[target] = true
+        end
+    end
+end
+
+M['metrics.export.http.*.listen'] = function(value, w)
+    if value ~= nil then
+        local _, _, err = network.parse_listen(value)
+        if err ~= nil then
+            w.error('metrics.export.http.listen: %s', err)
+        end
+    end
+end
+
+M['metrics.export.http.*'] = function(data, w)
+    if data.listen ~= nil and data.server ~= nil then
+        w.error('metrics.export.http.server cannot be used with listen')
+    end
+    if data.server ~= nil and (
+       data.ssl_key_file ~= nil or
+       data.ssl_cert_file ~= nil or
+       data.ssl_ca_file ~= nil or
+       data.ssl_ciphers ~= nil or
+       data.ssl_password ~= nil or
+       data.ssl_password_file ~= nil) then
+        w.error('metrics.export.http.server cannot be used with TLS options')
+    end
+    local endpoints = data.endpoints or {}
+    if #endpoints == 0 then
+        w.error('metrics.export.http.endpoints must define at least one entry')
+    end
+
+    local paths = {}
+    for _, endpoint in ipairs(endpoints) do
+        local path = textutils.remove_side_slashes(endpoint.path)
+        if paths[path] then
+            w.error('metrics.export.http.endpoints must have unique paths')
+        end
+        paths[path] = true
+    end
+end
+
+M['metrics.export.http.*.endpoints.*'] = function(data, w)
+    if data.metrics ~= nil and type(data.metrics) ~= 'table' then
+        w.error('metrics.export.http.endpoints.metrics must be a table')
+    end
+end
+
+M['metrics.export.http.*.endpoints.*.path'] = function(value, w)
+    if not value:startswith('/') then
+        w.error('metrics.export.http.endpoints.path must start with "/": %q',
+            value)
+    end
+end
+
+-- }}} metrics export
 
 -- {{{ feedback
 
