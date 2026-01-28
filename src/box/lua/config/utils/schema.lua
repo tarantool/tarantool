@@ -830,6 +830,46 @@ local function get_schemaless(data, ctx)
     return cur
 end
 
+-- Access a given nested field without checks against a schema.
+-- Create intermediate tables on assignments, similar to :set().
+local function set_schemaless(data, rhs, ctx)
+    if #ctx.journey == 0 then
+        return rhs
+    end
+
+    local requested_field = ctx.journey[1]
+    assert(requested_field ~= nil)
+
+    if data ~= nil and type(data) ~= 'table' then
+        walkthrough_error(ctx, 'Attempt to index a non-table value ' ..
+            '(%s) by field %q', type(data), requested_field)
+    end
+
+    walkthrough_enter(ctx, requested_field)
+
+    local field_value
+    if data ~= nil then
+        field_value = data[requested_field]
+    end
+
+    table.remove(ctx.journey, 1)
+    local new_field_value = set_schemaless(field_value, rhs, ctx)
+
+    -- At this point, it is critical to distinguish between box.NULL and nil:
+    --  * schema:set(data, <..path..>, nil) -- delete the value at <..path..>
+    --    from data.
+    --  * schema:set(data, <..path..>, box.NULL) -- set box.NULL at <..path..>
+    --    in data.
+    if type(new_field_value) == nil and data == nil then
+        return data
+    end
+
+    data = data or {}
+    data[requested_field] = new_field_value
+
+    return data
+end
+
 local function get_impl(schema, data, ctx)
     -- The journey is finished. Return what is under the feet.
     if #ctx.journey == 0 then
@@ -842,7 +882,7 @@ local function get_impl(schema, data, ctx)
     local requested_field = ctx.journey[1]
     assert(requested_field ~= nil)
 
-    if is_scalar(schema) and schema.type == 'any' then
+    if schema.type == 'any' then
         return get_schemaless(data, ctx)
     elseif is_scalar(schema) then
         assert(schema.type ~= 'any')
@@ -973,7 +1013,9 @@ local function set_impl(schema, data, rhs, ctx)
     local requested_field = ctx.journey[1]
     assert(requested_field ~= nil)
 
-    if is_scalar(schema) then
+    if schema.type == 'any' then
+        return set_schemaless(data, rhs, ctx)
+    elseif is_scalar(schema) then
         walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
             'by field %q', schema.type, requested_field)
     elseif schema.type == 'record' or schema.type == 'map' then
@@ -1057,9 +1099,9 @@ end
 -- * A root node (pointed by the empty path) can't be set using
 --   this method.
 -- * Array indexing is not supported yet.
--- * A scalar of the 'any' type can't be indexed, even when it is
---   a table. It is OK to set the whole value of the 'any'
---   type.
+-- * A scalar of the 'any' type can be indexed if it contains a
+--   table (or is nil/box.NULL). In this case a tail of the path
+--   inside the 'any' type is not checked against a schema.
 -- * Assignment of a non-nil `rhs` value creates intermediate
 --   tables over the given `path` instead of nil or box.NULL
 --   values.
@@ -1299,7 +1341,7 @@ local function map_schemaless(old, f, ctx)
 end
 
 local function map_impl(schema, data, f, ctx)
-    if is_scalar(schema) and schema.type == 'any' then
+    if schema.type == 'any' then
         return map_schemaless(data, f, ctx)
     end
 
@@ -1607,7 +1649,7 @@ end
 local function merge_impl(schema, a, b, ctx)
     -- Deduce shape information from the data itself if the schema
     -- doesn't specify it.
-    if is_scalar(schema) and schema.type == 'any' then
+    if schema.type == 'any' then
         return merge_schemaless(a, b)
     end
 
