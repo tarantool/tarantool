@@ -714,20 +714,36 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 
 /** Default implementation of xlog_file_is_temporary(). */
 static bool
-xlog_file_is_temporary_default(const char *filename)
+xlog_file_is_temporary_default(const char *filename,
+			       const char *target_ext)
 {
-	const char *ext = strrchr(filename, '.');
-	return ext != NULL && strcmp(ext, inprogress_suffix) == 0;
+	char buf[PATH_MAX];
+	/**
+	 * Note that both target_ext and inporgess_suffix have a dot.
+	 */
+	VERIFY((size_t)snprintf(buf, sizeof(buf), "%s%s", target_ext,
+				inprogress_suffix) < sizeof(buf));
+	strtolower(buf);
+	const char *target_ext_full = buf;
+	const char *ext = NULL;
+	const char *last = strrchr(filename, '.');
+	if (last != NULL) {
+		for (const char *p = strchr(filename, '.');
+		     p != NULL && p != last; p = strchr(p + 1, '.'))
+			ext = p;
+	}
+	return ext != NULL && strcmp(ext, target_ext_full) == 0;
 }
 
 xlog_file_is_temporary_f xlog_file_is_temporary =
 				xlog_file_is_temporary_default;
 
 void
-xdir_remove_temporary_files(struct xdir *xdir)
+xdir_remove_temporary_files(struct xdir *xdir, const char *filename_ext)
 {
 	const char *dirname = xdir->dirname;
 	DIR *dh = opendir(dirname);
+
 	if (dh == NULL) {
 		if (errno != ENOENT)
 			say_syserror("error reading directory '%s'", dirname);
@@ -737,7 +753,7 @@ xdir_remove_temporary_files(struct xdir *xdir)
 	while ((dent = readdir(dh)) != NULL) {
 		const char *filename = tt_snprintf(PATH_MAX, "%s/%s",
 						   dirname, dent->d_name);
-		if (xlog_file_is_temporary(filename))
+		if (xlog_file_is_temporary(filename, filename_ext))
 			xlog_remove_file(filename, XLOG_RM_VERBOSE);
 	}
 	closedir(dh);
