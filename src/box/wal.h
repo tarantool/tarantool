@@ -261,6 +261,12 @@ wal_write_vy_log(struct journal_entry *req);
 void
 wal_rotate_vy_log(void);
 
+/**
+ * Delete all .inprogress files in wal_dir.
+ */
+void
+wal_remove_temporary_files(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
