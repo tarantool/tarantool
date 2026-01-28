@@ -44,6 +44,7 @@
 #include "replication.h"
 #include "iproto_constants.h"
 #include "watcher.h"
+#include "tweaks.h"
 
 enum {
 	/**
@@ -62,6 +63,9 @@ const char *wal_mode_STRS[WAL_MODE_MAX] = {
 	[WAL_WRITE]	= "write",
 	[WAL_FSYNC]	= "fsync",
 };
+
+uint64_t WAL_ROWS_PER_YIELD = 1 << 15;
+TWEAK_UINT(WAL_ROWS_PER_YIELD);
 
 int wal_dir_lock = -1;
 
