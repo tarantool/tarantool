@@ -11,6 +11,7 @@ local TZ = date.TZ
 test:plan(44)
 
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -30,6 +31,13 @@ local MAX_SEC_RANGE = MAX_DAY_RANGE * SECS_PER_DAY
 local MAX_NSEC_RANGE = INT_MAX
 local MAX_USEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e3)
 local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
+
+local DAYS_EPOCH_OFFSET = 719163
+local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
 
 local incompat_types = 'incompatible types for datetime comparison'
 local only_integer_ts = 'only integer values allowed in timestamp'..
@@ -2395,9 +2403,49 @@ test:test("Parse with a custom format and format back to string", function(test)
         -- %s is replaced by the number of seconds since the
         -- Epoch, UTC (see mktime(3)).
         {
-            buf = '26-08-2024 1724630400',
-            fmt = '%d-%m-%Y %s',
+            buf = '1724630400',
+            fmt = '%s',
+            dt = date.new({timestamp = 1724630400}),
+        },
+        {
+            buf = '1724630400 +0300',
+            fmt = '%s %z',
+            dt = date.new({timestamp = 1724630400, tzoffset = 180}),
+        },
+        {
+            buf = '1724630400 MSK',
+            fmt = '%s %Z',
+            dt = date.new({timestamp = 1724630400, tz = 'MSK'}),
+        },
+        {
+            buf = '1724630400',
+            fmt = '%s',
             dt = date.new({year = 2024, month = 08, day = 26}),
+        },
+        {
+            buf = '350',
+            fmt = '%s',
+            dt = date.new({min = 5, sec = 50}),
+        },
+        {
+            buf = '350.123',
+            fmt = '%s.%3f',
+            dt = date.new({min = 5, sec = 50, msec = 123}),
+        },
+        {
+            buf = '0',
+            fmt = '%s',
+            dt = date.new({}),
+        },
+        {
+            buf = string.format('%d', MIN_EPOCH_SECS_VALUE),
+            fmt = '%s',
+            dt = date.new({timestamp = MIN_EPOCH_SECS_VALUE}),
+        },
+        {
+            buf = string.format('%d', MAX_EPOCH_SECS_VALUE),
+            fmt = '%s',
+            dt = date.new({timestamp = MAX_EPOCH_SECS_VALUE}),
         },
         -- %S is replaced by the second as a decimal number
         -- (00-60).
@@ -2701,7 +2749,8 @@ test:test("Parse with a custom format and format back to string", function(test)
         },
     }
     test:plan(#formats * 3)
-    for _, tc in pairs(formats) do
+    for index, tc in pairs(formats) do
+        test:diag(('test[%d]'):format(index))
         local dt, parsed_syms = date.parse(tc.buf, {format = tc.fmt})
         test:is(parsed_syms, #tc.buf,
                 ('%s: parse buffer is ok'):format(tc.fmt))
@@ -2721,15 +2770,36 @@ end
 test:test("Parse invalid string with a custom format", function(test)
     local formats = {
         -- %j %m both are used and their months are different.
-        -- 0000-001 is 0000-01-01.
         {
+            -- 0000-001 is 0000-01-01.
             buf = "07001",
             fmt = "%m%g%j",
         },
-        -- 2025-321 is 2025-11-17.
         {
+            -- 2025-321 is 2025-11-17.
             buf =  "2025-321 12",
             fmt = "%G-%j %m",
+        },
+        -- Timestamp %s errors.
+        {
+            -- Mix of timestamp with y/m/d.
+            buf = '26-08-2024 1724630400',
+            fmt = '%d-%m-%Y %s',
+        },
+        {
+            -- Mix of timestamp with h/m/s.
+            buf = '123 12:12:12',
+            fmt = '%d-%m-%Y %s',
+        },
+        {
+            -- Timestamp < MIN_EPOCH_SECS_VALUE.
+            buf = string.format('%d', MIN_EPOCH_SECS_VALUE - 1),
+            fmt = '%s',
+        },
+        {
+            -- Timestamp > MAX_EPOCH_SECS_VALUE.
+            buf = string.format('%d', MAX_EPOCH_SECS_VALUE + 1),
+            fmt = '%s',
         },
     }
     test:plan(#formats)
