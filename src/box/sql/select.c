@@ -2102,22 +2102,6 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 			name = sql_xstrdup(name);
 		}
 		size_t len = strlen(name);
-
-		/* Make sure the column name is unique.  If the name is not unique,
-		 * append an integer to the name so that it becomes unique.
-		 */
-		size_t cnt = 0;
-		while (sqlHashFind(&ht, name) != 0) {
-			assert(len > 0);
-			size_t j = len - 1;
-			for (; j > 0 && sqlIsdigit(name[j]); j--) {
-			};
-			size_t size = name[j] == '_' ? j : len;
-			char *tmp = sqlMPrintf("%.*s_%u", size, name, ++cnt);
-			sql_xfree(name);
-			name = tmp;
-			len = strlen(name);
-		}
 		assert(name != NULL);
 		void *field = &space_def->fields[i];
 		assert(field != NULL);
