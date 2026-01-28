@@ -649,6 +649,9 @@ wal_enable(void)
 	if (xdir_scan(&writer->wal_dir, true))
 		return -1;
 
+	xdir_remove_temporary_files(&writer->wal_dir,
+				    writer->wal_dir.filename_ext);
+
 	/* Open the most recent WAL file. */
 	if (wal_open(writer) != 0)
 		return -1;
