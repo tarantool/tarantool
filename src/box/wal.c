@@ -1684,3 +1684,21 @@ wal_notify_watchers(struct wal_writer *writer, unsigned events)
 	rlist_foreach_entry(watcher, &writer->watchers, next)
 		wal_watcher_notify(watcher, events);
 }
+
+static int
+wal_remove_temporary_files_f(struct cbus_call_msg *msg)
+{
+	(void)msg;
+	struct wal_writer *writer = &wal_writer_singleton;
+	xdir_remove_temporary_files(&writer->wal_dir);
+	return 0;
+}
+
+void
+wal_remove_temporary_files(void)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct cbus_call_msg msg;
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg,
+		  wal_remove_temporary_files_f);
+}
