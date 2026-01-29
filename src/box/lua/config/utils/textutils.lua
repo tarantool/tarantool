@@ -1,3 +1,5 @@
+local fun = require('fun')
+
 -- Remove indent from a text.
 --
 -- Similar to Python's textwrap.dedent().
@@ -27,7 +29,31 @@ local function toline(s)
     return s:gsub('\n', ' '):gsub(' +', ' '):strip()
 end
 
+local function for_each_list_item(s, f)
+    return table.concat(fun.iter(s:split('\n- ')):map(f):totable(), '\n- ')
+end
+
+local function for_each_paragraph(s, f)
+    return table.concat(fun.iter(s:split('\n\n')):map(f):totable(), '\n\n')
+end
+
+local function format_text(s)
+    return for_each_paragraph(dedent(s), function(paragraph)
+        -- Strip line breaks if the paragraph is not a list.
+        if paragraph:startswith('- ') then
+            -- Strip newlines in each list item.
+            return '- ' .. for_each_list_item(paragraph:sub(3),
+                                              function(list_item)
+                return toline(list_item)
+            end)
+        else
+            return toline(paragraph)
+        end
+    end)
+end
+
 return {
     dedent = dedent,
     toline = toline,
+    format_text = format_text,
 }
