@@ -172,3 +172,8 @@ endif()
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS} lua-tests
                   COMMENT "Build fuzzers")
+
+# Needed for OSS Fuzz.
+add_custom_target(copy_tests
+  COMMENT "Nothing is copied, Lua-based testing is not supported"
+)
