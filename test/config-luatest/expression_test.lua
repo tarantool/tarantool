@@ -703,13 +703,14 @@ g.test_validate_success = function()
     local vars = {config = {database = {use_mvcc_engine = true}}}
     local ast = expression.parse('!config.database.use_mvcc_engine')
     expression.validate(ast, vars)
+
+    -- A non-version string can be used as a predicate.
+    local vars = {config = {database = {mode = 'ro'}}}
+    local ast = expression.parse('config.database.mode')
+    expression.validate(ast, vars)
 end
 
 g.test_validate_failure = function()
-    local ast = expression.parse('a')
-    local exp_err = 'An expression should be a predicate, got variable'
-    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
-
     local ast = expression.parse('1.0.0')
     local exp_err = 'An expression should be a predicate, got version_literal'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
@@ -742,39 +743,28 @@ g.test_validate_failure = function()
     local exp_err = 'Variable "x" has type number, expected string'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
 
-    local vars = {x = ''}
-    local ast = expression.parse('x > 0.0.0')
-    local exp_err = 'Expected a version in variable "x", got an empty string'
-    t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
-
-    for _, x in ipairs({'.1', '1.', 'x', ' 1', '1 ', '1..2'}) do
+    for _, x in ipairs({'', '.1', '1.', 'x', ' 1', '1 ', '1..2',
+                         '1', '1.2', '1.2.3.4', '1.2.3.4.5'}) do
         local vars = {x = x}
         local ast = expression.parse('x > 0.0.0')
-        local exp_err = 'Variable "x" is not a version string'
-        t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
-    end
-
-    for _, x in ipairs({'1', '1.2', '1.2.3.4', '1.2.3.4.5'}) do
-        local vars = {x = x}
-        local ast = expression.parse('x > 0.0.0')
-        local exp_err = ('Expected a three component version in variable ' ..
-            '"x", got %d components'):format((#x + 1) / 2)
+        local exp_err = 'A comparison operator (<, >, <=, >=, !=, ==) ' ..
+            'requires version literals or variables as arguments'
         t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
     end
 
     local vars = {v = '1.0.0'}
     local ast = expression.parse('!v')
-    local exp_err = 'Unary "!" accepts only boolean expressions'
+    local exp_err = 'Unary "!" accepts only boolean or string expressions'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
 
     local ast = expression.parse('!1.0.0')
-    local exp_err = 'Unary "!" accepts only boolean expressions'
+    local exp_err = 'Unary "!" accepts only boolean or string expressions'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
 
     local vars = {v = '1.0.0', flag = true}
     local ast = expression.parse('v && flag')
     local exp_err = 'A logical operator (&& or ||) accepts only boolean ' ..
-        'expressions as arguments'
+        'or string expressions as arguments'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
 end
 

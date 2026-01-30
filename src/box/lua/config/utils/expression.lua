@@ -184,8 +184,10 @@ local function resolve_var(vars, name)
     return cur
 end
 
--- Infer node result type: 'version' or 'boolean'.
+-- Infer node result type: 'version', 'boolean' or 'string'.
 -- Also validates variable existence and its runtime type.
+--
+-- A non-version string is allowed only as a truthy/falsy predicate.
 local function node_type(node, vars)
     assert(node ~= nil)
     if node.type == 'version_literal' then
@@ -198,26 +200,28 @@ local function node_type(node, vars)
         if type(var) == 'boolean' then
             return 'boolean'
         end
+        if var == box.NULL then
+            return 'boolean'
+        end
         if type(var) ~= 'string' then
             error(('Variable %q has type %s, expected string'):format(
                 node.value, type(var)), 0)
         end
         if var == '' then
-            error(('Expected a version in variable %q, got an empty ' ..
-                'string'):format(node.value), 0)
+            return 'string'
         end
         local components = var:split('.')
+        local is_version = #components == 3
         for _, v in ipairs(components) do
             if not v:match('^[0-9]+$') then
-                error(('Variable %q is not a version string'):format(
-                    node.value), 0)
+                is_version = false
+                break
             end
         end
-        if #components ~= 3 then
-            error(('Expected a three component version in variable %q, got ' ..
-                '%d components'):format(node.value, #components), 0)
+        if is_version then
+            return 'version'
         end
-        return 'version'
+        return 'string'
     elseif node.type == 'unary' then
         if unary_operators[node.value] then
             return 'boolean'
@@ -246,8 +250,9 @@ local function validate_expr(node, vars)
             error(('Unknown unary operator %q'):format(node.value), 0)
         end
         local t = node_type(node.expr, vars)
-        if t ~= 'boolean' then
-            error('Unary "!" accepts only boolean expressions', 0)
+        if t ~= 'boolean' and t ~= 'string' then
+            error('Unary "!" accepts only boolean or string ' ..
+                'expressions', 0)
         end
         validate_expr(node.expr, vars)
     elseif node.type == 'operation' then
@@ -258,9 +263,10 @@ local function validate_expr(node, vars)
         local rt = node_type(node.right, vars)
 
         if logical_binary_operators[op] then
-            if lt ~= 'boolean' or rt ~= 'boolean' then
+            if (lt ~= 'boolean' and lt ~= 'string') or
+               (rt ~= 'boolean' and rt ~= 'string') then
                 error('A logical operator (&& or ||) accepts only boolean ' ..
-                    'expressions as arguments', 0)
+                    'or string expressions as arguments', 0)
             end
             return
         end
@@ -280,6 +286,10 @@ local function validate_expr(node, vars)
 end
 
 local function validate(node, vars)
+    if node.type == 'variable' then
+        node_type(node, vars)
+        return
+    end
     if node.type ~= 'operation' and node.type ~= 'unary' then
         error(('An expression should be a predicate, got %s'):format(
             node.type), 0)
@@ -339,7 +349,11 @@ local function evaluate(node, vars)
     if node.type == 'version_literal' then
         return node.value
     elseif node.type == 'variable' then
-        return resolve_var(vars, node.value)
+        local var = resolve_var(vars, node.value)
+        if var == box.NULL or var == '' then
+            return false
+        end
+        return var
     elseif node.type == 'unary' then
         local op = unary_operations[node.value]
         local expr = evaluate(node.expr, vars)
