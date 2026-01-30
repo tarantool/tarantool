@@ -586,6 +586,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pushliteral(L, MODULE_LUAPATH ";");
 	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
+	/* XXX */
 	tarantool_lua_pushpath_env(L, "LUA_PATH");
 	lua_setfield(L, top, "path");
 
@@ -599,6 +600,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pushliteral(L, MODULE_LIBPATH ";");
 	/* overwrite standard paths */
 	lua_concat(L, lua_gettop(L) - top);
+	/* XXX */
 	tarantool_lua_pushpath_env(L, "LUA_CPATH");
 	lua_setfield(L, top, "cpath");
 
@@ -1124,6 +1126,27 @@ run_script_f(va_list ap)
 	}
 
 	int is_a_tty = isatty(STDIN_FILENO);
+
+	luaL_loadstring(tarantool_L, "return "
+"(function() print('xxxxxxxx')"
+"local TARANTOOL_PATH = arg[-1]"
+"print(TARANTOOL_PATH .. ' =======')"
+"local fio = require('fio')"
+"local cwd = fio.cwd()"
+"print(cwd)"
+"local popen = require('popen')"
+"local cmd = ('luarocks --lua-version 5.1 --tree %s/lua_modules path'):format(TARANTOOL_PATH)"
+"print('===================== cmd luarocks', cmd)"
+"local ph = popen.shell(cmd, 'r')"
+"print('luarocks results ', ph:read():rstrip())"
+"ph:close()"
+"local ph = popen.shell('find / -name luzer_impl.so', 'r')"
+"print('find results ', ph:read():rstrip())"
+"ph:close()"
+"end)()"
+);
+	lua_call(tarantool_L, 0, 0);
+
 
 	if (bytecode) {
 		if (lua_require_lib(L, "internal.dobytecode") != 0)
