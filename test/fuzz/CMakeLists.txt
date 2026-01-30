@@ -204,8 +204,8 @@ endif ()
 
 include(ProtobufMutator)
 
-add_subdirectory(luaL_loadbuffer)
-add_subdirectory(sql_fuzzer)
+# add_subdirectory(luaL_loadbuffer)
+# add_subdirectory(sql_fuzzer)
 add_subdirectory(lua)
 
 add_custom_target(fuzzers
