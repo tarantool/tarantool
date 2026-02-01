@@ -195,6 +195,27 @@ sql_find_column_expr(const struct ExprList *list, const char *tab_name,
 	return -1;
 }
 
+/**
+ * This function counts the number of occurrences of name in space.
+ */
+static int
+sql_count_column_in_space_def(const struct space_def *space_def,
+			      const char *name, const char *old_name)
+{
+	int count = 0;
+	for (uint32_t i = 0; i < space_def->field_count; ++i) {
+		if (strcmp(space_def->fields[i].name, name) == 0)
+			count++;
+	}
+	if (count == 0 && old_name != NULL) {
+		for (uint32_t i = 0; i < space_def->field_count; ++i) {
+			if (strcmp(space_def->fields[i].name, old_name) == 0)
+				count++;
+		}
+	}
+	return count;
+}
+
 /*
  * Given the name of a column of the form X.Y.Z or Y.Z or just Z, look up
  * that name in the set of source tables in pSrcList and make the pExpr
@@ -320,7 +341,11 @@ lookupName(struct Parse *pParse, struct Expr *pExpr, struct NameContext *pNC)
 				     nameInUsingClause(pItem->pUsing, zCol,
 						       old_col)))
 					continue;
-				cnt++;
+				int count =
+					sql_count_column_in_space_def(space_def,
+								      zCol,
+								      old_col);
+				cnt = cnt + count;
 				pMatch = pItem;
 				pExpr->iColumn = (i16) j;
 			}
