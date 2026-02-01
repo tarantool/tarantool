@@ -308,6 +308,9 @@ lookupName(struct Parse *pParse, struct Expr *pExpr, struct NameContext *pNC)
 					sql_fieldno_by_expr(pItem->space, col);
 				if (fieldno == UINT32_MAX)
 					continue;
+				if (fieldno == UINT32_MAX - 1){
+					cnt = 2;
+				}
 				j = fieldno;
 				/*
 				 * If there has been exactly one prior match and
