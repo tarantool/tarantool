@@ -23,10 +23,10 @@ test:plan(1)
 test:do_execsql_test(
     "tkt-7a31705a7e6-1.1",
     [[
-        CREATE TABLE t1 (a INTEGER PRIMARY KEY);
-        CREATE TABLE t2 (a INTEGER PRIMARY KEY, b INTEGER);
-        CREATE TABLE t2x (b INTEGER PRIMARY KEY);
-        SELECT t1.a FROM ((t1 JOIN t2 ON t1.a=t2.a) AS x JOIN t2x ON x.b=t2x.b) as y;
+        CREATE TABLE t1 (a1 INTEGER PRIMARY KEY);
+        CREATE TABLE t2 (a2 INTEGER PRIMARY KEY, b2 INTEGER);
+        CREATE TABLE t2x (b2x INTEGER PRIMARY KEY);
+        SELECT t1.a1 FROM ((t1 JOIN t2 ON t1.a1=t2.a2) AS x JOIN t2x ON x.b2=t2x.b2x) as y;
     ]], {
         -- <tkt-7a31705a7e6-1.1>
 

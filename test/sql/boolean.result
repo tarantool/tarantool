@@ -592,11 +592,11 @@ SELECT cast('TRUE' AS BOOLEAN), cast('FALSE' AS BOOLEAN);
  | ...
 
 -- Check usage in trigger.
-CREATE TABLE t4 (i INT PRIMARY KEY, a BOOLEAN);
+CREATE TABLE t4 (i4 INT PRIMARY KEY, a BOOLEAN);
  | ---
  | - row_count: 1
  | ...
-CREATE TABLE t5 (i INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
+CREATE TABLE t5 (i5 INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
  | ---
  | - row_count: 1
  | ...
@@ -615,7 +615,7 @@ DROP TRIGGER r;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -625,7 +625,7 @@ SELECT * FROM t4;
 SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: b
  |     type: boolean
@@ -641,7 +641,7 @@ INSERT INTO t5 VALUES (100, false);
 SELECT * FROM t4 UNION SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -652,7 +652,7 @@ SELECT * FROM t4 UNION SELECT * FROM t5;
 SELECT * FROM t4 UNION ALL SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -664,7 +664,7 @@ SELECT * FROM t4 UNION ALL SELECT * FROM t5;
 SELECT * FROM t4 INTERSECT SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -682,7 +682,7 @@ INSERT INTO t5(b) SELECT a FROM t4;
 SELECT * FROM t5;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: b
  |     type: boolean
@@ -692,21 +692,21 @@ SELECT * FROM t5;
  |   - [101, false]
  | ...
 
-SELECT * FROM (SELECT t4.i, t5.i, a, b FROM t4, t5 WHERE a = false OR b = true);
+SELECT * FROM (SELECT t4.i4, t5.i5, a, b FROM t4, t5 WHERE a = false OR b = true);
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: a
  |     type: boolean
  |   - name: b
  |     type: boolean
  |   rows:
- |   - [100, 100, false, true]
+ |   - [100, 1, false, true]
  |   - [100, 100, false, false]
- |   - [100, 100, false, false]
+ |   - [100, 101, false, false]
  | ...
 
 -- Check VIEW.
@@ -745,7 +745,7 @@ INSERT INTO t4 SELECT * from temp;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -781,11 +781,11 @@ SELECT x, y FROM cnt;
 SELECT * FROM t4 JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: b
  |     type: boolean
@@ -799,11 +799,11 @@ SELECT * FROM t4 JOIN t5 ON t4.a = t5.b;
 SELECT * FROM t4 LEFT JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: b
  |     type: boolean
@@ -817,11 +817,11 @@ SELECT * FROM t4 LEFT JOIN t5 ON t4.a = t5.b;
 SELECT * FROM t4 INNER JOIN t5 ON t4.a = t5.b;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
- |   - name: i
+ |   - name: i5
  |     type: integer
  |   - name: b
  |     type: boolean
@@ -841,7 +841,7 @@ UPDATE t4 SET a = NOT a;
 SELECT * FROM t4;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
@@ -852,16 +852,16 @@ SELECT * FROM t4;
  | ...
 
 -- Check SWITCH-CASE.
-SELECT i, \
+SELECT i4, \
 CASE \
-	WHEN a == true AND i % 2 == 1 THEN false \
-	WHEN a == true and i % 2 == 0 THEN true \
+    WHEN a == true AND i4 % 2 == 1 THEN false \
+    WHEN a == true and i4 % 2 == 0 THEN true \
 	WHEN a != true then false \
 END AS a0 \
 FROM t4;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a0
  |     type: boolean
@@ -872,10 +872,10 @@ FROM t4;
  | ...
 
 -- Check ORDER BY.
-SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i;
+SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i4;
  | ---
  | - metadata:
- |   - name: i
+ |   - name: i4
  |     type: integer
  |   - name: a
  |     type: boolean
