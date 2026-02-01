@@ -150,8 +150,8 @@ SELECT cast('true' AS BOOLEAN), cast('false' AS BOOLEAN);
 SELECT cast('TRUE' AS BOOLEAN), cast('FALSE' AS BOOLEAN);
 
 -- Check usage in trigger.
-CREATE TABLE t4 (i INT PRIMARY KEY, a BOOLEAN);
-CREATE TABLE t5 (i INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
+CREATE TABLE t4 (i4 INT PRIMARY KEY, a BOOLEAN);
+CREATE TABLE t5 (i5 INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
 CREATE TRIGGER r AFTER INSERT ON t4 FOR EACH ROW BEGIN INSERT INTO t5(b) VALUES(true); END;
 INSERT INTO t4 VALUES (100, false);
 DROP TRIGGER r;
@@ -168,7 +168,7 @@ SELECT * FROM t4 INTERSECT SELECT * FROM t5;
 INSERT INTO t5(b) SELECT a FROM t4;
 SELECT * FROM t5;
 
-SELECT * FROM (SELECT t4.i, t5.i, a, b FROM t4, t5 WHERE a = false OR b = true);
+SELECT * FROM (SELECT t4.i4, t5.i5, a, b FROM t4, t5 WHERE a = false OR b = true);
 
 -- Check VIEW.
 CREATE VIEW v AS SELECT b FROM t5;
@@ -196,16 +196,16 @@ UPDATE t4 SET a = NOT a;
 SELECT * FROM t4;
 
 -- Check SWITCH-CASE.
-SELECT i, \
+SELECT i4, \
 CASE \
-	WHEN a == true AND i % 2 == 1 THEN false \
-	WHEN a == true and i % 2 == 0 THEN true \
+    WHEN a == true AND i4 % 2 == 1 THEN false \
+    WHEN a == true and i4 % 2 == 0 THEN true \
 	WHEN a != true then false \
 END AS a0 \
 FROM t4;
 
 -- Check ORDER BY.
-SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i;
+SELECT * FROM t4 UNION SELECT * FROM t5 ORDER BY a, i4;
 
 -- Check GROUP BY.
 SELECT a, COUNT(*) FROM (SELECT * FROM t4 UNION SELECT * FROM t5) GROUP BY a;
