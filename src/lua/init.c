@@ -573,10 +573,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
 
-	/* lua_modules/share/lua/5.1/luzer/init.lua */
 	if (home != NULL) {
-		lua_pushliteral(L, "/github/workspace/build-out/lua_modules/share/lua/5.1/?.lua;");
-		lua_pushliteral(L, "/github/workspace/build-out/lua_modules/share/lua/5.1/?/init.lua;");
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
 		lua_pushstring(L, home);
@@ -593,10 +590,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	tarantool_lua_pushpath_env(L, "LUA_PATH");
 	lua_setfield(L, top, "path");
 
-	/* lua_modules/lib/lua/5.1/luzer_impl.so */
 	if (home != NULL) {
-		lua_pushliteral(L, "/github/workspace/build-out/lua_modules/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
-		lua_pushliteral(L, "/github/workspace/build-out/lua_modules/lib/lua/?" MODULE_LIBSUFFIX ";");
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
 		lua_pushstring(L, home);
