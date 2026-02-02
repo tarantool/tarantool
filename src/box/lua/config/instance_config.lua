@@ -886,6 +886,11 @@ return schema.new('instance_config', schema.record({
         })),
     }),
     database = schema.record({
+        schema = schema.enum({
+            '2.11',
+        }, {
+            default = box.NULL,
+        }),
         instance_uuid = schema.scalar({
             type = 'string',
             box_cfg = 'instance_uuid',
