@@ -1069,10 +1069,6 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-
-		luaL_loadstring(tarantool_L, "print('main xxxxxxxxx')");
-		lua_call(tarantool_L, 0, 0);
-
 		if (tarantool_lua_run_script(script, &instance, opt_mask, optc,
 					     optv, main_argc, main_argv) != 0)
 			diag_raise();
