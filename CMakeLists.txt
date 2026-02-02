@@ -830,6 +830,11 @@ if(DEFINED EXTRA_DEPENDENCIES_CMAKE)
     include(${EXTRA_DEPENDENCIES_CMAKE})
 endif()
 
+#
+# WASM
+#
+option(TARANTOOL_WASM "Disable signal stack operations for WebAssembly" OFF)
+
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
 # file names are case-insensitive)
@@ -968,7 +973,8 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND
-    ENABLE_FEEDBACK_DAEMON)
+    ENABLE_FEEDBACK_DAEMON
+    TARANTOOL_WASM)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})
         set(value "${TARANTOOL_${option}}")
