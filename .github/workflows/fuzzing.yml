@@ -43,9 +43,9 @@ jobs:
   fuzzing:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
-    if: github.repository == 'tarantool/tarantool' &&
-        ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+    # if: github.repository == 'tarantool/tarantool' &&
+    #     ( github.event_name != 'pull_request' ||
+    #       contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
     runs-on: ubuntu-latest
 
@@ -64,6 +64,9 @@ jobs:
           oss-fuzz-project-name: 'tarantool'
           dry-run: false
           sanitizer: ${{ matrix.sanitizer }}
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
       - name: run fuzzers (${{ matrix.sanitizer }})
         uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
         with:
@@ -71,6 +74,9 @@ jobs:
           fuzz-seconds: 600
           dry-run: false
           sanitizer: ${{ matrix.sanitizer }}
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
       - uses: actions/checkout@v4
         id: checkout
         if: failure()
