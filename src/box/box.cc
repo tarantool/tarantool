@@ -41,6 +41,7 @@
 #include <say.h>
 #include <scoped_guard.h>
 #include "identifier.h"
+#include "app_threads.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "recovery.h"
@@ -2032,6 +2033,23 @@ box_check_small_alloc_options(void)
 			  " to 1024 * 16 and exponent of two");
 }
 
+/**
+ * Checks the value of the box.cfg.app_threads.
+ */
+static int
+box_check_app_threads(void)
+{
+	int app_threads = cfg_geti("app_threads");
+	if (app_threads < 0 || app_threads > APP_THREADS_MAX) {
+		diag_set(ClientError, ER_CFG, "app_threads",
+			 tt_sprintf("must be greater than or equal to 0 "
+				    "and less than or equal to %d",
+				    APP_THREADS_MAX));
+		return -1;
+	}
+	return 0;
+}
+
 static int
 box_check_iproto_options(void)
 {
@@ -2225,6 +2243,8 @@ box_check_config(void)
 		diag_raise();
 	box_check_small_alloc_options();
 	box_check_vinyl_options();
+	if (box_check_app_threads() != 0)
+		diag_raise();
 	if (box_check_iproto_options() != 0)
 		diag_raise();
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
@@ -6602,6 +6622,7 @@ box_storage_init(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
+	app_threads_start(cfg_geti("app_threads"));
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
@@ -6718,6 +6739,7 @@ box_storage_shutdown()
 	gc_shutdown();
 	engine_shutdown();
 	fiber_pool_shutdown(&tx_fiber_pool);
+	app_threads_stop();
 }
 
 void
