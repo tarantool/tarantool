@@ -129,12 +129,17 @@ local MAX_DATE_DAY = 11
 local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 -- -5879610-06-22
 local MIN_DATE_TEXT = ('%d-%02d-%02d'):format(MIN_DATE_YEAR, MIN_DATE_MONTH,
                                               MIN_DATE_DAY)
 -- 5879611-07-11
 local MAX_DATE_TEXT = ('%d-%02d-%02d'):format(MAX_DATE_YEAR, MAX_DATE_MONTH,
                                               MAX_DATE_DAY)
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
 local MAX_YEAR_RANGE = MAX_DATE_YEAR - MIN_DATE_YEAR
 local MAX_MONTH_RANGE = MAX_YEAR_RANGE * 12
 local MAX_WEEK_RANGE = MAX_YEAR_RANGE * AVERAGE_WEEK_YEAR
@@ -584,36 +589,6 @@ local function datetime_new(obj)
     else
         nsec = 0
     end
-    local ts = obj.timestamp
-    if ts ~= nil then
-        if ymd then
-            error('timestamp is not allowed if year/month/day provided', 2)
-        end
-        if hms then
-            error('timestamp is not allowed if hour/min/sec provided', 2)
-        end
-        if type(ts) ~= 'number' then
-            error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
-        end
-        local fraction
-        s, fraction = math_modf(ts)
-        -- In case of negative fraction part we should
-        -- make it positive at the expense of the integer part.
-        -- Code below expects that "nsec" value is always positive.
-        if fraction < 0 then
-            s = s - 1
-            fraction = fraction + 1
-        end
-        -- if there are separate nsec, usec, or msec provided then
-        -- timestamp should be integer
-        if count_usec == 0 then
-            nsec = fraction * 1e9
-        elseif fraction ~= 0 then
-            error('only integer values allowed in timestamp '..
-                  'if nsec, usec, or msecs provided', 2)
-        end
-        hms = true
-    end
 
     local offset = obj.tzoffset
     if offset ~= nil then
@@ -646,7 +621,40 @@ local function datetime_new(obj)
         offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
     end
 
-    -- .hour, .minute, .second
+    local ts = obj.timestamp
+    if ts ~= nil then
+        if ymd then
+            error('timestamp is not allowed if year/month/day provided', 2)
+        end
+        if hms then
+            error('timestamp is not allowed if hour/min/sec provided', 2)
+        end
+        if type(ts) ~= 'number' then
+            error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
+        end
+        local fraction
+        s, fraction = math_modf(ts)
+        -- In case of negative fraction part we should
+        -- make it positive at the expense of the integer part.
+        -- Code below expects that "nsec" value is always positive.
+        if fraction < 0 then
+            s = s - 1
+            fraction = fraction + 1
+        end
+        -- if there are separate nsec, usec, or msec provided then
+        -- timestamp should be integer
+        if count_usec == 0 then
+            nsec = fraction * 1e9
+        elseif fraction ~= 0 then
+            error('only integer values allowed in timestamp '..
+                  'if nsec, usec, or msecs provided', 2)
+        end
+        local utc_s = utc_secs(s, offset or 0)
+        check_range(utc_s, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'timestamp')
+        hms = true
+    end
+
+    -- .hour, .min, .sec or .timestamp
     local secs = 0
     if hms then
         secs = (h or 0) * 3600 + (m or 0) * 60 + (s or 0)
@@ -1146,12 +1154,16 @@ function datetime_set(self, obj)
         if usec ~= nil then
             nsec = usec * 1e3
         end
+        local tzindex = self.tzindex
         if tzname ~= nil then
-            offset, self.tzindex = parse_tzname(sec_int, tzname)
+            offset, tzindex = parse_tzname(sec_int, tzname)
         end
-        self.epoch = utc_secs(sec_int, offset)
+        local utc_s = utc_secs(sec_int, offset)
+        check_range(utc_s, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'timestamp')
+        self.epoch = utc_s
         self.nsec = nsec
         self.tzoffset = offset
+        self.tzindex = tzindex
 
         return self
     end
