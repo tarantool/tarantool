@@ -1545,6 +1545,35 @@ g.test_set_record_field_any = function()
     local any = {baz = {fiz = 'mydata'}}
     s:set(data, 'foo.bar', any)
     t.assert_equals(data, {foo = {bar = any}})
+
+    -- <data>.foo.bar.baz = <...>
+    local data = {}
+    s:set(data, 'foo.bar.baz', 'mydata')
+    t.assert_equals(data, {foo = {bar = {baz = 'mydata'}}})
+
+    -- <data>.foo.bar.baz = box.NULL
+    local data = {}
+    s:set(data, 'foo.bar.baz', box.NULL)
+    t.assert_equals(data, {foo = {bar = {baz = box.NULL}}})
+
+    -- Overwriting an existing value with box.NULL keeps other data.
+    local data = {foo = {bar = {baz = 'mydata', giz = 'keep'}}}
+    s:set(data, 'foo.bar.baz', box.NULL)
+    t.assert_equals(data, {foo = {bar = {baz = box.NULL, giz = 'keep'}}})
+    t.assert_type(data.foo.bar.baz, 'cdata')
+
+    -- Deleting a nested field inside 'any' doesn't drop other data.
+    local data = {foo = {bar = {baz = 'mydata', giz = 'keep'}}}
+    s:set(data, 'foo.bar.baz', nil)
+    t.assert_equals(data, {foo = {bar = {giz = 'keep'}}})
+
+    -- Indexing a non-table value inside 'any' is still forbidden.
+    local exp_err_msg = '[myschema] foo.bar: Attempt to index a non-table ' ..
+        'value (string) by field "baz"'
+    local data = {foo = {bar = 'mydata'}}
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data, 'foo.bar.baz', 'mydata')
+    end)
 end
 
 -- Set a map's field.
@@ -1803,22 +1832,20 @@ g.test_set_index_scalar = function()
     -- Verify that the data remains unchanged after an error.
     t.assert_equals(data, {})
 
-    -- The scalar of the 'any' type is the same in this regard.
+    -- Since gh-10204, scalar values of the `any` type are treated as schemaless
+    -- containers: setting a nested field past them is allowed and intermediate
+    -- tables are created on demand.
     local s = schema.new('myschema', schema.record({
         foo = schema.record({
             bar = schema.scalar({type = 'any'}),
         }),
     }))
-    local exp_err_msg = '[myschema] foo.bar: Attempt to index a scalar ' ..
-        'value of type any by field "baz"'
-    local data = {}
-    t.assert_error_msg_equals(exp_err_msg, function()
-        local rhs = {fiz = 'giz'}
-        s:set(data, 'foo.bar.baz', rhs)
-    end)
 
-    -- Verify that the data remains unchanged after an error.
-    t.assert_equals(data, {})
+    local data = {}
+    local rhs = {fiz = 'giz'}
+    s:set(data, 'foo.bar.baz', rhs)
+
+    t.assert_equals(data, { foo = { bar = { baz = { fiz = 'giz' } } } })
 end
 
 -- Attempt to set a value that doesn't correspond to the given
