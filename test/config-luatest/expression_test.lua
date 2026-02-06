@@ -166,11 +166,27 @@ g.test_lexer = function()
     t.assert_error_msg_equals(exp_err(1, 3, 'truncated expression'),
         lexer.split, 'x=')
 
-    -- =x and !x are forbidden.
-    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
-        lexer.split, '!x')
+    -- =x is forbidden.
     t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
         lexer.split, '=x')
+
+    -- Unary ! is allowed.
+    t.assert_equals(lexer.split('!x'), {
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'x'},
+    })
+    t.assert_equals(lexer.split('!(x<2.0.0)'), {
+        {type = 'operation', value = '!'},
+        {type = 'grouping', value = '('},
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '<'},
+        {type = 'version_literal', value = '2.0.0'},
+        {type = 'grouping', value = ')'},
+    })
+
+    -- Standalone '!' is a truncated expression (missing operand).
+    t.assert_error_msg_equals(exp_err(1, 2, 'truncated expression'),
+        lexer.split, '!')
 
     -- A separator should follow a version literal or a variable.
     t.assert_error_msg_equals(exp_err(1, 6, 'invalid token'),
@@ -202,6 +218,37 @@ g.test_lexer = function()
     t.assert_error_msg_equals(exp_err(1, 8, 'invalid version literal: ' ..
         'expected 3 components, got 4'),
         lexer.split, '1.2.3.4')
+
+    -- Lexer-level corner cases around '!'.
+    --
+    -- Note: syntactically "x ! config" is not a valid expression for parser,
+    -- but lexer should still tokenize it consistently.
+    t.assert_equals(lexer.split('x ! config'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'config'},
+    })
+
+    t.assert_equals(lexer.split('x!=!y'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '!='},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'y'},
+    })
+
+    t.assert_equals(lexer.split('x>=!y'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '>='},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'y'},
+    })
+
+    t.assert_equals(lexer.split('!x>1.0.0'), {
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '>'},
+        {type = 'version_literal', value = '1.0.0'}
+    })
 end
 
 -- Verify AST generation.
