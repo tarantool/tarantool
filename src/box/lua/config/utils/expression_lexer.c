@@ -28,7 +28,7 @@
  *
  * {
  *     -- The value is one of '>=', '<=', '>', '<', '!=', '==',
- *     -- '&&', '||'.
+ *     -- '&&', '||', '!'.
  *     type = 'operation',
  *     value = <string>,
  * }
@@ -247,6 +247,19 @@ luaT_expression_lexer_split(struct lua_State *L)
 			/* !<eof> or =<eof> is an error. */
 			if (*s == '\0')
 				return ERROR("truncated expression");
+			/* Handle '!' as either '!=' or unary '!'. */
+			if (*(s - 1) == '!') {
+				if (*s == '=') {
+					/* != */
+					PUSH_TOKEN("operation", s - 1, s);
+					state = START;
+					break;
+				}
+				/* unary ! */
+				PUSH_TOKEN("operation", s - 1, s - 1);
+				state = START;
+				continue;
+			}
 			/*
 			 * Anything other than != and == is an
 			 * error.
