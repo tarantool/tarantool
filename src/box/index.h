@@ -498,6 +498,24 @@ exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
 
 /**
+ * Checks that the half-open interval parameters are consistent and compatible
+ * with the index type.
+ *
+ * @param index_def index definition
+ * @param begin_key beginning key of the range
+ * @param begin_part_count number of parts in @a begin_key
+ * @param end_key end key of the range
+ * @param end_part_count number of parts in @a end_key
+ *
+ * @retval 0  The parameters are valid.
+ * @retval -1 The parameters are invalid.
+ */
+int
+range_validate(struct index_def *index_def,
+	       const char *begin_key, uint32_t begin_part_count,
+	       const char *end_key, uint32_t end_part_count);
+
+/**
  * Checks that the quantile parameters are consistent and compatible with
  * the index type.
  *

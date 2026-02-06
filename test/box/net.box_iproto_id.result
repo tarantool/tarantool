@@ -23,7 +23,7 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 10
+ | - 11
  | ...
 print_features(c)
  | ---
@@ -32,13 +32,14 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
- |   insert_arrow: true
- |   space_and_index_names: true
+ |   is_sync: true
+ |   delete_range: true
  |   dml_tuple_extension: true
+ |   insert_arrow: true
  |   streams: true
  |   watch_once: true
  |   call_ret_tuple_extension: true
- |   is_sync: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -67,13 +68,14 @@ print_features(c)
  |   error_extension: false
  |   call_arg_tuple_extension: false
  |   pagination: false
- |   insert_arrow: false
- |   space_and_index_names: false
+ |   is_sync: false
+ |   delete_range: false
  |   dml_tuple_extension: false
+ |   insert_arrow: false
  |   streams: false
  |   watch_once: false
  |   call_ret_tuple_extension: false
- |   is_sync: false
+ |   space_and_index_names: false
  | ...
 errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
  | ---
@@ -123,13 +125,14 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
- |   insert_arrow: true
- |   space_and_index_names: true
+ |   is_sync: true
+ |   delete_range: true
  |   dml_tuple_extension: true
+ |   insert_arrow: true
  |   streams: true
  |   watch_once: true
  |   call_ret_tuple_extension: true
- |   is_sync: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -175,7 +178,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 10
+ | - 11
  | ...
 print_features(c)
  | ---
@@ -184,13 +187,14 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
- |   insert_arrow: true
- |   space_and_index_names: true
+ |   is_sync: true
+ |   delete_range: true
  |   dml_tuple_extension: true
+ |   insert_arrow: true
  |   streams: true
  |   watch_once: true
  |   call_ret_tuple_extension: true
- |   is_sync: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -209,7 +213,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 10
+ | - 11
  | ...
 print_features(c)
  | ---
@@ -218,13 +222,14 @@ print_features(c)
  |   error_extension: true
  |   call_arg_tuple_extension: true
  |   pagination: true
- |   insert_arrow: true
- |   space_and_index_names: true
+ |   is_sync: true
+ |   delete_range: true
  |   dml_tuple_extension: true
+ |   insert_arrow: true
  |   streams: true
  |   watch_once: true
  |   call_ret_tuple_extension: true
- |   is_sync: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---

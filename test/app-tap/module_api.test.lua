@@ -697,8 +697,14 @@ local function test_box_txn(test, module)
     test:ok(module.box_txn_commit(), "box_txn_commit")
 end
 
+local function test_box_delete_range(test, module)
+    test:plan(1)
+    test:ok(module.box_delete_range(box.space.test.id),
+            "box_delete_range API")
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(54)
+    test:plan(55)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -737,6 +743,7 @@ require('tap').test("module_api", function(test)
     test:test("box_iproto_override", test_box_iproto_override, module)
     test:test("box_ibuf", test_box_ibuf, module)
     test:test("box_txn", test_box_txn, module)
+    test:test("box_delete_range", test_box_delete_range, module)
 
     space:drop()
 end)

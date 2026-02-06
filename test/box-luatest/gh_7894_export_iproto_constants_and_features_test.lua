@@ -138,6 +138,7 @@ local reference_table = {
         COMMIT = 15,
         ROLLBACK = 16,
         INSERT_ARROW = 17,
+        DELETE_RANGE = 18,
         RAFT = 30,
         RAFT_PROMOTE = 31,
         RAFT_DEMOTE = 32,
@@ -173,7 +174,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 10,
+    protocol_version = 11,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -190,6 +191,7 @@ local reference_table = {
         fetch_snapshot_cursor = is_enterprise and true or nil,
         is_sync = true,
         insert_arrow = true,
+        delete_range = true,
     },
     feature = {
         streams = 0,
@@ -205,6 +207,7 @@ local reference_table = {
         fetch_snapshot_cursor = 10,
         is_sync = 11,
         insert_arrow = 12,
+        delete_range = 13,
     },
 }
 

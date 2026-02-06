@@ -120,6 +120,12 @@ extern "C" {
 	 * Available since IPROTO protocol version 10.
 	 */								\
 	_(INSERT_ARROW, 12)						\
+	/**
+	 * Support of key range removal.
+	 *
+	 * Available since IPROTO protocol version 11.
+	 */								\
+	_(DELETE_RANGE, 13)						\
 
 #define IPROTO_FEATURE_MEMBER(s, v) IPROTO_FEATURE_ ## s = v,
 
@@ -144,7 +150,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 10,
+	IPROTO_CURRENT_VERSION = 11,
 };
 
 /**

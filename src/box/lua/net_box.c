@@ -99,6 +99,7 @@ static struct iproto_features NETBOX_IPROTO_FEATURES;
 	_(DELETE)							\
 	_(UPDATE)							\
 	_(UPSERT)							\
+	_(DELETE_RANGE)							\
 	_(SELECT)							\
 	_(SELECT_WITH_POS)						\
 	_(EXECUTE)							\
@@ -1109,6 +1110,38 @@ netbox_encode_upsert(lua_State *L, int idx,
 }
 
 /**
+ * Encode an `IPROTO_DELETE_RANGE` request and write it to the provided MsgPack
+ * stream.
+ */
+static int
+netbox_encode_delete_range(lua_State *L, int idx,
+			   struct netbox_method_encode_ctx *ctx)
+{
+	/* Lua stack at idx: space_id, index_id, begin_key, end_key */
+	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync,
+					 IPROTO_DELETE_RANGE, ctx->stream_id);
+
+	mpstream_encode_map(ctx->stream, 4);
+
+	netbox_encode_space_id_or_name(L, idx, ctx->stream);
+
+	netbox_encode_index_id_or_name(L, idx + 1, ctx->stream);
+
+	/* encode begin key */
+	mpstream_encode_uint(ctx->stream, IPROTO_KEY);
+	if (luamp_convert_key(L, cfg, ctx->stream, idx + 2) != 0)
+		return -1;
+
+	/* encode end key */
+	mpstream_encode_uint(ctx->stream, IPROTO_TUPLE);
+	if (luamp_convert_key(L, cfg, ctx->stream, idx + 3) != 0)
+		return -1;
+
+	netbox_end_encode(ctx->stream, svp);
+	return 0;
+}
+
+/**
  * Connects a transport to a remote host and reads a greeting message.
  * Returns 0 on success, -1 on error.
  */
@@ -1505,6 +1538,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_DELETE]		= netbox_encode_delete,
 		[NETBOX_UPDATE]		= netbox_encode_update,
 		[NETBOX_UPSERT]		= netbox_encode_upsert,
+		[NETBOX_DELETE_RANGE]	= netbox_encode_delete_range,
 		[NETBOX_SELECT]		= netbox_encode_select,
 		[NETBOX_SELECT_WITH_POS] = netbox_encode_select,
 		[NETBOX_EXECUTE]	= netbox_encode_execute,
@@ -2050,6 +2084,7 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_DELETE]		= netbox_decode_tuple,
 		[NETBOX_UPDATE]		= netbox_decode_tuple,
 		[NETBOX_UPSERT]		= netbox_decode_nil,
+		[NETBOX_DELETE_RANGE]	= netbox_decode_nil,
 		[NETBOX_SELECT]		= netbox_decode_select,
 		[NETBOX_SELECT_WITH_POS] = netbox_decode_select_with_pos,
 		[NETBOX_EXECUTE]	= netbox_decode_execute,
