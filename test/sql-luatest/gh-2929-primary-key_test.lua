@@ -1,0 +1,50 @@
+local server = require('luatest.server')
+local t = require('luatest')
+
+local g = t.group("keys", {{engine = 'memtx'}, {engine = 'vinyl'}})
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- All tables in SQL are now WITHOUT ROW ID, so if user
+-- tries to create table without a primary key, an appropriate error message
+-- should be raised. This tests checks it.
+g.test_gh_2929_primary_key = function(cg)
+    cg.server:exec(function(engine)
+        box.execute([[SET SESSION "sql_seq_scan" = true;]])
+        box.execute([[SET SESSION "sql_default_engine" = '%s';]], {engine})
+        box.cfg{}
+
+        box.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE);]])
+        local exp_err = [[Failed to create space 't2': PRIMARY KEY missing]]
+        local _, err = box.execute([[CREATE TABLE t2(a INT UNIQUE, b INT);]])
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = [[Failed to create space 't3': PRIMARY KEY missing]]
+        _, err = box.execute([[CREATE TABLE t3(a NUMBER);]])
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = [[Failed to create space 't4': PRIMARY KEY missing]]
+        _, err = box.execute([[CREATE TABLE t4(a NUMBER, b TEXT);]])
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = [[Failed to create space 't5': PRIMARY KEY missing]]
+        _, err = box.execute([[CREATE TABLE t5(a NUMBER, b NUMBER UNIQUE);]])
+        t.assert_equals(tostring(err), exp_err)
+
+        box.execute([[DROP TABLE t1;]])
+        t.assert_equals(box.space.t1, nil)
+
+        --
+        -- gh-3522: invalid primary key name
+        exp_err = [[Can't resolve field 'b']]
+        _, err = box.execute([[CREATE TABLE tx (a INT, PRIMARY KEY (b));]])
+        t.assert_equals(tostring(err), exp_err)
+    end, {cg.params.engine})
+end
