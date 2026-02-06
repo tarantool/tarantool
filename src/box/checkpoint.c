@@ -140,11 +140,10 @@ box_checkpoint_build_in_memory(struct box_checkpoint *out)
 }
 
 int
-box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled)
+box_checkpoint_build_on_disk(struct box_checkpoint *out)
 {
 	int rc;
 	struct engine_checkpoint_params engine_params = {
-		.is_scheduled = is_scheduled,
 		.box = out,
 	};
 	rc = engine_begin_checkpoint(&engine_params);
