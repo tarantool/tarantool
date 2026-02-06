@@ -106,8 +106,6 @@ struct engine_memory_stat {
 
 /** Parameters passed to the engines on checkpoint start. */
 struct engine_checkpoint_params {
-	/** Flag whether the checkpoint is scheduled or explicitly requested. */
-	bool is_scheduled;
 	/** Global engine-agnostic control states of the instance. */
 	const struct box_checkpoint *box;
 };

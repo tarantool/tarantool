@@ -2843,6 +2843,7 @@ static int
 vinyl_engine_begin_checkpoint(struct engine *engine,
 			      const struct engine_checkpoint_params *params)
 {
+	(void)params;
 	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
 	/*
@@ -2852,8 +2853,7 @@ vinyl_engine_begin_checkpoint(struct engine *engine,
 	 */
 	if (lsregion_used(&env->mem_env.allocator) == 0)
 		return 0;
-	if (vy_scheduler_begin_checkpoint(&env->scheduler,
-					  params->is_scheduled) != 0)
+	if (vy_scheduler_begin_checkpoint(&env->scheduler) != 0)
 		return -1;
 	return 0;
 }
