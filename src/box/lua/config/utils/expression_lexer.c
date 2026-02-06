@@ -16,15 +16,29 @@
  *
  * The following tokens are possible.
  *
+ * Variable:
+ *
  * {
  *     type = 'variable',
  *     value = <string>,
  * }
  *
+ * Variable name syntax:
+ * - starts with [A-Za-z_]
+ * - continues with [A-Za-z0-9_]
+ * - may contain dot-separated segments, where each dot must be followed by
+ *   [A-Za-z0-9_]
+ *
+ * Version literal:
+ *
  * {
  *     type = 'version_literal',
  *     value = <string>,
  * }
+ *
+ * Version literal syntax: N.N.N
+ *
+ * Operation:
  *
  * {
  *     -- The value is one of '>=', '<=', '>', '<', '!=', '==',
@@ -32,6 +46,8 @@
  *     type = 'operation',
  *     value = <string>,
  * }
+ *
+ * Grouping:
  *
  * {
  *     -- The value is '(' or ')'.
@@ -145,6 +161,17 @@ luaT_expression_lexer_split(struct lua_State *L)
 			 */
 			if (isalnum(*s) || *s == '_')
 				break;
+			/*
+			 * Allow dotted access (a.b): '.' is part of VARIABLE
+			 * only when followed by an identifier character.
+			 */
+			if (*s == '.') {
+				char next = *(s + 1);
+				if (isalnum(next) || next == '_')
+					break;
+				/* Reject dangling '.' like "a." or "a..b". */
+				return ERROR("invalid token");
+			}
 			/*
 			 * The series of the variable characters
 			 * has been ended.
