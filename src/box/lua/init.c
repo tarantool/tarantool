@@ -153,6 +153,7 @@ extern char session_lua[],
 	metrics_tarantool_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
+	metrics_export_role_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
 	config_applier_autoexpel_lua[],
@@ -168,6 +169,7 @@ extern char session_lua[],
 	config_applier_roles_lua[],
 	config_applier_sharding_lua[],
 	config_applier_box_status_lua[],
+	config_applier_metrics_export_lua[],
 	config_cluster_config_lua[],
 	config_descriptions_lua[],
 	config_validators_lua[],
@@ -329,6 +331,9 @@ static const char *lua_sources[] = {
 	"third_party/metrics/metrics/plugins/json",
 	"metrics.plugins.json", metrics_plugins_json_lua,
 
+	"third_party/metrics-export-role/roles/metrics-export",
+	"roles.metrics-export", metrics_export_role_lua,
+
 	/* {{{ config */
 
 	/*
@@ -473,6 +478,10 @@ static const char *lua_sources[] = {
 	"config/applier/box_status",
 	"internal.config.applier.box_status",
 	config_applier_box_status_lua,
+
+	"config/applier/metrics_export",
+	"internal.config.applier.metrics_export",
+	config_applier_metrics_export_lua,
 
 	"config/init",
 	"config",

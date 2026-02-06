@@ -35,7 +35,8 @@ runs:
         curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
         && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
         && rm cmake-3.26.0-linux-$(uname -i).tar.gz
-        tt rocks install luatest 1.2.1
+        tt rocks install luatest 1.4.0
         tt rocks install luacheck 0.26.0
+        tt rocks install http 1.9.0
         gem install coveralls-lcov
       shell: bash
