@@ -93,4 +93,6 @@ iproto_features_init(void)
 			    IPROTO_FEATURE_IS_SYNC);
 	iproto_features_set(&IPROTO_CURRENT_FEATURES,
 			    IPROTO_FEATURE_INSERT_ARROW);
+	iproto_features_set(&IPROTO_CURRENT_FEATURES,
+			    IPROTO_FEATURE_DELETE_RANGE);
 }

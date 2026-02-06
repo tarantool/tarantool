@@ -1903,6 +1903,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 	case IPROTO_DELETE:
 	case IPROTO_UPSERT:
 	case IPROTO_INSERT_ARROW:
+	case IPROTO_DELETE_RANGE:
 		assert(type < sizeof(iproto_thread->dml_route) /
 			      sizeof(*iproto_thread->dml_route));
 		*route = iproto_thread->dml_route[type];
@@ -2449,7 +2450,8 @@ tx_resolve_space_and_index_name(struct request *dml)
 		dml->space_id = space->def->id;
 	}
 	if ((dml->type == IPROTO_SELECT || dml->type == IPROTO_UPDATE ||
-	     dml->type == IPROTO_DELETE) && dml->index_name != NULL) {
+	     dml->type == IPROTO_DELETE || dml->type == IPROTO_DELETE_RANGE) &&
+	    dml->index_name != NULL) {
 		if (space == NULL)
 			space = space_cache_find(dml->space_id);
 		if (space == NULL)
@@ -3693,6 +3695,7 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	assert(dml_route[IPROTO_COMMIT] == NULL);
 	assert(dml_route[IPROTO_ROLLBACK] == NULL);
 	dml_route[IPROTO_INSERT_ARROW] = iproto_thread->process1_route;
+	dml_route[IPROTO_DELETE_RANGE] = iproto_thread->process1_route;
 
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };
