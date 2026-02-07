@@ -6,10 +6,33 @@
 #pragma once
 
 #include "index.h"
+#include "field_map.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * Generalization of tuple for memtx multikey and functional indexes that allows
+ * to uniquely identify multikey or functional keys.
+ */
+struct memtx_index_key {
+	/** Tuple for operation. */
+	struct tuple *tuple;
+	/**
+	 * Encoding of key for multikey and functional indexes. For multikey
+	 * indexes it represents the index in the multikey array. For functional
+	 * indexes it represents the pointer to the functional key. For other
+	 * indexes, it is set to `MULTIKEY_NONE`. It is also set to
+	 * `MULTIKEY_NONE` when the `replace` operation only requires the tuple.
+	 */
+	hint_t hint;
+};
+
+static const struct memtx_index_key memtx_index_key_null = {
+	.tuple = NULL,
+	.hint = (hint_t)MULTIKEY_NONE,
+};
 
 /** Virtual function table for memtx-specific index operations. */
 struct memtx_index_vtab {
@@ -28,9 +51,11 @@ struct memtx_index_vtab {
 	 * NB: do not use the same object for @a result and @a successor - they
 	 *     are different returned values and implementation can rely on it.
 	 */
-	int (*replace)(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
+	int (*replace)(struct index *index, struct memtx_index_key old_key,
+		       struct memtx_index_key new_key,
+		       enum dup_replace_mode mode,
+		       struct memtx_index_key *result,
+		       struct memtx_index_key *successor);
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
@@ -47,15 +72,25 @@ struct memtx_index_vtab {
 	void (*end_build)(struct index *index);
 };
 
-static inline int
+/**
+ * Get comparison hint for a multikey index tuple.
+ * @param key - multikey index tuple to compute the hint for
+ * @param cmp_def - key_def used for tuple comparison
+ * @return - hint value
+ */
+static inline hint_t
+memtx_index_multikey_tuple_hint(struct memtx_index_key key,
+				struct key_def *cmp_def)
+{
+	return key.hint == (hint_t)MULTIKEY_NONE ?
+		tuple_hint(key.tuple, cmp_def) : key.hint;
+}
+
+/** Wrapper around `memtx_index_vtab::replace`. */
+int
 memtx_index_replace(struct index *index, struct tuple *old_tuple,
 		    struct tuple *new_tuple, enum dup_replace_mode mode,
-		    struct tuple **result, struct tuple **successor)
-{
-	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
-	return vtab->replace(index, old_tuple, new_tuple, mode, result,
-			     successor);
-}
+		    struct tuple **result, struct tuple **successor);
 
 static inline void
 memtx_index_begin_build(struct index *index)
