@@ -105,11 +105,6 @@ struct iproto_stream {
 	/** This stream connection */
 	struct iproto_connection *connection;
 	/**
-	 * Pre-allocated disconnect msg to gracefully rollback stream
-	 * transaction and destroy stream object.
-	 */
-	struct cmsg on_disconnect;
-	/**
 	 * Message currently being processed in the tx thread.
 	 * This field is accesable only from iproto thread.
 	 */
@@ -133,25 +128,6 @@ iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
 	wpos->obuf = out;
 	wpos->svp = obuf_create_svp(out);
 }
-
-/**
- * Message sent when iproto thread dropped all connections that requested
- * to be dropped.
- */
-struct iproto_drop_finished {
-	/** Base structure. */
-	struct cmsg base;
-	/**
-	 * Generation a is a sequence number of iproto_drop_connections()
-	 * invocation.
-	 *
-	 * Generation is used to handle racy situation when previous invocation
-	 * of iproto_drop_connections() was failed and there is new invocation.
-	 * Message from previous invocation may be delivired and account
-	 * iproto thread as finished dropping connection which is not true.
-	 */
-	unsigned generation;
-};
 
 struct iproto_thread {
 	/**
@@ -229,11 +205,6 @@ struct iproto_thread {
 	/** Number of connections that pending drop. */
 	size_t drop_pending_connection_count;
 	/**
-	 * Message used to notify TX thread that all connections marked
-	 * to de dropped are dropped.
-	 */
-	struct iproto_drop_finished drop_finished_msg;
-	/**
 	 * If set then iproto thread shutdown is started and we should not
 	 * accept new connections.
 	 */
@@ -256,9 +227,13 @@ static struct fiber_cond drop_finished_cond;
 /** Count of iproto threads that are not finished connections drop yet. */
 static size_t drop_pending_thread_count;
 /**
- * Generation is a sequence number of dropping connection invocation.
+ * Sequence number of iproto_drop_connections() invocation.
  *
- * See also `struct iproto_drop_finished`.
+ * It is used to handle a racy situation when the previous invocation of
+ * iproto_drop_connections() failed and there is a new invocation.
+ * The message notifying tx about completion of the previous invocation
+ * must not account the iproto thread as finished dropping connection in
+ * this case.
  */
 static unsigned drop_generation;
 
@@ -437,10 +412,8 @@ struct iproto_cfg_msg: public cbus_call_msg
 			 */
 			struct iproto_connection *owner;
 			/**
-			 * Generation is sequence number of dropping
-			 * connection invocation.
-			 *
-			 * See also `struct iproto_drop_finished`.
+			 * Sequence number of iproto_drop_connections()
+			 * invocation
 			 */
 			unsigned generation;
 		} drop_connections;
@@ -462,6 +435,36 @@ iproto_cfg_msg_create(struct iproto_cfg_msg *msg, enum iproto_cfg_op op)
  */
 static void
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg);
+
+/** Special message used for service jobs, like handling disconnection. */
+struct iproto_service_msg {
+	/** Base struct. */
+	struct cmsg base;
+	/** IPROTO connection. */
+	struct iproto_connection *connection;
+	/** IPROTO stream. */
+	struct iproto_stream *stream;
+	/** Sequence number of iproto_drop_connections() invocation. */
+	unsigned drop_generation;
+};
+
+static struct iproto_service_msg *
+iproto_service_msg_new(const struct cmsg_hop *route)
+{
+	struct iproto_service_msg *msg = xalloc_object(typeof(*msg));
+	cmsg_init(&msg->base, route);
+	msg->connection = NULL;
+	msg->stream = NULL;
+	msg->drop_generation = 0;
+	return msg;
+}
+
+static void
+iproto_service_msg_delete(struct iproto_service_msg *msg)
+{
+	TRASH(msg);
+	free(msg);
+}
 
 int
 iproto_addr_count(void)
@@ -814,20 +817,6 @@ struct iproto_connection
 	struct session *session;
 	ev_loop *loop;
 	/**
-	 * Pre-allocated disconnect msg. Is sent right after
-	 * actual disconnect has happened. Does not destroy the
-	 * connection. Used to notify existing requests about the
-	 * occasion.
-	 */
-	struct cmsg disconnect_msg;
-	/**
-	 * Pre-allocated destroy msg. Is sent after disconnect has
-	 * happened and a last request has finished. Firstly
-	 * destroys tx-related resources and then deletes the
-	 * connection.
-	 */
-	struct cmsg destroy_msg;
-	/**
 	 * Connection state. Mainly it is used to determine when
 	 * the connection can be destroyed, and for debug purposes
 	 * to assert on a double destroy, for example.
@@ -907,17 +896,8 @@ struct iproto_connection
 	struct rlist in_connections;
 	/** Set if connection is being dropped. */
 	bool is_drop_pending;
-	/**
-	 * Generation is sequence number of dropping connection invocation.
-	 *
-	 * See also `struct iproto_drop_finished`.
-	 */
+	/** Sequence number of iproto_drop_connections() invocation. */
 	unsigned drop_generation;
-	/**
-	 * Messaged sent to TX to cancel all inprogress requests of the
-	 * connection.
-	 */
-	struct cmsg cancel_msg;
 	/** Set if connection is accepted in TX. */
 	bool is_established;
 	/** Number of iproto requests in flight. */
@@ -966,10 +946,10 @@ iproto_stream_rollback_on_disconnect(struct iproto_stream *stream)
 {
 	struct iproto_connection *conn = stream->connection;
 	struct iproto_thread *iproto_thread = conn->iproto_thread;
-	struct cmsg_hop *route =
-		iproto_thread->rollback_on_disconnect_route;
-	cmsg_init(&stream->on_disconnect, route);
-	cpipe_push(&iproto_thread->tx_pipe, &stream->on_disconnect);
+	struct iproto_service_msg *msg = iproto_service_msg_new(
+			iproto_thread->rollback_on_disconnect_route);
+	msg->stream = stream;
+	cpipe_push(&iproto_thread->tx_pipe, &msg->base);
 }
 
 /**
@@ -1130,7 +1110,10 @@ iproto_connection_try_to_start_destroy(struct iproto_connection *con)
 	 * other parts of the connection.
 	 */
 	con->state = IPROTO_CONNECTION_DESTROYED;
-	cpipe_push(&con->iproto_thread->tx_pipe, &con->destroy_msg);
+	struct iproto_service_msg *msg = iproto_service_msg_new(
+				con->iproto_thread->destroy_route);
+	msg->connection = con;
+	cpipe_push(&con->iproto_thread->tx_pipe, &msg->base);
 }
 
 /**
@@ -1175,7 +1158,10 @@ iproto_connection_close(struct iproto_connection *con)
 			    stailq_empty(&stream->pending_requests))
 				iproto_stream_rollback_on_disconnect(stream);
 		}
-		cpipe_push(&con->iproto_thread->tx_pipe, &con->disconnect_msg);
+		struct iproto_service_msg *msg = iproto_service_msg_new(
+					con->iproto_thread->disconnect_route);
+		msg->connection = con;
+		cpipe_push(&con->iproto_thread->tx_pipe, &msg->base);
 		assert(con->state == IPROTO_CONNECTION_ALIVE);
 		con->state = IPROTO_CONNECTION_CLOSED;
 	} else if (con->state == IPROTO_CONNECTION_PENDING_DESTROY) {
@@ -1689,9 +1675,6 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	rlist_create(&con->in_stop_list);
 	rlist_create(&con->tx.inprogress);
 	rlist_add_entry(&iproto_thread->connections, con, in_connections);
-	/* It may be very awkward to allocate at close. */
-	cmsg_init(&con->destroy_msg, con->iproto_thread->destroy_route);
-	cmsg_init(&con->disconnect_msg, con->iproto_thread->disconnect_route);
 	con->state = IPROTO_CONNECTION_ALIVE;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
@@ -1704,11 +1687,11 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 static void
 tx_process_drop_finished(struct cmsg *m)
 {
-	struct iproto_drop_finished *drop_finished =
-					(struct iproto_drop_finished *)m;
-	if (drop_finished->generation == drop_generation &&
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	if (msg->drop_generation == drop_generation &&
 	    --drop_pending_thread_count == 0)
 		fiber_cond_signal(&drop_finished_cond);
+	iproto_service_msg_delete(msg);
 }
 
 /** Send message to TX thread to notify that connections drop is finished. */
@@ -1718,11 +1701,10 @@ iproto_send_drop_finished(struct iproto_thread *iproto_thread,
 {
 	static const struct cmsg_hop drop_finished_route[1] =
 					{{ tx_process_drop_finished, NULL }};
-
-	cmsg_init(&iproto_thread->drop_finished_msg.base, drop_finished_route);
-	iproto_thread->drop_finished_msg.generation = generation;
-	cpipe_push(&iproto_thread->tx_pipe,
-		   &iproto_thread->drop_finished_msg.base);
+	struct iproto_service_msg *msg = iproto_service_msg_new(
+						drop_finished_route);
+	msg->drop_generation = generation;
+	cpipe_push(&iproto_thread->tx_pipe, &msg->base);
 }
 
 /** Recycle a connection. */
@@ -2015,10 +1997,8 @@ tx_fiber_init(struct session *session, uint64_t sync)
 static void
 tx_process_rollback_on_disconnect(struct cmsg *m)
 {
-	struct iproto_stream *stream =
-		container_of(m, struct iproto_stream,
-			     on_disconnect);
-
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_stream *stream = msg->stream;
 	if (stream->txn != NULL) {
 		tx_fiber_init(stream->connection->session, 0);
 		txn_attach(stream->txn);
@@ -2031,35 +2011,35 @@ tx_process_rollback_on_disconnect(struct cmsg *m)
 static void
 net_finish_rollback_on_disconnect(struct cmsg *m)
 {
-	struct iproto_stream *stream =
-		container_of(m, struct iproto_stream,
-			     on_disconnect);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_stream *stream = msg->stream;
 	struct iproto_connection *con = stream->connection;
-
 	struct mh_i64ptr_node_t node = { stream->id, NULL };
 	mh_i64ptr_remove(con->streams, &node, 0);
 	iproto_stream_delete(stream);
 	assert(con->state != IPROTO_CONNECTION_ALIVE);
 	if (con->state == IPROTO_CONNECTION_PENDING_DESTROY)
 		iproto_connection_try_to_start_destroy(con);
+	iproto_service_msg_delete(msg);
 }
 
 /** Cancel all inprogress requests of the connection. */
 static void
 tx_process_cancel_inprogress(struct cmsg *m)
 {
-	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, cancel_msg);
-	struct iproto_msg *msg;
-	rlist_foreach_entry(msg, &con->tx.inprogress, in_inprogress)
-		fiber_cancel(msg->fiber);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
+	struct iproto_msg *inprogress_msg;
+	rlist_foreach_entry(inprogress_msg, &con->tx.inprogress, in_inprogress)
+		fiber_cancel(inprogress_msg->fiber);
+	iproto_service_msg_delete(msg);
 }
 
 static void
 tx_process_disconnect(struct cmsg *m)
 {
-	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, disconnect_msg);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
 	if (con->session != NULL) {
 		session_close(con->session);
 		/*
@@ -2077,9 +2057,10 @@ tx_process_disconnect(struct cmsg *m)
 static void
 net_finish_disconnect(struct cmsg *m)
 {
-	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, disconnect_msg);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
 	iproto_connection_try_to_start_destroy(con);
+	iproto_service_msg_delete(msg);
 }
 
 /**
@@ -2089,8 +2070,8 @@ net_finish_disconnect(struct cmsg *m)
 static void
 tx_process_destroy(struct cmsg *m)
 {
-	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, destroy_msg);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
 	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	if (con->session) {
 		session_delete(con->session);
@@ -2111,10 +2092,11 @@ tx_process_destroy(struct cmsg *m)
 static void
 net_finish_destroy(struct cmsg *m)
 {
-	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, destroy_msg);
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
 	/* Runs the trigger, which may yield. */
 	iproto_connection_delete(con);
+	iproto_service_msg_delete(msg);
 }
 
 /** Account msg data in connection input buffer as processed. */
@@ -4012,6 +3994,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	}
 	case IPROTO_CFG_DROP_CONNECTIONS: {
 		struct iproto_connection *con;
+		struct iproto_service_msg *cancel_msg;
 		static const struct cmsg_hop cancel_route[1] =
 				{{ tx_process_cancel_inprogress, NULL }};
 		iproto_thread->drop_pending_connection_count = 0;
@@ -4044,9 +4027,11 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 				iproto_thread->drop_pending_connection_count++;
 			}
 			if (con->state != IPROTO_CONNECTION_DESTROYED) {
-				cmsg_init(&con->cancel_msg, cancel_route);
+				cancel_msg = iproto_service_msg_new(
+							cancel_route);
+				cancel_msg->connection = con;
 				cpipe_push(&iproto_thread->tx_pipe,
-					   &con->cancel_msg);
+					   &cancel_msg->base);
 			}
 		}
 		if (iproto_thread->drop_pending_connection_count == 0)
