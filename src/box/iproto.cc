@@ -182,7 +182,6 @@ struct iproto_thread {
 	 * Iproto thread memory pools
 	 */
 	struct mempool iproto_msg_pool;
-	struct mempool iproto_connection_pool;
 	struct mempool iproto_stream_pool;
 	/*
 	 * List of stopped connections
@@ -202,6 +201,8 @@ struct iproto_thread {
 	size_t requests_in_stream_queue;
 	/** List of all connections. */
 	struct rlist connections;
+	/** Total number of connections. */
+	int connection_count;
 	/** Number of connections that pending drop. */
 	size_t drop_pending_connection_count;
 	/**
@@ -1644,8 +1645,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 static struct iproto_connection *
 iproto_connection_new(struct iproto_thread *iproto_thread)
 {
-	struct iproto_connection *con = (struct iproto_connection *)
-		xmempool_alloc(&iproto_thread->iproto_connection_pool);
+	struct iproto_connection *con = xalloc_object(typeof(*con));
 	con->streams = mh_i64ptr_new();
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
@@ -1675,6 +1675,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	rlist_create(&con->in_stop_list);
 	rlist_create(&con->tx.inprogress);
 	rlist_add_entry(&iproto_thread->connections, con, in_connections);
+	iproto_thread->connection_count++;
 	con->state = IPROTO_CONNECTION_ALIVE;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
@@ -1711,6 +1712,7 @@ iproto_send_drop_finished(struct iproto_thread *iproto_thread,
 static inline void
 iproto_connection_delete(struct iproto_connection *con)
 {
+	struct iproto_thread *iproto_thread = con->iproto_thread;
 	assert(iproto_connection_is_idle(con));
 	assert(!iostream_is_initialized(&con->io));
 	assert(con->session == NULL);
@@ -1727,15 +1729,15 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);
 	rlist_del(&con->in_connections);
+	VERIFY(iproto_thread->connection_count-- > 0);
 	if (con->is_drop_pending) {
-		struct iproto_thread *iproto_thread = con->iproto_thread;
-
 		assert(iproto_thread->drop_pending_connection_count > 0);
 		if (--iproto_thread->drop_pending_connection_count == 0)
 			iproto_send_drop_finished(iproto_thread,
 						  con->drop_generation);
 	}
-	mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+	TRASH(con);
+	free(con);
 }
 
 /* }}} iproto_connection */
@@ -3432,8 +3434,6 @@ net_cord_f(va_list  ap)
 
 	mempool_create(&iproto_thread->iproto_msg_pool, &cord()->slabc,
 		       sizeof(struct iproto_msg));
-	mempool_create(&iproto_thread->iproto_connection_pool, &cord()->slabc,
-		       sizeof(struct iproto_connection));
 	mempool_create(&iproto_thread->iproto_stream_pool, &cord()->slabc,
 		       sizeof(struct iproto_stream));
 
@@ -3460,7 +3460,6 @@ net_cord_f(va_list  ap)
 	evio_service_detach(&iproto_thread->binary);
 
 	mempool_destroy(&iproto_thread->iproto_stream_pool);
-	mempool_destroy(&iproto_thread->iproto_connection_pool);
 	mempool_destroy(&iproto_thread->iproto_msg_pool);
 	return 0;
 }
@@ -3697,6 +3696,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	iproto_thread->tx.requests_in_progress = 0;
 	iproto_thread->requests_in_stream_queue = 0;
 	rlist_create(&iproto_thread->connections);
+	iproto_thread->connection_count = 0;
 }
 
 /**
@@ -3921,8 +3921,7 @@ iproto_fill_stat(struct iproto_thread *iproto_thread,
 	cfg_msg->stats->mem_used =
 		slab_cache_used(&iproto_thread->net_cord.slabc) +
 		slab_cache_used(&iproto_thread->net_slabc);
-	cfg_msg->stats->connections =
-		mempool_count(&iproto_thread->iproto_connection_pool);
+	cfg_msg->stats->connections = iproto_thread->connection_count;
 	cfg_msg->stats->streams =
 		mempool_count(&iproto_thread->iproto_stream_pool);
 	cfg_msg->stats->requests =
