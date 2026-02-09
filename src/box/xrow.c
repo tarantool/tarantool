@@ -1212,7 +1212,6 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		map_size++;
 	}
 	if (request->arrow_ipc != NULL) {
-		assert(request->type == IPROTO_INSERT_ARROW);
 		pos = mp_encode_uint(pos, IPROTO_ARROW);
 		pos = mp_encode_ext(pos, MP_ARROW, request->arrow_ipc,
 				    arrow_len);
