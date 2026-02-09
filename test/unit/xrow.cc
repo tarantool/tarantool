@@ -368,7 +368,7 @@ static void
 test_xrow_encode_dml(void)
 {
 	header();
-	plan(20);
+	plan(22);
 
 	struct request r;
 	memset(&r, 0, sizeof(r));
@@ -395,41 +395,56 @@ test_xrow_encode_dml(void)
 	const char *data = (const char *)iov[0].iov_base;
 	int map_size = mp_decode_map(&data);
 	is(map_size, 9, "decoded request map");
+	int decoded_key_count = 0;
 
 	is(mp_decode_uint(&data), IPROTO_SPACE_ID, "decoded space id key");
 	is(mp_decode_uint(&data), r.space_id, "decoded space id");
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_INDEX_ID, "decoded index id key");
 	is(mp_decode_uint(&data), r.index_id, "decoded index id");
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_INDEX_BASE, "decoded index base key");
 	is(mp_decode_uint(&data), (uint64_t)r.index_base, "decoded index base");
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_KEY, "decoded iproto key");
 	is(memcmp(data, r.key, strlen(r.key)), 0, "decoded key");
 	data += strlen(r.key);
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_OPS, "decoded ops key");
 	is(memcmp(data, r.ops, strlen(r.ops)), 0, "decoded ops");
 	data += strlen(r.ops);
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_TUPLE_META, "decoded meta key");
 	is(memcmp(data, r.tuple_meta, strlen(r.tuple_meta)), 0,
 	   "decoded meta");
 	data += strlen(r.tuple_meta);
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_TUPLE, "decoded tuple key");
 	is(memcmp(data, r.tuple, strlen(r.tuple)), 0, "decoded tuple");
 	data += strlen(r.tuple);
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_OLD_TUPLE, "decoded old tuple key");
 	is(memcmp(data, r.old_tuple, strlen(r.old_tuple)), 0,
 	   "decoded old tuple");
 	data += strlen(r.old_tuple);
+	decoded_key_count++;
 
 	is(mp_decode_uint(&data), IPROTO_NEW_TUPLE, "decoded new tuple key");
 	is(memcmp(data, r.new_tuple, strlen(r.new_tuple)), 0,
 	   "decoded new tuple");
+	data += strlen(r.new_tuple);
+	decoded_key_count++;
+
+	is(data - (char *)iov[0].iov_base, (ptrdiff_t)iov[0].iov_len,
+	   "decoded all data");
+	is(decoded_key_count, map_size, "decoded all keys");
 
 	check_plan();
 	footer();
