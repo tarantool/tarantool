@@ -40,6 +40,7 @@ extern "C" {
 #include "version.h"
 #include "random.h"
 #include "memory.h"
+#include "mp_extension_types.h"
 #include "fiber.h"
 
 int
@@ -368,7 +369,7 @@ static void
 test_xrow_encode_dml(void)
 {
 	header();
-	plan(22);
+	plan(26);
 
 	struct request r;
 	memset(&r, 0, sizeof(r));
@@ -387,6 +388,8 @@ test_xrow_encode_dml(void)
 	r.old_tuple_end = r.old_tuple + strlen(r.old_tuple);
 	r.new_tuple = "new tuple";
 	r.new_tuple_end = r.new_tuple + strlen(r.new_tuple);
+	r.arrow_ipc = "Arrow IPC";
+	r.arrow_ipc_end = r.arrow_ipc + strlen(r.arrow_ipc);
 
 	int iovcnt;
 	struct iovec iov[1];
@@ -394,7 +397,7 @@ test_xrow_encode_dml(void)
 	is(iovcnt, 1, "xrow_encode_dml rc");
 	const char *data = (const char *)iov[0].iov_base;
 	int map_size = mp_decode_map(&data);
-	is(map_size, 9, "decoded request map");
+	is(map_size, 10, "decoded request map");
 	int decoded_key_count = 0;
 
 	is(mp_decode_uint(&data), IPROTO_SPACE_ID, "decoded space id key");
@@ -440,6 +443,16 @@ test_xrow_encode_dml(void)
 	is(memcmp(data, r.new_tuple, strlen(r.new_tuple)), 0,
 	   "decoded new tuple");
 	data += strlen(r.new_tuple);
+	decoded_key_count++;
+
+	is(mp_decode_uint(&data), IPROTO_ARROW, "decoded Arrow key");
+	int8_t arrow_ext_type;
+	is(mp_decode_extl(&data, &arrow_ext_type), strlen(r.arrow_ipc),
+	   "decoded Arrow IPC size");
+	is(arrow_ext_type, MP_ARROW, "decoded Arrow IPC type");
+	is(memcmp(data, r.arrow_ipc, strlen(r.arrow_ipc)), 0,
+	   "decoded Arrow IPC data");
+	data += strlen(r.arrow_ipc);
 	decoded_key_count++;
 
 	is(data - (char *)iov[0].iov_base, (ptrdiff_t)iov[0].iov_len,
