@@ -507,6 +507,7 @@ t;
  |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
  |   297: box.error.KEY_PART_IRREPRESENTABLE_VALUE
  |   298: box.error.INVALID_SORTDATA_FILE
+ |   299: box.error.DICT_OVERFLOW
  | ...
 
 test_run:cmd("setopt delimiter ''");
