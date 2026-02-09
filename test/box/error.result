@@ -509,6 +509,7 @@ t;
  |   298: box.error.INVALID_SORTDATA_FILE
  |   299: box.error.NO_SUCH_THREAD
  |   300: box.error.UNABLE_TO_PROCESS_IN_THREAD
+ |   301: box.error.DICT_OVERFLOW
  | ...
 
 test_run:cmd("setopt delimiter ''");
