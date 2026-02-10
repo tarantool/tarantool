@@ -57,6 +57,7 @@ box_decimal_to_uint64
 box_decimal_trim
 box_decimal_zero
 box_delete
+box_delete_range
 box_error_clear
 box_error_code
 box_error_custom_type
