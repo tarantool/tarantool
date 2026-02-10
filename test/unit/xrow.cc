@@ -464,6 +464,577 @@ test_xrow_encode_dml(void)
 }
 
 /**
+ * Check the error message of the last diag set.
+ */
+#define diag_is(expected_error_message, ...) do { \
+	box_error_t *e = box_error_last(); \
+	const char *error_message = box_error_message(e); \
+	ok(strcmp(error_message, expected_error_message) == 0, ##__VA_ARGS__); \
+} while (false)
+
+/**
+ * Call xrow_decode_dml() and expect it to fail with an error message.
+ */
+static void
+xrow_decode_dml_fail(struct xrow_header *header, struct request *r,
+		     const char *case_message, const char *error_message)
+{
+	uint64_t key_map = dml_request_key_map(header->type);
+	is(xrow_decode_dml(header, r, key_map), -1, "%s: fail", case_message);
+	diag_is(error_message, "%s: diag", case_message);
+	box_error_clear();
+}
+
+/**
+ * Test that xrow_decode_dml() decodes IPROTO keys properly.
+ */
+static void
+test_xrow_decode_dml_keys()
+{
+	header();
+	plan(94);
+
+	const size_t buf_size = 1024;
+	char buf[buf_size];
+
+	/* The stuff to pass to xrow_decode_dml calls. */
+	uint64_t empty_key_map = 0;
+	struct request r;
+	struct xrow_header header;
+	memset(&header, 0, sizeof(header));
+	/* DML with an empty key map. */
+	header.type = IPROTO_NOP;
+	header.bodycnt = 1;
+	header.body[0].iov_base = buf;
+
+	/* Space ID: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT space ID is valid");
+	is(r.space_id, 1, "MP_UINT space ID is decoded");
+
+	/* Space ID: MP_INT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%d}",
+					   IPROTO_SPACE_ID, -1);
+	xrow_decode_dml_fail(&header, &r, "MP_INT space ID is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Index ID: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_INDEX_ID, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT index ID is valid");
+	is(r.index_id, 1, "MP_UINT index ID is decoded");
+
+	/* Index ID: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_INDEX_ID, "str");
+	xrow_decode_dml_fail(&header, &r, "MP_STR index ID is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Offset: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_OFFSET, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT offset is valid");
+	is(r.offset, 1, "MP_UINT offset is decoded");
+
+	/* Offset: MP_NIL. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%uNIL}",
+					   IPROTO_OFFSET);
+	xrow_decode_dml_fail(&header, &r, "MP_NIL offset is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Index base: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_INDEX_BASE, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT index base is valid");
+	is(r.index_base, 1, "MP_UINT index base is decoded");
+
+	/* Index base: MP_BOOL. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%b}",
+					   IPROTO_INDEX_BASE, true);
+	xrow_decode_dml_fail(&header, &r, "MP_BOOL index base is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Limit: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_LIMIT, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT limit is valid");
+	is(r.limit, 1, "MP_UINT limit is decoded");
+
+	/* Limit: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_LIMIT, "str");
+	xrow_decode_dml_fail(&header, &r, "MP_STR limit is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Iterator: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_ITERATOR, 1);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_UINT iterator is valid");
+	is(r.iterator, 1, "MP_UINT iterator is decoded");
+
+	/* Iterator: MP_FLOAT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%f}",
+					   IPROTO_ITERATOR, 0.1);
+	xrow_decode_dml_fail(&header, &r, "MP_FLOAT iterator is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Fetch position: MP_BOOL. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%b}",
+					   IPROTO_FETCH_POSITION, true);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_BOOL fetch position is valid");
+	is(r.fetch_position, true, "MP_BOOL fetch position is decoded");
+
+	/* Fetch position: MP_DOUBLE. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%lf}",
+					   IPROTO_FETCH_POSITION, 0.1);
+	xrow_decode_dml_fail(&header, &r, "MP_DOUBLE fetch position is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Tuple: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_TUPLE, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY tuple is valid");
+	is(mp_decode_array(&r.tuple), 1, "MP_ARRAY tuple len is valid");
+	is(mp_decode_uint(&r.tuple), 2, "MP_ARRAY tuple data is valid");
+	is(r.tuple, r.tuple_end, "MP_ARRAY tuple size is valid");
+
+	/* Tuple: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_TUPLE, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP tuple is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Key: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_KEY, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY key is valid");
+	is(mp_decode_array(&r.key), 1, "MP_ARRAY key len is valid");
+	is(mp_decode_uint(&r.key), 2, "MP_ARRAY key data is valid");
+	is(r.key, r.key_end, "MP_ARRAY key size is valid");
+
+	/* Key: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_KEY, "str");
+	xrow_decode_dml_fail(&header, &r, "MP_STR key is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Ops: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_OPS, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY ops is valid");
+	is(mp_decode_array(&r.ops), 1, "MP_ARRAY ops len is valid");
+	is(mp_decode_uint(&r.ops), 2, "MP_ARRAY ops data is valid");
+	is(r.ops, r.ops_end, "MP_ARRAY ops size is valid");
+
+	/* Ops: MP_NIL. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%uNIL}",
+					   IPROTO_OPS);
+	xrow_decode_dml_fail(&header, &r, "MP_NIL ops is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Tuple meta: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_TUPLE_META, 2, 3);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_MAP tuple meta is valid");
+	is(mp_decode_map(&r.tuple_meta), 1, "MP_MAP tuple meta len is valid");
+	is(mp_decode_uint(&r.tuple_meta), 2, "MP_MAP tuple meta key is valid");
+	is(mp_decode_uint(&r.tuple_meta), 3, "MP_MAP tuple meta val is valid");
+	is(r.tuple_meta, r.tuple_meta_end, "MP_MAP tuple meta size is valid");
+
+	/* Tuple meta: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_TUPLE_META, 2);
+	xrow_decode_dml_fail(&header, &r, "MP_ARRAY tuple meta is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Old tuple: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_OLD_TUPLE, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY old tuple is valid");
+	is(mp_decode_array(&r.old_tuple), 1, "MP_ARRAY old tuple len is valid");
+	is(mp_decode_uint(&r.old_tuple), 2, "MP_ARRAY old tuple data is valid");
+	is(r.old_tuple, r.old_tuple_end, "MP_ARRAY old tuple size is valid");
+
+	/* Old tuple: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_OLD_TUPLE, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP old tuple is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* New tuple: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_NEW_TUPLE, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY new tuple is valid");
+	is(mp_decode_array(&r.new_tuple), 1, "MP_ARRAY new tuple len is valid");
+	is(mp_decode_uint(&r.new_tuple), 2, "MP_ARRAY new tuple data is valid");
+	is(r.new_tuple, r.new_tuple_end, "MP_ARRAY new tuple size is valid");
+
+	/* New tuple: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_NEW_TUPLE, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP new tuple is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* After position: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_AFTER_POSITION, "str");
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_STR after position is valid");
+	is(mp_decode_strl(&r.after_position), strlen("str"),
+	   "MP_STR after position len is valid");
+	is(memcmp(r.after_position, "str", strlen("str")), 0,
+	   "MP_STR after position data is valid");
+	r.after_position += strlen("str");
+	is(r.after_position, r.after_position_end,
+	   "MP_STR after position size is valid");
+
+	/* After position: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_AFTER_POSITION, 2);
+	xrow_decode_dml_fail(&header, &r, "MP_UINT after position",
+			     "Invalid MsgPack - packet body");
+
+	/* After tuple: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_AFTER_TUPLE, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY after tuple is valid");
+	is(mp_decode_array(&r.after_tuple), 1,
+	   "MP_ARRAY after tuple len is valid");
+	is(mp_decode_uint(&r.after_tuple), 2,
+	   "MP_ARRAY after tuple data is valid");
+	is(r.after_tuple, r.after_tuple_end,
+	   "MP_ARRAY after tuple size is valid");
+
+	/* After tuple: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_AFTER_TUPLE, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP after tuple is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Space name: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_SPACE_NAME, "str");
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_STR space name is valid");
+	is(r.space_name_len, strlen("str"), "MP_STR space name len is valid");
+	is(memcmp(r.space_name, "str", strlen("str")), 0,
+	   "MP_STR space name data is valid");
+
+	/* Space name: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_NAME, 2);
+	xrow_decode_dml_fail(&header, &r, "MP_UINT space name is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Index name: MP_STR. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%s}",
+					   IPROTO_INDEX_NAME, "str");
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_STR index name is valid");
+	is(r.index_name_len, strlen("str"), "MP_STR index name len is valid");
+	is(memcmp(r.index_name, "str", strlen("str")), 0,
+	   "MP_STR index name data is valid");
+
+	/* Index name: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_INDEX_NAME, 2);
+	xrow_decode_dml_fail(&header, &r, "MP_UINT index name is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Arrow: MP_EXT(MP_ARROW). */
+	char mp_ext_arrow[6]; /* Prevents clang's extension warning. */
+	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(strlen("ext")));
+	mp_encode_ext(mp_ext_arrow, MP_ARROW, "ext", strlen("ext"));
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%p}",
+					   IPROTO_ARROW, mp_ext_arrow);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is valid");
+	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	   "MP_EXT(MP_ARROW) Arrow IPC size is valid");
+	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC data is valid");
+
+	/* Arrow: MP_EXT(MP_TUPLE). */
+	char mp_ext_tuple[6]; /* Prevents clang's extension warning. */
+	fail_unless(lengthof(mp_ext_tuple) == mp_sizeof_ext(strlen("ext")));
+	mp_encode_ext(mp_ext_tuple, MP_TUPLE, "ext", strlen("ext"));
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%p}",
+					   IPROTO_ARROW, mp_ext_tuple);
+	xrow_decode_dml_fail(&header, &r,
+			     "MP_EXT(MP_TUPLE) Arrow IPC is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* Arrow: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_ARROW, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP Arrow IPC is invalid",
+			     "Invalid MsgPack - packet body");
+
+	check_plan();
+	footer();
+}
+
+/**
+ * Test that xrow_decode_dml() decodes IPROTO requests properly.
+ */
+static void
+test_xrow_decode_dml_requests()
+{
+	header();
+	plan(89);
+
+	const size_t buf_size = 1024;
+	char buf[buf_size];
+
+	/* The stuff to pass to xrow_decode_dml calls. */
+	struct request r;
+	uint64_t empty_key_map = 0;
+	struct xrow_header header;
+	memset(&header, 0, sizeof(header));
+	header.bodycnt = 1;
+	header.body[0].iov_base = buf;
+
+	/* select() */
+	header.type = IPROTO_SELECT;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "select()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* select(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "select(space_id)",
+			     "Missing mandatory field 'LIMIT' in request");
+
+	/* select(space_id, limit) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u%u}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_LIMIT, 2);
+	xrow_decode_dml_fail(&header, &r, "select(space_id, limit)",
+			     "Missing mandatory field 'KEY' in request");
+
+	/* select(key, space_id, limit) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]%u%u%u%u}",
+					   IPROTO_KEY, 2,
+					   IPROTO_SPACE_ID, 3,
+					   IPROTO_LIMIT, 4);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "select(key, space_id, limit): success");
+	is(r.type, IPROTO_SELECT, "select(key, space_id, limit): request type");
+	is(r.space_id, 3, "select(key, space_id, limit): space ID");
+	is(mp_decode_array(&r.key), 1, "select(key, space_id, limit): key len");
+	is(mp_decode_uint(&r.key), 2, "select(key, space_id, limit): key[0]");
+	is(r.key, r.key_end, "select(key, space_id, limit): key size");
+	is(r.limit, 4, "select(key, space_id, limit): limit");
+
+	/* insert() */
+	header.type = IPROTO_INSERT;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "insert()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* insert(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "insert(space_id)",
+			     "Missing mandatory field 'TUPLE' in request");
+
+	/* insert(space_id, tuple) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_TUPLE, 3, 4);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "insert(space_id, tuple): success");
+	is(r.type, IPROTO_INSERT, "insert(space_id, tuple): request type");
+	is(r.space_id, 1, "insert(space_id, tuple): space ID");
+	is(mp_decode_array(&r.tuple), 2, "insert(space_id, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 3, "insert(space_id, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 4, "insert(space_id, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end, "insert(space_id, tuple): tuple size");
+
+	/* replace() */
+	header.type = IPROTO_REPLACE;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "replace()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* replace(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "replace(space_id)",
+			     "Missing mandatory field 'TUPLE' in request");
+
+	/* replace(space_id, tuple) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_TUPLE, 3, 4);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "replace(space_id, tuple): success");
+	is(r.type, IPROTO_REPLACE, "replace(space_id, tuple): request type");
+	is(r.space_id, 1, "replace(space_id, tuple): space ID");
+	is(mp_decode_array(&r.tuple), 2, "replace(space_id, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 3, "replace(space_id, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 4, "replace(space_id, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end, "replace(space_id, tuple): tuple size");
+
+	/* update() */
+	header.type = IPROTO_UPDATE;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "update()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* update(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "update(space_id)",
+			     "Missing mandatory field 'KEY' in request");
+
+	/* update(space_id, key) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_KEY, 3, 4);
+	xrow_decode_dml_fail(&header, &r, "update(space_id, key)",
+			     "Missing mandatory field 'TUPLE' in request");
+
+	/* update(space_id, key, tuple) */
+	header.body[0].iov_len = mp_format(buf, buf_size,
+					   "{%u%u%u[%u%u]%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_KEY, 3, 4,
+					   IPROTO_TUPLE, 5, 6);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "update(space_id, key, tuple): success");
+	is(r.type, IPROTO_UPDATE, "update(space_id, key, tuple): request type");
+	is(r.space_id, 1, "update(space_id, key, tuple): space ID");
+	is(mp_decode_array(&r.key), 2, "update(space_id, key, tuple): key len");
+	is(mp_decode_uint(&r.key), 3, "update(space_id, key, tuple): key[0]");
+	is(mp_decode_uint(&r.key), 4, "update(space_id, key, tuple): key[1]");
+	is(r.key, r.key_end, "update(space_id, key, tuple): key size");
+	is(mp_decode_array(&r.tuple), 2,
+	   "update(space_id, key, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 5,
+	   "update(space_id, key, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 6,
+	   "update(space_id, key, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end,
+	   "update(space_id, key, tuple): tuple size");
+
+	/* delete() */
+	header.type = IPROTO_DELETE;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "delete()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* delete(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "delete(space_id)",
+			     "Missing mandatory field 'KEY' in request");
+
+	/* delete(space_id, key) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_KEY, 3, 4);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "delete(space_id, key): success");
+	is(r.type, IPROTO_DELETE, "delete(space_id, key): request type");
+	is(r.space_id, 1, "delete(space_id, key): space ID");
+	is(mp_decode_array(&r.key), 2, "delete(space_id, key): key len");
+	is(mp_decode_uint(&r.key), 3, "delete(space_id, key): key[0]");
+	is(mp_decode_uint(&r.key), 4, "delete(space_id, key): key[1]");
+	is(r.key, r.key_end, "delete(space_id, key): key size");
+
+	/* upsert() */
+	header.type = IPROTO_UPSERT;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "upsert()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* upsert(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "upsert(tuple)",
+			     "Missing mandatory field 'TUPLE' in request");
+
+	/* upsert(space_id, tuple) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_TUPLE, 3, 4);
+	xrow_decode_dml_fail(&header, &r, "upsert(space_id, tuple)",
+			     "Missing mandatory field 'OPS' in request");
+
+	/* upsert(space_id, ops, tuple) */
+	header.body[0].iov_len = mp_format(buf, buf_size,
+					   "{%u%u%u[%u%u]%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_OPS, 3, 4,
+					   IPROTO_TUPLE, 5, 6);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "upsert(space_id, ops, tuple): success");
+	is(r.type, IPROTO_UPSERT, "upsert(space_id, ops, tuple): request type");
+	is(r.space_id, 1, "upsert(space_id, ops, tuple): space ID");
+	is(mp_decode_array(&r.ops), 2, "upsert(space_id, ops, tuple): ops len");
+	is(mp_decode_uint(&r.ops), 3, "upsert(space_id, ops, tuple): ops[0]");
+	is(mp_decode_uint(&r.ops), 4, "upsert(space_id, ops, tuple): ops[1]");
+	is(r.ops, r.ops_end, "upsert(space_id, ops, tuple): ops size");
+	is(mp_decode_array(&r.tuple), 2,
+	   "upsert(space_id, ops, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 5,
+	   "upsert(space_id, ops, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 6,
+	   "upsert(space_id, ops, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end,
+	   "upsert(space_id, ops, tuple): tuple size");
+
+	/* insert_arrow() */
+	header.type = IPROTO_INSERT_ARROW;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "insert_arrow()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* insert_arrow(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "insert_arrow(space_id)",
+			     "Missing mandatory field 'ARROW' in request");
+
+	/* insert_arrow(space_id, arrow) */
+	char mp_ext_arrow[6]; /* Prevents clang's extension warning. */
+	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(strlen("ext")));
+	mp_encode_ext(mp_ext_arrow, MP_ARROW, "ext", strlen("ext"));
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u%p}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_ARROW, mp_ext_arrow);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "insert_arrow(space_id, arrow): success");
+	is(r.type, IPROTO_INSERT_ARROW,
+	   "insert_arrow(space_id, arrow): request type");
+	is(r.space_id, 1, "insert_arrow(space_id, arrow): space ID");
+	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	   "insert_arrow(space_id, arrow): Arrow IPC size");
+	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	   "insert_arrow(space_id, arrow): Arrow IPC");
+
+	check_plan();
+	footer();
+}
+
+/**
  * Check that xrow_decode_* functions silently ignore unknown keys.
  */
 static void
@@ -825,7 +1396,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(13);
+	plan(15);
 
 	random_init();
 
@@ -835,6 +1406,8 @@ main(void)
 	test_request_str();
 	test_xrow_fields();
 	test_xrow_encode_dml();
+	test_xrow_decode_dml_keys();
+	test_xrow_decode_dml_requests();
 	test_xrow_decode_unknown_key();
 	test_xrow_decode_error_1();
 	test_xrow_decode_error_2();
