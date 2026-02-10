@@ -146,22 +146,23 @@ end;
 ...
 t;
 ---
-- - DELETE
-  - COMMIT
-  - SELECT
+- - DELETE_RANGE
+  - INSERT_ARROW
+  - BEGIN
   - ROLLBACK
   - INSERT
-  - EVAL
-  - ERROR
-  - INSERT_ARROW
-  - CALL
-  - BEGIN
+  - EXECUTE
   - PREPARE
-  - REPLACE
   - UPSERT
   - AUTH
-  - EXECUTE
   - UPDATE
+  - DELETE
+  - COMMIT
+  - SELECT
+  - EVAL
+  - CALL
+  - REPLACE
+  - ERROR
   - total
   - rps
   - total
