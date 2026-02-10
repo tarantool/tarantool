@@ -3517,6 +3517,20 @@ test_box_txn_rollback_to_savepoint(struct lua_State *L)
 	return 1;
 }
 
+static int
+test_box_delete_range(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	fail_unless(lua_isnumber(L, 1));
+	uint32_t space_id = lua_tointeger(L, 1);
+	char empty_key[mp_sizeof_array(0)];
+	char *empty_key_end = mp_encode_array(empty_key, 0);
+	if (box_delete_range(space_id, 0, empty_key, empty_key_end,
+			     empty_key, empty_key_end) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3583,6 +3597,7 @@ luaopen_module_api(lua_State *L)
 		{"box_txn_savepoint", test_box_txn_savepoint},
 		{"box_txn_rollback_to_savepoint",
 			test_box_txn_rollback_to_savepoint},
+		{"box_delete_range", test_box_delete_range},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
