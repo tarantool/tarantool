@@ -1812,10 +1812,19 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 							MEMTX_EXTENT_SIZE;
 }
 
+static int
+memtx_engine_tuple_validate(struct engine *engine, struct tuple_format *format,
+			    struct tuple *tuple)
+{
+	(void)engine;
+	return memtx_tuple_validate(format, tuple);
+}
+
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .free = */ memtx_engine_free,
 	/* .shutdown = */ memtx_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
+	/* .tuple_validate = */ memtx_engine_tuple_validate,
 	/* .create_read_view = */ memtx_engine_create_read_view,
 	/* .prepare_join = */ memtx_engine_prepare_join,
 	/* .join = */ memtx_engine_join,

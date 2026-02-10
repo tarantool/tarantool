@@ -62,6 +62,8 @@ struct txn_stmt;
 struct read_view_opts;
 struct space;
 struct space_def;
+struct tuple;
+struct tuple_format;
 struct vclock;
 struct xstream;
 struct engine_join_ctx;
@@ -128,6 +130,14 @@ struct engine_vtab {
 	/** Allocate a new space instance. */
 	struct space *(*create_space)(struct engine *engine,
 			struct space_def *def, struct rlist *key_list);
+	/**
+	 * Validate a tuple against the given format.
+	 *
+	 * The engine may need to preprocess the tuple before validation
+	 * (e.g. decompress a MemTX tuple).
+	 */
+	int (*tuple_validate)(struct engine *engine, struct tuple_format *format,
+			      struct tuple *tuple);
 	/**
 	 * Create a read view of the data stored in the engine.
 	 *
@@ -456,6 +466,13 @@ engine_abort_with_conflict(struct engine *engine, struct txn *txn)
 }
 
 static inline int
+engine_tuple_validate(struct engine *engine, struct tuple_format *format,
+		      struct tuple *tuple)
+{
+	return engine->vtab->tuple_validate(engine, format, tuple);
+}
+
+static inline int
 engine_check_space_def(struct engine *engine, struct space_def *def)
 {
 	return engine->vtab->check_space_def(def);
@@ -564,6 +581,8 @@ void generic_engine_rollback_statement(struct engine *, struct txn *,
 void generic_engine_rollback(struct engine *, struct txn *);
 void generic_engine_send_to_read_view(struct engine *, struct txn *, int64_t);
 void generic_engine_abort_with_conflict(struct engine *, struct txn *);
+int generic_engine_tuple_validate(struct engine *, struct tuple_format *,
+				  struct tuple *);
 int generic_engine_bootstrap(struct engine *);
 int generic_engine_begin_initial_recovery(struct engine *,
 					  const struct vclock *);

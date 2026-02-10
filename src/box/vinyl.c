@@ -4781,6 +4781,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .free = */ vinyl_engine_free,
 	/* .shutdown = */ vinyl_engine_shutdown,
 	/* .create_space = */ vinyl_engine_create_space,
+	/* .tuple_validate = */ generic_engine_tuple_validate,
 	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ vinyl_engine_prepare_join,
 	/* .join = */ vinyl_engine_join,
