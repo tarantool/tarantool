@@ -1044,6 +1044,10 @@ error:
 			request->arrow_ipc_end = data + size;
 			break;
 		}
+		case IPROTO_END_KEY:
+			request->end_key = value;
+			request->end_key_end = data;
+			break;
 		default:
 			break;
 		}
@@ -1103,6 +1107,10 @@ request_snprint(char *buf, int size, const struct request *request)
 		SNPRINT(total, snprintf, buf, size, ", after_tuple: ");
 		SNPRINT(total, mp_snprint, buf, size, request->after_tuple);
 	}
+	if (request->end_key != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", end_key: ");
+		SNPRINT(total, mp_snprint, buf, size, request->end_key);
+	}
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -1135,9 +1143,12 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	uint32_t old_tuple_len = request->old_tuple_end - request->old_tuple;
 	uint32_t new_tuple_len = request->new_tuple_end - request->new_tuple;
 	ssize_t arrow_len = request->arrow_ipc_end - request->arrow_ipc;
+	ssize_t end_key_len = request->end_key_end - request->end_key;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
-		       tuple_len + old_tuple_len + new_tuple_len + arrow_len;
+		       tuple_len + old_tuple_len + new_tuple_len + arrow_len +
+		       end_key_len;
 	assert(request->arrow_ipc == NULL || arrow_len > 0);
+	assert(request->end_key == NULL || end_key_len > 0);
 	char *begin = xregion_alloc(region, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
@@ -1211,6 +1222,12 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		pos = mp_encode_uint(pos, IPROTO_ARROW);
 		pos = mp_encode_ext(pos, MP_ARROW, request->arrow_ipc,
 				    arrow_len);
+		map_size++;
+	}
+	if (request->end_key != NULL) {
+		pos = mp_encode_uint(pos, IPROTO_END_KEY);
+		memcpy(pos, request->end_key, end_key_len);
+		pos += end_key_len;
 		map_size++;
 	}
 

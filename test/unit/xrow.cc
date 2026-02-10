@@ -313,11 +313,13 @@ test_request_str()
 
 	request.after_tuple = request.tuple;
 
+	request.end_key = request.key;
+
 	is(strcmp("{type: 'SELECT', replica_id: 5, lsn: 100, "
 		  "space_id: 512, index_id: 1, "
 		  "key: [200], tuple: [300], ops: [400], "
 		  "fetch_position: true, after_position: \"position\", "
-		  "after_tuple: [300]}",
+		  "after_tuple: [300], end_key: [200]}",
 		  request_str(&request)), 0, "request_str");
 
 	check_plan();
@@ -370,7 +372,7 @@ static void
 test_xrow_encode_dml(void)
 {
 	header();
-	plan(26);
+	plan(28);
 
 	struct request r;
 	memset(&r, 0, sizeof(r));
@@ -391,6 +393,8 @@ test_xrow_encode_dml(void)
 	r.new_tuple_end = r.new_tuple + strlen(r.new_tuple);
 	r.arrow_ipc = "Arrow IPC";
 	r.arrow_ipc_end = r.arrow_ipc + strlen(r.arrow_ipc);
+	r.end_key = "end key";
+	r.end_key_end = r.end_key + strlen(r.end_key);
 
 	int iovcnt;
 	struct iovec iov[1];
@@ -398,7 +402,7 @@ test_xrow_encode_dml(void)
 	is(iovcnt, 1, "xrow_encode_dml rc");
 	const char *data = (const char *)iov[0].iov_base;
 	int map_size = mp_decode_map(&data);
-	is(map_size, 10, "decoded request map");
+	is(map_size, 11, "decoded request map");
 	int decoded_key_count = 0;
 
 	is(mp_decode_uint(&data), IPROTO_SPACE_ID, "decoded space id key");
@@ -456,6 +460,11 @@ test_xrow_encode_dml(void)
 	data += strlen(r.arrow_ipc);
 	decoded_key_count++;
 
+	is(mp_decode_uint(&data), IPROTO_END_KEY, "decoded end key key");
+	is(memcmp(data, r.end_key, strlen(r.end_key)), 0, "decoded end key");
+	data += strlen(r.end_key);
+	decoded_key_count++;
+
 	is(data - (char *)iov[0].iov_base, (ptrdiff_t)iov[0].iov_len,
 	   "decoded all data");
 	is(decoded_key_count, map_size, "decoded all keys");
@@ -506,7 +515,7 @@ static void
 test_xrow_decode_dml_keys()
 {
 	header();
-	plan(125);
+	plan(133);
 
 	char buf[1024];
 	struct request r;
@@ -824,6 +833,24 @@ test_xrow_decode_dml_keys()
 	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
 	box_error_clear();
 
+	/* End key: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_END_KEY, &r), 0,
+	   "MP_ARRAY end key is valid");
+	is(mp_decode_array(&r.end_key), 1, "MP_ARRAY end key len is valid");
+	is(mp_decode_uint(&r.end_key), 2, "MP_ARRAY end key data is valid");
+	is(r.end_key, r.end_key_end, "MP_ARRAY end key size is valid");
+
+	/* End key: MP_MAP. */
+	pos = mp_encode_map(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_END_KEY, &r), -1,
+	   "MP_MAP end key is invalid");
+	is(r.end_key, NULL, "MP_MAP end key is not decoded");
+	is(r.end_key_end, NULL, "MP_MAP end key end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
 	check_plan();
 	footer();
 }
@@ -869,7 +896,7 @@ static void
 test_xrow_decode_dml_requests()
 {
 	header();
-	plan(82);
+	plan(98);
 
 	char buf[1024];
 	struct request r;
@@ -1150,6 +1177,66 @@ test_xrow_decode_dml_requests()
 	   "insert_arrow(space_id, arrow): Arrow IPC size");
 	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
 	   "insert_arrow(space_id, arrow): Arrow IPC");
+
+	/* delete_range() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_DELETE_RANGE, &r),
+	   -1, "delete_range(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "delete_range(): diag");
+	box_error_clear();
+
+	/* delete_range(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_DELETE_RANGE, &r),
+	   -1, "delete_range(space_id): fail");
+	ok(diag_is("Missing mandatory field 'KEY' in request"),
+	   "delete_range(space_id): diag");
+	box_error_clear();
+
+	/* delete_range(space_id, key) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_DELETE_RANGE, &r),
+	   -1, "delete_range(space_id, key): fail");
+	ok(diag_is("Missing mandatory field 'END_KEY' in request"),
+	   "delete_range(space_id, key): diag");
+	box_error_clear();
+
+	/* delete_range(space_id, key, end_key) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	pos = mp_encode_uint(pos, IPROTO_END_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 5);
+	pos = mp_encode_uint(pos, 6);
+	is(test_xrow_decode_dml_request(3, buf, pos, IPROTO_DELETE_RANGE, &r),
+	   0, "delete_range(space_id, key, end_key): success");
+	is(r.space_id, 1, "delete_range(space_id, key, end_key): space ID");
+	is(mp_decode_array(&r.key), 2,
+	   "delete_range(space_id, key, end_key): key len");
+	is(mp_decode_uint(&r.key), 3,
+	   "delete_range(space_id, key, end_key): key[0]");
+	is(mp_decode_uint(&r.key), 4,
+	   "delete_range(space_id, key, end_key): key[1]");
+	is(r.key, r.key_end,
+	   "delete_range(space_id, key, end_key): key size");
+	is(mp_decode_array(&r.end_key), 2,
+	   "delete_range(space_id, key, end_key): end_key len");
+	is(mp_decode_uint(&r.end_key), 5,
+	   "delete_range(space_id, key, end_key): end_key[0]");
+	is(mp_decode_uint(&r.end_key), 6,
+	   "delete_range(space_id, key, end_key): end_key[1]");
+	is(r.end_key, r.end_key_end,
+	   "delete_range(space_id, key, end_key): end_key size");
 
 	check_plan();
 	footer();
