@@ -130,6 +130,13 @@ txn_limbo_assert_locked(struct txn_limbo *limbo)
 	VERIFY(latch_is_locked(&limbo->state_latch));
 }
 
+static int64_t
+txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
+				uint32_t replica_id)
+{
+	return vclock_get(&limbo->queue.confirmed_vclock, replica_id);
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
@@ -529,25 +536,14 @@ reject_str(const struct synchro_request *req)
 	return tt_sprintf("RAFT: rejecting %s", synchro_request_str(req));
 }
 
-/**
- * Common filter for any incoming packet.
- */
+/** Ensure request sees the correct limbo owner. */
 static int
-txn_limbo_filter_generic(struct txn_limbo *limbo,
-			 const struct synchro_request *req)
+txn_limbo_filter_owner_match(struct txn_limbo *limbo,
+			     const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
 	if (!limbo->do_validate)
 		return 0;
-	if (req->queue_owner_id == REPLICA_ID_NIL) {
-		if (req->type != IPROTO_RAFT_PROMOTE) {
-			say_error("%s. Zero replica_id detected",
-				  reject_str(req));
-			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-				 "synchronous requests with zero replica_id");
-			return -1;
-		}
-	}
 	if (req->queue_owner_id != limbo->queue.owner_id) {
 		/*
 		 * Incoming packets should esteem limbo owner,
@@ -560,33 +556,112 @@ txn_limbo_filter_generic(struct txn_limbo *limbo,
 			 "got a request from a foreign synchro queue owner");
 		return -1;
 	}
-
 	return 0;
 }
 
-/**
- * Filter CONFIRM and ROLLBACK packets.
- */
+/** Ensure request is expecting a specific limbo owner. */
 static int
-txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
-				  const struct synchro_request *req)
+txn_limbo_filter_owner_set(struct txn_limbo *limbo,
+			   const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	assert(limbo->do_validate);
-	(void)limbo;
-	if (req->type == IPROTO_RAFT_CONFIRM) {
-		if (req->confirm.lsn > 0)
-			return 0;
-	} else if (req->type == IPROTO_RAFT_ROLLBACK) {
-		if (req->rollback.lsn > 0)
-			return 0;
-	} else {
-		unreachable();
+	if (!limbo->do_validate)
+		return 0;
+	if (req->queue_owner_id == REPLICA_ID_NIL) {
+		say_error("%s. Zero replica_id detected",
+			  reject_str(req));
+		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
+			 "synchronous requests with zero replica_id");
+		return -1;
 	}
+	return 0;
+}
+
+/** Ensure the request has a non-zero LSN whatever it is needed for. */
+static int
+txn_limbo_filter_non_zero_lsn(struct txn_limbo *limbo,
+			      const struct synchro_request *req,
+			      int64_t lsn)
+{
+	VERIFY(limbo->do_validate);
+	if (lsn > 0)
+		return 0;
 	say_error("%s. Zero lsn detected", reject_str(req));
 	diag_set(ClientError, ER_UNSUPPORTED, "Replication",
 		 "zero LSN for CONFIRM/ROLLBACK");
 	return -1;
+}
+
+/** Validate CONFIRM request. */
+static int
+txn_limbo_filter_confirm(struct txn_limbo *limbo,
+			 const struct synchro_request *req)
+{
+	txn_limbo_assert_locked(limbo);
+	assert(req->type == IPROTO_RAFT_CONFIRM);
+	assert(limbo->do_validate);
+	if (txn_limbo_filter_owner_set(limbo, req) != 0)
+		return -1;
+	if (txn_limbo_filter_non_zero_lsn(limbo, req, req->confirm.lsn) != 0)
+		return -1;
+	int64_t confirmed_lsn = txn_limbo_replica_confirmed_lsn(
+		limbo, req->queue_owner_id);
+	/*
+	 * Want to confirm something new? - need to own the limbo right now, in
+	 * the latest known term.
+	 */
+	if (req->confirm.lsn > confirmed_lsn)
+		return txn_limbo_filter_owner_match(limbo, req);
+	/*
+	 * A CONFIRM with lsn <= known confirm lsn for this replica may be
+	 * ignored without a second thought. The transactions it's going to
+	 * confirm were already confirmed by one of the PROMOTE/DEMOTE requests
+	 * in a new term.
+	 *
+	 * See that the CONFIRM can be ignored even in the current term if it
+	 * wants to commit already committed txns. This is a niche case which
+	 * might happen when a replica joins a master and receives a valid fully
+	 * confirmed read-view from it, but some CONFIRM WAL entries might have
+	 * been written by the master after the read-view is sent. Then the
+	 * replica would receive those "already known" CONFIRMs during xlogs
+	 * catch up.
+	 *
+	 * Besides, logically a confirmation of already confirmed txns doesn't
+	 * contradict anything.
+	 */
+	return 0;
+}
+
+/** Validate ROLLBACK request. */
+static int
+txn_limbo_filter_rollback(struct txn_limbo *limbo,
+			  const struct synchro_request *req)
+{
+	txn_limbo_assert_locked(limbo);
+	assert(req->type == IPROTO_RAFT_ROLLBACK);
+	assert(limbo->do_validate);
+	if (txn_limbo_filter_owner_set(limbo, req) != 0)
+		return -1;
+	if (txn_limbo_filter_non_zero_lsn(limbo, req, req->rollback.lsn) != 0)
+		return -1;
+	int64_t confirmed_lsn = txn_limbo_replica_confirmed_lsn(
+		limbo, req->queue_owner_id);
+	if (req->rollback.lsn <= confirmed_lsn)
+		return txn_limbo_filter_owner_match(limbo, req);
+	uint64_t origin_term = txn_limbo_replica_term(limbo,
+						      req->origin_id);
+	assert(origin_term <= limbo->term);
+	/*
+	 * Rollback in the current term wants to roll some currently waiting
+	 * transactions back. No case when it can be considered outdated.
+	 */
+	if (origin_term == limbo->term)
+		return txn_limbo_filter_owner_match(limbo, req);
+	/*
+	 * In older terms though this is fine to nopify it. Those txns must have
+	 * already been cancelled by the new leader anyway.
+	 */
+	return 0;
 }
 
 /** A filter PROMOTE and DEMOTE packets. */
@@ -597,6 +672,13 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	txn_limbo_assert_locked(limbo);
 	assert(limbo->do_validate);
 	assert(iproto_type_is_promote_request(req->type));
+	/*
+	 * PROMOTE might be claiming an unclaimed limbo. But DEMOTE can't be
+	 * unclaiming a nobody-owned limbo.
+	 */
+	if (req->type == IPROTO_RAFT_DEMOTE &&
+	    txn_limbo_filter_owner_set(limbo, req) != 0)
+		return -1;
 	/*
 	 * PROMOTE and DEMOTE packets must not have zero
 	 * term supplied, otherwise it is a broken packet.
@@ -695,8 +777,9 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 		return -1;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
+		return txn_limbo_filter_confirm(limbo, req);
 	case IPROTO_RAFT_ROLLBACK:
-		return txn_limbo_filter_confirm_rollback(limbo, req);
+		return txn_limbo_filter_rollback(limbo, req);
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE:
 		return txn_limbo_filter_promote_demote(limbo, req);
@@ -740,9 +823,6 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	if (txn_limbo_filter_generic(limbo, req) < 0)
-		return -1;
-
 	/*
 	 * Guard against new transactions appearing during WAL write. It is
 	 * necessary because otherwise when PROMOTE/DEMOTE would be done and it
@@ -823,6 +903,11 @@ txn_limbo_req_commit_confirm(struct txn_limbo *limbo, const struct synchro_reque
 {
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_CONFIRM);
+	/*
+	 * Check if outdated and its effects are nop / already applied before.
+	 */
+	if (req->queue_owner_id != limbo->queue.owner_id)
+		return;
 	txn_limbo_queue_apply_confirm(&limbo->queue, req->confirm.lsn);
 }
 
@@ -832,6 +917,11 @@ txn_limbo_req_commit_rollback(struct txn_limbo *limbo, const struct synchro_requ
 {
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_ROLLBACK);
+	/*
+	 * Check if outdated and its effects are nop / already applied before.
+	 */
+	if (req->queue_owner_id != limbo->queue.owner_id)
+		return;
 	txn_limbo_queue_apply_rollback(&limbo->queue, req->rollback.lsn,
 				       TXN_SIGNATURE_SYNC_ROLLBACK);
 }
