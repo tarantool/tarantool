@@ -37,6 +37,7 @@ extern "C" {
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
 #include "tt_uuid.h"
+#include "tuple.h"
 #include "version.h"
 #include "random.h"
 #include "memory.h"
@@ -464,6 +465,370 @@ test_xrow_encode_dml(void)
 }
 
 /**
+ * Check the error message of the last diag set.
+ */
+static bool
+diag_is(const char *expected_error_message)
+{
+	box_error_t *e = box_error_last();
+	const char *error_message = box_error_message(e);
+	return strcmp(error_message, expected_error_message) == 0;
+}
+
+/**
+ * Decode the given IPROTO key value with the xrow_decode_dml().
+ */
+static int
+test_xrow_decode_dml_key(char *value_mp, size_t value_mp_size,
+			 enum iproto_key key, struct request *r)
+{
+	/* Encode the request body. */
+	char buf[1024];
+	char *pos = mp_encode_map(buf, 1);
+	pos = mp_encode_uint(pos, key);
+	memcpy(pos, value_mp, value_mp_size);
+	pos += value_mp_size;
+
+	/* Try to decode the request. */
+	struct xrow_header header;
+	memset(&header, 0, sizeof(header));
+	header.type = iproto_type_MAX;
+	header.bodycnt = 1;
+	header.body[0].iov_base = buf;
+	header.body[0].iov_len = pos - buf;
+	return xrow_decode_dml(&header, r, /*key_map=*/0);
+}
+
+/**
+ * Test that xrow_decode_dml() decodes IPROTO keys properly.
+ */
+static void
+test_xrow_decode_dml_keys()
+{
+	header();
+	plan(125);
+
+	char buf[1024];
+	struct request r;
+
+	/* Space ID: MP_UINT. */
+	char *pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_SPACE_ID, &r), 0,
+	   "MP_UINT space ID is valid");
+	is(r.space_id, 1, "MP_UINT space ID is decoded");
+
+	/* Space ID: MP_INT. */
+	pos = mp_encode_int(buf, -1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_SPACE_ID, &r), -1,
+	   "MP_INT space ID is invalid");
+	is(r.space_id, 0, "MP_INT space ID is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Index ID: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_ID, &r), 0,
+	   "MP_UINT index ID is valid");
+	is(r.index_id, 1, "MP_UINT index ID is decoded");
+
+	/* Index ID: MP_STR. */
+	pos = mp_encode_str0(buf, "str");
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_ID, &r), -1,
+	   "MP_STR index ID is invalid");
+	is(r.index_id, 0, "MP_STR index ID is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Offset: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OFFSET, &r), 0,
+	   "MP_UINT offset is valid");
+	is(r.offset, 1, "MP_UINT offset is decoded");
+
+	/* Offset: MP_NIL. */
+	pos = mp_encode_nil(buf);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OFFSET, &r), -1,
+	   "MP_NIL offset is invalid");
+	is(r.offset, 0, "MP_NIL offset is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Index base: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_BASE, &r), 0,
+	   "MP_UINT index base is valid");
+	is(r.index_base, 1, "MP_UINT index base is decoded");
+
+	/* Index base: MP_BIN. */
+	pos = mp_encode_bin(buf, "bin", strlen("bin"));
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_BASE, &r), -1,
+	   "MP_BIN index base is invalid");
+	is(r.index_base, 0, "MP_BIN index base is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Limit: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_LIMIT, &r), 0,
+	   "MP_UINT limit is valid");
+	is(r.limit, 1, "MP_UINT limit is decoded");
+
+	/* Limit: MP_BOOL. */
+	pos = mp_encode_bool(buf, true);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_LIMIT, &r), -1,
+	   "MP_BOOL limit is invalid");
+	is(r.limit, 0, "MP_BOOL limit is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Iterator: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_ITERATOR, &r), 0,
+	   "MP_UINT iterator is valid");
+	is(r.iterator, 1, "MP_UINT iterator is decoded");
+
+	/* Iterator: MP_FLOAT. */
+	pos = mp_encode_float(buf, 0.1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_ITERATOR, &r), -1,
+	   "MP_FLOAT iterator is invalid");
+	is(r.iterator, 0, "MP_FLOAT iterator is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Fetch position: MP_BOOL. */
+	pos = mp_encode_bool(buf, true);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_FETCH_POSITION, &r),
+	   0, "MP_BOOL fetch position is valid");
+	is(r.fetch_position, true, "MP_BOOL fetch position is decoded");
+
+	/* Fetch position: MP_DOUBLE. */
+	pos = mp_encode_double(buf, 0.1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_FETCH_POSITION, &r),
+	   -1, "MP_DOUBLE fetch position is invalid");
+	is(r.fetch_position, false, "MP_DOUBLE fetch position is not decoded");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Tuple: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_TUPLE, &r), 0,
+	   "MP_ARRAY tuple is valid");
+	is(mp_decode_array(&r.tuple), 1, "MP_ARRAY tuple len is valid");
+	is(mp_decode_uint(&r.tuple), 2, "MP_ARRAY tuple data is valid");
+	is(r.tuple, r.tuple_end, "MP_ARRAY tuple size is valid");
+
+	/* Tuple: MP_MAP. */
+	pos = mp_encode_map(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_TUPLE, &r), -1,
+	   "MP_MAP tuple is invalid");
+	is(r.tuple, NULL, "MP_MAP tuple is not decoded");
+	is(r.tuple_end, NULL, "MP_MAP tuple end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Key: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_KEY, &r), 0,
+	   "MP_ARRAY key is valid");
+	is(mp_decode_array(&r.key), 1, "MP_ARRAY key len is valid");
+	is(mp_decode_uint(&r.key), 2, "MP_ARRAY key data is valid");
+	is(r.key, r.key_end, "MP_ARRAY key size is valid");
+
+	/* Key: MP_EXT. */
+	pos = mp_encode_ext(buf, /*type=*/0, "ext", strlen("ext"));
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_KEY, &r), -1,
+	   "MP_EXT key is invalid");
+	is(r.key, NULL, "MP_EXT key is not decoded");
+	is(r.key_end, NULL, "MP_EXT key end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Ops: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OPS, &r), 0,
+	   "MP_ARRAY ops is valid");
+	is(mp_decode_array(&r.ops), 1, "MP_ARRAY ops len is valid");
+	is(mp_decode_uint(&r.ops), 2, "MP_ARRAY ops data is valid");
+	is(r.ops, r.ops_end, "MP_ARRAY ops size is valid");
+
+	/* Ops: MP_NIL. */
+	pos = mp_encode_nil(buf);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OPS, &r), -1,
+	   "MP_NIL ops is invalid");
+	is(r.ops, NULL, "MP_NIL ops is not decoded");
+	is(r.ops_end, NULL, "MP_NIL ops end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Tuple meta: MP_MAP. */
+	pos = mp_encode_map(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_TUPLE_META, &r), 0,
+	   "MP_MAP tuple meta is valid");
+	is(mp_decode_map(&r.tuple_meta), 1, "MP_MAP tuple meta len is valid");
+	is(mp_decode_uint(&r.tuple_meta), 2, "MP_MAP tuple meta key is valid");
+	is(mp_decode_uint(&r.tuple_meta), 3, "MP_MAP tuple meta val is valid");
+	is(r.tuple_meta, r.tuple_meta_end, "MP_MAP tuple meta size is valid");
+
+	/* Tuple meta: MP_ARRAY. */
+	pos = mp_encode_array(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_TUPLE_META, &r), -1,
+	   "MP_ARRAY tuple meta is invalid");
+	is(r.tuple_meta, NULL, "MP_ARRAY tuple meta is not decoded");
+	is(r.tuple_meta_end, NULL, "MP_ARRAY tuple meta end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Old tuple: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OLD_TUPLE, &r), 0,
+	   "MP_ARRAY old tuple is valid");
+	is(mp_decode_array(&r.old_tuple), 1, "MP_ARRAY old tuple len is valid");
+	is(mp_decode_uint(&r.old_tuple), 2, "MP_ARRAY old tuple data is valid");
+	is(r.old_tuple, r.old_tuple_end, "MP_ARRAY old tuple size is valid");
+
+	/* Old tuple: MP_MAP. */
+	pos = mp_encode_map(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_OLD_TUPLE, &r), -1,
+	   "MP_MAP old tuple is invalid");
+	is(r.old_tuple, NULL, "MP_MAP old tuple is not decoded");
+	is(r.old_tuple_end, NULL, "MP_MAP old tuple end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* New tuple: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_NEW_TUPLE, &r), 0,
+	   "MP_ARRAY new tuple is valid");
+	is(mp_decode_array(&r.new_tuple), 1, "MP_ARRAY new tuple len is valid");
+	is(mp_decode_uint(&r.new_tuple), 2, "MP_ARRAY new tuple data is valid");
+	is(r.new_tuple, r.new_tuple_end, "MP_ARRAY new tuple size is valid");
+
+	/* New tuple: MP_MAP. */
+	pos = mp_encode_map(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_NEW_TUPLE, &r), -1,
+	   "MP_MAP new tuple is invalid");
+	is(r.new_tuple, NULL, "MP_MAP new tuple is not decoded");
+	is(r.new_tuple_end, NULL, "MP_MAP new tuple end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* After position: MP_STR. */
+	pos = mp_encode_str0(buf, "str");
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_AFTER_POSITION, &r),
+	   0, "MP_STR after position is valid");
+	is(mp_decode_strl(&r.after_position), strlen("str"),
+	   "MP_STR after position len is valid");
+	is(memcmp(r.after_position, "str", strlen("str")), 0,
+	   "MP_STR after position data is valid");
+	r.after_position += strlen("str");
+	is(r.after_position, r.after_position_end,
+	   "MP_STR after position size is valid");
+
+	/* After position: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_AFTER_POSITION, &r),
+	   -1, "MP_UINT after position is invalid");
+	is(r.after_position, NULL, "MP_UINT after position is not decoded");
+	is(r.after_position_end, NULL, "MP_UINT after position end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* After tuple: MP_ARRAY. */
+	pos = mp_encode_array(buf, 1);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_AFTER_TUPLE, &r), 0,
+	   "MP_ARRAY after tuple is valid");
+	is(mp_decode_array(&r.after_tuple), 1,
+	   "MP_ARRAY after tuple len is valid");
+	is(mp_decode_uint(&r.after_tuple), 2,
+	   "MP_ARRAY after tuple data is valid");
+	is(r.after_tuple, r.after_tuple_end,
+	   "MP_ARRAY after tuple size is valid");
+
+	/* After tuple: MP_MAP. */
+	pos = mp_encode_map(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_AFTER_TUPLE, &r), -1,
+	   "MP_MAP after tuple is invalid");
+	is(r.after_tuple, NULL, "MP_MAP after tuple is not decoded");
+	is(r.after_tuple_end, NULL, "MP_MAP after tuple end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Space name: MP_STR. */
+	pos = mp_encode_str0(buf, "str");
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_SPACE_NAME, &r), 0,
+	   "MP_STR space name is valid");
+	is(r.space_name_len, strlen("str"), "MP_STR space name len is valid");
+	is(memcmp(r.space_name, "str", strlen("str")), 0,
+	   "MP_STR space name data is valid");
+
+	/* Space name: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_SPACE_NAME, &r), -1,
+	   "MP_UINT space name is invalid");
+	is(r.space_name, NULL, "MP_UINT space name is not decoded");
+	is(r.space_name_len, 0, "MP_UINT space name len not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Index name: MP_STR. */
+	pos = mp_encode_str0(buf, "str");
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_NAME, &r), 0,
+	   "MP_STR index name is valid");
+	is(r.index_name_len, strlen("str"), "MP_STR index name len is valid");
+	is(memcmp(r.index_name, "str", strlen("str")), 0,
+	   "MP_STR index name data is valid");
+
+	/* Index name: MP_UINT. */
+	pos = mp_encode_uint(buf, 1);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_INDEX_NAME, &r), -1,
+	   "MP_UINT index name is invalid");
+	is(r.index_name, NULL, "MP_UINT index name is not decoded");
+	is(r.index_name_len, 0, "MP_UINT index name len not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Arrow: MP_EXT(MP_ARROW). */
+	pos = mp_encode_ext(buf, MP_ARROW, "ext", strlen("ext"));
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_ARROW, &r), 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is valid");
+	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	   "MP_EXT(MP_ARROW) Arrow IPC size is valid");
+	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC data is valid");
+
+	/* Arrow: MP_EXT(MP_TUPLE). */
+	pos = mp_encode_ext(buf, MP_TUPLE, "ext", strlen("ext"));
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_ARROW, &r), -1,
+	   "MP_EXT(MP_TUPLE) Arrow IPC is invalid");
+	is(r.arrow_ipc, NULL, "MP_EXT(MP_TUPLE) Arrow IPC is not decoded");
+	is(r.arrow_ipc_end, NULL, "MP_EXT(MP_TUPLE) Arrow IPC end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	/* Arrow: MP_MAP. */
+	pos = mp_encode_map(buf, 0);
+	is(test_xrow_decode_dml_key(buf, pos - buf, IPROTO_ARROW, &r), -1,
+	   "MP_MAP Arrow IPC is invalid");
+	is(r.arrow_ipc, NULL, "MP_MAP Arrow IPC is not decoded");
+	is(r.arrow_ipc_end, NULL, "MP_MAP Arrow IPC end not found");
+	ok(diag_is("Invalid MsgPack - packet body"), "diag set as expected");
+	box_error_clear();
+
+	check_plan();
+	footer();
+}
+
+/**
  * Check that xrow_decode_* functions silently ignore unknown keys.
  */
 static void
@@ -825,7 +1190,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(13);
+	plan(14);
 
 	random_init();
 
@@ -835,6 +1200,7 @@ main(void)
 	test_request_str();
 	test_xrow_fields();
 	test_xrow_encode_dml();
+	test_xrow_decode_dml_keys();
 	test_xrow_decode_unknown_key();
 	test_xrow_decode_error_1();
 	test_xrow_decode_error_2();
