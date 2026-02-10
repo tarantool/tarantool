@@ -171,6 +171,39 @@ lbox_index_delete(lua_State *L)
 	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
+/** Lua interface of the `box_delete_range`. */
+static int
+lbox_index_delete_range(lua_State *L)
+{
+	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    (lua_type(L, 3) != LUA_TTABLE && luaT_istuple(L, 3) == NULL) ||
+	    (lua_type(L, 4) != LUA_TTABLE && luaT_istuple(L, 4) == NULL)) {
+		diag_set(IllegalParams,
+			 "Usage: index.delete_range(begin_key, end_key)");
+		return luaT_error(L);
+	}
+
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	size_t region_svp = region_used(&fiber()->gc);
+	size_t begin_key_len;
+	const char *begin_key = lbox_encode_tuple_on_gc(L, 3, &begin_key_len);
+	if (begin_key == NULL)
+		return luaT_error(L);
+	size_t end_key_len;
+	const char *end_key = lbox_encode_tuple_on_gc(L, 4, &end_key_len);
+	if (end_key == NULL) {
+		region_truncate(&fiber()->gc, region_svp);
+		return luaT_error(L);
+	}
+
+	int rc = box_delete_range(space_id, index_id,
+				  begin_key, begin_key + begin_key_len,
+				  end_key, end_key + end_key_len);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? 0 : luaT_error(L);
+}
+
 static int
 lbox_index_random(lua_State *L)
 {
@@ -465,6 +498,7 @@ box_lua_index_init(struct lua_State *L)
 		{"update", lbox_index_update},
 		{"upsert",  lbox_upsert},
 		{"delete",  lbox_index_delete},
+		{"delete_range",  lbox_index_delete_range},
 		{"random", lbox_index_random},
 		{"get",  lbox_index_get},
 		{"min", lbox_index_min},
