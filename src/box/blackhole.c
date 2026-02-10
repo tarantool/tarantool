@@ -114,6 +114,7 @@ static const struct space_vtab blackhole_space_vtab = {
 	/* .execute_update = */ blackhole_space_execute_update,
 	/* .execute_upsert = */ blackhole_space_execute_upsert,
 	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
+	/* .execute_delete_range = */ generic_space_execute_delete_range,
 	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
 	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ generic_space_ephemeral_rowid_next,
