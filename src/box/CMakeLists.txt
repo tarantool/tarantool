@@ -185,6 +185,7 @@ set(box_sources
     xrow_io.cc
     tuple_convert.c
     index.cc
+    index_build.c
     index_def.c
     index_weak_ref.c
     iterator_type.c

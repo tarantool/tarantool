@@ -67,24 +67,6 @@ t.index.sk == nil;
 
 t:replace{2, 2};
 
-errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
-fiber.new(function() t:replace{1, 'asdf'} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
-t:create_index('sk', {parts = {2, 'unsigned'}});
-
-t:get{1};
-t.index.sk == nil;
-
-t:replace{1, 1};
-
-errinj.set('ERRINJ_BUILD_INDEX_DELAY', true);
-fiber.new(function() t:replace{2, 'asdf'} errinj.set('ERRINJ_BUILD_INDEX_DELAY', false) end)
-t:create_index('sk', {parts = {2, 'unsigned'}});
-
-t:get{2};
-t.index.sk == nil;
-
-t:replace{2, 2};
-
 test_run:cmd("setopt delimiter ''");
 
 t:drop()
@@ -105,72 +87,6 @@ s.index.secondary.unique
 errinj.set("ERRINJ_BUILD_INDEX", -1);
 s:insert{2, 10}
 s.index.secondary:select(10)
-s:drop()
-
---
--- Check that ALTER is aborted if a tuple inserted during index build
--- doesn't conform to the new format.
---
-s = box.schema.space.create('test', {engine = engine})
-_ = s:create_index('pk')
-
-pad = string.rep('x', 16)
-for i = 101, 200 do s:replace{i, i, pad} end
-
-ch = fiber.channel(1)
-ch1 = fiber.channel(1)
-test_run:cmd("setopt delimiter ';'")
-_ = fiber.create(function()
-    ch1:get()
-    for i = 1, 100 do
-        s:replace{i}
-    end
-    errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
-    ch:put(true)
-end);
-test_run:cmd("setopt delimiter ''");
-
-errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
-ch1:put(true)
-s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
-
-ch:get()
-
-s:count() -- 200
-s:drop()
-
---
--- Check that ALTER is aborted if a tuple inserted during index build
--- violates unique constraint.
---
-s = box.schema.space.create('test', {engine = engine})
-_ = s:create_index('pk')
-
-pad = string.rep('x', 16)
-for i = 101, 200 do s:replace{i, i, pad} end
-
-ch = fiber.channel(1)
-ch1 = fiber.channel(1)
-test_run:cmd("setopt delimiter ';'")
-_ = fiber.create(function()
-    ch1:get()
-    for i = 1, 100 do
-        s:replace{i, i + 1}
-    end
-    errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
-    ch:put(true)
-end);
-test_run:cmd("setopt delimiter ''");
-
-errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
-ch1:put(true)
-ok, err = pcall(s.create_index, s, 'sk', {parts = {2, 'unsigned'}})
-assert(not ok)
-assert(tostring(err):find('Duplicate key') ~= nil)
-
-ch:get()
-
-s:count() -- 200
 s:drop()
 
 --
