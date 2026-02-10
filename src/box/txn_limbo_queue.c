@@ -629,7 +629,8 @@ txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 {
 	assert(queue->owner_id != REPLICA_ID_NIL ||
 	       txn_limbo_queue_is_empty(queue));
-	assert(queue->confirmed_lsn <= lsn);
+	if (queue->confirmed_lsn >= lsn)
+		return;
 
 	bool queue_was_full = txn_limbo_queue_is_full(queue);
 	struct txn_limbo_entry *e, *next;
