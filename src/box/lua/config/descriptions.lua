@@ -883,6 +883,20 @@ I['database.hot_standby'] = format_text([[
     - For spaces created with engine set to `vinyl`.
 ]])
 
+I['database.schema'] = format_text([[
+    Database schema version.
+
+    This option specifies the schema version that the instance should be
+    compatible with. At the moment, only the `2.11` value is supported.
+
+    The `2.11` mode is intended for upgrades from Tarantool 2.11. In this
+    mode, Tarantool relaxes startup checks related to instance and replicaset
+    names (and skips applying them on startup), so a Tarantool 3.x instance
+    configured via the declarative config can join a 2.x replicaset where the
+    master snapshot may not contain names.
+]])
+
+
 I['database.instance_uuid'] = format_text([[
     An instance UUID.
 
