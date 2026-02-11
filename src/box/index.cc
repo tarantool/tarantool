@@ -220,9 +220,9 @@ error:
 }
 
 int
-quantile_validate(struct index_def *index_def, double level,
-		  const char *begin_key, uint32_t begin_part_count,
-		  const char *end_key, uint32_t end_part_count)
+range_validate(struct index_def *index_def,
+	       const char *begin_key, uint32_t begin_part_count,
+	       const char *end_key, uint32_t end_part_count)
 {
 	if (index_def->type != TREE) {
 		diag_set(UnsupportedIndexFeature, index_def, "quantile()");
@@ -246,6 +246,17 @@ quantile_validate(struct index_def *index_def, double level,
 		diag_set(IllegalParams, "begin_key must be < end_key");
 		return -1;
 	}
+	return 0;
+}
+
+int
+quantile_validate(struct index_def *index_def, double level,
+		  const char *begin_key, uint32_t begin_part_count,
+		  const char *end_key, uint32_t end_part_count)
+{
+	if (range_validate(index_def, begin_key, begin_part_count,
+			   end_key, end_part_count) != 0)
+		return -1;
 	if (level <= 0 || level >= 1) {
 		diag_set(IllegalParams, "level must be > 0 and < 1");
 		return -1;
