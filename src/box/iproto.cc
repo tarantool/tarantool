@@ -58,6 +58,7 @@
 #include "port.h"
 #include "box.h"
 #include "call.h"
+#include "app_threads.h"
 #include "tuple_convert.h"
 #include "session.h"
 #include "xrow.h"
@@ -85,7 +86,7 @@ enum {
 };
 
 enum {
-	 ENDPOINT_NAME_MAX = 10
+	ENDPOINT_NAME_MAX = 16,
 };
 
 struct iproto_connection;
@@ -457,12 +458,16 @@ struct iproto_service_msg {
 	struct cmsg base;
 	/** Serving thread id. */
 	int srv_id;
+	/** IPROTO thread. */
+	struct iproto_thread *iproto_thread;
 	/** IPROTO connection. */
 	struct iproto_connection *connection;
 	/** IPROTO stream. */
 	struct iproto_stream *stream;
 	/** Sequence number of iproto_drop_connections() invocation. */
 	unsigned drop_generation;
+	/** IPROTO max message count. */
+	int iproto_msg_max;
 };
 
 static struct iproto_service_msg *
@@ -471,9 +476,11 @@ iproto_service_msg_new(const struct cmsg_hop *route)
 	struct iproto_service_msg *msg = xalloc_object(typeof(*msg));
 	cmsg_init(&msg->base, route);
 	msg->srv_id = 0;
+	msg->iproto_thread = NULL;
 	msg->connection = NULL;
 	msg->stream = NULL;
 	msg->drop_generation = 0;
+	msg->iproto_msg_max = 0;
 	return msg;
 }
 
@@ -3577,6 +3584,52 @@ iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
 }
 
 /**
+ * Initializes the IPROTO infrastructure in a serving thread.
+ */
+static void
+srv_process_init(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_thread *iproto_thread = msg->iproto_thread;
+	int srv_id = msg->srv_id;
+	slab_cache_create(&iproto_thread->srv[srv_id].net_slabc, &runtime);
+	struct cpipe *pipe = &iproto_thread->srv[srv_id].ret_pipe;
+	char endpoint_name[ENDPOINT_NAME_MAX];
+	snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u", iproto_thread->id);
+	cpipe_create(pipe, endpoint_name);
+	cpipe_set_max_input(pipe, msg->iproto_msg_max / 2);
+	iproto_service_msg_delete(msg);
+}
+
+/**
+ * Destroys the IPROTO infrastructure in a serving thread.
+ */
+static void
+srv_process_free(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_thread *iproto_thread = msg->iproto_thread;
+	int srv_id = msg->srv_id;
+	struct cpipe *pipe = &iproto_thread->srv[srv_id].ret_pipe;
+	cpipe_destroy(pipe);
+	slab_cache_destroy(&iproto_thread->srv[srv_id].net_slabc);
+	iproto_service_msg_delete(msg);
+}
+
+/**
+ * Updates configuration of a pipe from a serving thread to IPROTO.
+ */
+static void
+srv_process_cfg(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_thread *iproto_thread = msg->iproto_thread;
+	struct cpipe *pipe = &iproto_thread->srv[msg->srv_id].ret_pipe;
+	cpipe_set_max_input(pipe, msg->iproto_msg_max / 2);
+	iproto_service_msg_delete(msg);
+}
+
+/**
  * The network io thread main function:
  * begin serving the message bus.
  */
@@ -3585,7 +3638,6 @@ net_cord_f(va_list  ap)
 {
 	struct iproto_thread *iproto_thread =
 		va_arg(ap, struct iproto_thread *);
-	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
 
 	mempool_create(&iproto_thread->iproto_msg_pool, &cord()->slabc,
 		       sizeof(struct iproto_msg));
@@ -3603,15 +3655,54 @@ net_cord_f(va_list  ap)
 	/* Create "net" endpoint. */
 	cbus_endpoint_create(&endpoint, endpoint_name,
 			     fiber_schedule_cb, fiber());
-	/* Create a pipe to "tx" thread. */
-	cpipe_create(tx_pipe, "tx");
-	cpipe_set_max_input(tx_pipe, iproto_msg_max / 2);
+	/* Create pipes to serving threads and back. */
+	for (int i = 0; i < iproto_thread->srv_count; i++) {
+		struct cpipe *pipe = &iproto_thread->srv[i].pipe;
+		if (i == 0) {
+			snprintf(endpoint_name, ENDPOINT_NAME_MAX, "tx");
+		} else {
+			snprintf(endpoint_name, ENDPOINT_NAME_MAX, "app%d", i);
+		}
+		cpipe_create(pipe, endpoint_name);
+		cpipe_set_max_input(pipe, iproto_msg_max / 2);
+		/* Pipe from the tx thread is created in iproto_init(). */
+		if (i > 0) {
+			static const struct cmsg_hop route[] = {
+				{srv_process_init, NULL},
+			};
+			struct iproto_service_msg *msg =
+				iproto_service_msg_new(route);
+			msg->srv_id = i;
+			msg->iproto_thread = iproto_thread;
+			msg->iproto_msg_max = iproto_msg_max;
+			cpipe_push(pipe, &msg->base);
+		}
+	}
 
 	/* Process incomming messages. */
 	cbus_loop(&endpoint);
 
+	/*
+	 * Destroy pipes to serving threads and back.
+	 * Pipe from the tx thread is destroyed in iproto_shutdown().
+	 */
+	for (int i = 0; i < iproto_thread->srv_count; i++) {
+		struct cpipe *pipe = &iproto_thread->srv[i].pipe;
+		/* Pipe from the tx thread is destroyed in iproto_shutdown(). */
+		if (i > 0) {
+			static const struct cmsg_hop route[] = {
+				{srv_process_free, NULL},
+			};
+			struct iproto_service_msg *msg =
+				iproto_service_msg_new(route);
+			msg->srv_id = i;
+			msg->iproto_thread = iproto_thread;
+			cpipe_push(pipe, &msg->base);
+		}
+		cpipe_destroy(pipe);
+	}
+	/* Destroy "net" endpoint. */
 	cbus_endpoint_destroy(&endpoint, cbus_process);
-	cpipe_destroy(tx_pipe);
 	evio_service_detach(&iproto_thread->binary);
 
 	mempool_destroy(&iproto_thread->iproto_stream_pool);
@@ -4024,10 +4115,11 @@ iproto_init(int threads_count)
 	memset(iproto_threads, 0, sizeof(struct iproto_thread) * threads_count);
 	fiber_cond_create(&drop_finished_cond);
 
+	int srv_count = app_thread_count + 1;
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
 		iproto_thread->id = i;
-		iproto_thread_init(iproto_thread, 1);
+		iproto_thread_init(iproto_thread, srv_count);
 	}
 
 	/*
@@ -4105,8 +4197,17 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	switch (cfg_msg->op) {
 	case IPROTO_CFG_MSG_MAX: {
 		for (int i = 0; i < iproto_thread->srv_count; i++) {
-			cpipe_set_max_input(&iproto_thread->srv[i].pipe,
-					    cfg_msg->iproto_msg_max / 2);
+			struct cpipe *pipe = &iproto_thread->srv[i].pipe;
+			cpipe_set_max_input(pipe, cfg_msg->iproto_msg_max / 2);
+			static const struct cmsg_hop route[] = {
+				{srv_process_cfg, NULL},
+			};
+			struct iproto_service_msg *msg =
+				iproto_service_msg_new(route);
+			msg->srv_id = i;
+			msg->iproto_thread = iproto_thread;
+			msg->iproto_msg_max = cfg_msg->iproto_msg_max;
+			cpipe_push(pipe, &msg->base);
 		}
 		int old = iproto_msg_max;
 		iproto_msg_max = cfg_msg->iproto_msg_max;
@@ -4400,11 +4501,8 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_MSG_MAX);
 	cfg_msg.iproto_msg_max = new_iproto_msg_max;
-	for (int i = 0; i < iproto_threads_count; i++) {
+	for (int i = 0; i < iproto_threads_count; i++)
 		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
-		struct cpipe *net_pipe = &iproto_threads[i].srv[0].ret_pipe;
-		cpipe_set_max_input(net_pipe, new_iproto_msg_max / 2);
-	}
 	return 0;
 }
 
