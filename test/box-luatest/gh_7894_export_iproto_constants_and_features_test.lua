@@ -37,6 +37,7 @@ local reference_table = {
         TSN = 0x08,
         FLAGS = 0x09,
         STREAM_ID = 0x0a,
+        THREAD_ID = 0x0b,
         SPACE_ID = 0x10,
         INDEX_ID = 0x11,
         LIMIT = 0x12,
