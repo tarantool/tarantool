@@ -829,6 +829,333 @@ test_xrow_decode_dml_keys()
 }
 
 /**
+ * Decode the given IPROTO request with the xrow_decode_dml().
+ */
+static int
+test_xrow_decode_dml_request(int key_count, char *keys, char *keys_end,
+			     enum iproto_type type, struct request *r)
+{
+	/* Verify the request body. */
+	int actual_key_count = 0;
+	const char *keys_pos = keys;
+	while (keys_pos != keys_end) {
+		fail_unless(keys_pos < keys_end);
+		mp_next(&keys_pos); /* key */
+		mp_next(&keys_pos); /* value */
+		actual_key_count++;
+	}
+	fail_unless(actual_key_count == key_count);
+
+	/* Wrap it into a map. */
+	char buf[1024];
+	char *pos = mp_encode_map(buf, key_count);
+	memcpy(pos, keys, keys_end - keys);
+	pos += keys_end - keys;
+
+	/* Try to decode the request. */
+	struct xrow_header header;
+	memset(&header, 0, sizeof(header));
+	header.type = type;
+	header.bodycnt = 1;
+	header.body[0].iov_base = buf;
+	header.body[0].iov_len = pos - buf;
+	return xrow_decode_dml(&header, r, dml_request_key_map(type));
+}
+
+/**
+ * Test that xrow_decode_dml() decodes IPROTO requests properly.
+ */
+static void
+test_xrow_decode_dml_requests()
+{
+	header();
+	plan(82);
+
+	char buf[1024];
+	struct request r;
+
+	/* select() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_SELECT, &r), -1,
+	   "select(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "select(): diag");
+	box_error_clear();
+
+	/* select(space_id) */
+	char *pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_SELECT, &r), -1,
+	   "select(space_id): fail");
+	ok(diag_is("Missing mandatory field 'LIMIT' in request"),
+	   "select(space_id): diag");
+	box_error_clear();
+
+	/* select(space_id, limit) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_LIMIT);
+	pos = mp_encode_uint(pos, 2);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_SELECT, &r), -1,
+	   "select(space_id, limit): fail");
+	ok(diag_is("Missing mandatory field 'KEY' in request"),
+	   "select(space_id, limit): diag");
+	box_error_clear();
+
+	/* select(key, space_id, limit) */
+	pos = mp_encode_uint(buf, IPROTO_KEY);
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_uint(pos, 2);
+	pos = mp_encode_uint(pos, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, IPROTO_LIMIT);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(3, buf, pos, IPROTO_SELECT, &r), 0,
+	   "select(key, space_id, limit): success");
+	is(r.space_id, 3, "select(key, space_id, limit): space ID");
+	is(mp_decode_array(&r.key), 1, "select(key, space_id, limit): key len");
+	is(mp_decode_uint(&r.key), 2, "select(key, space_id, limit): key[0]");
+	is(r.key, r.key_end, "select(key, space_id, limit): key size");
+	is(r.limit, 4, "select(key, space_id, limit): limit");
+
+	/* insert() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_INSERT, &r), -1,
+	   "insert(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "insert(): diag");
+	box_error_clear();
+
+	/* insert(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_INSERT, &r), -1,
+	   "insert(space_id): fail");
+	ok(diag_is("Missing mandatory field 'TUPLE' in request"),
+	   "insert(space_id): diag");
+	box_error_clear();
+
+	/* insert(space_id, tuple) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_TUPLE);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_INSERT, &r), 0,
+	   "insert(space_id, tuple): success");
+	is(r.space_id, 1, "insert(space_id, tuple): space ID");
+	is(mp_decode_array(&r.tuple), 2, "insert(space_id, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 3, "insert(space_id, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 4, "insert(space_id, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end, "insert(space_id, tuple): tuple size");
+
+	/* replace() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_REPLACE, &r), -1,
+	   "replace(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "replace(): diag");
+	box_error_clear();
+
+	/* replace(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_REPLACE, &r), -1,
+	   "replace(space_id): fail");
+	ok(diag_is("Missing mandatory field 'TUPLE' in request"),
+	   "replace(space_id): diag");
+	box_error_clear();
+
+	/* replace(space_id, tuple) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_TUPLE);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_REPLACE, &r), 0,
+	   "replace(space_id, tuple): success");
+	is(r.space_id, 1, "replace(space_id, tuple): space ID");
+	is(mp_decode_array(&r.tuple), 2, "replace(space_id, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 3, "replace(space_id, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 4, "replace(space_id, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end, "replace(space_id, tuple): tuple size");
+
+	/* update() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_UPDATE, &r), -1,
+	   "update(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "update(): diag");
+	box_error_clear();
+
+	/* update(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_UPDATE, &r), -1,
+	   "update(space_id): fail");
+	ok(diag_is("Missing mandatory field 'KEY' in request"),
+	   "update(space_id): diag");
+	box_error_clear();
+
+	/* update(space_id, key) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_UPDATE, &r), -1,
+	   "update(space_id, key): fail");
+	ok(diag_is("Missing mandatory field 'TUPLE' in request"),
+	   "update(space_id, key): diag");
+	box_error_clear();
+
+	/* update(space_id, key, tuple) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	pos = mp_encode_uint(pos, IPROTO_TUPLE);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 5);
+	pos = mp_encode_uint(pos, 6);
+	is(test_xrow_decode_dml_request(3, buf, pos, IPROTO_UPDATE, &r), 0,
+	   "update(space_id, key, tuple): success");
+	is(r.space_id, 1, "update(space_id, key, tuple): space ID");
+	is(mp_decode_array(&r.key), 2, "update(space_id, key, tuple): key len");
+	is(mp_decode_uint(&r.key), 3, "update(space_id, key, tuple): key[0]");
+	is(mp_decode_uint(&r.key), 4, "update(space_id, key, tuple): key[1]");
+	is(r.key, r.key_end, "update(space_id, key, tuple): key size");
+	is(mp_decode_array(&r.tuple), 2,
+	   "update(space_id, key, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 5,
+	   "update(space_id, key, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 6,
+	   "update(space_id, key, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end,
+	   "update(space_id, key, tuple): tuple size");
+
+	/* delete() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_DELETE, &r), -1,
+	   "delete(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "delete(): diag");
+	box_error_clear();
+
+	/* delete(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_DELETE, &r), -1,
+	   "delete(space_id): fail");
+	ok(diag_is("Missing mandatory field 'KEY' in request"),
+	   "delete(space_id): diag");
+	box_error_clear();
+
+	/* delete(space_id, key) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_KEY);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_DELETE, &r), 0,
+	   "delete(space_id, key): success");
+	is(r.space_id, 1, "delete(space_id, key): space ID");
+	is(mp_decode_array(&r.key), 2, "delete(space_id, key): key len");
+	is(mp_decode_uint(&r.key), 3, "delete(space_id, key): key[0]");
+	is(mp_decode_uint(&r.key), 4, "delete(space_id, key): key[1]");
+	is(r.key, r.key_end, "delete(space_id, key): key size");
+
+	/* upsert() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_UPSERT, &r), -1,
+	   "upsert(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "upsert(): diag");
+	box_error_clear();
+
+	/* upsert(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_UPSERT, &r), -1,
+	   "upsert(tuple): fail");
+	ok(diag_is("Missing mandatory field 'TUPLE' in request"),
+	   "upsert(tuple): diag");
+	box_error_clear();
+
+	/* upsert(space_id, tuple) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_TUPLE);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_UPSERT, &r), -1,
+	   "upsert(space_id, tuple): fail");
+	ok(diag_is("Missing mandatory field 'OPS' in request"),
+	   "upsert(space_id, tuple): diag");
+	box_error_clear();
+
+	/* upsert(space_id, ops, tuple) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_OPS);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 3);
+	pos = mp_encode_uint(pos, 4);
+	pos = mp_encode_uint(pos, IPROTO_TUPLE);
+	pos = mp_encode_array(pos, 2);
+	pos = mp_encode_uint(pos, 5);
+	pos = mp_encode_uint(pos, 6);
+	is(test_xrow_decode_dml_request(3, buf, pos, IPROTO_UPSERT, &r), 0,
+	   "upsert(space_id, ops, tuple): success");
+	is(r.space_id, 1, "upsert(space_id, ops, tuple): space ID");
+	is(mp_decode_array(&r.ops), 2, "upsert(space_id, ops, tuple): ops len");
+	is(mp_decode_uint(&r.ops), 3, "upsert(space_id, ops, tuple): ops[0]");
+	is(mp_decode_uint(&r.ops), 4, "upsert(space_id, ops, tuple): ops[1]");
+	is(r.ops, r.ops_end, "upsert(space_id, ops, tuple): ops size");
+	is(mp_decode_array(&r.tuple), 2,
+	   "upsert(space_id, ops, tuple): tuple len");
+	is(mp_decode_uint(&r.tuple), 5,
+	   "upsert(space_id, ops, tuple): tuple[0]");
+	is(mp_decode_uint(&r.tuple), 6,
+	   "upsert(space_id, ops, tuple): tuple[1]");
+	is(r.tuple, r.tuple_end,
+	   "upsert(space_id, ops, tuple): tuple size");
+
+	/* insert_arrow() */
+	is(test_xrow_decode_dml_request(0, buf, buf, IPROTO_INSERT_ARROW, &r),
+	   -1, "insert_arrow(): fail");
+	ok(diag_is("Missing mandatory field 'SPACE_ID' in request"),
+	   "insert_arrow(): diag");
+	box_error_clear();
+
+	/* insert_arrow(space_id) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	is(test_xrow_decode_dml_request(1, buf, pos, IPROTO_INSERT_ARROW, &r),
+	   -1, "insert_arrow(space_id): fail");
+	ok(diag_is("Missing mandatory field 'ARROW' in request"),
+	   "insert_arrow(space_id): diag");
+	box_error_clear();
+
+	/* insert_arrow(space_id, arrow) */
+	pos = mp_encode_uint(buf, IPROTO_SPACE_ID);
+	pos = mp_encode_uint(pos, 1);
+	pos = mp_encode_uint(pos, IPROTO_ARROW);
+	pos = mp_encode_ext(pos, MP_ARROW, "ext", strlen("ext"));
+	is(test_xrow_decode_dml_request(2, buf, pos, IPROTO_INSERT_ARROW, &r),
+	   0, "insert_arrow(space_id, arrow): success");
+	is(r.space_id, 1, "insert_arrow(space_id, arrow): space ID");
+	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	   "insert_arrow(space_id, arrow): Arrow IPC size");
+	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	   "insert_arrow(space_id, arrow): Arrow IPC");
+
+	check_plan();
+	footer();
+}
+
+/**
  * Check that xrow_decode_* functions silently ignore unknown keys.
  */
 static void
@@ -1190,7 +1517,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(14);
+	plan(15);
 
 	random_init();
 
@@ -1201,6 +1528,7 @@ main(void)
 	test_xrow_fields();
 	test_xrow_encode_dml();
 	test_xrow_decode_dml_keys();
+	test_xrow_decode_dml_requests();
 	test_xrow_decode_unknown_key();
 	test_xrow_decode_error_1();
 	test_xrow_decode_error_2();
