@@ -2039,6 +2039,15 @@ I['metrics.labels'] = 'Global labels to be added to every observation.'
 
 I['metrics.labels.*'] = 'Label value.'
 
+I['metrics.export'] = format_text([[
+    Configuration for exporting metrics using the `metrics-export-role` module.
+    The export target (for example, `http`) maps to the role configuration.
+    Export configuration is applied only when the `http.server` module is
+    available.
+]])
+
+I['metrics.export.*'] = 'Configuration options for a specific export target.'
+
 -- }}} metrics configuration
 
 -- {{{ process configuration
