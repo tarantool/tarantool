@@ -1917,6 +1917,7 @@ static void
 iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 {
 	uint64_t stream_id;
+	uint32_t thread_id;
 	uint32_t type;
 	bool is_replication_request;
 	bool request_is_not_for_stream;
@@ -1933,6 +1934,18 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 	assert(*pos == reqend);
 
 	type = msg->header.type;
+	thread_id = msg->header.thread_id;
+	if (thread_id != XROW_THREAD_UNSPEC &&
+	    thread_id >= (uint32_t)iproto_thread->srv_count) {
+		diag_set(ClientError, ER_NO_SUCH_THREAD, thread_id);
+		goto error;
+	}
+	if (thread_id != XROW_THREAD_UNSPEC && thread_id != 0) {
+		diag_set(ClientError, ER_UNABLE_TO_PROCESS_IN_THREAD,
+			 iproto_type_name(type), thread_id);
+		goto error;
+	}
+
 	stream_id = msg->header.stream_id;
 	request_is_not_for_stream =
 		((type > IPROTO_TYPE_STAT_MAX &&

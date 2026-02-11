@@ -198,6 +198,7 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		goto bad_header;
 	header->header = start;
 	header->header_end = tmp;
+	header->thread_id = XROW_THREAD_UNSPEC;
 	bool has_tsn = false;
 	uint32_t flags = 0;
 	uint64_t lsn = 0;
@@ -243,6 +244,9 @@ xrow_decode(struct xrow_header *header, const char **pos,
 			break;
 		case IPROTO_STREAM_ID:
 			header->stream_id = mp_decode_uint(pos);
+			break;
+		case IPROTO_THREAD_ID:
+			header->thread_id = mp_decode_uint(pos);
 			break;
 		default:
 			/* unknown header */
