@@ -57,6 +57,17 @@ jobs:
 
     timeout-minutes: 60
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: release
+            http_server: false
+          - name: release-with-http
+            http_server: true
+
+    name: ${{ matrix.name }}
+
     container:
       image: docker.io/tarantool/testing:ubuntu-focal
       # Mount /dev to the container to be able to mount a disk image inside it
@@ -82,12 +93,30 @@ jobs:
       - uses: ./.github/actions/environment
       - name: Install deps
         uses: ./.github/actions/install-deps-debian
+      - name: Install http.server
+        if: ${{ matrix.http_server }}
+        run: |
+          curl -L https://tarantool.io/release/3/installer.sh | bash
+          apt-get -y install tarantool tarantool-dev tt
+          tt rocks install http 1.9.0 --global
       - name: Optional submodule bump
         if: ${{ inputs.submodule }}
         uses: ./.github/actions/bump-submodule
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      - name: (TEMP) Bump metrics-export-role
+        run: |
+          cd third_party/metrics-export-role
+
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream https://github.com/mandesero/metrics-export-role.git
+          else
+            git remote add upstream https://github.com/mandesero/metrics-export-role.git
+          fi
+
+          git fetch upstream mandesero/tntp-2531-migrate-export-role
+          git checkout -B mandesero/tntp-2531-migrate-export-role FETCH_HEAD
       - name: test
         run: make -f .test.mk test-release
       - name: Send VK Teams message on failure
@@ -99,7 +128,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: release
+          name: ${{ matrix.name }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
       - name: Upload artifacts to S3
