@@ -88,6 +88,12 @@ jobs:
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      - name: (TEMP) Bump metrics-export-role
+        run: |
+          cd third_party/metrics-export-role
+          git remote add upstream https://github.com/mandesero/metrics-export-role.git
+          git fetch upstream mandesero/tntp-2531-migrate-export-role
+          git checkout mandesero/tntp-2531-migrate-export-role
       - name: test
         run: make -f .test.mk test-release
       - name: Send VK Teams message on failure
