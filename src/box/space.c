@@ -1499,6 +1499,7 @@ space_execute_dml(struct space *space, struct txn *txn,
 			return -1;
 		break;
 	case IPROTO_DELETE_RANGE:
+		*result = NULL;
 		if (space->vtab->execute_delete_range(space, txn, request) != 0)
 			return -1;
 		break;
