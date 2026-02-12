@@ -877,7 +877,6 @@ static void
 luamp_decode_extension_box(struct lua_State *L, struct luaL_serializer *cfg,
 			   const char **data, struct mp_ctx *ctx)
 {
-	(void)cfg;
 	assert(mp_typeof(**data) == MP_EXT);
 	int8_t ext_type;
 	uint32_t len = mp_decode_extl(data, &ext_type);
@@ -893,6 +892,11 @@ luamp_decode_extension_box(struct lua_State *L, struct luaL_serializer *cfg,
 		break;
 	}
 	case MP_TUPLE: {
+		if (!cord_is_main()) {
+			const char *tuple_data = tuple_unpack_raw(data);
+			luamp_decode_with_ctx(L, cfg, &tuple_data, ctx);
+			break;
+		}
 		struct tuple *tuple;
 		if (ctx == NULL) {
 			tuple = tuple_unpack_without_format(data);

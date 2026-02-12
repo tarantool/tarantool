@@ -297,6 +297,7 @@ set(box_sources
     lua/key_def.c
     lua/merger.c
     lua/watcher.c
+    lua/app_threads.c
     lua/iproto.c
     lua/func_adapter.c
     lua/tuple_format.c

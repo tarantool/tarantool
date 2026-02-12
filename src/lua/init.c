@@ -113,7 +113,8 @@ luaopen_zip(lua_State *L);
 /**
  * The single Lua state of the transaction processor (tx) thread.
  */
-struct lua_State *tarantool_L;
+__thread struct lua_State *tarantool_L;
+
 /**
  * The fiber running the startup Lua script
  */
@@ -744,14 +745,49 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 }
 
 void
-tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
-		   char **argv)
+tarantool_lua_init_minimal(void)
 {
+	assert(tarantool_L == NULL);
+
 	lua_State *L = luaT_newstate();
+	tarantool_L = L;
+
+	lua_atpanic(L, tarantool_panic_handler);
 	luaL_openlibs(L);
+
 #ifndef LUAJIT_JIT_STATUS
 	(void)luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_OFF);
 #endif
+	/*
+	 * Create a table for storing loaded built-in modules.
+	 * Similar to _LOADED (package.loaded).
+	 */
+	lua_newtable(L);
+	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+
+	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
+	luaL_loadstring(L, "return require('ffi')");
+	lua_call(L, 0, 0);
+	lua_register(L, "tonumber64", lbox_tonumber64);
+
+	tarantool_lua_utils_init(L);
+	tarantool_lua_error_init(L);
+	tarantool_lua_decimal_init(L);
+	tarantool_lua_serializer_init(L);
+
+	luaopen_msgpack(L);
+	lua_pop(L, 1);
+
+	/* clear possible left-overs of init */
+	lua_settop(L, 0);
+}
+
+void
+tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
+		   char **argv)
+{
+	tarantool_lua_init_minimal();
+	lua_State *L = tarantool_L;
 
 	/* Set _G.arg. */
 	lua_newtable(L);
@@ -769,13 +805,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	lua_newtable(L);
 	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_PACKAGE_SEARCHERS");
 
-	/*
-	 * Create a table for storing loaded built-in modules.
-	 * Similar to _LOADED (package.loaded).
-	 */
-	lua_newtable(L);
-	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
-
 	builtin_modcache_init();
 
 	/*
@@ -790,38 +819,27 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
 	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
 
-	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
-	luaL_loadstring(L, "return require('ffi')");
-	lua_call(L, 0, 0);
-	lua_register(L, "tonumber64", lbox_tonumber64);
-
 	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
-	tarantool_lua_utils_init(L);
 	tarantool_lua_xml_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
-	tarantool_lua_error_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_digest_init(L);
-	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
-	tarantool_lua_decimal_init(L);
 	tarantool_lua_trigger_init(L);
 	tarantool_lua_extras_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
 	luaopen_http_client_driver(L);
-	lua_pop(L, 1);
-	luaopen_msgpack(L);
 	lua_pop(L, 1);
 	luaopen_yaml(L);
 	lua_pop(L, 1);
@@ -873,10 +891,8 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		panic("Failed to unload 'strict' Lua module");
 #endif /* NDEBUG */
 
-	lua_atpanic(L, tarantool_panic_handler);
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
-	tarantool_L = L;
 }
 
 int

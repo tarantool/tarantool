@@ -9,6 +9,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct call_request;
+struct port;
+
 enum {
 	APP_THREADS_MAX = 1000,
 };
@@ -31,6 +34,18 @@ app_threads_start(int thread_count);
  */
 void
 app_threads_stop(void);
+
+/**
+ * Processes CALL request in this application thread.
+ */
+int
+app_thread_process_call(struct call_request *request, struct port *port);
+
+/**
+ * Processes EVAL request in this application thread.
+ */
+int
+app_thread_process_eval(struct call_request *request, struct port *port);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -1,4 +1,10 @@
+local datetime = require('datetime')
+local decimal = require('decimal')
+local ffi = require('ffi')
 local net = require('net.box')
+local uuid = require('uuid')
+local varbinary = require('varbinary')
+
 local server = require('luatest.server')
 local t = require('luatest')
 
@@ -59,8 +65,6 @@ g.test_unable_to_process_in_thread = function(cg)
     t.assert(conn:ping({_thread_id = 0}))
     t.assert_not(conn:ping({_thread_id = 1}))
     check(conn.watch_once, conn, 'foo')
-    check(conn.eval, conn, 'return true', {})
-    check(conn.call, conn, 'tonumber', {'1'})
     check(function(opts) return conn:prepare('select true', {}, nil, opts) end)
     check(function(opts) return conn:execute('select true', {}, nil, opts) end)
     local stream = conn:new_stream()
@@ -74,5 +78,79 @@ g.test_unable_to_process_in_thread = function(cg)
     check(space.update, space, {'foo'}, {{'=', 2, 'fuzz'}})
     check(space.upsert, space, {'foo'}, {{'=', 2, 'fuss'}})
     check(space.delete, space, {'foo'})
+    conn:close()
+end
+
+g.test_call_eval = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    -- Call a box function in the main thread.
+    t.assert_covers(conn:call('box.info', {}, {_thread_id = 0}),
+                    {status = 'running'})
+    -- Check that the box function is unavailable in an application thread.
+    local err = {
+        type = 'ClientError',
+        name = 'NO_SUCH_PROC',
+        func = 'box.info',
+    }
+    t.assert_error_covers(err, conn.call, conn, 'box.info', {},
+                          {_thread_id = 1})
+    -- Register a function in an application thread.
+    conn:eval([[rawset(_G, 'test_func', function() return 42 end)]], {},
+              {_thread_id = 1})
+    -- Check that it's available in this thread, but not in other threads.
+    t.assert_equals(conn:call('test_func', {}, {_thread_id = 1}), 42)
+    err.func = 'test_func'
+    t.assert_error_covers(err, conn.call, conn, 'test_func', {},
+                          {_thread_id = 0})
+    t.assert_error_covers(err, conn.call, conn, 'test_func', {},
+                          {_thread_id = 2})
+    -- Clear the function and check that it's no longer available.
+    conn:eval([[rawset(_G, 'test_func', nil)]], {},
+              {_thread_id = 1})
+    t.assert_error_covers(err, conn.call, conn, 'test_func', {},
+                          {_thread_id = 1})
+    conn:close()
+end
+
+g.test_builtin_types_serialization = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    -- Check basic types.
+    local function check(obj)
+        local ret_obj = conn:eval([[return ...]], {obj}, {_thread_id = 1})
+        t.assert_is(type(ret_obj), type(obj))
+        if type(ret_obj) == 'cdata' then
+            t.assert_is(ffi.typeof(ret_obj), ffi.typeof(obj))
+        end
+        t.assert_equals(ret_obj, obj)
+    end
+    check('foo')
+    check(123)
+    check(123456789123456789ULL)
+    check(-123456789123456789LL)
+    check(datetime.new())
+    check(datetime.interval.new())
+    check(decimal.new(123))
+    check(uuid.new())
+    check(varbinary.new('foo'))
+    -- Check errors.
+    local err = box.error.new({
+        type = 'CustomType',
+        name = 'MyError',
+        message = 'foobar',
+    })
+    local ret_err = conn:eval([[return ...]], {err}, {_thread_id = 1})
+    box.error.is(err)
+    t.assert_equals(ret_err:unpack(), err:unpack())
+    t.assert_error_covers(err:unpack(), conn.eval, conn, [[error(...)]], {err},
+                          {_thread_id = 1})
+    -- Tuples aren't supported yet (serialized as array).
+    local tuple = box.tuple.new({1, 2, 3})
+    local ret_type, ret_tuple = conn:eval([[
+        local tuple = ...
+        return type(tuple), tuple
+    ]], {tuple}, {_thread_id = 1})
+    t.assert_equals(ret_type, 'table')
+    t.assert_equals(type(ret_tuple), 'table')
+    t.assert_equals(ret_tuple, {1, 2, 3})
     conn:close()
 end
