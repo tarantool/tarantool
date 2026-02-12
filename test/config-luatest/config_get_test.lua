@@ -1,16 +1,12 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
-
 -- gh-10205: verify that options inside app.cfg.<key> and
 -- roles_cfg.<key> can be accessed using config:get().
-g.test_basic = function(g)
+g.test_basic = function()
     -- Minimal config.
     local mycfg = {foo = {bar = {baz = 42, n = box.NULL}}}
     local config = cbuilder:new()
@@ -20,7 +16,7 @@ g.test_basic = function(g)
         :config()
 
     -- Minimal cluster.
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Test cases.

@@ -5,13 +5,9 @@ local compat = require('compat')
 local instance_config = require('internal.config.instance_config')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- These options can't be changed on reload.
 local non_dynamic = {
@@ -71,7 +67,7 @@ end
 -- Start an instance with the given compat option value and verify
 -- that it is actually set.
 local function gen_startup_case(option_name, v)
-    return function(g)
+    return function()
         local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
@@ -80,7 +76,7 @@ local function gen_startup_case(option_name, v)
             })
             :config()
 
-        local cluster = cluster.new(g, startup_config)
+        local cluster = cluster:new(startup_config)
         cluster:start()
 
         verify(cluster, option_name, v)
@@ -90,12 +86,12 @@ end
 -- Start an instance and try to switch the given compat option
 -- with a reload and a verification of the effect.
 local function gen_reload_case(option_name)
-    return function(g)
+    return function()
         local startup_config = cbuilder:new()
             :add_instance('instance-001', {})
             :config()
 
-        local cluster = cluster.new(g, startup_config)
+        local cluster = cluster:new(startup_config)
         cluster:start()
 
         verify(cluster, option_name, 'default')
@@ -114,7 +110,7 @@ end
 -- Verify that an attempt to change the option on reload leads to
 -- an error.
 local function gen_reload_failure_case(option_name, startup_value, reload_value)
-    return function(g)
+    return function()
         local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
@@ -124,7 +120,7 @@ local function gen_reload_failure_case(option_name, startup_value, reload_value)
             })
             :config()
 
-        local cluster = cluster.new(g, startup_config)
+        local cluster = cluster:new(startup_config)
         cluster:start()
 
         -- Attempt to switch the option to another value.
@@ -177,7 +173,7 @@ end
 -- Verify that start with the given compat option value and reload
 -- it to the second given value is successful.
 local function gen_reload_success_case(option_name, startup_value, reload_value)
-    return function(g)
+    return function()
         local startup_config = cbuilder:new()
             :add_instance('instance-001', {
                 compat = {
@@ -187,7 +183,7 @@ local function gen_reload_success_case(option_name, startup_value, reload_value)
             })
             :config()
 
-        local cluster = cluster.new(g, startup_config)
+        local cluster = cluster:new(startup_config)
         cluster:start()
 
         -- Verify that the option is switched successfully.
