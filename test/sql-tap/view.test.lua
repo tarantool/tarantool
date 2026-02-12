@@ -1117,9 +1117,10 @@ test:do_catchsql_test(
         CREATE TABLE t11(a INT PRIMARY KEY);
         CREATE TABLE t12(b INT PRIMARY KEY);
         CREATE TABLE t13(c INT PRIMARY KEY);
+        CREATE TABLE t14(d INT PRIMARY KEY);
         CREATE VIEW v11 AS SELECT * FROM
             (SELECT a FROM (SELECT a, b FROM t11, t12)),
-            (SELECT * FROM (SELECT a, c FROM t11, t13));
+            (SELECT * FROM (SELECT c, d FROM t13, t14));
     ]], {
         -- <view-23.1>
         0
