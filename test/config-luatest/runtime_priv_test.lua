@@ -1,13 +1,9 @@
 local t = require('luatest')
 local net_box = require('net.box')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- {{{ Testing helpers
 
@@ -50,7 +46,7 @@ local function new_cluster_in_ro()
             password = 'ALICE',
         })
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     define_access_error_msg_function(cluster['i-001'])
@@ -218,7 +214,7 @@ g.test_direct_lua_call_before_initial_bootstrap = function()
 
     -- Don't wait for the startup since the cluster stays in
     -- the initial `box.cfg{}` and waits for the leader appoint.
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start({wait_until_ready = false})
     local server = cluster['i-001']
 

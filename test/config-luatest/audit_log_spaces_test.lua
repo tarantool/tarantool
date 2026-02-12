@@ -1,12 +1,8 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 g.before_all(function()
     t.tarantool.skip_if_not_enterprise(
@@ -21,13 +17,13 @@ end)
 -- (box.cfg.audit_spaces) after config:reload().
 --
 -- This scenario is described in tarantool/tarantool-ee#964.
-g.test_basic = function(g)
+g.test_basic = function()
     local config = cbuilder:new()
         :set_global_option('audit_log.spaces', {'myspace'})
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify a test case prerequisite: the option is applied.

@@ -1,12 +1,8 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- Verify that if an instance is removed from the declarative
 -- configuration, it is removed from upstreams in the box-level
@@ -14,7 +10,7 @@ g.after_all(cluster.clean)
 --
 -- It effectively stops the data flow from the removed instance to
 -- others.
-g.test_size_3_to_2 = function(g)
+g.test_size_3_to_2 = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'i-001')
@@ -23,7 +19,7 @@ g.test_size_3_to_2 = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify a test case prerequisite: all the instances have all
@@ -83,7 +79,7 @@ end
 -- instances to one.
 --
 -- This scenario was broken before gh-10716.
-g.test_size_2_to_1 = function(g)
+g.test_size_2_to_1 = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'i-001')
@@ -91,7 +87,7 @@ g.test_size_2_to_1 = function(g)
         :add_instance('i-002', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify a test case prerequisite: both instances are in the

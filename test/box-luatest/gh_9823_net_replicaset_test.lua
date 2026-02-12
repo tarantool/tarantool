@@ -1,12 +1,8 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_all(cluster.clean)
-g.after_each(cluster.drop)
 
 local REDUNDANCY_FACTOR = 3
 
@@ -60,10 +56,10 @@ local function get_connect_cfg(cluster)
 end
 
 -- Test errors of replicaset connector.
-g.test_net_replicaset_error = function(cg)
+g.test_net_replicaset_error = function()
     local config = test_config()
     config.groups.test.replicasets.storage.replication.failover = 'supervised'
-    local cluster = cluster.new(cg, config)
+    local cluster = cluster:new(config)
     cluster:start()
     local net_replicaset = require('internal.net.replicaset')
     local connect_cfg = get_connect_cfg(cluster)
@@ -147,9 +143,9 @@ g.test_net_replicaset_error = function(cg)
 end
 
 -- Test the normal work of replicaset connector.
-g.test_net_replicaset_basics = function(cg)
+g.test_net_replicaset_basics = function()
     local config = test_config()
-    local cluster = cluster.new(cg, config)
+    local cluster = cluster:new(config)
     cluster:start()
     local net_replicaset = require('internal.net.replicaset')
     local connect_cfg = get_connect_cfg(cluster)
@@ -186,9 +182,9 @@ g.test_net_replicaset_basics = function(cg)
 end
 
 -- Test that replicaset is deleted successfully by GC.
-g.test_net_replicaset_gc = function(cg)
+g.test_net_replicaset_gc = function()
     local config = test_config()
-    local cluster = cluster.new(cg, config)
+    local cluster = cluster:new(config)
     cluster:start()
     local net_replicaset = require('internal.net.replicaset')
     local connect_cfg = get_connect_cfg(cluster)
@@ -231,9 +227,9 @@ g.test_net_replicaset_gc = function(cg)
 end
 
 -- Test watch_leader method.
-g.test_watch_leader = function(cg)
+g.test_watch_leader = function()
     local config = test_config()
-    local cluster = cluster.new(cg, config)
+    local cluster = cluster:new(config)
     cluster:start()
     local net_replicaset = require('internal.net.replicaset')
     local connect_cfg = get_connect_cfg(cluster)

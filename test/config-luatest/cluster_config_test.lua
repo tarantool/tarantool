@@ -1,18 +1,14 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- Verify cluster configuration access methods.
 --
 -- * config:instances()
 -- * config:get(<...>, {instance = <...>})
-g.test_basic = function(g)
+g.test_basic = function()
     local config = cbuilder:new()
         :set_global_option('replication.failover', 'election')
         :set_global_option('process.title', '{{ instance_name }}')
@@ -43,7 +39,7 @@ g.test_basic = function(g)
 
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster:each(function(server)
@@ -103,13 +99,13 @@ end
 -- option and passing the given instance explicitly. The former
 -- takes into account configuration sources with the 'instance`
 -- type: 'env' and 'env (default)'. The latter doesn't.
-g.test_env = function(g)
+g.test_env = function()
     local config = cbuilder:new()
         :set_global_option('process.title', 'file')
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config, {
+    local cluster = cluster:new(config, {
         env = {
             TT_PROCESS_TITLE = 'env',
         },
@@ -132,12 +128,12 @@ g.test_env = function(g)
 end
 
 -- Attempt to pass an unknown instance name into config:get().
-g.test_errors = function(g)
+g.test_errors = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -150,7 +146,7 @@ g.test_errors = function(g)
     end)
 end
 
-g.test_instance_uri_success = function(g)
+g.test_instance_uri_success = function()
     local peer = {
         advertise = {
             peer = {
@@ -189,7 +185,7 @@ g.test_instance_uri_success = function(g)
 
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     local function check()
@@ -254,12 +250,12 @@ g.test_instance_uri_success = function(g)
     cluster['i-006']:exec(check)
 end
 
-g.test_instance_uri_errors = function(g)
+g.test_instance_uri_errors = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -283,7 +279,7 @@ g.test_instance_uri_errors = function(g)
 end
 
 -- Attempt to pass an empty group and an empty replicaset.
-g.test_misplace_option = function(g)
+g.test_misplace_option = function()
     local config = cbuilder:new()
         :use_group('g-001')
 
@@ -294,8 +290,8 @@ g.test_misplace_option = function(g)
         :set_group_option('roles', {'storage'})
         :config()
 
-    cluster.startup_error(g, config, "group \"sharding\" should " ..
-                                     "include at least one replicaset.")
+    cluster:startup_error(config, "group \"sharding\" should " ..
+                                  "include at least one replicaset.")
 
     local config = cbuilder:new()
         :use_group('g-001')
@@ -308,11 +304,11 @@ g.test_misplace_option = function(g)
 
         :config()
 
-    cluster.startup_error(g, config, "replicaset \"sharding\" should " ..
-                                     "include at least one instance.")
+    cluster:startup_error(config, "replicaset \"sharding\" should " ..
+                                  "include at least one instance.")
 end
 
-g.test_replicasets_with_same_name = function(g)
+g.test_replicasets_with_same_name = function()
     local config = cbuilder:new()
         :use_group('g-001')
         :use_replicaset('r-001')
@@ -325,12 +321,12 @@ g.test_replicasets_with_same_name = function(g)
         :config()
 
 
-    cluster.startup_error(g, config, 'found replicasets with the same ' ..
-                                     'name "r-001" in the groups ' ..
-                                     '"g-001" and "g-002".')
+    cluster:startup_error(config, 'found replicasets with the same ' ..
+                                  'name "r-001" in the groups ' ..
+                                  '"g-001" and "g-002".')
 end
 
-g.test_instances_with_same_name = function(g)
+g.test_instances_with_same_name = function()
     local config = cbuilder:new()
         :use_group('g-001')
         :use_replicaset('r-001')
@@ -341,10 +337,10 @@ g.test_instances_with_same_name = function(g)
 
         :config()
 
-    cluster.startup_error(g, config, 'found instances with the same ' ..
-                                     'name "i-001" in the replicasets ' ..
-                                     '"r-001" and "r-002" in the group ' ..
-                                     '"g-001".')
+    cluster:startup_error(config, 'found instances with the same ' ..
+                                  'name "i-001" in the replicasets ' ..
+                                  '"r-001" and "r-002" in the group ' ..
+                                  '"g-001".')
 
     config = cbuilder:new()
         :use_group('g-001')
@@ -357,9 +353,9 @@ g.test_instances_with_same_name = function(g)
 
         :config()
 
-    cluster.startup_error(g, config, 'found instances with the same ' ..
-                                     'name "i-001" in the replicaset ' ..
-                                     '"r-001" in the group "g-001" and ' ..
-                                     'in the replicaset "r-002" in the ' ..
-                                     'group "g-002".')
+    cluster:startup_error(config, 'found instances with the same ' ..
+                                  'name "i-001" in the replicaset ' ..
+                                  '"r-001" in the group "g-001" and ' ..
+                                  'in the replicaset "r-002" in the ' ..
+                                  'group "g-002".')
 end

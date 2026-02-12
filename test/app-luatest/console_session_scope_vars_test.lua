@@ -1,13 +1,9 @@
 local t = require('luatest')
 local it = require('test.interactive_tarantool')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 local function close_on_demand(g, name)
     if g[name] ~= nil then
@@ -22,11 +18,11 @@ g.after_each(function(g)
     close_on_demand(g, 'it_2')
 end)
 
-g.test_compat_default = function(g)
+g.test_compat_default = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -93,7 +89,7 @@ g.test_remote_old = function(g)
         :set_global_option('compat.console_session_scope_vars', 'old')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     g.it_1 = it.connect(cluster['i-001'])
@@ -116,7 +112,7 @@ g.test_remote_new = function(g)
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     g.it_1 = it.connect(cluster['i-001'])

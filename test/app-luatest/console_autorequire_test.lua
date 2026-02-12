@@ -1,7 +1,7 @@
 local t = require('luatest')
 local it = require('test.interactive_tarantool')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
@@ -40,10 +40,6 @@ local function assert_autorequire(it)
     end
 end
 
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
-
 g.after_each(function(g)
     if g.it ~= nil then
         g.it:close()
@@ -70,7 +66,7 @@ g.test_remote_old_no_autorequire = function(g)
         :set_global_option('compat.console_session_scope_vars', 'old')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     g.it = it.connect(cluster['i-001'])
@@ -82,7 +78,7 @@ g.test_remote_new_autorequire = function(g)
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     g.it = it.connect(cluster['i-001'])
@@ -95,7 +91,7 @@ g.test_remote_new_extend_env = function(g)
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -111,12 +107,12 @@ g.test_remote_new_extend_env = function(g)
     assert_autorequire(g.it)
 end
 
-g.test_remote_new_set_env_illegal_param = function(g)
+g.test_remote_new_set_env_illegal_param = function()
     local config = cbuilder:new()
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -134,7 +130,7 @@ g.test_remote_new_set_env = function(g)
         :set_global_option('compat.console_session_scope_vars', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Replace the initial environment.
