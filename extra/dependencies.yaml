@@ -1,0 +1,39 @@
+# Sorted alphabetically. See description in the wiki [1].
+# 1. https://github.com/tarantool/tarantool/wiki/Dependency-Management
+dependencies:
+  - name: c-ares
+    version: 1.88.1
+  - name: c-dt
+    version: edeaa5f98219ee87ea9c8416e470a88a12dabb38
+  - name: decNumber
+    version: 7a598bf5fc24e3abdc2062e3530e70a7591e4363
+  - name: libcurl
+    version: 461ce6c6160b86439ddd74c59541231ec9e8558e
+  - name: libiconv
+    version: 1.17
+  - name: libicu
+    version: 71.1
+  - name: libncurses
+    version: 6.3-20220716
+  - name: libreadline
+    version: 8.0
+  - name: libunwind
+    version: 1.6.2
+  - name: libyaml
+    version: 788563cb51bb71649ecf1f0a00f60b259e5372be
+  - name: libzip
+    version: 0.13.71
+  - name: lua-zlib
+    version: 2219aff270036650c4b9d478d10d44256c9df751
+  - name: nghttp2
+    version: 1.52.0
+  - name: openssl
+    version: 3.2.1
+  - name: tz
+    version: 2022a
+  - name: xxHash
+    version: 0.8.0
+  - name: zlib
+    version: 1.2.12
+  - name: zstd
+    version: pre-1.5.5
