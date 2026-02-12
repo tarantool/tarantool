@@ -4042,6 +4042,30 @@ err_key:
 }
 
 static int
+vinyl_index_get_internal(struct index *index, const char *key,
+			 uint32_t part_count, struct tuple **ret)
+{
+	assert(index->def->opts.is_unique);
+	assert(index->def->key_def->part_count == part_count);
+
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_env *env = vy_env(index->engine);
+	int rc = vy_get_by_raw_key(lsm, NULL, &env->xm->p_global_read_view,
+				   key, part_count, ret);
+	if (rc != 0)
+		return -1;
+	if (*ret != NULL) {
+		static struct tuple *internal_tuple_last = NULL;
+		/* Remove previous tuple */
+		if (likely(internal_tuple_last != NULL))
+			tuple_unref(internal_tuple_last);
+		/* Remember current tuple */
+		internal_tuple_last = *ret;
+	}
+	return 0;
+}
+
+static int
 vinyl_index_get(struct index *index, const char *key,
 		uint32_t part_count, struct tuple **ret)
 {
@@ -4853,7 +4877,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
+	/* .get_internal = */ vinyl_index_get_internal,
 	/* .get = */ vinyl_index_get,
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_iterator_with_offset = */
