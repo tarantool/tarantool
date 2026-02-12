@@ -142,8 +142,9 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
  * A MsgPack extensions handler. The return value indicates encoding success.
  */
 typedef bool
-(*luamp_encode_extension_f)(struct lua_State *, int, struct mpstream *,
-			    struct mp_ctx *, enum mp_type *);
+(*luamp_encode_extension_f)(struct lua_State *L, struct luaL_serializer *cfg,
+			    struct mpstream *stream, int idx,
+			    struct mp_ctx *ctx, enum mp_type *type);
 
 /**
  * @brief Set a callback that executed by encoder on unsupported Lua type
@@ -153,8 +154,8 @@ void
 luamp_set_encode_extension(luamp_encode_extension_f handler);
 
 typedef void
-(*luamp_decode_extension_f)(struct lua_State *L, const char **data,
-			    struct mp_ctx *ctx);
+(*luamp_decode_extension_f)(struct lua_State *L, struct luaL_serializer *cfg,
+			    const char **data, struct mp_ctx *ctx);
 
 /**
  * @brief Set a callback that executed by decode on unsupported extension
