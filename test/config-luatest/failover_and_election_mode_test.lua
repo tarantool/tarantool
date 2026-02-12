@@ -16,14 +16,10 @@
 
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 local textutils = require('internal.config.utils.textutils')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- An error that should appear if replication.failover =
 -- supervised and replication.election_mode is set to a value that
@@ -119,19 +115,19 @@ end
 -- Verify that the given incorrect configuration is reported as
 -- startup error.
 local function failure_case(failover, election_mode, synchro_mode, anon)
-    return function(g)
+    return function()
         local config = build_config(failover, election_mode, synchro_mode, anon)
         local exp_err = expected_error(failover, election_mode)
-        cluster.startup_error(g, config, exp_err)
+        cluster:startup_error(config, exp_err)
     end
 end
 
 -- Verify that the given correct configuration allows to start a
 -- replicaset successfully.
 local function success_case(failover, election_mode, synchro_mode, anon)
-    return function(g)
+    return function()
         local config = build_config(failover, election_mode, synchro_mode, anon)
-        local cluster = cluster.new(g, config)
+        local cluster = cluster:new(config)
         cluster:start()
 
         cluster['instance-004']:exec(function(failover, election_mode,

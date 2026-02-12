@@ -1,5 +1,5 @@
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 local compat = require('compat')
 local fio = require('fio')
 local fun = require('fun')
@@ -566,10 +566,6 @@ g_general.test_compat_opt_transition = function(cg)
     end)
 end
 
-g_recovery.before_all(cluster.init)
-g_recovery.after_all(cluster.clean)
-g_recovery.after_each(cluster.drop)
-
 g_recovery.before_each(function(cg)
     local config = cbuilder:new()
         :add_instance('server', {})
@@ -577,9 +573,9 @@ g_recovery.before_each(function(cg)
             box_consider_system_spaces_synchronous = 'new',
         })
         :config()
-    local cluster = cluster.new(cg, config)
-    cluster:start()
-    cluster.server:exec(function(check_sync_system_spaces)
+    cg.cluster = cluster:new(config)
+    cg.cluster:start()
+    cg.cluster.server:exec(function(check_sync_system_spaces)
         t.assert_equals(require("compat").
                         box_consider_system_spaces_synchronous.current, "new")
         box.schema.func.create('check_sync_system_spaces', {
