@@ -163,6 +163,8 @@ struct iproto_thread {
 		 * Used for returning request results.
 		 */
 		struct cpipe ret_pipe;
+		/** CALL/EVAL route. */
+		struct cmsg_hop call_route[2];
 		/** Route used to destroy an IPROTO connection. */
 		struct cmsg_hop destroy_route[2];
 	} *srv;
@@ -177,7 +179,6 @@ struct iproto_thread {
 	struct cmsg_hop rollback_on_disconnect_route[2];
 	struct cmsg_hop disconnect_route[2];
 	struct cmsg_hop misc_route[2];
-	struct cmsg_hop call_route[2];
 	struct cmsg_hop select_route[2];
 	struct cmsg_hop process1_route[2];
 	struct cmsg_hop sql_route[2];
@@ -1940,7 +1941,8 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 		diag_set(ClientError, ER_NO_SUCH_THREAD, thread_id);
 		goto error;
 	}
-	if (thread_id != XROW_THREAD_UNSPEC && thread_id != 0) {
+	if (thread_id != XROW_THREAD_UNSPEC && thread_id != 0 &&
+	    type != IPROTO_CALL && type != IPROTO_EVAL) {
 		diag_set(ClientError, ER_UNABLE_TO_PROCESS_IN_THREAD,
 			 iproto_type_name(type), thread_id);
 		goto error;
@@ -1989,6 +1991,9 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 		cmsg_init(&msg->base, iproto_thread->override_route);
 		return;
 	}
+
+	if (thread_id != XROW_THREAD_UNSPEC)
+		msg->srv_id = thread_id;
 
 	rc = iproto_msg_decode(msg, &route);
 	if (rc == 0) {
@@ -2054,7 +2059,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
 	case IPROTO_EVAL:
-		*route = iproto_thread->call_route;
+		*route = iproto_thread->srv[msg->srv_id].call_route;
 		if (xrow_decode_call(&msg->header, &msg->call))
 			return -1;
 		return 0;
@@ -2772,7 +2777,7 @@ error:
 }
 
 static int
-tx_process_call_on_yield(struct trigger *trigger, void *event)
+srv_process_call_on_yield(struct trigger *trigger, void *event)
 {
 	(void)event;
 	struct iproto_msg *msg = (struct iproto_msg *)trigger->data;
@@ -2810,7 +2815,7 @@ tx_process_call(struct cmsg *m)
 	 * a long polling request.
 	 */
 	struct trigger fiber_on_yield;
-	trigger_create(&fiber_on_yield, tx_process_call_on_yield, msg, NULL);
+	trigger_create(&fiber_on_yield, srv_process_call_on_yield, msg, NULL);
 	trigger_add(&fiber()->on_yield, &fiber_on_yield);
 
 	int rc;
@@ -2883,6 +2888,60 @@ error:
 	svp = obuf_create_svp(out);
 	tx_reply_error(msg);
 	tx_end_msg(msg, &svp);
+}
+
+/**
+ * Process a CALL/EVAL request in a serving thread.
+ */
+static void
+srv_process_call(struct cmsg *m)
+{
+	struct iproto_msg *msg = srv_accept_msg(m);
+	struct obuf *out;
+	struct obuf_svp svp;
+	struct port port;
+	int count;
+	int rc;
+
+	struct trigger fiber_on_yield;
+	trigger_create(&fiber_on_yield, srv_process_call_on_yield, msg, NULL);
+	trigger_add(&fiber()->on_yield, &fiber_on_yield);
+
+	switch (msg->header.type) {
+	case IPROTO_CALL:
+		rc = app_thread_process_call(&msg->call, &port);
+		break;
+	case IPROTO_EVAL:
+		rc = app_thread_process_eval(&msg->call, &port);
+		break;
+	default:
+		unreachable();
+	}
+
+	trigger_clear(&fiber_on_yield);
+
+	if (rc != 0)
+		goto error;
+
+	out = iproto_msg_obuf(msg);
+	iproto_prepare_select(out, &svp);
+	count = port_dump_msgpack(&port, out);
+	port_destroy(&port);
+	if (count < 0) {
+		obuf_rollback_to_svp(out, &svp);
+		goto error;
+	}
+	iproto_reply_select(out, &svp, msg->header.sync, /*schema_version=*/0,
+			    count, /*box_tuple_as_ext=*/false);
+	iproto_wpos_create(&msg->wpos, out);
+	srv_end_msg(msg);
+	return;
+error:
+	out = iproto_msg_obuf(msg);
+	iproto_reply_error(out, diag_last_error(&fiber()->diag),
+			   msg->header.sync, /*schema_version=*/0);
+	iproto_wpos_create(&msg->wpos, out);
+	srv_end_msg(msg);
 }
 
 static void
@@ -3879,8 +3938,6 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->disconnect_route[1] = {net_finish_disconnect, NULL};
 	iproto_thread->misc_route[0] = {tx_process_misc, net_pipe};
 	iproto_thread->misc_route[1] = {net_send_msg, NULL};
-	iproto_thread->call_route[0] = {tx_process_call, net_pipe};
-	iproto_thread->call_route[1] = {net_send_msg, NULL};
 	iproto_thread->select_route[0] = {tx_process_select, net_pipe};
 	iproto_thread->select_route[1] = {net_send_msg, NULL};
 	iproto_thread->process1_route[0] = {tx_process1, net_pipe};
@@ -3897,23 +3954,12 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->push_route[1] = {tx_end_push, NULL};
 
 	struct cmsg_hop **dml_route = iproto_thread->dml_route;
-	assert(dml_route[IPROTO_OK] == NULL);
 	dml_route[IPROTO_SELECT] = iproto_thread->select_route;
 	dml_route[IPROTO_INSERT] = iproto_thread->process1_route;
 	dml_route[IPROTO_REPLACE] = iproto_thread->process1_route;
 	dml_route[IPROTO_UPDATE] = iproto_thread->process1_route;
 	dml_route[IPROTO_DELETE] = iproto_thread->process1_route;
-	dml_route[IPROTO_CALL_16] = iproto_thread->call_route;
-	dml_route[IPROTO_AUTH] = iproto_thread->misc_route;
-	dml_route[IPROTO_EVAL] = iproto_thread->call_route;
 	dml_route[IPROTO_UPSERT] = iproto_thread->process1_route;
-	dml_route[IPROTO_CALL] = iproto_thread->call_route;
-	dml_route[IPROTO_EXECUTE] = iproto_thread->sql_route;
-	assert(dml_route[IPROTO_NOP] == NULL);
-	dml_route[IPROTO_PREPARE] = iproto_thread->sql_route;
-	assert(dml_route[IPROTO_BEGIN] == NULL);
-	assert(dml_route[IPROTO_COMMIT] == NULL);
-	assert(dml_route[IPROTO_ROLLBACK] == NULL);
 	dml_route[IPROTO_INSERT_ARROW] = iproto_thread->process1_route;
 
 	iproto_thread->connect_route[0] = {tx_process_connect, net_pipe};
@@ -3921,6 +3967,14 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->override_route[0] = {tx_process_override, net_pipe};
 	iproto_thread->override_route[1] = {net_send_msg, NULL};
 
+	iproto_thread->srv[0].call_route[0] = {tx_process_call, net_pipe};
+	iproto_thread->srv[0].call_route[1] = {net_send_msg, NULL};
+	for (int i = 1; i < iproto_thread->srv_count; i++) {
+		iproto_thread->srv[i].call_route[0] =
+			{srv_process_call, &iproto_thread->srv[i].ret_pipe};
+		iproto_thread->srv[i].call_route[1] =
+			{net_send_msg, NULL};
+	}
 	for (int i = 0; i < iproto_thread->srv_count; i++) {
 		iproto_thread->srv[i].destroy_route[0] =
 			{srv_process_destroy, &iproto_thread->srv[i].ret_pipe};

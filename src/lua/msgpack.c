@@ -119,7 +119,7 @@ luamp_error(void *error_ctx)
 	luaL_error(L, diag_last_error(diag_get())->errmsg);
 }
 
-struct luaL_serializer *luaL_msgpack_default = NULL;
+__thread struct luaL_serializer *luaL_msgpack_default = NULL;
 
 const char *
 luamp_get(struct lua_State *L, int idx, size_t *data_len)

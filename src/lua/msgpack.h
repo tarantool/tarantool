@@ -52,7 +52,7 @@ struct mp_ctx;
  * All changes made by msgpack.cfg{} function are also affect box's bindings
  * (this is a feature).
  */
-extern struct luaL_serializer *luaL_msgpack_default;
+extern __thread struct luaL_serializer *luaL_msgpack_default;
 
 /**
  * luaL_error()

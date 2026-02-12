@@ -41,7 +41,8 @@ struct lua_State;
 struct luaL_Reg;
 extern bool start_loop;
 
-extern struct lua_State *tarantool_L;
+/** Single global lua_State shared by core and modules. */
+extern __thread struct lua_State *tarantool_L;
 
 /* Struct with the information for instance configuration. */
 struct instance_state {
@@ -64,6 +65,13 @@ struct instance_state {
 /** Returns true if the name refers to a built-in global Lua object. */
 bool
 tarantool_lua_is_builtin_global(const char *name, uint32_t name_len);
+
+/**
+ * Create tarantool_L and initialize the minimal set of built-in Lua modules
+ * necessary to run Lua code in an application thread.
+ */
+void
+tarantool_lua_init_minimal(void);
 
 /**
  * Create tarantool_L and initialize built-in Lua modules.

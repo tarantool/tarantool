@@ -40,6 +40,7 @@
 #include "lib/core/decimal.h" /* decimal_t */
 #include "lib/core/mp_extension_types.h"
 #include "lua/error.h"
+#include "lua/decimal.h"
 
 #include "datetime.h"
 #include "trivia/util.h"
@@ -47,10 +48,8 @@
 #include "lua/utils.h"
 #include "tt_static.h"
 
-int luaL_map_metatable_ref = LUA_REFNIL;
-int luaL_array_metatable_ref = LUA_REFNIL;
-extern uint32_t CTID_UUID;
-extern uint32_t CTID_DECIMAL;
+__thread int luaL_map_metatable_ref = LUA_REFNIL;
+__thread int luaL_array_metatable_ref = LUA_REFNIL;
 
 /* {{{ luaL_serializer manipulations */
 

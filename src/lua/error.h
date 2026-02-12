@@ -37,7 +37,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern uint32_t CTID_CONST_STRUCT_ERROR_REF;
+extern __thread uint32_t CTID_CONST_STRUCT_ERROR_REF;
 
 /** \cond public */
 struct error;

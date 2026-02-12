@@ -53,6 +53,16 @@ struct tuple *
 tuple_unpack_without_format(const char **data);
 
 /**
+ * Load a raw tuple value from the buffer.
+ *
+ * @param data A buffer.
+ * @return A pointer to the tuple data in the buffer.
+ * @post *data = next value after packed tuple value.
+ */
+const char *
+tuple_unpack_raw(const char **data);
+
+/**
  * Encode a tuple value to a buffer.
  *
  * @param data A buffer.

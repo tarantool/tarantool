@@ -70,16 +70,18 @@ struct vclock;
  * const char *msg = lua_tostring(L, -1);
  * snprintf(m_errmsg, sizeof(m_errmsg), "%s", msg ? msg : "");
  */
-extern struct lua_State *tarantool_L;
+extern __thread struct lua_State *tarantool_L;
 
-extern uint32_t CTID_CHAR_PTR;
-extern uint32_t CTID_CONST_CHAR_PTR;
+extern __thread int luaL_nil_ref;
+
+extern __thread uint32_t CTID_CHAR_PTR;
+extern __thread uint32_t CTID_CONST_CHAR_PTR;
 /** Type ID of struct varbinary. */
-extern uint32_t CTID_VARBINARY;
-extern uint32_t CTID_UUID;
-extern uint32_t CTID_DATETIME;
+extern __thread uint32_t CTID_VARBINARY;
+extern __thread uint32_t CTID_UUID;
+extern __thread uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
-extern uint32_t CTID_INTERVAL;
+extern __thread uint32_t CTID_INTERVAL;
 
 /**
  * Creates a new Lua state with a custom allocator function.
@@ -298,8 +300,6 @@ luaL_maplen(struct lua_State *L, int idx)
 	}
 	return size;
 }
-
-extern int luaL_nil_ref;
 
 void
 luaL_register_type(struct lua_State *L, const char *type_name,

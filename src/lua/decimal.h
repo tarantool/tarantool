@@ -38,7 +38,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-extern uint32_t CTID_DECIMAL;
+extern __thread uint32_t CTID_DECIMAL;
 
 struct lua_State;
 
