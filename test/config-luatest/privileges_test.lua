@@ -1,12 +1,8 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 local base_config = cbuilder:new()
     :add_instance('i-001', {})
@@ -35,7 +31,7 @@ local function test_lua_call_direct_access()
     t.assert_error_msg_equals(msg, function() con:call('baz') end)
 end
 
-g.test_user_lua_call = function(g)
+g.test_user_lua_call = function()
     local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
@@ -44,12 +40,12 @@ g.test_user_lua_call = function(g)
             permissions = {'execute'}
         }
     }
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(test_lua_call_direct_access)
 end
 
-g.test_role_lua_call = function(g)
+g.test_role_lua_call = function()
     local config = cbuilder:new(base_config)
         :set_global_option('credentials.roles.test.privileges', {})
         :config()
@@ -60,7 +56,7 @@ g.test_role_lua_call = function(g)
         }
     }
     config.credentials.users.alice.roles = {'test'}
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(test_lua_call_direct_access)
 end
@@ -84,7 +80,7 @@ local function test_lua_call_universe_access()
     t.assert_error_msg_equals(msg, function() con:call('box.info') end)
 end
 
-g.test_lua_call_all = function(g)
+g.test_lua_call_all = function()
     local config = cbuilder:new(base_config)
         :config()
     config.credentials.users.alice.privileges = {
@@ -93,7 +89,7 @@ g.test_lua_call_all = function(g)
             permissions = {'execute'}
         }
     }
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(test_lua_call_universe_access)
 end
@@ -107,7 +103,7 @@ g.test_lua_call_all_with_func = function()
             permissions = {'execute'}
         }
     }
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(test_lua_call_universe_access)
 end
@@ -121,7 +117,7 @@ g.test_lua_call_all_with_built_in_func = function()
             permissions = {'execute'}
         }
     }
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(function()
         local netbox = require('net.box')
@@ -157,7 +153,7 @@ g.test_lua_call_reload = function()
                 permissions = {'execute'}
             }
         }
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     cluster['i-001']:exec(test_lua_call_reload)
     cluster:reload(config)

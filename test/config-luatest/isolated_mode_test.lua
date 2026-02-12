@@ -4,14 +4,10 @@ local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 local it = require('test.interactive_tarantool')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 g.after_each(function(g)
     if g.it ~= nil then
@@ -85,7 +81,7 @@ g.test_startup_with_snap = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Stop i-003. It leaves a local snapshot.
@@ -140,7 +136,7 @@ g.test_read_only = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Use the console connection, because an instance in the
@@ -198,7 +194,7 @@ g.test_iproto_stop = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Connect to the server's console and verify that it works.
@@ -241,7 +237,7 @@ g.test_iproto_stop_failure = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Imitate a timeout error on dropping iproto connections.
@@ -317,7 +313,7 @@ g.test_iproto_stop_failure_on_startup = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config, {
+    local cluster = cluster:new(config, {
         env = {
             -- Imitate a timeout error on dropping iproto
             -- connections.
@@ -420,7 +416,7 @@ g.test_replication_to = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Use the console connection, because an instance in the
@@ -472,7 +468,7 @@ end
 
 -- Verify that neither of replicaset members fetch data from an
 -- isolated instance.
-g.test_replication_from = function(g)
+g.test_replication_from = function()
     local function instance_uri(instance_name)
         return {
             login = 'replicator',
@@ -503,7 +499,7 @@ g.test_replication_from = function(g)
         :add_instance('i-003', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify a test case prerequisite: i-003 is in the upstreams
@@ -565,7 +561,7 @@ g.test_alert = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Connect to the server's console.
@@ -614,7 +610,7 @@ g.test_alert_on_startup = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Stop i-001. It leaves a local snapshot, so it can be
