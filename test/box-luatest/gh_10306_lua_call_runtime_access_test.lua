@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
@@ -9,10 +9,6 @@ local config = cbuilder:new()
     :set_global_option('credentials.users.alice')
     :set_global_option('credentials.users.alice.password', 'ALICE')
     :config()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 local function access_error_msg(user, func)
     local templ = 'Execute access to function \'%s\' is denied for user \'%s\''
@@ -25,8 +21,8 @@ local function define_access_error_msg_function(server)
     end, {string.dump(access_error_msg)})
 end
 
-g.test_lua_call_runtime_priv_grant = function(g)
-    local cluster = cluster.new(g, config)
+g.test_lua_call_runtime_priv_grant = function()
+    local cluster = cluster:new(config)
     cluster:start()
     define_access_error_msg_function(cluster['i-001'])
     cluster['i-001']:exec(function()
@@ -54,8 +50,8 @@ g.test_lua_call_runtime_priv_grant = function(g)
     end)
 end
 
-g.test_lua_call_runtime_priv_reset = function(g)
-    local cluster = cluster.new(g, config)
+g.test_lua_call_runtime_priv_reset = function()
+    local cluster = cluster:new(config)
     cluster:start()
     define_access_error_msg_function(cluster['i-001'])
     cluster['i-001']:exec(function()
@@ -86,8 +82,8 @@ g.test_lua_call_runtime_priv_reset = function(g)
     end)
 end
 
-g.test_grant_universe_lua_call = function(g)
-    local cluster = cluster.new(g, config)
+g.test_grant_universe_lua_call = function()
+    local cluster = cluster:new(config)
     cluster:start()
     define_access_error_msg_function(cluster['i-001'])
     cluster['i-001']:exec(function()
@@ -112,8 +108,8 @@ g.test_grant_universe_lua_call = function(g)
     end)
 end
 
-g.test_grant_builtins_lua_call = function(g)
-    local cluster = cluster.new(g, config)
+g.test_grant_builtins_lua_call = function()
+    local cluster = cluster:new(config)
     cluster:start()
     define_access_error_msg_function(cluster['i-001'])
     cluster['i-001']:exec(function()
@@ -133,8 +129,8 @@ g.test_grant_builtins_lua_call = function(g)
     end)
 end
 
-g.test_lua_call_runtime_priv_invalid_usage = function(g)
-    local cluster = cluster.new(g, config)
+g.test_lua_call_runtime_priv_invalid_usage = function()
+    local cluster = cluster:new(config)
     cluster:start()
     define_access_error_msg_function(cluster['i-001'])
     cluster['i-001']:exec(function()

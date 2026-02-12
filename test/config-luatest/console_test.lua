@@ -3,13 +3,9 @@ local fio = require('fio')
 local socket = require('socket')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- Connect to a text console.
 local function connect(cluster, instance_name, config, timeout)
@@ -63,12 +59,12 @@ local function assert_console_closed(cluster, config)
 end
 
 -- Start, reload, change, return back, disable.
-g.test_basic = function(g)
+g.test_basic = function()
     -- Start an instance and verify that the console works.
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     assert_console_works(cluster, config)
 
@@ -102,13 +98,13 @@ g.test_basic = function(g)
 end
 
 -- Start with some custom workinf directory and reload.
-g.test_custom_work_dir = function(g)
+g.test_custom_work_dir = function()
     local config = cbuilder:new()
         :set_global_option('process.work_dir', 'w')
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     assert_console_works(cluster, config)
 
@@ -117,14 +113,14 @@ g.test_custom_work_dir = function(g)
 end
 
 -- As previous, but with `../` in the socket path.
-g.test_parent_dir_in_socket_path = function(g)
+g.test_parent_dir_in_socket_path = function()
     local config = cbuilder:new()
         :set_global_option('process.work_dir', 'w')
         :set_global_option('console.socket', '../foo.control')
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     assert_console_works(cluster, config)
 
@@ -133,11 +129,11 @@ g.test_parent_dir_in_socket_path = function(g)
 end
 
 -- Re-open console by setting enable to false and true
-g.test_reopen_console = function(g)
+g.test_reopen_console = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     assert_console_works(cluster, config)
 
