@@ -133,17 +133,20 @@ luamp_get(struct lua_State *L, int idx, size_t *data_len)
 	return NULL;
 }
 
+/**
+ * Default extension encoder, always returns false.
+ */
 static bool
-luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream, struct mp_ctx *ctx,
-			       enum mp_type *type);
+luamp_encode_extension_default(struct lua_State *L, struct luaL_serializer *cfg,
+			       struct mpstream *stream, int idx,
+			       struct mp_ctx *ctx, enum mp_type *type);
 
 /**
  * Default extension decoder, always throws an error.
  */
 static void
-luamp_decode_extension_default(struct lua_State *L, const char **data,
-			       struct mp_ctx *ctx);
+luamp_decode_extension_default(struct lua_State *L, struct luaL_serializer *cfg,
+			       const char **data, struct mp_ctx *ctx);
 
 static luamp_encode_extension_f luamp_encode_extension =
 		luamp_encode_extension_default;
@@ -151,13 +154,14 @@ static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
 
 static bool
-luamp_encode_extension_default(struct lua_State *L, int idx,
-			       struct mpstream *stream, struct mp_ctx *ctx,
-			       enum mp_type *type)
+luamp_encode_extension_default(struct lua_State *L, struct luaL_serializer *cfg,
+			       struct mpstream *stream, int idx,
+			       struct mp_ctx *ctx, enum mp_type *type)
 {
-	(void) L;
-	(void) idx;
-	(void) stream;
+	(void)L;
+	(void)cfg;
+	(void)stream;
+	(void)idx;
 	(void)ctx;
 	(void)type;
 	return false;
@@ -174,9 +178,10 @@ luamp_set_encode_extension(luamp_encode_extension_f handler)
 }
 
 static void
-luamp_decode_extension_default(struct lua_State *L, const char **data,
-			       struct mp_ctx *ctx)
+luamp_decode_extension_default(struct lua_State *L, struct luaL_serializer *cfg,
+			       const char **data, struct mp_ctx *ctx)
 {
+	(void)cfg;
 	(void)ctx;
 	int8_t ext_type;
 	mp_decode_extl(data, &ext_type);
@@ -346,8 +351,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 						    field->errorval->errmsg);
 				break;
 			}
-			bool is_encoded = luamp_encode_extension(L, top, stream,
-								 ctx, &type);
+			bool is_encoded = luamp_encode_extension(
+					L, cfg, stream, top, ctx, &type);
 			assert(is_encoded);
 			(void)is_encoded;
 			break;
@@ -365,8 +370,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 				break;
 			}
 			/* Run trigger if type can't be encoded */
-			bool is_encoded = luamp_encode_extension(L, top, stream,
-								 ctx, &type);
+			bool is_encoded = luamp_encode_extension(
+					L, cfg, stream, top, ctx, &type);
 			if (is_encoded) {
 				/* Value has been packed by the trigger */
 				break;
@@ -528,7 +533,7 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 		default:
 			/* reset data to the extension header */
 			*data = svp;
-			luamp_decode_extension(L, data, ctx);
+			luamp_decode_extension(L, cfg, data, ctx);
 			break;
 		}
 		break;
