@@ -762,7 +762,7 @@ applier_connect(struct applier *applier)
 	applier_set_state(applier, APPLIER_READY);
 }
 
-static uint64_t
+static void
 applier_wait_snapshot(struct applier *applier)
 {
 	struct iostream *io = &applier->io;
@@ -827,15 +827,15 @@ applier_wait_snapshot(struct applier *applier)
 	/*
 	 * Receive initial data.
 	 */
-	uint64_t row_count = 0;
+	applier->row_count = 0;
 	while (true) {
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			if (apply_snapshot_row(&row) != 0)
 				diag_raise();
-			if (++row_count % ROWS_PER_LOG == 0) {
+			if (++applier->row_count % ROWS_PER_LOG == 0) {
 				say_info_ratelimited("%.1fM rows received",
-						     row_count / 1e6);
+						     applier->row_count / 1e6);
 			}
 		} else if (row.type == IPROTO_OK) {
 			if (applier->version_id < version_id(1, 7, 0)) {
@@ -859,8 +859,6 @@ applier_wait_snapshot(struct applier *applier)
 		}
 		coio_read_xrow(io, ibuf, &row);
 	}
-
-	return row_count;
 }
 
 static void
@@ -971,8 +969,8 @@ tx_save_body(struct applier *applier, struct xrow_header *row)
 	}
 }
 
-static uint64_t
-applier_wait_register(struct applier *applier, uint64_t row_count)
+static void
+applier_wait_register(struct applier *applier)
 {
 	/*
 	 * Tarantool < 1.7.0: there is no "final join" stage.
@@ -980,10 +978,11 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	 * until replica id is received.
 	 */
 	if (applier->version_id < version_id(1, 7, 0))
-		return row_count;
+		return;
 
 	uint64_t next_log_cnt =
-		row_count + ROWS_PER_LOG - row_count % ROWS_PER_LOG;
+		applier->row_count + ROWS_PER_LOG -
+		applier->row_count % ROWS_PER_LOG;
 	/*
 	 * Receive final data.
 	 */
@@ -997,9 +996,9 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	while (true) {
 		struct stailq rows;
 		RegionGuard region_guard(&fiber()->gc);
-		row_count += applier_read_tx(applier, &rows, &ctx,
+		applier->row_count += applier_read_tx(applier, &rows, &ctx,
 					     TIMEOUT_INFINITY);
-		while (row_count >= next_log_cnt) {
+		while (applier->row_count >= next_log_cnt) {
 			say_info_ratelimited("%.1fM rows received",
 					     next_log_cnt / 1e6);
 			next_log_cnt += ROWS_PER_LOG;
@@ -1017,8 +1016,6 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 		if (applier_apply_tx(applier, &rows) != 0)
 			diag_raise();
 	}
-
-	return row_count;
 }
 
 static void
@@ -1043,7 +1040,7 @@ applier_register(struct applier *applier, bool was_anon)
 	 */
 	applier_set_state(applier, was_anon ? APPLIER_REGISTER :
 					      APPLIER_FINAL_JOIN);
-	applier_wait_register(applier, 0);
+	applier_wait_register(applier);
 	applier_set_state(applier, was_anon ? APPLIER_REGISTERED :
 					      APPLIER_JOINED);
 	applier_set_state(applier, APPLIER_READY);
@@ -1058,7 +1055,7 @@ applier_join(struct applier *applier)
 	/* Send JOIN request */
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
-	uint64_t row_count;
+	uint64_t prev_row_count;
 	struct join_request req;
 	memset(&req, 0, sizeof(req));
 	req.instance_uuid = INSTANCE_UUID;
@@ -1069,13 +1066,15 @@ applier_join(struct applier *applier)
 
 	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
 
-	row_count = applier_wait_snapshot(applier);
+	applier_wait_snapshot(applier);
 
 	say_info("initial data received");
 
 	applier_set_state(applier, APPLIER_FINAL_JOIN);
 
-	if (applier_wait_register(applier, row_count) == row_count) {
+	prev_row_count = applier->row_count;
+	applier_wait_register(applier);
+	if (applier->row_count == prev_row_count) {
 		/*
 		 * We didn't receive any rows during registration.
 		 * Proceed to "subscribe" and do not finish bootstrap
