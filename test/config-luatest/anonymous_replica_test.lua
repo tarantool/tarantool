@@ -1,12 +1,8 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- Ease writing of a long error message in a code.
 local function toline(s)
@@ -19,7 +15,7 @@ end
 -- This test excludes the `replication.peers` autoconstruction
 -- logic by defining the option on its own. This automatic
 -- construction is verified in a separate test case.
-g.test_basic = function(g)
+g.test_basic = function()
     -- One master, two replicas, two anonymous replicas.
     local config = cbuilder:new()
         :set_replicaset_option('replication.peers', {
@@ -46,7 +42,7 @@ g.test_basic = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify that all the instances are healthy.
@@ -67,7 +63,7 @@ end
 
 -- Verify that an anonymous replica is not used as an upstream for
 -- other instances of the same replicaset.
-g.test_no_anonymous_upstream = function(g)
+g.test_no_anonymous_upstream = function()
     -- One master, two replicas, two anonymous replicas.
     --
     -- NB: It is the same as config in `test_basic`, but has no
@@ -92,7 +88,7 @@ g.test_no_anonymous_upstream = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
      -- Verify that the anonymous replicas are actually anonymous.
@@ -135,7 +131,7 @@ end
 
 -- Verify that anonymous replicas are skipped when choosing a
 -- bootstrap leader in the `failover: supervised` mode.
-g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
+g.test_supervised_mode_bootstrap_leader_not_anon = function()
     -- `failover: supervised` assigns a first non-anonymous
     -- instance as a bootstrap leader. The order is alphabetical.
     local config = cbuilder:new()
@@ -155,7 +151,7 @@ g.test_supervised_mode_bootstrap_leader_not_anon = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify that instance-001 (anonymous replica) is
@@ -178,7 +174,7 @@ end
 -- Verify that a replicaset with all the instances configured as
 -- anonymous replicas refuse to start with a meaningful error
 -- message.
-g.test_all_anonymous = function(g)
+g.test_all_anonymous = function()
     local config = cbuilder:new()
         :add_instance('instance-001', {
             replication = {
@@ -197,7 +193,7 @@ g.test_all_anonymous = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster:startup_error(config, toline([[
         All the instances of replicaset "replicaset-001" of group "group-001"
         are configured as anonymous replicas; it effectively means that the
         whole replicaset is read-only; moreover, it means that default
@@ -215,7 +211,7 @@ end
 -- is found.
 --
 -- replication.failover: off
-g.test_anonymous_replica_rw_mode = function(g)
+g.test_anonymous_replica_rw_mode = function()
     local config = cbuilder:new()
         :add_instance('instance-001', {
             database = {
@@ -234,7 +230,7 @@ g.test_anonymous_replica_rw_mode = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster:startup_error(config, toline([[
         database.mode = "rw" is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001", but this option cannot be used
         together with replication.anon = true
@@ -247,7 +243,7 @@ end
 -- is found.
 --
 -- replication.failover: manual
-g.test_anonymous_replica_leader = function(g)
+g.test_anonymous_replica_leader = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'instance-004')
@@ -261,7 +257,7 @@ g.test_anonymous_replica_leader = function(g)
         })
         :config()
 
-    cluster.startup_error(g, config, toline([[
+    cluster:startup_error(config, toline([[
         replication.anon = true is set for instance "instance-004" of replicaset
         "replicaset-001" of group "group-001" that is configured as a leader; a
         leader can not be an anonymous replica
@@ -275,7 +271,7 @@ end
 -- is found.
 --
 -- replication.failover: election
-g.test_anonymous_replica_election_mode_other_than_off = function(g)
+g.test_anonymous_replica_election_mode_other_than_off = function()
     local error_t = toline([[
         replication.election_mode = %q is set for instance "instance-004" of
         replicaset "replicaset-001" of group "group-001", but this option cannot
@@ -297,13 +293,13 @@ g.test_anonymous_replica_election_mode_other_than_off = function(g)
             })
             :config()
 
-        cluster.startup_error(g, config, error_t:format(election_mode))
+        cluster:startup_error(config, error_t:format(election_mode))
     end
 end
 
 -- Verify that the election mode defaults to 'off' for an
 -- anonymous replica in a replicaset with election failover.
-g.test_anonymous_replica_election_mode_off = function(g)
+g.test_anonymous_replica_election_mode_off = function()
     -- Three non-anonymous instances, two anonymous replicas.
     --
     -- The replicaset is in `failover: election` mode.
@@ -324,7 +320,7 @@ g.test_anonymous_replica_election_mode_off = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     local function verify_election_mode_candidate()
@@ -346,7 +342,7 @@ end
 
 -- Verify that an anonymous replica can join a replicaset that has
 -- all the instances in read-only mode.
-g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
+g.test_join_anonymous_replica_to_all_ro_replicaset = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.failover', 'manual')
         :set_replicaset_option('leader', 'instance-001')
@@ -356,7 +352,7 @@ g.test_join_anonymous_replica_to_all_ro_replicaset = function(g)
         :config()
 
     -- Bootstrap the replicaset.
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Unset the leader -- make all the instances read-only.

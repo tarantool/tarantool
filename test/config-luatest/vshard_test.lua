@@ -5,13 +5,9 @@ local justrun = require('luatest.justrun')
 local server = require('luatest.server')
 local cbuilder = require('luatest.cbuilder')
 local helpers = require('test.config-luatest.helpers')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = helpers.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 local has_vshard = pcall(require, 'vshard-ee')
 if not has_vshard then
@@ -775,7 +771,7 @@ end
 -- were unable to start in this scenario, assuming that all the
 -- instances have some sharding role (or at least an empty list in
 -- the sharding.roles option).
-g.test_no_sharding_role = function(g)
+g.test_no_sharding_role = function()
     skip_if_no_vshard()
 
     local config = cbuilder:new()
@@ -820,6 +816,6 @@ g.test_no_sharding_role = function(g)
     --
     -- :start() checks box.info.config.status on all the
     -- instances. We don't need to check anything else.
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 end
