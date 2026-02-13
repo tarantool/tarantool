@@ -3961,6 +3961,7 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	dml_route[IPROTO_DELETE] = iproto_thread->process1_route;
 	dml_route[IPROTO_UPSERT] = iproto_thread->process1_route;
 	dml_route[IPROTO_INSERT_ARROW] = iproto_thread->process1_route;
+	assert(dml_route[IPROTO_DELETE_RANGE] == NULL); /* Unuspported yet. */
 
 	iproto_thread->connect_route[0] = {tx_process_connect, net_pipe};
 	iproto_thread->connect_route[1] = {net_send_greeting, NULL};

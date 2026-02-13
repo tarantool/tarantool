@@ -262,6 +262,10 @@ struct request {
 	const char *index_name;
 	/** Length of @index_name. */
 	uint32_t index_name_len;
+	/** The `end` search key. */
+	const char *end_key;
+	/** End of @end_key. */
+	const char *end_key_end;
 };
 
 /**
