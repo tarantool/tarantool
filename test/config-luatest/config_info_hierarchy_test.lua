@@ -1,15 +1,11 @@
 local fio = require('fio')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 local server = require('luatest.server')
 local it = require('test.interactive_tarantool')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 g.after_each(function(g)
     if g.server ~= nil then
@@ -36,14 +32,14 @@ end
 -- Verify that the instance/replicaset/group names are shown in
 -- config:info() if tarantool is started from a declarative
 -- configuration.
-g.test_basic = function(g)
+g.test_basic = function()
     local config = cbuilder:new()
         :use_group('g-001')
         :use_replicaset('r-001')
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     assert_hierarchy(cluster['i-001'], {
@@ -55,7 +51,7 @@ end
 
 -- Verify that the reported hierarchy is actually corresponds to
 -- the given instance, not some other one.
-g.test_many = function(g)
+g.test_many = function()
     local config = cbuilder:new()
         :set_global_option('replication.failover', 'manual')
 
@@ -85,7 +81,7 @@ g.test_many = function(g)
 
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     for _, instance in ipairs({
@@ -131,7 +127,7 @@ g.test_2_11_1 = function(g)
     -- cluster helper starts servers in a temporary directory
     -- using the `chdir` option instead of `workdir`.
     local snap = 'test/box-luatest/upgrade/2.11.1/00000000000000000000.snap'
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     local data_dir = fio.pathjoin(cluster._dir, 'var/lib/i-001')
     fio.mktree(data_dir)
     assert(fio.copyfile(snap, data_dir))

@@ -1,14 +1,10 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
-
-g.test_basic = function(g)
+g.test_basic = function()
     -- Configuration limiting memory available to Lua with 256MB.
     local lua_memory = 256 * 1024 * 1024
     local config = cbuilder:new()
@@ -16,7 +12,7 @@ g.test_basic = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Check lua.memory has been successfully applied.
@@ -62,7 +58,7 @@ g.test_basic = function(g)
     end)
 end
 
-g.test_update = function(g)
+g.test_update = function()
     -- Config with 512MB memory limit.
     local lua_memory_0 = 512 * 1024 * 1024
     local config_0 = cbuilder:new()
@@ -70,7 +66,7 @@ g.test_update = function(g)
         :add_instance('i-001', {})
         :config()
 
-    local cluster = cluster.new(g, config_0)
+    local cluster = cluster:new(config_0)
     cluster:start()
 
     -- Config with 256MB memory limit.
@@ -191,7 +187,7 @@ g.test_update = function(g)
 
 end
 
-g.test_wrong_value = function(g)
+g.test_wrong_value = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :config()
@@ -200,5 +196,5 @@ g.test_wrong_value = function(g)
     -- Rewrite lua.memory option externally.
     config.lua = {memory = 1024}
 
-    cluster.startup_error(g, config, 'Memory limit should be >= 256MB')
+    cluster:startup_error(config, 'Memory limit should be >= 256MB')
 end

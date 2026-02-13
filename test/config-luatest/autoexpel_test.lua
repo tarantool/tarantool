@@ -3,13 +3,9 @@ local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- {{{ Helpers
 
@@ -84,7 +80,7 @@ end
 
 -- Verify that the autoexpelling reacts on the configuration
 -- reloading.
-g.test_works_on_reload = function(g)
+g.test_works_on_reload = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.autoexpel', {
             enabled = true,
@@ -104,7 +100,7 @@ g.test_works_on_reload = function(g)
         :add_instance('x-005', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Test case prerequisite.
@@ -126,7 +122,7 @@ g.test_works_on_reload = function(g)
 end
 
 -- Verify that the autoexpelling reacts on going to RW.
-g.test_works_on_rw = function(g)
+g.test_works_on_rw = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.autoexpel', {
             enabled = true,
@@ -145,7 +141,7 @@ g.test_works_on_rw = function(g)
         :add_instance('x-005', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Promote i-002 to leaders to make i-001 RO.
@@ -171,7 +167,7 @@ g.test_works_on_rw = function(g)
 end
 
 -- Verify that if the autoexpelling fails, an alert is reported.
-g.test_alert_on_write_error = function(g)
+g.test_alert_on_write_error = function()
     t.tarantool.skip_if_not_debug(
         'errinj based test cases only work in the Debug build')
 
@@ -189,7 +185,7 @@ g.test_alert_on_write_error = function(g)
         :add_instance('i-004', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Test case prerequisite.
@@ -279,7 +275,7 @@ end
 
 -- Similar to the previous one, but checks the error on the
 -- configuration reloading.
-g.test_error_on_multiple_rw_on_reload = function(g)
+g.test_error_on_multiple_rw_on_reload = function()
     local config = cbuilder:new()
         :set_replicaset_option('replication.autoexpel', {
             enabled = true,
@@ -292,7 +288,7 @@ g.test_error_on_multiple_rw_on_reload = function(g)
         :add_instance('i-004', {})
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Test case prerequisite.
