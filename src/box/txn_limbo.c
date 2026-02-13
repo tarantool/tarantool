@@ -432,7 +432,8 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 }
 
 int
-txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
+txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
+		      uint64_t term)
 {
 	txn_limbo_assert_locked(limbo);
 	/*
@@ -443,7 +444,7 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	assert(e == NULL || e->lsn <= lsn);
 	(void) e;
 	struct synchro_request req = {
-		.type = IPROTO_RAFT_PROMOTE,
+		.type = type,
 		.queue_owner_id = limbo->queue.owner_id,
 		.origin_id = instance_id,
 		.promote = {
@@ -455,30 +456,6 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
 	 * appear in WALs and replication.
 	 */
-	vclock_clear(&req.promote.confirmed_vclock);
-	if (txn_limbo_req_prepare(limbo, &req) < 0)
-		return -1;
-	synchro_request_write_or_panic(&req);
-	txn_limbo_req_commit(limbo, &req);
-	return 0;
-}
-
-int
-txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
-{
-	txn_limbo_assert_locked(limbo);
-	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
-	assert(e == NULL || e->lsn <= lsn);
-	(void)e;
-	struct synchro_request req = {
-		.type = IPROTO_RAFT_DEMOTE,
-		.queue_owner_id = limbo->queue.owner_id,
-		.origin_id = instance_id,
-		.promote = {
-			.lsn = lsn,
-			.term = term,
-		},
-	};
 	vclock_clear(&req.promote.confirmed_vclock);
 	if (txn_limbo_req_prepare(limbo, &req) < 0)
 		return -1;
