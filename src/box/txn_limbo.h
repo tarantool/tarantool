@@ -349,18 +349,13 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 		     struct synchro_request *req);
 
 /**
- * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and
- * ROLLBACK(@a lsn + 1) combined.
+ * Write a PROMOTE/DEMOTE request. It will do CONFIRM(@a lsn) +
+ * ROLLBACK(@a lsn + 1) + assign a new owner to the limbo (this node for
+ * PROMOTE, nobody for DEMOTE).
  */
 int
-txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
-
-/**
- * Write a DEMOTE request.
- * It has the same effect as PROMOTE and additionally clears limbo ownership.
- */
-int
-txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
+txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
+		      uint64_t term);
 
 /**
  * Update qsync parameters dynamically.
