@@ -612,6 +612,22 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	 * request lsn lays inside limbo [first; last] range. So that the
 	 * request has some queued data to process, otherwise it means the
 	 * request comes from split brained node.
+	 *
+	 * XXX: this case of split brain though is only possible (excluding
+	 * cases of potential stray broken requests) if this node did the
+	 * rollback-by-timeout on some txns, and later a PROMOTE/DEMOTE tries to
+	 * confirm them.
+	 *
+	 * This is one of the reasons why the rollback-by-timeout is broken by
+	 * design and needs to be eliminated in future versions entirely. It can
+	 * produce the split-brain even in a perfectly working cluster if the
+	 * old leader would slightly lag and decided to rollback its pending
+	 * synchro txns, while they are actually confirmed by a newer leader.
+	 *
+	 * The given check along with all the helper functions like "waiting for
+	 * LSNs of the limbo entries" or "getting LSN range of the queue" can be
+	 * fully deleted as soon as rollback-by-timeout nonsense is completely
+	 * deprecated.
 	 */
 	int64_t first_lsn, last_lsn;
 	txn_limbo_queue_get_lsn_range(&limbo->queue, &first_lsn, &last_lsn);
@@ -640,7 +656,7 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	 * Need all LSNs to be known. They will be used to determine whether
 	 * filtered request is safe to apply.
 	 */
-	if (txn_limbo_queue_wait_persisted(&limbo->queue) < 0)
+	if (txn_limbo_queue_wait_writes_finished(&limbo->queue) < 0)
 		return -1;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
