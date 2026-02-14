@@ -669,9 +669,9 @@ tx_status_update(struct cmsg *msg)
 	 * the single master in 100% so far). Other instances wait
 	 * for master's CONFIRM message instead.
 	 */
-	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER && !anon) {
+	if (!anon) {
 		txn_limbo_ack(&txn_limbo, ack.source,
-			      vclock_get(ack.vclock, instance_id));
+			      vclock_get(ack.vclock, txn_limbo.queue.owner_id));
 	}
 	trigger_run(&replicaset.on_ack, &ack);
 
