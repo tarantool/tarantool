@@ -893,6 +893,7 @@ txn_on_journal_write(struct journal_entry *entry)
 		txn_complete_success(txn);
 	} else {
 		int64_t lsn;
+		uint32_t ack_origin_id;
 		/*
 		 * Synchro lsn is taken from the last global row of a
 		 * transaction. When this is a remote transaction
@@ -901,28 +902,33 @@ txn_on_journal_write(struct journal_entry *entry)
 		 * global row.
 		 */
 		if (txn->n_applier_rows > 0) {
+			ack_origin_id = instance_id;
 			lsn = entry->rows[txn->n_applier_rows - 1]->lsn;
 		} else {
 			int i = entry->n_rows - 1;
 			struct xrow_header **rows = entry->rows;
-			/*
-			 * We don't care which lsn to choose for a fully local
-			 * transaction.
-			 */
 			if (!txn_is_fully_local(txn)) {
 				while (rows[i]->group_id == GROUP_LOCAL)
 					i--;
 				assert(i >= 0);
+				ack_origin_id = instance_id;
+			} else {
+				/*
+				 * Fully local transactions use vclock[0]
+				 * component and their WAL write confirms
+				 * nothing. The code here uses ID nil as
+				 * destination /dev/null for such acks.
+				 */
+				ack_origin_id = REPLICA_ID_NIL;
 			}
 			lsn = rows[i]->lsn;
 		}
 		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
-		if (txn_limbo.state == TXN_LIMBO_STATE_LEADER &&
-		    txn_has_flag(txn, TXN_WAIT_ACK))
-			txn_limbo_ack(&txn_limbo, txn_limbo.queue.owner_id,
-				      txn->limbo_entry->lsn);
+		assert(txn->limbo_entry->lsn == lsn);
+		if (txn_has_flag(txn, TXN_WAIT_ACK))
+			txn_limbo_ack(&txn_limbo, ack_origin_id, lsn);
 	}
 finish:
 	fiber_set_txn(fiber(), NULL);
