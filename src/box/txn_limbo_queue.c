@@ -120,6 +120,8 @@ txn_limbo_queue_complete_fail(struct txn_limbo_queue *queue,
 	txn->limbo_entry = NULL;
 	txn_limbo_queue_abort(queue, entry);
 	txn_clear_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+	if (entry == queue->entry_to_confirm)
+		queue->entry_to_confirm = NULL;
 	txn_limbo_queue_complete(txn, false);
 }
 
@@ -141,6 +143,8 @@ txn_limbo_queue_complete_success(struct txn_limbo_queue *queue,
 	 * affected transactions.
 	 */
 	assert(txn->signature >= 0);
+	if (entry == queue->entry_to_confirm)
+		queue->entry_to_confirm = NULL;
 	txn_limbo_queue_complete(txn, true);
 }
 
@@ -156,46 +160,6 @@ txn_limbo_queue_rollback_volatile_up_to(struct txn_limbo_queue *queue,
 			break;
 		txn_limbo_queue_complete_fail(queue, e, TXN_SIGNATURE_CASCADE);
 	}
-}
-
-/**
- * Assign a remote LSN to a limbo entry. That happens when a
- * remote transaction is added to the limbo and starts waiting for
- * a confirm.
- */
-static void
-txn_limbo_queue_assign_remote_lsn(struct txn_limbo_queue *queue,
-				  struct txn_limbo_entry *entry, int64_t lsn)
-{
-	VERIFY(queue->owner_id != REPLICA_ID_NIL);
-	assert(!txn_limbo_queue_is_owned_by_current_instance(queue));
-	assert(entry->lsn == -1);
-	assert(lsn > 0);
-	/*
-	 * Same as with local LSN assign, it is given after a WAL write. But for
-	 * remotely received transactions it doesn't matter so far. They don't
-	 * needs ACKs. They wait for explicit confirmations. That will be a
-	 * problem when need acks for anything else and when local txns will
-	 * become optionally non-blocking.
-	 */
-	entry->lsn = lsn;
-}
-
-/**
- * Assign a local LSN to a limbo entry. That happens when a local
- * transaction is written to WAL.
- */
-static void
-txn_limbo_queue_assign_local_lsn(struct txn_limbo_queue *queue,
-				 struct txn_limbo_entry *entry, int64_t lsn)
-{
-	assert(queue->owner_id != REPLICA_ID_NIL);
-	assert(txn_limbo_queue_is_owned_by_current_instance(queue));
-	assert(entry->lsn == -1);
-	assert(lsn > 0);
-	entry->lsn = lsn;
-	if (entry == queue->entry_to_confirm)
-		queue->ack_count = vclock_count_ge(&queue->vclock, entry->lsn);
 }
 
 static int
@@ -504,10 +468,12 @@ void
 txn_limbo_queue_assign_lsn(struct txn_limbo_queue *queue,
 			   struct txn_limbo_entry *entry, int64_t lsn)
 {
-	if (txn_limbo_queue_is_owned_by_current_instance(queue))
-		txn_limbo_queue_assign_local_lsn(queue, entry, lsn);
-	else
-		txn_limbo_queue_assign_remote_lsn(queue, entry, lsn);
+	assert(queue->owner_id != REPLICA_ID_NIL);
+	assert(entry->lsn == -1);
+	assert(lsn > 0);
+	entry->lsn = lsn;
+	if (entry == queue->entry_to_confirm)
+		queue->ack_count = vclock_count_ge(&queue->vclock, entry->lsn);
 }
 
 enum txn_limbo_wait_entry_result
@@ -745,6 +711,14 @@ txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
 					  new_owner_id);
 	queue->volatile_confirmed_lsn = queue->confirmed_lsn;
 	queue->entry_to_confirm = NULL;
+	/*
+	 * Previous owner had the vclock filled relative to own ID. It means all
+	 * cells in the vclock were different versions of the LSN of the
+	 * previous owner. When the owner is changed, the old vclock and acks
+	 * stop making sense.
+	 */
+	vclock_clear(&queue->vclock);
+	queue->ack_count = 0;
 }
 
 bool
@@ -752,6 +726,8 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 		    int64_t lsn)
 {
 	if (rlist_empty(&queue->entries))
+		return false;
+	if (replica_id == REPLICA_ID_NIL)
 		return false;
 	assert(queue->owner_id != REPLICA_ID_NIL);
 	int64_t prev_lsn = vclock_get(&queue->vclock, replica_id);
@@ -766,7 +742,6 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 	if (lsn == prev_lsn)
 		return false;
 	vclock_follow(&queue->vclock, replica_id, lsn);
-
 	if (queue->entry_to_confirm == NULL ||
 	    queue->entry_to_confirm->lsn < 0)
 		return false;
@@ -780,7 +755,6 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 bool
 txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 {
-	assert(txn_limbo_queue_is_owned_by_current_instance(queue));
 	if (queue->entry_to_confirm == NULL ||
 	    queue->entry_to_confirm->lsn == -1)
 		return false;
@@ -793,6 +767,7 @@ txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 	 * vclock_size(&queue->vclock) >= replication_synchro_quorum
 	 */
 	assert(k >= 0);
+	assert(!rlist_empty(&queue->entries));
 	int64_t confirm_lsn = vclock_nth_element(&queue->vclock, k);
 	assert(confirm_lsn >= queue->entry_to_confirm->lsn);
 	struct txn_limbo_entry *e = queue->entry_to_confirm;
@@ -817,7 +792,7 @@ txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 		}
 	}
 	assert(max_assigned_lsn != -1);
-	assert(max_assigned_lsn > queue->volatile_confirmed_lsn);
+	assert(max_assigned_lsn >= queue->volatile_confirmed_lsn);
 	queue->volatile_confirmed_lsn = max_assigned_lsn;
 	return true;
 }

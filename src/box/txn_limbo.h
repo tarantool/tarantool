@@ -342,6 +342,12 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
 
 /**
+ * True if enough ACKs are received for the given LSN to consider it confirmed.
+ */
+bool
+txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn);
+
+/**
  * Persist limbo state to a given synchro request.
  */
 void
