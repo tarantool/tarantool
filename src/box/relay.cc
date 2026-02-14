@@ -669,14 +669,18 @@ tx_status_update(struct cmsg *msg)
 	raft_process_term(box_raft(), status->term, ack.source);
 	/*
 	 * Let pending synchronous transactions know, which of
-	 * them were successfully sent to the replica. Acks are
-	 * collected only by the transactions originator (which is
-	 * the single master in 100% so far). Other instances wait
-	 * for master's CONFIRM message instead.
+	 * them were successfully sent to the replica.
 	 */
-	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER && !anon) {
-		txn_limbo_ack(&txn_limbo, ack.source,
-			      vclock_get(ack.vclock, instance_id));
+	if (!anon) {
+		/*
+		 * If the limbo has no owner, this will be ack for 0 LSN (since
+		 * acks have vclock[0] decoded as 0 on the receiving side,
+		 * regardless what was send). 0 LSN won't bump quorum and will
+		 * be just nop.
+		 */
+		int64_t lsn = vclock_get(ack.vclock, txn_limbo.queue.owner_id);
+		assert(txn_limbo.queue.owner_id != REPLICA_ID_NIL || lsn == 0);
+		txn_limbo_ack(&txn_limbo, ack.source, lsn);
 	}
 	trigger_run(&replicaset.on_ack, &ack);
 
