@@ -466,25 +466,9 @@ txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	return 0;
 }
 
-/**
- * Check that some synchronous transactions have gathered quorum and
- * write a confirmation entry of the last confirmed transaction.
- */
-static void
-txn_limbo_confirm(struct txn_limbo *limbo)
-{
-	assert(limbo->state == TXN_LIMBO_STATE_LEADER);
-	if (limbo->is_in_rollback)
-		return;
-	if (txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
-		fiber_wakeup(limbo->worker);
-}
-
 void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
-	assert(limbo->state == TXN_LIMBO_STATE_LEADER);
-	assert(!txn_limbo_is_ro(limbo));
 	if (txn_limbo_queue_ack(&limbo->queue, replica_id, lsn))
 		fiber_wakeup(limbo->worker);
 }
@@ -501,6 +485,14 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 {
 	return txn_limbo_queue_wait_empty(&limbo->queue, timeout);
+}
+
+bool
+txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
+{
+	assert(lsn > 0);
+	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
+	       replication_synchro_quorum;
 }
 
 /**
@@ -972,8 +964,10 @@ void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
 	/* The replication_synchro_quorum value may have changed. */
-	if (limbo->state == TXN_LIMBO_STATE_LEADER)
-		txn_limbo_confirm(limbo);
+	if (!limbo->is_in_rollback &&
+	    txn_limbo_is_owned_by_current_instance(limbo) &&
+	     txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
+		fiber_wakeup(limbo->worker);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM
