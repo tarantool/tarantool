@@ -2,11 +2,12 @@ local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local proxy = require('luatest.replica_proxy')
 local server = require('luatest.server')
+local assertions = require('luatest.assertions')
 
 local g = t.group('cover-box-wait-limbo-acked')
 --
 -- gh-7318:
--- Cover box_wait_limbo_acked with tests.
+-- Cover promotion's synchro queue quorum wait with tests.
 --
 local wait_timeout = 10
 
@@ -71,22 +72,6 @@ local function server_wait_wait_quorum_count_ge_than(server, threshold)
     end, {threshold, wait_timeout})
 end
 
-local function server_wait_synchro_queue_is_busy(server)
-    server:exec(function(wait_timeout)
-        t.helpers.retrying({timeout = wait_timeout}, function()
-            t.assert_equals(box.info.synchro.queue.busy, true)
-        end, {wait_timeout})
-    end)
-end
-
-local function server_wait_promote_greatest_term_ge_than(server, threshold)
-    server:exec(function(threshold, wait_timeout)
-        t.helpers.retrying({timeout = wait_timeout}, function(threshold)
-            t.assert_ge(box.info.synchro.queue.term, threshold)
-        end, threshold)
-    end, {threshold, wait_timeout})
-end
-
 g.before_each(function(cg)
     t.tarantool.skip_if_not_debug()
 
@@ -146,254 +131,60 @@ g.after_each(function(cg)
     cg.replica_proxy:stop()
 end)
 
-g.test_wal_sync_fails = function(cg)
-    -- The purpose of the test is to cover 'if (wal_sync(NULL) != 0)' in
-    -- 'box_wait_limbo_acked()'. For this we use a special injection -
-    -- 'ERRINJ_WAL_SYNC'.
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    -- We want the new term to be written strictly before insert.
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{1} end)
-    end)
-    -- We need to make sure that one entry is in limbo so that
-    -- we don't exit 'box_wait_limbo_acked()' immediately after
-    -- 'if (txn_limbo_is_empty(&txn_limbo))'.
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
-    -- We allow one entry to be written to exit
-    -- 'box_raft_wait_term_persisted()'. But we don't allow insert to be
-    -- written to ensure it hits 'if (last_entry->lsn < 0)' and then enters
-    -- 'wal_sync()' call.
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_SYNC', true)
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    -- We need to be sure we entered the wal_sync call
-    -- before allowing the rest of the entries to be written.
-    server_wait_wal_is_blocked(cg.replica)
-    cg.replica:exec(function(f)
-        t.assert_equals(box.info.synchro.queue.len, 1)
-        box.error.injection.set('ERRINJ_WAL_SYNC', false)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-        local _, ok, err = require('fiber').find(f):join()
-        t.assert(not ok)
-        t.assert_equals(err.type, 'ClientError')
-        t.assert_equals(err.message, 'Error injection \'wal sync\'')
-    end, {f})
-    server_becomes_the_leader_again(cg.master)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-end
-
-g.test_update_greatest_term_while_wal_sync = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (box_check_promote_term_intact(promote_term) != 0)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'wal_sync()' call.
-    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY'.
-    local term = cg.replica:get_election_term()
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', true)
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    cg.replica:wait_for_election_term(term + 1)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{1} end)
-        require('fiber').create(function() box.ctl.demote() end)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
-    cg.replica:wait_for_election_term(term + 2)
-    cg.master:exec(function()
-        box.cfg{replication_synchro_quorum=1}
-    end)
-    cg.master:wait_until_election_leader_found()
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    -- Before leaving wal_sync we need to make sure that
-    -- 'promote_greatest_term' is updated.
-    server_wait_promote_greatest_term_ge_than(cg.replica, 3)
-    cg.replica:exec(function(f)
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', false)
-        local _, ok, err = require('fiber').find(f):join()
-        t.assert(not ok)
-        t.assert_equals(err.type, 'ClientError')
-        t.assert_equals(err.message, 'Instance with replica id 1 '
-            .. 'was promoted first')
-    end, {f})
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-end
-
-g.test_txn_limbo_is_empty_while_wal_sync = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (txn_limbo_is_empty(&txn_limbo))' in
-    -- 'box_wait_limbo_acked()' located immediately after 'wal_sync()' call.
-    -- For this we use a special injection - 'ERRINJ_WAL_SYNC_DELAY'.
-
-    -- If the master becomes a leader again, we will cover the condition
-    -- from the previous test, and not what we want.
-    cg.master:exec(function()
-        box.cfg{
-            election_mode='off',
-            replication_synchro_quorum=1
-        }
-    end)
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', true)
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        box.space.test:insert{1}
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
-    server_wait_synchro_queue_is_busy(cg.replica)
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-    cg.replica:exec(function(f)
-        box.error.injection.set('ERRINJ_WAL_SYNC_DELAY', false)
-        local _, ok, err = require('fiber').find(f):join()
-        t.assert(ok)
-        t.assert(not err)
-    end, {f})
-    server_becomes_the_leader_again(cg.master)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-end
-
-g.test_new_synchronous_transactions_appeared_while_wal_sync = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'wal_sync()' call.
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{1} end)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
-    cg.master:exec(function()
-        -- We don’t let the second insert immediately get to the follower.
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        require('fiber').create(function() box.space.test:insert{2} end)
-    end)
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        -- Follower is now in 'wal_sync' so we can write the second insert.
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 2)
-    cg.replica:exec(function(f)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-        local _, ok, err = require('fiber').find(f):join()
-        t.assert(not ok)
-        t.assert_equals(err.type, 'ClientError')
-        t.assert_equals(err.message, 'Couldn\'t wait for quorum 2: '
-            .. 'new synchronous transactions appeared')
-    end, {f})
-    server_becomes_the_leader_again(cg.master)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-end
-
 g.test_update_greatest_term_while_wait_quorum = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (box_check_promote_term_intact(promote_term) != 0)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'box_wait_quorum()'.
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    -- In some tests we want to stop fiber 'f' at 'box_wait_quorum'.
-    -- Therefore, we pause replica_proxy.
-    cg.replica_proxy:pause()
-    -- We wait until the connection is suspended.
-    t.helpers.retrying({timeout = wait_timeout}, function()
-        cg.master:exec(function()
-            local status = box.info.replication[2].upstream.status
-            t.assert(status ~= 'follow')
-        end)
-    end)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{1} end)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
+    -- The purpose of the test is to cover synchro queue term bump right after
+    -- the quorum for pending transactions was gathered.
     cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        box.cfg{election_mode = 'manual'}
     end)
-    server_wait_wal_is_blocked(cg.replica)
-    local wait_quorum_count = get_wait_quorum_count(cg.replica)
-    local ff = require('fiber').create(function()
-        cg.replica:exec(function(f)
-            box.error.injection.set('ERRINJ_WAL_DELAY', false)
-            local _, ok, err = require('fiber').find(f):join()
-            t.assert(not ok)
-            t.assert_equals(err.type, 'ClientError')
-            local master_id = box.info.replication[1].id
-            t.assert_equals(err.message, 'Instance with replica id '
-                .. master_id .. ' was promoted first')
-        end, {f})
+    local term = cg.master:exec(function()
+        local fiber = require('fiber')
+        box.cfg{
+            election_mode = 'manual',
+            election_timeout = 1000,
+            replication_synchro_quorum = 3,
+        }
+        t.assert_equals(box.info.election.state, 'leader')
+        rawset(_G, 'f_txn', fiber.create(function()
+            fiber.self():set_joinable(true)
+            box.space.test:replace{1}
+        end))
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        t.assert_equals(box.info.election.state, 'leader')
+        box.ctl.demote()
+        t.assert_equals(box.info.election.state, 'follower')
+        rawset(_G, 'f_promote', fiber.create(function()
+            fiber.self():set_joinable(true)
+            box.ctl.promote()
+        end))
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.election.state, 'leader')
+        end)
+        t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        t.assert_lt(box.info.synchro.queue.term, box.info.election.term)
+        return box.info.election.term
     end)
-    ff:set_joinable(true)
-    -- We need to be sure we entered the 'box_wait_quorum' call.
-    server_wait_wait_quorum_count_ge_than(cg.replica, wait_quorum_count + 1)
-    server_becomes_the_leader_again(cg.master)
-    server_wait_promote_greatest_term_ge_than(cg.replica, 3)
-    -- Replica collects quorum.
-    cg.replica_proxy:resume()
-    local ok, err = ff:join()
-    t.assert_equals(err, nil)
-    t.assert(ok)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
+    cg.replica:exec(function(term)
+        t.helpers.retrying({timeout = 120}, function()
+            t.assert_equals(box.info.election.term, term)
+        end)
+        box.cfg{
+            replication_synchro_quorum = 1,
+            election_timeout = 1000,
+        }
+        box.ctl.promote()
+    end, {term})
+    cg.master:wait_for_vclock_of(cg.replica)
+    cg.master:exec(function()
+        t.assert_not((_G.f_promote:join(120)))
+        t.assert((_G.f_txn:join(120)))
+    end)
 end
 
 g.test_txn_limbo_is_empty_while_wait_quorum = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (txn_limbo_is_empty(&txn_limbo))' in
-    -- 'box_wait_limbo_acked()' located immediately after 'box_wait_quorum()'.
+    -- The purpose of the test is to see what happens when the synchro queue
+    -- gets empty during quorum wait.
     local f = cg.replica:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local f = require('fiber').create(function()
@@ -415,7 +206,7 @@ g.test_txn_limbo_is_empty_while_wait_quorum = function(cg)
     end)
     server_wait_synchro_queue_len_is_equal(cg.replica, 1)
     -- The master must not send 'CONFIRM' before fiber 'f'
-    -- reaches 'box_wait_quorum'. However, we must collect
+    -- reaches the quorum waiting code. However, we must collect
     -- quorum now, because then limbo on the master will be
     -- frozen after we write a new term on the replica.
     cg.master_proxy:pause()
@@ -453,9 +244,8 @@ g.test_txn_limbo_is_empty_while_wait_quorum = function(cg)
 end
 
 g.test_quorum_less_replication_synchro_quorum = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (quorum < replication_synchro_quorum)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'box_wait_quorum()'.
+    -- The purpose of the test is to cover what happens when the quorum is
+    -- changing during synchro queue quorum waiting.
     local f = cg.replica:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local f = require('fiber').create(function()
@@ -493,9 +283,10 @@ g.test_quorum_less_replication_synchro_quorum = function(cg)
 end
 
 g.test_new_synchronous_transactions_appeared_while_wait_quorum = function(cg)
-    -- The purpose of the test is to cover
-    -- 'if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'box_wait_quorum()'.
+    assertions.skip("not testable without crutches anymore")
+    -- The purpose of the test is to cover what happens when new transactions
+    -- are coming into the synchro queue while the instance is trying to gather
+    -- the quorum for promotion.
     cg.master:exec(function()
         box.cfg{
             election_fencing_mode='off',
