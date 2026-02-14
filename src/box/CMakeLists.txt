@@ -180,6 +180,7 @@ set(box_sources
     allocator.cc
     memtx_allocator.cc
     msgpack.c
+    app_threads.c
     iproto.cc
     xrow_io.cc
     tuple_convert.c
@@ -296,6 +297,7 @@ set(box_sources
     lua/key_def.c
     lua/merger.c
     lua/watcher.c
+    lua/app_threads.c
     lua/iproto.c
     lua/func_adapter.c
     lua/tuple_format.c

@@ -30,6 +30,8 @@
 	*** cord_cojoin_test: done ***
 	*** cord_cojoin_cancel_test ***
 	*** cord_cojoin_cancel_test: done ***
+	*** cord_cancel_test ***
+	*** cord_cancel_test: done ***
 	*** fiber_test_defaults ***
 	*** fiber_test_defaults: done ***
 	*** fiber_test_leak ***

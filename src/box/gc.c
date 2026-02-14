@@ -524,13 +524,14 @@ gc_add_checkpoint(const struct vclock *vclock, double timestamp)
 	gc_schedule_cleanup();
 }
 
+/** Actually performs checkpoint. */
 static int
-gc_do_checkpoint(bool is_scheduled)
+gc_do_checkpoint(void)
 {
 	assert(!gc.checkpoint_is_in_progress);
 	gc.checkpoint_is_in_progress = true;
 	struct box_checkpoint checkpoint;
-	int rc = box_checkpoint_build_on_disk(&checkpoint, is_scheduled);
+	int rc = box_checkpoint_build_on_disk(&checkpoint);
 	if (rc == 0) {
 		/*
 		 * Finally, track the newly created checkpoint in the garbage
@@ -566,7 +567,7 @@ gc_checkpoint(void)
 				0);
 	fiber_wakeup(gc.checkpoint_fiber);
 
-	if (gc_do_checkpoint(false) != 0)
+	if (gc_do_checkpoint() != 0)
 		return -1;
 
 	/*
@@ -635,7 +636,7 @@ gc_checkpoint_fiber_f(va_list ap)
 			 */
 			continue;
 		}
-		if (gc_do_checkpoint(true) != 0)
+		if (gc_do_checkpoint() != 0)
 			diag_log();
 	}
 	return 0;

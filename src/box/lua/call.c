@@ -36,12 +36,12 @@
 #include "box/func_def.h"
 #include "box/schema.h"
 #include "fiber.h"
+#include "trigger.h"
 #include "tt_static.h"
 
 #include "lua/utils.h"
 #include "lua/serializer.h"
 #include "lua/msgpack.h"
-#include "lua/trigger.h"
 
 #include "box/port.h"
 #include "box/lua/misc.h"
@@ -71,7 +71,7 @@ enum handlers {
 	HANDLER_MAX,
 };
 
-static int execute_lua_refs[HANDLER_MAX];
+static __thread int execute_lua_refs[HANDLER_MAX];
 
 /**
  * A copy of the default serializer with encode_error_as_ext option disabled.
@@ -79,7 +79,7 @@ static int execute_lua_refs[HANDLER_MAX];
  * It is used for returning errors in the legacy format to clients that do
  * not support the MP_ERROR MsgPack extension.
  */
-static struct luaL_serializer call_serializer_no_error_ext;
+static __thread struct luaL_serializer call_serializer_no_error_ext;
 
 /**
  * Returns a serializer that should be used for encoding CALL/EVAL result.
@@ -87,7 +87,9 @@ static struct luaL_serializer call_serializer_no_error_ext;
 static struct luaL_serializer *
 get_call_serializer(void)
 {
-	if (!iproto_features_test(&current_session()->meta.features,
+	struct session *session = fiber_get_session(fiber());
+	if (session != NULL && session->type == SESSION_TYPE_BINARY &&
+	    !iproto_features_test(&session->meta.features,
 				  IPROTO_FEATURE_ERROR_EXTENSION)) {
 		return &call_serializer_no_error_ext;
 	} else {
@@ -1334,15 +1336,17 @@ box_lua_call_init(struct lua_State *L)
 	trigger_add(&luaL_msgpack_default->on_update,
 		    &call_serializer_no_error_ext.update_trigger);
 
-	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
-	luaL_setfuncs(L, boxlib_internal, 0);
-	lua_pop(L, 1);
-	/*
-	 * Register the trigger that will push persistent
-	 * Lua functions objects to Lua.
-	 */
-	on_alter_func_in_lua.data = L;
-	trigger_add(&on_alter_func, &on_alter_func_in_lua);
+	if (cord_is_main()) {
+		luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+		luaL_setfuncs(L, boxlib_internal, 0);
+		lua_pop(L, 1);
+		/*
+		 * Register the trigger that will push persistent
+		 * Lua functions objects to Lua.
+		 */
+		on_alter_func_in_lua.data = L;
+		trigger_add(&on_alter_func, &on_alter_func_in_lua);
+	}
 
 	lua_CFunction handles[] = {
 		[HANDLER_CALL] = execute_lua_call,

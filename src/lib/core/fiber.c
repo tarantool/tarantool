@@ -1829,8 +1829,13 @@ box_region_truncate(size_t size)
 }
 
 /**
- * Callback for cancel_event. This event is used to signal to cord that
- * its fiber should be cancelled.
+ * Callback for cord's cancel_event.
+ *
+ * If the cord has main_fiber (i.e. it was started with cord_costart),
+ * cancels the fiber. The event loop will be broken by fiber's on_stop
+ * trigger. If there's no main_fiber, breaks the event loop immediately.
+ * The latter is useful if the cord was started with cord_start and
+ * the cord function called ev_run directly.
  */
 static void
 cord_cancel_callback(ev_loop *loop, ev_async *watcher, int revents)
@@ -1838,8 +1843,11 @@ cord_cancel_callback(ev_loop *loop, ev_async *watcher, int revents)
 	(void)loop;
 	(void)watcher;
 	(void)revents;
-	if (cord()->main_fiber)
+	if (cord()->main_fiber != NULL) {
 		fiber_cancel(cord()->main_fiber);
+	} else {
+		ev_break(loop(), EVBREAK_ALL);
+	}
 }
 
 void
@@ -1865,6 +1873,7 @@ cord_create(struct cord *cord, const char *name)
 	rlist_create(&cord->sched.wake);
 	cord->sched.fid = FIBER_ID_SCHED;
 	fiber_reset(&cord->sched);
+	cord->sched.f_ret = 0;
 	diag_create(&cord->sched.diag);
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_gc_checker_init(&cord->sched);
@@ -1882,7 +1891,9 @@ cord_create(struct cord *cord, const char *name)
 	 * event loop iteration.
 	 */
 	ev_async_init(&cord->wakeup_event, fiber_schedule_wakeup);
+
 	cord->main_fiber = NULL;
+	ev_async_init(&cord()->cancel_event, cord_cancel_callback);
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 
@@ -1982,7 +1993,10 @@ void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
 	cord_create(ct_arg->cord, (ct_arg->name));
-	ev_async_init(&cord()->cancel_event, cord_cancel_callback);
+	/*
+	 * cancel_event must be started before notifying cord_start so that
+	 * the caller may use it as soon as cord_start returns.
+	 */
 	ev_async_start(loop(), &cord()->cancel_event);
 	/** Can't possibly be the main thread */
 	assert(cord()->id != main_thread_id);
@@ -2078,6 +2092,12 @@ cord_join(struct cord *cord)
 	return res;
 }
 
+void
+cord_cancel(struct cord *cord)
+{
+	ev_async_send(cord->loop, &cord->cancel_event);
+}
+
 /** The state of the waiter for a thread to complete. */
 struct cord_cojoin_ctx
 {
@@ -2154,7 +2174,7 @@ cord_cojoin(struct cord *cord)
 		do {
 			assert(cord->id != 0);
 			if (fiber_is_cancelled())
-				ev_async_send(cord->loop, &cord->cancel_event);
+				cord_cancel(cord);
 			fiber_yield();
 		} while (!ctx.task_complete);
 	}

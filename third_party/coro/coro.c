@@ -112,20 +112,18 @@ coro_init (void)
    * address to make unwinding stop here.
    */
 
-   /* Clearing rbp is insufficient: undefine rip value's location — see: https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/x86_64/Gstep.c#L91-L92 */
+   /* Undefine rip value's location — see: https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/x86_64/Gstep.c#L91-L92 */
   ".cfi_undefined rip\n"
   /* Undefine rbp value's location — ibid. */
   ".cfi_undefined rbp\n"
   /* Undefine rbp-relative return address location, see: https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/dwarf/Gparser.c#L877 */
   ".cfi_return_column rbp\n"
 #endif /* ENABLE_BACKTRACE */
-  /* Clear rbp to conform to the x86_64 ABI, see: https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/x86_64/Gstep.c#L144-L148 */
-  "\txorq %%rbp, %%rbp\n"
   "\tmovq %0, %%rdi\n"
   "\tcallq *%1\n"
   :
   : "rm" (arg), "rm" (func)
-  : "rbp", "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11",
+  : "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11",
     "xmm0","xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
     "xmm8","xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
 #ifdef __AVX512F__

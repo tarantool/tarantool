@@ -4,9 +4,6 @@ macro(libcoro_build)
     set(coro_src
         ${PROJECT_SOURCE_DIR}/third_party/coro/coro.c
     )
-    set_source_files_properties(${coro_src} PROPERTIES
-                                COMPILE_FLAGS "${DEPENDENCY_CFLAGS} -fomit-frame-pointer")
-
     add_library(coro STATIC ${coro_src})
 
     set(LIBCORO_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/coro)

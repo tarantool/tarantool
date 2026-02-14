@@ -52,7 +52,7 @@ box_checkpoint_build_in_memory(struct box_checkpoint *out);
  * Only one on-disk checkpoint can be in progress.
  */
 int
-box_checkpoint_build_on_disk(struct box_checkpoint *out, bool is_scheduled);
+box_checkpoint_build_on_disk(struct box_checkpoint *out);
 
 /**
  * Extract the checkpoint data from the snapshot having exactly the provided

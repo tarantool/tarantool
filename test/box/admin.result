@@ -27,7 +27,9 @@ help()
 ...
 cfg_filter(box.cfg)
 ---
-- - - auth_type
+- - - app_threads
+    - 0
+  - - auth_type
     - chap-sha1
   - - background
     - false

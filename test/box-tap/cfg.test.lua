@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(114)
+test:plan(116)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -53,6 +53,8 @@ invalid('memtx_sort_threads', 'all')
 invalid('memtx_sort_threads', -1)
 invalid('memtx_sort_threads', 0)
 invalid('memtx_sort_threads', 257)
+invalid('app_threads', -1)
+invalid('app_threads', 1001)
 invalid('replication_synchro_queue_max_size', -1)
 invalid('replication_reconnect_timeout', -1)
 invalid('replication_synchro_quorum', 'N - Q + 1')

@@ -842,10 +842,11 @@ static const struct luaL_Reg boxlib_backup[] = {
  * indicates encoding success.
  */
 static bool
-luamp_encode_extension_box(struct lua_State *L, int idx,
-			   struct mpstream *stream, struct mp_ctx *base,
-			   enum mp_type *type)
+luamp_encode_extension_box(struct lua_State *L, struct luaL_serializer *cfg,
+			   struct mpstream *stream, int idx,
+			   struct mp_ctx *base, enum mp_type *type)
 {
+	(void)cfg;
 	struct tuple *tuple = luaT_istuple(L, idx);
 	if (tuple != NULL) {
 		if (base != NULL) {
@@ -873,8 +874,8 @@ luamp_encode_extension_box(struct lua_State *L, int idx,
  * A MsgPack extensions handler that supports box extensions decode.
  */
 static void
-luamp_decode_extension_box(struct lua_State *L, const char **data,
-			   struct mp_ctx *ctx)
+luamp_decode_extension_box(struct lua_State *L, struct luaL_serializer *cfg,
+			   const char **data, struct mp_ctx *ctx)
 {
 	assert(mp_typeof(**data) == MP_EXT);
 	int8_t ext_type;
@@ -891,6 +892,11 @@ luamp_decode_extension_box(struct lua_State *L, const char **data,
 		break;
 	}
 	case MP_TUPLE: {
+		if (!cord_is_main()) {
+			const char *tuple_data = tuple_unpack_raw(data);
+			luamp_decode_with_ctx(L, cfg, &tuple_data, ctx);
+			break;
+		}
 		struct tuple *tuple;
 		if (ctx == NULL) {
 			tuple = tuple_unpack_without_format(data);

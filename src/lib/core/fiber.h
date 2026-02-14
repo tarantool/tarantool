@@ -858,7 +858,7 @@ struct cord {
 	char name[FIBER_NAME_INLINE];
 	/** Cord main fiber started in case of cord_costart. */
 	struct fiber *main_fiber;
-	/** An event triggered to cancel cord main fiber. */
+	/** Event used to asynchronously stop this cord. */
 	ev_async cancel_event;
 	/** Number of alive client (non system) fibers. */
 	int client_fiber_count;
@@ -953,6 +953,23 @@ cord_cojoin(struct cord *cord);
  */
 int
 cord_join(struct cord *cord);
+
+/**
+ * Stop a cord running an event loop.
+ *
+ * If the cord was started with cord_costart(), the function cancels
+ * the main fiber. In this case the event loop will be broken and
+ * the cord will exit as soon as the main fiber returns.
+ *
+ * If the cord was started with cord_start(), the function breaks
+ * the event loop immediately. For this to work, the cord function
+ * must run the event loop with ev_run().
+ *
+ * Anyway, cord_cancel() doesn't wait for the cord to exit. Use it in
+ * conjunction with cord_join() or cord_cojoin() to destroy the cord.
+ */
+void
+cord_cancel(struct cord *cord);
 
 void
 cord_set_name(const char *name);

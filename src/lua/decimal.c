@@ -80,7 +80,7 @@ ldecimal_##name(struct lua_State *L) {						\
 	return 1;								\
 }
 
-uint32_t CTID_DECIMAL;
+__thread uint32_t CTID_DECIMAL;
 
 box_decimal_t *
 luaT_newdecimal(struct lua_State *L)

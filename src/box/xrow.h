@@ -58,6 +58,8 @@ enum {
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
 };
 
+#define XROW_THREAD_UNSPEC UINT32_MAX
+
 struct iostream;
 struct region;
 
@@ -66,6 +68,11 @@ struct xrow_header {
 
 	/** Request type. */
 	uint32_t type;
+	/**
+	 * Only for IPROTO requests: id of the serving thread to perform
+	 * request on, XROW_THREAD_UNSPEC if unspecified.
+	 */
+	uint32_t thread_id;
 	uint32_t replica_id;
 	/**
 	 * Replication group identifier. 0 - replicaset,

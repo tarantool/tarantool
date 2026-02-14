@@ -455,6 +455,30 @@ cord_cojoin_cancel_test(void)
 	footer();
 }
 
+static void *
+event_loop_f(void *ap)
+{
+	ev_run(loop());
+	return NULL;
+}
+
+static void
+cord_cancel_test(void)
+{
+	header();
+
+	struct cord cord;
+	fail_if(cord_start(&cord, "cord", event_loop_f, NULL) != 0);
+	cord_cancel(&cord);
+	fail_if(cord_join(&cord) != 0);
+
+	fail_if(cord_costart(&cord, "cord", wait_cancel_f, NULL) != 0);
+	cord_cancel(&cord);
+	fail_if(cord_cojoin(&cord) != 0);
+
+	footer();
+}
+
 static void
 fiber_test_defaults()
 {
@@ -790,6 +814,7 @@ main_f(va_list ap)
 	fiber_wait_on_deadline_test();
 	cord_cojoin_test();
 	cord_cojoin_cancel_test();
+	cord_cancel_test();
 	fiber_test_defaults();
 	fiber_test_leak_modes();
 	fiber_test_client_fiber_count();

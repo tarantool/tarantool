@@ -53,6 +53,7 @@ local REQUEST_OPTION_TYPES = {
        end
        return true
     end,
+    _thread_id = "number",
 }
 
 local CONNECT_OPTION_TYPES = {
@@ -893,10 +894,12 @@ function remote_methods:_request_impl(method, opts, format, stream_id, ...)
     method = internal.method[method]
     assert(method ~= nil)
     local transport = self._transport
+    local thread_id
     local on_push, on_push_ctx, buffer, skip_header, return_raw, deadline
     -- Extract options, set defaults, check if the request is
     -- async.
     if opts then
+        thread_id = opts._thread_id
         buffer = opts.buffer
         skip_header = opts.skip_header
         return_raw = opts.return_raw
@@ -906,8 +909,8 @@ function remote_methods:_request_impl(method, opts, format, stream_id, ...)
             end
             return transport:perform_async_request(self, buffer, skip_header,
                                                    return_raw, table.insert,
-                                                   {}, format, stream_id,
-                                                   method, ...)
+                                                   {}, format, thread_id,
+                                                   stream_id, method, ...)
         end
         if opts.timeout then
             deadline = fiber_clock() + opts.timeout
@@ -928,7 +931,8 @@ function remote_methods:_request_impl(method, opts, format, stream_id, ...)
     end
     local res, err = transport:perform_request(timeout, buffer, skip_header,
                                                return_raw, on_push, on_push_ctx,
-                                               format, stream_id, method, ...)
+                                               format, thread_id, stream_id,
+                                               method, ...)
     -- Try to wait until a schema is reloaded if needed.
     -- Regardless of reloading result, the main response is
     -- returned, since it does not depend on any schema things.

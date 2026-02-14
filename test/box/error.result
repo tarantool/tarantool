@@ -507,6 +507,8 @@ t;
  |   296: box.error.FIELD_IRREPRESENTABLE_VALUE
  |   297: box.error.KEY_PART_IRREPRESENTABLE_VALUE
  |   298: box.error.INVALID_SORTDATA_FILE
+ |   299: box.error.NO_SUCH_THREAD
+ |   300: box.error.UNABLE_TO_PROCESS_IN_THREAD
  | ...
 
 test_run:cmd("setopt delimiter ''");

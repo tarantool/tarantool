@@ -47,18 +47,18 @@
 #include "trivia/util.h"
 #include "vclock/vclock.h"
 
-int luaL_nil_ref = LUA_REFNIL;
+__thread int luaL_nil_ref = LUA_REFNIL;
 
-static int luaT_newthread_ref = LUA_NOREF;
+static __thread int luaT_newthread_ref = LUA_NOREF;
 
-static uint32_t CTID_STRUCT_IBUF;
-static uint32_t CTID_STRUCT_IBUF_PTR;
-uint32_t CTID_CHAR_PTR;
-uint32_t CTID_CONST_CHAR_PTR;
-uint32_t CTID_VARBINARY;
-uint32_t CTID_UUID;
-uint32_t CTID_DATETIME = 0;
-uint32_t CTID_INTERVAL = 0;
+static __thread uint32_t CTID_STRUCT_IBUF;
+static __thread uint32_t CTID_STRUCT_IBUF_PTR;
+__thread uint32_t CTID_CHAR_PTR;
+__thread uint32_t CTID_CONST_CHAR_PTR;
+__thread uint32_t CTID_VARBINARY;
+__thread uint32_t CTID_UUID;
+__thread uint32_t CTID_DATETIME = 0;
+__thread uint32_t CTID_INTERVAL = 0;
 
 struct lua_State *
 luaT_newstate(void)

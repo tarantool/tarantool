@@ -6,7 +6,6 @@
 #include "tt_compression.h"
 #include "trivia/config.h"
 #include "diag.h"
-#include "error.h"
 #include "msgpuck.h"
 
 #if defined(ENABLE_TUPLE_COMPRESSION)

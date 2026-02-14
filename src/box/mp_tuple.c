@@ -77,6 +77,16 @@ tuple_unpack_without_format(const char **data)
 	return tuple_new(tuple_format_runtime, tuple_data, *data);
 }
 
+const char *
+tuple_unpack_raw(const char **data)
+{
+	/* Ignore the format identifier.  */
+	mp_decode_uint(data);
+	const char *tuple_data = *data;
+	mp_next(data);
+	return tuple_data;
+}
+
 char *
 mp_encode_tuple(char *data, struct tuple *tuple)
 {

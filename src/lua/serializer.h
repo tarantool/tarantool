@@ -64,8 +64,8 @@ struct interval;
 #define LUAL_SERIALIZER "serializer"
 #define LUAL_SERIALIZE "__serialize"
 
-extern int luaL_map_metatable_ref;
-extern int luaL_array_metatable_ref;
+extern __thread int luaL_map_metatable_ref;
+extern __thread int luaL_array_metatable_ref;
 
 /* {{{ luaL_serializer manipulations */
 

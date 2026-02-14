@@ -443,6 +443,8 @@ struct errcode_record {
 	_(ER_FIELD_IRREPRESENTABLE_VALUE, 296,	"The value does not fit in field type", "field", STRING, "value", MSGPACK) \
 	_(ER_KEY_PART_IRREPRESENTABLE_VALUE, 297, "The value of key part does not fit in type", "partno", UINT, "value", MSGPACK) \
 	_(ER_INVALID_SORTDATA_FILE, 298,	"Invalid MemTX sort data file", "path", STRING, "details", STRING) \
+	_(ER_NO_SUCH_THREAD, 299,		"Thread does not exist", "thread_id", UINT) \
+	_(ER_UNABLE_TO_PROCESS_IN_THREAD, 300,	"Unable to process request in thread", "request", STRING, "thread_id", UINT) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

@@ -126,16 +126,6 @@ include(BuildLuzer)
 # Requires LUZER_LUA_CPATH and LUZER_LUA_PATH.
 include(BuildLuaTests)
 
-# Copying luzer-based tests located in different places to
-# a single directory. Needed for OSS Fuzz.
-add_custom_target(copy_tests
-  COMMAND ${CMAKE_COMMAND} -E copy
-          ${LUZER_TESTS_OSS_FUZZ}
-          ${LUZER_TESTS_DIR}
-  COMMENT "Copying luzer-based tests to a single directory"
-  DEPENDS lua-tests
-)
-
 # test_engine.lua supports luzer, but test_mvcc.lua is not.
 string(JOIN ";" LUZER_TESTS
   box_execute_test.lua
@@ -196,4 +186,16 @@ create_luzer_test(
   TEST_TITLE ${test_title}
   TEST_ENV "${TEST_ENV};TEST_ENGINE=vinyl"
   LABELS "fuzzing;${TEST_SUITE_NAME}"
+)
+
+# Copying luzer-based tests located in different places to
+# a single directory. Needed for OSS Fuzz. NOTE: The target must
+# be created only after all tests have been created, that is,
+# after calling all `create_luzer_test()`.
+add_custom_target(copy_tests
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${LUZER_TESTS_OSS_FUZZ}
+          ${LUZER_TESTS_DIR}
+  COMMENT "Copying luzer-based tests to a single directory"
+  DEPENDS lua-tests
 )

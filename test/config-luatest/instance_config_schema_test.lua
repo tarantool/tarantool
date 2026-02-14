@@ -1457,6 +1457,7 @@ g.test_box_cfg_coverage = function()
         audit_log = true,
         audit_filter = true,
         listen = true,
+        app_threads = true,
 
         -- Controlled by the leader and database.mode options,
         -- handled by the box_cfg applier.
