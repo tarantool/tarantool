@@ -716,7 +716,7 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 static bool
 xlog_file_is_temporary_default(const char *filename)
 {
-	char *ext = strrchr(filename, '.');
+	const char *ext = strrchr(filename, '.');
 	return ext != NULL && strcmp(ext, inprogress_suffix) == 0;
 }
 
