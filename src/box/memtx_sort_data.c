@@ -133,7 +133,7 @@ static const char *ENTRY_FMT = "%010u/%010u: %016lx, %016lx, %020ld\n";
 const char *
 memtx_sort_data_filename(const char *snap_filename)
 {
-	char *snap_ext = strrchr(snap_filename, '.');
+	const char *snap_ext = strrchr(snap_filename, '.');
 	assert(snap_ext != NULL);
 	if (strcmp(snap_ext, ".inprogress") == 0) {
 		snap_ext -= strlen(".snap");

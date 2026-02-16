@@ -3646,7 +3646,7 @@ sql_set_boolean_option(int id, bool value)
 static int
 sql_set_string_option(int id, const char *value)
 {
-	assert(sql_session_opts[id - SESSION_SETTING_SQL_BEGIN].field_type =
+	assert(sql_session_opts[id - SESSION_SETTING_SQL_BEGIN].field_type ==
 	       FIELD_TYPE_STRING);
 	assert(id == SESSION_SETTING_SQL_DEFAULT_ENGINE);
 	(void)id;

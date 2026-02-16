@@ -3189,7 +3189,7 @@ luaT_netbox_transport_start(struct lua_State *L)
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	assert(transport->worker == NULL);
 	assert(transport->coro_ref == LUA_NOREF);
-	assert(transport->self_ref = LUA_NOREF);
+	assert(transport->self_ref == LUA_NOREF);
 	struct lua_State *fiber_L = lua_newthread(L);
 	transport->coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	transport->self_ref = luaL_ref(L, LUA_REGISTRYINDEX);
