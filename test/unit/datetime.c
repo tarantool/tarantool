@@ -15,7 +15,7 @@
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
-#define TAP_TEST_LOCATION() note("%s [%zu]", __func__, index)
+#define TAP_TEST_LOCATION() note("%s [%zu]", __func__, index + 1)
 
 static const char sample[] = "2012-12-24T15:30Z";
 
@@ -71,23 +71,29 @@ struct {
 	S("2012-12-24 16:30 +01:00"),
 	S("2012-12-24 14:30 -01:00"),
 	S("2012-12-24 15:30 UTC"),
-	S("2012-12-24 16:30 UTC+1"),
-	S("2012-12-24 16:30 UTC+01"),
-	S("2012-12-24 16:30 UTC+0100"),
-	S("2012-12-24 16:30 UTC+01:00"),
-	S("2012-12-24 14:30 UTC-1"),
-	S("2012-12-24 14:30 UTC-01"),
-	S("2012-12-24 14:30 UTC-01:00"),
-	S("2012-12-24 14:30 UTC-0100"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 UTC+1"),
+	 * S("2012-12-24 16:30 UTC+01"),
+	 * S("2012-12-24 16:30 UTC+0100"),
+	 * S("2012-12-24 16:30 UTC+01:00"),
+	 * S("2012-12-24 14:30 UTC-1"),
+	 * S("2012-12-24 14:30 UTC-01"),
+	 * S("2012-12-24 14:30 UTC-01:00"),
+	 * S("2012-12-24 14:30 UTC-0100"),
+	 */
 	S("2012-12-24 15:30 GMT"),
-	S("2012-12-24 16:30 GMT+1"),
-	S("2012-12-24 16:30 GMT+01"),
-	S("2012-12-24 16:30 GMT+0100"),
-	S("2012-12-24 16:30 GMT+01:00"),
-	S("2012-12-24 14:30 GMT-1"),
-	S("2012-12-24 14:30 GMT-01"),
-	S("2012-12-24 14:30 GMT-01:00"),
-	S("2012-12-24 14:30 GMT-0100"),
+	/**
+	 * Unsupported cases commented out (gh-12095):
+	 * S("2012-12-24 16:30 GMT+1"),
+	 * S("2012-12-24 16:30 GMT+01"),
+	 * S("2012-12-24 16:30 GMT+0100"),
+	 * S("2012-12-24 16:30 GMT+01:00"),
+	 * S("2012-12-24 14:30 GMT-1"),
+	 * S("2012-12-24 14:30 GMT-01"),
+	 * S("2012-12-24 14:30 GMT-01:00"),
+	 * S("2012-12-24 14:30 GMT-0100"),
+	 */
 	S("2012-12-24 14:30 -01:00"),
 	S("2012-12-24 16:30:00 +01:00"),
 	S("2012-12-24 14:30:00 -01:00"),
@@ -107,13 +113,15 @@ datetime_test(void)
 	size_t index;
 	struct datetime date_expected;
 
-	plan(497);
 	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1);
 
+	const unsigned tap_tests_per_iter = 7;
+	plan(tap_tests_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
 		struct datetime date;
-		size_t len = datetime_parse_full(&date, tests[index].str,
-						 tests[index].len);
+		ssize_t len = datetime_parse_full(&date, tests[index].str,
+						  tests[index].len);
 		is(len > 0, true, "correct parse_datetime return value "
 		   "for '%s'", tests[index].str);
 		is(date.epoch, date_expected.epoch,
@@ -173,8 +181,10 @@ tostring_datetime_test(void)
 	};
 	size_t index;
 
-	plan(17);
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
 		struct datetime date = {
 			tests[index].secs,
 			tests[index].nsec,
@@ -197,10 +207,8 @@ _dt_to_epoch(dt_t dt)
 }
 
 static void
-parse_date_test(void)
+parse_date_iso8601_valid_test(void)
 {
-	plan(154);
-
 	static struct {
 		int64_t epoch;
 		const char *string;
@@ -238,7 +246,10 @@ parse_date_test(void)
 	};
 	size_t index;
 
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(valid_tests));
 	for (index = 0; index < lengthof(valid_tests); index++) {
+		TAP_TEST_LOCATION();
 		dt_t dt = 0;
 		const char *str = valid_tests[index].string;
 		size_t expected_len = valid_tests[index].len;
@@ -250,7 +261,12 @@ parse_date_test(void)
 		is(epoch, expected_epoch, "string '%s' parse, epoch %" PRId64,
 		   str, epoch);
 	}
+	check_plan();
+}
 
+static void
+parse_date_iso8601_invalid_test(void)
+{
 	static const char *const invalid_tests[] = {
 		"20121232",    /* Invalid day of month */
 		"2012-12-310", /* Invalid day of month */
@@ -280,14 +296,23 @@ parse_date_test(void)
 		"2012-1234",   /* Invalid */
 		"2012-X1234",  /* Invalid */
 	};
-	for (index = 0; index < lengthof(invalid_tests); index++) {
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(invalid_tests));
+	for (size_t index = 0; index < lengthof(invalid_tests); index++) {
+		TAP_TEST_LOCATION();
 		dt_t dt = 0;
 		const char *str = invalid_tests[index];
 		size_t len = tnt_dt_parse_iso_date(str, strlen(str), &dt);
 		is(len, 0, "expected failure of string '%s' parse, len %lu",
 		   str, len);
 	}
+	check_plan();
+}
 
+static void
+parse_date_strptime_valid_test(void)
+{
 	/* Check strptime valid formats. */
 	const struct {
 		const char *fmt;
@@ -368,7 +393,10 @@ parse_date_test(void)
 		{ "%Y-%m-%d",                "5879611-07-11" },
 	};
 
-	for (index = 0; index < lengthof(format_tests); index++) {
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(format_tests));
+	for (size_t index = 0; index < lengthof(format_tests); index++) {
+		TAP_TEST_LOCATION();
 		const char *fmt = format_tests[index].fmt;
 		const char *text = format_tests[index].text;
 		struct tnt_tm date = { .tm_epoch = 0};
@@ -460,8 +488,10 @@ mp_datetime_test()
 	};
 	size_t index;
 
-	plan(85);
+	const unsigned tap_tests_per_iter = 5;
+	plan(tap_tests_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
+		TAP_TEST_LOCATION();
 		struct datetime date = {
 			tests[index].secs,
 			tests[index].nsec,
@@ -488,34 +518,24 @@ mp_datetime_test()
 	check_plan();
 }
 
+/**
+ * Binary, MessagePack representation of datetime
+ * payload in MP value.
+ */
+struct binary_datetime {
+	/** Seconds since Epoch. */
+	int64_t epoch;
+	/** Nanoseconds, if any. */
+	int32_t nsec;
+	/** Offset in minutes from UTC. */
+	int16_t tzoffset;
+	/** Olson timezone id. */
+	int16_t tzindex;
+};
+
 static void
-mp_datetime_unpack_valid_checks(void)
+mp_datetime_unpack_ok_test(void)
 {
-	/* Binary, message-pack representation of datetime
-	 * payload in MP value
-	 */
-	struct binary_datetime {
-		/** Seconds since Epoch. */
-		int64_t epoch;
-		/** Nanoseconds, if any. */
-		int32_t nsec;
-		/** Offset in minutes from UTC. */
-		int16_t tzoffset;
-		/** Olson timezone id */
-		int16_t tzindex;
-	};
-
-	static struct binary_datetime invalid_values[] = {
-		{.epoch = MAX_EPOCH_SECS_VALUE + 1},
-		{.epoch = MIN_EPOCH_SECS_VALUE - 1},
-		{.nsec = MAX_NANOS_PER_SEC},
-		{.nsec = -1},
-		{.tzoffset = MIN_TZOFFSET - 1},
-		{.tzoffset = MAX_TZOFFSET + 1},
-		{.tzindex = MAX_TZINDEX + 1},
-		{.tzindex = -1},
-	};
-
 	static struct binary_datetime valid_values[] = {
 		{.epoch = MAX_EPOCH_SECS_VALUE},
 		{.epoch = MIN_EPOCH_SECS_VALUE},
@@ -530,8 +550,10 @@ mp_datetime_unpack_valid_checks(void)
 	const char *p;
 	struct datetime date;
 
-	plan(24);
+	const unsigned tap_tests_per_iter = 2;
+	plan(tap_tests_per_iter * lengthof(valid_values));
 	for (index = 0; index < lengthof(valid_values); index++) {
+		TAP_TEST_LOCATION();
 		struct binary_datetime value = valid_values[index];
 		p = (char *)&value;
 		memset(&date, 0, sizeof(date));
@@ -540,7 +562,29 @@ mp_datetime_unpack_valid_checks(void)
 		is((int64_t)dt->epoch, value.epoch, "epoch value expected");
 	}
 
-	for (index = 0; index < lengthof(valid_values); index++) {
+	check_plan();
+}
+
+static void
+mp_datetime_unpack_fail_test(void)
+{
+	static struct binary_datetime invalid_values[] = {
+		{.epoch = MAX_EPOCH_SECS_VALUE + 1},
+		{.epoch = MIN_EPOCH_SECS_VALUE - 1},
+		{.nsec = MAX_NANOS_PER_SEC},
+		{.nsec = -1},
+		{.tzoffset = MIN_TZOFFSET - 1},
+		{.tzoffset = MAX_TZOFFSET + 1},
+		{.tzindex = MAX_TZINDEX + 1},
+		{.tzindex = -1},
+	};
+
+	const unsigned tap_tests_per_iter = 1;
+	plan(tap_tests_per_iter * lengthof(invalid_values));
+	for (size_t index = 0; index < lengthof(invalid_values); index++) {
+		TAP_TEST_LOCATION();
+		const char *p;
+		struct datetime date;
 		struct binary_datetime value = invalid_values[index];
 		p = (char *)&value;
 		memset(&date, 0, sizeof(date));
@@ -635,12 +679,15 @@ interval_from_map_test(void)
 int
 main(void)
 {
-	plan(8);
+	plan(11);
 	datetime_test();
 	tostring_datetime_test();
-	parse_date_test();
+	parse_date_iso8601_valid_test();
+	parse_date_iso8601_invalid_test();
+	parse_date_strptime_valid_test();
 	parse_date_strptime_invalid_test();
-	mp_datetime_unpack_valid_checks();
+	mp_datetime_unpack_ok_test();
+	mp_datetime_unpack_fail_test();
 	mp_datetime_test();
 	mp_print_test();
 	interval_from_map_test();
