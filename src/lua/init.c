@@ -266,14 +266,6 @@ static const char *lua_modules[] = {
 };
 
 /**
- * If there's a risk that a module may fail to load, put it here.
- * Then it'll be embedded, but not loaded until the first use.
- */
-static const char *lua_modules_preload[] = {
-	NULL
-};
-
-/**
  * Names of all global built-in objects. Note that this is a set, not a map,
  * i.e. only keys are used while values are NULL.
  *
@@ -871,20 +863,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		luaT_set_module_from_source(L, modname, modsrc);
 	}
 
-	lua_getfield(L, LUA_REGISTRYINDEX, "_PRELOAD");
-	for (const char **s = lua_modules_preload; *s; s += 2) {
-		const char *modname = *s;
-		const char *modsrc = *(s + 1);
-		const char *modfile = lua_pushfstring(L,
-			"@builtin/%s.lua", modname);
-		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
-			panic("Error loading Lua module %s...: %s",
-			      modname, lua_tostring(L, -1));
-		lua_setfield(L, -3, modname); /* package.preload.modname = t */
-		lua_pop(L, 1); /* chunkname */
-		builtin_modcache_put(modname, modsrc);
-	}
-	lua_pop(L, 1); /* _PRELOAD */
 #ifdef NDEBUG
 	/* Unload strict after boot in release mode */
 	if (luaL_dostring(L, "require('strict').off()") != 0)
