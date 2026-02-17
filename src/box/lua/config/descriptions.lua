@@ -796,6 +796,10 @@ I['credentials.users'] = 'An array of users.'
 
 I['credentials.users.*'] = 'User name.'
 
+I['credentials.users.*.no_default'] = format_text([[
+    Whether to remove built-in privileges from this user.
+]])
+
 I['credentials.users.*.password'] = format_text([[
     A user's password.
 ]])
