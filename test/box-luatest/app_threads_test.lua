@@ -154,3 +154,9 @@ g.test_builtin_types_serialization = function(cg)
     t.assert_equals(ret_tuple, {1, 2, 3})
     conn:close()
 end
+
+g.test_os_exit_disabled = function(cg)
+    t.assert_error_msg_contains(
+        'Only main thread may call os.exit()',
+        cg.server.eval, cg.server, [[os.exit()]], {}, {_thread_id = 1})
+end

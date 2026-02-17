@@ -83,6 +83,10 @@ extern __thread uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
 extern __thread uint32_t CTID_INTERVAL;
 
+/** Function called by os.exit(). */
+extern void
+(*tarantool_lua_exit_function)(int code);
+
 /**
  * Creates a new Lua state with a custom allocator function.
  * Guarantees the state is not NULL. It panics if lua_State can't
