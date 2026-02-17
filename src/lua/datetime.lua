@@ -115,6 +115,11 @@ local TOSTRING_BUFSIZE  = 64
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
+-- at the moment the range of known timezones is UTC-12:00..UTC+14:00
+-- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
 local MIN_DATE_MONTH = 6
@@ -618,9 +623,7 @@ local function datetime_new(obj)
     local offset = obj.tzoffset
     if offset ~= nil then
         offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     -- .year, .month, .day
@@ -915,7 +918,7 @@ local function datetime_parse_from(str, obj)
 
     if tzoffset ~= nil then
         local offset = get_timezone(tzoffset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     if tzname ~= nil then
@@ -1107,7 +1110,7 @@ function datetime_set(self, obj)
     local offset = obj.tzoffset
     if offset ~= nil then
         offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
     offset = offset or self.tzoffset
 
