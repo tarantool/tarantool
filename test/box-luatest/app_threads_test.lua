@@ -195,4 +195,5 @@ g.test_builtin_modules = function(cg)
     check_module('pickle')
     check_module('msgpack')
     check_module('yaml')
+    check_module('json')
 end

@@ -97,8 +97,6 @@ static const char *json_token_type_name[] = {
     NULL
 };
 
-static struct luaL_serializer *luaL_json_default;
-
 static json_token_type_t ch2token[256];
 static char escape2char[256];  /* Decoding */
 
@@ -138,6 +136,7 @@ static int json_destroy_config(lua_State *l)
 }
 #endif
 
+__attribute__((constructor))
 static void json_create_tokens()
 {
     int i;
@@ -1153,8 +1152,7 @@ json_new(lua_State *L)
 int
 luaopen_json(lua_State *L)
 {
-    json_create_tokens();
-    luaL_json_default = luaL_newserializer(L, "json", jsonlib);
+    luaL_newserializer(L, "json", jsonlib);
     luaL_pushnull(L);
     lua_setfield(L, -2, "null"); /* compatibility with cjson */
     return 1;
