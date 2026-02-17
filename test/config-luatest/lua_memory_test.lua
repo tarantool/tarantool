@@ -77,7 +77,6 @@ g.test_update = function(g)
     local lua_memory_1 = 256 * 1024 * 1024
     local config_1 = cbuilder:new(config_0)
         :set_global_option('lua.memory', lua_memory_1)
-        :add_instance('i-001', {})
         :config()
 
     -- Load a config with a new lua.memory value.

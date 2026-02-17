@@ -127,6 +127,7 @@ lua_source(lua_sources ../third_party/metrics/metrics/tarantool/vinyl.lua metric
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool.lua metrics_tarantool_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/utils.lua metrics_utils_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/version.lua metrics_version_lua)
+lua_source(lua_sources ../third_party/metrics-export-role/roles/metrics-export.lua metrics_export_role_lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)

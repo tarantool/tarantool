@@ -101,6 +101,7 @@ add_subdirectory(config-luatest)
 add_subdirectory(engine-luatest)
 add_subdirectory(engine-tap)
 add_subdirectory(metrics-luatest)
+add_subdirectory(metrics-export-role-luatest)
 add_subdirectory(replication-luatest)
 add_subdirectory(sql-tap)
 add_subdirectory(sql-luatest)
@@ -193,6 +194,7 @@ list(APPEND EXECUTED_WITHOUT_TEST_RUN
     engine-luatest
     engine-tap
     metrics-luatest
+    metrics-export-role-luatest
     replication-luatest
     sql-luatest
     sql-tap
