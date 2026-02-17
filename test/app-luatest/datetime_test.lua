@@ -43,6 +43,52 @@ local SUPPORTED_DATETIME_FORMATS = {
             fmt = '%Y-%M-%DT%h:%m:%.3s+00:00',
             buf = '2024-07-31T14:30:02.132+00:00',
         },
+        -- Date-Times with (UTC|GMT) plus Time Shift (Tarantool extension).
+        {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 UTC+01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 UTC+0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 UTC+01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T14:30 UTC-0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T14:30 UTC-01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 GMT+01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 GMT+0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T16:30 GMT+01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T14:30 GMT-01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T14:30 GMT-0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%dT%H:%M %Z%z',
+            buf = '2012-12-24T14:30 GMT-01:00',
+            ts = 1356363000,
+        },
     },
 
     ['RFC3339 ONLY'] = {
@@ -104,6 +150,72 @@ local SUPPORTED_DATETIME_FORMATS = {
         }, {
             fmt = '%Y-%M-%DT%h:%m:%.3s-00:00',
             buf = '2024-07-31T14:30:02.132-00:00',
+        },
+        -- Date-Times with (UTC|GMT) plus Time Shift (Tarantool extension).
+        {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 UTC+1',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 UTC+01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 UTC+0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 UTC+01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 UTC-1',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 UTC-01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 UTC-0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 UTC-01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 GMT+1',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 GMT+01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 GMT+0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 16:30 GMT+01:00',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 GMT-1',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 GMT-01',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 GMT-0100',
+            ts = 1356363000,
+        }, {
+            fmt = '%Y-%m-%d %H:%M %Z%z',
+            buf = '2012-12-24 14:30 GMT-01:00',
+            ts = 1356363000,
         },
     },
 
@@ -2049,6 +2161,7 @@ for supported_by, standard_cases in pairs(SUPPORTED_DATETIME_FORMATS) do
         local f = case.fmt
         local testcase_name = 'test_supported_format_' .. f:gsub('/', '_')
         local fmtmsg = "Format '%s' supported by %s not parsed by %s"
+        local invalmsg = 'invalid result: date:%s'
 
         if supported_by == 'RFC3339 AND ISO8601' then
             local buf = case.buf
@@ -2061,12 +2174,20 @@ for supported_by, standard_cases in pairs(SUPPORTED_DATETIME_FORMATS) do
                 t.assert(iso8601_ok, fmtmsg:format(f, supported_by, 'iso8601'))
                 t.assert(rfc3339_ok, fmtmsg:format(f, supported_by, 'rfc3339'))
                 t.assert_equals(iso8601_val, rfc3339_val, 'unequal results')
+                if case.ts ~= nil then
+                    t.assert_equals(iso8601_val.timestamp, case.ts,
+                                    invalmsg:format(iso8601_val:format(f)))
+                end
             end
         else
             local dtfmt = supported_by:gsub(' ONLY', ''):lower()
             pg[testcase_name] = function()
-                local ok, _ = pcall(dt.parse, case.buf, {format = dtfmt})
+                local ok, val = pcall(dt.parse, case.buf, {format = dtfmt})
                 t.assert(ok, fmtmsg:format(f, supported_by, dtfmt))
+                if case.ts ~= nil then
+                    t.assert_equals(val.timestamp, case.ts,
+                                    invalmsg:format(val:format(case.fmt)))
+                end
             end
         end
     end
