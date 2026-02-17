@@ -70,8 +70,11 @@ struct VdbeOp {
 		int i;		/* Integer value if p4type==P4_INT32 */
 		void *p;	/* Generic pointer */
 		char *z;	/* Pointer to data for string (char array) types */
-		i64 *pI64;	/* Used when p4type is P4_INT64/UINT64 */
+		i64 *pI64;	/* Used when p4type is P4_INT64/UINT64 (pointer) */
+        i64 i64; /* Used when p4type is P4_INT64/UINT64 (direct value) */
+        u64 u64; /* Used when p4type is p4_UINT64 (direct value) */
 		double *pReal;	/* Used when p4type is P4_REAL */
+        double real; /* Used when p4type is P4_REAL (direct value)  */
 		/**
 		 * A pointer to function implementation.
 		 * Used when p4type is P4_FUNC.
@@ -141,6 +144,9 @@ struct SubProgram {
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
 #define P4_KEYINFO  (-19)       /* P4 is a pointer to sql_key_info structure. */
+#define P4_INT64_DIRECT (-20) /* P4 is a 64-bit signed integer (direct) */
+#define P4_UINT64_DIRECT (-21) /* P4 is a 64-bit unsigned integer (direct) */
+#define P4_REAL_DIRECT (-22) /* P4 is a 64-bit floating point value (direct) */
 
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1
@@ -197,6 +203,9 @@ int sqlVdbeAddOp3(Vdbe *, int, int, int, int);
 int sqlVdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
 int sqlVdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlVdbeAddOp4Int(Vdbe *, int, int, int, int, int);
+void sqlVdbeAddOp4Int64(Vdbe *, int op, int p1, int p2, int p3, i64 value);
+void sqlVdbeAddOp4UInt64(Vdbe *, int op, int p1, int p2, int p3, u64 value);
+void sqlVdbeAddOp4Real(Vdbe *, int op, int p1, int p2, int p3, double value);
 void sqlVdbeEndCoroutine(Vdbe *, int);
 void sqlVdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlVdbeChangeP1(Vdbe *, u32 addr, int P1);
