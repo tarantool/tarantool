@@ -192,21 +192,28 @@ extern char minifio_lua[],
 	version_lua[]
 ;
 
-static const char *lua_modules[] = {
+/** List of modules available in all threads. */
+static const char * const lua_modules_minimal[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
-	"compat", compat_lua,
-	"internal.utils", utils_lua,
-	"fun", fun_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
+	"fun", fun_lua,
+	"table", table_lua,
 	"errno", errno_lua,
+	"clock", clock_lua,
+	"varbinary", varbinary_lua,
+	NULL
+};
+
+/** List of modules available only in the main thread. */
+static const char * const lua_modules[] = {
+	"compat", compat_lua,
+	"internal.utils", utils_lua,
 	"fiber", fiber_lua,
 	"env", env_lua,
 	"buffer", buffer_lua,
 	"string", string_lua,
-	"varbinary", varbinary_lua,
-	"table", table_lua,
 	"msgpackffi", msgpackffi_lua,
 	"crypto", crypto_lua,
 	"digest", digest_lua,
@@ -217,7 +224,6 @@ static const char *lua_modules[] = {
 	"fio", fio_lua,
 	"error", error_lua,
 	"csv", csv_lua,
-	"clock", clock_lua,
 	"socket", socket_lua,
 	"title", title_lua,
 	"tap", tap_lua,
@@ -732,7 +738,8 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 
 	luaT_setmodule(L, modname);
 
-	builtin_modcache_put(modname, modsrc);
+	if (cord_is_main())
+		builtin_modcache_put(modname, modsrc);
 	lua_pop(L, 1); /* modfile */
 }
 
@@ -750,6 +757,10 @@ tarantool_lua_init_minimal(void)
 #ifndef LUAJIT_JIT_STATUS
 	(void)luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_OFF);
 #endif
+	/* Create a table for "package.searchers" analogue. */
+	lua_newtable(L);
+	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_PACKAGE_SEARCHERS");
+
 	/*
 	 * Create a table for storing loaded built-in modules.
 	 * Similar to _LOADED (package.loaded).
@@ -757,18 +768,39 @@ tarantool_lua_init_minimal(void)
 	lua_newtable(L);
 	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
 
+	/*
+	 * Setup paths and loaders.
+	 *
+	 * Load minifio first, because the loaders module depends on it.
+	 */
+	tarantool_lua_setpaths(L);
+	tarantool_lua_minifio_init(L);
+	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
+	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
+
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");
 	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_utils_init(L);
+	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
 	tarantool_lua_decimal_init(L);
+	tarantool_lua_pickle_init(L);
 	tarantool_lua_serializer_init(L);
 
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
+	luaopen_yaml(L);
+	lua_pop(L, 1);
+
+	luaopen_tarantool(L);
+	for (const char * const *s = lua_modules_minimal; *s; s += 2) {
+		const char *modname = *s;
+		const char *modsrc = *(s + 1);
+		luaT_set_module_from_source(L, modname, modsrc);
+	}
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
@@ -778,6 +810,11 @@ void
 tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		   char **argv)
 {
+	assert(cord_is_main());
+
+	builtin_modcache_init();
+	minifio_set_script(script);
+
 	tarantool_lua_init_minimal();
 	lua_State *L = tarantool_L;
 
@@ -793,24 +830,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	}
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
-	/* Create a table for "package.searchers" analogue. */
-	lua_newtable(L);
-	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_PACKAGE_SEARCHERS");
-
-	builtin_modcache_init();
-
-	/*
-	 * Setup paths and loaders.
-	 *
-	 * Load minifio first, because the loaders module depends
-	 * on it.
-	 */
-	tarantool_lua_setpaths(L);
-	tarantool_lua_minifio_init(L);
-	minifio_set_script(script);
-	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
-	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
-
 	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
 	tarantool_lua_uri_init(L);
@@ -819,11 +838,9 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
-	tarantool_lua_errno_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
-	tarantool_lua_pickle_init(L);
 	tarantool_lua_digest_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_trigger_init(L);
@@ -832,8 +849,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
 	luaopen_http_client_driver(L);
-	lua_pop(L, 1);
-	luaopen_yaml(L);
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
@@ -856,18 +871,11 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 #if defined(ENABLE_BACKTRACE)
 	backtrace_lua_init();
 #endif /* defined(ENABLE_BACKTRACE) */
-	luaopen_tarantool(L);
-	for (const char **s = lua_modules; *s; s += 2) {
+	for (const char * const *s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
 		const char *modsrc = *(s + 1);
 		luaT_set_module_from_source(L, modname, modsrc);
 	}
-
-#ifdef NDEBUG
-	/* Unload strict after boot in release mode */
-	if (luaL_dostring(L, "require('strict').off()") != 0)
-		panic("Failed to unload 'strict' Lua module");
-#endif /* NDEBUG */
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
@@ -876,7 +884,13 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 int
 tarantool_lua_postinit(struct lua_State *L)
 {
-	builtin_globals_init(L);
+	if (cord_is_main())
+		builtin_globals_init(L);
+#ifdef NDEBUG
+	/* Unload strict after boot in release mode */
+	if (luaL_dostring(L, "require('strict').off()") != 0)
+		panic("Failed to unload 'strict' Lua module");
+#endif /* NDEBUG */
 	/*
 	 * loaders.initializing = nil
 	 *
@@ -1237,6 +1251,8 @@ tarantool_lua_run_script(char *path, struct instance_state *instance,
 void
 tarantool_lua_free()
 {
+	assert(cord_is_main());
+
 	builtin_globals_free();
 	builtin_modcache_free();
 	tarantool_lua_utf8_free();

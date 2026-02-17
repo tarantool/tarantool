@@ -16,6 +16,7 @@ app_thread_lua_init(void)
 {
 	tarantool_lua_init_minimal();
 	box_lua_call_init(tarantool_L);
+	tarantool_lua_postinit(tarantool_L);
 }
 
 void
