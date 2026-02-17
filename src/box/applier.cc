@@ -2561,6 +2561,27 @@ applier_set_last_error(struct applier *applier, struct error *e)
 	diag_set_error(&applier->diag, e);
 }
 
+/*
+ * If the master restarts during the initial join state and the replica has
+ * already applied some rows, the replica might incorrectly conclude that it has
+ * all the data. Thus, we treat errors during APPLIER_FETCH_SNAPSHOT as
+ * unrecoverable if replica has some data.
+ */
+static bool
+applier_stop_on_corrupted_join(struct applier *applier, struct error *e)
+{
+	if (applier->state != APPLIER_FETCH_SNAPSHOT ||
+	    applier->row_count == 0) {
+		return false;
+	}
+	applier_set_last_error(applier, e);
+	applier_log_error(applier, e);
+	say_info("Error occurred during fetching snapshot, but some data has "
+		 "been applied. Stopping applier");
+	applier_disconnect(applier, APPLIER_STOPPED);
+	return true;
+}
+
 static int
 applier_f(va_list ap)
 {
@@ -2641,6 +2662,9 @@ applier_f(va_list ap)
 			unreachable();
 			return 0;
 		} catch (ClientError *e) {
+			if (applier_stop_on_corrupted_join(applier, e)) {
+				break;
+			}
 			if (e->errcode() == ER_CONNECTION_TO_SELF &&
 			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
 				/* Connection to itself, stop applier */
@@ -2747,16 +2771,25 @@ applier_f(va_list ap)
 			}
 			break;
 		} catch (SocketError *e) {
+			if (applier_stop_on_corrupted_join(applier, e)) {
+				break;
+			}
 			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SystemError *e) {
+			if (applier_stop_on_corrupted_join(applier, e)) {
+				break;
+			}
 			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SSLError *e) {
+			if (applier_stop_on_corrupted_join(applier, e)) {
+				break;
+			}
 			applier_set_last_error(applier, e);
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
