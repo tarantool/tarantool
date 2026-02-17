@@ -50,9 +50,6 @@ extern char tarantool_path[];
 extern long tarantool_start_time;
 
 void
-tarantool_exit(int);
-
-void
 load_cfg(void);
 
 /* The type of sigint callback's pointer. */

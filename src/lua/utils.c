@@ -60,6 +60,9 @@ __thread uint32_t CTID_UUID;
 __thread uint32_t CTID_DATETIME = 0;
 __thread uint32_t CTID_INTERVAL = 0;
 
+void
+(*tarantool_lua_exit_function)(int code) = exit;
+
 struct lua_State *
 luaT_newstate(void)
 {
@@ -1017,6 +1020,19 @@ luaT_getenv(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Variant of os.exit() that makes Tarantool exit gracefully.
+ */
+static int
+luaT_exit(struct lua_State *L)
+{
+	if (!cord_is_main())
+		return luaL_error(L, "Only main thread may call os.exit()");
+	int code = lua_tointeger(L, 1);
+	tarantool_lua_exit_function(code);
+	return 0;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
@@ -1090,6 +1106,9 @@ tarantool_lua_utils_init(struct lua_State *L)
 	lua_getglobal(L, "os");
 	lua_pushcfunction(L, luaT_getenv);
 	lua_setfield(L, -2, "getenv");
+	/* Overload os.exit() to call on_shutdown triggers. */
+	lua_pushcfunction(L, luaT_exit);
+	lua_setfield(L, -2, "exit");
 	lua_pop(L, 1);
 
 	lua_pushcfunction(L, luaT_newthread_wrapper);

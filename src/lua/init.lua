@@ -16,8 +16,6 @@ double
 tarantool_uptime(void);
 typedef int32_t pid_t;
 pid_t getpid(void);
-void
-tarantool_exit(int);
 ]]
 
 local fio = require("fio")
@@ -148,19 +146,6 @@ dostring = function(s, ...)
     end
     return chunk(...)
 end
-
-local fiber = require("fiber")
-local function exit(code)
-    code = (type(code) == 'number') and code or 0
-    ffi.C.tarantool_exit(code)
-    -- Make sure we yield even if the code after
-    -- os.exit() never yields. After on_shutdown
-    -- fiber completes, we will never wake up again.
-    local TIMEOUT_INFINITY = 500 * 365 * 86400
-    fiber._internal.set_system(fiber.self())
-    while true do fiber.sleep(TIMEOUT_INFINITY) end
-end
-rawset(os, "exit", exit)
 
 local function uptime()
     return tonumber(ffi.C.tarantool_uptime());

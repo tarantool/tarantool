@@ -106,7 +106,7 @@ static double start_time;
 
 /** A preallocated fiber to run on_shutdown triggers. */
 static struct fiber *on_shutdown_fiber = NULL;
-/** A flag restricting repeated execution of tarantool_exit(). */
+/** A flag restricting repeated execution of start_shutdown(). */
 static bool shutdown_started = false;
 static bool shutdown_finished = false;
 static int exit_code = 0;
@@ -164,8 +164,9 @@ on_shutdown_f(va_list ap)
 	return 0;
 }
 
-void
-tarantool_exit(int code)
+/** Trigger Tarantool shutdown. */
+static void
+start_shutdown(int code)
 {
 	start_loop = false;
 	if (shutdown_started) {
@@ -180,6 +181,20 @@ tarantool_exit(int code)
 	exit_code = code;
 	box_broadcast_fmt("box.shutdown", "%b", true);
 	fiber_wakeup(on_shutdown_fiber);
+}
+
+/** Exit Tarantool. */
+static void
+tarantool_exit(int code)
+{
+	start_shutdown(code);
+	/*
+	 * Make sure we yield even if the code after exit() never yields.
+	 * After on_shutdown fiber completes, we will never wake up again.
+	 */
+	fiber_set_system(fiber(), true);
+	while (true)
+		fiber_sleep(TIMEOUT_INFINITY);
 }
 
 static void
@@ -198,7 +213,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	 */
 	if (pid_file)
 		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
-	tarantool_exit(0);
+	start_shutdown(0);
 }
 
 /*
@@ -1038,6 +1053,7 @@ main(int argc, char **argv)
 		instance.config : script;
 	tarantool_lua_init(tarantool_bin, config_or_script, main_argc,
 			   main_argv);
+	tarantool_lua_exit_function = tarantool_exit;
 
 	start_time = ev_monotonic_time();
 
@@ -1106,10 +1122,10 @@ main(int argc, char **argv)
 	/*
 	 * If Tarantool was stopped by Ctrl+D or by reaching the end of the
 	 * init script, and there was neither os.exit nor SIGTERM, then call
-	 * tarantool_exit and start an event loop to run on_shutdown triggers.
+	 * start_shutdown and start an event loop to run on_shutdown triggers.
 	 */
 	if (!shutdown_started)
-		tarantool_exit(exit_code);
+		start_shutdown(exit_code);
 	if (!shutdown_finished)
 		ev_run(loop(), 0);
 	tarantool_free();
