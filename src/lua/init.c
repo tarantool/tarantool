@@ -794,6 +794,8 @@ tarantool_lua_init_minimal(void)
 	lua_pop(L, 1);
 	luaopen_yaml(L);
 	lua_pop(L, 1);
+	luaopen_json(L);
+	lua_pop(L, 1);
 
 	luaopen_tarantool(L);
 	for (const char * const *s = lua_modules_minimal; *s; s += 2) {
@@ -849,8 +851,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
 	luaopen_http_client_driver(L);
-	lua_pop(L, 1);
-	luaopen_json(L);
 	lua_pop(L, 1);
 #if defined(EMBED_LUAZLIB)
 	luaopen_zlib(L);
