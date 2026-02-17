@@ -570,6 +570,7 @@ txn_begin(void)
 	txn_set_flags(txn, TXN_SUPPORTS_MVCC);
 	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
+	txn->flag = false;
 	return txn;
 }
 
