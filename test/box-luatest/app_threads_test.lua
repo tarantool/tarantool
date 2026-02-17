@@ -160,3 +160,39 @@ g.test_os_exit_disabled = function(cg)
         'Only main thread may call os.exit()',
         cg.server.eval, cg.server, [[os.exit()]], {}, {_thread_id = 1})
 end
+
+g.test_builtin_modules = function(cg)
+    local function eval(expr, args)
+        return cg.server:eval(expr, args or {}, {_thread_id = 1})
+    end
+    local function check_module(module)
+        local type_ = eval([[
+            local module = ...
+            return type(require(module))]], {module})
+        t.assert_equals(type_, 'table')
+    end
+    local function check_module_func(module, func)
+        local type_ = eval([[
+            local module, func = ...
+            return type(require(module)[func])
+        ]], {module, func})
+        t.assert_equals(type_, 'function')
+    end
+    check_module('strict')
+    check_module('debug')
+    check_module_func('debug', 'sourcefile')
+    check_module_func('debug', 'sourcedir')
+    check_module('tarantool')
+    check_module('fun')
+    check_module('table')
+    check_module_func('table', 'copy')
+    check_module_func('table', 'deepcopy')
+    check_module_func('table', 'equals')
+    check_module('errno')
+    check_module('clock')
+    check_module('decimal')
+    check_module('varbinary')
+    check_module('pickle')
+    check_module('msgpack')
+    check_module('yaml')
+end

@@ -1,6 +1,7 @@
 -- init.lua -- internal file
 
 local ffi = require('ffi')
+local minifio = require('internal.minifio')
 local loaders = require('internal.loaders')
 local tarantool = require('tarantool')
 
@@ -17,8 +18,6 @@ tarantool_uptime(void);
 typedef int32_t pid_t;
 pid_t getpid(void);
 ]]
-
-local fio = require("fio")
 
 -- A wrapper with a unique name, used in the call stack traversing.
 local function __tarantool__internal__require__wrapper__()
@@ -55,7 +54,7 @@ local function get_common_subpath(path1, path2)
     path2 = path2:split('/')
     for i = 1, math.min(#path1, #path2) do
         if path1[i] == path2[i] then
-            result = fio.pathjoin(result, path1[i])
+            result = minifio.pathjoin(result, path1[i])
         else
             goto finish
         end
@@ -91,7 +90,7 @@ local function module_name_from_filename(filename)
     end
     result = result:gsub('/init.lua', '')
     result = result:gsub('%.lua', '')
-    result = strip_cwd_from_path(fio.cwd(), result)
+    result = strip_cwd_from_path(minifio.cwd(), result)
     result = result:gsub(loaders.ROCKS_LIB_PATH .. '/', '')
     result = result:gsub(loaders.ROCKS_LUA_PATH .. '/', '')
     result = result:gsub('/', '.')
