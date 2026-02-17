@@ -189,6 +189,7 @@ extern char minifio_lua[],
 	print_lua[],
 	pairs_lua[],
 	luadebug_lua[],
+	luawasm_lua[],
 	version_lua[]
 ;
 
@@ -260,6 +261,7 @@ static const char *lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
+	"luawasm", luawasm_lua,
 	"version", version_lua,
 	EXTRA_LUA_MODULES
 	NULL
@@ -700,6 +702,15 @@ luaopen_tarantool(lua_State *L)
 	/* build.test_build */
 	lua_pushstring(L, "test_build");
 #ifdef TEST_BUILD
+	lua_pushboolean(L, true);
+#else
+	lua_pushboolean(L, false);
+#endif
+	lua_settable(L, -3);
+
+	/* build.wasm */
+	lua_pushstring(L, "wasm");
+#ifdef TARANTOOL_WASM
 	lua_pushboolean(L, true);
 #else
 	lua_pushboolean(L, false);

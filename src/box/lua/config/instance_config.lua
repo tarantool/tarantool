@@ -1559,6 +1559,134 @@ return schema.new('instance_config', schema.record({
     }, {
         validate = validators['app'],
     }),
+    wasm = schema.record({
+        components = schema.map({
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.record({
+                path = schema.scalar({
+                    type = 'string',
+                }),
+                autorun = schema.scalar({
+                    type = 'boolean',
+                    default = false,
+                }),
+                limits = schema.record({
+                    max_instructions = schema.scalar({
+                        type = 'integer',
+                        default = box.NULL,
+                    }),
+                    memory_limit = schema.scalar({
+                        type = 'integer',
+                        default = box.NULL,
+                    }),
+                }),
+                env = schema.record({
+                    inherit_env = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    vars = schema.map({
+                        key = schema.scalar({
+                            type = 'string',
+                        }),
+                        value = schema.scalar({
+                            type = 'string',
+                        }),
+                    }),
+                }),
+                args = schema.record({
+                    inherit_args = schema.scalar({
+                        type = 'boolean',
+                        default = false,
+                    }),
+                    value = schema.array({
+                        items = schema.scalar({
+                            type = 'string',
+                        }),
+                    }),
+                }),
+                stdio = schema.record({
+                    inherit_stdin = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    inherit_stdout = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    inherit_stderr = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    stdin_path = schema.scalar({
+                        type = 'string',
+                        default = box.NULL,
+                    }),
+                    stdout_path = schema.scalar({
+                        type = 'string',
+                        default = box.NULL,
+                    }),
+                    stderr_path = schema.scalar({
+                        type = 'string',
+                        default = box.NULL,
+                    }),
+                }),
+                network = schema.record({
+                    inherit_network = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    allow_ip_name_lookup = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    allow_tcp = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    allow_udp = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                    allowed_ips = schema.array({
+                        items = schema.scalar({
+                            type = 'string',
+                        }),
+                        default = {},
+                    }),
+                    allowed_ports = schema.array({
+                        items = schema.scalar({
+                            type = 'integer',
+                        }),
+                        default = {},
+                    }),
+                }),
+                fs = schema.record({
+                    preopened_dirs = schema.array({
+                        items = schema.record({
+                            host_path = schema.scalar({
+                                type = 'string',
+                            }),
+                            guest_path = schema.scalar({
+                                type = 'string',
+                            }),
+                            perms = schema.enum({
+                                'ro',
+                                'rw',
+                            }, {
+                                default = 'rw',
+                            }),
+                        }),
+                        default = {},
+                    }),
+                }),
+            }),
+            default = {},
+            validate = validators['wasm.components.*']
+        }),
+    }),
     feedback = schema.record({
         enabled = schema.scalar({
             type = 'boolean',

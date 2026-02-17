@@ -3055,6 +3055,139 @@ I['wal.retention_period'] = format_text([[
 
 -- }}} wal configuration
 
+-- {{{ wasm configuration
+
+I['wasm'] = format_text([[
+    Configure WebAssembly components executed via WASI.
+]])
+
+I['wasm.components'] = format_text([[
+    Mapping of component names to their configuration.
+]])
+
+I['wasm.components.*'] = format_text([[
+    Configuration of a single WebAssembly component.
+]])
+
+I['wasm.components.*.path'] = format_text([[
+    'Path to a WASM file or to a directory containing it.'
+]])
+
+I['wasm.components.*.autorun'] = format_text([[
+    Run the component automatically when the instance starts.
+]])
+
+I['wasm.components.*.limits'] = 'Resource limits applied to the component.'
+
+I['wasm.components.*.limits.max_instructions'] = format_text([[
+     Maximum number of WebAssembly instructions the component may execute.
+]])
+
+I['wasm.components.*.limits.memory_limit'] = format_text([[
+    Maximum size of WebAssembly linear memory in bytes.
+]])
+
+I['wasm.components.*.env'] = 'Environment variable settings.'
+
+I['wasm.components.*.env.inherit_env'] = format_text([[
+    Forward host environment variables to the component.
+]])
+
+I['wasm.components.*.env.vars'] = format_text([[
+    Additional environment variables to set for the component.
+]])
+
+I['wasm.components.*.env.vars.*'] = 'Environment variable value.'
+
+I['wasm.components.*.args'] = 'Command-line arguments passed to the component.'
+
+I['wasm.components.*.args.inherit_args'] = format_text([[
+    Append host process arguments to the component arguments.
+]])
+
+I['wasm.components.*.args.value'] = format_text([[
+    Array of arguments for the component.
+]])
+
+I['wasm.components.*.args.value.*'] = 'Argument value.'
+
+I['wasm.components.*.stdio'] = 'Standard streams configuration.'
+
+I['wasm.components.*.stdio.inherit_stdin'] = format_text([[
+    Pass host standard input stream to the component.
+]])
+
+I['wasm.components.*.stdio.inherit_stdout'] = format_text([[
+    Pass host standard output stream to the component.
+]])
+
+I['wasm.components.*.stdio.inherit_stderr'] = format_text([[
+    Pass host standard error stream to the component.
+]])
+
+I['wasm.components.*.stdio.stdin_path'] = format_text([[
+    Path to a file used as the component's standard input.
+]])
+
+I['wasm.components.*.stdio.stdout_path'] = format_text([[
+    Path to a file where the component's standard output is written.
+]])
+I['wasm.components.*.stdio.stderr_path'] = format_text([[
+    Path to a file where the component's standard error is written.
+]])
+
+I['wasm.components.*.network'] = 'Network access configuration.'
+
+I['wasm.components.*.network.inherit_network'] = format_text([[
+    Allow the component to use host networking.
+]])
+
+I['wasm.components.*.network.allow_ip_name_lookup'] = format_text([[
+    Enable DNS lookups for the component.
+]])
+
+I['wasm.components.*.network.allow_tcp'] = format_text([[
+    Enable TCP sockets for the component.
+]])
+
+I['wasm.components.*.network.allow_udp'] = format_text([[
+    Enable UDP sockets for the component.
+]])
+
+I['wasm.components.*.network.allowed_ips'] = format_text([[
+    List of IP addresses permitted for network access.
+]])
+
+I['wasm.components.*.network.allowed_ips.*'] = 'Permitted IP address.'
+
+I['wasm.components.*.network.allowed_ports'] = format_text([[
+    List of TCP/UDP ports the component may access.
+]])
+
+I['wasm.components.*.network.allowed_ports.*'] = 'Permitted port number.'
+
+I['wasm.components.*.fs'] = 'Filesystem access configuration.'
+
+I['wasm.components.*.fs.preopened_dirs'] = format_text([[
+    Directories exposed to the component.
+]])
+
+I['wasm.components.*.fs.preopened_dirs.*'] = 'Directory mapping.'
+
+I['wasm.components.*.fs.preopened_dirs.*.host_path'] = format_text([[
+    Host directory path.
+]])
+
+I['wasm.components.*.fs.preopened_dirs.*.guest_path'] = format_text([[
+    Path inside the component's virtual filesystem.
+]])
+
+I['wasm.components.*.fs.preopened_dirs.*.perms'] = format_text([[
+    Access permissions: `ro` for read-only or `rw` for read-write.
+]])
+
+-- }}} wasm configuration
+
 -- }}} Instance descriptions
 
 -- {{{ Cluster descriptions

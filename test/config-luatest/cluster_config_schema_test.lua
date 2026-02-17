@@ -98,6 +98,7 @@ local instance_config_fields = {
     'labels',
     'isolated',
     'connpool',
+    'wasm',
 }
 
 -- Verify that the fields of the given schema correspond to the
@@ -463,6 +464,9 @@ g.test_defaults = function()
         connpool = {
             idle_timeout = 60,
         },
+        wasm = {
+            components = {},
+        }
     }
 
     -- Global defaults.

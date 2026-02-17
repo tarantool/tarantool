@@ -75,6 +75,7 @@ lua_source(lua_sources lua/varbinary.lua varbinary_lua)
 lua_source(lua_sources lua/protobuf_wireformat.lua protobuf_wireformat_lua)
 lua_source(lua_sources lua/protobuf.lua protobuf_lua)
 lua_source(lua_sources lua/version.lua version_lua)
+lua_source(lua_sources lua/luawasm.lua luawasm_lua)
 
 if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
