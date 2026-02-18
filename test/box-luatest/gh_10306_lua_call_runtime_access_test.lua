@@ -125,7 +125,11 @@ g.test_grant_builtins_lua_call = function()
         box.internal.lua_call_runtime_priv_grant('alice', 'box.info')
 
         -- Check that user `alice` can call built-in functions.
-        t.assert_equals(con:call('box.info'), box.info())
+        local info1 = con:call('box.info')
+        info1.election.leader_idle = nil
+        local info2 = box.info()
+        info2.election.leader_idle = nil
+        t.assert_equals(info1, info2)
     end)
 end
 

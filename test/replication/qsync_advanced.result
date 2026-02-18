@@ -617,6 +617,14 @@ test_run:switch('default')
  | ---
  | - true
  | ...
+-- WAL error made the leader resign.
+assert(box.info.ro)
+ | ---
+ | - true
+ | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.space.sync:drop()
  | ---
  | ...

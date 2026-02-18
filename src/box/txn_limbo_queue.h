@@ -274,10 +274,6 @@ int
 txn_limbo_queue_wait_last_txn(struct txn_limbo_queue *queue, bool *is_rollback,
 			      double timeout);
 
-/** Wait until the queue is empty. Regardless of how its transactions end. */
-int
-txn_limbo_queue_wait_empty(struct txn_limbo_queue *queue, double timeout);
-
 /**
  * Wait until all the entries, that are submitted to the journal, come back from
  * it with LSNs. After this call the queue has no unfinished business with the
