@@ -112,8 +112,8 @@ g.test_new_volatile_term_in_box_issue_promote = function(g)
     fiber_join(g.server_2, f2)
     fiber_join(g.server_3, f3)
 
-    luatest.assert(not ok and err.code == box.error.INTERFERING_ELECTIONS,
-        'interfering promote not handled')
+    luatest.assert(not ok)
+    luatest.assert_equals(err.code, box.error.INTERFERING_PROMOTE)
 
     -- This leaves cluster in split brain state, lets reinit it.
     g.cluster:drop()
@@ -145,8 +145,8 @@ g.test_new_volatile_term_in_box_issue_demote = function(g)
     fiber_join(g.server_2, f2)
     fiber_join(g.server_3, f3)
 
-    luatest.assert(not ok and err.code == box.error.INTERFERING_ELECTIONS,
-        'interfering promote not handled')
+    luatest.assert(not ok)
+    luatest.assert_equals(err.code, box.error.INTERFERING_ELECTIONS)
 
     -- This leaves cluster in split brain state, lets reinit it.
     g.cluster:drop()

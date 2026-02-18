@@ -372,8 +372,8 @@ static int
 box_ro_state_msg(char *buf, int size)
 {
 	int total = 0;
-	struct raft *raft = box_raft();
-	if (raft_is_ro(raft)) {
+	if (box_raft_is_ro()) {
+		struct raft *raft = box_raft();
 		const char *state = raft_state_str(raft->state);
 		uint64_t term = raft->volatile_term;
 		SNPRINT(total, snprintf, buf, size,
@@ -392,11 +392,10 @@ box_ro_state_msg(char *buf, int size)
 				SNPRINT(total, snprintf, buf, size, " (%s)",
 					tt_uuid_str(&r->uuid));
 		}
-	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.queue.owner_id;
-		uint64_t term = txn_limbo.term;
+		id = txn_limbo.queue.owner_id;
+		term = txn_limbo.term;
 		SNPRINT(total, snprintf, buf, size,
-			"synchro queue with term %llu belongs to %u",
+			", synchro queue with term %llu belongs to %u",
 			(unsigned long long)term, (unsigned)id);
 		struct replica *r = replica_by_id(id);
 		if (r != NULL)
@@ -429,7 +428,7 @@ box_update_ro_summary(void)
 {
 	bool old_is_ro_summary = is_ro_summary;
 	is_ro_summary = is_ro || is_orphan || is_waiting_for_own_rows ||
-			raft_is_ro(box_raft()) || txn_limbo_is_ro(&txn_limbo);
+			box_raft_is_ro();
 	/* In 99% nothing changes. Filter this out first. */
 	if (is_ro_summary == old_is_ro_summary)
 		return;
@@ -458,16 +457,8 @@ box_update_ro_summary(void)
 API_EXPORT const char *
 box_ro_reason(void)
 {
-	if (is_box_configured) {
-		/*
-		 * These modules are only initialized on first box.cfg(), it is
-		 * not safe to access them until then.
-		 */
-		if (raft_is_ro(box_raft()))
-			return "election";
-		if (txn_limbo_is_ro(&txn_limbo))
-			return "synchro";
-	}
+	if (is_box_configured && box_raft_is_ro())
+		return "synchro";
 	if (is_ro)
 		return "config";
 	if (is_waiting_for_own_rows)
@@ -501,7 +492,7 @@ box_check_writable(void)
 	 * enabled, for the client it is better to see that it is a 'follower'
 	 * and who is the leader than just see cfg 'read_only' is true.
 	 */
-	if (raft_is_ro(raft)) {
+	if (box_raft_is_ro()) {
 		const char *state = raft_state_str(raft->state);
 		uint64_t term = raft->volatile_term;
 		error_set_str(e, "state", state);
@@ -517,11 +508,9 @@ box_check_writable(void)
 			if (r != NULL)
 				error_set_uuid(e, "leader_uuid", &r->uuid);
 		}
-	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		uint32_t id = txn_limbo.queue.owner_id;
-		uint64_t term = txn_limbo.term;
+		id = txn_limbo.queue.owner_id;
 		error_set_uint(e, "queue_owner_id", id);
-		error_set_uint(e, "term", term);
+		error_set_uint(e, "queue_term", txn_limbo.term);
 		struct replica *r = replica_by_id(id);
 		/*
 		 * XXX: when an instance is deleted from _cluster, its limbo's
@@ -2959,41 +2948,6 @@ box_wait_linearization_point(double timeout)
 	return txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout);
 }
 
-/**
- * Check whether the greatest promote term has changed since it was last read.
- * IOW check that a foreign PROMOTE arrived while we were sleeping.
- */
-static int
-box_check_promote_term_intact(uint64_t promote_term)
-{
-	if (txn_limbo.term != promote_term) {
-		diag_set(ClientError, ER_INTERFERING_PROMOTE,
-			 txn_limbo.queue.owner_id);
-		return -1;
-	}
-	return 0;
-}
-
-/** Trigger a new election round but don't wait for its result. */
-static int
-box_trigger_elections(void)
-{
-	uint64_t promote_term = txn_limbo.term;
-	raft_new_term(box_raft());
-	if (box_raft_wait_term_persisted() < 0)
-		return -1;
-	return box_check_promote_term_intact(promote_term);
-}
-
-/** Try waiting until limbo is emptied up to given timeout. */
-static int
-box_try_wait_confirm(double timeout)
-{
-	uint64_t promote_term = txn_limbo.term;
-	txn_limbo_wait_empty(&txn_limbo, timeout);
-	return box_check_promote_term_intact(promote_term);
-}
-
 /** A guard to block multiple simultaneous promote()/demote() invocations. */
 static bool is_in_box_promote = false;
 
@@ -3068,52 +3022,23 @@ box_promote(void)
 		return 0;
 	if (box_check_promote() != 0)
 		return -1;
-
 	struct raft *raft = box_raft();
-	is_in_box_promote = true;
-	auto promote_guard = make_scoped_guard([&] {
-		is_in_box_promote = false;
-	});
-	/*
-	 * Currently active leader (the instance that is seen as leader by both
-	 * raft and txn_limbo) can't issue another PROMOTE.
-	 */
-	bool is_leader = txn_limbo.state == TXN_LIMBO_STATE_LEADER;
-	if (box_election_mode != ELECTION_MODE_OFF && is_leader)
-		VERIFY(raft->state == RAFT_STATE_LEADER);
-
-	if (is_leader)
-		return 0;
-	switch (box_election_mode) {
-	case ELECTION_MODE_OFF:
-		if (box_try_wait_confirm(2 * replication_synchro_timeout) != 0)
-			return -1;
-		if (box_trigger_elections() != 0)
-			return -1;
-		break;
-	case ELECTION_MODE_VOTER:
+	if (box_election_mode == ELECTION_MODE_VOTER) {
 		assert(raft->state == RAFT_STATE_FOLLOWER);
 		diag_set(ClientError, ER_UNSUPPORTED, "election_mode='voter'",
 			 "manual elections");
 		return -1;
-	case ELECTION_MODE_MANUAL:
-	case ELECTION_MODE_CANDIDATE:
-		if (raft->state == RAFT_STATE_LEADER)
-			return 0;
-		/*
-		 * box_promote_qsync() checks 'is_in_box_promote' to prevent
-		 * concurrent promotions. We must disable this guard here to
-		 * allow box_promote_qsync() to claim the limbo.
-		 */
-		is_in_box_promote = false;
-		if (box_raft_try_promote() != 0)
-			return -1;
-		return box_wait_for_rw_while_leader(raft);
-	default:
-		unreachable();
 	}
-	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
-				 replication_synchro_timeout);
+	/*
+	 * Currently active leader (the instance that is seen as leader by both
+	 * raft and txn_limbo) can't issue another PROMOTE.
+	 */
+	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
+		return 0;
+	if (box_raft_try_promote() != 0)
+		return -1;
+	assert(raft->state == RAFT_STATE_LEADER);
+	return box_wait_for_rw_while_leader(raft);
 }
 
 int
@@ -3129,32 +3054,32 @@ box_demote(void)
 		is_in_box_promote = false;
 	});
 
-	const struct raft *raft = box_raft();
 	if (box_election_mode != ELECTION_MODE_OFF) {
-		if (txn_limbo.state == TXN_LIMBO_STATE_LEADER)
-			box_raft_leader_step_off();
+		box_raft_leader_step_off();
 		return 0;
 	}
-
-	assert(raft->state == RAFT_STATE_FOLLOWER);
-	if (raft->leader != REPLICA_ID_NIL) {
+	if (txn_limbo.state == TXN_LIMBO_STATE_INACTIVE)
+		return 0;
+	/*
+	 * If Raft term went further than the limbo, it might indicate ongoing
+	 * elections. Lets not disrupt anything and only allow persistent
+	 * demotion when this instance actually owns the limbo in the latest
+	 * known Raft term.
+	 */
+	struct raft *raft = box_raft();
+	if (txn_limbo.term < raft->volatile_term ||
+	    txn_limbo.queue.owner_id != instance_id) {
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
-	if (txn_limbo.queue.owner_id == REPLICA_ID_NIL)
-		return 0;
-	/*
-	 * If the limbo term is up to date with Raft, then it might have
-	 * a valid owner right now. Demotion would disrupt it. In this
-	 * case the user has to explicitly overthrow the old owner with
-	 * local promote(), or call demote() on the actual owner.
-	 */
-	if (txn_limbo.term == raft->term && txn_limbo.state != TXN_LIMBO_STATE_LEADER)
-		return 0;
-	if (box_trigger_elections() != 0)
+	raft_new_term(raft);
+	uint64_t term = raft->volatile_term;
+	if (box_raft_wait_term_persisted() != 0)
 		return -1;
-	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
+	if (raft->volatile_term != term) {
+		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
 		return -1;
+	}
 	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_DEMOTE,
 				 replication_synchro_timeout);
 }
@@ -5993,6 +5918,7 @@ box_cfg_xc(void)
 	 */
 	if (dd_version_id > version_id(2, 10, 1))
 		txn_limbo_filter_enable(&txn_limbo);
+	box_raft_finish_recovery();
 	txn_limbo_finish_recovery(&txn_limbo);
 
 	is_box_configured = true;

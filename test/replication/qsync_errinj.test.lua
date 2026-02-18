@@ -75,6 +75,9 @@ box.space.sync:replace({14})
 box.error.injection.set("ERRINJ_WAL_IO", false)
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
 box.cfg{replication_synchro_quorum = 2}
+-- Leadership was lost due to WAL error.
+assert(box.info.election.state == 'follower')
+box.ctl.promote()
 box.space.sync:replace({15})
 test_run:wait_cond(function() return f1:status() == 'dead' end)
 ok1, err1
@@ -106,6 +109,9 @@ test_run:wait_cond(function() return f1:status() == 'dead' end)
 ok1, err1
 box.error.injection.set("ERRINJ_WAL_ROTATE", false)
 box.cfg{replication_synchro_quorum = 2}
+-- Leadership was lost due to WAL error.
+assert(box.info.election.state == 'follower')
+box.ctl.promote()
 box.space.sync:replace{2}
 test_run:switch('replica')
 box.space.sync:select{}

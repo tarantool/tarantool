@@ -617,6 +617,9 @@ test_run:switch('default')
  | ---
  | - true
  | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.space.sync:drop()
  | ---
  | ...
@@ -683,6 +686,9 @@ box.space.sync:select{} -- 1
 test_run:switch('default')
  | ---
  | - true
+ | ...
+box.ctl.promote()
+ | ---
  | ...
 box.space.sync:drop()
  | ---

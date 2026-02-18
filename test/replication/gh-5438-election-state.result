@@ -25,6 +25,9 @@ test_run:wait_cond(function() return box.info.election.term > term end)
 box.cfg{election_mode = 'off'}
  | ---
  | ...
+box.ctl.demote()
+ | ---
+ | ...
 
 box.schema.user.grant('guest', 'replication')
  | ---

@@ -1421,6 +1421,7 @@ wal_writer_f(va_list ap)
 static int
 wal_write_async(struct journal *journal, struct journal_entry *entry)
 {
+	say_info("------------------------------------------- wal_write_async start");
 	struct wal_writer *writer = (struct wal_writer *) journal;
 
 	ERROR_INJECT_COUNTDOWN(ERRINJ_WAL_IO_COUNTDOWN, {
@@ -1481,10 +1482,12 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 	++errinj(ERRINJ_WAL_WRITE_COUNT, ERRINJ_INT)->iparam;
 #endif
 	cpipe_submit_flush(&writer->wal_pipe);
+	say_info("------------------------------------------- wal_write_async success");
 	return 0;
 
 fail:
 	assert(entry->res == JOURNAL_ENTRY_ERR_UNKNOWN);
+	say_info("------------------------------------------- wal_write_async error");
 	return -1;
 }
 

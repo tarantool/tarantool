@@ -24,6 +24,10 @@ box.error.injection.set("ERRINJ_WAL_DELAY_COUNTDOWN", 0)
  | ---
  | - ok
  | ...
+assert(box.info.election.term == box.info.synchro.queue.term)
+ | ---
+ | - true
+ | ...
 box.cfg{                                                                        \
     election_mode = 'candidate',                                                \
     replication_timeout = 0.1,                                                  \
@@ -53,6 +57,15 @@ box.error.injection.set("ERRINJ_WAL_DELAY", false)
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
 }
+ | ---
+ | ...
+box.ctl.wal_sync()
+ | ---
+ | ...
+box.ctl.promote()
+ | ---
+ | ...
+box.ctl.demote()
  | ---
  | ...
 

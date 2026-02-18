@@ -197,6 +197,14 @@ box.error.injection.set("ERRINJ_WAL_DELAY", false)
 box.cfg{replication_synchro_quorum = 2}
  | ---
  | ...
+-- Leadership was lost due to WAL error.
+assert(box.info.election.state == 'follower')
+ | ---
+ | - true
+ | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.space.sync:replace({15})
  | ---
  | - [15]
@@ -281,6 +289,14 @@ box.error.injection.set("ERRINJ_WAL_ROTATE", false)
  | - ok
  | ...
 box.cfg{replication_synchro_quorum = 2}
+ | ---
+ | ...
+-- Leadership was lost due to WAL error.
+assert(box.info.election.state == 'follower')
+ | ---
+ | - true
+ | ...
+box.ctl.promote()
  | ---
  | ...
 box.space.sync:replace{2}

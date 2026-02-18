@@ -12,6 +12,7 @@ old_synchro_quorum = box.cfg.replication_synchro_quorum
 
 -- Start a WAL write and wait when it starts.
 box.error.injection.set("ERRINJ_WAL_DELAY_COUNTDOWN", 0)
+assert(box.info.election.term == box.info.synchro.queue.term)
 box.cfg{                                                                        \
     election_mode = 'candidate',                                                \
     replication_timeout = 0.1,                                                  \
@@ -29,6 +30,9 @@ box.error.injection.set("ERRINJ_WAL_DELAY", false)
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
 }
+box.ctl.wal_sync()
+box.ctl.promote()
+box.ctl.demote()
 
 --
 -- Another crash could happen when election mode was configured to be

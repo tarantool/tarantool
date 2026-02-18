@@ -283,6 +283,7 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 	latch_create(&limbo->state_latch);
 	limbo->svp_confirmed_lsn = -1;
 	limbo->raft = raft;
+	limbo->term = 1;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
 					 txn_limbo_worker_f);
 	if (limbo->worker == NULL)
@@ -440,17 +441,6 @@ txn_limbo_stop(struct txn_limbo *limbo)
 	VERIFY(fiber_join(limbo->worker) == 0);
 }
 
-bool
-txn_limbo_is_ro(struct txn_limbo *limbo)
-{
-	if (limbo->state == TXN_LIMBO_STATE_REPLICA)
-		return true;
-	if (limbo->state == TXN_LIMBO_STATE_LEADER)
-		return false;
-	assert(limbo->state == TXN_LIMBO_STATE_INACTIVE);
-	return raft_is_enabled(limbo->raft);
-}
-
 struct txn_limbo_entry *
 txn_limbo_last_synchro_entry(struct txn_limbo *limbo)
 {
@@ -564,16 +554,15 @@ int
 txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
 {
 	struct raft *raft = limbo->raft;
+	assert(raft_is_enabled(raft));
 	uint64_t term = raft->term;
 	uint64_t limbo_term = limbo->term;
-	bool is_raft_enabled = raft_is_enabled(raft);
-	if (is_raft_enabled &&
-	    txn_limbo_replica_term(limbo, instance_id) == term)
+	if (txn_limbo_replica_term(limbo, instance_id) == term)
 		return 0;
 	int64_t wait_lsn = txn_limbo_wait_acked(limbo, timeout);
 	if (wait_lsn < 0)
 		return -1;
-	if (is_raft_enabled && raft->state != RAFT_STATE_LEADER) {
+	if (type == IPROTO_RAFT_PROMOTE && raft->state != RAFT_STATE_LEADER) {
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
@@ -608,12 +597,6 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 {
 	return txn_limbo_queue_wait_last_txn(&limbo->queue, is_rollback,
 					     timeout);
-}
-
-int
-txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
-{
-	return txn_limbo_queue_wait_empty(&limbo->queue, timeout);
 }
 
 /**
@@ -924,8 +907,10 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 	 * correctly.
 	 */
 	assert(!limbo->is_in_rollback);
+	say_info("--------------------------------- txn_limbo_req_prepare 1, set in-rollback");
 	limbo->is_in_rollback = true;
 	if (txn_limbo_filter_request(limbo, req) < 0) {
+		say_info("--------------------------------- txn_limbo_req_prepare 2, remove in-rollback");
 		limbo->is_in_rollback = false;
 		return -1;
 	}
@@ -933,6 +918,7 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 	case IPROTO_RAFT_ROLLBACK:
+		say_info("--------------------------------- txn_limbo_req_prepare 3, remove in-rollback");
 		limbo->is_in_rollback = false;
 		break;
 	case IPROTO_RAFT_PROMOTE:
@@ -959,6 +945,7 @@ void
 txn_limbo_req_rollback(struct txn_limbo *limbo,
 		       const struct synchro_request *req)
 {
+	say_info("--------------------------------- txn_limbo_req_rollback, 1 for %p", req);
 	txn_limbo_assert_locked(limbo);
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
@@ -971,6 +958,7 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 		limbo->svp_confirmed_lsn = -1;
 		txn_limbo_update_system_spaces_is_sync_state(
 			limbo, req, /*is_rollback=*/true);
+			say_info("--------------------------------- txn_limbo_req_rollback, 2 remove in-rollback");
 		limbo->is_in_rollback = false;
 		txn_limbo_update_state(limbo);
 		break;
@@ -1027,6 +1015,7 @@ txn_limbo_req_commit_promote_demote(struct txn_limbo *limbo,
 	assert(limbo->is_transition_in_progress);
 	limbo->is_transition_in_progress = false;
 	limbo->svp_confirmed_lsn = -1;
+	say_info("--------------------------------- txn_limbo_req_commit_promote_demote, 1 remove in-rollback");
 	limbo->is_in_rollback = false;
 
 	uint64_t term = req->promote.term;

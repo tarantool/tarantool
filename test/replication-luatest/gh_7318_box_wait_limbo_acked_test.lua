@@ -37,25 +37,6 @@ local function server_wait_synchro_queue_len_is_equal(server, expected)
     end, {expected, wait_timeout})
 end
 
-local function server_becomes_the_leader_again(server)
-    local prev_cfg = server:exec(function()
-        local prev_cfg = box.cfg
-        box.cfg{
-            election_mode='candidate',
-            replication_synchro_quorum=1
-        }
-        return prev_cfg
-    end)
-    server:wait_until_election_leader_found()
-    server:exec(function(prev_cfg)
-        t.assert_equals(box.info.election.leader, box.info.id)
-        box.cfg{
-            election_mode=prev_cfg.election_mode,
-            replication_synchro_quorum=prev_cfg.replication_synchro_quorum,
-        }
-    end, {prev_cfg})
-end
-
 local function get_wait_quorum_count(server)
     return server:exec(function()
         return box.error.injection.get('ERRINJ_WAIT_QUORUM_COUNT')
@@ -281,7 +262,10 @@ g.test_quorum_less_replication_synchro_quorum = function(cg)
         local _, ok, err = require('fiber').find(f):join()
         t.assert(ok)
         t.assert_not(err)
+        t.assert(box.info.synchro.queue.len, 0)
     end, {f})
-    server_becomes_the_leader_again(cg.master)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 0)
+    cg.master:exec(function()
+        box.ctl.promote()
+        t.assert(box.info.synchro.queue.len, 0)
+    end)
 end

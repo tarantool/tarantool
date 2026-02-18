@@ -62,6 +62,7 @@ test_run:wait_cond(function() return async_f:status() == 'dead' end)
 assert(s:get({1}) ~= nil)
 assert(s2:get({2}) ~= nil)
 assert(s2:get({3}) ~= nil)
+assert(box.info.election.state == 'leader')
 
 --
 -- Try all the same, but the async transaction fails its WAL write.
@@ -76,6 +77,9 @@ errinj.set('ERRINJ_WAL_ROTATE', false)
 assert(s:get({4}) ~= nil)
 assert(s2:get({5}) == nil)
 assert(s2:get({6}) == nil)
+-- On WAL failure the instance lost its leadership.
+assert(box.info.election.state == 'follower')
+box.ctl.promote()
 
 -- Ensure nothing is broken, works fine.
 s:replace{7}

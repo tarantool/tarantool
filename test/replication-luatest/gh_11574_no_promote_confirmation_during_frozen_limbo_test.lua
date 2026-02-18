@@ -54,7 +54,7 @@ g.test_no_promote_confirmation_during_frozen_limbo = function(g)
         -- Wait until node switches into fencing mode
         t.helpers.retrying({}, function()
             t.assert(box.info.ro)
-            t.assert_equals(box.info.ro_reason, "election")
+            t.assert_equals(box.info.ro_reason, "synchro")
         end)
         box.cfg{replication_synchro_quorum = 1}
         t.assert_not(f:join(1))

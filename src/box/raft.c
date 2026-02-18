@@ -230,7 +230,11 @@ void
 box_raft_update_election_quorum(void)
 {
 	struct raft *raft = box_raft();
-	int quorum = replicaset_healthy_quorum();
+	int quorum;
+	if (box_election_mode != ELECTION_MODE_OFF)
+		quorum = replicaset_healthy_quorum();
+	else
+		quorum = 1;
 	raft_cfg_election_quorum(raft, quorum);
 	int size = MAX(replicaset.registered_count, 1);
 	raft_cfg_cluster_size(raft, size);
@@ -259,17 +263,12 @@ box_raft_cfg_election_mode(enum election_mode mode)
 		break;
 	case ELECTION_MODE_MANUAL:
 		box_raft_add_quorum_triggers();
-		if (raft->state == RAFT_STATE_LEADER ||
-		    raft->state == RAFT_STATE_CANDIDATE) {
-			/*
-			 * The node was configured to be a candidate. Don't
-			 * disrupt its current leadership or the elections it's
-			 * just started.
-			 */
-			raft_cfg_is_candidate_later(raft, false);
-		} else {
-			raft_cfg_is_candidate(raft, false);
-		}
+		/*
+		 * If the node already was the leader, don't disrupt its current
+		 * leadership. It doesn't contradict with the manual mode
+		 * anyway.
+		 */
+		raft_cfg_is_candidate_later(raft, false);
 		break;
 	case ELECTION_MODE_CANDIDATE:
 		box_raft_add_quorum_triggers();
@@ -286,7 +285,7 @@ box_raft_cfg_election_mode(enum election_mode mode)
 	default:
 		unreachable();
 	}
-	raft_cfg_is_enabled(raft, mode != ELECTION_MODE_OFF);
+	box_raft_update_election_quorum();
 	txn_limbo_update_state(&txn_limbo);
 }
 
@@ -477,9 +476,14 @@ box_raft_try_promote_f(struct trigger *trig, void *event)
 	 * error and continue promote.
 	 */
 	int healthy_count = replicaset.healthy_count;
-	if (healthy_count < replicaset_healthy_quorum()) {
+	if (healthy_count < raft->election_quorum &&
+	    /*
+	     * In elections-off the election quorum is 1 = self. Can ignore the
+	     * number of healthy replicas.
+	     */
+	    box_election_mode != ELECTION_MODE_OFF) {
 		diag_set(ClientError, ER_NO_ELECTION_QUORUM,
-			 healthy_count, replicaset_healthy_quorum());
+			 healthy_count, raft->election_quorum);
 		goto done;
 	}
 	/* The term ended with a leader being found. */
@@ -533,7 +537,8 @@ box_raft_try_promote(void)
 	is_in_raft_promote = true;
 	assert(raft->is_enabled);
 	assert(box_election_mode == ELECTION_MODE_MANUAL ||
-	       box_election_mode == ELECTION_MODE_CANDIDATE);
+	       box_election_mode == ELECTION_MODE_CANDIDATE ||
+	       box_election_mode == ELECTION_MODE_OFF);
 
 	raft_promote(raft);
 
@@ -692,6 +697,25 @@ box_raft_on_wal_error_f(struct watcher *watcher)
 {
 	(void)watcher;
 	box_raft_leader_step_off();
+}
+
+bool
+box_raft_is_ro(void)
+{
+	if (txn_limbo.state == TXN_LIMBO_STATE_REPLICA)
+		return true;
+	struct raft *raft = box_raft();
+	if (raft->volatile_term > txn_limbo.term)
+		return true;
+	if (box_election_mode == ELECTION_MODE_OFF)
+		return false;
+	return raft_is_ro(raft);
+}
+
+void
+box_raft_finish_recovery(void)
+{
+	raft_cfg_is_enabled(box_raft(), true);
 }
 
 void

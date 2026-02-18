@@ -89,20 +89,28 @@ g.test_raft_state_during_meta_join = function(lg)
     })
 
     replica:start()
-    local ok, err = replica:exec(function()
-        return pcall(box.ctl.promote)
+    replica:exec(function()
+        local fiber = require('fiber')
+        rawset(_G, 'promote_f', fiber.new(box.ctl.promote))
+        _G.promote_f:set_joinable(true)
+        -- Just doing box.ctl.promote() won't work - the instance is an orphan
+        -- and it will be read-only until subscribed properly, which in turn
+        -- will stall the promotion since it tries to wait until the instance
+        -- is writable.
+        t.helpers.retrying({timeout = 10}, function()
+            t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        end)
     end)
-
+    local ok, err = replica:exec(function()
+        box.error.injection.set('ERRINJ_APPLIER_SUBSCRIBE_DELAY', false)
+        return _G.promote_f:join(10)
+    end)
     --
     -- Before the patch there's the split brain error:
     -- "Split-Brain discovered: got a PROMOTE/DEMOTE with an obsolete term"
     --
     t.assert_equals(err, nil)
     t.assert(ok)
-
-    replica:exec(function()
-        box.error.injection.set('ERRINJ_APPLIER_SUBSCRIBE_DELAY', false)
-    end)
 
     replica:drop()
     lg.master:update_box_cfg{election_mode = 'off'}

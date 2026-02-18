@@ -50,6 +50,7 @@ g.after_each(function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000,
         }
+        box.ctl.promote()
         box.ctl.demote()
     end)
     -- If server-1 started demote but it is not delivered to server-2 yet, then
@@ -61,7 +62,6 @@ g.after_each(function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000,
         }
-        box.ctl.demote()
         if box.space.test then
             box.space.test:drop()
         end

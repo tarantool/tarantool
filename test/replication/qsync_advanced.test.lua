@@ -220,6 +220,7 @@ box.begin{txn_isolation='read-committed'} t = box.space.sync:select{} box.commit
 t
 -- Testcase cleanup.
 test_run:switch('default')
+box.ctl.promote()
 box.space.sync:drop()
 
 -- [RFC, quorum commit] check behaviour with failure answer from a replica
@@ -243,6 +244,7 @@ box.error.injection.set('ERRINJ_WAL_IO', false)
 box.space.sync:select{} -- 1
 -- Testcase cleanup.
 test_run:switch('default')
+box.ctl.promote()
 box.space.sync:drop()
 
 -- Teardown.

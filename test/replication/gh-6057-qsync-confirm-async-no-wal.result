@@ -104,6 +104,10 @@ assert(s2:get({3}) ~= nil)
  | ---
  | - true
  | ...
+assert(box.info.election.state == 'leader')
+ | ---
+ | - true
+ | ...
 
 --
 -- Try all the same, but the async transaction fails its WAL write.
@@ -140,6 +144,14 @@ assert(s2:get({5}) == nil)
 assert(s2:get({6}) == nil)
  | ---
  | - true
+ | ...
+-- On WAL failure the instance lost its leadership.
+assert(box.info.election.state == 'follower')
+ | ---
+ | - true
+ | ...
+box.ctl.promote()
+ | ---
  | ...
 
 -- Ensure nothing is broken, works fine.

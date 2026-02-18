@@ -864,28 +864,6 @@ txn_limbo_queue_wait_last_txn(struct txn_limbo_queue *queue, bool *is_rollback,
 }
 
 int
-txn_limbo_queue_wait_empty(struct txn_limbo_queue *queue, double timeout)
-{
-	if (txn_limbo_queue_is_empty(queue))
-		return 0;
-	bool is_rollback;
-	double deadline = fiber_clock() + timeout;
-	/*
-	 * Retry in the loop. More transactions might be added while waiting for
-	 * the last one.
-	 */
-	do {
-		if (txn_limbo_queue_wait_last_txn(queue, &is_rollback,
-						  timeout) != 0) {
-			diag_set(ClientError, ER_TIMEOUT);
-			return -1;
-		}
-		timeout = deadline - fiber_clock();
-	} while (!txn_limbo_queue_is_empty(queue));
-	return 0;
-}
-
-int
 txn_limbo_queue_wait_writes_finished(struct txn_limbo_queue *queue)
 {
 retry:

@@ -161,6 +161,20 @@ box_raft_election_fencing_pause(void);
 void
 box_raft_leader_step_off(void);
 
+/**
+ * Check if the current synchronous replication state (consisting of Raft and
+ * limbo) requires this instance to be reqd-only.
+ */
+bool
+box_raft_is_ro(void);
+
+/**
+ * Let the synchronous replication (Raft and limbo) know that the instance has
+ * fully recovered.
+ */
+void
+box_raft_finish_recovery(void);
+
 void
 box_raft_init(void);
 

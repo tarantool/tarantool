@@ -11,6 +11,7 @@ test_run:wait_cond(function() return box.info.election.term > term end)
 
 -- Make sure the replica receives new term on subscribe.
 box.cfg{election_mode = 'off'}
+box.ctl.demote()
 
 box.schema.user.grant('guest', 'replication')
 test_run:cmd('create server replica with rpl_master=default,\
