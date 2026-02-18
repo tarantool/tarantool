@@ -199,3 +199,72 @@ g.test_tarantool_version_check = function(g)
                   'Unexpected token "<"'
     })
 end
+
+g.test_fail_if_config_check = function(g)
+    local ok_when_enabled = [[-- --- #tarantool.metadata.v1
+-- fail_if: "!config.database.use_mvcc_engine"
+-- ...
+    ]]
+
+    local invalid_expr = [[-- --- #tarantool.metadata.v1
+-- fail_if: "config.database.use_mvcc_engine ! tarantool_version"
+-- ...
+    ]]
+
+    local version_and_config_check = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version < 0.0.0 || !config.database.use_mvcc_engine"
+-- ...
+    ]]
+
+    helpers.success_case(g, {
+        script = ok_when_enabled,
+        options = {
+            ['app.file'] = 'main.lua',
+            ['database.use_mvcc_engine'] = true,
+        },
+        verify = function() end,
+    })
+
+    helpers.success_case(g, {
+        script = ok_when_enabled,
+        options = {
+            ['app.module'] = 'main',
+            ['database.use_mvcc_engine'] = true,
+        },
+        verify = function() end,
+    })
+
+    helpers.failure_case({
+        script = invalid_expr,
+        options = {['app.file'] = 'main.lua'},
+        exp_err = 'App "main.lua" has invalid "fail_if" expression: ' ..
+                  'Unknown operation "!"',
+    })
+
+    helpers.failure_case({
+        script = invalid_expr,
+        options = {['app.module'] = 'main'},
+        exp_err = 'App "main" has invalid "fail_if" expression: ' ..
+                  'Unknown operation "!"',
+    })
+
+    -- tarantool_version < 0.0.0 is always false, so result depends on config.
+    helpers.success_case(g, {
+        script = version_and_config_check,
+        options = {
+            ['app.file'] = 'main.lua',
+            ['database.use_mvcc_engine'] = true,
+        },
+        verify = function() end,
+    })
+
+    helpers.failure_case({
+        script = version_and_config_check,
+        options = {
+            ['app.file'] = 'main.lua',
+            ['database.use_mvcc_engine'] = false,
+        },
+        exp_err = 'App "main.lua" failed the "fail_if" check: ' ..
+        '"tarantool_version < 0.0.0 || !config.database.use_mvcc_engine"',
+    })
+end
