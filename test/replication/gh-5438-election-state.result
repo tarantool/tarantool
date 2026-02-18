@@ -16,13 +16,26 @@ old_election_mode = box.cfg.election_mode
 box.cfg{election_mode = 'candidate'}
  | ---
  | ...
-test_run:wait_cond(function() return box.info.election.term > term end)
+test_run:wait_cond(function()                                                   \
+    return box.info.synchro.queue.term == term + 1                              \
+end)
+ | ---
+ | - true
+ | ...
+assert(box.info.election.term == term + 1)
+ | ---
+ | - true
+ | ...
+assert(not box.info.ro)
  | ---
  | - true
  | ...
 
 -- Make sure the replica receives new term on subscribe.
 box.cfg{election_mode = 'off'}
+ | ---
+ | ...
+box.ctl.demote()
  | ---
  | ...
 

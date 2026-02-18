@@ -50,6 +50,7 @@ g.after_each(function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000,
         }
+        box.ctl.promote()
         box.ctl.demote()
     end)
     -- If server-1 started demote but it is not delivered to server-2 yet, then
@@ -61,7 +62,6 @@ g.after_each(function(g)
             replication_synchro_quorum = 2,
             replication_synchro_timeout = 1000,
         }
-        box.ctl.demote()
         if box.space.test then
             box.space.test:drop()
         end
@@ -227,17 +227,9 @@ g.test_remote_promote_during_local_txn_including_it = function(g)
 
     -- Server 2 confirms the txns and sends a PROMOTE covering it to server 1.
     g.server2:exec(function()
-        box.cfg{
-            replication_synchro_quorum = 1,
-            -- To make it not wait for confirm from server 1. Just confirm via
-            -- the promotion ASAP.
-            replication_synchro_timeout = 0.001,
-        }
+        box.cfg{replication_synchro_quorum = 1}
         box.ctl.promote()
-        box.cfg{
-            replication_synchro_quorum = 2,
-            replication_synchro_timeout = 1000,
-        }
+        box.cfg{replication_synchro_quorum = 2}
     end)
 
     -- Server 1 receives the foreign PROMOTE. Now the local txns and a remote
