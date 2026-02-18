@@ -142,34 +142,33 @@ end
 _ = box.ctl.on_election(trig)
 
 box.cfg{replication_synchro_quorum=2}
+term = box.info.election.term
 box.cfg{election_mode='candidate'}
 
-test_run:wait_cond(function() return #election_tbl == 3 end)
-assert(election_tbl[1].state == 'follower')
-assert(election_tbl[2].term > election_tbl[1].term)
-assert(election_tbl[2].vote == 1)
-assert(election_tbl[2].state == 'candidate')
-assert(election_tbl[2].vote == 1)
-assert(election_tbl[3].state == 'leader')
+test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+assert(#election_tbl == 2)
+assert(election_tbl[1].term > term)
+assert(election_tbl[1].vote == 1)
+assert(election_tbl[1].state == 'candidate')
+assert(election_tbl[2].state == 'leader')
 
 box.cfg{election_mode='voter'}
-test_run:wait_cond(function() return #election_tbl == 4 end)
-assert(election_tbl[4].state == 'follower')
+test_run:wait_cond(function() return #election_tbl == 3 end)
+assert(election_tbl[3].state == 'follower')
 
 box.cfg{election_mode='off'}
-test_run:wait_cond(function() return #election_tbl == 5 end)
+assert(#election_tbl == 3)
 
 box.cfg{election_mode='manual'}
-test_run:wait_cond(function() return #election_tbl == 6 end)
-assert(election_tbl[6].state == 'follower')
+assert(#election_tbl == 3)
 
 box.ctl.promote()
-
-test_run:wait_cond(function() return #election_tbl == 8 end)
-assert(election_tbl[7].state == 'candidate')
-assert(election_tbl[7].term == election_tbl[6].term + 1)
-assert(election_tbl[7].vote == 1)
-assert(election_tbl[8].state == 'leader')
+test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+assert(#election_tbl == 5)
+assert(election_tbl[4].state == 'candidate')
+assert(election_tbl[4].term == election_tbl[3].term + 1)
+assert(election_tbl[4].vote == 1)
+assert(election_tbl[5].state == 'leader')
 
 test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')

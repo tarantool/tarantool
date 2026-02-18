@@ -679,13 +679,6 @@ replica_clear_id(struct replica *replica)
 	box_broadcast_ballot();
 }
 
-bool
-replicaset_has_healthy_quorum(void)
-{
-	int quorum = replicaset_healthy_quorum();
-	return replicaset.healthy_count >= quorum;
-}
-
 void
 replicaset_on_health_change(void)
 {
