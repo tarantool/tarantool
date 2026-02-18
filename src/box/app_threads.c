@@ -38,7 +38,15 @@ app_thread_f(void *unused)
 	fiber_pool_create(&fiber_pool, cord_name(cord()), INT_MAX,
 			  FIBER_POOL_IDLE_TIMEOUT);
 	ev_run(loop(), 0);
-	fiber_pool_destroy(&fiber_pool);
+	/*
+	 * XXX: We must destroy the fiber pool endpoint and truncate the idle
+	 * fiber list to avoid use-after-free bugs while destroying this cord
+	 * and/or other endpoints, but we can't call fiber_pool_shutdown() here
+	 * because it requires a running event loop so we do it directly.
+	 */
+	cbus_endpoint_destroy(&fiber_pool.endpoint, NULL);
+	while (!rlist_empty(&fiber_pool.idle))
+		rlist_shift(&fiber_pool.idle);
 	app_thread_lua_free();
 	return NULL;
 }
