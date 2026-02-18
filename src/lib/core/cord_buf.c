@@ -37,7 +37,7 @@ struct cord_buf {
  * The global buffer last saved to the cache. Having it here is supposed to
  * help to reuse the buffer's already allocated data sometimes.
  */
-static struct cord_buf *cord_buf_global = NULL;
+static __thread struct cord_buf *cord_buf_global = NULL;
 
 static inline void
 cord_buf_put(struct cord_buf *buf);
@@ -107,7 +107,6 @@ cord_buf_new(void)
 static inline void
 cord_buf_put(struct cord_buf *buf)
 {
-	assert(cord_is_main());
 	cord_buf_clear_owner(buf);
 	/*
 	 * Delete if the stash is busy. It could happen if there was >= 2
@@ -128,7 +127,6 @@ cord_buf_put(struct cord_buf *buf)
 static inline struct cord_buf *
 cord_buf_take(void)
 {
-	assert(cord_is_main());
 	struct cord_buf *buf = cord_buf_global;
 	if (buf != NULL)
 		cord_buf_global = NULL;
