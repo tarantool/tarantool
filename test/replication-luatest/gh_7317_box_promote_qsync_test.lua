@@ -49,6 +49,7 @@ local function block_server_on_box_wait_limbo_acked(server)
         t.assert_equals(box.info.synchro.queue.len, 1)
         box.cfg{election_mode = 'manual'}
         require('fiber').new(function()
+            box.ctl.demote()
             box.ctl.promote()
         end)
         t.helpers.retrying({timeout = 120}, function()

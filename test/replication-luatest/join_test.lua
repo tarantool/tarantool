@@ -90,7 +90,19 @@ g.test_raft_state_during_meta_join = function(lg)
 
     replica:start()
     local ok, err = replica:exec(function()
-        return pcall(box.ctl.promote)
+        local fiber = require('fiber')
+        local f = fiber.new(box.ctl.promote)
+        f:set_joinable(true)
+        -- Just doing box.ctl.promote() won't work - it will hang. Because the
+        -- instance is an orphan. Which means it will stay read-only and this
+        -- will stall the ending of box.ctl.promote(), because it is waiting for
+        -- the instance to become writable. but writability is not needed
+        -- anyway, it is enough to wait until the synchro queue is claimed.
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_equals(box.info.synchro.queue.owner, box.info.id)
+        end)
+        box.error.injection.set('ERRINJ_APPLIER_SUBSCRIBE_DELAY', false)
+        return f:join(60)
     end)
 
     --
@@ -99,10 +111,6 @@ g.test_raft_state_during_meta_join = function(lg)
     --
     t.assert_equals(err, nil)
     t.assert(ok)
-
-    replica:exec(function()
-        box.error.injection.set('ERRINJ_APPLIER_SUBSCRIBE_DELAY', false)
-    end)
 
     replica:drop()
     lg.master:update_box_cfg{election_mode = 'off'}

@@ -7,10 +7,15 @@ test_run = require('test_run').new()
 term = box.info.election.term
 old_election_mode = box.cfg.election_mode
 box.cfg{election_mode = 'candidate'}
-test_run:wait_cond(function() return box.info.election.term > term end)
+test_run:wait_cond(function()                                                   \
+    return box.info.synchro.queue.term == term + 1                              \
+end)
+assert(box.info.election.term == term + 1)
+assert(not box.info.ro)
 
 -- Make sure the replica receives new term on subscribe.
 box.cfg{election_mode = 'off'}
+box.ctl.demote()
 
 box.schema.user.grant('guest', 'replication')
 test_run:cmd('create server replica with rpl_master=default,\

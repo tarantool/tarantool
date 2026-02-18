@@ -589,10 +589,6 @@ replica_gc(const struct tt_uuid *uuid);
 void
 replicaset_on_health_change(void);
 
-/** Return whether there are enough "healthy" connections to form a quorum. */
-bool
-replicaset_has_healthy_quorum(void);
-
 /**
  * A special wrapper for replication_synchro_quorum, which lowers it to the
  * count of nodes registered in cluster.

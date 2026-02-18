@@ -3,7 +3,7 @@ fiber = require('fiber')
 
 replication_synchro_timeout = box.cfg.replication_synchro_timeout
 box.cfg{\
-    replication_synchro_timeout = 0.001,\
+    replication_synchro_timeout = 1000,\
 }
 
 _ = box.schema.create_space('sync', {is_sync = true}):create_index('pk')

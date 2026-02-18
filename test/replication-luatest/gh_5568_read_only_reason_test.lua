@@ -148,13 +148,13 @@ g.test_read_only_reason_election_no_leader = function(g)
                           '%s with term %s'):format(err.state, err.term))
     t.assert_equals(g.master:exec(function()
         return box.info.ro_reason
-    end), "election", "ro reason election");
+    end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
-        reason = 'election',
+        reason = 'synchro',
         state = 'follower',
         code = box.error.READONLY,
         type = 'ClientError'
-    }, 'reason is election, no leader')
+    }, 'reason is synchro, no leader')
     t.assert(not err.leader_id, 'no leader id')
     t.assert(not err.leader_uuid, 'no leader uuid')
 
@@ -191,15 +191,15 @@ g.test_read_only_reason_election_has_leader = function(g)
                           err.state, err.term, err.leader_id, err.leader_uuid))
     t.assert_equals(g.replica:exec(function()
         return box.info.ro_reason
-    end), "election", "ro reason election");
+    end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
-        reason = 'election',
+        reason = 'synchro',
         state = 'follower',
         leader_id = g.master:get_instance_id(),
         leader_uuid = g.master:get_instance_uuid(),
         code = box.error.READONLY,
         type = 'ClientError'
-    }, 'reason is election, has leader')
+    }, 'reason is synchro, has leader')
 
     -- Cleanup.
     g.master:exec(function()
@@ -236,9 +236,12 @@ g.test_read_only_reason_synchro = function(g)
     end)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
-    t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
-                          'term %s belongs to %s (%s)'):format(err.term,
-                          err.queue_owner_id, err.queue_owner_uuid))
+    local msg = read_only_msg
+    msg = msg .. ('state is election %s with term %s, leader is %s (%s), '..
+                  'synchro queue with term %s belongs to %s (%s)'):format(
+                  err.state, err.term, err.leader_id, err.leader_uuid,
+                  err.queue_term, err.queue_owner_id, err.queue_owner_uuid)
+    t.assert_str_contains(err.message, msg)
     t.assert_equals(g.replica:exec(function()
         return box.info.ro_reason
     end), "synchro", "ro reason synchro");
@@ -306,14 +309,14 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
                           err.term, err.leader_id))
     t.assert_equals(g.replica:exec(function()
         return box.info.ro_reason
-    end), "election", "ro reason election");
+    end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
-        reason = 'election',
+        reason = 'synchro',
         state = 'follower',
         leader_id = leader_id,
         code = box.error.READONLY,
         type = 'ClientError'
-    }, 'reason is election, has leader but no uuid')
+    }, 'reason is synchro, has leader but no uuid')
 end
 
 --
@@ -345,8 +348,10 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
     t.assert(not err.queue_owner_uuid)
-    t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
-                          'term %s belongs to %s'):format(err.term,
+    t.assert_str_contains(err.message, read_only_msg..('state is election %s'..
+                          ' with term %s, leader is %s, synchro queue with '..
+                          'term %s belongs to %s'):format(err.state,
+                          err.term, err.leader_id, err.queue_term,
                           err.queue_owner_id))
     t.assert_equals(g.replica:exec(function()
         return box.info.ro_reason
