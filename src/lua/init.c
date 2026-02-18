@@ -199,31 +199,35 @@ static const char * const lua_modules_minimal[] = {
 	"strict", strict_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
+	"internal.utils", utils_lua,
 	"internal.asan", asan_lua,
 	"buffer", buffer_lua,
 	"fun", fun_lua,
 	"table", table_lua,
+	"string", string_lua,
 	"errno", errno_lua,
 	"error", error_lua,
+	"version", version_lua,
 	"clock", clock_lua,
+	"iconv", iconv_lua,
+	"crypto", crypto_lua,
+	"digest", digest_lua,
+	"uri", uri_lua,
+	"uuid", uuid_lua,
 	"varbinary", varbinary_lua,
+	"timezones", timezones_lua,
+	"datetime", datetime_lua,
 	NULL
 };
 
 /** List of modules available only in the main thread. */
 static const char * const lua_modules[] = {
 	"compat", compat_lua,
-	"internal.utils", utils_lua,
 	"fiber", fiber_lua,
 	"env", env_lua,
-	"string", string_lua,
 	"msgpackffi", msgpackffi_lua,
-	"crypto", crypto_lua,
-	"digest", digest_lua,
 	"ulid", ulid_lua,
-	"uuid", uuid_lua,
 	"log", log_lua,
-	"uri", uri_lua,
 	"fio", fio_lua,
 	"csv", csv_lua,
 	"socket", socket_lua,
@@ -234,7 +238,6 @@ static const char * const lua_modules[] = {
 	"internal.argparse", argparse_lua,
 	"pwd", pwd_lua,
 	"http.client", httpc_lua,
-	"iconv", iconv_lua,
 	"swim", swim_lua,
 	"internal.protobuf.wireformat", protobuf_wireformat_lua,
 	"protobuf", protobuf_lua,
@@ -263,12 +266,9 @@ static const char * const lua_modules[] = {
 	"memprof", memprof_lua,
 	"sysprof.parse", sysprof_parse_lua,
 	"sysprof", sysprof_lua,
-	"timezones", timezones_lua,
-	"datetime", datetime_lua,
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
-	"version", version_lua,
 	EXTRA_LUA_MODULES
 	NULL
 };
@@ -784,6 +784,8 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_tweaks_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
+	tarantool_lua_uri_init(L);
+	tarantool_lua_digest_init(L);
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_serializer_init(L);
@@ -845,7 +847,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_init_minimal_impl(L);
 
 	tarantool_lua_alloc_init(L);
-	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);
 	tarantool_lua_fiber_init(L);
@@ -854,7 +855,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
-	tarantool_lua_digest_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_trigger_init(L);
 	tarantool_lua_extras_init(L);
