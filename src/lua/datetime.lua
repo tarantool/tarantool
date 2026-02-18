@@ -21,6 +21,7 @@ local tz = require('timezones')
 ]]
 
 ffi.cdef[[
+typedef long time_t;
 
 /* dt_core.h definitions */
 typedef int dt_t;
