@@ -745,14 +745,9 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 	lua_pop(L, 1); /* modfile */
 }
 
-void
-tarantool_lua_init_minimal(void)
+static void
+tarantool_lua_init_minimal_impl(lua_State *L)
 {
-	assert(tarantool_L == NULL);
-
-	lua_State *L = luaT_newstate();
-	tarantool_L = L;
-
 	lua_atpanic(L, tarantool_panic_handler);
 	luaL_openlibs(L);
 
@@ -812,16 +807,28 @@ tarantool_lua_init_minimal(void)
 }
 
 void
+tarantool_lua_init_minimal(void)
+{
+	assert(tarantool_L == NULL);
+
+	lua_State *L = luaT_newstate();
+	tarantool_L = L;
+
+	tarantool_lua_init_minimal_impl(L);
+}
+
+void
 tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		   char **argv)
 {
 	assert(cord_is_main());
+	assert(tarantool_L == NULL);
 
 	builtin_modcache_init();
 	minifio_set_script(script);
 
-	tarantool_lua_init_minimal();
-	lua_State *L = tarantool_L;
+	lua_State *L = luaT_newstate();
+	tarantool_L = L;
 
 	/* Set _G.arg. */
 	lua_newtable(L);
@@ -834,6 +841,8 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		lua_settable(L, -3);
 	}
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
+
+	tarantool_lua_init_minimal_impl(L);
 
 	tarantool_lua_alloc_init(L);
 	tarantool_lua_uri_init(L);
