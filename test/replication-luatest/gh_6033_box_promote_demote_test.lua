@@ -276,8 +276,8 @@ g_common.test_ok = function(g)
         'Demoting succeeds with elections on: %s', err))
 end
 
--- Simultaneous promoting/demoting should fail.
-g_common.test_simultaneous = function(g)
+-- Simultaneous promoting should fail.
+g_common.test_simultaneous_promote = function(g)
     wal_delay_start(g.server_1)
 
     local term = g.server_1:get_election_term()
@@ -287,20 +287,37 @@ g_common.test_simultaneous = function(g)
     local ok, err = g.server_1:exec(function()
         return pcall(box.ctl.promote)
     end)
-    luatest.assert(not ok and err.code == box.error.UNSUPPORTED,
-        'Simultaneous promote fails')
-
-    local ok, err = g.server_1:exec(function()
-        return pcall(box.ctl.demote)
-    end)
-    luatest.assert(not ok and err.code == box.error.UNSUPPORTED,
-        'Simultaneous demote fails')
+    luatest.assert_not(ok)
+    luatest.assert_equals(err.code, box.error.IN_ANOTHER_PROMOTE)
 
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)
     g.server_1:wait_for_synchro_queue_term(term + 1)
     wait_sync(g.cluster.servers)
     demote(g.server_1)
+end
+
+-- Simultaneous demoting should fail.
+g_common.test_simultaneous_demote = function(g)
+    promote(g.server_1)
+
+    wal_delay_start(g.server_1)
+    local term = g.server_1:get_election_term()
+    local f = demote_start(g.server_1)
+    g.server_1:wait_for_election_term(term + 1)
+
+    local ok, err = g.server_1:exec(function()
+        return pcall(box.ctl.demote)
+    end)
+    luatest.assert_not(ok)
+    luatest.assert_equals(err.code, box.error.UNSUPPORTED)
+    luatest.assert_str_contains(err.message, "box.ctl.promote/demote");
+    luatest.assert_str_contains(err.message, "simultaneous invocations");
+
+    wal_delay_end(g.server_1)
+    fiber_join(g.server_1, f)
+    g.server_1:wait_for_synchro_queue_term(term + 1)
+    wait_sync(g.cluster.servers)
 end
 
 -- Promoting voter should fail.
@@ -330,7 +347,7 @@ g_common.test_wal_interfering_promote = function(g)
     -- server_2.
     g.server_1:wait_for_election_term(term + 1)
     g.server_1:exec(function()
-        box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', true)
+        box.error.injection.set('ERRINJ_RAFT_PROMOTE_DELAY', true)
     end)
     wal_delay_end(g.server_1)
 
@@ -340,7 +357,7 @@ g_common.test_wal_interfering_promote = function(g)
     promote(g.server_2)
     g.server_1:wait_for_synchro_queue_term(term + 2)
     g.server_1:exec(function()
-        box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', false)
+        box.error.injection.set('ERRINJ_RAFT_PROMOTE_DELAY', false)
     end)
 
     local ok, err = fiber_join(g.server_1, f)
@@ -379,8 +396,8 @@ g_common.test_wal_interfering_demote = function(g)
     end)
 
     local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
-        'Interfering demote fails')
+    luatest.assert_not(ok)
+    luatest.assert_equals(err.code, box.error.INTERFERING_ELECTIONS)
     wait_sync(g.cluster.servers)
 
     -- server_1 incremented term and then failed it's demote.
@@ -430,12 +447,15 @@ g_common.test_limbo_full_interfering_promote = function(g)
     wait_sync({g.server_1, g.server_2, server_3})
 
     local f = promote_start(g.server_1)
-    local term = g.server_2:get_election_term()
+    local term = g.server_1:get_election_term()
+    g.server_2:wait_for_election_term(term)
     promote(g.server_2)
-    g.server_1:wait_for_synchro_queue_term(term + 1)
+    local qsync_term = g.server_2:get_synchro_queue_term()
+    luatest.assert_equals(qsync_term, term + 1)
+    g.server_1:wait_for_synchro_queue_term(qsync_term)
 
     local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
+    luatest.assert(not ok and err.code == box.error.INTERFERING_ELECTIONS,
         'Interfering promote fails')
 
     wait_sync({g.server_1, g.server_2, server_3})
@@ -479,8 +499,11 @@ g_common.test_limbo_full_interfering_demote = function(g)
     g.server_1:wait_for_synchro_queue_term(term + 1)
 
     local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
-        'Interfering demote fails')
+    luatest.assert_not(ok)
+    luatest.assert_items_include({
+        box.error.INTERFERING_PROMOTE,
+        box.error.INTERFERING_ELECTIONS
+    }, {err.code})
 
     wait_sync(g.cluster.servers)
     promote(g.server_1)
@@ -493,7 +516,7 @@ end
 g_common.test_fail_limbo_ack_promote = function(g)
     box_cfg_update({g.server_1}, {
         replication_synchro_quorum = 3,
-        replication_synchro_timeout = 0.1,
+        replication_synchro_timeout = 1000,
     })
 
     box_cfg_update({g.server_2}, {
@@ -510,23 +533,26 @@ g_common.test_fail_limbo_ack_promote = function(g)
     end)
     wait_sync(g.cluster.servers)
 
-    -- start promoting with default replication_synchro_timeout,
     -- wait until promote reaches waiting for limbo_acked,
     -- make it timeout by lowering replication_synchro_timeout
-    local f = promote_start(g.server_1)
-    luatest.helpers.retrying({}, function()
-        luatest.assert_not_equals(nil, g.server_1:grep_log(string.format(
-            'RAFT: persisted state {term: %d}', g.server_1:get_election_term()))
-        )
+    g.server_1:exec(function()
+        box.cfg{replication_synchro_timeout = 0.01}
+        local ok, err = pcall(box.ctl.promote)
+        luatest.assert(not ok and err.type == "TimedOut")
+        box.cfg{replication_synchro_timeout = 1000}
     end)
-    box_cfg_update({g.server_1}, {replication_synchro_timeout = 0.01})
-    local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.type == "TimedOut",
-        'Promote failed because quorum wait timed out')
 
     box_cfg_update(g.cluster.servers, {replication_synchro_quorum = 2})
-    promote(g.server_1)
-    g.server_1:exec(function() box.space.test:drop() end)
+    g.server_1:exec(function()
+        -- Since the quorum is lowered to a reachable value, the promotion will
+        -- eventually catch up with Raft and succeed. Just wait for it.
+        luatest.helpers.retrying({timeout = 60}, function()
+            local info = box.info
+            luatest.assert_equals(info.election.state, 'leader')
+            luatest.assert_not(box.info.ro)
+        end)
+        box.space.test:drop()
+    end)
     wait_sync(g.cluster.servers)
     demote(g.server_1)
 end

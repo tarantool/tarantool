@@ -24,11 +24,16 @@ end)
 -- continue waiting.
 box.cfg{election_mode = 'off'}
 box.cfg{election_mode = 'candidate'}
+assert(box.info.ro)
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
+-- Wait until become the leader and claim the synchro queue in the latest Raft
+-- term, so that the clear demotion is enabled.
+box.ctl.wait_rw()
 
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
 }
+box.ctl.demote()
 
 --
 -- Another crash could happen when election mode was configured to be

@@ -61,7 +61,7 @@ local function capture_synchro_queue_and_push_sync_transaction(server)
         -- a successful box.ctl.promote.
         box.cfg{election_mode = "off"}
         box.ctl.promote()
-        t.assert_equals(box.info.election.state, "follower")
+        t.assert_equals(box.info.election.state, "leader")
         t.assert_equals(box.info.synchro.queue.owner, box.info.id)
         t.assert_equals(box.info.synchro.queue.len, 0)
         box.atomic({wait = "submit"}, function() box.space.s:replace{0} end)
@@ -71,6 +71,8 @@ local function capture_synchro_queue_and_push_sync_transaction(server)
         -- fiber and join it after some actions. In our case this action
         -- is reconfiguring of replication_synchro_quorum.
         box.cfg{election_mode = "manual"}
+        box.ctl.demote()
+        t.assert_equals(box.info.election.state, "follower")
         rawset(_G, "raft_worker_f", fiber.new(function()
             box.ctl.promote()
             t.assert_equals(box.info.election.state, "leader")

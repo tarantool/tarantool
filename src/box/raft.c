@@ -118,6 +118,12 @@ box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
 	};
 }
 
+static bool
+box_raft_has_healthy_quorum(void)
+{
+	return replicaset.healthy_count >= replicaset_healthy_quorum();
+}
+
 static void
 box_raft_update_synchro_queue(struct raft *raft)
 {
@@ -227,7 +233,11 @@ void
 box_raft_update_election_quorum(void)
 {
 	struct raft *raft = box_raft();
-	int quorum = replicaset_healthy_quorum();
+	int quorum;
+	if (box_election_mode != ELECTION_MODE_OFF)
+		quorum = replicaset_healthy_quorum();
+	else
+		quorum = 1;
 	raft_cfg_election_quorum(raft, quorum);
 	int size = MAX(replicaset.registered_count, 1);
 	raft_cfg_cluster_size(raft, size);
@@ -252,25 +262,27 @@ box_raft_cfg_election_mode(enum election_mode mode)
 	case ELECTION_MODE_OFF:
 	case ELECTION_MODE_VOTER:
 		box_raft_remove_quorum_triggers();
+		/*
+		 * In off-mode the instance might actually be a Raft leader
+		 * right now, if it was promoted explicitly. And it could be
+		 * preserved. But it feels that a more intuitive approach is to
+		 * step down when user switches non-off -> off. Also it is a
+		 * small bit of legacy behaviour which exists since when the
+		 * off-mode was just ignoring Raft.
+		 */
 		raft_cfg_is_candidate(raft, false);
 		break;
 	case ELECTION_MODE_MANUAL:
 		box_raft_add_quorum_triggers();
-		if (raft->state == RAFT_STATE_LEADER ||
-		    raft->state == RAFT_STATE_CANDIDATE) {
-			/*
-			 * The node was configured to be a candidate. Don't
-			 * disrupt its current leadership or the elections it's
-			 * just started.
-			 */
-			raft_cfg_is_candidate_later(raft, false);
-		} else {
-			raft_cfg_is_candidate(raft, false);
-		}
+		/*
+		 * If the node already was the leader, don't disrupt its current
+		 * leadership. It doesn't contradict the manual mode anyway.
+		 */
+		raft_cfg_is_candidate_later(raft, false);
 		break;
 	case ELECTION_MODE_CANDIDATE:
 		box_raft_add_quorum_triggers();
-		if (replicaset_has_healthy_quorum()) {
+		if (box_raft_has_healthy_quorum()) {
 			raft_cfg_is_candidate(raft, true);
 		} else {
 			/*
@@ -283,7 +295,7 @@ box_raft_cfg_election_mode(enum election_mode mode)
 	default:
 		unreachable();
 	}
-	raft_cfg_is_enabled(raft, mode != ELECTION_MODE_OFF);
+	box_raft_update_election_quorum();
 	txn_limbo_update_state(&txn_limbo);
 }
 
@@ -295,7 +307,7 @@ static void
 box_raft_fence(void)
 {
 	struct raft *raft = box_raft();
-	if (!raft->is_enabled || raft->state != RAFT_STATE_LEADER ||
+	if (raft->state != RAFT_STATE_LEADER ||
 	    box_election_fencing_mode == ELECTION_FENCING_MODE_OFF ||
 	    box_raft_election_fencing_paused)
 		return;
@@ -308,7 +320,7 @@ void
 box_raft_leader_step_off(void)
 {
 	struct raft *raft = box_raft();
-	if (!raft->is_enabled || raft->state != RAFT_STATE_LEADER)
+	if (raft->state != RAFT_STATE_LEADER)
 		return;
 
 	/* It will be unfenced the next time new term is written. */
@@ -325,7 +337,7 @@ static void
 box_raft_notify_have_quorum(void)
 {
 	struct raft *raft = box_raft();
-	bool has_healthy_quorum = replicaset_has_healthy_quorum();
+	bool has_healthy_quorum = box_raft_has_healthy_quorum();
 	if (box_raft_election_fencing_paused && has_healthy_quorum)
 		box_raft_election_fencing_resume();
 
@@ -474,9 +486,11 @@ box_raft_try_promote_f(struct trigger *trig, void *event)
 	 * error and continue promote.
 	 */
 	int healthy_count = replicaset.healthy_count;
-	if (healthy_count < replicaset_healthy_quorum()) {
+	/* At least self is always healthy. */
+	assert(healthy_count >= 1);
+	if (healthy_count < raft->election_quorum) {
 		diag_set(ClientError, ER_NO_ELECTION_QUORUM,
-			 healthy_count, replicaset_healthy_quorum());
+			 healthy_count, raft->election_quorum);
 		goto done;
 	}
 	/* The term ended with a leader being found. */
@@ -530,7 +544,8 @@ box_raft_try_promote(void)
 	is_in_raft_promote = true;
 	assert(raft->is_enabled);
 	assert(box_election_mode == ELECTION_MODE_MANUAL ||
-	       box_election_mode == ELECTION_MODE_CANDIDATE);
+	       box_election_mode == ELECTION_MODE_CANDIDATE ||
+	       box_election_mode == ELECTION_MODE_OFF);
 
 	raft_promote(raft);
 
@@ -686,6 +701,25 @@ box_raft_on_wal_error_f(struct watcher *watcher)
 {
 	(void)watcher;
 	box_raft_leader_step_off();
+}
+
+bool
+box_raft_is_ro(void)
+{
+	if (txn_limbo.state == TXN_LIMBO_STATE_REPLICA)
+		return true;
+	struct raft *raft = box_raft();
+	if (raft->volatile_term > txn_limbo.term)
+		return true;
+	if (box_election_mode == ELECTION_MODE_OFF)
+		return false;
+	return raft_is_ro(raft);
+}
+
+void
+box_raft_finish_recovery(void)
+{
+	raft_cfg_is_enabled(box_raft(), true);
 }
 
 void
