@@ -943,6 +943,7 @@ box_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	box_lua_error_init(L);
+	box_lua_errinj_init(L);
 	box_lua_tuple_format_init(L);
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
