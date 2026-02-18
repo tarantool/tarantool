@@ -173,6 +173,9 @@ box.cfg{                                                                        
 }
  | ---
  | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.ctl.demote()
  | ---
  | ...

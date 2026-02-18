@@ -211,9 +211,6 @@ txn_limbo_update_state(struct txn_limbo *limbo);
 bool
 txn_limbo_would_block(struct txn_limbo *limbo);
 
-bool
-txn_limbo_is_ro(struct txn_limbo *limbo);
-
 /**
  * Return the latest term as seen in PROMOTE requests from instance with id
  * @a replica_id.
@@ -331,10 +328,6 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 int
 txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			double timeout);
-
-/** Wait until the limbo is empty. Regardless of how its transactions end. */
-int
-txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
 
 /**
  * Persist limbo state to a given synchro request.

@@ -94,5 +94,6 @@ box.cfg{                                                                        
     replication_synchro_timeout = old_replication_synchro_timeout,              \
     replication_synchro_quorum = old_synchro_quorum,                            \
 }
+box.ctl.promote()
 box.ctl.demote()
 box.schema.user.revoke('guest', 'super')

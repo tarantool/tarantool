@@ -22,8 +22,8 @@ g.before_all(function(cg)
     cg.box_cfg = {
         replication_timeout         = 0.1,
         replication_synchro_quorum  = 1,
-        replication_synchro_timeout = 0.01,
-        election_timeout            = 0.1,
+        replication_synchro_timeout = 1000,
+        election_timeout            = 1000,
         election_fencing_mode       = 'off',
         log_level                   = 6,
     }
