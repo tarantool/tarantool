@@ -1,7 +1,8 @@
 -- buffer.lua (internal file)
 
 local ffi = require('ffi')
-local utils = require('internal.utils')
+local asan = require('internal.asan')
+
 local READAHEAD = 16320
 
 ffi.cdef[[
@@ -83,11 +84,11 @@ local function ibuf_recycle(buf)
 end
 
 local function ibuf_poison_unallocated(buf)
-    utils.poison_memory_region(buf.wpos, buf.epos - buf.wpos);
+    asan.poison_memory_region(buf.wpos, buf.epos - buf.wpos);
 end
 
 local function ibuf_unpoison_unallocated(buf)
-    utils.unpoison_memory_region(buf.wpos, buf.epos - buf.wpos);
+    asan.unpoison_memory_region(buf.wpos, buf.epos - buf.wpos);
 end
 
 local function ibuf_reset(buf)
@@ -157,7 +158,7 @@ end
 local function ibuf_consume(buf, size)
     checkibuf(buf, 'consume')
     checksize(buf, size)
-    utils.poison_memory_region(buf.rpos, size);
+    asan.poison_memory_region(buf.rpos, size);
     buf.rpos = buf.rpos + size
 end
 

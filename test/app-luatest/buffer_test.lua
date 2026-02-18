@@ -1,6 +1,6 @@
 local tarantool = require('tarantool')
 local buffer = require('buffer')
-local utils = require('internal.utils')
+local asan = require('internal.asan')
 local ffi = require('ffi')
 local t = require('luatest')
 
@@ -11,7 +11,7 @@ g.test_poison = function()
 
     local buf = buffer.ibuf()
     local is_poisoned = function(buf, ptr)
-        t.assert(utils.memory_region_is_poisoned(ptr, buf:unused()))
+        t.assert(asan.memory_region_is_poisoned(ptr, buf:unused()))
     end
 
     -- Test poison on allocation. --
