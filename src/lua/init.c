@@ -204,6 +204,7 @@ static const char * const lua_modules_minimal[] = {
 	"fun", fun_lua,
 	"table", table_lua,
 	"errno", errno_lua,
+	"error", error_lua,
 	"clock", clock_lua,
 	"varbinary", varbinary_lua,
 	NULL
@@ -224,7 +225,6 @@ static const char * const lua_modules[] = {
 	"log", log_lua,
 	"uri", uri_lua,
 	"fio", fio_lua,
-	"error", error_lua,
 	"csv", csv_lua,
 	"socket", socket_lua,
 	"title", title_lua,
@@ -786,6 +786,7 @@ tarantool_lua_init_minimal(void)
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_utils_init(L);
+	tarantool_lua_tweaks_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
 	tarantool_lua_decimal_init(L);
@@ -835,7 +836,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
 	tarantool_lua_alloc_init(L);
-	tarantool_lua_tweaks_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);

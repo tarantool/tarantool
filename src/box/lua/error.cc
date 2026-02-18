@@ -36,14 +36,26 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include <fiber.h>
-#include <errinj.h>
-
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 #include "box/error.h"
+#include "core/errinj.h"
+#include "core/fiber.h"
+#include "core/tweaks.h"
 #include "mpstream/mpstream.h"
-#include "box/lua/tuple.h"
+
+/**
+ * Adds custom_type, base_type, and code fields to the table returned
+ * by error.unpack() in Lua.
+ */
+static bool box_error_unpack_type_and_code = true;
+TWEAK_BOOL(box_error_unpack_type_and_code);
+
+/**
+ * Enables verbose error serialization in Lua.
+ */
+static bool box_error_serialize_verbose = false;
+TWEAK_BOOL(box_error_serialize_verbose);
 
 /**
  * Set payload field of the `error' for the key `key` to value at stack index
@@ -457,7 +469,8 @@ lbox_errinj_info(struct lua_State *L)
 }
 
 void
-box_lua_error_init(struct lua_State *L) {
+box_lua_error_init(struct lua_State *L)
+{
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.error", 0);
 	for (int i = 0; i < box_error_code_MAX; i++) {
 		const char *name = box_error_codes[i].errstr;
@@ -473,7 +486,6 @@ box_lua_error_init(struct lua_State *L) {
 	{
 		lua_pushcfunction(L, luaT_error_call);
 		lua_setfield(L, -2, "__call");
-
 		lua_newtable(L);
 		{
 			lua_pushcfunction(L, luaT_error_last);
@@ -498,9 +510,12 @@ box_lua_error_init(struct lua_State *L) {
 		lua_setfield(L, -2, "__index");
 	}
 	lua_setmetatable(L, -2);
-
 	lua_pop(L, 1);
+}
 
+void
+box_lua_errinj_init(struct lua_State *L)
+{
 	static const struct luaL_Reg errinjlib[] = {
 		{"info", lbox_errinj_info},
 		{"set", lbox_errinj_set},

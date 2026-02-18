@@ -2,8 +2,8 @@
 
 local ffi = require('ffi')
 local msgpack = require('msgpack')
-local compat = require('compat')
 local buffer = require('buffer')
+local tweaks = require('internal.tweaks')
 
 local mp_decode = msgpack.decode_unchecked
 
@@ -152,7 +152,7 @@ local function error_unpack(err)
         result[ffi.string(f._name)] = mp_decode(f._data)
     end
     -- Hide redundant fields from unpack output (gh-9101).
-    if compat.box_error_unpack_type_and_code:is_new() then
+    if not tweaks.box_error_unpack_type_and_code then
         result.custom_type = nil
         result.base_type = nil
         if result.code == 0 then
@@ -182,7 +182,7 @@ end
 -- @param err error object
 -- @return error converted to table representation
 local function error_serialize(err)
-    if compat.box_error_serialize_verbose:is_new() then
+    if tweaks.box_error_serialize_verbose then
         local res = error_unpack(err)
         local cur = res
         while cur.prev ~= nil do
@@ -264,7 +264,7 @@ end
 -- @param err error object
 -- @return error's string representation
 local function error_to_string(err)
-    if compat.box_error_serialize_verbose:is_old() then
+    if not tweaks.box_error_serialize_verbose then
         return error_message(err)
     end
 

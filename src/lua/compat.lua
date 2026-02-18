@@ -278,13 +278,13 @@ local options = {
         default = 'old',
         obsolete = nil,
         brief = BOX_ERROR_UNPACK_TYPE_AND_CODE_BRIEF,
-        action = function() end
+        action = tweak_action('box_error_unpack_type_and_code', true, false),
     },
     box_error_serialize_verbose = {
         default = 'old',
         obsolete = nil,
         brief = BOX_ERROR_SERIALIZE_VERBOSE,
-        action = function() end,
+        action = tweak_action('box_error_serialize_verbose', false, true),
     },
     box_consider_system_spaces_synchronous = {
       default = 'old',
