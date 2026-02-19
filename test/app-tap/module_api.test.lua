@@ -697,8 +697,36 @@ local function test_box_txn(test, module)
     test:ok(module.box_txn_commit(), "box_txn_commit")
 end
 
+local function test_box_delete_range(test, module)
+    test:plan(7)
+
+    -- Check if there's no stats for the request yet.
+    test:ok(box.stat().DELETE_RANGE.total == 0, 'delete range stats: 0')
+
+    -- Test range deletion in MemTX.
+    local memtx_err_msg = "memtx does not support range deletion"
+    test:ok(module.box_delete_range(box.space.test.id, memtx_err_msg),
+            memtx_err_msg)
+    test:ok(box.stat().DELETE_RANGE.total == 1, 'delete range stats: 1')
+
+    -- Test range deletion in Vinyl.
+    local vinyl_space = box.schema.space.create('vinyl', {engine = 'vinyl'})
+    local vinyl_err_msg = "vinyl does not support range deletion"
+    test:ok(module.box_delete_range(vinyl_space.id, vinyl_err_msg),
+            vinyl_err_msg)
+    test:ok(box.stat().DELETE_RANGE.total == 2, 'delete range stats: 2')
+
+    -- Test range deletion in presence of a default field value.
+    -- Tests the iproto type check in `space_execute_dml`.
+    vinyl_space:format({{'id', 'unsigned'}, {'data', 'unsigned', default = 0}})
+    test:ok(module.box_delete_range(vinyl_space.id, vinyl_err_msg),
+            memtx_err_msg)
+    test:ok(box.stat().DELETE_RANGE.total == 3, 'delete range stats: 3')
+    vinyl_space:drop()
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(54)
+    test:plan(55)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -737,6 +765,7 @@ require('tap').test("module_api", function(test)
     test:test("box_iproto_override", test_box_iproto_override, module)
     test:test("box_ibuf", test_box_ibuf, module)
     test:test("box_txn", test_box_txn, module)
+    test:test("box_delete_range", test_box_delete_range, module)
 
     space:drop()
 end)

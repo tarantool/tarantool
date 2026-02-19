@@ -4301,6 +4301,25 @@ box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
 	return rc;
 }
 
+API_EXPORT int
+box_delete_range(uint32_t space_id, uint32_t index_id,
+		 const char *begin_key, const char *begin_key_end,
+		 const char *end_key, const char *end_key_end)
+{
+	mp_tuple_assert(begin_key, begin_key_end);
+	mp_tuple_assert(end_key, end_key_end);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_DELETE_RANGE;
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.key = begin_key;
+	request.key_end = begin_key_end;
+	request.end_key = end_key;
+	request.end_key_end = end_key_end;
+	return box_process1(&request, NULL);
+}
+
 /**
  * Trigger space truncation by bumping a counter
  * in _truncate space.
