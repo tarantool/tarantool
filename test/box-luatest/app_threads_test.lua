@@ -222,3 +222,23 @@ g.test_builtin_modules = function(cg)
         return e:unpack()
     ]]), {type = 'MyError', name = 'FooBar'})
 end
+
+g.test_lua_alloc = function(cg)
+    t.assert_error_covers({
+        message = 'not enough memory',
+    }, cg.server.eval, cg.server, [[
+        require('internal.alloc').setlimit(32 * 1024 * 1024)
+        string.rep('x', 16 * 1024 * 1024) -- fail
+    ]], {}, {_thread_id = 3})
+    local limit = cg.server:eval([[
+        string.rep('x', 16 * 1024 * 1024) -- ok
+        collectgarbage('collect')
+        return require('internal.alloc').getlimit()
+    ]], {}, {_thread_id = 4})
+    t.assert_equals(limit, 2 * 1024 * 1024 * 1024)
+    cg.server:eval([[
+        require('internal.alloc').setlimit(...)
+        string.rep('x', 16 * 1024 * 1024) -- ok
+        collectgarbage('collect')
+    ]], {limit}, {_thread_id = 3})
+end

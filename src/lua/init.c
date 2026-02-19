@@ -781,6 +781,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_utils_init(L);
+	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
@@ -846,7 +847,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 
 	tarantool_lua_init_minimal_impl(L);
 
-	tarantool_lua_alloc_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);
 	tarantool_lua_fiber_init(L);

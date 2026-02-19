@@ -13,15 +13,15 @@
  * Default allocator function which is wrapped into a new one
  * with the Lua memory limit checker.
  */
-static lua_Alloc orig_alloc;
+static __thread lua_Alloc orig_alloc;
 /**
  * Memory limit for LuaJIT.
  */
-static size_t memory_limit = LUA_MEMORY_LIMIT_DEFAULT;
+static __thread size_t memory_limit = LUA_MEMORY_LIMIT_DEFAULT;
 /**
  * Amount of memory used by LuaJIT.
  */
-static size_t used;
+static __thread size_t used;
 
 /**
  * Lua custom memory allocation function. It extends the original
