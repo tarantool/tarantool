@@ -3,27 +3,13 @@
  *
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include <signal.h>
 #include <string.h>
-#include <say.h>
-#include <pthread.h>
-#include "tt_sigaction.h"
+#include <sys/time.h>
+
 #include "clock.h"
 #include "clock_lowres.h"
-
-#ifndef NDEBUG
-/**
- * A thread that initialized this module. Only owner thread
- * is allowed to handle SIGALRM and use methods from this module.
- */
-static pthread_t owner;
-
-/** Check if current thread is owner. */
-bool
-clock_lowres_thread_is_owner(void)
-{
-	return pthread_equal(owner, pthread_self());
-}
-#endif
+#include "say.h"
 
 /** Resolution of clock (clock update period). */
 static const struct timeval resolution = {
@@ -45,22 +31,18 @@ static void
 clock_lowres_tick(int signum)
 {
 	(void)signum;
-	assert(clock_lowres_thread_is_owner());
 	clock_lowres_monotonic_clock_value = clock_monotonic();
 }
 
 void
 clock_lowres_signal_init(void)
 {
-#ifndef NDEBUG
-	owner = pthread_self();
-#endif
 	clock_lowres_monotonic_clock_value = clock_monotonic();
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = clock_lowres_tick;
 	sa.sa_flags = SA_RESTART;
-	if (tt_sigaction(SIGALRM, &sa, NULL) == -1)
+	if (sigaction(SIGALRM, &sa, NULL) == -1)
 		panic_syserror("cannot set low resolution clock timer signal");
 
 	struct itimerval timer;
@@ -81,6 +63,6 @@ clock_lowres_signal_reset(void)
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_DFL;
-	if (tt_sigaction(SIGALRM, &sa, NULL) == -1)
+	if (sigaction(SIGALRM, &sa, NULL) == -1)
 		say_syserror("cannot reset low resolution clock timer signal");
 }
