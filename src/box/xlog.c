@@ -1942,6 +1942,7 @@ xlog_cursor_next(struct xlog_cursor *cursor,
 		 struct xrow_header *xrow, bool force_recovery)
 {
 	assert(xlog_cursor_is_open(cursor));
+	ERROR_INJECT_SLEEP_FOR(ERRINJ_XLOG_READ_ROW_DELAY);
 	while (true) {
 		int rc;
 		rc = xlog_cursor_next_row(cursor, xrow);
