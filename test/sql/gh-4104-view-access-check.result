@@ -2,7 +2,7 @@ box.execute("CREATE TABLE supersecret(id INT PRIMARY KEY, data TEXT);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TABLE supersecret2(id INT PRIMARY KEY, data TEXT);")
+box.execute("CREATE TABLE supersecret2(id_1 INT PRIMARY KEY, data_1 TEXT);")
 ---
 - row_count: 1
 ...

@@ -80,7 +80,6 @@ set(sql_sources
     sql/expr.c
     sql/func.c
     sql/global.c
-    sql/hash.c
     sql/insert.c
     sql/main.c
     sql/malloc.c
