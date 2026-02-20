@@ -3260,19 +3260,17 @@ memtx_tx_prepare_finalize_slow(struct txn *txn)
 void
 memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 {
-	struct tuple *old_tuple, *new_tuple;
-	old_tuple = stmt->del_story_list != NULL ?
-		    stmt->del_story_list->story->tuple : NULL;
-	new_tuple = stmt->add_story == NULL ? NULL : stmt->add_story->tuple;
-	memtx_space_update_tuple_stat(stmt->space, old_tuple, new_tuple);
-
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
+		memtx_space_update_tuple_stat(stmt->space, NULL,
+					      stmt->add_story->tuple);
 		memtx_tx_story_unlink_added_by(stmt->add_story, stmt);
 	}
 	for (struct memtx_del_story_link *link = stmt->del_story_list;
 	     link != NULL; link = link->next) {
 		assert(link->story->del_stmt == stmt);
+		memtx_space_update_tuple_stat(stmt->space,
+					      link->story->tuple, NULL);
 		memtx_tx_story_unlink_deleted_by(link->story, stmt);
 	}
 	memtx_tx_story_gc();
