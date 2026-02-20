@@ -887,12 +887,31 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct tuple *unused;
 		struct index *index = space->index[i];
-		/* Rollback must not fail. */
-		if (memtx_index_replace(index, new_tuple, old_tuple, DUP_INSERT,
-					&unused, &unused) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
+		if (stmt->type == IPROTO_DELETE_RANGE) {
+			struct memtx_delete_range_stmt *memtx_stmt =
+				(struct memtx_delete_range_stmt *)
+					stmt->engine_savepoint;
+			for (size_t i = 0; i < memtx_stmt->tuple_count; i++) {
+				struct tuple *tuple = memtx_stmt->tuples[i];
+				/* Rollback must not fail. */
+				if (memtx_index_replace(index, tuple, NULL,
+							DUP_INSERT, &unused,
+							&unused) != 0) {
+					diag_log();
+					unreachable();
+					panic("failed to rollback"
+					      " delete_range()");
+				}
+			}
+		} else {
+			/* Rollback must not fail. */
+			if (memtx_index_replace(index, new_tuple,
+						old_tuple, DUP_INSERT,
+						&unused, &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rollback change");
+			}
 		}
 	}
 
