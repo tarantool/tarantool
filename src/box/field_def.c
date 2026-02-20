@@ -388,9 +388,9 @@ const int field_type_decimal_precision[] = {
 	/* [FIELD_TYPE_DECIMAL256] = */ 76,
 };
 
-static_assert(lengthof(field_type_is_fixed_decimal) == field_type_MAX,
+static_assert(lengthof(field_type_decimal_precision) == field_type_MAX,
 	      "Each field type must be present in "
-	      "field_type_is_fixed_decimal");
+	      "field_type_decimal_precision");
 
 const char *on_conflict_action_strs[] = {
 	/* [ON_CONFLICT_ACTION_NONE]     = */ "none",
