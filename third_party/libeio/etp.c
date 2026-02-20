@@ -94,7 +94,8 @@ etp_tmpbuf_get (struct etp_tmpbuf *buf, int len)
   if (buf->len < len)
     {
       free (buf->ptr);
-      buf->ptr = malloc (buf->len = len);
+      buf->len = len;
+      buf->ptr = ecb_malloc (buf->len);
     }
 
   return buf->ptr;
