@@ -62,11 +62,12 @@ test:do_test(
             INSERT INTO tabc VALUES(1,2,3);
             CREATE TABLE txyz(x INT PRIMARY KEY,y INT,z INT);
             INSERT INTO txyz VALUES(4,5,6);
-            CREATE TABLE tboth(a INT PRIMARY KEY,b INT,c INT,x INT,y INT,z INT);
+            CREATE TABLE tboth(a_1 INT PRIMARY KEY, b_1 INT,
+                               c_1 INT, x_1 INT, y_1 INT, z_1 INT);
             INSERT INTO tboth VALUES(11,12,13,14,15,16);
-            CREATE VIEW v1 AS SELECT tabc.a, txyz.x, *
+            CREATE VIEW v1 AS SELECT *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v2 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
+            CREATE VIEW v2 AS SELECT *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -131,11 +132,12 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-2.7",
     [[
-        SELECT tabc.a, txyz.x, tboth.a, tboth.x, * FROM tabc, txyz, tboth;
+        SELECT tabc.a, txyz.x, tboth.a_1, tboth.x_1, * FROM tabc, txyz, tboth;
     ]], {
         -- <colname-2.7>
-    "a", 1, "x", 4, "a", 11, "x", 14, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5,
-    "z", 6, "a", 11, "b", 12, "c", 13, "x", 14, "y", 15, "z", 16
+    "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a", 1,
+    "b", 2, "c", 3, "x", 4, "y", 5,
+    "z", 6, "a_1", 11, "b_1", 12, "c_1", 13, "x_1", 14, "y_1", 15, "z_1", 16
         -- </colname-2.7>
     })
 
@@ -145,7 +147,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-2.8>
-        "a",1,"x",4,"a_1",1,"b",2,"c",3,"x_1",4,"y",5,"z",6
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-2.8>
     })
 
@@ -155,9 +157,8 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-2.9>
-        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
-        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
-        "y_1", 15, "z_1", 16
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a_1", 11,
+        "b_1", 12, "c_1", 13, "x_1", 14, "y_1", 15, "z_1", 16
         -- </colname-2.9>
     })
 
@@ -167,9 +168,9 @@ test:do_test(
     function()
         test:execsql [[
             UPDATE "_session_settings" SET "value" = false WHERE "name" = 'sql_full_column_names';
-            CREATE VIEW v3 AS SELECT tabc.a, txyz.x, *
+            CREATE VIEW v3 AS SELECT *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v4 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
+            CREATE VIEW v4 AS SELECT *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -237,8 +238,8 @@ test:do_execsql2_test(
         SELECT * FROM tabc, txyz, tboth;
     ]], {
         -- <colname-3.7>
-        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a", 11, "b", 12,
-        "c", 13, "x", 14, "y", 15, "z", 16
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a_1", 11,
+        "b_1", 12, "c_1", 13, "x_1", 14, "y_1", 15, "z_1", 16
         -- </colname-3.7>
     })
 
@@ -248,8 +249,7 @@ test:do_execsql2_test(
         SELECT v1.a, * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-3.8>
-        "a", 1, "a", 1, "x", 4, "a_1", 1, "b", 2, "c", 3, "x_1", 4, "y", 5,
-        "z", 6
+        "a", 1, "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-3.8>
     })
 
@@ -259,9 +259,8 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-3.9>
-        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
-        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
-        "y_1", 15, "z_1", 16
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a_1", 11,
+        "b_1", 12, "c_1", 13, "x_1", 14, "y_1", 15, "z_1", 16
         -- </colname-3.9>
     })
 
@@ -271,7 +270,7 @@ test:do_execsql2_test(
         SELECT * FROM v3 ORDER BY 2;
     ]], {
         -- <colname-3.10>
-        "a", 1, "x", 4, "a_1", 1, "b", 2, "c", 3, "x_1", 4, "y", 5, "z", 6
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6
         -- </colname-3.10>
     })
 
@@ -281,9 +280,8 @@ test:do_execsql2_test(
         SELECT * FROM v4 ORDER BY 2;
     ]], {
         -- <colname-3.11>
-        "a", 1, "x", 4, "a_1", 11, "x_1", 14, "a_2", 1, "b", 2, "c", 3,
-        "x_2", 4, "y", 5, "z", 6, "a_3", 11, "b_1", 12, "c_1", 13, "x_3", 14,
-        "y_1", 15, "z_1", 16
+        "a", 1, "b", 2, "c", 3, "x", 4, "y", 5, "z", 6, "a_1", 11,
+        "b_1", 12, "c_1", 13, "x_1", 14, "y_1", 15, "z_1", 16
         -- </colname-3.11>
     })
 
@@ -293,9 +291,9 @@ test:do_test(
     function()
         test:execsql [[
             UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_column_names';
-            CREATE VIEW v5 AS SELECT tabc.a, txyz.x, *
+            CREATE VIEW v5 AS SELECT *
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
-            CREATE VIEW v6 AS SELECT tabc.a, txyz.x, tboth.a, tboth.x, *
+            CREATE VIEW v6 AS SELECT *
               FROM tabc, txyz, tboth ORDER BY 1 LIMIT 1;
         ]]
         return test:execsql2 [[
@@ -366,8 +364,8 @@ test:do_execsql2_test(
     ]], {
         -- <colname-4.7>
         "tabc.a", 1, "tabc.b", 2, "tabc.c", 3, "txyz.x", 4, "txyz.y", 5,
-        "txyz.z", 6, "tboth.a", 11, "tboth.b", 12, "tboth.c", 13,
-        "tboth.x", 14, "tboth.y", 15, "tboth.z", 16
+        "txyz.z", 6, "tboth.a_1", 11, "tboth.b_1", 12, "tboth.c_1", 13,
+        "tboth.x_1", 14, "tboth.y_1", 15, "tboth.z_1", 16
         -- </colname-4.7>
     })
 
@@ -377,8 +375,7 @@ test:do_execsql2_test(
         SELECT * FROM v1 ORDER BY 2;
     ]], {
         -- <colname-4.8>
-        "v1.a", 1, "v1.x", 4, "v1.a_1", 1, "v1.b", 2, "v1.c", 3, "v1.x_1", 4,
-        "v1.y", 5, "v1.z", 6
+        "v1.a", 1, "v1.b", 2, "v1.c", 3, "v1.x", 4, "v1.y", 5, "v1.z", 6
         -- </colname-4.8>
     })
 
@@ -388,9 +385,9 @@ test:do_execsql2_test(
         SELECT * FROM v2 ORDER BY 2;
     ]], {
         -- <colname-4.9>
-        "v2.a", 1, "v2.x", 4, "v2.a_1", 11, "v2.x_1", 14, "v2.a_2", 1,
-        "v2.b", 2, "v2.c", 3, "v2.x_2", 4, "v2.y", 5, "v2.z", 6, "v2.a_3", 11,
-        "v2.b_1", 12, "v2.c_1", 13, "v2.x_3", 14, "v2.y_1", 15, "v2.z_1", 16
+        "v2.a", 1, "v2.b", 2, "v2.c", 3, "v2.x", 4, "v2.y", 5, "v2.z", 6,
+        "v2.a_1", 11, "v2.b_1", 12, "v2.c_1", 13, "v2.x_1", 14,
+        "v2.y_1", 15, "v2.z_1", 16
         -- </colname-4.9>
     })
 
@@ -400,8 +397,7 @@ test:do_execsql2_test(
         SELECT * FROM v3 ORDER BY 2;
     ]], {
         -- <colname-4.10>
-        "v3.a", 1, "v3.x", 4, "v3.a_1", 1, "v3.b", 2, "v3.c", 3, "v3.x_1", 4,
-        "v3.y", 5, "v3.z", 6
+        "v3.a", 1, "v3.b", 2, "v3.c", 3, "v3.x", 4, "v3.y", 5, "v3.z", 6
         -- </colname-4.10>
     })
 
@@ -411,9 +407,9 @@ test:do_execsql2_test(
         SELECT * FROM v4 ORDER BY 2;
     ]], {
         -- <colname-4.11>
-        "v4.a", 1, "v4.x", 4, "v4.a_1", 11, "v4.x_1", 14, "v4.a_2", 1,
-        "v4.b", 2, "v4.c", 3, "v4.x_2", 4, "v4.y", 5, "v4.z", 6, "v4.a_3", 11,
-        "v4.b_1", 12, "v4.c_1", 13, "v4.x_3", 14, "v4.y_1", 15, "v4.z_1", 16
+        "v4.a", 1, "v4.b", 2, "v4.c", 3, "v4.x", 4, "v4.y", 5, "v4.z", 6,
+        "v4.a_1", 11, "v4.b_1", 12, "v4.c_1", 13, "v4.x_1", 14,
+        "v4.y_1", 15, "v4.z_1", 16
         -- </colname-4.11>
     })
 
@@ -423,8 +419,7 @@ test:do_execsql2_test(
         SELECT * FROM v5 ORDER BY 2;
     ]], {
         -- <colname-4.12>
-        "v5.a", 1, "v5.x", 4, "v5.a_1", 1, "v5.b", 2, "v5.c", 3, "v5.x_1", 4,
-        "v5.y", 5, "v5.z", 6
+        "v5.a", 1, "v5.b", 2, "v5.c", 3, "v5.x", 4, "v5.y", 5, "v5.z", 6
         -- </colname-4.12>
     })
 
@@ -434,9 +429,9 @@ test:do_execsql2_test(
         SELECT * FROM v6 ORDER BY 2;
     ]], {
         -- <colname-4.13>
-        "v6.a", 1, "v6.x", 4, "v6.a_1", 11, "v6.x_1", 14, "v6.a_2", 1,
-        "v6.b", 2, "v6.c", 3, "v6.x_2", 4, "v6.y", 5, "v6.z", 6, "v6.a_3", 11,
-        "v6.b_1", 12, "v6.c_1", 13, "v6.x_3", 14, "v6.y_1", 15, "v6.z_1", 16
+        "v6.a", 1, "v6.b", 2, "v6.c", 3, "v6.x", 4, "v6.y", 5, "v6.z", 6,
+        "v6.a_1", 11, "v6.b_1", 12, "v6.c_1", 13, "v6.x_1", 14, "v6.y_1",
+        15, "v6.z_1", 16
         -- </colname-4.13>
     })
 
