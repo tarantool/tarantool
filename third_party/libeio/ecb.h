@@ -874,5 +874,28 @@ ecb_inline ecb_const ecb_bool ecb_little_endian (void) { return ecb_byteorder_he
 
 #endif
 
+/*****************************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+
+/* a variant of a memory allocation function, calls the original */
+/* function and panics if it fails (i.e. it never returns NULL) */
+#define ecb_alloc(size, func, args...)				\
+  ({								\
+    void *ret = func (args);					\
+    if (ecb_expect_false (ret == 0))				\
+      {								\
+        fprintf (stderr, "Can't allocate %zu bytes at %s:%d",	\
+                 size, __FILE__, __LINE__);			\
+        exit (EXIT_FAILURE);					\
+      }								\
+    ret;							\
+  })
+
+#define ecb_malloc(size)	ecb_alloc ((size), malloc, (size))
+#define ecb_calloc(n, size)	ecb_alloc ((n) * (size), calloc, (n), (size))
+#define ecb_realloc(ptr, size)	ecb_alloc ((size), realloc, (ptr), (size))
+
 #endif
 

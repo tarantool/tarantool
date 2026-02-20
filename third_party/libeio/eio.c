@@ -326,15 +326,6 @@ static void eio_destroy (eio_req *req);
 /* buffer size for various temporary buffers */
 #define EIO_BUFSIZE 65536
 
-#define dBUF					\
-  char *eio_buf = malloc (EIO_BUFSIZE);		\
-  errno = ENOMEM;				\
-  if (!eio_buf)					\
-    return -1
-
-#define FUBd					\
-  free (eio_buf)
-
 /*****************************************************************************/
 
 struct etp_tmpbuf;
@@ -661,7 +652,7 @@ static eio_ssize_t
 eio__readahead (int fd, off_t offset, size_t count, etp_worker *self)
 {
   size_t todo = count;
-  dBUF;
+  char *eio_buf = ecb_malloc (EIO_BUFSIZE);
 
   while (todo > 0)
     {
@@ -672,7 +663,7 @@ eio__readahead (int fd, off_t offset, size_t count, etp_worker *self)
       todo   -= len;
     }
 
-  FUBd;
+  free (eio_buf);
 
   /* linux's readahead basically only fails for EBADF or EINVAL (not mmappable) */
   /* but not for e.g. EIO or eof, so we also never fail */
@@ -800,7 +791,7 @@ eio__sendfile (int ofd, int ifd, off_t offset, size_t count)
       )
     {
       /* emulate sendfile. this is a major pain in the ass */
-      dBUF;
+      char *eio_buf = ecb_malloc (EIO_BUFSIZE);
 
       res = 0;
 
@@ -829,7 +820,7 @@ eio__sendfile (int ofd, int ifd, off_t offset, size_t count)
           count  -= cnt;
         }
 
-      FUBd;
+      free (eio_buf);
     }
 
   return res;
@@ -1335,7 +1326,7 @@ eio__scandir (eio_req *req, etp_worker *self)
 #ifdef _WIN32
   {
     int len = strlen ((const char *)req->ptr1);
-    char *path = malloc (MAX_PATH);
+    char *path = ecb_malloc (MAX_PATH);
     const char *fmt;
     const char *reqpath = wd_expand (&self->tmpbuf, req->wd, req->ptr1);
 
@@ -1405,11 +1396,8 @@ eio__scandir (eio_req *req, etp_worker *self)
     free (req->ptr1);
 
   req->flags |= EIO_FLAG_PTR1_FREE | EIO_FLAG_PTR2_FREE;
-  req->ptr1 = dents = flags ? malloc (dentalloc * sizeof (eio_dirent)) : 0;
-  req->ptr2 = names = malloc (namesalloc);
-
-  if (!names || (flags && !dents))
-    return;
+  req->ptr1 = dents = flags ? ecb_malloc (dentalloc * sizeof (eio_dirent)) : 0;
+  req->ptr2 = names = ecb_malloc (namesalloc);
 
   for (;;)
     {
@@ -1481,10 +1469,7 @@ eio__scandir (eio_req *req, etp_worker *self)
           while (ecb_expect_false (namesoffs + len > namesalloc))
             {
               namesalloc *= 2;
-              req->ptr2 = names = realloc (names, namesalloc);
-
-              if (!names)
-                break;
+              req->ptr2 = names = ecb_realloc (names, namesalloc);
             }
 
           memcpy (names + namesoffs, name, len);
@@ -1496,10 +1481,7 @@ eio__scandir (eio_req *req, etp_worker *self)
               if (ecb_expect_false (dentoffs == dentalloc))
                 {
                   dentalloc *= 2;
-                  req->ptr1 = dents = realloc (dents, dentalloc * sizeof (eio_dirent));
-
-                  if (!dents)
-                    break;
+                  req->ptr1 = dents = ecb_realloc (dents, dentalloc * sizeof (eio_dirent));
                 }
 
               ent = dents + dentoffs;
@@ -1649,7 +1631,7 @@ eio__wd_open_sync (struct etp_tmpbuf *tmpbuf, eio_wd wd, const char *path)
     return EIO_INVALID_WD;
 #endif
 
-  res = malloc (sizeof (*res) + len); /* one extra 0-byte */
+  res = ecb_malloc (sizeof (*res) + len); /* one extra 0-byte */
 
 #if HAVE_AT
   res->fd = fd;
@@ -1779,10 +1761,7 @@ eio_api_destroy (eio_req *req)
 #define REQ(rtype)						\
   eio_req *req;                                                 \
                                                                 \
-  req = (eio_req *)calloc (1, sizeof *req);                     \
-  if (!req)                                                     \
-    return 0;                                                   \
-                                                                \
+  req = (eio_req *)ecb_calloc (1, sizeof *req);                 \
   req->type    = rtype;                                         \
   req->pri     = pri;						\
   req->finish  = cb;						\
