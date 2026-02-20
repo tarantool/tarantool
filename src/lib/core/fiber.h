@@ -1076,7 +1076,6 @@ fiber_time_from_call(void)
 static inline void
 fiber_set_slice(struct fiber_slice slice)
 {
-	assert(cord_is_main());
 	assert(fiber_slice_is_valid(slice));
 	cord()->slice = slice;
 }
@@ -1088,7 +1087,6 @@ fiber_set_slice(struct fiber_slice slice)
 static inline void
 fiber_extend_slice(struct fiber_slice slice)
 {
-	assert(cord_is_main());
 	assert(fiber_slice_is_valid(slice));
 	cord()->slice.err += slice.err;
 	cord()->slice.warn += slice.warn;
@@ -1102,7 +1100,6 @@ fiber_extend_slice(struct fiber_slice slice)
 static inline void
 fiber_set_default_max_slice(struct fiber_slice slice)
 {
-	assert(cord_is_main());
 	assert(fiber_slice_is_valid(slice));
 	cord()->max_slice = slice;
 	if ((fiber()->flags & FIBER_CUSTOM_SLICE) == 0)
@@ -1117,7 +1114,6 @@ fiber_set_default_max_slice(struct fiber_slice slice)
 static inline void
 fiber_set_max_slice(struct fiber *fib, struct fiber_slice slice)
 {
-	assert(cord_is_main());
 	assert(fiber_slice_is_valid(slice));
 	fib->max_slice = slice;
 	fib->flags |= FIBER_CUSTOM_SLICE;
@@ -1131,7 +1127,6 @@ fiber_set_max_slice(struct fiber *fib, struct fiber_slice slice)
 static inline struct fiber_slice
 fiber_get_max_slice(struct fiber *fib)
 {
-	assert(cord_is_main());
 	return (fib->flags & FIBER_CUSTOM_SLICE) != 0 ?
 	       fib->max_slice : cord()->max_slice;
 }
@@ -1142,7 +1137,6 @@ fiber_get_max_slice(struct fiber *fib)
 static inline int
 fiber_check_slice(void)
 {
-	assert(cord_is_main());
 	double time_from_call = fiber_time_from_call();
 	struct fiber_slice slice = cord()->slice;
 	if (unlikely(slice.warn < time_from_call)) {
@@ -1240,7 +1234,7 @@ fiber_c_invoke(fiber_func f, va_list ap)
  *
  * By default is true in debug build and false otherwise.
  */
-extern bool fiber_leak_backtrace_enable;
+extern __thread bool fiber_leak_backtrace_enable;
 #endif
 
 /**
@@ -1248,7 +1242,7 @@ extern bool fiber_leak_backtrace_enable;
  *
  * By default is true if compiled with ABORT_ON_LEAK and false otherwise.
  */
-extern bool fiber_abort_on_gc_leak;
+extern __thread bool fiber_abort_on_gc_leak;
 
 /**
  * Check if region gc has no allocations except for fiber itself internal

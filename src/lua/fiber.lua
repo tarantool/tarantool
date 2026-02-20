@@ -1,9 +1,7 @@
 -- fiber.lua (internal file)
 
-local compat = require('compat')
 local fiber = require('fiber')
 local ffi = require('ffi')
-local tarantool = require('tarantool')
 ffi.cdef[[
 double
 fiber_time(void);
@@ -15,41 +13,6 @@ int64_t
 fiber_clock64(void);
 ]]
 local C = ffi.C
-
-local TIMEOUT_INFINITY = 100 * 365 * 86400
-
-local FIBER_SLICE_DEFAULT_BRIEF = [[
-Sets the default value for the max fiber slice. The old value is infinity
-(no warnings or errors). The new value is {warn = 0.5, err = 1.0}.
-
-https://tarantool.io/compat/fiber_slice_default
-]]
-
--- ASAN build is slow. Turn slice check off to suppress noisy failures
--- on exceeding slice limit in this case.
-local max_slice_default
-if tarantool.build.asan then
-    max_slice_default = TIMEOUT_INFINITY
-else
-    max_slice_default = { warn = 0.5, err = 1.0 }
-end
-
-compat.add_option({
-    name = 'fiber_slice_default',
-    default = 'new',
-    obsolete = nil,
-    brief = FIBER_SLICE_DEFAULT_BRIEF,
-    action = function(is_new)
-        local slice
-        if is_new then
-            slice = max_slice_default
-        else
-            slice = TIMEOUT_INFINITY
-        end
-        fiber.set_max_slice(slice)
-    end,
-    run_action_now = true,
-})
 
 local function fiber_time()
     return tonumber(C.fiber_time())

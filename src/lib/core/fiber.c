@@ -269,16 +269,16 @@ static __thread bool fiber_top_enabled = false;
 
 #ifdef ENABLE_BACKTRACE
 #ifndef NDEBUG
-bool fiber_leak_backtrace_enable = true;
+__thread bool fiber_leak_backtrace_enable = true;
 #else
-bool fiber_leak_backtrace_enable = false;
+__thread bool fiber_leak_backtrace_enable = false;
 #endif
 #endif
 
 #ifdef ABORT_ON_LEAK
-bool fiber_abort_on_gc_leak = true;
+__thread bool fiber_abort_on_gc_leak = true;
 #else
-bool fiber_abort_on_gc_leak = false;
+__thread bool fiber_abort_on_gc_leak = false;
 #endif
 
 #ifdef ENABLE_BACKTRACE
@@ -463,7 +463,6 @@ cord_add_garbage(struct cord *cord, struct fiber *f);
 static inline void
 cord_reset_slice(struct fiber *f)
 {
-	assert(cord_is_main());
 	cord()->call_time = clock_lowres_monotonic();
 	struct fiber_slice new_slice = cord()->max_slice;
 	if ((f->flags & FIBER_CUSTOM_SLICE) != 0)
@@ -510,8 +509,7 @@ fiber_call_impl(struct fiber *callee)
 	cord->fiber = callee;
 	callee->flags = (callee->flags & ~FIBER_IS_READY) | FIBER_IS_RUNNING;
 
-	if (cord_is_main())
-		cord_reset_slice(callee);
+	cord_reset_slice(callee);
 
 	ASAN_START_SWITCH_FIBER(asan_state, 1,
 				callee->stack,
@@ -532,8 +530,7 @@ fiber_call(struct fiber *callee)
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
 
-	if (cord_is_main())
-		cord_on_yield();
+	cord_on_yield();
 
 	clock_set_on_csw(caller);
 	callee->caller = caller;
@@ -843,10 +840,8 @@ fiber_yield_impl(MAYBE_UNUSED bool will_switch_back)
 	if (! rlist_empty(&caller->on_yield))
 		trigger_run(&caller->on_yield, NULL);
 
-	if (cord_is_main()) {
-		cord_on_yield();
-		cord_reset_slice(callee);
-	}
+	cord_on_yield();
+	cord_reset_slice(callee);
 
 	clock_set_on_csw(caller);
 
@@ -1897,10 +1892,7 @@ cord_create(struct cord *cord, const char *name)
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 
-	/* fiber.top() currently works only for the main thread. */
-	if (cord_is_main()) {
-		fiber_top_init();
-	}
+	fiber_top_init();
 	cord_set_name(name);
 
 	trigger_init_in_thread();
