@@ -3753,7 +3753,7 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
     local uid = user_or_role_resolve(name)
     opts = opts or {}
     local template = {password = 'string', if_not_exists = 'boolean',
-                      _origin = 'string'}
+                      _origin = 'string', no_default = 'boolean'}
     check_param_table(opts, template, 2)
     local origin = opts._origin or DEFAULT_ORIGIN
     local _user = box.space[box.schema.USER_ID]
@@ -3784,16 +3784,19 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
     local opts_field = user_opts_from_origins({[origin] = true})
     uid = _user:auto_increment{session.euid(), name, 'user', auth_list, {},
                                math.floor(fiber.time()), opts_field}.id
-    -- grant role 'public' to the user
-    box.schema.user.grant(uid, 'public')
-    -- Grant privilege 'alter' on itself, so that it can
-    -- change its password or username.
-    box.schema.user.grant(uid, 'alter', 'user', uid)
-    -- we have to grant global privileges from setuid function, since
-    -- only admin has the ownership over universe and we don't have
-    -- grant option
-    box.session.su('admin', box.schema.user.grant, uid, 'session,usage', 'universe',
-                   nil, {if_not_exists=true})
+    if not opts.no_default then
+        -- grant role 'public' to the user
+        box.schema.user.grant(uid, 'public')
+        -- Grant privilege 'alter' on itself, so that it can
+        -- change its password or username.
+        box.schema.user.grant(uid, 'alter', 'user', uid)
+        -- we have to grant global privileges from setuid function, since
+        -- only admin has the ownership over universe and we don't have
+        -- grant option
+        box.session.su('admin', box.schema.user.grant, uid,
+                       'session,usage', 'universe', nil,
+                       {if_not_exists=true})
+    end
 end)
 
 -- Note: we intentionally keep the semantics that `box.schema.*.exists(name)`

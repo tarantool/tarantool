@@ -1328,6 +1328,7 @@ g.test_credentials = function()
                         },
                     },
                     roles = {'one', 'two'},
+                    no_default = true,
                 },
             },
         },
