@@ -842,6 +842,17 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			if (space->upgrade != NULL && old_tuple != NULL)
 				memtx_space_upgrade_untrack_tuple(
 						space->upgrade, old_tuple);
+			if (stmt->type == IPROTO_DELETE_RANGE) {
+				struct tuple *old_tuple;
+				memtx_tuple_list_foreach(stmt->engine_savepoint,
+							 old_tuple, {
+					if (space->upgrade != NULL)
+						memtx_space_upgrade_untrack_tuple(
+							space->upgrade,
+							old_tuple);
+					tuple_unref(old_tuple);
+				});
+			}
 		}
 	}
 }
@@ -854,7 +865,12 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	(void)txn;
 	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
 	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
-	if (old_tuple == NULL && new_tuple == NULL)
+	/*
+	 * The range delete request has its deleted tuples stored in
+	 * the engine savepoint instead of the new & old tuple pair.
+	 */
+	if (old_tuple == NULL && new_tuple == NULL &&
+	    stmt->type != IPROTO_DELETE_RANGE)
 		return;
 	struct space *space = stmt->space;
 	if (space == NULL) {
@@ -870,6 +886,20 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 
 	if (space->upgrade != NULL && new_tuple != NULL)
 		memtx_space_upgrade_untrack_tuple(space->upgrade, new_tuple);
+
+	/*
+	 * Schedule unreferencing tuples in the rollback info
+	 * (this is to be done both with and without MVCC).
+	 */
+	auto unref_rollback_info_tuples = make_scoped_guard([&] {
+		if (stmt->type == IPROTO_DELETE_RANGE) {
+			struct tuple *old_tuple;
+			memtx_tuple_list_foreach(stmt->engine_savepoint,
+						 old_tuple, {
+				tuple_unref(old_tuple);
+			});
+		}
+	});
 
 	/*
 	 * With MVCC, we do not physically rollback the state of the indexes.
@@ -889,15 +919,39 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct tuple *unused;
 		struct index *index = space->index[i];
-		/* Rollback must not fail. */
-		if (memtx_index_replace(index, new_tuple, old_tuple, DUP_INSERT,
-					&unused, &unused) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
+		if (stmt->type == IPROTO_DELETE_RANGE) {
+			struct tuple *old_tuple;
+			memtx_tuple_list_foreach(stmt->engine_savepoint,
+						 old_tuple, {
+				/* Rollback must not fail. */
+				if (memtx_index_replace(index, NULL, old_tuple,
+							DUP_INSERT, &unused,
+							&unused) != 0) {
+					diag_log();
+					unreachable();
+					panic("failed to rollback"
+					      " delete_range()");
+				}
+			});
+		} else {
+			/* Rollback must not fail. */
+			if (memtx_index_replace(index, new_tuple,
+						old_tuple, DUP_INSERT,
+						&unused, &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rollback change");
+			}
 		}
 	}
 
+	if (stmt->type == IPROTO_DELETE_RANGE) {
+		struct tuple *old_tuple;
+		memtx_tuple_list_foreach(stmt->engine_savepoint, old_tuple, {
+			memtx_space_update_tuple_stat(space, NULL, old_tuple);
+			tuple_ref(old_tuple); /* Ref in the space. */
+		});
+	}
 	memtx_space_update_tuple_stat(space, new_tuple, old_tuple);
 	if (old_tuple != NULL)
 		tuple_ref(old_tuple);

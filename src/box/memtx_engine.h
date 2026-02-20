@@ -37,11 +37,14 @@
 #include <small/small.h>
 #include <small/mempool.h>
 #include <small/matras.h>
+#include <small/region.h>
+
 
 #include "engine.h"
 #include "xlog.h"
 #include "salad/stailq.h"
 #include "sysalloc.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -180,6 +183,41 @@ struct memtx_engine {
 		struct memtx_sort_data_reader *sort_data_reader;
 	} recovery;
 };
+
+/**
+ * Container for deleted tuples.
+ */
+struct memtx_tuple_list {
+	/* A deleted tuple. */
+	struct tuple *tuple;
+	/* The next one. */
+	struct memtx_tuple_list *next;
+};
+
+/**
+ * Traverse all the tuples in the list.
+ */
+#define memtx_tuple_list_foreach(list_, tuple_, code_) do { \
+		struct memtx_tuple_list *list__ = (typeof(list__))list_; \
+		while (list__ != NULL) { \
+			tuple_ = list__->tuple; \
+			code_ \
+			list__ = list__->next; \
+		} \
+} while (false)
+
+/**
+ * Add an item to the front of a MemTX delete list.
+ */
+static inline void
+memtx_tuple_list_push_front(struct memtx_tuple_list **del_list,
+			    struct tuple *tuple, struct region *region)
+{
+	struct memtx_tuple_list *next = *del_list;
+	*del_list = xregion_alloc_object(region, typeof(**del_list));
+	(*del_list)->tuple = tuple;
+	(*del_list)->next = next;
+}
 
 struct memtx_gc_task;
 

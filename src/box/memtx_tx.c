@@ -2950,6 +2950,12 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 		}
 	}
 	/* We have no stories here so reference bare tuples instead. */
+	if (stmt->type == IPROTO_DELETE_RANGE) {
+		struct tuple *old_tuple;
+		memtx_tuple_list_foreach(stmt->engine_savepoint, old_tuple, {
+			tuple_ref(old_tuple);
+		});
+	}
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
 	if (old_tuple != NULL)
