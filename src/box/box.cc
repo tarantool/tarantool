@@ -6733,6 +6733,19 @@ box_storage_shutdown()
 		diag_log();
 		panic("cannot gracefully shutdown iproto");
 	}
+
+	errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL)->bparam = false;
+	journal_sync(NULL);
+
+	struct txn *txn, *tmp;
+	rlist_foreach_entry_safe_reverse(txn, &txns, in_txns, tmp){
+		assert(in_txn() == NULL);
+	    fiber_set_txn(fiber(), txn);
+ 		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		txn_abort(txn);
+		fiber_set_txn(fiber(), NULL);
+	}
+	
 	replication_shutdown();
 	box_raft_shutdown();
 	txn_limbo_shutdown();
