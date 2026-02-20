@@ -426,6 +426,7 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .base = */ memtx_rtree_index_vtab_base,
 	/* .replace = */ memtx_rtree_index_replace,
+	/* .get_range_internal = */ generic_memtx_index_get_range_internal,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ memtx_rtree_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

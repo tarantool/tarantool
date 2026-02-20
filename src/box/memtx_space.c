@@ -681,6 +681,83 @@ out:
 	return rc;
 }
 
+static int
+memtx_space_execute_delete_range(struct space *space, struct txn *txn,
+				 struct request *request)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	/*
+	 * It might so happen that during WAL recovery secondary indexes of the
+	 * space are not yet built (it's been deyaled up until the recovery has
+	 * finished). So we won't be able to use SKs for deletion. It might be
+	 * changed in the future but let's only support range deletion through
+	 * primary key for now.
+	 */
+	if (request->index_id != 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Engine 'memtx'",
+			 "delete_range() on secondary index");
+		return -1;
+	}
+	struct index *pk = index_find(space, request->index_id);
+	if (pk == NULL)
+		return -1;
+	const char *begin_key = request->key;
+	const char *end_key = request->end_key;
+	uint32_t begin_part_count = mp_decode_array(&begin_key);
+	uint32_t end_part_count = mp_decode_array(&end_key);
+	if (range_validate(pk->def, begin_key, begin_part_count,
+			   end_key, end_part_count) != 0)
+		return -1;
+
+	/* Get the tuple range from the PK (includes MVCC). */
+	struct region *region = tx_region_acquire(txn);
+	struct tuple **tuples;
+	size_t tuple_count;
+	if (memtx_index_get_range_internal(pk, begin_key, begin_part_count,
+					   end_key, end_part_count, &tuples,
+					   &tuple_count, region) != 0)
+		return -1;
+	if (tuple_count == 0)
+		return 0;
+
+	/* Create a rollback info for the operation. */
+	struct memtx_delete_range_stmt *stmt =
+		xregion_alloc_object(region, typeof(*stmt));
+	stmt->tuples = tuples;
+	stmt->tuple_count = 0;
+
+	/* Set the rollback info in case of a failure below. */
+	struct txn_stmt *txn_stmt = txn_current_stmt(txn);
+	txn_stmt->engine_savepoint = stmt;
+
+	/* Delete the tuples. */
+	for (size_t i = 0; i < tuple_count; i++) {
+		struct tuple *old_index_tuple = tuples[i];
+		struct tuple *deleted;
+		if (memtx_space->replace(space, old_index_tuple, NULL,
+					 DUP_REPLACE_OR_INSERT,
+					 &deleted) != 0) {
+			return -1;
+		}
+		assert(deleted == old_index_tuple);
+		tuple_unref(deleted);
+		stmt->tuple_count++;
+	}
+	assert(stmt->tuple_count == tuple_count);
+
+	/* Merely to make triggers work. */
+	char data[1];
+	assert(sizeof(data) == mp_sizeof_array(0));
+	char *data_end = mp_encode_array(data, 0);
+	txn_stmt->new_tuple = tuple_new(tuple_format_runtime, data, data_end);
+	if (txn_stmt->new_tuple == NULL) {
+		diag_log();
+		panic("failed to allocate empty tuple for delete_range");
+	}
+	tuple_ref(txn_stmt->new_tuple);
+	return 0;
+}
+
 /**
  * This function simply creates new memtx tuple, refs it and calls space's
  * replace function. In constrast to original memtx_space_execute_replace(), it
@@ -1587,7 +1664,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
 	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
-	/* .execute_delete_range = */ generic_space_execute_delete_range,
+	/* .execute_delete_range = */ memtx_space_execute_delete_range,
 	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
 	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ memtx_space_ephemeral_rowid_next,

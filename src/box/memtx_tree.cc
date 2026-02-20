@@ -257,6 +257,18 @@ canonicalize_lookup(enum iterator_type *type,
 		*type = ITER_GE;
 }
 
+template <bool USE_HINT>
+struct memtx_tree_key_data<USE_HINT>
+create_key_data(const char *key, uint32_t part_count, struct key_def *key_def)
+{
+	struct memtx_tree_key_data<USE_HINT> data;
+	data.key = key;
+	data.part_count = part_count;
+	if (USE_HINT)
+		data.set_hint(key_hint(key, part_count, key_def));
+	return data;
+}
+
 template <class TREE>
 static inline struct key_def *
 memtx_tree_cmp_def(TREE *tree)
@@ -1120,19 +1132,10 @@ memtx_tree_index_quantile(struct index *base, double level,
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	struct key_def *key_def = base->def->key_def;
 
-	struct memtx_tree_key_data<USE_HINT> begin_data;
-	begin_data.key = begin_key;
-	begin_data.part_count = begin_part_count;
-	if (USE_HINT)
-		begin_data.set_hint(
-			key_hint(begin_key, begin_part_count, key_def));
-
-	struct memtx_tree_key_data<USE_HINT> end_data;
-	end_data.key = end_key;
-	end_data.part_count = end_part_count;
-	if (USE_HINT)
-		end_data.set_hint(
-			key_hint(end_key, end_part_count, key_def));
+	struct memtx_tree_key_data<USE_HINT> begin_data =
+		create_key_data<USE_HINT>(begin_key, begin_part_count, key_def);
+	struct memtx_tree_key_data<USE_HINT> end_data =
+		create_key_data<USE_HINT>(end_key, end_part_count, key_def);
 
 	size_t begin_offset;
 	memtx_tree_lower_bound_get_offset(tree, &begin_data, NULL,
@@ -1216,11 +1219,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-	struct memtx_tree_key_data<USE_HINT> start_data;
-	start_data.key = key;
-	start_data.part_count = part_count;
-	if (USE_HINT)
-		start_data.set_hint(key_hint(key, part_count, cmp_def));
+	struct memtx_tree_key_data<USE_HINT> start_data =
+		create_key_data<USE_HINT>(key, part_count, cmp_def);
 	struct memtx_tree_key_data<USE_HINT> null_after_data = {};
 	memtx_tree_iterator_t<USE_HINT> unused;
 	size_t begin_offset;
@@ -1323,11 +1323,8 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(base->def->space_id);
-	struct memtx_tree_key_data<USE_HINT> key_data;
-	key_data.key = key;
-	key_data.part_count = part_count;
-	if (USE_HINT)
-		key_data.set_hint(key_hint(key, part_count, cmp_def));
+	struct memtx_tree_key_data<USE_HINT> key_data =
+		create_key_data<USE_HINT>(key, part_count, cmp_def);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_find(&index->tree, &key_data);
 	if (res == NULL) {
@@ -1340,6 +1337,86 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index);
+	return 0;
+}
+
+template <bool USE_HINT>
+static int
+memtx_tree_index_get_range_internal(
+	struct index *base, const char *begin_key, uint32_t begin_part_count,
+	const char *end_key, uint32_t end_part_count, struct tuple ***tuples,
+	size_t *tuple_count, struct region *region)
+{
+	assert((base->def->opts.hint == INDEX_HINT_ON) == USE_HINT);
+
+	/* Lookup the range borders. */
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+	memtx_tree_t<USE_HINT> *tree = &index->tree;
+	struct key_def *key_def = base->def->key_def;
+	struct memtx_tree_key_data<USE_HINT> begin_data =
+		create_key_data<USE_HINT>(begin_key, begin_part_count, key_def);
+	struct memtx_tree_key_data<USE_HINT> end_data =
+		create_key_data<USE_HINT>(end_key, end_part_count, key_def);
+	size_t begin_offset;
+	memtx_tree_iterator_t<USE_HINT> begin_iterator =
+		memtx_tree_lower_bound_get_offset(tree, &begin_data,
+						  NULL, &begin_offset);
+	size_t end_offset;
+	memtx_tree_iterator_t<USE_HINT> end_iterator;
+	if (end_data.part_count > 0) {
+		end_iterator = memtx_tree_lower_bound_get_offset(
+				tree, &end_data, NULL, &end_offset);
+	} else {
+		end_offset = memtx_tree_size(tree);
+		invalidate_tree_iterator(&end_iterator);
+	}
+	assert(end_offset >= begin_offset);
+
+	/* Nothing to get. */
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	struct memtx_tree_data<USE_HINT> until_data = {};
+	if (!memtx_tree_iterator_is_invalid(&end_iterator)) {
+		until_data = *memtx_tree_iterator_get_elem(
+				tree, &end_iterator);
+	}
+	if (end_offset == begin_offset) {
+		/*
+		 * We've found nothing in the range: any insertion into it
+		 * must lead to a conflict with the current transaction.
+		 */
+		memtx_tx_track_count_until(txn, space, base, ITER_GE,
+					   begin_data.key,
+					   begin_data.part_count,
+					   until_data.tuple, until_data.hint);
+		*tuple_count = 0;
+		return 0;
+	}
+
+	/* Get all the tuples. */
+	size_t full_count = end_offset - begin_offset;
+	uint32_t invisible_count =
+		memtx_tx_index_invisible_count_matching_until(
+			txn, space, base, ITER_GE,
+			begin_data.key, begin_data.part_count,
+			until_data.tuple, until_data.hint);
+	*tuple_count = full_count - invisible_count;
+	*tuples = xregion_alloc_array(region, typeof(**tuples), *tuple_count);
+	for (size_t i = 0; i < full_count; i++) {
+		struct memtx_tree_data<USE_HINT> *data =
+			memtx_tree_iterator_get_elem(tree, &begin_iterator);
+		memtx_tree_iterator_next(tree, &begin_iterator);
+		if (!memtx_tx_tuple_key_is_visible(txn, space, base,
+						   data->tuple))
+			continue;
+		bool is_multikey = base->def->key_def->is_multikey;
+		uint32_t mk_index = is_multikey ? (uint32_t)data->hint : 0;
+		(*tuples)[i] = memtx_tx_tuple_clarify(txn, space, data->tuple,
+						      base, mk_index);
+	}
+	assert(memtx_tree_iterator_is_equal(tree, &begin_iterator,
+					    &end_iterator));
 	return 0;
 }
 
@@ -2690,6 +2767,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 static const struct memtx_index_vtab memtx_tree_disabled_index_vtab = {
 	/* .base = */ memtx_tree_disabled_index_vtab_base,
 	/* .replace = */ memtx_tree_disabled_index_replace,
+	/* .get_range_internal = */ generic_memtx_index_get_range_internal,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ memtx_tree_disabled_index_build_next,
@@ -2761,6 +2839,8 @@ get_memtx_tree_index_vtab(void)
 		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
 				 is_func ? memtx_tree_func_index_replace :
 				 memtx_tree_index_replace<USE_HINT>,
+		/* .get_range_internal = */
+			memtx_tree_index_get_range_internal<USE_HINT>,
 		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
 		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
 		/* .build_next = */ is_mk ? memtx_tree_index_build_next_multikey :
