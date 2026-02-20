@@ -105,6 +105,7 @@
 #include "event.h"
 #include "tweaks.h"
 #include "memtx_tx.h"
+#include "index_build.h"
 
 static char status[64] = "unconfigured";
 
@@ -6712,6 +6713,7 @@ box_init(void)
 	builtin_events_init();
 	crash_callback = box_crash_callback;
 	memtx_tx_manager_init();
+	index_build_init();
 }
 
 void
@@ -6776,6 +6778,7 @@ box_shutdown(void)
 void
 box_free(void)
 {
+	index_build_free();
 	/* Free tx manager resources - space cache must not use them. */
 	memtx_tx_manager_free();
 	/* References engines. */

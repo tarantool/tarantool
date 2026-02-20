@@ -71,6 +71,7 @@
 #include "column_mask.h"
 #include "trigger.h"
 #include "wal.h" /* wal_mode() */
+#include "index_build.h"
 
 /**
  * Yield after iterating over this many objects (e.g. ranges).
@@ -4042,6 +4043,30 @@ err_key:
 }
 
 static int
+vinyl_index_get_internal(struct index *index, const char *key,
+			 uint32_t part_count, struct tuple **ret)
+{
+	assert(index->def->opts.is_unique);
+	assert(index->def->key_def->part_count == part_count);
+
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_env *env = vy_env(index->engine);
+	int rc = vy_get_by_raw_key(lsm, NULL, &env->xm->p_global_read_view,
+				   key, part_count, ret);
+	if (rc != 0)
+		return -1;
+	if (*ret != NULL) {
+		static struct tuple *internal_tuple_last = NULL;
+		/* Remove previous tuple */
+		if (likely(internal_tuple_last != NULL))
+			tuple_unref(internal_tuple_last);
+		/* Remember current tuple */
+		internal_tuple_last = *ret;
+	}
+	return 0;
+}
+
+static int
 vinyl_index_get(struct index *index, const char *key,
 		uint32_t part_count, struct tuple **ret)
 {
@@ -4076,93 +4101,14 @@ vinyl_index_get(struct index *index, const char *key,
 	return 0;
 }
 
+static int
+vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
+		      struct tuple_format *new_format,
+		      bool check_unique_constraint, struct tuple *tuple);
+
 /*** }}} Cursor */
 
 /* {{{ Index build */
-
-/** Argument passed to vy_build_on_replace(). */
-struct vy_build_ctx {
-	/** LSM tree under construction. */
-	struct vy_lsm *lsm;
-	/** Format to check new tuples against. */
-	struct tuple_format *format;
-	/**
-	 * Check the unique constraint of the new index
-	 * if this flag is set.
-	 */
-	bool check_unique_constraint;
-	/** Set in case a build error occurred. */
-	bool is_failed;
-	/** Container for storing errors. */
-	struct diag diag;
-};
-
-/**
- * This is an on_replace trigger callback that forwards DML requests
- * to the index that is currently being built.
- */
-static int
-vy_build_on_replace(struct trigger *trigger, void *event)
-{
-	struct txn *txn = event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	struct vy_build_ctx *ctx = trigger->data;
-	struct tuple_format *format = ctx->format;
-	struct vy_lsm *lsm = ctx->lsm;
-	struct vy_tx *tx = txn->engines_tx[lsm->base.engine->id];
-
-	if (ctx->is_failed)
-		return 0; /* already failed, nothing to do */
-
-	/* Check new tuples for conformity to the new format. */
-	if (stmt->new_tuple != NULL &&
-	    tuple_validate(format, stmt->new_tuple) != 0)
-		goto err;
-
-	/* Check key uniqueness if necessary. */
-	if (ctx->check_unique_constraint && stmt->new_tuple != NULL &&
-	    vy_check_is_unique_secondary(tx, vy_tx_read_view(tx),
-					 lsm, stmt->new_tuple) != 0)
-		goto err;
-
-	/* Forward the statement to the new LSM tree. */
-	if (stmt->old_tuple != NULL) {
-		struct tuple *delete = vy_stmt_new_surrogate_delete(format,
-							stmt->old_tuple);
-		if (delete == NULL)
-			goto err;
-		int rc = vy_tx_set(tx, lsm, delete);
-		tuple_unref(delete);
-		if (rc != 0)
-			goto err;
-	}
-	if (stmt->new_tuple != NULL) {
-		uint32_t data_len;
-		const char *data = tuple_data_range(stmt->new_tuple, &data_len);
-		struct tuple *insert = vy_stmt_new_insert(format, data,
-							  data + data_len);
-		if (insert == NULL)
-			goto err;
-		int rc = vy_tx_set(tx, lsm, insert);
-		tuple_unref(insert);
-		if (rc != 0)
-			goto err;
-	}
-	return 0;
-err:
-	/*
-	 * No need to abort the DDL request if this transaction
-	 * has been aborted as its changes won't be applied to
-	 * the space anyway. Besides, it might have been aborted
-	 * by the DDL request itself, in which case the build
-	 * context isn't valid and so we must not modify it.
-	 */
-	if (tx->state == VINYL_TX_ABORT)
-		return 0;
-	ctx->is_failed = true;
-	diag_move(diag_get(), &ctx->diag);
-	return 0;
-}
 
 /**
  * Insert a single statement into the LSM tree that is currently
@@ -4425,6 +4371,76 @@ vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
 }
 
 static int
+vinyl_index_build_replace_confirmed(struct index *index, struct tuple *tuple)
+{
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_env *env = vy_env(index->engine);
+	return vy_build_insert_tuple(env, lsm, lsm->mem_format, false, tuple);
+}
+
+static int
+vinyl_index_build_replace_in_progress(struct index *index,
+				      struct tuple *old_tuple,
+				      struct tuple *new_tuple)
+{
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct txn *txn = in_txn();
+	assert(txn != NULL);
+	struct vy_tx *tx = txn->engines_tx[index->engine->id];
+	if (tx == NULL || tx->state == VINYL_TX_ABORT) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+	if (old_tuple != NULL) {
+		struct tuple *delete =
+			vy_stmt_new_surrogate_delete(lsm->mem_format,
+						     old_tuple);
+		if (delete == NULL)
+			return -1;
+		int rc = vy_tx_set(tx, lsm, delete);
+		tuple_unref(delete);
+		if (rc != 0)
+			return -1;
+	}
+	if (new_tuple != NULL) {
+		uint32_t data_len;
+		const char *data = tuple_data_range(new_tuple, &data_len);
+		struct tuple *insert =
+			vy_stmt_new_insert(lsm->mem_format, data,
+					   data + data_len);
+		if (insert == NULL)
+			return -1;
+		int rc = vy_tx_set(tx, lsm, insert);
+		tuple_unref(insert);
+		if (rc != 0)
+			return -1;
+	}
+	return 0;
+}
+
+/*
+ * Dump the new index upon build completion so that we don't
+ * have to rebuild it on recovery. No need to trigger dump if
+ * the space happens to be empty.
+ */
+static int
+vinyl_index_build_finalize(struct index *index)
+{
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_env *env = vy_env(index->engine);
+	if (!vy_lsm_is_empty(lsm))
+		return vy_scheduler_dump(&env->scheduler);
+	return 0;
+}
+
+static const struct index_build_vtab vinyl_index_build_vtab = {
+	.replace_confirmed = vinyl_index_build_replace_confirmed,
+	.replace_in_progress = vinyl_index_build_replace_in_progress,
+	.rollback = generic_index_build_rollback,
+	.finalize = vinyl_index_build_finalize
+};
+
+static int
 vinyl_space_build_index(struct space *src_space, struct index *new_index,
 			struct tuple_format *new_format,
 			bool check_unique_constraint)
@@ -4432,12 +4448,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	struct vy_env *env = vy_env(src_space->engine);
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
 	struct txn *txn = in_txn();
-
-	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
-	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
-		diag_set(ClientError, ER_INJECTION, "build index");
-		return -1;
-	}
 
 	if (vinyl_index_open(new_index) != 0)
 		return -1;
@@ -4450,6 +4460,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
 		return vy_build_recover(env, new_lsm, pk);
 
+	/* TODO: remove (added only for vinyl/ddl.test.lua) */
 	/*
 	 * Transactions started before the space alter request can't
 	 * be checked with on_replace trigger so we abort them.
@@ -4459,6 +4470,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 
 	if (!need_wal_sync && vy_lsm_is_empty(pk))
 		return 0; /* space is empty, nothing to do */
+	/* TODO: remove (added only for vinyl/ddl.test.lua) */
 
 	if (new_index->def->iid == 0) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
@@ -4466,111 +4478,20 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		return -1;
 	}
 
+	/* TODO: remove when build is detached from transaction */
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
+	/* TODO: remove when build is detached from transaction */
+	space_invalidate(src_space);
 
-	/*
-	 * Iterate over all tuples stored in the space and insert
-	 * each of them into the new LSM tree. Since read iterator
-	 * may yield, we install an on_replace trigger to forward
-	 * DML requests issued during the build.
-	 */
-	struct trigger on_replace;
-	struct vy_build_ctx ctx;
-	ctx.lsm = new_lsm;
-	ctx.format = new_format;
-	ctx.check_unique_constraint = check_unique_constraint;
-	ctx.is_failed = false;
-	diag_create(&ctx.diag);
-	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
-	trigger_add(&src_space->on_replace, &on_replace);
-
-	/*
-	 * Flush transactions waiting on WAL after installing on_replace
-	 * trigger so that changes made by newer transactions are checked
-	 * by the trigger callback.
-	 */
-	int rc;
-	if (need_wal_sync) {
-		rc = journal_sync(NULL);
-		if (rc != 0)
-			goto out;
-	}
-
-	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, pk, NULL, ITER_GE, pk->env->empty_key,
-			      &env->xm->p_committed_read_view);
-	int loops = 0;
-	struct vy_entry entry;
-	int64_t build_lsn = env->xm->lsn;
-	while ((rc = vy_read_iterator_next(&itr, &entry)) == 0) {
-		struct tuple *tuple = entry.stmt;
-		if (tuple == NULL)
-			break;
-		/*
-		 * Insert the tuple into the new index unless it
-		 * was inserted into the space after we started
-		 * building the new index - in the latter case
-		 * the new tuple has already been inserted by the
-		 * on_replace trigger.
-		 *
-		 * Note, yield is not allowed between reading the
-		 * tuple from the primary index and inserting it
-		 * into the new index. If we yielded, the tuple
-		 * could be overwritten by a concurrent transaction,
-		 * in which case we would insert an outdated tuple.
-		 */
-		if (vy_stmt_lsn(tuple) <= build_lsn) {
-			rc = vy_build_insert_tuple(env, new_lsm, new_format,
-						   check_unique_constraint,
-						   tuple);
-			if (rc != 0)
-				break;
-		}
-		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
-				    thread_sleep(inj->dparam));
-		/*
-		 * Read iterator yields only when it reads runs.
-		 * Yield periodically in order not to stall the
-		 * tx thread in case there are a lot of tuples in
-		 * mems or cache.
-		 */
-		if (++loops % VY_YIELD_LOOPS == 0) {
-			fiber_sleep(0);
-			if (fiber_is_cancelled()) {
-				diag_set(FiberIsCancelled);
-				rc = -1;
-				break;
-			}
-		}
-		if (ctx.is_failed) {
-			diag_move(&ctx.diag, diag_get());
-			rc = -1;
-			break;
-		}
-		/*
-		 * Sleep after one tuple is inserted to test
-		 * on_replace triggers for index build.
-		 */
-		ERROR_INJECT_YIELD(ERRINJ_BUILD_INDEX_DELAY);
-	}
-	vy_read_iterator_close(&itr);
-
-	/*
-	 * Dump the new index upon build completion so that we don't
-	 * have to rebuild it on recovery. No need to trigger dump if
-	 * the space happens to be empty.
-	 */
-	if (rc == 0 && !vy_lsm_is_empty(new_lsm))
-		rc = vy_scheduler_dump(&env->scheduler);
-
-	if (rc == 0 && ctx.is_failed) {
-		diag_move(&ctx.diag, diag_get());
-		rc = -1;
-	}
-out:
-	diag_destroy(&ctx.diag);
-	trigger_clear(&on_replace);
+	trigger_clear(&txn->fiber_on_yield);
+	fiber_set_txn(fiber(), NULL);
+	int rc = index_build(src_space, new_index, new_format,
+			     check_unique_constraint,
+			     &vinyl_index_build_vtab,
+			     true, VY_YIELD_LOOPS, need_wal_sync);
+	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+	fiber_set_txn(fiber(), txn);
 	return rc;
 }
 
@@ -4781,6 +4702,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .free = */ vinyl_engine_free,
 	/* .shutdown = */ vinyl_engine_shutdown,
 	/* .create_space = */ vinyl_engine_create_space,
+	/* .tuple_validate = */ generic_engine_tuple_validate,
 	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ vinyl_engine_prepare_join,
 	/* .join = */ vinyl_engine_join,
@@ -4852,7 +4774,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
+	/* .get_internal = */ vinyl_index_get_internal,
 	/* .get = */ vinyl_index_get,
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_iterator_with_offset = */

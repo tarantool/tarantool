@@ -342,6 +342,16 @@ journal_write(struct journal_entry *entry)
 static inline int
 journal_sync(struct vclock *out)
 {
+	/*
+	 * During bootstrap and some recovery stages we use a stub journal which
+	 * doesn't support sync (current_journal->sync == NULL). In this case,
+	 * journal_sync() should be a no-op barrier rather than a segfault.
+	 */
+	if (current_journal == NULL || current_journal->sync == NULL) {
+		if (out != NULL)
+			vclock_create(out);
+		return 0;
+	}
 	return current_journal->sync(current_journal, out);
 }
 
