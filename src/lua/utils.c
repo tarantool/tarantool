@@ -1126,6 +1126,9 @@ tarantool_lua_utils_init(struct lua_State *L)
  */
 void cord_on_yield(void)
 {
+	if (tarantool_L == NULL)
+		return;
+
 	struct global_State *g = G(tarantool_L);
 	/*
 	 * XXX: Switching fibers while running the trace leads to
