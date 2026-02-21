@@ -1,5 +1,6 @@
 local schema = require('experimental.config.utils.schema')
 local descriptions = require('internal.config.descriptions')
+local deprecations = require('internal.config.deprecations')
 local tarantool = require('tarantool')
 local urilib = require('uri')
 local file = require('internal.config.utils.file')
@@ -2349,5 +2350,6 @@ return schema.new('instance_config', schema.record({
     },
     _extra_annotations = {
         descriptions = descriptions.instance_descriptions,
+        deprecations = deprecations.instance_deprecations,
     }
 })
