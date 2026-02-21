@@ -261,6 +261,12 @@ wal_write_vy_log(struct journal_entry *req);
 void
 wal_rotate_vy_log(void);
 
+/**
+ * Forcing WAL writer into rollback state
+ */
+void
+wal_force_rollback(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
