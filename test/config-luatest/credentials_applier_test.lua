@@ -4,15 +4,11 @@ local t = require('luatest')
 local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = helpers.group()
 
 local internal = require('internal.config.applier.credentials')._internal
-
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
 
 -- Collect delayed grant alerts and transform to
 -- '<space> <permission>' form.
@@ -1211,7 +1207,7 @@ end
 --
 -- Create a space and rename it to a space that should have the
 -- same privileges.
-g.test_space_rename_rw2rw = function(g)
+g.test_space_rename_rw2rw = function()
     -- Create a configuration with privileges for two spaces.
     local config = cbuilder:new()
         :add_instance('i-001', {})
@@ -1227,7 +1223,7 @@ g.test_space_rename_rw2rw = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     define_warnings_function(cluster['i-001'])
     define_assert_priv_function(cluster['i-001'])
@@ -1286,7 +1282,7 @@ end
 --
 -- Create a space with the 'read' privilege and rename it to a
 -- space that should have 'read,write' privileges.
-g.test_space_rename_r2rw = function(g)
+g.test_space_rename_r2rw = function()
     -- Create a configuration with different privileges for two
     -- spaces.
     local config = cbuilder:new()
@@ -1303,7 +1299,7 @@ g.test_space_rename_r2rw = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     define_warnings_function(cluster['i-001'])
     define_assert_priv_function(cluster['i-001'])
@@ -1359,7 +1355,7 @@ end
 --
 -- Create a space with 'read,write' privileges and rename it to a
 -- space that should have just 'read' privilege.
-g.test_space_rename_rw2r = function(g)
+g.test_space_rename_rw2r = function()
     -- Create a configuration with different privileges for two
     -- spaces.
     local config = cbuilder:new()
@@ -1376,7 +1372,7 @@ g.test_space_rename_rw2r = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     define_warnings_function(cluster['i-001'])
     define_assert_priv_function(cluster['i-001'])
@@ -1429,7 +1425,7 @@ end
 
 -- Verify that the config status does not change if there are pending
 -- alerts when some missed_privilege alerts are dropped.
-g.test_fix_status_change_with_pending_warnings = function(g)
+g.test_fix_status_change_with_pending_warnings = function()
     -- Create a configuration with privileges for two missing spaces.
     local config = cbuilder:new()
         :add_instance('i-001', {})
@@ -1441,7 +1437,7 @@ g.test_fix_status_change_with_pending_warnings = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
     define_warnings_function(cluster['i-001'])
 
@@ -1483,7 +1479,7 @@ end
 
 -- Verify that it is possible to assign a credential role that does not exist.
 -- And that this role will be correctly assigned when it is created.
-g.test_set_nonexistent_role = function(g)
+g.test_set_nonexistent_role = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.roles.role_one', {
@@ -1491,7 +1487,7 @@ g.test_set_nonexistent_role = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify that an alert is set for delayed privilege grants
@@ -1521,7 +1517,7 @@ end
 
 -- Verify that alert does not go away if the user is created with a given name
 -- instead of a role.
-g.test_set_user_instead_of_role = function(g)
+g.test_set_user_instead_of_role = function()
     local config = cbuilder:new()
         :add_instance('i-001', {})
         :set_global_option('credentials.users.user_one', {
@@ -1529,7 +1525,7 @@ g.test_set_user_instead_of_role = function(g)
         })
         :config()
 
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     -- Verify that the alert is set.

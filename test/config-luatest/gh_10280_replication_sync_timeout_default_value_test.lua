@@ -1,19 +1,15 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
-local cluster = require('test.config-luatest.cluster')
+local cluster = require('luatest.cluster')
 
 local g = t.group()
 
-g.before_all(cluster.init)
-g.after_each(cluster.drop)
-g.after_all(cluster.clean)
-
-g.test_sync_timeout_value_new = function(g)
+g.test_sync_timeout_value_new = function()
     local config = cbuilder:new()
         :set_global_option('compat.box_cfg_replication_sync_timeout', 'new')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -21,12 +17,12 @@ g.test_sync_timeout_value_new = function(g)
     end)
 end
 
-g.test_sync_timeout_value_old = function(g)
+g.test_sync_timeout_value_old = function()
     local config = cbuilder:new()
         :set_global_option('compat.box_cfg_replication_sync_timeout', 'old')
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
@@ -34,12 +30,12 @@ g.test_sync_timeout_value_old = function(g)
     end)
 end
 
-g.test_sync_timeout_value_reload = function(g)
+g.test_sync_timeout_value_reload = function()
     local config = cbuilder:new()
         :set_global_option('replication.sync_timeout', 5)
         :add_instance('i-001', {})
         :config()
-    local cluster = cluster.new(g, config)
+    local cluster = cluster:new(config)
     cluster:start()
 
     cluster['i-001']:exec(function()
