@@ -16,7 +16,13 @@ g.before_all(function(cg)
             server.build_listen_uri('node1', cg.cluster.id),
             server.build_listen_uri('node2', cg.cluster.id)
         },
-        election_mode = 'candidate'
+        election_mode = 'candidate',
+        -- When replica wants to change its name, it will reconnect. There is a
+        -- moment of time when the replica closed the old connection, before it
+        -- made a new one. And the leader might notice that it lost the quorum
+        -- of subscribers, and resign. Then the replica won't be able to change
+        -- its name.
+        election_fencing_mode = 'off',
     }
     cg.node1 = cg.cluster:build_and_add_server({alias = 'node1', box_cfg = cfg})
     cg.node2 = cg.cluster:build_and_add_server({alias = 'node2', box_cfg = cfg})
