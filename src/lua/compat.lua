@@ -6,6 +6,7 @@ local OLD = false
 
 local ffi = require('ffi')
 local tweaks = require('internal.tweaks')
+local tarantool = require('tarantool')
 
 ffi.cdef[[
     /**
@@ -40,6 +41,13 @@ as single text block which is handier for the reader, but may be incompatible
 with some existing applications that rely on the old style.
 
 https://tarantool.io/compat/yaml_pretty_multiline
+]]
+
+local FIBER_SLICE_DEFAULT_BRIEF = [[
+Sets the default value for the max fiber slice. The old value is infinity
+(no warnings or errors). The new value is {warn = 0.5, err = 1.0}.
+
+https://tarantool.io/compat/fiber_slice_default
 ]]
 
 local FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF = [[
@@ -206,6 +214,20 @@ local options = {
         obsolete = nil,
         brief = YAML_PRETTY_MULTILINE_BRIEF,
         action = tweak_action('yaml_pretty_multiline', false, true),
+    },
+    fiber_slice_default = {
+        default = 'new',
+        obsolete = nil,
+        brief = FIBER_SLICE_DEFAULT_BRIEF,
+        action = function(is_new)
+            local slice = 100 * 365 * 86400 -- TIMEOUT_INFINITY
+            -- ASAN build is slow. Turn slice check off to suppress noisy
+            -- failures on exceeding slice limit in this case.
+            if is_new and not tarantool.build.asan then
+                slice = {warn = 0.5, err = 1.0}
+            end
+            require('fiber').set_max_slice(slice)
+        end,
     },
     fiber_channel_close_mode = {
         default = 'new',
