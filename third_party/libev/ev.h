@@ -551,7 +551,7 @@ EV_API_DECL void ev_sleep (ev_tstamp delay) EV_NOEXCEPT; /* sleep for a while */
  * or take some potentially destructive action.
  * The default is your system realloc function.
  */
-EV_API_DECL void ev_set_allocator (void *(*cb)(void *ptr, long size) EV_NOEXCEPT) EV_NOEXCEPT;
+EV_API_DECL void ev_set_allocator (void *(*cb)(void *ptr, size_t size) EV_NOEXCEPT) EV_NOEXCEPT;
 
 /* set the callback function to call on a
  * retryable syscall error
