@@ -570,7 +570,7 @@ namespace ev {
     return ev_embeddable_backends ();
   }
 
-  inline void set_allocator (void *(*cb)(void *ptr, long size) EV_NOEXCEPT) EV_NOEXCEPT
+  inline void set_allocator (void *(*cb)(void *ptr, size_t size) EV_NOEXCEPT) EV_NOEXCEPT
   {
     ev_set_allocator (cb);
   }

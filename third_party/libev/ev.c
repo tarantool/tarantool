@@ -2022,7 +2022,7 @@ ev_syserr (const char *msg)
 }
 
 static void *
-ev_realloc_emul (void *ptr, long size) EV_NOEXCEPT
+ev_realloc_emul (void *ptr, size_t size) EV_NOEXCEPT
 {
   /* some systems, notably openbsd and darwin, fail to properly
    * implement realloc (x, 0) (as required by both ansi c-89 and
@@ -2038,17 +2038,17 @@ ev_realloc_emul (void *ptr, long size) EV_NOEXCEPT
   return 0;
 }
 
-static void *(*alloc)(void *ptr, long size) EV_NOEXCEPT = ev_realloc_emul;
+static void *(*alloc)(void *ptr, size_t size) EV_NOEXCEPT = ev_realloc_emul;
 
 ecb_cold
 void
-ev_set_allocator (void *(*cb)(void *ptr, long size) EV_NOEXCEPT) EV_NOEXCEPT
+ev_set_allocator (void *(*cb)(void *ptr, size_t size) EV_NOEXCEPT) EV_NOEXCEPT
 {
   alloc = cb;
 }
 
 inline_speed void *
-ev_realloc (void *ptr, long size)
+ev_realloc (void *ptr, size_t size)
 {
   ptr = alloc (ptr, size);
 
@@ -2258,14 +2258,14 @@ ev_sleep (ev_tstamp delay) EV_NOEXCEPT
 inline_size int
 array_nextsize (int elem, int cur, int cnt)
 {
-  int ncur = cur + 1;
+  size_t ncur = cur + 1;
 
   do
     ncur <<= 1;
   while (cnt > ncur);
 
   /* if size is large, round to MALLOC_ROUND - 4 * longs to accommodate malloc overhead */
-  if (elem * ncur > MALLOC_ROUND - sizeof (void *) * 4)
+  if (ncur * elem > MALLOC_ROUND - sizeof (void *) * 4)
     {
       ncur *= elem;
       ncur = (ncur + elem + (MALLOC_ROUND - 1) + sizeof (void *) * 4) & ~(MALLOC_ROUND - 1);
@@ -2273,6 +2273,15 @@ array_nextsize (int elem, int cur, int cnt)
       ncur /= elem;
     }
 
+  if (ncur > INT_MAX)
+    {
+#if EV_AVOID_STDIO
+      ev_printerr ("(libev) too many objects to be allocated, aborting.\n");
+#else
+      fprintf (stderr, "(libev) cannot allocate %ld objects, aborting.", ncur);
+#endif
+      abort ();
+    }
   return ncur;
 }
 
@@ -2281,7 +2290,7 @@ static void *
 array_realloc (int elem, void *base, int *cur, int cnt)
 {
   *cur = array_nextsize (elem, *cur, cnt);
-  return ev_realloc (base, elem * *cur);
+  return ev_realloc (base, (size_t)*cur * elem);
 }
 
 #define array_needsize_noinit(base,offset,count)
