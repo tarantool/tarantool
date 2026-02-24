@@ -2166,6 +2166,16 @@ return schema.new('instance_config', schema.record({
         }, {
             validate = validators['failover.metrics'],
         })),
+        iproto = enterprise_edition(schema.record({
+            ssl = schema.record({
+                ca_file = schema.scalar({ type = 'string' }),
+                ssl_cert = schema.scalar({ type = 'string' }),
+                ssl_key = schema.scalar({ type = 'string' }),
+                ssl_ciphers = schema.scalar({ type = 'string' }),
+                ssl_password = schema.scalar({ type = 'string' }),
+                ssl_password_file = schema.scalar({ type = 'string' }),
+            }),
+        })),
     }, {
         validate = validators['failover'],
     }),
