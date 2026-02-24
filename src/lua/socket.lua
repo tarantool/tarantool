@@ -1143,7 +1143,9 @@ local function tcp_server_handler(server, sc, from)
     end
 end
 
-local function tcp_server_loop(server, s, addr)
+local function tcp_server_loop_impl(server, s, addr)
+    addr = addr or socket_name(s) or { host = '?', port = '?' }
+
     fiber.name(format("%s/%s:%s", server.name, addr.host, addr.port), {truncate = true})
     log.info("started")
     while socket_readable(s) do
@@ -1170,6 +1172,14 @@ end
 
 local function tcp_server_usage()
     error('Usage: socket.tcp_server(host, port, handler | opts)')
+end
+
+local function tcp_server_create_usage()
+    error('Usage: socket.tcp_server_create(host, port, prepare | opts)')
+end
+
+local function tcp_server_loop_usage()
+    error('Usage: socket.tcp_server_loop(socket, handler | opts)')
 end
 
 local function tcp_server_do_bind(s, addr)
@@ -1225,7 +1235,6 @@ local function tcp_server_bind_addr(s, addr)
     return tcp_server_do_bind(s, addr)
 end
 
-
 local function tcp_server_bind(host, port, prepare, timeout)
     timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
     local dns, err
@@ -1266,12 +1275,62 @@ local function tcp_server_bind(host, port, prepare, timeout)
     return nil, boxerrno.strerror()
 end
 
+local function tcp_server_create_impl(host, port, prepare, timeout)
+    local s, addr = tcp_server_bind(host, port, prepare, timeout)
+    if not s then
+        -- addr is error message now.
+        return nil, addr
+    end
+    return s, addr
+end
+
+local function tcp_server_create(host, port, opts, timeout)
+    local prepare
+    if type(opts) == 'function' then
+        prepare = opts
+    elseif type(opts) == 'table' then
+        if opts.prepare ~= nil and
+            type(opts.prepare) ~= 'function' then
+            tcp_server_create_usage()
+        end
+        prepare = opts.prepare
+    else
+        tcp_server_create_usage()
+    end
+    return tcp_server_create_impl(host, port, prepare, timeout)
+end
+
+local function tcp_server_loop(s, opts)
+    local server = {}
+    if type(opts) == 'function' then
+        server.handler = opts
+    elseif type(opts) == 'table' then
+        if type(opts.handler) ~= 'function' then
+            tcp_server_loop_usage()
+        end
+        for k, v in pairs(opts) do
+            server[k] = v
+        end
+    else
+        tcp_server_loop_usage()
+    end
+    if type(server.handler) ~= 'function' then
+        tcp_server_loop_usage()
+    end
+    server.name = server.name or 'server'
+
+    if type(s) == 'number' then
+        s = socket_from_fd(s)
+    end
+    return tcp_server_loop_impl(server, s)
+end
+
 local function tcp_server(host, port, opts, timeout)
     local server = {}
     if type(opts) == 'function' then
         server.handler = opts
     elseif type(opts) == 'table' then
-        if type(opts.handler) ~='function' or (opts.prepare ~= nil and
+        if type(opts.handler) ~= 'function' or (opts.prepare ~= nil and
             type(opts.prepare) ~= 'function') then
             tcp_server_usage()
         end
@@ -1281,13 +1340,20 @@ local function tcp_server(host, port, opts, timeout)
     else
         tcp_server_usage()
     end
+    if type(server.handler) ~= 'function' then
+        tcp_server_usage()
+    end
     server.name = server.name or 'server'
-    local s, addr = tcp_server_bind(host, port, server.prepare, timeout)
+    local s, addr = tcp_server_create_impl(
+        host,
+        port,
+        server.prepare,
+        timeout
+    )
     if not s then
-        -- addr is error message now.
         return nil, addr
     end
-    fiber.create(tcp_server_loop, server, s, addr)
+    fiber.create(tcp_server_loop_impl, server, s, addr)
     return s, addr
 end
 
@@ -1654,6 +1720,8 @@ return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
     tcp_server = tcp_server,
+    tcp_server_create = tcp_server_create,
+    tcp_server_loop = tcp_server_loop,
     iowait = internal.iowait,
     internal = internal,
 }, {
