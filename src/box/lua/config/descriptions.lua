@@ -1782,6 +1782,33 @@ I['iproto.threads'] = format_text([[
 
 -- }}} iproto configuration
 
+-- {{{ failover.iproto configuration
+
+I['failover.iproto'] = format_text([[
+    IPROTO connection parameters for the failover coordinator. This
+    functionality is available only in Tarantool Enterprise.
+]])
+
+I['failover.iproto.ssl'] = format_text([[
+    SSL parameters used by the failover coordinator to connect to instances
+    over IPROTO when SSL is enabled. This functionality is available only in
+    Tarantool Enterprise.
+]])
+
+I['failover.iproto.ssl.ca_file'] = I['iproto.ssl.ca_file']
+
+I['failover.iproto.ssl.ssl_cert'] = I['iproto.ssl.ssl_cert']
+
+I['failover.iproto.ssl.ssl_key'] = I['iproto.ssl.ssl_key']
+
+I['failover.iproto.ssl.ssl_ciphers'] = I['iproto.ssl.ssl_ciphers']
+
+I['failover.iproto.ssl.ssl_password'] = I['iproto.ssl.ssl_password']
+
+I['failover.iproto.ssl.ssl_password_file'] = I['iproto.ssl.ssl_password_file']
+
+-- }}} failover.iproto configuration
+
 -- {{{ isolated configuration
 
 I['isolated'] = format_text([[

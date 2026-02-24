@@ -1910,6 +1910,16 @@ g.test_failover = function()
                 },
             },
         }
+        iconfig.failover.iproto = {
+            ssl = {
+                ca_file = 'one',
+                ssl_cert = 'two',
+                ssl_key = 'three',
+                ssl_ciphers = 'four',
+                ssl_password = 'five',
+                ssl_password_file = 'six',
+            },
+        }
     end
 
     instance_config:validate(iconfig)
