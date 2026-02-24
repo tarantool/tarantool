@@ -183,6 +183,7 @@ g.test_builtin_modules = function(cg)
     check_module_func('debug', 'sourcefile')
     check_module_func('debug', 'sourcedir')
     check_module('tarantool')
+    check_module('fiber')
     check_module('buffer')
     check_module('fun')
     check_module('table')
@@ -241,4 +242,52 @@ g.test_lua_alloc = function(cg)
         string.rep('x', 16 * 1024 * 1024) -- ok
         collectgarbage('collect')
     ]], {limit}, {_thread_id = 3})
+end
+
+g.test_fiber = function(cg)
+    -- fiber.sleep
+    t.assert_equals(cg.server:eval([[
+        require('fiber').sleep(0.1)
+        return ...
+    ]], {'foobar'}, {_thread_id = 1}), 'foobar')
+
+    -- fiber.slice
+    local max_slice = cg.server:eval([[
+        return require('fiber').self():info().max_slice
+    ]], {}, {_thread_id = 1})
+    t.assert_error_covers({
+        message = 'fiber slice is exceeded',
+    }, cg.server.eval, cg.server, [[
+        local fiber = require('fiber')
+        fiber.set_max_slice(0.001)
+        for i = 1, 10 * 1000 * 1000 do
+            fiber.check_slice()
+        end
+    ]], {}, {_thread_id = 1})
+    t.assert_equals(cg.server:eval([[
+        return require('fiber').self():info().max_slice
+    ]], {}, {_thread_id = 2}), max_slice)
+    cg.server:eval([[
+        local max_slice = ...
+        if max_slice == nil then
+            max_slice = 100 * 365 * 86400 -- TIMEOUT_INFINITY
+        end
+        require('fiber').set_max_slice(max_slice)
+    ]], {max_slice}, {_thread_id = 1})
+
+    -- fiber.top
+    t.assert_covers(cg.server:eval([[
+        local fiber = require('fiber')
+        fiber.top_enable()
+        return fiber.top()
+    ]], {}, {_thread_id = 1}), {cpu = {['1/sched'] = {}}})
+    t.assert_error_covers({
+        message = 'fiber.top() is disabled. ' ..
+                  'Enable it with fiber.top_enable() first',
+    }, cg.server.eval, cg.server, [[
+        require('fiber').top()
+    ]], {}, {_thread_id = 2})
+    cg.server:eval([[
+        require('fiber').top_disable()
+    ]], {max_slice}, {_thread_id = 1})
 end

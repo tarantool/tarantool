@@ -199,6 +199,7 @@ static const char * const lua_modules_minimal[] = {
 	"strict", strict_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
+	"fiber", fiber_lua,
 	"internal.utils", utils_lua,
 	"internal.asan", asan_lua,
 	"buffer", buffer_lua,
@@ -223,7 +224,6 @@ static const char * const lua_modules_minimal[] = {
 /** List of modules available only in the main thread. */
 static const char * const lua_modules[] = {
 	"compat", compat_lua,
-	"fiber", fiber_lua,
 	"env", env_lua,
 	"msgpackffi", msgpackffi_lua,
 	"ulid", ulid_lua,
@@ -783,6 +783,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_utils_init(L);
 	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
+	tarantool_lua_fiber_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
 	tarantool_lua_uri_init(L);
@@ -849,7 +850,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);
-	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_fio_init(L);
