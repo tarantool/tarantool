@@ -40,26 +40,6 @@
 #include "mp_util.h"
 
 /**
- * Check that key hasn't been changed after applying upsert operation.
- */
-static bool
-vy_apply_result_does_cross_pk(struct tuple *old_stmt, const char *result,
-			      const char *result_end, struct key_def *cmp_def,
-			      uint64_t col_mask)
-{
-	if (!key_update_can_be_skipped(cmp_def->column_mask, col_mask)) {
-		struct tuple *tuple =
-			vy_stmt_new_replace(tuple_format(old_stmt), result,
-					    result_end);
-		int cmp_res = vy_stmt_compare(old_stmt, HINT_NONE, tuple,
-					      HINT_NONE, cmp_def);
-		tuple_unref(tuple);
-		return cmp_res != 0;
-	}
-	return false;
-}
-
-/**
  * Apply update operations from @a upsert on tuple @a stmt. If @a stmt is
  * void statement (i.e. it is NULL or delete statement) then operations are
  * applied on tuple stored in @a upsert. Update operations of @a upsert which
@@ -111,6 +91,7 @@ vy_apply_upsert_on_terminal_stmt(struct tuple *upsert, struct tuple *stmt,
 		mp_next(&ups_ops);
 		stmt = upsert;
 	}
+	struct tuple *result_stmt = NULL;
 	for (uint32_t i = 0; i < ups_cnt; ++i) {
 		assert(mp_typeof(*ups_ops) == MP_ARRAY);
 		const char *ups_ops_end = ups_ops;
@@ -124,14 +105,11 @@ vy_apply_upsert_on_terminal_stmt(struct tuple *upsert, struct tuple *stmt,
 				struct error *e = diag_last_error(diag_get());
 				assert(e != NULL);
 				/* Bail out immediately in case of OOM. */
-				if (e->type != &type_ClientError) {
-					region_truncate(region, region_svp);
-					return NULL;
-				}
+				if (e->type != &type_ClientError)
+					goto fail;
 				diag_log();
 			}
-			ups_ops = ups_ops_end;
-			continue;
+			goto next;
 		}
 		/*
 		 * Result statement must satisfy space's format. Since upsert's
@@ -142,35 +120,52 @@ vy_apply_upsert_on_terminal_stmt(struct tuple *upsert, struct tuple *stmt,
 		if (tuple_validate_raw(format, exec_res) != 0) {
 			if (!suppress_error)
 				diag_log();
-			ups_ops = ups_ops_end;
-			continue;
+			goto next;
 		}
 		/*
 		 * If it turns out that resulting tuple modifies primary
 		 * key, then simply ignore this upsert.
 		 */
-		if (vy_apply_result_does_cross_pk(stmt, exec_res,
-						  exec_res + mp_size, cmp_def,
-						  column_mask)) {
-			if (!suppress_error) {
-				say_error("upsert operations %s are not applied"\
-					  " due to primary key modification",
-					  mp_str(ups_ops));
+		if (!key_update_can_be_skipped(cmp_def->column_mask,
+					       column_mask)) {
+			struct tuple *new_stmt = vy_stmt_new_replace(
+					format, exec_res, exec_res + mp_size);
+			if (new_stmt == NULL)
+				goto fail;
+			if (vy_stmt_compare(stmt, HINT_NONE, new_stmt,
+					    HINT_NONE, cmp_def) != 0) {
+				if (!suppress_error) {
+					say_error("upsert operations %s "
+						  "are not applied due to "
+						  "primary key modification",
+						  mp_str(ups_ops));
+				}
+				tuple_unref(new_stmt);
+				goto next;
 			}
-			ups_ops = ups_ops_end;
-			continue;
+			if (result_stmt != NULL)
+				tuple_unref(result_stmt);
+			result_stmt = new_stmt;
 		}
-		ups_ops = ups_ops_end;
 		result_mp = exec_res;
 		result_mp_end = exec_res + mp_size;
+next:
+		ups_ops = ups_ops_end;
 	}
-	struct tuple *new_terminal_stmt = vy_stmt_new_replace(format, result_mp,
-							      result_mp_end);
+	if (result_stmt == NULL) {
+		result_stmt = vy_stmt_new_replace(format, result_mp,
+						  result_mp_end);
+		if (result_stmt == NULL)
+			goto fail;
+	}
+	vy_stmt_set_lsn(result_stmt, vy_stmt_lsn(upsert));
 	region_truncate(region, region_svp);
-	if (new_terminal_stmt == NULL)
-		return NULL;
-	vy_stmt_set_lsn(new_terminal_stmt, vy_stmt_lsn(upsert));
-	return new_terminal_stmt;
+	return result_stmt;
+fail:
+	if (result_stmt != NULL)
+		tuple_unref(result_stmt);
+	region_truncate(region, region_svp);
+	return NULL;
 }
 
 /**
