@@ -70,8 +70,15 @@ struct VdbeOp {
 		int i;		/* Integer value if p4type==P4_INT32 */
 		void *p;	/* Generic pointer */
 		char *z;	/* Pointer to data for string (char array) types */
-		i64 *pI64;	/* Used when p4type is P4_INT64/UINT64 */
-		double *pReal;	/* Used when p4type is P4_REAL */
+		/**
+		 * Used to store values of type INT64 (if p4type is P4_INT64)
+		 * and UINT64 (if id p4type is P4_UINT64).
+		 */
+		int64_t i64;
+		/**
+		 * Used to store values of type DOUBLE (if p4type is P4_REAL).
+		 */
+		double real;
 		/**
 		 * A pointer to function implementation.
 		 * Used when p4type is P4_FUNC.
@@ -195,8 +202,19 @@ int sqlVdbeLoadString(Vdbe *, int, const char *);
 void sqlVdbeMultiLoad(Vdbe *, int, const char *, ...);
 int sqlVdbeAddOp3(Vdbe *, int, int, int, int);
 int sqlVdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
-int sqlVdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlVdbeAddOp4Int(Vdbe *, int, int, int, int, int);
+
+/** Add an opcode that includes the p4 value as a 64-bit integer. */
+int
+sql_vdbe_add_op4_int64(Vdbe *, int, int, int, int64_t);
+
+/** Add an opcode that includes the p4 value as a 64-bit unsigned. */
+int
+sql_vdbe_add_op4_uint64(Vdbe *, int, int, int, int64_t);
+
+/** Add an opcode that includes the p4 value as a double. */
+int
+sql_vdbe_add_op4_real(Vdbe *, int, int, int, double);
 void sqlVdbeEndCoroutine(Vdbe *, int);
 void sqlVdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlVdbeChangeP1(Vdbe *, u32 addr, int P1);
