@@ -728,8 +728,12 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 	}
 	scheduler->generation++;
 	scheduler->checkpoint_in_progress = true;
-	scheduler->is_throttled = false;
 	fiber_cond_signal(&scheduler->scheduler_cond);
+	if (scheduler->is_throttled) {
+		say_info("unthrottling scheduler for checkpoint");
+		scheduler->is_throttled = false;
+		fiber_wakeup(scheduler->scheduler_fiber);
+	}
 	say_info("vinyl checkpoint started");
 	return 0;
 }
