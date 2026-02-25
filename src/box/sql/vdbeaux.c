@@ -312,25 +312,6 @@ sqlVdbeAddOp4(Vdbe * p,	/* Add the opcode to this VM */
 }
 
 /*
- * Add an opcode that includes the p4 value with a P4_INT64/UINT64
- * or P4_REAL type.
- */
-int
-sqlVdbeAddOp4Dup8(Vdbe * p,	/* Add the opcode to this VM */
-		      int op,	/* The new opcode */
-		      int p1,	/* The P1 operand */
-		      int p2,	/* The P2 operand */
-		      int p3,	/* The P3 operand */
-		      const u8 * zP4,	/* The P4 operand */
-		      int p4type	/* P4 operand type */
-    )
-{
-	char *p4copy = sql_xmalloc(8);
-	memcpy(p4copy, zP4, 8);
-	return sqlVdbeAddOp4(p, op, p1, p2, p3, p4copy, p4type);
-}
-
-/*
  * Add an opcode that includes the p4 value as an integer.
  */
 int
@@ -345,6 +326,36 @@ sqlVdbeAddOp4Int(Vdbe * p,	/* Add the opcode to this VM */
 	VdbeOp *pOp = &p->aOp[addr];
 	pOp->p4type = P4_INT32;
 	pOp->p4.i = p4;
+	return addr;
+}
+
+int
+sql_vdbe_add_op4_int64(Vdbe *p, int p1, int p2, int p3, int64_t p4)
+{
+	int addr = sqlVdbeAddOp3(p, OP_Int64, p1, p2, p3);
+	VdbeOp *pOp = &p->aOp[addr];
+	pOp->p4type = P4_INT64;
+	pOp->p4.i64 = p4;
+	return addr;
+}
+
+int
+sql_vdbe_add_op4_uint64(Vdbe *p, int p1, int p2, int p3, int64_t p4)
+{
+	int addr = sqlVdbeAddOp3(p, OP_Int64, p1, p2, p3);
+	VdbeOp *pOp = &p->aOp[addr];
+	pOp->p4type = P4_UINT64;
+	pOp->p4.i64 = p4;
+	return addr;
+}
+
+int
+sql_vdbe_add_op4_real(Vdbe *p, int p1, int p2, int p3, double p4)
+{
+	int addr = sqlVdbeAddOp3(p, OP_Real, p1, p2, p3);
+	VdbeOp *pOp = &p->aOp[addr];
+	pOp->p4type = P4_REAL;
+	pOp->p4.real = p4;
 	return addr;
 }
 
@@ -579,9 +590,6 @@ freeP4(int p4type, void *p4)
 			break;
 		}
 	case P4_DEC:
-	case P4_REAL:
-	case P4_INT64:
-	case P4_UINT64:
 	case P4_DYNAMIC:
 	case P4_INTARRAY:{
 			sql_xfree(p4);
@@ -998,11 +1006,11 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			sqlXPrintf(&x, "%d", pOp->p4.b);
 			break;
 	case P4_INT64:{
-			sqlXPrintf(&x, "%lld", *pOp->p4.pI64);
+			sqlXPrintf(&x, "%lld", pOp->p4.i64);
 			break;
 		}
 	case P4_UINT64: {
-		sqlXPrintf(&x, "%llu", (uint64_t)*pOp->p4.pI64);
+		sqlXPrintf(&x, "%llu", (uint64_t)pOp->p4.i64);
 			break;
 	}
 	case P4_INT32:{
@@ -1010,7 +1018,7 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			break;
 		}
 	case P4_REAL:{
-			sqlXPrintf(&x, "%.16g", *pOp->p4.pReal);
+			sqlXPrintf(&x, "%.16g", pOp->p4.real);
 			break;
 		}
 	case P4_DEC:{

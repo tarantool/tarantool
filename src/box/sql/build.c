@@ -1097,11 +1097,9 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 	sqlVdbeAddOp2(v, OP_Integer, 1, first_col + 4);
 
 	/* 5. Minimum  */
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 5, 0,
-			  (unsigned char *) &min_usigned_long_long, P4_UINT64);
+	sql_vdbe_add_op4_uint64(v, 0, first_col + 5, 0, min_usigned_long_long);
 	/* 6. Maximum  */
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 6, 0,
-			  (unsigned char *) &max_usigned_long_long, P4_UINT64);
+	sql_vdbe_add_op4_uint64(v, 0, first_col + 6, 0, max_usigned_long_long);
 	/* 7. Start  */
 	sqlVdbeAddOp2(v, OP_Integer, 1, first_col + 7);
 
