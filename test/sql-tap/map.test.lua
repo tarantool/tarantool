@@ -749,7 +749,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "map-12.11",
     [[
-        SELECT IFNULL(m, 1) FROM t;
+        SELECT IFNULL(m, m1('a', 1)) FROM t;
     ]], {
         {abc = 123},
         {d = 4, e = 5, f = 6},

@@ -746,7 +746,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "array-12.11",
     [[
-        SELECT IFNULL(a, 1) FROM t;
+        SELECT IFNULL(a, a1(1)) FROM t;
     ]], {
         {123},
         {4, 5, 6}
