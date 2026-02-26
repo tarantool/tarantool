@@ -430,6 +430,69 @@ bit_clz_u64(uint64_t x)
 #endif
 }
 
+/**
+ * @brief Count Leading Zeros.
+ * Returns the number of leading 0-bits in @a x, starting at bit number
+ * @a offset and ending at bit number @a offset + @a count. Bytes are
+ * examined starting from right to left, but bits within bytes are
+ * read from least to most significant.
+ * @param x byte array
+ * @param offset bit number to start counting leading 0-bits from
+ * @param count number of bits to take into account while counting the
+ *    number of leading 0-bits.
+ * @return the number of leading 0-bits
+ */
+static inline size_t
+bit_clz_le(uint8_t *x, size_t offset, size_t count)
+{
+	size_t lz_cnt = 0;
+	if (count == 0)
+		return 0;
+
+	/*
+	 * We can have:
+	 * - a head of bits in the start;
+	 * - a bunch of whole bytes in the middle;
+	 * - a tail of bits in the end.
+	 */
+	size_t x_nth_byte = offset / CHAR_BIT;
+	size_t x_nth_bit = offset % CHAR_BIT;
+
+	/* The head may be the only byte to inspect. */
+	size_t x_head_size = x_nth_bit + count < CHAR_BIT ?
+			       count : CHAR_BIT - x_nth_bit;
+	size_t x_rest_size = count - x_head_size;    /* Can be 0. */
+	size_t x_body_size = x_rest_size / CHAR_BIT; /* In bytes. */
+	size_t x_tail_size = x_rest_size % CHAR_BIT; /* In bits. */
+
+	for (size_t i = x_nth_bit; i < x_nth_bit + x_head_size; i++) {
+		if ((x[x_nth_byte] & (0x1 << i)) == 0)
+			lz_cnt += 1;
+		else
+			return lz_cnt;
+	}
+
+	for (size_t i = x_nth_byte + 1;
+	     i < x_nth_byte + 1 + x_body_size;
+	     i++) {
+		if (x[i] != 0) {
+			lz_cnt += bit_ctz_u32(x[i]);
+			return lz_cnt;
+		} else {
+			lz_cnt += CHAR_BIT;
+		}
+	}
+
+	size_t x_tail_byte = x_nth_byte + x_body_size + 1;
+	size_t x_tail_byte_tz_cnt = x[x_tail_byte] == 0 ? CHAR_BIT :
+				    bit_ctz_u32(x[x_tail_byte]);
+	size_t x_tail_lz_cnt = x_tail_byte_tz_cnt > x_tail_size ?
+			       x_tail_size : x_tail_byte_tz_cnt;
+	lz_cnt += x_tail_lz_cnt;
+
+	return lz_cnt;
+}
+
 #undef CLZ_NAIVE
 
 /**
