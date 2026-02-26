@@ -3135,8 +3135,7 @@ codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
 		assert(!sqlIsNaN(value));	/* The new AtoF never returns NaN */
 		if (negateFlag)
 			value = -value;
-		sqlVdbeAddOp4Dup8(v, OP_Real, 0, iMem, 0, (u8 *) & value,
-				      P4_REAL);
+		sql_vdbe_add_op4_real(v, 0, iMem, 0, value);
 	}
 }
 
@@ -3221,8 +3220,10 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 	 */
 	if (is_neg && value != INT64_MIN)
 		value = -value;
-	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0, (u8 *) &value,
-			  is_neg ? P4_INT64 : P4_UINT64);
+	if (is_neg)
+		sql_vdbe_add_op4_int64(v, 0, mem, 0, value);
+	else
+		sql_vdbe_add_op4_uint64(v, 0, mem, 0, value);
 }
 
 static void

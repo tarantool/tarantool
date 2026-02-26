@@ -274,13 +274,6 @@ sql_stmt_est_size(const struct Vdbe *v)
 		case P4_INT32:
 			size += sizeof(v->aOp[i].p4.i);
 			break;
-		case P4_UINT64:
-		case P4_INT64:
-			size += sizeof(*v->aOp[i].p4.pI64);
-			break;
-		case P4_REAL:
-			size += sizeof(*v->aOp[i].p4.pReal);
-			break;
 		case P4_DEC:
 			size += sizeof(*v->aOp[i].p4.dec);
 			break;
