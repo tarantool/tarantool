@@ -278,9 +278,13 @@ txn_limbo_queue_wait_last_txn(struct txn_limbo_queue *queue, bool *is_rollback,
 int
 txn_limbo_queue_wait_empty(struct txn_limbo_queue *queue, double timeout);
 
-/** Wait until all the entries receive an lsn. */
+/**
+ * Wait until all the entries, that are submitted to the journal, come back from
+ * it with LSNs. After this call the queue has no unfinished business with the
+ * journal. All entries are either not even sent there (volatile) or have LSNs.
+ */
 int
-txn_limbo_queue_wait_persisted(struct txn_limbo_queue *queue);
+txn_limbo_queue_wait_writes_finished(struct txn_limbo_queue *queue);
 
 /** Rollback all the volatile txns. See more in the limbo doc. */
 void
