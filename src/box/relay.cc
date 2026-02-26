@@ -179,6 +179,8 @@ struct relay {
 	struct stailq pending_gc;
 	/** Time when last row was sent to the peer. */
 	double last_row_time;
+	/** Time when last WAL row was sent to the peer. */
+	double last_wal_time;
 	/** Time when last heartbeat was sent to the peer. */
 	double last_heartbeat_time;
 	/** Time of last communication with the tx thread. */
@@ -860,9 +862,9 @@ relay_send_heartbeat(struct relay *relay)
 	xrow_encode_relay_heartbeat(&row, &relay->last_sent_ack);
 	/*
 	 * Do not encode timestamp if this heartbeat is sent in between
-	 * data rows so as to not affect replica's upstream lag.
+	 * WAL rows so as to not affect replica's upstream lag.
 	 */
-	if (relay->last_row_time > relay->last_heartbeat_time)
+	if (relay->last_wal_time > relay->last_heartbeat_time)
 		row.tm = 0;
 	else
 		row.tm = ev_now(loop());
@@ -1193,6 +1195,8 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	struct xrow_stream *stream = &relay->xrow_stream;
 	packet->sync = relay->sync;
 	relay->last_row_time = ev_monotonic_now(loop());
+	if (packet->lsn > 0)
+		relay->last_wal_time = relay->last_row_time;
 	xrow_stream_write(stream, packet);
 }
 
