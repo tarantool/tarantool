@@ -1678,11 +1678,21 @@ sql_index_id_by_src(const struct SrcList_item *src)
 uint32_t
 sql_space_fieldno(const struct space *space, const char *name)
 {
+	uint32_t j = UINT32_MAX;
+	int flag = 0;
 	for (uint32_t i = 0; i < space->def->field_count; ++i) {
-		if (strcmp(space->def->fields[i].name, name) == 0)
-			return i;
+		if (strcmp(space->def->fields[i].name, name) == 0) {
+			if (j == UINT32_MAX) {
+			    j = i;
+			}
+			else {
+				flag = 1;
+			}
+		}
 	}
-	return UINT32_MAX;
+	if (flag)
+	    return UINT32_MAX - 1;
+	return j;
 }
 
 uint32_t
