@@ -79,6 +79,9 @@ struct space_vtab {
 	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
 				    struct ArrowArray *array,
 				    struct ArrowSchema *schema);
+	/** Executes a range delete request. */
+	int (*execute_delete_range)(struct space *space, struct txn *txn,
+				    struct request *request);
 
 	int (*ephemeral_replace)(struct space *, const char *, const char *);
 
@@ -790,6 +793,8 @@ size_t generic_space_bsize(struct space *);
 int generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				       struct ArrowArray *array,
 				       struct ArrowSchema *schema);
+int generic_space_execute_delete_range(struct space *space, struct txn *txn,
+				       struct request *request);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
 int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);

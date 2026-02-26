@@ -1436,7 +1436,8 @@ space_execute_dml(struct space *space, struct txn *txn,
 	bool need_defaults_apply = tuple_format_has_defaults(space->format) &&
 				   recovery_state == FINISHED_RECOVERY &&
 				   request->type != IPROTO_UPDATE &&
-				   request->type != IPROTO_DELETE;
+				   request->type != IPROTO_DELETE &&
+				   request->type != IPROTO_DELETE_RANGE;
 	if (unlikely(need_defaults_apply)) {
 		if (space_apply_defaults(space, txn, request) != 0)
 			return -1;
@@ -1495,6 +1496,11 @@ space_execute_dml(struct space *space, struct txn *txn,
 	case IPROTO_INSERT_ARROW:
 		*result = NULL;
 		if (space_execute_insert_arrow(space, txn, request) != 0)
+			return -1;
+		break;
+	case IPROTO_DELETE_RANGE:
+		*result = NULL;
+		if (space->vtab->execute_delete_range(space, txn, request) != 0)
 			return -1;
 		break;
 	default:
@@ -1570,6 +1576,17 @@ generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 	(void)schema;
 	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
 		 "arrow format");
+	return -1;
+}
+
+int
+generic_space_execute_delete_range(struct space *space, struct txn *txn,
+				   struct request *request)
+{
+	(void)txn;
+	(void)request;
+	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
+		 "range deletion");
 	return -1;
 }
 

@@ -736,6 +736,23 @@ box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
 		 struct ArrowSchema *schema);
 
 /**
+ * Execute a range delete request.
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param begin_key beginning key of the target range
+ * \param begin_key_end end of \a begin_key
+ * \param end_key end key of the target range
+ * \param end_key_end end of \a end_key
+ * \retval 0 on success
+ * \retval -1 on error (check box_error_last())
+ */
+API_EXPORT int
+box_delete_range(uint32_t space_id, uint32_t index_id,
+		 const char *begin_key, const char *begin_key_end,
+		 const char *end_key, const char *end_key_end);
+
+/**
  * Truncate space.
  *
  * \param space_id space identifier
