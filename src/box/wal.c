@@ -192,6 +192,12 @@ struct wal_writer
 	 * queue, until the tx thread has recovered.
 	 */
 	bool is_in_rollback;
+
+	/**
+	 * Used to block the acceptance of new transactions 
+	 * while the instance is shutting down
+	 */
+	bool is_shutting_down;
 	/**
 	 * WAL watchers, i.e. threads that should be alerted
 	 * whenever there are new records appended to the journal.
@@ -490,6 +496,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	stailq_create(&writer->rollback);
 	writer->is_in_rollback = false;
+	writer->is_shutting_down = false;
 
 	writer->checkpoint_wal_size = 0;
 	writer->checkpoint_threshold = INT64_MAX;
@@ -1446,6 +1453,14 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 		goto fail;
 	}
 
+	if (writer->is_shutting_down){
+		say_error("Aborting transaction %lld during "
+			  "sutting down",
+			  (long long)vclock_sum(&writer->vclock));
+		diag_set(ClientError, ER_SHUTTING_DOWN);
+		goto fail;
+	}
+
 	struct wal_msg *batch;
 	if (!stailq_empty(&writer->wal_pipe.input) &&
 	    (batch = wal_msg(stailq_first_entry(&writer->wal_pipe.input,
@@ -1683,4 +1698,25 @@ wal_notify_watchers(struct wal_writer *writer, unsigned events)
 	struct wal_watcher *watcher;
 	rlist_foreach_entry(watcher, &writer->watchers, next)
 		wal_watcher_notify(watcher, events);
+}
+
+static int
+wal_force_rollback_f(struct cbus_call_msg *data)
+{
+    (void)data;
+    struct wal_writer *writer = &wal_writer_singleton;
+    writer->is_shutting_down = true;
+    return 0;
+}
+
+void
+wal_force_rollback(void)
+{
+    struct wal_writer *writer = &wal_writer_singleton;
+    if (writer->wal_mode == WAL_NONE)
+        return;
+
+    struct cbus_call_msg msg;
+    cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg,
+          wal_force_rollback_f);
 }
