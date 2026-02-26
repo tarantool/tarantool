@@ -84,3 +84,27 @@ g.test_4256_do_not_change_order_during_insertion = function(cg)
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- gh-4157: Autoincrementing a value inside a transaction running in SQL
+-- causes a segmentation fault.
+--
+g.test_4157_transitive_transaction = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (id INT PRIMARY KEY AUTOINCREMENT);]])
+        box.execute([[START TRANSACTION;]])
+        box.execute([[INSERT INTO t VALUES (NULL), (NULL);]])
+        box.execute([[INSERT INTO t VALUES (NULL), (NULL);]])
+        box.execute([[SAVEPOINT sp;]])
+        box.execute([[INSERT INTO t VALUES (NULL);]])
+        box.execute([[ROLLBACK TO sp;]])
+        local _, err = box.execute([[INSERT INTO t VALUES (NULL);]])
+        t.assert_equals(err, nil)
+        box.commit()
+
+        local res = box.space.t:select()
+        t.assert_equals(res, {{1}, {2}, {3}, {4}, {6}})
+
+        box.space.t:drop()
+    end)
+end
