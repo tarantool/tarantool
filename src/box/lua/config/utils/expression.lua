@@ -7,18 +7,22 @@
 -- version constraints in the declarative configuration module.
 -- (`conditional[N].if`).
 --
--- The module support one data type: version. A value may be
--- referenced in two ways:
+-- Supported value kinds:
 --
--- 1. Version literal: 1.2.3 (always three components).
--- 2. Variable: foo, x23, _foo_bar and so.
+-- 1. Version literal: `1.2.3` (always exactly three numeric components).
+-- 2. Variable:
+--    - starts with [A-Za-z_];
+--    - continues with [A-Za-z0-9_];
+--    - may contain dot-separated segments (e.g. `foo.bar_baz`), where each
+--      dot must be followed by [A-Za-z0-9_].
 --
 -- The operations are the following.
 --
 -- 1. Logical OR: ||
 -- 2. Logical AND: &&
--- 3. Compare: >, <, >=, <=, !=, ==
--- 4. Parentheses: (, )
+-- 3. Logical NOT: !
+-- 4. Compare: >, <, >=, <=, !=, ==
+-- 5. Parentheses: (, )
 
 local expression_lexer = require('internal.config.utils.expression_lexer')
 
@@ -45,12 +49,25 @@ local right_bpower_map = {
     ['=='] = 6,
 }
 
+local prefix_bpower_map = {
+    ['!'] = 7,
+}
+
 local function parse_expr(lexer, min_bpower)
     local left
 
     local token = lexer:next()
     if token == nil then
         error('Unexpected end of an expression', 0)
+    elseif token.type == 'operation' and
+        prefix_bpower_map[token.value] ~= nil then
+        local rbp = prefix_bpower_map[token.value]
+        local expr = parse_expr(lexer, rbp)
+        left = {
+            type = 'unary',
+            value = token.value,
+            expr = expr,
+        }
     elseif token.type == 'version_literal' then
         left = token
     elseif token.type == 'variable' then
@@ -78,12 +95,18 @@ local function parse_expr(lexer, min_bpower)
             error(('Expected an operation, got %q'):format(op.value), 0)
         end
         local left_bpower = left_bpower_map[op.value]
+        if left_bpower == nil then
+            error(('Unknown operation %q'):format(op.value), 0)
+        end
         if left_bpower < min_bpower then
             break
         end
 
         lexer:next()
         local right_bpower = right_bpower_map[op.value]
+        if right_bpower == nil then
+            error(('Unknown operation %q'):format(op.value), 0)
+        end
         local right = parse_expr(lexer, right_bpower)
 
         left = {
@@ -126,14 +149,52 @@ local function parse(s)
     return ast
 end
 
-local function validate_expr(node, vars)
-    -- luacheck: ignore 542 empty if branch
+local logical_binary_operators = {
+    ['||'] = true,
+    ['&&'] = true,
+}
+
+local compare_binary_operators = {
+    ['<'] = true,
+    ['>'] = true,
+    ['<='] = true,
+    ['>='] = true,
+    ['=='] = true,
+    ['!='] = true,
+}
+
+local unary_operators = {
+    ['!'] = true,
+}
+
+local function resolve_var(vars, name)
+    if type(vars) ~= 'table' then
+        return nil
+    end
+
+    local cur = vars
+    for part in name:gmatch('[^%.]+') do
+        if type(cur) ~= 'table' then
+            return nil
+        end
+        cur = cur[part]
+    end
+    return cur
+end
+
+-- Infer node result type: 'version' or 'boolean'.
+-- Also validates variable existence and its runtime type.
+local function node_type(node, vars)
+    assert(node ~= nil)
     if node.type == 'version_literal' then
-        -- Nothing to validate.
+        return 'version'
     elseif node.type == 'variable' then
-        local var = vars[node.value]
+        local var = resolve_var(vars, node.value)
         if type(var) == 'nil' then
             error(('Unknown variable: %q'):format(node.value), 0)
+        end
+        if type(var) == 'boolean' then
+            return 'boolean'
         end
         if type(var) ~= 'string' then
             error(('Variable %q has type %s, expected string'):format(
@@ -154,41 +215,70 @@ local function validate_expr(node, vars)
             error(('Expected a three component version in variable %q, got ' ..
                 '%d components'):format(node.value, #components), 0)
         end
+        return 'version'
+    elseif node.type == 'unary' then
+        if unary_operators[node.value] then
+            return 'boolean'
+        end
+        error(('Unknown unary operator %q'):format(node.value), 0)
     elseif node.type == 'operation' then
-        local lbool = node.left.type == 'operation'
-        local rbool = node.right.type == 'operation'
-
-        local requires_boolean = {
-            ['||'] = true,
-            ['&&'] = true,
-        }
-        if requires_boolean[node.value] and not (lbool and rbool) then
-            error('A logical operator (&& or ||) accepts only boolean ' ..
-                'expressions as arguments', 0)
+        local op = node.value
+        if logical_binary_operators[node.value] or
+        compare_binary_operators[node.value] then
+            return 'boolean'
         end
+        error(('Unknown operation %q'):format(op), 0)
+    else
+        assert(false)
+    end
+end
 
-        local requires_version_values = {
-            ['<'] = true,
-            ['>'] = true,
-            ['<='] = true,
-            ['>='] = true,
-            ['!='] = true,
-            ['=='] = true,
-        }
-        if requires_version_values[node.value] and (lbool or rbool) then
-            error('A comparison operator (<, >, <=, >=, !=, ==) requires ' ..
-                'version literals or variables as arguments', 0)
+local function validate_expr(node, vars)
+    -- luacheck: ignore 542 empty if branch
+    if node.type == 'version_literal' then
+        -- Nothing to validate.
+    elseif node.type == 'variable' then
+        node_type(node, vars)
+    elseif node.type == 'unary' then
+        if not unary_operators[node.value] then
+            error(('Unknown unary operator %q'):format(node.value), 0)
         end
-
+        local t = node_type(node.expr, vars)
+        if t ~= 'boolean' then
+            error('Unary "!" accepts only boolean expressions', 0)
+        end
+        validate_expr(node.expr, vars)
+    elseif node.type == 'operation' then
         validate_expr(node.left, vars)
         validate_expr(node.right, vars)
+        local op = node.value
+        local lt = node_type(node.left, vars)
+        local rt = node_type(node.right, vars)
+
+        if logical_binary_operators[op] then
+            if lt ~= 'boolean' or rt ~= 'boolean' then
+                error('A logical operator (&& or ||) accepts only boolean ' ..
+                    'expressions as arguments', 0)
+            end
+            return
+        end
+
+        if compare_binary_operators[op] then
+            if lt ~= 'version' or rt ~= 'version' then
+                error('A comparison operator (<, >, <=, >=, !=, ==) ' ..
+                    'requires version literals or variables as arguments', 0)
+            end
+            return
+        end
+
+        error(('Unknown operation %q'):format(op), 0)
     else
         assert(false)
     end
 end
 
 local function validate(node, vars)
-    if node.type ~= 'operation' then
+    if node.type ~= 'operation' and node.type ~= 'unary' then
         error(('An expression should be a predicate, got %s'):format(
             node.type), 0)
     end
@@ -237,11 +327,21 @@ local operations = {
     end,
 }
 
+local unary_operations = {
+    ['!'] = function (a)
+        return not a
+    end,
+}
+
 local function evaluate(node, vars)
     if node.type == 'version_literal' then
         return node.value
     elseif node.type == 'variable' then
-        return vars[node.value]
+        return resolve_var(vars, node.value)
+    elseif node.type == 'unary' then
+        local op = unary_operations[node.value]
+        local expr = evaluate(node.expr, vars)
+        return op(expr)
     elseif node.type == 'operation' then
         local left = evaluate(node.left, vars)
         local op = operations[node.value]

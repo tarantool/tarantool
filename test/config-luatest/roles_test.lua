@@ -1220,3 +1220,79 @@ g.test_tarantool_version_check = function(g)
                   'Unexpected token "<"'
     })
 end
+
+g.test_role_fail_if_config_check = function(g)
+    local role_config_only = [[-- --- #tarantool.metadata.v1
+-- fail_if: "!config.database.use_mvcc_engine"
+-- ...
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local role_version_and_config = [[-- --- #tarantool.metadata.v1
+-- fail_if: "tarantool_version < 0.0.0 || !config.database.use_mvcc_engine"
+-- ...
+
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+        }
+    ]]
+
+    local cases = {
+        {
+            name = 'config-only: enabled -> success',
+            role = role_config_only,
+            mvcc = true,
+            ok = true,
+        },
+        {
+            name = 'config-only: disabled -> failure',
+            role = role_config_only,
+            mvcc = false,
+            ok = false,
+            exp_err = 'Role "r" failed the "fail_if" check: ' ..
+                      '"!config.database.use_mvcc_engine"',
+        },
+        {
+            name = 'version+config: enabled -> success',
+            role = role_version_and_config,
+            mvcc = true,
+            ok = true,
+        },
+        {
+            name = 'version+config: disabled -> failure',
+            role = role_version_and_config,
+            mvcc = false,
+            ok = false,
+            exp_err = 'Role "r" failed the "fail_if" check: ' ..
+            '"tarantool_version < 0.0.0 || !config.database.use_mvcc_engine"',
+        },
+    }
+
+    for _, c in ipairs(cases) do
+        local opts = {
+            ['roles'] = {'r'},
+            ['database.use_mvcc_engine'] = c.mvcc,
+        }
+
+        if c.ok then
+            helpers.success_case(g, {
+                roles = {r = c.role},
+                options = opts,
+                verify = function() end,
+            })
+        else
+            helpers.failure_case({
+                roles = {r = c.role},
+                options = opts,
+                exp_err = c.exp_err,
+            })
+        end
+    end
+end

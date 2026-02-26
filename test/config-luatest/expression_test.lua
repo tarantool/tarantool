@@ -166,17 +166,56 @@ g.test_lexer = function()
     t.assert_error_msg_equals(exp_err(1, 3, 'truncated expression'),
         lexer.split, 'x=')
 
-    -- =x and !x are forbidden.
-    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
-        lexer.split, '!x')
+    -- =x is forbidden.
     t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
         lexer.split, '=x')
+
+    -- Unary ! is allowed.
+    t.assert_equals(lexer.split('!x'), {
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'x'},
+    })
+    t.assert_equals(lexer.split('!(x<2.0.0)'), {
+        {type = 'operation', value = '!'},
+        {type = 'grouping', value = '('},
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '<'},
+        {type = 'version_literal', value = '2.0.0'},
+        {type = 'grouping', value = ')'},
+    })
+
+    -- Standalone '!' is a truncated expression (missing operand).
+    t.assert_error_msg_equals(exp_err(1, 2, 'truncated expression'),
+        lexer.split, '!')
+
+    -- Dotted variables: allowed only when '.' is followed by [A-Za-z0-9_].
+    t.assert_equals(lexer.split('config.database.use_mvcc_engine'), {
+        {type = 'variable', value = 'config.database.use_mvcc_engine'},
+    })
+    t.assert_equals(lexer.split('a._b'), {
+        {type = 'variable', value = 'a._b'},
+    })
+    t.assert_equals(lexer.split('a.1_b'), {
+        {type = 'variable', value = 'a.1_b'},
+    })
 
     -- A separator should follow a version literal or a variable.
     t.assert_error_msg_equals(exp_err(1, 6, 'invalid token'),
         lexer.split, '0.1.2x')
+
+    -- Dot at end is forbidden.
     t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
         lexer.split, 'x.')
+
+    -- Two dots in a row are forbidden.
+    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
+        lexer.split, 'x..y')
+
+    -- Dot before operator is forbidden.
+    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
+        lexer.split, 'x.!')
+    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
+        lexer.split, 'x.)')
 
     -- | and & are invalid operators.
     t.assert_error_msg_equals(exp_err(1, 3, 'invalid token'),
@@ -202,6 +241,63 @@ g.test_lexer = function()
     t.assert_error_msg_equals(exp_err(1, 8, 'invalid version literal: ' ..
         'expected 3 components, got 4'),
         lexer.split, '1.2.3.4')
+
+    -- Full example from metadata.
+    t.assert_equals(lexer.split(
+    'tarantool_version < 3.5.0 || !config.database.use_mvcc_engine'), {
+        {type = 'variable', value = 'tarantool_version'},
+        {type = 'operation', value = '<'},
+        {type = 'version_literal', value = '3.5.0'},
+        {type = 'operation', value = '||'},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'config.database.use_mvcc_engine'}
+    })
+
+    -- Lexer-level corner cases around '!'.
+    --
+    -- Note: syntactically "x ! config" is not a valid expression for parser,
+    -- but lexer should still tokenize it consistently.
+    t.assert_equals(lexer.split('x ! config'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'config'},
+    })
+
+    t.assert_equals(lexer.split('x!=!y'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '!='},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'y'},
+    })
+
+    t.assert_equals(lexer.split('x>=!y'), {
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '>='},
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'y'},
+    })
+
+    t.assert_equals(lexer.split('!x>1.0.0'), {
+        {type = 'operation', value = '!'},
+        {type = 'variable', value = 'x'},
+        {type = 'operation', value = '>'},
+        {type = 'version_literal', value = '1.0.0'}
+    })
+
+    t.assert_equals(lexer.split('x.y.z>1.0.0'), {
+        {type = 'variable', value = 'x.y.z'},
+        {type = 'operation', value = '>'},
+        {type = 'version_literal', value = '1.0.0'}
+    })
+
+    t.assert_error_msg_equals(exp_err(1, 2, 'invalid token'),
+    lexer.split, 'x. y')
+
+    t.assert_error_msg_equals(exp_err(1, 1, 'invalid token'),
+        lexer.split, '.')
+
+    t.assert_error_msg_equals(exp_err(1, 3, 'invalid token'),
+        lexer.split, 'x!.')
 end
 
 -- Verify AST generation.
@@ -403,6 +499,133 @@ g.test_parse_basic = function()
     })
 end
 
+g.test_parse_unary = function()
+    t.assert_equals(expression.parse('!x'), {
+        type = 'unary',
+        value = '!',
+        expr = {
+            type = 'variable',
+            value = 'x'
+        },
+    })
+    t.assert_equals(expression.parse('!!x'), {
+        type = 'unary',
+        value = '!',
+        expr = {
+            type = 'unary',
+            value = '!',
+            expr = {
+                type = 'variable',
+                value = 'x'
+            },
+        },
+    })
+    t.assert_equals(expression.parse('!(x < 2.0.0)'), {
+        type = 'unary',
+        value = '!',
+        expr = {
+            type = 'operation',
+            value = '<',
+            left = {
+                type = 'variable',
+                value = 'x'
+            },
+            right = {
+                type = 'version_literal',
+                value = '2.0.0'
+            },
+        },
+    })
+    -- Unary binds tighter than infix operators.
+    -- Parsed as: (!x) && (y > z)
+    t.assert_equals(expression.parse('!x && y > z'), {
+        type = 'operation',
+        value = '&&',
+        left = {
+            type = 'unary',
+            value = '!',
+            expr = {
+                type = 'variable',
+                value = 'x'
+            },
+        },
+        right = {
+            type = 'operation',
+            value = '>',
+            left = {
+                type = 'variable',
+                value = 'y'
+            },
+            right = {
+                type = 'variable',
+                value = 'z'
+            },
+        },
+    })
+    -- Unary on the right side of infix.
+    t.assert_equals(expression.parse('a > b || !c'), {
+        type = 'operation',
+        value = '||',
+        left = {
+            type = 'operation',
+            value = '>',
+            left = {
+                type = 'variable',
+                value = 'a'
+            },
+            right = {
+                type = 'variable',
+                value = 'b'
+            },
+        },
+        right = {
+            type = 'unary',
+            value = '!',
+            expr = {
+                type = 'variable',
+                value = 'c'
+            },
+        },
+    })
+end
+
+g.test_parse_dotted_variable = function()
+    t.assert_equals(expression.parse('!config.database.use_mvcc_engine'), {
+        type = 'unary',
+        value = '!',
+        expr = {
+            type = 'variable',
+            value = 'config.database.use_mvcc_engine',
+        },
+    })
+    t.assert_equals(expression.parse(
+        'tarantool_version < 3.5.0 || !config.database.use_mvcc_engine'),
+        {
+            type = 'operation',
+            value = '||',
+            left = {
+                type = 'operation',
+                value = '<',
+                left = {
+                    type = 'variable',
+                    value = 'tarantool_version'
+                },
+                right = {
+                    type = 'version_literal',
+                    value = '3.5.0'
+                },
+            },
+            right = {
+                type = 'unary',
+                value = '!',
+                expr = {
+                    type = 'variable',
+                    value = 'config.database.use_mvcc_engine'
+                },
+            },
+        })
+end
+
 -- A couple of incorrect expressions.
 g.test_parse_failure = function()
     t.assert_error_msg_equals('Expected a string as an expression, got nil',
@@ -423,6 +646,13 @@ g.test_parse_failure = function()
         expression.parse, '>')
     t.assert_error_msg_equals('Expected end of an expression, got ")"',
         expression.parse, '5.0.0 < 6.0.0)')
+    t.assert_error_msg_equals('Unknown operation "!"',
+        expression.parse, 'x ! y')
+    t.assert_error_msg_equals('Unknown operation "!"',
+        expression.parse, 'a > b ! c')
+    t.assert_error_msg_equals('Unexpected token ")"',
+        expression.parse, '(!)')
+
 end
 
 g.test_validate_success = function()
@@ -431,6 +661,26 @@ g.test_validate_success = function()
         j = v}
     local ast = expression.parse(
         '(a > b || c < d) && e <= 1.0.0 || 2.3.4 >= f || g != h && i == j')
+    expression.validate(ast, vars)
+
+    -- Unary over boolean variable.
+    local vars = {flag = true}
+    local ast = expression.parse('!flag')
+    expression.validate(ast, vars)
+
+    -- Unary over a boolean expression (comparison).
+    local vars = {v = '3.4.0'}
+    local ast = expression.parse('!(v < 3.5.0)')
+    expression.validate(ast, vars)
+
+    -- Combined with logical operators.
+    local vars = {v = '3.6.0', flag = false}
+    local ast = expression.parse('v < 3.5.0 || !flag')
+    expression.validate(ast, vars)
+
+    -- Dotted variable name (lexer+parser integration).
+    local vars = {config = {database = {use_mvcc_engine = true}}}
+    local ast = expression.parse('!config.database.use_mvcc_engine')
     expression.validate(ast, vars)
 end
 
@@ -459,8 +709,7 @@ g.test_validate_failure = function()
     t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
 
     local ast = expression.parse('x && 2.0.0')
-    local exp_err = 'A logical operator (&& or ||) accepts only boolean ' ..
-        'expressions as arguments'
+    local exp_err = 'Unknown variable: "x"'
     t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
 
     local ast = expression.parse('x > 0.0.0')
@@ -491,6 +740,21 @@ g.test_validate_failure = function()
             '"x", got %d components'):format((#x + 1) / 2)
         t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
     end
+
+    local vars = {v = '1.0.0'}
+    local ast = expression.parse('!v')
+    local exp_err = 'Unary "!" accepts only boolean expressions'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
+
+    local ast = expression.parse('!1.0.0')
+    local exp_err = 'Unary "!" accepts only boolean expressions'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, {})
+
+    local vars = {v = '1.0.0', flag = true}
+    local ast = expression.parse('v && flag')
+    local exp_err = 'A logical operator (&& or ||) accepts only boolean ' ..
+        'expressions as arguments'
+    t.assert_error_msg_equals(exp_err, expression.validate, ast, vars)
 end
 
 g.test_evaluate = function()
@@ -543,4 +807,48 @@ g.test_evaluate = function()
     t.assert_equals(eval(expr, {v = '5.1.0'}), true)
 
     t.assert_equals(eval('1.10.0 > 1.2.0', {}), true)
+
+    t.assert_equals(eval('!flag', {flag = true}), false)
+    t.assert_equals(eval('!flag', {flag = false}), true)
+
+    t.assert_equals(eval('!!flag', {flag = true}), true)
+    t.assert_equals(eval('!!flag', {flag = false}), false)
+
+    t.assert_equals(eval('!(v < 3.5.0)', {v = '3.4.0'}), false)
+    t.assert_equals(eval('!(v < 3.5.0)', {v = '3.5.0'}), true)
+
+    -- Precedence check: '!' binds tighter than '&&' and '||'.
+    local expr = 'v < 3.5.0 || !flag'
+    t.assert_equals(eval(expr, {v = '3.4.0', flag = true}), true)
+    t.assert_equals(eval(expr, {v = '3.5.0', flag = true}), false)
+    t.assert_equals(eval(expr, {v = '3.5.0', flag = false}), true)
+
+    local expr = '!flag && v >= 3.5.0'
+    t.assert_equals(eval(expr, {flag = false, v = '3.5.0'}), true)
+    t.assert_equals(eval(expr, {flag = true, v = '3.5.0'}), false)
+    t.assert_equals(eval(expr, {flag = false, v = '3.4.0'}), false)
+
+    local vars = {config = {database = {use_mvcc_engine = true}}}
+    t.assert_equals(eval('!config.database.use_mvcc_engine', vars), false)
+    local vars = {config = {database = {use_mvcc_engine = false}}}
+    t.assert_equals(eval('!config.database.use_mvcc_engine', vars), true)
+
+    -- Full example from metadata.
+    local vars = {
+        tarantool_version = '3.4.0',
+        config = {database = {use_mvcc_engine = true}}}
+    local expr = 'tarantool_version < 3.5.0 || !config.database.use_mvcc_engine'
+    t.assert_equals(eval(expr, vars), true)
+
+    local vars = {
+        tarantool_version = '3.5.0',
+        config = {database = {use_mvcc_engine = true}}}
+    local expr = 'tarantool_version < 3.5.0 || !config.database.use_mvcc_engine'
+    t.assert_equals(eval(expr, vars), false)
+
+    local vars = {
+        tarantool_version = '3.5.0',
+        config = {database = {use_mvcc_engine = false}}}
+    local expr = 'tarantool_version < 3.5.0 || !config.database.use_mvcc_engine'
+    t.assert_equals(eval(expr, vars), true)
 end
