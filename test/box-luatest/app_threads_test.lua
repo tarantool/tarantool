@@ -183,6 +183,7 @@ g.test_builtin_modules = function(cg)
     check_module_func('debug', 'sourcefile')
     check_module_func('debug', 'sourcedir')
     check_module('tarantool')
+    check_module('log')
     check_module('fiber')
     check_module('buffer')
     check_module('fun')
@@ -290,4 +291,93 @@ g.test_fiber = function(cg)
     cg.server:eval([[
         require('fiber').top_disable()
     ]], {max_slice}, {_thread_id = 1})
+end
+
+g.test_log = function(cg)
+    local function eval(expr, args)
+        return cg.server:eval(expr, args or {}, {_thread_id = 1})
+    end
+    local function check_func(func, exists)
+        t.assert_equals(eval([[return type(require('log')[...])]], {func}),
+                        exists and 'function' or 'nil')
+    end
+
+    -- Check that logging functions are available.
+    check_func('new', true)
+    check_func('debug', true)
+    check_func('verbose', true)
+    check_func('info', true)
+    check_func('warn', true)
+    check_func('error', true)
+
+    -- Check that configuration/management functions are unavailable.
+    check_func('rotate', false)
+    check_func('pid', false)
+    check_func('level', false)
+    check_func('log_format', false)
+    check_func('cfg', false)
+    check_func('box_api', false)
+
+    -- Check that logging works and the thread name is logged.
+    eval([[require('log').info('fuzzbuzz')]])
+    t.assert_str_contains(cg.server:grep_log('.*fuzzbuzz.*'), '/app1/')
+
+    -- Check that log levels are propagated.
+    local old_level = cg.server:exec(function()
+        local log = require('log')
+        local old_level = log.cfg.level
+        require('log').cfg({
+            level = 'verbose',
+            modules = {
+                test1 = 'debug',
+                test2 = 'info',
+            },
+        })
+        return old_level
+    end)
+
+    eval([[
+        local log = require('log')
+        local log1 = require('log').new('test1')
+        local log2 = require('log').new('test2')
+        local log3 = require('log').new('test3')
+        log.debug('foobar1')
+        log.verbose('foobar2')
+        log1.debug('foobar3')
+        log2.verbose('foobar4')
+        log2.info('foobar5')
+        log3.debug('foobar6')
+        log3.verbose('foobar7')
+    ]])
+
+    t.assert_not(cg.server:grep_log('foobar1'))
+    t.assert(cg.server:grep_log('foobar2'))
+    t.assert(cg.server:grep_log('foobar3'))
+    t.assert_not(cg.server:grep_log('foobar4'))
+    t.assert(cg.server:grep_log('foobar5'))
+    t.assert_not(cg.server:grep_log('foobar6'))
+    t.assert(cg.server:grep_log('foobar7'))
+
+    cg.server:exec(function(old_level)
+        require('log').cfg({
+            level = old_level,
+            modules = {},
+        })
+    end, {old_level})
+
+    -- Check that log format is propagated.
+    cg.server:exec(function()
+        local log = require('log')
+        t.assert_equals(log.cfg.format, 'plain')
+        log.log_format('json')
+    end)
+
+    eval([[require('log').info('foobarbuzz')]])
+    t.assert_str_contains(cg.server:grep_log('.*foobarbuzz.*'),
+                          [["file": "eval"]])
+
+    cg.server:exec(function()
+        local log = require('log')
+        log.log_format('plain')
+    end)
 end

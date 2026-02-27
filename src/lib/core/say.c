@@ -30,7 +30,10 @@
  */
 #include "say.h"
 #include "fiber.h"
+#include "assoc.h"
 #include "errinj.h"
+#include "trivia/util.h"
+#include "tt_pthread.h"
 #include "tt_strerror.h"
 
 #include <errno.h>
@@ -236,6 +239,62 @@ log_set_level(struct log *log, enum say_level level)
 	log->level = level;
 }
 
+/**
+ * Clear the modules hash table.
+ */
+static void
+log_clear_modules(struct log *log)
+{
+	struct mh_strnu32_t *h = log->modules;
+	mh_int_t i;
+	mh_foreach(h, i)
+		free((void *)mh_strnu32_node(h, i)->str);
+	mh_strnu32_clear(h);
+}
+
+void
+log_set_modules(struct log *log, const struct say_module *modules)
+{
+	/*
+	 * Sic: tt_pthread_mutex_lock() writes to the log so we don't use
+	 * it here to avoid a deadlock while checking the log level.
+	 */
+	VERIFY(pthread_mutex_lock(&log->modules_mutex) == 0);
+	log_clear_modules(log);
+	for (const struct say_module *m = modules; m->name != NULL; m++) {
+		char *name = xstrdup(m->name);
+		uint32_t name_len = strlen(name);
+		uint32_t name_hash = mh_strn_hash(m->name, name_len);
+		struct mh_strnu32_node_t node = {
+			name, name_len, name_hash, m->log_level,
+		};
+		struct mh_strnu32_node_t prev;
+		struct mh_strnu32_node_t *prev_ptr = &prev;
+		mh_strnu32_put(log->modules, &node, &prev_ptr, NULL);
+		assert(prev_ptr == NULL);
+	}
+	VERIFY(pthread_mutex_unlock(&log->modules_mutex) == 0);
+}
+
+int
+log_get_module_log_level(struct log *log, const char *name)
+{
+	/* The boot logger doesn't initialize the modules hash table. */
+	if (log == &log_boot)
+		return log->level;
+	/*
+	 * Sic: tt_pthread_mutex_lock() writes to the log so we don't use
+	 * it here to avoid infinite recursion.
+	 */
+	VERIFY(pthread_mutex_lock(&log->modules_mutex) == 0);
+	struct mh_strnu32_t *h = log->modules;
+	mh_int_t i = mh_strnu32_find_str(h, name, strlen(name));
+	int level = (i == mh_end(h) ? log->level :
+		     (int)mh_strnu32_node(h, i)->val);
+	VERIFY(pthread_mutex_unlock(&log->modules_mutex) == 0);
+	return level;
+}
+
 void
 log_set_format(struct log *log, log_format_func_t format_func)
 {
@@ -253,6 +312,18 @@ int
 say_get_log_level(void)
 {
 	return log_default->level;
+}
+
+void
+say_set_modules(const struct say_module *modules)
+{
+	log_set_modules(log_default, modules);
+}
+
+int
+say_get_module_log_level(const char *name)
+{
+	return log_get_module_log_level(log_default, name);
 }
 
 void
@@ -672,6 +743,8 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	log->path = NULL;
 	log->format_func = say_format_plain;
 	log->level = S_INFO;
+	log->modules = mh_strnu32_new();
+	tt_pthread_mutex_init(&log->modules_mutex, NULL);
 	log->rotating_threads = 0;
 	tt_pthread_mutex_init(&log->rotate_mutex, NULL);
 	tt_pthread_cond_init(&log->rotate_cond, NULL);
@@ -1435,6 +1508,9 @@ log_destroy(struct log *log)
 	 */
 	if (log->type != SAY_LOGGER_STDERR)
 		close(log->fd);
+	log_clear_modules(log);
+	mh_strnu32_delete(log->modules);
+	tt_pthread_mutex_destroy(&log->modules_mutex);
 	free(log->syslog_ident);
 	free(log->path);
 	rlist_del_entry(log, in_log_list);
@@ -1474,7 +1550,7 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 
 	assert(level >= 0 && level < say_level_MAX);
 
-	if (check_level && level > log->level)
+	if (check_level && level > log_get_module_log_level(log, "tarantool"))
 		goto out;
 
 	total = format_log_entry(log, level, module, filename, line, error,
