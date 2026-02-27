@@ -14,6 +14,9 @@
 /* Select the tree flavor to test. */
 #if defined(TEST_DEFAULT)
 # define SMALL_BLOCK_SIZE 128
+#elif defined(TEST_TIME_SERIES_OPTIMIZED)
+# define BPS_TIME_SERIES_OPTIMIZED
+# define SMALL_BLOCK_SIZE 128
 #elif defined(TEST_INNER_CARD)
 # define BPS_INNER_CARD
 # define SMALL_BLOCK_SIZE 128
