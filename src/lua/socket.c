@@ -256,6 +256,9 @@ static const struct lbox_sockopt_reg so_opts[] = {
 #ifdef SO_REUSEADDR
 	{"SO_REUSEADDR",	SO_REUSEADDR,		1,	1, },
 #endif
+#ifdef SO_REUSEPORT
+	{"SO_REUSEPORT",	SO_REUSEPORT,		1,	1, },
+#endif
 #ifdef SO_SNDBUF
 	{"SO_SNDBUF",		SO_SNDBUF,		1,	1, },
 #endif
