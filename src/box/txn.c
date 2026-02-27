@@ -306,8 +306,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->min_key = NULL;
 	stmt->max_key = NULL;
 	stmt->add_story = NULL;
-	stmt->del_story = NULL;
-	stmt->next_in_del_list = NULL;
+	stmt->del_stories = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
@@ -319,7 +318,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 static inline void
 txn_stmt_destroy(struct txn_stmt *stmt)
 {
-	assert(stmt->add_story == NULL && stmt->del_story == NULL);
+	assert(stmt->add_story == NULL && stmt->del_stories == NULL);
 
 	if (stmt->has_triggers)
 		trigger_destroy(&stmt->on_rollback);
