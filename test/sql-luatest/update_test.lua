@@ -8,7 +8,7 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function(engine)
         box.execute([[SET SESSION "sql_seq_scan" = true;]])
-        local sql = [[SET SESSION "sql_default_engine" = '%s']]
+        local sql = [[SET SESSION "sql_default_engine" = '%s;']]
         box.execute(sql:format(engine))
     end, {cg.params.engine})
 end)
@@ -31,7 +31,7 @@ g.test_2251_multiple_update = function(cg)
                                   WHERE b IN (SELECT b FROM t1);]])
         t.assert_equals(res, {row_count = 2})
 
-        res = box.execute("SELECT e FROM t1")
+        res = box.execute("SELECT e FROM t1;")
         t.assert_equals(res.rows, {{7}, {8}})
 
         box.execute([[CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT UNIQUE,
@@ -43,10 +43,36 @@ g.test_2251_multiple_update = function(cg)
                             IN (SELECT b FROM t2);]])
         t.assert_equals(res, {row_count = 2})
 
-        res = box.execute("SELECT e FROM t2")
+        res = box.execute("SELECT e FROM t2;")
         t.assert_equals(res.rows, {{6}, {7}})
 
-        box.execute("DROP TABLE t1")
-        box.execute("DROP TABLE t2")
+        box.execute("DROP TABLE t1;")
+        box.execute("DROP TABLE t2;")
+    end)
+end
+
+--
+-- Make sure that the nested SELECT statement within the UPDATE statement
+-- executes correctly.
+--
+g.test_update_with_nested_select = function(cg)
+    cg.server:exec(function ()
+        -- Create space.
+        box.execute([[CREATE TABLE t1(a INTEGER PRIMARY KEY,
+                                      b INT UNIQUE, e INT);]])
+
+        -- Seed entries.
+        box.execute("INSERT INTO t1 VALUES(1, 4, 6);")
+        box.execute("INSERT INTO t1 VALUES(2, 5, 7);")
+
+        -- Both entries must be updated.
+        local sql = "UPDATE t1 SET e = e + 1 WHERE b IN (SELECT b FROM t1);"
+        t.assert_equals(box.execute(sql), {row_count = 2})
+
+        -- Check.
+        t.assert_equals(box.execute("SELECT e FROM t1;").rows, {{7}, {8}})
+
+        -- Cleanup.
+        box.execute("DROP TABLE t1;")
     end)
 end
