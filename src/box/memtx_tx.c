@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "txn.h"
 #include "memtx_tx.h"
 #include "memtx_space.h"
 #include "memtx_index.h"
@@ -632,6 +633,9 @@ memtx_tx_region_object_to_type(enum memtx_tx_alloc_object alloc_obj)
 	case MEMTX_TX_OBJECT_READ_TRACKER:
 		alloc_type = MEMTX_TX_ALLOC_TRACKER;
 		break;
+	case MEMTX_TX_OBJECT_STMT_DEL_STORY_LINK:
+		alloc_type = MEMTX_TX_ALLOC_STMT_DEL_STORY_LINK;
+		break;
 	default:
 		unreachable();
 	};
@@ -656,6 +660,11 @@ memtx_tx_xregion_alloc_object(struct txn *txn,
 		alloc = xregion_alloc_object(&txn->region,
 					     struct tx_read_tracker);
 		size = sizeof(struct tx_read_tracker);
+		break;
+	case MEMTX_TX_OBJECT_STMT_DEL_STORY_LINK:
+		alloc = xregion_alloc_object(&txn->region,
+					     struct memtx_del_story_link);
+		size = sizeof(struct memtx_del_story_link);
 		break;
 	default:
 		unreachable();
@@ -684,6 +693,7 @@ memtx_tx_xregion_alloc(struct txn *txn, size_t size,
 const char *memtx_tx_alloc_type_strs[MEMTX_TX_ALLOC_TYPE_MAX] = {
 	"trackers",
 	"conflicts",
+	"stmt_del_story_list",
 };
 
 /** String representation of enum memtx_tx_story_status. */
@@ -1276,12 +1286,29 @@ static void
 memtx_tx_story_link_deleted_by(struct memtx_story *story,
 			       struct txn_stmt *stmt)
 {
-	assert(stmt->del_story == NULL);
-	assert(stmt->next_in_del_list == NULL);
-
-	stmt->del_story = story;
-	stmt->next_in_del_list = story->del_stmt;
+	struct memtx_del_story_link *prev = stmt->del_story_list;
+	stmt->del_story_list = memtx_tx_xregion_alloc_object(
+				stmt->txn, MEMTX_TX_OBJECT_STMT_DEL_STORY_LINK);
+	stmt->del_story_list->story = story;
+	stmt->del_story_list->next = prev;
+	stmt->del_story_list->next_del_stmt = story->del_stmt;
 	story->del_stmt = stmt;
+}
+
+/**
+ * Find an entry deleting @a story in @a stmt->del_story_list.
+ *
+ * @return NULL if no entry found.
+ */
+static struct memtx_del_story_link *
+memtx_tx_stmt_del_story_find(struct txn_stmt *stmt, struct memtx_story *story)
+{
+	for (struct memtx_del_story_link *link = stmt->del_story_list;
+	     link != NULL; link = link->next) {
+		if (link->story == story)
+			return link;
+	}
+	return NULL;
 }
 
 /**
@@ -1292,17 +1319,30 @@ static void
 memtx_tx_story_unlink_deleted_by(struct memtx_story *story,
 				 struct txn_stmt *stmt)
 {
-	assert(stmt->del_story == story);
-
-	/* Find a place in list from which stmt must be deleted. */
+	/*
+	 * Unlink the entry from del_story_list->next_del_stmt:
+	 * the story is not deleted by the statement anymore.
+	 */
 	struct txn_stmt **ptr = &story->del_stmt;
+	struct memtx_del_story_link *link = memtx_tx_stmt_del_story_find(*ptr,
+									 story);
 	while (*ptr != stmt) {
-		ptr = &(*ptr)->next_in_del_list;
-		assert(ptr != NULL);
+		ptr = &link->next_del_stmt;
+		link = memtx_tx_stmt_del_story_find(*ptr, story);
+		assert(link != NULL);
 	}
-	*ptr = stmt->next_in_del_list;
-	stmt->next_in_del_list = NULL;
-	stmt->del_story = NULL;
+	*ptr = link->next_del_stmt;
+
+	/*
+	 * Unlink the entry from del_story_list->next:
+	 * the statement does not delete the story anymore.
+	 */
+	struct memtx_del_story_link **plink = &stmt->del_story_list;
+	while ((*plink)->story != story)
+		plink = &(*plink)->next;
+	*plink = (*plink)->next;
+
+	/* The dropped del_story_list entry will be freed with the stmt->txn. */
 }
 
 /**
@@ -1785,11 +1825,11 @@ memtx_tx_story_is_deleted_by_txn(struct memtx_story *story, struct txn *txn,
 			 *   not aborted, @story has definitely not been touched
 			 *   by any other transaction.
 			 * Thus, the presence of a statement stmt inside @txn
-			 * such that stmt->del_story == story, combined with the
-			 * presence of a read-tracker (@story, @txn), guarantees
-			 * that either @txn will be aborted, or it will commit
-			 * successfully, and in that case no other transaction
-			 * will delete or replace @story.
+			 * such that one of stmt->del_story_list->story == story
+			 * combined with the presence of a read-tracker (@story,
+			 * @txn), guarantees that either @txn will be aborted,
+			 * or it will commit successfully, and in that case no
+			 * other transaction will delete or replace @story.
 			 */
 			*is_own_change = false;
 			struct tx_read_tracker *tracker;
@@ -1802,7 +1842,7 @@ memtx_tx_story_is_deleted_by_txn(struct memtx_story *story, struct txn *txn,
 			}
 			return true;
 		}
-		dels = dels->next_in_del_list;
+		dels = memtx_tx_stmt_del_story_find(dels, story)->next_del_stmt;
 	}
 	*is_own_change = false;
 	return false;
@@ -2638,13 +2678,13 @@ memtx_tx_handle_dups_in_secondary_index(
 		 * precedence delete.
 		 */
 		if (newer_story->link[ind].is_own_change &&
-		    test_stmt->del_story == NULL)
+		    test_stmt->del_story_list == NULL)
 			continue;
 		/*
 		 * Ignore the case when other TX overwrites in both
 		 * primary and secondary index.
 		 */
-		if (test_stmt->del_story == story)
+		if (memtx_tx_stmt_del_story_find(test_stmt, story) != NULL)
 			continue;
 		txn_abort_with_conflict(test_stmt->txn);
 	}
@@ -2690,7 +2730,13 @@ static void
 memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 {
 	struct memtx_story *add_story = stmt->add_story;
-	struct memtx_story *del_story = stmt->del_story;
+	struct memtx_del_story_link *del_story_list = stmt->del_story_list;
+	if (del_story_list != NULL) {
+		/* If has add_story, should not have more than one del_story. */
+		assert(del_story_list->next == NULL);
+	}
+	struct memtx_story *del_story = del_story_list != NULL ?
+					del_story_list->story : NULL;
 
 	/*
 	 * Sink the story to the end of chain and mark it as deleted long
@@ -2730,7 +2776,8 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 		struct txn_stmt **from = &add_story->del_stmt;
 		while (*from != NULL) {
 			struct txn_stmt *test_stmt = *from;
-			assert(test_stmt->del_story == add_story);
+			assert(memtx_tx_stmt_del_story_find(test_stmt,
+							    add_story) != NULL);
 			assert(test_stmt->txn != stmt->txn);
 			struct memtx_story *test_story = test_stmt->add_story;
 			(void)test_story;
@@ -2739,9 +2786,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			assert(test_stmt->txn->psn == 0);
 
 			/* Unlink from add_story list. */
-			*from = test_stmt->next_in_del_list;
-			test_stmt->next_in_del_list = NULL;
-			test_stmt->del_story = NULL;
+			memtx_tx_story_unlink_deleted_by(add_story, test_stmt);
 
 			if (del_story != NULL) {
 				/* Link to del_story's list. */
@@ -2801,11 +2846,9 @@ memtx_tx_abort_gap_readers_on_rollback(
  * Rollback deletion of story by statement.
  */
 static void
-memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
+memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt,
+					struct memtx_story *del_story)
 {
-	struct memtx_story *del_story = stmt->del_story;
-	assert(del_story != NULL);
-
 	/*
 	 * In case of rollback of prepared statement we need to rollback
 	 * preparation actions and abort other transactions that managed
@@ -2830,7 +2873,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 			if (test_story->link[0].is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
-			assert(test_stmt->del_story == NULL);
+			assert(test_stmt->del_story_list == NULL);
 			assert(test_stmt->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
 		}
@@ -2843,6 +2886,15 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 
 	/* Unlink the story from the statement. */
 	memtx_tx_story_unlink_deleted_by(del_story, stmt);
+}
+
+static void
+memtx_tx_history_rollback_deleted_stories(struct txn_stmt *stmt)
+{
+	for (struct memtx_del_story_link *link = stmt->del_story_list;
+	     link != NULL; link = link->next) {
+		memtx_tx_history_rollback_deleted_story(stmt, link->story);
+	}
 }
 
 /**
@@ -2895,25 +2947,30 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
 		assert(stmt->add_story->add_psn == stmt->txn->psn);
 	}
-	if (stmt->del_story != NULL)
-		assert(stmt->del_story->del_psn == stmt->txn->psn);
-	/*
-	 * There can be no more than one prepared statement deleting a story at
-	 * any point in time.
-	 */
-	assert(stmt->txn->psn == 0 || stmt->next_in_del_list == NULL);
+	if (stmt->del_story_list != NULL) {
+		for (struct memtx_del_story_link *link = stmt->del_story_list;
+		     link != NULL; link = link->next) {
+			assert(link->story->del_psn == stmt->txn->psn);
+			/*
+			 * There can be no more than one prepared statement
+			 * deleting a story at any point in time.
+			 */
+			assert(stmt->txn->psn == 0 ||
+			       link->next_del_stmt == NULL);
+		}
+	}
 
 	/*
-	 * Note that both add_story and del_story can be NULL,
+	 * Note that both add_story and del_story_list can be NULL,
 	 * see comment in memtx_tx_history_prepare_stmt.
 	 */
 	if (stmt->add_story != NULL)
 		memtx_tx_history_rollback_added_story(stmt);
-	else if (stmt->del_story != NULL)
-		memtx_tx_history_rollback_deleted_story(stmt);
+	else if (stmt->del_story_list != NULL)
+		memtx_tx_history_rollback_deleted_stories(stmt);
 	else
 		memtx_tx_history_rollback_empty_stmt(stmt);
-	assert(stmt->add_story == NULL && stmt->del_story == NULL);
+	assert(stmt->add_story == NULL && stmt->del_story_list == NULL);
 }
 
 /**
@@ -2992,12 +3049,14 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	/* Consistency asserts. */
 	{
 		assert(story->del_stmt == NULL ||
-		       story->del_stmt->next_in_del_list == NULL);
+		       memtx_tx_stmt_del_story_find(
+				story->del_stmt, story)->next_del_stmt == NULL);
 		struct memtx_story *old_story = story->link[0].older_story;
-		if (stmt->del_story == NULL)
+		if (stmt->del_story_list == NULL)
 			assert(old_story == NULL || old_story->del_psn != 0);
 		else
-			assert(old_story == stmt->del_story);
+			assert(stmt->del_story_list->story == old_story &&
+			       stmt->del_story_list->next == NULL);
 		(void)old_story;
 	}
 
@@ -3005,7 +3064,9 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	 * Set newer (in-progress) statements in the primary chain to delete
 	 * this story.
 	 */
-	if (stmt->del_story == NULL) {
+	struct memtx_story *del_story = stmt->del_story_list != NULL ?
+					stmt->del_story_list->story : NULL;
+	if (del_story == NULL) {
 		/*
 		 * This statement replaced nothing. That means that before
 		 * this preparation there was no visible tuple in index, and
@@ -3022,7 +3083,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			if (test_story->link[0].is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
-			assert(test_stmt->del_story == NULL);
+			assert(test_stmt->del_story_list == NULL);
 			assert(test_stmt->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
@@ -3035,22 +3096,24 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * they deleted or replaced that another tuple. They must be
 		 * told that they replace this tuple now.
 		 */
-		struct txn_stmt **from = &stmt->del_story->del_stmt;
+		struct txn_stmt **from = &stmt->del_story_list->story->del_stmt;
 		while (*from != NULL) {
 			struct txn_stmt *test_stmt = *from;
-			assert(test_stmt->del_story == stmt->del_story);
+			assert(memtx_tx_stmt_del_story_find(test_stmt,
+							    del_story) != NULL);
 			if (test_stmt == stmt) {
 				/* Leave this statement, go to the next. */
-				from = &test_stmt->next_in_del_list;
+				struct memtx_del_story_link *link =
+					memtx_tx_stmt_del_story_find(*from,
+								     del_story);
+				from = &link->next_del_stmt;
 				continue;
 			}
 			assert(test_stmt->txn != stmt->txn);
 			assert(test_stmt->txn->psn == 0);
 
 			/* Unlink from old story list. */
-			*from = test_stmt->next_in_del_list;
-			test_stmt->next_in_del_list = NULL;
-			test_stmt->del_story = NULL;
+			memtx_tx_story_unlink_deleted_by(del_story, test_stmt);
 
 			/* Link to story's list. */
 			memtx_tx_story_link_deleted_by(story, test_stmt);
@@ -3058,13 +3121,12 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	}
 
 	/* Handle main conflicts. */
-	if (stmt->del_story != NULL) {
+	if (del_story != NULL) {
 		/*
-		 * The story stmt->del_story ends by now. Every TX that
+		 * The story del_story ends by now. Every TX that
 		 * depend on it must go to read view or be aborted.
 		 */
-		memtx_tx_handle_conflict_story_readers(stmt->del_story,
-						       stmt->txn);
+		memtx_tx_handle_conflict_story_readers(del_story, stmt->txn);
 	} else {
 		/*
 		 * A tuple is inserted. Every TX that depends on absence of
@@ -3079,8 +3141,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 
 	/* Finally set PSNs in stories to mark them add/delete as prepared. */
 	stmt->add_story->add_psn = stmt->txn->psn;
-	if (stmt->del_story != NULL)
-		stmt->del_story->del_psn = stmt->txn->psn;
+	if (del_story != NULL)
+		del_story->del_psn = stmt->txn->psn;
 
 	for (uint32_t i = 1; i < story->index_count; i++) {
 		struct memtx_story *top_story =
@@ -3100,45 +3162,60 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 
 /**
  * Helper of memtx_tx_history_prepare_stmt. Do the job in case when
- * stmt->add_story == NULL, that is DELETE etc.
+ * stmt->add_story == NULL, that is DELETE, DELETE_RANGE etc.
+ */
+static void
+memtx_tx_history_prepare_del_story(struct txn_stmt *stmt,
+				   struct memtx_story *del_story)
+{
+	assert(memtx_tx_stmt_del_story_find(stmt, del_story) != NULL);
+	/*
+	 * There can be other transactions that want to delete old_story.
+	 * Since the story ends, all of them must be unlinked from the story.
+	 */
+	struct txn_stmt **from = &del_story->del_stmt;
+	while (*from != NULL) {
+		struct txn_stmt *test_stmt = *from;
+		assert(memtx_tx_stmt_del_story_find(test_stmt,
+						    del_story) != NULL);
+		if (test_stmt == stmt) {
+			/* Leave this statement, go to the next. */
+			struct memtx_del_story_link *link =
+				memtx_tx_stmt_del_story_find(*from, del_story);
+			from = &link->next_del_stmt;
+			continue;
+		}
+		assert(test_stmt->txn != stmt->txn);
+		assert(test_stmt->txn->psn == 0);
+
+		/* Unlink from old story list. */
+		memtx_tx_story_unlink_deleted_by(del_story, test_stmt);
+	}
+
+	/*
+	 * The story del_story ends by now. Every TX that
+	 * depend on it must go to read view or be aborted.
+	 */
+	memtx_tx_handle_conflict_story_readers(del_story, stmt->txn);
+
+	/* Finally set PSN in story to mark its deletion as prepared. */
+	del_story->del_psn = stmt->txn->psn;
+}
+
+/**
+ * Helper of memtx_tx_history_prepare_stmt. Do the job in case when
+ * stmt->add_story == NULL, that is DELETE, DELETE_RANGE etc.
  */
 static void
 memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
 {
 	assert(stmt->add_story == NULL);
-	assert(stmt->del_story != NULL);
+	assert(stmt->del_story_list != NULL);
 
-	/*
-	 * There can be other transactions that want to delete old_story.
-	 * Since the story ends, all of them must be unlinked from the story.
-	 */
-	struct txn_stmt **from = &stmt->del_story->del_stmt;
-	while (*from != NULL) {
-		struct txn_stmt *test_stmt = *from;
-		assert(test_stmt->del_story == stmt->del_story);
-		if (test_stmt == stmt) {
-			/* Leave this statement, go to the next. */
-			from = &test_stmt->next_in_del_list;
-			continue;
-		}
-		assert(test_stmt->txn != stmt->txn);
-		assert(test_stmt->del_story == stmt->del_story);
-		assert(test_stmt->txn->psn == 0);
-
-		/* Unlink from old story list. */
-		*from = test_stmt->next_in_del_list;
-		test_stmt->next_in_del_list = NULL;
-		test_stmt->del_story = NULL;
+	for (struct memtx_del_story_link *link = stmt->del_story_list;
+	     link != NULL; link = link->next) {
+		memtx_tx_history_prepare_del_story(stmt, link->story);
 	}
-
-	/*
-	 * The story stmt->del_story ends by now. Every TX that
-	 * depend on it must go to read view or be aborted.
-	 */
-	memtx_tx_handle_conflict_story_readers(stmt->del_story, stmt->txn);
-
-	/* Finally set PSN in story to mark its deletion as prepared. */
-	stmt->del_story->del_psn = stmt->txn->psn;
 }
 
 void
@@ -3147,10 +3224,10 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 	assert(stmt->txn->psn != 0);
 	assert(stmt->space != NULL);
 	if (stmt->space->def->opts.is_ephemeral)
-		assert(stmt->add_story == NULL && stmt->del_story == NULL);
+		assert(stmt->add_story == NULL && stmt->del_story_list == NULL);
 
 	/*
-	 * Note that both add_story and del_story can be NULL in cases:
+	 * Note that both add_story and del_story_list can be NULL in cases:
 	 * * The space is is_ephemeral.
 	 * * It's an initial recovery.
 	 * * It's a deletion from space by key that was not found in the space.
@@ -3158,7 +3235,7 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 	 */
 	if (stmt->add_story != NULL)
 		memtx_tx_history_prepare_insert_stmt(stmt);
-	else if (stmt->del_story != NULL)
+	else if (stmt->del_story_list != NULL)
 		memtx_tx_history_prepare_delete_stmt(stmt);
 
 	memtx_tx_story_gc();
@@ -3175,7 +3252,8 @@ void
 memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 {
 	struct tuple *old_tuple, *new_tuple;
-	old_tuple = stmt->del_story == NULL ? NULL : stmt->del_story->tuple;
+	old_tuple = stmt->del_story_list != NULL ?
+		    stmt->del_story_list->story->tuple : NULL;
 	new_tuple = stmt->add_story == NULL ? NULL : stmt->add_story->tuple;
 	memtx_space_update_tuple_stat(stmt->space, old_tuple, new_tuple);
 
@@ -3183,9 +3261,10 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 		assert(stmt->add_story->add_stmt == stmt);
 		memtx_tx_story_unlink_added_by(stmt->add_story, stmt);
 	}
-	if (stmt->del_story != NULL) {
-		assert(stmt->del_story->del_stmt == stmt);
-		memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
+	for (struct memtx_del_story_link *link = stmt->del_story_list;
+	     link != NULL; link = link->next) {
+		assert(link->story->del_stmt == stmt);
+		memtx_tx_story_unlink_deleted_by(link->story, stmt);
 	}
 	memtx_tx_story_gc();
 }
