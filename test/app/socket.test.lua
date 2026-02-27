@@ -134,6 +134,10 @@ s:close()
 
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', true)
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
+s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', false)
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
 s:bind('127.0.0.1', 0)
 s:listen(128)
 
@@ -228,7 +232,6 @@ function aexitst(ai, hostnames, port)
     end
     return ai
 end;
-
 
 aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), {'127.0.0.1', '::1'}, 80 );
@@ -366,7 +369,6 @@ fiber.cancel(f)
 while f:status() ~= 'dead' do fiber.sleep(0.001) end
 master:close()
 f = nil
-
 
 path = 'tarantool-test-socket'
 s = socket('PF_UNIX', 'SOCK_STREAM', 0)
@@ -532,7 +534,6 @@ fio.stat(path) == nil
 
 { socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
 
-
 -- wrong options for getaddrinfo
 socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == errno.EINVAL
 socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
@@ -575,7 +576,6 @@ for i = 1, 10 do
 end;
 err == nil or err;
 test_run:cmd("setopt delimiter ''");
-
 
 --------------------------------------------------------------------------------
 -- Lua Socket Emulation
