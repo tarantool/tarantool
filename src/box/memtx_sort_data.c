@@ -10,6 +10,25 @@
 #include "core/assoc.h"
 #include "trivia/util.h"
 
+#include "tweaks.h"
+#include <zstd.h> 
+#include <assert.h>
+#include <lz4.h>
+
+uint64_t MEMTX_SORT_DATA_LZ4_ACCELERATION = 10;
+TWEAK_UINT(MEMTX_SORT_DATA_LZ4_ACCELERATION);
+
+uint64_t MEMTX_SORT_DATA_ZSTD_LEVEL = 3;
+TWEAK_UINT(MEMTX_SORT_DATA_ZSTD_LEVEL);
+
+enum compression{
+	LZ_4,
+	ZSTD
+};
+
+static enum compression COMPRESSION_TYPE = ZSTD;
+
+
 /**
  * Maps: (space_id, index_id) => (sort data entry information).
  */
@@ -39,8 +58,10 @@ struct memtx_sort_data_reader_entry {
 	struct memtx_sort_data_key key;
 	/** The offset of the sort data in the file. */
 	long offset;
-	/** The physical size of the sort data. */
+	/**The logical size of sort data. */
 	long psize;
+	/** The physical size of the sort data. */
+	long csize;
 	/** The amount of tuples stored. */
 	long len;
 };
@@ -53,8 +74,10 @@ struct memtx_sort_data_writer_entry {
 	long header_entry_offset;
 	/** The offset of the sort data in the file. */
 	long offset;
-	/** The physical size of the sort data. */
+	/**The logical size of sort data */
 	long psize;
+	/** The physical size of the sort data. */
+	long csize;
 	/** The amount of tuples stored. */
 	long len;
 };
@@ -93,6 +116,11 @@ struct memtx_sort_data_writer {
 	struct memtx_sort_data_writer_entry *curr_entry;
 	/** The offset to the next index entry in the file header. */
 	long next_header_entry_offset;
+
+	/**Temporary buf for uncompressed sort data */
+	char *sk_buf;
+	size_t sk_buf_capacity;
+	size_t sk_buf_size;
 };
 
 /** The sort data reader context. */
@@ -128,7 +156,7 @@ static const char *ENTRIES_FMT = "Entries: %010u\n";
  * All the values have a fixed size, so one can put any value here when this
  * part is created and return back to write valid values once they're known.
  */
-static const char *ENTRY_FMT = "%010u/%010u: %016lx, %016lx, %020ld\n";
+static const char *ENTRY_FMT = "%010u/%010u: %016lx, %016lx, %016lx, %020ld\n";
 
 const char *
 memtx_sort_data_filename(const char *snap_filename)
@@ -198,6 +226,10 @@ memtx_sort_data_writer_new(void)
 	memset(writer->filename, 0, sizeof(writer->filename));
 	writer->entries = mh_memtx_sort_data_writer_entries_new();
 	writer->curr_entry = NULL;
+
+	writer->sk_buf = NULL;
+	writer->sk_buf_capacity = 0;
+	writer->sk_buf_size = 0;
 	return writer;
 }
 
@@ -206,6 +238,7 @@ memtx_sort_data_writer_delete(struct memtx_sort_data_writer *writer)
 {
 	assert(writer->fp == NULL); /* Either closed or discarded. */
 	mh_memtx_sort_data_writer_entries_delete(writer->entries);
+	free(writer->sk_buf);
 	free(writer);
 }
 
@@ -242,6 +275,7 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 	if (writer_printf(writer,
 			  "SORTDATA\n"
 			  "1\n"
+			  "2\n"
 			  "Version: %s\n"
 			  "Instance: %s\n"
 			  "VClock: %s\n\n",
@@ -276,7 +310,7 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 				continue;
 			assert(i == 0 || memtx_index_def_supports_sort_data(
 					space_rv->index_map[i]->def));
-			writer_printf(writer, ENTRY_FMT, 0, 0, 0L, 0L, 0L);
+			writer_printf(writer, ENTRY_FMT, 0, 0, 0L, 0L, 0L, 0L);
 			entry_count++;
 		}
 	}
@@ -359,9 +393,10 @@ memtx_sort_data_writer_begin(struct memtx_sort_data_writer *writer,
 	entry.offset = file_end_offset;
 	entry.header_entry_offset = writer->next_header_entry_offset;
 	mh_int_t i = mh_memtx_sort_data_writer_entries_put(writer->entries,
-							   &entry, NULL, NULL);
-	writer->next_header_entry_offset += strlen(tt_sprintf(ENTRY_FMT, 0,
-							      0, 0L, 0L, 0L));
+	 						   &entry, NULL, NULL);
+	// writer->next_header_entry_offset += strlen(tt_sprintf(ENTRY_FMT, 0,
+	// 						      0, 0L, 0L, 0L));
+	writer->next_header_entry_offset += strlen(tt_sprintf(ENTRY_FMT, 0, 0, 0L, 0L, 0L, 0L));	
 	writer->curr_entry =
 		mh_memtx_sort_data_writer_entries_node(writer->entries, i);
 	return 0;
@@ -372,14 +407,45 @@ memtx_sort_data_writer_put(struct memtx_sort_data_writer *writer,
 			   void *data, size_t size, size_t count)
 {
 	assert(writer->curr_entry != NULL);
-	if (fwrite(data, size, count, writer->fp) != count) {
-		diag_set(SystemError, "%s: failed to write the sort data",
-			 writer->filename);
-		return -1;
+	struct memtx_sort_data_writer_entry *entry = writer->curr_entry;
+	// if (fwrite(data, size, count, writer->fp) != count) {
+	// 	diag_set(SystemError, "%s: failed to write the sort data",
+	// 		 writer->filename);
+	// 	return -1;
+	// }
+	// writer->curr_entry->psize += size * count;
+	// writer->curr_entry->len += count;
+	// return 0;
+	if (entry->key.index_id == 0) {
+		if (fwrite(data, size, count, writer->fp) != count) {
+			diag_set(SystemError, "%s: failed to write the sort data",
+				 writer->filename);
+			return -1;
+		}
+		entry->psize += (long)(size * count);
+		entry->len += (long)count;
+		return 0;
 	}
-	writer->curr_entry->psize += size * count;
-	writer->curr_entry->len += count;
+
+	size_t chunk_size = size * count;
+	size_t need = writer->sk_buf_size + chunk_size;
+
+	if (need > writer->sk_buf_capacity) {
+		size_t new_cap = writer->sk_buf_capacity ? writer->sk_buf_capacity : 4096;
+		while (new_cap < need)
+			new_cap *= 2;
+		char *new_buf = (char *)xrealloc(writer->sk_buf, new_cap);
+		writer->sk_buf = new_buf;
+		writer->sk_buf_capacity = new_cap;
+	}
+
+	memcpy(writer->sk_buf + writer->sk_buf_size, data, chunk_size);
+	writer->sk_buf_size += chunk_size;
+
+	entry->psize += (long)chunk_size;
+	entry->len += (long)count;
 	return 0;
+
 }
 
 int
@@ -395,11 +461,93 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 	/* Update the dummy sort data entry in the file header. */
 	assert(writer->curr_entry != NULL);
 	struct memtx_sort_data_writer_entry *entry = writer->curr_entry;
+	// if (writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
+	//     writer_printf(writer, ENTRY_FMT, entry->key.space_id,
+	// 		  entry->key.index_id, entry->offset,
+	// 		  entry->psize, entry->len) != 0)
+	// 	return -1;
+
+	if (entry->key.index_id != 0) {
+		if (writer_seek(writer, entry->offset, SEEK_SET) != 0)
+			return -1;
+
+		if (entry->psize == 0) {
+			entry->csize = 0;
+		} else if (COMPRESSION_TYPE == LZ_4 && entry->psize > INT_MAX) {
+			printf("LZ4: %lu", MEMTX_SORT_DATA_LZ4_ACCELERATION);
+			if (fwrite(writer->sk_buf, 1, entry->psize, writer->fp) !=
+			    (size_t)entry->psize) {
+				diag_set(SystemError, "%s: failed to write the sort data",
+					 writer->filename);
+				return -1;
+			}
+			entry->csize = entry->psize;
+		} else {
+			int src_size = (int)entry->psize;
+			size_t max_dst = 0;
+			size_t dst_size = 0;
+			char *dst = NULL;
+
+			if (COMPRESSION_TYPE == LZ_4) {
+				max_dst = (size_t)LZ4_compressBound(src_size);
+				dst = (char *)xmalloc(max_dst);
+
+				int rc = LZ4_compress_fast(writer->sk_buf, dst,
+							   src_size, (int)max_dst,
+							   (int)MEMTX_SORT_DATA_LZ4_ACCELERATION);
+				
+				if (rc > 0 && rc <= (int)max_dst)
+					dst_size = (size_t)rc;
+				else
+					dst_size = 0;
+			} else if (COMPRESSION_TYPE == ZSTD) {
+				printf("ZSTD: %lu", MEMTX_SORT_DATA_ZSTD_LEVEL);
+				
+				max_dst = ZSTD_compressBound((size_t)src_size);
+				dst = (char *)xmalloc(max_dst);
+
+				size_t rc = ZSTD_compress(dst, max_dst,
+							  writer->sk_buf, (size_t)src_size,
+							  MEMTX_SORT_DATA_ZSTD_LEVEL);
+				
+				if (!ZSTD_isError(rc) && rc <= max_dst)
+					dst_size = rc;
+				else
+					dst_size = 0;
+			}
+			if (dst == NULL || dst_size == 0 ||
+			    dst_size >= (size_t)entry->psize) {
+				free(dst);
+				printf("Uncompressed data\n");
+				if (fwrite(writer->sk_buf, 1, entry->psize, writer->fp) !=
+				    (size_t)entry->psize) {
+					diag_set(SystemError, "%s: failed to write the sort data",
+						 writer->filename);
+					return -1;
+				}
+				entry->csize = entry->psize;
+			} else {
+				printf("Compressed data\n");
+				if (fwrite(dst, 1, dst_size, writer->fp) != dst_size) {
+					free(dst);
+					diag_set(SystemError, "%s: failed to write the sort data",
+						 writer->filename);
+					return -1;
+				}
+				entry->csize = (long)dst_size;
+				free(dst);
+			}
+		}
+		writer->sk_buf_size = 0;
+	} else {
+		entry->csize = entry->psize;
+	}
+
 	if (writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
 	    writer_printf(writer, ENTRY_FMT, entry->key.space_id,
 			  entry->key.index_id, entry->offset,
-			  entry->psize, entry->len) != 0)
-		return -1;
+			  entry->psize, entry->csize, entry->len) != 0)
+		return -1;	
 	writer->curr_entry = NULL;
 	return 0;
 }
@@ -463,6 +611,10 @@ memtx_sort_data_reader_new(const char *snap_filename,
 	/* Verify the file version. */
 	if (memtx_sort_data_header_expect(reader, "1\n") == NULL)
 		goto fail_close;
+	
+	/* Verify the file version. */
+	if (memtx_sort_data_header_expect(reader, "2\n") == NULL)
+		goto fail_close;
 
 	/* Skip the Tarantool version. */
 	if (memtx_sort_data_header_expect(reader, "Version: ") == NULL)
@@ -522,12 +674,18 @@ memtx_sort_data_reader_new(const char *snap_filename,
 	/* Get the sort data entries. */
 	for (unsigned i = 0; i < entry_count; i++) {
 		struct memtx_sort_data_reader_entry entry;
-		if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
-			   &entry.key.index_id, &entry.offset,
-			   &entry.psize, &entry.len) != 5) {
-			say_error("%s: entry read failed", reader->filename);
-			goto fail_close;
-		}
+		// if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
+		// 	   &entry.key.index_id, &entry.offset,
+		// 	   &entry.psize, &entry.len) != 5) {
+		// 	say_error("%s: entry read failed", reader->filename);
+		// 	goto fail_close;
+		// }
+ 		if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
+ 				   &entry.key.index_id, &entry.offset,
+ 				   &entry.psize, &entry.csize, &entry.len) != 6) {
+ 			say_error("%s: entry read failed", reader->filename);
+ 			goto fail_close;
+ 		}		
 		mh_memtx_sort_data_entries_put(reader->entries,
 					       &entry, NULL, NULL);
 	}
@@ -665,22 +823,97 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 			 reader->filename, "SK size is invalid");
 		return -1;
 	}
-	if (fread(buffer, 1, entry->psize,
-		  reader->fp) != (size_t)entry->psize) {
+	// if (fread(buffer, 1, entry->psize,
+	// 	  reader->fp) != (size_t)entry->psize) {
+	// 	if (feof(reader->fp)) {
+	// 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+	// 			 reader->filename, "EOF during SK read");
+	// 		return -1;
+	// 	} else {
+	// 		diag_set(SystemError, "%s: space %u: failed to read "
+	// 			 " index #%u data", reader->filename,
+	// 			 entry->key.space_id, entry->key.index_id);
+	// 		return -1;
+	// 	}
+	// }
+	// return 0;
+	if (entry->csize == entry->psize) {
+		if (fread(buffer, 1, entry->psize,
+			  reader->fp) != (size_t)entry->psize) {
+			if (feof(reader->fp)) {
+				diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+					 reader->filename, "EOF during SK read");
+				return -1;
+			} else {
+				diag_set(SystemError, "%s: space %u: failed to read "
+					 " index #%u data", reader->filename,
+					 entry->key.space_id, entry->key.index_id);
+				return -1;
+			}
+		}
+		return 0;
+	}
+
+	if (entry->csize <= 0) {
+		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+			 reader->filename, "SK compressed size is invalid");
+		return -1;
+	}
+
+	if (COMPRESSION_TYPE == LZ_4 &&
+	    (entry->psize > INT_MAX || entry->csize > INT_MAX)) {
+		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+			 reader->filename, "SK block is too big for LZ4");
+		return -1;
+	}
+
+	char *compressed = (char *)xmalloc((size_t)entry->csize);
+	if (fread(compressed, 1, entry->csize,
+		  reader->fp) != (size_t)entry->csize) {
 		if (feof(reader->fp)) {
+			free(compressed);
 			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
 				 reader->filename, "EOF during SK read");
 			return -1;
 		} else {
+			free(compressed);
 			diag_set(SystemError, "%s: space %u: failed to read "
 				 " index #%u data", reader->filename,
 				 entry->key.space_id, entry->key.index_id);
 			return -1;
 		}
 	}
+	if (COMPRESSION_TYPE == LZ_4) {
+		int decoded = LZ4_decompress_safe(compressed, buffer,
+						  (int)entry->csize,
+						  (int)entry->psize);
+		free(compressed);
+
+		if (decoded < 0 || decoded != (int)entry->psize) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "LZ4 decompression failed");
+			return -1;
+		}
+	} else if (COMPRESSION_TYPE == ZSTD) {
+		size_t decoded = ZSTD_decompress(buffer, (size_t)entry->psize,
+						 compressed, (size_t)entry->csize);
+		free(compressed);
+
+		if (ZSTD_isError(decoded) ||
+		    decoded != (size_t)entry->psize) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "ZSTD decompression failed");
+			return -1;
+		}
+	} else {
+		free(compressed);
+		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+			 reader->filename, "Unknown compression type");
+		return -1;
+	}
+
 	return 0;
 }
-
 struct tuple *
 memtx_sort_data_reader_resolve_tuple(struct memtx_sort_data_reader *reader,
 				     struct tuple *old_ptr)
