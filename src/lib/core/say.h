@@ -70,6 +70,14 @@ enum say_format {
 	say_format_MAX
 };
 
+/** Log module configuration. */
+struct say_module {
+	/** Module name. */
+	const char *name;
+	/** Module log level. */
+	int log_level;
+};
+
 /**
  * Logging level.
  */
@@ -157,6 +165,8 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 				 int line, const char *error,
 				 const char *format, va_list ap);
 
+struct mh_strnu32_t;
+
 /**
  * A log object. There is a singleton for the default log.
  */
@@ -165,6 +175,10 @@ struct log {
 	int fd;
 	/** The current log level. */
 	int level;
+	/** Hash table: module name -> log level. */
+	struct mh_strnu32_t *modules;
+	/** Mutex protecting the modules configuration. */
+	pthread_mutex_t modules_mutex;
 	enum say_logger_type type;
 	/* Type of syslog destination. */
 	enum say_syslog_server_type syslog_server_type;
@@ -257,6 +271,26 @@ void
 log_set_level(struct log *log, enum say_level level);
 
 /**
+ * Update the log module configuration. Can be used dynamically.
+ *
+ * @param log           log object
+ * @param modules       configuration array, last entry's name must be NULL
+ */
+void
+log_set_modules(struct log *log, const struct say_module *modules);
+
+/**
+ * Get log level of a log module or return the global log level
+ * if the module is not configured.
+ *
+ * @param log   log object
+ * @param name  module name
+ * @retval      log level
+ */
+int
+log_get_module_log_level(struct log *log, const char *name);
+
+/**
  * Set log format. Can be used dynamically.
  *
  * @param log		log object
@@ -286,6 +320,18 @@ say_get_log_level(void);
  */
 void
 say_set_log_format(enum say_format format);
+
+/**
+ * Update the log module configuration for the default logger.
+ */
+void
+say_set_modules(const struct say_module *modules);
+
+/**
+ * Get log level of a log module for the default logger.
+ */
+int
+say_get_module_log_level(const char *name);
 
 /**
  * Set flight recorder log level.

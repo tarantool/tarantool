@@ -5,11 +5,22 @@ ffi.cdef[[
     typedef void (*sayfunc_t)(int level, const char *filename, int line,
                const char *error, const char *format, ...);
 
+    struct say_module {
+        const char *name;
+        int log_level;
+    };
+
     void
     say_set_log_level(int new_level);
 
     void
     say_set_log_format(enum say_format format);
+
+    void
+    say_set_modules(const struct say_module *modules);
+
+    int
+    say_get_module_log_level(const char *name);
 
     int
     say_check_cfg(const char *log,
@@ -157,7 +168,7 @@ end
 -- Main routine which pass data to C logging code.
 local function say(self, level, fmt, ...)
     local name = self and self.name
-    local module_level = name and log_cfg.modules and log_cfg.modules[name] or
+    local module_level = name and ffi.C.say_get_module_log_level(name) or
                          log_cfg.level
     if level > log_normalize_level(module_level) and
        level > ffi.C.log_level_flightrec then
@@ -269,8 +280,7 @@ local log_initialized = false
 -- Convert cfg options to types suitable for ffi say_ functions.
 local function log_C_cfg(cfg)
     local cfg_C = table.copy(cfg)
-    local level = cfg.modules and cfg.modules.tarantool or cfg.level
-    cfg_C.level = log_normalize_level(level)
+    cfg_C.level = log_normalize_level(cfg.level)
     local nonblock
     if cfg.nonblock ~= nil then
         nonblock = cfg.nonblock and 1 or 0
@@ -374,6 +384,24 @@ local function set_log_format(format)
     log_debug("log: format set to '%s'", format)
 end
 
+local function set_log_modules(modules)
+    modules = modules or {}
+    local count = 0
+    for _ in pairs(modules) do
+        count = count + 1
+    end
+    local cfg = ffi.new('struct say_module[?]', count + 1)
+    local i = 0
+    for name, log_level in pairs(modules) do
+        cfg[i].name = name
+        cfg[i].log_level = log_normalize_level(log_level)
+        i = i + 1
+    end
+    cfg[count].name = nil
+    cfg[count].log_level = 0
+    ffi.C.say_set_modules(cfg)
+end
+
 local function log_configure(self, cfg, box_api)
     if not box_api then
         if not log_initialized then
@@ -387,6 +415,7 @@ local function log_configure(self, cfg, box_api)
     local cfg_C = log_C_cfg(cfg)
     ffi.C.say_logger_init(cfg_C.log, cfg_C.level,
                           cfg_C.nonblock, cfg_C.format)
+    set_log_modules(cfg.modules)
     log_initialized = true
 
     for o in pairs(option_types) do

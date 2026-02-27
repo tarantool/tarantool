@@ -309,11 +309,13 @@ port_destroy
 random_bytes
 say_check_cfg
 say_from_lua
+say_get_module_log_level
 say_logger_init
 say_logger_initialized
 say_logrotate
 say_set_log_format
 say_set_log_level
+say_set_modules
 space_bsize
 space_by_id
 space_run_triggers
