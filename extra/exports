@@ -189,6 +189,7 @@ console_set_output_format
 cord_ibuf_drop
 cord_ibuf_put
 cord_ibuf_take
+cord_is_main
 crc32_calc
 crypto_ERR_error_string
 crypto_ERR_get_error
@@ -309,6 +310,7 @@ port_destroy
 random_bytes
 say_check_cfg
 say_from_lua
+say_get_log_level
 say_get_module_log_level
 say_logger_init
 say_logger_initialized

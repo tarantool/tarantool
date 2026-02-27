@@ -13,6 +13,9 @@ ffi.cdef[[
     void
     say_set_log_level(int new_level);
 
+    int
+    say_get_log_level(void);
+
     void
     say_set_log_format(enum say_format format);
 
@@ -69,6 +72,9 @@ ffi.cdef[[
     extern void
     log_write_flightrec_from_lua(int level, const char *filename, int line,
                                  ...);
+
+    bool
+    cord_is_main(void);
 ]]
 
 local S_WARN = ffi.C.S_WARN
@@ -169,7 +175,7 @@ end
 local function say(self, level, fmt, ...)
     local name = self and self.name
     local module_level = name and ffi.C.say_get_module_log_level(name) or
-                         log_cfg.level
+                                  ffi.C.say_get_log_level()
     if level > log_normalize_level(module_level) and
        level > ffi.C.log_level_flightrec then
         return
@@ -474,20 +480,23 @@ log_main = {
     debug = log_debug,
     error = log_error,
     new = log_new,
-    rotate = log_rotate,
-    pid = log_pid,
-    level = set_log_level,
-    log_format = set_log_format,
-    cfg = setmetatable(log_cfg, {
+}
+
+if ffi.C.cord_is_main() then
+    log_main.rotate = log_rotate
+    log_main.pid = log_pid
+    log_main.level = set_log_level
+    log_main.log_format = set_log_format
+    log_main.cfg = setmetatable(log_cfg, {
         __call = function(self, cfg) log_configure(self, cfg, false) end,
-    }),
-    box_api = {
+    })
+    log_main.box_api = {
         cfg = function()
             log_configure(log_cfg, box_to_log_cfg(box.cfg), true)
         end,
         cfg_check = function() log_check_cfg(box_to_log_cfg(box.cfg)) end,
-    },
-}
+    }
+end
 
 setmetatable(log_main, {
     __serialize = function(self)
