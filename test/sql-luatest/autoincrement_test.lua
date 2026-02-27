@@ -8,7 +8,7 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function(engine)
         box.execute([[SET SESSION "sql_seq_scan" = true;]])
-        local sql = [[SET SESSION "sql_default_engine" = '%s;']]
+        local sql = [[SET SESSION "sql_default_engine" = '%s';]]
         box.execute(sql:format(engine))
     end, {cg.params.engine})
 end)
@@ -16,6 +16,31 @@ end)
 g.after_all(function(cg)
     cg.server:drop()
 end)
+
+g.test_drop_only_generated_sequences = function(cg)
+    cg.server:exec(function(engine)
+        -- Not automatic sequence should not be removed by DROP TABLE.
+        t.assert_equals(#box.space._sequence:select(), 0)
+        local test_space = box.schema.create_space('t', {
+            engine = engine,
+            format = {{'i', 'integer'}},
+        })
+        local seq = box.schema.sequence.create('S')
+        t.assert_equals(#box.space._sequence:select(), 1)
+        test_space:create_index('I', {sequence = 'S'})
+        box.execute('DROP TABLE t;')
+        t.assert_equals(#box.space._sequence:select(), 1)
+        seq:drop()
+        t.assert_equals(#box.space._sequence:select(), 0)
+
+        -- Automatic sequence should be removed at DROP TABLE, together
+        -- with all the grants.
+        box.execute('CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT);')
+        t.assert_equals(#box.space._sequence:select(), 1)
+        box.execute('DROP TABLE t;')
+        t.assert_equals(#box.space._sequence:select(), 0)
+    end, {cg.params.engine})
+end
 
 --
 -- gh-2981: Make sure that values ​​inserted
