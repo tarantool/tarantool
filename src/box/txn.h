@@ -300,6 +300,25 @@ struct txn_stmt_rollback_info {
 	struct tuple *new_tuple;
 };
 
+struct txn_stmt;
+
+/**
+ * A link to a deleted story, to another statement the story has been deleted by
+ * and to the next deleted story (if any).
+ *
+ * Only one prepared TX can delete a tuple and a story. But when there are
+ * several in-progress transactions and they delete the same tuple we have to
+ * remember several delete statements for one story. This is done in this list.
+ */
+struct memtx_del_story_link {
+	/** A story deleted by the statement. */
+	struct memtx_story *story;
+	/** Another story deleted by the statement. */
+	struct memtx_del_story_link *next;
+	/** Another statement that has deleted @a story. */
+	struct txn_stmt *next_del_stmt;
+};
+
 /**
  * A single statement of a multi-statement
  * transaction: undo and redo info.
@@ -330,19 +349,11 @@ struct txn_stmt {
 	/**
 	 * If new_tuple == NULL and this transaction was not prepared,
 	 * this member holds added story of the old_tuple.
+	 *
+	 * If the statement is IPROTO_DELETE_RANGE, it holds all deleted
+	 * tuple stories (next_story != NULL if deleted more than one).
 	 */
-	struct memtx_story *del_story;
-	/**
-	 * Link in memtx_story::del_stmt linked list.
-	 * Only one prepared TX can delete a tuple and a story. But
-	 * when there are several in-progress transactions and they delete
-	 * the same tuple we have to store several delete statements in one
-	 * story. It's implemented in that way: story has a pointer to the first
-	 * deleting statement, that statement has a pointer to the next etc,
-	 * with NULL in the end.
-	 * That member is that the pointer to next deleting statement.
-	 */
-	struct txn_stmt *next_in_del_list;
+	struct memtx_del_story_link *del_story_list;
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */

@@ -308,8 +308,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->rollback_info.old_tuple = NULL;
 	stmt->rollback_info.new_tuple = NULL;
 	stmt->add_story = NULL;
-	stmt->del_story = NULL;
-	stmt->next_in_del_list = NULL;
+	stmt->del_story_list = NULL;
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
@@ -321,7 +320,7 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 static inline void
 txn_stmt_destroy(struct txn_stmt *stmt)
 {
-	assert(stmt->add_story == NULL && stmt->del_story == NULL);
+	assert(stmt->add_story == NULL && stmt->del_story_list == NULL);
 
 	if (stmt->has_triggers)
 		trigger_destroy(&stmt->on_rollback);
