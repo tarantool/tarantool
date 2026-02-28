@@ -2734,6 +2734,22 @@ applier_f(va_list ap)
 			applier_next_state = APPLIER_STOPPED;
 			try_reconnect = false;
 		}
+		/*
+		 * If the master restarts during the initial join state and
+		 * the replica has already applied some rows, the replica might
+		 * incorrectly conclude that it has all the data. Thus, we treat
+		 * errors during APPLIER_FETCH_SNAPSHOT as unrecoverable if
+		 * replica has some data.
+		 */
+		if (applier->state == APPLIER_FETCH_SNAPSHOT &&
+		    applier->row_count > 0) {
+			say_info("Error occurred during fetching snapshot, "
+				 "but some data has "
+				 "been applied. Stopping applier");
+			applier_next_state = APPLIER_STOPPED;
+			try_reconnect = false;
+		}
+
 		struct error *err = diag_last_error(diag_get());
 		applier_set_last_error(applier, err);
 		applier_log_error(applier, err);

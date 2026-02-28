@@ -553,6 +553,10 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	engine_join_xc(&ctx, &relay->stream);
 	if (relay_flush(relay) < 0)
 		diag_raise();
+	ERROR_INJECT(ERRINJ_RELAY_INITIAL_JOIN_END_DELAY, {
+		say_warn("relay initial join is delayed");
+		ERROR_INJECT_YIELD(ERRINJ_RELAY_INITIAL_JOIN_END_DELAY);
+	});
 }
 
 int
