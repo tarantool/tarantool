@@ -5969,6 +5969,7 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	if (wal_enable() != 0)
 		diag_raise();
 
+	wal_remove_temporary_files();
 	engine_end_recovery_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
 		diag_raise();
