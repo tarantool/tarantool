@@ -2581,6 +2581,8 @@ applier_f(va_list ap)
 
 	/* Re-connect loop */
 	while (true) {
+		bool try_reconnect = true;
+		applier_state applier_next_state;
 		FiberGCChecker gc_check;
 		try {
 			/*
@@ -2648,10 +2650,7 @@ applier_f(va_list ap)
 				break;
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_TOO_EARLY_SUBSCRIBE) {
 				/*
 				 * The instance is not anonymous, and is
@@ -2661,36 +2660,24 @@ applier_f(va_list ap)
 				 * until they receive _cluster record of this
 				 * instance. From some third node, for example.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_SYNC_QUORUM_TIMEOUT ||
 				   e->errcode() == ER_SYNC_ROLLBACK) {
 				/*
 				 * Join failure due to synchronous
 				 * transaction rollback.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_CFG ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||
 				   e->errcode() == ER_CREDS_MISMATCH) {
 				/* Invalid configuration */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_SYSTEM ||
 				   e->errcode() == ER_SSL) {
 				/* System error from master instance. */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_DISCONNECTED);
-				goto reconnect;
+				applier_next_state = APPLIER_DISCONNECTED;
 			} else if (e->errcode() == ER_NIL_UUID) {
 				/*
 				 * Real tarantool can't have a nil UUID. This
@@ -2699,17 +2686,11 @@ applier_f(va_list ap)
 				 * will be replaced by a normal tarantool node
 				 * sooner or later.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier,
-						   APPLIER_DISCONNECTED);
-				goto reconnect;
+				applier_next_state = APPLIER_DISCONNECTED;
 			} else {
 				/* Unrecoverable errors */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_STOPPED);
-				break;
+				applier_next_state = APPLIER_STOPPED;
+				try_reconnect = false;
 			}
 		} catch (XlogGapError *e) {
 			/*
@@ -2734,10 +2715,7 @@ applier_f(va_list ap)
 			 * and in the meantime try to get newer changes from
 			 * node1.
 			 */
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_LOADING);
-			goto reconnect;
+			applier_next_state = APPLIER_LOADING;
 		} catch (FiberIsCancelled *e) {
 			if (!diag_is_empty(&applier->diag)) {
 				applier_disconnect(applier, APPLIER_STOPPED);
@@ -2747,26 +2725,21 @@ applier_f(va_list ap)
 			}
 			break;
 		} catch (SocketError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (SystemError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (SSLError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (Exception *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_STOPPED);
-			break;
+			applier_next_state = APPLIER_STOPPED;
+			try_reconnect = false;
 		}
+		struct error *err = diag_last_error(diag_get());
+		applier_set_last_error(applier, err);
+		applier_log_error(applier, err);
+		applier_disconnect(applier, applier_next_state);
+		if (!try_reconnect)
+			break;
 		/* Put fiber_sleep() out of catch block.
 		 *
 		 * This is done to avoid the case when two or more
@@ -2779,7 +2752,6 @@ applier_f(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-reconnect:
 		diag_clear(diag_get());
 		fiber_sleep(replication_effective_reconnect_timeout());
 	}
