@@ -50,6 +50,7 @@
 #include "memtx_index.h"
 #include "schema.h"
 #include "small/region.h"
+#include "index_build.h"
 
 /*
  * Yield every 1K tuples while building a new index or checking
@@ -1201,324 +1202,108 @@ memtx_init_ephemeral_space(struct space *space)
 	memtx_space_add_primary_key(space);
 }
 
-/*
- * Struct to allocate by memtx_build_on_replace trigger, contains
- * transactional statement triggers with their data.
- */
-struct memtx_build_stmt_trigger {
-	/** Link in memtx_ddl_state::stmt_triggers. */
-	struct rlist in_state;
-	/** See memtx_build_on_replace_rollback. */
-	struct trigger on_rollback;
-	/** See memtx_build_on_replace_commit. */
-	struct trigger on_commit;
-	/** State of the DDL. */
-	struct memtx_ddl_state *state;
-};
-
-/**
- * Rolls back a replace in the index that was done during its
- * background build.
- */
 static int
-memtx_build_on_replace_rollback(struct trigger *base, void *event)
+memtx_index_build_replace_confirmed(struct index *index, struct tuple *tuple)
 {
-	struct txn_stmt *stmt = (struct txn_stmt *)event;
-	struct memtx_build_stmt_trigger *trigger =
-		container_of(base, struct memtx_build_stmt_trigger,
-			     on_rollback);
-	struct memtx_ddl_state *state = trigger->state;
-
-	/* The trigger is fired and will be deleted - remove from the state. */
-	rlist_del_entry(trigger, in_state);
-	/*
-	 * Old tuple's format is valid if it exists.
-	 */
-	assert(stmt != NULL);
-	assert(stmt->old_tuple == NULL ||
-	       memtx_tuple_validate(state->format, stmt->old_tuple) == 0);
-
-	struct tuple *delete = NULL;
-	struct tuple *successor = NULL;
-	/*
-	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
-	 * with a duplicate at a unique index, this trigger would not be called.
-	 */
-	state->rc = memtx_index_replace(state->index, stmt->new_tuple,
-					stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-					&delete, &successor);
-	if (state->rc != 0) {
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
-	/*
-	 * All tuples stored in a memtx space are
-	 * referenced by the primary index. That is
-	 * why we need to ref new tuple and unref old tuple.
-	 */
-	if (state->index->def->iid == 0) {
-		if (stmt->old_tuple != NULL)
-			tuple_ref(stmt->old_tuple);
-		if (stmt->new_tuple != NULL)
-			tuple_unref(stmt->new_tuple);
-	}
-
-	return 0;
-}
-
-/**
- * Deletes the transactional statement triggers from
- * memtx_ddl_state::stmt_triggers since they are going to be deleted.
- */
-static int
-memtx_build_on_replace_commit(struct trigger *base, void *event)
-{
-	(void)event;
-	struct memtx_build_stmt_trigger *trigger =
-		container_of(base, struct memtx_build_stmt_trigger, on_commit);
-	rlist_del_entry(trigger, in_state);
-	return 0;
-}
-
-static int
-memtx_build_on_replace(struct trigger *trigger, void *event)
-{
-	struct txn *txn = event;
-	struct memtx_ddl_state *state = trigger->data;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-
-	struct tuple *cmp_tuple = stmt->new_tuple != NULL ? stmt->new_tuple :
-							    stmt->old_tuple;
-	/*
-	 * Only update the already built part of an index. All the other
-	 * tuples will be inserted when build continues.
-	 */
-	if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple, HINT_NONE,
-			  state->cmp_def) < 0)
-		return 0;
-
-	if (stmt->new_tuple != NULL &&
-	    memtx_tuple_validate(state->format, stmt->new_tuple) != 0) {
-		state->rc = -1;
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
-
-	struct tuple *delete = NULL;
-	enum dup_replace_mode mode =
-		state->index->def->opts.is_unique ? DUP_INSERT :
-						    DUP_REPLACE_OR_INSERT;
+	assert(tuple != NULL);
+	struct tuple *deleted = NULL;
 	struct tuple *successor;
-	state->rc = memtx_index_replace(state->index, stmt->old_tuple,
-					stmt->new_tuple, mode, &delete,
-					&successor);
-	if (state->rc != 0) {
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
-	/*
-	 * All tuples stored in a memtx space are
-	 * referenced by the primary index. That is
-	 * why we need to ref new tuple and unref old tuple.
-	 */
-	if (state->index->def->iid == 0) {
-		if (stmt->new_tuple != NULL)
-			tuple_ref(stmt->new_tuple);
-		if (stmt->old_tuple != NULL)
-			tuple_unref(stmt->old_tuple);
-	}
-	/*
-	 * Set on_rollback trigger on stmt to avoid
-	 * problem when rollbacked changes appears in
-	 * built-in-background index.
-	 */
-	struct memtx_build_stmt_trigger *stmt_trigger =
-		xregion_alloc_object(&in_txn()->region,
-				     struct memtx_build_stmt_trigger);
-	rlist_add_entry(&state->stmt_triggers, stmt_trigger, in_state);
-	stmt_trigger->state = state;
-
-	trigger_create(&stmt_trigger->on_rollback,
-		       memtx_build_on_replace_rollback, NULL, NULL);
-	trigger_create(&stmt_trigger->on_commit,
-		       memtx_build_on_replace_commit, NULL, NULL);
-	txn_stmt_on_rollback(stmt, &stmt_trigger->on_rollback);
-	txn_stmt_on_commit(stmt, &stmt_trigger->on_commit);
+	int rc = memtx_index_replace(index, NULL, tuple, DUP_INSERT,
+				     &deleted, &successor);
+	if (rc != 0)
+		return rc;
+	if (index->def->iid == 0)
+		tuple_ref(tuple);
 	return 0;
 }
+
+static int
+memtx_index_build_replace_in_progress(struct index *index,
+				      struct tuple *old_tuple,
+				      struct tuple *new_tuple)
+{
+	struct tuple *deleted = NULL;
+	struct tuple *successor;
+	int rc = memtx_index_replace(index, old_tuple, new_tuple,
+				     DUP_REPLACE_OR_INSERT,
+				     &deleted, &successor);
+	if (rc != 0)
+		return rc;
+	assert(deleted == old_tuple);
+	if (index->def->iid == 0) {
+		if (new_tuple != NULL)
+			tuple_ref(new_tuple);
+		if (old_tuple != NULL)
+			tuple_unref(old_tuple);
+	}
+	return 0;
+}
+
+static int
+memtx_index_build_rollback(struct index *index, struct tuple *old_tuple,
+			   struct tuple *new_tuple)
+{
+	struct tuple *deleted = NULL;
+	struct tuple *successor;
+	enum dup_replace_mode mode = new_tuple == NULL ? DUP_INSERT :
+							 DUP_REPLACE;
+	int rc = memtx_index_replace(index, new_tuple, old_tuple, mode,
+				     &deleted, &successor);
+	if (rc != 0)
+		return rc;
+	assert(deleted == new_tuple);
+	if (index->def->iid == 0) {
+		if (old_tuple != NULL)
+			tuple_ref(old_tuple);
+		if (new_tuple != NULL)
+			tuple_unref(new_tuple);
+	}
+	return 0;
+}
+
+static const struct index_build_vtab memtx_index_build_vtab = {
+	.replace_confirmed = memtx_index_build_replace_confirmed,
+	.replace_in_progress = memtx_index_build_replace_in_progress,
+	.rollback = memtx_index_build_rollback,
+	.finalize = generic_index_build_finalize
+};
 
 static int
 memtx_space_build_index(struct space *src_space, struct index *new_index,
 			struct tuple_format *new_format,
 			bool check_unique_constraint)
 {
-	/* In memtx unique check comes for free so we never skip it. */
-	(void)check_unique_constraint;
-
-	struct txn *txn = in_txn();
-	/**
-	 * If it's a secondary key, and we're not building them
-	 * yet (i.e. it's snapshot recovery for memtx), do nothing.
-	 */
 	if (new_index->def->iid != 0) {
-		struct memtx_space *memtx_space;
-		memtx_space = (struct memtx_space *)src_space;
-		if (!(memtx_space->replace == memtx_space_replace_all_keys))
+		struct memtx_space *memtx_space = (struct memtx_space *)src_space;
+		if (memtx_space->replace != memtx_space_replace_all_keys)
 			return 0;
 	}
+	struct txn *txn = in_txn();
+
+	/* TODO: remove (added only for engine/ddl.test.lua) */
 	struct index *pk = index_find(src_space, 0);
 	if (pk == NULL)
 		return -1;
 	if (index_size(pk) == 0)
 		return 0;
+	/* TODO: remove (added only for engine/ddl.test.lua) */
 
-	struct errinj *inj = errinj(ERRINJ_BUILD_INDEX, ERRINJ_INT);
-	if (inj != NULL && inj->iparam == (int)new_index->def->iid) {
-		diag_set(ClientError, ER_INJECTION, "build index");
-		return -1;
-	}
-
+	/* TODO: remove when build is detached from transaction */
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
+	/* TODO: remove when build is detached from transaction */
+	space_invalidate(src_space);
 
-	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		return -1;
-	/*
-	 * If we insert a tuple during index being built, new tuple will or
-	 * will not be inserted in index depending on result of lexicographical
-	 * comparison with tuple which was inserted into new index last.
-	 * The problem is HASH index is unordered, so background
-	 * build will not work properly if primary key is HASH index.
-	 */
-	bool can_yield = pk->def->type != HASH;
-
-	inj = errinj(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL);
-	if (inj != NULL && inj->bparam == true)
-		can_yield = false;
-
+	trigger_clear(&txn->fiber_on_yield);
+	fiber_set_txn(fiber(), NULL);
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
-	struct memtx_ddl_state state;
-	struct trigger on_replace;
-	/*
-	 * Create trigger and initialize ddl state
-	 * if build in background is enabled.
-	 */
-	if (can_yield) {
-		state.index = new_index;
-		state.format = new_format;
-		state.cmp_def = pk->def->key_def;
-		state.rc = 0;
-		diag_create(&state.diag);
-		rlist_create(&state.stmt_triggers);
-
-		trigger_create(&on_replace, memtx_build_on_replace, &state,
-			       NULL);
-		/*
-		 * If MVCC is enabled, all concurrent writes that we haven't
-		 * read will be conflicted, so we don't need to set the trigger.
-		 * Moreover, concurrent transaction can be rolled back much
-		 * later than the index will be built so the memtx_ddl_state
-		 * will be invalid in this case since it's allocated on stack
-		 * of this function.
-		 */
-		if (!memtx_tx_manager_use_mvcc_engine)
-			trigger_add(&src_space->on_replace, &on_replace);
-	}
-
-	/*
-	 * The index has to be built tuple by tuple, since
-	 * there is no guarantee that all tuples satisfy
-	 * new index' constraints. If any tuple can not be
-	 * added to the index (insufficient number of fields,
-	 * etc., the build is aborted.
-	 */
-	/* Build the new index. */
-	int rc;
-	struct tuple *tuple;
-	size_t count = 0;
-	while ((rc = iterator_next_internal(it, &tuple)) == 0 &&
-	       tuple != NULL) {
-		struct key_def *key_def = new_index->def->key_def;
-		if (!tuple_format_is_compatible_with_key_def(tuple_format(tuple),
-							     key_def)) {
-			rc = -1;
-			break;
-		}
-		/*
-		 * Check that the tuple is OK according to the
-		 * new format.
-		 */
-		rc = memtx_tuple_validate(new_format, tuple);
-		if (rc != 0)
-			break;
-		/*
-		 * @todo: better message if there is a duplicate.
-		 */
-		struct tuple *old_tuple;
-		struct tuple *successor;
-		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT,
-					 &old_tuple, &successor);
-		if (rc != 0)
-			break;
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
-		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
-				    thread_sleep(inj->dparam));
-		/*
-		 * All tuples stored in a memtx space must be
-		 * referenced by the primary index.
-		 */
-		if (new_index->def->iid == 0)
-			tuple_ref(tuple);
-		/*
-		 * Do not build index in background
-		 * if the feature is disabled.
-		 */
-		if (!can_yield)
-			continue;
-		/*
-		 * Remember the latest inserted tuple to
-		 * avoid processing yet to be added tuples
-		 * in on_replace triggers.
-		 */
-		state.cursor = tuple;
-		tuple_ref(state.cursor);
-		if (++count % MEMTX_DDL_YIELD_LOOPS == 0 &&
-		    memtx->state == MEMTX_OK)
-			fiber_sleep(0);
-		/*
-		 * Sleep after at least one tuple is inserted to test
-		 * on_replace triggers for index build.
-		 */
-		ERROR_INJECT_YIELD(ERRINJ_BUILD_INDEX_DELAY);
-		tuple_unref(state.cursor);
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			rc = -1;
-			break;
-		}
-		/*
-		 * The on_replace trigger may have failed
-		 * during the yield.
-		 */
-		if (state.rc != 0) {
-			rc = -1;
-			diag_move(&state.diag, diag_get());
-			break;
-		}
-	}
-	iterator_delete(it);
-	if (can_yield) {
-		struct memtx_build_stmt_trigger *trg;
-		rlist_foreach_entry(trg, &state.stmt_triggers, in_state) {
-			trigger_clear(&trg->on_rollback);
-			trigger_clear(&trg->on_commit);
-		}
-		diag_destroy(&state.diag);
-		trigger_clear(&on_replace);
-	}
+	bool can_yield = (memtx->state == MEMTX_OK) && (pk->def->type != HASH);
+	int rc = index_build(src_space, new_index, new_format,
+			     check_unique_constraint,
+			     &memtx_index_build_vtab,
+			     can_yield, MEMTX_DDL_YIELD_LOOPS, true);
+	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+	fiber_set_txn(fiber(), txn);
 	return rc;
 }
 
