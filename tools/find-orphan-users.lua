@@ -35,9 +35,12 @@
 --
 -- dofile('/path/to/this/file.lua')
 
+local bit = require('bit')
+
 local DEFAULT_ORIGIN = ''
 local CONFIG_ORIGIN = 'config'
 local USER_OPTS_FIELD = 8
+local PRIV_OPTS_FIELD = 6
 
 -- Return origins for user/role from the given tuple.
 local function user_origins_from_tuple(tuple)
@@ -93,6 +96,27 @@ local function gen_disown_f(user_or_role)
         error(('%s: %s'):format(func_name, fmt:format(...)), 0)
     end
 
+    local function migrate_privileges_to_config(uid)
+        for _, tuple in ipairs(box.space._priv.index.primary:select({uid})) do
+            local opts = tuple[PRIV_OPTS_FIELD]
+            local origins
+            if opts ~= nil and opts.origins ~= nil then
+                origins = table.deepcopy(opts.origins)
+            else
+                origins = {[DEFAULT_ORIGIN] = tuple.privilege}
+            end
+            if origins[DEFAULT_ORIGIN] ~= nil
+               and origins[DEFAULT_ORIGIN] ~= 0 then
+                origins[CONFIG_ORIGIN] = bit.bor(origins[CONFIG_ORIGIN] or 0,
+                    origins[DEFAULT_ORIGIN])
+                opts = opts or {}
+                opts.origins = origins
+                box.space._priv:update({tuple.grantee, tuple.object_type,
+                    tuple.object_id}, {{'=', PRIV_OPTS_FIELD, opts}})
+            end
+        end
+    end
+
     return function(name)
         if type(name) ~= 'string' then
             e('expected string, got %s', type(name))
@@ -116,7 +140,19 @@ local function gen_disown_f(user_or_role)
             e('the %s %q is not owned by the Lua code', user_or_role, name)
         end
 
-        box.schema[user_or_role].drop(name)
+        -- Temporary compatibility step: migrate previously granted privileges
+        -- to CONFIG origin before drop. We don't have centralized privilege
+        -- management from YAML yet, so for now we just migrate existing grants.
+        -- This prevents privilege loss when upgrading from older Tarantool
+        -- versions where earlier grants could otherwise be overwritten.
+        migrate_privileges_to_config(t.id)
+        box.schema[user_or_role].drop(name, {_origin = DEFAULT_ORIGIN})
+
+        return ('The %s %q is now considered to be managed by the ' ..
+                'configuration.\nNote that it may still retain implicit ' ..
+                'privileges granted manually or inherited earlier. ' ..
+                'Please review its privileges if necessary.')
+                :format(user_or_role, name)
     end
 end
 
