@@ -1,8 +1,8 @@
 local luzer = require("luzer")
+local memprof = require("misc.memprof")
 
-local has_memprof, memprof = pcall(require, "misc.memprof")
-if not has_memprof then
-  print("Unsupported version.")
+if not memprof.enabled then
+  print("memprof is unsupported or disabled")
   os.exit(0)
 end
 
