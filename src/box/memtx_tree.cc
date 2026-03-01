@@ -1507,22 +1507,38 @@ fail:
 	return -1;
 }
 
+/** Replace old tuple with new tuple in the index. */
 template <bool USE_HINT>
 static int
-memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
-{
+memtx_tree_index_replace(struct index *base, struct memtx_index_key old_key,
+			 struct memtx_index_key new_key,
+			 enum dup_replace_mode mode,
+			 struct memtx_index_key *result,
+			 struct memtx_index_key *successor) {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct key_def *key_def = base->def->key_def;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	struct tuple *old_tuple = old_key.tuple;
+	struct tuple *new_tuple = new_key.tuple;
+	bool is_mk = key_def->is_multikey;
+	bool is_func = key_def->for_func_index;
+	bool is_mk_or_func = is_mk || is_func;
+	assert(!is_mk_or_func || USE_HINT);
+	uint64_t key_hint = new_tuple != NULL ? new_key.hint : old_key.hint;
+	assert(!is_mk_or_func || key_hint != (hint_t)MULTIKEY_NONE);
+	struct memtx_tree_data<USE_HINT> new_data;
+	new_data.tuple = NULL;
+	*result = memtx_index_key_null;
 	if (new_tuple != NULL &&
-	    !tuple_key_is_excluded(new_tuple, key_def, MULTIKEY_NONE)) {
-		struct memtx_tree_data<USE_HINT> new_data;
+	    (is_func || !tuple_key_is_excluded(new_tuple, key_def, key_hint))) {
 		new_data.tuple = new_tuple;
-		if (USE_HINT)
-			new_data.set_hint(tuple_hint(new_tuple, cmp_def));
+		if (USE_HINT) {
+			hint_t hint =
+				memtx_index_multikey_tuple_hint(new_key,
+								cmp_def);
+			new_data.set_hint(hint);
+		}
 		struct memtx_tree_data<USE_HINT> dup_data, suc_data;
 		dup_data.tuple = suc_data.tuple = NULL;
 
@@ -1530,440 +1546,82 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (memtx_tree_index_insert_impl(index, new_data, &dup_data,
 						 &suc_data) != 0)
 			return -1;
-
-		if (index_check_dup(base, old_tuple, new_tuple,
-				    dup_data.tuple, mode) != 0) {
+		/*
+		 * When tuple contains the same key multiple times, the previous
+		 * key occurrence is pushed out of the index.
+		 */
+		bool is_mk_conflict =
+			is_mk_or_func && dup_data.tuple == new_tuple;
+		if (!is_mk_conflict &&
+		    index_check_dup(base, old_tuple, new_tuple, dup_data.tuple,
+				    mode) != 0) {
 			VERIFY(memtx_tree_index_delete_impl<USE_HINT>(
-						index, new_data, NULL) == 0);
+				index, new_data, NULL) == 0);
 			if (dup_data.tuple != NULL)
 				VERIFY(memtx_tree_index_insert_impl<USE_HINT>(
 						index, dup_data, NULL,
 						NULL) == 0);
 			return -1;
 		}
-		*successor = suc_data.tuple;
-		if (dup_data.tuple != NULL) {
-			*result = dup_data.tuple;
+		successor->tuple = suc_data.tuple;
+		successor->hint =
+			is_mk_or_func ? suc_data.hint : (hint_t)MULTIKEY_NONE;
+		/*
+		 * Functional indexes need to be aware of multikey conflicts,
+		 * so we return the same tuple to signal it.
+		 */
+		if (dup_data.tuple != NULL && (!is_mk_conflict || is_func)) {
+			result->tuple = dup_data.tuple;
+			result->hint = is_mk_or_func ? dup_data.hint
+					: (hint_t)MULTIKEY_NONE;
 			return 0;
 		}
 	}
+	if (new_tuple != NULL && is_mk_or_func) {
+		assert(result->tuple == NULL || old_tuple == NULL ||
+		       old_tuple == result->tuple);
+		return 0;
+	}
 	if (old_tuple != NULL &&
-	    !tuple_key_is_excluded(old_tuple, key_def, MULTIKEY_NONE)) {
+	    (is_func || !tuple_key_is_excluded(old_tuple, key_def, key_hint))) {
 		struct memtx_tree_data<USE_HINT> old_data;
 		old_data.tuple = old_tuple;
-		if (USE_HINT)
-			old_data.set_hint(tuple_hint(old_tuple, cmp_def));
-		if (memtx_tree_index_delete_impl<USE_HINT>(
-					index, old_data, NULL) != 0) {
-			if (new_tuple != NULL &&
-			    !tuple_key_is_excluded(new_tuple, key_def,
-						   MULTIKEY_NONE)) {
-				struct memtx_tree_data<USE_HINT> new_data;
-				new_data.tuple = new_tuple;
-				if (USE_HINT)
-					new_data.set_hint(tuple_hint(new_tuple,
-								     cmp_def));
-				VERIFY(memtx_tree_index_delete_impl<USE_HINT>(
-						index, new_data, NULL) == 0);
-			}
-			return -1;
+		if (USE_HINT) {
+			hint_t hint =
+				memtx_index_multikey_tuple_hint(old_key,
+								cmp_def);
+			old_data.set_hint(hint);
 		}
-		*result = old_tuple;
-	} else {
-		*result = NULL;
-	}
-	return 0;
-}
-
-/**
- * Perform tuple insertion by given multikey index.
- * In case of replacement, all old tuple entries are deleted
- * by all it's multikey indexes.
- */
-static int
-memtx_tree_index_replace_multikey_one(struct memtx_tree_index<true> *index,
-			struct tuple *old_tuple, struct tuple *new_tuple,
-			enum dup_replace_mode mode, hint_t hint,
-			struct memtx_tree_data<true> *replaced_data,
-			struct memtx_tree_data<true> *successor_data,
-			bool *is_multikey_conflict)
-{
-	struct memtx_tree_data<true> new_data, dup_data;
-	new_data.tuple = new_tuple;
-	new_data.hint = hint;
-	dup_data.tuple = NULL;
-	*is_multikey_conflict = false;
-	if (memtx_tree_index_insert_impl(index, new_data, &dup_data,
-					 successor_data) != 0)
-		return -1;
-	if (dup_data.tuple == new_tuple) {
-		/*
-		 * When tuple contains the same key multiple
-		 * times, the previous key occurrence is pushed
-		 * out of the index.
-		 */
-		*is_multikey_conflict = true;
-	} else if (index_check_dup(&index->base, old_tuple, new_tuple,
-				   dup_data.tuple, mode) != 0) {
-		/* Rollback replace. */
-		VERIFY(memtx_tree_index_delete_impl<true>(
+		int res = 0;
+		struct memtx_tree_data<USE_HINT> deleted_data;
+		deleted_data.tuple = NULL;
+		if (is_mk_or_func)
+			res = memtx_tree_index_delete_value_impl<USE_HINT>(
+				index, old_data, &deleted_data);
+		else
+			res = memtx_tree_index_delete_impl<USE_HINT>(
+				index, old_data, NULL);
+		if (res != 0 && is_mk_or_func)
+			return -1;
+		if (res != 0 && new_tuple != NULL &&
+		    !tuple_key_is_excluded(new_tuple, key_def, MULTIKEY_NONE)) {
+			VERIFY(memtx_tree_index_delete_impl<USE_HINT>(
 				index, new_data, NULL) == 0);
-		if (dup_data.tuple != NULL)
-			VERIFY(memtx_tree_index_insert_impl<true>(
-					index, dup_data, NULL, NULL) == 0);
-		return -1;
-	}
-	*replaced_data = dup_data;
-	return 0;
-}
-
-/**
- * Rollback the sequence of memtx_tree_index_replace_multikey_one
- * insertions with multikey indexes [0, err_multikey_idx - 1]
- * where the err_multikey_idx is the first multikey index where
- * error has been raised.
- *
- * This routine can't fail because all replaced_tuple (when
- * specified) nodes in tree are already allocated (they might be
- * overridden with new_tuple, but they definitely present) and
- * delete operation is fault-tolerant.
- */
-static void
-memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index<true> *index,
-			struct tuple *new_tuple, struct tuple *replaced_tuple,
-			int err_multikey_idx)
-{
-	struct key_def *key_def = index->base.def->key_def;
-	struct memtx_tree_data<true> data;
-	if (replaced_tuple != NULL) {
-		/* Restore replaced tuple index occurrences. */
-		struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-		data.tuple = replaced_tuple;
-		uint32_t multikey_count =
-			tuple_multikey_count(replaced_tuple, cmp_def);
-		for (int i = 0; (uint32_t) i < multikey_count; i++) {
-			if (tuple_key_is_excluded(replaced_tuple, key_def, i))
-				continue;
-			data.hint = i;
-			VERIFY(memtx_tree_index_insert_impl<true>(
-					index, data, NULL, NULL) == 0);
-		}
-	}
-	if (new_tuple == NULL)
-		return;
-	/*
-	 * Rollback new_tuple insertion by multikey index
-	 * [0, multikey_idx).
-	 */
-	data.tuple = new_tuple;
-	for (int i = 0; i < err_multikey_idx; i++) {
-		if (tuple_key_is_excluded(new_tuple, key_def, i))
-			continue;
-		data.hint = i;
-		VERIFY(memtx_tree_index_delete_value_impl<true>(
-					index, data, NULL) == 0);
-	}
-}
-
-/**
- * :replace() function for a multikey index: replace old tuple
- * index entries with ones from the new tuple.
- *
- * In a multikey index a single tuple is associated with 0..N keys
- * of the b+*tree. Imagine old tuple key set is called "old_keys"
- * and a new tuple set is called "new_keys". This function must
- * 1) delete all removed keys: (new_keys - old_keys)
- * 2) update tuple pointer in all preserved keys: (old_keys ^ new_keys)
- * 3) insert data for all new keys (new_keys - old_keys).
- *
- * Compare with a standard unique or non-unique index, when a key
- * is present only once, so whenever we encounter a duplicate, it
- * is guaranteed to point at the old tuple (in non-unique indexes
- * we augment the secondary key parts with primary key parts, so
- * b+*tree still contains unique entries only).
- *
- * To reduce the number of insert and delete operations on the
- * tree, this function attempts to optimistically add all keys
- * from the new tuple to the tree first.
- *
- * When this step finds a duplicate, it's either of the following:
- * - for a unique multikey index, it may be the old tuple or
- *   some other tuple. Since unique index forbids duplicates,
- *   this branch ends with an error unless we found the old tuple.
- * - for a non-unique multikey index, both secondary and primary
- *   key parts must match, so it's guaranteed to be the old tuple.
- *
- * In other words, when an optimistic insert finds a duplicate,
- * it's either an error, in which case we roll back all the new
- * keys from the tree and abort the procedure, or the old tuple,
- * which we save to get back to, later.
- *
- * When adding new keys finishes, we have completed steps
- * 2) and 3):
- * - added set (new_keys - old_keys) to the index
- * - updated set (new_keys ^ old_keys) with a new tuple pointer.
- *
- * We now must perform 1), which is remove (old_keys - new_keys).
- *
- * This is done by using the old tuple pointer saved from the
- * previous step. To not accidentally delete the common key
- * set of the old and the new tuple, we don't using key parts alone
- * to compare - we also look at b+* tree value that has the tuple
- * pointer, and delete old tuple entries only.
- */
-static int
-memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
-			struct tuple *new_tuple, enum dup_replace_mode mode,
-			struct tuple **result, struct tuple **successor)
-{
-	struct memtx_tree_index<true> *index =
-		(struct memtx_tree_index<true> *)base;
-
-	/* MUTLIKEY doesn't support successor for now. */
-	*successor = NULL;
-
-	struct key_def *key_def = base->def->key_def;
-	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-	*result = NULL;
-	if (new_tuple != NULL) {
-		int multikey_idx = 0, err = 0;
-		uint32_t multikey_count =
-			tuple_multikey_count(new_tuple, cmp_def);
-		for (; (uint32_t) multikey_idx < multikey_count;
-		     multikey_idx++) {
-			if (tuple_key_is_excluded(new_tuple, key_def,
-						  multikey_idx))
-				continue;
-			bool is_multikey_conflict;
-			struct memtx_tree_data<true> replaced_data;
-			err = memtx_tree_index_replace_multikey_one(index,
-						old_tuple, new_tuple, mode,
-						multikey_idx, &replaced_data,
-						NULL, &is_multikey_conflict);
-			if (err != 0)
-				break;
-			if (replaced_data.tuple != NULL &&
-			    !is_multikey_conflict) {
-				assert(*result == NULL ||
-				       *result == replaced_data.tuple);
-				*result = replaced_data.tuple;
-			}
-		}
-		if (err != 0) {
-			memtx_tree_index_replace_multikey_rollback(index,
-					new_tuple, *result, multikey_idx);
+			return -1;
+		} else if (res != 0) {
 			return -1;
 		}
-		if (*result != NULL) {
-			assert(old_tuple == NULL || old_tuple == *result);
-			old_tuple = *result;
+		if (is_func && deleted_data.tuple != NULL) {
+			assert(deleted_data.tuple == old_tuple);
+			result->tuple = deleted_data.tuple;
+			result->hint = deleted_data.hint;
+		} else if (!is_func) {
+			result->tuple = old_tuple;
+			result->hint =
+				is_mk ? key_hint : (hint_t)MULTIKEY_NONE;
 		}
-	}
-	if (old_tuple != NULL) {
-		struct memtx_tree_data<true> data;
-		data.tuple = old_tuple;
-		uint32_t multikey_count =
-			tuple_multikey_count(old_tuple, cmp_def);
-		for (int i = 0; (uint32_t) i < multikey_count; i++) {
-			if (tuple_key_is_excluded(old_tuple, key_def, i))
-				continue;
-			data.hint = i;
-			if (memtx_tree_index_delete_value_impl<true>(
-					index, data, NULL) != 0) {
-				uint32_t multikey_count = 0;
-				if (new_tuple != 0)
-					multikey_count =
-						tuple_multikey_count(new_tuple,
-								     cmp_def);
-				memtx_tree_index_replace_multikey_rollback(
-					index, new_tuple, old_tuple,
-					multikey_count);
-				return -1;
-			}
-		}
-		*result = old_tuple;
 	}
 	return 0;
-}
-
-/**
- * An undo entry for multikey functional index replace operation.
- * Used to roll back a failed insert/replace and restore the
- * original key_hint(s) and to commit a completed insert/replace
- * and destruct old tuple key_hint(s).
-*/
-struct func_key_undo {
-	/** A link to organize entries in list. */
-	struct rlist link;
-	/** An inserted record copy. */
-	struct memtx_tree_data<true> key;
-};
-
-/**
- * Rollback a sequence of memtx_tree_index_replace_multikey_one
- * insertions for functional index. Routine uses given list to
- * return a given index object in it's original state.
- */
-static void
-memtx_tree_func_index_replace_rollback(struct memtx_tree_index<true> *index,
-				       struct rlist *old_keys,
-				       struct rlist *new_keys)
-{
-	struct func_key_undo *entry;
-	rlist_foreach_entry(entry, new_keys, link) {
-		VERIFY(memtx_tree_index_delete_value_impl<true>(
-					index, entry->key, NULL) == 0);
-		tuple_unref((struct tuple *)entry->key.hint);
-	}
-	rlist_foreach_entry(entry, old_keys, link)
-		VERIFY(memtx_tree_index_insert_impl<true>(
-				index, entry->key, NULL, NULL) == 0);
-}
-
-/**
- * @sa memtx_tree_index_replace_multikey().
- * Use the functional index function from the key definition
- * to build a key list. Then each returned key is reallocated in
- * engine's memory as key_hint object and is used as comparison
- * hint.
- * To release key_hint memory in case of replace failure
- * we use a list of undo records which are allocated on region.
- * It is used to restore the original b+* entries with their
- * original key_hint(s) pointers in case of failure and release
- * the now useless hints of old items in case of success.
- */
-static int
-memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
-			struct tuple *new_tuple, enum dup_replace_mode mode,
-			struct tuple **result, struct tuple **successor)
-{
-	/* The successor will be set only if the function is not multikey. */
-	*successor = NULL;
-
-	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	struct memtx_tree_index<true> *index =
-		(struct memtx_tree_index<true> *)base;
-	struct index_def *index_def = index->base.def;
-	assert(index_def->key_def->for_func_index);
-	/* Make sure that key_def is not multikey - we rely on it below. */
-	assert(!index_def->key_def->is_multikey);
-
-	int rc = -1;
-	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
-
-	*result = NULL;
-	struct key_list_iterator it;
-	struct rlist old_keys, new_keys;
-	rlist_create(&old_keys);
-	rlist_create(&new_keys);
-	if (new_tuple != NULL) {
-		if (key_list_iterator_create(&it, new_tuple, index_def, true,
-					     memtx->func_key_format) != 0)
-			goto end;
-		int err = 0;
-		struct tuple *key;
-		struct func_key_undo *undo;
-		struct key_def *key_def = index_def->key_def;
-		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
-			key != NULL) {
-			/* Save functional key to MVCC, even excluded one. */
-			memtx_tx_save_func_key(new_tuple, base, key);
-			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
-				continue;
-			/* Perform insertion, log it in list. */
-			undo = xregion_alloc_object(region, typeof(*undo));
-			tuple_ref(key);
-			undo->key.tuple = new_tuple;
-			undo->key.hint = (hint_t)key;
-			rlist_add(&new_keys, &undo->link);
-			bool is_multikey_conflict;
-			struct memtx_tree_data<true> old_data, successor_data;
-			old_data.tuple = NULL;
-			successor_data.tuple = NULL;
-			err = memtx_tree_index_replace_multikey_one(index,
-						old_tuple, new_tuple,
-						mode, (hint_t)key, &old_data,
-						&successor_data,
-						&is_multikey_conflict);
-			if (err != 0)
-				break;
-			if (!it.func_is_multikey)
-				*successor = successor_data.tuple;
-			if (old_data.tuple != NULL && !is_multikey_conflict) {
-				undo = xregion_alloc_object(region,
-							    typeof(*undo));
-				undo->key = old_data;
-				rlist_add(&old_keys, &undo->link);
-				*result = old_data.tuple;
-			} else if (old_data.tuple != NULL &&
-				   is_multikey_conflict) {
-				/*
-				 * Remove the replaced tuple undo
-				 * from undo list.
-				 */
-				tuple_unref((struct tuple *)old_data.hint);
-				rlist_foreach_entry(undo, &new_keys, link) {
-					if (undo->key.hint == old_data.hint) {
-						rlist_del(&undo->link);
-						break;
-					}
-				}
-			}
-		}
-		if (key != NULL || err != 0) {
-			memtx_tree_func_index_replace_rollback(index,
-						&old_keys, &new_keys);
-			goto end;
-		}
-		if (*result != NULL) {
-			assert(old_tuple == NULL || old_tuple == *result);
-			old_tuple = *result;
-		}
-	}
-	if (old_tuple != NULL) {
-		/*
-		 * Use the runtime format to avoid OOM while deleting a tuple
-		 * from a space. It's okay, because we are not going to store
-		 * the keys in the index.
-		 */
-		if (key_list_iterator_create(&it, old_tuple, index_def, false,
-					     tuple_format_runtime) != 0)
-			goto end;
-		struct memtx_tree_data<true> data, deleted_data;
-		data.tuple = old_tuple;
-		struct tuple *key;
-		while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
-			data.hint = (hint_t) key;
-			deleted_data.tuple = NULL;
-			if (memtx_tree_index_delete_value_impl(
-					index, data, &deleted_data) != 0) {
-				memtx_tree_func_index_replace_rollback(
-					index, &old_keys, &new_keys);
-				return -1;
-			}
-			if (deleted_data.tuple != NULL) {
-				*result = old_tuple;
-				struct func_key_undo *undo =
-					xregion_alloc_object(region,
-							     typeof(*undo));
-				undo->key = deleted_data;
-				rlist_add(&old_keys, &undo->link);
-			}
-		}
-		assert(key == NULL);
-	}
-	/*
-	 * Commit changes: release hints for
-	 * replaced entries.
-	 */
-	struct func_key_undo *undo;
-	rlist_foreach_entry(undo, &old_keys, link)
-		tuple_unref((struct tuple *)undo->key.hint);
-	rc = 0;
-end:
-	region_truncate(region, region_svp);
-	return rc;
 }
 
 template <bool USE_HINT>
@@ -2317,18 +1975,19 @@ memtx_tree_disabled_index_build_next(struct index *index, struct tuple *tuple)
 }
 
 static int
-memtx_tree_disabled_index_replace(struct index *index, struct tuple *old_tuple,
-				  struct tuple *new_tuple,
+memtx_tree_disabled_index_replace(struct index *index,
+				  struct memtx_index_key old_key,
+				  struct memtx_index_key new_key,
 				  enum dup_replace_mode mode,
-				  struct tuple **result,
-				  struct tuple **successor)
+				  struct memtx_index_key *result,
+				  struct memtx_index_key *successor)
 {
 	(void)index;
-	(void)old_tuple;
-	(void)new_tuple;
+	(void)old_key;
+	(void)new_key;
 	(void)mode;
-	*result = NULL;
-	*successor = NULL;
+	*result = memtx_index_key_null;
+	*successor = memtx_index_key_null;
 	return 0;
 }
 
@@ -2758,8 +2417,7 @@ get_memtx_tree_index_vtab(void)
 	};
 	static const struct memtx_index_vtab vtab = {
 		/* .base = */ vtab_base,
-		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
-				 is_func ? memtx_tree_func_index_replace :
+		/* .replace = */
 				 memtx_tree_index_replace<USE_HINT>,
 		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
 		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
