@@ -120,10 +120,28 @@ g.test_env = function()
         local res = config:get('process.title')
         t.assert_equals(res, 'env')
 
+        res = config:get('process.title', {env = true})
+        t.assert_equals(res, 'env')
+
         -- With the `instance` option the environment variables
         -- are ignored: only cluster configuration has an effect.
-        local res = config:get('process.title', {instance = 'i-001'})
+        res = config:get('process.title', {instance = 'i-001'})
         t.assert_equals(res, 'file')
+
+        res = config:get('process.title', {env = false})
+        t.assert_equals(res, 'file')
+        local res = config:get('process.title', {
+            instance = 'i-001',
+            env = false,
+        })
+        t.assert_equals(res, 'file')
+
+        local err_msg = 'config:get: "instance" and "env = true" options ' ..
+            'can\'t be used together, because it is unknown which TT_* ' ..
+            'environment variables were passed to another instance'
+        t.assert_error_msg_equals(err_msg, function()
+            config:get('process.title', {instance = 'i-001', env = true})
+        end)
     end)
 end
 
