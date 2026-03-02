@@ -212,6 +212,13 @@ lbox_fio_write(struct lua_State *L)
 static int
 lbox_fio_chown(struct lua_State *L)
 {
+	enum {
+#ifdef NDEBUG
+		START_BUF_LEN = 128,
+#else
+		START_BUF_LEN = 2,
+#endif
+	};
 	const char *pathname;
 	if (lua_gettop(L) < 3) {
 usage:
@@ -228,7 +235,15 @@ usage:
 		const char *username = lua_tostring(L, 2);
 		if (username == NULL)
 			username = "";
-		struct passwd *entry = getpwnam(username);
+		struct passwd pwbuf, *entry;
+		size_t buflen = START_BUF_LEN;
+		char *buf = xmalloc(buflen);
+		while (getpwnam_r(username, &pwbuf, buf, buflen,
+				  &entry) == ERANGE) {
+			buflen *= 2;
+			buf = xrealloc(buf, buflen);
+		}
+		free(buf);
 		if (!entry) {
 			errno = EINVAL;
 			lua_pushnil(L);
@@ -244,7 +259,15 @@ usage:
 		const char *groupname = lua_tostring(L, 3);
 		if (groupname == NULL)
 			groupname = "";
-		struct group *entry = getgrnam(groupname);
+		struct group grbuf, *entry;
+		size_t buflen = START_BUF_LEN;
+		char *buf = xmalloc(buflen);
+		while (getgrnam_r(groupname, &grbuf, buf, buflen,
+				  &entry) == ERANGE) {
+			buflen *= 2;
+			buf = xrealloc(buf, buflen);
+		}
+		free(buf);
 		if (!entry) {
 			errno = EINVAL;
 			lua_pushnil(L);
