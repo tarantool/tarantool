@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.8" xml:lang="en-US">
+  <compounddef id="structsay__module" kind="struct" language="C++" prot="public">
+    <compoundname>say_module</compoundname>
+    <includes refid="module_8h" local="no">module.h</includes>
+    <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structsay__module_1a0624b999617210f32f44a78d41f37712" prot="public" static="no" mutable="no">
+        <type>const char *</type>
+        <definition>const char* say_module::name</definition>
+        <argsstring></argsstring>
+        <name>name</name>
+        <qualifiedname>say_module::name</qualifiedname>
+        <briefdescription>
+<para>Module name. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="531" column="12" bodyfile="src/module.h" bodystart="531" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structsay__module_1afc12ac101823f430768455f8c1b5e1bb" prot="public" static="no" mutable="no">
+        <type>int</type>
+        <definition>int say_module::log_level</definition>
+        <argsstring></argsstring>
+        <name>log_level</name>
+        <qualifiedname>say_module::log_level</qualifiedname>
+        <briefdescription>
+<para>Module log level. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="533" column="5" bodyfile="src/module.h" bodystart="533" bodyend="-1"/>
+      </memberdef>
+    </sectiondef>
+    <briefdescription>
+<para>Log module configuration. </para>
+    </briefdescription>
+    <detaileddescription>
+    </detaileddescription>
+    <location file="src/module.h" line="529" column="1" bodyfile="src/module.h" bodystart="529" bodyend="534"/>
+    <listofallmembers>
+      <member refid="structsay__module_1afc12ac101823f430768455f8c1b5e1bb" prot="public" virt="non-virtual"><scope>say_module</scope><name>log_level</name></member>
+      <member refid="structsay__module_1a0624b999617210f32f44a78d41f37712" prot="public" virt="non-virtual"><scope>say_module</scope><name>name</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

@@ -1,7 +1,7 @@
 var searchData=
 [
   ['likely_0',['likely',['../module_8h.html#a217a0bd562b98ae8c2ffce44935351e1',1,'module.h']]],
-  ['log_5flevel_1',['log_level',['../module_8h.html#ab5a71c2541c377b3d5b34fdb35964c2e',1,'module.h']]],
+  ['log_5flevel_1',['log_level',['../structsay__module.html#afc12ac101823f430768455f8c1b5e1bb',1,'say_module::log_level'],['../module_8h.html#ab5a71c2541c377b3d5b34fdb35964c2e',1,'log_level:&#160;module.h']]],
   ['log_5fwrite_5fflightrec_2',['log_write_flightrec',['../module_8h.html#abfe1e6dda2fc92e77e64561cd3d4380f',1,'module.h']]],
   ['lual_5fcdef_3',['luaL_cdef',['../module_8h.html#a498681c0c56f0aebe938004ab8947b0f',1,'module.h']]],
   ['lual_5fcheckcdata_4',['luaL_checkcdata',['../module_8h.html#aad6199825fbbd80b6f27ff6bc2f2a1b7',1,'module.h']]],

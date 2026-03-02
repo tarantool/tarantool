@@ -15,6 +15,10 @@
     <member refid="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" kind="variable"><name></name></member>
     <member refid="unionPACKED_1a1782075c62f8d5e3b0f6a87c8382d373" kind="variable"><name>padding</name></member>
   </compound>
+  <compound refid="structsay__module" kind="struct"><name>say_module</name>
+    <member refid="structsay__module_1a0624b999617210f32f44a78d41f37712" kind="variable"><name>name</name></member>
+    <member refid="structsay__module_1afc12ac101823f430768455f8c1b5e1bb" kind="variable"><name>log_level</name></member>
+  </compound>
   <compound refid="module_8h" kind="file"><name>module.h</name>
     <member refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" kind="define"><name>PACKAGE_VERSION_MAJOR</name></member>
     <member refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" kind="define"><name>PACKAGE_VERSION_MINOR</name></member>
