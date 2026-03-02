@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "coio_task.h"
 #include "diag.h"
 #include "fiber.h"
 #include "fiber_pool.h"
@@ -33,6 +34,7 @@ static void *
 app_thread_f(void *unused)
 {
 	(void)unused;
+	coio_enable();
 	app_thread_lua_init();
 	struct fiber_pool fiber_pool;
 	fiber_pool_create(&fiber_pool, cord_name(cord()), INT_MAX,

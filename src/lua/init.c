@@ -209,6 +209,7 @@ static const char * const lua_modules_minimal[] = {
 	"errno", errno_lua,
 	"error", error_lua,
 	"log", log_lua,
+	"fio", fio_lua,
 	"version", version_lua,
 	"clock", clock_lua,
 	"iconv", iconv_lua,
@@ -228,7 +229,6 @@ static const char * const lua_modules[] = {
 	"env", env_lua,
 	"msgpackffi", msgpackffi_lua,
 	"ulid", ulid_lua,
-	"fio", fio_lua,
 	"csv", csv_lua,
 	"socket", socket_lua,
 	"title", title_lua,
@@ -788,6 +788,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
+	tarantool_lua_fio_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_digest_init(L);
 	tarantool_lua_decimal_init(L);
@@ -852,7 +853,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_xml_init(L);
-	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_swim_init(L);
