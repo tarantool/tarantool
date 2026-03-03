@@ -260,7 +260,12 @@ txn_limbo_stop(struct txn_limbo *limbo)
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
-	return limbo->state == TXN_LIMBO_STATE_REPLICA;
+	if (limbo->state == TXN_LIMBO_STATE_REPLICA)
+		return true;
+	if (limbo->state == TXN_LIMBO_STATE_LEADER)
+		return false;
+	assert(limbo->state == TXN_LIMBO_STATE_INACTIVE);
+	return raft_is_enabled(limbo->raft);
 }
 
 struct txn_limbo_entry *
