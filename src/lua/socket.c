@@ -612,31 +612,17 @@ lbox_socket_push_family(struct lua_State *L, int family)
 static int
 lbox_socket_push_protocol(struct lua_State *L, int protonumber)
 {
-	enum {
-#ifdef NDEBUG
-		START_BUF_LEN = 128,
-#else
-		START_BUF_LEN = 2,
-#endif
-	};
 	if (protonumber == 0) {
 		lua_pushinteger(L, 0);
 		return 1;
 	}
-	struct protoent pbuf, *p;
-	size_t buflen = START_BUF_LEN;
-	char *buf = xmalloc(buflen);
-	while (getprotobynumber_r(protonumber, &pbuf, buf, buflen,
-				  &p) == ERANGE) {
-		buflen *= 2;
-		buf = xrealloc(buf, buflen);
-	}
-	if (p) {
-		lua_pushstring(L, p->p_name);
+	char *name = sio_getprotobynumber(protonumber);
+	if (name != NULL) {
+		lua_pushstring(L, name);
+		free(name);
 	} else {
 		lua_pushinteger(L, protonumber);
 	}
-	free(buf);
 	return 1;
 }
 
@@ -1012,34 +998,14 @@ lbox_socket_recvfrom(struct lua_State *L)
 	return 2;
 }
 
-/*
- * Lua wrapper around getprotobyname_r(). Takes a protocol name and returns
- * the corresponding protocol number or nil if not found.
- */
 static int
 lbox_socket_getprotobyname(struct lua_State *L)
 {
-	enum {
-#ifdef NDEBUG
-		START_BUF_LEN = 128,
-#else
-		START_BUF_LEN = 2,
-#endif
-	};
-	const char *name = luaL_checkstring(L, 1);
-	struct protoent pbuf, *p;
-	size_t buflen = START_BUF_LEN;
-	char *buf = xmalloc(buflen);
-	while (getprotobyname_r(name, &pbuf, buf, buflen, &p) == ERANGE) {
-		buflen *= 2;
-		buf = xrealloc(buf, buflen);
-	}
-	if (p != NULL) {
-		lua_pushinteger(L, p->p_proto);
-	} else {
+	int proto = sio_getprotobyname(luaL_checkstring(L, 1));
+	if (proto >= 0)
+		lua_pushinteger(L, proto);
+	else
 		lua_pushnil(L);
-	}
-	free(buf);
 	return 1;
 }
 

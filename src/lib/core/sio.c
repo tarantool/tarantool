@@ -42,6 +42,7 @@
 #include "exception.h"
 #include "uri/uri.h"
 #include "errinj.h"
+#include "tt_pthread.h"
 
 #if TARGET_OS_DARWIN
 #include <sys/sysctl.h>
@@ -468,4 +469,78 @@ invalid_uri:
 	uri_destroy(&u);
 	diag_set(SocketError, sio_socketname(-1), "invalid uri \"%s\"", uri);
 	return -1;
+}
+
+#ifdef __APPLE__
+/**
+ * 'man' on getprotobyname/number() on MacOS locally says "These functions use
+ * a thread-specific data space". But looking it up online tells a different
+ * thing:
+ *
+ * https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/getprotoent.3.html
+ *
+ * This: "These functions use a static data space".
+ *
+ * To be on the safe side, lets just use a mutex here to ensure not more than
+ * one thread will access this theoretical "static data space". Still, it won't
+ * protect if user code will call the raw functions, but Macs are only used for
+ * development, so it won't be a problem.
+ */
+static pthread_mutex_t protomutex = PTHREAD_MUTEX_INITIALIZER;
+#else
+	enum {
+#ifdef NDEBUG
+		PROTO_START_BUF_LEN = 128,
+#else
+		PROTO_START_BUF_LEN = 2,
+#endif
+	};
+#endif
+
+int
+sio_getprotobyname(const char *name)
+{
+#ifdef __APPLE__
+	tt_pthread_mutex_lock(&protomutex);
+	struct protoent *ent = getprotobyname(name);
+	int rc = ent == NULL ? -1 : ent->p_proto;
+	tt_pthread_mutex_unlock(&protomutex);
+	return rc;
+#else
+	struct protoent pbuf, *p;
+	size_t buflen = PROTO_START_BUF_LEN;
+	char *buf = xmalloc(buflen);
+	while (getprotobyname_r(name, &pbuf, buf, buflen, &p) == ERANGE) {
+		buflen *= 2;
+		buf = xrealloc(buf, buflen);
+	}
+	int rc = p != NULL ? p->p_proto : -1;
+	free(buf);
+	return rc;
+#endif
+}
+
+char *
+sio_getprotobynumber(int proto)
+{
+#ifdef __APPLE__
+	tt_pthread_mutex_lock(&protomutex);
+	struct protoent *ent = getprotobynumber(proto);
+	char *res = ent == NULL ? NULL : xstrdup(ent->p_name);
+	tt_pthread_mutex_unlock(&protomutex);
+	return res;
+#else
+	struct protoent pbuf, *p;
+	size_t buflen = PROTO_START_BUF_LEN;
+	char *buf = xmalloc(buflen);
+	while (getprotobynumber_r(proto, &pbuf, buf, buflen, &p) == ERANGE) {
+		buflen *= 2;
+		buf = xrealloc(buf, buflen);
+	}
+	char *res = NULL;
+	if (p != NULL)
+		res = xstrdup(p->p_name);
+	free(buf);
+	return res;
+#endif
 }

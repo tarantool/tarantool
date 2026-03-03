@@ -137,6 +137,23 @@ check_auto_bind(void)
 	footer();
 }
 
+static void
+check_getprotoby(void)
+{
+	header();
+	plan(2);
+
+	is(sio_getprotobyname("tcp"), IPPROTO_TCP, "tcp by name");
+
+	char *name = sio_getprotobynumber(IPPROTO_TCP);
+	fail_unless(name != NULL);
+	is(strcmp(name, "tcp"), 0, "tcp by number");
+	free(name);
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
@@ -144,10 +161,11 @@ main(void)
 	fiber_init(fiber_c_invoke);
 
 	header();
-	plan(3);
+	plan(4);
 	check_uri_to_addr();
 	check_auto_bind();
 	check_sio_socketname_addr();
+	check_getprotoby();
 	int rc = check_plan();
 	footer();
 
