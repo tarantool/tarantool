@@ -380,6 +380,10 @@ enum iproto_cfg_op {
 	 */
 	IPROTO_CFG_STAT,
 	/**
+	 * Command code to reset IPROTO thread statistics.
+	 */
+	IPROTO_CFG_RESET_STAT,
+	/**
 	 * Command code to notify IPROTO threads a new handler has been set or
 	 * reset.
 	 */
@@ -4300,6 +4304,9 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	case IPROTO_CFG_STAT:
 		iproto_fill_stat(iproto_thread, cfg_msg);
 		break;
+	case IPROTO_CFG_RESET_STAT:
+		rmean_cleanup(iproto_thread->rmean);
+		break;
 	case IPROTO_CFG_OVERRIDE:
 		if (cfg_msg->override.is_set) {
 			uint32_t old;
@@ -4552,7 +4559,9 @@ void
 iproto_reset_stat(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
-		rmean_cleanup(iproto_threads[i].rmean);
+		struct iproto_cfg_msg cfg_msg;
+		iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_RESET_STAT);
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
 		rmean_cleanup(iproto_threads[i].tx.rmean);
 	}
 }
