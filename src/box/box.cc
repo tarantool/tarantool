@@ -457,10 +457,16 @@ box_update_ro_summary(void)
 API_EXPORT const char *
 box_ro_reason(void)
 {
-	if (raft_is_ro(box_raft()))
-		return "election";
-	if (txn_limbo_is_ro(&txn_limbo))
-		return "synchro";
+	if (is_box_configured) {
+		/*
+		 * These modules are only initialized on first box.cfg(), it is
+		 * not safe to access them until then.
+		 */
+		if (raft_is_ro(box_raft()))
+			return "election";
+		if (txn_limbo_is_ro(&txn_limbo))
+			return "synchro";
+	}
 	if (is_ro)
 		return "config";
 	if (is_waiting_for_own_rows)
