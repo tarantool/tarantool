@@ -51,13 +51,6 @@ ffi.cdef[[
 
     typedef struct { int active; int timeout; } linger_t;
 
-    struct protoent {
-        char  *p_name;       /* official protocol name */
-        char **p_aliases;    /* alias list */
-        int    p_proto;      /* protocol number */
-    };
-    struct protoent *getprotobyname(const char *name);
-
     void *memmem(const void *haystack, size_t haystacklen,
         const void *needle, size_t needlelen);
 ]]
@@ -208,12 +201,11 @@ local function getprotobyname(name)
     if num ~= nil then
         return num
     end
-    local p = ffi.C.getprotobyname(name)
-    if p == nil then
+    num = internal.getprotobyname(name)
+    if num == nil then
         boxerrno(boxerrno.EPROTOTYPE)
         return nil
     end
-    num = p.p_proto
     -- update cache
     internal.protocols[name] = num
     return num
