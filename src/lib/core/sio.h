@@ -246,6 +246,21 @@ const char *
 sio_socketname_addr(int fd, const struct sockaddr *base_addr,
 		    socklen_t addrlen);
 
+/**
+ * Get protocol numeric ID on this system by its name.
+ * Platform-agnostic thread-safe version of getprotobyname().
+ */
+int
+sio_getprotobyname(const char *name);
+
+/**
+ * Get protocol name by its numeric ID on this system. The resulting
+ * buffer needs to be freed with free(), when not NULL.
+ * Platform-agnostic thread-safe version of getprotobynumber().
+ */
+char *
+sio_getprotobynumber(int proto);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
