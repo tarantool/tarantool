@@ -238,7 +238,8 @@ local function gen_legacy_loader(searchers, index)
         if loaded then
             return loaded
         else
-            if _G.box and _G.box.error then
+            local box = rawget(_G, 'box')
+            if box ~= nil and box.error ~= nil then
                 box.error(box.error.PROC_LUA, message, 3)
             else
                 error(message, 3)

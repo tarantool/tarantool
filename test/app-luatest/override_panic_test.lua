@@ -64,3 +64,20 @@ g.test_setmodule_panic = function()
             'with another value',
     })
 end
+
+--
+-- Trigger error while loading a built-in module.
+--
+-- To do that, we override 'buffer', which is required by other built-in
+-- modules (for example, string).
+--
+g.test_load_panic = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'override/buffer.lua', [[foobar]])
+    treegen.write_file(dir, 'main.lua', '')
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
+    t.assert_covers(res, {exit_code = 1})
+    local pattern = "error loading module 'buffer'.*'=' expected near '<eof>'"
+    t.assert_str_contains(res.stderr, pattern, true)
+end
