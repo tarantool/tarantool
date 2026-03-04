@@ -997,6 +997,74 @@ wal_collect_garbage(const struct vclock *vclock)
 		  wal_collect_garbage_f);
 }
 
+/** Message to exchange data between TX and WAL threads on backup. */
+struct wal_backup_msg {
+	/** Base struct. */
+	struct cbus_call_msg base;
+	/** vclock of the first xlog in backup. */
+	const struct vclock *begin_vclock;
+	/** vclock of the last (exclusive) xlog in backup. */
+	const struct vclock *end_vclock;
+	/** xlog filenames in backup. Each name is allocated on heap. */
+	char **filenames;
+	/** Filenames count. */
+	int filename_count;
+};
+
+/** Backup done in WAL thread. */
+static int
+wal_backup_f(struct cbus_call_msg *data)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_backup_msg *msg = (struct wal_backup_msg *)data;
+	enum {
+#ifdef NDEBUG
+		START_ARRAY_CAPACITY = 16,
+#else
+		START_ARRAY_CAPACITY = 1,
+#endif
+	};
+	int capacity = START_ARRAY_CAPACITY;
+	int count = 0;
+	char **filenames = xmalloc(sizeof(char *) * capacity);
+	for (struct vclock *vclock = vclockset_first(&writer->wal_dir.index);
+	     vclock != NULL;
+	     vclock = vclockset_next(&writer->wal_dir.index, vclock)) {
+		if (vclock_compare(vclock, msg->begin_vclock) < 0)
+			continue;
+		if (vclock_compare(vclock, msg->end_vclock) >= 0)
+			break;
+		const char *filename = xdir_format_filename(
+					&writer->wal_dir, vclock_sum(vclock));
+		if (count >= capacity) {
+			capacity *= 2;
+			filenames = xrealloc(
+					filenames, sizeof(char *) * capacity);
+		}
+		filenames[count++] = xstrdup(filename);
+	}
+	msg->filenames = filenames;
+	msg->filename_count = count;
+	return 0;
+}
+
+void
+wal_backup(const struct vclock *begin_vclock, const struct vclock *end_vclock,
+	   wal_backup_cb cb, void *cb_arg)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_backup_msg msg;
+	msg.begin_vclock = begin_vclock;
+	msg.end_vclock = end_vclock;
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
+		  wal_backup_f);
+	for (int i = 0; i < msg.filename_count; i++) {
+		cb(msg.filenames[i], cb_arg);
+		free(msg.filenames[i]);
+	}
+	free(msg.filenames);
+}
+
 static void
 wal_notify_watchers(struct wal_writer *writer, unsigned events);
 

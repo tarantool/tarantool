@@ -124,14 +124,21 @@ txn_checkpoint_build(struct box_checkpoint *out, bool do_journal_rotation)
 	 * committed. Lets make sure they are, so the checkpoint won't have any
 	 * rolled back data.
 	 */
+	double deadline = fiber_clock() + replication_synchro_timeout;
 	while (!ctx.is_rollback && !ctx.is_commit) {
 		if (fiber_is_cancelled()) {
-			trigger_clear(&on_commit);
-			trigger_clear(&on_rollback);
 			diag_set(FiberIsCancelled);
-			return -1;
+			break;
 		}
-		fiber_yield();
+		if (fiber_yield_deadline(deadline)) {
+			diag_set(TimedOut);
+			break;
+		}
+	}
+	if (!ctx.is_rollback && !ctx.is_commit) {
+		trigger_clear(&on_commit);
+		trigger_clear(&on_rollback);
+		return -1;
 	}
 	if (ctx.is_rollback) {
 		diag_set(ClientError, ER_SYNC_ROLLBACK);
@@ -183,3 +190,9 @@ box_checkpoint_build_from_snapshot(struct box_checkpoint *out,
 	return -1;
 }
 #endif
+
+int
+box_checkpoint_build_for_journal(struct box_checkpoint *out)
+{
+	return txn_checkpoint_build(out, true /* do journal rotation */);
+}
