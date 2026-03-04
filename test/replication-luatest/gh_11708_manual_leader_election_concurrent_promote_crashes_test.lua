@@ -52,9 +52,7 @@ g.test_concurrent_promote_after_box_cfg = function(cg)
         local err
         ok, err = f:join()
         t.assert_not(ok)
-        local msg = 'box.ctl.promote/demote does not support simultaneous ' ..
-                    'invocations'
-        t.assert_equals(err.message, msg)
+        t.assert_equals(err.message, 'box.ctl.promote() is already running')
     end)
 end
 
