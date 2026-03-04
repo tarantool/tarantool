@@ -130,15 +130,15 @@ _ = test_run:cmd('switch copy1')
 ...
 box.space.memtx:select()
 ---
-- - [1, 'memtx1', 1]
-  - [2, 'memtx2', 1]
-  - [3, 'memtx3', 1]
+- - [1, 'memtx1', 2]
+  - [2, 'memtx2', 2]
+  - [3, 'memtx3', 2]
 ...
 box.space.vinyl:select()
 ---
-- - [1, 'vinyl1', 1]
-  - [2, 'vinyl2', 1]
-  - [3, 'vinyl3', 1]
+- - [1, 'vinyl1', 2]
+  - [2, 'vinyl2', 2]
+  - [3, 'vinyl3', 2]
 ...
 _ = test_run:cmd('switch default')
 ---

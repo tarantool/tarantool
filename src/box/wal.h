@@ -41,6 +41,12 @@ struct fiber;
 struct wal_writer;
 struct tt_uuid;
 
+/**
+ * Callback called by wal_backup().
+ */
+typedef int
+(*wal_backup_cb)(const char *path, void *arg);
+
 enum wal_mode {
 	/**
 	 * Do not write data at all.
@@ -236,6 +242,13 @@ wal_get_retention_vclock(struct vclock *vclock);
  */
 void
 wal_collect_garbage(const struct vclock *vclock);
+
+/**
+ * Backup up WAL. Calls @cb on every xlog from @begin_vclock to @end_vclock.
+ */
+void
+wal_backup(const struct vclock *begin_vclock, const struct vclock *end_vclock,
+	   wal_backup_cb cb, void *cb_arg);
 
 void
 wal_init_vy_log(void);

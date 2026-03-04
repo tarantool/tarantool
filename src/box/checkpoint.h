@@ -62,6 +62,13 @@ int
 box_checkpoint_build_from_snapshot(struct box_checkpoint *out,
 				   const struct vclock *vclock);
 
+/**
+ * Creates checkpoint in journal - the journal is rotated and prepared txns
+ * written into rotated journal are committed.
+ */
+int
+box_checkpoint_build_for_journal(struct box_checkpoint *out);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

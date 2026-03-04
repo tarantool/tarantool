@@ -106,6 +106,7 @@
 #include "tweaks.h"
 #include "memtx_tx.h"
 #include "coll_id_cache.h"
+#include "latch.h"
 
 static char status[64] = "unconfigured";
 
@@ -153,6 +154,8 @@ waiting_for_own_rows_trigger
  * If there is no in-progress backup, is set to NULL.
  */
 static struct gc_checkpoint_ref *backup_gc;
+
+static struct latch backup_latch = LATCH_INITIALIZER(backup_latch);
 
 bool box_read_ffi_is_disabled;
 
@@ -6072,31 +6075,49 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
+	latch_lock(&backup_latch);
 	struct gc_checkpoint *checkpoint;
+	int i = 0;
 	gc_foreach_checkpoint_reverse(checkpoint) {
-		if (checkpoint_idx-- == 0)
+		if (i++ == checkpoint_idx)
 			break;
 	}
-	if (checkpoint_idx >= 0) {
+	if (i <= checkpoint_idx) {
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		latch_unlock(&backup_latch);
 		return -1;
 	}
 	backup_gc = gc_ref_checkpoint(checkpoint, "backup");
-	int rc = engine_backup(&checkpoint->vclock, cb, cb_arg);
-	if (rc != 0) {
-		gc_unref_checkpoint(backup_gc);
-		backup_gc = NULL;
+	if (checkpoint_idx == 0) {
+		struct box_checkpoint box_ckpt;
+		if (box_checkpoint_build_for_journal(&box_ckpt) != 0)
+			goto error;
+		if (engine_backup(&checkpoint->vclock, cb, cb_arg) != 0)
+			goto error;
+		wal_backup(&checkpoint->vclock, &box_ckpt.journal.vclock,
+			   cb, cb_arg);
+	} else {
+		if (engine_backup(&checkpoint->vclock, cb, cb_arg) != 0)
+			goto error;
 	}
-	return rc;
+	latch_unlock(&backup_latch);
+	return 0;
+error:
+	gc_unref_checkpoint(backup_gc);
+	backup_gc = NULL;
+	latch_unlock(&backup_latch);
+	return -1;
 }
 
 void
 box_backup_stop(void)
 {
+	latch_lock(&backup_latch);
 	if (backup_gc != NULL) {
 		gc_unref_checkpoint(backup_gc);
 		backup_gc = NULL;
 	}
+	latch_unlock(&backup_latch);
 }
 
 API_EXPORT const char *
