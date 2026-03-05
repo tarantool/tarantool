@@ -14,6 +14,7 @@
 #include <zstd.h> 
 #include <assert.h>
 #include <lz4.h>
+#include <zlib.h>
 
 uint64_t MEMTX_SORT_DATA_LZ4_ACCELERATION = 10;
 TWEAK_UINT(MEMTX_SORT_DATA_LZ4_ACCELERATION);
@@ -21,9 +22,13 @@ TWEAK_UINT(MEMTX_SORT_DATA_LZ4_ACCELERATION);
 uint64_t MEMTX_SORT_DATA_ZSTD_LEVEL = 3;
 TWEAK_UINT(MEMTX_SORT_DATA_ZSTD_LEVEL);
 
+uint64_t MEMTX_SORT_DATA_ZLIB_LEVEL = 6;
+TWEAK_UINT(MEMTX_SORT_DATA_ZLIB_LEVEL);
+
 enum compression{
 	LZ_4,
-	ZSTD
+	ZSTD,
+	ZLIB
 };
 
 static enum compression COMPRESSION_TYPE = ZSTD;
@@ -458,14 +463,10 @@ memtx_sort_data_writer_put_tuple(struct memtx_sort_data_writer *writer,
 int
 memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 {
-	/* Update the dummy sort data entry in the file header. */
+	
 	assert(writer->curr_entry != NULL);
 	struct memtx_sort_data_writer_entry *entry = writer->curr_entry;
-	// if (writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
-	//     writer_printf(writer, ENTRY_FMT, entry->key.space_id,
-	// 		  entry->key.index_id, entry->offset,
-	// 		  entry->psize, entry->len) != 0)
-	// 	return -1;
+
 
 	if (entry->key.index_id != 0) {
 		if (writer_seek(writer, entry->offset, SEEK_SET) != 0)
@@ -495,23 +496,38 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 				int rc = LZ4_compress_fast(writer->sk_buf, dst,
 							   src_size, (int)max_dst,
 							   (int)MEMTX_SORT_DATA_LZ4_ACCELERATION);
-				
+
 				if (rc > 0 && rc <= (int)max_dst)
 					dst_size = (size_t)rc;
 				else
 					dst_size = 0;
 			} else if (COMPRESSION_TYPE == ZSTD) {
 				printf("ZSTD: %lu", MEMTX_SORT_DATA_ZSTD_LEVEL);
-				
+
 				max_dst = ZSTD_compressBound((size_t)src_size);
 				dst = (char *)xmalloc(max_dst);
 
 				size_t rc = ZSTD_compress(dst, max_dst,
 							  writer->sk_buf, (size_t)src_size,
 							  MEMTX_SORT_DATA_ZSTD_LEVEL);
-				
+
 				if (!ZSTD_isError(rc) && rc <= max_dst)
 					dst_size = rc;
+				else
+					dst_size = 0;
+			} else if (COMPRESSION_TYPE == ZLIB) {
+				uLongf zdst_len;
+				max_dst = (size_t)compressBound((uLong)src_size);
+				dst = (char *)xmalloc(max_dst);
+				zdst_len = (uLongf)max_dst;
+
+				int rc = compress2((Bytef *)dst, &zdst_len,
+						   (const Bytef *)writer->sk_buf,
+						   (uLong)src_size,
+						   (int)MEMTX_SORT_DATA_ZLIB_LEVEL);
+
+				if (rc == Z_OK)
+					dst_size = (size_t)zdst_len;
 				else
 					dst_size = 0;
 			}
@@ -547,7 +563,7 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 	    writer_printf(writer, ENTRY_FMT, entry->key.space_id,
 			  entry->key.index_id, entry->offset,
 			  entry->psize, entry->csize, entry->len) != 0)
-		return -1;	
+		return -1;
 	writer->curr_entry = NULL;
 	return 0;
 }
@@ -811,32 +827,17 @@ memtx_sort_data_reader_get_size(struct memtx_sort_data_reader *reader)
 	assert(reader->curr_entry != NULL);
 	return reader->curr_entry->len;
 }
-
 int
 memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 			   void *buffer, long expected_data_size)
 {
 	struct memtx_sort_data_reader_entry *entry = reader->curr_entry;
-	assert(entry != NULL); /* Only called if sort data exists. */
+	assert(entry != NULL);
 	if (entry->psize != expected_data_size) {
 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
 			 reader->filename, "SK size is invalid");
 		return -1;
 	}
-	// if (fread(buffer, 1, entry->psize,
-	// 	  reader->fp) != (size_t)entry->psize) {
-	// 	if (feof(reader->fp)) {
-	// 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
-	// 			 reader->filename, "EOF during SK read");
-	// 		return -1;
-	// 	} else {
-	// 		diag_set(SystemError, "%s: space %u: failed to read "
-	// 			 " index #%u data", reader->filename,
-	// 			 entry->key.space_id, entry->key.index_id);
-	// 		return -1;
-	// 	}
-	// }
-	// return 0;
 	if (entry->csize == entry->psize) {
 		if (fread(buffer, 1, entry->psize,
 			  reader->fp) != (size_t)entry->psize) {
@@ -905,6 +906,17 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 				 reader->filename, "ZSTD decompression failed");
 			return -1;
 		}
+	} else if (COMPRESSION_TYPE == ZLIB) {
+		uLongf dst_len = (uLongf)entry->psize;
+		int rc = uncompress((Bytef *)buffer, &dst_len,
+				    (const Bytef *)compressed, (uLong)entry->csize);
+		free(compressed);
+
+		if (rc != Z_OK || dst_len != (uLongf)entry->psize) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "ZLIB decompression failed");
+			return -1;
+		}
 	} else {
 		free(compressed);
 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
@@ -914,6 +926,7 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 
 	return 0;
 }
+
 struct tuple *
 memtx_sort_data_reader_resolve_tuple(struct memtx_sort_data_reader *reader,
 				     struct tuple *old_ptr)
