@@ -175,6 +175,7 @@ cache_test()
 int
 main(int, const char**)
 {
+	say_logger_init("/dev/null", S_INFO, 0, "plain");
 	coll_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
@@ -184,4 +185,5 @@ main(int, const char**)
 	fiber_free();
 	memory_free();
 	coll_free();
+	say_logger_free();
 }
