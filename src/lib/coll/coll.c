@@ -29,6 +29,12 @@
  * SUCH DAMAGE.
  */
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <PMurHash.h>
 #include <unicode/ucol.h>
 #include <unicode/ucnv.h>
@@ -37,11 +43,111 @@
 #include "coll.h"
 #include "diag.h"
 #include "assoc.h"
+#include "trivia/util.h"
 #include "tt_static.h"
 #include "say.h"
 
 struct UCaseMap *icu_ucase_default_map = NULL;
 struct UConverter *icu_utf8_conv = NULL;
+
+/**
+ * Null-terminated array of locale strings that will be used for creating
+ * predefined collations.
+ */
+static const char * const predefined_locales[] = {
+	"af", /* Afrikaans */
+	"am", /* Amharic (no character changes, just re-ordering) */
+	"ar", /* Arabic (use only "standard") */
+	"as", /* Assamese */
+	"az", /* Azerbaijani (Azeri) */
+	"be", /* Belarusian */
+	"bn", /* Bengali (Bangla actually) */
+	"bs", /* Bosnian (tailored as Croatian) */
+	"bs_Cyrl", /* Bosnian in Cyrillic (tailored as Serbian) */
+	"ca", /* Catalan */
+	"cs", /* Czech */
+	"cy", /* Welsh */
+	"da", /* Danish */
+	"de_DE_u_co_phonebk", /* German (umlaut as 'ae', 'oe', 'ue') */
+	"de_AT_u_co_phonebk", /* Austrian German (umlaut primary greater) */
+	"dsb", /* Lower Sorbian */
+	"ee", /* Ewe */
+	"eo", /* Esperanto */
+	"es", /* Spanish */
+	"es_u_co_trad", /* Spanish ('ch' and 'll' as a grapheme) */
+	"et", /* Estonian */
+	"fa", /* Persian */
+	"fi", /* Finnish (v and w are primary equal) */
+	"fi_u_co_phonebk", /* Finnish (v and w as separate characters) */
+	"fil", /* Filipino */
+	"fo", /* Faroese */
+	"fr_CA", /* Canadian French */
+	"gu", /* Gujarati */
+	"ha", /* Hausa */
+	"haw", /* Hawaiian */
+	"he", /* Hebrew */
+	"hi", /* Hindi */
+	"hr", /* Croatian */
+	"hu", /* Hungarian */
+	"hy", /* Armenian */
+	"ig", /* Igbo */
+	"is", /* Icelandic */
+	"ja", /* Japanese */
+	"kk", /* Kazakh */
+	"kl", /* Kalaallisut */
+	"kn", /* Kannada */
+	"ko", /* Korean */
+	"kok", /* Konkani */
+	"ky", /* Kyrgyz */
+	"lkt", /* Lakota */
+	"ln", /* Lingala */
+	"lt", /* Lithuanian */
+	"lv", /* Latvian */
+	"mk", /* Macedonian */
+	"ml", /* Malayalam */
+	"mr", /* Marathi */
+	"mt", /* Maltese */
+	"nb", /* Norwegian Bokmal */
+	"nn", /* Norwegian Nynorsk */
+	"nso", /* Northern Sotho */
+	"om", /* Oromo */
+	"or", /* Oriya (Odia) */
+	"pa", /* Punjabi */
+	"pl", /* Polish */
+	"ro", /* Romanian */
+	"sa", /* Sanskrit */
+	"se", /* Northern Sami */
+	"si", /* Sinhala */
+	"si_u_co_dict", /* Sinhala (U+0DA5 = U+0DA2,0DCA,0DA4) */
+	"sk", /* Slovak */
+	"sl", /* Slovenian */
+	"sq", /* Albanian (just "standard") */
+	"sr", /* Serbian */
+	"sr_Latn", /* Serbian in Latin (tailored as Croatian) */
+	"sv", /* Swedish (v and w are primary equal) */
+	"sv_u_co_reformed", /* Swedish (v and w as separate characters) */
+	"ta", /* Tamil */
+	"te", /* Telugu */
+	"th", /* Thai */
+	"tn", /* Tswana */
+	"to", /* Tonga */
+	"tr", /* Turkish */
+	"ug", /* Uyghur in Cyrillic - is there such locale? */
+	"uk", /* Ukrainian */
+	"ur", /* Urdu */
+	"vi", /* Vietnamese */
+	"vo", /* Volapük */
+	"wae", /* Walser */
+	"wo", /* Wolof */
+	"yo", /* Yoruba */
+	"zh", /* Chinese */
+	"zh_u_co_big5han", /* Chinese (ideographs: big5 order) */
+	"zh_u_co_gb2312", /* Chinese (ideographs: GB-2312 order) */
+	"zh_u_co_pinyin", /* Chinese (ideographs: pinyin order) */
+	"zh_u_co_stroke", /* Chinese (ideographs: stroke order) */
+	"zh_u_co_zhuyin", /* Chinese (ideographs: zhuyin order) */
+	NULL
+};
 
 #define mh_name _coll
 struct mh_coll_key_t {
@@ -315,14 +421,14 @@ coll_def_snfingerprint(char *buffer, int size, const struct coll_def *def)
 {
 	int total = 0;
 	if (def->type == COLL_TYPE_ICU) {
-		SNPRINT(total, snprintf, buffer, size, "{locale: %s,"\
-			"type = %d, icu: ", def->locale, (int) def->type);
+		SNPRINT(total, snprintf, buffer, size,
+			"{type: icu, locale: '%s', icu: ", def->locale);
 		SNPRINT(total, coll_icu_def_snfingerprint, buffer,
 			size, &def->icu);
 		SNPRINT(total, snprintf, buffer, size, "}");
 	} else {
 		assert(def->type == COLL_TYPE_BINARY);
-		SNPRINT(total, snprintf, buffer, size, "{type = binary}");
+		SNPRINT(total, snprintf, buffer, size, "{type: binary}");
 	}
 	return total;
 }
@@ -351,8 +457,8 @@ coll_can_merge(const struct coll *first, const struct coll *second)
 
 }
 
-struct coll *
-coll_new(const struct coll_def *def)
+static struct coll *
+coll_new_impl(const struct coll_def *def, bool is_predefined)
 {
 	int fingerprint_len = coll_def_snfingerprint(NULL, 0, def);
 	assert(fingerprint_len <= TT_STATIC_BUF_LEN);
@@ -363,9 +469,17 @@ coll_new(const struct coll_def *def)
 	struct mh_coll_key_t key = { fingerprint, fingerprint_len, hash };
 	mh_int_t i = mh_coll_find(coll_cache, &key, NULL);
 	if (i != mh_end(coll_cache)) {
+		assert(!is_predefined);
 		struct coll *coll = mh_coll_node(coll_cache, i)->coll;
 		coll_ref(coll);
 		return coll;
+	}
+
+	if (!is_predefined) {
+		say_warn_once("Usage of custom collations is deprecated. "
+			      "Tarantool 4.0 and newer will not start if "
+			      "there are custom collations in the database.");
+		say_warn("Creating custom collation %s", fingerprint);
 	}
 
 	int total_size = sizeof(struct coll) + fingerprint_len + 1;
@@ -399,6 +513,24 @@ coll_new(const struct coll_def *def)
 	return coll;
 }
 
+struct coll *
+coll_new(const struct coll_def *def)
+{
+	return coll_new_impl(def, /*is_predefined=*/false);
+}
+
+/**
+ * Creates a new predefined collation and adds it to the cache.
+ */
+static void
+coll_create_predefined(const struct coll_def *def)
+{
+	if (coll_new_impl(def, /*is_predefined=*/true) == NULL) {
+		diag_log();
+		panic("Can not create predefined collation");
+	}
+}
+
 void
 coll_unref(struct coll *coll)
 {
@@ -423,6 +555,24 @@ coll_init(void)
 	icu_utf8_conv = ucnv_open("utf8", &err);
 	if (icu_ucase_default_map == NULL || icu_utf8_conv == NULL)
 		panic("Can not create system collations cache");
+	/* Create predefined collations. */
+	struct coll_def def;
+	memset(&def, 0, sizeof(def));
+	def.type = COLL_TYPE_BINARY;
+	coll_create_predefined(&def); /* binary */
+	def.type = COLL_TYPE_ICU;
+	def.icu.strength = COLL_ICU_STRENGTH_TERTIARY;
+	coll_create_predefined(&def); /* unicode */
+	def.icu.strength = COLL_ICU_STRENGTH_PRIMARY;
+	coll_create_predefined(&def); /* unicode_ci */
+	for (const char * const *plocale = predefined_locales;
+	     *plocale != NULL; plocale++) {
+		strlcpy(def.locale, *plocale, sizeof(def.locale));
+		for (int strength = 1; strength <= 3; strength++) {
+			def.icu.strength = strength;
+			coll_create_predefined(&def);
+		}
+	}
 }
 
 void
@@ -430,5 +580,11 @@ coll_free(void)
 {
 	ucasemap_close(icu_ucase_default_map);
 	ucnv_close(icu_utf8_conv);
+	mh_int_t i;
+	mh_foreach(coll_cache, i) {
+		struct coll *coll = mh_coll_node(coll_cache, i)->coll;
+		assert(coll->refs == 1);
+		coll_unref(coll);
+	}
 	mh_coll_delete(coll_cache);
 }
