@@ -454,25 +454,12 @@ tarantool_lua_utf8_init(struct lua_State *L)
 	def.icu.strength = COLL_ICU_STRENGTH_TERTIARY;
 	unicode_coll = coll_new(&def);
 	if (unicode_coll == NULL)
-		goto error_coll;
+		luaT_error(L);
 	def.icu.strength = COLL_ICU_STRENGTH_PRIMARY;
 	unicode_ci_coll = coll_new(&def);
 	if (unicode_ci_coll == NULL)
-		goto error_coll;
+		luaT_error(L);
 	luaT_newmodule(L, "utf8", utf8_lib);
 	/* Assign to _G.utf8 for compatibility with Lua 5.3. */
 	lua_setfield(L, LUA_GLOBALSINDEX, "utf8");
-	return;
-error_coll:
-	tarantool_lua_utf8_free();
-	luaT_error(L);
-}
-
-void
-tarantool_lua_utf8_free()
-{
-	if (unicode_coll != NULL)
-		coll_unref(unicode_coll);
-	if (unicode_ci_coll != NULL)
-		coll_unref(unicode_ci_coll);
 }
