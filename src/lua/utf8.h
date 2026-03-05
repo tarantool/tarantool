@@ -36,7 +36,4 @@ struct lua_State;
 void
 tarantool_lua_utf8_init(struct lua_State *L);
 
-void
-tarantool_lua_utf8_free();
-
 #endif /* TARANTOOL_LUA_UTF8_H_INCLUDED */

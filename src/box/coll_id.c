@@ -61,6 +61,5 @@ void
 coll_id_delete(struct coll_id *coll_id)
 {
 	assert(rlist_empty(&coll_id->cache_pin_list));
-	coll_unref(coll_id->coll);
 	free(coll_id);
 }
