@@ -69,7 +69,6 @@ enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
 struct tuple;
 struct tuple_info;
 struct tuple_format;
-struct coll;
 struct mpstream;
 
 /** Engine-specific tuple format methods. */
@@ -144,10 +143,6 @@ struct tuple_field {
 	bool is_multikey_part;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
-	/** Collation definition for string comparison */
-	struct coll *coll;
-	/** Collation identifier. */
-	uint32_t coll_id;
 	/** Compression options for this field. */
 	struct compression_opts compression_opts;
 	/**

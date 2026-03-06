@@ -889,24 +889,10 @@ struct coll *
 sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 {
 	assert(def != NULL);
-	/*
-	 * It is not always possible to fetch collation directly
-	 * from struct space due to its absence in space cache.
-	 * To be more precise when space is ephemeral or it is
-	 * under construction.
-	 *
-	 * In cases mentioned above collation is fetched by id.
-	 */
-	if (def->opts.is_ephemeral) {
-		assert(column < (uint32_t)def->field_count);
-		*coll_id = def->fields[column].coll_id;
-		struct coll_id *collation = coll_by_id(*coll_id);
-		return collation != NULL ? collation->coll : NULL;
-	}
-	struct space *space = space_by_id(def->id);
-	struct tuple_field *field = tuple_format_field(space->format, column);
-	*coll_id = field->coll_id;
-	return field->coll;
+	assert(column < (uint32_t)def->field_count);
+	*coll_id = def->fields[column].coll_id;
+	struct coll_id *collation = coll_by_id(*coll_id);
+	return collation != NULL ? collation->coll : NULL;
 }
 
 void
