@@ -299,9 +299,8 @@ space_pin_collations_helper(struct space *space, uint32_t id,
 void
 space_pin_collations(struct space *space)
 {
-	struct tuple_format *format = space->format;
-	for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
-		struct tuple_field *field = tuple_format_field(format, i);
+	for (uint32_t i = 0; i < space->def->field_count; i++) {
+		struct field_def *field = &space->def->fields[i];
 		space_pin_collations_helper(space, field->coll_id,
 					    COLL_ID_HOLDER_SPACE_FORMAT);
 	}

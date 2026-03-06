@@ -576,6 +576,15 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			  "formatted field count");
 		return NULL;
 	}
+	for (uint32_t i = 0; i < field_count; i++) {
+		struct field_def *field = &fields[i];
+		if (field->coll_id != COLL_NONE &&
+		    coll_by_id(field->coll_id) == NULL) {
+			diag_set(ClientError, ER_WRONG_COLLATION_OPTIONS,
+				 "collation was not found by ID");
+			return NULL;
+		}
+	}
 	struct space_opts opts;
 	if (space_opts_decode(&opts, space_opts, region) != 0)
 		return NULL;

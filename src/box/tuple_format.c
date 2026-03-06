@@ -32,7 +32,6 @@
 #include "bit/bit.h"
 #include "fiber.h"
 #include "json/json.h"
-#include "coll_id_cache.h"
 #include "trivia/util.h"
 #include "tuple.h"
 #include "tuple_builder.h"
@@ -108,8 +107,6 @@ tuple_format_cmp(const struct tuple_format *format1,
 			tuple_format1_field_by_format2_field(b, field_a);
 		if (field_a->type != field_b->type)
 			return (int)field_a->type - (int)field_b->type;
-		if (field_a->coll_id != field_b->coll_id)
-			return (int)field_a->coll_id - (int)field_b->coll_id;
 		if (field_a->nullable_action != field_b->nullable_action)
 			return (int)field_a->nullable_action -
 				(int)field_b->nullable_action;
@@ -166,7 +163,6 @@ tuple_format_hash(struct tuple_format *format)
 	json_tree_foreach_entry_preorder(f, &format->fields.root,
 					 struct tuple_field, token) {
 		TUPLE_FIELD_MEMBER_HASH(f, type, h, carry, size)
-		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, compression_opts, h, carry, size);
@@ -209,7 +205,6 @@ tuple_field_new(void)
 	field->token.type = JSON_TOKEN_END;
 	field->type = FIELD_TYPE_ANY;
 	field->offset_slot = TUPLE_OFFSET_SLOT_NIL;
-	field->coll_id = COLL_NONE;
 	field->nullable_action = ON_CONFLICT_ACTION_NONE;
 	field->multikey_required_fields = NULL;
 	field->constraint_count = 0;
@@ -519,19 +514,6 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 		field->type = fields[i].type;
 		field->type_params = fields[i].type_params;
 		field->nullable_action = fields[i].nullable_action;
-		struct coll *coll = NULL;
-		uint32_t cid = fields[i].coll_id;
-		if (cid != COLL_NONE) {
-			struct coll_id *coll_id = coll_by_id(cid);
-			if (coll_id == NULL) {
-				diag_set(ClientError,ER_WRONG_COLLATION_OPTIONS,
-					 "collation was not found by ID");
-				return -1;
-			}
-			coll = coll_id->coll;
-		}
-		field->coll = coll;
-		field->coll_id = cid;
 		/*
 		 * Padding byte values are unspecified on assignment, use memcpy
 		 * so that we can compute hash and compare members as raw values

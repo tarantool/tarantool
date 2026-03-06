@@ -114,10 +114,9 @@ test_tuple_format_cmp(void)
 	size = mp_format(buf, lengthof(buf), "[{%s%s %s%d}]",
 			 "name", "f", "collation", 2);
 	f2 = runtime_tuple_format_new(buf, size, false);
-	ok(f1 != f2, "tuple formats with different 'collation' definitions "
-	   "are not equal");
+	ok(f1 == f2, "tuple formats with different 'collation' definitions "
+	   "are equal");
 	tuple_format_delete(f1);
-	tuple_format_delete(f2);
 
 	coll_id_cache_delete(coll_id2);
 	coll_id_cache_delete(coll_id1);
