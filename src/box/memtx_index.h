@@ -105,12 +105,41 @@ memtx_index_get_internal(struct index *index, const char *key,
 }
 
 /**
- * Replace a tuple in the index.
+ * Replace a tuple in the index and return the replaced and successor tuples.
  */
 int
+memtx_index_replace_with_results(struct index *index, struct tuple *old_tuple,
+				 struct tuple *new_tuple,
+				 enum dup_replace_mode mode,
+				 struct tuple **result,
+				 struct tuple **successor);
+
+/**
+ * Replace a tuple in the index and return the replaced tuple.
+ */
+static inline int
+memtx_index_replace_with_single_result(struct index *index,
+				       struct tuple *old_tuple,
+				       struct tuple *new_tuple,
+				       enum dup_replace_mode mode,
+				       struct tuple **result)
+{
+	struct tuple *unused;
+	return memtx_index_replace_with_results(index, old_tuple, new_tuple,
+						mode, result, &unused);
+}
+
+/**
+ * Replace a tuple in the index.
+ */
+static inline int
 memtx_index_replace(struct index *index, struct tuple *old_tuple,
-		    struct tuple *new_tuple, enum dup_replace_mode mode,
-		    struct tuple **result, struct tuple **successor);
+		    struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	struct tuple *unused;
+	return memtx_index_replace_with_results(index, old_tuple, new_tuple,
+						mode, &unused, &unused);
+}
 
 static inline void
 memtx_index_begin_build(struct index *index)
