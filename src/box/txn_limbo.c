@@ -135,6 +135,36 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 	return vclock_get(&limbo->queue.confirmed_vclock, replica_id);
 }
 
+static int
+txn_limbo_check_own_term_intact(const struct txn_limbo *limbo, uint64_t term)
+{
+	if (limbo->term != term) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE,
+			 limbo->queue.owner_id);
+		return -1;
+	}
+	return 0;
+}
+
+static int
+txn_limbo_check_raft_term_intact(const struct txn_limbo *limbo, uint64_t term)
+{
+	if (limbo->raft->volatile_term != term) {
+		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
+		return -1;
+	}
+	return 0;
+}
+
+static bool
+txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
+{
+	if (lsn < 0)
+		return false;
+	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
+	       replication_synchro_quorum;
+}
+
 static void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
@@ -308,6 +338,83 @@ end:
 	box_update_ro_summary();
 }
 
+static int
+txn_limbo_on_ack_wakeup_f(struct trigger *trigger, void *event)
+{
+	(void)event;
+	fiber_wakeup(trigger->data);
+	return 0;
+}
+
+/**
+ * A helper to wait until all limbo entries are ready to be confirmed, i.e.
+ * written to WAL and have gathered a quorum of ACKs from replicas.
+ * Return lsn of the last quorum-acked limbo entry on success.
+ */
+static int64_t
+txn_limbo_wait_acked(struct txn_limbo *limbo, double timeout)
+{
+	if (txn_limbo_is_empty(limbo))
+		return limbo->queue.confirmed_lsn;
+#ifndef NDEBUG
+	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
+#endif
+	uint64_t term = limbo->term;
+	double deadline = fiber_clock() + timeout;
+	while (!fiber_is_cancelled()) {
+		struct txn_limbo_entry *last
+			= txn_limbo_last_synchro_entry(limbo);
+		if (txn_limbo_has_quorum_for(limbo, last->lsn))
+			return last->lsn;
+		struct trigger on_ack;
+		trigger_create(&on_ack, txn_limbo_on_ack_wakeup_f,
+			       fiber(), NULL);
+		trigger_add(&replicaset.on_ack, &on_ack);
+		int rc = fiber_cond_wait_deadline(&limbo->queue.cond, deadline);
+		trigger_clear(&on_ack);
+		if (rc != 0)
+			return -1;
+		if (txn_limbo_check_own_term_intact(limbo, term) != 0)
+			return -1;
+		if (txn_limbo_is_empty(limbo))
+			return limbo->queue.confirmed_lsn;
+	}
+	diag_set(FiberIsCancelled);
+	return -1;
+}
+
+/** Execute an ownership change request (PROMOTE/DEMOTE). */
+static int
+txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type,
+		      int64_t lsn, uint64_t term)
+{
+	/*
+	 * We make sure that promote is only written once everything this
+	 * instance has may be confirmed.
+	 */
+	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
+	VERIFY(e == NULL || e->lsn <= lsn);
+	struct synchro_request req = {
+		.type = type,
+		.queue_owner_id = limbo->queue.owner_id,
+		.origin_id = instance_id,
+		.promote = {
+			.lsn = lsn,
+			.term = term,
+		},
+	};
+	/*
+	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
+	 * appear in WALs and replication.
+	 */
+	vclock_clear(&req.promote.confirmed_vclock);
+	if (txn_limbo_req_prepare(limbo, &req) < 0)
+		return -1;
+	synchro_request_write_or_panic(&req);
+	txn_limbo_req_commit(limbo, &req);
+	return 0;
+}
+
 /*******************************************************************************
  * Public API
  ******************************************************************************/
@@ -454,36 +561,45 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 }
 
 int
-txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-		      uint64_t term)
+txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
 {
-	txn_limbo_assert_locked(limbo);
-	/*
-	 * We make sure that promote is only written once everything this
-	 * instance has may be confirmed.
-	 */
-	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
-	assert(e == NULL || e->lsn <= lsn);
-	(void) e;
-	struct synchro_request req = {
-		.type = type,
-		.queue_owner_id = limbo->queue.owner_id,
-		.origin_id = instance_id,
-		.promote = {
-			.lsn = lsn,
-			.term = term,
-		},
-	};
-	/*
-	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
-	 * appear in WALs and replication.
-	 */
-	vclock_clear(&req.promote.confirmed_vclock);
-	if (txn_limbo_req_prepare(limbo, &req) < 0)
+	struct raft *raft = limbo->raft;
+	uint64_t term = raft->term;
+	uint64_t limbo_term = limbo->term;
+	bool is_raft_enabled = raft_is_enabled(raft);
+	if (is_raft_enabled &&
+	    txn_limbo_replica_term(limbo, instance_id) == term)
+		return 0;
+	int64_t wait_lsn = txn_limbo_wait_acked(limbo, timeout);
+	if (wait_lsn < 0)
 		return -1;
-	synchro_request_write_or_panic(&req);
-	txn_limbo_req_commit(limbo, &req);
-	return 0;
+	if (is_raft_enabled && raft->state != RAFT_STATE_LEADER) {
+		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
+		return -1;
+	}
+	int rc = 0;
+	rc = txn_limbo_check_raft_term_intact(limbo, term);
+	if (rc != 0)
+		return rc;
+	/*
+	 * Fully ready to execute the promotion now.
+	 */
+	txn_limbo_begin(limbo);
+	rc = txn_limbo_check_raft_term_intact(limbo, term);
+	if (rc != 0)
+		goto tx_end;
+	rc = txn_limbo_check_own_term_intact(limbo, limbo_term);
+	if (rc != 0)
+		goto tx_end;
+	rc = txn_limbo_req_promote(limbo, type, wait_lsn, term);
+tx_end:
+	if (rc == 0) {
+		txn_limbo_commit(limbo);
+		assert(txn_limbo_is_empty(limbo));
+	} else {
+		txn_limbo_rollback(limbo);
+	}
+	return rc;
 }
 
 int
@@ -498,15 +614,6 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 {
 	return txn_limbo_queue_wait_empty(&limbo->queue, timeout);
-}
-
-bool
-txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
-{
-	if (lsn < 0)
-		return false;
-	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
-	       replication_synchro_quorum;
 }
 
 /**
