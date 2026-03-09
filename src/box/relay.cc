@@ -54,7 +54,6 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "wal.h"
-#include "txn_limbo.h"
 #include "raft.h"
 #include "box.h"
 
@@ -673,18 +672,8 @@ tx_status_update(struct cmsg *msg)
 	 * true proper replica must declare itself not anon, and not be expelled
 	 * by the master.
 	 */
-	if (!anon && ack.source != REPLICA_ID_NIL) {
-		/*
-		 * If the limbo has no owner, this will be ack for 0 LSN (since
-		 * acks have vclock[0] decoded as 0 on the receiving side,
-		 * regardless what was send). 0 LSN won't bump quorum and will
-		 * be just nop.
-		 */
-		int64_t lsn = vclock_get(ack.vclock, txn_limbo.queue.owner_id);
-		assert(txn_limbo.queue.owner_id != REPLICA_ID_NIL || lsn == 0);
-		txn_limbo_ack(&txn_limbo, ack.source, lsn);
+	if (!anon && ack.source != REPLICA_ID_NIL)
 		trigger_run(&replicaset.on_ack, &ack);
-	}
 
 	if (!relay->tx.is_paired) {
 		/*
