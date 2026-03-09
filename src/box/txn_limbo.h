@@ -337,12 +337,6 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout);
 
 /**
- * True if enough ACKs are received for the given LSN to consider it confirmed.
- */
-bool
-txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn);
-
-/**
  * Persist limbo state to a given synchro request.
  */
 void
@@ -350,13 +344,11 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 		     struct synchro_request *req);
 
 /**
- * Write a PROMOTE/DEMOTE request. It will do CONFIRM(@a lsn) +
- * ROLLBACK(@a lsn + 1) + assign a new owner to the limbo (this node for
- * PROMOTE, nobody for DEMOTE).
+ * Execute promotion/demotion to catch up with the Raft state, in case this node
+ * is a Raft leader in a new term, and the limbo is behind.
  */
 int
-txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-		      uint64_t term);
+txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout);
 
 /**
  * Update qsync parameters dynamically.

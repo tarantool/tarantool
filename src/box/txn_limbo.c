@@ -137,7 +137,27 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 	return vclock_get(&limbo->queue.confirmed_vclock, replica_id);
 }
 
-bool
+/** Check limbo's term is unchanged. */
+static int
+txn_limbo_check_own_term_intact(const struct txn_limbo *limbo, uint64_t term)
+{
+	if (limbo->term == term)
+		return 0;
+	diag_set(ClientError, ER_INTERFERING_PROMOTE, limbo->queue.owner_id);
+	return -1;
+}
+
+/** Check Raft's term is unchanged. */
+static int
+txn_limbo_check_raft_term_intact(const struct txn_limbo *limbo, uint64_t term)
+{
+	if (limbo->raft->volatile_term == term)
+		return 0;
+	diag_set(ClientError, ER_INTERFERING_ELECTIONS);
+	return -1;
+}
+
+static bool
 txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
 {
 	assert(lsn > 0);
@@ -324,7 +344,44 @@ end:
 	box_update_ro_summary();
 }
 
-int
+/**
+ * A helper to wait until all limbo entries are ready to be confirmed, i.e.
+ * written to WAL and have gathered a quorum of ACKs from replicas.
+ * Return lsn of the last quorum-acked limbo entry on success.
+ */
+static int64_t
+txn_limbo_wait_acked(struct txn_limbo *limbo, double timeout)
+{
+	if (txn_limbo_is_empty(limbo))
+		return limbo->queue.confirmed_lsn;
+#ifndef NDEBUG
+	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
+#endif
+	uint64_t term = limbo->term;
+	double deadline = fiber_clock() + timeout;
+	while (!fiber_is_cancelled()) {
+		int64_t lsn = txn_limbo_last_synchro_entry(limbo)->lsn;
+		if (lsn > 0 && txn_limbo_has_quorum_for(limbo, lsn))
+			return lsn;
+		struct trigger on_ack;
+		trigger_create(&on_ack, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
+		trigger_add(&replicaset.on_ack, &on_ack);
+		int rc = fiber_cond_wait_deadline(&limbo->queue.cond, deadline);
+		trigger_clear(&on_ack);
+		if (rc != 0)
+			return -1;
+		if (txn_limbo_check_own_term_intact(limbo, term) != 0)
+			return -1;
+		if (txn_limbo_is_empty(limbo))
+			return limbo->queue.confirmed_lsn;
+	}
+	diag_set(FiberIsCancelled);
+	return -1;
+}
+
+/** Execute an ownership change request (PROMOTE/DEMOTE). */
+static int
 txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 		      uint64_t term)
 {
@@ -499,6 +556,47 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 	req->promote.term = limbo->term;
 	vclock_copy(&req->promote.confirmed_vclock,
 		    &limbo->queue.confirmed_vclock);
+}
+
+int
+txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
+{
+	struct raft *raft = limbo->raft;
+	uint64_t term = raft->term;
+	uint64_t limbo_term = limbo->term;
+	bool is_raft_enabled = raft_is_enabled(raft);
+	if (is_raft_enabled &&
+	    txn_limbo_replica_term(limbo, instance_id) == term)
+		return 0;
+	int64_t wait_lsn = txn_limbo_wait_acked(limbo, timeout);
+	if (wait_lsn < 0)
+		return -1;
+	if (is_raft_enabled && raft->state != RAFT_STATE_LEADER) {
+		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
+		return -1;
+	}
+	int rc = txn_limbo_check_raft_term_intact(limbo, term);
+	if (rc != 0)
+		return rc;
+	/*
+	 * Fully ready to execute the promotion now.
+	 */
+	txn_limbo_begin(limbo);
+	rc = txn_limbo_check_raft_term_intact(limbo, term);
+	if (rc != 0)
+		goto tx_end;
+	rc = txn_limbo_check_own_term_intact(limbo, limbo_term);
+	if (rc != 0)
+		goto tx_end;
+	rc = txn_limbo_req_promote(limbo, type, wait_lsn, term);
+tx_end:
+	if (rc == 0) {
+		txn_limbo_commit(limbo);
+		assert(txn_limbo_is_empty(limbo));
+	} else {
+		txn_limbo_rollback(limbo);
+	}
+	return rc;
 }
 
 int
