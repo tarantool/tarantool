@@ -663,10 +663,12 @@ tx_status_update(struct cmsg *msg)
 	 */
 	raft_process_term(box_raft(), status->term, ack.source);
 	/*
-	 * Let pending synchronous transactions know, which of
-	 * them were successfully sent to the replica.
+	 * A replica can declare itself anon, but master might assign it an ID.
+	 * Or replica might be having an ID, but the master can remove it. A
+	 * true proper replica must declare itself not anon, and not be expelled
+	 * by the master.
 	 */
-	if (!anon) {
+	if (!anon && ack.source != REPLICA_ID_NIL) {
 		/*
 		 * If the limbo has no owner, this will be ack for 0 LSN (since
 		 * acks have vclock[0] decoded as 0 on the receiving side,
@@ -676,8 +678,8 @@ tx_status_update(struct cmsg *msg)
 		int64_t lsn = vclock_get(ack.vclock, txn_limbo.queue.owner_id);
 		assert(txn_limbo.queue.owner_id != REPLICA_ID_NIL || lsn == 0);
 		txn_limbo_ack(&txn_limbo, ack.source, lsn);
+		trigger_run(&replicaset.on_ack, &ack);
 	}
-	trigger_run(&replicaset.on_ack, &ack);
 
 	if (!relay->tx.is_paired) {
 		/*
