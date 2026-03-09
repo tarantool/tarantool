@@ -923,11 +923,10 @@ txn_on_journal_write(struct journal_entry *entry)
 			}
 			lsn = rows[i]->lsn;
 		}
-		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
+		txn_limbo_assign_lsn(&txn_limbo, ack_origin_id,
+				     txn->limbo_entry, lsn);
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
-		assert(txn->limbo_entry->lsn == lsn);
-		txn_limbo_ack(&txn_limbo, ack_origin_id, lsn);
 	}
 finish:
 	fiber_set_txn(fiber(), NULL);
