@@ -171,6 +171,8 @@ struct txn_limbo {
 	 * `confirmed_lsn`.
 	 */
 	struct fiber *worker;
+	/** A trigger invoked on replica acks. */
+	struct trigger on_ack;
 };
 
 /**
@@ -259,15 +261,8 @@ txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
 /** Assign the LSN to the queue entry. */
 void
-txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
-		     int64_t lsn);
-
-/**
- * Ack all transactions up to the given LSN on behalf of the
- * replica with the specified ID.
- */
-void
-txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
+txn_limbo_assign_lsn(struct txn_limbo *limbo, uint32_t origin_id,
+		     struct txn_limbo_entry *entry, int64_t lsn);
 
 /** Try to wait for the given entry's completion. */
 enum txn_limbo_wait_entry_result

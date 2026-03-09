@@ -54,7 +54,6 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "wal.h"
-#include "txn_limbo.h"
 #include "raft.h"
 #include "box.h"
 
@@ -668,11 +667,8 @@ tx_status_update(struct cmsg *msg)
 	 * true proper replica must declare itself not anon, and not by expelled
 	 * by the master.
 	 */
-	if (!anon && ack.source != REPLICA_ID_NIL) {
-		txn_limbo_ack(&txn_limbo, ack.source,
-			      vclock_get(ack.vclock, txn_limbo.queue.owner_id));
+	if (!anon && ack.source != REPLICA_ID_NIL)
 		trigger_run(&replicaset.on_ack, &ack);
-	}
 
 	if (!relay->tx.is_paired) {
 		/*
