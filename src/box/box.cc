@@ -6379,9 +6379,9 @@ box_storage_init(void)
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
-	txn_limbo_init(box_raft());
 	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
+	txn_limbo_init(box_raft());
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
 	audit_log_init();
@@ -6412,8 +6412,8 @@ box_storage_free(void)
 		return;
 	wal_free();
 	iproto_free();
-	replication_free();
 	txn_limbo_free();
+	replication_free();
 	gc_free();
 	engine_free();
 	flightrec_free();
