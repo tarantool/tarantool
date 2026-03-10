@@ -17,7 +17,8 @@ g.before_all(function()
     }
     g.server:start()
     g.server:exec(function()
-        require('third_party.metrics.test.rock_utils').remove_builtin('metrics')
+        local rocks_utils = 'test.metrics-luatest.test.rock_utils'
+        require(rocks_utils).remove_builtin('metrics')
         box.cfg{feedback_send_metrics = true}
     end)
 end)
