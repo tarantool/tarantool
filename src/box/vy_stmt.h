@@ -363,19 +363,6 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id);
 
 /**
- * Return true if @a stmt can be referenced. Now to be not refable
- * it must be allocated on lsregion.
- * @param stmt a statement
- * @retval true if @a stmt was allocated on lsregion
- * @retval false otherwise
- */
-static inline bool
-vy_stmt_is_refable(struct tuple *stmt)
-{
-	return !tuple_is_unreferenced(stmt);
-}
-
-/**
  * Return a comparison hint of a vinyl statement.
  */
 static inline hint_t

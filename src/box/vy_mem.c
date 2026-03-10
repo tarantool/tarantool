@@ -171,7 +171,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry,
 	/* Check if the statement can be inserted in the vy_mem. */
 	assert(entry.stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
-	assert(!vy_stmt_is_refable(entry.stmt));
+	assert(tuple_is_unreferenced(entry.stmt));
 	size_t size = tuple_size(entry.stmt);
 	struct vy_entry replaced = vy_entry_none();
 	struct vy_mem_tree_iterator inserted;
@@ -236,7 +236,7 @@ vy_mem_insert(struct vy_mem *mem, struct vy_entry entry,
 	assert(vy_stmt_is_key(entry.stmt) ||
 	       entry.stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
-	assert(!vy_stmt_is_refable(entry.stmt));
+	assert(tuple_is_unreferenced(entry.stmt));
 	size_t size = tuple_size(entry.stmt);
 	struct vy_entry replaced = vy_entry_none();
 	if (vy_mem_tree_insert(&mem->tree, entry, &replaced, NULL))
@@ -259,7 +259,7 @@ void
 vy_mem_commit_stmt(struct vy_mem *mem, struct vy_entry entry)
 {
 	/* The statement must be from a lsregion. */
-	assert(!vy_stmt_is_refable(entry.stmt));
+	assert(tuple_is_unreferenced(entry.stmt));
 	int64_t lsn = vy_stmt_lsn(entry.stmt);
 	/*
 	 * Normally statement LSN grows monotonically,
@@ -282,7 +282,7 @@ vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry,
 		     struct vy_stmt_counter *count)
 {
 	/* The statement must be from a lsregion. */
-	assert(!vy_stmt_is_refable(entry.stmt));
+	assert(tuple_is_unreferenced(entry.stmt));
 	/*
 	 * The statement isn't present in the memory tree if it was replaced by
 	 * vy_mem_insert(). In this case we must not decrement the row count.
@@ -593,7 +593,14 @@ vy_mem_iterator_get_history(struct vy_mem_iterator *itr,
 {
 	do {
 		vy_stmt_counter_acct_tuple(&itr->stat->get, itr->curr.stmt);
-		if (vy_history_append_stmt(history, itr->curr) != 0)
+		struct vy_entry entry;
+		entry.stmt = vy_stmt_dup(itr->curr.stmt);
+		if (entry.stmt == NULL)
+			return -1;
+		entry.hint = itr->curr.hint;
+		int rc = vy_history_append_stmt(history, entry);
+		tuple_unref(entry.stmt);
+		if (rc != 0)
 			return -1;
 		if (vy_history_is_terminal(history))
 			break;
