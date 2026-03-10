@@ -17,7 +17,8 @@ local g = helpers.group()
 -- applied. It sets a custom process title, which is verified here.
 g.test_example = function(g)
     local dir = treegen.prepare_directory({}, {})
-    local config_file = fio.abspath('doc/examples/config/upgrade.yaml')
+    local config_file = fio.abspath('test/config-luatest/examples/config/' ..
+        'upgrade.yaml')
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.server:start()
