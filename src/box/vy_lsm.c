@@ -903,8 +903,8 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 {
 	uint32_t format_id = entry.stmt->format_id;
 
-	assert(vy_stmt_is_refable(entry.stmt));
-	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
+	assert(!tuple_is_unreferenced(entry.stmt));
+	assert(*region_stmt == NULL || tuple_is_unreferenced(*region_stmt));
 	assert(vy_stmt_is_key(entry.stmt) ||
 	       format_id == tuple_format_id(mem->format));
 
