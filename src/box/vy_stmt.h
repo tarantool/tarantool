@@ -376,32 +376,6 @@ vy_stmt_is_refable(struct tuple *stmt)
 }
 
 /**
- * Ref tuple, if it exists (!= NULL) and can be referenced.
- * @sa vy_stmt_is_refable.
- *
- * @param tuple Tuple to ref or NULL.
- */
-static inline void
-vy_stmt_ref_if_possible(struct tuple *stmt)
-{
-	if (vy_stmt_is_refable(stmt))
-		tuple_ref(stmt);
-}
-
-/**
- * Unref tuple, if it exists (!= NULL) and can be unreferenced.
- * @sa vy_stmt_is_refable.
- *
- * @param tuple Tuple to unref or NULL.
- */
-static inline void
-vy_stmt_unref_if_possible(struct tuple *stmt)
-{
-	if (vy_stmt_is_refable(stmt))
-		tuple_unref(stmt);
-}
-
-/**
  * Return a comparison hint of a vinyl statement.
  */
 static inline hint_t

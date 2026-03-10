@@ -438,6 +438,8 @@ struct vy_mem_stream {
 	struct vy_mem *mem;
 	/** Current position */
 	struct vy_mem_tree_iterator curr_pos;
+	/** The last tuple returned to user */
+	struct vy_entry entry;
 };
 
 /**

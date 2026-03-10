@@ -975,8 +975,8 @@ vy_deferred_delete_batch_free_f(struct cmsg *cmsg)
 	struct vy_task *task = batch->task;
 	for (int i = 0; i < batch->count; i++) {
 		struct vy_deferred_delete_stmt *stmt = &batch->stmt[i];
-		vy_stmt_unref_if_possible(stmt->old_stmt);
-		vy_stmt_unref_if_possible(stmt->new_stmt);
+		tuple_unref(stmt->old_stmt);
+		tuple_unref(stmt->new_stmt);
 	}
 	/*
 	 * Abort the task if the tx thread failed to process
@@ -1054,9 +1054,9 @@ vy_task_deferred_delete_process(struct vy_deferred_delete_handler *handler,
 	assert(batch->count < VY_DEFERRED_DELETE_BATCH_MAX);
 	struct vy_deferred_delete_stmt *stmt = &batch->stmt[batch->count++];
 	stmt->old_stmt = old_stmt;
-	vy_stmt_ref_if_possible(old_stmt);
+	tuple_ref(old_stmt);
 	stmt->new_stmt = new_stmt;
-	vy_stmt_ref_if_possible(new_stmt);
+	tuple_ref(new_stmt);
 
 	if (batch->count == VY_DEFERRED_DELETE_BATCH_MAX)
 		vy_task_deferred_delete_flush(task);
