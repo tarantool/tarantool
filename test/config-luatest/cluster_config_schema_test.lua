@@ -533,7 +533,7 @@ local examples = {
 
 for case, path in pairs(examples) do
     local test_name = ('test_example_%s'):format(case)
-    local config_path = ('doc/examples/config/%s'):format(path)
+    local config_path = ('test/config-luatest/examples/config/%s'):format(path)
     g[test_name] = function()
         local config_file = fio.abspath(config_path)
         local fh = fio.open(config_file, {'O_RDONLY'})
@@ -551,7 +551,7 @@ local enterprise_examples = {
 
 for case, path in pairs(enterprise_examples) do
     local test_name = ('test_example_%s'):format(case)
-    local config_path = ('doc/examples/config/%s'):format(path)
+    local config_path = ('test/config-luatest/examples/config/%s'):format(path)
     g[test_name] = function()
         t.tarantool.skip_if_not_enterprise()
         local config_file = fio.abspath(config_path)
