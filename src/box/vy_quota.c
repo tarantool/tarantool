@@ -292,6 +292,7 @@ vy_quota_force_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 void
 vy_quota_release(struct vy_quota *q, size_t size)
 {
+	say_info("---------------qouta before release -----------------%zd", q->used);
 	/*
 	 * Don't use vy_quota_do_unuse(), because it affects
 	 * the rate limit state.
