@@ -36,6 +36,7 @@
 #include "tt_static.h"
 #include "fiber.h"
 #include "errinj.h"
+#include "say.h"
 
 #define MAX_HEADER_LEN 8192
 
@@ -128,6 +129,42 @@ curl_easy_header_cb(char *buffer, size_t size, size_t nitems, void *ctx)
 	}
 	memcpy(p, buffer, bytes);
 	return bytes;
+}
+
+/**
+ * libcurl callback for CURLOPT_DEBUGFUNCTION.
+ * @see https://curl.se/libcurl/c/CURLOPT_DEBUGFUNCTION.html
+ */
+static int
+curl_easy_debug_cb(CURL *easy, curl_infotype type, char *data, size_t size,
+		   void *userptr)
+{
+	(void)easy;
+	(void)userptr;
+
+	switch (type) {
+	case CURLINFO_TEXT:
+	case CURLINFO_HEADER_IN:
+	case CURLINFO_HEADER_OUT:
+		say_info("libcurl: %.*s", (int)size, data);
+		break;
+	case CURLINFO_DATA_IN:
+		say_info("libcurl: < %zu bytes data", size);
+		break;
+	case CURLINFO_DATA_OUT:
+		say_info("libcurl: > %zu bytes data", size);
+		break;
+	case CURLINFO_SSL_DATA_IN:
+		say_info("libcurl: < %zu bytes ssl data", size);
+		break;
+	case CURLINFO_SSL_DATA_OUT:
+		say_info("libcurl: > %zu bytes ssl data", size);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
@@ -355,6 +392,8 @@ httpc_set_low_speed_limit(struct httpc_request *req, long low_speed_limit)
 void
 httpc_set_verbose(struct httpc_request *req, bool curl_verbose)
 {
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_DEBUGFUNCTION,
+			 curl_easy_debug_cb);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_VERBOSE,
 			 (long) curl_verbose);
 }
