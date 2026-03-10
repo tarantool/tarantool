@@ -89,7 +89,7 @@ end)
 
 g.test_disown = function()
     local find_orphan_users_script =
-        fio.abspath('tools/find-orphan-users.lua')
+        fio.abspath('test/config-luatest/find-orphan-users.lua')
     t.assert(fio.path.exists(find_orphan_users_script))
 
     g.server:exec(function(find_orphan_users_script)
