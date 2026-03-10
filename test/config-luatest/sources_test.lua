@@ -17,7 +17,8 @@ g.after_each(function(g)
 end)
 
 g.test_source_file = function()
-    local config = {_config_file = 'doc/examples/config/single.yaml'}
+    local config =
+        {_config_file = 'test/config-luatest/examples/config/single.yaml'}
     source_file:sync(config, {})
     local res = source_file:get()
     local exp = {
