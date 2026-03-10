@@ -1091,6 +1091,9 @@ vy_task_write_run(struct vy_task *task, bool no_compression)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_stmt_stream *wi = task->wi;
 
+	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_RUN_WRITE_CRASH_COUNTDOWN, {
+		panic("injected crash");
+	});
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});

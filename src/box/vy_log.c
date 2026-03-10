@@ -791,7 +791,14 @@ vy_log_tx_flush(struct vy_log_tx *tx)
 		struct xrow_header *row = &rows[i];
 		vy_log_record_encode(record, row);
 		entry->rows[i] = row;
+		/*
+		 * Update the recovery context with records written during
+		 * recovery - we will need them for garbage collection.
+		 */
+		if (vy_log.recovery != NULL)
+			vy_recovery_process_record(vy_log.recovery, record);
 		i++;
+
 	}
 	assert(i == tx_size);
 
@@ -851,8 +858,7 @@ vy_log_flusher_f(va_list va)
 		 * Disable writes during local recovery.
 		 * See vy_log_tx_commit().
 		 */
-		if (vy_log.recovery != NULL ||
-		    stailq_empty(&vy_log.pending_tx)) {
+		if (stailq_empty(&vy_log.pending_tx)) {
 			fiber_cond_wait(&vy_log.flusher_cond);
 			continue;
 		}
@@ -1039,6 +1045,7 @@ struct vy_recovery *
 vy_log_begin_recovery(const struct vclock *vclock, bool force_recovery)
 {
 	assert(vy_log.recovery == NULL);
+	xdir_remove_temporary_files(&vy_log.dir);
 
 	/*
 	 * Do not fail recovery if vinyl directory does not exist,
@@ -1147,17 +1154,6 @@ vy_log_end_recovery(void)
 {
 	assert(vy_log.recovery != NULL);
 
-	/*
-	 * Update the recovery context with records written during
-	 * recovery - we will need them for garbage collection.
-	 */
-	struct vy_log_tx *tx;
-	stailq_foreach_entry(tx, &vy_log.pending_tx, in_pending) {
-		struct vy_log_record *record;
-		stailq_foreach_entry(record, &tx->records, in_tx)
-			vy_recovery_process_record(vy_log.recovery, record);
-	}
-
 	/* Flush all pending records. */
 	if (vy_log_flush() < 0) {
 		diag_log();
@@ -1165,7 +1161,6 @@ vy_log_end_recovery(void)
 		return -1;
 	}
 
-	xdir_remove_temporary_files(&vy_log.dir);
 	vy_log.recovery = NULL;
 	return 0;
 }
@@ -1299,17 +1294,6 @@ vy_log_tx_begin(void)
 int
 vy_log_tx_commit(void)
 {
-	/*
-	 * During recovery, we may replay records we failed to commit
-	 * before restart (e.g. drop LSM tree). Since the log isn't open
-	 * yet, simply leave them in the tx buffer to be flushed upon
-	 * recovery completion.
-	 */
-	if (vy_log.recovery != NULL) {
-		vy_log_tx_try_commit();
-		return 0;
-	}
-
 	struct vy_log_tx *tx = vy_log.tx;
 	vy_log.tx = NULL;
 	assert(tx != NULL);
