@@ -45,6 +45,9 @@ vy_log_tx_begin(void) {}
 void
 vy_log_tx_try_commit(void) {}
 
+void
+vy_log_tx_try_commit_recoverable(void) {}
+
 int
 vy_log_tx_commit(void)
 {

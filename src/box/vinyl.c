@@ -857,7 +857,7 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	 */
 	vy_log_tx_begin();
 	vy_log_create_lsm(lsm->id, lsn);
-	vy_log_tx_try_commit();
+	vy_log_tx_try_commit_recoverable();
 }
 
 static void
@@ -912,7 +912,7 @@ vinyl_index_commit_modify(struct index *index, int64_t lsn)
 
 	vy_log_tx_begin();
 	vy_log_modify_lsm(lsm->id, lsm->key_def, lsn);
-	vy_log_tx_try_commit();
+	vy_log_tx_try_commit_recoverable();
 }
 
 static void
@@ -936,7 +936,7 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 
 	vy_log_tx_begin();
 	vy_log_drop_lsm(lsm->id, lsn);
-	vy_log_tx_try_commit();
+	vy_log_tx_try_commit_recoverable();
 }
 
 static void
@@ -2814,18 +2814,6 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
-/**
- * Called upon local recovery completion to enable memory quota
- * and start the scheduler.
- */
-static void
-vy_env_complete_recovery(struct vy_env *env)
-{
-	vy_scheduler_start(&env->scheduler);
-	vy_quota_enable(&env->quota);
-	vy_regulator_start(&env->regulator);
-}
-
 struct engine *
 vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery)
@@ -3004,8 +2992,10 @@ vinyl_engine_bootstrap(struct engine *engine)
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
-	vy_env_complete_recovery(e);
 	e->status = VINYL_ONLINE;
+	vy_scheduler_start(&e->scheduler);
+	vy_quota_enable(&e->quota);
+	vy_regulator_start(&e->regulator);
 	return 0;
 }
 
@@ -3023,25 +3013,16 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 						    e->force_recovery);
 		if (e->recovery == NULL)
 			return -1;
-		/*
-		 * We can't schedule any background tasks until
-		 * local recovery is complete, because they would
-		 * disrupt yet to be recovered data stored on disk.
-		 * So we don't start the scheduler fiber or enable
-		 * memory limit until then.
-		 *
-		 * This is OK, because during recovery an instance
-		 * can't consume more memory than it used before
-		 * restart and hence memory dumps are not necessary.
-		 */
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
 		if (vy_log_bootstrap() != 0)
 			return -1;
-		vy_env_complete_recovery(e);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 		e->run_env.initial_join = true;
 	}
+	vy_scheduler_start(&e->scheduler);
+	vy_quota_enable(&e->quota);
+	vy_regulator_start(&e->regulator);
 	return 0;
 }
 
@@ -3116,7 +3097,6 @@ vinyl_engine_end_recovery(struct engine *engine)
 		 */
 		e->xm->lsn = vclock_sum(e->recovery_vclock);
 		e->recovery_vclock = NULL;
-		vy_env_complete_recovery(e);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;

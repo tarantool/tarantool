@@ -329,7 +329,7 @@ vy_lsm_create(struct vy_lsm *lsm)
 	vy_log_prepare_lsm(id, lsm->space_id, lsm->index_id,
 			   lsm->group_id, lsm->key_def);
 	vy_log_insert_range(id, range->id, NULL, NULL);
-	vy_log_tx_try_commit();
+	vy_log_tx_try_commit_recoverable();
 
 	/* Assign the id. */
 	assert(lsm->id < 0);

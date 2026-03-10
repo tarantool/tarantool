@@ -536,6 +536,17 @@ void
 vy_log_tx_try_commit(void);
 
 /**
+ * Similar vy_log_tx_try_commit() but additionally updates recovery
+ * context during recovery (see vy_log_begin_recovery()), fixing
+ * it with records we fail to save on previous starts.
+ *
+ * It is expected to be called when missing vy_log changes can be recovered
+ * from xlog.
+ */
+void
+vy_log_tx_try_commit_recoverable(void);
+
+/**
  * Write a record to the metadata log.
  *
  * This function simply appends the record to the internal buffer.
