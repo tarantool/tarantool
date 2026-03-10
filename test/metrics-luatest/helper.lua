@@ -8,7 +8,7 @@ local fun = require('fun')
 -- but in case someone has metrics package installed globally
 -- and wants to run the tests with pure luatest, we disable
 -- override here.
-local rock_utils = require('third_party.metrics.test.rock_utils')
+local rock_utils = require('test.metrics-luatest.test.rock_utils')
 rock_utils.remove_override('metrics')
 rock_utils.assert_builtin('metrics')
 
@@ -64,22 +64,22 @@ local function array_to_map(arr)
     return map
 end
 
-local third_party_tests = get_test_modules_list('third_party/metrics/test')
+local third_party_tests = get_test_modules_list('test/metrics-luatest/test')
 local core_tests = get_test_modules_list('test/metrics-luatest')
 
 -- Embedded metrics does not include cartridge role.
 -- We don't check cartridge integration here too, refer to
 -- https://github.com/tarantool/cartridge/pull/2047
 local ignore_tests = {
-    'third_party.metrics.test.integration.cartridge_health_test',
-    'third_party.metrics.test.integration.cartridge_hotreload_test',
-    'third_party.metrics.test.integration.cartridge_metrics_test',
-    'third_party.metrics.test.integration.cartridge_nohttp_test',
-    'third_party.metrics.test.integration.cartridge_role_test',
-    'third_party.metrics.test.integration.highload_test',
-    'third_party.metrics.test.integration.hotreload_test',
-    'third_party.metrics.test.unit.cartridge_issues_test',
-    'third_party.metrics.test.unit.cartridge_role_test',
+    'test.metrics-luatest.test.integration.cartridge_health_test',
+    'test.metrics-luatest.test.integration.cartridge_hotreload_test',
+    'test.metrics-luatest.test.integration.cartridge_metrics_test',
+    'test.metrics-luatest.test.integration.cartridge_nohttp_test',
+    'test.metrics-luatest.test.integration.cartridge_role_test',
+    'test.metrics-luatest.test.integration.highload_test',
+    'test.metrics-luatest.test.integration.hotreload_test',
+    'test.metrics-luatest.test.unit.cartridge_issues_test',
+    'test.metrics-luatest.test.unit.cartridge_role_test',
 }
 
 core_tests = array_to_map(core_tests)
@@ -93,7 +93,7 @@ end
 for third_party_test, _ in pairs(third_party_tests) do
     -- Replace . to _ since tests here is not hierarchic:
     -- test-run does not expect hierarchic structure.
-    local name = third_party_test:gsub('^third_party.metrics.test.', '')
+    local name = third_party_test:gsub('^test.metrics%-luatest.test.', '')
                                  :gsub('%.', '_')
     local core_test = 'test.metrics-luatest.' .. name
 
@@ -104,17 +104,14 @@ end
 -- Workaround paths to reuse existing submodule tests.
 local function workaround_requires(path)
     package.preload[path] = function()
-        return require('third_party.metrics.' .. path)
+        return require('test.metrics-luatest.' .. path)
     end
 end
 
 workaround_requires('test.utils')
 
 require('test.utils')
-local test_root = fio.dirname(
-    fio.dirname(fio.abspath(
-        package.search('third_party.metrics.test.utils')))) -- luacheck: ignore
-
+local test_root = fio.abspath('test/metrics-luatest')
 package.loaded['test.utils'].LUA_PATH = os.getenv('LUA_PATH') ..
     test_root .. '/?.lua;' ..
     test_root .. '/?/init.lua;'

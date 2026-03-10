@@ -1,6 +1,8 @@
-local build_path = os.getenv("BUILDDIR")
-package.cpath = build_path .. '/src/lua/?.lua;' .. package.cpath
-local uri = require('src.lua.uri')
+local source_is_available, uri = pcall(require, 'src.lua.uri')
+if not source_is_available then
+    uri = require('uri')
+end
+
 local t = require('luatest')
 
 local decimal = require('decimal')
