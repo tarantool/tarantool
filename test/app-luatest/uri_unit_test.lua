@@ -1,6 +1,4 @@
-local build_path = os.getenv("BUILDDIR")
-package.cpath = build_path .. '/src/lua/?.lua;' .. package.cpath
-local uri = require('src.lua.uri')
+local uri = require('test.app-luatest.uri')
 local t = require('luatest')
 
 local decimal = require('decimal')
