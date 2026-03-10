@@ -36,6 +36,7 @@
 #include "tt_static.h"
 #include "fiber.h"
 #include "errinj.h"
+#include "say.h"
 
 #define MAX_HEADER_LEN 8192
 
@@ -128,6 +129,68 @@ curl_easy_header_cb(char *buffer, size_t size, size_t nitems, void *ctx)
 	}
 	memcpy(p, buffer, bytes);
 	return bytes;
+}
+
+/** Log a single libcurl debug line after trimming trailing CRLF. */
+static void
+httpc_log_libcurl_line(char prefix, const char *data, size_t size)
+{
+	while (size > 0 && (data[size - 1] == '\n' || data[size - 1] == '\r'))
+		--size;
+	say_file_line(S_INFO, NULL, 0, NULL, "libcurl: %c %.*s", prefix,
+		      (int)size, data);
+}
+
+/**
+ * libcurl callback for CURLOPT_DEBUGFUNCTION.
+ * @see https://curl.se/libcurl/c/CURLOPT_DEBUGFUNCTION.html
+ */
+static int
+curl_easy_debug_cb(CURL *easy, curl_infotype type, char *data, size_t size,
+		   void *userptr)
+{
+	(void)easy;
+	(void)userptr;
+
+	switch (type) {
+	case CURLINFO_TEXT:
+	case CURLINFO_HEADER_IN:
+	case CURLINFO_HEADER_OUT: {
+		char prefix = type == CURLINFO_TEXT ? '*' :
+			      type == CURLINFO_HEADER_IN ? '<' :
+			      '>';
+
+		while (size > 0) {
+			char *line_end = memchr(data, '\n', size);
+			size_t line_size = line_end == NULL ? size :
+					   (size_t)(line_end - data + 1);
+			httpc_log_libcurl_line(prefix, data, line_size);
+			data += line_size;
+			size -= line_size;
+		}
+		break;
+	}
+	case CURLINFO_DATA_IN:
+		say_file_line(S_INFO, NULL, 0, NULL,
+			      "libcurl: < [%zu bytes data]", size);
+		break;
+	case CURLINFO_DATA_OUT:
+		say_file_line(S_INFO, NULL, 0, NULL,
+			      "libcurl: > [%zu bytes data]", size);
+		break;
+	case CURLINFO_SSL_DATA_IN:
+		say_file_line(S_INFO, NULL, 0, NULL,
+			      "libcurl: < [%zu bytes ssl data]", size);
+		break;
+	case CURLINFO_SSL_DATA_OUT:
+		say_file_line(S_INFO, NULL, 0, NULL,
+			      "libcurl: > [%zu bytes ssl data]", size);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int
@@ -355,6 +418,8 @@ httpc_set_low_speed_limit(struct httpc_request *req, long low_speed_limit)
 void
 httpc_set_verbose(struct httpc_request *req, bool curl_verbose)
 {
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_DEBUGFUNCTION,
+			 curl_easy_debug_cb);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_VERBOSE,
 			 (long) curl_verbose);
 }
