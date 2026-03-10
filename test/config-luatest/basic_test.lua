@@ -74,7 +74,8 @@ end
 
 g.test_example_single = function(g)
     local dir = treegen.prepare_directory({}, {})
-    local config_file = fio.abspath('doc/examples/config/single.yaml')
+    local config_file = fio.abspath('test/config-luatest/examples/config/' ..
+        'single.yaml')
     local opts = {config_file = config_file, chdir = dir}
     g.server = server:new(fun.chain(opts, {alias = 'instance-001'}):tomap())
     g.server:start()
@@ -83,9 +84,11 @@ end
 
 g.test_example_replicaset = function(g)
     local dir = treegen.prepare_directory({}, {})
-    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+    fio.copytree('test/config-luatest/examples/config/secrets',
+                  fio.pathjoin(dir, 'secrets'))
 
-    local config_file = fio.abspath('doc/examples/config/replicaset.yaml')
+    local config_file = fio.abspath('test/config-luatest/examples/config/' ..
+        'replicaset.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
 
     -- Verify that the default database mode for a replicaset with
@@ -100,9 +103,10 @@ end
 
 g.test_example_replicaset_manual_failover = function(g)
     local dir = treegen.prepare_directory({}, {})
-    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+    fio.copytree('test/config-luatest/examples/config/secrets',
+                 fio.pathjoin(dir, 'secrets'))
 
-    local config_file = fio.abspath('doc/examples/config/' ..
+    local config_file = fio.abspath('test/config-luatest/examples/config/' ..
         'replicaset_manual_failover.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
 
@@ -118,9 +122,10 @@ end
 
 g.test_example_replicaset_election_failover = function(g)
     local dir = treegen.prepare_directory({}, {})
-    fio.copytree('doc/examples/config/secrets', fio.pathjoin(dir, 'secrets'))
+    fio.copytree('test/config-luatest/examples/config/secrets',
+                 fio.pathjoin(dir, 'secrets'))
 
-    local config_file = fio.abspath('doc/examples/config/' ..
+    local config_file = fio.abspath('test/config-luatest/examples/config/' ..
         'replicaset_election_failover.yaml')
     helpers.start_example_replicaset(g, dir, config_file)
 
