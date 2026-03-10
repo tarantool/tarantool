@@ -1,11 +1,11 @@
--- This tests are using treegen to catch information about protocol version
--- by catching stderr. Treegen creates and tracks temporary directories, where
--- scripts with testing workloads reside.
+-- These tests use treegen to run a separate tarantool process and check
+-- libcurl verbose output in Tarantool log.
 
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local socket = require('socket')
+local fio = require('fio')
 
 local wrong_version_group = t.group()
 
@@ -54,10 +54,14 @@ http_version_group.after_each(function(g)
 end)
 
 local http_request_script = string.dump(function()
+    local log = require('log')
     local http_client = require('http.client').new()
     local proto = os.getenv('PROTO')
     local port = os.getenv('HTTP_SERVER_PORT')
     local uri = proto .. '://127.0.0.1:' .. port
+
+    log.cfg({log = 'tarantool.log'})
+
     local ok = pcall(http_client.get, http_client, uri, {
         verbose = true,
         http_version = os.getenv('HTTP_VERSION'),
@@ -76,9 +80,15 @@ http_version_group.test_http_version = function(g)
     local env = {HTTP_SERVER_PORT = g.server:name().port}
     env.PROTO = g.params.proto
     env.HTTP_VERSION = g.params.version
-    local res = justrun.tarantool(dir, env, args, opts)
+    justrun.tarantool(dir, env, args, opts)
+
+    local log_path = fio.pathjoin(dir, 'tarantool.log')
+    local log_file = fio.open(log_path)
+    t.assert_not_equals(log_file, nil)
+    local log_data = log_file:read()
+    log_file:close()
     local exp = expected[tostring(g.params.version)][g.params.proto]
-    t.assert_str_contains(res.stderr, exp)
+    t.assert_str_contains(log_data, exp)
 end
 
 wrong_version_group.test_request_wrong_http_version = function()
