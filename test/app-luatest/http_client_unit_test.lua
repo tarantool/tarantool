@@ -9,12 +9,16 @@ local ffi = require("ffi")
 
 local g = t.group('http_client_unit')
 
-package.loaded['http.client'] = {
-    new = function() return end
-}
-local driver = package.loaded['http.client'] -- luacheck: no unused
+local source_is_available, httpc = pcall(require, "src.lua.httpc")
+if source_is_available then
+    package.loaded["http.client"] = {
+        new = function() return end
+    }
+    local driver = package.loaded["http.client"] -- luacheck: no unused
+else
+    httpc = require('http.client')
+end
 
-local httpc = require("src.lua.httpc")
 local encode_body = httpc._internal.encode_body
 local decode_body = httpc._internal.decode_body
 local extract_mime_type = httpc._internal.extract_mime_type
