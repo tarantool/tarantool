@@ -1,3 +1,3 @@
 require('test.metrics-luatest.helper')
 
-require('third_party.metrics.test.collectors.histogram_test')
+require('test.metrics-luatest.test.collectors.histogram_test')
