@@ -2274,9 +2274,9 @@ vy_run_writer_write_to_page(struct vy_run_writer *writer, struct vy_entry entry)
 	    vy_bloom_builder_add(writer->bloom, entry, writer->key_def) != 0)
 		return -1;
 	if (writer->last.stmt != NULL)
-		vy_stmt_unref_if_possible(writer->last.stmt);
+		tuple_unref(writer->last.stmt);
 	writer->last = entry;
-	vy_stmt_ref_if_possible(entry.stmt);
+	tuple_ref(entry.stmt);
 	struct vy_run *run = writer->run;
 	struct vy_page_info *page = run->page_info + run->info.page_count - 1;
 	uint32_t *offset = (uint32_t *)ibuf_alloc(&writer->row_index_buf,
@@ -2364,7 +2364,7 @@ static void
 vy_run_writer_destroy(struct vy_run_writer *writer)
 {
 	if (writer->last.stmt != NULL)
-		vy_stmt_unref_if_possible(writer->last.stmt);
+		tuple_unref(writer->last.stmt);
 	if (xlog_is_open(&writer->data_xlog))
 		xlog_discard(&writer->data_xlog);
 	if (writer->bloom != NULL)

@@ -660,24 +660,41 @@ vy_mem_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 {
 	assert(virt_stream->iface->next == vy_mem_stream_next);
 	struct vy_mem_stream *stream = (struct vy_mem_stream *)virt_stream;
-
+	if (stream->entry.stmt != NULL)
+		tuple_unref(stream->entry.stmt);
 	struct vy_entry *res =
 		vy_mem_tree_iterator_get_elem(&stream->mem->tree,
 					      &stream->curr_pos);
 	if (res == NULL) {
-		*ret = vy_entry_none();
+		stream->entry = vy_entry_none();
 	} else {
-		*ret = *res;
+		stream->entry.stmt = vy_stmt_dup(res->stmt);
+		if (stream->entry.stmt == NULL)
+			return -1;
+		stream->entry.hint = res->hint;
 		vy_mem_tree_iterator_next(&stream->mem->tree,
 					  &stream->curr_pos);
 	}
+	*ret = stream->entry;
 	return 0;
+}
+
+/** Implementation of vy_stmt_stream::stop(). */
+static void
+vy_mem_stream_stop(struct vy_stmt_stream *virt_stream)
+{
+	assert(virt_stream->iface->next == vy_mem_stream_next);
+	struct vy_mem_stream *stream = (struct vy_mem_stream *)virt_stream;
+	if (stream->entry.stmt != NULL) {
+		tuple_unref(stream->entry.stmt);
+		stream->entry = vy_entry_none();
+	}
 }
 
 static const struct vy_stmt_stream_iface vy_mem_stream_iface = {
 	.start = NULL,
 	.next = vy_mem_stream_next,
-	.stop = NULL,
+	.stop = vy_mem_stream_stop,
 	.close = NULL
 };
 
@@ -687,6 +704,7 @@ vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem)
 	stream->base.iface = &vy_mem_stream_iface;
 	stream->mem = mem;
 	stream->curr_pos = vy_mem_tree_first(&mem->tree);
+	stream->entry = vy_entry_none();
 }
 
 /* }}} vy_mem_iterator API implementation */

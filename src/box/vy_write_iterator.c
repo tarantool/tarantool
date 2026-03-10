@@ -112,7 +112,7 @@ vy_write_history_new(struct vy_entry entry, struct vy_write_history *next)
 	assert(next == NULL || (next->entry.stmt != NULL &&
 	       vy_stmt_lsn(next->entry.stmt) > vy_stmt_lsn(entry.stmt)));
 	h->next = next;
-	vy_stmt_ref_if_possible(entry.stmt);
+	tuple_ref(entry.stmt);
 	return h;
 }
 
@@ -126,7 +126,7 @@ vy_write_history_destroy(struct vy_write_history *history)
 {
 	do {
 		if (history->entry.stmt != NULL)
-			vy_stmt_unref_if_possible(history->entry.stmt);
+			tuple_unref(history->entry.stmt);
 		history = history->next;
 	} while (history != NULL);
 }
@@ -154,7 +154,7 @@ static inline void
 vy_read_view_stmt_destroy(struct vy_read_view_stmt *rv)
 {
 	if (rv->entry.stmt != NULL)
-		vy_stmt_unref_if_possible(rv->entry.stmt);
+		tuple_unref(rv->entry.stmt);
 	rv->entry = vy_entry_none();
 	/*
 	 * History must be already cleaned up in
@@ -439,11 +439,11 @@ vy_write_iterator_stop(struct vy_stmt_stream *vstream)
 	rlist_foreach_entry(src, &stream->src_list, in_src_list)
 		vy_write_iterator_remove_src(stream, src);
 	if (stream->last.stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->last.stmt);
+		tuple_unref(stream->last.stmt);
 		stream->last = vy_entry_none();
 	}
 	if (stream->deferred_delete.stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		tuple_unref(stream->deferred_delete.stmt);
 		stream->deferred_delete = vy_entry_none();
 	}
 	struct vy_deferred_delete_handler *handler =
@@ -592,7 +592,7 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
 	assert(stream->rv_used_count > 0);
 	stream->rv_used_count--;
 	if (stream->last.stmt != NULL)
-		vy_stmt_unref_if_possible(stream->last.stmt);
+		tuple_unref(stream->last.stmt);
 	stream->last = rv->entry;
 	rv->entry = vy_entry_none();
 	return stream->last;
@@ -632,7 +632,7 @@ vy_write_iterator_deferred_delete(struct vy_write_iterator *stream,
 		    handler->iface->process(handler, stmt,
 					    stream->deferred_delete.stmt) != 0)
 			return -1;
-		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		tuple_unref(stream->deferred_delete.stmt);
 		stream->deferred_delete = vy_entry_none();
 	}
 	/*
@@ -644,7 +644,7 @@ vy_write_iterator_deferred_delete(struct vy_write_iterator *stream,
 	if ((vy_stmt_flags(stmt) & VY_STMT_DEFERRED_DELETE) != 0) {
 		assert(vy_stmt_type(stmt) == IPROTO_DELETE ||
 		       vy_stmt_type(stmt) == IPROTO_REPLACE);
-		vy_stmt_ref_if_possible(stmt);
+		tuple_ref(stmt);
 		stream->deferred_delete = entry;
 	}
 	return 0;
@@ -699,7 +699,7 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 			 "malloc", "vinyl write stream heap");
 		return rc;
 	}
-	vy_stmt_ref_if_possible(src->entry.stmt);
+	tuple_ref(src->entry.stmt);
 	/*
 	 * For each pair (merge_until_lsn, current_rv_lsn] build
 	 * a history in the corresponding read view.
@@ -809,12 +809,12 @@ next_lsn:
 	 */
 	if (rc == 0 && stream->is_last_level &&
 	    stream->deferred_delete.stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		tuple_unref(stream->deferred_delete.stmt);
 		stream->deferred_delete = vy_entry_none();
 	}
 
 	vy_source_heap_delete(&stream->src_heap, &end_of_key_src);
-	vy_stmt_unref_if_possible(end_of_key_src.entry.stmt);
+	tuple_unref(end_of_key_src.entry.stmt);
 	return rc;
 }
 
@@ -887,7 +887,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 						stream->cmp_def, false);
 		if (applied.stmt == NULL)
 			return -1;
-		vy_stmt_unref_if_possible(h->entry.stmt);
+		tuple_unref(h->entry.stmt);
 		h->entry = applied;
 	}
 	/* Squash the rest of UPSERTs. */
@@ -902,9 +902,9 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 						stream->cmp_def, false);
 		if (applied.stmt == NULL)
 			return -1;
-		vy_stmt_unref_if_possible(result->entry.stmt);
+		tuple_unref(result->entry.stmt);
 		result->entry = applied;
-		vy_stmt_unref_if_possible(h->entry.stmt);
+		tuple_unref(h->entry.stmt);
 		/*
 		 * Don't bother freeing 'h' since it's
 		 * allocated on a region.
@@ -926,11 +926,6 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 	uint8_t flags = vy_stmt_flags(rv->entry.stmt);
 	if ((flags & VY_STMT_DEFERRED_DELETE) != 0 &&
 	    !vy_entry_is_equal(rv->entry, stream->deferred_delete)) {
-		if (!vy_stmt_is_refable(rv->entry.stmt)) {
-			rv->entry.stmt = vy_stmt_dup(rv->entry.stmt);
-			if (rv->entry.stmt == NULL)
-				return -1;
-		}
 		vy_stmt_set_flags(rv->entry.stmt,
 				  flags & ~VY_STMT_DEFERRED_DELETE);
 	}
@@ -946,7 +941,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		 * statements for this key in older runs or the
 		 * last statement is a DELETE.
 		 */
-		vy_stmt_unref_if_possible(rv->entry.stmt);
+		tuple_unref(rv->entry.stmt);
 		rv->entry = vy_entry_none();
 	} else if ((is_first_insert &&
 		    vy_stmt_type(rv->entry.stmt) == IPROTO_REPLACE) ||
@@ -971,7 +966,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		else
 			vy_stmt_set_type(copy, IPROTO_REPLACE);
 		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->entry.stmt));
-		vy_stmt_unref_if_possible(rv->entry.stmt);
+		tuple_unref(rv->entry.stmt);
 		rv->entry.stmt = copy;
 	}
 	return 0;
@@ -1091,11 +1086,11 @@ vy_write_iterator_next(struct vy_stmt_stream *vstream, struct vy_entry *ret)
 			 * The statement was returned via a read view.
 			 * Nothing to do.
 			 */
-			vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+			tuple_unref(stream->deferred_delete.stmt);
 			stream->deferred_delete = vy_entry_none();
 		} else {
 			if (stream->last.stmt != NULL)
-				vy_stmt_unref_if_possible(stream->last.stmt);
+				tuple_unref(stream->last.stmt);
 			*ret = stream->last = stream->deferred_delete;
 			stream->deferred_delete = vy_entry_none();
 			return 0;
