@@ -847,12 +847,7 @@ vy_log_flusher_f(va_list va)
 	(void)va;
 	while (!fiber_is_cancelled()) {
 		fiber_check_gc();
-		/*
-		 * Disable writes during local recovery.
-		 * See vy_log_tx_commit().
-		 */
-		if (vy_log.recovery != NULL ||
-		    stailq_empty(&vy_log.pending_tx)) {
+		if (stailq_empty(&vy_log.pending_tx)) {
 			fiber_cond_wait(&vy_log.flusher_cond);
 			continue;
 		}
@@ -1147,17 +1142,6 @@ vy_log_end_recovery(void)
 {
 	assert(vy_log.recovery != NULL);
 
-	/*
-	 * Update the recovery context with records written during
-	 * recovery - we will need them for garbage collection.
-	 */
-	struct vy_log_tx *tx;
-	stailq_foreach_entry(tx, &vy_log.pending_tx, in_pending) {
-		struct vy_log_record *record;
-		stailq_foreach_entry(record, &tx->records, in_tx)
-			vy_recovery_process_record(vy_log.recovery, record);
-	}
-
 	/* Flush all pending records. */
 	if (vy_log_flush() < 0) {
 		diag_log();
@@ -1299,17 +1283,6 @@ vy_log_tx_begin(void)
 int
 vy_log_tx_commit(void)
 {
-	/*
-	 * During recovery, we may replay records we failed to commit
-	 * before restart (e.g. drop LSM tree). Since the log isn't open
-	 * yet, simply leave them in the tx buffer to be flushed upon
-	 * recovery completion.
-	 */
-	if (vy_log.recovery != NULL) {
-		vy_log_tx_try_commit();
-		return 0;
-	}
-
 	struct vy_log_tx *tx = vy_log.tx;
 	vy_log.tx = NULL;
 	assert(tx != NULL);
@@ -1342,6 +1315,19 @@ vy_log_tx_try_commit(void)
 	fiber_cond_signal(&vy_log.flusher_cond);
 	vy_log.tx = NULL;
 	say_verbose("commit vylog transaction");
+}
+
+void
+vy_log_tx_try_commit_recoverable(void)
+{
+	assert(vy_log.tx != NULL);
+	if (vy_log.recovery != NULL) {
+		struct vy_log_record *record;
+		stailq_foreach_entry(record, &vy_log.tx->records, in_tx)
+			VERIFY(vy_recovery_process_record(vy_log.recovery,
+							  record) == 0);
+	}
+	vy_log_tx_try_commit();
 }
 
 void

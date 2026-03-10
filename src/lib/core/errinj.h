@@ -184,6 +184,7 @@ struct errinj {
 	_(ERRINJ_VY_RUN_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_RUN_RECOVER_COUNTDOWN, ERRINJ_INT, {.iparam = -1})\
 	_(ERRINJ_VY_RUN_WRITE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RUN_WRITE_CRASH_COUNTDOWN, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_VY_RUN_WRITE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_VY_SCHED_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
