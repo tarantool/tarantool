@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group('box-cfg-metrics')
 local server = require('luatest.server')
 
-local utils = require('third_party.metrics.test.utils')
+local utils = require('test.metrics-luatest.test.utils')
 
 g.before_all(function()
     g.server = server:new()
