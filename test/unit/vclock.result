@@ -1,4 +1,4 @@
-1..10
+1..11
     1..40
 	*** test_compare ***
     ok 1 - compare (), () => 0
@@ -147,6 +147,13 @@ ok 4 - subtests
     ok 32 - fromstring "{1:20, 1:10}" => 12
 	*** test_fromstring_invalid: done ***
 ok 5 - subtests
+    1..3
+	*** test_snprint ***
+    ok 1 - from string
+    ok 2 - snprint
+    ok 3 - correct
+	*** test_snprint: done ***
+ok 6 - subtests
     1..6
 	*** test_minmax ***
     ok 1 - max_ignore0 between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 1, 1: 17, 2: 7}
@@ -156,7 +163,7 @@ ok 5 - subtests
     ok 5 - max between {0: 1, 1: 17, 2: 3} and {0: 10, 1: 5, 2: 7} is {0: 10, 1: 17, 2: 7}
     ok 6 - min between {0: 10, 1: 17, 2: 3} and {0: 1, 1: 5, 2: 7} is {0: 1, 1: 5, 2: 3}
 	*** test_minmax: done ***
-ok 6 - subtests
+ok 7 - subtests
     1..7
 	*** test_mp ***
     ok 1 - Case must pass successfully
@@ -167,7 +174,7 @@ ok 6 - subtests
     ok 6 - Case must pass successfully
     ok 7 - Case must pass successfully
 	*** test_mp: done ***
-ok 7 - subtests
+ok 8 - subtests
     1..8
 	*** test_mp_invalid ***
     ok 1 - Decoder must fail
@@ -179,7 +186,7 @@ ok 7 - subtests
     ok 7 - Decoder must fail
     ok 8 - Decoder must fail
 	*** test_mp_invalid: done ***
-ok 8 - subtests
+ok 9 - subtests
     1..11
 	*** test_nth_element ***
     ok 1 - vclock_nth_element "{0: 1, 2: 3, 5: 7, 10: 3}", 2 => 3
@@ -194,7 +201,7 @@ ok 8 - subtests
     ok 10 - vclock_nth_element "{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 1 => 2
     ok 11 - vclock_nth_element "{2: 5, 4: 6, 6: 7, 8: 8, 10: 9}", 5 => -1
 	*** test_nth_element: done ***
-ok 9 - subtests
+ok 10 - subtests
     1..10
 	*** test_count_ge ***
     ok 1 - vclock_count_ge "{0: 1, 2: 3, 5: 7, 10: 3}", 3 => 3
@@ -208,4 +215,4 @@ ok 9 - subtests
     ok 9 - vclock_count_ge "{1: 2, 3: 4, 5: 6, 7: 8, 9: 10}", 5 => 3
     ok 10 - vclock_count_ge "{2: 1, 4: 2, 6: 3, 8: 4, 10: 5}", 3 => 3
 	*** test_count_ge: done ***
-ok 10 - subtests
+ok 11 - subtests
