@@ -181,7 +181,7 @@ test_basic()
 
 	/* create second run */
 	struct vy_mem *run_mem =
-		vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+		vy_mem_new(pk->mem->env, pk->cmp_def, pk->format,
 			   *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
@@ -213,7 +213,7 @@ test_basic()
 	vy_run_unref(run);
 
 	/* create first run */
-	run_mem = vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+	run_mem = vy_mem_new(pk->mem->env, pk->cmp_def, pk->format,
 			     *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {

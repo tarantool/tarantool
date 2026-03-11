@@ -944,7 +944,7 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 
 	for (int i = 0; i < batch->count; i++) {
 		if (vy_deferred_delete_process_one(deferred_delete_space,
-						   pk->space_id, pk->mem_format,
+						   pk->space_id, pk->format,
 						   &batch->stmt[i]) != 0) {
 			goto fail_rollback;
 		}
@@ -1713,7 +1713,7 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	int32_t dump_count = 0;
 	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice, lsm->mem_format,
+		if (vy_write_iterator_new_slice(wi, slice, lsm->format,
 						lsm->env->key_format) != 0)
 			goto err_wi_sub;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,

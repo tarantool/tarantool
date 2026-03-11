@@ -208,7 +208,7 @@ struct vy_lsm {
 	 */
 	struct key_def *pk_in_cmp_def;
 	/** Tuple format of the space this LSM tree belongs to. */
-	struct tuple_format *mem_format;
+	struct tuple_format *format;
 	/**
 	 * If this LSM tree is for a secondary index, the following
 	 * variable points to the LSM tree of the primary index of

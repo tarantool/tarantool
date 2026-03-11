@@ -738,7 +738,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     &lsm->stat.disk.iterator, slice,
 				     iterator_type, itr->key,
 				     itr->read_view, lsm->cmp_def,
-				     lsm->key_def, lsm->mem_format,
+				     lsm->key_def, lsm->format,
 				     lsm->env->key_format,
 				     /*is_primary=*/lsm->index_id == 0);
 		sub_src->max_lsn = slice->run->dump_lsn;
