@@ -1311,37 +1311,45 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 		    const struct synchro_request *req)
 {
 	assert(iproto_type_is_synchro_request(req->type));
-
 	char *pos = body;
-
 	/* Skip one byte for the map. */
 	pos++;
 	uint32_t map_size = 0;
-
-	pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
-	pos = mp_encode_uint(pos, req->replica_id);
-	map_size++;
-
-	pos = mp_encode_uint(pos, IPROTO_LSN);
-	pos = mp_encode_uint(pos, req->lsn);
-	map_size++;
-
-	if (req->term != 0) {
+	switch (req->type) {
+	case IPROTO_RAFT_CONFIRM:
+		map_size = 2;
+		pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
+		pos = mp_encode_uint(pos, req->queue_owner_id);
+		pos = mp_encode_uint(pos, IPROTO_LSN);
+		pos = mp_encode_uint(pos, req->confirm.lsn);
+		break;
+	case IPROTO_RAFT_ROLLBACK:
+		map_size = 2;
+		pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
+		pos = mp_encode_uint(pos, req->queue_owner_id);
+		pos = mp_encode_uint(pos, IPROTO_LSN);
+		pos = mp_encode_uint(pos, req->rollback.lsn);
+		break;
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE:
+		pos = mp_encode_uint(pos, IPROTO_REPLICA_ID);
+		pos = mp_encode_uint(pos, req->queue_owner_id);
+		pos = mp_encode_uint(pos, IPROTO_LSN);
+		pos = mp_encode_uint(pos, req->promote.lsn);
 		pos = mp_encode_uint(pos, IPROTO_TERM);
-		pos = mp_encode_uint(pos, req->term);
-		map_size++;
+		pos = mp_encode_uint(pos, req->promote.term);
+		if (vclock_is_set(&req->promote.confirmed_vclock)) {
+			map_size = 4;
+			pos = mp_encode_uint(pos, IPROTO_VCLOCK);
+			pos = mp_encode_vclock_ignore0(
+				pos, &req->promote.confirmed_vclock);
+		} else {
+			map_size = 3;
+		}
+		break;
 	}
-
-	if (vclock_is_set(&req->confirmed_vclock)) {
-		pos = mp_encode_uint(pos, IPROTO_VCLOCK);
-		pos = mp_encode_vclock_ignore0(pos, &req->confirmed_vclock);
-		map_size++;
-	}
-
 	mp_encode_map(body, map_size);
-
 	assert(pos - body < XROW_BODY_LEN_MAX);
-
 	memset(row, 0, sizeof(*row));
 	row->type = req->type;
 	row->body[0].iov_base = body;
@@ -1349,24 +1357,11 @@ xrow_encode_synchro(struct xrow_header *row, char *body,
 	row->bodycnt = 1;
 }
 
-int
-xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
+/** Decode IPROTO_RAFT_CONFIRM request. */
+static int
+xrow_decode_synchro_confirm(struct synchro_request *req, const char *d)
 {
-	if (row->bodycnt == 0) {
-		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
-		return -1;
-	}
-
-	assert(row->bodycnt == 1);
-
-	const char *d = (const char *)row->body[0].iov_base;
-	if (mp_typeof(*d) != MP_MAP) {
-		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
-		return -1;
-	}
-
-	memset(req, 0, sizeof(*req));
-	vclock_clear(&req->confirmed_vclock);
+	assert(req->type == IPROTO_RAFT_CONFIRM);
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		enum mp_type type = mp_typeof(*d);
@@ -1377,36 +1372,125 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 		}
 		uint8_t key = mp_decode_uint(&d);
 		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*d)) {
-bad_msgpack:
-			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
-					   "request body");
+		    iproto_key_type[key] != mp_typeof(*d))
 			return -1;
-		}
 		switch (key) {
 		case IPROTO_REPLICA_ID:
-			req->replica_id = mp_decode_uint(&d);
+			req->queue_owner_id = mp_decode_uint(&d);
 			break;
 		case IPROTO_LSN:
-			req->lsn = mp_decode_uint(&d);
-			break;
-		case IPROTO_TERM:
-			req->term = mp_decode_uint(&d);
-			break;
-		case IPROTO_VCLOCK:
-			if (mp_decode_vclock_ignore0(
-					&d, &req->confirmed_vclock) != 0)
-				goto bad_msgpack;
+			req->confirm.lsn = mp_decode_uint(&d);
 			break;
 		default:
 			mp_next(&d);
 		}
 	}
+	return 0;
+}
 
+/** Decode IPROTO_RAFT_ROLLBACK request. */
+static int
+xrow_decode_synchro_rollback(struct synchro_request *req, const char *d)
+{
+	assert(req->type == IPROTO_RAFT_ROLLBACK);
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		enum mp_type type = mp_typeof(*d);
+		if (type != MP_UINT) {
+			mp_next(&d);
+			mp_next(&d);
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		if (key < iproto_key_MAX &&
+		    iproto_key_type[key] != mp_typeof(*d))
+			return -1;
+		switch (key) {
+		case IPROTO_REPLICA_ID:
+			req->queue_owner_id = mp_decode_uint(&d);
+			break;
+		case IPROTO_LSN:
+			req->rollback.lsn = mp_decode_uint(&d);
+			break;
+		default:
+			mp_next(&d);
+		}
+	}
+	return 0;
+}
+
+/** Decode IPROTO_RAFT_PROMOTE/DEMOTE request. */
+static int
+xrow_decode_synchro_promote(struct synchro_request *req, const char *d)
+{
+	assert(req->type == IPROTO_RAFT_PROMOTE ||
+	       req->type == IPROTO_RAFT_DEMOTE);
+	vclock_clear(&req->promote.confirmed_vclock);
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		enum mp_type type = mp_typeof(*d);
+		if (type != MP_UINT) {
+			mp_next(&d);
+			mp_next(&d);
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		if (key < iproto_key_MAX &&
+		    iproto_key_type[key] != mp_typeof(*d))
+			return -1;
+		switch (key) {
+		case IPROTO_REPLICA_ID:
+			req->queue_owner_id = mp_decode_uint(&d);
+			break;
+		case IPROTO_LSN:
+			req->promote.lsn = mp_decode_uint(&d);
+			break;
+		case IPROTO_TERM:
+			req->promote.term = mp_decode_uint(&d);
+			break;
+		case IPROTO_VCLOCK:
+			if (mp_decode_vclock_ignore0(
+					&d,
+					&req->promote.confirmed_vclock) != 0)
+				return -1;
+			break;
+		default:
+			mp_next(&d);
+		}
+	}
+	return 0;
+}
+
+int
+xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
+{
+	if (row->bodycnt == 0)
+		goto bad_body;
+	assert(row->bodycnt == 1);
+	const char *d = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP)
+		goto bad_body;
+	memset(req, 0, sizeof(*req));
 	req->type = row->type;
 	req->origin_id = row->replica_id;
-
-	return 0;
+	int rc = 0;
+	switch (row->type) {
+	case IPROTO_RAFT_CONFIRM:
+		rc = xrow_decode_synchro_confirm(req, d);
+		break;
+	case IPROTO_RAFT_ROLLBACK:
+		rc = xrow_decode_synchro_rollback(req, d);
+		break;
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE:
+		rc = xrow_decode_synchro_promote(req, d);
+		break;
+	}
+	if (rc == 0)
+		return 0;
+bad_body:
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
+	return -1;
 }
 
 void

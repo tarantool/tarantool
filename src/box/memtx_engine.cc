@@ -536,7 +536,7 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 	 * Origin id cannot be deduced from row.replica_id in a checkpoint,
 	 * because all its rows have a zero replica_id.
 	 */
-	req.origin_id = req.replica_id;
+	req.origin_id = req.queue_owner_id;
 	return txn_limbo_process(&txn_limbo, &req);
 }
 

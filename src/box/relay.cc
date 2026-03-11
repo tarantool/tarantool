@@ -495,7 +495,7 @@ send_join_meta(struct xstream *stream, const struct box_checkpoint *ckpt)
 
 	char body[XROW_BODY_LEN_MAX];
 	xrow_encode_synchro(&row, body, &ckpt->limbo);
-	row.replica_id = ckpt->limbo.replica_id;
+	row.replica_id = ckpt->limbo.queue_owner_id;
 	xstream_write(stream, &row);
 }
 
@@ -1351,13 +1351,13 @@ relay_filter_row(struct relay *relay, struct xrow_header *packet)
 		struct synchro_request req;
 		if (xrow_decode_synchro(packet, &req) != 0)
 			diag_raise();
-		while (relay->sent_raft_term < req.term) {
+		while (relay->sent_raft_term < req.promote.term) {
 			if (fiber_is_cancelled()) {
 				diag_set(FiberIsCancelled);
 				diag_raise();
 			}
 			cbus_process(&relay->tx_endpoint);
-			if (relay->sent_raft_term >= req.term)
+			if (relay->sent_raft_term >= req.promote.term)
 				break;
 			fiber_yield();
 		}
