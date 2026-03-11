@@ -363,9 +363,7 @@ coll_new(const struct coll_def *def)
 	struct mh_coll_key_t key = { fingerprint, fingerprint_len, hash };
 	mh_int_t i = mh_coll_find(coll_cache, &key, NULL);
 	if (i != mh_end(coll_cache)) {
-		struct coll *coll = mh_coll_node(coll_cache, i)->coll;
-		coll_ref(coll);
-		return coll;
+		return mh_coll_node(coll_cache, i)->coll;
 	}
 
 	int total_size = sizeof(struct coll) + fingerprint_len + 1;
@@ -375,7 +373,6 @@ coll_new(const struct coll_def *def)
 		return NULL;
 	}
 	memcpy((char *) coll->fingerprint, fingerprint, fingerprint_len + 1);
-	coll->refs = 1;
 	coll->type = def->type;
 	switch (coll->type) {
 	case COLL_TYPE_ICU:
@@ -399,19 +396,11 @@ coll_new(const struct coll_def *def)
 	return coll;
 }
 
-void
-coll_unref(struct coll *coll)
+static void
+coll_delete(struct coll *coll)
 {
-	assert(coll->refs > 0);
-	if (--coll->refs == 0) {
-		int len = strlen(coll->fingerprint);
-		struct mh_coll_node_t node = {
-			len, mh_strn_hash(coll->fingerprint, len), coll
-		};
-		mh_coll_remove(coll_cache, &node, NULL);
-		ucol_close(coll->collator);
-		free(coll);
-	}
+	ucol_close(coll->collator);
+	free(coll);
 }
 
 void
@@ -430,5 +419,10 @@ coll_free(void)
 {
 	ucasemap_close(icu_ucase_default_map);
 	ucnv_close(icu_utf8_conv);
+	mh_int_t i;
+	mh_foreach(coll_cache, i) {
+		struct coll *coll = mh_coll_node(coll_cache, i)->coll;
+		coll_delete(coll);
+	}
 	mh_coll_delete(coll_cache);
 }

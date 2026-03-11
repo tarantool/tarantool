@@ -1266,7 +1266,6 @@ tarantool_lua_free()
 
 	builtin_globals_free();
 	builtin_modcache_free();
-	tarantool_lua_utf8_free();
 	/*
 	 * Some part of the start script panicked, and called
 	 * exit().  The call stack in this case leads us back to

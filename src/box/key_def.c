@@ -127,9 +127,6 @@ key_def_copy_impl(struct key_def *res, const struct key_def *src, size_t sz)
 		size_t path_offset = src->multikey_path - (char *)src;
 		res->multikey_path = (char *)res + path_offset;
 	}
-	for (uint32_t i = 0; i < res->part_count; i++)
-		if (res->parts[i].coll != NULL)
-			coll_ref(res->parts[i].coll);
 	return res;
 }
 
@@ -153,9 +150,6 @@ key_def_dup(const struct key_def *src)
 void
 key_def_delete(struct key_def *def)
 {
-	for (uint32_t i = 0; i < def->part_count; i++)
-		if (def->parts[i].coll != NULL)
-			coll_unref(def->parts[i].coll);
 	TRASH(def);
 	free(def);
 }
@@ -263,8 +257,6 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	def->parts[part_no].type = type;
 	def->parts[part_no].type_params = *type_params;
 	def->parts[part_no].coll = coll;
-	if (coll != NULL)
-		coll_ref(def->parts[part_no].coll);
 	def->parts[part_no].coll_id = coll_id;
 	def->parts[part_no].sort_order = sort_order == SORT_ORDER_DESC ?
 					 SORT_ORDER_DESC : SORT_ORDER_ASC;

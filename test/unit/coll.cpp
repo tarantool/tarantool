@@ -59,7 +59,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- --||-- + upper first -- " << endl;
 	def.icu.case_first = COLL_ICU_CF_UPPER_FIRST;
@@ -67,7 +66,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- --||-- + lower first -- " << endl;
 	def.icu.case_first = COLL_ICU_CF_LOWER_FIRST;
@@ -75,7 +73,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- --||-- + secondary strength + numeric -- " << endl;
 	def.icu.strength = COLL_ICU_STRENGTH_SECONDARY;
@@ -84,7 +81,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- --||-- + case level -- " << endl;
 	def.icu.case_level = COLL_ICU_ON;
@@ -92,7 +88,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"Б", "бб", "е", "ЕЕЕЕ", "ё", "Ё", "и", "И", "123", "45" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- en_EN -- " << endl;
 	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN-EN");
@@ -100,7 +95,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	cout << " -- cs_CZ -- " << endl;
 	snprintf(def.locale, sizeof(def.locale), "%s", "cs_CZ");
@@ -108,7 +102,6 @@ manual_test()
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
 	test_sort_strings(strings, coll);
-	coll_unref(coll);
 
 	footer();
 }
@@ -142,7 +135,6 @@ hash_test()
 	cout << (calc_hash("ае", coll) != calc_hash("аё", coll) ? "OK" : "Fail") << endl;
 	cout << (calc_hash("ае", coll) != calc_hash("аЕ", coll) ? "OK" : "Fail") << endl;
 	cout << (calc_hash("аЕ", coll) != calc_hash("аё", coll) ? "OK" : "Fail") << endl;
-	coll_unref(coll);
 
 	/* Case insensitive */
 	def.icu.strength = COLL_ICU_STRENGTH_SECONDARY;
@@ -152,7 +144,6 @@ hash_test()
 	cout << (calc_hash("ае", coll) != calc_hash("аё", coll) ? "OK" : "Fail") << endl;
 	cout << (calc_hash("ае", coll) == calc_hash("аЕ", coll) ? "OK" : "Fail") << endl;
 	cout << (calc_hash("аЕ", coll) != calc_hash("аё", coll) ? "OK" : "Fail") << endl;
-	coll_unref(coll);
 
 	footer();
 }
@@ -172,13 +163,10 @@ cache_test()
 	struct coll *coll2 = coll_new(&def);
 	is(coll1, coll2,
 	   "collations with the same definition are not duplicated");
-	coll_unref(coll2);
 	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN");
 	coll2 = coll_new(&def);
 	isnt(coll1, coll2,
 	     "collations with different definitions are different objects");
-	coll_unref(coll2);
-	coll_unref(coll1);
 
 	check_plan();
 	footer();
