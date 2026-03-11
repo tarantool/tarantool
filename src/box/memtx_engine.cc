@@ -556,7 +556,8 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 			 * a checkpoint, because all its rows have a zero
 			 * replica_id.
 			 */
-			entry->synchro.origin_id = entry->synchro.replica_id;
+			entry->synchro.origin_id =
+				entry->synchro.queue_owner_id;
 			return txn_limbo_process(&txn_limbo, &entry->synchro);
 		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
