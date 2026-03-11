@@ -107,10 +107,8 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	 * counter.
 	 */
 	if (cord_is_main()) {
-		if (format != env->key_format) {
-			assert(env->sum_tuple_size >= size);
-			env->sum_tuple_size -= size;
-		}
+		assert(env->sum_tuple_size >= size);
+		env->sum_tuple_size -= size;
 		tuple_format_unref(format);
 	}
 #ifndef NDEBUG
@@ -234,8 +232,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	tuple_create(tuple, 1, tuple_format_id(format),
 		     data_offset, bsize, false);
 	if (cord_is_main()) {
-		if (format != env->key_format)
-			env->sum_tuple_size += total_size;
+		env->sum_tuple_size += total_size;
 		tuple_format_ref(format);
 	}
 	vy_stmt_set_lsn(tuple, 0);
