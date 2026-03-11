@@ -296,7 +296,14 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "memory");
 	info_append_int(h, "tx", vy_tx_manager_mem_used(env->xm));
 	info_append_int(h, "level0", lsregion_used(&env->mem_env.allocator));
-	info_append_int(h, "tuple", env->stmt_env.sum_tuple_size);
+	/*
+	 * Exclude the empty key from accounting so as to show zero
+	 * if Vinyl isn't used.
+	 */
+	int64_t sum_tuple_size = env->stmt_env.sum_tuple_size;
+	sum_tuple_size -= tuple_size(env->lsm_env.empty_key.stmt);
+	assert(sum_tuple_size >= 0);
+	info_append_int(h, "tuple", sum_tuple_size);
 	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
 	info_append_int(h, "page_index", env->lsm_env.page_index_size);
 	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
