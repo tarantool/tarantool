@@ -70,6 +70,12 @@ vy_stmt_persistent_flags(struct tuple *stmt, bool is_primary)
 	 */
 	mask &= ~VY_STMT_UPDATE;
 
+	/*
+	 * No need to write this flag to disk because we can recover
+	 * it from the context.
+	 */
+	mask &= ~VY_STMT_KEY;
+
 	if (!is_primary) {
 		/*
 		 * Do not store VY_STMT_DEFERRED_DELETE flag in
@@ -300,7 +306,6 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 struct tuple *
 vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count)
 {
-	assert(vy_stmt_is_key_format(format));
 	assert(part_count == 0 || key != NULL);
 	/* Key don't have field map */
 	assert(format->field_map_size == 0);
@@ -321,6 +326,7 @@ vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count)
 	char *data = mp_encode_array(raw, part_count);
 	memcpy(data, key, key_size);
 	assert(data + key_size == raw + bsize);
+	vy_stmt_set_flags(stmt, VY_STMT_KEY);
 	return stmt;
 }
 
@@ -748,6 +754,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 	if (xrow_decode_dml(xrow, &request, key_map) != 0)
 		return NULL;
 	struct tuple *stmt = NULL;
+	bool is_key = false;
 	struct iovec ops;
 	switch (request.type) {
 	case IPROTO_DELETE:
@@ -755,12 +762,15 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 		stmt = vy_stmt_new_with_ops(env->key_format,
 					    request.key, request.key_end,
 					    NULL, 0, IPROTO_DELETE);
+		is_key = true;
 		break;
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 		stmt = vy_stmt_new_with_ops(format, request.tuple,
 					    request.tuple_end,
 					    NULL, 0, request.type);
+		if (format == env->key_format)
+			is_key = true;
 		break;
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;
@@ -782,6 +792,8 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 
 	vy_stmt_meta_decode(&request, stmt);
 	vy_stmt_set_lsn(stmt, xrow->lsn);
+	if (is_key)
+		vy_stmt_set_flags(stmt, vy_stmt_flags(stmt) | VY_STMT_KEY);
 	return stmt;
 }
 

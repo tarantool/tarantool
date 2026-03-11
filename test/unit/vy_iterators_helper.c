@@ -132,7 +132,7 @@ vy_new_simple_stmt(struct tuple_format *format, struct key_def *key_def,
 	}
 	free(buf);
 	vy_stmt_set_lsn(ret, templ->lsn);
-	vy_stmt_set_flags(ret, templ->flags);
+	vy_stmt_set_flags(ret, vy_stmt_flags(ret) | templ->flags);
 	struct vy_entry entry;
 	entry.stmt = ret;
 	entry.hint = vy_stmt_hint(ret, key_def);

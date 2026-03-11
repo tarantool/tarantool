@@ -84,9 +84,6 @@ struct vy_stmt_env {
 	 * statements read from secondary index runs). It doesn't
 	 * impose any restrictions on tuple fields, neither does
 	 * it setup offset map.
-	 *
-	 * Note, all key statements must use this format, because
-	 * vy_stmt_is_key() is built upon that assumption.
 	 */
 	struct tuple_format *key_format;
 };
@@ -139,6 +136,16 @@ enum {
 	 * compaction. It is never written to disk.
 	 */
 	VY_STMT_UPDATE			= 1 << 2,
+	/**
+	 * Set for statements in the key format:
+	 * - Keys created for read queries.
+	 * - DELETE statements (except for surrogate DELETEs).
+	 * - INSERT and REPLACE statements recovered from disk for
+	 *   secondary indexes.
+	 * This flag isn't written to disk because we can recover it
+	 * from the context.
+	 */
+	VY_STMT_KEY			= 1 << 3,
 	/**
 	 * Bit mask of all statement flags.
 	 */
@@ -275,19 +282,11 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 	((struct vy_stmt *)stmt)->n_upserts = n;
 }
 
-/** Return true if the given format is a key format. */
-static inline bool
-vy_stmt_is_key_format(const struct tuple_format *format)
-{
-	struct vy_stmt_env *env = format->engine;
-	return env->key_format == format;
-}
-
 /** Return true if the vinyl statement has key format. */
 static inline bool
 vy_stmt_is_key(struct tuple *stmt)
 {
-	return vy_stmt_is_key_format(tuple_format(stmt));
+	return (vy_stmt_flags(stmt) & VY_STMT_KEY) != 0;
 }
 
 /**
