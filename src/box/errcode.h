@@ -445,6 +445,7 @@ struct errcode_record {
 	_(ER_INVALID_SORTDATA_FILE, 298,	"Invalid MemTX sort data file", "path", STRING, "details", STRING) \
 	_(ER_NO_SUCH_THREAD, 299,		"Thread does not exist", "thread_id", UINT) \
 	_(ER_UNABLE_TO_PROCESS_IN_THREAD, 300,	"Unable to process request in thread", "request", STRING, "thread_id", UINT) \
+	_(ER_SHUTTING_DOWN, 301, "WAL thread blocked cause instance is shutting down") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
