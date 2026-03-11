@@ -1713,8 +1713,8 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	int32_t dump_count = 0;
 	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice,
-						lsm->disk_format) != 0)
+		if (vy_write_iterator_new_slice(wi, slice, lsm->mem_format,
+						lsm->env->key_format) != 0)
 			goto err_wi_sub;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);

@@ -67,7 +67,7 @@ test_iterator_restore_after_insertion(void)
 
 	plan(1);
 
-	struct vy_entry select_key = vy_entry_key_new(stmt_env.key_format,
+	struct vy_entry select_key = vy_entry_key_new(key_format,
 						      key_def, NULL, 0);
 	uint64_t restore_on_value = 20;
 	uint64_t restore_on_value_reverse = 60;

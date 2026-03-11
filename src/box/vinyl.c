@@ -1219,7 +1219,6 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 
 	SWAP(old_lsm, new_lsm);
 	SWAP(old_lsm->mem_format, new_lsm->mem_format);
-	SWAP(old_lsm->disk_format, new_lsm->disk_format);
 
 	/* Update pointer to the primary key. */
 	vy_lsm_update_pk(old_lsm, vy_lsm(old_space->index_map[0]));
@@ -2770,11 +2769,13 @@ vy_env_new(const char *path, size_t memory,
 			    &e->run_env, &e->xm->read_views,
 			    &e->quota);
 
-	if (vy_lsm_env_create(&e->lsm_env, e->path,
-			      &e->scheduler.generation,
-			      e->stmt_env.key_format,
-			      vy_squash_schedule, e) != 0)
-		goto error_lsm_env;
+	struct tuple_format *key_format;
+	key_format = vy_simple_stmt_format_new(&e->stmt_env, NULL, 0);
+	if (key_format == NULL)
+		panic("failed to create vinyl key format");
+
+	vy_lsm_env_create(&e->lsm_env, e->path, &e->scheduler.generation,
+			  key_format, vy_squash_schedule, e);
 
 	vy_quota_create(&e->quota, memory, vy_env_quota_exceeded_cb);
 	vy_regulator_create(&e->regulator, &e->quota,
@@ -2788,10 +2789,6 @@ vy_env_new(const char *path, size_t memory,
 	vy_log_init(e->path);
 	return e;
 
-error_lsm_env:
-	vy_mem_env_destroy(&e->mem_env);
-	vy_scheduler_destroy(&e->scheduler);
-	vy_squash_queue_delete(e->squash_queue);
 error_squash_queue:
 	vy_tx_manager_delete(e->xm);
 error_xm:
@@ -2814,7 +2811,6 @@ vy_env_delete(struct vy_env *e)
 	vy_lsm_env_destroy(&e->lsm_env);
 	vy_mem_env_destroy(&e->mem_env);
 	vy_cache_env_destroy(&e->cache_env);
-	vy_stmt_env_destroy(&e->stmt_env);
 	vy_quota_destroy(&e->quota);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);

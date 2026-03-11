@@ -145,16 +145,6 @@ vy_stmt_env_create(struct vy_stmt_env *env)
 	env->tuple_format_vtab.tuple_info = vy_tuple_info;
 	env->max_tuple_size = 1024 * 1024;
 	env->sum_tuple_size = 0;
-	env->key_format = vy_simple_stmt_format_new(env, NULL, 0);
-	if (env->key_format == NULL)
-		panic("failed to create vinyl key format");
-	tuple_format_ref(env->key_format);
-}
-
-void
-vy_stmt_env_destroy(struct vy_stmt_env *env)
-{
-	tuple_format_unref(env->key_format);
 }
 
 struct tuple_format *
@@ -740,14 +730,14 @@ vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 }
 
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
+	       struct tuple_format *key_format, bool is_primary)
 {
 	ERROR_INJECT_COUNTDOWN(ERRINJ_VY_STMT_DECODE_COUNTDOWN, {
 		diag_set(ClientError, ER_INJECTION,
 			 "vinyl statement decode");
 		return NULL;
 	});
-	struct vy_stmt_env *env = format->engine;
 	struct request request;
 	uint64_t key_map = dml_request_key_map(xrow->type);
 	key_map &= ~(1ULL << IPROTO_SPACE_ID); /* space_id is optional */
@@ -759,7 +749,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 	switch (request.type) {
 	case IPROTO_DELETE:
 		/* Always use key format for DELETE statements. */
-		stmt = vy_stmt_new_with_ops(env->key_format,
+		stmt = vy_stmt_new_with_ops(key_format,
 					    request.key, request.key_end,
 					    NULL, 0, IPROTO_DELETE);
 		is_key = true;
@@ -769,7 +759,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 		stmt = vy_stmt_new_with_ops(format, request.tuple,
 					    request.tuple_end,
 					    NULL, 0, request.type);
-		if (format == env->key_format)
+		if (!is_primary)
 			is_key = true;
 		break;
 	case IPROTO_UPSERT:

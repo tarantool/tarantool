@@ -8,6 +8,7 @@
 struct tt_uuid INSTANCE_UUID;
 
 struct vy_stmt_env stmt_env;
+struct tuple_format *key_format;
 struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
 struct mempool history_node_pool;
@@ -23,6 +24,9 @@ vy_iterator_C_test_init(size_t cache_size)
 	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
 	vy_stmt_env_create(&stmt_env);
+	key_format = vy_simple_stmt_format_new(&stmt_env, NULL, 0);
+	fail_if(key_format == NULL);
+	tuple_format_ref(key_format);
 	vy_cache_env_create(&cache_env, cord_slab_cache());
 	vy_cache_env_set_quota(&cache_env, cache_size);
 	size_t mem_size = 64 * 1024 * 1024;
@@ -35,9 +39,9 @@ void
 vy_iterator_C_test_finish()
 {
 	mempool_destroy(&history_node_pool);
+	tuple_format_unref(key_format);
 	vy_mem_env_destroy(&mem_env);
 	vy_cache_env_destroy(&cache_env);
-	vy_stmt_env_destroy(&stmt_env);
 	tuple_free();
 	fiber_free();
 	memory_free();
@@ -123,7 +127,7 @@ vy_new_simple_stmt(struct tuple_format *format, struct key_def *key_def,
 		break;
 	}
 	case IPROTO_SELECT: {
-		ret = vy_key_from_msgpack(stmt_env.key_format, buf);
+		ret = vy_key_from_msgpack(key_format, buf);
 		fail_if(ret == NULL);
 		break;
 	}

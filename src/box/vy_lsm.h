@@ -70,7 +70,12 @@ struct vy_lsm_env {
 	const char *path;
 	/** Memory generation counter. */
 	int64_t *p_generation;
-	/** Tuple format for keys (SELECT). */
+	/**
+	 * Tuple format used for creating key statements (e.g.
+	 * statements read from secondary index runs). It doesn't
+	 * impose any restrictions on tuple fields, neither does
+	 * it setup offset map.
+	 */
 	struct tuple_format *key_format;
 	/** Key (SELECT) with no parts. */
 	struct vy_entry empty_key;
@@ -129,7 +134,7 @@ struct vy_lsm_env {
 };
 
 /** Create a common LSM tree environment. */
-int
+void
 vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  int64_t *p_generation, struct tuple_format *key_format,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
@@ -202,19 +207,6 @@ struct vy_lsm {
 	 * to a primary index.
 	 */
 	struct key_def *pk_in_cmp_def;
-	/**
-	 * Tuple format for tuples of this LSM tree created when
-	 * reading pages from disk.
-	 * Is distinct from mem_format only for secondary keys,
-	 * whose tuples have MP_NIL in all "gap" positions between
-	 * positions of the secondary and primary key fields.
-	 * These gaps are necessary to make such tuples comparable
-	 * with tuples from vy_mem, while using the same cmp_def.
-	 * Since upserts are never present in secondary keys, is
-	 * used only for REPLACE and DELETE
-	 * tuples.
-	 */
-	struct tuple_format *disk_format;
 	/** Tuple format of the space this LSM tree belongs to. */
 	struct tuple_format *mem_format;
 	/**

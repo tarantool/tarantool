@@ -58,6 +58,7 @@ STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_DEFERRED_DELETE, __VA_ARGS__)
 STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_SKIP_READ, __VA_ARGS__)
 
 extern struct vy_stmt_env stmt_env;
+extern struct tuple_format *key_format;
 extern struct vy_mem_env mem_env;
 extern struct vy_cache_env cache_env;
 extern struct mempool history_node_pool;
