@@ -283,6 +283,13 @@ vclock_to_string(const struct vclock *vclock);
 size_t
 vclock_from_string(struct vclock *vclock, const char *str);
 
+/**
+ * Stringify the vclock into the given buffer. Same semantics as
+ * snprintf().
+ */
+int
+vclock_snprint(char *buf, int size, const struct vclock *vclock);
+
 enum { VCLOCK_ORDER_UNDEFINED = INT_MAX };
 
 /**
