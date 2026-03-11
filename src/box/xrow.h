@@ -353,37 +353,36 @@ struct synchro_request {
 	 */
 	uint16_t type;
 	/**
-	 * ID of the instance owning the pending transactions.
-	 * Note, it may be not the same instance, who created this
-	 * request. An instance can make an operation on foreign
-	 * synchronous transactions in case a new master tries to
-	 * finish transactions of an old master.
+	 * The latest confirmed ID of the synchronous queue owner from the PoV
+	 * of the request's originator.
 	 */
-	uint32_t replica_id;
+	uint32_t queue_owner_id;
 	/**
 	 * Id of the instance which has issued this request. Only filled on
 	 * decoding, and left blank when encoding a request.
 	 */
 	uint32_t origin_id;
-	/**
-	 * Operation LSN.
-	 * In case of CONFIRM it means 'confirm all
-	 * transactions with lsn <= this value'.
-	 * In case of ROLLBACK it means 'rollback all transactions
-	 * with lsn >= this value'.
-	 * In case of PROMOTE it means CONFIRM(lsn) + ROLLBACK(lsn+1)
-	 */
-	int64_t lsn;
-	/**
-	 * The new term the instance issuing this request is in. Only used for
-	 * PROMOTE and DEMOTE requests.
-	 */
-	uint64_t term;
-	/**
-	 * Confirmed lsns of all the previous limbo owners. Only used for
-	 * PROMOTE and DEMOTE requests.
-	 */
-	struct vclock confirmed_vclock;
+	union {
+		struct {
+			/**
+			 * Confirm all txns with LSN <= this one, and rollback
+			 * all the others.
+			 */
+			int64_t lsn;
+			/** Raft term in which this request was issued. */
+			uint64_t term;
+			/** Confirmed lsns of all the previous limbo owners. */
+			struct vclock confirmed_vclock;
+		} promote;
+		struct {
+			/** Confirm all txns having LSN <= this one. */
+			int64_t lsn;
+		} confirm;
+		struct {
+			/** Rollback all txns having LSN >= this one. */
+			int64_t lsn;
+		} rollback;
+	};
 };
 
 /**
