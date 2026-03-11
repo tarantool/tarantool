@@ -1865,8 +1865,10 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					    request->key, request->key_end);
 		if (delete == NULL)
 			return -1;
+		uint8_t flags = VY_STMT_KEY;
 		if (space->index_count > 1)
-			vy_stmt_set_flags(delete, VY_STMT_DEFERRED_DELETE);
+			flags |= VY_STMT_DEFERRED_DELETE;
+		vy_stmt_set_flags(delete, flags);
 		rc = vy_tx_set(tx, pk, delete);
 	}
 	tuple_unref(delete);
