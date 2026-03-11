@@ -58,7 +58,7 @@ static void
 test_basic()
 {
 	header();
-	plan(15);
+	plan(14);
 
 	/** Suppress info messages from vy_run_writer. */
 	say_set_log_level(S_WARN);
@@ -67,11 +67,8 @@ test_basic()
 	int64_t generation = 0;
 	struct slab_cache *slab_cache = cord_slab_cache();
 
-	int rc;
 	struct vy_lsm_env lsm_env;
-	rc = vy_lsm_env_create(&lsm_env, ".", &generation,
-			       stmt_env.key_format, NULL, NULL);
-	is(rc, 0, "vy_lsm_env_create");
+	vy_lsm_env_create(&lsm_env, ".", &generation, key_format, NULL, NULL);
 
 	struct vy_run_env run_env;
 	vy_run_env_create(&run_env, 0);
@@ -116,7 +113,7 @@ test_basic()
 	char path[PATH_MAX];
 	strcpy(path, dir_name);
 	strcat(path, "/512");
-	rc = mkdir(path, 0777);
+	int rc = mkdir(path, 0777);
 	is(rc, 0, "temp dir create (2)");
 	strcat(path, "/0");
 	rc = mkdir(path, 0777);

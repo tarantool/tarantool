@@ -491,14 +491,15 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem)
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *vstream,
 			    struct vy_slice *slice,
-			    struct tuple_format *disk_format)
+			    struct tuple_format *format,
+			    struct tuple_format *key_format)
 {
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream);
 	if (src == NULL)
 		return -1;
 	vy_slice_stream_open(&src->slice_stream, slice, stream->cmp_def,
-			     disk_format);
+			     format, key_format, stream->is_primary);
 	return 0;
 }
 

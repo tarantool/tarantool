@@ -266,7 +266,8 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *stream,
 			    struct vy_slice *slice,
-			    struct tuple_format *disk_format);
+			    struct tuple_format *format,
+			    struct tuple_format *key_format);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */
 

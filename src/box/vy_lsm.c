@@ -70,7 +70,7 @@ static const int64_t VY_MIN_RANGE_SIZE = 128 * 1024 * 1024;
  */
 static const int64_t VY_MAX_RANGE_SIZE = 2LL * 1024 * 1024 * 1024;
 
-int
+void
 vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  int64_t *p_generation, struct tuple_format *key_format,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
@@ -79,7 +79,7 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 	env->empty_key.hint = HINT_NONE;
 	env->empty_key.stmt = vy_key_new(key_format, NULL, 0);
 	if (env->empty_key.stmt == NULL)
-		return -1;
+		panic("failed to allocate vinyl empty key");
 	env->path = path;
 	env->p_generation = p_generation;
 	env->key_format = key_format;
@@ -90,7 +90,6 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 	env->lsm_count = 0;
 	mempool_create(&env->history_node_pool, cord_slab_cache(),
 		       sizeof(struct vy_history_node));
-	return 0;
 }
 
 void
@@ -170,30 +169,13 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 
 	lsm->cmp_def = cmp_def;
 	lsm->key_def = key_def;
-	if (index_def->iid == 0) {
-		/*
-		 * Disk tuples can be returned to an user from a
-		 * primary key. And they must have field
-		 * definitions as well as space->format tuples.
-		 */
-		lsm->disk_format = format;
-	} else {
-		/*
-		 * To save disk space, we do not store full tuples
-		 * in secondary index runs. Instead we only store
-		 * extended keys (i.e. keys consisting of secondary
-		 * and primary index parts). This is enough to look
-		 * up a full tuple in the primary index.
-		 */
-		lsm->disk_format = lsm_env->key_format;
-
+	if (index_def->iid != 0) {
 		lsm->pk_in_cmp_def = key_def_find_pk_in_cmp_def(lsm->cmp_def,
 								pk->key_def,
 								&fiber()->gc);
 		if (lsm->pk_in_cmp_def == NULL)
 			goto fail_pk_in_cmp_def;
 	}
-	tuple_format_ref(lsm->disk_format);
 
 	if (vy_lsm_stat_create(&lsm->stat) != 0)
 		goto fail_stat;
@@ -238,7 +220,6 @@ fail_mem:
 fail_run_hist:
 	vy_lsm_stat_destroy(&lsm->stat);
 fail_stat:
-	tuple_format_unref(lsm->disk_format);
 	if (lsm->pk_in_cmp_def != NULL)
 		key_def_delete(lsm->pk_in_cmp_def);
 fail_pk_in_cmp_def:
@@ -291,7 +272,6 @@ vy_lsm_delete(struct vy_lsm *lsm)
 
 	vy_range_tree_iter(&lsm->range_tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&lsm->range_heap);
-	tuple_format_unref(lsm->disk_format);
 	key_def_delete(lsm->cmp_def);
 	key_def_delete(lsm->key_def);
 	if (lsm->pk_in_cmp_def != NULL)
@@ -361,7 +341,8 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 	     vy_run_rebuild_index(run, lsm->env->path,
 				  lsm->space_id, lsm->index_id,
 				  lsm->cmp_def, lsm->key_def,
-				  lsm->disk_format, &lsm->opts) != 0)) {
+				  lsm->mem_format, lsm->env->key_format,
+				  &lsm->opts) != 0)) {
 		vy_run_unref(run);
 		return NULL;
 	}

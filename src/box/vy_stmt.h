@@ -79,13 +79,6 @@ struct vy_stmt_env {
 	 * in the main thread.
 	 */
 	size_t sum_tuple_size;
-	/**
-	 * Tuple format used for creating key statements (e.g.
-	 * statements read from secondary index runs). It doesn't
-	 * impose any restrictions on tuple fields, neither does
-	 * it setup offset map.
-	 */
-	struct tuple_format *key_format;
 };
 
 /** Initialize a vinyl statement environment. */
@@ -678,7 +671,8 @@ vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
  * @retval NULL on error
  */
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format);
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
+	       struct tuple_format *key_format, bool is_primary);
 
 /**
  * Format a statement into string.
