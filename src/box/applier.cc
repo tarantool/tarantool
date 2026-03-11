@@ -1562,7 +1562,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 	req = &item->req.synchro;
 	/* Note! Might be different from row->replica_id. */
 	confirmed_lsn = txn_limbo_replica_confirmed_lsn(&txn_limbo,
-							req->replica_id);
+							req->queue_owner_id);
 	switch (row->type) {
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE:
@@ -1573,7 +1573,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 		 */
 		return 0;
 	case IPROTO_RAFT_CONFIRM:
-		if (req->lsn > confirmed_lsn)
+		if (req->confirm.lsn > confirmed_lsn)
 			return 0;
 		/*
 		 * A CONFIRM with lsn <= known confirm lsn for this replica may
@@ -1594,7 +1594,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 		 */
 		break;
 	case IPROTO_RAFT_ROLLBACK:
-		if (req->lsn <= confirmed_lsn)
+		if (req->rollback.lsn <= confirmed_lsn)
 			return 0;
 		/*
 		 * Rollback in the current term wants to roll some currently
