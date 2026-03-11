@@ -248,6 +248,7 @@ check_function_exists(setprogname HAVE_SETPROGNAME)
 check_function_exists(getprogname HAVE_GETPROGNAME)
 
 check_symbol_exists(malloc_info malloc.h HAVE_MALLOC_INFO)
+check_symbol_exists(malloc_trim malloc.h HAVE_MALLOC_TRIM)
 
 #
 # Enable 'make tags' target.
