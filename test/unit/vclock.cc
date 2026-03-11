@@ -405,6 +405,24 @@ test_fromstring_invalid()
 
 #undef test
 
+static int
+test_snprint(void)
+{
+	plan(3);
+	header();
+
+	const char *str = "{0: 1, 2: 10}";
+	struct vclock v;
+	vclock_create(&v);
+	is(vclock_from_string(&v, str), 0, "from string");
+	char buf[1024];
+	is(vclock_snprint(buf, sizeof(buf), &v), (int)strlen(str), "snprint");
+	is(strcmp(str, buf), 0, "correct");
+
+	footer();
+	return check_plan();
+}
+
 #define test(fun, a, b, exp) ({						\
 	struct vclock va;						\
 	vclock_create(&va);						\
@@ -591,13 +609,14 @@ test_count_ge(void)
 int
 main(void)
 {
-	plan(10);
+	plan(11);
 
 	test_compare();
 	test_isearch();
 	test_tostring();
 	test_fromstring();
 	test_fromstring_invalid();
+	test_snprint();
 	test_minmax();
 	test_mp();
 	test_mp_invalid();
