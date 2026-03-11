@@ -1218,7 +1218,7 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 				 old_index_id, new_index_id);
 
 	SWAP(old_lsm, new_lsm);
-	SWAP(old_lsm->mem_format, new_lsm->mem_format);
+	SWAP(old_lsm->format, new_lsm->format);
 
 	/* Update pointer to the primary key. */
 	vy_lsm_update_pk(old_lsm, vy_lsm(old_space->index_map[0]));
@@ -1846,7 +1846,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	int rc = 0;
 	struct tuple *delete;
 	if (stmt->old_tuple != NULL) {
-		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+		delete = vy_stmt_new_surrogate_delete(pk->format,
 						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
@@ -1931,7 +1931,7 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (space->index_count == 1)
 		return 0;
 
-	struct tuple *delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+	struct tuple *delete = vy_stmt_new_surrogate_delete(pk->format,
 							    stmt->old_tuple);
 	if (delete == NULL)
 		return -1;
@@ -1999,7 +1999,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	size_t region_svp = region_used(&fiber()->gc);
 	new_tuple = xrow_update_execute(request->tuple, request->tuple_end,
 					old_tuple, old_tuple_end,
-					pk->mem_format, &new_size,
+					pk->format, &new_size,
 					request->index_base, &column_mask);
 	if (new_tuple == NULL) {
 		error_set_index(diag_last_error(diag_get()), pk->base.def);
@@ -2010,12 +2010,12 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matches the space format and
 	 * the primary key was not modified.
 	 */
-	if (tuple_validate_raw(pk->mem_format, new_tuple)) {
+	if (tuple_validate_raw(pk->format, new_tuple)) {
 		region_truncate(&fiber()->gc, region_svp);
 		error_set_index(diag_last_error(diag_get()), pk->base.def);
 		return -1;
 	}
-	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
+	stmt->new_tuple = vy_stmt_new_replace(pk->format, new_tuple,
 					      new_tuple_end);
 	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
@@ -2085,7 +2085,7 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 	operations[0].iov_len = 1;
 	operations[1].iov_base = (void *)expr;
 	operations[1].iov_len = expr_end - expr;
-	vystmt = vy_stmt_new_upsert(lsm->mem_format, tuple, tuple_end,
+	vystmt = vy_stmt_new_upsert(lsm->format, tuple, tuple_end,
 				    operations, 2);
 	if (vystmt == NULL)
 		return -1;
@@ -2212,7 +2212,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return 0;
 	/* Check update operations. */
 	if (xrow_update_check_ops(request->ops, request->ops_end,
-				  pk->mem_format, request->index_base) != 0) {
+				  pk->format, request->index_base) != 0) {
 		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
@@ -2225,7 +2225,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	const char *tuple_end = request->tuple_end;
 	const char *ops = request->ops;
 	const char *ops_end = request->ops_end;
-	if (tuple_validate_raw(pk->mem_format, tuple))
+	if (tuple_validate_raw(pk->format, tuple))
 		return -1;
 
 	if (space->index_count == 1 && !space_has_on_replace_triggers(space) &&
@@ -2260,7 +2260,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * turns into INSERT.
 	 */
 	if (stmt->old_tuple == NULL) {
-		stmt->new_tuple = vy_stmt_new_insert(pk->mem_format,
+		stmt->new_tuple = vy_stmt_new_insert(pk->format,
 						     tuple, tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
@@ -2273,7 +2273,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	size_t region_svp = region_used(&fiber()->gc);
 	/* Apply upsert operations to the old tuple. */
 	new_tuple = xrow_upsert_execute(ops, ops_end, old_tuple, old_tuple_end,
-					pk->mem_format, &new_size, 0, false,
+					pk->format, &new_size, 0, false,
 					&column_mask);
 	if (new_tuple == NULL)
 		return -1;
@@ -2281,12 +2281,12 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matched the space
 	 * format and the primary key was not modified.
 	 */
-	if (tuple_validate_raw(pk->mem_format, new_tuple)) {
+	if (tuple_validate_raw(pk->format, new_tuple)) {
 		region_truncate(&fiber()->gc, region_svp);
 		return -1;
 	}
 	new_tuple_end = new_tuple + new_size;
-	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
+	stmt->new_tuple = vy_stmt_new_replace(pk->format, new_tuple,
 					      new_tuple_end);
 	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
@@ -2332,12 +2332,12 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 	if (vy_is_committed(env, pk))
 		return 0;
-	if (tuple_validate_raw(pk->mem_format, request->tuple)) {
+	if (tuple_validate_raw(pk->format, request->tuple)) {
 		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
 	/* First insert into the primary index. */
-	stmt->new_tuple = vy_stmt_new_insert(pk->mem_format, request->tuple,
+	stmt->new_tuple = vy_stmt_new_insert(pk->format, request->tuple,
 					     request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
@@ -2383,11 +2383,11 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return 0;
 
 	/* Validate and create a statement for the new tuple. */
-	if (tuple_validate_raw(pk->mem_format, request->tuple)) {
+	if (tuple_validate_raw(pk->format, request->tuple)) {
 		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
-	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, request->tuple,
+	stmt->new_tuple = vy_stmt_new_replace(pk->format, request->tuple,
 					      request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
@@ -2432,7 +2432,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	int rc = 0;
 	struct tuple *delete = NULL;
 	if (stmt->old_tuple != NULL) {
-		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+		delete = vy_stmt_new_surrogate_delete(pk->format,
 						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
@@ -4303,8 +4303,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	struct tuple *insert = NULL;
 	struct tuple *old_tuple = old.stmt;
 	if (old_tuple != NULL) {
-		delete = vy_stmt_new_surrogate_delete(lsm->mem_format,
-						      old_tuple);
+		delete = vy_stmt_new_surrogate_delete(lsm->format, old_tuple);
 		if (delete == NULL) {
 			tuple_unref(old_tuple);
 			return -1;
@@ -4314,8 +4313,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
 		uint32_t data_len;
 		const char *data = tuple_data_range(mem_stmt, &data_len);
-		insert = vy_stmt_new_insert(lsm->mem_format,
-					    data, data + data_len);
+		insert = vy_stmt_new_insert(lsm->format, data, data + data_len);
 		if (insert == NULL)
 			goto err;
 	} else if (type == IPROTO_UPSERT) {
@@ -4325,8 +4323,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 			goto err;
 		uint32_t data_len;
 		const char *data = tuple_data_range(new_tuple, &data_len);
-		insert = vy_stmt_new_insert(lsm->mem_format,
-					    data, data + data_len);
+		insert = vy_stmt_new_insert(lsm->format, data, data + data_len);
 		tuple_unref(new_tuple);
 		if (insert == NULL)
 			goto err;
@@ -4677,7 +4674,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 
 	/* Create the deferred DELETE statement. */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
-	struct tuple *delete = vy_stmt_new_delete(pk->mem_format, delete_data,
+	struct tuple *delete = vy_stmt_new_delete(pk->format, delete_data,
 						  delete_data_end);
 	if (delete == NULL)
 		return -1;

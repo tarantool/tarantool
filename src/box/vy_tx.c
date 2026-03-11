@@ -534,7 +534,7 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	}
 
 	struct tuple *delete_stmt;
-	delete_stmt = vy_stmt_new_surrogate_delete(pk->mem_format,
+	delete_stmt = vy_stmt_new_surrogate_delete(pk->format,
 						   overwritten.stmt);
 	tuple_unref(overwritten.stmt);
 	if (delete_stmt == NULL)

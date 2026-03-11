@@ -201,8 +201,8 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->pk = pk;
 	if (pk != NULL)
 		vy_lsm_ref(pk);
-	lsm->mem_format = format;
-	tuple_format_ref(lsm->mem_format);
+	lsm->format = format;
+	tuple_format_ref(lsm->format);
 	heap_node_create(&lsm->in_dump);
 	heap_node_create(&lsm->in_compaction);
 	lsm->space_id = index_def->space_id;
@@ -279,7 +279,7 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	histogram_delete(lsm->run_hist);
 	vy_lsm_stat_destroy(&lsm->stat);
 	vy_cache_destroy(&lsm->cache);
-	tuple_format_unref(lsm->mem_format);
+	tuple_format_unref(lsm->format);
 	TRASH(lsm);
 	free(lsm);
 }
@@ -341,7 +341,7 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 	     vy_run_rebuild_index(run, lsm->env->path,
 				  lsm->space_id, lsm->index_id,
 				  lsm->cmp_def, lsm->key_def,
-				  lsm->mem_format, lsm->env->key_format,
+				  lsm->format, lsm->env->key_format,
 				  &lsm->opts) != 0)) {
 		vy_run_unref(run);
 		return NULL;
@@ -846,7 +846,7 @@ vy_lsm_rotate_mem(struct vy_lsm *lsm)
 	struct vy_mem *mem;
 
 	assert(lsm->mem != NULL);
-	mem = vy_mem_new(lsm->mem->env, lsm->cmp_def, lsm->mem_format,
+	mem = vy_mem_new(lsm->mem->env, lsm->cmp_def, lsm->format,
 			 *lsm->env->p_generation, space_cache_version);
 	if (mem == NULL)
 		return -1;

@@ -164,7 +164,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
 	struct vy_run_iterator run_itr;
 	vy_run_iterator_open(&run_itr, &lsm->stat.disk.iterator, slice,
 			     ITER_EQ, key, rv, lsm->cmp_def, lsm->key_def,
-			     lsm->mem_format, lsm->env->key_format,
+			     lsm->format, lsm->env->key_format,
 			     /*is_primary=*/lsm->index_id == 0);
 	struct vy_history slice_history;
 	vy_history_create(&slice_history, &lsm->env->history_node_pool);
