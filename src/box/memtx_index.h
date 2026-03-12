@@ -32,6 +32,17 @@ struct memtx_index_vtab {
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
 		       struct tuple **result, struct tuple **successor);
 	/**
+	 * Retrieves tuples from @a index in range [@a begin_key, @a end_key).
+	 * The tuples are stored in @a tuples array, allocated by the function
+	 * on @a region. The array size is returned in @a tuple_count.
+	 */
+	int (*get_range_internal)(
+		struct index *index,
+		const char *begin_key, uint32_t begin_part_count,
+		const char *end_key, uint32_t end_part_count,
+		struct tuple ***tuples, size_t *tuple_count,
+		struct region *region);
+	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
 	void (*begin_build)(struct index *index);
@@ -55,6 +66,20 @@ memtx_index_replace(struct index *index, struct tuple *old_tuple,
 	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
 	return vtab->replace(index, old_tuple, new_tuple, mode, result,
 			     successor);
+}
+
+static inline int
+memtx_index_get_range_internal(
+	struct index *index,
+	const char *begin_key, uint32_t begin_part_count,
+	const char *end_key, uint32_t end_part_count,
+	struct tuple ***tuples, size_t *tuple_count,
+	struct region *region)
+{
+	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
+	return vtab->get_range_internal(index, begin_key, begin_part_count,
+					end_key, end_part_count, tuples,
+					tuple_count, region);
 }
 
 static inline void
@@ -84,6 +109,13 @@ memtx_index_end_build(struct index *index)
 	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
 	vtab->end_build(index);
 }
+
+/* No-op stub for the `get_range_internal` operation. */
+int
+generic_memtx_index_get_range_internal(
+	struct index *index, const char *begin_key, uint32_t begin_part_count,
+	const char *end_key, uint32_t end_part_count, struct tuple ***tuples,
+	size_t *tuple_count, struct region *region);
 
 /** No-op stub for the `begin_build` operation. */
 void

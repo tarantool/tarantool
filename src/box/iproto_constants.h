@@ -160,6 +160,10 @@ extern const char *iproto_flag_bit_strs[];
 	/** Also request keys. See the comment above. */		\
 	/** The data in Arrow format. */				\
 	_(ARROW, 0x36, MP_EXT)						\
+	/** The key to operate from. */				\
+	_(BEGIN_KEY, 0x37, MP_ARRAY)					\
+	/** The key to operate until. */				\
+	_(END_KEY, 0x38, MP_ARRAY)					\
 									\
 	/* Leave a gap between response keys and SQL keys. */		\
 	_(SQL_TEXT, 0x40, MP_STR)					\
@@ -353,6 +357,8 @@ iproto_key_bit(unsigned char key)
 	_(ROLLBACK, 16)							\
 	/** INSERT Arrow request. */					\
 	_(INSERT_ARROW, 17)						\
+	/** DELETE range request. */					\
+	_(DELETE_RANGE, 18)						\
 									\
 	_(RAFT, 30)							\
 	/** PROMOTE request. */						\
@@ -436,7 +442,7 @@ enum iproto_type {
 	IPROTO_UNKNOWN = -1,
 
 	/** The maximum typecode used for box.stat() */
-	IPROTO_TYPE_STAT_MAX = IPROTO_INSERT_ARROW + 1,
+	IPROTO_TYPE_STAT_MAX = IPROTO_DELETE_RANGE + 1,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,
@@ -533,7 +539,7 @@ iproto_type_is_dml(uint16_t type)
 {
 	return (type >= IPROTO_SELECT && type <= IPROTO_DELETE) ||
 		type == IPROTO_UPSERT || type == IPROTO_NOP ||
-		type == IPROTO_INSERT_ARROW;
+		type == IPROTO_INSERT_ARROW || type == IPROTO_DELETE_RANGE;
 }
 
 /**

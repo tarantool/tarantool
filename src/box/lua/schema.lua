@@ -2797,6 +2797,11 @@ base_index_mt.delete = function(index, key)
     check_index_arg(index, 'delete', 2)
     return internal.delete(index.space_id, index.id, keify(key));
 end
+base_index_mt.delete_range = function(index, begin_key, end_key)
+    check_index_arg(index, 'delete_range', 2)
+    return internal.delete_range(index.space_id, index.id,
+                                 keify(begin_key), keify(end_key))
+end
 
 base_index_mt.stat = function(index)
     return internal.stat(index.space_id, index.id);
@@ -2933,6 +2938,10 @@ end
 space_mt.delete = function(space, key)
     check_space_arg(space, 'delete', 2)
     return check_primary_index(space, 2):delete(key)
+end
+space_mt.delete_range = function(space, begin_key, end_key)
+    check_space_arg(space, 'delete_ragne', 2)
+    return check_primary_index(space, 2):delete_range(begin_key, end_key)
 end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the
