@@ -419,7 +419,7 @@ parse_date_strptime_invalid_test(void)
 		   "using '%s' must fail on: %s",
 		   text, fmt, fail_case);
 
-		struct datetime date = { 0 };
+		struct datetime date = { 0, 0, 0, 0 };
 		size_t res = datetime_strptime(&date, text, fmt);
 		is(res, 0, "datetime_strptime fail to"
 		   " parse string '%s' using '%s'",
