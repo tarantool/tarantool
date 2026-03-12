@@ -105,8 +105,6 @@ test_basic()
 	isnt(pk, NULL, "range is not NULL");
 	vy_lsm_add_range(pk, range);
 
-	struct rlist read_views = RLIST_HEAD_INITIALIZER(read_views);
-
 	char dir_tmpl[] = "./vy_point_test.XXXXXX";
 	char *dir_name = mkdtemp(dir_tmpl);
 	isnt(dir_name, NULL, "temp dir name is not NULL");
@@ -195,7 +193,7 @@ test_basic()
 	}
 	struct vy_stmt_stream *write_stream;
 	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
-					     &read_views, NULL);
+					     NULL, 0, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
@@ -226,7 +224,7 @@ test_basic()
 		vy_mem_insert_template(run_mem, &tmpl_val);
 	}
 	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
-					     &read_views, NULL);
+					     NULL, 0, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");

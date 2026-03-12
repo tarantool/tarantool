@@ -214,6 +214,8 @@ struct vy_slice {
 		/** Link in vy_join_ctx->slices list. */
 		struct rlist in_join;
 	};
+	/** Link in vy_task::compacted_slices. */
+	struct rlist in_compaction;
 	/**
 	 * Indexes of the first and the last page in the run
 	 * that belong to this slice.

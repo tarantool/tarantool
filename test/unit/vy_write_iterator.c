@@ -86,7 +86,7 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 			       int expected_count,
 			       const struct vy_stmt_template *deferred,
 			       int deferred_count,
-			       const int *vlsns, int vlsns_count,
+			       const int64_t *vlsns, int vlsns_count,
 			       bool is_primary, bool is_last_level)
 {
 	uint32_t fields[] = { 0 };
@@ -96,16 +96,13 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 	struct vy_mem *mem = create_test_mem(key_def);
 	for (int i = 0; i < content_count; ++i)
 		vy_mem_insert_template(mem, &content[i]);
-	struct rlist rv_list;
-	struct vy_read_view *rv_array = malloc(sizeof(*rv_array) * vlsns_count);
-	fail_if(rv_array == NULL);
-	init_read_views_list(&rv_list, rv_array, vlsns, vlsns_count);
 
 	struct test_handler handler;
 	test_handler_create(&handler, mem->format);
 
 	struct vy_stmt_stream *wi;
-	wi = vy_write_iterator_new(key_def, is_primary, is_last_level, &rv_list,
+	wi = vy_write_iterator_new(key_def, is_primary, is_last_level,
+				   vlsns, vlsns_count,
 				   is_primary ? &handler.base : NULL);
 	fail_if(wi == NULL);
 	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);
@@ -143,7 +140,6 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 	wi->iface->close(wi);
 	vy_mem_delete(mem);
 	box_key_def_delete(key_def);
-	free(rv_array);
 }
 
 void
@@ -174,7 +170,7 @@ test_basic(void)
 	const struct vy_stmt_template expected[] = {
 		content[9], content[7], content[4], content[2]
 	};
-	const int vlsns[] = {7, 9, 12};
+	const int64_t vlsns[] = {7, 9, 12};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -208,7 +204,7 @@ test_basic(void)
 		STMT_TEMPLATE(10, UPSERT, 1, 3),
 		STMT_TEMPLATE(6, UPSERT, 1, 1),
 	};
-	const int vlsns[] = {6, 10, 13};
+	const int64_t vlsns[] = {6, 10, 13};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -236,7 +232,7 @@ test_basic(void)
 		content[3],
 		STMT_TEMPLATE(7, REPLACE, 1, 2)
 	};
-	const int vlsns[] = {7};
+	const int64_t vlsns[] = {7};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -256,7 +252,7 @@ test_basic(void)
 		STMT_TEMPLATE(8, REPLACE, 1, 2),
 	};
 	const struct vy_stmt_template expected[] = { content[1], content[0] };
-	const int vlsns[] = {7, 8};
+	const int64_t vlsns[] = {7, 8};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -280,7 +276,7 @@ test_basic(void)
 		STMT_TEMPLATE(8, REPLACE, 1, 1),
 	};
 	const struct vy_stmt_template expected[] = { content[1] };
-	const int vlsns[] = {7, 8};
+	const int64_t vlsns[] = {7, 8};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -303,7 +299,7 @@ test_basic(void)
 		STMT_TEMPLATE(8, REPLACE, 1, 1),
 	};
 	const struct vy_stmt_template expected[] = { content[1], content[0] };
-	const int vlsns[] = {7, 8};
+	const int64_t vlsns[] = {7, 8};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -330,7 +326,7 @@ test_basic(void)
 	const struct vy_stmt_template expected[] = {
 		content[3], STMT_TEMPLATE(7, UPSERT, 1, 1)
 	};
-	const int vlsns[] = {7};
+	const int64_t vlsns[] = {7};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -358,7 +354,7 @@ test_basic(void)
 	const struct vy_stmt_template expected[] = {
 		content[3], content[2], content[1]
 	};
-	const int vlsns[] = {7, 10, 20, 21, 22, 23};
+	const int64_t vlsns[] = {7, 10, 20, 21, 22, 23};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -388,7 +384,7 @@ test_basic(void)
 		STMT_TEMPLATE(9, DELETE, 1),
 	};
 	const struct vy_stmt_template expected[] = { content[1] };
-	const int vlsns[] = {5, 7, 9};
+	const int64_t vlsns[] = {5, 7, 9};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -420,7 +416,7 @@ test_basic(void)
 		STMT_TEMPLATE(20, DELETE, 1),
 	};
 	const struct vy_stmt_template expected[] = { content[3], content[1] };
-	const int vlsns[] = {5, 11};
+	const int64_t vlsns[] = {5, 11};
 	compare_write_iterator_results(content, lengthof(content),
 				       expected, lengthof(expected), NULL, 0,
 				       vlsns, lengthof(vlsns), true, false);
@@ -459,7 +455,7 @@ test_basic(void)
 		content[6],
 		STMT_TEMPLATE(7, INSERT, 1, 4),
 	};
-	const int vlsns[] = {3, 5, 7, 8, 9};
+	const int64_t vlsns[] = {3, 5, 7, 8, 9};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -499,7 +495,7 @@ test_basic(void)
 		content[4],
 		STMT_TEMPLATE(6, REPLACE, 1, 2),
 	};
-	const int vlsns[] = {6, 7};
+	const int64_t vlsns[] = {6, 7};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
@@ -545,7 +541,7 @@ test_basic(void)
 		STMT_TEMPLATE(8, DELETE, 1, 4),
 		STMT_TEMPLATE(5, DELETE, 1, 2),
 	};
-	const int vlsns[] = {5, 7, 11};
+	const int64_t vlsns[] = {5, 7, 11};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int deferred_count = sizeof(deferred) / sizeof(deferred[0]);
@@ -577,7 +573,7 @@ test_basic(void)
 		STMT_TEMPLATE_DEFERRED_DELETE(7, REPLACE, 1, 1),
 	};
 	const struct vy_stmt_template deferred[] = {};
-	const int vlsns[] = {};
+	const int64_t vlsns[] = {};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int deferred_count = sizeof(deferred) / sizeof(deferred[0]);
@@ -609,7 +605,7 @@ test_basic(void)
 		STMT_TEMPLATE_DEFERRED_DELETE(7, REPLACE, 1, 1),
 	};
 	const struct vy_stmt_template deferred[] = {};
-	const int vlsns[] = {7};
+	const int64_t vlsns[] = {7};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int deferred_count = sizeof(deferred) / sizeof(deferred[0]);
@@ -637,7 +633,7 @@ test_basic(void)
 		STMT_TEMPLATE_DEFERRED_DELETE(7, REPLACE, 1, 1),
 	};
 	const struct vy_stmt_template deferred[] = {};
-	const int vlsns[] = {};
+	const int64_t vlsns[] = {};
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int deferred_count = sizeof(deferred) / sizeof(deferred[0]);

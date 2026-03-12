@@ -198,17 +198,6 @@ vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
 	tuple_unref(written.stmt);
 }
 
-void
-init_read_views_list(struct rlist *rlist, struct vy_read_view *rvs,
-		     const int *vlsns, int count)
-{
-	rlist_create(rlist);
-	for (int i = 0; i < count; ++i) {
-		rvs[i].vlsn = vlsns[i];
-		rlist_add_tail_entry(rlist, &rvs[i], in_read_views);
-	}
-}
-
 struct vy_mem *
 create_test_mem(struct key_def *def)
 {
