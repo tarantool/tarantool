@@ -43,11 +43,12 @@ g.test_page_load_error = function(cg)
         box.cfg{vinyl_max_tuple_size = 128}
         for _, iterator in ipairs({'ge', 'gt', 'le', 'lt', 'eq', 'req'}) do
             for key = 1, 50 do
-                -- With key = 1 and iterator = 'lt', the read iterator will
-                -- figure out that no page can store requested tuples by
-                -- looking at the first page's min key and won't load any
-                -- pages.
-                if key > 1 or iterator ~= 'lt' then
+                -- With LT 1 and GT 50, the read iterator will figure out
+                -- that no page can store requested tuples and won't load
+                -- any statements.
+                t.log({key = key, iterator = iterator})
+                if not ((key == 1 and iterator == 'lt') or
+                        (key == 50 and iterator == 'gt')) then
                     t.assert_error_covers({
                         type = 'ClientError',
                         code = box.error.VINYL_MAX_TUPLE_SIZE,

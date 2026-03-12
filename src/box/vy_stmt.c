@@ -787,6 +787,38 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
 	return stmt;
 }
 
+const char *
+vy_key_from_xrow(struct xrow_header *xrow, struct key_def *cmp_def,
+		 bool is_primary)
+{
+	struct request request;
+	uint64_t key_map = dml_request_key_map(xrow->type);
+	key_map &= ~(1ULL << IPROTO_SPACE_ID); /* space_id is optional */
+	if (xrow_decode_dml(xrow, &request, key_map) != 0)
+		return NULL;
+	switch (request.type) {
+	case IPROTO_DELETE:
+		return request.key;
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPSERT:
+		if (is_primary) {
+			uint32_t key_size;
+			return tuple_extract_key_raw(
+					request.tuple, request.tuple_end,
+					cmp_def, MULTIKEY_NONE, &key_size);
+		}
+		return request.tuple;
+	default:
+		/* TODO: report filename. */
+		diag_set(ClientError, ER_INVALID_RUN_FILE,
+			 tt_sprintf("Can't decode statement: "
+				    "unknown request type %u",
+				    (unsigned)request.type));
+		return NULL;
+	}
+}
+
 int
 vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 {

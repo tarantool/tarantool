@@ -101,10 +101,6 @@ struct vy_page_read_task {
 	enum iterator_type iterator_type;
 	/** key definition (needed for key lookup) */
 	struct key_def *cmp_def;
-	/** format used for tuples */
-	struct tuple_format *format;
-	/** format used for keys */
-	struct tuple_format *key_format;
 	/** true if the index is primary */
 	bool is_primary;
 	/** [out] position of the key in the page */
@@ -812,6 +808,20 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no, struct key_def *cmp_def,
 }
 
 /**
+ * Like vy_page_stmt() but returns a raw key extracted from the statement
+ * stored in the page at the given index.
+ */
+static const char *
+vy_page_key(struct vy_page *page, uint32_t stmt_no, struct key_def *cmp_def,
+	    bool is_primary)
+{
+	struct xrow_header xrow;
+	if (vy_page_xrow(page, stmt_no, &xrow) != 0)
+		return NULL;
+	return vy_key_from_xrow(&xrow, cmp_def, is_primary);
+}
+
+/**
  * Binary search in page
  * In terms of STL, makes lower_bound for EQ,GE,LT and upper_bound for GT,LE
  * Additionally *equal_key argument is set to true if the found value is
@@ -819,11 +829,28 @@ vy_page_stmt(struct vy_page *page, uint32_t stmt_no, struct key_def *cmp_def,
  */
 static int
 vy_page_find_key(struct vy_page *page, struct vy_entry key,
-		 struct key_def *cmp_def, struct tuple_format *format,
-		 struct tuple_format *key_format, bool is_primary,
+		 struct key_def *cmp_def, bool is_primary,
 		 enum iterator_type iterator_type, uint32_t *pos,
 		 bool *equal_key)
 {
+	int rc = -1;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	/*
+	 * Extract the raw key from the key statement data to avoid accesses to
+	 * the tuple format because it may be unavailable to the calling thread.
+	 */
+	uint32_t data_size;
+	const char *data = tuple_data_range(key.stmt, &data_size);
+	if (!vy_stmt_is_key(key.stmt)) {
+		int multikey_idx = vy_entry_multikey_idx(key, cmp_def);
+		data = tuple_extract_key_raw(data, data + data_size,
+					     cmp_def, multikey_idx, &data_size);
+		if (data == NULL)
+			goto out;
+	}
+	uint32_t part_count = mp_decode_array(&data);
+	hint_t hint = key_hint(data, part_count, cmp_def);
 	uint32_t beg = 0;
 	uint32_t end = page->row_count;
 	*equal_key = false;
@@ -831,23 +858,28 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 	int zero_cmp = (iterator_type == ITER_GT ||
 			iterator_type == ITER_LE ? -1 : 0);
 	while (beg != end) {
+		size_t region_svp_inner = region_used(region);
 		uint32_t mid = beg + (end - beg) / 2;
-		struct vy_entry fnd_key = vy_page_stmt(page, mid, cmp_def,
-						       format, key_format,
-						       is_primary);
-		if (fnd_key.stmt == NULL)
-			return -1;
-		int cmp = vy_entry_compare(fnd_key, key, cmp_def);
+		const char *other_data = vy_page_key(page, mid, cmp_def,
+						     is_primary);
+		if (other_data == NULL)
+			goto out;
+		uint32_t other_part_count = mp_decode_array(&other_data);
+		int cmp = key_compare(other_data, other_part_count, HINT_NONE,
+				      data, part_count, hint, cmp_def);
 		cmp = cmp ? cmp : zero_cmp;
 		*equal_key = *equal_key || cmp == 0;
 		if (cmp < 0)
 			beg = mid + 1;
 		else
 			end = mid;
-		tuple_unref(fnd_key.stmt);
+		region_truncate(region, region_svp_inner);
 	}
 	*pos = end;
-	return 0;
+	rc = 0;
+out:
+	region_truncate(region, region_svp);
+	return rc;
 }
 
 /**
@@ -1016,9 +1048,8 @@ vy_page_read_cb(struct cbus_call_msg *base)
 		return -1;
 	if (task->key.stmt != NULL &&
 	    vy_page_find_key(task->page, task->key, task->cmp_def,
-			     task->format, task->key_format, task->is_primary,
-			     task->iterator_type, &task->pos_in_page,
-			     &task->equal_found) != 0)
+			     task->is_primary, task->iterator_type,
+			     &task->pos_in_page, &task->equal_found) != 0)
 		return -1;
 	return 0;
 }
@@ -1052,7 +1083,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	if (page != NULL) {
 		if (key.stmt != NULL &&
 		    vy_page_find_key(page, key, itr->cmp_def,
-				     itr->format, itr->key_format,
 				     itr->is_primary, iterator_type,
 				     pos_in_page, equal_found) != 0)
 			return -1;
@@ -1080,8 +1110,6 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	task->key = key;
 	task->iterator_type = iterator_type;
 	task->cmp_def = itr->cmp_def;
-	task->format = itr->format;
-	task->key_format = itr->key_format;
 	task->is_primary = itr->is_primary;
 	task->pos_in_page = 0;
 	task->equal_found = false;
@@ -2708,8 +2736,7 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 
 	bool unused;
 	if (vy_page_find_key(stream->page, stream->slice->begin,
-			     stream->cmp_def, stream->format,
-			     stream->key_format, stream->is_primary,
+			     stream->cmp_def, stream->is_primary,
 			     ITER_GE, &stream->pos_in_page, &unused) != 0) {
 		vy_page_delete(stream->page);
 		stream->page = NULL;
