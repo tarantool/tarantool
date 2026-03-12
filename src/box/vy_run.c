@@ -2810,20 +2810,11 @@ vy_slice_stream_stop(struct vy_stmt_stream *virt_stream)
 	}
 }
 
-static void
-vy_slice_stream_close(struct vy_stmt_stream *virt_stream)
-{
-	assert(virt_stream->iface->close == vy_slice_stream_close);
-	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
-	tuple_format_unref(stream->format);
-	tuple_format_unref(stream->key_format);
-}
-
 static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 	.start = vy_slice_stream_search,
 	.next = vy_slice_stream_next,
 	.stop = vy_slice_stream_stop,
-	.close = vy_slice_stream_close,
+	.close = NULL,
 };
 
 void
@@ -2841,8 +2832,6 @@ vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 	stream->slice = slice;
 	stream->cmp_def = cmp_def;
 	stream->format = format;
-	tuple_format_ref(format);
 	stream->key_format = key_format;
-	tuple_format_ref(key_format);
 	stream->is_primary = is_primary;
 }

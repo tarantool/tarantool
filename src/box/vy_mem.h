@@ -156,8 +156,10 @@ vy_mem_tree_cmp_key(struct vy_entry entry, struct vy_mem_tree_key *key,
 struct vy_mem {
 	/** Vinyl memory environment. */
 	struct vy_mem_env *env;
-	/** Link in range->sealed list. */
+	/** Link in vy_lsm::sealed. */
 	struct rlist in_sealed;
+	/** Link in vy_task::dumped_mems. */
+	struct rlist in_dump;
 	/** BPS tree */
 	struct vy_mem_tree tree;
 	/* The matras allocator used by the tree. */

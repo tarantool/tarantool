@@ -344,7 +344,7 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface;
  */
 struct vy_stmt_stream *
 vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
-		      bool is_last_level, struct rlist *read_views,
+		      bool is_last_level, const int64_t *vlsns, int vlsn_count,
 		      struct vy_deferred_delete_handler *handler)
 {
 	/*
@@ -355,12 +355,8 @@ vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
 	/*
 	 * One is reserved for INT64_MAX - maximal read view.
 	 */
-	int count = 1;
-	struct rlist *unused;
-	rlist_foreach(unused, read_views)
-		++count;
 	size_t size = sizeof(struct vy_write_iterator) +
-		      count * sizeof(struct vy_read_view_stmt);
+		      (vlsn_count + 1) * sizeof(struct vy_read_view_stmt);
 	struct vy_write_iterator *stream =
 		(struct vy_write_iterator *) calloc(1, size);
 	if (stream == NULL) {
@@ -368,19 +364,16 @@ vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
 		return NULL;
 	}
 	stream->stmt_i = -1;
-	stream->rv_count = count;
+	stream->rv_count = vlsn_count + 1;
 	stream->read_views[0].vlsn = INT64_MAX;
 	stream->read_views[0].entry = vy_entry_none();
-	count--;
-	struct vy_read_view *rv;
 	/* Descending order. */
-	rlist_foreach_entry(rv, read_views, in_read_views) {
+	for (int i = 0; i < vlsn_count; i++) {
 		struct vy_read_view_stmt *p;
-		p = &stream->read_views[count--];
-		p->vlsn = rv->vlsn;
+		p = &stream->read_views[vlsn_count - i];
+		p->vlsn = vlsns[i];
 		p->entry = vy_entry_none();
 	}
-	assert(count == 0);
 
 	stream->base.iface = &vy_slice_stream_iface;
 	vy_source_heap_create(&stream->src_heap);

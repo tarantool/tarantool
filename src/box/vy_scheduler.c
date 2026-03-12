@@ -56,6 +56,7 @@
 #include "vy_mem.h"
 #include "vy_quota.h"
 #include "vy_range.h"
+#include "vy_read_view.h"
 #include "vy_run.h"
 #include "vy_write_iterator.h"
 #include "trivia/util.h"
@@ -188,16 +189,22 @@ struct vy_task {
 	struct vy_range *range;
 	/** Run written by this task. */
 	struct vy_run *new_run;
-	/** Write iterator producing statements for the new run. */
-	struct vy_stmt_stream *wi;
 	/**
-	 * First (newest) and last (oldest) slices to compact.
-	 *
-	 * While a compaction task is in progress, a new slice
-	 * can be added to a range by concurrent dump, so we
-	 * need to remember the slices we are compacting.
+	 * List of in-memory indexes dumped by this task,
+	 * linked by vy_mem::in_dump.
 	 */
-	struct vy_slice *first_slice, *last_slice;
+	struct rlist dumped_mems;
+	/**
+	 * List of run slices compacted by this task,
+	 * linked by vy_slice::in_compaction.
+	 */
+	struct rlist compacted_slices;
+	/** Set if there is no older level than the one we're writing to. */
+	bool is_last_level;
+	/** Array of read view LSNs sorted in the ascending order. */
+	int64_t *vlsns;
+	/** Number of entries in the vlsns array. */
+	int vlsn_count;
 	/**
 	 * Index options may be modified while a task is in
 	 * progress so we save them here to safely access them
@@ -252,8 +259,25 @@ vy_task_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	task->key_def = key_def_dup(lsm->key_def);
 	vy_lsm_ref(lsm);
 	diag_create(&task->diag);
+	rlist_create(&task->dumped_mems);
+	rlist_create(&task->compacted_slices);
 	task->deferred_delete_handler.iface = &vy_task_deferred_delete_iface;
 	return task;
+}
+
+/** Initialize the VLSNs array from a read view list. */
+static void
+vy_task_set_read_views(struct vy_task *task, struct rlist *read_views)
+{
+	struct vy_read_view *rv;
+	rlist_foreach_entry(rv, read_views, in_read_views)
+		task->vlsn_count++;
+	if (task->vlsn_count > 0) {
+		task->vlsns = xcalloc(task->vlsn_count, sizeof(*task->vlsns));
+		int i = 0;
+		rlist_foreach_entry(rv, read_views, in_read_views)
+			task->vlsns[i++] = rv->vlsn;
+	}
 }
 
 /** Free a task allocated with vy_task_new(). */
@@ -266,6 +290,7 @@ vy_task_delete(struct vy_task *task)
 	key_def_delete(task->key_def);
 	vy_lsm_unref(task->lsm);
 	diag_destroy(&task->diag);
+	free(task->vlsns);
 	free(task);
 }
 
@@ -1083,13 +1108,16 @@ vy_task_deferred_delete_iface = {
 	.destroy = vy_task_deferred_delete_destroy,
 };
 
+/**
+ * Writes statements returned by a write stream to a new run.
+ */
 static int
-vy_task_write_run(struct vy_task *task, bool no_compression)
+vy_task_write_run(struct vy_task *task, struct vy_stmt_stream *wi,
+		  bool no_compression)
 {
 	enum { YIELD_LOOPS = 32 };
 
 	struct vy_lsm *lsm = task->lsm;
-	struct vy_stmt_stream *wi = task->wi;
 
 	ERROR_INJECT(ERRINJ_VY_RUN_WRITE,
 		     {diag_set(ClientError, ER_INJECTION,
@@ -1147,11 +1175,33 @@ vy_task_dump_execute(struct vy_task *task)
 {
 	ERROR_INJECT_SLEEP(ERRINJ_VY_DUMP_DELAY);
 	/*
+	 * Note, since deferred DELETE are generated on tx commit
+	 * in case the overwritten tuple is found in-memory, no
+	 * deferred DELETE statement should be generated during
+	 * dump so we don't pass a deferred DELETE handler.
+	 */
+	int rc = -1;
+	bool is_primary = (task->lsm->index_id == 0);
+	struct vy_stmt_stream *wi = vy_write_iterator_new(
+			task->cmp_def, is_primary, task->is_last_level,
+			task->vlsns, task->vlsn_count, NULL);
+	if (wi == NULL)
+		goto out;
+	struct vy_mem *mem;
+	rlist_foreach_entry(mem, &task->dumped_mems, in_dump) {
+		if (vy_write_iterator_new_mem(wi, mem) != 0)
+			goto out_close;
+	}
+	/*
 	 * Don't compress L1 runs as they are most frequently read
 	 * and smallest runs at the same time and so we would gain
 	 * nothing by compressing them.
 	 */
-	return vy_task_write_run(task, true);
+	rc = vy_task_write_run(task, wi, true);
+out_close:
+	wi->iface->close(wi);
+out:
+	return rc;
 }
 
 static int
@@ -1276,9 +1326,7 @@ delete_mems:
 	 * LSM tree statistics.
 	 */
 	vy_stmt_counter_reset(&dump_input);
-	rlist_foreach_entry_safe(mem, &lsm->sealed, in_sealed, next_mem) {
-		if (mem->generation > scheduler->dump_generation)
-			continue;
+	rlist_foreach_entry_safe(mem, &task->dumped_mems, in_dump, next_mem) {
 		vy_stmt_counter_add(&dump_input, &mem->count);
 		vy_lsm_delete_mem(lsm, mem);
 	}
@@ -1292,9 +1340,6 @@ delete_mems:
 		scheduler->stat.dump_input += dump_input.bytes;
 	scheduler->stat.dump_output += dump_output.bytes;
 	scheduler->stat.dump_time += dump_time;
-
-	/* The iterator has been cleaned up in a worker thread. */
-	task->wi->iface->close(task->wi);
 
 	lsm->is_dumping = false;
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1328,9 +1373,6 @@ vy_task_dump_abort(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 
 	assert(lsm->is_dumping);
-
-	/* The iterator has been cleaned up in a worker thread. */
-	task->wi->iface->close(task->wi);
 
 	struct error *e = diag_last_error(&task->diag);
 	error_log(e);
@@ -1379,6 +1421,13 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	if (vy_lsm_rotate_mem_if_required(lsm) != 0)
 		goto err;
 
+	struct vy_task *task = vy_task_new(scheduler, worker, lsm, &dump_ops);
+	if (task == NULL)
+		goto err;
+
+	if (lsm->run_count == 0)
+		task->is_last_level = true;
+
 	/*
 	 * Wait until all active writes to in-memory trees
 	 * eligible for dump are over.
@@ -1398,18 +1447,15 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 			continue;
 		}
 		dump_lsn = MAX(dump_lsn, mem->dump_lsn);
+		rlist_add_tail_entry(&task->dumped_mems, mem, in_dump);
 	}
-
-	if (dump_lsn < 0) {
+	if (rlist_empty(&task->dumped_mems)) {
 		/* Nothing to do, pick another LSM tree. */
 		vy_scheduler_update_lsm(scheduler, lsm);
 		vy_scheduler_complete_dump(scheduler);
+		vy_task_delete(task);
 		return 0;
 	}
-
-	struct vy_task *task = vy_task_new(scheduler, worker, lsm, &dump_ops);
-	if (task == NULL)
-		goto err;
 
 	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, lsm);
 	if (new_run == NULL)
@@ -1418,29 +1464,10 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	new_run->dump_count = 1;
 	new_run->dump_lsn = dump_lsn;
 
-	/*
-	 * Note, since deferred DELETE are generated on tx commit
-	 * in case the overwritten tuple is found in-memory, no
-	 * deferred DELETE statement should be generated during
-	 * dump so we don't pass a deferred DELETE handler.
-	 */
-	struct vy_stmt_stream *wi;
-	bool is_last_level = (lsm->run_count == 0);
-	wi = vy_write_iterator_new(task->cmp_def, lsm->index_id == 0,
-				   is_last_level, scheduler->read_views, NULL);
-	if (wi == NULL)
-		goto err_wi;
-	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
-		if (mem->generation > scheduler->dump_generation)
-			continue;
-		if (vy_write_iterator_new_mem(wi, mem) != 0)
-			goto err_wi_sub;
-	}
-
 	task->new_run = new_run;
-	task->wi = wi;
 	task->bloom_fpr = lsm->opts.bloom_fpr;
 	task->page_size = lsm->opts.page_size;
+	vy_task_set_read_views(task, scheduler->read_views);
 
 	lsm->is_dumping = true;
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1462,11 +1489,6 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	say_verbose("%s: dump started", vy_lsm_name(lsm));
 	*p_task = task;
 	return 0;
-
-err_wi_sub:
-	task->wi->iface->close(wi);
-err_wi:
-	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(task);
 err:
@@ -1479,7 +1501,26 @@ static int
 vy_task_compaction_execute(struct vy_task *task)
 {
 	ERROR_INJECT_SLEEP(ERRINJ_VY_COMPACTION_DELAY);
-	return vy_task_write_run(task, false);
+	int rc = -1;
+	struct vy_lsm *lsm = task->lsm;
+	bool is_primary = (lsm->index_id == 0);
+	struct vy_stmt_stream *wi = vy_write_iterator_new(
+			task->cmp_def, is_primary, task->is_last_level,
+			task->vlsns, task->vlsn_count,
+			is_primary ? &task->deferred_delete_handler : NULL);
+	if (wi == NULL)
+		goto out;
+	struct vy_slice *slice;
+	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction) {
+		if (vy_write_iterator_new_slice(wi, slice, lsm->format,
+						lsm->env->key_format) != 0)
+			goto out_close;
+	}
+	rc = vy_task_write_run(task, wi, false);
+out_close:
+	wi->iface->close(wi);
+out:
+	return rc;
 }
 
 static int
@@ -1492,8 +1533,6 @@ vy_task_compaction_complete(struct vy_task *task)
 	double compaction_time = ev_monotonic_now(loop()) - task->start_time;
 	struct vy_disk_stmt_counter compaction_output = new_run->count;
 	struct vy_disk_stmt_counter compaction_input;
-	struct vy_slice *first_slice = task->first_slice;
-	struct vy_slice *last_slice = task->last_slice;
 	struct vy_slice *slice, *next_slice, *new_slice = NULL;
 	struct vy_run *run;
 
@@ -1528,29 +1567,21 @@ vy_task_compaction_complete(struct vy_task *task)
 	 * as a result of compaction.
 	 */
 	RLIST_HEAD(unused_runs);
-	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
+	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction)
 		slice->run->compacted_slice_count++;
-		if (slice == last_slice)
-			break;
-	}
-	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
+	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction) {
 		run = slice->run;
 		if (run->compacted_slice_count == run->slice_count)
 			rlist_add_entry(&unused_runs, run, in_unused);
 		slice->run->compacted_slice_count = 0;
-		if (slice == last_slice)
-			break;
 	}
 
 	/*
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	for (slice = first_slice; ; slice = rlist_next_entry(slice, in_range)) {
+	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction)
 		vy_log_delete_slice(slice->id);
-		if (slice == last_slice)
-			break;
-	}
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, VY_LOG_GC_LSN_CURRENT);
 	if (new_slice != NULL) {
@@ -1603,18 +1634,16 @@ vy_task_compaction_complete(struct vy_task *task)
 	 * we must insert the new slice at the same position where
 	 * the compacted slices were.
 	 */
-	RLIST_HEAD(compacted_slices);
 	vy_lsm_unacct_range(lsm, range);
-	if (new_slice != NULL)
+	if (new_slice != NULL) {
+		struct vy_slice *first_slice = rlist_first_entry(
+			&task->compacted_slices, typeof(*slice), in_compaction);
 		vy_range_add_slice_before(range, new_slice, first_slice);
+	}
 	vy_disk_stmt_counter_reset(&compaction_input);
-	for (slice = first_slice; ; slice = next_slice) {
-		next_slice = rlist_next_entry(slice, in_range);
+	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction) {
 		vy_range_remove_slice(range, slice);
-		rlist_add_entry(&compacted_slices, slice, in_range);
 		vy_disk_stmt_counter_add(&compaction_input, &slice->count);
-		if (slice == last_slice)
-			break;
 	}
 	range->n_compactions++;
 	vy_range_update_compaction_priority(range, &lsm->opts);
@@ -1631,15 +1660,12 @@ vy_task_compaction_complete(struct vy_task *task)
 	 */
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_lsm_remove_run(lsm, run);
-	rlist_foreach_entry_safe(slice, &compacted_slices,
-				 in_range, next_slice) {
+	rlist_foreach_entry_safe(slice, &task->compacted_slices,
+				 in_compaction, next_slice) {
 		vy_slice_wait_pinned(slice);
 		vy_slice_delete(slice);
 	}
 out:
-	/* The iterator has been cleaned up in worker. */
-	task->wi->iface->close(task->wi);
-
 	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1655,9 +1681,6 @@ vy_task_compaction_abort(struct vy_task *task)
 	struct vy_scheduler *scheduler = task->scheduler;
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
-
-	/* The iterator has been cleaned up in worker. */
-	task->wi->iface->close(task->wi);
 
 	struct error *e = diag_last_error(&task->diag);
 	error_log(e);
@@ -1694,43 +1717,30 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	struct vy_task *task = vy_task_new(scheduler, worker, lsm,
 					   &compaction_ops);
 	if (task == NULL)
-		goto err_task;
+		goto err;
 
 	struct vy_run *new_run = vy_run_prepare(scheduler->run_env, lsm);
 	if (new_run == NULL)
 		goto err_run;
 
-	struct vy_stmt_stream *wi;
-	bool is_last_level = (range->compaction_priority == range->slice_count);
-	wi = vy_write_iterator_new(task->cmp_def, lsm->index_id == 0,
-				   is_last_level, scheduler->read_views,
-				   lsm->index_id > 0 ? NULL :
-				   &task->deferred_delete_handler);
-	if (wi == NULL)
-		goto err_wi;
-
 	struct vy_slice *slice;
 	int32_t dump_count = 0;
 	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice, lsm->format,
-						lsm->env->key_format) != 0)
-			goto err_wi_sub;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
 		dump_count += slice->run->dump_count;
-		/* Remember the slices we are compacting. */
-		if (task->first_slice == NULL)
-			task->first_slice = slice;
-		task->last_slice = slice;
-
+		rlist_add_tail_entry(&task->compacted_slices, slice,
+				     in_compaction);
 		if (--n == 0)
 			break;
 	}
 	assert(n == 0);
 	assert(new_run->dump_lsn >= 0);
-	if (range->compaction_priority == range->slice_count)
+	if (range->compaction_priority == range->slice_count) {
 		dump_count -= slice->run->dump_count;
+		task->is_last_level = true;
+	}
 	/*
 	 * Do not update dumps_per_compaction in case compaction
 	 * was triggered manually to avoid unexpected side effects,
@@ -1745,9 +1755,9 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 
 	task->range = range;
 	task->new_run = new_run;
-	task->wi = wi;
 	task->bloom_fpr = lsm->opts.bloom_fpr;
 	task->page_size = lsm->opts.page_size;
+	vy_task_set_read_views(task, scheduler->read_views);
 
 	/*
 	 * Remove the range we are going to compact from the heap
@@ -1761,14 +1771,9 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		    range->compaction_priority, range->slice_count);
 	*p_task = task;
 	return 0;
-
-err_wi_sub:
-	task->wi->iface->close(wi);
-err_wi:
-	vy_run_discard(new_run);
 err_run:
 	vy_task_delete(task);
-err_task:
+err:
 	diag_log();
 	say_error("%s: could not start compacting range %s",
 		  vy_lsm_name(lsm), vy_range_str(range));

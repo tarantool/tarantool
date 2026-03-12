@@ -153,19 +153,6 @@ vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
 			   const struct vy_stmt_template *templ);
 
 /**
- * Create a list of read views using the specified vlsns.
- *
- * @param rlist[out] Result list of read views.
- * @param rvs[out] Read views array.
- * @param vlsns Array of read view lsns, sorted in ascending
- *        order.
- * @param count Size of the @vlsns.
- */
-void
-init_read_views_list(struct rlist *rlist, struct vy_read_view *rvs,
-		     const int *vlsns, int count);
-
-/**
  * Create vy_mem with the specified key_def, using the @region as
  * allocator.
  *
