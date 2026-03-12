@@ -675,6 +675,19 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format,
 	       struct tuple_format *key_format, bool is_primary);
 
 /**
+ * Extract a raw key from xrow.
+ *
+ * @retval key data on success
+ * @retval NULL on error
+ *
+ * Returned key data either points to the xrow body or is allocated
+ * from the fiber gc region.
+ */
+const char *
+vy_key_from_xrow(struct xrow_header *xrow, struct key_def *cmp_def,
+		 bool is_primary);
+
+/**
  * Format a statement into string.
  * Example: REPLACE([1, 2, "string"], lsn=48)
  */
