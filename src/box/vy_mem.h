@@ -442,13 +442,16 @@ struct vy_mem_stream {
 	struct vy_mem_tree_iterator curr_pos;
 	/** The last tuple returned to user */
 	struct vy_entry entry;
+	/** Format for allocating tuples fetched from the in-memory index. */
+	struct tuple_format *format;
 };
 
 /**
  * Open a mem stream. Use vy_stmt_stream api for further work.
  */
 void
-vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem);
+vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem,
+		   struct tuple_format *format);
 
 #if defined(__cplusplus)
 } /* extern "C" */

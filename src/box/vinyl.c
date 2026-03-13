@@ -609,15 +609,6 @@ vinyl_engine_check_space_def(struct space_def *def)
 	return 0;
 }
 
-/** Create a vinyl space statement format. */
-static struct tuple_format *
-vy_space_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
-			 uint16_t key_count, struct space_def *space_def)
-{
-	return space_tuple_format_new(&env->tuple_format_vtab,
-				      env, keys, key_count, space_def);
-}
-
 static struct space *
 vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
@@ -736,8 +727,8 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		assert(pk != NULL);
 	}
 	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->cache_env,
-					&env->mem_env, index_def, space->format,
-					pk, space_group_id(space));
+					&env->mem_env, index_def, space->def,
+					space->format, pk);
 	if (lsm == NULL)
 		return NULL;
 
@@ -1218,6 +1209,7 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 				 old_index_id, new_index_id);
 
 	SWAP(old_lsm, new_lsm);
+	SWAP(old_lsm->space_def, new_lsm->space_def);
 	SWAP(old_lsm->format, new_lsm->format);
 
 	/* Update pointer to the primary key. */

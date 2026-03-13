@@ -467,13 +467,14 @@ vy_write_iterator_close(struct vy_stmt_stream *vstream)
  * @return 0 on success or -1 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_new_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem)
+vy_write_iterator_new_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem,
+			  struct tuple_format *format)
 {
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream);
 	if (src == NULL)
 		return -1;
-	vy_mem_stream_open(&src->mem_stream, mem);
+	vy_mem_stream_open(&src->mem_stream, mem, format);
 	return 0;
 }
 
@@ -952,16 +953,11 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		 * so as not to trigger optimization #5 on the next
 		 * compaction.
 		 */
-		struct tuple *copy = vy_stmt_dup(rv->entry.stmt);
-		if (copy == NULL)
-			return -1;
 		if (is_first_insert)
-			vy_stmt_set_type(copy, IPROTO_INSERT);
+			vy_stmt_set_type(rv->entry.stmt, IPROTO_INSERT);
 		else
-			vy_stmt_set_type(copy, IPROTO_REPLACE);
-		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->entry.stmt));
-		tuple_unref(rv->entry.stmt);
-		rv->entry.stmt = copy;
+			vy_stmt_set_type(rv->entry.stmt, IPROTO_REPLACE);
+		vy_stmt_set_lsn(rv->entry.stmt, vy_stmt_lsn(rv->entry.stmt));
 	}
 	return 0;
 }

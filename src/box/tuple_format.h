@@ -66,6 +66,7 @@ enum { TUPLE_INDEX_BASE = 1 };
  */
 enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
 
+struct cord;
 struct tuple;
 struct tuple_info;
 struct tuple_format;
@@ -314,6 +315,13 @@ struct tuple_format {
 	char *data;
 	/** Length of MsgPack encoding. */
 	size_t data_len;
+#ifndef NDEBUG
+	/**
+	 * Thread that created this tuple format. Only the thread that created
+	 * a format may use it for creating and destroying tuples.
+	 */
+	struct cord *owner;
+#endif
 };
 
 /**
@@ -360,11 +368,24 @@ tuple_format_field(struct tuple_format *format, uint32_t fieldno)
 	return tuple_format_field_by_path(format, fieldno, NULL, 0, 0);
 }
 
-extern struct tuple_format *tuple_formats[];
+extern __thread struct tuple_format *tuple_formats[];
+
+#ifndef NDEBUG
+/** Ensure that the format was created by the current thread. */
+void
+tuple_format_check_owner(struct tuple_format *format);
+#else /* !NDEBUG */
+static inline void
+tuple_format_check_owner(struct tuple_format *format)
+{
+	(void)format;
+}
+#endif /* !NDEBUG */
 
 static inline uint32_t
 tuple_format_id(struct tuple_format *format)
 {
+	tuple_format_check_owner(format);
 	assert(tuple_formats[format->id] == format);
 	return format->id;
 }
@@ -372,7 +393,9 @@ tuple_format_id(struct tuple_format *format)
 static inline struct tuple_format *
 tuple_format_by_id(uint32_t tuple_format_id)
 {
-	return tuple_formats[tuple_format_id];
+	struct tuple_format *format = tuple_formats[tuple_format_id];
+	tuple_format_check_owner(format);
+	return format;
 }
 
 /** Delete a format with zero ref count. */
@@ -382,6 +405,7 @@ tuple_format_delete(struct tuple_format *format);
 static inline void
 tuple_format_ref(struct tuple_format *format)
 {
+	tuple_format_check_owner(format);
 	assert((uint64_t)format->refs + 1 <= FORMAT_REF_MAX);
 	format->refs++;
 }
@@ -389,6 +413,7 @@ tuple_format_ref(struct tuple_format *format)
 static inline void
 tuple_format_unref(struct tuple_format *format)
 {
+	tuple_format_check_owner(format);
 	assert(format->refs >= 1);
 	if (--format->refs == 0)
 		tuple_format_delete(format);

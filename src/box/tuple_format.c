@@ -43,11 +43,19 @@
 #include <PMurHash.h>
 
 /** Global table of tuple formats */
-struct tuple_format *tuple_formats[FORMAT_ID_MAX + 1];
-static intptr_t recycled_format_ids = FORMAT_ID_NIL;
+__thread struct tuple_format *tuple_formats[FORMAT_ID_MAX + 1];
+static __thread intptr_t recycled_format_ids = FORMAT_ID_NIL;
+static __thread uint32_t formats_size = 0;
+static __thread uint64_t formats_epoch = 0;
 
-static uint32_t formats_size = 0;
-static uint64_t formats_epoch = 0;
+#ifndef NDEBUG
+void
+tuple_format_check_owner(struct tuple_format *format)
+{
+	assert(format != NULL);
+	assert(format->owner == cord());
+}
+#endif /* NDEBUG */
 
 /**
  * Find in format1::fields the field by format2_field's JSON path.
@@ -190,7 +198,7 @@ tuple_format_hash(struct tuple_format *format)
 #define mh_cmp_key(a, b, arg) (tuple_format_cmp((a), *(b)))
 #include "salad/mhash.h"
 
-static struct mh_tuple_format_t *tuple_formats_hash = NULL;
+static __thread struct mh_tuple_format_t *tuple_formats_hash = NULL;
 
 static struct tuple_field *
 tuple_field_new(void)
@@ -647,6 +655,9 @@ out:
 							constraint_count);
 
 	format->hash = tuple_format_hash(format);
+#ifndef NDEBUG
+	format->owner = cord();
+#endif
 	return 0;
 }
 
@@ -776,6 +787,7 @@ error:
 static inline void
 tuple_format_destroy(struct tuple_format *format)
 {
+	tuple_format_check_owner(format);
 	free(format->required_fields);
 	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);

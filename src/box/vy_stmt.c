@@ -41,6 +41,7 @@
 #include <small/lsregion.h>
 
 #include "error.h"
+#include "space_def.h"
 #include "tuple_bloom.h"
 #include "tuple_format.h"
 #include "xrow.h"
@@ -153,6 +154,14 @@ vy_simple_stmt_format_new(struct vy_stmt_env *env,
 {
 	return simple_tuple_format_new(&env->tuple_format_vtab,
 				       env, keys, key_count);
+}
+
+struct tuple_format *
+vy_space_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
+			 uint16_t key_count, const struct space_def *space_def)
+{
+	return space_tuple_format_new(&env->tuple_format_vtab,
+				      env, keys, key_count, space_def);
 }
 
 bool
@@ -417,6 +426,35 @@ vy_stmt_new_delete(struct tuple_format *format, const char *tuple_begin,
 {
 	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
 				    NULL, 0, IPROTO_DELETE);
+}
+
+struct tuple *
+vy_stmt_new_copy(struct tuple_format *format, struct tuple *stmt)
+{
+	const char *data;
+	uint32_t data_size;
+	int ops_cnt = 0;
+	struct iovec ops;
+	enum iproto_type type = vy_stmt_type(stmt);
+	if (type == IPROTO_UPSERT) {
+		data = vy_upsert_data_range(stmt, &data_size);
+		uint32_t ops_size;
+		ops.iov_base = (void *)vy_stmt_upsert_ops(stmt, &ops_size);
+		ops.iov_len = ops_size;
+		ops_cnt = 1;
+	} else {
+		data = tuple_data_range(stmt, &data_size);
+	}
+	struct tuple *copy = vy_stmt_new_with_ops(format, data,
+						  data + data_size,
+						  &ops, ops_cnt, type);
+	if (copy != NULL) {
+		/* Copy vy_stmt fields. */
+		size_t offset = sizeof(struct tuple);
+		memcpy((void *)copy + offset, (void *)stmt + offset,
+		       sizeof(struct vy_stmt) - offset);
+	}
+	return copy;
 }
 
 struct tuple *
