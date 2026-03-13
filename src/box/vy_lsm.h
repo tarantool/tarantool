@@ -52,6 +52,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
+struct space_def;
 struct tuple;
 struct tuple_format;
 struct vy_lsm;
@@ -207,6 +208,8 @@ struct vy_lsm {
 	 * to a primary index.
 	 */
 	struct key_def *pk_in_cmp_def;
+	/** Copy of the space definition. */
+	struct space_def *space_def;
 	/** Tuple format of the space this LSM tree belongs to. */
 	struct tuple_format *format;
 	/**
@@ -336,7 +339,8 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm);
 struct vy_lsm *
 vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	   struct vy_mem_env *mem_env, struct index_def *index_def,
-	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id);
+	   struct space_def *space_def, struct tuple_format *format,
+	   struct vy_lsm *pk);
 
 /** Free an LSM tree object. */
 void

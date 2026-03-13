@@ -49,6 +49,7 @@ extern "C" {
 
 struct xrow_header;
 struct region;
+struct space_def;
 struct tuple_format;
 struct tuple_dictionary;
 struct tuple_bloom;
@@ -93,6 +94,11 @@ vy_stmt_env_destroy(struct vy_stmt_env *env);
 struct tuple_format *
 vy_simple_stmt_format_new(struct vy_stmt_env *env,
 			  struct key_def *const *keys, uint16_t key_count);
+
+/** Create a vinyl space statement format. */
+struct tuple_format *
+vy_space_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
+			 uint16_t key_count, const struct space_def *space_def);
 
 /** Statement flags. */
 enum {
@@ -535,6 +541,16 @@ struct tuple *
 vy_stmt_new_upsert(struct tuple_format *format,
 		   const char *tuple_begin, const char *tuple_end,
 		   struct iovec *operations, uint32_t ops_cnt);
+
+/**
+ * Create a copy of a statement using a new format.
+ *
+ * @param stmt statement
+ * @param format new statement format
+ * @return new statement of the same type with the same data.
+ */
+struct tuple *
+vy_stmt_new_copy(struct tuple_format *format, struct tuple *stmt);
 
 /**
  * Create REPLACE statement from UPSERT statement.

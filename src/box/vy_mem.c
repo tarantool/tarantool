@@ -675,7 +675,8 @@ vy_mem_stream_next(struct vy_stmt_stream *virt_stream, struct vy_entry *ret)
 	if (res == NULL) {
 		stream->entry = vy_entry_none();
 	} else {
-		stream->entry.stmt = vy_stmt_dup(res->stmt);
+		stream->entry.stmt = vy_stmt_new_copy(stream->format,
+						      res->stmt);
 		if (stream->entry.stmt == NULL)
 			return -1;
 		stream->entry.hint = res->hint;
@@ -706,12 +707,14 @@ static const struct vy_stmt_stream_iface vy_mem_stream_iface = {
 };
 
 void
-vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem)
+vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem,
+		   struct tuple_format *format)
 {
 	stream->base.iface = &vy_mem_stream_iface;
 	stream->mem = mem;
 	stream->curr_pos = vy_mem_tree_first(&mem->tree);
 	stream->entry = vy_entry_none();
+	stream->format = format;
 }
 
 /* }}} vy_mem_iterator API implementation */
