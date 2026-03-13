@@ -2637,8 +2637,7 @@ memtx_tx_handle_dups_in_secondary_index(
 		 * Ignore case when other TX executes insert after
 		 * precedence delete.
 		 */
-		if (newer_story->link[ind].is_own_change &&
-		    test_stmt->del_story == NULL)
+		if (test_stmt->txn->flag)
 			continue;
 		/*
 		 * Ignore the case when other TX overwrites in both
@@ -2683,6 +2682,23 @@ memtx_tx_handle_dups_and_gaps_on_rollback(struct memtx_story *story)
 	}
 }
 
+#define assert_zero_or_one_del_stmt(_story, _txn) do { \
+	assert(_story == NULL || _story->del_stmt == NULL || \
+		   (_story->del_stmt->txn == _txn && \
+		   _story->del_stmt->next_in_del_list == NULL)); \
+} while (0)
+
+void clear_flag(struct memtx_story *story)
+{
+	if (story == NULL)
+		return;
+	struct txn_stmt *del_stmt = story->del_stmt;
+	while (del_stmt != NULL) {
+		del_stmt->txn->flag = false;
+		del_stmt = del_stmt->next_in_del_list;
+	}
+}
+
 /*
  * Rollback addition of story by statement.
  */
@@ -2714,6 +2730,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	 * to read this prepared state.
 	 */
 	if (stmt->txn->psn != 0) {
+		assert_zero_or_one_del_stmt(del_story, stmt->txn);
 		/*
 		 * During preparation of this statement there were two cases:
 		 * * del_story != NULL: all in-progress transactions that were
@@ -2747,6 +2764,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 				/* Link to del_story's list. */
 				memtx_tx_story_link_deleted_by(del_story,
 							       test_stmt);
+				test_stmt->txn->flag = true;
 			}
 		}
 
@@ -2764,13 +2782,15 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 		 * be aborted.
 		 */
 		memtx_tx_abort_story_readers(add_story);
+
+		clear_flag(del_story);
 	}
 
 	/* Unlink stories from the statement. */
 	memtx_tx_story_unlink_added_by(add_story, stmt);
 	if (del_story != NULL)
 		memtx_tx_story_unlink_deleted_by(del_story, stmt);
-
+	
 	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
@@ -2812,6 +2832,7 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 	 * to read this prepared state.
 	 */
 	if (stmt->txn->psn != 0) {
+		assert_zero_or_one_del_stmt(del_story, stmt->txn);
 		/*
 		 * During preparation of deletion we could unlink other
 		 * transactions that want to overwrite this story. Now we have
@@ -2833,12 +2854,15 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 			assert(test_stmt->del_story == NULL);
 			assert(test_stmt->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(del_story, test_stmt);
+			test_stmt->txn->flag = true;
 		}
 
 		memtx_tx_handle_dups_and_gaps_on_rollback(del_story);
 
 		/* Revert psn assignment. */
 		del_story->del_psn = 0;
+
+		clear_flag(del_story);
 	}
 
 	/* Unlink the story from the statement. */
@@ -3001,6 +3025,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		(void)old_story;
 	}
 
+	assert_zero_or_one_del_stmt(story, stmt->txn);
+
 	/*
 	 * Set newer (in-progress) statements in the primary chain to delete
 	 * this story.
@@ -3025,6 +3051,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			assert(test_stmt->del_story == NULL);
 			assert(test_stmt->txn->psn == 0);
 			memtx_tx_story_link_deleted_by(story, test_stmt);
+			test_stmt->txn->flag = true;
 		}
 	} else {
 		/*
@@ -3054,6 +3081,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 
 			/* Link to story's list. */
 			memtx_tx_story_link_deleted_by(story, test_stmt);
+			test_stmt->txn->flag = true;
 		}
 	}
 
@@ -3096,6 +3124,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 */
 		memtx_tx_handle_conflict_gap_readers(top_story, i, stmt->txn);
 	}
+
+	clear_flag(story);
 }
 
 /**
