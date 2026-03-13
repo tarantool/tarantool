@@ -457,10 +457,16 @@ box_update_ro_summary(void)
 API_EXPORT const char *
 box_ro_reason(void)
 {
-	if (raft_is_ro(box_raft()))
-		return "election";
-	if (txn_limbo_is_ro(&txn_limbo))
-		return "synchro";
+	if (is_box_configured) {
+		/*
+		 * These modules are only initialized on first box.cfg(), it is
+		 * not safe to access them until then.
+		 */
+		if (raft_is_ro(box_raft()))
+			return "election";
+		if (txn_limbo_is_ro(&txn_limbo))
+			return "synchro";
+	}
 	if (is_ro)
 		return "config";
 	if (is_waiting_for_own_rows)
@@ -3313,15 +3319,14 @@ box_promote(void)
 	case ELECTION_MODE_CANDIDATE:
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
-		if (box_raft_try_promote() != 0)
-			return -1;
 		/*
 		 * box_promote_qsync() checks 'is_in_box_promote' to prevent
 		 * concurrent promotions. We must disable this guard here to
-		 * allow box_promote_qsync() to claim the limbo while we wait
-		 * in box_wait_ro().
+		 * allow box_promote_qsync() to claim the limbo.
 		 */
 		is_in_box_promote = false;
+		if (box_raft_try_promote() != 0)
+			return -1;
 		return box_wait_ro(false, replication_synchro_timeout);
 	default:
 		unreachable();
