@@ -7,6 +7,7 @@ local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 local utils    = require('internal.utils')
+local compat = require('compat')
 
 local this_module
 
@@ -1390,9 +1391,15 @@ local function handle_eval_result(status, ...)
         return box.error(E_PROC_LUA, (...))
     end
     local results = {...}
-    for i = 1, select('#', ...) do
-        if type(results[i]) == 'cdata' then
-            results[i] = msgpack.decode(msgpack.encode(results[i]))
+    --
+    -- If box_tuple_extension is set to 'old', the remote net_box will convert
+    -- cdata to table. We do the same here for compatibility.
+    --
+    if compat.box_tuple_extension:is_old() then
+        for i = 1, select('#', ...) do
+            if type(results[i]) == 'cdata' then
+                results[i] = msgpack.decode(msgpack.encode(results[i]))
+            end
         end
     end
     return unpack(results)
