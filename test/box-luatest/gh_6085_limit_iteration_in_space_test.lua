@@ -96,3 +96,17 @@ g.test_limit_on_sigurg = function()
     -- Must end before slice is over.
     t.assert(end_time - start_time < 3)
 end
+
+g.test_check_slice_on_each_operation = function()
+    g.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.space.tester
+        fiber.set_max_slice(0)
+        os.execute('sleep 0.1')
+        for _ = 1, 2000 do
+            local ok, err = pcall(s.replace, s, {1})
+            t.assert_not(ok)
+            t.assert_equals(tostring(err), "fiber slice is exceeded")
+        end
+    end)
+end
