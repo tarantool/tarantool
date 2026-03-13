@@ -17,15 +17,18 @@
 
 #define TAP_TEST_LOCATION() note("%s [%zu]", __func__, index + 1)
 
-static const char sample[] = "2012-12-24T15:30Z";
-
 void
 cord_on_yield(void) {}
 
-#define S(s) {s, sizeof(s) - 1}
+/** 1356363000 is 2012-12-24T15:30Z */
+#define DEFAULT_SAMPLE_EPOCH 1356363000
+#define S(s) {s, sizeof(s) - 1, DEFAULT_SAMPLE_EPOCH}
+#define SAMPLE_NON_DEF_EPOCH(s, sample_epoch) {s, sizeof(s) - 1, sample_epoch}
+#define DELTA(delta) (DEFAULT_SAMPLE_EPOCH + (delta))
 struct {
 	const char *str;
 	size_t len;
+	double sample_epoch;
 } tests[] = {
 	S("2012-12-24 15:30Z"),
 	S("2012-12-24 15:30z"),
@@ -104,48 +107,70 @@ struct {
 	S("2012-12-24T1630+01:00"),
 	S("20121224T16:30+01"),
 	S("20121224T16:30 +01"),
+	S("20121224T16,5+0100"),
+	S("20121224T16,5+01:00"),
+	SAMPLE_NON_DEF_EPOCH("20121224T16.75+0100", DELTA(15 * 60)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16.625+0100", DELTA(7 * 60 + 30)),
+	S("2012-12-24T16,5+01:00"),
+	SAMPLE_NON_DEF_EPOCH("2012-12-24T16.75+01:00", DELTA(15 * 60)),
+	SAMPLE_NON_DEF_EPOCH("2012-12-24T16.625+01:00", DELTA(7 * 60 + 30)),
+	S("20121224T1630.0+0100"),
+	SAMPLE_NON_DEF_EPOCH("20121224T1630.5+0100", DELTA(30)),
+	S("20121224T16:30.0+0100"),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30.5+0100", DELTA(30)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30,1+0100", DELTA(6)),
+	SAMPLE_NON_DEF_EPOCH("20121224T16:30,01666667+0100", DELTA(1)),
 };
 #undef S
+#undef SAMPLE_NON_DEF_EPOCH
+#undef DELTA
+#undef DEFAULT_SAMPLE_EPOCH
 
 static void
 datetime_test(void)
 {
 	size_t index;
-	struct datetime date_expected;
-
-	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1);
 
 	const unsigned tap_tests_per_iter = 7;
 	plan(tap_tests_per_iter * lengthof(tests));
 	for (index = 0; index < lengthof(tests); index++) {
 		TAP_TEST_LOCATION();
+		/* Result of datetime_parse_full. */
+		ssize_t parse_len;
+		/* Results of datetime_(strftime|strptime). */
+		size_t flen, plen;
+		const char *test_str = tests[index].str;
+		size_t test_len = tests[index].len;
+		size_t test_sample_epoch = tests[index].sample_epoch;
 		struct datetime date;
-		ssize_t len = datetime_parse_full(&date, tests[index].str,
-						  tests[index].len);
-		is(len > 0, true, "correct parse_datetime return value "
-		   "for '%s'", tests[index].str);
-		is(date.epoch, date_expected.epoch,
-		   "correct parse_datetime output "
+
+		parse_len = datetime_parse_full(&date, test_str, test_len);
+		is((parse_len > 0) && ((size_t)parse_len == test_len), true,
+		   "correct datetime_parse_full "
+		   "parsed symbols for '%s'", test_str);
+		is(date.epoch, test_sample_epoch,
+		   "correct datetime_parse_full output "
 		   "seconds for '%s",
-		   tests[index].str);
+		   test_str);
 
 		/*
 		 * check that stringized literal produces the same date
 		 * time fields
 		 */
 		static char buff[DT_TO_STRING_BUFSIZE];
-		len = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
-		ok(len > 0, "strftime");
+		flen = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
+		ok(flen > 0, "datetime_strftime");
 		struct datetime date_strp;
-		len = datetime_strptime(&date_strp, buff, "%F %T%z");
-		is(len > 0, true, "correct parse_strptime return value "
-		   "for '%s'", buff);
+		plen = datetime_strptime(&date_strp, buff, "%F %T%z");
+		is(plen == flen, true, "correct datetime_strptime "
+		   "parsed symbols for '%s'", buff);
 		is(date.epoch, date_strp.epoch,
 		   "reversible seconds via datetime_strptime for '%s'", buff);
 		struct datetime date_parsed;
-		len = datetime_parse_full(&date_parsed, buff, len);
-		is(len > 0, true, "correct datetime_parse_full return value "
-		   "for '%s'", buff);
+		parse_len = datetime_parse_full(&date_parsed, buff, flen);
+		is((parse_len > 0) & ((size_t)parse_len == flen), true,
+		   "correct datetime_parse_full "
+		   "parsed symbols for '%s'", buff);
 		is(date.epoch, date_parsed.epoch,
 		   "reversible seconds via datetime_parse_full for '%s'", buff);
 	}
