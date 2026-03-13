@@ -2339,6 +2339,18 @@ return schema.new('instance_config', schema.record({
             default = 60,
         }),
     }),
+    alerts = schema.record({
+        default = schema.enum({
+            'show',
+            'hide',
+        }, {
+            default = 'hide',
+        }),
+        transparent_huge_pages = schema.enum({
+            'show',
+            'hide',
+        }),
+    }),
 }), {
     methods = {
         instance_uri = instance_uri,
