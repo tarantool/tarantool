@@ -711,6 +711,9 @@ local function set_names_in_background(config, box_cfg)
 
     local is_startup = type(box.cfg) == 'function'
     local is_anon = configdata:get('replication.anon', {use_default = true})
+    local schema_compat = configdata:get('database.schema',
+        {use_default = true})
+    local skip_names_on_startup = is_startup and schema_compat == '2.11'
 
     -- Names are applied only if they're already in snap file.
     -- Otherwise, master must apply names after box.cfg asynchronously.
@@ -719,11 +722,13 @@ local function set_names_in_background(config, box_cfg)
     -- system space, so it can't have a persistent instance name.
     -- It is never returned by :missing_names().
     local missing_names = configdata:missing_names()
-    if not is_anon and not missing_names._peers[names.instance_name] then
-        box_cfg.instance_name = names.instance_name
-    end
-    if not missing_names[names.replicaset_name] then
-        box_cfg.replicaset_name = names.replicaset_name
+    if not skip_names_on_startup then
+        if not is_anon and not missing_names._peers[names.instance_name] then
+            box_cfg.instance_name = names.instance_name
+        end
+        if not missing_names[names.replicaset_name] then
+            box_cfg.replicaset_name = names.replicaset_name
+        end
     end
     if not missing_names_is_empty(missing_names, names.replicaset_name) then
         if is_startup then

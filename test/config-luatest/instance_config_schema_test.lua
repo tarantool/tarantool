@@ -918,6 +918,7 @@ g.test_database = function()
             txn_synchro_timeout = 5,
             txn_isolation = 'best-effort',
             use_mvcc_engine = true,
+            schema = box.NULL,
         },
     }
     instance_config:validate(iconfig)
