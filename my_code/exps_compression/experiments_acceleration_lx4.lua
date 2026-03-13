@@ -63,14 +63,14 @@ for accel = MIN_ACCEL, MAX_ACCEL do
     
     print(string.format("[RECOVERY] accel = %d", accel))
     run(reco_cmd)
-    local reco_cnd_2 = string.format('du -ha /home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0')
+    local reco_cnd_2 = string.format('du -ha ./build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0')
     print(string.format("[SORTDATA MEMORY USAGE]"))
     run(reco_cnd_2) 
 
 
 
-    local delete_cmd_recovery = string.format('rm -rf /home/sandrech/tarantool/build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0')
-    local delete_cmd_snap = string.format('rm -rf /home/sandrech/tarantool/build/box_snapshot,engine=memtx,index=TREE,nohint=false,sk_count=1,row_count=10000000,column_count=3')
+    local delete_cmd_recovery = string.format('rm -rf ./build/recovery,engine=memtx,index=TREE,nohint=false,sk_count=1,column_count=3,row_count=10000000,wal_row_count=0,wal_replace_count=0')
+    local delete_cmd_snap = string.format('rm -rf ./build/box_snapshot,engine=memtx,index=TREE,nohint=false,sk_count=1,row_count=10000000,column_count=3')
     run(delete_cmd_recovery)
     run(delete_cmd_snap)
 end
