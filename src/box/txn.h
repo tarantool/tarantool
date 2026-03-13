@@ -359,6 +359,7 @@ struct txn_stmt {
 	* Request type - IPROTO type code
 	*/
 	uint16_t type;
+	struct rlist before_commit;
 	/** Commit/rollback triggers associated with this statement. */
 	struct rlist on_commit;
 	struct rlist on_rollback;
@@ -830,10 +831,20 @@ static inline void
 txn_stmt_init_triggers(struct txn_stmt *stmt)
 {
 	if (!stmt->has_triggers) {
+		rlist_create(&stmt->before_commit);
 		rlist_create(&stmt->on_commit);
 		rlist_create(&stmt->on_rollback);
 		stmt->has_triggers = true;
 	}
+}
+
+static inline void
+txn_stmt_before_commit(struct txn_stmt *stmt, struct trigger *trigger)
+{
+	txn_stmt_init_triggers(stmt);
+	/* Statement triggers are private and never have anything to free. */
+	assert(trigger->destroy == NULL);
+	trigger_add(&stmt->before_commit, trigger);
 }
 
 static inline void

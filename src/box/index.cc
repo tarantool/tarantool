@@ -339,7 +339,8 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 	}
 	return 0;
 fail:
-	txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
+	if (in_txn() != NULL)
+		txn_set_flags(in_txn(), TXN_STMT_ROLLBACK);
 	return -1;
 }
 

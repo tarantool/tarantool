@@ -177,6 +177,7 @@ static const struct engine_vtab blackhole_engine_vtab = {
 	/* .free = */ blackhole_engine_free,
 	/* .shutdown = */ generic_engine_shutdown,
 	/* .create_space = */ blackhole_engine_create_space,
+	/* .tuple_validate = */ generic_engine_tuple_validate,
 	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ generic_engine_prepare_join,
 	/* .join = */ generic_engine_join,

@@ -36,6 +36,7 @@
 
 #include "errinj.h"
 #include "fiber.h"
+#include "tuple.h"
 
 struct engine *engines[MAX_ENGINE_COUNT + 1];
 enum recovery_state recovery_state = RECOVERY_NOT_STARTED;
@@ -362,6 +363,14 @@ generic_engine_abort_with_conflict(struct engine *engine, struct txn *txn)
 	(void)engine;
 	(void)txn;
 	unreachable();
+}
+
+int
+generic_engine_tuple_validate(struct engine *engine, struct tuple_format *format,
+			      struct tuple *tuple)
+{
+	(void)engine;
+	return tuple_validate(format, tuple);
 }
 
 int
