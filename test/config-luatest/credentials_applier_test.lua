@@ -965,6 +965,64 @@ g.test_postpone_grants_till_rename = function(g)
         end,
         verify_args = {iconfig},
     })
+
+end
+
+g.test_no_default_privileges = function(g)
+    helpers.success_case(g, {
+        options = {
+            credentials = {
+                users = {
+                    guest = {
+                        roles = { 'super' }
+                    },
+                    with_defaults = {
+                    },
+                    without_defaults = {
+                        no_default = true,
+                    },
+                },
+            },
+        },
+        verify = function()
+            local function has_privilege(user_name, expected,
+                                         object_type, object_name)
+                for _, priv in ipairs(box.schema.user.info(user_name)) do
+                    local perms, obj_type, obj = unpack(priv)
+                    if obj_type == object_type and obj == object_name then
+                        local got = {}
+                        for _, perm in ipairs(perms:split(',')) do
+                            got[perm] = true
+                        end
+                        local ok = true
+                        for _, perm in ipairs(expected) do
+                            if got[perm] ~= true then
+                                ok = false
+                            end
+                        end
+                        if ok then
+                            return true
+                        end
+                    end
+                end
+                return false
+            end
+
+            t.assert(has_privilege('with_defaults', {'execute'}, 'role',
+                                   'public'))
+            t.assert(has_privilege('with_defaults', {'session', 'usage'},
+                                   'universe', ''))
+            t.assert(has_privilege('with_defaults', {'alter'}, 'user',
+                                   'with_defaults'))
+
+            t.assert_not(has_privilege('without_defaults', {'execute'},
+                                       'role', 'public'))
+            t.assert_not(has_privilege('without_defaults',
+                                       {'session', 'usage'}, 'universe', ''))
+            t.assert_not(has_privilege('without_defaults', {'alter'},
+                                       'user', 'without_defaults'))
+        end,
+    })
 end
 
 g.test_lua_eval_lua_call_sql = function()
