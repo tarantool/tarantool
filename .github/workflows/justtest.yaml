@@ -1,0 +1,699 @@
+# The idea of this workflow is to be simple and developer-friendly.
+#
+# You don't have to read all the comments: it is better to just
+# follow the code. The workflow has a lot of remarks regarding
+# a motivation to use this and not that. They're not necessary to
+# understand what is going on.
+#
+# {{{ Design choices
+#
+# Overview
+# ========
+#
+# To achieve the simplicity several choices are made:
+#
+# * Use GitHub hosted runners.
+# * Don't attempt to enhance GitHub Actions.
+# * No secrets or deployments.
+# * No hacks for unusual tests.
+# * Keep all the logic within a single file.
+#
+# However, there are several choices, where a complication is
+# taken as acceptable in the sense that the workflow is still
+# readable without a deep context.
+#
+# * Perform several builds in one workflow.
+# * Split testing to jobs per test suite.
+# * Cache submodules build.
+#
+# Let's look into these points.
+#
+# Self-constraints
+# ================
+#
+# Use GitHub hosted runners
+# -------------------------
+#
+# This way we don't deal with any infrastructural questions here.
+#
+# For example, we don't have to use docker and support our own
+# docker images for testing.
+#
+# Also, actions/checkout needs a couple of hacks to make it
+# working on a self-hosted runner (at least git clean for
+# submodules, fetching tags for submodules, removing lock files
+# left by a previous job).
+#
+# At the same time the GitHub hosted runners provide a good
+# parallelization level (60 jobs in parallel on the Team plan)
+# and we shouldn't experience large delays during development.
+#
+# At least, if we experience delays with a basic testing on
+# this amount of parallel jobs, we should consider to reduce
+# workloads.
+#
+# Don't attempt to enhance GitHub Actions
+# ---------------------------------------
+#
+# There are things that are not supported by GitHub Actions
+# natively, but technically possible to implement on top of it.
+# We don't do that here.
+#
+# For example:
+#
+# - Cancel in-progress jobs on a new push to a non-release
+#   branch.
+# - Skip jobs on a push to a fork.
+# - Skip some jobs depending on pull request labels.
+#
+# No secrets or deployments
+# -------------------------
+#
+# In particular, no Telegram/VK Teams notifications.
+#
+# This way we don't have to bother about forks, where the
+# secrets are not available. The workflow just works in the
+# upstream and in the fork and that's nice.
+#
+# We have less security questions to consider.
+#
+# Everything that we want to achieve here is to verify
+# correctness of the code on the given commit. Deployment jobs
+# need to give a special care about build dependencies,
+# generated versions (sometimes even for submodules) and other
+# aspects of reproducible-to-some-extent builds. We don't do
+# that here.
+#
+# No hacks for unusual tests
+# --------------------------
+#
+# If a test requires a special setup, it is likely not to be run
+# here. Instead of extra complication of this workflow, consider
+# creating a separate one with a needed setup.
+#
+# Keep all the logic within a single file
+# ---------------------------------------
+#
+# The testing steps should be simple enough to feel like a shell
+# script. Once we experience a need to hide some logic behind an
+# our own action or a reusable workflow, we likely
+# overcomplicate the logic and splitting it doesn't really help
+# with understanding.
+#
+# Also, don't make this action reusable, because it also means
+# splitting the logic: we inject some steps here that are needed
+# for the outside workflow.
+#
+# Deliberate complications
+# ========================
+#
+# Perform several builds in one workflow
+# --------------------------------------
+#
+# It seems that it doesn't complicate things too much.
+#
+# Split testing to jobs per test suite
+# ------------------------------------
+#
+# At first, it allows to restart a smaller piece of the workload
+# if an unstable test failed.
+#
+# Next, it allows to achieve larger parallelization level and
+# the feedback from CI is faster this way.
+#
+# Cache submodules build
+# ----------------------
+#
+# It is too attractive to have such a fast build. We use the
+# submodule hash to don't rebuild it each time.
+#
+# }}} Design choices
+#
+# TODO
+# ====
+#
+# This workflow is not ready to replace existing workflows that
+# perform the same build types. The reason is that
+# tarantool/luajit uses the existing workflows as reusable ones.
+
+name: justtest
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # {{{ Build configurations
+
+    strategy:
+      matrix:
+        build-conf:
+          # TODO: Do we really need to run all the tests on the
+          # debug and release builds?
+          #
+          # First, there are tests that uses error injections,
+          # which are only available on the debug build.
+          #
+          # Second, the debug build has assertions enabled, so it
+          # can spot a problem that passes unseen on the release
+          # build.
+          #
+          # Third, the debug build has Lua's strict mode enabled
+          # by default.
+          #
+          # OTOH, the release build is what a customer typically
+          # uses, so it is the primary target. It feels
+          # counter-intuitive to verify the primary target with
+          # less tests that the additional targets.
+          #
+          # However, a release deployment job anyway performs the
+          # release build and it is different from this one in
+          # fact (at least the dependencies are linked statically
+          # and a specific building container is used). So, maybe,
+          # it is better to concentrate on developer needs in this
+          # workflow and reduce testing on the release build?
+          - debug
+          - release
+          # The idea is to verify that tarantool compiles with
+          # clang. At first, it is a code health check. And next,
+          # some developers use it.
+          #
+          # clang is known for its good analysis and warnings
+          # regarding potentially problematic code, but some of
+          # these nice linter capacities need analysis passes that
+          # are run on -O2, but not -O0. This way we can only get
+          # these warnings on RelWithDebInfo, but not on Debug.
+          #
+          # Seems like there is no reason to additionally verify
+          # the Debug build on clang.
+          #
+          # TODO: Whether we have to run all the tests with the
+          # clang build?
+          - clang
+
+        # Define cmake-build-type.
+        include:
+          - build-conf: debug
+            cmake-build-type: Debug
+          - build-conf: release
+            cmake-build-type: RelWithDebInfo
+          - build-conf: clang
+            cmake-build-type: RelWithDebInfo
+
+    # }}} Build configurations
+
+    steps:
+      # {{{ Install build dependencies
+
+      # Disable man-db triggers. They're executed after each
+      # $(apt-get install <...>) call and it sometimes takes
+      # about a minute.
+      #
+      # https://github.com/actions/runner-images/issues/10977
+      # https://stackoverflow.com/a/77841777/1598057
+      - name: Disable man-db triggers
+        run: |
+          echo "set man-db/auto-update false" | sudo debconf-communicate
+          sudo dpkg-reconfigure man-db
+
+      - name: Install build dependencies
+        run: sudo apt-get install libreadline-dev
+
+      - name: Setup clang
+        if: ${{ matrix.build-conf == 'clang' }}
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 19
+          echo CC=clang-19 >> ${GITHUB_ENV}
+          echo CXX=clang++-19 >> ${GITHUB_ENV}
+
+      # }}} Install build dependencies
+
+      # {{{ Clone repository (with caching)
+
+      - name: Checkout repository (shallow, no submodules)
+        uses: actions/checkout@v4
+        with:
+          # The repository and its submodules are public and
+          # accessible without authorization.
+          #
+          # We don't need to persist any tokens. Let's don't do
+          # that to reduce the security risk to accidentally share
+          # the token (for example, with actions/upload-artifact).
+          #
+          # https://github.com/actions/checkout/issues/485
+          persist-credentials: false
+
+      # Collect submodules information before fetching them.
+      #
+      # Outputs:
+      #
+      # * paths -- a newline separated list of submodule paths.
+      # * hash -- a hashsum of all submodule commit IDs.
+      - name: Extract submodules information
+        id: submodules-info
+        run: |
+          submodules() { sed -n 's/\s*path\s*=\s*\(\S*\)$/\1/p' .gitmodules; }
+          commit_id() { git ls-tree --object-only HEAD "$1"; }
+
+          {
+              echo 'paths<<EOF'
+              submodules
+              echo EOF
+          } >> $GITHUB_OUTPUT
+
+          for path in $(submodules); do
+              echo "${path}=$(commit_id ${path})"
+          done | md5sum - | awk '{ print "hash="$1; }' >> $GITHUB_OUTPUT
+
+      # Restore the submodule from the cache if possible.
+      #
+      # Points regarding the cache key:
+      #
+      # * Deduced from submodules commit IDs.
+      # * Contains the build configuration name, because the cache
+      #   includes the built libraries.
+      # * Has -v1 suffix.
+      #
+      # The suffix is to be bumped if something outside of the
+      # submodule that affects the build of the submodule is
+      # changed (say, a configuration option in the given build
+      # type or an option passed to ExternalProject_Add)
+      #
+      # The cache contains the sources, the object files and the
+      # libraries. It would be nice to cache just static libraries
+      # to reduce the cache file size, but I've met a couple of
+      # problems on this road:
+      #
+      # * The incremental build machinery needs all the
+      #   intermediate files (autotools generated files, object
+      #   files) to ensure that the libraries are built after the
+      #   given sources, at least for libunwind.
+      # * Even if all the intermediate files are here, the files
+      #   from the cache have the modification time in the past
+      #   (it is preserved by caching) and the freshly cloned
+      #   source files are newer than them.
+      #
+      # While the cache is about tens of megabytes, it seems OK
+      # to just cache the sources, the object files and the
+      # resulting libraries all together.
+      - name: Restore submodules from cache (with build objects)
+        id: restore-submodules-from-cache
+        uses: actions/cache@v4
+        with:
+          key: submodules-${{ steps.submodules-info.outputs.hash }}-${{ matrix.build-conf }}-v1
+          path: |
+            ${{ steps.submodules-info.outputs.paths }}
+            build/libyaml
+            build/curl
+            build/ares
+            build/nghttp2
+
+      # If the submodules cache is not found, just fetch them all
+      # from the git repositories.
+      - name: Checkout the submodules (shallow clone)
+        if: steps.restore-submodules-from-cache.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --recursive --depth 1 --jobs 8
+
+      # This little adjustment allows to perform a shallow clone
+      # of the LuaJIT submodule.
+      - name: Strip $(git describe) call from LuaJIT build script
+        if: steps.restore-submodules-from-cache.outputs.cache-hit != 'true'
+        run: |
+          rm third_party/luajit/.git
+          sed -i -e 's/CMAKE_SOURCE_DIR/PROJECT_SOURCE_DIR/' third_party/luajit/cmake/SetVersion.cmake
+
+      # }}} Clone repository (with caching)
+
+      # {{{ Configure and build
+
+      # -DTARANTOOL_VERSION=<...>
+      #
+      # Hardcode a fake tarantool version (but with the real git
+      # commit hash).
+      #
+      # The $(git describe --long HEAD) information is not
+      # available, because a shallow clone is performed above. It
+      # is to speed up the job.
+      #
+      # We anyway don't deploy this build to anywhere, it is
+      # needed only to run tests.
+      #
+      # -DCMAKE_BUILD_TYPE=<...>
+      # ------------------------
+      #
+      # Depends on the requested build type: Debug or
+      # RelWithDebInfo.
+      #
+      # -DENABLE_WERROR=ON
+      # ------------------
+      #
+      # Fail the build on a compiler warning regarding the
+      # tarantool source code (adds -Werror compiler flag).
+      # Not sure about compiler flags for submodules.
+      #
+      # -DTEST_BUILD=ON
+      # ---------------
+      #
+      # Shouldn't be used in any build deployed to the outside.
+      # Simplifies detecting various incorrect situations in
+      # testing. Enables a few additional tests. Doesn't depend
+      # from the build type option.
+      #
+      # * Set default timeout of iproto graceful shutdown to
+      #   infinity (see box.cc for details).
+      # * Abort on a memory leak detected on the fiber GC region.
+      # * Set 0.01 seconds sleep in the synchronous queue worker
+      #   fiber instead of 1 second.
+      # * Set `require('tarantool').build.test_build` to `true`.
+      # * Add ER_TEST_* error codes to box error and corresponding
+      #   test cases.
+      - name: Configure tarantool build
+        run: |
+          COMMIT_ID=$(git rev-parse --short HEAD)
+          cmake .                                                   \
+            -DTARANTOOL_VERSION=3.9.9-entrypoint-9-g${COMMIT_ID}    \
+            -DCMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}       \
+            -DENABLE_WERROR=ON                                      \
+            -DTEST_BUILD=ON
+
+      # The *-deps targets are needed to build libraries for
+      # luajit-test jobs.
+      - name: Build tarantool and test files
+        run: |
+          make -j $(nproc)             \
+            all                        \
+            lua-Harness-tests-deps     \
+            LuaJIT-tests-deps          \
+            PUC-Rio-Lua-5.1-tests-deps \
+            tarantool-c-tests-deps     \
+            tarantool-tests-deps
+
+      # }}} Configure and build
+
+      # {{{ Run unit tests
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: test-run/requirements.txt
+
+      - name: Setup testing dependencies
+        run: pip install -r test-run/requirements.txt
+
+      # Testing executables in test/unit takes 600-700 MiB size in
+      # sum (some executables are 30-47 MiB depending of the build
+      # type). The compressed artifact is 250-300 MiB. If we're
+      # going to execute these tests in a separate job, uploading
+      # such an artifact would take ~25 seconds. Running these
+      # tests is 5-15 second. Let's just run them here.
+      #
+      # We can also consider it as a kind of a smoke test to
+      # execute before creating a lot of jobs with the remaining
+      # test suites.
+      - name: Run unit/*
+        run: ./test/test-run.py unit/
+
+      # }}} Run unit tests
+
+      # {{{ Upload build artifacts for testing jobs
+
+      # Upload build artifacts
+      #
+      # * Tarantool executable
+      # * Test files
+      # * LuaJIT test files
+      #
+      # LuaJIT test files
+      # -----------------
+      #
+      # Files needed for LuaJIT testing and unit test executables.
+      #
+      # - CTestTestfile.cmake contains a list of tests for ctest
+      # - *.so are used in some tests written on Lua
+      # - *.c_test are the unit test executables (tarantool-c test
+      #   suite)
+      #
+      # CTest needs CTestTestfile.cmake in the root directory: it
+      # doesn't search these files in descendant directories. So,
+      # we need to copy the root CTestTestfile.cmake, which
+      # includes one in third_party/luajit, which includes one in
+      # third_party/luajit/test, which includes test suite
+      # specific CTestTestfile.cmake files.
+      #
+      # Luckily, CTest ignores includes of directories, where the
+      # CTestTestfile.cmake is absent. So, we can just copy the
+      # whole chain of these files from the root to the directory
+      # with tests we want to run.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.build-conf }}
+          path: |
+            src/tarantool
+            test/**/*.so
+            src/lib/small/test/*.test
+            CTestTestfile.cmake
+            third_party/luajit/CTestTestfile.cmake
+            third_party/luajit/test/**/CTestTestfile.cmake
+            third_party/luajit/test/**/*.so
+            third_party/luajit/test/*/*.c_test
+            VERSION
+
+      # }}} Upload build artifacts for testing jobs
+
+  # {{{ Run tarantool testing (in separate jobs)
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      matrix:
+        build-conf:
+          - debug
+          - release
+          - clang
+
+        # Note: unit/ test suite is run during the build.
+        #
+        # TODO: Drop engine_long when gh-11043 lands.
+        test_suite:
+          - app
+          - app-luatest
+          - app-tap
+          - box
+          - box-luatest
+          - box-py
+          - box-tap
+          - config-luatest
+          - engine
+          - engine_long
+          - engine-luatest
+          - engine-tap
+          - metrics-luatest
+          - replication
+          - replication-luatest
+          - replication-py
+          - small
+          - sql
+          - sql-luatest
+          - sql-tap
+          - swim
+          - vinyl
+          - vinyl-luatest
+          - wal_off
+          - xlog
+          - xlog-py
+
+    steps:
+      # We only need the test/ directory and some submodules.
+      #
+      # actions/checkout has no option to select submodules to
+      # fetch, so perform clone without submodules and fetch them
+      # in the next step.
+      #
+      # We don't need the commit history, so a shallow clone is
+      # OK.
+      - name: Checkout repository (shallow clone, no submodules)
+        uses: actions/checkout@v4
+        with:
+          # See actions/checkout step in the build job above.
+          persist-credentials: false
+
+      # test-run is needed, because it is the test runner we're
+      # using.
+      #
+      # checks and metrics are needed, because we run tests from
+      # these submodules as part of tarantool's test suite.
+      - name: Checkout test-run, checks and metrics submodules
+        run: |
+          git submodule update --init --recursive \
+            test-run                              \
+            third_party/checks                    \
+            third_party/metrics
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.build-conf }}
+
+      - name: Restore executable bits
+        run: chmod a+x src/tarantool src/lib/small/test/*.test
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: test-run/requirements.txt
+
+      - name: Setup testing dependencies
+        run: pip install -r test-run/requirements.txt
+
+      # --retry
+      # -------
+      #
+      # Zero tolerance about unstable tests would be nice, but it
+      # doesn't work good for us, at least for now.
+      #
+      # A developer who mets the flaky failure is not necessarily
+      # one who is responsible for the given subsystem. So, he/she
+      # reports the unstable test and restarts the job. It takes
+      # some human attention and time, so we're interested in
+      # minimizing such situations.
+      #
+      # Even if an author of the test mets the unstable failure,
+      # he/she may have other ongoing work now. It is often not OK
+      # to stop everything, lost needed context from the head and
+      # work on fixing the test or a problem in tarantool that it
+      # reveals.
+      #
+      # In short, a flaky problem in one subsystem shouldn't block
+      # the development of other subsystems.
+      #
+      # This way we add some tolerance for unstable tests using
+      # the --retry option.
+      #
+      # --long
+      # ------
+      #
+      # Run all the tests, including ones that are marked as long.
+      #
+      # TODO: Drop --long when gh-11043 lands.
+      - name: Run ${{ matrix.test_suite }}/*
+        run: ./test/test-run.py --retries 3 ${{ matrix.test_suite }}/ --long
+
+  # }}} Run tarantool testing (in separate jobs)
+
+  # {{{ Run LuaJIT testing (in separate jobs)
+
+  luajit-test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    strategy:
+      matrix:
+        build-conf:
+          - debug
+          - release
+          - clang
+
+        test_suite:
+          - lua-Harness
+          - LuaJIT
+          - PUC-Rio-Lua-5.1
+          - tarantool-c
+          - tarantool
+
+    steps:
+      # We only need the third_party/luajit/test directory from
+      # the third_party/luajit submodule.
+      #
+      # actions/checkout has no option to select submodules to
+      # fetch, so perform clone without submodules and fetch
+      # luajit in the next step.
+      #
+      # We don't need the commit history, so a shallow clone is
+      # OK.
+      - name: Checkout repository (shallow clone)
+        uses: actions/checkout@v4
+        with:
+          # See actions/checkout step in the build job above.
+          persist-credentials: false
+
+      - name: Checkout luajit submodule
+        run: git submodule update --init --recursive third_party/luajit
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.build-conf }}
+
+      - name: Restore executable bits
+        run: chmod a+x src/tarantool third_party/luajit/test/*/*.c_test
+
+      # Normally the directory is created by CMake, but since we
+      # split the build and the testing phases, we have to do it
+      # by ourself.
+      #
+      # See also the '-E <...>-test-deps' CTest option below.
+      - name: Prepare for PUC-Rio-Lua-5.1
+        run: mkdir third_party/luajit/test/PUC-Rio-Lua-5.1-tests/libs/P1
+        if: ${{ matrix.test_suite == 'PUC-Rio-Lua-5.1' }}
+
+      # -VV
+      # ---
+      #
+      # More verbose output.
+      #
+      # --no-tests=error
+      # ----------------
+      #
+      # It is definitely an error in our case if there are no
+      # tests. Likely the build artifact is broken.
+      #
+      # --output-on-failure
+      # -------------------
+      #
+      # CMake doesn't give any details about failed tests by
+      # default. It does with the flag.
+      #
+      # -j $(nproc)
+      # -----------
+      #
+      # Parallelize the testing to make it faster.
+      #
+      # -L <...>-tests
+      # --------------
+      #
+      # Run tests labeled with the given label (it is a test suite
+      # name in our case).
+      #
+      # -E <...>-tests-deps
+      # -------------------
+      #
+      # Running the <...>-tests-deps pseudo-test leads to the
+      # following error (at least on the tarantool-c test suite):
+      #
+      # > Error: could not load cache
+      #
+      # It seems that not all actions that CTest performs using
+      # CMake are available if we split the build and the testing
+      # phases.
+      #
+      # The option excludes the <...>-test-deps pseudo-test.
+      - name: Run ${{ matrix.test_suite }}/*
+        run: |
+          ctest -VV                           \
+            --no-tests=error                  \
+            --output-on-failure               \
+            -j $(nproc)                       \
+            -L ${{ matrix.test_suite }}-tests \
+            -E ${{ matrix.test_suite }}-tests-deps
+
+  # }}} Run LuaJIT testing (in separate jobs)
