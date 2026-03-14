@@ -14,7 +14,7 @@ package.loaded['http.client'] = {
 }
 local driver = package.loaded['http.client'] -- luacheck: no unused
 
-local httpc = require("src.lua.httpc")
+local httpc = require("test.app-luatest.httpc")
 local encode_body = httpc._internal.encode_body
 local decode_body = httpc._internal.decode_body
 local extract_mime_type = httpc._internal.extract_mime_type
