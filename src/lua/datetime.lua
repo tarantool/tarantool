@@ -543,6 +543,33 @@ local function extract_obj_hms(obj)
     return h, m, s, hms
 end
 
+-- Returns nsec if obj.nsec or obj.usec or obj.msec is defined.
+-- Returns nil if not.
+local function extract_obj_nsec(obj)
+    local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
+    local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
+                       bool2int(msec ~= nil)
+    if count_usec > 0 then
+        if count_usec > 1 then
+            error('only one of nsec, usec or msecs may be defined '..
+                  'simultaneously', 3)
+        end
+        if usec ~= nil then
+            check_range(usec, 0, 1e6, 'usec', nil, 1)
+            check_integer(usec, 'usec', 1)
+            nsec = usec * 1e3
+        elseif msec ~= nil then
+            check_range(msec, 0, 1e3, 'msec', nil, 1)
+            check_integer(msec, 'msec', 1)
+            nsec = msec * 1e6
+        else
+            check_range(nsec, 0, 1e9, 'nsec', nil, 1)
+            check_integer(nsec, 'nsec', 1)
+        end
+    end
+    return nsec
+end
+
 local function get_timezone(offset, msg)
     if type(offset) == 'number' then
         check_integer(offset, 'tzoffset')
@@ -564,32 +591,10 @@ local function datetime_new(obj)
 
     local y, M, d, ymd = extract_obj_ymd(obj)
     local h, m, s, hms = extract_obj_hms(obj)
+    local nsec = extract_obj_nsec(obj)
 
     local dt = DAYS_EPOCH_OFFSET
 
-    local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
-    local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
-                       bool2int(msec ~= nil)
-    if count_usec > 0 then
-        if count_usec > 1 then
-            error('only one of nsec, usec or msecs may be defined '..
-                  'simultaneously', 2)
-        end
-        if usec ~= nil then
-            check_range(usec, 0, 1e6, 'usec')
-            check_integer(usec, 'usec')
-            nsec = usec * 1e3
-        elseif msec ~= nil then
-            check_range(msec, 0, 1e3, 'msec')
-            check_integer(msec, 'msec')
-            nsec = msec * 1e6
-        else
-            check_range(nsec, 0, 1e9, 'nsec')
-            check_integer(nsec, 'nsec')
-        end
-    else
-        nsec = 0
-    end
     local ts = obj.timestamp
     if ts ~= nil then
         if ymd then
@@ -612,7 +617,7 @@ local function datetime_new(obj)
         end
         -- if there are separate nsec, usec, or msec provided then
         -- timestamp should be integer
-        if count_usec == 0 then
+        if nsec == nil then
             nsec = fraction * 1e9
         elseif fraction ~= 0 then
             error('only integer values allowed in timestamp '..
@@ -620,6 +625,7 @@ local function datetime_new(obj)
         end
         hms = true
     end
+    nsec = nsec or 0
 
     local offset = obj.tzoffset
     if offset ~= nil then
@@ -1036,6 +1042,7 @@ function datetime_set(self, obj)
 
     local y, M, d, ymd = extract_obj_ymd(obj)
     local h, m, s, hms = extract_obj_hms(obj)
+    local nsec = extract_obj_nsec(obj)
 
     local dt = local_dt(self)
     local y0 = ffi.new('int[1]')
@@ -1048,29 +1055,6 @@ function datetime_set(self, obj)
     local h0 = math_floor(lsecs / (60 * 60)) % 24
     local m0 = math_floor(lsecs / 60) % 60
     local s0 = lsecs % 60
-
-    local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
-    local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
-                       bool2int(msec ~= nil)
-    if count_usec > 0 then
-        if count_usec > 1 then
-            error('only one of nsec, usec or msecs may be defined '..
-                  'simultaneously', 2)
-        end
-        if usec ~= nil then
-            check_range(usec, 0, 1e6, 'usec')
-            check_integer(usec, 'usec')
-            self.nsec = usec * 1e3
-        elseif msec ~= nil then
-            check_range(msec, 0, 1e3, 'msec')
-            check_integer(msec, 'msec')
-            self.nsec = msec * 1e6
-        elseif nsec ~= nil then
-            check_range(nsec, 0, 1e9, 'nsec')
-            check_integer(nsec, 'nsec')
-            self.nsec = nsec
-        end
-    end
 
     local offset = obj.tzoffset
     if offset ~= nil then
@@ -1101,19 +1085,13 @@ function datetime_set(self, obj)
         -- if there is one of nsec, usec, msec provided
         -- then ignore fraction in timestamp
         -- otherwise - use nsec, usec, or msec
-        if count_usec == 0 then
+        if nsec == nil then
             nsec = fraction * 1e9
         elseif fraction ~= 0 then
             error('only integer values allowed in timestamp '..
                   'if nsec, usec, or msecs provided', 2)
         end
 
-        if msec ~= nil then
-            nsec = msec * 1e6
-        end
-        if usec ~= nil then
-            nsec = usec * 1e3
-        end
         if tzname ~= nil then
             offset, self.tzindex = parse_tzname(sec_int, tzname)
         end
@@ -1143,6 +1121,7 @@ function datetime_set(self, obj)
 
     -- denormalize back to local timezone
     time_localize(self, offset)
+    self.nsec = nsec or self.nsec
 
     return self
 end
