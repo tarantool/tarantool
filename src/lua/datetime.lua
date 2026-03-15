@@ -235,13 +235,14 @@ local function check_str(s, message)
     end
 end
 
-local function check_integer(v, message)
+local function check_integer(v, message, error_level_up)
+    error_level_up = error_level_up or 0
     if v == nil then
         return
     end
     if type(v) ~= 'number' or v % 1 ~= 0 then
         error(('%s: integer value expected, but received %s'):
-              format(message, type(v)), 4)
+              format(message, type(v)), 4 + error_level_up)
     end
 end
 
@@ -255,20 +256,21 @@ end
 -- range may be of a form of pair {from, to} or
 -- tuple {from, to, -1 in extra}
 -- -1 is a special value (so far) used for days only
-local function check_range(v, from, to, txt, extra)
+local function check_range(v, from, to, txt, extra, error_level_up)
+    error_level_up = error_level_up or 0
     if type(v) ~= 'number' then
         error(('numeric value expected, but received %s'):
-              format(type(v)), 3)
+              format(type(v)), 3 + error_level_up)
     end
     if extra == v or (v >= from and v <= to) then
         return
     end
     if extra == nil then
         error(('value %d of %s is out of allowed range [%d, %d]'):
-              format(v, txt, from, to), 3)
+              format(v, txt, from, to), 3 + error_level_up)
     else
         error(('value %d of %s is out of allowed range [%d, %d..%d]'):
-              format(v, txt, extra, from, to), 3)
+              format(v, txt, extra, from, to), 3 + error_level_up)
     end
 end
 
@@ -502,6 +504,46 @@ local function datetime_new_dt(dt, secs, nanosecs, offset, tzindex)
                             offset, tzindex)
 end
 
+local function extract_obj_ymd(obj)
+    local y, M, d, ymd = obj.year, obj.month, obj.day, false
+    if y ~= nil then
+        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year', nil, 1)
+        check_integer(y, 'year', 1)
+        ymd = true
+    end
+    if M ~= nil then
+        check_range(M, 1, 12, 'month', nil, 1)
+        check_integer(M, 'month', 1)
+        ymd = true
+    end
+    if d ~= nil then
+        check_range(d, 1, 31, 'day', -1, 1)
+        check_integer(d, 'day', 1)
+        ymd = true
+    end
+    return y, M, d, ymd
+end
+
+local function extract_obj_hms(obj)
+    local h, m, s, hms = obj.hour, obj.min, obj.sec, false
+    if h ~= nil then
+        check_range(h, 0, 23, 'hour', nil, 1)
+        check_integer(h, 'hour', 1)
+        hms = true
+    end
+    if m ~= nil then
+        check_range(m, 0, 59, 'min', nil, 1)
+        check_integer(m, 'min', 1)
+        hms = true
+    end
+    if s ~= nil then
+        check_range(s, 0, 60, 'sec', nil, 1)
+        check_integer(s, 'sec', 1)
+        hms = true
+    end
+    return h, m, s, hms
+end
+
 local function get_timezone(offset, msg)
     if type(offset) == 'number' then
         check_integer(offset, 'tzoffset')
@@ -514,53 +556,17 @@ local function get_timezone(offset, msg)
     end
 end
 
--- create datetime given attribute values from obj
+-- Create datetime given attribute values from obj.
 local function datetime_new(obj)
     if obj == nil then
         return datetime_new_raw(0, 0, 0, 0)
     end
     check_table(obj, 'datetime.new()')
 
-    local ymd = false
-    local hms = false
-    local dt = DAYS_EPOCH_OFFSET
+    local y, M, d, ymd = extract_obj_ymd(obj)
+    local h, m, s, hms = extract_obj_hms(obj)
 
-    local y = obj.year
-    if y ~= nil then
-        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year')
-        check_integer(y, 'year')
-        ymd = true
-    end
-    local M = obj.month
-    if M ~= nil then
-        check_range(M, 1, 12, 'month')
-        check_integer(M, 'month')
-        ymd = true
-    end
-    local d = obj.day
-    if d ~= nil then
-        check_range(d, 1, 31, 'day', -1)
-        check_integer(d, 'day')
-        ymd = true
-    end
-    local h = obj.hour
-    if h ~= nil then
-        check_range(h, 0, 23, 'hour')
-        check_integer(h, 'hour')
-        hms = true
-    end
-    local m = obj.min
-    if m ~= nil then
-        check_range(m, 0, 59, 'min')
-        check_integer(m, 'min')
-        hms = true
-    end
-    local s = obj.sec
-    if s ~= nil then
-        check_range(s, 0, 60, 'sec')
-        check_integer(s, 'sec')
-        hms = true
-    end
+    local dt = DAYS_EPOCH_OFFSET
 
     local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
     local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
@@ -1029,8 +1035,8 @@ function datetime_set(self, obj)
     check_date(self, 'datetime.set()')
     check_table(obj, "datetime.set()")
 
-    local ymd = false
-    local hms = false
+    local y, M, d, ymd = extract_obj_ymd(obj)
+    local h, m, s, hms = extract_obj_hms(obj)
 
     local dt = local_dt(self)
     local y0 = ffi.new('int[1]')
@@ -1039,48 +1045,10 @@ function datetime_set(self, obj)
     builtin.tnt_dt_to_ymd(dt, y0, M0, d0)
     y0, M0, d0 = y0[0], M0[0], d0[0]
 
-    local y = obj.year
-    if y ~= nil then
-        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year')
-        check_integer(y, 'year')
-        ymd = true
-    end
-    local M = obj.month
-    if M ~= nil then
-        check_range(M, 1, 12, 'month')
-        check_integer(M, 'month')
-        ymd = true
-    end
-    local d = obj.day
-    if d ~= nil then
-        check_range(d, 1, 31, 'day', -1)
-        check_integer(d, 'day')
-        ymd = true
-    end
-
     local lsecs = local_secs(self)
     local h0 = math_floor(lsecs / (60 * 60)) % 24
     local m0 = math_floor(lsecs / 60) % 60
-    local sec0 = lsecs % 60
-
-    local h = obj.hour
-    if h ~= nil then
-        check_range(h, 0, 23, 'hour')
-        check_integer(h, 'hour')
-        hms = true
-    end
-    local m = obj.min
-    if m ~= nil then
-        check_range(m, 0, 59, 'min')
-        check_integer(m, 'min')
-        hms = true
-    end
-    local sec = obj.sec
-    if sec ~= nil then
-        check_range(sec, 0, 60, 'sec')
-        check_integer(sec, 'sec')
-        hms = true
-    end
+    local s0 = lsecs % 60
 
     local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
     local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
@@ -1162,10 +1130,7 @@ function datetime_set(self, obj)
 
     -- .year, .month, .day
     if ymd then
-        y = y or y0
-        M = M or M0
-        d = d or d0
-        datetime_ymd_update(self, y, M, d)
+        datetime_ymd_update(self, y or y0, M or M0, d or d0)
     end
 
     if tzname ~= nil then
@@ -1174,7 +1139,7 @@ function datetime_set(self, obj)
 
     -- .hour, .minute, .second
     if hms then
-        datetime_hms_update(self, h or h0, m or m0, sec or sec0)
+        datetime_hms_update(self, h or h0, m or m0, s or s0)
     end
 
     -- denormalize back to local timezone
