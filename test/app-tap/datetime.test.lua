@@ -2829,7 +2829,7 @@ test:test('totable() with timezone', function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(16)
+    test:plan(17)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -2863,6 +2863,8 @@ test:test("Time :set{} operations", function(test)
             '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+    test:is(tostring(ts:set{timestamp = 1630359071}),
+            '2021-08-30T21:31:11+0800', 'int timestamp zeroes nsec')
     test:is(tostring(ts:set{timestamp = -0.1}),
             '1969-12-31T23:59:59.900+0800', 'negative timestamp')
 end)
