@@ -143,7 +143,7 @@ local sequences = {
         { ['p obj'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
         { ['n'] = '' },
         { ['p ymd'] = 'ymd => false' },
-        { ['w'] = 'local hms = false' },
+        { ['w 0'] = 'local h, m, s, hms = extract_obj_hms(obj)' },
         { ['bogus;'] = 'is not recognized.' },
         { ['h'] = '' },
         { ['t'] = '=> builtin/datetime.lua' },
