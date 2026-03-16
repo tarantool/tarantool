@@ -274,7 +274,17 @@ local function check_range(v, from, to, txt, extra, error_level_up)
     end
 end
 
-local function dt_from_ymd_checked(y, M, d)
+local function dt_from_ymd(y, M, d)
+    if d < 0 then
+        d = builtin.tnt_dt_days_in_month(y, M)
+    elseif d > 28 then
+        local day_in_month = builtin.tnt_dt_days_in_month(y, M)
+        if d > day_in_month then
+            error(('invalid number of days %d in month %d for %d'):
+                  format(d, M, y), 4)
+        end
+    end
+
     local pdt = date_dt_stash_take()
     local is_valid = builtin.tnt_dt_from_ymd_checked(y, M, d, pdt)
     if not is_valid then
@@ -656,19 +666,7 @@ local function datetime_new(obj)
 
     -- .year, .month, .day
     if ymd then
-        y = y or 1970
-        M = M or 1
-        d = d or 1
-        if d < 0 then
-            d = builtin.tnt_dt_days_in_month(y, M)
-        elseif d > 28 then
-            local day_in_month = builtin.tnt_dt_days_in_month(y, M)
-            if d > day_in_month then
-                error(('invalid number of days %d in month %d for %d'):
-                    format(d, M, y), 3)
-            end
-        end
-        dt = dt_from_ymd_checked(y, M, d)
+        dt = dt_from_ymd(y or 1970, M or 1, d or 1)
     end
 
     local tzindex = 0
@@ -1036,16 +1034,7 @@ local function datetime_update_dt(self, dt)
 end
 
 local function datetime_ymd_update(self, y, M, d)
-    if d < 0 then
-        d = builtin.tnt_dt_days_in_month(y, M)
-    elseif d > 28 then
-        local day_in_month = builtin.tnt_dt_days_in_month(y, M)
-        if d > day_in_month then
-            error(('invalid number of days %d in month %d for %d'):
-                  format(d, M, y), 3)
-        end
-    end
-    local dt = dt_from_ymd_checked(y, M, d)
+    local dt = dt_from_ymd(y, M, d)
     datetime_update_dt(self, dt)
 end
 
