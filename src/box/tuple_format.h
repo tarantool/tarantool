@@ -314,6 +314,11 @@ struct tuple_format {
 	char *data;
 	/** Length of MsgPack encoding. */
 	size_t data_len;
+	/**
+	 * Thread that created this tuple format. Only the thread that created
+	 * a format may use it for creating and destroying tuples.
+	 */
+	struct cord *owner;
 };
 
 /**
@@ -360,19 +365,26 @@ tuple_format_field(struct tuple_format *format, uint32_t fieldno)
 	return tuple_format_field_by_path(format, fieldno, NULL, 0, 0);
 }
 
-extern struct tuple_format *tuple_formats[];
+/** Global table of tuple formats. */
+extern __thread struct tuple_format **tuple_formats;
+
+/** Set if the tuple format table was inherited from another thread. */
+extern __thread bool tuple_formats_inherited;
 
 static inline uint32_t
 tuple_format_id(struct tuple_format *format)
 {
 	assert(tuple_formats[format->id] == format);
+	assert(tuple_formats_inherited || format->owner == cord());
 	return format->id;
 }
 
 static inline struct tuple_format *
 tuple_format_by_id(uint32_t tuple_format_id)
 {
-	return tuple_formats[tuple_format_id];
+	struct tuple_format *format = tuple_formats[tuple_format_id];
+	assert(tuple_formats_inherited || format->owner == cord());
+	return format;
 }
 
 /** Delete a format with zero ref count. */
@@ -382,6 +394,7 @@ tuple_format_delete(struct tuple_format *format);
 static inline void
 tuple_format_ref(struct tuple_format *format)
 {
+	assert(format->owner == cord());
 	assert((uint64_t)format->refs + 1 <= FORMAT_REF_MAX);
 	format->refs++;
 }
@@ -389,6 +402,7 @@ tuple_format_ref(struct tuple_format *format)
 static inline void
 tuple_format_unref(struct tuple_format *format)
 {
+	assert(format->owner == cord());
 	assert(format->refs >= 1);
 	if (--format->refs == 0)
 		tuple_format_delete(format);
@@ -557,6 +571,24 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
  */
 void
 tuple_format_init();
+
+/**
+ * Inherit a tuple format table from another thread.
+ *
+ * The tuple format table is thread-local and normally a thread may only
+ * access tuple formats that were created by it. However, sometimes its
+ * useful to access tuple formats created by another thread, for example,
+ * to sort tuples in helper threads. To let it happen, a thread is supposed
+ * to call tuple_formats_inherit() instead of tuple_format_init() passing
+ * a pointer to the tuple format table from another thread. A thread that
+ * inherited tuple formats may lookup a tuple format by id but it may not
+ * create, destroy, reference, or unreference tuple formats (asserted). In
+ * particular, this means that it may not create or destroy tuples. The main
+ * thread must ensure that formats that can be used by an inheriting thread
+ * will not be freed.
+ */
+void
+tuple_formats_inherit(struct tuple_format **formats);
 
 
 /** Tuple format iterator flags to configure parse mode. */

@@ -38,6 +38,10 @@ struct sort_data {
 	tt_sort_compare_f cmp;
 	/** Extra argument for `cmp` function. */
 	void *cmp_arg;
+	/** Function for sorter thread initialization. */
+	tt_sort_init_f init;
+	/** Extra argument for `init` function. */
+	void *init_arg;
 	/**
 	 * Number of threads to run sort on. It is equal to number of
 	 * buckets we divide the data to.
@@ -90,6 +94,13 @@ struct sort_worker {
 	size_t bucket_size;
 };
 
+static void
+sort_thread_init(struct sort_data *sort)
+{
+	if (sort->init != NULL)
+		sort->init(sort->init_arg);
+}
+
 /**
  * Find bucket for element using binary search among sorted in ascending
  * order splitters.
@@ -131,6 +142,8 @@ calc_elem_bucket(va_list ap)
 	struct sort_worker *worker = va_arg(ap, typeof(worker));
 	struct sort_data *sort = worker->sort;
 
+	sort_thread_init(sort);
+
 	void *pos = sort->data + worker->begin * sort->elem_size;
 	for (size_t i = worker->begin; i < worker->end; i++) {
 		int b = find_bucket(sort, pos);
@@ -153,6 +166,8 @@ split_to_buckets(va_list ap)
 	struct sort_worker *worker = va_arg(ap, typeof(worker));
 	struct sort_data *sort = worker->sort;
 
+	sort_thread_init(sort);
+
 	void *pos = sort->data + worker->begin * sort->elem_size;
 	for (size_t i = worker->begin; i < worker->end; i++) {
 		int b = sort->elem_bucket[i];
@@ -174,6 +189,8 @@ sort_bucket(va_list ap)
 {
 	struct sort_worker *worker = va_arg(ap, typeof(worker));
 	struct sort_data *sort = worker->sort;
+
+	sort_thread_init(sort);
 
 	/* Sort this worker bucket. */
 	qsort_arg(sort->buffer + worker->bucket_begin * sort->elem_size,
@@ -276,6 +293,8 @@ check_presorted(va_list ap)
 	struct sort_data *sort = worker->sort;
 	worker->presorted = true;
 
+	sort_thread_init(sort);
+
 	ERROR_INJECT_SLEEP_FOR(ERRINJ_TT_SORT_CHECK_PRESORTED_DELAY);
 	void *pos = sort->data + worker->begin * sort->elem_size;
 	void *limit = sort->data + (worker->end - 1) * sort->elem_size;
@@ -294,6 +313,8 @@ static int
 sort_all(va_list ap)
 {
 	struct sort_data *sort = va_arg(ap, typeof(sort));
+
+	sort_thread_init(sort);
 
 	qsort_arg(sort->data, sort->elem_count, sort->elem_size, sort->cmp,
 		  sort->cmp_arg);
@@ -318,7 +339,8 @@ sort_single_thread(struct sort_data *sort)
 
 void
 tt_sort(void *data, size_t elem_count, size_t elem_size,
-	tt_sort_compare_f cmp, void *cmp_arg, int thread_count)
+	tt_sort_compare_f cmp, void *cmp_arg,
+	tt_sort_init_f init, void *init_arg, int thread_count)
 {
 	struct sort_data sort;
 	double time_start, time_finish;
@@ -370,6 +392,8 @@ tt_sort(void *data, size_t elem_count, size_t elem_size,
 	sort.elem_size = elem_size;
 	sort.cmp = cmp;
 	sort.cmp_arg = cmp_arg;
+	sort.init = init;
+	sort.init_arg = init_arg;
 	sort.thread_count = thread_count;
 
 	if (thread_count == 1) {

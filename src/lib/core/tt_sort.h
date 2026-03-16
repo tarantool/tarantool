@@ -16,6 +16,9 @@ extern "C" {
 typedef int
 (*tt_sort_compare_f)(const void *a, const void *b, void *arg);
 
+typedef void
+(*tt_sort_init_f)(void *arg);
+
 /**
  * A variant of sample sort algorithm. Sort is executed in multiple threads.
  * The calling thread itself does not take a working load and yields while
@@ -27,12 +30,15 @@ typedef int
  *  elem_size    - sizeof of single data element
  *  cmp          - comparison function with usual semantics (as in qsort(3)) and
  *                 extra argument
- *  arg          - extra argument to be passed to comparison function
+ *  cmp_arg      - extra argument to be passed to comparison function
+ *  init         - if not NULL, function called in each thread at start
+ *  init_arg     - extra argument to be passed to the initialization function
  *  thread_count - number of threads to execute the sort in
  */
 void
 tt_sort(void *data, size_t elem_count, size_t elem_size,
-	tt_sort_compare_f cmp, void *cmp_arg, int thread_count);
+	tt_sort_compare_f cmp, void *cmp_arg,
+	tt_sort_init_f init, void *init_arg, int thread_count);
 
 #if defined(__cplusplus)
 } /* extern "C" */

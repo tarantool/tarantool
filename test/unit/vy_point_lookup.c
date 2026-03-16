@@ -9,6 +9,7 @@
 #include "vy_iterators_helper.h"
 #include "vy_write_iterator.h"
 #include "identifier.h"
+#include "space_def.h"
 
 uint64_t schema_version;
 uint32_t space_cache_version;
@@ -18,6 +19,10 @@ struct space *
 space_by_id_slow(uint32_t id) { return NULL; }
 struct vy_lsm *vy_lsm(struct index *index) { return NULL; }
 void index_delete(struct index *index) { unreachable(); }
+struct space_def *
+space_def_dup(const struct space_def *space_def) { return NULL; }
+void
+space_def_delete(struct space_def *space_def) {}
 
 static int
 write_run(struct vy_run *run, const char *dir_name,
@@ -95,8 +100,10 @@ test_basic()
 			      NULL, NULL, TREE,
 			      &index_opts, key_def, NULL);
 
+	struct space_def space_def;
+	memset(&space_def, 0, sizeof(space_def));
 	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
-				       index_def, format, NULL, 0);
+				       index_def, &space_def, format, NULL);
 	isnt(pk, NULL, "lsm is not NULL");
 
 	struct vy_range *range = vy_range_new(1, vy_entry_none(),
@@ -194,7 +201,7 @@ test_basic()
 	struct vy_stmt_stream *write_stream;
 	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
 					     NULL, 0, NULL);
-	vy_write_iterator_new_mem(write_stream, run_mem);
+	vy_write_iterator_new_mem(write_stream, run_mem, run_mem->format);
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
 
@@ -225,7 +232,7 @@ test_basic()
 	}
 	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
 					     NULL, 0, NULL);
-	vy_write_iterator_new_mem(write_stream, run_mem);
+	vy_write_iterator_new_mem(write_stream, run_mem, run_mem->format);
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");
 

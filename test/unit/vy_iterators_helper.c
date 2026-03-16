@@ -14,6 +14,11 @@ struct vy_cache_env cache_env;
 struct mempool history_node_pool;
 struct vy_stmt_counter dummy_count;
 
+struct tuple_format *
+space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
+		       struct key_def *const *keys, uint16_t key_count,
+		       const struct space_def *def) { return NULL; }
+
 void
 vy_iterator_C_test_init(size_t cache_size)
 {

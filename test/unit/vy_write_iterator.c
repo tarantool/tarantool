@@ -105,7 +105,7 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 				   vlsns, vlsns_count,
 				   is_primary ? &handler.base : NULL);
 	fail_if(wi == NULL);
-	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);
+	fail_if(vy_write_iterator_new_mem(wi, mem, mem->format) != 0);
 
 	struct vy_entry ret;
 	fail_if(wi->iface->start(wi) != 0);

@@ -42,6 +42,7 @@
 #include "errcode.h"
 #include "histogram.h"
 #include "index_def.h"
+#include "space_def.h"
 #include "say.h"
 #include "schema.h"
 #include "tuple.h"
@@ -122,7 +123,8 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm)
 struct vy_lsm *
 vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	   struct vy_mem_env *mem_env, struct index_def *index_def,
-	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id)
+	   struct space_def *space_def, struct tuple_format *format,
+	   struct vy_lsm *pk)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -201,13 +203,14 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->pk = pk;
 	if (pk != NULL)
 		vy_lsm_ref(pk);
+	lsm->space_def = space_def_dup(space_def);
 	lsm->format = format;
 	tuple_format_ref(lsm->format);
 	heap_node_create(&lsm->in_dump);
 	heap_node_create(&lsm->in_compaction);
 	lsm->space_id = index_def->space_id;
 	lsm->index_id = index_def->iid;
-	lsm->group_id = group_id;
+	lsm->group_id = space_def->opts.group_id;
 	lsm->opts = index_def->opts;
 	vy_lsm_read_set_new(&lsm->read_set);
 	rlist_create(&lsm->on_destroy);
@@ -279,6 +282,7 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	histogram_delete(lsm->run_hist);
 	vy_lsm_stat_destroy(&lsm->stat);
 	vy_cache_destroy(&lsm->cache);
+	space_def_delete(lsm->space_def);
 	tuple_format_unref(lsm->format);
 	TRASH(lsm);
 	free(lsm);

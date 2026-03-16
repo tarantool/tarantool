@@ -257,7 +257,8 @@ vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
  * @return 0 on success, -1 on error (diag is set).
  */
 NODISCARD int
-vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
+vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem,
+			  struct tuple_format *format);
 
 /**
  * Add a run slice as a source to the iterator.
