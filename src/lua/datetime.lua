@@ -571,6 +571,48 @@ local function extract_obj_nsec(obj)
     return nsec
 end
 
+-- Returns UTC epoch if timestamp is defined.
+-- Returns nsec as fraction part of timestamp if nsec isn't defined.
+-- Post: defined(epoch) => defined(nsec).
+-- from_set is needed to prevent timestamp type check for set() to save
+-- backward compatibility, see [1].
+--
+-- 1. https://github.com/tarantool/tarantool/issues/12411
+local function extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, from_set)
+    local ts = obj.timestamp
+    if ts == nil then
+        return nil, nsec
+    end
+
+    if ymd then
+        error('timestamp is not allowed if year/month/day provided', 3)
+    end
+    if hms then
+        error('timestamp is not allowed if hour/min/sec provided', 3)
+    end
+    if not from_set and type(ts) ~= 'number' then
+        error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
+    end
+    local epoch, fraction = math_modf(ts)
+    -- In case of negative fraction part we should
+    -- make it positive at the expense of the integer part.
+    -- Code below expects that "nsec" value is always positive.
+    if fraction < 0 then
+        epoch = epoch - 1
+        fraction = fraction + 1
+    end
+    -- if there are separate nsec, usec, or msec provided then
+    -- timestamp should be integer
+    if nsec == nil then
+        nsec = fraction * 1e9
+    elseif fraction ~= 0 then
+        error('only integer values allowed in timestamp '..
+                'if nsec, usec, or msecs provided', 3)
+    end
+
+    return epoch, nsec
+end
+
 local function get_timezone(offset, msg)
     if type(offset) == 'number' then
         check_integer(offset, 'tzoffset')
@@ -593,37 +635,13 @@ local function datetime_new(obj)
     local y, M, d, ymd = extract_obj_ymd(obj)
     local h, m, s, hms = extract_obj_hms(obj)
     local nsec = extract_obj_nsec(obj)
+    local epoch
+    epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec)
 
     local dt = DAYS_EPOCH_OFFSET
 
-    local ts = obj.timestamp
-    if ts ~= nil then
-        if ymd then
-            error('timestamp is not allowed if year/month/day provided', 2)
-        end
-        if hms then
-            error('timestamp is not allowed if hour/min/sec provided', 2)
-        end
-        if type(ts) ~= 'number' then
-            error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
-        end
-        local fraction
-        s, fraction = math_modf(ts)
-        -- In case of negative fraction part we should
-        -- make it positive at the expense of the integer part.
-        -- Code below expects that "nsec" value is always positive.
-        if fraction < 0 then
-            s = s - 1
-            fraction = fraction + 1
-        end
-        -- if there are separate nsec, usec, or msec provided then
-        -- timestamp should be integer
-        if nsec == nil then
-            nsec = fraction * 1e9
-        elseif fraction ~= 0 then
-            error('only integer values allowed in timestamp '..
-                  'if nsec, usec, or msecs provided', 2)
-        end
+    if epoch ~= nil then
+        s = epoch
         hms = true
     end
     nsec = nsec or 0
@@ -1044,6 +1062,8 @@ function datetime_set(self, obj)
     local y, M, d, ymd = extract_obj_ymd(obj)
     local h, m, s, hms = extract_obj_hms(obj)
     local nsec = extract_obj_nsec(obj)
+    local epoch
+    epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, true)
 
     local dt = local_dt(self)
     local y0 = ffi.new('int[1]')
@@ -1066,37 +1086,11 @@ function datetime_set(self, obj)
 
     local tzname = obj.tz
 
-    local ts = obj.timestamp
-    if ts ~= nil then
-        if ymd then
-            error('timestamp is not allowed if year/month/day provided', 2)
-        end
-        if hms then
-            error('timestamp is not allowed if hour/min/sec provided', 2)
-        end
-        local sec_int, fraction
-        sec_int, fraction = math_modf(ts)
-        -- In case of negative fraction part we should
-        -- make it positive at the expense of the integer part.
-        -- Code below expects that "nsec" value is always positive.
-        if fraction < 0 then
-            sec_int = sec_int - 1
-            fraction = fraction + 1
-        end
-        -- if there is one of nsec, usec, msec provided
-        -- then ignore fraction in timestamp
-        -- otherwise - use nsec, usec, or msec
-        if nsec == nil then
-            nsec = fraction * 1e9
-        elseif fraction ~= 0 then
-            error('only integer values allowed in timestamp '..
-                  'if nsec, usec, or msecs provided', 2)
-        end
-
+    if epoch ~= nil then
         if tzname ~= nil then
-            offset, self.tzindex = parse_tzname(sec_int, tzname)
+            offset, self.tzindex = parse_tzname(epoch, tzname)
         end
-        self.epoch = utc_secs(sec_int, offset)
+        self.epoch = utc_secs(epoch, offset)
         self.nsec = nsec
         self.tzoffset = offset
 
