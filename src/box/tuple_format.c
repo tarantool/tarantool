@@ -42,12 +42,12 @@
 
 #include <PMurHash.h>
 
-/** Global table of tuple formats */
-struct tuple_format *tuple_formats[FORMAT_ID_MAX + 1];
-static intptr_t recycled_format_ids = FORMAT_ID_NIL;
+__thread struct tuple_format **tuple_formats;
+__thread bool tuple_formats_inherited;
 
-static uint32_t formats_size = 0;
-static uint64_t formats_epoch = 0;
+static __thread intptr_t recycled_format_ids = FORMAT_ID_NIL;
+static __thread uint32_t formats_size = 0;
+static __thread uint64_t formats_epoch = 0;
 
 /**
  * Find in format1::fields the field by format2_field's JSON path.
@@ -190,7 +190,7 @@ tuple_format_hash(struct tuple_format *format)
 #define mh_cmp_key(a, b, arg) (tuple_format_cmp((a), *(b)))
 #include "salad/mhash.h"
 
-static struct mh_tuple_format_t *tuple_formats_hash = NULL;
+static __thread struct mh_tuple_format_t *tuple_formats_hash = NULL;
 
 static struct tuple_field *
 tuple_field_new(void)
@@ -647,6 +647,7 @@ out:
 							constraint_count);
 
 	format->hash = tuple_format_hash(format);
+	format->owner = cord();
 	return 0;
 }
 
@@ -832,6 +833,7 @@ tuple_format_remove_from_hash(struct tuple_format *format)
 void
 tuple_format_delete(struct tuple_format *format)
 {
+	assert(!tuple_formats_inherited);
 	tuple_format_remove_from_hash(format);
 	tuple_format_deregister(format);
 	tuple_format_destroy(format);
@@ -848,6 +850,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 uint32_t constraint_count, const char *format_data,
 		 size_t format_data_len)
 {
+	assert(!tuple_formats_inherited);
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
 	if (format == NULL)
@@ -1214,6 +1217,8 @@ tuple_format_min_field_count(struct key_def * const *keys, uint16_t key_count,
 void
 tuple_format_init()
 {
+	assert(tuple_formats == NULL);
+	tuple_formats = xcalloc(FORMAT_ID_MAX + 1, sizeof(*tuple_formats));
 	tuple_formats_hash = mh_tuple_format_new();
 	recycled_format_ids = FORMAT_ID_NIL;
 	formats_size = 0;
@@ -1223,6 +1228,7 @@ tuple_format_init()
 void
 tuple_format_free()
 {
+	assert(!tuple_formats_inherited);
 	/* Clear recycled ids. */
 	while (recycled_format_ids != FORMAT_ID_NIL) {
 		uint16_t id = (uint16_t) recycled_format_ids;
@@ -1237,7 +1243,16 @@ tuple_format_free()
 			free(*format);
 		}
 	}
+	free(tuple_formats);
 	mh_tuple_format_delete(tuple_formats_hash);
+}
+
+void
+tuple_formats_inherit(struct tuple_format **formats)
+{
+	assert(tuple_formats == NULL);
+	tuple_formats = formats;
+	tuple_formats_inherited = true;
 }
 
 void

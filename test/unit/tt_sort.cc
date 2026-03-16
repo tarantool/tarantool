@@ -48,7 +48,7 @@ test_no_extra_threads(void)
 			v = gen();
 
 		tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
-			nullptr, 4);
+			nullptr, nullptr, nullptr, 4);
 
 		ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 	}
@@ -70,19 +70,22 @@ test_no_extra_threads_presorted(void)
 	/* All elements are equal. */
 	for (auto &v : data)
 		v = 1;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/* Data is presorted. */
 	for (int i = 0; i < N; i++)
 		data[i] = i;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/* Data is presorted but in descending order. */
 	for (int i = 0; i < N; i++)
 		data[i] = N - i;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	footer();
@@ -112,7 +115,7 @@ test_multi_threaded(void)
 				v = gen();
 
 			tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
-				nullptr, t);
+				nullptr, nullptr, nullptr, t);
 
 			ok(std::is_sorted(data.begin(), data.end()),
 			   "Must be sorted");
@@ -136,19 +139,22 @@ test_presorted()
 	/* All elements are equal. */
 	for (auto &v : data)
 		v = 1;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/* Data is presorted. */
 	for (int i = 0; i < N; i++)
 		data[i] = i;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/* Data is presorted but in descending order. */
 	for (int i = 0; i < N; i++)
 		data[i] = N - i;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/*
@@ -159,7 +165,8 @@ test_presorted()
 		data[i] = i;
 	for (int i = 0; i < N / 2; i++)
 		data[N / 2 + i] = i;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 2);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 2);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	/*
@@ -169,7 +176,8 @@ test_presorted()
 	for (int i = 0; i < N; i++)
 		data[i] = i;
 	data[N / 4] = 0;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 2);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 2);
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
 	footer();
@@ -194,7 +202,8 @@ test_degenerated_bucket()
 	for (int i = 0; i < N; i++)
 		data[i] = i % 7 == 0 ? gen() : 0;
 
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, nullptr, 4);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing,
+		nullptr, nullptr, nullptr, 4);
 
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 
@@ -219,7 +228,8 @@ test_extra_argument()
 		v = gen();
 
 	int arg;
-	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, &arg, 3);
+	tt_sort(data.data(), N, sizeof(data[0]), cmp_testing, &arg,
+		nullptr, nullptr, 3);
 	std::reverse(data.begin(), data.end());
 	ok(std::is_sorted(data.begin(), data.end()), "Must be sorted");
 

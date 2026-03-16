@@ -2221,6 +2221,13 @@ memtx_tree_index_build_array_deduplicate(
 	index->build_array_size = w_idx + 1;
 }
 
+static void
+memtx_sort_thread_init(void *arg)
+{
+	struct tuple_format **formats = (struct tuple_format **)arg;
+	tuple_formats_inherit(formats);
+}
+
 template <bool USE_HINT>
 static void
 memtx_tree_index_end_build(struct index *base)
@@ -2230,8 +2237,10 @@ memtx_tree_index_end_build(struct index *base)
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 	tt_sort(index->build_array, index->build_array_size,
-		sizeof(index->build_array[0]), memtx_tree_qcompare<USE_HINT>,
-		cmp_def, memtx->sort_threads);
+		sizeof(index->build_array[0]),
+		memtx_tree_qcompare<USE_HINT>, cmp_def,
+		memtx_sort_thread_init, tuple_formats,
+		memtx->sort_threads);
 	if (cmp_def->is_multikey || cmp_def->for_func_index) {
 		/*
 		 * Multikey index may have equal(in terms of

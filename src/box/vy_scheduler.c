@@ -180,6 +180,19 @@ struct vy_task {
 	/** LSM tree this task is for. */
 	struct vy_lsm *lsm;
 	/**
+	 * Pointer to the statement environment. Used for creating
+	 * tuple formats in the writer thread.
+	 */
+	struct vy_stmt_env *stmt_env;
+	/**
+	 * Copy of the space definition. We use it to create a copy
+	 * of the space format in the writer thread. We can't just use
+	 * a simple format created from the key definition because
+	 * we still have to check tuple fields while applying UPSERT
+	 * statements.
+	 */
+	struct space_def *space_def;
+	/**
 	 * Copies of lsm->key/cmp_def to protect from
 	 * multithread read/write on alter.
 	 */
@@ -255,6 +268,8 @@ vy_task_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	task->worker = worker;
 	task->start_time = ev_monotonic_now(loop());
 	task->lsm = lsm;
+	task->stmt_env = lsm->format->engine;
+	task->space_def = space_def_dup(lsm->space_def);
 	task->cmp_def = key_def_dup(lsm->cmp_def);
 	task->key_def = key_def_dup(lsm->key_def);
 	vy_lsm_ref(lsm);
@@ -288,6 +303,7 @@ vy_task_delete(struct vy_task *task)
 	assert(task->deferred_delete_in_progress == 0);
 	key_def_delete(task->cmp_def);
 	key_def_delete(task->key_def);
+	space_def_delete(task->space_def);
 	vy_lsm_unref(task->lsm);
 	diag_destroy(&task->diag);
 	free(task->vlsns);
@@ -1182,15 +1198,20 @@ vy_task_dump_execute(struct vy_task *task)
 	 */
 	int rc = -1;
 	bool is_primary = (task->lsm->index_id == 0);
+	struct tuple_format *format = vy_space_stmt_format_new(
+			task->stmt_env, &task->cmp_def, 1, task->space_def);
+	if (format == NULL)
+		goto out;
+	tuple_format_ref(format);
 	struct vy_stmt_stream *wi = vy_write_iterator_new(
 			task->cmp_def, is_primary, task->is_last_level,
 			task->vlsns, task->vlsn_count, NULL);
 	if (wi == NULL)
-		goto out;
+		goto out_delete_format;
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &task->dumped_mems, in_dump) {
-		if (vy_write_iterator_new_mem(wi, mem) != 0)
-			goto out_close;
+		if (vy_write_iterator_new_mem(wi, mem, format) != 0)
+			goto out_close_wi;
 	}
 	/*
 	 * Don't compress L1 runs as they are most frequently read
@@ -1198,8 +1219,10 @@ vy_task_dump_execute(struct vy_task *task)
 	 * nothing by compressing them.
 	 */
 	rc = vy_task_write_run(task, wi, true);
-out_close:
+out_close_wi:
 	wi->iface->close(wi);
+out_delete_format:
+	tuple_format_unref(format);
 out:
 	return rc;
 }
@@ -1502,23 +1525,36 @@ vy_task_compaction_execute(struct vy_task *task)
 {
 	ERROR_INJECT_SLEEP(ERRINJ_VY_COMPACTION_DELAY);
 	int rc = -1;
-	struct vy_lsm *lsm = task->lsm;
-	bool is_primary = (lsm->index_id == 0);
+	bool is_primary = (task->lsm->index_id == 0);
+	struct tuple_format *format = vy_space_stmt_format_new(
+			task->stmt_env, &task->cmp_def, 1, task->space_def);
+	if (format == NULL)
+		goto out;
+	tuple_format_ref(format);
+	struct tuple_format *key_format = vy_simple_stmt_format_new(
+			task->stmt_env, NULL, 0);
+	if (key_format == NULL)
+		goto out_delete_format;
+	tuple_format_ref(key_format);
 	struct vy_stmt_stream *wi = vy_write_iterator_new(
 			task->cmp_def, is_primary, task->is_last_level,
 			task->vlsns, task->vlsn_count,
 			is_primary ? &task->deferred_delete_handler : NULL);
 	if (wi == NULL)
-		goto out;
+		goto out_delete_key_format;
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &task->compacted_slices, in_compaction) {
-		if (vy_write_iterator_new_slice(wi, slice, lsm->format,
-						lsm->env->key_format) != 0)
-			goto out_close;
+		if (vy_write_iterator_new_slice(wi, slice, format,
+						key_format) != 0)
+			goto out_close_wi;
 	}
 	rc = vy_task_write_run(task, wi, false);
-out_close:
+out_close_wi:
 	wi->iface->close(wi);
+out_delete_key_format:
+	tuple_format_unref(key_format);
+out_delete_format:
+	tuple_format_unref(format);
 out:
 	return rc;
 }
@@ -2159,6 +2195,8 @@ vy_worker_f(va_list ap)
 	struct vy_worker *worker = va_arg(ap, struct vy_worker *);
 	struct cbus_endpoint endpoint;
 
+	tuple_format_init();
+
 	cpipe_create(&worker->tx_pipe, "tx");
 	cbus_endpoint_create(&endpoint, cord_name(&worker->cord),
 			     fiber_schedule_cb, fiber());
@@ -2178,5 +2216,7 @@ vy_worker_f(va_list ap)
 	}
 	cbus_endpoint_destroy(&endpoint, cbus_process);
 	cpipe_destroy(&worker->tx_pipe);
+
+	tuple_format_free();
 	return 0;
 }
