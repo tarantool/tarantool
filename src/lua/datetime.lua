@@ -449,11 +449,12 @@ end
     Returns timezone offset in minutes if string was accepted
     by parser, otherwise raise an error.
 ]]
-local function parse_tzoffset(str)
+local function parse_tzoffset(str, error_level_up)
+    error_level_up = error_level_up or 0
     local offset = ffi.new('int[1]')
     local len = builtin.tnt_dt_parse_iso_zone_lenient(str, #str, offset)
     if len ~= #str then
-        error(('invalid time-zone format %s'):format(str), 3)
+        error(('invalid time-zone format %s'):format(str), 3 + error_level_up)
     end
     return offset[0]
 end
@@ -622,16 +623,44 @@ local function extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, from_set)
     return epoch, nsec
 end
 
-local function get_timezone(offset, msg)
+local function get_timezone(offset, msg, error_level_up)
+    error_level_up = error_level_up or 0
     if type(offset) == 'number' then
-        check_integer(offset, 'tzoffset')
+        check_integer(offset, 'tzoffset', error_level_up)
         return offset
     elseif type(offset) == 'string' then
-        return parse_tzoffset(offset)
+        return parse_tzoffset(offset, error_level_up)
     else
         error(('%s: string or number expected, but received %s'):
-              format(msg, offset), 3)
+              format(msg, offset), 3 + error_level_up)
     end
+end
+
+-- base_epoch is needed for Olson timezone lookup.
+local function extract_obj_tzoffset_tzindex(obj, base_epoch)
+    local tzoffset, tzindex
+
+    local obj_tzoffset = obj.tzoffset
+    local tzname = obj.tz
+    if tzname ~= nil then
+         tzoffset, tzindex = parse_tzname(base_epoch, tzname)
+    elseif obj_tzoffset ~= nil then
+        tzindex = 0
+        tzoffset = get_timezone(obj_tzoffset, 'tzoffset', 1)
+        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
+        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+        check_range(tzoffset, -720, 840, 'tzoffset', nil, 1)
+    end
+    return tzoffset, tzindex
+end
+
+-- Timestamp is erroneously considered as "local", not UTC (gh10363).
+-- Handle this historical case here.
+local function update_epoch(epoch, offset)
+    -- Convert "local" timestamp to UTC timestamp.
+    -- Removing this adjustment will fix gh10363.
+    epoch = utc_secs(epoch, offset)
+    return epoch
 end
 
 -- Create datetime given attribute values from obj.
@@ -646,33 +675,27 @@ local function datetime_new(obj)
     local nsec = extract_obj_nsec(obj)
     local epoch
     epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec)
-
-    local dt = DAYS_EPOCH_OFFSET
-
-    if epoch ~= nil then
-        s = epoch
-        hms = true
-    end
     nsec = nsec or 0
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
+    -- Timestamp case.
+    if epoch ~= nil then
+        local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
+        tzoffset, tzindex = tzoffset or 0, tzindex or 0
+        epoch = update_epoch(epoch, tzoffset)
+        return datetime_new_raw(epoch, nsec, tzoffset, tzindex)
     end
+
+    -- ymd | hms case.
+    local dt = DAYS_EPOCH_OFFSET
 
     -- .year, .month, .day
     if ymd then
         dt = dt_from_ymd(y or 1970, M or 1, d or 1)
     end
 
-    local tzindex = 0
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
-    end
+    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj,
+        epoch_from_dt(dt))
+    tzoffset, tzindex = tzoffset or 0, tzindex or 0
 
     -- .hour, .minute, .second
     local secs = 0
@@ -680,7 +703,7 @@ local function datetime_new(obj)
         secs = (h or 0) * 3600 + (m or 0) * 60 + (s or 0)
     end
 
-    return datetime_new_dt(dt, secs, nsec, offset or 0, tzindex)
+    return datetime_new_dt(dt, secs, nsec, tzoffset, tzindex)
 end
 
 --[[
@@ -1053,6 +1076,18 @@ function datetime_set(self, obj)
     local epoch
     epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, true)
 
+    if epoch ~= nil then
+        local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
+        local effective_tzoffset = tzoffset or self.tzoffset
+        epoch = update_epoch(epoch, effective_tzoffset)
+
+        self.epoch = epoch
+        self.nsec = nsec
+        self.tzoffset = effective_tzoffset
+        self.tzindex = tzindex or self.tzindex
+        return self
+    end
+
     local dt = local_dt(self)
     local y0 = ffi.new('int[1]')
     local M0 = ffi.new('int[1]')
@@ -1065,27 +1100,8 @@ function datetime_set(self, obj)
     local m0 = math_floor(lsecs / 60) % 60
     local s0 = lsecs % 60
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
-    end
-    offset = offset or self.tzoffset
-
-    local tzname = obj.tz
-
-    if epoch ~= nil then
-        if tzname ~= nil then
-            offset, self.tzindex = parse_tzname(epoch, tzname)
-        end
-        self.epoch = utc_secs(epoch, offset)
-        self.nsec = nsec
-        self.tzoffset = offset
-
-        return self
-    end
-
     -- normalize time to UTC from current timezone
+    local old_tzoffset = self.tzoffset
     time_delocalize(self)
 
     -- .year, .month, .day
@@ -1093,9 +1109,11 @@ function datetime_set(self, obj)
         datetime_ymd_update(self, y or y0, M or M0, d or d0)
     end
 
-    if tzname ~= nil then
-        offset, self.tzindex = parse_tzname(self.epoch, tzname)
-    end
+    -- TODO need to check:
+    -- datetime_new() uses epoch_from_dt(dt) as base_epoch, there
+    -- h:m:s = 00:00:00. This differ with self.epoch as base_epoch
+    -- due to h:m:s may have any proper value.
+    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, self.epoch)
 
     -- .hour, .minute, .second
     if hms then
@@ -1103,8 +1121,10 @@ function datetime_set(self, obj)
     end
 
     -- denormalize back to local timezone
-    time_localize(self, offset)
+    local effective_tzoffset = tzoffset or old_tzoffset
+    time_localize(self, effective_tzoffset)
     self.nsec = nsec or self.nsec
+    self.tzindex = tzindex or self.tzindex
 
     return self
 end
