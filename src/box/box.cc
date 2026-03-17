@@ -3021,11 +3021,10 @@ box_wait_limbo_acked(double timeout)
 	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
 #endif
 	uint64_t promote_term = txn_limbo.term;
-	int64_t tid = txn_limbo_last_synchro_entry(&txn_limbo)->txn->id;
-	struct txn_limbo_entry *last;
 	double deadline = fiber_clock() + timeout;
 	while (!fiber_is_cancelled()) {
-		last = txn_limbo_last_synchro_entry(&txn_limbo);
+		struct txn_limbo_entry *last =
+			txn_limbo_last_synchro_entry(&txn_limbo);
 		if (txn_limbo_has_quorum_for(&txn_limbo, last->lsn))
 			return last->lsn;
 		struct trigger on_ack;
@@ -3044,12 +3043,6 @@ box_wait_limbo_acked(double timeout)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
 			return txn_limbo.queue.confirmed_lsn;
-		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
-			diag_set(ClientError, ER_QUORUM_WAIT,
-				 replication_synchro_quorum,
-				 "new synchronous transactions appeared");
-			return -1;
-		}
 	}
 	diag_set(FiberIsCancelled);
 	return -1;

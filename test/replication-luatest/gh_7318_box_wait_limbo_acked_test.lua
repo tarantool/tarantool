@@ -2,7 +2,6 @@ local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local proxy = require('luatest.replica_proxy')
 local server = require('luatest.server')
-local assertions = require('luatest.assertions')
 
 local g = t.group('cover-box-wait-limbo-acked')
 --
@@ -285,77 +284,4 @@ g.test_quorum_less_replication_synchro_quorum = function(cg)
     end, {f})
     server_becomes_the_leader_again(cg.master)
     server_wait_synchro_queue_len_is_equal(cg.replica, 0)
-end
-
-g.test_new_synchronous_transactions_appeared_while_wait_quorum = function(cg)
-    assertions.skip("not testable without crutches anymore")
-    -- The purpose of the test is to cover
-    -- 'if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn)' in
-    -- 'box_wait_limbo_acked()' located immediately after 'box_wait_quorum()'.
-    cg.master:exec(function()
-        box.cfg{
-            election_fencing_mode='off',
-            replication_synchro_quorum=3
-        }
-    end)
-    cg.replica_proxy:pause()
-    t.helpers.retrying({timeout = wait_timeout}, function()
-        cg.master:exec(function()
-            local status = box.info.replication[2].upstream.status
-            t.assert(status ~= 'follow')
-        end)
-    end)
-    local f = cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f = require('fiber').create(function()
-            return pcall(box.ctl.promote)
-        end)
-        f:set_joinable(true)
-        return f:id()
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{1} end)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.master, 1)
-    server_wait_synchro_queue_len_is_equal(cg.replica, 1)
-    -- The second transaction should not arrive before at the replica
-    -- before fiber 'f' reaches 'box_wait_quorum'.
-    cg.master_proxy:pause()
-    t.helpers.retrying({timeout = wait_timeout}, function()
-        cg.replica:exec(function()
-            local status = box.info.replication[1].upstream.status
-            t.assert(status ~= 'follow')
-        end)
-    end)
-    cg.master:exec(function()
-        require('fiber').create(function() box.space.test:insert{2} end)
-    end)
-    server_wait_synchro_queue_len_is_equal(cg.master, 2)
-    cg.replica:exec(function()
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end)
-    server_wait_wal_is_blocked(cg.replica)
-    local wait_quorum_count = get_wait_quorum_count(cg.replica)
-    local ff = require('fiber').create(function()
-        cg.replica:exec(function(f)
-            box.error.injection.set('ERRINJ_WAL_DELAY', false)
-            local _, ok, err = require('fiber').find(f):join()
-            t.assert(not ok)
-            t.assert_equals(err.type, 'ClientError')
-            t.assert_equals(err.message, 'Couldn\'t wait for quorum 2: '
-                .. 'new synchronous transactions appeared')
-        end, {f})
-    end)
-    ff:set_joinable(true)
-    server_wait_wait_quorum_count_ge_than(cg.replica, wait_quorum_count + 1)
-    -- Now the master will send the second insert transaction.
-    cg.master_proxy:resume()
-    server_wait_synchro_queue_len_is_equal(cg.replica, 2)
-    cg.replica_proxy:resume()
-    local ok, err = ff:join()
-    t.assert(ok)
-    t.assert(not err)
-    server_becomes_the_leader_again(cg.master)
 end
