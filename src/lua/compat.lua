@@ -54,6 +54,15 @@ channel close.
 https://tarantool.io/compat/fiber_channel_close_mode
 ]]
 
+local DATETIME_SETFN_TIMESTAMP_TYPE_CHECK_BRIEF = [[
+Whether to check timestamp type in datetime obj:set().
+The new behaviour requires timestamp to be a number for set()
+function as new() function requires. The old behaviour skips
+type check for timestamp in set().
+
+https://tarantool.io/compat/datetime_setfn_timestamp_type_check
+]]
+
 local SQL_PRIV_BRIEF = [[
 Whether to enable access checks for SQL requests. The old behavior is to let
 any user execute an arbitrary SQL request over IPROTO. With the new behavior,
@@ -206,6 +215,13 @@ local options = {
         brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
         action = tweak_action('fiber_channel_close_mode',
                               'forceful', 'graceful'),
+    },
+    datetime_setfn_timestamp_type_check = {
+        default = 'old',
+        obsolete = nil,
+        brief = DATETIME_SETFN_TIMESTAMP_TYPE_CHECK_BRIEF,
+        action = tweak_action('datetime_setfn_timestamp_type_check',
+                              false, true),
     },
     sql_priv = {
         default = 'new',
