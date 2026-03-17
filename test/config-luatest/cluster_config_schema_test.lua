@@ -450,6 +450,7 @@ g.test_defaults = function()
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
             wal_cleanup_delay_deprecation = 'old',
+            datetime_setfn_timestamp_type_check = 'old',
         },
         isolated = false,
         stateboard = {
