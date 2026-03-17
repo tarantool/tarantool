@@ -2941,6 +2941,8 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
 end)
 
 
+-- This suite is moved to app-luatest/datetime_test.lua
+-- and is deprecated to update here.
 test:test("Time invalid :set{} operations", function(test)
     test:plan(94)
 

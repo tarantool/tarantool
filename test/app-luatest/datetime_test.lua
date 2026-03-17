@@ -1,6 +1,22 @@
 local t = require('luatest')
 local dt = require('datetime')
 
+-- -- Datetime module constants.
+
+-- Minimum supported date: -5879610-06-22.
+local MIN_DATE_YEAR = -5879610
+local MIN_DATE_MONTH = 6
+local MIN_DATE_DAY = 22
+-- Maximum supported date: 5879611-07-11.
+local MAX_DATE_YEAR = 5879611
+local MAX_DATE_MONTH = 7
+local MAX_DATE_DAY = 11
+
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
+-- -- End of datetime module constants.
+
 local SUPPORTED_DATETIME_FORMATS = {
     ['RFC3339 AND ISO8601'] = {
         -- Dates.
@@ -2097,4 +2113,457 @@ for supported_by, standard_cases in pairs(UNSUPPORTED_DATETIME_FORMATS) do
             end
         end
     end
+end
+
+-- "Time invalid :set{} operations" tests moved from
+-- app-tap/datetime.test.lua.
+local function get_single_key_val(arg, table_expected)
+    local key, val
+    if type(arg) == 'table' then
+        local count = 0
+        for k, v in pairs(arg) do
+            key, val = k, v
+            count = count + 1
+        end
+        t.fail_if(key == nil, 'misconfig')
+        t.fail_if(val == nil, 'misconfig')
+        t.fail_if(count > 1, 'misconfig')
+    else
+        t.fail_if(table_expected, 'misconfig')
+        key = nil
+        val = arg
+    end
+    return key, val
+end
+
+local INVALID_SET_OPERATIONS_ERRORS = {
+    only_one_of = 'only one of nsec, usec or msecs may be defined'..
+        ' simultaneously',
+    only_integer_ts = 'only integer values allowed in timestamp'..
+        ' if nsec, usec, or msecs provided',
+    timestamp_and_ymd = 'timestamp is not allowed if year/month/day provided',
+    timestamp_and_hms = 'timestamp is not allowed if hour/min/sec provided',
+
+    only_integer_msg = function(set_arg)
+        local key, _ = get_single_key_val(set_arg, true)
+        return key .. ': integer value expected, but received number'
+    end,
+
+    expected_type = function(set_arg, typename, msg)
+        local _, val = get_single_key_val(set_arg, false)
+        return ("%s: expected %s, but received %s"):format(msg, typename, type(val))
+    end,
+
+    expected_type2 = function(set_arg, what_expected)
+        local key, val = get_single_key_val(set_arg, true)
+        return ("%s: %s expected, but received %s"):format(key, what_expected, val)
+    end,
+
+    range_check_error = function(set_arg, range)
+        local key, val = get_single_key_val(set_arg, true)
+        return ('value %s of %s is out of allowed range [%s, %s]'):
+              format(val, key, range[1], range[2])
+    end,
+
+    range_check_3_error = function(set_arg, range)
+        local key, val = get_single_key_val(set_arg, true)
+        return ('value %d of %s is out of allowed range [%d, %d..%d]'):
+            format(val, key, range[1], range[2], range[3])
+    end,
+
+    invalid_days_in_mon = function(set_arg)
+        local d, M, y = set_arg.day, set_arg.month, set_arg.year
+        t.fail_if(d == nil, 'misconfig')
+        t.fail_if(M == nil, 'misconfig')
+        t.fail_if(y == nil, 'misconfig')
+        return ('invalid number of days %d in month %d for %d'):format(d, M, y)
+    end,
+
+    invalid_date = function(set_arg)
+        local d, M, y = set_arg.day, set_arg.month, set_arg.year
+        t.fail_if(d == nil, 'misconfig')
+        t.fail_if(M == nil, 'misconfig')
+        t.fail_if(y == nil, 'misconfig')
+        return ('date %d-%02d-%02d is invalid'):format(y, M, d)
+    end,
+}
+
+local INVALID_SET_OPERATIONS = {
+    -- Fractional unit mix tests.
+    {
+        set = {nsec = 123456, usec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {nsec = 123456, msec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {usec = 123, msec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {nsec = 123456, usec = 123, msec = 123},
+        err_key = 'only_one_of',
+    },
+    -- Timestamp plus units mixed tests.
+    {
+        set = {timestamp = 12345.125, msec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 12345.125, usec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 12345.125, nsec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 1630359071.125, year = 2021},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, month = 9},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, day = 29},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, hour = 20},
+        err_key = 'timestamp_and_hms',
+    },
+    {
+        set = {timestamp = 1630359071.125, min = 10},
+        err_key = 'timestamp_and_hms',
+    },
+    {
+        set = {timestamp = 1630359071.125, sec = 29},
+        err_key = 'timestamp_and_hms',
+    },
+    -- Type tests.
+    {
+        set = '2001-01-01',
+        err_fn = 'expected_type',
+        err_fn_args = {'table', 'datetime.set()'},
+    },
+    {
+        set = 20010101,
+        err_fn = 'expected_type',
+        err_fn_args = {'table', 'datetime.set()'},
+    },
+    {
+        set = {year = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {month = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {day = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {hour = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {min = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {sec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {msec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {usec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {nsec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {tzoffset = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {tzoffset = {}},
+        err_fn = 'expected_type2',
+        err_fn_args = {'string or number'},
+    },
+    {
+        set = {tzoffset = dt.new()},
+        err_fn = 'expected_type2',
+        err_fn_args = {'string or number'},
+    },
+    {
+        set = {tz = 400},
+        err_fn = 'expected_type',
+        err_fn_args = {'string', 'parse_tzname()'},
+    },
+    -- Single unit range tests.
+    {
+        set = {year = MIN_DATE_YEAR - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_DATE_YEAR, MAX_DATE_YEAR}},
+    },
+    {
+        set = {year = MIN_DATE_YEAR - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_DATE_YEAR, MAX_DATE_YEAR}},
+    },
+    {
+        set = {year = MAX_DATE_YEAR + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_DATE_YEAR, MAX_DATE_YEAR}},
+    },
+    {
+        set = {year = MAX_DATE_YEAR + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_DATE_YEAR, MAX_DATE_YEAR}},
+    },
+    {
+        set = {month = 1 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{1, 12}},
+    },
+    {
+        set = {month = 1 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{1, 12}},
+    },
+    {
+        set = {month = 12 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{1, 12}},
+    },
+    {
+        set = {month = 12 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{1, 12}},
+    },
+    {
+        set = {day = -1 - 50},
+        err_fn = 'range_check_3_error',
+        err_fn_args = {{-1, 1, 31}},
+    },
+    {
+        set = {day = -1 - 1},
+        err_fn = 'range_check_3_error',
+        err_fn_args = {{-1, 1, 31}},
+    },
+    {
+        set = {day = 31 + 1},
+        err_fn = 'range_check_3_error',
+        err_fn_args = {{-1, 1, 31}},
+    },
+    {
+        set = {day = 31 + 50},
+        err_fn = 'range_check_3_error',
+        err_fn_args = {{-1, 1, 31}},
+    },
+    {
+        set = {hour = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 23}},
+    },
+    {
+        set = {hour = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 23}},
+    },
+    {
+        set = {hour = 23 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 23}},
+    },
+    {
+        set = {hour = 23 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 23}},
+    },
+    {
+        set = {min = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 59}},
+    },
+    {
+        set = {min = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 59}},
+    },
+    {
+        set = {min = 59 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 59}},
+    },
+    {
+        set = {min = 59 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 59}},
+    },
+    {
+        set = {sec = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 60}},
+    },
+    {
+        set = {sec = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 60}},
+    },
+    {
+        set = {sec = 60 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 60}},
+    },
+    {
+        set = {sec = 60 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 60}},
+    },
+    {
+        set = {msec = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e3}},
+    },
+    {
+        set = {msec = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e3}},
+    },
+    {
+        set = {msec = 1e3 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e3}},
+    },
+    {
+        set = {msec = 1e3 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e3}},
+    },
+    {
+        set = {usec = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e6}},
+    },
+    {
+        set = {usec = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e6}},
+    },
+    {
+        set = {usec = 1e6 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e6}},
+    },
+    {
+        set = {usec = 1e6 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e6}},
+    },
+    {
+        set = {nsec = 0 - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e9}},
+    },
+    {
+        set = {nsec = 0 - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e9}},
+    },
+    {
+        set = {nsec = 1e9 + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e9}},
+    },
+    {
+        set = {nsec = 1e9 + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{0, 1e9}},
+    },
+    {
+        set = {tzoffset = MIN_TZOFFSET - 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_TZOFFSET, MAX_TZOFFSET}},
+    },
+    {
+        set = {tzoffset = MIN_TZOFFSET - 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_TZOFFSET, MAX_TZOFFSET}},
+    },
+    {
+        set = {tzoffset = MAX_TZOFFSET + 1},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_TZOFFSET, MAX_TZOFFSET}},
+    },
+    {
+        set = {tzoffset = MAX_TZOFFSET + 50},
+        err_fn = 'range_check_error',
+        err_fn_args = {{MIN_TZOFFSET, MAX_TZOFFSET}},
+    },
+    -- Date range tests.
+    {
+        set = {year = 2021, month = 6, day = 31},
+        err_fn = 'invalid_days_in_mon',
+    },
+    {
+        set = {year = MIN_DATE_YEAR, month = MIN_DATE_MONTH - 1, day = 1},
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {
+            year = MIN_DATE_YEAR,
+            month = MIN_DATE_MONTH,
+            day = MIN_DATE_DAY - 1
+        },
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {
+            year = MAX_DATE_YEAR,
+            month = MAX_DATE_MONTH,
+            day = MAX_DATE_DAY + 1
+        },
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {year = MAX_DATE_YEAR, month = MAX_DATE_MONTH + 1, day = 1},
+        err_fn = 'invalid_date',
+    },
+}
+
+local g_set_fail = t.group("set_fail", INVALID_SET_OPERATIONS)
+
+g_set_fail.test = function(cg)
+    local p = cg.params
+
+    t.fail_if(p.set == nil, 'misconfig')
+
+    local function dt_set()
+        local d = dt.new(p.new or {})
+        d:set(p.set)
+    end
+
+    local error
+    if p.err_key ~= nil then
+        error = INVALID_SET_OPERATIONS_ERRORS[p.err_key]
+    elseif p.err_fn ~= nil then
+        local fn = INVALID_SET_OPERATIONS_ERRORS[p.err_fn]
+        t.fail_if(type(fn) ~= 'function', 'misconfig')
+        error = fn(p.set, unpack(p.err_fn_args or {}))
+    elseif p.err_msg ~= nil then
+        error = p.err_msg
+    else
+        t.fail('misconfig')
+    end
+    t.assert_error_msg_contains(error, dt_set)
 end
