@@ -119,3 +119,121 @@ g.test_duplicate_function = function(cg)
         t.assert_equals(box.space.t1, nil)
     end)
 end
+
+g = t.group("drop_table", {{engine = 'memtx'}, {engine = 'vinyl'}})
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+    cg.server:exec(function(engine)
+        local sql = [[SET SESSION "sql_default_engine" = '%s';]]
+        box.execute(sql:format(engine))
+    end, {cg.params.engine})
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- gh-3592: clean-up garbage on failed CREATE TABLE statement.
+g.test_3592_clean_up_if_failed_create_table = function(cg)
+    cg.server:exec(function()
+        -- Let user have enough rights to create space, but not enough to
+        -- create index.
+        --
+        box.schema.user.create('tmp')
+        box.schema.user.grant('tmp', 'create, read', 'universe')
+        box.schema.user.grant('tmp', 'write', 'space', '_space')
+        box.schema.user.grant('tmp', 'write', 'space', '_schema')
+
+        -- Number of records in _space, _index, _sequence:
+        local space_count = box.space._space:count()
+        local index_count = box.space._index:count()
+        local sequence_count = box.space._sequence:count()
+
+        box.session.su('tmp')
+        --
+        -- Error: user do not have rights to write in box.space._index.
+        -- Space that was already created should be automatically dropped.
+        --
+        local exp_err = "Write access to space '_index' "..
+                        "is denied for user 'tmp'"
+        local sql = "CREATE TABLE t1 (id INT PRIMARY KEY, a INT);"
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        -- Error: no such table.
+        exp_err = "Space 't1' does not exist"
+        _, err = box.execute('DROP TABLE t1;')
+        t.assert_equals(tostring(err), exp_err)
+
+        box.session.su('guest')
+
+        --
+        -- Check that _space, _index and _sequence have the same number of
+        -- records.
+        --
+        t.assert_equals(space_count, box.space._space:count())
+        t.assert_equals(index_count, box.space._index:count())
+        t.assert_equals(sequence_count, box.space._sequence:count())
+
+        --
+        -- Give user right to write in _index. Still have not enough
+        -- rights to write in _sequence.
+        --
+        box.schema.user.grant('tmp', 'write', 'space', '_index')
+        box.session.su('tmp')
+
+        --
+        -- Error: user do not have rights to write in _sequence.
+        --
+        exp_err = "Write access to space '_sequence' is denied for user 'tmp'"
+        sql = "CREATE TABLE t2 (id INT PRIMARY KEY AUTOINCREMENT, "..
+              "a INT UNIQUE, b INT UNIQUE, c INT UNIQUE, d INT UNIQUE);"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        box.session.su('guest')
+
+        --
+        -- Check that _space, _index and _sequence have the same number of
+        -- records.
+        --
+        t.assert_equals(space_count, box.space._space:count())
+        t.assert_equals(index_count, box.space._index:count())
+        t.assert_equals(sequence_count, box.space._sequence:count())
+
+        --
+        -- Check that clean-up works fine after another error.
+        --
+        box.schema.user.grant('tmp', 'write', 'space')
+        box.session.su('tmp')
+
+        box.execute('CREATE TABLE t3(a INTEGER PRIMARY KEY);')
+        --
+        -- Error: Failed to drop referenced table.
+        --
+        sql = 'CREATE TABLE t4(x INTEGER PRIMARY KEY REFERENCES t3, '..
+              'a INT UNIQUE, c TEXT REFERENCES t3);'
+        box.execute(sql)
+
+        exp_err = "Can't modify space 't3': space is referenced by foreign key"
+        _, err = box.execute('DROP TABLE t3;')
+        t.assert_equals(tostring(err), exp_err)
+
+        box.execute('DROP TABLE t4;')
+        box.execute('DROP TABLE t3;')
+
+        --
+        -- Check that _space, _index and _sequence have the same number of
+        -- records.
+        --
+        t.assert_equals(space_count, box.space._space:count())
+        t.assert_equals(index_count, box.space._index:count())
+        t.assert_equals(sequence_count, box.space._sequence:count())
+
+        box.session.su('guest')
+
+        box.schema.user.drop('tmp')
+    end)
+end
