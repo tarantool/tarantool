@@ -394,16 +394,6 @@ local function utc_secs(epoch, tzoffset)
     return epoch - tzoffset * 60
 end
 
-local function time_delocalize(self)
-    self.epoch = local_secs(self)
-    self.tzoffset = 0
-end
-
-local function time_localize(self, offset)
-    self.epoch = utc_secs(self.epoch, offset)
-    self.tzoffset = offset
-end
-
 -- get epoch seconds, shift to the local timezone
 -- adjust from 1970-related to 0000-related time
 -- then return dt in those coordinates (number of days
@@ -1048,21 +1038,19 @@ local function datetime_totable(self)
     }
 end
 
-local function datetime_update_dt(self, dt)
-    local epoch = self.epoch
+local function datetime_update_epoch_dt(epoch, dt)
     local secs_day = epoch % SECS_PER_DAY
-    self.epoch = (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY + secs_day
+    return (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY + secs_day
 end
 
-local function datetime_ymd_update(self, y, M, d)
+local function datetime_update_epoch_ymd(epoch, y, M, d)
     local dt = dt_from_ymd(y, M, d)
-    datetime_update_dt(self, dt)
+    return datetime_update_epoch_dt(epoch, dt)
 end
 
-local function datetime_hms_update(self, h, m, s)
-    local epoch = self.epoch
+local function datetime_update_epoch_hms(epoch, h, m, s)
     local secs_day = epoch - (epoch % SECS_PER_DAY)
-    self.epoch = secs_day + h * 3600 + m * 60 + s
+    return secs_day + h * 3600 + m * 60 + s
 end
 
 function datetime_set(self, obj)
@@ -1094,35 +1082,34 @@ function datetime_set(self, obj)
     builtin.tnt_dt_to_ymd(dt, y0, M0, d0)
     y0, M0, d0 = y0[0], M0[0], d0[0]
 
+    -- Normalize time to UTC from current timezone,
+    -- lsecs is "normalized" time.
     local lsecs = local_secs(self)
     local h0 = math_floor(lsecs / (60 * 60)) % 24
     local m0 = math_floor(lsecs / 60) % 60
     local s0 = lsecs % 60
 
-    -- normalize time to UTC from current timezone
-    local old_tzoffset = self.tzoffset
-    time_delocalize(self)
-
     -- .year, .month, .day
     if ymd then
-        datetime_ymd_update(self, y or y0, M or M0, d or d0)
+        lsecs = datetime_update_epoch_ymd(lsecs, y or y0, M or M0, d or d0)
     end
 
     -- TODO need to check:
     -- datetime_new() uses epoch_from_dt(dt) as base_epoch, there
     -- h:m:s = 00:00:00. This differ with self.epoch as base_epoch
     -- due to h:m:s may have any proper value.
-    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, self.epoch)
+    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, lsecs)
 
     -- .hour, .minute, .second
     if hms then
-        datetime_hms_update(self, h or h0, m or m0, s or s0)
+        lsecs = datetime_update_epoch_hms(lsecs, h or h0, m or m0, s or s0)
     end
 
     -- denormalize back to local timezone
-    local effective_tzoffset = tzoffset or old_tzoffset
-    time_localize(self, effective_tzoffset)
+    local effective_tzoffset = tzoffset or self.tzoffset
+    self.epoch = utc_secs(lsecs, effective_tzoffset)
     self.nsec = nsec or self.nsec
+    self.tzoffset = effective_tzoffset
     self.tzindex = tzindex or self.tzindex
 
     return self
