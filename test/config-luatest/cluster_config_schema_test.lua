@@ -351,6 +351,7 @@ g.test_defaults = function()
             box_space_max = 'new',
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
+            datetime_setfn_timestamp_type_check = 'old',
         },
     }
     local res = cluster_config:apply_default({})
