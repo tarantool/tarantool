@@ -2166,6 +2166,24 @@ end
 
 -- {{{ new() and set() invalid args test.
 
+-- For set() we must fill all components to check possible corruption.
+local SET_BASE_DATE_TIME_UNITS = dt.new({
+    year = 2021, month = 2, day = 3,
+    hour = 12, min = 34, sec = 56,
+    nsec = 123456789, tz = 'Europe/Moscow'}):totable()
+-- Workaround for gh-12619.
+SET_BASE_DATE_TIME_UNITS.timestamp = nil
+
+-- Timestamp fixing for gh-10363 workaround.
+local function to_local_time(timestamp)
+    checks('number')
+    return timestamp + SET_BASE_DATE_TIME_UNITS.tzoffset * 60
+end
+local function to_utc_time(timestamp)
+    checks('number')
+    return timestamp - SET_BASE_DATE_TIME_UNITS.tzoffset * 60
+end
+
 local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
     only_one_of = 'only one of nsec, usec or msecs may be defined'..
         ' simultaneously',
@@ -2214,6 +2232,15 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
               format(val, key, range[1], range[2])
     end,
 
+    range_check_error_set_timestamp = function(set_arg, range)
+        checks({timestamp = 'number'}, {[1] = 'number', [2] = 'number'})
+        local key, val = get_single_key_val(set_arg, true)
+        -- Workaround for gh-10363.
+        val = to_utc_time(val)
+        return ('value %d of %s is out of allowed range [%d, %d]'):
+              format(val, key, range[1], range[2])
+    end,
+
     range_check_3_error = function(set_arg, range)
         local key, val = get_single_key_val(set_arg, true)
         return ('value %d of %s is out of allowed range [%d, %d..%d]'):
@@ -2236,6 +2263,13 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
         t.fail_if(M == nil, msg)
         t.fail_if(y == nil, msg)
         return ('date %d-%02d-%02d is invalid'):format(y, M, d)
+    end,
+
+    couldnt_parse_tz = function(set_arg, msg_tail)
+        checks('?', '?string')
+        msg_tail = msg_tail or ''
+        local _, val = get_single_key_val(set_arg, true)
+        return ('could not parse \'%s\''):format(val)..msg_tail
     end,
 
     invalid_tzoffset_fmt_error = function(set_arg)
@@ -2420,6 +2454,25 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
         },
         err_fn = 'invalid_tzoffset_fmt_error',
     },
+    -- Timezone parse tests.
+    {
+        set = {tz = 'zzzYYYwww'},
+        err_fn = 'couldnt_parse_tz',
+    },
+    -- See lib/tzcode/timezones.h for erroneous zones.
+    {
+        -- Zones with TZ_AMBIGUOUS flag.
+        set = {tz = 'ECT'},
+        err_fn = 'couldnt_parse_tz',
+        err_fn_args = {' - ambiguous timezone'},
+    },
+    {
+        -- Zones with TZ_NYI flag.
+        set = {tz = '_'},
+        err_fn = 'couldnt_parse_tz',
+        err_fn_args = {' - nyi timezone'},
+        skip = 'no zones with TZ_NYI flag',
+    },
     -- Single unit range tests.
     {
         set_range = {'year', YEAR_RANGE},
@@ -2451,10 +2504,26 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
         err_fn = 'range_check_error_string',
         err_fn_args = {SEC_RANGE},
     },
+    -- new() test: we create new datetime object with tzoffset = 0,
+    -- therefore workaround for gh-10363 is not needed.
     {
         set_range = {'timestamp', TIMESTAMP_RANGE},
         err_fn = 'range_check_error_digit',
         err_fn_args = {TIMESTAMP_RANGE},
+        _set = {skip = 'need workaround for gh-10363'},
+    },
+    -- set() test: we use source object with tzoffset ~= 0 and
+    -- workaround for gh-10363 is needed.
+    {
+        set_multiple = {
+            {timestamp = to_local_time(TIMESTAMP_RANGE[1] - 1)},
+            {timestamp = to_local_time(TIMESTAMP_RANGE[1] - 50)},
+            {timestamp = to_local_time(TIMESTAMP_RANGE[2] + 1)},
+            {timestamp = to_local_time(TIMESTAMP_RANGE[2] + 50)},
+        },
+        err_fn = 'range_check_error_set_timestamp',
+        err_fn_args = {TIMESTAMP_RANGE},
+        _new = {skip = 'only set'},
     },
     {
         set_range = {'msec', MSEC_RANGE},
@@ -2552,8 +2621,18 @@ local function test_invalid_new_and_set_time_units(cg, new_test)
     end
     t.skip_if(p.skip ~= nil, p.skip)
 
-    local function new_tester(set) dt.new(set) end
-    local function set_tester(set) dt.new():set(set) end
+    local function new_tester(set, expected_error)
+        checks('?', 'string')
+        t.assert_error_msg_contains(expected_error, dt.new, set)
+    end
+    local function set_tester(set, expected_error)
+        checks('?', 'string')
+        local d = dt.new(SET_BASE_DATE_TIME_UNITS)
+        local before = d:totable()
+        t.assert_error_msg_contains(expected_error, d.set, d, set)
+        local after = d:totable()
+        t.assert_equals(after, before, 'd was changed')
+    end
     local tester = new_test and new_tester or set_tester
 
     local function single_test(set)
@@ -2572,7 +2651,7 @@ local function test_invalid_new_and_set_time_units(cg, new_test)
             t.fail('misconfig')
         end
         -- Check for required error.
-        t.assert_error_msg_contains(error, tester, set)
+        tester(set, error)
     end
 
     local function multiple_test(set_multiple)
