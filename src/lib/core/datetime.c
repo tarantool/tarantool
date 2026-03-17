@@ -23,6 +23,13 @@
 #include "mp_extension_types.h"
 
 #include "fiber.h"
+#include "core/tweaks.h"
+
+/**
+ * Enables timestamp type check in dt_obj:set().
+ */
+static bool datetime_setfn_timestamp_type_check = false;
+TWEAK_BOOL(datetime_setfn_timestamp_type_check);
 
 /**
  * Floored modulo and divide.
