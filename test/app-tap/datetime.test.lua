@@ -279,6 +279,8 @@ test:test("Simple date creation by attributes", function(test)
     test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
 end)
 
+-- This suite is moved to app-luatest/datetime_test.lua
+-- and is deprecated to update here.
 test:test("Simple date creation by attributes - check failed", function(test)
     test:plan(93)
 
@@ -2941,6 +2943,8 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
 end)
 
 
+-- This suite is moved to app-luatest/datetime_test.lua
+-- and is deprecated to update here.
 test:test("Time invalid :set{} operations", function(test)
     test:plan(94)
 
