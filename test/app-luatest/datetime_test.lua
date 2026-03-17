@@ -1,5 +1,58 @@
 local t = require('luatest')
 local dt = require('datetime')
+local fun = require('fun')
+local checks = require('checks')
+local compat = require('compat')
+
+-- {{{ Datetime module and related helper constants.
+
+-- Minimum supported date: -5879610-06-22.
+local MIN_DATE_YEAR = -5879610
+local MIN_DATE_MONTH = 6
+local MIN_DATE_DAY = 22
+-- Maximum supported date: 5879611-07-11.
+local MAX_DATE_YEAR = 5879611
+local MAX_DATE_MONTH = 7
+local MAX_DATE_DAY = 11
+
+local MIN_TZOFFSET = -12 * 60
+local MAX_TZOFFSET = 14 * 60
+
+local YEAR_RANGE = {MIN_DATE_YEAR, MAX_DATE_YEAR}
+local MONTH_RANGE = {1, 12}
+local DAY_RANGE = {1, 31}
+local HOUR_RANGE = {0, 23}
+local MINUTE_RANGE = {0, 59}
+local SEC_RANGE = {0, 60}
+local MSEC_RANGE = {0, 1E3}
+local USEC_RANGE = {0, 1E6}
+local NSEC_RANGE = {0, 1E9}
+local TZOFFSET_RANGE = {MIN_TZOFFSET, MAX_TZOFFSET}
+
+-- }}} Datetime module and related helper constants.
+
+-- {{{ Common utils.
+
+local function get_single_key_val(arg, table_expected)
+    local key, val
+    if type(arg) == 'table' then
+        local count = 0
+        for k, v in pairs(arg) do
+            key, val = k, v
+            count = count + 1
+        end
+        t.fail_if(key == nil, 'misconfig: expected table {key = val}')
+        t.fail_if(val == nil, 'misconfig: expected table {key = val}')
+        t.fail_if(count > 1, 'misconfig: expected table {key = val}')
+    else
+        t.fail_if(table_expected, 'misconfig: expected table')
+        key = nil
+        val = arg
+    end
+    return key, val
+end
+
+-- }}} Common utils.
 
 local SUPPORTED_DATETIME_FORMATS = {
     ['RFC3339 AND ISO8601'] = {
@@ -2098,3 +2151,416 @@ for supported_by, standard_cases in pairs(UNSUPPORTED_DATETIME_FORMATS) do
         end
     end
 end
+
+-- {{{ new() and set() invalid args test.
+
+local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
+    only_one_of = 'only one of nsec, usec or msecs may be defined'..
+        ' simultaneously',
+    only_integer_ts = 'only integer values allowed in timestamp'..
+        ' if nsec, usec, or msecs provided',
+    timestamp_and_ymd = 'timestamp is not allowed if year/month/day provided',
+    timestamp_and_hms = 'timestamp is not allowed if hour/min/sec provided',
+
+    only_integer_msg = function(set_arg)
+        local key, _ = get_single_key_val(set_arg, true)
+        return key .. ': integer value expected, but received number'
+    end,
+
+    numeric_exp = function(set_arg)
+        local _, val = get_single_key_val(set_arg, true)
+        return 'numeric value expected, but received '..type(val)
+    end,
+
+    expected_type = function(set_arg, typename, msg)
+        local _, val = get_single_key_val(set_arg, false)
+        return ("%s: expected %s, but received %s"):format(msg, typename, type(val))
+    end,
+
+    expected_type2 = function(set_arg, what_expected)
+        local key, val = get_single_key_val(set_arg, true)
+        return ("%s: %s expected, but received %s"):format(key, what_expected, val)
+    end,
+
+    range_check_error = function(set_arg, range)
+        local key, val = get_single_key_val(set_arg, true)
+        return ('value %s of %s is out of allowed range [%s, %s]'):
+              format(val, key, range[1], range[2])
+    end,
+
+    range_check_3_error = function(set_arg, range)
+        local key, val = get_single_key_val(set_arg, true)
+        return ('value %d of %s is out of allowed range [%d, %d..%d]'):
+            format(val, key, range[1], range[2], range[3])
+    end,
+
+    invalid_days_in_mon = function(set_arg)
+        local msg = 'misconfig: expected table {day = d, month = M, year = y}'
+        local d, M, y = set_arg.day, set_arg.month, set_arg.year
+        t.fail_if(d == nil, msg)
+        t.fail_if(M == nil, msg)
+        t.fail_if(y == nil, msg)
+        return ('invalid number of days %d in month %d for %d'):format(d, M, y)
+    end,
+
+    invalid_date = function(set_arg)
+        local msg = 'misconfig: expected table {day = d, month = M, year = y}'
+        local d, M, y = set_arg.day, set_arg.month, set_arg.year
+        t.fail_if(d == nil, msg)
+        t.fail_if(M == nil, msg)
+        t.fail_if(y == nil, msg)
+        return ('date %d-%02d-%02d is invalid'):format(y, M, d)
+    end,
+}
+
+local INVALID_NEW_AND_SET_TIME_UNITS = {
+    -- Fractional unit mix tests.
+    {
+        set = {nsec = 123456, usec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {nsec = 123456, msec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {usec = 123, msec = 123},
+        err_key = 'only_one_of',
+    },
+    {
+        set = {nsec = 123456, usec = 123, msec = 123},
+        err_key = 'only_one_of',
+    },
+    -- Timestamp plus units mixed tests.
+    {
+        set = {timestamp = 12345.125, msec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 12345.125, usec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 12345.125, nsec = 123},
+        err_key = 'only_integer_ts',
+    },
+    {
+        set = {timestamp = 1630359071.125, year = 2021},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, month = 9},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, day = 29},
+        err_key = 'timestamp_and_ymd',
+    },
+    {
+        set = {timestamp = 1630359071.125, hour = 20},
+        err_key = 'timestamp_and_hms',
+    },
+    {
+        set = {timestamp = 1630359071.125, min = 10},
+        err_key = 'timestamp_and_hms',
+    },
+    {
+        set = {timestamp = 1630359071.125, sec = 29},
+        err_key = 'timestamp_and_hms',
+    },
+    -- Type tests.
+    {
+        set_multiple = {'2001-01-01', 20010101},
+        err_fn = 'expected_type',
+        _new = {err_fn_args = {'table', 'datetime.new()'}},
+        _set = {err_fn_args = {'table', 'datetime.set()'}},
+    },
+    {
+        set_multiple = {{year = {}}, {year = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {year = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{month = {}}, {month = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {month = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{day = {}}, {day = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {day = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{hour = {}}, {hour = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {hour = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{min = {}}, {min = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {min = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{sec = {}}, {sec = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {sec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{msec = {}}, {msec = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {msec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{usec = {}}, {usec = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {usec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{nsec = {}}, {nsec = dt.new()}},
+        err_fn = 'numeric_exp',
+    },
+    {
+        set = {nsec = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set_multiple = {{tzoffset = {}}, {tzoffset = dt.new()}},
+        err_fn = 'expected_type2',
+        err_fn_args = {'string or number'},
+    },
+    {
+        set = {tzoffset = 1.1},
+        err_fn = 'only_integer_msg',
+    },
+    {
+        set = {tz = 400},
+        err_fn = 'expected_type',
+        err_fn_args = {'string', 'parse_tzname()'},
+    },
+    -- Single unit range tests.
+    {
+        set_range = {'year', YEAR_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {YEAR_RANGE},
+    },
+    {
+        set_range = {'month', MONTH_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {MONTH_RANGE},
+    },
+    {
+        set_range = {'day', DAY_RANGE},
+        err_fn = 'range_check_3_error',
+        err_fn_args = {{-1, 1, 31}},
+    },
+    {
+        set_range = {'hour', HOUR_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {HOUR_RANGE},
+    },
+    {
+        set_range = {'min', MINUTE_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {MINUTE_RANGE},
+    },
+    {
+        set_range = {'sec', SEC_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {SEC_RANGE},
+    },
+    {
+        set_range = {'msec', MSEC_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {MSEC_RANGE},
+    },
+    {
+        set_range = {'usec', USEC_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {USEC_RANGE},
+    },
+    {
+        set_range = {'nsec', NSEC_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {NSEC_RANGE},
+    },
+    {
+        set_range = {'tzoffset', TZOFFSET_RANGE},
+        err_fn = 'range_check_error',
+        err_fn_args = {TZOFFSET_RANGE},
+    },
+    -- Date range tests.
+    {
+        set = {year = 2021, month = 6, day = 31},
+        err_fn = 'invalid_days_in_mon',
+    },
+    {
+        set = {year = MIN_DATE_YEAR, month = MIN_DATE_MONTH - 1, day = 1},
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {
+            year = MIN_DATE_YEAR,
+            month = MIN_DATE_MONTH,
+            day = MIN_DATE_DAY - 1
+        },
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {
+            year = MAX_DATE_YEAR,
+            month = MAX_DATE_MONTH,
+            day = MAX_DATE_DAY + 1
+        },
+        err_fn = 'invalid_date',
+    },
+    {
+        set = {year = MAX_DATE_YEAR, month = MAX_DATE_MONTH + 1, day = 1},
+        err_fn = 'invalid_date',
+    },
+}
+
+-- The test covers new() and set() errors due to invalid arguments passed.
+local function test_invalid_new_and_set_time_units(cg, new_test)
+    local par = cg.params
+    local function check_par(_)
+        checks({
+            -- The reason to skip test.
+            skip = '?string',
+            -- Table with compat option required for test.
+            compat = '?table',
+            -- Test set for single test.
+            set = '?',
+            -- Run several single tests with same error.
+            set_multiple = '?table',
+            -- Test set for range test.
+            -- It runs several single tests.
+            set_range = '?table',
+            -- Raw error message.
+            err_msg = '?string',
+            -- Key of raw error message in a table
+            -- INVALID_NEW_AND_SET_TIME_UNITS_ERRORS (T).
+            err_key = '?string',
+            -- Key of function, generating error message in T.
+            -- It's first arg is `set`.
+            err_fn = '?string',
+            -- Addidional args for `err_fn`.
+            err_fn_args = '?table',
+            -- Overrides for new() test.
+            _new = '?table',
+            -- Overrides for set() test.
+            _set = '?table',
+        })
+    end
+    check_par(par)
+
+    -- Function related params adjustment.
+    local p
+    if new_test and par._new ~= nil then
+        p = fun.chain(par, par._new):tomap()
+    elseif not new_test and par._set ~= nil then
+        p = fun.chain(par, par._set):tomap()
+    else
+        p = par
+    end
+    t.skip_if(p.skip ~= nil, p.skip)
+
+    local function new_tester(set) dt.new(set) end
+    local function set_tester(set) dt.new():set(set) end
+    local tester = new_test and new_tester or set_tester
+
+    local function single_test(set)
+        -- Prepare test error message.
+        local error
+        if p.err_key ~= nil then
+            error = INVALID_NEW_AND_SET_TIME_UNITS_ERRORS[p.err_key]
+        elseif p.err_fn ~= nil then
+            local fn = INVALID_NEW_AND_SET_TIME_UNITS_ERRORS[p.err_fn]
+            t.fail_if(type(fn) ~= 'function', 'misconfig')
+            local err_fn_args = p.err_fn_args or {}
+            error = fn(set, unpack(err_fn_args))
+        elseif p.err_msg ~= nil then
+            error = p.err_msg
+        else
+            t.fail('misconfig')
+        end
+        -- Check for required error.
+        t.assert_error_msg_contains(error, tester, set)
+    end
+
+    local function multiple_test(set_multiple)
+        t.fail_if(type(set_multiple) ~= 'table', 'misconfig')
+        for _, set in pairs(set_multiple) do
+            single_test(set)
+        end
+    end
+
+    local function range_test(key, range)
+        t.fail_if(type(key) ~= 'string', 'misconfig')
+        t.fail_if(type(range) ~= 'table', 'misconfig')
+        local min, max = range[1], range[2]
+        t.fail_if(min == nil, 'misconfig')
+        t.fail_if(max == nil, 'misconfig')
+        single_test({[key] = min - 1})
+        single_test({[key] = min - 50})
+        single_test({[key] = max + 1})
+        single_test({[key] = max + 50})
+    end
+
+    -- Switch compat settings if required.
+    if p.compat ~= nil then
+        local k, v = get_single_key_val(p.compat, true)
+        compat[k] = v
+    end
+    -- Run test.
+    if p.set ~= nil then
+        single_test(p.set)
+    elseif p.set_multiple ~= nil then
+        multiple_test(p.set_multiple)
+    elseif p.set_range ~= nil then
+        range_test(p.set_range[1], p.set_range[2])
+    else
+        t.fail('misconfig')
+    end
+    -- Restore compat settings to default.
+    if p.compat ~= nil then
+        local k, _ = get_single_key_val(p.compat, true)
+        compat[k] = 'default'
+    end
+end
+
+local g_fail_time_units = t.group('fail_time_units',
+    INVALID_NEW_AND_SET_TIME_UNITS)
+
+g_fail_time_units.test_new = function(cg)
+    test_invalid_new_and_set_time_units(cg, true)
+end
+
+g_fail_time_units.test_set = function(cg)
+    test_invalid_new_and_set_time_units(cg, false)
+end
+
+-- }}} new() and set() invalid args test.
