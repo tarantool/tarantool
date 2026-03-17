@@ -412,6 +412,13 @@ I['compat.yaml_pretty_multiline'] = format_text([[
     - `old` (2.x default): only strings containing the `\n\n` substring
 ]])
 
+I['compat.datetime_setfn_timestamp_type_check'] = format_text([[
+    Whether to check timestamp type in datetime obj:set().
+
+    - `new` (4.x default): check for number type
+    - `old` (3.x default): don't check
+]])
+
 -- }}} compat configuration
 
 -- {{{ config configuration

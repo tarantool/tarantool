@@ -7,6 +7,7 @@ local ffi = require('ffi')
 local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
+local compat = require('compat')
 
 test:plan(44)
 
@@ -90,6 +91,10 @@ end
 
 local function invalid_date_fmt_error(str)
     return ('invalid date format %s'):format(str)
+end
+
+local function invalid_timestamp_type_error(ts)
+    return ('bad timestamp (\'number\' expected, got \'%s\')'):format(type(ts))
 end
 
 local function assert_raises(test, error_msg, func, ...)
@@ -280,7 +285,7 @@ test:test("Simple date creation by attributes", function(test)
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(93)
+    test:plan(95)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -367,6 +372,10 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp_type_error('1630359071.125'),
+            {timestamp = '1630359071.125'}},
+        {invalid_timestamp_type_error(true),
+            {timestamp = true}},
         {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.new()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -2859,6 +2868,11 @@ test:test("Time :set{} operations", function(test)
     -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
             '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125' )
+    -- When 'new' is set, this leads to error. That is checked in luatest.
+    if compat.datetime_setfn_timestamp_type_check == 'old' then
+        test:is(tostring(ts:set{timestamp = '1630359071.125'}),
+                '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125')
+    end
     test:is(tostring(ts:set{ msec = 123}), '2021-08-30T21:31:11.123+0800',
             'msec = 123')
     test:is(tostring(ts:set{ usec = 123}), '2021-08-30T21:31:11.000123+0800',

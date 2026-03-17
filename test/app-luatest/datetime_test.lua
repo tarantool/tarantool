@@ -1,5 +1,6 @@
 local t = require('luatest')
 local dt = require('datetime')
+local compat = require('compat')
 
 -- -- Datetime module constants.
 
@@ -2159,6 +2160,11 @@ local INVALID_SET_OPERATIONS_ERRORS = {
         return ("%s: %s expected, but received %s"):format(key, what_expected, val)
     end,
 
+    expected_type3 = function(set_arg, what_expected)
+        local key, val = get_single_key_val(set_arg, true)
+        return ("bad %s ('%s' expected, got '%s')"):format(key, what_expected, type(val))
+    end,
+
     range_check_error = function(set_arg, range)
         local key, val = get_single_key_val(set_arg, true)
         return ('value %s of %s is out of allowed range [%s, %s]'):
@@ -2289,6 +2295,23 @@ local INVALID_SET_OPERATIONS = {
     {
         set = {nsec = 1.1},
         err_fn = 'only_integer_msg',
+    },
+    {
+        datetime_setfn_timestamp_type_check = 'new',
+        set = {timestamp = '3600.1'},
+        err_fn = 'expected_type3',
+        err_fn_args = {'number'},
+    },
+    {
+        datetime_setfn_timestamp_type_check = 'new',
+        set = {timestamp = true},
+        err_fn = 'expected_type3',
+        err_fn_args = {'number'},
+    },
+    {
+        datetime_setfn_timestamp_type_check = 'old',
+        set = {timestamp = true},
+        err_msg = 'bad argument #1 to \'math_modf\' (number expected, got boolean)',
     },
     {
         set = {tzoffset = 1.1},
@@ -2565,5 +2588,15 @@ g_set_fail.test = function(cg)
     else
         t.fail('misconfig')
     end
+
+    local c1 = p.datetime_setfn_timestamp_type_check
+    if c1 ~= nil then
+        compat.datetime_setfn_timestamp_type_check = c1
+    end
+
     t.assert_error_msg_contains(error, dt_set)
+
+    if c1 ~= nil then
+        compat.datetime_setfn_timestamp_type_check = 'default'
+    end
 end
