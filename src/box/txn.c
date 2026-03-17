@@ -935,8 +935,7 @@ txn_on_journal_write(struct journal_entry *entry)
 		if (txn->fiber != NULL)
 			fiber_wakeup(txn->fiber);
 		assert(txn->limbo_entry->lsn == lsn);
-		if (txn_has_flag(txn, TXN_WAIT_ACK))
-			txn_limbo_ack(&txn_limbo, ack_origin_id, lsn);
+		txn_limbo_ack(&txn_limbo, ack_origin_id, lsn);
 	}
 finish:
 	fiber_set_txn(fiber(), NULL);
