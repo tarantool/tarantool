@@ -2211,6 +2211,18 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
         t.fail_if(y == nil, msg)
         return ('date %d-%02d-%02d is invalid'):format(y, M, d)
     end,
+
+    couldnt_parse_tz = function(set_arg, msg_tail)
+        checks('?', '?string')
+        msg_tail = msg_tail or ''
+        local _, val = get_single_key_val(set_arg, true)
+        return ('could not parse \'%s\''):format(val)..msg_tail
+    end,
+
+    invalid_tzoffset_fmt_error = function(set_arg)
+        local _, val = get_single_key_val(set_arg, true)
+        return ('invalid time-zone format %s'):format(val)
+    end,
 }
 
 local INVALID_NEW_AND_SET_TIME_UNITS = {
@@ -2361,6 +2373,40 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
         err_fn = 'expected_type',
         err_fn_args = {'string', 'parse_tzname()'},
     },
+    -- Tzoffset parse tests.
+    {
+        set_multiple = {
+            {tzoffset = '+03:00 what?'},
+            {tzoffset = '-0000 '},
+            {tzoffset = '+0000 '},
+            {tzoffset = 'bogus'},
+            {tzoffset = '0100'},
+            {tzoffset = '+-0100'},
+            {tzoffset = '+25:00'},
+            {tzoffset = '+9900'},
+            {tzoffset = '-99:00'},
+        },
+        err_fn = 'invalid_tzoffset_fmt_error',
+    },
+    -- Timezone parse tests.
+    {
+        set = {tz = 'zzzYYYwww'},
+        err_fn = 'couldnt_parse_tz',
+    },
+    -- See lib/tzcode/timezones.h for erroneous zones.
+    {
+        -- Zones with TZ_AMBIGUOUS flag.
+        set = {tz = 'ECT'},
+        err_fn = 'couldnt_parse_tz',
+        err_fn_args = {' - ambiguous timezone'},
+    },
+    -- For now, there are no zones with TZ_NYI flag.
+    -- {
+    --     -- Zones with TZ_NYI flag.
+    --     set = {tz = '?'},
+    --     err_fn = 'couldnt_parse_tz',
+    --     err_fn_args = {' - nyi timezone'},
+    -- },
     -- Single unit range tests.
     {
         set_range = {'year', YEAR_RANGE},
@@ -2488,8 +2534,19 @@ local function test_invalid_new_and_set_time_units(cg, new_test)
     end
     t.skip_if(p.skip ~= nil, p.skip)
 
-    local function new_tester(set) dt.new(set) end
-    local function set_tester(set) dt.new():set(set) end
+    local function new_tester(set, expected_error)
+        t.assert_error_msg_contains(expected_error, dt.new, set)
+    end
+    local function set_tester(set, expected_error)
+        local d = dt.new({
+            year = 2021, month = 2, day = 3,
+            hour = 12, min = 34, sec = 56,
+            nsec = 123456789, tz = 'Europe/Moscow'})
+        local before = d:totable()
+        t.assert_error_msg_contains(expected_error, d.set, d, set)
+        local after = d:totable()
+        t.assert_equals(after, before, 'd was changed')
+    end
     local tester = new_test and new_tester or set_tester
 
     local function single_test(set)
@@ -2508,7 +2565,7 @@ local function test_invalid_new_and_set_time_units(cg, new_test)
             t.fail('misconfig')
         end
         -- Check for required error.
-        t.assert_error_msg_contains(error, tester, set)
+        tester(set, error)
     end
 
     local function multiple_test(set_multiple)

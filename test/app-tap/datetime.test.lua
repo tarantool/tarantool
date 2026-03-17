@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(42)
+test:plan(41)
 
 local INT_MAX = 2147483647
 
@@ -63,10 +63,6 @@ end
 local function ival_overflow(op, name, value, max)
     return ('%s moves value %s of %s out of allowed range [%s, %s]'):
             format(op, value, name, -max, max)
-end
-
-local function invalid_tz_fmt_error(val)
-    return ('invalid time-zone format %s'):format(val)
 end
 
 local function invalid_date_fmt_error(str)
@@ -2807,38 +2803,6 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
             format(tostring(ts), tostring(ts2)))
     test:is_deeply(ts:totable(), ts2:totable(),
         ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
-end)
-
-test:test("Time invalid tzoffset in :set{} operations", function(test)
-    test:plan(13)
-
-    local ts = date.new{}
-    local bad_strings = {
-        '+03:00 what?',
-        '-0000 ',
-        '+0000 ',
-        'bogus',
-        '0100',
-        '+-0100',
-        '+25:00',
-        '+9900',
-        '-99:00',
-    }
-    for _, val in ipairs(bad_strings) do
-        assert_raises(test, invalid_tz_fmt_error(val),
-                      function() ts:set{ tzoffset = val } end)
-    end
-
-    local bad_numbers = {
-        880,
-        -800,
-        10000,
-        -10000,
-    }
-    for _, val in ipairs(bad_numbers) do
-        assert_raises(test, range_check_error('tzoffset', val, {-720, 840}),
-                      function() ts:set{ tzoffset = val } end)
-    end
 end)
 
 test:test("Time :set{day = -1} operations", function(test)
