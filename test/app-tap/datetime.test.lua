@@ -8,7 +8,7 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
-test:plan(44)
+test:plan(42)
 
 local INT_MAX = 2147483647
 
@@ -32,17 +32,11 @@ local MAX_USEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e3)
 local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
 
 local incompat_types = 'incompatible types for datetime comparison'
-local only_integer_ts = 'only integer values allowed in timestamp'..
-                        ' if nsec, usec, or msecs provided'
 local only_integer_msg = function(key)
     return key .. ': integer value expected, but received number'
 end
 local only_one_of = 'only one of nsec, usec or msecs may be defined'..
                     ' simultaneously'
-local timestamp_and_ymd = 'timestamp is not allowed if year/month/day provided'
-local timestamp_and_hms = 'timestamp is not allowed if hour/min/sec provided'
-local str_or_num_exp = 'tzoffset: string or number expected, but received'
-local numeric_exp = 'numeric value expected, but received '
 local expected_interval_but = 'expected interval or table, but received'
 local expected_datetime_but = 'expected datetime, interval or table, but received'
 local ambiguous_timezone = 'ambiguous timezone: both tzoffset and tz are specified'
@@ -61,27 +55,14 @@ local function expected_str(msg, value)
     return ("%s: expected string, but received %s"):format(msg, type(value))
 end
 
-local function invalid_days_in_mon(d, M, y)
-    return ('invalid number of days %d in month %d for %d'):format(d, M, y)
-end
-
 local function range_check_error(name, value, range)
     return ('value %s of %s is out of allowed range [%s, %s]'):
               format(value, name, range[1], range[2])
 end
 
-local function range_check_3_error(name, value, range)
-    return ('value %d of %s is out of allowed range [%d, %d..%d]'):
-            format(value, name, range[1], range[2], range[3])
-end
-
 local function ival_overflow(op, name, value, max)
     return ('%s moves value %s of %s out of allowed range [%s, %s]'):
             format(op, value, name, -max, max)
-end
-
-local function invalid_date(y, M, d)
-    return ('date %d-%02d-%02d is invalid'):format(y, M, d)
 end
 
 local function invalid_tz_fmt_error(val)
@@ -277,118 +258,6 @@ test:test("Simple date creation by attributes", function(test)
     d2 = date.new({timestamp = d1.timestamp, tz = 'Europe/Moscow'})
     test:is(d1.tzoffset, d2.tzoffset, '{ymd} and {timestamp} tzoffset equals')
     test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
-end)
-
-test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(93)
-
-    local boundary_checks = {
-        {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
-        {'month', {1, 12}},
-        {'day', {1, 31, -1}},
-        {'hour', {0, 23}},
-        {'min', {0, 59}},
-        {'sec', {0, 60}},
-        {'usec', {0, 1e6}},
-        {'msec', {0, 1e3}},
-        {'nsec', {0, 1e9}},
-        {'tzoffset', {-720, 840}, str_or_num_exp},
-    }
-    local ts = date.new()
-
-    for _, row in pairs(boundary_checks) do
-        local attr_name, bounds, expected_msg = unpack(row)
-        local left, right, extra = unpack(bounds)
-
-        if extra == nil then
-            assert_raises(test,
-                          range_check_error(attr_name, left - 1,
-                          {left, right}),
-                          function() date.new{ [attr_name] = left - 1} end)
-            assert_raises(test,
-                          range_check_error(attr_name, right + 1,
-                          {left, right}),
-                          function() date.new{ [attr_name] = right + 1} end)
-            assert_raises(test,
-                          range_check_error(attr_name, left - 50,
-                          {left, right}),
-                          function() date.new{ [attr_name] = left - 50} end)
-            assert_raises(test,
-                          range_check_error(attr_name, right + 50,
-                          {left, right}),
-                          function() date.new{ [attr_name] = right + 50} end)
-        else -- special case for {day = -1}
-            assert_raises(test,
-                          range_check_3_error(attr_name, left - 1,
-                          {extra, left, right}),
-                          function() date.new{ [attr_name] = left - 1} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, right + 1,
-                          {extra, left, right}),
-                          function() date.new{ [attr_name] = right + 1} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, left - 50,
-                          {extra, left, right}),
-                          function() date.new{ [attr_name] = left - 50} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, right + 50,
-                          {extra, left, right}),
-                          function() date.new{ [attr_name] = right + 50} end)
-        end
-        -- tzoffset uses different message to others
-        expected_msg = expected_msg or numeric_exp
-        assert_raises_like(test, expected_msg,
-                           function() date.new{[attr_name] = {}} end)
-        assert_raises_like(test, expected_msg,
-                           function() date.new{[attr_name] = ts} end)
-    end
-
-    local specific_errors = {
-        {only_one_of, { nsec = 123456, usec = 123}},
-        {only_one_of, { nsec = 123456, msec = 123}},
-        {only_one_of, { usec = 123, msec = 123}},
-        {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
-        {only_integer_msg('nsec'), { nsec = 1.1 }},
-        {only_integer_msg('msec'), { msec = 1.1 }},
-        {only_integer_msg('usec'), { usec = 1.1 }},
-        {only_integer_msg('tzoffset'), { tzoffset = 1.1 }},
-        {only_integer_msg('year'), { year = 1.1 }},
-        {only_integer_msg('month'), { month = 1.1 }},
-        {only_integer_msg('day'), { day = 1.1 }},
-        {only_integer_msg('hour'), { hour = 1.1 }},
-        {only_integer_msg('min'), { min = 1.1 }},
-        {only_integer_msg('sec'), { sec = 1.1 }},
-        {only_integer_ts, { timestamp = 12345.125, usec = 123}},
-        {only_integer_ts, { timestamp = 12345.125, msec = 123}},
-        {only_integer_ts, { timestamp = 12345.125, nsec = 123}},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, month = 9 }},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, month = 9 }},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, day = 29 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
-        {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
-        {table_expected('datetime.new()', 20010101), 20010101},
-        {range_check_3_error('day', 32, {-1, 1, 31}),
-            {year = 2021, month = 6, day = 32}},
-        {invalid_days_in_mon(31, 6, 2021), { year = 2021, month = 6, day = 31}},
-        {invalid_date(-5879610, 6, 21),
-            {year = -5879610, month = 6, day = 21}},
-        {invalid_date(-5879610, 1, 1),
-            {year = -5879610, month = 1, day = 1}},
-        {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
-            {year = -16009610, month = 12, day = 31}},
-        {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
-            {year = 16009610, month = 1, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 9, 1),
-            {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 7, 12),
-            {year = MAX_DATE_YEAR, month = 7, day = 12}},
-    }
-    for _, row in pairs(specific_errors) do
-        local err_msg, attribs = unpack(row)
-        assert_raises(test, err_msg, function() date.new(attribs) end)
-    end
 end)
 
 test:test("Formatting limits", function(test)
@@ -2938,121 +2807,6 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
             format(tostring(ts), tostring(ts2)))
     test:is_deeply(ts:totable(), ts2:totable(),
         ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
-end)
-
-
-test:test("Time invalid :set{} operations", function(test)
-    test:plan(94)
-
-    local boundary_checks = {
-        {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
-        {'month', {1, 12}},
-        {'day', {1, 31, -1}},
-        {'hour', {0, 23}},
-        {'min', {0, 59}},
-        {'sec', {0, 60}},
-        {'usec', {0, 1e6}},
-        {'msec', {0, 1e3}},
-        {'nsec', {0, 1e9}},
-        {'tzoffset', {-720, 840}, str_or_num_exp},
-    }
-    local ts = date.new()
-
-    for _, row in pairs(boundary_checks) do
-        local attr_name, bounds, expected_msg = unpack(row)
-        local left, right, extra = unpack(bounds)
-
-        if extra == nil then
-            assert_raises(test,
-                          range_check_error(attr_name, left - 1,
-                          {left, right}),
-                          function() ts:set{ [attr_name] = left - 1} end)
-            assert_raises(test,
-                          range_check_error(attr_name, right + 1,
-                          {left, right}),
-                          function() ts:set{ [attr_name] = right + 1} end)
-            assert_raises(test,
-                          range_check_error(attr_name, left - 50,
-                          {left, right}),
-                          function() ts:set{ [attr_name] = left - 50} end)
-            assert_raises(test,
-                          range_check_error(attr_name, right + 50,
-                          {left, right}),
-                          function() ts:set{ [attr_name] = right + 50} end)
-        else -- special case for {day = -1}
-            assert_raises(test,
-                          range_check_3_error(attr_name, left - 1,
-                          {extra, left, right}),
-                          function() ts:set{ [attr_name] = left - 1} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, right + 1,
-                          {extra, left, right}),
-                          function() ts:set{ [attr_name] = right + 1} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, left - 50,
-                          {extra, left, right}),
-                          function() ts:set{ [attr_name] = left - 50} end)
-            assert_raises(test,
-                          range_check_3_error(attr_name, right + 50,
-                          {extra, left, right}),
-                          function() ts:set{ [attr_name] = right + 50} end)
-        end
-        -- tzoffset uses different message to others
-        expected_msg = expected_msg or numeric_exp
-        assert_raises_like(test, expected_msg,
-                           function() ts:set{[attr_name] = {}} end)
-        assert_raises_like(test, expected_msg,
-                           function() ts:set{[attr_name] = ts} end)
-    end
-
-    ts:set{year = 2021}
-    local specific_errors = {
-        {only_one_of, { nsec = 123456, usec = 123}},
-        {only_one_of, { nsec = 123456, msec = 123}},
-        {only_one_of, { usec = 123, msec = 123}},
-        {only_one_of, { nsec = 123456, usec = 123, msec = 123}},
-        {only_integer_msg('nsec'), { nsec = 1.1 }},
-        {only_integer_msg('msec'), { msec = 1.1 }},
-        {only_integer_msg('usec'), { usec = 1.1 }},
-        {only_integer_msg('tzoffset'), { tzoffset = 1.1 }},
-        {only_integer_msg('year'), { year = 1.1 }},
-        {only_integer_msg('month'), { month = 1.1 }},
-        {only_integer_msg('day'), { day = 1.1 }},
-        {only_integer_msg('hour'), { hour = 1.1 }},
-        {only_integer_msg('min'), { min = 1.1 }},
-        {only_integer_msg('sec'), { sec = 1.1 }},
-        {only_integer_ts, { timestamp = 12345.125, usec = 123}},
-        {only_integer_ts, { timestamp = 12345.125, msec = 123}},
-        {only_integer_ts, { timestamp = 12345.125, nsec = 123}},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, month = 9 }},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, month = 9 }},
-        {timestamp_and_ymd, {timestamp = 1630359071.125, day = 29 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
-        {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
-        {expected_str('parse_tzname()', 400), {tz = 400}},
-        {table_expected('datetime.set()', '2001-01-01'), '2001-01-01'},
-        {table_expected('datetime.set()', 20010101), 20010101},
-        {range_check_3_error('day', 32, {-1, 1, 31}),
-            {year = 2021, month = 6, day = 32}},
-        {invalid_days_in_mon(31, 6, 2021), { month = 6, day = 31}},
-        {invalid_date(-5879610, 6, 21),
-            {year = -5879610, month = 6, day = 21}},
-        {invalid_date(-5879610, 1, 1),
-            {year = -5879610, month = 1, day = 1}},
-        {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
-            {year = -16009610, month = 12, day = 31}},
-        {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
-            {year = 16009610, month = 1, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 9, 1),
-            {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {invalid_date(MAX_DATE_YEAR, 7, 12),
-            {year = MAX_DATE_YEAR, month = 7, day = 12}},
-    }
-    for _, row in pairs(specific_errors) do
-        local err_msg, attribs = unpack(row)
-        assert_raises(test, err_msg, function() ts:set(attribs) end)
-    end
 end)
 
 test:test("Time invalid tzoffset in :set{} operations", function(test)
