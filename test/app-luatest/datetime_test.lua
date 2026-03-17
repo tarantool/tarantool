@@ -2174,6 +2174,11 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
         return ("%s: %s expected, but received %s"):format(key, what_expected, val)
     end,
 
+    expected_type3 = function(set_arg, what_expected)
+        local key, val = get_single_key_val(set_arg, true)
+        return ("bad %s ('%s' expected, got '%s')"):format(key, what_expected, type(val))
+    end,
+
     range_check_error = function(set_arg, range)
         local key, val = get_single_key_val(set_arg, true)
         return ('value %s of %s is out of allowed range [%s, %s]'):
@@ -2306,6 +2311,25 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
     {
         set = {nsec = 1.1},
         err_fn = 'only_integer_msg',
+    },
+    {
+        set = {timestamp = '3600.1'},
+        err_fn = 'expected_type3',
+        err_fn_args = {'number'},
+        _set = {compat = {datetime_setfn_timestamp_type_check = 'new'}},
+    },
+    {
+        set = {timestamp = true},
+        err_fn = 'expected_type3',
+        err_fn_args = {'number'},
+        _set = {compat = {datetime_setfn_timestamp_type_check = 'new'}},
+    },
+    {
+        compat = {datetime_setfn_timestamp_type_check = 'old'},
+        set = {timestamp = true},
+        err_msg = 'bad argument #1 to \'math_modf\' '..
+            '(number expected, got boolean)',
+        _new = {skip = 'only set() - old behaviour'},
     },
     {
         set = {tzoffset = 1.1},
