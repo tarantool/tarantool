@@ -1,6 +1,7 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
 local tz = require('timezones')
+local tweaks = require('internal.tweaks')
 
 --[[
     `c-dt` library functions handles properly both positive and negative `dt`
@@ -606,7 +607,8 @@ local function extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, from_set)
     if hms then
         error('timestamp is not allowed if hour/min/sec provided', 3)
     end
-    if not from_set and type(ts) ~= 'number' then
+    if (not from_set or tweaks.datetime_setfn_timestamp_type_check) and
+        type(ts) ~= 'number' then
         error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
     end
     local epoch, fraction = math_modf(ts)
