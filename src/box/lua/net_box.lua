@@ -1389,7 +1389,7 @@ local function handle_eval_result(status, ...)
         rollback()
         return box.error(E_PROC_LUA, (...))
     end
-    return unpack({...})
+    return unpack({...}, 1, table.maxn({...}))
 end
 
 this_module.self = {
