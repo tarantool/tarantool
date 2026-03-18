@@ -124,26 +124,31 @@ create_fuzz_test(PREFIX http_parser
 
 create_fuzz_test(PREFIX swim_proto_member
                  SOURCES swim_proto_member_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES swim fuzzer_config
 )
 
 create_fuzz_test(PREFIX swim_proto_meta
                  SOURCES swim_proto_meta_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES swim fuzzer_config
 )
 
 create_fuzz_test(PREFIX datetime_parse_full
                  SOURCES datetime_parse_full_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES core fuzzer_config
 )
 
 create_fuzz_test(PREFIX datetime_strptime
                  SOURCES datetime_strptime_fuzzer.cc
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES core fuzzer_config
 )
 
 create_fuzz_test(PREFIX mp_datetime
                  SOURCES mp_datetime_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES core fuzzer_config
 )
 
@@ -153,46 +158,57 @@ create_fuzz_test(PREFIX vclock_from_string
 
 create_fuzz_test(PREFIX xrow_greeting_decode
                  SOURCES xrow_greeting_decode_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_id
                  SOURCES xrow_decode_id_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_auth
                  SOURCES xrow_decode_auth_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_begin
                  SOURCES xrow_decode_begin_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_call
                  SOURCES xrow_decode_call_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_dml
                  SOURCES xrow_decode_dml_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_raft
                  SOURCES xrow_decode_raft_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_sql
                  SOURCES xrow_decode_sql_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_watch
                  SOURCES xrow_decode_watch_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_header_decode
                  SOURCES xrow_header_decode_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 create_fuzz_test(PREFIX xrow_decode_error
                  SOURCES xrow_decode_error_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
 # Blocked by https://github.com/tarantool/tarantool/issues/8948.

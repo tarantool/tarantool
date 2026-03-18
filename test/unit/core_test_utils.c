@@ -28,29 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdint.h>
-#include <small/rlist.h>
 
 /**
  * Mock function to resolve circular dependencies in unit tests
  */
 void cord_on_yield(void)
 {
-}
-
-struct txn;
-
-RLIST_HEAD(txns);
-
-void
-txn_send_to_read_view(struct txn *txn, int64_t psn)
-{
-	(void)txn;
-	(void)psn;
-}
-
-void
-txn_abort_with_conflict(struct txn *txn)
-{
-	(void)txn;
 }

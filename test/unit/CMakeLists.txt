@@ -196,7 +196,7 @@ create_unit_test(PREFIX xmalloc
                  LIBRARIES unit
 )
 create_unit_test(PREFIX datetime
-                 SOURCES datetime.c
+                 SOURCES datetime.c core_test_utils.c
                  LIBRARIES tzcode core cdt unit
 )
 create_unit_test(PREFIX error

@@ -3,9 +3,6 @@
 
 #include "datetime.h"
 
-extern "C" void
-cord_on_yield(void) {}
-
 extern "C" int
 LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {

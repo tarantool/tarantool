@@ -4,6 +4,7 @@
 #include "vy_run.h"
 #include "fiber.h"
 #include <bit/bit.h>
+#include <small/rlist.h>
 #include <crc32.h>
 #include <box/vy_point_lookup.h>
 #include "vy_iterators_helper.h"
@@ -23,6 +24,12 @@ struct space_def *
 space_def_dup(const struct space_def *space_def) { return NULL; }
 void
 space_def_delete(struct space_def *space_def) {}
+struct txn;
+RLIST_HEAD(txns);
+void
+txn_send_to_read_view(struct txn *txn, int64_t psn) {}
+void
+txn_abort_with_conflict(struct txn *txn) {}
 
 static int
 write_run(struct vy_run *run, const char *dir_name,

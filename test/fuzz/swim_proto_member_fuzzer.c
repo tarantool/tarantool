@@ -28,8 +28,6 @@ tarantool_version_id()
     return 1;
 }
 
-void cord_on_yield() {}
-
 int
 LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
