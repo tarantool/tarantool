@@ -2,9 +2,6 @@
 #include "box/iproto_constants.h"
 #include "memory.h"
 
-void
-cord_on_yield(void) {}
-
 __attribute__((constructor))
 static void
 setup(void)

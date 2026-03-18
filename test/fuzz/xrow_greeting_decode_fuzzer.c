@@ -4,9 +4,6 @@
 #include "box/iproto_constants.h"
 #include "trivia/util.h"
 
-void
-cord_on_yield(void) {}
-
 int
 LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {

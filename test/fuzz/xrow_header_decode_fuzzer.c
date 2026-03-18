@@ -3,9 +3,6 @@
 #include "box/error.h"
 #include "memory.h"
 
-void
-cord_on_yield(void) {}
-
 static void
 fuzz_check_on_error(const struct mp_check_error *mperr)
 {

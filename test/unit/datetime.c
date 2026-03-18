@@ -19,9 +19,6 @@
 
 static const char sample[] = "2012-12-24T15:30Z";
 
-void
-cord_on_yield(void) {}
-
 #define S(s) {s, sizeof(s) - 1}
 struct {
 	const char *str;

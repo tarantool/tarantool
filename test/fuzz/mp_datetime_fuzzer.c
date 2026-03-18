@@ -15,6 +15,3 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	assert(datetime_validate(&ret));
 	return 0;
 }
-
-void
-cord_on_yield(void) {}
