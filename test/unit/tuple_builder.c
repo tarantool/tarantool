@@ -161,7 +161,7 @@ main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(NULL);
+	tuple_init();
 
 	int rc = test_tuple_builder();
 

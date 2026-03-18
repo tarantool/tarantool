@@ -51,8 +51,8 @@ struct key_part;
 extern struct tuple_format *tuple_format_runtime;
 
 /** Initialize tuple library */
-int
-tuple_init(field_name_hash_f hash);
+void
+tuple_init(void);
 
 /** Cleanup tuple library */
 void

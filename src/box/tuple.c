@@ -357,18 +357,17 @@ error:
 	return NULL;
 }
 
-int
-tuple_init(field_name_hash_f hash)
+void
+tuple_init(void)
 {
 	tuple_format_init();
-	field_name_hash = hash;
 	/*
 	 * Create a format for runtime tuples
 	 */
 	tuple_format_runtime = runtime_tuple_format_new(NULL, 0,
 							/*names_only=*/false);
 	if (tuple_format_runtime == NULL)
-		return -1;
+		panic("failed to create runtime tuple format");
 
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_runtime);
@@ -386,7 +385,6 @@ tuple_init(field_name_hash_f hash)
 	tuple_uploaded_refs = mh_tuple_uploaded_refs_new();
 
 	coll_id_cache_init();
-	return 0;
 }
 
 void

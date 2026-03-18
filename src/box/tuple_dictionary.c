@@ -35,8 +35,6 @@
 
 #include "PMurHash.h"
 
-field_name_hash_f field_name_hash;
-
 /** Free names hash and its content. */
 static inline void
 tuple_dictionary_delete_hash(struct mh_strnu32_t *hash)

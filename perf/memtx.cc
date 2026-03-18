@@ -98,7 +98,7 @@ private:
 		::space_cache_init();
 		::user_cache_init();
 		::session_init();
-		::tuple_init(nullptr);
+		::tuple_init();
 
 		/*
 		 * The fiber slice settings need to be tweaked, since this

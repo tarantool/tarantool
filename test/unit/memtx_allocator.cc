@@ -645,7 +645,7 @@ main()
 	clock_lowres_signal_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(NULL);
+	tuple_init();
 	struct quota quota;
 	quota_init(&quota, QUOTA_MAX);
 	struct slab_arena arena;
