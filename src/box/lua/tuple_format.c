@@ -120,7 +120,7 @@ box_tuple_format_serialize_impl(struct lua_State *L,
 
 	const char *data = format->data;
 	luamp_decode(L, luaL_msgpack_default, &data);
-	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 1);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.tuple_format", 1);
 	lua_getfield(L, -1, "denormalize_format");
 	lua_remove(L, -2);
 	lua_pushvalue(L, -2);
