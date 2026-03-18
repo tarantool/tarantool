@@ -36,7 +36,7 @@
 #include <spawn.h>
 
 #include "box/allocator.h"
-#include "lua/utils.h" /* lua_hash() */
+#include "lua/utils.h"
 #include "fiber_pool.h"
 #include <say.h>
 #include <scoped_guard.h>
@@ -6704,8 +6704,7 @@ box_init(void)
 	 */
 	session_init();
 	schema_module_init();
-	if (tuple_init(lua_hash) != 0)
-		diag_raise();
+	tuple_init();
 	sequence_init();
 	box_watcher_init();
 	box_raft_init();

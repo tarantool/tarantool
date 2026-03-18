@@ -60,12 +60,6 @@ enum data_format {
 	FORMAT_SPARSE,
 };
 
-static uint32_t
-test_field_name_hash(const char *str, uint32_t len)
-{
-	return str[0] + len;
-}
-
 /** Class that creates and destroys memtx engine. */
 class MemtxEngine {
 public:
@@ -81,7 +75,7 @@ private:
 		memory_init();
 		fiber_init(fiber_c_invoke);
 		region_alloc(&fiber()->gc, 4);
-		tuple_init(test_field_name_hash);
+		tuple_init();
 
 		memset(&memtx, 0, sizeof(memtx));
 

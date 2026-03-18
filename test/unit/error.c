@@ -979,12 +979,6 @@ test_client_error_creation(void)
 
 #endif
 
-static uint32_t
-field_name_hash_impl(const char *str, uint32_t len)
-{
-	return str[0] + len;
-}
-
 int
 main(void)
 {
@@ -998,7 +992,7 @@ main(void)
 	random_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(field_name_hash_impl);
+	tuple_init();
 
 	test_payload_field_str();
 	test_payload_field_uint();

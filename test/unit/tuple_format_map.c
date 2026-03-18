@@ -418,18 +418,12 @@ test_tuple_format_map(void)
 	return check_plan();
 }
 
-static uint32_t
-test_field_name_hash(const char *str, uint32_t len)
-{
-	return str[0] + len;
-}
-
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(test_field_name_hash);
+	tuple_init();
 
 	int rc = test_tuple_format_map();
 

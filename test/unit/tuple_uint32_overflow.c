@@ -65,7 +65,7 @@ main()
 	plan(2);
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(NULL);
+	tuple_init();
 
 
 	tuple_next_u32_test();

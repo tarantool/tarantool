@@ -291,18 +291,12 @@ test_mp_tuple(void)
 	return check_plan();
 }
 
-static uint32_t
-field_name_hash_impl(const char *str, uint32_t len)
-{
-	return str[0] + len;
-}
-
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(field_name_hash_impl);
+	tuple_init();
 
 	int rc = test_mp_tuple();
 

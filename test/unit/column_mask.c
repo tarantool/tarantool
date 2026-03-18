@@ -292,18 +292,12 @@ test_paths(void)
 	footer();
 }
 
-static uint32_t
-simple_hash(const char* str, uint32_t len)
-{
-	return str[0] + len;
-}
-
 int
 main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(simple_hash);
+	tuple_init();
 	header();
 	plan(28);
 

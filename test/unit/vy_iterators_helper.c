@@ -27,7 +27,7 @@ vy_iterator_C_test_init(size_t cache_size)
 
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init(NULL);
+	tuple_init();
 	vy_stmt_env_create(&stmt_env);
 	key_format = vy_simple_stmt_format_new(&stmt_env, NULL, 0);
 	fail_if(key_format == NULL);

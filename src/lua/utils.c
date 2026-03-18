@@ -1187,6 +1187,12 @@ void cord_on_yield(void)
 	}
 }
 
+uint32_t
+field_name_hash(const char *str, uint32_t len)
+{
+	return lua_hash(str, len);
+}
+
 const char *
 luaT_checkstring(struct lua_State *L, int index)
 {
