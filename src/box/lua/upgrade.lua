@@ -34,13 +34,6 @@ local SUPER = 31
 -- Utils
 --------------------------------------------------------------------------------
 
--- Used to give a hint that the table should be serialized in MsgPack as map
--- and not as a array. Typical use is to give hint for empty table when it is
--- not possible to infer type from table content.
-local function setmap(tab)
-    return setmetatable(tab, { __serialize = 'map' })
-end
-
 -- space:truncate() doesn't work with disabled triggers on __index
 local function truncate(space)
     local pk = space.index[0]
@@ -235,7 +228,7 @@ local function create_truncate_space()
 
     log.info("create space _truncate")
     box.space._space:insert{
-        _truncate.id, ADMIN, '_truncate', 'memtx', 0, setmap({}),
+        _truncate.id, ADMIN, '_truncate', 'memtx', 0, utils.setmap({}),
         {{name = 'id', type = 'unsigned'}, {name = 'count', type = 'unsigned'}}
     }
 
@@ -254,7 +247,7 @@ end
 
 local function user_trig_1_7_5(_, tuple)
     if tuple and (type(tuple[5]) ~= 'table' or next(tuple[5]) == nil) then
-        tuple = tuple:update{{'=', 5, setmap({})}}
+        tuple = tuple:update{{'=', 5, utils.setmap({})}}
         log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
     end
     return tuple
@@ -339,7 +332,7 @@ local function initial_1_7_5()
     local _priv = box.space[box.schema.PRIV_ID]
     local _cluster = box.space[box.schema.CLUSTER_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
-    local MAP = setmap({})
+    local MAP = utils.setmap({})
 
     --
     -- _schema
@@ -564,7 +557,7 @@ local function space_trig_1_7_6(_, tuple)
             -- Create the fields from ground up. Better not to use existing
             -- ones, anything can be there, we must be sure, that every field
             -- is encoded as map and has 'name' and 'type' keys.
-            local field = setmap({
+            local field = utils.setmap({
                 name = f['name'],
                 type = f['type'],
             })
@@ -598,7 +591,7 @@ local function create_sequence_space()
     local _sequence = box.space[box.schema.SEQUENCE_ID]
     local _sequence_data = box.space[box.schema.SEQUENCE_DATA_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    local MAP = setmap({})
+    local MAP = utils.setmap({})
 
     log.info("create space _sequence")
     _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP, sequence_format}
@@ -630,7 +623,8 @@ local function create_collation_space()
     local _collation = box.space[box.schema.COLLATION_ID]
 
     log.info("create space _collation")
-    box.space._space:insert{_collation.id, ADMIN, '_collation', 'memtx', 0, setmap({}),
+    box.space._space:insert{_collation.id, ADMIN, '_collation', 'memtx', 0,
+        utils.setmap({}),
         { { name = 'id', type = 'unsigned' }, { name = 'name', type = 'string' },
           { name = 'owner', type = 'unsigned' }, { name = 'type', type = 'string' },
           { name = 'locale', type = 'string' }, { name = 'opts', type = 'map' } } }
@@ -642,7 +636,7 @@ local function create_collation_space()
     box.space._index:insert{_collation.id, 1, 'name', 'tree', {unique = true}, {{1, 'string'}}}
 
     log.info("create predefined collations")
-    box.space._collation:replace{1, "unicode", ADMIN, "ICU", "", setmap{}}
+    box.space._collation:replace{1, "unicode", ADMIN, "ICU", "", utils.setmap{}}
     box.space._collation:replace{2, "unicode_ci", ADMIN, "ICU", "", {strength='primary'}}
 
     local _priv = box.space[box.schema.PRIV_ID]
@@ -689,7 +683,7 @@ local function upgrade_to_1_7_7()
     --
     -- create role 'super' and grant it all privileges on universe
     --
-    _user:replace{SUPER, ADMIN, 'super', 'role', setmap({})}
+    _user:replace{SUPER, ADMIN, 'super', 'role', utils.setmap({})}
     _priv:replace({ADMIN, SUPER, 'universe', 0, 4294967295})
 end
 
@@ -791,7 +785,7 @@ local function upgrade_to_2_1_0()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _trigger = box.space[box.schema.TRIGGER_ID]
-    local MAP = setmap({})
+    local MAP = utils.setmap({})
 
     log.info("create space _trigger")
     local format = {{name='name', type='string'},
@@ -817,7 +811,7 @@ local function upgrade_to_2_1_0()
                           {name='parent_cols', type='array'}}
     log.info("create space _fk_constraint")
     _space:insert{box.schema.FK_CONSTRAINT_ID, ADMIN, '_fk_constraint', 'memtx',
-                  0, setmap({}), fk_constr_ft}
+                  0, utils.setmap({}), fk_constr_ft}
 
     log.info("create index primary on _fk_constraint")
     _index:insert{box.schema.FK_CONSTRAINT_ID, 0, 'primary', 'tree',
@@ -836,8 +830,10 @@ local function upgrade_to_2_1_0()
     format[2] = {type='any', name='value', is_nullable=true}
     _space:update({box.schema.SCHEMA_ID}, {{'=', 7, format}})
 
-    box.space._collation:replace{0, "none", ADMIN, "BINARY", "", setmap{}}
-    box.space._collation:replace{3, "binary", ADMIN, "BINARY", "", setmap{}}
+    box.space._collation:replace{0, "none", ADMIN, "BINARY", "",
+                                 utils.setmap{}}
+    box.space._collation:replace{3, "binary", ADMIN, "BINARY", "",
+                                 utils.setmap{}}
 
     upgrade_priv_to_2_1_0()
 end
@@ -1038,7 +1034,7 @@ local function upgrade_ck_constraint_to_2_2_1()
     -- stored in space opts. Now we use separate space
     -- _ck_constraint for this purpose. Perform legacy data
     -- migration.
-    local MAP = setmap({})
+    local MAP = utils.setmap({})
     local _space = box.space._space
     local _index = box.space._index
     local _ck_constraint = box.space._ck_constraint
@@ -1085,7 +1081,8 @@ local function upgrade_func_to_2_2_1()
     for _, v in box.space._func:pairs() do
         _func:replace({v[1], v[2], v[3], v[4], v[5] or 'LUA', '', 'function',
                       {}, 'any', 'none', 'none', false, false, true,
-                      v[15] or {'LUA'}, setmap({}), '', datetime, datetime})
+                      v[15] or {'LUA'}, utils.setmap({}), '',
+                      datetime, datetime})
     end
     local sql_builtin_list = {
         "TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
@@ -1103,7 +1100,8 @@ local function upgrade_func_to_2_2_1()
     for _, v in pairs(sql_builtin_list) do
         local t = _func:auto_increment({ADMIN, v, 1, 'SQL_BUILTIN', '',
                                        'function', {}, 'any', 'none', 'none',
-                                        false, false, true, {}, setmap({}), '',
+                                        false, false, true, {},
+                                        utils.setmap({}), '',
                                         datetime, datetime})
         _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     end
@@ -1111,7 +1109,7 @@ local function upgrade_func_to_2_2_1()
                         'function(code) return assert(loadstring(code))() end',
                         'function', {'string'}, 'any', 'none', 'none',
                         false, false, true, {'LUA', 'SQL'},
-                        setmap({}), '', datetime, datetime})
+                        utils.setmap({}), '', datetime, datetime})
     _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     local format = {}
     format[1] = {name='id', type='unsigned'}
@@ -1148,7 +1146,7 @@ local function create_func_index()
                     {name='index_id', type='unsigned'},
                     {name='func_id',  type='unsigned'}}
     _space:insert{_func_index.id, ADMIN, '_func_index', 'memtx', 0,
-                  setmap({}), format}
+                  utils.setmap({}), format}
     _index:insert{_func_index.id, 0, 'primary', 'tree', {unique = true},
                   {{0, 'unsigned'}, {1, 'unsigned'}}}
     _index:insert{_func_index.id, 1, 'fid', 'tree', {unique = false},
@@ -1178,7 +1176,8 @@ local function upgrade_to_2_3_0()
     for _, v in pairs(new_builtins) do
         local t = _func:auto_increment({ADMIN, v, 1, 'SQL_BUILTIN', '',
                                        'function', {}, 'any', 'none', 'none',
-                                        false, false, true, {}, setmap({}), '',
+                                        false, false, true, {},
+                                        utils.setmap({}), '',
                                         datetime, datetime})
         _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     end
@@ -1353,7 +1352,7 @@ local function convert_sql_constraints_to_tuple_constraints()
         local child_cols = v[8]
         local parent_cols = v[9]
         local def = _space:get{child_id}
-        local mapping = setmap({})
+        local mapping = utils.setmap({})
         for i, id in pairs(child_cols) do
             mapping[id] = parent_cols[i]
         end
@@ -1372,8 +1371,9 @@ local function convert_sql_constraints_to_tuple_constraints()
         local func_name = 'check_' .. def[3] .. '_' .. name
         local t = _func:auto_increment({ADMIN, func_name, 1, 'SQL_EXPR', code,
                                        'function', {}, 'any', 'none', 'none',
-                                        true, true, true, {'LUA'}, setmap({}),
-                                        '', datetime, datetime})
+                                        true, true, true, {'LUA'},
+                                        utils.setmap({}), '',
+                                        datetime, datetime})
         local ck = def.flags.constraint or {}
         ck[name] = t[1]
         _space:update({space_id}, {{'=', '[6].constraint', ck}})
@@ -1701,7 +1701,7 @@ local function restore_sql_builtin_functions(issue_handler)
         if _func.index.name:get(func) == nil then
             local t = _func:auto_increment{
                 ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
-                'none', 'none', false, false, true, {}, setmap({}), '',
+                'none', 'none', false, false, true, {}, utils.setmap({}), '',
                 datetime, datetime}
             box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
         end
@@ -1726,7 +1726,7 @@ local function remove_deferred_deletes(issue_handler)
         local new_flags = table.copy(space.flags)
         if new_flags.defer_deletes ~= nil then
             new_flags.defer_deletes = nil
-            setmap(new_flags)
+            utils.setmap(new_flags)
             box.space._space:update(space.id, {{'=', 'flags', new_flags}})
         end
     end

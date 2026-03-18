@@ -1,5 +1,12 @@
 local utils = {}
 
+-- Used to give a hint that the table should be serialized in MsgPack as map
+-- and not as a array. Typical use is to give hint for empty table when it is
+-- not possible to infer type from table content.
+function utils.setmap(tab)
+    return setmetatable(tab, { __serialize = 'map' })
+end
+
 -- Same as type(), but returns 'number' if 'param' is
 -- of type 'cdata' and represents a 64-bit integer.
 local function param_type(param)

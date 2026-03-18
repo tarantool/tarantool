@@ -24,10 +24,6 @@ local DEFAULT_ORIGIN = ''
 local PRIV_OPTS_FIELD_ID = 6
 local USER_OPTS_FIELD_ID = 8
 
-local function setmap(table)
-    return setmetatable(table, { __serialize = 'map' })
-end
-
 local builtin = ffi.C
 
 -- performance fixup for hot functions
@@ -623,7 +619,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
                       error_prefix .. "foreign key: field must be a table " ..
                       "with local field -> foreign field mapping", level + 1)
         end
-        field = setmap(converted)
+        field = utils.setmap(converted)
     end
     if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
@@ -760,7 +756,7 @@ local function normalize_format(space_id, space_name, format, level)
                                                       "format[" .. i .. "]: ",
                                                       level + 1)
                 elseif k == 'compression' and type(given[k]) == 'table' then
-                    field[k] = setmap(given[k])
+                    field[k] = utils.setmap(given[k])
                 else
                     field[k] = v
                 end
@@ -797,7 +793,7 @@ local function denormalize_foreign_key_one(fkey)
 end
 
 local function denormalize_foreign_key(fkey)
-    local result = setmap{}
+    local result = utils.setmap{}
     for k, v in pairs(fkey) do
         result[k] = denormalize_foreign_key_one(v)
     end
@@ -901,7 +897,7 @@ box.schema.space.create = function(name, options)
     local foreign_key = normalize_foreign_key(id, name, options.foreign_key, '',
                                               true, 2)
     -- filter out global parameters from the options array
-    local space_options = setmap({
+    local space_options = utils.setmap({
         group_id = options.is_local and 1 or nil,
         temporary = options.temporary,
         type = options.type,
@@ -3497,8 +3493,9 @@ box.schema.func.create = function(name, opts)
                     body = '', routine_type = 'function', returns = 'any',
                     param_list = {}, aggregate = 'none', sql_data_access = 'none',
                     is_deterministic = false, is_sandboxed = false,
-                    is_null_call = true, exports = {'LUA'}, opts = setmap{},
-                    comment = '', created = datetime, last_altered = datetime,
+                    is_null_call = true, exports = {'LUA'},
+                    opts = utils.setmap{}, comment = '',
+                    created = datetime, last_altered = datetime,
                     trigger = {}})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
@@ -3591,7 +3588,7 @@ box.schema.func.call = internal.func_call
 
 box.internal.collation = {}
 box.internal.collation.create = function(name, coll_type, locale, opts)
-    opts = opts or setmap{}
+    opts = opts or utils.setmap{}
     if type(name) ~= 'string' then
         box.error(box.error.ILLEGAL_PARAMS,
                   "name (first arg) must be a string", 2)
@@ -3615,7 +3612,7 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
         strength = "tertiary",
     }
     opts = update_param_table(opts, collation_defaults)
-    opts = setmap(opts)
+    opts = utils.setmap(opts)
 
     local _coll = box.space[box.schema.COLLATION_ID]
     if lua_opts.if_not_exists then
@@ -3779,7 +3776,7 @@ box.schema.user.create = atomic_wrapper(function(name, opts)
         check_password(opts.password, nil, 2)
         auth_list = prepare_auth_list(opts.password)
     else
-        auth_list = setmap({})
+        auth_list = utils.setmap({})
     end
     local opts_field = user_opts_from_origins({[origin] = true})
     uid = _user:auto_increment{session.euid(), name, 'user', auth_list, {},
@@ -4270,7 +4267,7 @@ box.schema.role.create = function(name, opts)
     end
     local opts_field = user_opts_from_origins({[origin] = true})
     call_at(2, _user.auto_increment, _user,
-            {session.euid(), name, 'role', setmap({}), {},
+            {session.euid(), name, 'role', utils.setmap({}), {},
              math.floor(fiber.time()), opts_field})
 end
 
