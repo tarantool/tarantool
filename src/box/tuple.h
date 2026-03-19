@@ -48,7 +48,7 @@ struct key_part;
  * A format for standalone tuples allocated on runtime arena.
  * \sa tuple_new().
  */
-extern struct tuple_format *tuple_format_runtime;
+extern __thread struct tuple_format *tuple_format_runtime;
 
 /** Initialize tuple library */
 void
@@ -1520,7 +1520,7 @@ tuple_unref(struct tuple *tuple)
 size_t
 tuple_bigref_tuple_count();
 
-extern struct tuple *box_tuple_last;
+extern __thread struct tuple *box_tuple_last;
 
 /**
  * Convert internal `struct tuple` to public `box_tuple_t`.

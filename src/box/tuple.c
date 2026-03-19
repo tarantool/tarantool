@@ -36,10 +36,12 @@
 #include "small/quota.h"
 #include "small/small.h"
 #include "xrow_update.h"
-#include "coll_id_cache.h"
 
-static struct mempool tuple_iterator_pool;
-static struct small_alloc runtime_alloc;
+/** Memory pool used for allocating tuple_iterator objects. */
+static __thread struct mempool tuple_iterator_pool;
+
+/** Runtime tuple allocator. */
+static __thread struct small_alloc runtime_alloc;
 
 enum {
 	/** Lowest allowed slab_alloc_minimal */
@@ -81,7 +83,7 @@ tuple_pointer_hash(const struct tuple *a)
 #define MH_SOURCE 1
 #include "salad/mhash.h"
 
-static struct mh_tuple_uploaded_refs_t *tuple_uploaded_refs;
+static __thread struct mh_tuple_uploaded_refs_t *tuple_uploaded_refs;
 
 static const double ALLOC_FACTOR = 1.05;
 
@@ -89,9 +91,9 @@ static const double ALLOC_FACTOR = 1.05;
  * Last tuple returned by public C API
  * \sa tuple_bless()
  */
-struct tuple *box_tuple_last;
+__thread struct tuple *box_tuple_last;
 
-struct tuple_format *tuple_format_runtime;
+__thread struct tuple_format *tuple_format_runtime;
 
 static void
 runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple);
@@ -383,8 +385,6 @@ tuple_init(void)
 	box_tuple_last = NULL;
 
 	tuple_uploaded_refs = mh_tuple_uploaded_refs_new();
-
-	coll_id_cache_init();
 }
 
 void
@@ -439,8 +439,6 @@ tuple_free(void)
 	small_alloc_destroy(&runtime_alloc);
 
 	tuple_format_free();
-
-	coll_id_cache_destroy();
 
 	mh_tuple_uploaded_refs_delete(tuple_uploaded_refs);
 }

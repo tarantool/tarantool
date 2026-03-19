@@ -40,6 +40,7 @@
 #include <small/region.h>
 #include "cord_buf.h"
 #include <fiber.h>
+#include "tweaks.h"
 
 #include "box/tuple.h"
 #include "box/tuple_convert.h"
@@ -66,11 +67,9 @@ static const char *tuple_iteratorlib_name = "box.tuple.iterator";
  * optimization for excessively sparse arrays as a tuple always
  * must be regular MP_ARRAY.
  */
-static struct luaL_serializer tuple_serializer;
+static __thread struct luaL_serializer tuple_serializer;
 
-extern char tuple_lua[]; /* Lua source */
-
-uint32_t CTID_STRUCT_TUPLE_REF;
+__thread uint32_t CTID_STRUCT_TUPLE_REF;
 
 /**
  * <luaT_tuple_encode_table>() reference in the Lua registry.
@@ -80,7 +79,7 @@ uint32_t CTID_STRUCT_TUPLE_REF;
  * It reduces Lua GC pressure in comparison with calling of
  * <lua_cpcall>() or <lua_pushcfunction>() on each invocation.
  */
-static int luaT_tuple_encode_table_ref = LUA_NOREF;
+static __thread int luaT_tuple_encode_table_ref = LUA_NOREF;
 /**
  * <lbox_tuple_gc> reference in the Lua registry.
  *
@@ -91,7 +90,15 @@ static int luaT_tuple_encode_table_ref = LUA_NOREF;
  * for Lua world, the common tuple __gc finalizer can be easily
  * obtained from the Lua registry via this reference.
  */
-static int luaT_tuple_gc_ref = LUA_NOREF;
+static __thread int luaT_tuple_gc_ref = LUA_NOREF;
+
+/**
+ * If set, box.tuple.new() will interpret the argument list as an array
+ * of tuple fields. This does not allow passing a tuple format as a second
+ * argument.
+ */
+static bool box_tuple_new_vararg = false;
+TWEAK_BOOL(box_tuple_new_vararg);
 
 box_tuple_t *
 luaT_checktuple(struct lua_State *L, int idx)

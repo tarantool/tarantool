@@ -1,5 +1,17 @@
 local utils = require('internal.utils')
 
+local function find_coll(name)
+    return box.space and box.space._collation.index.name:get{name}
+end
+
+local function find_func(name)
+    return box.space and box.space._func.index.name:get(name)
+end
+
+local function find_space(name_or_id)
+    return box.space and box.space[name_or_id]
+end
+
 -- Check and normalize constraint definition.
 -- Given constraint @a constr is expected to be either a func name or
 --  a table with function names and/or consraint name:function name pairs.
@@ -9,7 +21,7 @@ local function normalize_constraint(constr, error_prefix, level)
     if type(constr) == 'string' then
         -- Short form of field constraint - just name of func,
         -- e.g.: {...constraint = "func_name"}
-        local found = box.space._func.index.name:get(constr)
+        local found = find_func(constr)
         if not found then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "constraint function " ..
@@ -29,7 +41,7 @@ local function normalize_constraint(constr, error_prefix, level)
                           "is expected to be a string, " ..
                           "but got " .. type(constr_func), level + 1)
             end
-            local found = box.space._func.index.name:get(constr_func)
+            local found = find_func(constr_func)
             if not found then
                 box.error(box.error.ILLEGAL_PARAMS,
                           error_prefix .. "constraint function " ..
@@ -133,7 +145,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
         end
         field = utils.setmap(converted)
     end
-    if not box.space[def.space] and not fkey_same_space then
+    if not find_space(def.space) and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space " .. tostring(def.space)
                   .. " was not found", level + 1)
@@ -148,7 +160,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
     if fkey_same_space then
         return {field = field}
     else
-        return {space = box.space[def.space].id, field = field}
+        return {space = find_space(def.space).id, field = field}
     end
 end
 
@@ -183,7 +195,7 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
         fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex,
                                          fkey_same_space, level)
         local fkey_name = fkey_same_space and (space_name or 'unknown') or
-                          box.space[fkey.space].name
+                          find_space(fkey.space).name
         return {[fkey_name] = fkey}
     end
     -- the second, detailed form.
@@ -217,7 +229,7 @@ local function normalize_default_func(func_name, error_prefix, level)
                   error_prefix .. "field default function name is expected " ..
                   "to be a string, but got " .. type(func_name), level + 1)
     end
-    local found = box.space._func.index.name:get(func_name)
+    local found = find_func(func_name)
     if not found then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "field default function was not found by " ..
@@ -247,7 +259,7 @@ local function normalize_format(space_id, space_name, format, level)
                 elseif k == 2 and not given.type and not given.name then
                     field.type = v
                 elseif k == 'collation' then
-                    local coll = box.space._collation.index.name:get{v}
+                    local coll = find_coll(v)
                     if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
                             "format[" .. i .. "]: collation " ..
