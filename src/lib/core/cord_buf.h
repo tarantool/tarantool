@@ -44,6 +44,12 @@ cord_ibuf_put(struct ibuf *ibuf);
 void
 cord_ibuf_drop(struct ibuf *ibuf);
 
+/**
+ * Release all memory held by the cord buffer.
+ */
+void
+cord_buf_free(void);
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

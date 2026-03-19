@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 #include "coio_task.h"
+#include "cord_buf.h"
 #include "diag.h"
 #include "fiber.h"
 #include "fiber_pool.h"
@@ -53,6 +54,7 @@ app_thread_f(void *unused)
 		rlist_shift(&fiber_pool.idle);
 	app_thread_lua_free();
 	tuple_free();
+	cord_buf_free();
 	return NULL;
 }
 

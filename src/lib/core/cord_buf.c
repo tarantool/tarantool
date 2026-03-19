@@ -163,3 +163,12 @@ cord_ibuf_drop(struct ibuf *ibuf)
 	ibuf_reinit(ibuf);
 	cord_ibuf_put(ibuf);
 }
+
+void
+cord_buf_free(void)
+{
+	if (cord_buf_global != NULL) {
+		cord_buf_delete(cord_buf_global);
+		cord_buf_global = NULL;
+	}
+}
