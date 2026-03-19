@@ -4,7 +4,7 @@ local ffi = require('ffi')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
-local compat = require('compat')
+local tweaks = require('internal.tweaks')
 local utils = require('internal.utils')
 
 local internal = box.internal
@@ -83,7 +83,7 @@ local NEW_OPTION_TYPES = {
 }
 
 local new_tuple = function(...)
-    if compat.box_tuple_new_vararg:is_old() then
+    if tweaks.box_tuple_new_vararg then
         return internal.tuple.new{...}
     end
     local tuple, options = ...

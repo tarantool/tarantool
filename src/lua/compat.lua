@@ -267,7 +267,7 @@ local options = {
         default = 'new',
         obsolete = nil,
         brief = BOX_TUPLE_NEW_VARARG_BRIEF,
-        action = function() end,
+        action = tweak_action('box_tuple_new_vararg', true, false),
     },
     box_session_push_deprecation = {
         default = 'old',

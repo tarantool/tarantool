@@ -105,6 +105,7 @@
 #include "event.h"
 #include "tweaks.h"
 #include "memtx_tx.h"
+#include "coll_id_cache.h"
 
 static char status[64] = "unconfigured";
 
@@ -6704,6 +6705,7 @@ box_init(void)
 	 */
 	session_init();
 	schema_module_init();
+	coll_id_cache_init();
 	tuple_init();
 	sequence_init();
 	box_watcher_init();
@@ -6801,6 +6803,7 @@ box_free(void)
 	tarantool_trigger_on_change_event = NULL;
 	txn_event_trigger_free();
 	tuple_free();
+	coll_id_cache_destroy();
 	port_free();
 	iproto_constants_free();
 	box_lua_call_runtime_priv_reset();

@@ -21,6 +21,7 @@
 #include "say.h"
 #include "tarantool_ev.h"
 #include "trivia/util.h"
+#include "tuple.h"
 #include "xrow.h"
 
 #include "lua/app_threads.h"
@@ -35,6 +36,7 @@ app_thread_f(void *unused)
 {
 	(void)unused;
 	coio_enable();
+	tuple_init();
 	app_thread_lua_init();
 	struct fiber_pool fiber_pool;
 	fiber_pool_create(&fiber_pool, cord_name(cord()), INT_MAX,
@@ -50,6 +52,7 @@ app_thread_f(void *unused)
 	while (!rlist_empty(&fiber_pool.idle))
 		rlist_shift(&fiber_pool.idle);
 	app_thread_lua_free();
+	tuple_free();
 	return NULL;
 }
 

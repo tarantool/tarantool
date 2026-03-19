@@ -222,6 +222,7 @@ g.test_builtin_modules = function(cg)
     check_module('datetime')
     check_module('pickle')
     check_module('msgpack')
+    check_module('msgpackffi')
     check_module('yaml')
     check_module('json')
     t.assert_covers(eval([[
@@ -423,4 +424,64 @@ g.test_socket = function(cg)
         rawset(_G, 'test_server', nil)
         server:close()
     ]], {}, {_thread_id = 1})
+end
+
+g.test_tuple = function(cg)
+    local function eval(expr, args)
+        return cg.server:eval(expr, args or {}, {_thread_id = 1})
+    end
+    -- Creating and updating a tuple.
+    t.assert_equals(eval([[
+        local tuple = box.tuple.new({1, 1, 1})
+        return tuple:update({{'+', 2, 1}, {'+', 3, 2}})
+    ]]), {1, 2, 3})
+    -- Addressing tuple fields by name.
+    t.assert_equals(eval([[
+        local format = box.tuple.format.new({
+            {'x', 'unsigned'}, {'y', 'string'},
+        })
+        local tuple = box.tuple.new({1, 'foo'}, {format = format})
+        return tuple:update({
+            {'=', 'x', tuple.x * 1000},
+            {':', 'y', -1, 0, 'bar'},
+        })
+    ]]), {1000, 'foobar'})
+    -- Validating a tuple against a format.
+    t.assert_error_covers({
+        type = 'ClientError',
+        name = 'FIELD_TYPE',
+        expected = 'unsigned',
+        actual = 'integer',
+    }, eval, [[
+        local format = box.tuple.format.new({
+            {'a', 'unsigned'}, {'b', 'string'},
+        })
+        return box.tuple.new({-1, 'foo'}, {format = format})
+    ]])
+    -- Check errors raised on an attempt to refer to a global schema object
+    -- while creating a tuple format.
+    for _, v in ipairs({
+        {
+            {{'x', 'string', collation = 'unicode'}},
+            "format[1]: collation was not found by name 'unicode'",
+        },
+        {
+            {{'x', 'string', default_func = 'test'}},
+            "format[1]: field default function was not found by name 'test'",
+        },
+        {
+            {{'x', 'string', constraint = 'test'}},
+            "format[1]: constraint function was not found by name 'test'",
+        },
+        {
+            {{'x', 'string', foreign_key = {space = 'test', field = 'y'}}},
+            "format[1]: foreign key: space test was not found",
+        },
+    }) do
+        local format, err = unpack(v)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = err,
+        }, eval, [[box.tuple.format.new(...)]], {format})
+    end
 end

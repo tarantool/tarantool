@@ -221,6 +221,7 @@ static const char * const lua_modules_minimal[] = {
 	"varbinary", varbinary_lua,
 	"timezones", timezones_lua,
 	"datetime", datetime_lua,
+	"msgpackffi", msgpackffi_lua,
 	NULL
 };
 
@@ -228,7 +229,6 @@ static const char * const lua_modules_minimal[] = {
 static const char * const lua_modules[] = {
 	"compat", compat_lua,
 	"env", env_lua,
-	"msgpackffi", msgpackffi_lua,
 	"ulid", ulid_lua,
 	"csv", csv_lua,
 	"title", title_lua,

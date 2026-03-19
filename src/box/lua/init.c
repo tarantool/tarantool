@@ -214,14 +214,14 @@ extern char session_lua[],
 
 /** List of modules available in all threads. */
 static const char * const lua_sources_minimal[] = {
+	"box/tuple", NULL, tuple_lua,
+	"box/tuple_format", NULL, tuple_format_lua,
 	NULL
 };
 
 /** List of modules available only in the main thread. */
 static const char * const lua_sources_main[] = {
 	"box/session", NULL, session_lua,
-	"box/tuple", NULL, tuple_lua,
-	"box/tuple_format", NULL, tuple_format_lua,
 	"box/schema", NULL, schema_lua,
 #if ENABLE_FEEDBACK_DAEMON
 	/*
@@ -938,6 +938,8 @@ void
 box_lua_init_minimal(struct lua_State *L)
 {
 	box_lua_error_init(L);
+	box_lua_tuple_format_init(L);
+	box_lua_tuple_init(L);
 	box_lua_call_init(L);
 
 	load_lua_sources(L, lua_sources_minimal);
@@ -969,8 +971,6 @@ box_lua_init(struct lua_State *L)
 	box_lua_init_minimal(L);
 
 	box_lua_errinj_init(L);
-	box_lua_tuple_format_init(L);
-	box_lua_tuple_init(L);
 	box_lua_cfg_init(L);
 	box_lua_lib_init(L);
 	box_lua_slab_init(L);
