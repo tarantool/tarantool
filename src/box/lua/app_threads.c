@@ -9,15 +9,14 @@
 #include <stdint.h>
 
 #include "lua/init.h"
+#include "box/lua/init.h"
 #include "box/lua/call.h"
-#include "box/lua/error.h"
 
 void
 app_thread_lua_init(void)
 {
 	tarantool_lua_init_minimal();
-	box_lua_error_init(tarantool_L);
-	box_lua_call_init(tarantool_L);
+	box_lua_init_minimal(tarantool_L);
 	tarantool_lua_postinit(tarantool_L);
 }
 

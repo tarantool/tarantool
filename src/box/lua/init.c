@@ -34,6 +34,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#include "lib/core/fiber.h"
+#include "lib/core/say.h"
 #include "lib/core/mp_extension_types.h"
 
 #include "lua/utils.h" /* luaT_error() */
@@ -209,7 +211,14 @@ extern char session_lua[],
  *    box or box.internal.
  * 3. A Lua source code of the module.
  */
-static const char *lua_sources[] = {
+
+/** List of modules available in all threads. */
+static const char * const lua_sources_minimal[] = {
+	NULL
+};
+
+/** List of modules available only in the main thread. */
+static const char * const lua_sources_main[] = {
 	"box/session", NULL, session_lua,
 	"box/tuple", NULL, tuple_lua,
 	"box/tuple_format", NULL, tuple_format_lua,
@@ -494,6 +503,10 @@ static const char *lua_sources[] = {
 
 	NULL
 };
+
+/* Load Lua modules from sources. */
+static void
+load_lua_sources(struct lua_State *L, const char * const *lua_sources);
 
 static int
 lbox_commit(lua_State *L)
@@ -921,11 +934,22 @@ tuple_err:
 	}
 }
 
-#include "say.h"
+void
+box_lua_init_minimal(struct lua_State *L)
+{
+	box_lua_error_init(L);
+	box_lua_call_init(L);
+
+	load_lua_sources(L, lua_sources_minimal);
+
+	assert(lua_gettop(L) == 0);
+}
 
 void
 box_lua_init(struct lua_State *L)
 {
+	assert(cord_is_main());
+
 	luaL_cdef(L, "struct txn_savepoint;");
 	CTID_STRUCT_TXN_SAVEPOINT_PTR = luaL_ctypeid(L,
 						     "struct txn_savepoint*");
@@ -942,11 +966,11 @@ box_lua_init(struct lua_State *L)
 	luaL_setfuncs(L, boxlib_backup, 0);
 	lua_pop(L, 1);
 
-	box_lua_error_init(L);
+	box_lua_init_minimal(L);
+
 	box_lua_errinj_init(L);
 	box_lua_tuple_format_init(L);
 	box_lua_tuple_init(L);
-	box_lua_call_init(L);
 	box_lua_cfg_init(L);
 	box_lua_lib_init(L);
 	box_lua_slab_init(L);
@@ -978,8 +1002,15 @@ box_lua_init(struct lua_State *L)
 	luamp_set_encode_extension(luamp_encode_extension_box);
 	luamp_set_decode_extension(luamp_decode_extension_box);
 
-	/* Load Lua extension */
-	for (const char **s = lua_sources; *s; s += 3) {
+	load_lua_sources(L, lua_sources_main);
+
+	assert(lua_gettop(L) == 0);
+};
+
+static void
+load_lua_sources(struct lua_State *L, const char *const *lua_sources)
+{
+	for (const char * const *s = lua_sources; *s; s += 3) {
 		const char *modfile_raw = *s;
 		const char *modname = *(s + 1);
 		const char *modsrc = *(s + 2);
@@ -1014,15 +1045,15 @@ box_lua_init(struct lua_State *L)
 		 * For example, "net.box" instead of
 		 * "box/net_box".
 		 */
-		builtin_modcache_put(modfile_raw, modsrc);
+		if (cord_is_main())
+			builtin_modcache_put(modfile_raw, modsrc);
 	}
-
-	assert(lua_gettop(L) == 0);
 }
 
 void
 box_lua_free(void)
 {
+	assert(cord_is_main());
 	box_lua_iproto_free();
 	box_lua_space_free();
 }

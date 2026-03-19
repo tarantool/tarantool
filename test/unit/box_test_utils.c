@@ -20,3 +20,9 @@ set_sigint_cb(sigint_cb_t new_sigint_cb)
 
 char tarantool_path[PATH_MAX];
 long tarantool_start_time;
+
+double
+tarantool_uptime(void) { return 0; }
+
+void
+load_cfg(void) {}
