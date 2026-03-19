@@ -251,6 +251,18 @@ g.test_lua_alloc = function(cg)
     ]], {limit}, {_thread_id = 3})
 end
 
+g.test_buffer = function(cg)
+    t.assert_equals(cg.server:eval([[
+        local ffi = require('ffi')
+        local buffer = require('buffer')
+        local ibuf = buffer.internal.cord_ibuf_take()
+        local data = ibuf:alloc(5)
+        ffi.copy(data, ffi.cast('const char *', 'abcdefghi'), ibuf:size())
+        local str = ffi.string(ibuf.rpos, ibuf:size())
+        return str
+    ]], {}, {_thread_id = 1}), 'abcde')
+end
+
 g.test_fiber = function(cg)
     -- fiber.sleep
     t.assert_equals(cg.server:eval([[

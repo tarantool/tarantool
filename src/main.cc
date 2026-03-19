@@ -52,6 +52,7 @@
 #include "fiber.h"
 #include "cbus.h"
 #include "coio_task.h"
+#include "cord_buf.h"
 #include <crc32.h>
 #include "memory.h"
 #include <say.h>
@@ -616,6 +617,7 @@ tarantool_free(void)
 	coll_free();
 	systemd_free();
 	say_logger_free();
+	cord_buf_free();
 	fiber_free();
 	memory_free();
 	random_free();
