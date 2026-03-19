@@ -296,6 +296,86 @@ g.test_config_broadcast = function()
     t.assert_equals(res.stdout, table.concat(exp, "\n"))
 end
 
+g.test_config_wish_status = function()
+    local dir = treegen.prepare_directory({}, {})
+    local file_config = [[
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', file_config)
+
+    local script = [[
+        local fiber = require('fiber')
+        local config = require('config')
+
+        config:_startup('instance-001', 'config.yaml')
+        print(config:wish_status({'ready'}, 0))
+
+        local ch = fiber.channel(1)
+        fiber.create(function()
+            ch:put(config:wish_status({'reload_in_progress'}, 60))
+        end)
+        fiber.sleep(0)
+
+        config:reload()
+        print(ch:get())
+        print(config:wish_status({'check_errors'}, 0.01))
+        os.exit(0)
+    ]]
+    treegen.write_file(dir, 'main.lua', script)
+
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout,
+        table.concat({'ready', 'reload_in_progress', 'ready'}, "\n"))
+end
+
+g.test_config_wish_status_negative = function()
+    local dir = treegen.prepare_directory({}, {})
+    local file_config = [[
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', file_config)
+
+    local script = [[
+        local config = require('config')
+
+        config:_startup('instance-001', 'config.yaml')
+
+        local ok, err = pcall(function()
+            config:wish_status({'ready'}, -1)
+        end)
+
+        print(ok)
+        print(err:match('Expected non%-negative number or nil, got number') ~= nil)
+
+        ok, err = pcall(function()
+            config:wish_status({'ready'}, 'bad')
+        end)
+
+        print(ok)
+        print(err:match('Expected non%-negative number or nil, got string') ~= nil)
+        os.exit(0)
+    ]]
+    treegen.write_file(dir, 'main.lua', script)
+
+    local opts = {nojson = true, stderr = false}
+    local res = justrun.tarantool(dir, {}, {'main.lua'}, opts)
+    t.assert_equals(res.exit_code, 0)
+    t.assert_equals(res.stdout,
+                    table.concat({'false', 'true', 'false', 'true'}, "\n"))
+end
+
 g.test_config_option = function()
     local dir = treegen.prepare_directory({}, {})
     local file_config = [[
