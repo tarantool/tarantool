@@ -36,6 +36,17 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
+
+/**
+ * Initialize the minimal set of `box` module features.
+ * Called from application threads.
+ */
+void
+box_lua_init_minimal(struct lua_State *L);
+
+/**
+ * Initializes `box` module.
+ */
 void
 box_lua_init(struct lua_State *L);
 
