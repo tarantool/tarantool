@@ -17,6 +17,7 @@
 #include "diag.h"
 #include "fiber.h"
 #include "fiber_pool.h"
+#include "mp_box_ctx.h"
 #include "msgpuck.h"
 #include "port.h"
 #include "say.h"
@@ -97,9 +98,13 @@ app_thread_process_call(struct call_request *request, struct port *port)
 {
 	const char *name = request->name;
 	uint32_t name_len = mp_decode_strl(&name);
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
 	struct port args;
-	port_msgpack_create(&args, request->args,
-			    request->args_end - request->args);
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
 	int rc = app_thread_lua_call(name, name_len, &args, port);
 	port_msgpack_destroy(&args);
 	return rc;
@@ -110,9 +115,13 @@ app_thread_process_eval(struct call_request *request, struct port *port)
 {
 	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
+	struct mp_box_ctx ctx;
+	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
+		return -1;
 	struct port args;
-	port_msgpack_create(&args, request->args,
-			    request->args_end - request->args);
+	port_msgpack_create_with_ctx(&args, request->args,
+				     request->args_end - request->args,
+				     (struct mp_ctx *)&ctx);
 	int rc = app_thread_lua_eval(expr, expr_len, &args, port);
 	port_msgpack_destroy(&args);
 	return rc;

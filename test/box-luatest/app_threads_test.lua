@@ -133,6 +133,7 @@ g.test_builtin_types_serialization = function(cg)
     check(decimal.new(123))
     check(uuid.new())
     check(varbinary.new('foo'))
+    check(box.tuple.new({1, 2, 3}))
     -- Check errors.
     local err = box.error.new({
         type = 'CustomType',
@@ -144,17 +145,42 @@ g.test_builtin_types_serialization = function(cg)
     t.assert_equals(ret_err:unpack(), err:unpack())
     t.assert_error_covers(err:unpack(), conn.eval, conn, [[error(...)]], {err},
                           {_thread_id = 1})
-    -- Tuples aren't supported yet (serialized as array).
-    local tuple = box.tuple.new({1, 2, 3})
-    local ret_type, ret_tuple = conn:eval([[
-        local tuple = ...
-        return type(tuple), tuple
-    ]], {tuple}, {_thread_id = 1})
-    t.assert_equals(ret_type, 'table')
-    t.assert_equals(type(ret_tuple), 'table')
-    t.assert_equals(ret_tuple, {1, 2, 3})
+    -- Check formatted tuples.
+    local format1 = box.tuple.format.new({
+        {'a', 'unsigned'}, {'b', 'unsigned'}, {'c', 'unsigned'}})
+    local format2 = box.tuple.format.new({
+        {'x', 'string'}, {'y', 'string'},
+    })
+    local tuple1 = box.tuple.new({10, 20, 30}, {format = format1})
+    local tuple2 = box.tuple.new({'foo', 'bar'}, {format = format2})
+    local ret_tuple1, ret_tuple2 = conn:eval([[return ...]], {tuple1, tuple2},
+                                             {_thread_id = 1})
+    t.assert(box.tuple.is(ret_tuple1))
+    t.assert(box.tuple.is(ret_tuple2))
+    t.assert_equals(ret_tuple1:tomap(), tuple1:tomap())
+    t.assert_equals(ret_tuple2:tomap(), tuple2:tomap())
     conn:close()
 end
+
+g.test_call_ret_tuple_extension_unset = function(cg)
+    t.tarantool.skip_if_not_debug()
+    box.error.injection.set('ERRINJ_NETBOX_FLIP_FEATURE',
+                            box.iproto.feature.call_ret_tuple_extension)
+    local conn = net.connect(cg.server.net_box_uri)
+    local tuple = conn:eval([[
+        local format = box.tuple.format.new({
+            {'a', 'unsigned'}, {'b', 'unsigned'},
+        })
+        return box.tuple.new({10, 20}, {format = format})
+    ]], {}, {_thread_id = 1})
+    t.assert_type(tuple, 'table')
+    t.assert_equals(tuple, {10, 20})
+    conn:close()
+end
+
+g.after_test('test_call_ret_tuple_extension_unset', function()
+    box.error.injection.set('ERRINJ_NETBOX_FLIP_FEATURE', -1)
+end)
 
 g.test_os_exit_disabled = function(cg)
     t.assert_error_msg_contains(

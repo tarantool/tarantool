@@ -2907,6 +2907,16 @@ srv_process_call(struct cmsg *m)
 	int count;
 	int rc;
 
+	/*
+	 * We access a flag that is set by another thread (tx) but it
+	 * should be fine because the feature bits are initialized once,
+	 * when a connection is established (by the IPROTO_ID request
+	 * handler), and aren't normally changed afterwards.
+	 */
+	bool box_tuple_as_ext = iproto_features_test(
+			&msg->connection->session->meta.features,
+			IPROTO_FEATURE_CALL_RET_TUPLE_EXTENSION);
+
 	struct trigger fiber_on_yield;
 	trigger_create(&fiber_on_yield, srv_process_call_on_yield, msg, NULL);
 	trigger_add(&fiber()->on_yield, &fiber_on_yield);
@@ -2929,14 +2939,27 @@ srv_process_call(struct cmsg *m)
 
 	out = iproto_msg_obuf(msg);
 	iproto_prepare_select(out, &svp);
-	count = port_dump_msgpack(&port, out);
+	if (box_tuple_as_ext) {
+		struct mp_box_ctx ctx;
+		struct mp_ctx *ctx_ref = (struct mp_ctx *)&ctx;
+		mp_box_ctx_create(&ctx, NULL, NULL);
+		count = port_dump_msgpack_with_ctx(&port, out, ctx_ref);
+		if (count >= 0 &&
+		    tuple_format_map_to_iproto_obuf(&ctx.tuple_format_map,
+						    out) != 0) {
+			count = -1;
+		}
+		mp_ctx_destroy(ctx_ref);
+	} else {
+		count = port_dump_msgpack(&port, out);
+	}
 	port_destroy(&port);
 	if (count < 0) {
 		obuf_rollback_to_svp(out, &svp);
 		goto error;
 	}
 	iproto_reply_select(out, &svp, msg->header.sync, /*schema_version=*/0,
-			    count, /*box_tuple_as_ext=*/false);
+			    count, box_tuple_as_ext);
 	iproto_wpos_create(&msg->wpos, out);
 	srv_end_msg(msg);
 	return;
