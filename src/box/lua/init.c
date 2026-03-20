@@ -216,6 +216,8 @@ extern char session_lua[],
 static const char * const lua_sources_minimal[] = {
 	"box/tuple", NULL, tuple_lua,
 	"box/tuple_format", NULL, tuple_format_lua,
+	"box/key_def", "key_def", key_def_lua,
+	"box/merger", "merger", merger_lua,
 	NULL
 };
 
@@ -237,8 +239,6 @@ static const char * const lua_sources_main[] = {
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/console", "console", console_lua,
-	"box/key_def", "key_def", key_def_lua,
-	"box/merger", "merger", merger_lua,
 	"box/iproto", "iproto", iproto_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
@@ -938,6 +938,10 @@ box_lua_init_minimal(struct lua_State *L)
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
 
+	luaopen_key_def(L);
+	lua_pop(L, 1);
+	luaopen_merger(L);
+	lua_pop(L, 1);
 	load_lua_sources(L, lua_sources_minimal);
 
 	assert(lua_gettop(L) == 0);
@@ -989,10 +993,6 @@ box_lua_init(struct lua_State *L)
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
-	lua_pop(L, 1);
-	luaopen_key_def(L);
-	lua_pop(L, 1);
-	luaopen_merger(L);
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
