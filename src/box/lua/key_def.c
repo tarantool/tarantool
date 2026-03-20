@@ -38,7 +38,7 @@
 #include "misc.h"
 #include "tuple.h"
 
-static uint32_t CTID_STRUCT_KEY_DEF_REF = 0;
+static __thread uint32_t CTID_STRUCT_KEY_DEF_REF = 0;
 
 /**
  * Free a key_def from a Lua code.

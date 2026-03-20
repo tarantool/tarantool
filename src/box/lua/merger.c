@@ -58,7 +58,7 @@
 
 #include "box/merger.h"      /* merge_source_*, merger_*() */
 
-static uint32_t CTID_STRUCT_MERGE_SOURCE_REF = 0;
+static __thread uint32_t CTID_STRUCT_MERGE_SOURCE_REF = 0;
 
 /**
  * A type of a function to create a source from a Lua iterator on

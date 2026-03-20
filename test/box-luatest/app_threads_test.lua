@@ -225,6 +225,8 @@ g.test_builtin_modules = function(cg)
     check_module('msgpackffi')
     check_module('yaml')
     check_module('json')
+    check_module('key_def')
+    check_module('merger')
     t.assert_covers(eval([[
         local e = box.error.new({type = 'MyError', name = 'FooBar'})
         return e:unpack()
@@ -496,4 +498,42 @@ g.test_tuple = function(cg)
             message = err,
         }, eval, [[box.tuple.format.new(...)]], {format})
     end
+end
+
+g.test_key_def = function(cg)
+    local function eval(expr, args)
+        return cg.server:eval(expr, args or {}, {_thread_id = 1})
+    end
+    t.assert_equals(eval([[
+        local key_def_lib = require('key_def')
+        local key_def = key_def_lib.new({
+            {fieldno = 1, type = 'string', collation = 'unicode_ci'},
+            {fieldno = 3, type = 'unsigned'},
+        })
+        return key_def:compare(
+            box.tuple.new({'FOO', 10, 20}),
+            box.tuple.new({'foo', 10, 30})
+        )
+    ]]), -1)
+    t.assert_equals(eval([[
+        local merger_lib = require('merger')
+        local key_def_lib = require('key_def')
+        local key_def = key_def_lib.new({
+            {fieldno = 1, type = 'unsigned'},
+            {fieldno = 2, type = 'unsigned'},
+        })
+        local merger = merger_lib.new(key_def, {
+            merger_lib.new_source_fromtable({
+                {1, 10}, {1, 30}, {1, 50},
+                {2, 10}, {2, 30}, {2, 50},
+            }),
+            merger_lib.new_source_fromtable({
+                {1, 20}, {1, 40}, {2, 20}, {2, 40},
+            }),
+        })
+        return merger:select()
+    ]]), {
+        {1, 10}, {1, 20}, {1, 30}, {1, 40}, {1, 50},
+        {2, 10}, {2, 20}, {2, 30}, {2, 40}, {2, 50},
+    })
 end
