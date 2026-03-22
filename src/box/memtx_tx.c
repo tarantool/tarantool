@@ -2087,7 +2087,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
  * added or deleted) by `stmt`'s transaction.
  */
 static int
-check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
+check_dup(struct txn_stmt *stmt, struct rlist *directly_replaced,
 	  struct tuple **old_tuple, enum dup_replace_mode mode)
 {
 	struct space *space = stmt->space;
@@ -2097,13 +2097,16 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 	struct tuple *new_tuple = add_story->tuple;
 
 	struct tuple *visible_replaced;
-	if (directly_replaced[0] == NULL ||
-	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
+	struct tuple *primary_replaced =
+		memtx_index_replace_result_list_to_single_result(
+			&directly_replaced[0]);
+	if (primary_replaced == NULL ||
+	    !tuple_has_flag(primary_replaced, TUPLE_IS_DIRTY)) {
 		add_story->link[0].is_own_change = false;
-		visible_replaced = directly_replaced[0];
+		visible_replaced = primary_replaced;
 	} else {
 		struct memtx_story *story =
-			memtx_tx_story_get(directly_replaced[0]);
+			memtx_tx_story_get(primary_replaced);
 		memtx_tx_story_find_visible_tuple(
 			story, txn, 0, true, &visible_replaced,
 			&add_story->link[0].is_own_change);
@@ -2120,12 +2123,15 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 		 * Check that visible tuple is NULL or the same as in the
 		 * primary index, namely replaced[0].
 		 */
-		if (directly_replaced[i] == NULL)
+		struct tuple *secondary_replaced =
+			memtx_index_replace_result_list_to_single_result(
+				&directly_replaced[i]);
+		if (secondary_replaced == NULL)
 			continue; /* NULL is OK in any case. */
 
 		struct tuple *visible;
-		if (!tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY)) {
-			visible = directly_replaced[i];
+		if (!tuple_has_flag(secondary_replaced, TUPLE_IS_DIRTY)) {
+			visible = secondary_replaced;
 			add_story->link[i].is_own_change = false;
 		} else {
 			/*
@@ -2134,7 +2140,7 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 			 * that's the only chance to be OK.
 			 */
 			struct memtx_story *story =
-				memtx_tx_story_get(directly_replaced[i]);
+				memtx_tx_story_get(secondary_replaced);
 			memtx_tx_story_find_visible_tuple(
 				story, txn, i, true, &visible,
 				&add_story->link[i].is_own_change);
@@ -2283,8 +2289,8 @@ static int
 memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple *new_tuple,
-				 struct tuple **directly_replaced,
-				 struct tuple **direct_successor,
+				 struct rlist *directly_replaced,
+				 struct rlist *direct_successor,
 				 enum dup_replace_mode mode,
 				 struct tuple **result)
 {
@@ -2303,7 +2309,9 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	}
 
 	/* Create next story in the primary index if necessary. */
-	struct tuple *next_pk = directly_replaced[0];
+	struct tuple *next_pk =
+		memtx_index_replace_result_list_to_single_result(
+			&directly_replaced[0]);
 	struct memtx_story *next_pk_story = NULL;
 	if (next_pk != NULL && tuple_has_flag(next_pk, TUPLE_IS_DIRTY)) {
 		next_pk_story = memtx_tx_story_get(next_pk);
@@ -2313,8 +2321,12 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	/* Collect conflicts or form chains. */
 	for (uint32_t i = 0; i < space->index_count; i++) {
-		struct tuple *next = directly_replaced[i];
-		struct tuple *succ = direct_successor[i];
+		struct tuple *next =
+			memtx_index_replace_result_list_to_single_result(
+				&directly_replaced[i]);
+		struct tuple *succ =
+			memtx_index_replace_result_list_to_single_result(
+				&direct_successor[i]);
 		struct index *index = space->index[i];
 		bool tuple_is_excluded = memtx_tx_tuple_key_is_excluded(
 			new_tuple, index, index->def->key_def);
@@ -2478,8 +2490,11 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 */
 	static_assert(BOX_INDEX_MAX == 128, "size of `directly_replaced` and "
 		      "`direct_successor` arrays on the stack");
-	struct tuple *directly_replaced[space->index_count];
-	struct tuple *direct_successor[space->index_count];
+	struct rlist directly_replaced[space->index_count];
+	struct rlist direct_successor[space->index_count];
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	int rc = -1;
 
 	/*
 	 * Update primary index.
@@ -2497,7 +2512,10 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 			use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
 			&directly_replaced[i], &direct_successor[i]) != 0)
 		goto rollback;
-	assert(directly_replaced[i] || new_tuple);
+	struct tuple *primary_replaced =
+			memtx_index_replace_result_list_to_single_result(
+				&directly_replaced[i]);
+	assert(primary_replaced != NULL || new_tuple != NULL);
 
 	/*
 	 * Update secondary indexes.
@@ -2512,7 +2530,7 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	for (i++; i < space->index_count; i++) {
 		struct index *index = space->index[i];
 		if (memtx_index_replace_with_results(
-				index, use_mvcc ? NULL : directly_replaced[0],
+				index, use_mvcc ? NULL : primary_replaced,
 				new_tuple,
 				use_mvcc ? DUP_REPLACE_OR_INSERT : DUP_INSERT,
 				&directly_replaced[i],
@@ -2534,37 +2552,32 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	} else {
 		/*
 		 * Without MVCC, we update the engine stats, reference
-		 * `new_tuple` and set `result` tuples using the tuple that we
-		 * replaced in the primary index.
+		 * `new_tuple, set `result` tuples using the tuple that we
+		 * replaced in the primary index and clean up replace results.
 		 */
-		memtx_space_update_tuple_stat(space, directly_replaced[0],
+		memtx_space_update_tuple_stat(space, primary_replaced,
 					      new_tuple);
 		if (new_tuple != NULL)
 			tuple_ref(new_tuple);
-		*result = directly_replaced[0];
+		*result = primary_replaced;
 	}
-	return 0;
-
+	rc = 0;
+	for (; i > 0; i--)
+		memtx_index_replace_cleanup_result_list(
+			space->index[i - 1], &directly_replaced[i - 1]);
+	goto end;
 rollback:
-	/*
-	 * Rollback index changes.
-	 */
-	for (; i > 0; i--) {
-		struct index *index = space->index[i - 1];
-		if (memtx_index_replace(index, new_tuple,
-					directly_replaced[i - 1],
-					DUP_INSERT) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
-	}
+	for (; i > 0; i--)
+		memtx_index_replace_rollback(space->index[i - 1], new_tuple,
+					     &directly_replaced[i - 1]);
 	/*
 	 * Delete story created for `new_tuple`.
 	 */
 	if (use_mvcc)
 		memtx_tx_story_delete(memtx_tx_story_get(new_tuple));
-	return -1;
+end:
+	region_truncate(region, region_svp);
+	return rc;
 }
 
 /*

@@ -23,53 +23,26 @@ memtx_index_replace_impl(struct index *index,
 			     successor);
 }
 
-/**
- * Rollback the sequence of memtx_tree_index_replace_multikey_one
- * insertions with multikey indexes [0, new_tuple_err_mk_idx - 1]
- * where the err_multikey_idx is the first multikey index where
- * error has been raised.
- *
- * This routine can't fail because all replaced_tuple (when
- * specified) nodes in tree are already allocated (they might be
- * overridden with new_tuple, but they definitely present) and
- * delete operation is fault-tolerant.
- */
 static void
 memtx_index_replace_multikey_rollback(struct index *index,
-				      struct tuple *new_tuple,
-				      uint32_t new_tuple_err_mk_idx,
-				      struct tuple *replaced)
+				      struct rlist *inserted,
+				      struct rlist *result)
 {
-	struct key_def *cmp_def = index->def->cmp_def;
-	struct memtx_index_entry entry = {
-		.tuple = new_tuple,
-		.hint = MULTIKEY_NONE,
-	};
+	struct memtx_index_replace_result *replace_result;
 	struct memtx_index_entry unused;
-	if (new_tuple != NULL) {
-		/*
-		 * Rollback new_tuple insertion by multikey index
-		 * [0, multikey_idx).
-		 */
-		for (; new_tuple_err_mk_idx > 0; --new_tuple_err_mk_idx) {
-			entry.hint = new_tuple_err_mk_idx - 1;
-			VERIFY(memtx_index_replace_impl(index, entry,
-							memtx_index_entry_null,
-							DUP_INSERT, &unused,
-							&unused) == 0);
-		}
-	}
-	if (replaced == NULL)
-		return;
-	/* Restore replaced tuple index occurrences. */
-	entry.tuple = replaced;
-	uint32_t mk_count = tuple_multikey_count(replaced, cmp_def);
-	for (uint32_t mk_idx = 0; mk_idx < mk_count; ++mk_idx) {
-		entry.hint = mk_idx;
-		VERIFY(memtx_index_replace_impl(index, memtx_index_entry_null,
-						entry, DUP_INSERT, &unused,
+	rlist_foreach_entry(replace_result, inserted, link) {
+		VERIFY(memtx_index_replace_impl(index, replace_result->entry,
+						memtx_index_entry_null,
+						DUP_INSERT, &unused,
 						&unused) == 0);
+		if (index->def->key_def->for_func_index)
+			tuple_unref((struct tuple *)replace_result->entry.hint);
 	}
+	rlist_foreach_entry(replace_result, result, link)
+		VERIFY(memtx_index_replace_impl(index, memtx_index_entry_null,
+						replace_result->entry,
+						DUP_INSERT, &unused,
+						&unused) == 0);
 }
 
 /**
@@ -121,10 +94,11 @@ memtx_index_replace_multikey_rollback(struct index *index,
 static int
 memtx_index_replace_multikey(struct index *index, struct tuple *old_tuple,
 			     struct tuple *new_tuple,
-			     enum dup_replace_mode mode, struct tuple **result)
+			     enum dup_replace_mode mode,
+			     struct rlist *result,
+			     struct rlist *successor)
 {
 	struct key_def *cmp_def = index->def->cmp_def;
-	uint32_t new_tuple_mk_idx = 0;
 	struct memtx_index_entry old_entry = {
 		.tuple = old_tuple,
 		.hint = MULTIKEY_NONE,
@@ -133,66 +107,69 @@ memtx_index_replace_multikey(struct index *index, struct tuple *old_tuple,
 		.tuple = new_tuple,
 		.hint = MULTIKEY_NONE,
 	};
-	*result = NULL;
+	struct region *region = &fiber()->gc;
 	struct memtx_index_entry unused;
+	struct memtx_index_replace_result *replace_result;
+	struct rlist replaced;
+	rlist_create(&replaced);
+	struct rlist deleted;
+	rlist_create(&deleted);
+	struct rlist inserted;
+	rlist_create(&inserted);
 
 	if (new_tuple != NULL) {
 		uint32_t mk_count = tuple_multikey_count(new_tuple, cmp_def);
-		for (new_tuple_mk_idx = 0; new_tuple_mk_idx < mk_count;
+		for (size_t new_tuple_mk_idx = 0; new_tuple_mk_idx < mk_count;
 		     ++new_tuple_mk_idx) {
 			new_entry.hint = new_tuple_mk_idx;
-			struct memtx_index_entry replaced;
-			if (memtx_index_replace_impl(index, old_entry,
-						     new_entry, mode, &replaced,
-						     &unused) != 0) {
-				memtx_index_replace_multikey_rollback(
-					index, new_tuple, new_tuple_mk_idx,
-					*result);
-				return -1;
-			}
-			assert(replaced.tuple == NULL ||
-			       replaced.tuple == old_tuple);
-			if (replaced.tuple != NULL) {
-				assert(*result == NULL ||
-				       *result == replaced.tuple);
-				*result = replaced.tuple;
-			}
+			struct memtx_index_replace_result *replaced_result =
+				xregion_alloc_object(region,
+						     typeof(*replaced_result));
+			rlist_add(&replaced, &replaced_result->link);
+			struct memtx_index_replace_result *successor_result =
+				xregion_alloc_object(region,
+						     typeof(*successor_result));
+			rlist_add(successor, &successor_result->link);
+			if (memtx_index_replace_impl(
+					index, old_entry, new_entry, mode,
+					&replaced_result->entry,
+					&successor_result->entry) != 0)
+				goto rollback;
+			replace_result =
+				xregion_alloc_object(region,
+						     typeof(*replace_result));
+			replace_result->entry.tuple = new_entry.tuple;
+			replace_result->entry.hint = new_entry.hint;
+			rlist_add(&inserted, &replace_result->link);
 		}
-		assert(*result == NULL || old_tuple == NULL ||
-		       old_tuple == *result);
 	}
-	if (old_tuple == NULL)
+	if (old_tuple == NULL) {
+		rlist_splice(result, &replaced);
 		return 0;
+	}
 	uint32_t mk_count = tuple_multikey_count(old_tuple, cmp_def);
 	for (size_t old_tuple_mk_idx = 0; old_tuple_mk_idx < mk_count;
 	     ++old_tuple_mk_idx) {
 		old_entry.hint = old_tuple_mk_idx;
+		struct memtx_index_replace_result *deleted_result =
+			xregion_alloc_object(region, typeof(*deleted_result));
+		rlist_add(&deleted, &deleted_result->link);
 		if (memtx_index_replace_impl(index, old_entry,
 					     memtx_index_entry_null,
-					     DUP_INSERT, &unused,
-					     &unused) != 0) {
-			memtx_index_replace_multikey_rollback(index, new_tuple,
-							      new_tuple_mk_idx,
-							      old_tuple);
-			return -1;
-		}
+					     DUP_INSERT, &deleted_result->entry,
+					     &unused) != 0)
+			goto rollback;
 	}
-	*result = old_tuple;
+	if (new_tuple == NULL)
+		rlist_splice(result, &deleted);
+	else
+		rlist_splice(result, &replaced);
 	return 0;
+rollback:
+	rlist_splice(&deleted, &replaced);
+	memtx_index_replace_multikey_rollback(index, &inserted, &deleted);
+	return -1;
 }
-
-/**
- * An undo entry for multikey functional index replace operation.
- * Used to roll back a failed insert/replace and restore the
- * original key_hint(s) and to commit a completed insert/replace
- * and destruct old tuple key_hint(s).
- */
-struct func_key_undo {
-	/** A link to organize entries in list. */
-	struct rlist link;
-	/** An inserted record copy. */
-	struct memtx_index_entry entry;
-};
 
 /**
  * Use the functional index function from the key definition
@@ -208,7 +185,7 @@ struct func_key_undo {
 static int
 memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
+			 struct rlist *result, struct rlist *successor)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)index->engine;
 	struct index_def *index_def = index->def;
@@ -216,16 +193,16 @@ memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 	/* Make sure that key_def is not multikey - we rely on it below. */
 	assert(!index_def->key_def->is_multikey);
 
-	int rc = -1;
 	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
 	struct key_list_iterator it;
-	struct rlist old_entries, new_entries;
-	rlist_create(&old_entries);
-	rlist_create(&new_entries);
-	struct func_key_undo *undo;
 	struct memtx_index_entry unused;
-	struct func_key_undo *entry;
+	struct memtx_index_replace_result *replace_result;
+	struct rlist replaced;
+	rlist_create(&replaced);
+	struct rlist deleted;
+	rlist_create(&deleted);
+	struct rlist inserted;
+	rlist_create(&inserted);
 
 	struct memtx_index_entry old_entry = {
 		.tuple = old_tuple,
@@ -235,70 +212,75 @@ memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 		.tuple = new_tuple,
 		.hint = MULTIKEY_NONE,
 	};
-	*result = NULL;
 	if (new_tuple != NULL) {
 		if (key_list_iterator_create(&it, new_tuple, index_def, true,
 					     memtx->func_key_format) != 0)
-			goto end;
+			return -1;
 		int err = 0;
 		struct tuple *key;
-		struct func_key_undo *undo;
 		struct key_def *key_def = index_def->key_def;
 		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
 		       key != NULL) {
 			/* Save functional key to MVCC, even excluded one. */
 			memtx_tx_save_func_key(new_tuple, index, key);
+			struct memtx_index_replace_result *replaced_result =
+				xregion_alloc_object(region,
+						     typeof(*replaced_result));
+			replaced_result->entry = memtx_index_entry_null;
+			rlist_add(&replaced, &replaced_result->link);
+			struct memtx_index_replace_result *successor_result =
+				xregion_alloc_object(region,
+						     typeof(*successor_result));
+			successor_result->entry = memtx_index_entry_null;
+			rlist_add(successor, &successor_result->link);
 			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
 				continue;
 			new_entry.hint = (uint64_t)key;
-			struct memtx_index_entry replaced;
-			struct memtx_index_entry successor_entry;
-			err = memtx_index_replace_impl(index, old_entry,
-						       new_entry, mode,
-						       &replaced,
-						       &successor_entry);
+			err = memtx_index_replace_impl(
+				index, old_entry, new_entry, mode,
+				&replaced_result->entry,
+				&successor_result->entry);
 			if (err != 0)
 				break;
-			if (!it.func_is_multikey)
-				*successor = successor_entry.tuple;
 			bool is_mk_conflict =
-				replaced.tuple == new_entry.tuple;
-			undo = xregion_alloc_object(region, typeof(*undo));
+				replaced_result->entry.tuple == new_entry.tuple;
+			replace_result =
+				xregion_alloc_object(region,
+						     typeof(*replace_result));
 			tuple_ref(key);
-			undo->entry.tuple = new_tuple;
-			undo->entry.hint = (uint64_t)key;
-			rlist_add(&new_entries, &undo->link);
-			if (replaced.tuple != NULL && !is_mk_conflict) {
-				undo = xregion_alloc_object(region,
-							    typeof(*undo));
-				undo->entry.tuple = replaced.tuple;
-				undo->entry.hint = replaced.hint;
-				rlist_add(&old_entries, &undo->link);
-				assert(*result == NULL ||
-				       *result == replaced.tuple);
-				*result = replaced.tuple;
-			} else if (is_mk_conflict) {
+			replace_result->entry.tuple = new_tuple;
+			replace_result->entry.hint = (uint64_t)key;
+			rlist_add(&inserted, &replace_result->link);
+			if (is_mk_conflict) {
 				/*
-				 * Remove the replaced tuple undo
-				 * from undo list.
+				 * Remove the replaced tuple entry
+				 * from inserted list.
 				 */
-				tuple_unref((struct tuple *)replaced.hint);
-				rlist_foreach_entry(undo, &new_entries, link) {
-					if (undo->entry.hint == replaced.hint) {
-						rlist_del(&undo->link);
+				hint_t hint = replaced_result->entry.hint;
+				tuple_unref((struct tuple *)hint);
+				rlist_foreach_entry(replace_result, &inserted,
+						    link) {
+					if (replace_result->entry.hint ==
+					    hint) {
+						rlist_del(
+							&replace_result->link);
 						break;
 					}
 				}
+				replaced_result->entry =
+					memtx_index_entry_null;
+				successor_result->entry =
+					memtx_index_entry_null;
 			}
 		}
 		assert(key == NULL || err != 0);
 		if (err != 0)
 			goto rollback;
-		assert(*result == NULL || old_tuple == NULL ||
-		       old_tuple == *result);
 	}
-	if (old_tuple == NULL)
-		goto commit;
+	if (old_tuple == NULL) {
+		rlist_splice(result, &replaced);
+		return 0;
+	}
 	/*
 	 * Use the runtime format to avoid OOM while deleting a tuple
 	 * from a space. It's okay, because we are not going to store
@@ -306,73 +288,54 @@ memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 	 */
 	if (key_list_iterator_create(&it, old_tuple, index_def, false,
 				     tuple_format_runtime) != 0)
-		goto end;
+		goto rollback;
 	struct tuple *key;
 	while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
 		old_entry.hint = (uint64_t)key;
-		struct memtx_index_entry deleted;
-		deleted.tuple = NULL;
+		struct memtx_index_replace_result *deleted_result =
+			xregion_alloc_object(region, typeof(*deleted_result));
+		deleted_result->entry = memtx_index_entry_null;
+		rlist_add(&deleted, &deleted_result->link);
 		if (memtx_index_replace_impl(index, old_entry,
 					     memtx_index_entry_null, DUP_INSERT,
-					     &deleted, &unused) != 0)
+					     &deleted_result->entry,
+					     &unused) != 0)
 			goto rollback;
-		if (deleted.tuple != NULL) {
-			struct func_key_undo *undo =
-			xregion_alloc_object(region,
-					     typeof(*undo));
-			undo->entry.tuple = deleted.tuple;
-			undo->entry.hint = deleted.hint;
-			rlist_add(&old_entries, &undo->link);
-		}
 	}
 	assert(key == NULL);
-	*result = old_tuple;
-commit:
-	/*
-	 * Commit changes: release hints for
-	 * replaced entries.
-	 */
-	rlist_foreach_entry(undo, &old_entries, link)
-		tuple_unref((struct tuple *)undo->entry.hint);
-	rc = 0;
-	goto end;
+	struct rlist *unref;
+	if (new_tuple == NULL) {
+		rlist_splice(result, &deleted);
+		unref = &replaced;
+	}
+	else {
+		rlist_splice(result, &replaced);
+		unref = &deleted;
+	}
+	rlist_foreach_entry(replace_result, unref, link)
+		if (replace_result->entry.tuple != NULL)
+			tuple_unref((struct tuple *)replace_result->entry.hint);
+	return 0;
 rollback:
-	rlist_foreach_entry(entry, &new_entries, link) {
-		VERIFY(memtx_index_replace_impl(index, entry->entry,
-						memtx_index_entry_null,
-						DUP_INSERT, &unused,
-						&unused) == 0);
-		tuple_unref((struct tuple *)entry->entry.hint);
-	}
-	rlist_foreach_entry(entry, &old_entries, link) {
-		VERIFY(memtx_index_replace_impl(index, memtx_index_entry_null,
-						entry->entry, DUP_INSERT,
-						&unused, &unused) == 0);
-	}
-end:
-	region_truncate(region, region_svp);
-	return rc;
+	rlist_splice(&deleted, &replaced);
+	memtx_index_replace_multikey_rollback(index, &inserted, &deleted);
+	return -1;
 }
 
 int
 memtx_index_replace_with_results(struct index *index, struct tuple *old_tuple,
 				 struct tuple *new_tuple,
 				 enum dup_replace_mode mode,
-				 struct tuple **result,
-				 struct tuple **successor)
+				 struct rlist *result, struct rlist *successor)
 {
-	if (index->def->key_def->is_multikey) {
-		/* MUTLIKEY doesn't support successor for now. */
-		*successor = NULL;
+	rlist_create(result);
+	rlist_create(successor);
+	if (index->def->key_def->is_multikey)
 		return memtx_index_replace_multikey(index, old_tuple, new_tuple,
-						    mode, result);
-	}
-	if (index->def->key_def->for_func_index) {
-		/* Successor will be set only if function is not multikey. */
-		*successor = NULL;
+						    mode, result, successor);
+	if (index->def->key_def->for_func_index)
 		return memtx_index_replace_func(index, old_tuple, new_tuple,
 						mode, result, successor);
-	}
 
 	struct memtx_index_entry old_entry = {
 		.tuple = old_tuple,
@@ -382,12 +345,43 @@ memtx_index_replace_with_results(struct index *index, struct tuple *old_tuple,
 		.tuple = new_tuple,
 		.hint = MULTIKEY_NONE,
 	};
-	struct memtx_index_entry result_entry, successor_entry;
-	int rc = memtx_index_replace_impl(index, old_entry, new_entry, mode,
-					  &result_entry, &successor_entry);
-	*result = result_entry.tuple;
-	*successor = successor_entry.tuple;
-	return rc;
+	struct memtx_index_replace_result *replaced_result =
+		xregion_alloc_object(&fiber()->gc, typeof(*replaced_result));
+	rlist_add(result, &replaced_result->link);
+	struct memtx_index_replace_result *successor_result =
+		xregion_alloc_object(&fiber()->gc, typeof(*successor_result));
+	rlist_add(successor, &successor_result->link);
+	return memtx_index_replace_impl(index, old_entry, new_entry, mode,
+					&replaced_result->entry,
+					&successor_result->entry);
+}
+
+void
+memtx_index_replace_cleanup_result_list(struct index *index,
+					struct rlist *result_list)
+{
+	struct memtx_index_replace_result *result;
+	if (index->def->key_def->for_func_index)
+		rlist_foreach_entry(result, result_list, link)
+			if (result->entry.tuple != NULL)
+				tuple_unref((struct tuple *)result->entry.hint);
+}
+
+void
+memtx_index_replace_rollback(struct index *index, struct tuple *new_tuple,
+			     struct rlist *result)
+{
+
+	struct memtx_index_replace_result *replace_result;
+	struct tuple *old_tuple = NULL;
+	rlist_foreach_entry(replace_result, result, link)
+		if (replace_result->entry.tuple != NULL) {
+			old_tuple = replace_result->entry.tuple;
+			break;
+		}
+	VERIFY(memtx_index_replace(index, new_tuple, old_tuple,
+				   DUP_INSERT) == 0);
+	memtx_index_replace_cleanup_result_list(index, result);
 }
 
 void
