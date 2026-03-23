@@ -6679,8 +6679,6 @@ box_storage_free(void)
 void
 box_init(void)
 {
-	iproto_constants_init();
-	iproto_features_init();
 	port_init();
 	box_on_recovery_state_event =
 		event_get("box.ctl.on_recovery_state", true);
@@ -6805,7 +6803,6 @@ box_free(void)
 	tuple_free();
 	coll_id_cache_destroy();
 	port_free();
-	iproto_constants_free();
 	box_lua_call_runtime_priv_reset();
 	/* schema_module_free(); */
 	/* session_free(); */
