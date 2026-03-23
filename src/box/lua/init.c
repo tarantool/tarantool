@@ -98,6 +98,7 @@ extern char session_lua[],
 	tuple_lua[],
 	tuple_format_lua[],
 	key_def_lua[],
+	box_utils_lua[],
 	schema_lua[],
 	load_cfg_lua[],
 	xlog_lua[],
@@ -218,6 +219,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/tuple_format", NULL, tuple_format_lua,
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
+	"box/utils", NULL, box_utils_lua,
 	NULL
 };
 

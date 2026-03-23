@@ -8,6 +8,7 @@ option(ENABLE_FEEDBACK_DAEMON "Feedback daemon which reports debug data to the T
 
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua load_cfg_lua)
+lua_source(lua_sources lua/utils.lua box_utils_lua)
 lua_source(lua_sources lua/schema.lua schema_lua)
 lua_source(lua_sources lua/tuple.lua tuple_lua)
 lua_source(lua_sources lua/tuple_format.lua tuple_format_lua)
