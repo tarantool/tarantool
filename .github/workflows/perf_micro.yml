@@ -113,46 +113,46 @@ jobs:
         if: github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
-      - name: test
-        run: make -f .test.mk test-perf
-        env:
-          # The taskset alone will pin all the process threads
-          # into a single (random) isolated CPU, see
-          # https://bugzilla.kernel.org/show_bug.cgi?id=116701.
-          # The workaround is using realtime scheduler for the
-          # isolated task using chrt, e. g.:
-          # sudo taskset 0xef chrt 50.
-          # But this makes the process use non-standard, real-time
-          # round-robin scheduling mechanism.
-          # Hardware machine for benchmarking has a group of
-          # isolated CPUs 1-24.
-          BENCH_CMD: "taskset 0x01fffffe chrt 50"
-      - name: Aggregate benchmark results
-        run: make -f .test.mk test-perf-aggregate
-      - name: Send statistics to InfluxDB
-        # Run on push to the 'master' and release branches or on
-        # non-fork pull requests (secrets are unavailable in fork
-        # pull requests).
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
-        # TODO: For now, use the debug bucket for this PoC.
-        # --silent -o /dev/null: Prevent dumping any reply part
-        # in the output in case of an error.
-        # --fail: Exit with the 22 error code is status >= 400.
-        # --write-out: See the reason for the failure, if any.
-        # --retry, --retry-delay: To avoid losing the results of
-        # running after such a long job, try to retry sending the
-        # results.
-        run: >
-          curl --request POST
-          "${{ secrets.INFLUXDB_URL }}/api/v2/write?org=tarantool&bucket=perf-debug&precision=s"
-          --write-out "%{http_code}"
-          --retry 5
-          --retry-delay 5
-          --connect-timeout 120
-          --fail --silent -o /dev/null
-          --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}"
-          --data-binary @./perf/output/summary.txt
+      # - name: test
+      #   run: make -f .test.mk test-perf
+      #   env:
+      #     # The taskset alone will pin all the process threads
+      #     # into a single (random) isolated CPU, see
+      #     # https://bugzilla.kernel.org/show_bug.cgi?id=116701.
+      #     # The workaround is using realtime scheduler for the
+      #     # isolated task using chrt, e. g.:
+      #     # sudo taskset 0xef chrt 50.
+      #     # But this makes the process use non-standard, real-time
+      #     # round-robin scheduling mechanism.
+      #     # Hardware machine for benchmarking has a group of
+      #     # isolated CPUs 1-24.
+      #     BENCH_CMD: "taskset 0x01fffffe chrt 50"
+      # - name: Aggregate benchmark results
+      #   run: make -f .test.mk test-perf-aggregate
+      # - name: Send statistics to InfluxDB
+      #   # Run on push to the 'master' and release branches or on
+      #   # non-fork pull requests (secrets are unavailable in fork
+      #   # pull requests).
+      #   if: github.event_name != 'pull_request' ||
+      #     github.event.pull_request.head.repo.full_name == github.repository
+      #   # TODO: For now, use the debug bucket for this PoC.
+      #   # --silent -o /dev/null: Prevent dumping any reply part
+      #   # in the output in case of an error.
+      #   # --fail: Exit with the 22 error code is status >= 400.
+      #   # --write-out: See the reason for the failure, if any.
+      #   # --retry, --retry-delay: To avoid losing the results of
+      #   # running after such a long job, try to retry sending the
+      #   # results.
+      #   run: >
+      #     curl --request POST
+      #     "${{ secrets.INFLUXDB_URL }}/api/v2/write?org=tarantool&bucket=perf-debug&precision=s"
+      #     --write-out "%{http_code}"
+      #     --retry 5
+      #     --retry-delay 5
+      #     --connect-timeout 120
+      #     --fail --silent -o /dev/null
+      #     --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}"
+      #     --data-binary @./perf/output/summary.txt
       - name: Prepare data with performance results for analysis
         # Run on push to the 'master' and release branches or on
         # non-fork pull requests (secrets are unavailable in fork
