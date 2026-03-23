@@ -89,6 +89,8 @@ enum {
 	ENDPOINT_NAME_MAX = 16,
 };
 
+struct mp_ctx iproto_mp_ctx;
+
 struct iproto_connection;
 struct iproto_msg;
 
@@ -4194,6 +4196,8 @@ TRIGGER(trigger_on_change, trigger_on_change_iproto_notify);
 void
 iproto_init(int threads_count)
 {
+	mp_ctx_create_default(&iproto_mp_ctx, iproto_key_translation);
+
 	iproto_threads_count = 0;
 	struct session_vtab iproto_session_vtab = {
 		/* .push = */ iproto_session_push,
@@ -4722,6 +4726,8 @@ iproto_free(void)
 	 * in case it's unix sockets.
 	 */
 	evio_service_stop(&tx_binary);
+
+	mp_ctx_destroy(&iproto_mp_ctx);
 }
 
 static int

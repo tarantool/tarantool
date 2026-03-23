@@ -1052,6 +1052,5 @@ void
 box_lua_free(void)
 {
 	assert(cord_is_main());
-	box_lua_iproto_free();
 	box_lua_space_free();
 }

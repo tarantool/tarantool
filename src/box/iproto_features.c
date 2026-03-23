@@ -61,7 +61,8 @@ mp_decode_iproto_features(const char **data, struct iproto_features *features)
 	return 0;
 }
 
-void
+__attribute__((constructor))
+static void
 iproto_features_init(void)
 {
 	iproto_features_create(&IPROTO_CURRENT_FEATURES);
