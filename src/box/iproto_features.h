@@ -218,12 +218,6 @@ mp_encode_iproto_features(char *data, const struct iproto_features *features);
 int
 mp_decode_iproto_features(const char **data, struct iproto_features *features);
 
-/**
- * Initializes this module.
- */
-void
-iproto_features_init(void);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif

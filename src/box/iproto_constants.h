@@ -258,8 +258,18 @@ static_assert(iproto_key_MAX <= 0x80, "iproto_key_MAX must be <= 0x80");
 /** IPROTO key name by code. */
 extern const char *iproto_key_strs[];
 
+/** IPROTO key name by code, in lower case. */
+extern char *iproto_key_lower_strs[];
+
 /** MsgPack value type by IPROTO key. */
 extern const unsigned char iproto_key_type[];
+
+/** Translation table for a MsgPack context (mp_ctx). */
+extern struct mh_strnu32_t *iproto_key_translation;
+
+/** Computes a hash of an IPROTO key name. */
+uint32_t
+iproto_key_hash(const char *str, uint32_t len);
 
 /**
  * Keys, stored in IPROTO_METADATA. They can not be received
@@ -705,27 +715,6 @@ vy_row_index_key_name(enum vy_row_index_key key)
 		return NULL;
 	extern const char *vy_row_index_key_strs[];
 	return vy_row_index_key_strs[key];
-}
-
-/** Initialize the "IPROTO constants" subsystem. */
-static inline void
-iproto_constants_init(void)
-{
-	for (size_t i = 0; i < iproto_type_MAX; i++) {
-		const char *type_name = iproto_type_strs[i];
-		iproto_type_lower_strs[i] = type_name == NULL ? NULL :
-					    strtolowerdup(type_name);
-	}
-}
-
-/** Destroy the "IPROTO constants" subsystem. */
-static inline void
-iproto_constants_free(void)
-{
-	for (size_t i = 0; i < iproto_type_MAX; i++) {
-		free(iproto_type_lower_strs[i]);
-		iproto_type_lower_strs[i] = NULL;
-	}
 }
 
 #if defined(__cplusplus)

@@ -3289,8 +3289,9 @@ luaT_netbox_transport_graceful_shutdown(struct lua_State *L)
 	return 0;
 }
 
-int
-luaopen_net_box(struct lua_State *L)
+__attribute__((constructor))
+static void
+netbox_iproto_features_init(void)
 {
 	iproto_features_create(&NETBOX_IPROTO_FEATURES);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
@@ -3315,7 +3316,11 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_CALL_ARG_TUPLE_EXTENSION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_IS_SYNC);
+}
 
+int
+luaopen_net_box(struct lua_State *L)
+{
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 

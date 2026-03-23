@@ -30,6 +30,8 @@
  */
 #include "iproto_constants.h"
 
+#include "assoc.h"
+
 #define bit(c) (1ULL<<IPROTO_##c)
 const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	0,                                                    /* unused */
@@ -73,6 +75,10 @@ const unsigned char iproto_key_type[iproto_key_MAX] = {
 const char *iproto_key_strs[iproto_key_MAX] = {
 	IPROTO_KEYS(IPROTO_KEY_STRS_MEMBER)
 };
+
+char *iproto_key_lower_strs[iproto_key_MAX];
+
+struct mh_strnu32_t *iproto_key_translation;
 
 #define IPROTO_METADATA_KEY_STRS_MEMBER(s, ...) \
 	[IPROTO_FIELD_ ## s] = #s,
@@ -124,3 +130,55 @@ const char *vy_page_info_key_strs[vy_page_info_key_MAX] = {
 const char *vy_row_index_key_strs[vy_row_index_key_MAX] = {
 	VY_ROW_INDEX_KEYS(VY_ROW_INDEX_KEY_STRS_MEMBER)
 };
+
+__attribute__((constructor))
+static void
+iproto_constants_init(void)
+{
+	iproto_key_translation = mh_strnu32_new();
+	for (size_t i = 0; i < iproto_key_MAX; i++) {
+		const char *key_name = iproto_key_strs[i];
+		if (key_name != NULL) {
+			size_t key_len = strlen(key_name);
+			struct mh_strnu32_node_t node = {
+				.str = key_name,
+				.len = key_len,
+				.hash = iproto_key_hash(key_name, key_len),
+				.val = i,
+			};
+			struct mh_strnu32_node_t prev;
+			struct mh_strnu32_node_t *prev_ptr = &prev;
+			mh_strnu32_put(iproto_key_translation, &node,
+				       &prev_ptr, NULL);
+			assert(prev_ptr == NULL);
+			char *key_name_lower = strtolowerdup(key_name);
+			iproto_key_lower_strs[i] = key_name_lower;
+			node.str = key_name_lower;
+			node.hash = iproto_key_hash(key_name_lower, key_len);
+			mh_strnu32_put(iproto_key_translation, &node,
+				       &prev_ptr, NULL);
+			assert(prev_ptr == NULL);
+		}
+	}
+	for (size_t i = 0; i < iproto_type_MAX; i++) {
+		const char *type_name = iproto_type_strs[i];
+		iproto_type_lower_strs[i] = type_name == NULL ? NULL :
+					    strtolowerdup(type_name);
+	}
+}
+
+__attribute__((destructor))
+static void
+iproto_constants_free(void)
+{
+	for (size_t i = 0; i < iproto_type_MAX; i++) {
+		free(iproto_type_lower_strs[i]);
+		iproto_type_lower_strs[i] = NULL;
+	}
+	for (size_t i = 0; i < iproto_key_MAX; i++) {
+		free(iproto_key_lower_strs[i]);
+		iproto_key_lower_strs[i] = NULL;
+	}
+	mh_strnu32_delete(iproto_key_translation);
+	iproto_key_translation = NULL;
+}

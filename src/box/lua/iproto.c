@@ -36,13 +36,6 @@
 #include <lauxlib.h>
 
 /**
- * Translation table for iproto_default_mp_ctx.
- */
-static struct mh_strnu32_t *iproto_key_translation;
-
-struct mp_ctx iproto_mp_ctx;
-
-/**
  * Pushes IPROTO constants generated from `IPROTO_FLAGS` onto Lua stack.
  */
 static void
@@ -69,20 +62,6 @@ push_iproto_key_enum(struct lua_State *L)
 			continue;
 		lua_pushinteger(L, i);
 		lua_setfield(L, -2, name);
-		size_t len = strlen(name);
-		char *lowercase = strtolowerdup(name);
-		struct mh_strnu32_node_t translation = {
-			.str = lowercase,
-			.len = len,
-			.hash = lua_hash(lowercase, len),
-			.val = i,
-		};
-		mh_strnu32_put(iproto_key_translation, &translation,
-			       NULL, NULL);
-		translation.str = xstrdup(name);
-		translation.hash = lua_hash(translation.str, len);
-		mh_strnu32_put(iproto_key_translation, &translation,
-			       NULL, NULL);
 	}
 	lua_setfield(L, -2, "key");
 }
@@ -624,11 +603,9 @@ truncated_input:
 void
 box_lua_iproto_init(struct lua_State *L)
 {
-	iproto_key_translation = mh_strnu32_new();
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
-	mp_ctx_create_default(&iproto_mp_ctx, iproto_key_translation);
 	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
 		{"encode_greeting", lbox_iproto_encode_greeting},
@@ -647,20 +624,4 @@ box_lua_iproto_init(struct lua_State *L)
 	luaL_setfuncs(L, internal_funcs, 0);
 	lua_pop(L, 1); /* box.iproto.internal */
 	lua_pop(L, 1); /* box.iproto */
-}
-
-/**
- * Deletes the IPROTO key translation and all its dynamically allocated key
- * strings.
- */
-void
-box_lua_iproto_free(void)
-{
-	mp_ctx_destroy(&iproto_mp_ctx);
-	struct mh_strnu32_t *h = iproto_key_translation;
-	mh_int_t k;
-	mh_foreach(h, k)
-		free((void *)mh_strnu32_node(h, k)->str);
-	mh_strnu32_delete(iproto_key_translation);
-	iproto_key_translation = NULL;
 }
