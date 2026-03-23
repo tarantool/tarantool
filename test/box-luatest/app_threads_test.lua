@@ -563,3 +563,35 @@ g.test_key_def = function(cg)
         {2, 10}, {2, 20}, {2, 30}, {2, 40}, {2, 50},
     })
 end
+
+g.test_net_box = function(cg)
+    cg.server:eval([[
+        local conn = require('net.box').connect(...)
+        conn:eval("box.schema.space.create('test')")
+        conn:eval("box.space.test:create_index('primary')")
+        conn:reload_schema()
+        conn.space.test:insert({1, 'a'})
+        conn.space.test:insert({2, 'b'})
+        conn.space.test:insert({3, 'c'})
+        conn:close()
+    ]], {cg.server.net_box_uri}, {_thread_id = 1})
+    t.assert_equals(cg.server:eval([[
+        local conn = require('net.box').connect(...)
+        local ret = conn.space.test:select({}, {iterator = 'le'})
+        conn:close()
+        return ret
+    ]], {cg.server.net_box_uri}, {_thread_id = 2}), {
+        {3, 'c'}, {2, 'b'}, {1, 'a'},
+    })
+    t.assert(cg.server:eval([[
+        return require('net.box').self == nil
+    ]], {cg.server.net_box_uri}, {_thread_id = 3}))
+end
+
+g.after_test('test_net_box', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

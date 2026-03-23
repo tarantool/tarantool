@@ -220,6 +220,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
 	"box/utils", NULL, box_utils_lua,
+	"box/net_box", "net.box", net_box_lua,
 	NULL
 };
 
@@ -238,7 +239,6 @@ static const char * const lua_sources_main[] = {
 	"box/xlog", "xlog", xlog_lua,
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
-	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/console", "console", console_lua,
 	"box/iproto", "iproto", iproto_lua,
@@ -939,11 +939,15 @@ box_lua_init_minimal(struct lua_State *L)
 	box_lua_tuple_format_init(L);
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
+	box_lua_iproto_constants_init(L);
 
 	luaopen_key_def(L);
 	lua_pop(L, 1);
 	luaopen_merger(L);
 	lua_pop(L, 1);
+	luaopen_net_box(L);
+	lua_pop(L, 1);
+
 	load_lua_sources(L, lua_sources_minimal);
 
 	assert(lua_gettop(L) == 0);
@@ -992,8 +996,6 @@ box_lua_init(struct lua_State *L)
 	box_lua_expression_lexer_init(L);
 	box_lua_extras_init(L);
 
-	luaopen_net_box(L);
-	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
 	lua_pop(L, 1);
 
