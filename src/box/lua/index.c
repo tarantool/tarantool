@@ -289,15 +289,6 @@ lbox_index_count(lua_State *L)
 	return 1;
 }
 
-static void
-box_index_init_iterator_types(struct lua_State *L, int idx)
-{
-	for (int i = 0; i < iterator_type_MAX; i++) {
-		lua_pushnumber(L, i);
-		lua_setfield(L, idx, iterator_type_strs[i]);
-	}
-}
-
 /* }}} */
 
 /* {{{ box.index.iterator Lua library: index iterators */
@@ -453,11 +444,6 @@ box_lua_index_init(struct lua_State *L)
 	(void) rc;
 	CTID_STRUCT_ITERATOR_PTR = luaL_ctypeid(L, "struct iterator*");
 	assert(CTID_STRUCT_ITERATOR_PTR != 0);
-
-	/* box.index */
-	luaL_findtable(L, LUA_GLOBALSINDEX, "box.index", 0);
-	box_index_init_iterator_types(L, -2);
-	lua_pop(L, 1);
 
 	static const struct luaL_Reg boxlib_internal[] = {
 		{"insert", lbox_insert},
