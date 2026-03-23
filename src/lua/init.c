@@ -222,6 +222,7 @@ static const char * const lua_modules_minimal[] = {
 	"timezones", timezones_lua,
 	"datetime", datetime_lua,
 	"msgpackffi", msgpackffi_lua,
+	"http.client", httpc_lua,
 	NULL
 };
 
@@ -237,7 +238,6 @@ static const char * const lua_modules[] = {
 	"help", help_lua,
 	"internal.argparse", argparse_lua,
 	"pwd", pwd_lua,
-	"http.client", httpc_lua,
 	"swim", swim_lua,
 	"internal.protobuf.wireformat", protobuf_wireformat_lua,
 	"protobuf", protobuf_lua,
@@ -803,6 +803,8 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
+	luaopen_http_client_driver(L);
+	lua_pop(L, 1);
 
 	luaopen_tarantool(L);
 	for (const char * const *s = lua_modules_minimal; *s; s += 2) {
@@ -861,8 +863,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
-	luaopen_http_client_driver(L);
-	lua_pop(L, 1);
 #if defined(EMBED_LUAZLIB)
 	luaopen_zlib(L);
 	lua_pop(L, 1);

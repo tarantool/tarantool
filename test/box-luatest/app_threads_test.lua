@@ -253,6 +253,7 @@ g.test_builtin_modules = function(cg)
     check_module('json')
     check_module('key_def')
     check_module('merger')
+    check_module('http.client')
     t.assert_covers(eval([[
         local e = box.error.new({type = 'MyError', name = 'FooBar'})
         return e:unpack()
@@ -595,3 +596,9 @@ g.after_test('test_net_box', function(cg)
         end
     end)
 end)
+
+g.test_luatest_exec = function(cg)
+    cg.server:exec(function()
+        t.assert(true)
+    end, {}, {_thread_id = 1})
+end
