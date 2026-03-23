@@ -783,6 +783,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	tarantool_lua_utils_init(L);
 	tarantool_lua_alloc_init(L);
 	tarantool_lua_tweaks_init(L);
+	tarantool_lua_trigger_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
@@ -856,7 +857,6 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_xml_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_swim_init(L);
-	tarantool_lua_trigger_init(L);
 	tarantool_lua_extras_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);

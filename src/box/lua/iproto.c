@@ -597,15 +597,19 @@ truncated_input:
 	return 2;
 }
 
-/**
- * Initializes module for working with Tarantool's network subsystem.
- */
 void
-box_lua_iproto_init(struct lua_State *L)
+box_lua_iproto_constants_init(struct lua_State *L)
 {
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
+	lua_pop(L, 1); /* box.iproto */
+}
+
+void
+box_lua_iproto_init(struct lua_State *L)
+{
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	static const struct luaL_Reg funcs[] = {
 		{"send", lbox_iproto_send},
 		{"encode_greeting", lbox_iproto_encode_greeting},
