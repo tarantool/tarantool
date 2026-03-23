@@ -13,6 +13,12 @@ extern "C" {
 struct lua_State;
 
 /**
+ * Initializes constants and feature bits in the `box.iproto` namespace.
+ */
+void
+box_lua_iproto_constants_init(struct lua_State *L);
+
+/**
  * Initializes `box.iproto` submodule for working with Tarantool network
  * subsystem.
  */
