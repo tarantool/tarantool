@@ -172,6 +172,7 @@ extern char session_lua[],
 	config_applier_sharding_lua[],
 	config_applier_box_status_lua[],
 	config_cluster_config_lua[],
+	config_deprecations_lua[],
 	config_descriptions_lua[],
 	config_validators_lua[],
 	config_configdata_lua[],
@@ -396,6 +397,10 @@ static const char * const lua_sources_main[] = {
 	"config/utils/network",
 	"internal.config.utils.network",
 	config_utils_network_lua,
+
+	"config/deprecations",
+	"internal.config.deprecations",
+	config_deprecations_lua,
 
 	"config/descriptions",
 	"internal.config.descriptions",

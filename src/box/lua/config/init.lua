@@ -317,6 +317,12 @@ function methods._store(self, iconfig, cconfig, source_info)
         ]]):format(action, self._instance_name, source_info_str), 0)
     end
 
+    -- Emit deprecation warnings to notify users about outdated
+    -- configuration options.
+    for _, deprecation in pairs(instance_config:_deprecations(iconfig)) do
+        log.warn(deprecation.message)
+    end
+
     self._configdata = configdata.new(iconfig, cconfig, self._instance_name)
 end
 
