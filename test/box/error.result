@@ -510,6 +510,8 @@ t;
  |   299: box.error.NO_SUCH_THREAD
  |   300: box.error.UNABLE_TO_PROCESS_IN_THREAD
  |   301: box.error.DICT_OVERFLOW
+ |   302: box.error.NO_SUCH_THREAD_GROUP
+ |   303: box.error.THREADS_NOT_CONFIGURED
  | ...
 
 test_run:cmd("setopt delimiter ''");

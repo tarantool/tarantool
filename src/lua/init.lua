@@ -189,6 +189,7 @@ local trace_check_required_modules = {
     ['builtin/error.lua'] = true,
     ['builtin/tarantool.lua']= true,
     ['builtin/version.lua']= true,
+    ['builtin/app_threads.lua'] = true,
 }
 
 --

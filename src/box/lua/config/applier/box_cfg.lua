@@ -755,6 +755,35 @@ end
 
 -- }}} <replicaset>.bootstrap_leader
 
+-- {{{ threads
+
+local function set_threads(config, box_cfg, post_box_cfg_hooks)
+    local configdata = config._configdata
+    local threads_cfg = configdata:get('threads', {use_default = true})
+    local is_startup = type(box.cfg) == 'function'
+    if not is_startup then
+        if not table.equals(threads_cfg, box.internal.threads.cfg()) then
+            local warning = 'box_cfg.apply: threads configuration ' ..
+                'will not be set until the instance is restarted'
+            config._aboard:set({type = 'warn', message = warning})
+        end
+        return
+    end
+    if threads_cfg == nil then
+        return
+    end
+    if threads_cfg.groups == nil then
+        threads_cfg.groups = {}
+    end
+    box_cfg.app_threads = 0
+    for _, group_cfg in ipairs(threads_cfg.groups) do
+        box_cfg.app_threads = box_cfg.app_threads + group_cfg.size
+    end
+    post_box_cfg_hooks:add(box.internal.threads.cfg, threads_cfg)
+end
+
+-- }}} threads
+
 -- {{{ metrics
 
 local function set_metrics(configdata, box_cfg)
@@ -1391,6 +1420,7 @@ local function apply(config)
     revert_non_dynamic_options(config, box_cfg)
     set_names_in_background(config, box_cfg)
     set_bootstrap_leader(configdata, box_cfg)
+    set_threads(config, box_cfg, post_box_cfg_hooks)
     set_metrics(configdata, box_cfg)
 
     -- RO may be enforced by the isolated mode, so we call the
