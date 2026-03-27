@@ -485,7 +485,8 @@ local mt = {
 
 -- Validate UUIDs and names passed to config against the data,
 -- saved inside snapshot. Fail early if mismatch is found.
-local function validate_names(saved_names, config_names, iconfig)
+local function validate_names(saved_names, config_names, iconfig, opts)
+    local skip_names = opts ~= nil and opts.skip_names or false
     -- Snapshot always has replicaset uuid and
     -- at least one peer in _cluster space.
     if saved_names.replicaset_uuid == nil then
@@ -511,11 +512,13 @@ local function validate_names(saved_names, config_names, iconfig)
                             config_names.replicaset_uuid), 0)
     end
 
-    if saved_names.replicaset_name ~= nil and
-       saved_names.replicaset_name ~= config_names.replicaset_name then
-        error(string.format('Replicaset name mismatch. Snapshot: %s, ' ..
-                            'config: %s.', saved_names.replicaset_name,
-                            config_names.replicaset_name), 0)
+    if not skip_names then
+        if saved_names.replicaset_name ~= nil and
+           saved_names.replicaset_name ~= config_names.replicaset_name then
+            error(string.format('Replicaset name mismatch. Snapshot: %s, ' ..
+                                'config: %s.', saved_names.replicaset_name,
+                                config_names.replicaset_name), 0)
+        end
     end
 
     if config_names.instance_uuid ~= nil and
@@ -525,17 +528,20 @@ local function validate_names(saved_names, config_names, iconfig)
                             config_names.instance_uuid), 0)
     end
 
-    if saved_names.instance_name ~= nil and
-       saved_names.instance_name ~= config_names.instance_name then
-        error(string.format('Instance name mismatch. Snapshot: %s, ' ..
-                            'config: %s.', saved_names.instance_name,
-                            config_names.instance_name), 0)
+    if not skip_names then
+        if saved_names.instance_name ~= nil and
+           saved_names.instance_name ~= config_names.instance_name then
+            error(string.format('Instance name mismatch. Snapshot: %s, ' ..
+                                'config: %s.', saved_names.instance_name,
+                                config_names.instance_name), 0)
+        end
     end
 
     -- Fail early, if current UUID is not set, but no name is found
     -- inside the snapshot file. Ignore this failure, if replica is
     -- configured as anonymous, anon replicas cannot have names.
-    if not instance_config:get(iconfig, 'replication.anon') then
+    if not instance_config:get(iconfig, 'replication.anon') and
+       not skip_names then
         if saved_names.instance_name == nil and
            config_names.instance_uuid == nil then
             error(string.format('Instance name for %s is not set in snapshot' ..
@@ -1169,13 +1175,17 @@ local function new(iconfig, cconfig, instance_name)
     -- and during config reload.
     local saved_names = find_saved_names(iconfig_def)
     if saved_names ~= nil then
+        local schema_compat = instance_config:get(iconfig_def,
+            'database.schema')
         validate_names(saved_names, {
             replicaset_name = found.replicaset_name,
             instance_name = instance_name,
             -- UUIDs from config, generated one should not be used here.
             replicaset_uuid = replicaset_uuid,
             instance_uuid = instance_uuid,
-        }, iconfig_def)
+        }, iconfig_def, {
+            skip_names = schema_compat == '2.11',
+        })
     end
 
     -- A couple of checks that are only performed on startup.
