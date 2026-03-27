@@ -60,6 +60,7 @@
 #include "sio.h"
 #include "tt_strerror.h"
 #include "tweaks.h"
+#include "errinj.h"
 
 /**
  * In 3.0.0 the meaning of box.info.cluster changed to something not related. In
@@ -121,8 +122,13 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 			       applier->last_row_time);
 		lua_settable(L, -3);
 
+		bool write_sensitive = false;
+		ERROR_INJECT(ERRINJ_BOX_INFO_REPL_WRITE_SECRET, {
+			write_sensitive = true;
+		});
 		char name[APPLIER_SOURCE_MAXLEN];
-		int total = uri_format(name, sizeof(name), &applier->uri, false);
+		int total = uri_format(name, sizeof(name),
+				       &applier->uri, write_sensitive);
 		/*
 		 * total can be greater than sizeof(name) if
 		 * name has insufficient length. Terminating
