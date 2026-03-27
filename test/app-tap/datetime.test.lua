@@ -7,6 +7,7 @@ local ffi = require('ffi')
 local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
+local compat = require('compat')
 
 test:plan(44)
 
@@ -90,6 +91,10 @@ end
 
 local function invalid_date_fmt_error(str)
     return ('invalid date format %s'):format(str)
+end
+
+local function invalid_timestamp_type_error(ts)
+    return ('bad timestamp (\'number\' expected, got \'%s\')'):format(type(ts))
 end
 
 local function assert_raises(test, error_msg, func, ...)
@@ -239,7 +244,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(15)
+    test:plan(17)
     local ts
     local obj = {}
     local attribs = {
@@ -271,10 +276,16 @@ test:test("Simple date creation by attributes", function(test)
             '2021-08-30T21:31:11.000000123Z', '{timestamp.nsec}')
     test:is(tostring(date.new{timestamp = -0.1}),
             '1969-12-31T23:59:59.900Z', '{negative timestamp}')
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    local d1, d2
+    d1 = date.new({year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'})
+    d2 = date.new({timestamp = d1.timestamp, tz = 'Europe/Moscow'})
+    test:is(d1.tzoffset, d2.tzoffset, '{ymd} and {timestamp} tzoffset equals')
+    test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(93)
+    test:plan(95)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -361,6 +372,10 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp_type_error('1630359071.125'),
+            {timestamp = '1630359071.125'}},
+        {invalid_timestamp_type_error(true),
+            {timestamp = true}},
         {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.new()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -2831,7 +2846,7 @@ test:test('totable() with timezone', function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(16)
+    test:plan(17)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -2853,6 +2868,11 @@ test:test("Time :set{} operations", function(test)
     -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
             '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125' )
+    -- When 'new' is set, this leads to error. That is checked in luatest.
+    if compat.datetime_setfn_timestamp_type_check == 'old' then
+        test:is(tostring(ts:set{timestamp = '1630359071.125'}),
+                '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125')
+    end
     test:is(tostring(ts:set{ msec = 123}), '2021-08-30T21:31:11.123+0800',
             'msec = 123')
     test:is(tostring(ts:set{ usec = 123}), '2021-08-30T21:31:11.000123+0800',
@@ -2865,12 +2885,14 @@ test:test("Time :set{} operations", function(test)
             '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+    test:is(tostring(ts:set{timestamp = 1630359071}),
+            '2021-08-30T21:31:11+0800', 'int timestamp zeroes nsec')
     test:is(tostring(ts:set{timestamp = -0.1}),
             '1969-12-31T23:59:59.900+0800', 'negative timestamp')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(12)
+    test:plan(15*2)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -2883,6 +2905,7 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         {'tzoffset', -8*60},
         {'tzoffset', '+0800'},
         {'tz', 'MSK'},
+        {'tz', 'Europe/Moscow'},
         {'nsec', 560000},
     }
     for _, row in pairs(attribs) do
@@ -2892,6 +2915,8 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         ts2 = date.new():set(obj)
         test:is(ts, ts2, ('[%s] = %s (%s = %s)'):
                 format(key, tostring(value), tostring(ts), tostring(ts2)))
+        test:is_deeply(ts:totable(), ts2:totable(),
+            ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
     end
 
     obj = {timestamp = 1630359071.125, tzoffset = '+0800'}
@@ -2899,15 +2924,39 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 
     obj = {timestamp = -0.1, tzoffset = '+0800'}
     ts = date.new(obj)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('negative timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    obj = {year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('ymd + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = ts.timestamp, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:diag(json.encode({ts:totable(), ts2:totable()}))
+    test:is(ts, ts2, ('timestamp + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 end)
 
 
+-- This suite is moved to app-luatest/datetime_test.lua
+-- and is deprecated to update here.
 test:test("Time invalid :set{} operations", function(test)
     test:plan(94)
 

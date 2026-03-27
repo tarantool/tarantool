@@ -1,6 +1,7 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
 local tz = require('timezones')
+local tweaks = require('internal.tweaks')
 
 --[[
     `c-dt` library functions handles properly both positive and negative `dt`
@@ -235,13 +236,14 @@ local function check_str(s, message)
     end
 end
 
-local function check_integer(v, message)
+local function check_integer(v, message, level_up)
+    level_up = level_up or 0
     if v == nil then
         return
     end
     if type(v) ~= 'number' or v % 1 ~= 0 then
         error(('%s: integer value expected, but received %s'):
-              format(message, type(v)), 4)
+              format(message, type(v)), 4 + level_up)
     end
 end
 
@@ -255,24 +257,35 @@ end
 -- range may be of a form of pair {from, to} or
 -- tuple {from, to, -1 in extra}
 -- -1 is a special value (so far) used for days only
-local function check_range(v, from, to, txt, extra)
+local function check_range(v, from, to, txt, extra, level_up)
+    level_up = level_up or 0
     if type(v) ~= 'number' then
         error(('numeric value expected, but received %s'):
-              format(type(v)), 3)
+              format(type(v)), 3 + level_up)
     end
     if extra == v or (v >= from and v <= to) then
         return
     end
     if extra == nil then
         error(('value %d of %s is out of allowed range [%d, %d]'):
-              format(v, txt, from, to), 3)
+              format(v, txt, from, to), 3 + level_up)
     else
         error(('value %d of %s is out of allowed range [%d, %d..%d]'):
-              format(v, txt, extra, from, to), 3)
+              format(v, txt, extra, from, to), 3 + level_up)
     end
 end
 
-local function dt_from_ymd_checked(y, M, d)
+local function dt_from_ymd(y, M, d)
+    if d < 0 then
+        d = builtin.tnt_dt_days_in_month(y, M)
+    elseif d > 28 then
+        local day_in_month = builtin.tnt_dt_days_in_month(y, M)
+        if d > day_in_month then
+            error(('invalid number of days %d in month %d for %d'):
+                  format(d, M, y), 4)
+        end
+    end
+
     local pdt = date_dt_stash_take()
     local is_valid = builtin.tnt_dt_from_ymd_checked(y, M, d, pdt)
     if not is_valid then
@@ -438,11 +451,12 @@ end
     Returns timezone offset in minutes if string was accepted
     by parser, otherwise raise an error.
 ]]
-local function parse_tzoffset(str)
+local function parse_tzoffset(str, level_up)
+    level_up = level_up or 0
     local offset = ffi.new('int[1]')
     local len = builtin.tnt_dt_parse_iso_zone_lenient(str, #str, offset)
     if len ~= #str then
-        error(('invalid time-zone format %s'):format(str), 3)
+        error(('invalid time-zone format %s'):format(str), 3 + level_up)
     end
     return offset[0]
 end
@@ -502,150 +516,187 @@ local function datetime_new_dt(dt, secs, nanosecs, offset, tzindex)
                             offset, tzindex)
 end
 
-local function get_timezone(offset, msg)
-    if type(offset) == 'number' then
-        check_integer(offset, 'tzoffset')
-        return offset
-    elseif type(offset) == 'string' then
-        return parse_tzoffset(offset)
-    else
-        error(('%s: string or number expected, but received %s'):
-              format(msg, offset), 3)
+local function extract_obj_ymd(obj)
+    local y, M, d, ymd = obj.year, obj.month, obj.day, false
+    if y ~= nil then
+        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year', nil, 1)
+        check_integer(y, 'year', 1)
+        ymd = true
     end
+    if M ~= nil then
+        check_range(M, 1, 12, 'month', nil, 1)
+        check_integer(M, 'month', 1)
+        ymd = true
+    end
+    if d ~= nil then
+        check_range(d, 1, 31, 'day', -1, 1)
+        check_integer(d, 'day', 1)
+        ymd = true
+    end
+    return y, M, d, ymd
 end
 
--- create datetime given attribute values from obj
-local function datetime_new(obj)
-    if obj == nil then
-        return datetime_new_raw(0, 0, 0, 0)
-    end
-    check_table(obj, 'datetime.new()')
-
-    local ymd = false
-    local hms = false
-    local dt = DAYS_EPOCH_OFFSET
-
-    local y = obj.year
-    if y ~= nil then
-        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year')
-        check_integer(y, 'year')
-        ymd = true
-    end
-    local M = obj.month
-    if M ~= nil then
-        check_range(M, 1, 12, 'month')
-        check_integer(M, 'month')
-        ymd = true
-    end
-    local d = obj.day
-    if d ~= nil then
-        check_range(d, 1, 31, 'day', -1)
-        check_integer(d, 'day')
-        ymd = true
-    end
-    local h = obj.hour
+local function extract_obj_hms(obj)
+    local h, m, s, hms = obj.hour, obj.min, obj.sec, false
     if h ~= nil then
-        check_range(h, 0, 23, 'hour')
-        check_integer(h, 'hour')
+        check_range(h, 0, 23, 'hour', nil, 1)
+        check_integer(h, 'hour', 1)
         hms = true
     end
-    local m = obj.min
     if m ~= nil then
-        check_range(m, 0, 59, 'min')
-        check_integer(m, 'min')
+        check_range(m, 0, 59, 'min', nil, 1)
+        check_integer(m, 'min', 1)
         hms = true
     end
-    local s = obj.sec
     if s ~= nil then
-        check_range(s, 0, 60, 'sec')
-        check_integer(s, 'sec')
+        check_range(s, 0, 60, 'sec', nil, 1)
+        check_integer(s, 'sec', 1)
         hms = true
     end
+    return h, m, s, hms
+end
 
+-- Returns nsec if obj.nsec or obj.usec or obj.msec is defined.
+-- Returns nil if not.
+local function extract_obj_nsec(obj)
     local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
     local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
                        bool2int(msec ~= nil)
     if count_usec > 0 then
         if count_usec > 1 then
             error('only one of nsec, usec or msecs may be defined '..
-                  'simultaneously', 2)
+                  'simultaneously', 4)
         end
         if usec ~= nil then
-            check_range(usec, 0, 1e6, 'usec')
-            check_integer(usec, 'usec')
+            check_range(usec, 0, 1e6, 'usec', nil, 1)
+            check_integer(usec, 'usec', 1)
             nsec = usec * 1e3
         elseif msec ~= nil then
-            check_range(msec, 0, 1e3, 'msec')
-            check_integer(msec, 'msec')
+            check_range(msec, 0, 1e3, 'msec', nil, 1)
+            check_integer(msec, 'msec', 1)
             nsec = msec * 1e6
         else
-            check_range(nsec, 0, 1e9, 'nsec')
-            check_integer(nsec, 'nsec')
+            check_range(nsec, 0, 1e9, 'nsec', nil, 1)
+            check_integer(nsec, 'nsec', 1)
         end
-    else
-        nsec = 0
     end
+    return nsec
+end
+
+-- Returns UTC epoch if timestamp is defined.
+-- Return nsec as fraction part of timestamp if nsec isn't defined.
+-- Post: defined(epoch) => defined(nsec).
+-- from_set is needed to prevent ts type check for set() to save
+-- backward compatibility (see gh12411).
+local function extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, from_set)
     local ts = obj.timestamp
-    if ts ~= nil then
-        if ymd then
-            error('timestamp is not allowed if year/month/day provided', 2)
-        end
-        if hms then
-            error('timestamp is not allowed if hour/min/sec provided', 2)
-        end
-        if type(ts) ~= 'number' then
-            error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
-        end
-        local fraction
-        s, fraction = math_modf(ts)
-        -- In case of negative fraction part we should
-        -- make it positive at the expense of the integer part.
-        -- Code below expects that "nsec" value is always positive.
-        if fraction < 0 then
-            s = s - 1
-            fraction = fraction + 1
-        end
-        -- if there are separate nsec, usec, or msec provided then
-        -- timestamp should be integer
-        if count_usec == 0 then
-            nsec = fraction * 1e9
-        elseif fraction ~= 0 then
-            error('only integer values allowed in timestamp '..
-                  'if nsec, usec, or msecs provided', 2)
-        end
-        hms = true
+    if ts == nil then
+        return nil, nsec
     end
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
+    if ymd then
+        error('timestamp is not allowed if year/month/day provided', 3)
+    end
+    if hms then
+        error('timestamp is not allowed if hour/min/sec provided', 3)
+    end
+    if (not from_set or tweaks.datetime_setfn_timestamp_type_check) and
+        type(ts) ~= 'number' then
+        error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
+    end
+    local epoch, fraction = math_modf(ts)
+    -- In case of negative fraction part we should
+    -- make it positive at the expense of the integer part.
+    -- Code below expects that "nsec" value is always positive.
+    if fraction < 0 then
+        epoch = epoch - 1
+        fraction = fraction + 1
+    end
+    -- if there are separate nsec, usec, or msec provided then
+    -- timestamp should be integer
+    if nsec == nil then
+        nsec = fraction * 1e9
+    elseif fraction ~= 0 then
+        error('only integer values allowed in timestamp '..
+                'if nsec, usec, or msecs provided', 3)
+    end
+
+    return epoch, nsec
+end
+
+local function get_timezone(offset, msg, level_up)
+    level_up = level_up or 0
+    if type(offset) == 'number' then
+        check_integer(offset, 'tzoffset', level_up)
+        return offset
+    elseif type(offset) == 'string' then
+        return parse_tzoffset(offset, level_up)
+    else
+        error(('%s: string or number expected, but received %s'):
+              format(msg, offset), 3 + level_up)
+    end
+end
+
+-- base_epoch is needed for Olson timezone lookup.
+local function extract_obj_tzoffset_tzindex(obj, base_epoch)
+    local tzoffset, tzindex
+
+    local obj_tzoffset = obj.tzoffset
+    local tzname = obj.tz
+    if tzname ~= nil then
+         tzoffset, tzindex = parse_tzname(base_epoch, tzname)
+    elseif obj_tzoffset ~= nil then
+        tzindex = 0
+        tzoffset = get_timezone(obj_tzoffset, 'tzoffset', 1)
         -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
         -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(tzoffset, -720, 840, 'tzoffset', nil, 1)
     end
+    return tzoffset, tzindex
+end
+
+-- Timestamp is erroneously considered as "local", not UTC (gh10363).
+-- Handle this historical case here.
+local function update_epoch(epoch, offset)
+    -- Convert "local" timestamp to UTC timestamp.
+    -- Removing this adjustment will fix gh10363.
+    epoch = utc_secs(epoch, offset)
+    return epoch
+end
+
+-- Create datetime given attribute values from obj.
+local function datetime_new(obj)
+    if obj == nil then
+        return datetime_new_raw(0, 0, 0, 0)
+    end
+    check_table(obj, 'datetime.new()')
+
+    local y, M, d, ymd = extract_obj_ymd(obj)
+    local h, m, s, hms = extract_obj_hms(obj)
+    local nsec = extract_obj_nsec(obj)
+    local epoch
+    epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec)
+    nsec = nsec or 0
+
+    -- Timestamp case.
+    if epoch ~= nil then
+        local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
+        tzoffset, tzindex = tzoffset or 0, tzindex or 0
+        epoch = update_epoch(epoch, tzoffset)
+        return datetime_new_raw(epoch, nsec, tzoffset, tzindex)
+    end
+
+    -- ymd | hms case.
+    local dt = DAYS_EPOCH_OFFSET
 
     -- .year, .month, .day
     if ymd then
-        y = y or 1970
-        M = M or 1
-        d = d or 1
-        if d < 0 then
-            d = builtin.tnt_dt_days_in_month(y, M)
-        elseif d > 28 then
-            local day_in_month = builtin.tnt_dt_days_in_month(y, M)
-            if d > day_in_month then
-                error(('invalid number of days %d in month %d for %d'):
-                    format(d, M, y), 3)
-            end
-        end
-        dt = dt_from_ymd_checked(y, M, d)
+        dt = dt_from_ymd(y or 1970, M or 1, d or 1)
     end
 
-    local tzindex = 0
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, tzindex = parse_tzname(epoch_from_dt(dt), tzname)
-    end
+    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj,
+        epoch_from_dt(dt))
+    tzoffset, tzindex = tzoffset or 0, tzindex or 0
 
     -- .hour, .minute, .second
     local secs = 0
@@ -653,7 +704,7 @@ local function datetime_new(obj)
         secs = (h or 0) * 3600 + (m or 0) * 60 + (s or 0)
     end
 
-    return datetime_new_dt(dt, secs, nsec, offset or 0, tzindex)
+    return datetime_new_dt(dt, secs, nsec, tzoffset, tzindex)
 end
 
 --[[
@@ -1006,16 +1057,7 @@ local function datetime_update_dt(self, dt)
 end
 
 local function datetime_ymd_update(self, y, M, d)
-    if d < 0 then
-        d = builtin.tnt_dt_days_in_month(y, M)
-    elseif d > 28 then
-        local day_in_month = builtin.tnt_dt_days_in_month(y, M)
-        if d > day_in_month then
-            error(('invalid number of days %d in month %d for %d'):
-                  format(d, M, y), 3)
-        end
-    end
-    local dt = dt_from_ymd_checked(y, M, d)
+    local dt = dt_from_ymd(y, M, d)
     datetime_update_dt(self, dt)
 end
 
@@ -1029,8 +1071,23 @@ function datetime_set(self, obj)
     check_date(self, 'datetime.set()')
     check_table(obj, "datetime.set()")
 
-    local ymd = false
-    local hms = false
+    local y, M, d, ymd = extract_obj_ymd(obj)
+    local h, m, s, hms = extract_obj_hms(obj)
+    local nsec = extract_obj_nsec(obj)
+    local epoch
+    epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec, true)
+
+    if epoch ~= nil then
+        local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, epoch)
+        local effective_tzoffset = tzoffset or self.tzoffset
+        epoch = update_epoch(epoch, effective_tzoffset)
+
+        self.epoch = epoch
+        self.nsec = nsec
+        self.tzoffset = effective_tzoffset
+        self.tzindex = tzindex or self.tzindex
+        return self
+    end
 
     local dt = local_dt(self)
     local y0 = ffi.new('int[1]')
@@ -1039,146 +1096,36 @@ function datetime_set(self, obj)
     builtin.tnt_dt_to_ymd(dt, y0, M0, d0)
     y0, M0, d0 = y0[0], M0[0], d0[0]
 
-    local y = obj.year
-    if y ~= nil then
-        check_range(y, MIN_DATE_YEAR, MAX_DATE_YEAR, 'year')
-        check_integer(y, 'year')
-        ymd = true
-    end
-    local M = obj.month
-    if M ~= nil then
-        check_range(M, 1, 12, 'month')
-        check_integer(M, 'month')
-        ymd = true
-    end
-    local d = obj.day
-    if d ~= nil then
-        check_range(d, 1, 31, 'day', -1)
-        check_integer(d, 'day')
-        ymd = true
-    end
-
     local lsecs = local_secs(self)
     local h0 = math_floor(lsecs / (60 * 60)) % 24
     local m0 = math_floor(lsecs / 60) % 60
-    local sec0 = lsecs % 60
-
-    local h = obj.hour
-    if h ~= nil then
-        check_range(h, 0, 23, 'hour')
-        check_integer(h, 'hour')
-        hms = true
-    end
-    local m = obj.min
-    if m ~= nil then
-        check_range(m, 0, 59, 'min')
-        check_integer(m, 'min')
-        hms = true
-    end
-    local sec = obj.sec
-    if sec ~= nil then
-        check_range(sec, 0, 60, 'sec')
-        check_integer(sec, 'sec')
-        hms = true
-    end
-
-    local nsec, usec, msec = obj.nsec, obj.usec, obj.msec
-    local count_usec = bool2int(nsec ~= nil) + bool2int(usec ~= nil) +
-                       bool2int(msec ~= nil)
-    if count_usec > 0 then
-        if count_usec > 1 then
-            error('only one of nsec, usec or msecs may be defined '..
-                  'simultaneously', 2)
-        end
-        if usec ~= nil then
-            check_range(usec, 0, 1e6, 'usec')
-            check_integer(usec, 'usec')
-            self.nsec = usec * 1e3
-        elseif msec ~= nil then
-            check_range(msec, 0, 1e3, 'msec')
-            check_integer(msec, 'msec')
-            self.nsec = msec * 1e6
-        elseif nsec ~= nil then
-            check_range(nsec, 0, 1e9, 'nsec')
-            check_integer(nsec, 'nsec')
-            self.nsec = nsec
-        end
-    end
-
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
-    end
-    offset = offset or self.tzoffset
-
-    local tzname = obj.tz
-
-    local ts = obj.timestamp
-    if ts ~= nil then
-        if ymd then
-            error('timestamp is not allowed if year/month/day provided', 2)
-        end
-        if hms then
-            error('timestamp is not allowed if hour/min/sec provided', 2)
-        end
-        local sec_int, fraction
-        sec_int, fraction = math_modf(ts)
-        -- In case of negative fraction part we should
-        -- make it positive at the expense of the integer part.
-        -- Code below expects that "nsec" value is always positive.
-        if fraction < 0 then
-            sec_int = sec_int - 1
-            fraction = fraction + 1
-        end
-        -- if there is one of nsec, usec, msec provided
-        -- then ignore fraction in timestamp
-        -- otherwise - use nsec, usec, or msec
-        if count_usec == 0 then
-            nsec = fraction * 1e9
-        elseif fraction ~= 0 then
-            error('only integer values allowed in timestamp '..
-                  'if nsec, usec, or msecs provided', 2)
-        end
-
-        if msec ~= nil then
-            nsec = msec * 1e6
-        end
-        if usec ~= nil then
-            nsec = usec * 1e3
-        end
-        if tzname ~= nil then
-            offset, self.tzindex = parse_tzname(sec_int, tzname)
-        end
-        self.epoch = utc_secs(sec_int, offset)
-        self.nsec = nsec
-        self.tzoffset = offset
-
-        return self
-    end
+    local s0 = lsecs % 60
 
     -- normalize time to UTC from current timezone
+    local old_tzoffset = self.tzoffset
     time_delocalize(self)
 
     -- .year, .month, .day
     if ymd then
-        y = y or y0
-        M = M or M0
-        d = d or d0
-        datetime_ymd_update(self, y, M, d)
+        datetime_ymd_update(self, y or y0, M or M0, d or d0)
     end
 
-    if tzname ~= nil then
-        offset, self.tzindex = parse_tzname(self.epoch, tzname)
-    end
+    -- TODO need to check:
+    -- datetime_new() uses epoch_from_dt(dt) as base_epoch, there
+    -- h:m:s = 00:00:00. This differ with self.epoch as base_epoch
+    -- due to h:m:s may have any proper value.
+    local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, self.epoch)
 
     -- .hour, .minute, .second
     if hms then
-        datetime_hms_update(self, h or h0, m or m0, sec or sec0)
+        datetime_hms_update(self, h or h0, m or m0, s or s0)
     end
 
     -- denormalize back to local timezone
-    time_localize(self, offset)
+    local effective_tzoffset = tzoffset or old_tzoffset
+    time_localize(self, effective_tzoffset)
+    self.nsec = nsec or self.nsec
+    self.tzindex = tzindex or self.tzindex
 
     return self
 end
