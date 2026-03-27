@@ -331,11 +331,13 @@ g.test_instances_with_same_name = function()
         :use_group('g-001')
         :use_replicaset('r-001')
         :add_instance('i-001', {})
-
-        :use_replicaset('r-002')
-        :add_instance('i-001', {})
-
         :config()
+
+    -- cbuilder doesn't allow to create a config with a duplicate
+    -- instance name so we add it manually.
+    config.groups['g-001'].replicasets['r-002'] = {
+        instances = {['i-001'] = {}},
+    }
 
     cluster:startup_error(config, 'found instances with the same ' ..
                                   'name "i-001" in the replicasets ' ..
@@ -346,12 +348,11 @@ g.test_instances_with_same_name = function()
         :use_group('g-001')
         :use_replicaset('r-001')
         :add_instance('i-001', {})
-
-        :use_group('g-002')
-        :use_replicaset('r-002')
-        :add_instance('i-001', {})
-
         :config()
+
+    config.groups['g-002'] = {
+        replicasets = {['r-002'] = {instances = {['i-001'] = {}}}},
+    }
 
     cluster:startup_error(config, 'found instances with the same ' ..
                                   'name "i-001" in the replicaset ' ..
