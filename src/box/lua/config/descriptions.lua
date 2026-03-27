@@ -3055,6 +3055,34 @@ I['wal.retention_period'] = format_text([[
 
 -- }}} wal configuration
 
+-- {{{ threads configuration
+
+I['threads'] = format_text([[
+    The `threads` section defines configuration parameters related to
+    application threads.
+]])
+
+I['threads.groups'] = format_text([[
+    An array of thread groups.
+]])
+
+I['threads.groups.*'] = format_text([[
+    Thread group definition.
+]])
+
+I['threads.groups.*.name'] = format_text([[
+    Thread group name.
+
+    Each thread group must have a unique name. The name "tx" must not be
+    used because it is reserved for the main thread.
+]])
+
+I['threads.groups.*.size'] = format_text([[
+    Number of threads in the group.
+]])
+
+-- }}} threads configuration
+
 -- }}} Instance descriptions
 
 -- {{{ Cluster descriptions
