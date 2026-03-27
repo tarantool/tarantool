@@ -130,7 +130,17 @@ target_link_libraries(box_error core mpstream vclock)
 
 add_library(node_name STATIC node_name.c)
 
-add_library(xrow STATIC xrow.c iproto_constants.c iproto_features.c)
+set(xrow_sources
+    xrow.c
+    iproto_constants.c
+    iproto_features.c
+)
+
+if(ENABLE_ARROW_IPC)
+    list(APPEND xrow_sources ${ARROW_IPC_SOURCES})
+endif()
+
+add_library(xrow STATIC ${xrow_sources})
 target_link_libraries(xrow server core small vclock misc box_error node_name
                       ${MSGPUCK_LIBRARIES})
 

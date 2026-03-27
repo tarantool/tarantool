@@ -4297,13 +4297,14 @@ box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
 	memset(&request, 0, sizeof(request));
 	request.type = IPROTO_INSERT_ARROW;
 	request.space_id = space_id;
-	request.arrow_array = array;
-	request.arrow_schema = schema;
+	request.arrow_array = *array;
+	request.arrow_schema = *schema;
 	int rc = box_process1(&request, NULL);
-	if (array->release != NULL)
-		array->release(array);
-	if (schema->release != NULL)
-		schema->release(schema);
+	/* The array and schema may or may not be released by `box_process1'. */
+	if (request.arrow_array.release != NULL)
+		request.arrow_array.release(&request.arrow_array);
+	if (request.arrow_schema.release != NULL)
+		request.arrow_schema.release(&request.arrow_schema);
 	return rc;
 }
 

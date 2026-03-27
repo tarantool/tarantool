@@ -1362,14 +1362,15 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 			   struct request *request)
 {
 	int rc;
-	struct region *gc = &fiber()->gc;
-	size_t gc_svp = region_used(gc);
-	struct ArrowArray *array = request->arrow_array;
-	struct ArrowSchema *schema = request->arrow_schema;
-
+	struct ArrowArray *array = &request->arrow_array;
+	struct ArrowSchema *schema = &request->arrow_schema;
+	/*
+	 * If the request is originated from a `box_insert_arrow()' call,
+	 * then it contains only in-memory data. If it is originated from
+	 * IPROTO, then it contains both in-memory and serialized IPC data.
+	 */
+	assert(array != NULL && schema != NULL);
 	if (request->arrow_ipc == NULL) {
-		assert(array != NULL);
-		assert(schema != NULL);
 		assert(request->arrow_ipc_end == NULL);
 		struct region *txn_region = tx_region_acquire(txn);
 		rc = arrow_ipc_encode(array, schema, txn_region,
@@ -1378,26 +1379,14 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 		tx_region_release(txn, TX_ALLOC_SYSTEM);
 		if (rc != 0)
 			goto eof;
-	} else {
-		assert(array == NULL);
-		assert(schema == NULL);
-		assert(request->arrow_ipc_end != NULL);
-		array = xregion_alloc_object(gc, struct ArrowArray);
-		schema = xregion_alloc_object(gc, struct ArrowSchema);
-		rc = arrow_ipc_decode(array, schema, request->arrow_ipc,
-				      request->arrow_ipc_end);
-		if (rc != 0)
-			goto eof;
 	}
 
 	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
-
+eof:
 	if (array->release != NULL)
 		array->release(array);
 	if (schema->release != NULL)
 		schema->release(schema);
-eof:
-	region_truncate(gc, gc_svp);
 	return rc;
 }
 
