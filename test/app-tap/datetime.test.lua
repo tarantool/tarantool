@@ -11,6 +11,7 @@ local TZ = date.TZ
 test:plan(44)
 
 local INT_MAX = 2147483647
+local INT_MIN = -2147483648
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -30,6 +31,13 @@ local MAX_SEC_RANGE = MAX_DAY_RANGE * SECS_PER_DAY
 local MAX_NSEC_RANGE = INT_MAX
 local MAX_USEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e3)
 local MAX_MSEC_RANGE = math.floor(MAX_NSEC_RANGE / 1e6)
+
+local DAYS_EPOCH_OFFSET = 719163
+local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
+local MIN_DT_DAY_VALUE = INT_MIN
+local MAX_DT_DAY_VALUE = INT_MAX
+local MIN_EPOCH_SECS_VALUE = MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
+local MAX_EPOCH_SECS_VALUE = MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_OFFSET
 
 local incompat_types = 'incompatible types for datetime comparison'
 local only_integer_ts = 'only integer values allowed in timestamp'..
@@ -70,6 +78,14 @@ local function range_check_error(name, value, range)
               format(value, name, range[1], range[2])
 end
 
+-- Using %s conversion for large integer values produce
+-- scientific-format strings. This wrapper is for the case, when
+-- precise integer representation is needed.
+local function range_check_error_d(name, value, range)
+    return ('value %d of %s is out of allowed range [%d, %d]'):
+              format(value, name, range[1], range[2])
+end
+
 local function range_check_3_error(name, value, range)
     return ('value %d of %s is out of allowed range [%d, %d..%d]'):
             format(value, name, range[1], range[2], range[3])
@@ -82,6 +98,11 @@ end
 
 local function invalid_date(y, M, d)
     return ('date %d-%02d-%02d is invalid'):format(y, M, d)
+end
+
+local function invalid_timestamp(ts)
+    return range_check_error_d('timestamp', ts,
+        {MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE})
 end
 
 local function invalid_tz_fmt_error(val)
@@ -239,7 +260,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(15)
+    test:plan(19)
     local ts
     local obj = {}
     local attribs = {
@@ -271,10 +292,21 @@ test:test("Simple date creation by attributes", function(test)
             '2021-08-30T21:31:11.000000123Z', '{timestamp.nsec}')
     test:is(tostring(date.new{timestamp = -0.1}),
             '1969-12-31T23:59:59.900Z', '{negative timestamp}')
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    local d1, d2
+    d1 = date.new({year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'})
+    d2 = date.new({timestamp = d1.timestamp, tz = 'Europe/Moscow'})
+    test:is(d1.tzoffset, d2.tzoffset, '{ymd} and {timestamp} tzoffset equals')
+    test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
+
+    test:is(tostring(date.new{timestamp = MIN_EPOCH_SECS_VALUE}),
+            '-5879610-06-22T00:00:00Z', '{MIN_EPOCH_SECS_VALUE timestamp}')
+    test:is(tostring(date.new{timestamp = MAX_EPOCH_SECS_VALUE}),
+            '5879611-07-11T00:00:00Z', '{MAX_EPOCH_SECS_VALUE timestamp}')
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(93)
+    test:plan(95)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -361,6 +393,8 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp(MIN_EPOCH_SECS_VALUE - 1), {timestamp = MIN_EPOCH_SECS_VALUE - 1}},
+        {invalid_timestamp(MAX_EPOCH_SECS_VALUE + 1), {timestamp = MAX_EPOCH_SECS_VALUE + 1}},
         {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.new()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -2831,7 +2865,7 @@ test:test('totable() with timezone', function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(16)
+    test:plan(17)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -2865,12 +2899,14 @@ test:test("Time :set{} operations", function(test)
             '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+    test:is(tostring(ts:set{timestamp = 1630359071}),
+            '2021-08-30T21:31:11+0800', 'int timestamp zeroes nsec')
     test:is(tostring(ts:set{timestamp = -0.1}),
             '1969-12-31T23:59:59.900+0800', 'negative timestamp')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(12)
+    test:plan(17*2)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -2883,6 +2919,7 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         {'tzoffset', -8*60},
         {'tzoffset', '+0800'},
         {'tz', 'MSK'},
+        {'tz', 'Europe/Moscow'},
         {'nsec', 560000},
     }
     for _, row in pairs(attribs) do
@@ -2892,6 +2929,8 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         ts2 = date.new():set(obj)
         test:is(ts, ts2, ('[%s] = %s (%s = %s)'):
                 format(key, tostring(value), tostring(ts), tostring(ts2)))
+        test:is_deeply(ts:totable(), ts2:totable(),
+            ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
     end
 
     obj = {timestamp = 1630359071.125, tzoffset = '+0800'}
@@ -2899,17 +2938,55 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 
     obj = {timestamp = -0.1, tzoffset = '+0800'}
     ts = date.new(obj)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('negative timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    obj = {year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('ymd + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = ts.timestamp, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:diag(json.encode({ts:totable(), ts2:totable()}))
+    test:is(ts, ts2, ('timestamp + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = MIN_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MIN_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = MAX_EPOCH_SECS_VALUE}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('MAX_EPOCH_SECS_VALUE timestamp (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 end)
 
 
 test:test("Time invalid :set{} operations", function(test)
-    test:plan(94)
+    test:plan(96)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -2997,6 +3074,8 @@ test:test("Time invalid :set{} operations", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
+        {invalid_timestamp(MIN_EPOCH_SECS_VALUE - 1), {timestamp = MIN_EPOCH_SECS_VALUE - 1}},
+        {invalid_timestamp(MAX_EPOCH_SECS_VALUE + 1), {timestamp = MAX_EPOCH_SECS_VALUE + 1}},
         {expected_str('parse_tzname()', 400), {tz = 400}},
         {table_expected('datetime.set()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.set()', 20010101), 20010101},
