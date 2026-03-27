@@ -472,4 +472,24 @@ end
 
 -- }}} sharding
 
+-- {{{ threads
+
+M['threads.groups'] = function(groups, w)
+    local group_names = {}
+    for _, group in ipairs(groups or {}) do
+        if group.name == 'tx' then
+            w.error('Thread group name "tx" is reserved')
+        end
+        if group_names[group.name] then
+            w.error('Duplicate thread group name: %q', group.name)
+        end
+        if group.size <= 0 then
+            w.error('Thread group %q has invalid size: must be > 0', group.name)
+        end
+        group_names[group.name] = true
+    end
+end
+
+-- }}} threads
+
 return M

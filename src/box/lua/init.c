@@ -112,6 +112,7 @@ extern char session_lua[],
 	console_lua[],
 	merger_lua[],
 	iproto_lua[],
+	app_threads_lua[],
 	checks_version_lua[],
 	checks_lua[],
 	metrics_api_lua[],
@@ -221,6 +222,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/merger", "merger", merger_lua,
 	"box/utils", NULL, box_utils_lua,
 	"box/net_box", "net.box", net_box_lua,
+	"box/app_threads", "experimental.threads", app_threads_lua,
 	NULL
 };
 

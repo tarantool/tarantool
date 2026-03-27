@@ -98,6 +98,7 @@ local instance_config_fields = {
     'labels',
     'isolated',
     'connpool',
+    'threads',
 }
 
 -- Verify that the fields of the given schema correspond to the

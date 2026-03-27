@@ -2339,6 +2339,19 @@ return schema.new('instance_config', schema.record({
             default = 60,
         }),
     }),
+    threads = schema.record({
+        groups = schema.array({
+            items = schema.record({
+                name = schema.scalar({
+                    type = 'string',
+                }),
+                size = schema.scalar({
+                    type = 'integer',
+                }),
+            }),
+            validate = validators['threads.groups'],
+        })
+    }),
 }), {
     methods = {
         instance_uri = instance_uri,

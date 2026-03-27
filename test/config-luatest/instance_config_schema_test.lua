@@ -1952,3 +1952,35 @@ g.test_isolated = function()
     instance_config:validate({isolated = true})
     t.assert_equals(instance_config:apply_default({}).isolated, false)
 end
+
+g.test_threads = function()
+    local iconfig = {threads = {}}
+    instance_config:validate(iconfig)
+
+    iconfig.threads.groups = {}
+    instance_config:validate(iconfig)
+
+    iconfig.threads.groups[1] = {name = 'test1', size = 1}
+    instance_config:validate(iconfig)
+
+    iconfig.threads.groups[2] = {name = 'test2', size = 2}
+    instance_config:validate(iconfig)
+
+    iconfig.threads.groups[3] = {name = 'tx', size = 3}
+    t.assert_error_msg_content_equals(
+        '[instance_config] threads.groups: ' ..
+        'Thread group name "tx" is reserved',
+        instance_config.validate, instance_config, iconfig)
+
+    iconfig.threads.groups[3] = {name = 'test1', size = 3}
+    t.assert_error_msg_content_equals(
+        '[instance_config] threads.groups: ' ..
+        'Duplicate thread group name: "test1"',
+        instance_config.validate, instance_config, iconfig)
+
+    iconfig.threads.groups[3] = {name = 'test3', size = 0}
+    t.assert_error_msg_content_equals(
+        '[instance_config] threads.groups: ' ..
+        'Thread group "test3" has invalid size: must be > 0',
+        instance_config.validate, instance_config, iconfig)
+end
