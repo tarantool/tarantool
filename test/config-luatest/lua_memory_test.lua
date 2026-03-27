@@ -71,7 +71,7 @@ g.test_update = function()
 
     -- Config with 256MB memory limit.
     local lua_memory_1 = 256 * 1024 * 1024
-    local config_1 = cbuilder:new(config_0)
+    local config_1 = cbuilder:new()
         :set_global_option('lua.memory', lua_memory_1)
         :add_instance('i-001', {})
         :config()
