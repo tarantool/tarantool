@@ -51,7 +51,7 @@ vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 	return prev_lsn;
 }
 
-static int
+int
 vclock_snprint(char *buf, int size, const struct vclock *vclock)
 {
 	int total = 0;
