@@ -8,7 +8,8 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function(engine)
         box.execute([[SET SESSION "sql_seq_scan" = true;]])
-        box.execute([[SET SESSION "sql_default_engine" = '%s']], {engine})
+        local sql = [[SET SESSION "sql_default_engine" = '%s']]
+        box.execute(sql:format(engine))
     end, {cg.params.engine})
 end)
 
