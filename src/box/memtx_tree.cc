@@ -257,6 +257,18 @@ canonicalize_lookup(enum iterator_type *type,
 		*type = ITER_GE;
 }
 
+template<bool USE_HINT>
+struct memtx_tree_key_data<USE_HINT>
+create_key_data(const char *key, uint32_t part_count, struct key_def *key_def)
+{
+	struct memtx_tree_key_data<USE_HINT> data;
+	data.key = key;
+	data.part_count = part_count;
+	if (USE_HINT)
+		data.set_hint(key_hint(key, part_count, key_def));
+	return data;
+}
+
 template <class TREE>
 static inline struct key_def *
 memtx_tree_cmp_def(TREE *tree)
@@ -1120,19 +1132,10 @@ memtx_tree_index_quantile(struct index *base, double level,
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	struct key_def *key_def = base->def->key_def;
 
-	struct memtx_tree_key_data<USE_HINT> begin_data;
-	begin_data.key = begin_key;
-	begin_data.part_count = begin_part_count;
-	if (USE_HINT)
-		begin_data.set_hint(
-			key_hint(begin_key, begin_part_count, key_def));
-
-	struct memtx_tree_key_data<USE_HINT> end_data;
-	end_data.key = end_key;
-	end_data.part_count = end_part_count;
-	if (USE_HINT)
-		end_data.set_hint(
-			key_hint(end_key, end_part_count, key_def));
+	struct memtx_tree_key_data<USE_HINT> begin_data =
+		create_key_data<USE_HINT>(begin_key, begin_part_count, key_def);
+	struct memtx_tree_key_data<USE_HINT> end_data =
+		create_key_data<USE_HINT>(end_key, end_part_count, key_def);
 
 	size_t begin_offset;
 	memtx_tree_lower_bound_get_offset(tree, &begin_data, NULL,
@@ -1216,11 +1219,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-	struct memtx_tree_key_data<USE_HINT> start_data;
-	start_data.key = key;
-	start_data.part_count = part_count;
-	if (USE_HINT)
-		start_data.set_hint(key_hint(key, part_count, cmp_def));
+	struct memtx_tree_key_data<USE_HINT> start_data =
+		create_key_data<USE_HINT>(key, part_count, cmp_def);
 	struct memtx_tree_key_data<USE_HINT> null_after_data = {};
 	memtx_tree_iterator_t<USE_HINT> unused;
 	size_t begin_offset;
@@ -1323,11 +1323,8 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(base->def->space_id);
-	struct memtx_tree_key_data<USE_HINT> key_data;
-	key_data.key = key;
-	key_data.part_count = part_count;
-	if (USE_HINT)
-		key_data.set_hint(key_hint(key, part_count, cmp_def));
+	struct memtx_tree_key_data<USE_HINT> key_data =
+		create_key_data<USE_HINT>(key, part_count, cmp_def);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_find(&index->tree, &key_data);
 	if (res == NULL) {

@@ -181,6 +181,16 @@ struct memtx_engine {
 	} recovery;
 };
 
+/**
+ * Rollback info for a range delete request - contains the deleted tuples.
+ */
+struct memtx_delete_range_stmt {
+	/* The deleted tuples. */
+	struct tuple **tuples;
+	/* The deleted tuple count. */
+	size_t tuple_count;
+};
+
 struct memtx_gc_task;
 
 struct memtx_gc_task_vtab {
