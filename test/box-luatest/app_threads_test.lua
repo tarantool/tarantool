@@ -328,7 +328,7 @@ g.test_fiber = function(cg)
         local fiber = require('fiber')
         fiber.top_enable()
         return fiber.top()
-    ]], {}, {_thread_id = 1}), {cpu = {['1/sched'] = {}}})
+    ]], {}, {_thread_id = 1}), {cpu = {['1/sched'] = {time = 0}}})
     t.assert_error_covers({
         message = 'fiber.top() is disabled. ' ..
                   'Enable it with fiber.top_enable() first',
