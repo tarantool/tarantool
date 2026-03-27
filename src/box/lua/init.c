@@ -157,6 +157,7 @@ extern char session_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
 	/* {{{ config */
+	config_applier_alerts_lua[],
 	config_applier_app_lua[],
 	config_applier_autoexpel_lua[],
 	config_applier_box_cfg_lua[],
@@ -428,6 +429,10 @@ static const char * const lua_sources_main[] = {
 	"config/source/file",
 	"internal.config.source.file",
 	config_source_file_lua,
+
+	"config/applier/alerts",
+	"internal.config.applier.alerts",
+	config_applier_alerts_lua,
 
 	"config/applier/app",
 	"internal.config.applier.app",

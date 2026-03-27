@@ -135,6 +135,33 @@ I['app.module'] = 'A Lua module to load an application from.'
 
 -- }}} app configuration
 
+-- {{{ alerts configuration
+
+I['alerts'] = format_text([[
+    The `alerts` section controls which alerts are displayed in
+    `box.info.config.alerts`. By default, all alerts are hidden.
+]])
+
+I['alerts.default'] = format_text([[
+    Default visibility for all alerts.
+
+    - `show`: Show all alerts unless explicitly hidden.
+    - `hide`: Hide all alerts unless explicitly shown.
+]])
+
+I['alerts.transparent_huge_pages'] = format_text([[
+    Controls whether to show the Transparent Huge Pages (THP) alert.
+
+    The alert is shown when THP is enabled (`always` or `madvise` mode).
+
+    To disable THP:
+    ```
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    ```
+]])
+
+-- }}} alerts configuration
+
 -- {{{ audit_log configuration
 
 I['audit_log'] = format_text([[
