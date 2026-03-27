@@ -164,7 +164,7 @@ jobs:
             tzdata \
             tt \
             unzip
-          tt rocks install luatest 1.2.0
+          tt rocks install luatest 1.4.1
 
       - name: Run tests
         run: |
