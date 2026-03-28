@@ -1332,6 +1332,44 @@ I['failover.stateboard.renew_interval'] = format_text([[
     commands from etcd.
 ]])
 
+I['failover.ssl'] = format_text([[
+    SSL parameters used by the failover coordinator to connect to instances
+    over IPROTO when SSL is enabled.
+]])
+
+I['failover.ssl.ssl_ca_file'] = format_text([[
+    (Optional) A path to a trusted certificate authority (CA) file used to
+    verify the instance certificate. If not set, the coordinator doesn't verify
+    the instance certificate.
+]])
+
+I['failover.ssl.ssl_cert_file'] = format_text([[
+    (Optional) A path to the client SSL certificate file used by the
+    coordinator. Required if instances are configured to require a client
+    certificate (mTLS).
+]])
+
+I['failover.ssl.ssl_key_file'] = format_text([[
+    (Optional) A path to the client private SSL key file used by the
+    coordinator. Required if ssl_cert_file is set.
+]])
+
+I['failover.ssl.ssl_ciphers'] = format_text([[
+    (Optional) A colon-separated (:) list of SSL cipher suites the connection
+    can use.
+]])
+
+I['failover.ssl.ssl_password'] = format_text([[
+    (Optional) A password for an encrypted private SSL key provided using
+    ssl_key_file. Alternatively, the password can be provided in
+    ssl_password_file.
+]])
+
+I['failover.ssl.ssl_password_file'] = format_text([[
+    (Optional) A path to a text file with one or more passwords for encrypted
+    private SSL keys provided using ssl_key_file (each on a separate line).
+]])
+
 -- }}} failover configuration
 
 -- {{{ feedback configuration
