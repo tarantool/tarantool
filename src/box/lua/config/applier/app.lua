@@ -1,11 +1,9 @@
 local log = require('internal.config.utils.log')
 local utils_file = require('internal.config.utils.file')
 local expression = require('internal.config.utils.expression')
+local TARANTOOL_VERSION = _TARANTOOL:match('^%d+%.%d+%.%d+')
+assert(TARANTOOL_VERSION ~= nil)
 
-local fail_if_vars = {
-    tarantool_version = _TARANTOOL:match('^%d+%.%d+%.%d+'),
-}
-assert(fail_if_vars.tarantool_version ~= nil)
 
 local app_state = {
     -- This variable is used to track the app loaded before the box.cfg() call.
@@ -16,6 +14,11 @@ local app_state = {
 
 local function run(config, opts)
     local configdata = config._configdata
+    local iconfig_def = configdata._iconfig_def
+    local fail_if_vars = {
+        tarantool_version = TARANTOOL_VERSION,
+        config = iconfig_def,
+    }
     local file = configdata:get('app.file', {use_default = true})
     local module = configdata:get('app.module', {use_default = true})
 
