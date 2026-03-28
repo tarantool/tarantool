@@ -239,7 +239,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(15)
+    test:plan(17)
     local ts
     local obj = {}
     local attribs = {
@@ -271,6 +271,12 @@ test:test("Simple date creation by attributes", function(test)
             '2021-08-30T21:31:11.000000123Z', '{timestamp.nsec}')
     test:is(tostring(date.new{timestamp = -0.1}),
             '1969-12-31T23:59:59.900Z', '{negative timestamp}')
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    local d1, d2
+    d1 = date.new({year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'})
+    d2 = date.new({timestamp = d1.timestamp, tz = 'Europe/Moscow'})
+    test:is(d1.tzoffset, d2.tzoffset, '{ymd} and {timestamp} tzoffset equals')
+    test:is(d1.tzoffset, 240, 'Moscow time on 2012-07-02 is +04:00 to UTC')
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
@@ -2831,7 +2837,7 @@ test:test('totable() with timezone', function(test)
 end)
 
 test:test("Time :set{} operations", function(test)
-    test:plan(16)
+    test:plan(17)
 
     local ts = date.new{ year = 2021, month = 8, day = 31,
                   hour = 0, min = 31, sec = 11, tzoffset = '+0300'}
@@ -2865,12 +2871,14 @@ test:test("Time :set{} operations", function(test)
             '2021-08-30T21:31:11.000123+0800', 'timestamp + usec')
     test:is(tostring(ts:set{timestamp = 1630359071, nsec = 123}),
             '2021-08-30T21:31:11.000000123+0800', 'timestamp + nsec')
+    test:is(tostring(ts:set{timestamp = 1630359071}),
+            '2021-08-30T21:31:11+0800', 'int timestamp zeroes nsec')
     test:is(tostring(ts:set{timestamp = -0.1}),
             '1969-12-31T23:59:59.900+0800', 'negative timestamp')
 end)
 
 test:test("Check :set{} and .new{} equal for all attributes", function(test)
-    test:plan(12)
+    test:plan(15*2)
     local ts, ts2
     local obj = {}
     local attribs = {
@@ -2883,6 +2891,7 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         {'tzoffset', -8*60},
         {'tzoffset', '+0800'},
         {'tz', 'MSK'},
+        {'tz', 'Europe/Moscow'},
         {'nsec', 560000},
     }
     for _, row in pairs(attribs) do
@@ -2892,6 +2901,8 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
         ts2 = date.new():set(obj)
         test:is(ts, ts2, ('[%s] = %s (%s = %s)'):
                 format(key, tostring(value), tostring(ts), tostring(ts2)))
+        test:is_deeply(ts:totable(), ts2:totable(),
+            ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
     end
 
     obj = {timestamp = 1630359071.125, tzoffset = '+0800'}
@@ -2899,12 +2910,34 @@ test:test("Check :set{} and .new{} equal for all attributes", function(test)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 
     obj = {timestamp = -0.1, tzoffset = '+0800'}
     ts = date.new(obj)
     ts2 = date.new():set(obj)
     test:is(ts, ts2, ('negative timestamp+tzoffset (%s = %s)'):
             format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    -- On 2012-07-02 the Moscow time is +04:00 to UTC.
+    obj = {year = 2012, month = 7, day = 2, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('ymd + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
+
+    obj = {timestamp = ts.timestamp, tz = 'Europe/Moscow'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:diag(json.encode({ts:totable(), ts2:totable()}))
+    test:is(ts, ts2, ('timestamp + tz (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+    test:is_deeply(ts:totable(), ts2:totable(),
+        ':totable() equals:'..json.encode({ts:totable(), ts2:totable()}))
 end)
 
 
