@@ -91,7 +91,8 @@ int
 memtx_index_replace_with_results(struct index *index, struct tuple *old_tuple,
 				 struct tuple *new_tuple,
 				 enum dup_replace_mode mode,
-				 struct rlist *result, struct rlist *successor);
+				 struct rlist *result, struct rlist *successor,
+				 struct rlist *inserted);
 
 /**
  * Convert a result list to a single result tuple, assuming the result list
@@ -129,7 +130,8 @@ memtx_index_replace_with_single_result(struct index *index,
 	struct rlist unused;
 	size_t region_svp = region_used(&fiber()->gc);
 	int rc = memtx_index_replace_with_results(index, old_tuple, new_tuple,
-						  mode, &result_list, &unused);
+						  mode, &result_list, &unused,
+						  &unused);
 	*result =
 		memtx_index_replace_result_list_to_single_result(&result_list);
 	memtx_index_replace_cleanup_result_list(index, &result_list);
@@ -146,14 +148,22 @@ memtx_index_replace(struct index *index, struct tuple *old_tuple,
 		    struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	struct rlist result;
-	struct rlist successor;
+	struct rlist unused;
 	size_t region_svp = region_used(&fiber()->gc);
 	int rc = memtx_index_replace_with_results(index, old_tuple, new_tuple,
-						  mode, &result, &successor);
+						  mode, &result, &unused,
+						  &unused);
 	memtx_index_replace_cleanup_result_list(index, &result);
 	region_truncate(&fiber()->gc, region_svp);
 	return rc;
 }
+
+int
+memtx_index_replace_index_entry(struct index *index,
+				struct memtx_index_entry old_entry,
+				struct memtx_index_entry new_entry,
+				enum dup_replace_mode mode,
+				struct memtx_index_entry *result);
 
 /**
  * Rollback result of replace.
