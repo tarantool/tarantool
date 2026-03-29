@@ -437,22 +437,26 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	*ret = res != NULL ? res->tuple : NULL;
+	bool is_multikey_or_func = index_base->def->key_def->is_multikey ||
+				   index_base->def->key_def->for_func_index;
+	struct memtx_index_entry entry = {
+		.tuple = *ret,
+		.hint = res != NULL && is_multikey_or_func ?
+			res->hint : HINT_NONE,
+	};
 	if (*ret == NULL) {
 		iterator->next_internal = exhausted_iterator_next;
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
-		bool is_multikey = index_base->def->key_def->is_multikey;
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+		*ret = memtx_tx_index_entry_clarify(txn, space, index_base,
+						    entry);
 	}
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
-	struct tuple *successor = res != NULL ? res->tuple : NULL;
-	memtx_tx_track_gap(in_txn(), space, index_base, successor, ITER_GE,
+	memtx_tx_track_gap(in_txn(), space, index_base, entry, ITER_GE,
 			   NULL, 0);
 
 	return 0;
@@ -479,21 +483,28 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	*ret = res != NULL ? res->tuple : NULL;
+	bool is_multikey_or_func = index_base->def->key_def->is_multikey ||
+				   index_base->def->key_def->for_func_index;
+	struct memtx_index_entry entry = {
+		.tuple = *ret,
+		.hint = res != NULL && is_multikey_or_func ?
+			res->hint : HINT_NONE,
+	};
 	if (*ret == NULL) {
 		iterator->next_internal = exhausted_iterator_next;
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
-		bool is_multikey = index_base->def->key_def->is_multikey;
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+		*ret = memtx_tx_index_entry_clarify(txn, space, index_base,
+						    entry);
 	}
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
-	memtx_tx_track_gap(in_txn(), space, index_base, successor, ITER_LE,
+	entry.tuple = successor;
+	entry.hint = is_multikey_or_func ? it->last.hint : HINT_NONE;
+	memtx_tx_track_gap(in_txn(), space, index_base, entry, ITER_LE,
 			   NULL, 0);
 
 	tuple_unref(successor);
@@ -522,6 +533,13 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	/* Use user key def to save a few loops. */
+	bool is_multikey_or_func = index_base->def->key_def->is_multikey ||
+				   index_base->def->key_def->for_func_index;
+	struct memtx_index_entry entry = {
+		.tuple = res != NULL ? res->tuple : NULL,
+		.hint = res != NULL && is_multikey_or_func ?
+			res->hint : HINT_NONE,
+	};
 	if (res == NULL ||
 	    tuple_compare_with_key(res->tuple, res->hint,
 				   it->key_data.key,
@@ -534,23 +552,19 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		 * Got end of key. Store gap from the previous tuple to the
 		 * key boundary in nearby tuple.
 		 */
-		struct tuple *nearby_tuple = res == NULL ? NULL : res->tuple;
-
-		memtx_tx_track_gap(in_txn(), space, index_base, nearby_tuple,
+		memtx_tx_track_gap(in_txn(), space, index_base, entry,
 				   ITER_EQ, it->key_data.key,
 				   it->key_data.part_count);
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
-		bool is_multikey = index_base->def->key_def->is_multikey;
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+		*ret = memtx_tx_index_entry_clarify(txn, space, index_base,
+						    entry);
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, index_base, res->tuple,
+		memtx_tx_track_gap(in_txn(), space, index_base, entry,
 				   ITER_GE, NULL, 0);
 	}
 
@@ -577,6 +591,12 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	tuple_ref(successor);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
+	bool is_multikey_or_func = index_base->def->key_def->is_multikey ||
+				   index_base->def->key_def->for_func_index;
+	struct memtx_index_entry successor_entry = {
+		.tuple = successor,
+		.hint = is_multikey_or_func ? it->last.hint : HINT_NONE,
+	};
 	/* Use user key def to save a few loops. */
 	if (res == NULL ||
 	    tuple_compare_with_key(res->tuple, res->hint,
@@ -591,21 +611,23 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		 * Got end of key. Store gap from the key boundary to the
 		 * previous tuple in nearby tuple.
 		 */
-		memtx_tx_track_gap(in_txn(), space, index_base, successor,
+		memtx_tx_track_gap(in_txn(), space, index_base, successor_entry,
 				   ITER_REQ, it->key_data.key,
 				   it->key_data.part_count);
 	} else {
 		tree_iterator_set_last<USE_HINT>(it, res);
 		struct txn *txn = in_txn();
-		bool is_multikey = index_base->def->key_def->is_multikey;
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+		struct memtx_index_entry entry = {
+			.tuple = res->tuple,
+			.hint = is_multikey_or_func ? res->hint : HINT_NONE,
+		};
+		*ret = memtx_tx_index_entry_clarify(txn, space, index_base,
+						    entry);
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, index_base, successor,
+		memtx_tx_track_gap(in_txn(), space, index_base, successor_entry,
 				   ITER_LE, NULL, 0);
 	}
 	tuple_unref(successor);
@@ -826,6 +848,13 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	 * need to track gap based on it.
 	 */
 	struct tuple *successor = initial_elem ? initial_elem->tuple : NULL;
+	bool is_multikey_or_func = index_base->def->key_def->is_multikey ||
+				   index_base->def->key_def->for_func_index;
+	struct memtx_index_entry successor_entry = {
+		.tuple = successor,
+		.hint = successor != NULL && is_multikey_or_func ?
+			initial_elem->hint : HINT_NONE,
+	};
 
 	struct memtx_tree_data<USE_HINT> *res = initial_elem;
 
@@ -862,9 +891,13 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 				start_data.part_count, res->tuple, res->hint);
 		memtx_tree_iterator_t<USE_HINT> *iterator = &it->tree_iterator;
 		while (skip_more_visible != 0 && res != NULL) {
-			if (memtx_tx_tuple_key_is_visible(txn, space,
-							  index_base,
-							  res->tuple))
+			struct memtx_index_entry entry = {
+				.tuple = res->tuple,
+				.hint = is_multikey_or_func ?
+					res->hint : HINT_NONE,
+			};
+			if (memtx_tx_index_entry_is_visible(txn, space,
+							    index_base, entry))
 				skip_more_visible--;
 			if (reverse)
 				memtx_tree_iterator_prev(tree, iterator);
@@ -894,10 +927,12 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (res != NULL && eq_match) {
 		tree_iterator_set_last(it, res);
 		tree_iterator_set_next_method(it);
-		bool is_multikey = index_base->def->key_def->is_multikey;
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+		struct memtx_index_entry entry = {
+			.tuple = res->tuple,
+			.hint = is_multikey_or_func ? res->hint : HINT_NONE,
+		};
+		*ret = memtx_tx_index_entry_clarify(txn, space, index_base,
+						    entry);
 	}
 
 	/*
@@ -953,9 +988,10 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
-		memtx_tx_track_gap(txn, space, index_base, successor, type,
-				   start_data.key, MIN(start_data.part_count,
-				   index_base->def->key_def->part_count));
+		memtx_tx_track_gap(txn, space, index_base, successor_entry,
+				   type, start_data.key,
+				   MIN(start_data.part_count,
+				       index_base->def->key_def->part_count));
 
 end:
 
@@ -1183,10 +1219,12 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(base->def->space_id);
-	bool is_multikey = base->def->key_def->is_multikey;
+	bool is_multikey_or_func = base->def->key_def->is_multikey ||
+			   base->def->key_def->for_func_index;
 	if (memtx_tree_index_size<USE_HINT>(base) == 0) {
 		*result = NULL;
-		memtx_tx_track_gap(txn, space, base, NULL, ITER_GE, NULL, 0);
+		memtx_tx_track_gap(txn, space, base, memtx_index_entry_null,
+				   ITER_GE, NULL, 0);
 		return 0;
 	}
 
@@ -1194,9 +1232,11 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		struct memtx_tree_data<USE_HINT> *res =
 			memtx_tree_random(&index->tree, rnd++);
 		assert(res != NULL);
-		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*result = memtx_tx_tuple_clarify(txn, space, res->tuple,
-						 base, mk_index);
+		struct memtx_index_entry entry = {
+			.tuple = res->tuple,
+			.hint = is_multikey_or_func ? res->hint : HINT_NONE,
+		};
+		*result = memtx_tx_index_entry_clarify(txn, space, base, entry);
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -1262,7 +1302,14 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 * If someone writes a matching tuple at the beginning of the
 		 * tree it will conflict with us.
 		 */
-		memtx_tx_track_gap(txn, space, base, successor, type,
+		bool is_multikey_or_func = base->def->key_def->is_multikey ||
+					   base->def->key_def->for_func_index;
+		struct memtx_index_entry entry = {
+			.tuple = successor,
+			.hint = successor != NULL && is_multikey_or_func ?
+				initial_elem->hint : HINT_NONE,
+		};
+		memtx_tx_track_gap(txn, space, base, entry, type,
 				   start_data.key, start_data.part_count);
 		return 0; /* No tuples prior to the first one. */
 	}
@@ -1277,8 +1324,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 		 * pair at the end of the tree it will conflict with us. The
 		 * tree can be empty here.
 		 */
-		memtx_tx_track_gap(txn, space, base, NULL, type, start_data.key,
-				   start_data.part_count);
+		memtx_tx_track_gap(txn, space, base, memtx_index_entry_null,
+				   type, start_data.key, start_data.part_count);
 		return 0; /* No tuples beyond the last one. */
 	}
 
@@ -1338,10 +1385,13 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 		memtx_tx_track_point(txn, space, base, key);
 		return 0;
 	}
-	bool is_multikey = base->def->key_def->is_multikey;
-	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
-					 mk_index);
+	bool is_multikey_or_func = base->def->key_def->is_multikey ||
+				   base->def->key_def->for_func_index;
+	struct memtx_index_entry entry = {
+		.tuple = res->tuple,
+		.hint = is_multikey_or_func ? res->hint : HINT_NONE,
+	};
+	*result = memtx_tx_index_entry_clarify(txn, space, base, entry);
 	return 0;
 }
 
@@ -1578,18 +1628,15 @@ memtx_tree_index_replace(struct index *base,
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	struct key_def *key_def = base->def->key_def;
-	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	struct tuple *old_tuple = old_entry.tuple;
 	struct tuple *new_tuple = new_entry.tuple;
 	*result = memtx_index_entry_null;
 	*successor = memtx_index_entry_null;
-	if (new_tuple != NULL &&
-	    !tuple_key_is_excluded(new_tuple, key_def, MULTIKEY_NONE)) {
+	if (new_tuple != NULL) {
 		struct memtx_tree_data<USE_HINT> new_data;
 		new_data.tuple = new_tuple;
 		if (USE_HINT)
-			new_data.set_hint(tuple_hint(new_tuple, cmp_def));
+			new_data.set_hint(new_entry.hint);
 		if (memtx_tree_index_insert_and_check_dup(
 				index, old_tuple, new_tuple, mode, new_data,
 				result, successor,
@@ -1598,30 +1645,29 @@ memtx_tree_index_replace(struct index *base,
 		if (result->tuple != NULL)
 			return 0;
 	}
-	if (old_tuple != NULL &&
-	    !tuple_key_is_excluded(old_tuple, key_def, MULTIKEY_NONE)) {
+	if (old_tuple != NULL) {
 		struct memtx_tree_data<USE_HINT> old_data;
 		old_data.tuple = old_tuple;
 		if (USE_HINT)
-			old_data.set_hint(tuple_hint(old_tuple, cmp_def));
+			old_data.set_hint(old_entry.hint);
+		struct memtx_tree_data<USE_HINT> deleted_data;
 		if (memtx_tree_index_delete_impl<USE_HINT>(
-					index, old_data, NULL) != 0) {
-			if (new_tuple != NULL &&
-			    !tuple_key_is_excluded(new_tuple, key_def,
-						   MULTIKEY_NONE)) {
+					index, old_data, &deleted_data) != 0) {
+			if (new_tuple != NULL) {
 				struct memtx_tree_data<USE_HINT> new_data;
 				new_data.tuple = new_tuple;
 				if (USE_HINT)
-					new_data.set_hint(tuple_hint(new_tuple,
-								     cmp_def));
+					new_data.set_hint(new_entry.hint);
 				VERIFY(memtx_tree_index_delete_impl<USE_HINT>(
 						index, new_data, NULL) == 0);
 			}
 			return -1;
 		}
-		result->tuple = old_tuple;
-	} else {
-		result->tuple = NULL;
+		if (deleted_data.tuple != NULL) {
+			result->tuple = old_tuple;
+			if (USE_HINT)
+				result->hint = deleted_data.hint;
+		}
 	}
 	return 0;
 }
@@ -1659,17 +1705,13 @@ memtx_tree_index_replace_multikey_impl(struct index *base,
 				       enum dup_replace_mode mode,
 				       struct memtx_index_entry *result,
 				       struct memtx_index_entry *successor,
-				       bool check_if_excluded,
 				       bool return_mk_conflict)
 {
 	struct memtx_tree_index<true> *index =
 		(struct memtx_tree_index<true> *)base;
-	struct key_def *key_def = base->def->key_def;
 	struct tuple *old_tuple = old_entry.tuple;
 	struct tuple *new_tuple = new_entry.tuple;
-	if (new_tuple != NULL && (!check_if_excluded ||
-				  !tuple_key_is_excluded(new_tuple, key_def,
-							 new_entry.hint))) {
+	if (new_tuple != NULL) {
 		struct memtx_tree_data<true> new_data;
 		new_data.tuple = new_tuple;
 		new_data.set_hint(new_entry.hint);
@@ -1680,9 +1722,7 @@ memtx_tree_index_replace_multikey_impl(struct index *base,
 	}
 	if (new_tuple != NULL)
 		return 0;
-	if (old_tuple != NULL && (!check_if_excluded ||
-				  !tuple_key_is_excluded(old_tuple, key_def,
-							 old_entry.hint)))
+	if (old_tuple != NULL)
 		return memtx_tree_index_delete_old_value(index, old_entry,
 							 result);
 	return 0;
@@ -1703,7 +1743,7 @@ memtx_tree_index_replace_multikey(struct index *base,
 	*successor = memtx_index_entry_null;
 	return memtx_tree_index_replace_multikey_impl(
 		base, old_entry, new_entry, mode, result, successor,
-		/*check_if_excluded=*/true, /*return_mk_conflict=*/false);
+		/*return_mk_conflict=*/false);
 }
 
 /**
@@ -1721,7 +1761,7 @@ memtx_tree_func_index_replace(struct index *base,
 	*successor = memtx_index_entry_null;
 	return memtx_tree_index_replace_multikey_impl(
 		base, old_entry, new_entry, mode, result, successor,
-		/*check_if_excluded=*/false, /*return_mk_conflict=*/true);
+		/*return_mk_conflict=*/true);
 }
 
 template <bool USE_HINT>
@@ -2449,6 +2489,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 static const struct memtx_index_vtab memtx_tree_disabled_index_vtab = {
 	/* .base = */ memtx_tree_disabled_index_vtab_base,
 	/* .replace = */ memtx_tree_disabled_index_replace,
+	/* .replace_entry = */ memtx_tree_disabled_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ memtx_tree_disabled_index_build_next,
@@ -2520,6 +2561,7 @@ get_memtx_tree_index_vtab(void)
 		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
 				 is_func ? memtx_tree_func_index_replace :
 				 memtx_tree_index_replace<USE_HINT>,
+		/* .replace_entry = */ memtx_tree_index_replace<USE_HINT>,
 		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
 		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
 		/* .build_next = */ is_mk ? memtx_tree_index_build_next_multikey :
