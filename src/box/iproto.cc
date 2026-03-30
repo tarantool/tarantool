@@ -89,8 +89,6 @@ enum {
 	ENDPOINT_NAME_MAX = 16,
 };
 
-struct mp_ctx iproto_mp_ctx;
-
 struct iproto_connection;
 struct iproto_msg;
 
@@ -3319,10 +3317,12 @@ tx_run_override_triggers(struct event *event, const char *header,
 	enum iproto_handler_status rc = IPROTO_HANDLER_FALLBACK;
 	const char *name = NULL;
 	struct func_adapter *trigger = NULL;
+	struct mp_ctx mp_ctx;
+	mp_ctx_create_default(&mp_ctx, iproto_key_translation);
 	struct port args, ret_port;
 	port_c_create(&args);
-	port_c_add_mp_object(&args, header, header_end, &iproto_mp_ctx);
-	port_c_add_mp_object(&args, body, body_end, &iproto_mp_ctx);
+	port_c_add_mp_object(&args, header, header_end, &mp_ctx);
+	port_c_add_mp_object(&args, body, body_end, &mp_ctx);
 
 	struct event_trigger_iterator it;
 	event_trigger_iterator_create(&it, event);
@@ -4196,8 +4196,6 @@ TRIGGER(trigger_on_change, trigger_on_change_iproto_notify);
 void
 iproto_init(int threads_count)
 {
-	mp_ctx_create_default(&iproto_mp_ctx, iproto_key_translation);
-
 	iproto_threads_count = 0;
 	struct session_vtab iproto_session_vtab = {
 		/* .push = */ iproto_session_push,
@@ -4726,8 +4724,6 @@ iproto_free(void)
 	 * in case it's unix sockets.
 	 */
 	evio_service_stop(&tx_binary);
-
-	mp_ctx_destroy(&iproto_mp_ctx);
 }
 
 static int
