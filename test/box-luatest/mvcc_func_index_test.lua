@@ -433,6 +433,7 @@ g.test_no_function_call_on_non_func_read = function(cg)
         mvcc_check_has_tuple_stories()
 
         rawset(_G, 'counter', 0)
+        require('fiber').set_slice(60)
         -- Many iterations to be more sure about covering the problem.
         for i = 1, 100 do
             -- Cover all methods with FFI implementation in the following way:
