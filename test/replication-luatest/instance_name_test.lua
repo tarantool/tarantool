@@ -17,7 +17,7 @@ local function wait_for_death(instance)
     instance.process = nil
 end
 
-g.before_all = function(lg)
+g.before_all(function(lg)
     lg.replica_set = replica_set:new({})
     local box_cfg = {
         replication = {
@@ -39,11 +39,11 @@ g.before_all = function(lg)
         box_cfg = box_cfg,
     })
     lg.replica_set:start()
-end
+end)
 
-g.after_all = function(lg)
+g.after_all(function(lg)
     lg.replica_set:drop()
-end
+end)
 
 g.test_local_errors = function(lg)
     lg.master:exec(function()
@@ -556,7 +556,7 @@ end
 
 local g_no_name = t.group('no-names')
 
-g_no_name.before_all = function(lg)
+g_no_name.before_all(function(lg)
     lg.replica_set = replica_set:new({})
     local box_cfg = {
         replication_timeout = 0.1,
@@ -579,11 +579,11 @@ g_no_name.before_all = function(lg)
 
     lg.replica_set:start()
     lg.replica_set:wait_for_fullmesh()
-end
+end)
 
-g_no_name.after_all = function(lg)
+g_no_name.after_all(function(lg)
     lg.replica_set:drop()
-end
+end)
 
 -- Test, that replica doesn't hang on name apply.
 g_no_name.test_replica_hang = function(lg)

@@ -15,7 +15,7 @@ local function wait_for_death(instance)
     instance.process = nil
 end
 
-g.before_all = function(lg)
+g.before_all(function(lg)
     lg.replica_set = replica_set:new({})
     local box_cfg = {
         replication = {
@@ -36,11 +36,11 @@ g.before_all = function(lg)
         box_cfg = box_cfg,
     })
     lg.replica_set:start()
-end
+end)
 
-g.after_all = function(lg)
+g.after_all(function(lg)
     lg.replica_set:drop()
-end
+end)
 
 g.test_local_errors = function(lg)
     lg.master:exec(function()
