@@ -1099,6 +1099,12 @@ tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type);
 void
 txn_free(struct txn *txn);
 
+/*
+ * Stop and cancel all the started transactions.
+ */
+void
+txn_shutdown(struct txn *txn);
+
 /**
  * FFI bindings: do not throw exceptions, do not accept extra
  * arguments

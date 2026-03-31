@@ -6733,7 +6733,23 @@ box_storage_shutdown()
 		diag_log();
 		panic("cannot gracefully shutdown iproto");
 	}
+
+	errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL)->bparam = false;
+	wal_force_rollback();
+
+	/*
+	 * journal_sync() may fail if a rollback is already in progress. In this
+	 * case wait until all the pending transactions are cancelled due to the
+	 * cascading rollback.
+	 **/
+	while (journal_sync(NULL) != 0)
+		fiber_sleep(0.01);
+
 	replication_shutdown();
+	struct txn *txn, *tmp;
+	rlist_foreach_entry_safe_reverse(txn, &txns, in_txns, tmp) {
+		txn_shutdown(txn);
+	}
 	box_raft_shutdown();
 	txn_limbo_shutdown();
 	gc_shutdown();

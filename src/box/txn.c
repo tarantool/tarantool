@@ -1795,3 +1795,13 @@ txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt)
 	txn_update_row_counts(txn, stmt, -1);
 	stmt->row = NULL;
 }
+
+void
+txn_shutdown(struct txn *txn)
+{
+	assert(in_txn() == NULL);
+	fiber_set_txn(fiber(), txn);
+	diag_set(ClientError, ER_WAL_SHUTTING_DOWN);
+	txn_abort(txn);
+	fiber_set_txn(fiber(), NULL);
+}
