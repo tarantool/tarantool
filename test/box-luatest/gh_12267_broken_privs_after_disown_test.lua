@@ -162,5 +162,27 @@ g.test_disown = function()
 
         local info_after_disown = get_users_info()
         t.assert_equals(info_before_disown, info_after_disown)
+
+        local config = require('config')
+        config:reload()
+        t.helpers.retrying({timeout = 2, delay = 0.4}, function()
+            t.assert_equals(config:info().status, 'check_warnings')
+        end)
+
+        local info_after_disown_and_cfg_reload = get_users_info()
+        t.assert_equals(info_before_disown, info_after_disown_and_cfg_reload)
+
+        local function assert_config_origin(kind, name)
+            local exists = box.schema[kind].exists
+            t.assert(exists(name, {_origin = 'config'}))
+            t.assert_not(exists(name, {_origin = ''}))
+        end
+
+        assert_config_origin('role', 'sharding')
+        assert_config_origin('role', 'reader')
+        assert_config_origin('user', 'storage')
+        assert_config_origin('user', 'replicator')
+        assert_config_origin('user', 'test')
+        assert_config_origin('user', 'client')
     end, {find_orphan_users_script})
 end
