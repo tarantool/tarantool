@@ -162,5 +162,14 @@ g.test_disown = function()
 
         local info_after_disown = get_users_info()
         t.assert_equals(info_before_disown, info_after_disown)
+
+        local config = require('config')
+        config:reload()
+        t.helpers.retrying({timeout = 2, delay = 0.4}, function()
+            t.assert_equals(config:info().status, 'check_warnings')
+        end)
+
+        local info_after_disown_and_cfg_reload = get_users_info()
+        t.assert_equals(info_before_disown, info_after_disown_and_cfg_reload)
     end, {find_orphan_users_script})
 end
