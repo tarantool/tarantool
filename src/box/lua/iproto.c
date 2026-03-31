@@ -242,6 +242,15 @@ lbox_iproto_drop_connections(struct lua_State *L)
 	return 0;
 }
 
+/** Lua wrapper around iproto_enable_thread_requests(). */
+static int
+lbox_iproto_enable_thread_requests(struct lua_State *L)
+{
+	(void)L;
+	iproto_enable_thread_requests();
+	return 0;
+}
+
 /**
  * Encodes a packet header/body argument to MsgPack: if the argument is a
  * string, then no encoding is needed — otherwise the argument must be a Lua
@@ -623,6 +632,7 @@ box_lua_iproto_init(struct lua_State *L)
 	static const struct luaL_Reg internal_funcs[] = {
 		{"session_new", lbox_iproto_session_new},
 		{"drop_connections", lbox_iproto_drop_connections},
+		{"enable_thread_requests", lbox_iproto_enable_thread_requests},
 		{NULL, NULL}
 	};
 	luaL_setfuncs(L, internal_funcs, 0);
