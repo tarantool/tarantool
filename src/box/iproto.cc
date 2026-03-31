@@ -967,6 +967,8 @@ struct iproto_connection
 	bool is_established;
 	/** Number of iproto requests in flight. */
 	size_t request_count;
+	/** Whether requests to application threads are allowed. */
+	bool may_set_thread_id;
 };
 
 /** Returns a string suitable for logging. */
@@ -1801,6 +1803,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->is_in_replication = false;
 	con->is_drop_pending = false;
 	con->is_established = false;
+	con->may_set_thread_id = false;
 	rlist_create(&con->in_stop_list);
 	rlist_add_entry(&iproto_thread->connections, con, in_connections);
 	iproto_thread->connection_count++;
@@ -1940,6 +1943,10 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 
 	type = msg->header.type;
 	thread_id = msg->header.thread_id;
+	if (thread_id != XROW_THREAD_UNSPEC && !con->may_set_thread_id) {
+		diag_set(ClientError, ER_THREAD_REQUESTS_DISABLED);
+		goto error;
+	}
 	if (thread_id != XROW_THREAD_UNSPEC &&
 	    thread_id >= (uint32_t)iproto_thread->srv_count) {
 		diag_set(ClientError, ER_NO_SUCH_THREAD, thread_id);
@@ -4834,4 +4841,33 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 
 	iproto_override_finish(handlers, req_type, is_set);
 	return 0;
+}
+
+/**
+ * Enable requests to application threads over the given connection.
+ */
+static void
+net_enable_thread_requests(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	msg->connection->may_set_thread_id = true;
+	iproto_service_msg_delete(msg);
+}
+
+void
+iproto_enable_thread_requests(void)
+{
+	assert(cord_is_main());
+	struct session *session = fiber_get_session(fiber());
+	if (session == NULL || session->type != SESSION_TYPE_BINARY)
+		return;
+	struct iproto_connection *connection =
+		(struct iproto_connection *)session->meta.connection;
+	struct cpipe *net_pipe = &connection->iproto_thread->srv[0].ret_pipe;
+	static const struct cmsg_hop route[] = {
+		{net_enable_thread_requests, NULL},
+	};
+	struct iproto_service_msg *msg = iproto_service_msg_new(route);
+	msg->connection = connection;
+	cpipe_push(net_pipe, &msg->base);
 }
