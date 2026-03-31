@@ -135,6 +135,13 @@ int
 iproto_override(uint32_t req_type, iproto_handler_t cb,
 		iproto_handler_destroy_t destroy, void *ctx);
 
+/**
+ * Allows clients of the current session direct requests to application threads.
+ * Makes sense only if the current session type is "binary" (IPROTO).
+ */
+void
+iproto_enable_thread_requests(void);
+
 void
 iproto_init(int threads_count);
 
