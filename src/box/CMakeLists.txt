@@ -272,7 +272,6 @@ set(box_sources
     read_view.c
     mp_box_ctx.c
     xlog_reader.c
-    mp_arrow.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
