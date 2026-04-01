@@ -825,6 +825,15 @@ tarantool_lua_init_minimal(void)
 	lua_State *L = luaT_newstate();
 	tarantool_L = L;
 
+	/**
+	 * It doesn't make much sense to use command line arguments in
+	 * application threads but some Lua modules (for example, metrics)
+	 * may rely on _G.arg being set. Let's initialize it with an empty
+	 * table to make them happy.
+	 */
+	lua_newtable(L);
+	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
+
 	tarantool_lua_init_minimal_impl(L);
 }
 
