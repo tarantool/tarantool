@@ -710,12 +710,13 @@ end
 
 -- {{{ Create users
 
-local function create_user(user_name)
+local function create_user(user_name, opts)
     if box.schema.user.exists(user_name, {_origin = CONFIG_ORIGIN}) then
         log.verbose('credentials.apply: user %q already exists', user_name)
     else
         log.verbose('credentials.apply: create user %q', user_name)
-        box.schema.user.create(user_name, {_origin = CONFIG_ORIGIN})
+        box.schema.user.create(user_name, {_origin = CONFIG_ORIGIN,
+                                           no_default = opts.no_default})
     end
 end
 
@@ -813,7 +814,7 @@ end
 local function create_users(user_map)
     for user_name, user_def in pairs(user_map or {}) do
         if user_def ~= nil then
-            create_user(user_name)
+            create_user(user_name, { no_default = user_def.no_default })
             set_password(user_name, user_def.password)
         end
     end
