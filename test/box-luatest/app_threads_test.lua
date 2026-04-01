@@ -275,6 +275,8 @@ g.test_builtin_modules = function(cg)
     check_module('key_def')
     check_module('merger')
     check_module('http.client')
+    check_module('checks')
+    check_module('metrics')
     t.assert_covers(eval([[
         local e = box.error.new({type = 'MyError', name = 'FooBar'})
         return e:unpack()
@@ -621,5 +623,35 @@ end)
 g.test_luatest_exec = function(cg)
     cg.server:exec(function()
         t.assert(true)
+    end, {}, {_thread_id = 1})
+end
+
+g.test_checks = function(cg)
+    cg.server:exec(function()
+        local checks = require('checks')
+        local function test_func(arg1, arg2)
+            checks('string', 'tuple')
+            return {arg1, arg2}
+        end
+        t.assert_error_msg_contains(
+            'bad argument #1', test_func, 10, 20)
+        t.assert_error_msg_contains(
+            'bad argument #2', test_func, 'foo', 20)
+        t.assert_equals(test_func('foo', box.tuple.new({1, 2, 3})),
+                        {'foo', box.tuple.new({1, 2, 3})})
+    end, {}, {_thread_id = 1})
+end
+
+g.test_metrics = function(cg)
+    cg.server:exec(function()
+        local metrics = require('metrics')
+        metrics.gauge('test_metric'):set(123, {test_label = 'foo'})
+        t.assert_covers(metrics.collect(), {
+            {
+                metric_name = 'test_metric',
+                label_pairs = {test_label = 'foo'},
+                value = 123,
+            },
+        })
     end, {}, {_thread_id = 1})
 end

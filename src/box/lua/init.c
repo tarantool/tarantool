@@ -223,27 +223,6 @@ static const char * const lua_sources_minimal[] = {
 	"box/utils", NULL, box_utils_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
-	NULL
-};
-
-/** List of modules available only in the main thread. */
-static const char * const lua_sources_main[] = {
-	"box/session", NULL, session_lua,
-	"box/schema", NULL, schema_lua,
-#if ENABLE_FEEDBACK_DAEMON
-	/*
-	 * It is important to initialize the daemon before
-	 * load_cfg, because the latter picks up some values
-	 * from the feedback daemon.
-	 */
-	"box/feedback_daemon", NULL, feedback_daemon_lua,
-#endif
-	"box/xlog", "xlog", xlog_lua,
-	"box/version", NULL, internal_version_lua,
-	"box/upgrade", NULL, upgrade_lua,
-	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
-	"box/console", "console", console_lua,
-	"box/iproto", "iproto", iproto_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
 	 * must be loaded after decimal and datetime lua modules
@@ -341,6 +320,27 @@ static const char * const lua_sources_main[] = {
 	"metrics.plugins.prometheus", metrics_plugins_prometheus_lua,
 	"third_party/metrics/metrics/plugins/json",
 	"metrics.plugins.json", metrics_plugins_json_lua,
+	NULL
+};
+
+/** List of modules available only in the main thread. */
+static const char * const lua_sources_main[] = {
+	"box/session", NULL, session_lua,
+	"box/schema", NULL, schema_lua,
+#if ENABLE_FEEDBACK_DAEMON
+	/*
+	 * It is important to initialize the daemon before
+	 * load_cfg, because the latter picks up some values
+	 * from the feedback daemon.
+	 */
+	"box/feedback_daemon", NULL, feedback_daemon_lua,
+#endif
+	"box/xlog", "xlog", xlog_lua,
+	"box/version", NULL, internal_version_lua,
+	"box/upgrade", NULL, upgrade_lua,
+	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
+	"box/console", "console", console_lua,
+	"box/iproto", "iproto", iproto_lua,
 
 	/* {{{ config */
 
