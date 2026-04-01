@@ -441,15 +441,22 @@ fail:
 	return -1;
 }
 
+/** Replace old tuple with new tuple in the index. */
 static int
-memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
+memtx_hash_index_replace(struct index *base,
+			 struct memtx_index_entry old_entry,
+			 struct memtx_index_entry new_entry,
+			 enum dup_replace_mode mode,
+			 struct memtx_index_entry *result,
+			 struct memtx_index_entry *successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
 	/* HASH index doesn't support ordering. */
-	*successor = NULL;
+	*successor = memtx_index_entry_null;
+	struct tuple *old_tuple = old_entry.tuple;
+	struct tuple *new_tuple = new_entry.tuple;
+	*result = memtx_index_entry_null;
 
 	if (new_tuple != NULL) {
 		struct tuple *dup_tuple;
@@ -467,7 +474,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		}
 
 		if (dup_tuple) {
-			*result = dup_tuple;
+			result->tuple = dup_tuple;
 			return 0;
 		}
 	}
@@ -480,7 +487,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 			return -1;
 		}
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
 	return 0;
 }
 
