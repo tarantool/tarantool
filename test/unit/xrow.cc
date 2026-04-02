@@ -468,8 +468,9 @@ test_xrow_encode_dml(void)
  */
 #define diag_is(expected_error_message, ...) do { \
 	box_error_t *e = box_error_last(); \
-	const char *error_message = box_error_message(e); \
-	ok(strcmp(error_message, expected_error_message) == 0, ##__VA_ARGS__); \
+	const char *_error_message = box_error_message(e); \
+	ok(strcmp(_error_message, expected_error_message) == 0, \
+	   ##__VA_ARGS__); \
 } while (false)
 
 /**
@@ -757,17 +758,51 @@ test_xrow_decode_dml_keys()
 			     "Invalid MsgPack - packet body");
 
 	/* Arrow: MP_EXT(MP_ARROW). */
-	char mp_ext_arrow[6]; /* Prevents clang's extension warning. */
-	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(strlen("ext")));
-	mp_encode_ext(mp_ext_arrow, MP_ARROW, "ext", strlen("ext"));
+	const char arrow_ipc[] =
+		"\xff\xff\xff\xff\x70\x00\x00\x00\x04\x00\x00\x00\x9e\xff\xff"
+		"\xff\x04\x00\x01\x00\x04\x00\x00\x00\xb6\xff\xff\xff\x0c\x00"
+		"\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04"
+		"\x00\x00\x00\xda\xff\xff\xff\x14\x00\x00\x00\x02\x02\x00\x00"
+		"\x04\x00\x00\x00\xf0\xff\xff\xff\x40\x00\x00\x00\x01\x00\x00"
+		"\x00\x61\x00\x00\x00\x06\x00\x08\x00\x04\x00\x0c\x00\x10\x00"
+		"\x04\x00\x08\x00\x09\x00\x0c\x00\x0c\x00\x0c\x00\x00\x00\x04"
+		"\x00\x00\x00\x08\x00\x0a\x00\x0c\x00\x04\x00\x06\x00\x08\x00"
+		"\xff\xff\xff\xff\x88\x00\x00\x00\x04\x00\x00\x00\x8a\xff\xff"
+		"\xff\x04\x00\x03\x00\x10\x00\x00\x00\x08\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\xac\xff\xff\xff\x01\x00\x00\x00\x00"
+		"\x00\x00\x00\x34\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00"
+		"\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x01"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x0a\x00\x14\x00\x04\x00\x0c\x00\x10\x00\x0c\x00\x14\x00\x04"
+		"\x00\x06\x00\x08\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00";
+	size_t arrow_ipc_len = sizeof(arrow_ipc);
+	char mp_ext_arrow[4 + 273]; /* Prevents clang's extension warning. */
+	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(arrow_ipc_len));
+	mp_encode_ext(mp_ext_arrow, MP_ARROW, arrow_ipc, arrow_ipc_len);
 	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%p}",
 					   IPROTO_ARROW, mp_ext_arrow);
+#ifdef ENABLE_ARROW_IPC
 	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
 	   "MP_EXT(MP_ARROW) Arrow IPC is valid");
-	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	is(r.arrow_ipc_end - r.arrow_ipc, (int)arrow_ipc_len,
 	   "MP_EXT(MP_ARROW) Arrow IPC size is valid");
-	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	is(memcmp(r.arrow_ipc, arrow_ipc, arrow_ipc_len), 0,
 	   "MP_EXT(MP_ARROW) Arrow IPC data is valid");
+#else /* ENABLE_ARROW_IPC */
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), -1,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported");
+	box_error_t *e = box_error_last();
+	ok(strcmp(box_error_message(e),
+		  "Invalid MsgPack - cannot unpack arrow data") == 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported: diag 1");
+	ok(strcmp(box_error_message(e->cause),
+		  "CE version does not support arrow format") == 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported: diag 2");
+	box_error_clear();
+#endif /* ENABLE_ARROW_IPC */
 
 	/* Arrow: MP_EXT(MP_TUPLE). */
 	char mp_ext_tuple[6]; /* Prevents clang's extension warning. */
@@ -796,7 +831,11 @@ static void
 test_xrow_decode_dml_requests()
 {
 	header();
+#ifdef ENABLE_ARROW_IPC
 	plan(89);
+#else /* ENABLE_ARROW_IPC */
+	plan(87);
+#endif /* ENABLE_ARROW_IPC */
 
 	const size_t buf_size = 1024;
 	char buf[buf_size];
@@ -1014,21 +1053,55 @@ test_xrow_decode_dml_requests()
 			     "Missing mandatory field 'ARROW' in request");
 
 	/* insert_arrow(space_id, arrow) */
-	char mp_ext_arrow[6]; /* Prevents clang's extension warning. */
-	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(strlen("ext")));
-	mp_encode_ext(mp_ext_arrow, MP_ARROW, "ext", strlen("ext"));
+	const char arrow_ipc[] =
+		"\xff\xff\xff\xff\x70\x00\x00\x00\x04\x00\x00\x00\x9e\xff\xff"
+		"\xff\x04\x00\x01\x00\x04\x00\x00\x00\xb6\xff\xff\xff\x0c\x00"
+		"\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04"
+		"\x00\x00\x00\xda\xff\xff\xff\x14\x00\x00\x00\x02\x02\x00\x00"
+		"\x04\x00\x00\x00\xf0\xff\xff\xff\x40\x00\x00\x00\x01\x00\x00"
+		"\x00\x61\x00\x00\x00\x06\x00\x08\x00\x04\x00\x0c\x00\x10\x00"
+		"\x04\x00\x08\x00\x09\x00\x0c\x00\x0c\x00\x0c\x00\x00\x00\x04"
+		"\x00\x00\x00\x08\x00\x0a\x00\x0c\x00\x04\x00\x06\x00\x08\x00"
+		"\xff\xff\xff\xff\x88\x00\x00\x00\x04\x00\x00\x00\x8a\xff\xff"
+		"\xff\x04\x00\x03\x00\x10\x00\x00\x00\x08\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\xac\xff\xff\xff\x01\x00\x00\x00\x00"
+		"\x00\x00\x00\x34\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00"
+		"\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x08\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x01"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x0a\x00\x14\x00\x04\x00\x0c\x00\x10\x00\x0c\x00\x14\x00\x04"
+		"\x00\x06\x00\x08\x00\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00";
+	size_t arrow_ipc_len = sizeof(arrow_ipc);
+	char mp_ext_arrow[4 + 273]; /* Prevents clang's extension warning. */
+	fail_unless(lengthof(mp_ext_arrow) == mp_sizeof_ext(arrow_ipc_len));
+	mp_encode_ext(mp_ext_arrow, MP_ARROW, arrow_ipc, arrow_ipc_len);
 	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u%p}",
 					   IPROTO_SPACE_ID, 1,
 					   IPROTO_ARROW, mp_ext_arrow);
+#ifdef ENABLE_ARROW_IPC
 	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
 	   "insert_arrow(space_id, arrow): success");
 	is(r.type, IPROTO_INSERT_ARROW,
 	   "insert_arrow(space_id, arrow): request type");
 	is(r.space_id, 1, "insert_arrow(space_id, arrow): space ID");
-	is(r.arrow_ipc_end - r.arrow_ipc, strlen("ext"),
+	is(r.arrow_ipc_end - r.arrow_ipc, (int)arrow_ipc_len,
 	   "insert_arrow(space_id, arrow): Arrow IPC size");
-	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
+	is(memcmp(r.arrow_ipc, arrow_ipc, arrow_ipc_len), 0,
 	   "insert_arrow(space_id, arrow): Arrow IPC");
+#else /* ENABLE_ARROW_IPC */
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), -1,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported");
+	box_error_t *e = box_error_last();
+	ok(strcmp(box_error_message(e),
+		  "Invalid MsgPack - cannot unpack arrow data") == 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported: diag 1");
+	ok(strcmp(box_error_message(e->cause),
+		  "CE version does not support arrow format") == 0,
+	   "MP_EXT(MP_ARROW) Arrow IPC is not supported: diag 2");
+	box_error_clear();
+#endif /* ENABLE_ARROW_IPC */
 
 	check_plan();
 	footer();

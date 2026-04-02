@@ -35,6 +35,7 @@
 #include <small/obuf.h>
 #include <base64.h>
 
+#include "arrow_ipc.h"
 #include "fiber.h"
 #include "iostream.h"
 #include "version.h"
@@ -1046,6 +1047,14 @@ error:
 				goto error;
 			request->arrow_ipc = data;
 			request->arrow_ipc_end = data + size;
+			if (arrow_ipc_decode(&request->arrow_array,
+					     &request->arrow_schema,
+					     request->arrow_ipc,
+					     request->arrow_ipc_end) != 0) {
+				diag_add(ClientError, ER_INVALID_MSGPACK,
+					 "cannot unpack arrow data");
+				return -1;
+			}
 			break;
 		}
 		default:
