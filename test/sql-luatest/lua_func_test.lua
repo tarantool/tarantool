@@ -92,3 +92,52 @@ g.test_5427_lua_func_changes_result = function(cg)
         t.assert_equals(res, exp)
     end)
 end
+
+g = t.group("func")
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+    cg.server:exec(function()
+        box.execute([[SET SESSION "sql_seq_scan" = true;]])
+    end)
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Check errors during function create process
+g.test_func_recreate = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local opts = {
+            language = 'Lua',
+            body = [[function (n) require('fiber').sleep(n) return n end]],
+            param_list = {'number'},
+            returns = 'number',
+            exports = {'LUA', 'SQL'}
+        }
+        local _, err = box.schema.func.create('WAITFOR', opts)
+        t.assert_equals(err, nil)
+        local ch = fiber.channel(1)
+
+        local sql = 'SELECT WAITFOR(0.2e0);'
+        fiber.create(function () ch:put(box.execute(sql)) end)
+        fiber.sleep(0.1)
+
+        box.func.WAITFOR:drop()
+
+        _, err = box.schema.func.create('WAITFOR', opts)
+        t.assert_equals(err, nil)
+
+        local res = ch:get()
+        t.assert_equals(res.rows, {{0.2}})
+        box.func.WAITFOR:drop()
+
+        _, err = box.schema.func.create('WAITFOR', opts)
+        t.assert_equals(err, nil)
+
+        box.func.WAITFOR:drop()
+    end)
+end
