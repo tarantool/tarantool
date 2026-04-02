@@ -2942,7 +2942,7 @@ end)
 
 
 test:test("Time invalid :set{} operations", function(test)
-    test:plan(94)
+    test:plan(60 + 35 * 2)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -3005,7 +3005,9 @@ test:test("Time invalid :set{} operations", function(test)
                            function() ts:set{[attr_name] = ts} end)
     end
 
-    ts:set{year = 2021}
+    ts:set{year = 2021, month = 02, day = 03,
+        hour = 12, min = 34, sec = 56,
+        nsec = 123456789, tz = 'Europe/Moscow'}
     local specific_errors = {
         {only_one_of, { nsec = 123456, usec = 123}},
         {only_one_of, { nsec = 123456, msec = 123}},
@@ -3031,6 +3033,7 @@ test:test("Time invalid :set{} operations", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
         {expected_str('parse_tzname()', 400), {tz = 400}},
+        {couldnt_parse('zzzYYYwww'), {tz = 'zzzYYYwww'}},
         {table_expected('datetime.set()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.set()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -3051,7 +3054,11 @@ test:test("Time invalid :set{} operations", function(test)
     }
     for _, row in pairs(specific_errors) do
         local err_msg, attribs = unpack(row)
+        local before = ts:totable()
         assert_raises(test, err_msg, function() ts:set(attribs) end)
+        local after = ts:totable()
+        test:is_deeply(after, before,
+            'ts unchanged:'..json.encode({after = after, before = before}))
     end
 end)
 
