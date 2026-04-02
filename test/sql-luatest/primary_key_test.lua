@@ -66,3 +66,48 @@ g.test_4745_table_info_assertion = function(cg)
         T:drop()
     end, {cg.params.engine})
 end
+
+-- gh-3473: Primary key can't be declared with NULL.
+g.test_3473_primary_key_not_declared_null = function(cg)
+    cg.server:exec(function()
+        local exp_err = "Primary index of space 'te17' "..
+                        "can not contain nullable parts"
+        local sql = "CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);"
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Failed to execute SQL statement: "..
+                  "NULL declaration for column 'b' of table 'test' "..
+                  "has been already set to 'none'"
+        sql = "CREATE TABLE test (a int PRIMARY KEY, "..
+              "b int NULL ON CONFLICT IGNORE);"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Primary index of space 'test' can not contain nullable parts"
+        sql = "CREATE TABLE test (a int, b int NULL, "..
+              "c int, PRIMARY KEY(a, b, c));"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        -- Several NOT NULL REPLACE constraints work.
+        --
+        sql = "CREATE TABLE a (id INT PRIMARY KEY, a INT NOT NULL "..
+              "ON CONFLICT REPLACE DEFAULT 1, b INT NOT NULL ON "..
+              "CONFLICT REPLACE DEFAULT 2);"
+        box.execute(sql)
+        box.execute("INSERT INTO a VALUES(1, NULL, NULL);")
+        box.execute("INSERT INTO a VALUES(2, NULL, NULL);")
+
+        local exp = {
+            {1, 1, 2},
+            {2, 1, 2},
+        }
+        local res = box.execute("SELECT * FROM a;")
+        t.assert_equals(res.rows, exp)
+        box.execute("DROP TABLE a;")
+    end)
+end
