@@ -30,6 +30,7 @@ local net_box = require('net.box')
 local help = require('help').help
 local utils = require('internal.utils')
 local tarantool = require('tarantool')
+local fio = require('fio')
 
 local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
@@ -81,6 +82,9 @@ local default_local_eos = ''
 
 -- Each but the last string of multiline command should end with this string.
 local continuation_symbol = '\\'
+
+-- History file name.
+local HISTORY_FILE_NAME = '.tarantool_history'
 
 output_handlers["yaml"] = function(status, _opts, ...)
     local err, ok, res
@@ -1031,15 +1035,80 @@ end
 -- Start REPL on stdin
 --
 local started = false
+
+--
+-- Determine the history file path following XDG Base Directory specification.
+--
+-- The function checks for the history file in the following order:
+-- 1. $HOME/.tarantool_history (if it exists - takes priority for migration)
+-- 2. $XDG_STATE_HOME/tarantool/.tarantool_history (if XDG_STATE_HOME is set
+--    and the directory exists)
+-- 3. $HOME/.local/state/tarantool/.tarantool_history (if the directory exists)
+--
+-- If none of the above exist (fresh install), the function creates the
+-- XDG-compliant state directory and returns a path inside it:
+-- 4. $XDG_STATE_HOME/tarantool/.tarantool_history (if XDG_STATE_HOME is set)
+-- 5. $HOME/.local/state/tarantool/.tarantool_history (default)
+--
+-- Returns nil only if HOME is not set.
+--
+local function get_history_file_path()
+    local xdg_state_home = os.getenv('XDG_STATE_HOME')
+    local home_dir = os.getenv('HOME')
+
+    -- Legacy path takes priority for seamless migration.
+    if home_dir then
+        local home_history = fio.pathjoin(home_dir, HISTORY_FILE_NAME)
+        if fio.path.exists(home_history) then
+            return home_history
+        end
+    end
+
+    -- $XDG_STATE_HOME/tarantool/ directory already exists.
+    if xdg_state_home then
+        local xdg_history_dir = fio.pathjoin(xdg_state_home, 'tarantool')
+        if fio.path.exists(xdg_history_dir) then
+            return fio.pathjoin(xdg_history_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    -- $HOME/.local/state/tarantool/ directory already exists.
+    if home_dir then
+        local home_state_dir = fio.pathjoin(home_dir, '.local', 'state',
+                                            'tarantool')
+        if fio.path.exists(home_state_dir) then
+            return fio.pathjoin(home_state_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    -- Fresh install: create the XDG-compliant state directory.
+    if xdg_state_home then
+        local xdg_history_dir = fio.pathjoin(xdg_state_home, 'tarantool')
+        if fio.mktree(xdg_history_dir) then
+            return fio.pathjoin(xdg_history_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    if home_dir then
+        local home_state_dir = fio.pathjoin(home_dir, '.local', 'state',
+                                            'tarantool')
+        if fio.mktree(home_state_dir) then
+            return fio.pathjoin(home_state_dir, HISTORY_FILE_NAME)
+        end
+    end
+
+    return nil
+end
+
 function M.start()
     if started then
         error("console is already started")
     end
     started = true
     local self = setmetatable({ running = true }, repl_mt)
-    local home_dir = os.getenv('HOME')
-    if home_dir then
-        self.history_file = home_dir .. '/.tarantool_history'
+    local history_file = get_history_file_path()
+    if history_file then
+        self.history_file = history_file
         internal.load_history(self.history_file)
     end
     session_internal.create(1, "repl") -- stdin fileno
