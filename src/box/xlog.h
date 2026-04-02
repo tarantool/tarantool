@@ -277,7 +277,7 @@ int
 xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *vclock);
 
 typedef bool
-(*xlog_file_is_temporary_f)(const char *filename);
+(*xlog_file_is_temporary_f)(const char *filename, const char *target_ext);
 
 /**
  * Returns true if the file with the given name is a temporary xlog file that
@@ -286,13 +286,14 @@ typedef bool
 extern xlog_file_is_temporary_f xlog_file_is_temporary;
 
 /**
- * Removes all temporary files in the specified directory.
+ * Removes all temporary files with the specified extension in the specified
+ * directory.
  *
  * We call this function at startup to clean up the xlog directory of
  * incomplete files left from the previous run.
  */
 void
-xdir_remove_temporary_files(struct xdir *xdir);
+xdir_remove_temporary_files(struct xdir *xdir, const char *filename_ext);
 
 /**
  * Return LSN and vclock (unless @vclock is NULL) of the oldest

@@ -521,6 +521,28 @@ static int
 wal_writer_f(va_list ap);
 
 static int
+wal_remove_temporary_files_f(struct cbus_call_msg *msg)
+{
+	(void)msg;
+	struct wal_writer *writer = &wal_writer_singleton;
+	xdir_remove_temporary_files(&writer->wal_dir,
+				    writer->wal_dir.filename_ext);
+	return 0;
+}
+
+/**
+ * Delete all .xlog.inprogress files in wal_dir.
+ */
+static int
+wal_remove_temporary_files(void)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct cbus_call_msg msg;
+	return cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg,
+			 wal_remove_temporary_files_f);
+}
+
+static int
 wal_open_f(struct cbus_call_msg *msg)
 {
 	(void)msg;
@@ -647,6 +669,9 @@ wal_enable(void)
 	 * see wal_collect_garbage().
 	 */
 	if (xdir_scan(&writer->wal_dir, true))
+		return -1;
+
+	if (wal_remove_temporary_files() != 0)
 		return -1;
 
 	/* Open the most recent WAL file. */
