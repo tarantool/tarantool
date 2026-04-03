@@ -1,3 +1,4 @@
+local fiber = require('fiber')
 local fio = require('fio')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
@@ -81,6 +82,41 @@ end
 
 local function broadcast(self)
     box.broadcast('config.info', self:info())
+end
+
+local status_names = {
+    uninitialized = true,
+    startup_in_progress = true,
+    reload_in_progress = true,
+    check_errors = true,
+    check_warnings = true,
+    ready = true,
+}
+
+local function normalize_wished_statuses(statuses)
+    if type(statuses) == 'string' then
+        statuses = {statuses}
+    elseif type(statuses) ~= 'table' then
+        error(('Expected string or table, got %s'):format(type(statuses)), 0)
+    end
+
+    local res = {}
+    for i, status in ipairs(statuses) do
+        if type(status) ~= 'string' then
+            error(('Expected string, got %s at index %d'):format(
+                type(status), i), 0)
+        end
+        if not status_names[status] then
+            error(('Unknown config status %q'):format(status), 0)
+        end
+        res[status] = true
+    end
+
+    if next(res) == nil then
+        error('Expected at least one config status', 0)
+    end
+
+    return res
 end
 
 function methods._meta(self, source_name, key, value)
@@ -561,6 +597,36 @@ function methods.info(self, version)
 
     error(('config:info() expects %s or nil as an argument, got %q'):format(
         table.concat(supported_versions, ', '), version), 0)
+end
+
+function methods.wish_status(self, statuses, timeout)
+    selfcheck(self, 'wish_status')
+
+    local wished_statuses = normalize_wished_statuses(statuses)
+    if timeout ~= nil and (type(timeout) ~= 'number' or timeout < 0) then
+        error(('Expected non-negative number or nil, got %s'):format(
+            type(timeout)), 0)
+    end
+    timeout = timeout or 0
+
+    local actual_status = self._status
+    local cond = fiber.cond()
+    local watcher = box.watch('config.info', function(_, info)
+        actual_status = info.status
+        if wished_statuses[actual_status] then
+            cond:signal()
+        end
+    end)
+
+    if not wished_statuses[actual_status] then
+        local deadline = fiber.clock() + timeout
+        repeat
+        until wished_statuses[actual_status] or
+            not cond:wait(math.max(0, deadline - fiber.clock()))
+    end
+
+    watcher:unregister()
+    return actual_status
 end
 
 function methods.is_storage(self, opts)
