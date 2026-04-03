@@ -1332,6 +1332,24 @@ I['failover.stateboard.renew_interval'] = format_text([[
     commands from etcd.
 ]])
 
+I['failover.ssl'] = format_text([[
+    SSL parameters required for encrypted connections. These parameters would
+    be used to set up SSL failover coordinator connections to instances over
+    IPROTO. This functionality is available only in Tarantool Enterprise.
+]])
+
+I['failover.ssl.ssl_ca_file'] = I['<uri>.params.ssl_ca_file']
+
+I['failover.ssl.ssl_cert_file'] = I['<uri>.params.ssl_cert_file']
+
+I['failover.ssl.ssl_key_file'] = I['<uri>.params.ssl_key_file']
+
+I['failover.ssl.ssl_ciphers'] = I['<uri>.params.ssl_ciphers']
+
+I['failover.ssl.ssl_password'] = I['<uri>.params.ssl_password']
+
+I['failover.ssl.ssl_password_file'] = I['<uri>.params.ssl_password_file']
+
 -- }}} failover configuration
 
 -- {{{ feedback configuration
