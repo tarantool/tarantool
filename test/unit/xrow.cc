@@ -312,11 +312,14 @@ test_request_str()
 
 	request.after_tuple = request.tuple;
 
+	request.begin_key = request.key;
+	request.end_key = request.key;
+
 	is(strcmp("{type: 'SELECT', replica_id: 5, lsn: 100, "
 		  "space_id: 512, index_id: 1, "
 		  "key: [200], tuple: [300], ops: [400], "
 		  "fetch_position: true, after_position: \"position\", "
-		  "after_tuple: [300]}",
+		  "after_tuple: [300], begin_key: [200], end_key: [200]}",
 		  request_str(&request)), 0, "request_str");
 
 	check_plan();
@@ -369,7 +372,7 @@ static void
 test_xrow_encode_dml(void)
 {
 	header();
-	plan(26);
+	plan(30);
 
 	struct request r;
 	memset(&r, 0, sizeof(r));
@@ -390,6 +393,10 @@ test_xrow_encode_dml(void)
 	r.new_tuple_end = r.new_tuple + strlen(r.new_tuple);
 	r.arrow_ipc = "Arrow IPC";
 	r.arrow_ipc_end = r.arrow_ipc + strlen(r.arrow_ipc);
+	r.begin_key = "begin key";
+	r.begin_key_end = r.begin_key + strlen(r.begin_key);
+	r.end_key = "end key";
+	r.end_key_end = r.end_key + strlen(r.end_key);
 
 	int iovcnt;
 	struct iovec iov[1];
@@ -397,7 +404,7 @@ test_xrow_encode_dml(void)
 	is(iovcnt, 1, "xrow_encode_dml rc");
 	const char *data = (const char *)iov[0].iov_base;
 	int map_size = mp_decode_map(&data);
-	is(map_size, 10, "decoded request map");
+	is(map_size, 12, "decoded request map");
 	int decoded_key_count = 0;
 
 	is(mp_decode_uint(&data), IPROTO_SPACE_ID, "decoded space id key");
@@ -455,6 +462,17 @@ test_xrow_encode_dml(void)
 	data += strlen(r.arrow_ipc);
 	decoded_key_count++;
 
+	is(mp_decode_uint(&data), IPROTO_BEGIN_KEY, "decoded begin key key");
+	is(memcmp(data, r.begin_key, strlen(r.begin_key)), 0,
+	   "decoded begin key");
+	data += strlen(r.begin_key);
+	decoded_key_count++;
+
+	is(mp_decode_uint(&data), IPROTO_END_KEY, "decoded end key key");
+	is(memcmp(data, r.end_key, strlen(r.end_key)), 0, "decoded end key");
+	data += strlen(r.end_key);
+	decoded_key_count++;
+
 	is(data - (char *)iov[0].iov_base, (ptrdiff_t)iov[0].iov_len,
 	   "decoded all data");
 	is(decoded_key_count, map_size, "decoded all keys");
@@ -492,7 +510,7 @@ static void
 test_xrow_decode_dml_keys()
 {
 	header();
-	plan(94);
+	plan(106);
 
 	const size_t buf_size = 1024;
 	char buf[buf_size];
@@ -785,6 +803,36 @@ test_xrow_decode_dml_keys()
 	xrow_decode_dml_fail(&header, &r, "MP_MAP Arrow IPC is invalid",
 			     "Invalid MsgPack - packet body");
 
+	/* Begin key: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_BEGIN_KEY, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY begin key is valid");
+	is(mp_decode_array(&r.begin_key), 1, "MP_ARRAY begin key len is valid");
+	is(mp_decode_uint(&r.begin_key), 2, "MP_ARRAY begin key data is valid");
+	is(r.begin_key, r.begin_key_end, "MP_ARRAY begin key size is valid");
+
+	/* Begin key: MP_UINT. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_BEGIN_KEY, 1);
+	xrow_decode_dml_fail(&header, &r, "MP_UINT begin key is invalid",
+			     "Invalid MsgPack - packet body");
+
+	/* End key: MP_ARRAY. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u[%u]}",
+					   IPROTO_END_KEY, 2);
+	is(xrow_decode_dml(&header, &r, empty_key_map), 0,
+	   "MP_ARRAY end key is valid");
+	is(mp_decode_array(&r.end_key), 1, "MP_ARRAY end key len is valid");
+	is(mp_decode_uint(&r.end_key), 2, "MP_ARRAY end key data is valid");
+	is(r.end_key, r.end_key_end, "MP_ARRAY end key size is valid");
+
+	/* End key: MP_MAP. */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u{%u%u}}",
+					   IPROTO_END_KEY, 2, 3);
+	xrow_decode_dml_fail(&header, &r, "MP_MAP end key is invalid",
+			     "Invalid MsgPack - packet body");
+
 	check_plan();
 	footer();
 }
@@ -796,7 +844,7 @@ static void
 test_xrow_decode_dml_requests()
 {
 	header();
-	plan(89);
+	plan(105);
 
 	const size_t buf_size = 1024;
 	char buf[buf_size];
@@ -1029,6 +1077,52 @@ test_xrow_decode_dml_requests()
 	   "insert_arrow(space_id, arrow): Arrow IPC size");
 	is(memcmp(r.arrow_ipc, "ext", strlen("ext")), 0,
 	   "insert_arrow(space_id, arrow): Arrow IPC");
+
+	/* delete_range() */
+	header.type = IPROTO_DELETE_RANGE;
+	header.body[0].iov_len = mp_format(buf, buf_size, "{}");
+	xrow_decode_dml_fail(&header, &r, "delete_range()",
+			     "Missing mandatory field 'SPACE_ID' in request");
+
+	/* delete_range(space_id) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u}",
+					   IPROTO_SPACE_ID, 1);
+	xrow_decode_dml_fail(&header, &r, "delete_range(space_id)",
+			     "Missing mandatory field 'KEY' in request"),
+
+	/* delete_range(space_id, begin_key) */
+	header.body[0].iov_len = mp_format(buf, buf_size, "{%u%u%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_BEGIN_KEY, 3, 4);
+	xrow_decode_dml_fail(&header, &r, "delete_range(space_id, begin_key)",
+			     "Missing mandatory field 'END_KEY' in request");
+
+	/* delete_range(space_id, begin_key, end_key) */
+	header.body[0].iov_len = mp_format(buf, buf_size,
+					   "{%u%u%u[%u%u]%u[%u%u]}",
+					   IPROTO_SPACE_ID, 1,
+					   IPROTO_BEGIN_KEY, 3, 4,
+					   IPROTO_END_KEY, 5, 6);
+	is(xrow_decode_dml(&header, &r, dml_request_key_map(header.type)), 0,
+	   "delete_range(space_id, begin_key, end_key): success");
+	is(r.space_id, 1,
+	   "delete_range(space_id, begin_key, end_key): space ID");
+	is(mp_decode_array(&r.begin_key), 2,
+	   "delete_range(space_id, begin_key, end_key): begin_key len");
+	is(mp_decode_uint(&r.begin_key), 3,
+	   "delete_range(space_id, begin_key, end_key): begin_key[0]");
+	is(mp_decode_uint(&r.begin_key), 4,
+	   "delete_range(space_id, begin_key, end_key): begin_key[1]");
+	is(r.begin_key, r.begin_key_end,
+	   "delete_range(space_id, begin_key, end_key): begin_key size");
+	is(mp_decode_array(&r.end_key), 2,
+	   "delete_range(space_id, begin_key, end_key): end_key len");
+	is(mp_decode_uint(&r.end_key), 5,
+	   "delete_range(space_id, begin_key, end_key): end_key[0]");
+	is(mp_decode_uint(&r.end_key), 6,
+	   "delete_range(space_id, begin_key, end_key): end_key[1]");
+	is(r.end_key, r.end_key_end,
+	   "delete_range(space_id, begin_key, end_key): end_key size");
 
 	check_plan();
 	footer();

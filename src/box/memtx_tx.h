@@ -50,7 +50,8 @@ extern bool memtx_tx_manager_use_mvcc_engine;
 enum memtx_tx_alloc_type {
 	MEMTX_TX_ALLOC_TRACKER = 0,
 	MEMTX_TX_ALLOC_CONFLICT = 1,
-	MEMTX_TX_ALLOC_TYPE_MAX = 2,
+	MEMTX_TX_ALLOC_LIST = 2,
+	MEMTX_TX_ALLOC_TYPE_MAX,
 };
 
 extern const char *memtx_tx_alloc_type_strs[];
@@ -75,7 +76,11 @@ enum memtx_tx_alloc_object {
 	 * Object of type struct tx_read_tracker.
 	 */
 	MEMTX_TX_OBJECT_READ_TRACKER = 2,
-	MEMTX_TX_OBJECT_MAX = 3,
+	/**
+	 * Object of type struct memtx_del_story_link.
+	 */
+	MEMTX_TX_OBJECT_STMT_DEL_STORY_LINK = 3,
+	MEMTX_TX_OBJECT_MAX,
 };
 
 /**
