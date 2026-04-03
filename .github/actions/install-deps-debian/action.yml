@@ -21,6 +21,14 @@ runs:
           automake \
           libtool
 
+        apt-get purge --auto-remove cmake -y
+        # Old Ubuntu and Debian repos do not contain cmake 3.26.0.
+        # Thus, we use an alternative way of installing this
+        # version.
+        curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
+        && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
+        && rm cmake-3.26.0-linux-$(uname -i).tar.gz
+
         luarocks install luacheck 0.26.1
         gem install coveralls-lcov
       shell: bash
