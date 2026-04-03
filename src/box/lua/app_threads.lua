@@ -72,7 +72,7 @@ end
 local function find_thread_group(group_name)
     local group = thread_groups[group_name]
     if group == nil then
-        box.error(box.error.NO_SUCH_THREAD_GROUP, group_name)
+        box.error(box.error.NO_SUCH_THREAD_GROUP, group_name, 3)
     end
     return group
 end
@@ -133,7 +133,7 @@ function thread_group_methods:_dispatch(cb, args, opts)
         end
     end
     if last_err ~= nil then
-        error(last_err)
+        box.error(last_err, 2)
     end
     return results
 end
@@ -242,7 +242,7 @@ function threads.export(func_name, func)
     utils.check_param(func_name, 'function name', 'string', 2)
     utils.check_param(func, 'function object', 'function', 2)
     if exported_functions[func_name] ~= nil then
-        box.error(box.error.FUNCTION_EXISTS, func_name)
+        box.error(box.error.FUNCTION_EXISTS, func_name, 2)
     end
     exported_functions[func_name] = func
 end
