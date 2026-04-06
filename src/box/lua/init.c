@@ -221,6 +221,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
 	"box/utils", NULL, box_utils_lua,
+	"box/iproto", "iproto", iproto_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
 	/*
@@ -340,7 +341,6 @@ static const char * const lua_sources_main[] = {
 	"box/upgrade", NULL, upgrade_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/console", "console", console_lua,
-	"box/iproto", "iproto", iproto_lua,
 
 	/* {{{ config */
 
