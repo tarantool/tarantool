@@ -54,6 +54,7 @@ lua_source(lua_sources lua/config/utils/aboard.lua         config_utils_aboard_l
 lua_source(lua_sources lua/config/utils/expression.lua     config_utils_expression_lua)
 lua_source(lua_sources lua/config/utils/file.lua           config_utils_file_lua)
 lua_source(lua_sources lua/config/utils/log.lua            config_utils_log_lua)
+lua_source(lua_sources lua/config/utils/size.lua           config_utils_size_lua)
 lua_source(lua_sources lua/config/utils/odict.lua          config_utils_odict_lua)
 lua_source(lua_sources lua/config/utils/schema.lua         config_utils_schema_lua)
 lua_source(lua_sources lua/config/utils/snapshot.lua       config_utils_snapshot_lua)
