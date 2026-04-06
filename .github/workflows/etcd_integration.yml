@@ -49,7 +49,7 @@ jobs:
           sudo apt-get -y install tt
 
       - name: Setup luatest
-        run: tt rocks install luatest 1.0.1
+        run: tt rocks install luatest 1.4.2
 
       - name: Run tests
         run: make test
