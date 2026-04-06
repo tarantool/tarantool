@@ -6,17 +6,17 @@ box.iproto.override = function(request_type, callback)
 
     if request_type == nil then
         box.error(box.error.PROC_LUA,
-                  'Usage: box.iproto.override(request_type, callback)')
+                  'Usage: box.iproto.override(request_type, callback)', 2)
     end
     if type(request_type) ~= 'number' and type(request_type) ~= 'string' then
         box.error(box.error.PROC_LUA,
                   ("bad argument #1 to 'override' (number or string " ..
-                   "expected, got %s)"):format(type(request_type)))
+                   "expected, got %s)"):format(type(request_type)), 2)
     end
     if callback ~= nil and type(callback) ~= 'function' then
         box.error(box.error.PROC_LUA,
                   ("bad argument #2 to 'override' (function expected, " ..
-                   "got %s)"):format(type(callback)))
+                   "got %s)"):format(type(callback)), 2)
     end
 
     local event_name
