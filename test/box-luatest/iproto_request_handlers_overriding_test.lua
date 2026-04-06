@@ -174,19 +174,15 @@ end
 g.test_box_iproto_override_errors = function(cg)
     cg.server:exec(function(unsupported_rq_types)
         local err_msg = "Usage: box.iproto.override(request_type, callback)"
-        t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override()
-        end)
+        t.assert_error_msg_content_equals(err_msg, box.iproto.override)
         err_msg = "bad argument #1 to 'override' " ..
                   "(number or string expected, got function)"
-        t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override(function() end)
-        end)
+        t.assert_error_msg_content_equals(err_msg, box.iproto.override,
+                                          function() end)
         err_msg = "bad argument #2 to 'override' " ..
                   "(function expected, got string)"
-        t.assert_error_msg_content_equals(err_msg, function()
-            box.iproto.override(0, 'str')
-        end)
+        t.assert_error_msg_content_equals(err_msg, box.iproto.override,
+                                          0, 'str')
         for _, rq_type in pairs(unsupported_rq_types) do
             box.iproto.override(rq_type, function() end)
         end
