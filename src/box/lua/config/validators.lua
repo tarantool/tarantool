@@ -2,6 +2,7 @@ local tarantool = require('tarantool')
 local urilib = require('uri')
 local uuid = require('uuid')
 local network = require('internal.config.utils.network')
+local size = require('internal.config.utils.size')
 
 
 -- Store validation functions. Each key in this table corresponds
@@ -378,7 +379,11 @@ end
 -- {{{ lua
 
 M['lua.memory'] = function(data, w)
-    if data < 256 * 1024 * 1024 then
+    local parsed, err = size.parse(data)
+    if parsed == nil then
+        w.error('Unable to parse a byte size: %s', err)
+    end
+    if parsed < 256 * 1024 * 1024 then
         w.error('Memory limit should be >= 256MB')
     end
 end

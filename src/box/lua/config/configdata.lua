@@ -309,8 +309,10 @@ local function build_iconfig(instance_def)
         replicaset_name = instance_def.replicaset_name,
         group_name = instance_def.group_name,
     }
-    instance_def.iconfig = instance_config:apply_vars(iconfig, vars)
-    instance_def.iconfig_def = instance_config:apply_vars(iconfig_def, vars)
+    instance_def.iconfig = instance_config:apply_byte_sizes(
+        instance_config:apply_vars(iconfig, vars))
+    instance_def.iconfig_def = instance_config:apply_byte_sizes(
+        instance_config:apply_vars(iconfig_def, vars))
 end
 
 -- Instance object metatable.
@@ -1053,8 +1055,10 @@ local function new(iconfig, cconfig, instance_name)
         replicaset_name = found.replicaset_name,
         group_name = found.group_name,
     }
-    iconfig = instance_config:apply_vars(iconfig, vars)
-    iconfig_def = instance_config:apply_vars(iconfig_def, vars)
+    iconfig = instance_config:apply_byte_sizes(
+        instance_config:apply_vars(iconfig, vars))
+    iconfig_def = instance_config:apply_byte_sizes(
+        instance_config:apply_vars(iconfig_def, vars))
 
     local replicaset_uuid = instance_config:get(iconfig_def,
         'database.replicaset_uuid')

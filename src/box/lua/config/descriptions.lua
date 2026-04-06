@@ -24,6 +24,15 @@ local function format_text(s)
     end)
 end
 
+local function format_bytes_text(s)
+    return format_text(s .. [[
+
+        You can specify the value either as a number of bytes or as a
+        human-readable string with binary units (for example, `1GiB`,
+        `256MiB`, `4KiB`).
+    ]])
+end
+
 -- {{{ Instance descriptions
 
 local I = {}
@@ -1426,7 +1435,7 @@ I['feedback.metrics_collect_interval'] = format_text([[
     The interval (in seconds) for collecting metrics.
 ]])
 
-I['feedback.metrics_limit'] = format_text([[
+I['feedback.metrics_limit'] = format_bytes_text([[
     The maximum size of memory (in bytes) used to store metrics before
     sending them to the feedback server. If the size of collected metrics
     exceeds this value, earlier metrics are dropped.
@@ -1531,12 +1540,12 @@ I['flightrec.logs_log_level'] = format_text([[
     differ from `log_level`.
 ]])
 
-I['flightrec.logs_max_msg_size'] = format_text([[
+I['flightrec.logs_max_msg_size'] = format_bytes_text([[
     Specify the maximum size (in bytes) of the log message. The log message
     is truncated if its size exceeds this limit.
 ]])
 
-I['flightrec.logs_size'] = format_text([[
+I['flightrec.logs_size'] = format_bytes_text([[
     Specify the size (in bytes) of the log storage. You can set this option
     to 0 to disable the log storage.
 ]])
@@ -1553,17 +1562,17 @@ I['flightrec.metrics_period'] = format_text([[
     frequency of metric dumps is defined by `flightrec.metrics_interval`.
 ]])
 
-I['flightrec.requests_max_req_size'] = format_text([[
+I['flightrec.requests_max_req_size'] = format_bytes_text([[
     Specify the maximum size (in bytes) of a request entry.
     A request entry is truncated if this size is exceeded.
 ]])
 
-I['flightrec.requests_max_res_size'] = format_text([[
+I['flightrec.requests_max_res_size'] = format_bytes_text([[
     Specify the maximum size (in bytes) of a response entry.
     A response entry is truncated if this size is exceeded.
 ]])
 
-I['flightrec.requests_size'] = format_text([[
+I['flightrec.requests_size'] = format_bytes_text([[
     Specify the size (in bytes) of storage for the request and
     response data. You can set this parameter to 0 to disable
     a storage of requests and responses.
@@ -1750,7 +1759,7 @@ I['iproto.net_msg_max'] = format_text([[
     network messages.
 ]])
 
-I['iproto.readahead'] = format_text([[
+I['iproto.readahead'] = format_bytes_text([[
     The size of the read-ahead buffer associated with a client connection. The
     larger the buffer, the more memory an active connection consumes, and the
     more requests can be read from the operating system buffer in a single
@@ -2016,7 +2025,7 @@ I['lua'] = format_text([[
     to Lua within Tarantool.
 ]])
 
-I['lua.memory'] = format_text([[
+I['lua.memory'] = format_bytes_text([[
     Define amount of memory available to Lua in bytes.
     Default is 2GB, with a minimum of 256MB.
 
@@ -2044,12 +2053,12 @@ I['memtx.allocator'] = format_text([[
       switch to `system` in such cases.
 ]])
 
-I['memtx.max_tuple_size'] = format_text([[
+I['memtx.max_tuple_size'] = format_bytes_text([[
     Size of the largest allocation unit for the memtx storage engine in bytes.
     It can be increased if it is necessary to store large tuples.
 ]])
 
-I['memtx.memory'] = format_text([[
+I['memtx.memory'] = format_bytes_text([[
     The amount of memory in bytes that Tarantool allocates to store tuples.
     When the limit is reached, `INSERT` and `UPDATE` requests fail with the
     `ER_MEMORY_ISSUE` error. The server does not go beyond the `memtx.memory`
@@ -2057,7 +2066,7 @@ I['memtx.memory'] = format_text([[
     indexes and connection information.
 ]])
 
-I['memtx.min_tuple_size'] = format_text([[
+I['memtx.min_tuple_size'] = format_bytes_text([[
     Size of the smallest allocation unit in bytes. It can be decreased if
     most of the tuples are very small.
 ]])
@@ -2068,7 +2077,7 @@ I['memtx.slab_alloc_factor'] = format_text([[
     on the total amount of memory available and the distribution of item sizes.
 ]])
 
-I['memtx.slab_alloc_granularity'] = format_text([[
+I['memtx.slab_alloc_granularity'] = format_bytes_text([[
     Specify the granularity in bytes of memory allocation in the small
     allocator. The `memtx.slab_alloc_granularity` value should meet the
     following conditions:
@@ -2818,7 +2827,7 @@ I['snapshot.by.interval'] = format_text([[
     daemon is disabled.
 ]])
 
-I['snapshot.by.wal_size'] = format_text([[
+I['snapshot.by.wal_size'] = format_bytes_text([[
     The threshold for the total size in bytes for all WAL files created
     since the last snapshot taken. Once the configured threshold is exceeded,
     the WAL thread notifies the checkpoint daemon that it must make a new
@@ -2857,7 +2866,7 @@ I['snapshot.snap_io_rate_limit'] = format_text([[
 
 I['sql'] = 'This section defines configuration parameters related to SQL.'
 
-I['sql.cache_size'] = format_text([[
+I['sql.cache_size'] = format_bytes_text([[
     The maximum cache size (in bytes) for all SQL prepared statements.
     To see the actual cache size, use `box.info.sql().cache.size`.
 ]])
@@ -2932,22 +2941,22 @@ I['vinyl.dir'] = format_text([[
     relative to `process.work_dir`.
 ]])
 
-I['vinyl.max_tuple_size'] = format_text([[
+I['vinyl.max_tuple_size'] = format_bytes_text([[
     The size of the largest allocation unit, for the vinyl storage engine.
     It can be increased if it is necessary to store large tuples.
 ]])
 
-I['vinyl.memory'] = format_text([[
+I['vinyl.memory'] = format_bytes_text([[
     The maximum number of in-memory bytes that vinyl uses.
 ]])
 
-I['vinyl.page_size'] = format_text([[
+I['vinyl.page_size'] = format_bytes_text([[
     The page size. A page is a read/write unit for vinyl disk operations.
     The `vinyl.page_size` setting is a default value for the page_size option
     passed to `space_object:create_index()`.
 ]])
 
-I['vinyl.range_size'] = format_text([[
+I['vinyl.range_size'] = format_bytes_text([[
     The default maximum range size for a vinyl index, in bytes. The maximum
     range size affects the decision of whether to split a range.
 
@@ -3009,13 +3018,13 @@ I['quiver.dir'] = format_text([[
     relative to `process.work_dir`.
 ]])
 
-I['quiver.memory'] = format_text([[
+I['quiver.memory'] = format_bytes_text([[
     The maximum size of in-memory buffers used for accumulating write requests.
     The quiver engine decides when it should start dumping in-memory buffers to
     disk depending on this parameter.
 ]])
 
-I['quiver.run_size'] = format_text([[
+I['quiver.run_size'] = format_bytes_text([[
     The maximum size of a run file, in bytes. When the quiver engine dumps
     in-memory buffers to disk, it splits the output stream into files depending
     on this parameter.
@@ -3091,7 +3100,7 @@ I['wal.ext.spaces.*.new'] = I['wal.ext.new']
 
 I['wal.ext.spaces.*.old'] = I['wal.ext.old']
 
-I['wal.max_size'] = format_text([[
+I['wal.max_size'] = format_bytes_text([[
     The maximum number of bytes in a single write-ahead log file. When a
     request would cause an `.xlog` file to become larger than `wal.max_size`,
     Tarantool creates a new WAL file.
@@ -3107,7 +3116,7 @@ I['wal.mode'] = format_text([[
     - `fsync`: fibers wait for their data, `fsync(2)` follows each `write(2)`.
 ]])
 
-I['wal.queue_max_size'] = format_text([[
+I['wal.queue_max_size'] = format_bytes_text([[
     The size of the queue in bytes used by a replica to submit new transactions
     to a write-ahead log (WAL). This option helps limit the rate at which a
     replica submits transactions to the WAL. Limiting the queue size might be
