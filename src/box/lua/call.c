@@ -74,6 +74,13 @@ enum handlers {
 static __thread int execute_lua_refs[HANDLER_MAX];
 
 /**
+ * Reference to the box.internal.func_registry table used for quick access
+ * in box_lua_call(). The table stores a mapping of exported function names
+ * to function objects.
+ */
+static __thread int func_registry_ref;
+
+/**
  * A copy of the default serializer with encode_error_as_ext option disabled.
  * Changes to the default serializer are propagated via an update trigger.
  * It is used for returning errors in the legacy format to clients that do
@@ -102,6 +109,18 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	lua_checkstack(L, 2); /* No more than 2 entries are needed. */
 	int top = lua_gettop(L);
+	/*
+	 * First, check box.internal.func_registry. Fall back on
+	 * searching in _G if not found.
+	 */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, func_registry_ref);
+	lua_pushlstring(L, name, name_end - name);
+	lua_rawget(L, -2);
+	if (!lua_isnil(L, -1)) {
+		lua_remove(L, -2);
+		return 1;
+	}
+	lua_pop(L, 2);
 
 	/* Take the first token. */
 	const char *start = name;
@@ -1360,6 +1379,13 @@ box_lua_call_init(struct lua_State *L)
 		lua_pushcfunction(L, handles[i]);
 		execute_lua_refs[i] = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
+
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	lua_newtable(L);
+	lua_pushvalue(L, -1);
+	func_registry_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_setfield(L, -2, "func_registry");
+	lua_pop(L, 1);
 
 #if 0
 	/* Get CTypeID for `struct port *' */

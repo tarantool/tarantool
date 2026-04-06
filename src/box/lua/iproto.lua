@@ -1,3 +1,24 @@
+local ffi = require('ffi')
+local utils = require('internal.utils')
+
+ffi.cdef[[
+    bool
+    cord_is_main(void);
+]]
+
+-- Makes a function callable over the IPROTO protocol by the given name.
+box.iproto.export = function(func_name, func)
+    utils.check_param(func_name, 'function name', 'string', 2)
+    utils.check_param(func, 'function object', 'function', 2)
+    if box.internal.func_registry[func_name] ~= nil then
+        box.error(box.error.FUNCTION_EXISTS, func_name, 2)
+    end
+    box.internal.func_registry[func_name] = func
+end
+
+-- box.iproto.override is available in the main thread only
+if ffi.C.cord_is_main() then
+
 -- Sets IPROTO request handler callback (second argument) for the given request
 -- type (first argument, number).
 -- Passing nil as the callback resets the corresponding request handler.
@@ -33,3 +54,5 @@ box.iproto.override = function(request_type, callback)
         trigger.set(event_name, trigger_name, callback)
     end
 end
+
+end -- cord_is_main
