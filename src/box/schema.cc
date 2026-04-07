@@ -225,10 +225,10 @@ sc_space_new(uint32_t id, const char *name,
 	     uint32_t key_part_count,
 	     struct trigger *replace_trigger)
 {
-	struct space_def *def =
-		space_def_new_xc(id, ADMIN, 0, name, strlen(name), "memtx",
-				 strlen("memtx"), &space_opts_default, NULL, 0,
-				 NULL, 0);
+	struct space_def *def = space_def_new(id, ADMIN, 0, name, strlen(name),
+					      "memtx", strlen("memtx"),
+					      &space_opts_default,
+					      NULL, 0, NULL, 0);
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct key_def *key_def = key_def_new(key_parts, key_part_count, 0);
 	if (key_def == NULL)
@@ -469,9 +469,9 @@ schema_init(void)
 		struct space_opts opts = space_opts_default;
 		opts.group_id = GROUP_LOCAL;
 		struct space_def *def;
-		def = space_def_new_xc(BOX_VINYL_DEFERRED_DELETE_ID, ADMIN, 0,
-				       name, strlen(name), engine,
-				       strlen(engine), &opts, NULL, 0, NULL, 0);
+		def = space_def_new(BOX_VINYL_DEFERRED_DELETE_ID, ADMIN, 0,
+				    name, strlen(name), engine,
+				    strlen(engine), &opts, NULL, 0, NULL, 0);
 		auto def_guard = make_scoped_guard([=] {
 			space_def_delete(def);
 		});

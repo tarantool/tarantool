@@ -30,8 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple_dictionary.h"
 #include "schema_def.h"
+#include "opt_def.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -169,11 +169,6 @@ struct space_def {
 	 */
 	uint32_t exact_field_count;
 	char engine_name[ENGINE_NAME_MAX + 1];
-	/**
-	 * Tuple field names dictionary, shared with a space's
-	 * tuple format.
-	 */
-	struct tuple_dictionary *dict;
 	/** Space fields, specified by a user. */
 	struct field_def *fields;
 	/** Length of @a fields. */
@@ -269,26 +264,6 @@ space_def_tuple_is_temporary(const char *data, uint32_t *space_id);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-#include "diag.h"
-
-static inline struct space_def *
-space_def_new_xc(uint32_t id, uint32_t uid, uint32_t exact_field_count,
-		 const char *name, uint32_t name_len,
-		 const char *engine_name, uint32_t engine_len,
-		 const struct space_opts *opts, const struct field_def *fields,
-		 uint32_t field_count, const char *format_data,
-		 size_t format_data_len)
-{
-	struct space_def *ret = space_def_new(id, uid, exact_field_count, name,
-					      name_len, engine_name, engine_len,
-					      opts, fields, field_count,
-					      format_data, format_data_len);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
-}
-
 #endif /* __cplusplus */
 
 #endif /* TARANTOOL_BOX_SPACE_DEF_H_INCLUDED */

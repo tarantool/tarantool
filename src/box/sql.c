@@ -390,8 +390,6 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 
 	struct space_def *space_def = space_def_new_ephemeral(field_count,
 							      fields);
-	if (space_def == NULL)
-		return NULL;
 
 	struct key_def *key_def = key_def_new(parts, part_count, 0);
 	if (key_def == NULL) {
