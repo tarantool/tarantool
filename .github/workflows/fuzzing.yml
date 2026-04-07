@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'master'
-      - 'release/**'
     tags:
       - '**'
     paths:
@@ -19,6 +18,8 @@ on:
       - 'third_party/tz/**'
   pull_request:
     types: [opened, reopened, synchronize, labeled]
+    branches:
+      - 'master'
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow
