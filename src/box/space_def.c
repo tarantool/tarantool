@@ -37,6 +37,7 @@
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
 #include "tuple_format.h"
+#include "tuple_dictionary.h"
 
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
@@ -110,14 +111,21 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		       struct key_def *const *keys, uint16_t key_count,
 		       const struct space_def *def)
 {
-	return tuple_format_new(vtab, engine, keys, key_count,
+	struct tuple_dictionary *dict = tuple_dictionary_new(def->fields,
+							     def->field_count);
+	if (dict == NULL)
+		return NULL;
+	struct tuple_format *format = tuple_format_new(
+				vtab, engine, keys, key_count,
 				def->fields, def->field_count,
-				def->exact_field_count, def->dict,
+				def->exact_field_count, dict,
 				space_opts_is_data_temporary(&def->opts),
 				def->opts.is_ephemeral,
 				def->opts.constraint_def,
 				def->opts.constraint_count, def->format_data,
 				def->format_data_len);
+	tuple_dictionary_unref(dict);
+	return format;
 }
 
 /**
@@ -146,7 +154,6 @@ space_def_dup(const struct space_def *src)
 	memcpy(ret, src, size);
 	memset(&ret->opts, 0, sizeof(ret->opts));
 	ret->fields = field_def_array_dup(src->fields, src->field_count);
-	tuple_dictionary_ref(ret->dict);
 	space_def_dup_opts(ret, &src->opts);
 	if (src->format_data != NULL) {
 		ret->format_data = xmalloc(src->format_data_len);
@@ -172,11 +179,6 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	struct space_def *def = xmalloc(size);
 	assert(name_len <= BOX_NAME_MAX);
 	assert(engine_len <= ENGINE_NAME_MAX);
-	def->dict = tuple_dictionary_new(fields, field_count);
-	if (def->dict == NULL) {
-		free(def);
-		return NULL;
-	}
 	def->id = id;
 	def->uid = uid;
 	def->exact_field_count = exact_field_count;
@@ -224,7 +226,6 @@ void
 space_def_delete(struct space_def *def)
 {
 	field_def_array_delete(def->fields, def->field_count);
-	tuple_dictionary_unref(def->dict);
 	free(def->opts.sql);
 	free(def->opts.constraint_def);
 	space_upgrade_def_delete(def->opts.upgrade_def);

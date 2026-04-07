@@ -616,8 +616,6 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		space_def_new(id, uid, exact_field_count, name, name_len,
 			      engine_name, engine_name_len, &opts, fields,
 			      field_count, format, format_len);
-	if (def == NULL)
-		return NULL;
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct engine *engine = engine_find(def->engine_name);
 	if (engine == NULL)
@@ -1255,38 +1253,19 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 /** Change non-essential properties of a space. */
 class ModifySpace: public AlterSpaceOp
 {
-	void space_swap_dictionaries(struct space_def *old_def,
-				     struct space_def *new_def,
-				     struct tuple_format *new_format);
 public:
 	ModifySpace(struct alter_space *alter, struct space_def *def)
-		: AlterSpaceOp(alter), new_def(def) {}
+		: AlterSpaceOp(alter), new_def(def),
+		  dict_with_old_names(NULL) {}
 	/* New space definition. */
 	struct space_def *new_def;
+	/* Dictionary with the old field names, referenced. */
+	struct tuple_dictionary *dict_with_old_names;
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
 	virtual void rollback(struct alter_space *alter);
 	virtual ~ModifySpace();
 };
-
-void
-ModifySpace::space_swap_dictionaries(struct space_def *old_def,
-				     struct space_def *new_def,
-				     struct tuple_format *new_format)
-{
-	/*
-	 * When new space_def is created, it allocates new dictionary.
-	 * Move new names into an old dictionary, which already is referenced
-	 * by existing tuple formats. New dictionary object is deleted later,
-	 * in alter_space_delete.
-	 */
-	tuple_dictionary_unref(new_format->dict);
-	new_format->dict = old_def->dict;
-	tuple_dictionary_ref(new_format->dict);
-
-	SWAP(old_def->dict, new_def->dict);
-	tuple_dictionary_swap(old_def->dict, new_def->dict);
-}
 
 /** Amend the definition of the new space. */
 void
@@ -1303,8 +1282,9 @@ void
 ModifySpace::alter(struct alter_space *alter)
 {
 	/*
-	 * Unless it's online space upgrade, use the old dictionary for the new
-	 * space, because it's already referenced by existing tuple formats.
+	 * Unless it's online space upgrade, use the old dictionary with the
+	 * new field names for the new space, because it's already referenced
+	 * by existing tuple formats,
 	 *
 	 * For online space upgrade, all tuples fetched from the space will be
 	 * upgraded to the new format before returning to the user so it isn't
@@ -1314,9 +1294,12 @@ ModifySpace::alter(struct alter_space *alter)
 	 * function.
 	 */
 	if (alter->space_def->opts.upgrade_def == NULL) {
-		space_swap_dictionaries(alter->old_space->def,
-					alter->new_space->def,
-					alter->new_space->format);
+		struct tuple_format *old_format = alter->old_space->format;
+		struct tuple_format *new_format = alter->new_space->format;
+		tuple_dictionary_swap(old_format->dict, new_format->dict);
+		dict_with_old_names = new_format->dict;
+		new_format->dict = old_format->dict;
+		tuple_dictionary_ref(new_format->dict);
 	}
 }
 
@@ -1324,9 +1307,8 @@ void
 ModifySpace::rollback(struct alter_space *alter)
 {
 	if (alter->space_def->opts.upgrade_def == NULL) {
-		space_swap_dictionaries(alter->new_space->def,
-					alter->old_space->def,
-					alter->new_space->format);
+		struct tuple_format *old_format = alter->old_space->format;
+		tuple_dictionary_swap(old_format->dict, dict_with_old_names);
 	}
 }
 
@@ -1334,6 +1316,8 @@ ModifySpace::~ModifySpace()
 {
 	if (new_def != NULL)
 		space_def_delete(new_def);
+	if (dict_with_old_names != NULL)
+		tuple_dictionary_unref(dict_with_old_names);
 }
 
 /** DropIndex - remove an index from space. */

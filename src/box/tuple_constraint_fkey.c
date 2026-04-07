@@ -37,7 +37,7 @@ find_field_no_by_def(struct space *space,
 	/* A bit more complicated case - find by name. */
 	uint32_t field_no;
 	uint32_t hash = field_name_hash(field_def->name, field_def->name_len);
-	if (tuple_fieldno_by_name(space->def->dict, field_def->name,
+	if (tuple_fieldno_by_name(space->format->dict, field_def->name,
 				  field_def->name_len, hash, &field_no) != 0)
 		return -1;
 	return field_no;
