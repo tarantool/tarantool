@@ -607,35 +607,38 @@ truncated_input:
 }
 
 void
-box_lua_iproto_constants_init(struct lua_State *L)
+box_lua_iproto_init(struct lua_State *L)
 {
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
-	lua_pop(L, 1); /* box.iproto */
-}
-
-void
-box_lua_iproto_init(struct lua_State *L)
-{
-	luaL_findtable(L, LUA_GLOBALSINDEX, "box.iproto", 0);
-	static const struct luaL_Reg funcs[] = {
+	static const struct luaL_Reg funcs_main[] = {
 		{"send", lbox_iproto_send},
+		{NULL, NULL}
+	};
+	static const struct luaL_Reg funcs_common[] = {
 		{"encode_greeting", lbox_iproto_encode_greeting},
 		{"decode_greeting", lbox_iproto_decode_greeting},
 		{"encode_packet", lbox_iproto_encode_packet},
 		{"decode_packet", lbox_iproto_decode_packet},
 		{NULL, NULL}
 	};
-	luaL_setfuncs(L, funcs, 0);
+	if (cord_is_main())
+		luaL_setfuncs(L, funcs_main, 0);
+	luaL_setfuncs(L, funcs_common, 0);
 	luaL_findtable(L, -1, "internal", 0);
-	static const struct luaL_Reg internal_funcs[] = {
+	static const struct luaL_Reg internal_funcs_main[] = {
 		{"session_new", lbox_iproto_session_new},
 		{"drop_connections", lbox_iproto_drop_connections},
 		{"enable_thread_requests", lbox_iproto_enable_thread_requests},
 		{NULL, NULL}
 	};
-	luaL_setfuncs(L, internal_funcs, 0);
+	static const struct luaL_Reg internal_funcs_common[] = {
+		{NULL, NULL}
+	};
+	if (cord_is_main())
+		luaL_setfuncs(L, internal_funcs_main, 0);
+	luaL_setfuncs(L, internal_funcs_common, 0);
 	lua_pop(L, 1); /* box.iproto.internal */
 	lua_pop(L, 1); /* box.iproto */
 }

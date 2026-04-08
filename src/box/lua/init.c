@@ -941,7 +941,7 @@ box_lua_init_minimal(struct lua_State *L)
 	box_lua_tuple_format_init(L);
 	box_lua_tuple_init(L);
 	box_lua_call_init(L);
-	box_lua_iproto_constants_init(L);
+	box_lua_iproto_init(L);
 
 	luaopen_key_def(L);
 	lua_pop(L, 1);
@@ -993,7 +993,6 @@ box_lua_init(struct lua_State *L)
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
-	box_lua_iproto_init(L);
 	box_lua_trigger_init(L);
 	box_lua_expression_lexer_init(L);
 	box_lua_extras_init(L);
