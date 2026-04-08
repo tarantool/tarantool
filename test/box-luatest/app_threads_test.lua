@@ -281,6 +281,40 @@ g.test_builtin_modules = function(cg)
         local e = box.error.new({type = 'MyError', name = 'FooBar'})
         return e:unpack()
     ]]), {type = 'MyError', name = 'FooBar'})
+    t.assert_items_equals(eval([[
+        local keys = {}
+        for k in pairs(box.iproto) do
+            table.insert(keys, k)
+        end
+        return keys
+    ]]), {
+        'GREETING_PROTOCOL_LEN_MAX',
+        'GREETING_SALT_LEN_MAX',
+        'GREETING_SIZE',
+        'ballot_key',
+        'decode_greeting',
+        'decode_packet',
+        'encode_greeting',
+        'encode_packet',
+        'export',
+        'feature',
+        'flag',
+        'internal',
+        'key',
+        'metadata_key',
+        'protocol_features',
+        'protocol_version',
+        'raft_key',
+        'type',
+    })
+    t.assert_items_equals(eval([[
+        local keys = {}
+        for k in pairs(box.iproto.internal) do
+            table.insert(keys, k)
+        end
+        return keys
+    ]]), {
+    })
 end
 
 g.test_lua_alloc = function(cg)
