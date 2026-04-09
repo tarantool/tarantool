@@ -20,6 +20,14 @@ enum {
 extern int app_thread_count;
 
 /**
+ * Identifier of the current thread:
+ * * 0 for the main thread
+ * * 1 <= id <= app_thread_count for an application thread
+ * * -1 for other threads
+ */
+extern __thread int app_thread_id;
+
+/**
  * Starts application threads.
  *
  * Each thread runs an event loop and has a cbus endpoint named 'app<id>'

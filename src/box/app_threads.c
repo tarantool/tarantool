@@ -29,14 +29,16 @@
 #include "lua/app_threads.h"
 
 int app_thread_count;
+__thread int app_thread_id = -1;
 
 /** Array of application threads. */
 static struct cord *app_thread_cords;
 
 static void *
-app_thread_f(void *unused)
+app_thread_f(void *arg)
 {
-	(void)unused;
+	app_thread_id = (intptr_t)arg;
+	assert(app_thread_id >= 1 && app_thread_id <= app_thread_count);
 	coio_enable();
 	tuple_init();
 	app_thread_lua_init();
@@ -62,9 +64,12 @@ app_thread_f(void *unused)
 void
 app_threads_start(int thread_count)
 {
+	assert(cord_is_main());
+	assert(app_thread_id == -1);
 	assert(app_thread_count == 0);
 	assert(app_thread_cords == NULL);
 	assert(thread_count >= 0 && thread_count <= APP_THREADS_MAX);
+	app_thread_id = 0;
 	if (thread_count == 0)
 		return;
 	app_thread_count = thread_count;
@@ -74,7 +79,8 @@ app_threads_start(int thread_count)
 		char name[16];
 		/* Sic: ids start with 1 because id 0 is reserved for tx. */
 		snprintf(name, sizeof(name), "app%d", i + 1);
-		if (cord_start(cord, name, app_thread_f, NULL) != 0)
+		if (cord_start(cord, name, app_thread_f,
+			       (void *)(intptr_t)(i + 1)) != 0)
 			panic_syserror("failed to start application thread");
 	}
 }
@@ -82,6 +88,8 @@ app_threads_start(int thread_count)
 void
 app_threads_stop(void)
 {
+	assert(cord_is_main());
+	assert(app_thread_id == 0);
 	for (int i = 0; i < app_thread_count; i++) {
 		struct cord *cord = &app_thread_cords[i];
 		cord_cancel(cord);
