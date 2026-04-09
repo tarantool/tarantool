@@ -2184,6 +2184,7 @@ static void
 srv_process_cancel_inprogress(struct cmsg *m)
 {
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	assert(msg->srv_id == app_thread_id);
 	struct iproto_connection *con = msg->connection;
 	struct rlist *inprogress = &con->srv[msg->srv_id].inprogress;
 	struct iproto_msg *inprogress_msg;
@@ -2228,6 +2229,7 @@ static void
 srv_process_destroy(struct cmsg *m)
 {
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	assert(msg->srv_id == app_thread_id);
 	struct iproto_connection *con = msg->connection;
 	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	if (msg->srv_id == 0 && con->session != NULL) {
@@ -2302,13 +2304,14 @@ net_discard_input(struct cmsg *m)
 static void
 srv_discard_input(struct iproto_msg *msg)
 {
+	int srv_id = msg->srv_id;
+	assert(srv_id == app_thread_id);
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	static const struct cmsg_hop discard_input_route[] = {
 		{net_discard_input, NULL},
 	};
 	cmsg_init(&msg->discard_input, discard_input_route);
-	cpipe_push(&iproto_thread->srv[msg->srv_id].ret_pipe,
-		   &msg->discard_input);
+	cpipe_push(&iproto_thread->srv[srv_id].ret_pipe, &msg->discard_input);
 }
 
 /**
@@ -2380,6 +2383,7 @@ static inline struct iproto_msg *
 srv_accept_msg(struct cmsg *m)
 {
 	struct iproto_msg *msg = (struct iproto_msg *)m;
+	assert(msg->srv_id == app_thread_id);
 	srv_accept_wpos(msg->connection, msg->srv_id, &msg->wpos);
 	rlist_add_entry(&msg->connection->srv[msg->srv_id].inprogress,
 			msg, in_inprogress);
@@ -2445,6 +2449,7 @@ tx_check_msg(struct iproto_msg *msg)
 static inline void
 srv_end_msg(struct iproto_msg *msg)
 {
+	assert(msg->srv_id == app_thread_id);
 	rlist_del(&msg->in_inprogress);
 	msg->fiber = NULL;
 }
@@ -3700,6 +3705,7 @@ srv_process_init(struct cmsg *m)
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_thread *iproto_thread = msg->iproto_thread;
 	int srv_id = msg->srv_id;
+	assert(srv_id == app_thread_id);
 	slab_cache_create(&iproto_thread->srv[srv_id].net_slabc, &runtime);
 	struct cpipe *pipe = &iproto_thread->srv[srv_id].ret_pipe;
 	char endpoint_name[ENDPOINT_NAME_MAX];
@@ -3718,6 +3724,7 @@ srv_process_free(struct cmsg *m)
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_thread *iproto_thread = msg->iproto_thread;
 	int srv_id = msg->srv_id;
+	assert(srv_id == app_thread_id);
 	struct cpipe *pipe = &iproto_thread->srv[srv_id].ret_pipe;
 	cpipe_destroy(pipe);
 	slab_cache_destroy(&iproto_thread->srv[srv_id].net_slabc);
@@ -3732,7 +3739,9 @@ srv_process_cfg(struct cmsg *m)
 {
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_thread *iproto_thread = msg->iproto_thread;
-	struct cpipe *pipe = &iproto_thread->srv[msg->srv_id].ret_pipe;
+	int srv_id = msg->srv_id;
+	assert(srv_id == app_thread_id);
+	struct cpipe *pipe = &iproto_thread->srv[srv_id].ret_pipe;
 	cpipe_set_max_input(pipe, msg->iproto_msg_max / 2);
 	iproto_service_msg_delete(msg);
 }
