@@ -6,6 +6,8 @@ ffi.cdef[[
     cord_is_main(void);
 ]]
 
+local may_register_funcs = true
+
 -- Makes a function callable over the IPROTO protocol by the given name.
 box.iproto.export = function(func_name, func)
     utils.check_param(func_name, 'function name', 'string', 2)
@@ -14,10 +16,26 @@ box.iproto.export = function(func_name, func)
         box.error(box.error.FUNCTION_EXISTS, func_name, 2)
     end
     box.internal.func_registry[func_name] = func
+    if may_register_funcs then
+        box.iproto.internal.register_func(func_name)
+    end
 end
 
--- box.iproto.override is available in the main thread only
 if ffi.C.cord_is_main() then
+
+--
+-- box.iproto.export() may be called in the main thread before the IPROTO
+-- threads are started. In this case exported functions will be registered
+-- in IPROTO after box.cfg() is done.
+--
+may_register_funcs = false
+
+box.iproto.internal.register_funcs_after_box_cfg = function()
+    for func_name in pairs(box.internal.func_registry) do
+        box.iproto.internal.register_func(func_name)
+    end
+    may_register_funcs = true
+end
 
 -- Sets IPROTO request handler callback (second argument) for the given request
 -- type (first argument, number).

@@ -1277,6 +1277,8 @@ local function load_cfg(cfg)
             box.info.version)
         log.warn(msg)
     end
+
+    box.iproto.internal.register_funcs_after_box_cfg()
 end
 box.cfg = locked(load_cfg)
 
