@@ -251,6 +251,15 @@ lbox_iproto_enable_thread_requests(struct lua_State *L)
 	return 0;
 }
 
+/** Lua wrapper around iproto_register_func(). */
+static int
+lbox_iproto_register_func(struct lua_State *L)
+{
+	const char *name = luaL_checkstring(L, 1);
+	iproto_register_func(name);
+	return 0;
+}
+
 /**
  * Encodes a packet header/body argument to MsgPack: if the argument is a
  * string, then no encoding is needed — otherwise the argument must be a Lua
@@ -634,6 +643,7 @@ box_lua_iproto_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg internal_funcs_common[] = {
+		{"register_func", lbox_iproto_register_func},
 		{NULL, NULL}
 	};
 	if (cord_is_main())
