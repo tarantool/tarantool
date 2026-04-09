@@ -72,6 +72,7 @@
 #include "tt_static.h"
 #include "trivia/util.h"
 #include "salad/stailq.h"
+#include "salad/grp_alloc.h"
 #include "txn.h"
 #include "on_shutdown.h"
 #include "flightrec.h"
@@ -129,6 +130,16 @@ iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
 	wpos->obuf = out;
 	wpos->svp = obuf_create_svp(out);
 }
+
+/** Registered function descriptor, see iproto_register_func(). */
+struct iproto_func {
+	/** Function name. */
+	char *name;
+	/** Array of serving thread ids where the function is available. */
+	int *srv_ids;
+	/** Number of entries in the srv_ids array. */
+	int srv_count;
+};
 
 struct iproto_thread {
 	/**
@@ -194,6 +205,11 @@ struct iproto_thread {
 	 * request preprocessing and use the 'override' route.
 	 */
 	mh_i32_t *req_handlers;
+	/**
+	 * Hash table of functions registered with iproto_register_func().
+	 * Keys are function names, values are iproto_func objects.
+	 */
+	mh_strnptr_t *funcs;
 	/*
 	 * Iproto thread memory pools
 	 */
@@ -473,6 +489,8 @@ struct iproto_service_msg {
 	unsigned drop_generation;
 	/** IPROTO max message count. */
 	int iproto_msg_max;
+	/** Function name passed to iproto_register_func(). */
+	char *func_name;
 };
 
 static struct iproto_service_msg *
@@ -486,6 +504,7 @@ iproto_service_msg_new(const struct cmsg_hop *route)
 	msg->stream = NULL;
 	msg->drop_generation = 0;
 	msg->iproto_msg_max = 0;
+	msg->func_name = NULL;
 	return msg;
 }
 
@@ -1921,6 +1940,29 @@ net_end_subscribe(struct cmsg *msg);
 static int
 iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route);
 
+/**
+ * Reroutes an IPROTO_CALL request to a random serving thread that registered
+ * the target function. Does nothing if the function isn't registered on any
+ * serving thread.
+ */
+static void
+iproto_msg_reroute(struct iproto_msg *msg, struct cmsg_hop **route)
+{
+	assert(msg->header.type == IPROTO_CALL);
+	assert(msg->header.thread_id == XROW_THREAD_UNSPEC);
+	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	struct mh_strnptr_t *funcs = iproto_thread->funcs;
+	const char *name = msg->call.name;
+	uint32_t name_len = mp_decode_strl(&name);
+	mh_int_t i = mh_strnptr_find_str(funcs, name, name_len);
+	if (i == mh_end(funcs))
+		return;
+	struct iproto_func *func =
+		(struct iproto_func *)mh_strnptr_node(funcs, i)->val;
+	msg->srv_id = func->srv_ids[rand() % func->srv_count];
+	*route = iproto_thread->srv[msg->srv_id].call_route;
+}
+
 static void
 iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 {
@@ -2008,6 +2050,8 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 
 	rc = iproto_msg_decode(msg, &route);
 	if (rc == 0) {
+		if (type == IPROTO_CALL && thread_id == XROW_THREAD_UNSPEC)
+			iproto_msg_reroute(msg, &route);
 		assert(route != NULL);
 		cmsg_init(&msg->base, route);
 		return;
@@ -4036,6 +4080,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread, int srv_count)
 	iproto_thread->srv_count = srv_count;
 	iproto_thread_init_routes(iproto_thread);
 	iproto_thread->req_handlers = mh_i32_new();
+	iproto_thread->funcs = mh_strnptr_new();
 	slab_cache_create(&iproto_thread->srv[0].net_slabc, &runtime);
 	/* Init statistics counter */
 	iproto_thread->rmean = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
@@ -4710,6 +4755,11 @@ void
 iproto_free(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
+		mh_int_t j;
+		struct mh_strnptr_t *funcs = iproto_threads[i].funcs;
+		mh_foreach(funcs, j)
+			free(mh_strnptr_node(funcs, j)->val);
+		mh_strnptr_delete(funcs);
 		mh_i32_delete(iproto_threads[i].req_handlers);
 		/*
 		 * Close socket descriptor to prevent hot standby instance
@@ -4879,4 +4929,69 @@ iproto_enable_thread_requests(void)
 	struct iproto_service_msg *msg = iproto_service_msg_new(route);
 	msg->connection = connection;
 	cpipe_push(net_pipe, &msg->base);
+}
+
+/**
+ * Register a function in an IPROTO thread.
+ */
+static void
+net_register_func(struct cmsg *m)
+{
+	const int srv_count_max = app_thread_count + 1;
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	uint32_t srv_id = msg->srv_id;
+	struct iproto_thread *iproto_thread = msg->iproto_thread;
+	const char *name = msg->func_name;
+	uint32_t name_len = strlen(name);
+	uint32_t name_hash = mh_strn_hash(name, name_len);
+	struct mh_strnptr_t *funcs = iproto_thread->funcs;
+	struct iproto_func *func;
+	struct mh_strnptr_key_t k = {name, name_len, name_hash};
+	mh_int_t i = mh_strnptr_find(funcs, &k, NULL);
+	if (i == mh_end(funcs)) {
+		struct grp_alloc all = grp_alloc_initializer();
+		grp_alloc_reserve_data(&all, sizeof(*func));
+		grp_alloc_reserve_str(&all, name_len);
+		grp_alloc_reserve_data(
+			&all, sizeof(*func->srv_ids) * srv_count_max);
+		grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+		func = (struct iproto_func *)grp_alloc_create_data(
+						&all, sizeof(*func));
+		func->name = grp_alloc_create_str(&all, name, name_len);
+		func->srv_ids = (int *)grp_alloc_create_data(
+			&all, sizeof(*func->srv_ids) * srv_count_max);
+		func->srv_count = 0;
+		assert(grp_alloc_size(&all) == 0);
+		struct mh_strnptr_node_t n = {
+			func->name, name_len, name_hash, func,
+		};
+		struct mh_strnptr_node_t prev;
+		struct mh_strnptr_node_t *prev_ptr = &prev;
+		mh_strnptr_put(funcs, &n, &prev_ptr, NULL);
+		assert(prev_ptr == NULL);
+	} else {
+		func = (struct iproto_func *)mh_strnptr_node(funcs, i)->val;
+	}
+	assert(func->srv_count < srv_count_max);
+	func->srv_ids[func->srv_count++] = srv_id;
+	free(msg->func_name);
+	iproto_service_msg_delete(msg);
+}
+
+void
+iproto_register_func(const char *name)
+{
+	assert(app_thread_id >= 0);
+	for (int i = 0; i < iproto_threads_count; i++) {
+		static const struct cmsg_hop route[] = {
+			{net_register_func, NULL},
+		};
+		struct iproto_service_msg *msg = iproto_service_msg_new(route);
+		struct iproto_thread *iproto_thread = &iproto_threads[i];
+		msg->srv_id = app_thread_id;
+		msg->iproto_thread = iproto_thread;
+		msg->func_name = (char *)xstrdup(name);
+		cpipe_push(&iproto_thread->srv[app_thread_id].ret_pipe,
+			   &msg->base);
+	}
 }

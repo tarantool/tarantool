@@ -314,6 +314,7 @@ g.test_builtin_modules = function(cg)
         end
         return keys
     ]]), {
+        'register_func',
     })
 end
 

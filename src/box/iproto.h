@@ -142,6 +142,17 @@ iproto_override(uint32_t req_type, iproto_handler_t cb,
 void
 iproto_enable_thread_requests(void);
 
+/**
+ * Lets IPROTO threads know that there's a function with the given name
+ * in the current request-serving thread (tx or app).
+ *
+ * If a function is registered by any request-serving thread, IPROTO threads
+ * will route IPROTO_CALL requests for this function only to the threads where
+ * it was registered, evenly balancing the load among them.
+ */
+void
+iproto_register_func(const char *name);
+
 void
 iproto_init(int threads_count);
 
