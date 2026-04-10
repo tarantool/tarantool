@@ -468,8 +468,8 @@ test_xrow_encode_dml(void)
  */
 #define diag_is(expected_error_message, ...) do { \
 	box_error_t *e = box_error_last(); \
-	const char *error_message = box_error_message(e); \
-	ok(strcmp(error_message, expected_error_message) == 0, ##__VA_ARGS__); \
+	const char *_err_msg = box_error_message(e); \
+	ok(strcmp(_err_msg, expected_error_message) == 0, ##__VA_ARGS__); \
 } while (false)
 
 /**
