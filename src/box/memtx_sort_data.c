@@ -138,6 +138,8 @@ struct memtx_sort_data_reader {
 	size_t zsrc_pos;
 	/** Remaining compressed bytes in current entry not yet read from file. */
 	long compressed_left;
+	/** True if .sortdata is compressed. */
+	bool is_compressed;
 };
 
 /* {{{ Utilities **************************************************************/
@@ -158,6 +160,9 @@ static const char *ENTRIES_FMT = "Entries: %010u\n";
  * All the values have a fixed size, so one can put any value here when this
  * part is created and return back to write valid values once they're known.
  */
+static const char *ENTRY_FMT_UNCOMPRESSED =
+	"%010u/%010u: %016lx, %016lx, %020ld\n";
+
 static const char *ENTRY_FMT =
 	"%010u/%010u: %016lx, %016lx, %016lx, %020ld\n";
 
@@ -182,7 +187,7 @@ memtx_sort_data_filename(const char *snap_filename)
 /* {{{ Writer *****************************************************************/
 
 static int
-writer_seek(struct memtx_sort_data_writer *writer, long offset, int whence)
+memtx_sort_data_writer_seek(struct memtx_sort_data_writer *writer, long offset, int whence)
 {
 	if (fseek(writer->fp, offset, whence) != 0) {
 		diag_set(SystemError, "%s: failed to fseek in the sort data file",
@@ -193,7 +198,7 @@ writer_seek(struct memtx_sort_data_writer *writer, long offset, int whence)
 }
 
 static int
-writer_get_offset(struct memtx_sort_data_writer *writer, long *offset)
+memtx_sort_data_writer_get_offset(struct memtx_sort_data_writer *writer, long *offset)
 {
 	*offset = ftell(writer->fp);
 	if (*offset == -1) {
@@ -205,7 +210,7 @@ writer_get_offset(struct memtx_sort_data_writer *writer, long *offset)
 }
 
 static int
-writer_printf(struct memtx_sort_data_writer *writer, const char *fmt, ...)
+memtx_sort_data_writer_printf(struct memtx_sort_data_writer *writer, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -220,7 +225,7 @@ writer_printf(struct memtx_sort_data_writer *writer, const char *fmt, ...)
 }
 
 static int
-writer_write_all(struct memtx_sort_data_writer *writer, const void *data,
+memtx_sort_data_writer_write_all(struct memtx_sort_data_writer *writer, const void *data,
 		 size_t size)
 {
 	if (size == 0)
@@ -234,7 +239,7 @@ writer_write_all(struct memtx_sort_data_writer *writer, const void *data,
 }
 
 static int
-writer_zstd_write(struct memtx_sort_data_writer *writer, const void *src,
+memtx_sort_data_writer_zstd_write(struct memtx_sort_data_writer *writer, const void *src,
 		  size_t src_size, ZSTD_EndDirective mode)
 {
 	assert(writer->curr_entry != NULL);
@@ -260,7 +265,7 @@ writer_zstd_write(struct memtx_sort_data_writer *writer, const void *src,
 			return -1;
 		}
 
-		if (writer_write_all(writer, output.dst, output.pos) != 0)
+		if (memtx_sort_data_writer_write_all(writer, output.dst, output.pos) != 0)
 			return -1;
 		writer->curr_entry->csize += (long)output.pos;
 
@@ -335,7 +340,7 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 		return -1;
 	}
 
-	if (writer_printf(writer,
+	if (memtx_sort_data_writer_printf(writer,
 			  "SORTDATA\n"
 			  "1\n"
 			  "2\n"
@@ -348,11 +353,11 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 		return -1;
 
 	long entries_offset;
-	if (writer_get_offset(writer, &entries_offset) != 0 ||
-	    writer_printf(writer, ENTRIES_FMT, 0) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &entries_offset) != 0 ||
+	    memtx_sort_data_writer_printf(writer, ENTRIES_FMT, 0) != 0)
 		return -1;
 
-	if (writer_get_offset(writer, &writer->next_header_entry_offset) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &writer->next_header_entry_offset) != 0)
 		return -1;
 
 	uint32_t entry_count = 0;
@@ -365,19 +370,19 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 				continue;
 			assert(i == 0 || memtx_index_def_supports_sort_data(
 					space_rv->index_map[i]->def));
-			if (writer_printf(writer, ENTRY_FMT, 0, 0,
+			if (memtx_sort_data_writer_printf(writer, ENTRY_FMT, 0, 0,
 					  0L, 0L, 0L, 0L) != 0)
 				return -1;
 			entry_count++;
 		}
 	}
 
-	if (writer_printf(writer, "\n") != 0)
+	if (memtx_sort_data_writer_printf(writer, "\n") != 0)
 		return -1;
 
-	if (writer_seek(writer, entries_offset, SEEK_SET) != 0)
+	if (memtx_sort_data_writer_seek(writer, entries_offset, SEEK_SET) != 0)
 		return -1;
-	return writer_printf(writer, ENTRIES_FMT, entry_count);
+	return memtx_sort_data_writer_printf(writer, ENTRIES_FMT, entry_count);
 }
 
 int
@@ -430,11 +435,11 @@ int
 memtx_sort_data_writer_begin(struct memtx_sort_data_writer *writer,
 			     uint32_t space_id, uint32_t index_id)
 {
-	if (writer_seek(writer, 0, SEEK_END) != 0)
+	if (memtx_sort_data_writer_seek(writer, 0, SEEK_END) != 0)
 		return -1;
 
 	long file_end_offset;
-	if (writer_get_offset(writer, &file_end_offset) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &file_end_offset) != 0)
 		return -1;
 
 	assert(writer->curr_entry == NULL);
@@ -491,7 +496,7 @@ memtx_sort_data_writer_put(struct memtx_sort_data_writer *writer,
 		left -= to_copy;
 
 		if (writer->in_buf_pos == writer->in_buf_cap) {
-			if (writer_zstd_write(writer, writer->in_buf,
+			if (memtx_sort_data_writer_zstd_write(writer, writer->in_buf,
 					      writer->in_buf_pos,
 					      ZSTD_e_continue) != 0)
 				return -1;
@@ -516,20 +521,20 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 
 	if (entry->psize > 0) {
 		if (writer->in_buf_pos > 0) {
-			if (writer_zstd_write(writer, writer->in_buf,
+			if (memtx_sort_data_writer_zstd_write(writer, writer->in_buf,
 					      writer->in_buf_pos,
 					      ZSTD_e_continue) != 0)
 				return -1;
 			writer->in_buf_pos = 0;
 		}
-		if (writer_zstd_write(writer, NULL, 0, ZSTD_e_end) != 0)
+		if (memtx_sort_data_writer_zstd_write(writer, NULL, 0, ZSTD_e_end) != 0)
 			return -1;
 	} else {
 		entry->csize = 0;
 	}
 
-	if (writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
-	    writer_printf(writer, ENTRY_FMT, entry->key.space_id,
+	if (memtx_sort_data_writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
+	    memtx_sort_data_writer_printf(writer, ENTRY_FMT, entry->key.space_id,
 			  entry->key.index_id, entry->offset,
 			  entry->psize, entry->csize, entry->len) != 0)
 		return -1;
@@ -574,13 +579,21 @@ reader_start_entry_stream(struct memtx_sort_data_reader *reader,
 		return -1;
 	}
 
+	reader->curr_entry = entry;
+
+	if (!reader->is_compressed) {
+		reader->compressed_left = 0;
+		reader->zsrc_size = 0;
+		reader->zsrc_pos = 0;
+		return 0;
+	}
+
 	size_t rc = ZSTD_DCtx_reset(reader->zctx, ZSTD_reset_session_only);
 	if (ZSTD_isError(rc)) {
 		diag_set(ClientError, ER_COMPRESSION, ZSTD_getErrorName(rc));
 		return -1;
 	}
 
-	reader->curr_entry = entry;
 	reader->compressed_left = entry->csize;
 	reader->zsrc_size = 0;
 	reader->zsrc_pos = 0;
@@ -588,7 +601,7 @@ reader_start_entry_stream(struct memtx_sort_data_reader *reader,
 }
 
 static int
-reader_refill_zsrc(struct memtx_sort_data_reader *reader)
+memtx_sort_data_reader_refill_zsrc(struct memtx_sort_data_reader *reader)
 {
 	if (reader->compressed_left <= 0) {
 		reader->zsrc_size = 0;
@@ -616,7 +629,7 @@ reader_refill_zsrc(struct memtx_sort_data_reader *reader)
 }
 
 static int
-reader_read_exact_uncompressed(struct memtx_sort_data_reader *reader,
+memtx_sort_data_reader_read_exact_uncompressed(struct memtx_sort_data_reader *reader,
 			       void *dst, size_t size)
 {
 	char *pos = (char *)dst;
@@ -625,7 +638,7 @@ reader_read_exact_uncompressed(struct memtx_sort_data_reader *reader,
 	while (left > 0) {
 		if (reader->zsrc_pos == reader->zsrc_size &&
 		    reader->compressed_left > 0) {
-			if (reader_refill_zsrc(reader) != 0)
+			if (memtx_sort_data_reader_refill_zsrc(reader) != 0)
 				return -1;
 		}
 
@@ -700,11 +713,24 @@ memtx_sort_data_reader_new(const char *snap_filename,
 		goto fail_close;
 	if (memtx_sort_data_header_expect(reader, "1\n") == NULL)
 		goto fail_close;
-	if (memtx_sort_data_header_expect(reader, "2\n") == NULL)
-		goto fail_close;
 
-	if (memtx_sort_data_header_expect(reader, "Version: ") == NULL)
+	char *line = tt_static_buf();
+	if (fgets(line, TT_STATIC_BUF_LEN, reader->fp) == NULL) {
 		goto fail_close;
+	}
+
+	char *version_str;
+	if (strcmp(line, "2\n") == 0) {
+		reader->is_compressed = true;
+		version_str = memtx_sort_data_header_expect(reader, "Version: ");
+		if (version_str == NULL)
+			goto fail_close;
+	} else if (strncmp(line, "Version: ", strlen("Version: ")) == 0) {
+		reader->is_compressed = false;
+		version_str = line + strlen("Version: ");
+	} else {
+		goto fail_close;
+	}
 
 	char *uuid_str = memtx_sort_data_header_expect(reader, "Instance: ");
 	if (uuid_str == NULL)
@@ -755,14 +781,26 @@ memtx_sort_data_reader_new(const char *snap_filename,
 
 	for (unsigned i = 0; i < entry_count; i++) {
 		struct memtx_sort_data_reader_entry entry;
-		if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
-			   &entry.key.index_id, &entry.offset,
-			   &entry.psize, &entry.csize, &entry.len) != 6) {
-			say_error("%s: entry read failed", reader->filename);
-			goto fail_close;
+		memset(&entry, 0, sizeof(entry));
+
+		if (reader->is_compressed) {
+			if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
+				   &entry.key.index_id, &entry.offset,
+				   &entry.psize, &entry.csize, &entry.len) != 6) {
+				say_error("%s: entry read failed", reader->filename);
+				goto fail_close;
+			}
+		} else {
+			if (fscanf(reader->fp, ENTRY_FMT_UNCOMPRESSED, &entry.key.space_id,
+				   &entry.key.index_id, &entry.offset,
+				   &entry.psize, &entry.len) != 5) {
+				say_error("%s: entry read failed", reader->filename);
+				goto fail_close;
+			}
+			entry.csize = entry.psize;
 		}
-		mh_memtx_sort_data_entries_put(reader->entries,
-					       &entry, NULL, NULL);
+
+		mh_memtx_sort_data_entries_put(reader->entries, &entry, NULL, NULL);
 	}
 
 	say_info("using the memtx sort data from `%s'", reader->filename);
@@ -824,9 +862,25 @@ memtx_sort_data_reader_pk_add_tuple(struct memtx_sort_data_reader *reader,
 		return 0;
 
 	struct mh_ptrptr_node_t node;
-	if (reader_read_exact_uncompressed(reader, &node.key,
-					   sizeof(node.key)) != 0)
-		return -1;
+
+	if (!reader->is_compressed) {
+		if (fread(&node.key, sizeof(node.key), 1, reader->fp) != 1) {
+			if (feof(reader->fp)) {
+				diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+					 reader->filename, "EOF during PK read");
+			} else {
+				diag_set(SystemError, "%s: space %u PK read failed",
+					 reader->filename,
+					 reader->curr_entry->key.space_id);
+			}
+			return -1;
+		}
+	} else {
+		if (memtx_sort_data_reader_read_exact_uncompressed(reader, &node.key,
+						   sizeof(node.key)) != 0)
+			return -1;
+	}
+
 	node.val = tuple;
 	mh_ptrptr_put(reader->old2new, &node, NULL, NULL);
 	return 0;
@@ -884,7 +938,24 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 	if (entry->psize == 0)
 		return 0;
 
-	return reader_read_exact_uncompressed(reader, buffer,
+	if (!reader->is_compressed) {
+		if (fread(buffer, 1, entry->psize, reader->fp) !=
+		    (size_t)entry->psize) {
+			if (feof(reader->fp)) {
+				diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+					 reader->filename, "EOF during SK read");
+			} else {
+				diag_set(SystemError, "%s: space %u: failed to read "
+					 "index #%u data",
+					 reader->filename,
+					 entry->key.space_id, entry->key.index_id);
+			}
+			return -1;
+		}
+		return 0;
+	}
+
+	return memtx_sort_data_reader_read_exact_uncompressed(reader, buffer,
 					      (size_t)entry->psize);
 }
 
