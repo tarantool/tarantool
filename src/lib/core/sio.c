@@ -295,6 +295,7 @@ sio_listen(int fd)
 	return rc;
 }
 
+__attribute__((no_sanitize("thread")))
 int
 sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
