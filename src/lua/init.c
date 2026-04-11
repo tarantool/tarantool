@@ -697,6 +697,15 @@ luaopen_tarantool(lua_State *L)
 #endif
 	lua_settable(L, -3);
 
+	/* build.tsan */
+	lua_pushstring(L, "tsan");
+#ifdef ENABLE_TSAN
+	lua_pushboolean(L, true);
+#else
+	lua_pushboolean(L, false);
+#endif
+	lua_settable(L, -3);
+
 	/* build.test_build */
 	lua_pushstring(L, "test_build");
 #ifdef TEST_BUILD

@@ -384,6 +384,7 @@ luaT_error_is(struct lua_State *L)
 	return 1;
 }
 
+__attribute__((no_sanitize("thread")))
 static int
 lbox_errinj_set(struct lua_State *L)
 {
@@ -417,6 +418,7 @@ lbox_errinj_set(struct lua_State *L)
 	return 1;
 }
 
+__attribute__((no_sanitize("thread")))
 static int
 lbox_errinj_push_value(struct lua_State *L, const struct errinj *e)
 {
