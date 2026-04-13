@@ -601,6 +601,7 @@ fiber_attr_create(struct fiber_attr *fiber_attr);
 struct session;
 struct txn;
 struct credentials;
+struct runtime_credentials;
 struct lua_State;
 struct ipc_wait_pad;
 
@@ -727,6 +728,8 @@ struct fiber {
 		struct session *session;
 		struct credentials *credentials;
 		struct txn *txn;
+		/** Credentials used for checking runtime privileges. */
+		struct runtime_credentials *runtime_credentials;
 		/** Fields related to Lua code execution. */
 		struct {
 			/**

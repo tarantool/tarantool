@@ -189,6 +189,7 @@ struct iproto_thread {
 	struct cmsg_hop rollback_route[2];
 	struct cmsg_hop rollback_on_disconnect_route[2];
 	struct cmsg_hop disconnect_route[2];
+	struct cmsg_hop auth_route[2];
 	struct cmsg_hop misc_route[2];
 	struct cmsg_hop select_route[2];
 	struct cmsg_hop process1_route[2];
@@ -435,6 +436,8 @@ struct iproto_cfg_msg: public cbus_call_msg
 			struct iostream io;
 			/** New connection session. */
 			struct session *session;
+			/** Authenticated user name. */
+			char *user_name;
 		} session_new;
 		struct {
 			/** Overridden request type. */
@@ -491,6 +494,8 @@ struct iproto_service_msg {
 	int iproto_msg_max;
 	/** Function name passed to iproto_register_func(). */
 	char *func_name;
+	/** Authenticated user name. */
+	char *user_name;
 };
 
 static struct iproto_service_msg *
@@ -505,6 +510,7 @@ iproto_service_msg_new(const struct cmsg_hop *route)
 	msg->drop_generation = 0;
 	msg->iproto_msg_max = 0;
 	msg->func_name = NULL;
+	msg->user_name = NULL;
 	return msg;
 }
 
@@ -602,8 +608,12 @@ struct iproto_msg
 		struct call_request call;
 		/** Watch request. */
 		struct watch_request watch;
-		/** Authentication request. */
-		struct auth_request auth;
+		struct {
+			/** Authentication request. */
+			struct auth_request auth;
+			/** Set if the request was successfully processed. */
+			bool auth_successful;
+		};
 		/** Features request. */
 		struct id_request id;
 		/** SQL request, if this is the EXECUTE/PREPARE request. */
@@ -853,6 +863,10 @@ struct iproto_connection
 		 * List of inprogress messages (see iproto_msg::in_inprogress).
 		 */
 		struct rlist inprogress;
+		/**
+		 * Credentials used for checking runtime privileges.
+		 */
+		struct runtime_credentials runtime_credentials;
 	} *srv;
 	/**
 	 * When we flush output, we cycle through all serving threads' output
@@ -1812,6 +1826,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 		iproto_wpos_create(&con->srv[i].wpos, con->srv[i].p_obuf);
 		iproto_wpos_create(&con->srv[i].wend, con->srv[i].p_obuf);
 		rlist_create(&con->srv[i].inprogress);
+		con->srv[i].runtime_credentials.user_name = NULL;
 	}
 	con->flush.srv_id = 0;
 	con->flush.wend = con->srv[0].wend;
@@ -1876,6 +1891,7 @@ iproto_connection_delete(struct iproto_connection *con)
 	for (int i = 0; i < iproto_thread->srv_count; i++) {
 		assert(!obuf_is_initialized(&con->srv[i].obuf[0]));
 		assert(!obuf_is_initialized(&con->srv[i].obuf[1]));
+		free(con->srv[i].runtime_credentials.user_name);
 	}
 	assert(mh_size(con->streams) == 0);
 	mh_i64ptr_delete(con->streams);
@@ -2160,9 +2176,10 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		*route = iproto_thread->misc_route;
 		return 0;
 	case IPROTO_AUTH:
-		*route = iproto_thread->misc_route;
+		*route = iproto_thread->auth_route;
 		if (xrow_decode_auth(&msg->header, &msg->auth))
 			return -1;
+		msg->auth_successful = false;
 		return 0;
 	default:
 		*route = NULL;
@@ -2433,6 +2450,9 @@ srv_accept_msg(struct cmsg *m)
 			msg, in_inprogress);
 	assert(msg->fiber == NULL);
 	msg->fiber = fiber();
+	assert(msg->fiber->storage.runtime_credentials == NULL);
+	msg->fiber->storage.runtime_credentials =
+		&msg->connection->srv[msg->srv_id].runtime_credentials;
 	return msg;
 }
 
@@ -2495,6 +2515,7 @@ srv_end_msg(struct iproto_msg *msg)
 {
 	assert(msg->srv_id == app_thread_id);
 	rlist_del(&msg->in_inprogress);
+	msg->fiber->storage.runtime_credentials = NULL;
 	msg->fiber = NULL;
 }
 
@@ -3043,6 +3064,76 @@ iproto_session_notify(struct session *session, uint64_t sync,
 		      const char *key, size_t key_len,
 		      const char *data, const char *data_end);
 
+/** Process a user authentication request in the tx thread. */
+static void
+tx_process_auth(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	struct iproto_connection *con = msg->connection;
+	struct obuf *out = iproto_msg_obuf(msg);
+	struct obuf_svp svp = obuf_create_svp(out);
+	assert(!in_txn());
+	if (tx_check_msg(msg) != 0)
+		goto error;
+	if (box_process_auth(&msg->auth, con->salt, IPROTO_SALT_SIZE) != 0)
+		goto error;
+	msg->auth_successful = true;
+	iproto_reply_ok(out, msg->header.sync, ::schema_version);
+	iproto_wpos_create(&msg->wpos, out);
+	tx_end_msg(msg, &svp);
+	return;
+error:
+	svp = obuf_create_svp(out);
+	tx_reply_error(msg);
+	tx_end_msg(msg, &svp);
+}
+
+/** Finish a user authentication request in a serving thread. */
+static void
+srv_finish_auth(struct cmsg *m)
+{
+	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
+	struct iproto_connection *con = msg->connection;
+	int srv_id = msg->srv_id;
+	assert(srv_id == app_thread_id);
+	struct runtime_credentials *cr = &con->srv[srv_id].runtime_credentials;
+	free(cr->user_name);
+	cr->user_name = msg->user_name;
+	iproto_service_msg_delete(msg);
+}
+
+/**
+ * Finish a user authentication request in the IPROTO thread.
+ *
+ * The function sends a message to each serving threads that makes it update
+ * credentials used for runtime privilege checking.
+ */
+static void
+net_finish_auth(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *)m;
+	if (msg->auth_successful) {
+		struct iproto_connection *con = msg->connection;
+		struct iproto_thread *iproto_thread = con->iproto_thread;
+		static const struct cmsg_hop finish_auth_route[] = {
+			{srv_finish_auth, NULL},
+		};
+		const char *user_name = msg->auth.user_name;
+		uint32_t user_name_len = mp_decode_strl(&user_name);
+		for (int i = 0; i < iproto_thread->srv_count; i++) {
+			struct iproto_service_msg *finish_auth_msg =
+				iproto_service_msg_new(finish_auth_route);
+			finish_auth_msg->srv_id = i;
+			finish_auth_msg->connection = con;
+			finish_auth_msg->user_name =
+				(char *)xstrndup(user_name, user_name_len);
+			cpipe_push(&iproto_thread->srv[i].pipe,
+				   &finish_auth_msg->base);
+		}
+	}
+	net_send_msg(m);
+}
+
 static void
 tx_process_misc(struct cmsg *m)
 {
@@ -3057,12 +3148,6 @@ tx_process_misc(struct cmsg *m)
 	struct ballot ballot;
 	header = obuf_create_svp(out);
 	switch (msg->header.type) {
-	case IPROTO_AUTH:
-		if (box_process_auth(&msg->auth, con->salt,
-				     IPROTO_SALT_SIZE) != 0)
-			goto error;
-		iproto_reply_ok(out, msg->header.sync, ::schema_version);
-		break;
 	case IPROTO_PING:
 		iproto_reply_ok(out, msg->header.sync, ::schema_version);
 		break;
@@ -3714,7 +3799,7 @@ net_send_greeting(struct cmsg *m)
 static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
-		     struct session *session)
+		     struct session *session, char *user_name)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
@@ -3723,6 +3808,8 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
 	msg->connect.session = session;
+	for (int i = 0; i < iproto_thread->srv_count; i++)
+		con->srv[i].runtime_credentials.user_name = user_name;
 	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
@@ -3737,7 +3824,7 @@ iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
-			     /*session=*/NULL);
+			     /*session=*/NULL, /*user_name=*/NULL);
 }
 
 /**
@@ -4025,6 +4112,8 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 		{net_finish_rollback_on_disconnect, NULL};
 	iproto_thread->disconnect_route[0] = {tx_process_disconnect, net_pipe};
 	iproto_thread->disconnect_route[1] = {net_finish_disconnect, NULL};
+	iproto_thread->auth_route[0] = {tx_process_auth, net_pipe};
+	iproto_thread->auth_route[1] = {net_finish_auth, NULL};
 	iproto_thread->misc_route[0] = {tx_process_misc, net_pipe};
 	iproto_thread->misc_route[1] = {net_send_msg, NULL};
 	iproto_thread->select_route[0] = {tx_process_select, net_pipe};
@@ -4411,12 +4500,14 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	case IPROTO_CFG_SESSION_NEW: {
 		struct iostream *io = &cfg_msg->session_new.io;
 		struct session *session = cfg_msg->session_new.session;
+		char *user_name = cfg_msg->session_new.user_name;
 		struct sockaddr_storage addrstorage;
 		struct sockaddr *addr = (struct sockaddr *)&addrstorage;
 		socklen_t addrlen = sizeof(addrstorage);
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
-		iproto_thread_accept(iproto_thread, io, addr, addrlen, session);
+		iproto_thread_accept(iproto_thread, io, addr, addrlen,
+				     session, user_name);
 		break;
 	}
 	case IPROTO_CFG_DROP_CONNECTIONS: {
@@ -4676,14 +4767,18 @@ iproto_session_new(struct iostream *io, struct user *user, uint64_t *sid)
 		diag_set(ClientError, ER_SHUTDOWN);
 		return -1;
 	}
+	char *user_name = NULL;
 	struct session *session = session_new(SESSION_TYPE_BACKGROUND);
-	if (user != NULL)
+	if (user != NULL) {
 		credentials_reset(&session->credentials, user);
+		user_name = (char *)xstrdup(user->def->name);
+	}
 	struct iproto_cfg_msg *cfg_msg =
 		(struct iproto_cfg_msg *)xmalloc(sizeof(*cfg_msg));
 	iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_SESSION_NEW);
 	iostream_move(&cfg_msg->session_new.io, io);
 	cfg_msg->session_new.session = session;
+	cfg_msg->session_new.user_name = user_name;
 	static int thread = 0;
 	thread = (thread + 1) % iproto_threads_count;
 	iproto_do_cfg_async(&iproto_threads[thread], cfg_msg);
