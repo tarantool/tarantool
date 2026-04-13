@@ -138,6 +138,32 @@ local function log_destination(log)
     end
 end
 
+local function audit_spaces_value(audit_log)
+    local spaces = audit_log.spaces
+
+    if spaces == nil then
+        return box.NULL
+    end
+
+    local first_key = next(spaces)
+    if first_key == nil then
+        return {}
+    end
+
+    if type(first_key) == 'number' then
+        return spaces
+    end
+
+    local res = {}
+    for space_name, opts in pairs(spaces) do
+        table.insert(res, {
+            name = space_name,
+            extract_key = opts.extract_key,
+        })
+    end
+    return res
+end
+
 -- }}} log/audit_log helpers
 
 -- {{{ log
@@ -162,6 +188,9 @@ local function set_audit_log(configdata, box_cfg)
     --
     -- `audit_log.nonblock` and 'audit_log.filter' options are marked with the
     -- `box_cfg` annotations and so they're already added to `box_cfg`.
+    --
+    -- Record form of `audit_log.spaces` must be transformed to table form
+    -- of `box.cfg.audit_spaces`.
     local audit_log = configdata:get('audit_log', {use_default = true})
     if audit_log ~= nil and next(audit_log) ~= nil then
         box_cfg.audit_log = log_destination(audit_log)
@@ -171,6 +200,7 @@ local function set_audit_log(configdata, box_cfg)
         else
             box_cfg.audit_filter = 'compatibility'
         end
+        box_cfg.audit_spaces = audit_spaces_value(audit_log)
     end
 end
 
