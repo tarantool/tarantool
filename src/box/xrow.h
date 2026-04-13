@@ -35,6 +35,7 @@
 #include <stddef.h>
 #include <sys/uio.h> /* struct iovec */
 
+#include "arrow/abi.h"
 #include "diag.h"
 #include "iproto_features.h"
 #include "iproto_constants.h"
@@ -224,6 +225,10 @@ struct request {
 	struct ArrowArray *arrow_array;
 	/** Arrow schema for @arrow_array. */
 	struct ArrowSchema *arrow_schema;
+	/** Embedded arrow_array, produced by applier. */
+	struct ArrowArray arrow_array_storage;
+	/** Embedded arrow_schema, produced by applier. */
+	struct ArrowSchema arrow_schema_storage;
 	/** The data in serialized Arrow format. */
 	const char *arrow_ipc;
 	/** End of @arrow_ipc. */
