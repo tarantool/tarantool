@@ -139,6 +139,23 @@ cfg_getd_default(const char *param, double default_val)
 	return ok ? val : default_val;
 }
 
+bool
+cfg_isnil(const char *name)
+{
+	cfg_get(name);
+	bool is_nil = lua_isnil(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return is_nil;
+}
+
+bool
+cfg_istable(const char *name)
+{
+	cfg_get(name);
+	bool is_table = lua_istable(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return is_table;
+}
 
 int
 cfg_getarr_size(const char *name)
