@@ -1378,8 +1378,7 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 		tx_region_release(txn, TX_ALLOC_SYSTEM);
 		if (rc != 0)
 			goto eof;
-	} else {
-		assert(array == NULL);
+	} else if (array == NULL) {
 		assert(schema == NULL);
 		assert(request->arrow_ipc_end != NULL);
 		array = xregion_alloc_object(gc, struct ArrowArray);
@@ -1389,7 +1388,10 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 		if (rc != 0)
 			goto eof;
 	}
-
+	/*
+	 * In case of replication the request may contain both IPC and in-memory
+	 * versions of the arrow data, which was decoded by the applier thread.
+	 */
 	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
 
 	if (array->release != NULL)
