@@ -32,6 +32,7 @@
 
 #include <msgpuck.h>
 
+#include "arrow_ipc.h"
 #include "authentication.h"
 #include "xlog.h"
 #include "fiber.h"
@@ -902,7 +903,7 @@ struct applier_read_ctx {
 };
 
 static uint64_t
-applier_read_tx(struct applier *applier, struct stailq *rows,
+applier_read_tx(struct applier *applier, struct applier_tx *tx,
 		const struct applier_read_ctx *ctx, double timeout);
 
 /**
@@ -932,6 +933,8 @@ struct applier_tx {
 	struct stailq_entry next;
 	/** The transaction rows. */
 	struct stailq rows;
+	/** Whether there is `IPROTO_INSERT_ARROW` in `rows`. */
+	bool has_arrow_ipc;
 };
 
 /** A callback for row allocation used by tx thread. */
@@ -977,6 +980,68 @@ tx_save_body(struct applier *applier, struct xrow_header *row)
 	}
 }
 
+/**
+ * Decode the data from Arrow IPC format into in-memory ArrowArray and
+ * ArrowSchema. These structures are released by the TX thread on success,
+ * or by applier_thread_detach_applier() on failure.
+ *
+ * This function must be called right before pushing the message to TX,
+ * otherwise it will be required to cleanup the decoded data from the `rows`
+ * if some error is raised or a fiber is cancelled.
+ */
+static void
+applier_thread_decode_arrow_ipc(struct applier_tx *tx)
+{
+	if (!tx->has_arrow_ipc)
+		return;
+	struct applier_tx_row *tx_row;
+	stailq_foreach_entry(tx_row, &tx->rows, next) {
+		if (tx_row->row.type != IPROTO_INSERT_ARROW)
+			continue;
+		struct request *req = &tx_row->req.dml;
+		if (arrow_ipc_decode(&req->arrow_array_storage,
+				     &req->arrow_schema_storage,
+				     req->arrow_ipc, req->arrow_ipc_end) == 0) {
+			req->arrow_array = &req->arrow_array_storage;
+			req->arrow_schema = &req->arrow_schema_storage;
+		}
+		/*
+		 * Do not raise an error on decode failure, because this
+		 * function must not fail. `req->arrow_array` will remain
+		 * NULL, so the TX thread will decode it again, and the
+		 * error will be handled there.
+		 */
+	}
+}
+
+/**
+ * Release ArrowArray and ArrowSchema that were initialized by
+ * applier_thread_decode_arrow_ipc().
+ */
+static void
+applier_thread_release_arrow(struct applier *applier)
+{
+	for (int i = 0; i < 2; i++) {
+		struct applier_tx *tx;
+		struct applier_data_msg *msg = &applier->thread.msgs[i];
+		stailq_foreach_entry(tx, &msg->txs, next) {
+			struct applier_tx_row *tx_row;
+			stailq_foreach_entry(tx_row, &tx->rows, next) {
+				if (tx_row->row.type != IPROTO_INSERT_ARROW)
+					continue;
+				struct ArrowArray *array =
+					tx_row->req.dml.arrow_array;
+				struct ArrowSchema *schema =
+					tx_row->req.dml.arrow_schema;
+				if (array->release != NULL)
+					array->release(array);
+				if (schema->release != NULL)
+					schema->release(schema);
+			}
+		}
+	}
+}
+
 static uint64_t
 applier_wait_register(struct applier *applier, uint64_t row_count)
 {
@@ -1001,9 +1066,9 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	};
 
 	while (true) {
-		struct stailq rows;
+		struct applier_tx tx;
 		RegionGuard region_guard(&fiber()->gc);
-		row_count += applier_read_tx(applier, &rows, &ctx,
+		row_count += applier_read_tx(applier, &tx, &ctx,
 					     TIMEOUT_INFINITY);
 		while (row_count >= next_log_cnt) {
 			say_info_ratelimited("%.1fM rows received",
@@ -1011,16 +1076,15 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 			next_log_cnt += ROWS_PER_LOG;
 		}
 		struct xrow_header *first_row =
-			&stailq_first_entry(&rows, struct applier_tx_row,
+			&stailq_first_entry(&tx.rows, struct applier_tx_row,
 					    next)->row;
 		if (first_row->type == IPROTO_OK) {
 			/* Current vclock. This is not used now, ignore. */
-			assert(first_row ==
-			       &stailq_last_entry(&rows, struct applier_tx_row,
-						  next)->row);
+			assert(first_row == &stailq_last_entry(
+				&tx.rows, struct applier_tx_row, next)->row);
 			break;
 		}
-		if (applier_apply_tx(applier, &rows) != 0)
+		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
 	}
 
@@ -1195,19 +1259,22 @@ set_next_tx_row(struct stailq *rows, struct applier_tx_row *tx_row, int64_t tsn)
  * network input space is reused for the next xrow.
  */
 static uint64_t
-applier_read_tx(struct applier *applier, struct stailq *rows,
+applier_read_tx(struct applier *applier, struct applier_tx *tx,
 		const struct applier_read_ctx *ctx, double timeout)
 {
 	int64_t tsn = 0;
 	uint64_t row_count = 0;
 
-	stailq_create(rows);
+	stailq_create(&tx->rows);
+	tx->has_arrow_ipc = false;
 	do {
 		struct applier_tx_row *tx_row =
 			applier_read_tx_row(applier, ctx, timeout);
-		tsn = set_next_tx_row(rows, tx_row, tsn);
+		tsn = set_next_tx_row(&tx->rows, tx_row, tsn);
 		ctx->save_body(applier, &tx_row->row);
 		applier_parse_tx_row(tx_row);
+		if (tx_row->row.type == IPROTO_INSERT_ARROW)
+			tx->has_arrow_ipc = true;
 		++row_count;
 	} while (tsn != 0);
 	return row_count;
@@ -2036,7 +2103,7 @@ applier_thread_reader_f(va_list ap)
 			goto exit_notify;
 		}
 		try {
-			applier_read_tx(applier, &tx->rows, &ctx, timeout);
+			applier_read_tx(applier, tx, &ctx, timeout);
 		} catch (FiberIsCancelled *) {
 			return 0;
 		} catch (Exception *e) {
@@ -2051,6 +2118,7 @@ applier_thread_reader_f(va_list ap)
 			if (fiber_is_cancelled())
 				return 0;
 		} while (true);
+		applier_thread_decode_arrow_ipc(tx);
 		applier_thread_push_tx(thread, msg, tx);
 	}
 	return 0;
@@ -2227,6 +2295,7 @@ static int
 applier_thread_detach_applier(struct cbus_call_msg *base)
 {
 	struct applier *applier = ((struct applier_cfg_msg *)base)->applier;
+	applier_thread_release_arrow(applier);
 	if (applier->thread.writer != NULL) {
 		fiber_cancel(applier->thread.writer);
 		fiber_join(applier->thread.writer);
