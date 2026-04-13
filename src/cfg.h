@@ -77,6 +77,14 @@ cfg_getd(const char *param);
 double
 cfg_getd_default(const char *param, double default_val);
 
+/** Whether the parameter is absent. */
+bool
+cfg_isnil(const char *name);
+
+/** Whether the parameter is table. */
+bool
+cfg_istable(const char *name);
+
 int
 cfg_getarr_size(const char *name);
 
