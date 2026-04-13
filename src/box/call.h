@@ -42,6 +42,12 @@ extern "C" {
 struct port;
 struct call_request;
 
+/** Credentials used for runtime privilege checking. */
+struct runtime_credentials {
+	/** Name of the authenticated user. */
+	char *user_name;
+};
+
 /** Context passed to box_on_call trigger callback. */
 struct box_on_call_ctx {
 	/** True for EVAL, false for CALL. */

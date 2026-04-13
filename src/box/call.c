@@ -34,6 +34,7 @@
 #include "../lua/init.h" /* tarantool_lua_is_builtin_global */
 #include "schema.h"
 #include "session.h"
+#include "fiber.h"
 #include "func.h"
 #include "port.h"
 #include "box.h"
@@ -187,13 +188,18 @@ access_check_lua_call(const char *name, uint32_t name_len)
 		    (object[cr->auth_token].effective & PRIV_X) != 0)
 			return 0;
 	}
-	struct user *user = user_find(cr->uid);
-	if (user != NULL) {
-		const char *uname = user->def->name;
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	if (runtime_cr != NULL) {
+		const char *uname = runtime_cr->user_name != NULL ?
+				    runtime_cr->user_name : "guest";
 		uint32_t uname_len = strlen(uname);
 		if (box_lua_call_runtime_priv_is_granted(uname, uname_len, name,
 							 name_len))
 			return 0;
+	}
+	struct user *user = user_find(cr->uid);
+	if (user != NULL) {
 		diag_set(AccessDeniedError, priv_name(PRIV_X),
 			 schema_object_name(SC_FUNCTION),
 			 tt_cstr(name, name_len), user->def->name);
