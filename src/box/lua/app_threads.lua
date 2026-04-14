@@ -158,6 +158,23 @@ function thread_group_methods:init(cfg, group_name)
 end
 
 --
+-- Callback for thread_group:reload_priv().
+--
+local function thread_reload_priv_cb(args, thread_id)
+    assert(threads_conn ~= nil)
+    return threads_conn:call('box.internal.threads.reload_priv', args,
+                             {_thread_id = thread_id, is_async = true})
+end
+
+--
+-- Reloads privileges in all threads of this group.
+--
+function thread_group_methods:reload_priv(priv)
+    assert(threads_conn ~= nil)
+    return self:_dispatch(thread_reload_priv_cb, {priv}, {target = 'all'})
+end
+
+--
 -- Callback for thread_group:call().
 --
 local function thread_call_cb(args, thread_id)
@@ -207,6 +224,18 @@ function box.internal.threads.init(cfg, group_name, thread_id, conn_fd)
 end
 
 --
+-- Reloads privileges in the current thread.
+--
+function box.internal.threads.reload_priv(priv)
+    box.internal.lua_call_runtime_priv_reset()
+    for user_name, funcs in pairs(priv) do
+        for func_name, _ in pairs(funcs) do
+            box.internal.lua_call_runtime_priv_grant(user_name, func_name)
+        end
+    end
+end
+
+--
 -- Configures the threads subsystem. Called once from the main thread.
 -- If called without arguments, returns the current configuration.
 --
@@ -220,6 +249,18 @@ function box.internal.threads.cfg(cfg)
     for group_name, group in pairs(thread_groups) do
         if group_name ~= this_group_name then
             group:init(cfg, group_name)
+        end
+    end
+end
+
+--
+-- Configures runtime privileges in application threads. Note that the main
+-- thread is excluded (it's supposed to be configured before box.cfg).
+--
+function box.internal.threads.cfg_priv(priv)
+    for group_name, group in pairs(thread_groups) do
+        if group_name ~= 'tx' then
+            group:reload_priv(priv)
         end
     end
 end

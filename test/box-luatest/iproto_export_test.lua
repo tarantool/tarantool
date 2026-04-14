@@ -74,6 +74,9 @@ g2.test_iproto_export_in_app_threads = function(cg)
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
     cg.server:exec(function()
+        box.schema.user.passwd('admin', 'secret')
+    end)
+    cg.server:exec(function()
         box.iproto.export('test.func_1', function(v) return {1, v} end)
     end, {}, {_thread_id = 0})
     cg.server:exec(function()
@@ -85,24 +88,28 @@ g2.test_iproto_export_in_app_threads = function(cg)
         rawset(_G, 'test', {})
         _G.test.func_3 = function(v) return {3, v} end
     end, {}, {_thread_id = 2})
+    local conn = net.connect(cg.server.net_box_uri, {
+        user = 'admin', password = 'secret',
+    })
+    conn:call('box.iproto.internal.enable_thread_requests')
     local err = {type = 'ClientError', name = 'NO_SUCH_PROC'}
-    t.assert_equals(cg.server:call('test.func_1', {'x'}, {_thread_id = 0}),
+    t.assert_equals(conn:call('test.func_1', {'x'}, {_thread_id = 0}),
                     {1, 'x'})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_2', {'x'}, {_thread_id = 0})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_3', {'x'}, {_thread_id = 0})
-    t.assert_equals(cg.server:call('test.func_2', {'x'}, {_thread_id = 1}),
+    t.assert_equals(conn:call('test.func_2', {'x'}, {_thread_id = 1}),
                     {2, 'x'})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_1', {'x'}, {_thread_id = 1})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_3', {'x'}, {_thread_id = 1})
-    t.assert_equals(cg.server:call('test.func_3', {'x'}, {_thread_id = 2}),
+    t.assert_equals(conn:call('test.func_3', {'x'}, {_thread_id = 2}),
                     {3, 'x'})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_1', {'x'}, {_thread_id = 2})
-    t.assert_error_covers(err, cg.server.call, cg.server,
+    t.assert_error_covers(err, conn.call, conn,
                           'test.func_2', {'x'}, {_thread_id = 2})
 end
 
@@ -120,6 +127,9 @@ g2.test_iproto_call_routing = function(cg)
     })
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
+    cg.server:exec(function()
+        box.schema.user.passwd('admin', 'secret')
+    end)
     cg.server:exec(function()
         rawset(_G, 'test_func_2', function() return 0 end)
         box.iproto.export('test_func_3', function() return 0 end)
@@ -145,7 +155,10 @@ g2.test_iproto_call_routing = function(cg)
     end, {}, {_thread_id = 3})
     local conns = {}
     for _ = 1, 10 do
-        table.insert(conns, net.connect(cg.server.net_box_uri))
+        local conn = net.connect(cg.server.net_box_uri, {
+            user = 'admin', password = 'secret',
+        })
+        table.insert(conns, conn)
     end
     local err_margin = 100
     local total_calls = 1000

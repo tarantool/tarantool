@@ -14,6 +14,7 @@
 
 #include "coio_task.h"
 #include "cord_buf.h"
+#include "call.h"
 #include "diag.h"
 #include "fiber.h"
 #include "fiber_pool.h"
@@ -21,9 +22,12 @@
 #include "msgpuck.h"
 #include "port.h"
 #include "say.h"
+#include "schema_def.h"
 #include "tarantool_ev.h"
 #include "trivia/util.h"
+#include "tt_static.h"
 #include "tuple.h"
+#include "user_def.h"
 #include "xrow.h"
 
 #include "lua/app_threads.h"
@@ -56,6 +60,7 @@ app_thread_f(void *arg)
 	while (!rlist_empty(&fiber_pool.idle))
 		rlist_shift(&fiber_pool.idle);
 	app_thread_lua_free();
+	box_lua_call_runtime_priv_reset();
 	tuple_free();
 	cord_buf_free();
 	return NULL;
@@ -106,6 +111,19 @@ app_thread_process_call(struct call_request *request, struct port *port)
 {
 	const char *name = request->name;
 	uint32_t name_len = mp_decode_strl(&name);
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	const char *uname = runtime_cr->user_name != NULL ?
+			    runtime_cr->user_name : "guest";
+	uint32_t uname_len = strlen(uname);
+	if (strcmp(uname, "admin") != 0 &&
+	    !box_lua_call_runtime_priv_is_granted(uname, uname_len,
+						  name, name_len)) {
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_FUNCTION),
+			 tt_cstr(name, name_len), uname);
+		return -1;
+	}
 	struct mp_box_ctx ctx;
 	if (mp_box_ctx_create(&ctx, NULL, request->tuple_formats) != 0)
 		return -1;

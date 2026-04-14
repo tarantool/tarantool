@@ -20,6 +20,9 @@ g.before_all(function(cg)
     })
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
+    cg.server:exec(function()
+        box.schema.user.passwd('admin', 'secret')
+    end)
 end)
 
 g.after_all(function(cg)
@@ -27,7 +30,9 @@ g.after_all(function(cg)
 end)
 
 g.test_thread_requests_disabled = function(cg)
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri, {
+        user = 'admin', password = 'secret',
+    })
     local err = {type = 'ClientError', name = 'THREAD_REQUESTS_DISABLED'}
     t.assert_error_covers(err, conn.call, conn, 'tonumber', {'123'},
                           {_thread_id = 1})
@@ -101,7 +106,9 @@ g.test_unable_to_process_in_thread = function(cg)
 end
 
 g.test_call_eval = function(cg)
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri, {
+        user = 'admin', password = 'secret',
+    })
     conn:call('box.iproto.internal.enable_thread_requests')
     -- Call a box function in the main thread.
     t.assert_covers(conn:call('box.info', {}, {_thread_id = 0}),

@@ -52,7 +52,7 @@ struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
 static const struct port_vtab port_msgpack_vtab;
 
-static struct mh_strnstrnptr_t *user_rt_access = NULL;
+static __thread struct mh_strnstrnptr_t *user_rt_access = NULL;
 
 void
 port_msgpack_create_with_ctx(struct port *base, const char *data,
@@ -163,10 +163,6 @@ box_run_on_call(enum iproto_type type, const char *expr, int expr_len,
 	};
 	trigger_run(&box_on_call, &ctx);
 }
-
-static bool
-box_lua_call_runtime_priv_is_granted(const char *uname, uint32_t uname_len,
-				     const char *fname, uint32_t fname_len);
 
 int
 access_check_lua_call(const char *name, uint32_t name_len)
@@ -356,7 +352,7 @@ box_lua_call_runtime_priv_grant(const char *uname, uint32_t uname_len,
 	mh_strnstrnptr_put(user_rt_access, &access_node, NULL, NULL);
 }
 
-static bool
+bool
 box_lua_call_runtime_priv_is_granted(const char *uname, uint32_t uname_len,
 				     const char *fname, uint32_t fname_len)
 {
