@@ -49,8 +49,7 @@ g.test_simple = function(cg)
         s:insert{3, 'aa'}
         if is_unique then
             t.assert_error_msg_content_equals(
-                'Duplicate key exists in unique index "idx" in space "test" ' ..
-                'with old tuple - [3, "aa"] and new tuple - [4, "aa"]',
+                'Duplicate key exists in unique index "idx" in space "test"',
                 function() s:insert{4, 'aa'} end)
             t.assert_equals(idx:select{'aa'}, {{3, 'aa'}})
         else
@@ -90,10 +89,7 @@ g.test_multikey_multipart = function(cg)
         s:insert{'Sherlock', '221B Baker St Marylebone London NW1 6XE UK', '2'}
         if is_unique then
             t.assert_error_msg_content_equals(
-                'Duplicate key exists in unique index "addr" in space "test"' ..
-                ' with old tuple - ["Sherlock", "221B Baker St Marylebone ' ..
-                'London NW1 6XE UK", "2"] and new tuple - ["Sherlock2", "' ..
-                '221B Baker St Marylebone London NW1 6XE UK", "2"]',
+                'Duplicate key exists in unique index "addr" in space "test"',
                 function()
                     s:insert{'Sherlock2',
                              '221B Baker St Marylebone London NW1 6XE UK', '2'}

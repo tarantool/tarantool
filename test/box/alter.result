@@ -64,11 +64,7 @@ assert(res.code == box.error.TUPLE_FOUND)
 ...
 _space:insert{_index.id, ADMIN, '_index', 'memtx', 0, EMPTY_MAP, {}}
 ---
-- error: 'Duplicate key exists in unique index "primary" in space "_space" with old
-    tuple - [288, 1, "_index", "memtx", 0, {}, [{"name": "id", "type": "unsigned"},
-    {"name": "iid", "type": "unsigned"}, {"name": "name", "type": "string"}, {"name":
-    "type", "type": "string"}, {"name": "opts", "type": "map"}, {"name": "parts",
-    "type": "array"}]] and new tuple - [288, 1, "_index", "memtx", 0, {}, []]'
+- error: Duplicate key exists in unique index "primary" in space "_space"
 ...
 --
 -- Can't drop a space with an index

@@ -13,7 +13,7 @@
 #include "random.h"
 #include "ssl_error.h"
 #include "vclock/vclock.h"
-#include "box/tuple.h"
+#include "small/static.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -764,7 +764,7 @@ static void
 test_client_error_creation(void)
 {
 	header();
-	plan(67);
+	plan(64);
 
 	/* Test CHAR argument type */
 	const char *s;
@@ -845,16 +845,6 @@ test_client_error_creation(void)
 	uint32_t mp_size;
 	const char *mp;
 	diag_set(ClientError, ER_TEST_TYPE_MSGPACK, mp_buf);
-	e = diag_last_error(diag_get());
-	mp = error_get_mp(e, "field", &mp_size);
-	ok(mp_size == size);
-	ok(s != NULL && memcmp(mp, mp_buf, mp_size) == 0);
-
-	/* Test TUPLE argument type */
-	struct tuple *tuple = tuple_new(tuple_format_runtime, mp_buf,
-					mp_buf + size);
-	diag_set(ClientError, ER_TEST_TYPE_TUPLE, tuple);
-	tuple_delete(tuple);
 	e = diag_last_error(diag_get());
 	mp = error_get_mp(e, "field", &mp_size);
 	ok(mp_size == size);
@@ -968,10 +958,6 @@ test_client_error_creation(void)
 	e = diag_last_error(diag_get());
 	mp = error_get_mp(e, "field", &mp_size);
 	ok(mp == NULL);
-	diag_set(ClientError, ER_TEST_TYPE_TUPLE, NULL);
-	e = diag_last_error(diag_get());
-	mp = error_get_mp(e, "field", &mp_size);
-	ok(mp == NULL);
 
 	check_plan();
 	footer();
@@ -992,7 +978,6 @@ main(void)
 	random_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	tuple_init();
 
 	test_payload_field_str();
 	test_payload_field_uint();
@@ -1014,7 +999,6 @@ main(void)
 	test_client_error_creation();
 #endif
 
-	tuple_free();
 	fiber_free();
 	memory_free();
 	random_free();

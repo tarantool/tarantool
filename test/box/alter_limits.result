@@ -821,14 +821,12 @@ s.index.primary:select{}
 -- a duplicate in the created index
 index = s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'unsigned'} })
 ---
-- error: Duplicate key exists in unique index "nodups" in space "full" with old tuple
-    - ["Barbara", 2012] and new tuple - ["Cloud Atlas", 2012]
+- error: Duplicate key exists in unique index "nodups" in space "full"
 ...
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 ---
-- error: Duplicate key exists in unique index "year" in space "full" with old tuple
-    - ["Barbara", 2012] and new tuple - ["Cloud Atlas", 2012]
+- error: Duplicate key exists in unique index "year" in space "full"
 ...
 s.index.primary:select{}
 ---
@@ -902,8 +900,7 @@ s:insert{2, 1}
 ...
 s.index.secondary:alter{ unique = true }
 ---
-- error: Duplicate key exists in unique index "secondary" in space "test" with old
-    tuple - [2, 1] and new tuple - [1, 1]
+- error: Duplicate key exists in unique index "secondary" in space "test"
 ...
 s:delete{2}
 ---
@@ -914,8 +911,7 @@ s.index.secondary:alter{ unique = true }
 ...
 s:insert{2, 1}
 ---
-- error: Duplicate key exists in unique index "secondary" in space "test" with old
-    tuple - [1, 1] and new tuple - [2, 1]
+- error: Duplicate key exists in unique index "secondary" in space "test"
 ...
 s:insert{2, 2}
 ---

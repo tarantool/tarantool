@@ -419,8 +419,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3b VALUES ('A');")
         local _, err = box.execute("INSERT INTO t3b VALUES ('a');")
         local exp_err = "Duplicate key exists in unique index "..
-                        '"pk_unnamed_t3b_1" in space "t3b" with old '..
-                        'tuple - ["a"] and new tuple - ["a"]'
+                        '"pk_unnamed_t3b_1" in space "t3b"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3b;").rows, {{'A'}, {'a'}})
         box.execute("DROP TABLE t3b;")
@@ -442,8 +441,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3c VALUES ('A');")
         _, err = box.execute("INSERT INTO t3c VALUES ('a');")
         exp_err = "Duplicate key exists in unique index "..
-                  '"pk_unnamed_t3c_1" in space "t3c" with old '..
-                  'tuple - ["a"] and new tuple - ["a"]'
+                  '"pk_unnamed_t3c_1" in space "t3c"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3c;").rows, {{'a'}, {'A'}})
         box.execute("DROP TABLE t3c;")
@@ -465,8 +463,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3d VALUES ('A');")
         _, err = box.execute("INSERT INTO t3d VALUES ('a');")
         exp_err = "Duplicate key exists in unique index "..
-                  '"pk_unnamed_t3d_1" in space "t3d" with old '..
-                  'tuple - ["a"] and new tuple - ["a"]'
+                  '"pk_unnamed_t3d_1" in space "t3d"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3d;").rows, {{'A'}, {'a'}})
         box.execute("DROP TABLE t3d;")
@@ -478,8 +475,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3e VALUES ('a');")
         _, err = box.execute("INSERT INTO t3e VALUES ('A');")
         exp_err = "Duplicate key exists in unique index "..
-                  '"pk_unnamed_t3e_1" in space "t3e" with old '..
-                  'tuple - ["a"] and new tuple - ["A"]'
+                  '"pk_unnamed_t3e_1" in space "t3e"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3e;").rows, {{'a'}})
         box.execute("DROP TABLE t3e;")
@@ -501,8 +497,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3f VALUES ('A');")
         _, err = box.execute("INSERT INTO t3f VALUES ('a');")
         exp_err = "Duplicate key exists in unique index "..
-                  '"pk_unnamed_t3f_1" in space "t3f" with old '..
-                  'tuple - ["a"] and new tuple - ["a"]'
+                  '"pk_unnamed_t3f_1" in space "t3f"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3f;").rows, {{'a'}, {'A'}})
         box.execute("DROP TABLE t3f;")
@@ -514,8 +509,7 @@ g.test_3537_duplicate_key_error = function(cg)
         box.execute("INSERT INTO t3g VALUES ('a');")
         _, err = box.execute("INSERT INTO t3g VALUES ('A');")
         exp_err = "Duplicate key exists in unique index "..
-                  '"pk_unnamed_t3g_1" in space "t3g" with old '..
-                  'tuple - ["a"] and new tuple - ["A"]'
+                  '"pk_unnamed_t3g_1" in space "t3g"'
         t.assert_equals(err.message, exp_err)
         t.assert_equals(box.execute("SELECT * FROM t3g;").rows, {{'a'}})
         box.execute("DROP TABLE t3g;")
@@ -629,18 +623,15 @@ g.test_4007_collation_feature_request = function (cg)
         t.assert_equals(s:insert{'Ё'}, {'Ё'})
         -- the following calls should fail
         local exp_err = 'Duplicate key exists in unique index "pk" '..
-                        'in space "t1" with old tuple - '..
-                        '["Ё"] and new tuple - ["е"]'
+                        'in space "t1"'
         t.assert_error_msg_equals(exp_err, s.insert, s, {'е'})
 
         exp_err = 'Duplicate key exists in unique index "pk" '..
-                  'in space "t1" with old tuple - '..
-                  '["Ё"] and new tuple - ["Е"]'
+                  'in space "t1"'
         t.assert_error_msg_equals(exp_err, s.insert, s, {'Е'})
 
         exp_err = 'Duplicate key exists in unique index "pk" '..
-                  'in space "t1" with old tuple - '..
-                  '["Ё"] and new tuple - ["ё"]'
+                  'in space "t1"'
         t.assert_error_msg_equals(exp_err, s.insert, s, {'ё'})
         -- return single 'Ё'
         t.assert_equals(s:select{}, {{'Ё'}})

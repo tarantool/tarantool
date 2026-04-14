@@ -1323,9 +1323,9 @@ after_old_tuple_lookup:;
 	    old_tuple != NULL && new_tuple != NULL &&
 	    tuple_compare(old_tuple, HINT_NONE, new_tuple, HINT_NONE,
 			  pk->def->key_def) != 0) {
-		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 space->def->name, space->def->id, old_tuple, new_tuple,
-			 NULL);
+		index_set_update_pk_error(
+			space_name(space), space_id(space),
+			pk->def->key_def, old_tuple, new_tuple);
 		rc = -1;
 		goto out;
 	}

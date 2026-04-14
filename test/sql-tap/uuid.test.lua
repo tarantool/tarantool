@@ -220,9 +220,7 @@ test:do_catchsql_test(
         INSERT INTO t5u SELECT 2, u FROM t2 LIMIT 1;
     ]], {
         1, 'Duplicate key exists in unique index "unique_unnamed_t5u_2" '..
-        'in space "t5u" with old tuple - '..
-        '[1, 11111111-1111-1111-1111-111111111111] and new tuple - '..
-        '[2, 11111111-1111-1111-1111-111111111111]'
+        'in space "t5u"'
     })
 
 -- Check that built-in functions work with UUIDs as intended.

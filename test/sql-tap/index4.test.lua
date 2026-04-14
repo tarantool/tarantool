@@ -153,8 +153,7 @@ test:do_catchsql_test(
         CREATE UNIQUE INDEX i3 ON t2(x);
     ]], {
         -- <2.2>
-        1, "Duplicate key exists in unique index \"i3\" in space \"t2\" with "..
-        "old tuple - [2, 35] and new tuple - [4, 35]"
+        1, "Duplicate key exists in unique index \"i3\" in space \"t2\""
         -- </2.2>
     })
 

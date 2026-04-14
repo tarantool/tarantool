@@ -157,11 +157,9 @@ g.test_errors = function(cg)
 
         -- Check "duplicate key exists" error messages.
         t.assert_error_msg_content_equals('Duplicate key exists in unique ' ..
-            'index "pk" in space "test" with old tuple - [0, -1] and new ' ..
-            'tuple - [0, -1]', s.insert, s, {0})
+            'index "pk" in space "test"', s.insert, s, {0})
         t.assert_error_msg_content_equals('Duplicate key exists in unique ' ..
-            'index "sk" in space "test" with old tuple - [0, -1] and new ' ..
-            'tuple - [1, -1]', s.insert, s, {1})
+            'index "sk" in space "test"', s.insert, s, {1})
         s:truncate()
 
         -- Space format has more fields than the inserted tuple.

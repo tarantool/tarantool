@@ -871,6 +871,17 @@ struct index_read_view_iterator {
 	};
 };
 
+/* Extracts necessary data and sets ER_CANT_UPDATE_PRIMARY_KEY error. */
+void
+index_set_update_pk_error(const char *space_name, uint32_t space_id,
+			  struct key_def *pk_def, struct tuple *old_tuple,
+			  struct tuple *new_tuple);
+
+/* Extracts necessary data and sets ER_TUPLE_FOUND error. */
+void
+index_set_dup_error(struct index *index, struct tuple *old_tuple,
+		    struct tuple *new_tuple);
+
 /**
  * Check if replacement of an old tuple with a new one is allowed.
  * Return 0 on success, -1 on error (diag is set).

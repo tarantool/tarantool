@@ -1171,6 +1171,10 @@ key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 	return key_def->key_hint(key, part_count, key_def);
 }
 
+/** Adds MsgPack Array header to a key without it. */
+char *
+key_to_array(const char *key, uint32_t part_count, struct region *region);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

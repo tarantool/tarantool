@@ -415,8 +415,17 @@ end
 
 g.before_test('test_tuple_found_payload', function(cg)
     cg.server:exec(function()
+        box.schema.func.create('space_test_func_index', {
+            is_deterministic = true,
+            body = [[function(tuple)
+                return {tuple[2]}
+            end]]
+        })
         box.schema.space.create('test')
         box.space.test:create_index('primary')
+        box.space.test:create_index('multikey', {parts = {3, path = '[*]'}})
+        box.space.test:create_index('func', {
+            func = 'space_test_func_index', parts = {{1, 'string'}}})
     end)
 end)
 
@@ -425,8 +434,10 @@ g.test_tuple_found_payload = function(cg)
     cg.server:exec(function()
         -- Make MsgPack tuple length larger than TT_STATIC_BUF_LEN
         -- so that tuple in formatted string will be truncated.
-        local t1 = {1, string.rep('x', 2048)}
-        local t2 = {1, string.rep('y', 2048)}
+        local t1 = {1, string.rep('x', 2048), {1, 2, 3}}
+        local t2 = {1, string.rep('y', 2048), {1, 2, 3}}
+        local t3 = {2, string.rep('z', 2048), {1, 2, 3}}
+        local t4 = {3, string.rep('x', 2048), {0}}
         box.space.test:insert(t1)
         local ok, actual = pcall(box.space.test.insert, box.space.test, t2)
         t.assert_not(ok)
@@ -435,11 +446,49 @@ g.test_tuple_found_payload = function(cg)
         t.assert_str_matches(actual.message,
                              '^Duplicate key exists in unique index.*$')
         actual.message = nil
+
         t.assert_covers(actual, {
             space = 'test',
             index = 'primary',
-            old_tuple = t1,
-            new_tuple = t2,
+            key = {1},
+            old_tuple_primary_key = {1},
+            new_tuple_primary_key = {1},
+        })
+
+        ok, actual = pcall(box.space.test.insert, box.space.test, t3)
+        t.assert_not(ok)
+        actual = actual:unpack()
+        t.assert_equals(type(actual), 'table')
+        t.assert_str_matches(actual.message,
+                             '^Duplicate key exists in unique index.*$')
+        actual.message = nil
+
+        t.assert_equals(actual.key, nil)
+        t.assert_covers(actual, {
+            space = 'test',
+            index = 'multikey',
+            old_tuple_primary_key = {1},
+            new_tuple_primary_key = {2},
+            details = 'functional and multikey indexes do not support ' ..
+                      'key extraction, so it is not set'
+        })
+
+        ok, actual = pcall(box.space.test.insert, box.space.test, t4)
+        t.assert_not(ok)
+        actual = actual:unpack()
+        t.assert_equals(type(actual), 'table')
+        t.assert_str_matches(actual.message,
+                             '^Duplicate key exists in unique index.*$')
+        actual.message = nil
+
+        t.assert_equals(actual.key, nil)
+        t.assert_covers(actual, {
+            space = 'test',
+            index = 'func',
+            old_tuple_primary_key = {1},
+            new_tuple_primary_key = {3},
+            details = 'functional and multikey indexes do not support ' ..
+                      'key extraction, so it is not set'
         })
     end)
 end
@@ -448,6 +497,9 @@ g.after_test('test_tuple_found_payload', function(cg)
     cg.server:exec(function()
         if box.space.test ~= nil then
             box.space.test:drop()
+        end
+        if box.func.space_test_func_index ~= nil then
+            box.func.space_test_func_index:drop()
         end
     end)
 end)
@@ -609,7 +661,6 @@ g.test_dml_tuple_validation_errors = function(cg)
         local test = box.schema.create_space('test', {field_count = 5})
         test:create_index('primary')
         t.assert_error_covers({
-            tuple = {1, 2},
             message = 'Tuple field count 2 does not match space field count 5'
         }, test.insert, test, {1, 2})
         test:drop()
@@ -618,11 +669,9 @@ g.test_dml_tuple_validation_errors = function(cg)
         }})
         test:create_index('primary')
         t.assert_error_covers({
-            tuple = {3, 4},
             message = 'Tuple field 3 (f3) required by space format is missing'
         }, test.insert, test, {3, 4})
         t.assert_error_covers({
-            tuple = {5, 'foo', 6},
             message = 'Tuple field 2 (f2) type does not match one required ' ..
                       'by operation: expected number, got string'
         }, test.insert, test, {5, 'foo', 6})
@@ -632,7 +681,6 @@ g.test_dml_tuple_validation_errors = function(cg)
         }})
         test:create_index('primary')
         t.assert_error_covers({
-            tuple = {7, 300},
             message = "The value of field 2 (f2) exceeds the supported " ..
                        "range for type 'int8': expected [-128..127], got 300"
         }, test.insert, test, {7, 300})
@@ -650,7 +698,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             {name = 'link', foreign_key = {space = 'foreign', field = 'id'}}
         }})
         t.assert_error_covers({
-            tuple = {1, 2},
             message = "Foreign key constraint 'foreign' failed for field " ..
                       "'2 (link)': foreign tuple was not found",
         }, test.insert, test, {1, 2})
@@ -663,7 +710,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             },
         })
         t.assert_error_covers({
-            tuple = {3, 4},
             message = "Foreign key constraint 'foreign' failed: foreign " ..
                       "tuple was not found",
         }, test.insert, test, {3, 4})
@@ -680,7 +726,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             {name = 'value', type = 'number', constraint = 'some_constraint'}
         }})
         t.assert_error_covers({
-            tuple = {1, 11},
             message = "Check constraint 'some_constraint' failed for field " ..
                       "'2 (value)'"
         }, test.insert, test, {1, 11})
@@ -698,7 +743,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             constraint = 'some_constraint',
         })
         t.assert_error_covers({
-            tuple = {7, 7},
             message = "Check constraint 'some_constraint' failed for a tuple",
         }, test.insert, test, {7, 7})
         test:drop()
@@ -711,7 +755,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             {1, 'number'}, {2, 'str', path = 'x.y'}
         }})
         t.assert_error_covers({
-            tuple = {1, {x = {y = 2}}},
             message = 'Tuple field count 2 does not match space field count 5',
         }, test.insert, test, {1, {x = {y = 2}}})
         test:drop()
@@ -721,7 +764,6 @@ g.test_dml_tuple_validation_errors = function(cg)
             {1, 'number'}, {2, 'str', path = 'x.y'}
         }})
         t.assert_error_covers({
-            tuple = {3, {x = {z = 4}}},
             message = 'Tuple field [2]["x"]["y"] required by space ' ..
                       'format is missing',
         }, test.insert, test, {3, {x = {z = 4}}})
@@ -833,8 +875,8 @@ g.test_dml_update_primary_key = function(cg)
         t.assert_error_covers({
             space = 'test',
             space_id = test.id,
-            old_tuple = {1, 2},
-            new_tuple = {3, 2},
+            old_key = {1},
+            new_key = {3},
             message = "Attempt to modify a tuple field which is part of " ..
                       "primary index in space 'test'",
         }, test.update, test, {1}, {{'=', 1, 3}})
@@ -846,8 +888,8 @@ g.test_dml_update_primary_key = function(cg)
         t.assert_error_covers({
             space = 'test',
             space_id = test.id,
-            old_tuple = {1, 2},
-            new_tuple = {2, 3},
+            old_key = {1},
+            new_key = {2},
             message = "Attempt to modify a tuple field which is part of " ..
                       "primary index in space 'test'",
         }, test.replace, test, {1, 3})
@@ -859,8 +901,8 @@ g.test_dml_update_primary_key = function(cg)
         t.assert_error_covers({
             space = 'test',
             space_id = test.id,
-            old_tuple = {1, 2},
-            new_tuple = {3, 2},
+            old_key = {1},
+            new_key = {3},
             message = "Attempt to modify a tuple field which is part of " ..
                       "primary index in space 'test'",
         }, test.update, test, {1}, {{'=', 1, 3}})
@@ -871,8 +913,8 @@ g.test_dml_update_primary_key = function(cg)
         t.assert_error_covers({
             space = '_session_settings',
             space_id = space.id,
-            old_tuple = {'sql_full_metadata', false},
-            new_tuple = {'foo', false},
+            old_key = {'sql_full_metadata'},
+            new_key = {'foo'},
             message = "Attempt to modify a tuple field which is part of " ..
                       "primary index in space '_session_settings'",
         }, space.update, space, 'sql_full_metadata', {{'=', 1, 'foo'}})
@@ -883,8 +925,8 @@ g.test_dml_update_primary_key = function(cg)
         t.assert_error_covers({
             space = 'test',
             space_id = test.id,
-            old_tuple = {1, 2},
-            new_tuple = {3, 2},
+            old_key = {1},
+            new_key = {3},
             message = "Attempt to modify a tuple field which is part of " ..
                       "primary index in space 'test'",
         }, test.update, test, {1}, {{'=', 1, 3}})

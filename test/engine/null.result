@@ -88,8 +88,7 @@ s:insert{3, box.NULL}
 ...
 s:insert{4, 1} -- Fail.
 ---
-- error: Duplicate key exists in unique index "sk" in space "test" with old tuple
-    - [1, 1] and new tuple - [4, 1]
+- error: Duplicate key exists in unique index "sk" in space "test"
 ...
 s:insert{4, 4}
 ---
@@ -372,8 +371,7 @@ sk2:select{}
 -- Check duplicate conflict on replace.
 s:replace{4, 4, 3} -- fail
 ---
-- error: Duplicate key exists in unique index "sk2" in space "test" with old tuple
-    - [3, 3, 3] and new tuple - [4, 4, 3]
+- error: Duplicate key exists in unique index "sk2" in space "test"
 ...
 s:replace{4, 4, box.NULL} -- ok
 ---

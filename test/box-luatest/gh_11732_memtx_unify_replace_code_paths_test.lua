@@ -45,8 +45,7 @@ g.test_check_dup_failures = function(cg)
 
         -- Try to insert a duplicate tuple.
 
-        local msg = 'Duplicate key exists in unique index "p" in space "s" ' ..
-            'with old tuple - [0, 0, 0] and new tuple - [0, 1, 1]'
+        local msg = 'Duplicate key exists in unique index "p" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:insert{0, 1, 1}
         end)
@@ -56,8 +55,7 @@ g.test_check_dup_failures = function(cg)
         t.assert_equals(s.index[2]:get{0}, {0, 0, 0})
         t.assert_equals(s.index[2]:get{1}, nil)
 
-        msg = 'Duplicate key exists in unique index "s1" in space "s" ' ..
-            'with old tuple - [0, 0, 0] and new tuple - [1, 0, 1]'
+        msg = 'Duplicate key exists in unique index "s1" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:insert{1, 0, 1}
         end)
@@ -67,8 +65,7 @@ g.test_check_dup_failures = function(cg)
         t.assert_equals(s.index[2]:get{0}, {0, 0, 0})
         t.assert_equals(s.index[2]:get{1}, nil)
 
-        msg = 'Duplicate key exists in unique index "s2" in space "s" ' ..
-            'with old tuple - [0, 0, 0] and new tuple - [1, 1, 0]'
+        msg = 'Duplicate key exists in unique index "s2" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:insert{1, 1, 0}
         end)
@@ -82,8 +79,7 @@ g.test_check_dup_failures = function(cg)
         -- index.
         s:insert{1, 1, 1}
 
-        msg = 'Duplicate key exists in unique index "s1" in space "s" ' ..
-            'with old tuple - [1, 1, 1] and new tuple - [0, 1, 1]'
+        msg = 'Duplicate key exists in unique index "s1" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:replace{0, 1, 1}
         end)
@@ -94,8 +90,7 @@ g.test_check_dup_failures = function(cg)
         t.assert_equals(s.index[2]:get{0}, {0, 0, 0})
         t.assert_equals(s.index[2]:get{1}, {1, 1, 1})
 
-        msg = 'Duplicate key exists in unique index "s2" in space "s" ' ..
-            'with old tuple - [1, 1, 1] and new tuple - [0, 0, 1]'
+        msg = 'Duplicate key exists in unique index "s2" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:replace{0, 0, 1}
         end)
@@ -119,8 +114,7 @@ g.test_check_dup_failures = function(cg)
         f:set_joinable(true)
         s:delete{0}
 
-        msg = 'Duplicate key exists in unique index "s1" in space "s" ' ..
-            'with old tuple - [1, 1, 1] and new tuple - [0, 1, 1]'
+        msg = 'Duplicate key exists in unique index "s1" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:insert{0, 1, 1}
         end)
@@ -131,8 +125,7 @@ g.test_check_dup_failures = function(cg)
         t.assert_equals(s.index[2]:get{0}, nil)
         t.assert_equals(s.index[2]:get{1}, {1, 1, 1})
 
-        msg = 'Duplicate key exists in unique index "s2" in space "s" ' ..
-            'with old tuple - [1, 1, 1] and new tuple - [0, 0, 1]'
+        msg = 'Duplicate key exists in unique index "s2" in space "s"'
         t.assert_error_msg_equals(msg, function()
             s:insert{0, 0, 1}
         end)

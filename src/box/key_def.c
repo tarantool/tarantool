@@ -30,6 +30,7 @@
  */
 #include "json/json.h"
 #include "key_def.h"
+#include "mpstream/mpstream.h"
 #include "tuple_format.h"
 #include "tuple_compare.h"
 #include "tuple_extract_key.h"
@@ -1295,4 +1296,23 @@ key_part_validate(enum field_type key_type,
 		return -1;
 	}
 	return 0;
+}
+
+char *
+key_to_array(const char *key, uint32_t part_count, struct region *region)
+{
+	size_t region_svp = region_used(region);
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      mpstream_panic_cb, NULL);
+	mpstream_encode_array(&stream, part_count);
+
+	const char *key_end = key;
+	for (uint32_t i = 0; i < part_count; i++)
+		mp_next(&key_end);
+	mpstream_memcpy(&stream, key, key_end - key);
+
+	mpstream_flush(&stream);
+	size_t key_size = region_used(region) - region_svp;
+	return xregion_join(region, key_size);
 }

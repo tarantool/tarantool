@@ -371,10 +371,9 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 		    memcmp(key, new_key, key_len) != 0) {
 			struct tuple *old_tuple =
 				tuple_new(format, old_data, old_data_end);
-			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 space_name(space), space_id(space),
-				 old_tuple, *result,
-				 NULL);
+			index_set_update_pk_error(
+				pk_def->space_name, pk_def->space_id,
+				pk_def->key_def, old_tuple, *result);
 			tuple_delete(old_tuple);
 			goto finish;
 		}

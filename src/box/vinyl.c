@@ -1628,9 +1628,7 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
 	if (found != NULL) {
-		diag_set(ClientError, ER_TUPLE_FOUND, lsm->base.def->name,
-			 lsm->base.def->space_name, tuple_str(found),
-			 tuple_str(stmt), found, stmt);
+		index_set_dup_error(&lsm->base, found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1676,9 +1674,7 @@ vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **r
 		return 0;
 	}
 	if (found != NULL) {
-		diag_set(ClientError, ER_TUPLE_FOUND, lsm->base.def->name,
-			 lsm->base.def->space_name, tuple_str(found),
-			 tuple_str(stmt), found, stmt);
+		index_set_dup_error(&lsm->base, found, stmt);
 		tuple_unref(found);
 		return -1;
 	}
@@ -1890,9 +1886,9 @@ vy_check_update(const struct vy_lsm *pk,
 	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
 	    vy_stmt_compare(old_tuple, HINT_NONE, new_tuple,
 			    HINT_NONE, pk->key_def) != 0) {
-		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 pk->base.def->space_name, pk->base.def->space_id,
-			 old_tuple, new_tuple, NULL);
+		index_set_update_pk_error(
+			pk->base.def->space_name, pk->base.def->space_id,
+			pk->key_def, old_tuple, new_tuple);
 		return -1;
 	}
 	return 0;

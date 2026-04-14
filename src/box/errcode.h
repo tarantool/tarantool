@@ -49,7 +49,6 @@ enum errcode_field_type {
 	ERRCODE_FIELD_TYPE_ULLONG,
 	ERRCODE_FIELD_TYPE_STRING,
 	ERRCODE_FIELD_TYPE_MSGPACK,
-	ERRCODE_FIELD_TYPE_TUPLE,
 };
 
 /** Error code field description. */
@@ -98,7 +97,6 @@ struct errcode_record {
 	_(ER_TEST_TYPE_ULLONG, 10007,		"Test error", "field", ULLONG) \
 	_(ER_TEST_TYPE_STRING, 10008,		"Test error", "field", STRING) \
 	_(ER_TEST_TYPE_MSGPACK, 10009,		"Test error", "field", MSGPACK) \
-	_(ER_TEST_TYPE_TUPLE, 10010,		"Test error", "field", TUPLE) \
 	_(ER_TEST_2_ARGS, 10100,		"Test error", "f1", INT, "f2", INT) \
 	_(ER_TEST_3_ARGS, 10101,		"Test error", "f1", INT, "f2", INT, "f3", INT) \
 	_(ER_TEST_4_ARGS, 10102,		"Test error", "f1", INT, "f2", INT, "f3", INT, "f4", INT) \
@@ -143,7 +141,7 @@ struct errcode_record {
 	_(ER_UNKNOWN, 0,			"Unknown error") \
 	_(ER_ILLEGAL_PARAMS, 1,			"%s", "", STRING) \
 	_(ER_MEMORY_ISSUE, 2,			"Failed to allocate %u bytes in %s for %s") \
-	_(ER_TUPLE_FOUND, 3,			"Duplicate key exists in unique index \"%s\" in space \"%s\" with old tuple - %s and new tuple - %s", "index", STRING, "space", STRING, "", STRING, "", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
+	_(ER_TUPLE_FOUND, 3,			"Duplicate key exists in unique index \"%s\" in space \"%s\"", "index", STRING, "space", STRING, "key", MSGPACK, "old_tuple_primary_key", MSGPACK, "new_tuple_primary_key", MSGPACK) \
 	/* ER_TUPLE_NOT_FOUND, 4, Unused */ \
 	_(ER_UNSUPPORTED, 5,			"%s does not support %s", "", STRING, "", STRING) \
 	/* ER_NONMASTER, 6, Unused */ \
@@ -234,7 +232,7 @@ struct errcode_record {
 	_(ER_PRIV_NOT_GRANTED, 91,		"User '%s' does not have %s access on %s '%s'", "user", STRING, "privilege", STRING, "object_type", STRING, "object", STRING) \
 	_(ER_ROLE_NOT_GRANTED, 92,		"User '%s' does not have role '%s'", "user", STRING, "role", STRING) \
 	_(ER_MISSING_SNAPSHOT, 93,		"Can't find snapshot") \
-	_(ER_CANT_UPDATE_PRIMARY_KEY, 94,	"Attempt to modify a tuple field which is part of primary index in space '%s'", "space", STRING, "space_id", UINT, "old_tuple", TUPLE, "new_tuple", TUPLE, "ops", MSGPACK) \
+	_(ER_CANT_UPDATE_PRIMARY_KEY, 94,	"Attempt to modify a tuple field which is part of primary index in space '%s'", "space", STRING, "space_id", UINT, "old_key", MSGPACK, "new_key", MSGPACK, "ops", MSGPACK) \
 	_(ER_UPDATE_INTEGER_OVERFLOW, 95,	"Integer overflow when performing '%c' operation on field %s", "operation", CHAR, "field", STRING) \
 	_(ER_GUEST_USER_PASSWORD, 96,		"Setting password for guest user has no effect") \
 	_(ER_TRANSACTION_CONFLICT, 97,		"Transaction has been aborted by conflict") \
@@ -438,7 +436,7 @@ struct errcode_record {
 	_(ER_REPLICA_GC, 291,			"Cannot clean up replica's resources", "uuid", STRING, "details", STRING) \
 	_(ER_ALIEN_ENGINE, 292,			"Snapshot contains alien space engine row", "engine", STRING) \
 	_(ER_MVCC_UNAVAILABLE, 293,		"MVCC is unavailable for storage engine '%s' so it cannot be used in the same transaction with '%s', which supports MVCC", "engine_without_mvcc", STRING, "engine_with_mvcc", STRING) \
-	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_tuple", TUPLE, "new_tuple", TUPLE) \
+	_(ER_CANT_UPGRADE_INDEXED_FIELD, 294,	"Space upgrade doesn't support changing indexed fields", "space", STRING, "space_id", UINT, "index", STRING, "old_key", MSGPACK, "new_key", MSGPACK, "primary_key", MSGPACK) \
 	_(ER_SYNC_TIMEOUT, 295,			"Quorum collection for a synchronous transaction is timed out. The transaction is detached from this fiber and continues waiting for quorum") \
 	_(ER_FIELD_IRREPRESENTABLE_VALUE, 296,	"The value does not fit in field type", "field", STRING, "value", MSGPACK) \
 	_(ER_KEY_PART_IRREPRESENTABLE_VALUE, 297, "The value of key part does not fit in type", "partno", UINT, "value", MSGPACK) \

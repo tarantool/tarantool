@@ -98,8 +98,7 @@ test:do_catchsql_test(
     ]], {
         -- <intpkey-1.6>
         1, "Duplicate key exists in unique index \"pk_unnamed_t1_1\" in "..
-        "space \"t1\" with old tuple - [5, \"hello\", \"world\"] and new "..
-        "tuple - [5, \"second\", \"entry\"]"
+        "space \"t1\""
         -- </intpkey-1.6>
     })
 

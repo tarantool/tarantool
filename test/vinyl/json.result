@@ -48,8 +48,7 @@ s:replace{{a = 1, b = 2, c = 3}, 2}
 ...
 s:insert{{a = 1, b = 2, c = 3}, 3}
 ---
-- error: 'Duplicate key exists in unique index "pk" in space "test" with old tuple
-    - [{"b": 2, "a": 1, "c": 3}, 2] and new tuple - [{"b": 2, "a": 1, "c": 3}, 3]'
+- error: Duplicate key exists in unique index "pk" in space "test"
 ...
 pk:stat().disk.iterator.lookup -- 0 (served from memory)
 ---
@@ -125,8 +124,7 @@ s:replace{{a = 1, b = 1, c = 3}}
 ...
 s:insert{{a = 1, b = 1, c = 3}}
 ---
-- error: 'Duplicate key exists in unique index "pk" in space "test" with old tuple
-    - [{"b": 1, "a": 1, "c": 3}] and new tuple - [{"b": 1, "a": 1, "c": 3}]'
+- error: Duplicate key exists in unique index "pk" in space "test"
 ...
 s:select{1, 1, 1}
 ---

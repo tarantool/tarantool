@@ -4381,6 +4381,11 @@ before_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			return -1;
 		}
 		if (new_ts < old_ts || (new_ts == old_ts && new_id < old_id)) {
+			/*
+			 * Note that we don't usually log tuples because they
+			 * may contain sensitive data or they can be large.
+			 * The replace in `_schema` is not the case.
+			 */
 			say_info("Ignore the replace of tuple %s with %s in "
 				 "space _schema: the former has a newer "
 				 "timestamp", tuple_str(old_tuple),

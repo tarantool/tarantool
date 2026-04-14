@@ -38,9 +38,9 @@ g.test_insert_int_into_double_field = function(cg)
         local int_1 = 1
         local double_1 = ffi.new('double', 1.0)
         local errdup = 'Duplicate key exists in unique index "s_idx" in space '
-                       ..'"s" with old tuple - '
+                       ..'"s"'
         s:insert({int_1})
-        t.assert_error_msg_contains(errdup, s.insert, s, {double_1})
+        t.assert_error_msg_equals(errdup, s.insert, s, {double_1})
         t.assert_equals(s:get{double_1}, {int_1});
 
         -- 2 ** 63 - 1 can't be directly converted to double,

@@ -14,7 +14,7 @@ test:do_catchsql_test(
 
 local insert_err = {1,
     "Duplicate key exists in unique index \"pk_unnamed_t2_1\" in space "..
-    "\"t2\" with old tuple - [2] and new tuple - [2]"}
+    "\"t2\""}
 local data = {
 --id|TRIG TYPE|INSERT TYPE|insert error|commit error| result
  {1, "AFTER", "or abort",   insert_err, {0},          {1,1,2}},

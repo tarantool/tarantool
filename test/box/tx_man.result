@@ -3222,8 +3222,7 @@ s:replace{0, 0, 0}
 -- Hit dirty {0, 0, 0} in pk and conflict clean {1, 1, 1}.
 s:replace{0, 1, 0}
  | ---
- | - error: Duplicate key exists in unique index "sk" in space "test" with old tuple
- |     - [1, 1, 1] and new tuple - [0, 1, 0]
+ | - error: Duplicate key exists in unique index "sk" in space "test"
  | ...
 
 s:drop()
@@ -3603,8 +3602,7 @@ tx2:begin()
  | ...
 tx2('s:replace{2, 1, "replace"}') -- fails like ordinal replace
  | ---
- | - - {'error': 'Duplicate key exists in unique index "hi" in space "s" with old tuple
- |       - [1, 1, "original"] and new tuple - [2, 1, "replace"]'}
+ | - - {'error': 'Duplicate key exists in unique index "hi" in space "s"'}
  | ...
 tx1:begin()
  | ---
@@ -3612,8 +3610,7 @@ tx1:begin()
  | ...
 tx1('s:insert{1, 2, "inserted"}') -- fails like ordinal insert
  | ---
- | - - {'error': 'Duplicate key exists in unique index "ti" in space "s" with old tuple
- |       - [1, 1, "original"] and new tuple - [1, 2, "inserted"]'}
+ | - - {'error': 'Duplicate key exists in unique index "ti" in space "s"'}
  | ...
 s:delete{1}
  | ---

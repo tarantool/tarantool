@@ -121,8 +121,7 @@ box.info.replication[1].upstream.status
 ...
 box.info.replication[1].upstream.message
 ---
-- Duplicate key exists in unique index "pk" in space "test" with old tuple - [6, "r"]
-  and new tuple - [6, "m"]
+- Duplicate key exists in unique index "pk" in space "test"
 ...
 -- check restart does not help
 test_run:cmd("switch default")

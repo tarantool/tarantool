@@ -640,9 +640,9 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		    tuple_compare(old_tuple, HINT_NONE, new_tuple,
 				  HINT_NONE, pk->def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
-			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 space_name(space), space_id(space),
-				 old_tuple, new_tuple, NULL);
+			index_set_update_pk_error(
+				pk->def->space_name, pk->def->space_id,
+				pk->def->key_def, old_tuple, new_tuple);
 			diag_log();
 			tuple_unref(new_tuple);
 			return 0;

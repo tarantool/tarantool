@@ -241,14 +241,6 @@ ClientError::ClientError(const char *file, unsigned line, uint32_t errcode,
 			}
 			break;
 		}
-		case ERRCODE_FIELD_TYPE_TUPLE: {
-			struct tuple *tuple = va_arg(ap, struct tuple *);
-			assert(set_payload);
-			if (tuple != NULL)
-				error_set_mp(this, name, tuple_data(tuple),
-					     tuple_bsize(tuple));
-			break;
-		}
 		default:
 			assert(false);
 		}

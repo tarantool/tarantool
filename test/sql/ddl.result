@@ -380,8 +380,7 @@ true_check_res = monster_ddl_check()
 true_check_res
  | ---
  | - - 'Finished ok, errors and trigger catcher content: '
- |   - Duplicate key exists in unique index "unique_unnamed_t2_2" in space "t2" with
- |     old tuple - [1, 1, 1] and new tuple - [2, 2, 1]
+ |   - Duplicate key exists in unique index "unique_unnamed_t2_2" in space "t2"
  |   - metadata:
  |     - name: id
  |       type: integer

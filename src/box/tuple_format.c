@@ -1185,10 +1185,6 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		goto error;
 	return 0;
 error:;
-	const char *tuple_end = tuple;
-	mp_next(&tuple_end);
-	struct error *e = diag_last_error(diag_get());
-	error_set_mp(e, "tuple", tuple, tuple_end - tuple);
 	return -1;
 }
 

@@ -27,9 +27,7 @@ end)
 g.test_net_box_error = function(cg)
     local c = net.connect(cg.server.net_box_uri)
     t.assert_error_msg_content_equals(
-        'Duplicate key exists in unique index "primary" in space "test" ' ..
-        'with old tuple - [1, "with %d %f %n symbols"] ' ..
-        'and new tuple - [1, "qwe"]',
+        'Duplicate key exists in unique index "primary" in space "test"',
         c.space.test.insert, c.space.test, {1, 'qwe'})
     t.assert_error_msg_content_equals('error at %s:%d',
                                       c.call, c, 'test1', {})

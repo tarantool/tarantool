@@ -279,9 +279,7 @@ g.test_datetime_13 = function()
 
         local sql = [[INSERT INTO t SELECT 2, dt from t1 LIMIT 1;]]
         local res = [[Duplicate key exists in unique index ]]..
-                    [["unique_unnamed_t_2" in space "t" with old tuple - ]]..
-                    [[[1, 2001-01-01T01:00:00Z] and new tuple - ]]..
-                    "[2, 2001-01-01T01:00:00Z]"
+                    [["unique_unnamed_t_2" in space "t"]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 

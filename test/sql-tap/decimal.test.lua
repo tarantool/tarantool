@@ -227,7 +227,7 @@ test:do_catchsql_test(
         INSERT INTO t5u SELECT 2, u FROM t2 LIMIT 1;
     ]], {
         1, 'Duplicate key exists in unique index "unique_unnamed_t5u_2" in '..
-           'space "t5u" with old tuple - [1, 111] and new tuple - [2, 111]'
+           'space "t5u"'
     })
 
 local func = {language = 'Lua', body = 'function(x) return type(x) end',

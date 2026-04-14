@@ -304,6 +304,65 @@ prepare_start_prefix_iterator(enum iterator_type *type, const char **key,
 	return true;
 }
 
+void
+index_set_update_pk_error(const char *space_name, uint32_t space_id,
+			  struct key_def *pk_def, struct tuple *old_tuple,
+			  struct tuple *new_tuple)
+{
+	assert(old_tuple != NULL);
+	assert(new_tuple != NULL);
+
+	struct region *gc = &fiber()->gc;
+	uint32_t gc_svp = region_used(gc);
+
+	uint32_t key_size;
+	const char *old_key =
+		tuple_extract_key(old_tuple, pk_def, MULTIKEY_NONE, &key_size);
+	const char *new_key =
+		tuple_extract_key(new_tuple, pk_def, MULTIKEY_NONE, &key_size);
+	diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY, space_name, space_id,
+		 old_key, new_key, /*ops=*/NULL);
+
+	region_truncate(gc, gc_svp);
+}
+
+void
+index_set_dup_error(struct index *index, struct tuple *old_tuple,
+		    struct tuple *new_tuple)
+{
+	assert(old_tuple != NULL);
+	assert(new_tuple != NULL);
+
+	struct region *gc = &fiber()->gc;
+	uint32_t gc_svp = region_used(gc);
+
+	struct key_def *key_def = index->def->key_def;
+	struct key_def *pk_def = index->def->pk_def;
+
+	uint32_t key_size = 0;
+	const char *key = NULL;
+	if (!key_def->for_func_index && !key_def->is_multikey)
+		key = tuple_extract_key(new_tuple, key_def, MULTIKEY_NONE,
+					&key_size);
+
+	const char *old_pk_key =
+		tuple_extract_key(old_tuple, pk_def, MULTIKEY_NONE, &key_size);
+	const char *new_pk_key =
+		tuple_extract_key(new_tuple, pk_def, MULTIKEY_NONE, &key_size);
+	diag_set(ClientError, ER_TUPLE_FOUND,
+		 index->def->name, index->def->space_name,
+		 key, old_pk_key, new_pk_key);
+
+	if (key == NULL) {
+		struct error *e = diag_last_error(diag_get());
+		error_set_str(e, "details", "functional and multikey indexes "
+			      "do not support key extraction, so it is not "
+			      "set");
+	}
+
+	region_truncate(gc, gc_svp);
+}
+
 int
 index_check_dup(struct index *index, struct tuple *old_tuple,
 		struct tuple *new_tuple, struct tuple *dup_tuple,
@@ -312,13 +371,10 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 	if (dup_tuple == NULL) {
 		if (mode == DUP_REPLACE) {
 			assert(old_tuple != NULL);
-			/*
-			 * dup_replace_mode is DUP_REPLACE, and
-			 * a tuple with the same key is not found.
-			 */
-			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 index->def->space_name, index->def->space_id,
-				 old_tuple, new_tuple, NULL);
+			struct index_def *def = index->def;
+			index_set_update_pk_error(
+				def->space_name, def->space_id, def->pk_def,
+				old_tuple, new_tuple);
 			goto fail;
 		}
 	} else { /* dup_tuple != NULL */
@@ -330,10 +386,7 @@ index_check_dup(struct index *index, struct tuple *old_tuple,
 			 * possibly delete more than one tuple
 			 * at once.
 			 */
-			diag_set(ClientError, ER_TUPLE_FOUND,
-				 index->def->name, index->def->space_name,
-				 tuple_str(dup_tuple), tuple_str(new_tuple),
-				 dup_tuple, new_tuple);
+			index_set_dup_error(index, dup_tuple, new_tuple);
 			goto fail;
 		}
 	}
