@@ -3246,6 +3246,39 @@ box_check_promote(void) {
 	return 0;
 }
 
+/**
+ * Wait until this instance becomes writable, as long as it remains the Raft
+ * leader.
+ */
+static int
+box_wait_for_rw_while_leader(struct raft *raft)
+{
+	assert(is_box_configured);
+	double deadline = ev_monotonic_now(loop()) +
+		replication_synchro_timeout;
+	while (box_is_ro()) {
+		if (raft->state != RAFT_STATE_LEADER) {
+			diag_set(ClientError, ER_INTERFERING_ELECTIONS);
+			return -1;
+		}
+		struct trigger on_update;
+		trigger_create(
+			&on_update,
+			[](struct trigger *t, void *) -> int {
+				fiber_wakeup((struct fiber *)t->data);
+				return 0;
+			}, fiber(), NULL);
+		raft_on_update(raft, &on_update);
+		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
+		trigger_clear(&on_update);
+		if (rc != 0)
+			return -1;
+	}
+	assert(raft->state == RAFT_STATE_LEADER);
+	assert(!box_is_ro());
+	return 0;
+}
+
 int
 box_promote(void)
 {
@@ -3293,7 +3326,7 @@ box_promote(void)
 		is_in_box_promote = false;
 		if (box_raft_try_promote() != 0)
 			return -1;
-		return box_wait_ro(false, replication_synchro_timeout);
+		return box_wait_for_rw_while_leader(raft);
 	default:
 		unreachable();
 	}
