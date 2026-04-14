@@ -1337,10 +1337,14 @@ on_msgpack_serializer_update(struct trigger *trigger, void *event)
 
 static TRIGGER(on_alter_func_in_lua, lbox_func_new_or_delete);
 
-static const struct luaL_Reg boxlib_internal[] = {
+static const struct luaL_Reg boxlib_internal_main[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"module_reload", lbox_module_reload},
 	{"func_call", lbox_func_call},
+	{NULL, NULL}
+};
+
+static const struct luaL_Reg boxlib_internal_common[] = {
 	{"lua_call_runtime_priv_grant", lbox_box_lua_call_runtime_priv_grant},
 	{"lua_call_runtime_priv_reset", lbox_box_lua_call_runtime_priv_reset},
 	{NULL, NULL}
@@ -1355,10 +1359,13 @@ box_lua_call_init(struct lua_State *L)
 	trigger_add(&luaL_msgpack_default->on_update,
 		    &call_serializer_no_error_ext.update_trigger);
 
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	if (cord_is_main())
+		luaL_setfuncs(L, boxlib_internal_main, 0);
+	luaL_setfuncs(L, boxlib_internal_common, 0);
+	lua_pop(L, 1);
+
 	if (cord_is_main()) {
-		luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
-		luaL_setfuncs(L, boxlib_internal, 0);
-		lua_pop(L, 1);
 		/*
 		 * Register the trigger that will push persistent
 		 * Lua functions objects to Lua.

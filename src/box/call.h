@@ -103,6 +103,13 @@ void
 box_lua_call_runtime_priv_grant(const char *uname, uint32_t uname_len,
 				const char *fname, uint32_t fname_len);
 
+/**
+ * Return true if a user has access to a lua_call function.
+ */
+bool
+box_lua_call_runtime_priv_is_granted(const char *uname, uint32_t uname_len,
+				     const char *fname, uint32_t fname_len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

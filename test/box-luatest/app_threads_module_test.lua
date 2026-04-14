@@ -1,3 +1,5 @@
+local net = require('net.box')
+
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
@@ -519,4 +521,121 @@ g.test_threads_eval = function()
         t.assert_equals(threads.eval('test2', expr, {}, {target = 'all'}),
                         {{'test2', 4}, {'test2', 5}})
     end, {}, {_thread_id = 5})
+end
+
+g.test_threads_priv = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_1', 'test_func_2'},
+            },
+        })
+        :set_global_option('credentials.users.admin.password', 'secret')
+        :set_global_option('credentials.users.alice.password', 'ALICE')
+        :set_global_option('credentials.users.alice.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_1'},
+            },
+        })
+        :set_global_option('credentials.users.bob.password', 'BOB')
+        :set_global_option('credentials.users.bob.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'all'},
+            },
+        })
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'test1', size = 1},
+            {name = 'test2', size = 2},
+            {name = 'test3', size = 3},
+        })
+        :config()
+    local cluster = cluster:new(config)
+    cluster.server:start()
+    cluster.server:exec(function()
+        local threads = require('experimental.threads')
+        for _, group in ipairs(threads.info().groups) do
+            threads.eval(group.name, [[
+                for _, f in ipairs({
+                    'test_func_1', 'test_func_2', 'test_func_3',
+                }) do
+                    box.iproto.export(f, function() return f end)
+                end
+            ]])
+        end
+    end)
+    local conn_guest = net.connect(cluster.server.net_box_uri)
+    local conn_admin = net.connect(cluster.server.net_box_uri,
+                                   {user = 'admin', password = 'secret'})
+    local conn_alice = net.connect(cluster.server.net_box_uri,
+                                   {user = 'alice', password = 'ALICE'})
+    local conn_bob = net.connect(cluster.server.net_box_uri,
+                                 {user = 'bob', password = 'BOB'})
+    local function check_ok(conn, func_name)
+        t.assert_equals(conn:call(func_name), func_name)
+    end
+    local function check_err(conn, func_name)
+        t.assert_error_covers({
+            type = 'AccessDeniedError',
+            access_type = 'Execute',
+            object_type = 'function',
+            object_name = func_name,
+            user = conn.opts and conn.opts.user or 'guest',
+        }, conn.call, conn, func_name)
+    end
+    -- Run the checks a few times so that function call requests land in
+    -- different application threads.
+    for _ = 1, 10 do
+        check_ok(conn_admin, 'test_func_1')
+        check_ok(conn_admin, 'test_func_2')
+        check_ok(conn_admin, 'test_func_3')
+        check_ok(conn_guest, 'test_func_1')
+        check_ok(conn_guest, 'test_func_2')
+        check_err(conn_guest, 'test_func_3')
+        check_ok(conn_alice, 'test_func_1')
+        check_err(conn_alice, 'test_func_2')
+        check_err(conn_alice, 'test_func_3')
+        check_ok(conn_bob, 'test_func_1')
+        check_ok(conn_bob, 'test_func_2')
+        check_ok(conn_bob, 'test_func_3')
+    end
+    -- Reload config and check again.
+    config = cbuilder:new(config)
+        :set_global_option('credentials.users.guest.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_3'},
+            },
+        })
+        :set_global_option('credentials.users.alice.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'all'},
+            },
+        })
+        :set_global_option('credentials.users.bob.privileges', {
+            {
+                permissions = {'execute'},
+                lua_call = {'test_func_2'},
+            },
+        })
+        :config()
+    cluster:reload(config)
+    for _ = 1, 10 do
+        check_ok(conn_admin, 'test_func_1')
+        check_ok(conn_admin, 'test_func_2')
+        check_ok(conn_admin, 'test_func_3')
+        check_err(conn_guest, 'test_func_1')
+        check_err(conn_guest, 'test_func_2')
+        check_ok(conn_guest, 'test_func_3')
+        check_ok(conn_alice, 'test_func_1')
+        check_ok(conn_alice, 'test_func_2')
+        check_ok(conn_alice, 'test_func_3')
+        check_err(conn_bob, 'test_func_1')
+        check_ok(conn_bob, 'test_func_2')
+        check_err(conn_bob, 'test_func_3')
+    end
 end

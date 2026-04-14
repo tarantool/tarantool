@@ -16,6 +16,9 @@ local function add_funcs(res, user_or_role_def)
         end
         if has_execute and privilege.lua_call ~= nil then
             for _, func_name in ipairs(privilege.lua_call) do
+                if func_name == 'all' then
+                    func_name = ''
+                end
                 res[func_name] = true
             end
         end
@@ -99,10 +102,9 @@ local function grant_implicit_privileges(configdata)
     end
 end
 
-local function apply(config_module)
+local function extract_priv(configdata)
     -- Prepare a context with the configuration information to
     -- transform.
-    local configdata = config_module._configdata
     local ctx = {
         roles = configdata:get('credentials.roles') or {},
         users = configdata:get('credentials.users') or {},
@@ -124,24 +126,33 @@ local function apply(config_module)
             res[user_name] = funcs
         end
     end
+    return res
+end
+
+local function apply(config_module)
+    local configdata = config_module._configdata
+    local priv = extract_priv(configdata)
 
     -- Reset the runtime privileges and grant all the configured
     -- ones.
     box.internal.lua_call_runtime_priv_reset()
-    for user_name, funcs in pairs(res) do
+    for user_name, funcs in pairs(priv) do
         for func_name, _ in pairs(funcs) do
-            if func_name == 'all' then
-                box.internal.lua_call_runtime_priv_grant(user_name, '')
-            else
-                box.internal.lua_call_runtime_priv_grant(user_name, func_name)
-            end
+            box.internal.lua_call_runtime_priv_grant(user_name, func_name)
         end
     end
 
     grant_implicit_privileges(configdata)
 end
 
+local function post_apply(config_module)
+    local configdata = config_module._configdata
+    local priv = extract_priv(configdata)
+    box.internal.threads.cfg_priv(priv)
+end
+
 return {
     name = 'runtime_priv',
     apply = apply,
+    post_apply = post_apply,
 }
