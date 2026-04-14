@@ -2284,8 +2284,9 @@ applier_thread_attach_applier(struct cbus_call_msg *base)
 	fiber_cond_create(&applier->thread.writer_cond);
 	applier_thread_ibuf_init(applier);
 	applier_thread_msgs_init(applier);
-	applier_thread_fiber_init(applier);
 	memset(&applier->thread.next_ack, 0, sizeof(applier->thread.next_ack));
+	applier->thread.has_acks_to_send = false;
+	applier_thread_fiber_init(applier);
 
 	return 0;
 }
