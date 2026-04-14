@@ -358,6 +358,7 @@ typedef struct ev_signal
   EV_WATCHER_LIST (ev_signal)
 
   int signum; /* ro */
+  pid_t sender_pid;  /* rw, holds the PID of the last signal sender */
 } ev_signal;
 
 /* invoked when sigchld is received and waitpid indicates the given pid */
@@ -763,8 +764,8 @@ EV_API_DECL int ev_activecnt       (EV_P) EV_NOEXCEPT;
 EV_API_DECL void ev_feed_event     (EV_P_ void *w, int revents) EV_NOEXCEPT;
 EV_API_DECL void ev_feed_fd_event  (EV_P_ int fd, int revents) EV_NOEXCEPT;
 #if EV_SIGNAL_ENABLE
-EV_API_DECL void ev_feed_signal    (int signum) EV_NOEXCEPT;
-EV_API_DECL void ev_feed_signal_event (EV_P_ int signum) EV_NOEXCEPT;
+EV_API_DECL void ev_feed_signal    (int signum, pid_t sender_pid) EV_NOEXCEPT;
+EV_API_DECL void ev_feed_signal_event (EV_P_ int signum, pid_t sender_pid) EV_NOEXCEPT;
 #endif
 EV_API_DECL void ev_invoke         (EV_P_ void *w, int revents);
 EV_API_DECL int  ev_clear_pending  (EV_P_ void *w) EV_NOEXCEPT;
