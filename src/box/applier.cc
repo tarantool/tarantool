@@ -1370,9 +1370,11 @@ apply_synchro_req(uint32_t replica_id, struct xrow_header *row, struct synchro_r
 	if (txn_limbo_req_prepare(&txn_limbo, req) < 0)
 		goto err;
 	if (journal_write(&entry.base) != 0) {
-		txn_limbo_req_rollback(&txn_limbo, req);
+		if (!entry.base.is_complete)
+			txn_limbo_req_rollback(&txn_limbo, req);
 		goto err;
 	}
+	assert(entry.base.is_complete);
 	if (entry.base.res < 0) {
 		diag_set_journal_res(entry.base.res);
 		goto err;
