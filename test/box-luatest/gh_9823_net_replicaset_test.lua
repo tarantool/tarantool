@@ -160,6 +160,17 @@ g.test_net_replicaset_basics = function()
         return info.name
     end)
 
+    -- Get config by replicaset name.
+    cluster.router:exec(function(leader_name)
+        local net_replicaset = require('internal.net.replicaset')
+        local connect_cfg = net_replicaset.get_connect_cfg('storage')
+        local rs = net_replicaset.connect(connect_cfg)
+        local info = rs:call_leader('box.info')
+        t.assert_equals(info.ro, false)
+        t.assert_equals(info.name, leader_name)
+        rs:close()
+    end, {leader_name})
+
     -- Connect using config.
     local rs = net_replicaset.connect(connect_cfg)
     local info = rs:call_leader('box.info')
