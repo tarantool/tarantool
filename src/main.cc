@@ -136,9 +136,12 @@ sig_checkpoint_f(va_list ap)
 }
 
 static void
-sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
-	     int /* revents */)
+signal_checkpoint(ev_loop *loop, struct ev_signal *w, int revents)
 {
+	(void)loop;
+	(void)revents;
+	say_info("got signal #%d (%s) from PID %ld, triggering checkpoint",
+		 w->signum, strsignal(w->signum), (long)w->sender_pid);
 	struct fiber *f = fiber_new_system("checkpoint", sig_checkpoint_f);
 	if (f == NULL) {
 		say_warn("failed to allocate checkpoint fiber");
@@ -196,7 +199,6 @@ static void
 signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void) loop;
-	(void) w;
 	(void) revents;
 
 	/**
@@ -207,7 +209,8 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	 * explicit in the log.
 	 */
 	if (pid_file)
-		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
+		say_crit("got signal #%d (%s) from PID %ld", w->signum,
+			 strsignal(w->signum), (long)w->sender_pid);
 	tarantool_exit(0);
 }
 
@@ -233,6 +236,16 @@ signal_sigwinch_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	(void) revents;
 	if (rl_instream)
 		rl_resize_terminal();
+}
+
+static void
+signal_sighup_cb(ev_loop *loop, struct ev_signal *w, int revents)
+{
+	(void)loop;
+	(void)revents;
+	say_info("got signal #%d (%s) from PID %ld",
+		 w->signum, strsignal(w->signum), (long)w->sender_pid);
+	say_logrotate();
 }
 
 static void
@@ -292,11 +305,11 @@ signal_init(void)
 	fiber_signal_init();
 	crash_signal_init();
 
-	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
+	ev_signal_init(&ev_sigs[0], signal_checkpoint, SIGUSR1);
 	ev_signal_init(&ev_sigs[1], signal_sigint_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_sigwinch_cb, SIGWINCH);
-	ev_signal_init(&ev_sigs[4], say_logrotate, SIGHUP);
+	ev_signal_init(&ev_sigs[4], signal_sighup_cb, SIGHUP);
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_start(loop(), &ev_sigs[i]);
 
