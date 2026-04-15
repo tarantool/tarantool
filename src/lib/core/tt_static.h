@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "msgpuck.h"
 #include "small/static.h"
 #include "trivia/util.h"
 #include <string.h>
@@ -116,6 +117,15 @@ tt_snprintf(size_t size, const char *format, ...)
 					  format, ap);
 	va_end(ap);
 	return result;
+}
+
+/** Prints a MsgPack as a string to the static buffer. */
+static inline const char *
+tt_print_mp(const char *data)
+{
+	char *dst = (char *)static_reserve(TT_STATIC_BUF_LEN);
+	VERIFY(mp_snprint(dst, TT_STATIC_BUF_LEN, data) >= 0);
+	return dst;
 }
 
 #ifdef UNDEF_MIN
