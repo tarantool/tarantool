@@ -1049,7 +1049,7 @@ g.test_role_graceful_shutdown = function(g)
     log_file:close()
 
     t.assert_str_contains(log_content,
-        '.*Terminated\n' ..
+        '.*Terminated.-\n' ..
         '.* roles.on_shutdown: stopping role two\n' ..
         '.* Role two stopped\n' ..
         '.* roles.on_shutdown: stopping role one\n' ..
@@ -1107,7 +1107,7 @@ g.test_role_graceful_shutdown_order = function(g)
     log_file:close()
 
     t.assert_str_contains(log_content,
-        '.*Terminated\n' ..
+        '.*Terminated.-\n' ..
         '.* roles.on_shutdown: stopping role one\n' ..
         '.* Role one stopped\n' ..
         '.* roles.on_shutdown: stopping role two\n' ..
