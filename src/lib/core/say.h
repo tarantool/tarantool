@@ -359,8 +359,9 @@ say_log_level_str(int level);
 struct ev_loop;
 struct ev_signal;
 
+/* Invoke the log rotation. */
 void
-say_logrotate(struct ev_loop *, struct ev_signal *, int /* revents */);
+say_logrotate(void);
 
 /** Init default logger. */
 void
