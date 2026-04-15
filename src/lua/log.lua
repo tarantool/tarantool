@@ -33,7 +33,7 @@ ffi.cdef[[
     extern struct ev_signal;
 
     extern void
-    say_logrotate(struct ev_loop *, struct ev_signal *, int);
+    say_logrotate();
 
     enum say_level {
         S_FATAL,
@@ -239,7 +239,7 @@ local log_debug = say_closure(nil, S_DEBUG)
 -- Rotate log (basically reopen the log file and
 -- start writting into it).
 local function log_rotate()
-    ffi.C.say_logrotate(nil, nil, 0)
+    ffi.C.say_logrotate()
 end
 
 -- Returns pid of a pipe process.

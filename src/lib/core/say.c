@@ -371,11 +371,8 @@ logrotate_cleanup_cb(struct coio_task *ptr)
 }
 
 void
-say_logrotate(struct ev_loop *loop, struct ev_signal *w, int revents)
+say_logrotate()
 {
-	(void) loop;
-	(void) w;
-	(void) revents;
 	int saved_errno = errno;
 	struct log *log;
 	rlist_foreach_entry(log, &log_rotate_list, in_log_list) {
