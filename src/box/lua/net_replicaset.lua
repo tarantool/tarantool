@@ -1,5 +1,11 @@
+local ffi = require('ffi')
 local fiber = require('fiber')
 local net_box = require('net.box')
+
+ffi.cdef[[
+    bool
+    cord_is_main(void);
+]]
 
 -- The constant is copy-paste from tarantool/src/lua/socket.lua.
 local TIMEOUT_INFINITY = 500 * 365 * 86400
@@ -315,22 +321,27 @@ local function connect_by_cfg(cfg)
 end
 
 -- Allowed options and their types in cfg.instances.x of connect by name.
-local connect_by_name_cfg_template = {
+local connect_opts_template = {
     reconnect_timeout = 'number or nil',
 }
 
--- Connect by replicaset name.
--- Optional config is passed to every net.box.connect function.
+-- Given a replicaset name and connection options, return a configuration
+-- table suitable for passing to connect().
 -- REPLICASET_NOT_FOUND error may be thrown.
-local function connect_by_rs_name(replicaset_name, cfg)
-    cfg = cfg or {}
-    check_options(cfg, connect_by_name_cfg_template, 'connect cfg')
+local function get_connect_cfg(replicaset_name, opts)
+    opts = opts or {}
+    check_options(opts, connect_opts_template, 'opts')
+
+    if not ffi.C.cord_is_main() then
+        error('config is available only in main thread', 0)
+    end
+
     local config = require('config')
 
     local connect_cfg = {
         name = replicaset_name,
         instances = {},
-        reconnect_timeout = cfg.reconnect_timeout,
+        reconnect_timeout = opts.reconnect_timeout,
     }
     for _, instance_info in pairs(config:instances()) do
         if instance_info.replicaset_name == replicaset_name then
@@ -343,7 +354,15 @@ local function connect_by_rs_name(replicaset_name, cfg)
     if not next(connect_cfg.instances) then
         rs_error(box.error.REPLICASET_NOT_FOUND, replicaset_name)
     end
-   return connect_by_cfg(connect_cfg)
+    return connect_cfg
+end
+
+-- Connect by replicaset name.
+-- Options are passed to every net.box.connect function.
+-- REPLICASET_NOT_FOUND error may be thrown.
+local function connect_by_rs_name(replicaset_name, opts)
+    local connect_cfg = get_connect_cfg(replicaset_name, opts)
+    return connect_by_cfg(connect_cfg)
 end
 
 -- Connect by given config or replicaset name an config.
@@ -360,5 +379,6 @@ local function connect_common(cfg_or_name, ...)
 end
 
 return {
+    get_connect_cfg = get_connect_cfg,
     connect = connect_common,
 }

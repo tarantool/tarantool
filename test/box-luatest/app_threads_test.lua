@@ -6,6 +6,8 @@ local socket = require('socket')
 local uuid = require('uuid')
 local varbinary = require('varbinary')
 
+local cbuilder = require('luatest.cbuilder')
+local cluster = require('luatest.cluster')
 local server = require('luatest.server')
 local t = require('luatest')
 
@@ -661,6 +663,43 @@ g.after_test('test_net_box', function(cg)
         end
     end)
 end)
+
+g.test_net_replicaset = function()
+    local config = cbuilder:new()
+        :set_global_option('credentials.users.storage.roles', {'super'})
+        :set_global_option('credentials.users.storage.password', 'secret')
+        :set_global_option('iproto.advertise.sharding.login', 'storage')
+        :use_replicaset('storage')
+        :set_replicaset_option('replication.failover', 'manual')
+        :set_replicaset_option('leader', 'storage_a')
+        :add_instance('storage_a', {})
+        :add_instance('storage_b', {})
+        :use_replicaset('router')
+        :add_instance('router', {})
+        :set_instance_option('router', 'threads.groups', {
+            {name = 'test', size = 1},
+        })
+        :config()
+    local cluster = cluster:new(config)
+    cluster:start()
+    cluster.router:call('box.iproto.internal.enable_thread_requests')
+    local connect_cfg = cluster.router:exec(function()
+        local net_replicaset = require('internal.net.replicaset')
+        return net_replicaset.get_connect_cfg('storage')
+    end)
+    cluster.router:exec(function(connect_cfg)
+        local net_replicaset = require('internal.net.replicaset')
+        local err = 'config is available only in main thread'
+        t.assert_error_msg_equals(err, net_replicaset.get_connect_cfg,
+                                  'storage')
+        t.assert_error_msg_equals(err, net_replicaset.connect,
+                                  'storage')
+        local conn = net_replicaset.connect(connect_cfg)
+        local info = conn:call_leader('box.info')
+        t.assert_covers(info, {ro = false, name = 'storage_a'})
+        conn:close()
+    end, {connect_cfg}, {_thread_id = 1})
+end
 
 g.test_luatest_exec = function(cg)
     cg.server:exec(function()

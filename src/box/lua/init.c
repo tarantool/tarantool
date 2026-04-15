@@ -223,6 +223,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/utils", NULL, box_utils_lua,
 	"box/iproto", "iproto", iproto_lua,
 	"box/net_box", "net.box", net_box_lua,
+	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
@@ -339,7 +340,6 @@ static const char * const lua_sources_main[] = {
 	"box/xlog", "xlog", xlog_lua,
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
-	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/console", "console", console_lua,
 
 	/* {{{ config */
