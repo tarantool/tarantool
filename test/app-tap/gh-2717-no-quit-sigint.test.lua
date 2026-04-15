@@ -200,13 +200,13 @@ test:unlike(status.state, popen.state.ALIVE,
 
 start_time = clock.monotonic()
 local data = ''
-while data:match('got signal 2') == nil
+while data:match('got signal #2') == nil
         and clock.monotonic() - start_time < time_quota do
     data = data .. process_timeout.read_with_timeout(f,
             file_read_timeout,
             file_read_interval)
 end
-assert(data:match('got signal 2'), 'there is no one note about SIGINT')
+assert(data:match('got signal #2'), 'there is no one note about SIGINT')
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 
 f:close()

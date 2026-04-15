@@ -299,8 +299,9 @@ say_format_by_name(const char *format);
 struct ev_loop;
 struct ev_signal;
 
+/* Invoke the log rotation. */
 void
-say_logrotate(struct ev_loop *, struct ev_signal *, int /* revents */);
+say_logrotate(void);
 
 /** Init default logger. */
 void
