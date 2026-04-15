@@ -130,7 +130,7 @@ test_log_rotate()
 	while (created_logs < running)
 		tt_pthread_cond_wait(&cond_sync, &mutex);
 	tt_pthread_mutex_unlock(&mutex);
-	say_logrotate(NULL, NULL, 0);
+	say_logrotate();
 
 	for (int i = 0; i < created_logs; i++) {
 		log_destroy(&loggers[i].logger);
@@ -275,7 +275,7 @@ int main()
 
 	/* Test gh-4450. */
 	log_create(&test_log, tmp_filename, false);
-	say_logrotate(NULL, NULL, 0);
+	say_logrotate();
 	coio_shutdown();
 	log_destroy(&test_log);
 
