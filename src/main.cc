@@ -100,7 +100,7 @@ static char *pid_file = NULL;
 static char **main_argv;
 static int main_argc;
 /** Signals handled after start as part of the event loop. */
-static ev_signal ev_sigs[7];
+static ev_signal ev_sigs[6];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 static double start_time;
@@ -131,9 +131,9 @@ static void
 signal_checkpoint(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void)loop;
-	(void)w;
 	(void)revents;
-	say_info("got signal SIGUSR1, triggering checkpoint");
+	say_info("got signal #%d (%s) from PID %ld, triggering checkpoint",
+		 w->signum, strsignal(w->signum), (long)w->sender_pid);
 	box_checkpoint_async();
 }
 
@@ -202,7 +202,6 @@ static void
 signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void) loop;
-	(void) w;
 	(void) revents;
 
 	/**
@@ -213,7 +212,8 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	 * explicit in the log.
 	 */
 	if (pid_file)
-		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
+		say_crit("got signal #%d (%s) from PID %ld", w->signum,
+			 strsignal(w->signum), (long)w->sender_pid);
 	start_shutdown(0);
 }
 
@@ -245,18 +245,21 @@ static void
 broadcast_sigusr2(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void)loop;
-	(void)w;
 	(void)revents;
+	say_info("got signal #%d (%s) from PID %ld",
+		 w->signum, strsignal(w->signum), (long)w->sender_pid);
 	const char *key = "box.internal.SIGUSR2";
 	box_broadcast(key, strlen(key), NULL, 0);
 }
 
 static void
-broadcast_sighup(ev_loop *loop, struct ev_signal *w, int revents)
+signal_sighup_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void)loop;
-	(void)w;
 	(void)revents;
+	say_info("got signal #%d (%s) from PID %ld",
+		 w->signum, strsignal(w->signum), (long)w->sender_pid);
+	say_logrotate();
 	const char *key = "box.internal.SIGHUP";
 	box_broadcast(key, strlen(key), NULL, 0);
 }
@@ -322,9 +325,8 @@ signal_init(void)
 	ev_signal_init(&ev_sigs[1], signal_sigint_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_sigwinch_cb, SIGWINCH);
-	ev_signal_init(&ev_sigs[4], say_logrotate, SIGHUP);
-	ev_signal_init(&ev_sigs[5], broadcast_sighup, SIGHUP);
-	ev_signal_init(&ev_sigs[6], broadcast_sigusr2, SIGUSR2);
+	ev_signal_init(&ev_sigs[4], signal_sighup_cb, SIGHUP);
+	ev_signal_init(&ev_sigs[5], broadcast_sigusr2, SIGUSR2);
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_start(loop(), &ev_sigs[i]);
 
