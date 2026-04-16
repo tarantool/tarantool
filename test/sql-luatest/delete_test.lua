@@ -44,3 +44,33 @@ g.test_delete_multiple_idx = function(cg)
         box.execute([[DROP TABLE t3;]])
     end)
 end
+
+g.test_delete = function(cg)
+    cg.server:exec(function()
+        -- Create space.
+        box.execute([[CREATE TABLE zoobar (c1 INT, c2 INT PRIMARY KEY, c3 TEXT,
+                                           c4 INT);]])
+        box.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4);")
+
+        -- Seed entry.
+        local sql = "INSERT INTO zoobar VALUES (%d, %d, 'c3', 444);"
+        local exp = {}
+        for i = 1, 100 do
+            table.insert(exp, {2 * i, i, 'c3', 444})
+            box.execute(sql:format(2 * i, i))
+        end
+
+        -- Check table is not empty.
+        t.assert_equals(box.execute("SELECT * FROM zoobar;").rows, exp)
+
+        -- Do clean up.
+        t.assert_equals(box.execute("DELETE FROM zoobar;"), {row_count = 100})
+
+        -- Make sure table is empty.
+        t.assert_equals(box.execute("SELECT * FROM zoobar;").rows, {})
+
+        -- Cleanup.
+        box.execute("DROP INDEX zoobar2 ON zoobar;")
+        box.execute("DROP TABLE zoobar;")
+    end)
+end

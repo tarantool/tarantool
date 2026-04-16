@@ -103,3 +103,19 @@ g.test_4422_allow_specify_engine_in_create_table = function(cg)
         t.assert_equals(tostring(err), exp_err)
     end)
 end
+
+--
+-- gh-4183: Check if there is a garbage in case of failure to
+-- create a constraint, when more than one constraint of the same
+-- type is created with the same name and in the same
+-- CREATE TABLE statement.
+--
+g.test_duplicate_function = function(cg)
+    cg.server:exec(function()
+        local _, err = box.execute([[CREATE TABLE t1(id INT PRIMARY KEY,
+                                     CONSTRAINT ck1 CHECK(id > 0),
+                                     CONSTRAINT ck1 CHECK(id < 0));]])
+        t.assert_equals(err.message, "Function 'check_t1_ck1' already exists")
+        t.assert_equals(box.space.t1, nil)
+    end)
+end
