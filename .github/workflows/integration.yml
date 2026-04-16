@@ -131,11 +131,12 @@ jobs:
   #   with:
   #     artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
-  php-client:
-    needs: tarantool
-    uses: tarantool-php/client/.github/workflows/reusable_qa.yml@master
-    with:
-      artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
+  # FIXME: Disabled due to tarantool-php/client#100
+  # php-client:
+  #   needs: tarantool
+  #   uses: tarantool-php/client/.github/workflows/reusable_qa.yml@master
+  #   with:
+  #     artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
   php-queue:
     needs: tarantool
