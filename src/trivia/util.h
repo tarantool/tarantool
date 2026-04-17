@@ -940,6 +940,20 @@ lsan_turn_off(void)
 
 #endif
 
+#define FMT_BUF_SIZE (1024 * 1024)
+
+/**
+ * Allocate space in a static buffer and snprintf() to it.
+ * The result string is for temporary use. It is became
+ * invalid after next N allocations, where N depends on
+ * the length of newly allocated strings.
+ *
+ * The routine aborts on any error, especially if it
+ * fails to allocate when len(output) > FMT_BUF_SIZE.
+ */
+const char *
+fmt(const char *fmt, ...) CFORMAT(printf, 1, 2);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

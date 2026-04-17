@@ -338,6 +338,10 @@ create_unit_test(PREFIX trivia
                  SOURCES trivia.c
                  LIBRARIES unit
 )
+create_unit_test(PREFIX trivia_util
+                 SOURCES trivia_util.c
+                 LIBRARIES trivia unit
+)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
