@@ -74,6 +74,7 @@ tg.test_role_with_early_load_tag = function(g)
             ['roles'] = {'one'}
         },
         verify = verify,
+        setsearchroot = false,
     })
 end
 
@@ -102,6 +103,7 @@ tg.test_role_with_early_load_tag_added = function(g)
         },
         verify = function() end,
         verify_2 = function() end,
+        setsearchroot = false,
     })
 
     t.assert_not(g.server:grep_log(
@@ -157,6 +159,7 @@ tg.test_app_with_early_load_tag = function(g)
                ['app.module'] = 'main',
            },
         verify = verify,
+        setsearchroot = false,
     })
 end
 
@@ -202,6 +205,7 @@ tg.test_app_with_early_load_tag_added = function(g)
         verify = function() end,
         verify_2 = function() end,
         script_2 = early_load_script,
+        setsearchroot = false,
     })
 
     t.assert(g.server:grep_log(

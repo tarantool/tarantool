@@ -131,6 +131,7 @@ local function prepare_case(opts)
     local script = opts.script
     local options = opts.options
     local env = opts.env
+    local setsearchroot = opts.setsearchroot
 
     if dir == nil then
         dir = treegen.prepare_directory({}, {})
@@ -162,6 +163,7 @@ local function prepare_case(opts)
         chdir = dir,
         env = env,
         alias = 'instance-001',
+        setsearchroot = setsearchroot,
     }
     local justrun = {
         -- dir
