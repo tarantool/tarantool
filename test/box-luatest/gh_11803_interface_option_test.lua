@@ -1,8 +1,45 @@
 local net = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
+local ffi = require('ffi')
 
 local g = t.group()
+
+ffi.cdef([[
+struct ifaddrs {
+    struct ifaddrs *ifa_next;
+    char *ifa_name;
+    unsigned int ifa_flags;
+    void *ifa_addr;
+    void *ifa_netmask;
+    union {
+        void *ifu_broadaddr;
+        void *ifu_dstaddr;
+    } ifa_ifu;
+    void *ifa_data;
+};
+int getifaddrs(struct ifaddrs **ifap);
+void freeifaddrs(struct ifaddrs *ifa);
+]])
+
+local function loopback_ifname()
+    -- The option is matched against ifa_name from getifaddrs() in
+    -- src/lib/core/coio.c:coio_bind_iface(). The loopback interface is
+    -- called "lo" on Linux and "lo0" on macOS, so avoid hardcoding it.
+    local ifap = ffi.new('struct ifaddrs *[1]')
+    t.assert_equals(ffi.C.getifaddrs(ifap), 0)
+    local ifa = ifap[0]
+    while ifa ~= nil do
+        local ifname = ffi.string(ifa.ifa_name)
+        if ifname:match('^lo%d*$') ~= nil then
+            ffi.C.freeifaddrs(ifap[0])
+            return ifname
+        end
+        ifa = ifa.ifa_next
+    end
+    ffi.C.freeifaddrs(ifap[0])
+    t.fail('Failed to find a loopback interface')
+end
 
 -- Check if IPv6 is supported on the test machine.
 local function ipv6_supported()
@@ -27,6 +64,8 @@ local function ipv6_supported()
 end
 
 g.test_replication = function()
+    local ifname = loopback_ifname()
+
     -- Successfully set up replication using the given interface.
     local function check_ok(listen, ifname)
         local srv = server:new({alias = 'master'})
@@ -58,16 +97,16 @@ g.test_replication = function()
     end
 
     -- Listen hostname.
-    check_ok('localhost:0', 'lo')
+    check_ok('localhost:0', ifname)
     check_fail('localhost:0', 'lol', 'suitable interface not found: lol')
 
     -- Listen IPv4.
-    check_ok('127.0.0.1:0', 'lo')
+    check_ok('127.0.0.1:0', ifname)
     check_fail('127.0.0.1:0', 'lol', 'suitable interface not found: lol')
 
     -- Listen IPv6.
     if ipv6_supported() then
-        check_ok('[::1]:0', 'lo')
+        check_ok('[::1]:0', ifname)
         check_fail('[::1]:0', 'lol', 'suitable interface not found: lol')
     end
 
@@ -84,6 +123,8 @@ g.test_replication = function()
 end
 
 g.test_net_box = function()
+    local ifname = loopback_ifname()
+
     -- Create and start a server listening to the address.
     local function create_server(listen)
         local srv = server:new({alias = 'master'})
@@ -119,20 +160,20 @@ g.test_net_box = function()
 
     -- Listen hostname.
     local srv = create_server('localhost:0')
-    check_ok(srv, 'lo')
+    check_ok(srv, ifname)
     check_fail(srv, 'lol', 'suitable interface not found: lol')
     srv:drop()
 
     -- Listen IPv4.
     srv = create_server('127.0.0.1:0')
-    check_ok(srv, 'lo')
+    check_ok(srv, ifname)
     check_fail(srv, 'lol', 'suitable interface not found: lol')
     srv:drop()
 
     -- Listen IPv6.
     if ipv6_supported() then
         srv = create_server('[::1]:0')
-        check_ok(srv, 'lo')
+        check_ok(srv, ifname)
         check_fail(srv, 'lol', 'suitable interface not found: lol')
         srv:drop()
     end
@@ -141,13 +182,13 @@ g.test_net_box = function()
     local fio = require('fio')
     local SOCKET_PATH = fio.pathjoin(server.vardir, 'gh-11803-netbox.sock')
     srv = create_server(SOCKET_PATH)
-    check_fail(srv, 'lo', 'interface is specified for non-IP connection')
+    check_fail(srv, ifname, 'interface is specified for non-IP connection')
     check_fail(srv, 'lol', 'interface is specified for non-IP connection')
     srv:drop()
 
     -- Listen UNIX socket with protocol: unix/:/path/to.sock.
     srv = create_server('unix/:' .. SOCKET_PATH)
-    check_fail(srv, 'lo', 'interface is specified for non-IP connection')
+    check_fail(srv, ifname, 'interface is specified for non-IP connection')
     check_fail(srv, 'lol', 'interface is specified for non-IP connection')
     srv:drop()
 end
