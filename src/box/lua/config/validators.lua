@@ -107,6 +107,59 @@ end
 
 -- }}} app
 
+-- {{{ audit_log
+
+local function validate_audit_log_space_opts(space, data, w)
+    if type(data) ~= 'table' then
+        w.error('audit_log.spaces.%s must be a record', space)
+    end
+    for option, value in pairs(data) do
+        if option == 'extract_key' then
+            if type(value) ~= 'boolean' then
+                w.error('audit_log.spaces.%s.extract_key must be boolean',
+                        space)
+            end
+        else
+            w.error('Unexpected field audit_log.spaces.%s.%s', space, option)
+        end
+    end
+end
+
+M['audit_log.spaces'] = function(data, w)
+    local errmsg = 'audit_log.spaces must be a map or an array of strings'
+    if type(data) ~= 'table' then
+        w.error(errmsg)
+    end
+    local first_key = next(data)
+    if first_key == nil then
+        return
+    end
+    local key_type = type(first_key)
+    if key_type == 'number' then
+        for key, value in pairs(data) do
+            if type(key) ~= 'number' then
+                w.error(errmsg)
+            end
+            if type(value) ~= 'string' then
+                w.error(errmsg)
+            end
+        end
+        return
+    end
+    if key_type == 'string' then
+        for space, opts in pairs(data) do
+            if type(space) ~= 'string' then
+                w.error(errmsg)
+            end
+            validate_audit_log_space_opts(space, opts, w)
+        end
+        return
+    end
+    w.error(errmsg)
+end
+
+-- }}} audit_log
+
 -- {{{ config
 
 M['config.context.*'] = function(var, w)

@@ -180,21 +180,58 @@ I['audit_log.pipe'] = format_text([[
 ]])
 
 I['audit_log.spaces'] = format_text([[
-    The array of space names for which data operation events (`space_select`,
-    `space_insert`, `space_replace`, `space_delete`) should be logged. The array
-    accepts string values. If set to box.NULL, the data operation events are
-    logged for all spaces.
+    Specifies spaces for which data operation events (`space_select`,
+    `space_insert`, `space_replace`, `space_delete`) should be logged.
+
+    This option accepts one of the following forms:
+
+    - an array of space names;
+    - a map where keys are space names and values are audit options.
+
+    If set to box.NULL, the data operation events are logged for all spaces.
 ]])
 
 I['audit_log.spaces.*'] = format_text([[
-    A specific space name in the array for which data operation events are
-    logged. Each entry must be a string representing the name of the space
-    to monitor.
+    Specifies a space for which data operation events are logged. Accepts one
+    of the following forms:
 
-    Example:
+    - a string representing a space name;
+    - a map where the key is a space name and the value is a map with
+      per-space options.
+
+    The following option is supported:
+    - `extract_key` - optional boolean field, having the same semantics as
+      `audit_log.extract_key`, but only for the given space.
+
+    Also, space name can be a wildcard (`*`). If met, data operation events
+    are logged for all spaces. Also, its `extract_key` option, if specified, is
+    a default option for all spaces without explicitly specified `extract_key`.
+
+    Examples:
 
     `spaces: [bands, singers]`, only the events of `bands` and `singers` spaces
     are logged.
+
+    ```
+    spaces:
+        bands: {}
+        singers: {}
+    ```
+    The same semantics as above.
+
+    ```
+    spaces:
+        bands:
+            extract_key: true
+        singers:
+            extract_key: true
+        '*':
+            extract_key: false
+    ```
+    Since there is a wildcard, data operation events are logged for all spaces.
+    But events of spaces `bands` and `singers` use primary keys instead of full
+    tuples when logged. All other spaces' events still use full tuples because
+    it's explicitly specified in the wildcard entry.
 ]])
 
 I['audit_log.to'] = 'Enable audit logging and define the log location.'

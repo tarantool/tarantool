@@ -1456,6 +1456,7 @@ g.test_box_cfg_coverage = function()
         metrics = true,
         audit_log = true,
         audit_filter = true,
+        audit_spaces = true,
         listen = true,
         app_threads = true,
 
@@ -1852,6 +1853,64 @@ g.test_audit_available = function()
     }
     local res = instance_config:apply_default({}).audit_log
     t.assert_equals(res, exp)
+end
+
+g.test_audit_spaces = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {audit_log = {}}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = box.NULL
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = {}
+    instance_config:validate(iconfig)
+
+    -- Array of strings interface.
+    iconfig.audit_log.spaces = {'space1'}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = {'space1', 'space2'}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = {'space1', {name = 'space2'}}
+    t.assert_error_msg_content_equals(
+        '[instance_config] audit_log.spaces: ' ..
+        'audit_log.spaces must be a map or an array of strings',
+        instance_config.validate, instance_config, iconfig)
+
+    iconfig.audit_log.spaces = {{name = 'space1'}, 'space2'}
+    t.assert_error_msg_content_equals(
+        '[instance_config] audit_log.spaces: ' ..
+        'audit_log.spaces must be a map or an array of strings',
+        instance_config.validate, instance_config, iconfig)
+
+    -- Check wildcard.
+    iconfig.audit_log.spaces = {'space1', 'space2', '*'}
+    instance_config:validate(iconfig)
+
+    -- Record interface.
+    iconfig.audit_log.spaces = {space1 = {}}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = {space1 = {}, ['*'] = {}}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces =
+        {space1 = {}, space2 = {extract_key = true}, ['*'] = {}}
+    instance_config:validate(iconfig)
+
+    iconfig.audit_log.spaces = {space1 = {extract_key = 10}}
+    t.assert_error_msg_content_equals(
+        '[instance_config] audit_log.spaces: ' ..
+        'audit_log.spaces.space1.extract_key must be boolean',
+        instance_config.validate, instance_config, iconfig)
+
+    iconfig.audit_log.spaces = {space1 = {unexpected_option = true}}
+    t.assert_error_msg_content_equals(
+        '[instance_config] audit_log.spaces: ' ..
+        'Unexpected field audit_log.spaces.space1.unexpected_option',
+        instance_config.validate, instance_config, iconfig)
 end
 
 g.test_failover = function()

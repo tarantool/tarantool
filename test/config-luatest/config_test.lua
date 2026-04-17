@@ -1000,15 +1000,16 @@ g.test_audit_options = function()
         'data_operations', 'compatibility'
     }
 
-    local verify = function(events)
+    local verify = function(events, audit_spaces)
         t.assert_equals(box.cfg.audit_log, nil)
         t.assert_equals(box.cfg.audit_nonblock, true)
         t.assert_equals(box.cfg.audit_format, 'csv')
         t.assert_equals(box.cfg.audit_filter, table.concat(events, ","))
-        t.assert_equals(box.cfg.audit_spaces, {'space1', 'space2', 'space3'})
+        t.assert_items_equals(box.cfg.audit_spaces, audit_spaces)
         t.assert_equals(box.cfg.audit_extract_key, true)
     end
 
+    local audit_spaces = {'space1', 'space2', 'space3'}
     helpers.success_case(g, {
         dir = dir,
         options = {
@@ -1020,7 +1021,29 @@ g.test_audit_options = function()
             ['audit_log.extract_key'] = true,
         },
         verify = verify,
-        verify_args = {events}
+        verify_args = {events, audit_spaces}
+    })
+
+    dir = treegen.prepare_directory({}, {})
+    audit_spaces = {
+        {name = '*', extract_key = true},
+        {name = 'space1'},
+        {name = 'space2', extract_key = false}}
+    helpers.success_case(g, {
+        dir = dir,
+        options = {
+            ['audit_log.to'] = 'devnull',
+            ['audit_log.nonblock'] = true,
+            ['audit_log.format'] = 'csv',
+            ['audit_log.filter'] = events,
+            ['audit_log.spaces'] = {
+                space1 = {},
+                space2 = {extract_key = false},
+                ['*'] = {extract_key = true}},
+            ['audit_log.extract_key'] = true,
+        },
+        verify = verify,
+        verify_args = {events, audit_spaces}
     })
 end
 
