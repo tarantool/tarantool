@@ -97,7 +97,7 @@ local function verify_configdata()
 
     t.assert_equals(data:get('iproto'), expected.iproto)
 
-    local f = function(w) return w.schema.type == 'integer' end
+    local f = function(w) return w.schema.byte_size == true end
     local function remove_descriptions(tbl)
         if type(tbl) ~= 'table' then
             return
@@ -121,10 +121,12 @@ local function verify_configdata()
             schema = {
                 box_cfg = "sql_cache_size",
                 default = 5242880,
-                type = "integer",
+                type = "integer, string",
+                byte_size = true,
                 computed = {
                     annotations = {
                         box_cfg = "sql_cache_size",
+                        byte_size = true,
                     },
                 },
             },
@@ -135,10 +137,12 @@ local function verify_configdata()
             schema = {
                 box_cfg = "memtx_memory",
                 default = 268435456,
-                type = "integer",
+                type = "integer, string",
+                byte_size = true,
                 computed = {
                     annotations = {
                         box_cfg = "memtx_memory",
+                        byte_size = true,
                     },
                 },
             },
