@@ -14,9 +14,7 @@ end)
 
 g.test_tokenizer = function(cg)
     cg.server:exec(function()
-        package.path = os.getenv("BUILDDIR") .. "/test/sql-tap/lua/?.lua;" ..
-                       package.path
-        local sql_tokenizer = require('sql_tokenizer')
+        local sql_tokenizer = require('test.sql-tap.lua.sql_tokenizer')
 
         local exp = {
             "select 1;",
