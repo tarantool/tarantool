@@ -54,7 +54,6 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "wal.h"
-#include "txn_limbo.h"
 #include "raft.h"
 #include "box.h"
 
@@ -663,17 +662,13 @@ tx_status_update(struct cmsg *msg)
 	 */
 	raft_process_term(box_raft(), status->term, ack.source);
 	/*
-	 * Let pending synchronous transactions know, which of
-	 * them were successfully sent to the replica. Acks are
-	 * collected only by the transactions originator (which is
-	 * the single master in 100% so far). Other instances wait
-	 * for master's CONFIRM message instead.
+	 * A replica can declare itself anon, but master might assign it an ID.
+	 * Or replica might be having an ID, but the master can remove it. A
+	 * true proper replica must declare itself not anon, and not be expelled
+	 * by the master.
 	 */
-	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER && !anon) {
-		txn_limbo_ack(&txn_limbo, ack.source,
-			      vclock_get(ack.vclock, instance_id));
-	}
-	trigger_run(&replicaset.on_ack, &ack);
+	if (!anon && ack.source != REPLICA_ID_NIL)
+		trigger_run(&replicaset.on_ack, &ack);
 
 	if (!relay->tx.is_paired) {
 		/*

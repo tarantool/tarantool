@@ -137,6 +137,13 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 	return vclock_get(&limbo->queue.confirmed_vclock, replica_id);
 }
 
+static void
+txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
+{
+	if (txn_limbo_queue_ack(&limbo->queue, replica_id, lsn))
+		fiber_wakeup(limbo->worker);
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
@@ -226,6 +233,23 @@ txn_limbo_worker_f(va_list args)
 	return 0;
 }
 
+static int
+txn_limbo_on_ack_f(struct trigger *t, void *event)
+{
+	struct txn_limbo *limbo = t->data;
+	assert(t == &limbo->on_ack);
+	const struct replication_ack *ack = event;
+	/*
+	 * If the limbo has no owner, this will be ack for 0 LSN (since acks
+	 * have vclock[0] decoded as 0 on the receiving side, regardless what
+	 * was send). 0 LSN won't bump quorum and will be just nop.
+	 */
+	int64_t lsn = vclock_get(ack->vclock, limbo->queue.owner_id);
+	assert(limbo->queue.owner_id != REPLICA_ID_NIL || lsn == 0);
+	txn_limbo_ack(limbo, ack->source, lsn);
+	return 0;
+}
+
 static inline void
 txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 {
@@ -243,6 +267,8 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 		panic("failed to allocate synchronous queue worker fiber");
 	limbo->worker->f_arg = limbo;
 	fiber_set_joinable(limbo->worker, true);
+	trigger_create(&limbo->on_ack, txn_limbo_on_ack_f, limbo, NULL);
+	trigger_add(&replicaset.on_ack, &limbo->on_ack);
 }
 
 void
@@ -303,6 +329,7 @@ txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size)
 static inline void
 txn_limbo_destroy(struct txn_limbo *limbo)
 {
+	trigger_clear(&limbo->on_ack);
 	txn_limbo_queue_destroy(&limbo->queue);
 	TRASH(limbo);
 }
@@ -376,10 +403,11 @@ txn_limbo_abort(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 }
 
 void
-txn_limbo_assign_lsn(struct txn_limbo *limbo, struct txn_limbo_entry *entry,
-		     int64_t lsn)
+txn_limbo_assign_lsn(struct txn_limbo *limbo, uint32_t origin_id,
+		     struct txn_limbo_entry *entry, int64_t lsn)
 {
 	txn_limbo_queue_assign_lsn(&limbo->queue, entry, lsn);
+	txn_limbo_ack(limbo, origin_id, lsn);
 }
 
 enum txn_limbo_wait_entry_result
@@ -466,29 +494,6 @@ txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	return 0;
 }
 
-/**
- * Check that some synchronous transactions have gathered quorum and
- * write a confirmation entry of the last confirmed transaction.
- */
-static void
-txn_limbo_confirm(struct txn_limbo *limbo)
-{
-	assert(limbo->state == TXN_LIMBO_STATE_LEADER);
-	if (limbo->is_in_rollback)
-		return;
-	if (txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
-		fiber_wakeup(limbo->worker);
-}
-
-void
-txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
-{
-	assert(limbo->state == TXN_LIMBO_STATE_LEADER);
-	assert(!txn_limbo_is_ro(limbo));
-	if (txn_limbo_queue_ack(&limbo->queue, replica_id, lsn))
-		fiber_wakeup(limbo->worker);
-}
-
 int
 txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			double timeout)
@@ -501,6 +506,14 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 {
 	return txn_limbo_queue_wait_empty(&limbo->queue, timeout);
+}
+
+bool
+txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
+{
+	assert(lsn > 0);
+	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
+	       replication_synchro_quorum;
 }
 
 /**
@@ -988,8 +1001,10 @@ void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
 	/* The replication_synchro_quorum value may have changed. */
-	if (limbo->state == TXN_LIMBO_STATE_LEADER)
-		txn_limbo_confirm(limbo);
+	if (!limbo->is_in_rollback &&
+	    txn_limbo_is_owned_by_current_instance(limbo) &&
+	     txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
+		fiber_wakeup(limbo->worker);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM

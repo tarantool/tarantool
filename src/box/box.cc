@@ -2847,45 +2847,6 @@ box_set_instance_name(void)
 	guard.is_active = false;
 }
 
-/** Trigger to catch ACKs from all nodes when need to wait for quorum. */
-struct synchro_quorum_trigger {
-	/** Inherit trigger. */
-	struct trigger base;
-	/** Target LSN to wait for. */
-	int64_t target_lsn;
-	/** Replica ID whose LSN is being waited. */
-	uint32_t replica_id;
-	/**
-	 * All versions of the given replica's LSN as seen by other nodes. The
-	 * same as in the txn limbo.
-	 */
-	struct vclock vclock;
-	/** Number of nodes who confirmed the LSN. */
-	int ack_count;
-	/** Fiber to wakeup when quorum is reached. */
-	struct fiber *waiter;
-};
-
-static int
-synchro_quorum_on_ack_f(struct trigger *trigger, void *event)
-{
-	struct replication_ack *ack = (struct replication_ack *)event;
-	struct synchro_quorum_trigger *t =
-		(struct synchro_quorum_trigger *)trigger;
-	int64_t new_lsn = vclock_get(ack->vclock, t->replica_id);
-	int64_t old_lsn = vclock_get(&t->vclock, ack->source);
-	if (new_lsn < t->target_lsn || old_lsn >= t->target_lsn)
-		return 0;
-
-	vclock_follow(&t->vclock, ack->source, new_lsn);
-	++t->ack_count;
-	if (t->ack_count >= replication_synchro_quorum) {
-		fiber_wakeup(t->waiter);
-		trigger_clear(trigger);
-	}
-	return 0;
-}
-
 static int
 box_check_waiting_for_own_rows_f(struct trigger *trigger, void *event)
 {
@@ -2915,40 +2876,6 @@ box_check_waiting_for_own_rows(void)
 	} else {
 		box_set_waiting_for_own_rows(false);
 	}
-}
-
-/**
- * A helper which count how many nodes have the needed LSN of the given node.
- */
-static int
-box_ack_count(uint32_t lead_id, int64_t target_lsn, struct vclock *vclock)
-{
-	/* Take this node into account immediately. */
-	int ack_count = vclock_get(box_vclock, lead_id) >= target_lsn;
-	replicaset_foreach(replica) {
-		if (relay_get_state(replica->relay) != RELAY_FOLLOW ||
-		    replica->anon)
-			continue;
-
-		assert(replica->id != REPLICA_ID_NIL);
-		assert(!tt_uuid_is_equal(&INSTANCE_UUID, &replica->uuid));
-
-		int64_t lsn = vclock_get(relay_vclock(replica->relay), lead_id);
-		/*
-		 * The replica might not yet received anything from the old
-		 * leader. Easily can happen with a newly added replica. Vclock
-		 * can't be followed then because would assert on lsn > old lsn
-		 * whereas they are both 0.
-		 */
-		if (lsn == 0)
-			continue;
-		vclock_follow(vclock, replica->id, lsn);
-		if (lsn >= target_lsn) {
-			ack_count++;
-			continue;
-		}
-	}
-	return ack_count;
 }
 
 /** box_wait_vclock trigger data. */
@@ -3090,88 +3017,34 @@ box_wait_limbo_acked(double timeout)
 {
 	if (txn_limbo_is_empty(&txn_limbo))
 		return txn_limbo.queue.confirmed_lsn;
-
+#ifndef NDEBUG
+	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
+#endif
 	uint64_t promote_term = txn_limbo.term;
-	struct txn_limbo_entry *last_entry;
-	last_entry = txn_limbo_last_synchro_entry(&txn_limbo);
-	/* Wait for the last entries WAL write. */
-	if (last_entry->lsn < 0) {
-		int64_t tid = last_entry->txn->id;
-		if (txn_persist_all_prepared(NULL) != 0)
+	double deadline = fiber_clock() + timeout;
+	while (!fiber_is_cancelled()) {
+		int64_t lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
+		if (lsn > 0 && txn_limbo_has_quorum_for(&txn_limbo, lsn))
+			return lsn;
+		struct trigger on_ack;
+		trigger_create(
+			&on_ack, [](struct trigger *trigger, void *) -> int {
+			fiber_wakeup((struct fiber *)trigger->data);
+			return 0;
+		}, fiber(), NULL);
+		trigger_add(&replicaset.on_ack, &on_ack);
+		int rc = fiber_cond_wait_deadline(&txn_limbo.queue.cond,
+						  deadline);
+		trigger_clear(&on_ack);
+		if (rc != 0)
 			return -1;
 		if (box_check_promote_term_intact(promote_term) != 0)
 			return -1;
 		if (txn_limbo_is_empty(&txn_limbo))
 			return txn_limbo.queue.confirmed_lsn;
-		if (tid != txn_limbo_last_synchro_entry(&txn_limbo)->txn->id) {
-			diag_set(ClientError, ER_QUORUM_WAIT,
-				 replication_synchro_quorum,
-				 "new synchronous transactions appeared");
-			return -1;
-		}
 	}
-	assert(last_entry->lsn > 0);
-	int64_t wait_lsn = last_entry->lsn;
-
-#ifndef NDEBUG
-	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
-#endif
-	struct synchro_quorum_trigger t;
-	memset(&t, 0, sizeof(t));
-	vclock_create(&t.vclock);
-	int ack_count = box_ack_count(txn_limbo.queue.owner_id, wait_lsn,
-				      &t.vclock);
-	if (ack_count < replication_synchro_quorum) {
-		if (replicaset.registered_count < replication_synchro_quorum)
-			say_warn("replication_synchro_quorum is higher than number of "
-				 "registered replicas. The node will be in RO state "
-				 "because it can't collect acks for synchronous queue");
-		t.target_lsn = wait_lsn;
-		t.replica_id = txn_limbo.queue.owner_id;
-		t.ack_count = ack_count;
-		t.waiter = fiber();
-		trigger_create(&t.base, synchro_quorum_on_ack_f, NULL, NULL);
-		trigger_add(&replicaset.on_ack, &t.base);
-		double deadline = ev_monotonic_now(loop()) + timeout;
-		while (!fiber_is_cancelled() &&
-		       t.ack_count < replication_synchro_quorum) {
-			if (fiber_cond_wait_deadline(&txn_limbo.queue.cond,
-						     deadline) == -1)
-				break;
-		}
-		trigger_clear(&t.base);
-		ack_count = t.ack_count;
-		/*
-		 * No point to proceed after cancellation even if got the
-		 * quorum. The quorum is waited by limbo clear function.
-		 * Emptying the limbo involves a pair of blocking WAL
-		 * writes, making the fiber sleep even longer, which
-		 * isn't appropriate when it's canceled.
-		 */
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (ack_count < replication_synchro_quorum) {
-			diag_set(TimedOut);
-			return -1;
-		}
-	}
-
-	if (box_check_promote_term_intact(promote_term) != 0)
-		return -1;
-
-	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.queue.confirmed_lsn;
-
-	if (wait_lsn < txn_limbo_last_synchro_entry(&txn_limbo)->lsn) {
-		diag_set(ClientError, ER_QUORUM_WAIT,
-			 replication_synchro_quorum,
-			 "new synchronous transactions appeared");
-		return -1;
-	}
-
-	return wait_lsn;
+	diag_set(FiberIsCancelled);
+	return -1;
 }
 
 /** A guard to block multiple simultaneous promote()/demote() invocations. */
@@ -3246,6 +3119,39 @@ box_check_promote(void) {
 	return 0;
 }
 
+/**
+ * Wait until this instance becomes writable, as long as it remains the Raft
+ * leader.
+ */
+static int
+box_wait_for_rw_while_leader(struct raft *raft)
+{
+	assert(is_box_configured);
+	double deadline = ev_monotonic_now(loop()) +
+		replication_synchro_timeout;
+	while (box_is_ro()) {
+		if (raft->state != RAFT_STATE_LEADER) {
+			diag_set(ClientError, ER_INTERFERING_ELECTIONS);
+			return -1;
+		}
+		struct trigger on_update;
+		trigger_create(
+			&on_update,
+			[](struct trigger *t, void *) -> int {
+				fiber_wakeup((struct fiber *)t->data);
+				return 0;
+			}, fiber(), NULL);
+		raft_on_update(raft, &on_update);
+		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
+		trigger_clear(&on_update);
+		if (rc != 0)
+			return -1;
+	}
+	assert(raft->state == RAFT_STATE_LEADER);
+	assert(!box_is_ro());
+	return 0;
+}
+
 int
 box_promote(void)
 {
@@ -3293,7 +3199,7 @@ box_promote(void)
 		is_in_box_promote = false;
 		if (box_raft_try_promote() != 0)
 			return -1;
-		return box_wait_ro(false, replication_synchro_timeout);
+		return box_wait_for_rw_while_leader(raft);
 	default:
 		unreachable();
 	}
@@ -6597,9 +6503,9 @@ box_storage_init(void)
 	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
-	txn_limbo_init(box_raft());
 	journal_on_cascading_rollback = box_on_journal_cascading_rollback;
 	replication_init(cfg_geti_default("replication_threads", 1));
+	txn_limbo_init(box_raft());
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
 	audit_log_init();
@@ -6630,8 +6536,8 @@ box_storage_free(void)
 		return;
 	wal_free();
 	iproto_free();
-	replication_free();
 	txn_limbo_free();
+	replication_free();
 	gc_free();
 	engine_free();
 	flightrec_free();
