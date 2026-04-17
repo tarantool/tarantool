@@ -13,6 +13,23 @@ local t = require('luatest')
 
 local g = t.group()
 
+--
+-- FIXME(gh-12546): For server.exec to be able to find the luatest module,
+-- searchroot must be set in the test server. For the main thread, this is
+-- done automatically by luatest itself, but due to the bug in Tarantool,
+-- searchroot isn't propagated to application threads so we have to set it
+-- manually. Remove this when the bug is fixed.
+--
+local function setsearchroot(server)
+    local searchroot, app_threads = server:exec(function()
+        return package.searchroot(), box.cfg.app_threads
+    end)
+    for i = 1, app_threads do
+        server:eval('package.setsearchroot(...)', {searchroot},
+                    {_thread_id = i})
+    end
+end
+
 g.before_all(function(cg)
     cg.server = server:new({
         box_cfg = {
@@ -22,6 +39,7 @@ g.before_all(function(cg)
     })
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
+    setsearchroot(cg.server)
     cg.server:exec(function()
         box.schema.user.passwd('admin', 'secret')
     end)
@@ -683,6 +701,7 @@ g.test_net_replicaset = function()
     local cluster = cluster:new(config)
     cluster:start()
     cluster.router:call('box.iproto.internal.enable_thread_requests')
+    setsearchroot(cluster.router)
     local connect_cfg = cluster.router:exec(function()
         local net_replicaset = require('internal.net.replicaset')
         return net_replicaset.get_connect_cfg('storage')
