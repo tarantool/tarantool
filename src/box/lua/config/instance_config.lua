@@ -2313,6 +2313,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        datetime_setfn_timestamp_type_check = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
