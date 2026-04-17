@@ -604,8 +604,8 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				return NULL;
 
 			/* Min/max as in datetime.h, converted to sec. */
-			#define MAX_TZOFFSET (14L * 60) * 60
-			#define MIN_TZOFFSET (-12L * 60) * 60
+			#define MAX_TZOFFSET 913 * 60
+			#define MIN_TZOFFSET (-956) * 60
 			/*
 			 * TODO: This check must be moved to datetime.c,
 			 * there the range is defined. Here we must

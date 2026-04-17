@@ -2294,8 +2294,8 @@ end
 --
 g.test_datetime_33_2 = function()
     g.server:exec(function()
-        local MIN_TZOFFSET = -12 * 60
-        local MAX_TZOFFSET = 14 * 60
+        local MIN_TZOFFSET = -956
+        local MAX_TZOFFSET = 913
 
         local sql = [[SELECT CAST(#v AS DATETIME);]]
 
