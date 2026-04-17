@@ -117,10 +117,9 @@ local TOSTRING_BUFSIZE  = 64
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
--- At the moment the range of known timezones is UTC-12:00..UTC+14:00. See [1].
--- 1. https://en.wikipedia.org/wiki/List_of_UTC_time_offsets.
-local MIN_TZOFFSET = -12 * 60
-local MAX_TZOFFSET = 14 * 60
+-- See datetime.h.
+local MIN_TZOFFSET = -956
+local MAX_TZOFFSET = 913
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
