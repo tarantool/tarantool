@@ -383,6 +383,21 @@ I['compat.replication_synchro_timeout'] = format_text([[
       after a `replication.synchro_timeout`
 ]])
 
+I['compat.skip_replication_names'] = format_text([[
+    The `compat.skip_replication_names` option controls whether Tarantool
+    skips instance and replicaset name handling during replication startup.
+
+    - `new` (3.x default): Tarantool applies `instance_name` and
+      `replicaset_name` on startup and validates them against the snapshot
+      data.
+    - `old` (2.x default): Tarantool skips applying `instance_name` and
+      `replicaset_name` on startup and does not validate them against the
+      snapshot data. This mode is intended for upgrades from Tarantool 2.11,
+      so a Tarantool 3.x+ instance configured via the declarative config can
+      join a 2.11-compatible replicaset where the master snapshot may not
+      contain names.
+]])
+
 I['compat.sql_priv'] = format_text([[
     Whether to enable access checks for SQL requests over iproto:
 

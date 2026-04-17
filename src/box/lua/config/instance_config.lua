@@ -2250,6 +2250,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'new',
         }),
+        skip_replication_names = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'new',
+        }),
         box_error_unpack_type_and_code = schema.enum({
             'old',
             'new',
