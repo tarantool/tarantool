@@ -6702,6 +6702,10 @@ box_storage_shutdown()
 		diag_log();
 		panic("cannot gracefully shutdown iproto");
 	}
+
+	errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL)->bparam = false;
+	wal_start_shutdown();
+	txns_shutdown();
 	replication_shutdown();
 	box_raft_shutdown();
 	txn_limbo_shutdown();

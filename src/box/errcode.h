@@ -449,6 +449,7 @@ struct errcode_record {
 	_(ER_NO_SUCH_THREAD_GROUP, 302,		"Thread group does not exist", "thread_group", STRING) \
 	_(ER_THREADS_NOT_CONFIGURED, 303,	"Threads are not configured") \
 	_(ER_THREAD_REQUESTS_DISABLED, 304,	"Requests to application threads are disabled for this session") \
+	_(ER_WAL_SHUTTING_DOWN, 305, "WAL write aborted due to the instance shutdown") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
