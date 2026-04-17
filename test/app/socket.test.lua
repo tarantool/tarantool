@@ -135,9 +135,9 @@ s:close()
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', true)
-s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') > 0
 s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', false)
-s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') == 0
 s:bind('127.0.0.1', 0)
 s:listen(128)
 
