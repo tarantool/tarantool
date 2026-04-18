@@ -9,6 +9,13 @@
 
 #include "core/assoc.h"
 #include "trivia/util.h"
+#include "tweaks.h"
+
+#include <assert.h>
+#include <zstd.h>
+
+uint64_t MEMTX_SORT_DATA_ZSTD_LEVEL = 3;
+TWEAK_UINT(MEMTX_SORT_DATA_ZSTD_LEVEL);
 
 /**
  * Maps: (space_id, index_id) => (sort data entry information).
@@ -39,8 +46,10 @@ struct memtx_sort_data_reader_entry {
 	struct memtx_sort_data_key key;
 	/** The offset of the sort data in the file. */
 	long offset;
-	/** The physical size of the sort data. */
+	/** The logical (uncompressed) size of sort data. */
 	long psize;
+	/** The physical (compressed) size of sort data. */
+	long csize;
 	/** The amount of tuples stored. */
 	long len;
 };
@@ -53,8 +62,10 @@ struct memtx_sort_data_writer_entry {
 	long header_entry_offset;
 	/** The offset of the sort data in the file. */
 	long offset;
-	/** The physical size of the sort data. */
+	/** The logical (uncompressed) size of sort data. */
 	long psize;
+	/** The physical (compressed) size of sort data. */
+	long csize;
 	/** The amount of tuples stored. */
 	long len;
 };
@@ -93,6 +104,15 @@ struct memtx_sort_data_writer {
 	struct memtx_sort_data_writer_entry *curr_entry;
 	/** The offset to the next index entry in the file header. */
 	long next_header_entry_offset;
+	/** ZSTD compression context reused between entries. */
+	ZSTD_CCtx *zctx;
+	/** Uncompressed chunk buffer. */
+	char *in_buf;
+	size_t in_buf_cap;
+	size_t in_buf_pos;
+	/** Compressed chunk buffer. */
+	char *out_buf;
+	size_t out_buf_cap;
 };
 
 /** The sort data reader context. */
@@ -107,8 +127,19 @@ struct memtx_sort_data_reader {
 	struct memtx_sort_data_reader_entry *curr_entry;
 	/** The old to new tuple address map used on recovery of a space. */
 	struct mh_ptrptr_t *old2new;
-	/** The buffer to use on fread. */
+	/** The buffer to use on fread via setvbuf(). */
 	void *buffer;
+	/** ZSTD decompression context reused between entries. */
+	ZSTD_DCtx *zctx;
+	/** Compressed input chunk buffer. */
+	char *zsrc_buf;
+	size_t zsrc_buf_cap;
+	size_t zsrc_size;
+	size_t zsrc_pos;
+	/** Remaining compressed bytes in current entry not yet read from file. */
+	long compressed_left;
+	/** True if .sortdata is compressed. */
+	bool is_compressed;
 };
 
 /* {{{ Utilities **************************************************************/
@@ -123,17 +154,22 @@ static const char *ENTRIES_FMT = "Entries: %010u\n";
 
 /**
  * Sort data file entry format string: space ID / index ID, physical offset of
- * the corresponding data in the file, physical size of the data, tuple count.
+ * the corresponding data in the file, logical size, compressed size, tuple
+ * count.
  *
  * All the values have a fixed size, so one can put any value here when this
  * part is created and return back to write valid values once they're known.
  */
-static const char *ENTRY_FMT = "%010u/%010u: %016lx, %016lx, %020ld\n";
+static const char *ENTRY_FMT_UNCOMPRESSED =
+	"%010u/%010u: %016lx, %016lx, %020ld\n";
+
+static const char *ENTRY_FMT =
+	"%010u/%010u: %016lx, %016lx, %016lx, %020ld\n";
 
 const char *
 memtx_sort_data_filename(const char *snap_filename)
 {
-	const char *snap_ext = strrchr(snap_filename, '.');
+	char *snap_ext = strrchr(snap_filename, '.');
 	assert(snap_ext != NULL);
 	if (strcmp(snap_ext, ".inprogress") == 0) {
 		snap_ext -= strlen(".snap");
@@ -150,43 +186,98 @@ memtx_sort_data_filename(const char *snap_filename)
 
 /* {{{ Writer *****************************************************************/
 
-/** Seek to the specified offset in the sort data file. */
 static int
-writer_seek(struct memtx_sort_data_writer *writer, long offset, int whence)
+memtx_sort_data_writer_seek(struct memtx_sort_data_writer *writer, long offset, int whence)
 {
 	if (fseek(writer->fp, offset, whence) != 0) {
-		diag_set(SystemError, "%s: failed to fseek in the "
-			 "sort data file", writer->filename);
+		diag_set(SystemError, "%s: failed to fseek in the sort data file",
+			 writer->filename);
 		return -1;
 	}
 	return 0;
 }
 
-/** Get the current sort data file offset. */
 static int
-writer_get_offset(struct memtx_sort_data_writer *writer, long *offset)
+memtx_sort_data_writer_get_offset(struct memtx_sort_data_writer *writer, long *offset)
 {
 	*offset = ftell(writer->fp);
 	if (*offset == -1) {
-		diag_set(SystemError, "%s: failed to ftell on the "
-			 "sort data file", writer->filename);
+		diag_set(SystemError, "%s: failed to ftell on the sort data file",
+			 writer->filename);
 		return -1;
 	}
 	return 0;
 }
 
-/** Write the formatted string into the sort data file. */
 static int
-writer_printf(struct memtx_sort_data_writer *writer, const char *fmt, ...)
+memtx_sort_data_writer_printf(struct memtx_sort_data_writer *writer, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
 	if (vfprintf(writer->fp, fmt, args) < 0) {
+		va_end(args);
 		diag_set(SystemError, "%s: failed to write the sort data file",
 			 writer->filename);
 		return -1;
 	}
 	va_end(args);
+	return 0;
+}
+
+static int
+memtx_sort_data_writer_write_all(struct memtx_sort_data_writer *writer, const void *data,
+		 size_t size)
+{
+	if (size == 0)
+		return 0;
+	if (fwrite(data, 1, size, writer->fp) != size) {
+		diag_set(SystemError, "%s: failed to write the sort data",
+			 writer->filename);
+		return -1;
+	}
+	return 0;
+}
+
+static int
+memtx_sort_data_writer_zstd_write(struct memtx_sort_data_writer *writer, const void *src,
+		  size_t src_size, ZSTD_EndDirective mode)
+{
+	assert(writer->curr_entry != NULL);
+
+	ZSTD_inBuffer input = {
+		.src = src,
+		.size = src_size,
+		.pos = 0,
+	};
+
+	while (true) {
+		ZSTD_outBuffer output = {
+			.dst = writer->out_buf,
+			.size = writer->out_buf_cap,
+			.pos = 0,
+		};
+
+		size_t rc = ZSTD_compressStream2(writer->zctx, &output, &input,
+						 mode);
+		if (ZSTD_isError(rc)) {
+			diag_set(ClientError, ER_COMPRESSION,
+				 ZSTD_getErrorName(rc));
+			return -1;
+		}
+
+		if (memtx_sort_data_writer_write_all(writer, output.dst, output.pos) != 0)
+			return -1;
+		writer->curr_entry->csize += (long)output.pos;
+
+		if (mode == ZSTD_e_continue) {
+			if (input.pos == input.size)
+				break;
+		} else {
+			if (rc == 0 && input.pos == input.size)
+				break;
+		}
+	}
+
 	return 0;
 }
 
@@ -198,6 +289,17 @@ memtx_sort_data_writer_new(void)
 	memset(writer->filename, 0, sizeof(writer->filename));
 	writer->entries = mh_memtx_sort_data_writer_entries_new();
 	writer->curr_entry = NULL;
+	writer->next_header_entry_offset = 0;
+
+	writer->zctx = ZSTD_createCCtx();
+	if (writer->zctx == NULL)
+		panic("failed to create ZSTD CCtx");
+
+	writer->in_buf_cap = ZSTD_CStreamInSize();
+	writer->out_buf_cap = ZSTD_CStreamOutSize();
+	writer->in_buf = xmalloc(writer->in_buf_cap);
+	writer->out_buf = xmalloc(writer->out_buf_cap);
+	writer->in_buf_pos = 0;
 	return writer;
 }
 
@@ -206,6 +308,9 @@ memtx_sort_data_writer_delete(struct memtx_sort_data_writer *writer)
 {
 	assert(writer->fp == NULL); /* Either closed or discarded. */
 	mh_memtx_sort_data_writer_entries_delete(writer->entries);
+	ZSTD_freeCCtx(writer->zctx);
+	free(writer->in_buf);
+	free(writer->out_buf);
 	free(writer);
 }
 
@@ -216,7 +321,6 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 				   const struct tt_uuid *instance_uuid,
 				   struct read_view *rv)
 {
-	/* Check a materialized file does not exist already. */
 	const char *filename = memtx_sort_data_filename(snap_filename);
 	if (access(filename, F_OK) == 0) {
 		errno = EEXIST;
@@ -224,24 +328,22 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 		return -1;
 	}
 
-	/* The in-progress file name. */
 	VERIFY((size_t)snprintf(writer->filename, sizeof(writer->filename),
 				"%s.inprogress", filename) <
 	       sizeof(writer->filename));
 
-	/* Open the file for write. */
 	say_info("saving memtx sort data `%s'", writer->filename);
 	writer->fp = fopen(writer->filename, "wb");
 	if (writer->fp == NULL) {
-		diag_set(SystemError, "%s: failed to open the sort "
-			 "data file for write", writer->filename);
+		diag_set(SystemError, "%s: failed to open the sort data file "
+			 "for write", writer->filename);
 		return -1;
 	}
 
-	/* Write the file header. */
-	if (writer_printf(writer,
+	if (memtx_sort_data_writer_printf(writer,
 			  "SORTDATA\n"
 			  "1\n"
+			  "2\n"
 			  "Version: %s\n"
 			  "Instance: %s\n"
 			  "VClock: %s\n\n",
@@ -250,25 +352,17 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 			  vclock_to_string(vclock)) != 0)
 		return -1;
 
-	/* Write the entry count to fill it later. */
 	long entries_offset;
-	if (writer_get_offset(writer, &entries_offset) != 0 ||
-	    writer_printf(writer, ENTRIES_FMT, 0) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &entries_offset) != 0 ||
+	    memtx_sort_data_writer_printf(writer, ENTRIES_FMT, 0) != 0)
 		return -1;
 
-	/* Save the pointer to the first sort data header entry. */
-	if (writer_get_offset(writer, &writer->next_header_entry_offset) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &writer->next_header_entry_offset) != 0)
 		return -1;
 
-	/* Write dummy header entries to fill them later. */
 	uint32_t entry_count = 0;
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, rv) {
-		/*
-		 * The secondary indexes are only read-view'ed if the sort data
-		 * is enabled and the space has secondary indexes supporting it.
-		 * See the checkpoint index filter in the MemTX engine.
-		 */
 		if (space_rv->index_count <= 1)
 			continue;
 		for (uint32_t i = 0; i <= space_rv->index_id_max; i++) {
@@ -276,25 +370,25 @@ memtx_sort_data_writer_create_file(struct memtx_sort_data_writer *writer,
 				continue;
 			assert(i == 0 || memtx_index_def_supports_sort_data(
 					space_rv->index_map[i]->def));
-			writer_printf(writer, ENTRY_FMT, 0, 0, 0L, 0L, 0L);
+			if (memtx_sort_data_writer_printf(writer, ENTRY_FMT, 0, 0,
+					  0L, 0L, 0L, 0L) != 0)
+				return -1;
 			entry_count++;
 		}
 	}
 
-	/* The final newline. */
-	if (writer_printf(writer, "\n") != 0)
+	if (memtx_sort_data_writer_printf(writer, "\n") != 0)
 		return -1;
 
-	/* Write the calculated entry count and return. */
-	if (writer_seek(writer, entries_offset, SEEK_SET) != 0)
+	if (memtx_sort_data_writer_seek(writer, entries_offset, SEEK_SET) != 0)
 		return -1;
-	return writer_printf(writer, ENTRIES_FMT, entry_count);
+	return memtx_sort_data_writer_printf(writer, ENTRIES_FMT, entry_count);
 }
 
 int
 memtx_sort_data_writer_close_file(struct memtx_sort_data_writer *writer)
 {
-	assert(writer->fp != NULL); /* No close without open. */
+	assert(writer->fp != NULL);
 	fclose(writer->fp);
 	writer->fp = NULL;
 	say_info("done");
@@ -304,7 +398,6 @@ memtx_sort_data_writer_close_file(struct memtx_sort_data_writer *writer)
 int
 memtx_sort_data_writer_materialize(struct memtx_sort_data_writer *writer)
 {
-	/* The file must be successfully created. */
 	assert(strlen(writer->filename) != 0);
 
 	char *filename = writer->filename;
@@ -314,7 +407,6 @@ memtx_sort_data_writer_materialize(struct memtx_sort_data_writer *writer)
 	assert(suffix);
 	assert(strcmp(suffix, ".inprogress") == 0);
 
-	/* Create a new filename without '.inprogress' suffix. */
 	memcpy(new_filename, filename, suffix - filename);
 	new_filename[suffix - filename] = '\0';
 
@@ -330,10 +422,8 @@ memtx_sort_data_writer_materialize(struct memtx_sort_data_writer *writer)
 void
 memtx_sort_data_writer_discard(struct memtx_sort_data_writer *writer)
 {
-	/* Check if it's created. */
 	if (strlen(writer->filename) != 0) {
 		xlog_remove_file(writer->filename, 0);
-		/* Check if it's not closed. */
 		if (writer->fp != NULL) {
 			fclose(writer->fp);
 			writer->fp = NULL;
@@ -345,25 +435,42 @@ int
 memtx_sort_data_writer_begin(struct memtx_sort_data_writer *writer,
 			     uint32_t space_id, uint32_t index_id)
 {
-	/* The new index sort data is to be written at the end of the file. */
-	if (writer_seek(writer, 0, SEEK_END) != 0)
+	if (memtx_sort_data_writer_seek(writer, 0, SEEK_END) != 0)
 		return -1;
+
 	long file_end_offset;
-	if (writer_get_offset(writer, &file_end_offset) != 0)
+	if (memtx_sort_data_writer_get_offset(writer, &file_end_offset) != 0)
 		return -1;
 
 	assert(writer->curr_entry == NULL);
-	struct memtx_sort_data_writer_entry entry = {};
+	struct memtx_sort_data_writer_entry entry;
+	memset(&entry, 0, sizeof(entry));
 	entry.key.space_id = space_id;
 	entry.key.index_id = index_id;
 	entry.offset = file_end_offset;
 	entry.header_entry_offset = writer->next_header_entry_offset;
+
 	mh_int_t i = mh_memtx_sort_data_writer_entries_put(writer->entries,
 							   &entry, NULL, NULL);
-	writer->next_header_entry_offset += strlen(tt_sprintf(ENTRY_FMT, 0,
-							      0, 0L, 0L, 0L));
+	writer->next_header_entry_offset += strlen(tt_sprintf(
+		ENTRY_FMT, 0, 0, 0L, 0L, 0L, 0L));
 	writer->curr_entry =
 		mh_memtx_sort_data_writer_entries_node(writer->entries, i);
+
+	writer->in_buf_pos = 0;
+
+	size_t rc = ZSTD_CCtx_reset(writer->zctx, ZSTD_reset_session_only);
+	if (ZSTD_isError(rc)) {
+		diag_set(ClientError, ER_COMPRESSION, ZSTD_getErrorName(rc));
+		return -1;
+	}
+	rc = ZSTD_CCtx_setParameter(writer->zctx,
+				    ZSTD_c_compressionLevel,
+				    (int)MEMTX_SORT_DATA_ZSTD_LEVEL);
+	if (ZSTD_isError(rc)) {
+		diag_set(ClientError, ER_COMPRESSION, ZSTD_getErrorName(rc));
+		return -1;
+	}
 	return 0;
 }
 
@@ -372,13 +479,30 @@ memtx_sort_data_writer_put(struct memtx_sort_data_writer *writer,
 			   void *data, size_t size, size_t count)
 {
 	assert(writer->curr_entry != NULL);
-	if (fwrite(data, size, count, writer->fp) != count) {
-		diag_set(SystemError, "%s: failed to write the sort data",
-			 writer->filename);
-		return -1;
+
+	char *pos = (char *)data;
+	size_t left = size * count;
+
+	writer->curr_entry->psize += (long)(size * count);
+	writer->curr_entry->len += (long)count;
+
+	while (left > 0) {
+		size_t avail = writer->in_buf_cap - writer->in_buf_pos;
+		size_t to_copy = MIN(avail, left);
+
+		memcpy(writer->in_buf + writer->in_buf_pos, pos, to_copy);
+		writer->in_buf_pos += to_copy;
+		pos += to_copy;
+		left -= to_copy;
+
+		if (writer->in_buf_pos == writer->in_buf_cap) {
+			if (memtx_sort_data_writer_zstd_write(writer, writer->in_buf,
+					      writer->in_buf_pos,
+					      ZSTD_e_continue) != 0)
+				return -1;
+			writer->in_buf_pos = 0;
+		}
 	}
-	writer->curr_entry->psize += size * count;
-	writer->curr_entry->len += count;
 	return 0;
 }
 
@@ -392,14 +516,29 @@ memtx_sort_data_writer_put_tuple(struct memtx_sort_data_writer *writer,
 int
 memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 {
-	/* Update the dummy sort data entry in the file header. */
 	assert(writer->curr_entry != NULL);
 	struct memtx_sort_data_writer_entry *entry = writer->curr_entry;
-	if (writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
-	    writer_printf(writer, ENTRY_FMT, entry->key.space_id,
+
+	if (entry->psize > 0) {
+		if (writer->in_buf_pos > 0) {
+			if (memtx_sort_data_writer_zstd_write(writer, writer->in_buf,
+					      writer->in_buf_pos,
+					      ZSTD_e_continue) != 0)
+				return -1;
+			writer->in_buf_pos = 0;
+		}
+		if (memtx_sort_data_writer_zstd_write(writer, NULL, 0, ZSTD_e_end) != 0)
+			return -1;
+	} else {
+		entry->csize = 0;
+	}
+
+	if (memtx_sort_data_writer_seek(writer, entry->header_entry_offset, SEEK_SET) != 0 ||
+	    memtx_sort_data_writer_printf(writer, ENTRY_FMT, entry->key.space_id,
 			  entry->key.index_id, entry->offset,
-			  entry->psize, entry->len) != 0)
+			  entry->psize, entry->csize, entry->len) != 0)
 		return -1;
+
 	writer->curr_entry = NULL;
 	return 0;
 }
@@ -408,12 +547,6 @@ memtx_sort_data_writer_commit(struct memtx_sort_data_writer *writer)
 
 /* {{{ Reader *****************************************************************/
 
-/**
- * Read the expected next contents in the file header. Returns a pointer to the
- * string right after the expected one (the buffer is statically allocated).
- *
- * WARNING: the max size of the header line is limited.
- */
 static char *
 memtx_sort_data_header_expect(struct memtx_sort_data_reader *reader,
 			      const char *expect)
@@ -429,6 +562,118 @@ memtx_sort_data_header_expect(struct memtx_sort_data_reader *reader,
 	return line + expect_len;
 }
 
+static int
+reader_start_entry_stream(struct memtx_sort_data_reader *reader,
+			  struct memtx_sort_data_reader_entry *entry)
+{
+	if (entry->psize < 0 || entry->csize < 0) {
+		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+			 reader->filename, "negative entry size");
+		return -1;
+	}
+
+	if (fseek(reader->fp, entry->offset, SEEK_SET) != 0) {
+		diag_set(SystemError, "%s: space %u index %u seek failed",
+			 reader->filename, entry->key.space_id,
+			 entry->key.index_id);
+		return -1;
+	}
+
+	reader->curr_entry = entry;
+
+	if (!reader->is_compressed) {
+		reader->compressed_left = 0;
+		reader->zsrc_size = 0;
+		reader->zsrc_pos = 0;
+		return 0;
+	}
+
+	size_t rc = ZSTD_DCtx_reset(reader->zctx, ZSTD_reset_session_only);
+	if (ZSTD_isError(rc)) {
+		diag_set(ClientError, ER_COMPRESSION, ZSTD_getErrorName(rc));
+		return -1;
+	}
+
+	reader->compressed_left = entry->csize;
+	reader->zsrc_size = 0;
+	reader->zsrc_pos = 0;
+	return 0;
+}
+
+static int
+memtx_sort_data_reader_refill_zsrc(struct memtx_sort_data_reader *reader)
+{
+	if (reader->compressed_left <= 0) {
+		reader->zsrc_size = 0;
+		reader->zsrc_pos = 0;
+		return 0;
+	}
+
+	size_t to_read = MIN(reader->zsrc_buf_cap, (size_t)reader->compressed_left);
+	size_t read = fread(reader->zsrc_buf, 1, to_read, reader->fp);
+	if (read != to_read) {
+		if (feof(reader->fp)) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "EOF during compressed read");
+		} else {
+			diag_set(SystemError, "%s: failed to read compressed data",
+				 reader->filename);
+		}
+		return -1;
+	}
+
+	reader->zsrc_size = read;
+	reader->zsrc_pos = 0;
+	reader->compressed_left -= (long)read;
+	return 0;
+}
+
+static int
+memtx_sort_data_reader_read_exact_uncompressed(struct memtx_sort_data_reader *reader,
+			       void *dst, size_t size)
+{
+	char *pos = (char *)dst;
+	size_t left = size;
+
+	while (left > 0) {
+		if (reader->zsrc_pos == reader->zsrc_size &&
+		    reader->compressed_left > 0) {
+			if (memtx_sort_data_reader_refill_zsrc(reader) != 0)
+				return -1;
+		}
+
+		ZSTD_inBuffer input = {
+			.src = reader->zsrc_buf,
+			.size = reader->zsrc_size,
+			.pos = reader->zsrc_pos,
+		};
+		ZSTD_outBuffer output = {
+			.dst = pos,
+			.size = left,
+			.pos = 0,
+		};
+
+		size_t prev_in_pos = input.pos;
+		size_t rc = ZSTD_decompressStream(reader->zctx, &output, &input);
+		if (ZSTD_isError(rc)) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, ZSTD_getErrorName(rc));
+			return -1;
+		}
+
+		reader->zsrc_pos = input.pos;
+		pos += output.pos;
+		left -= output.pos;
+
+		if (output.pos == 0 && input.pos == prev_in_pos) {
+			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+				 reader->filename, "truncated zstd stream");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 struct memtx_sort_data_reader *
 memtx_sort_data_reader_new(const char *snap_filename,
 			   const struct vclock *vclock,
@@ -436,19 +681,27 @@ memtx_sort_data_reader_new(const char *snap_filename,
 {
 	const char *filename = memtx_sort_data_filename(snap_filename);
 	struct memtx_sort_data_reader *reader = xmalloc(sizeof(*reader));
+	memset(reader, 0, sizeof(*reader));
+
 	snprintf(reader->filename, sizeof(reader->filename), "%s", filename);
 	reader->entries = mh_memtx_sort_data_entries_new();
 	reader->curr_entry = NULL;
 	reader->old2new = NULL;
 
-	/* Open the .sortdata file. */
+	reader->zctx = ZSTD_createDCtx();
+	if (reader->zctx == NULL) {
+		say_error("%s: failed to create ZSTD DCtx", reader->filename);
+		goto fail_free;
+	}
+	reader->zsrc_buf_cap = ZSTD_DStreamInSize();
+	reader->zsrc_buf = xmalloc(reader->zsrc_buf_cap);
+
 	reader->fp = fopen(reader->filename, "rb");
 	if (reader->fp == NULL) {
 		say_error("%s: file open failed", reader->filename);
 		goto fail_free;
 	}
 
-	/* Set the read buffer, the PK sort data read is very slow otherwise. */
 	size_t buffer_capacity = 8 * 1024 * 1024; /* 8MB */
 	reader->buffer = xmalloc(buffer_capacity);
 	if (setvbuf(reader->fp, reader->buffer, _IOFBF, buffer_capacity) != 0) {
@@ -456,23 +709,33 @@ memtx_sort_data_reader_new(const char *snap_filename,
 		goto fail_close;
 	}
 
-	/* Verify the file magic. */
 	if (memtx_sort_data_header_expect(reader, "SORTDATA\n") == NULL)
 		goto fail_close;
-
-	/* Verify the file version. */
 	if (memtx_sort_data_header_expect(reader, "1\n") == NULL)
 		goto fail_close;
 
-	/* Skip the Tarantool version. */
-	if (memtx_sort_data_header_expect(reader, "Version: ") == NULL)
+	char *line = tt_static_buf();
+	if (fgets(line, TT_STATIC_BUF_LEN, reader->fp) == NULL) {
 		goto fail_close;
+	}
 
-	/* Verify the instance UUID. */
+	char *version_str;
+	if (strcmp(line, "2\n") == 0) {
+		reader->is_compressed = true;
+		version_str = memtx_sort_data_header_expect(reader, "Version: ");
+		if (version_str == NULL)
+			goto fail_close;
+	} else if (strncmp(line, "Version: ", strlen("Version: ")) == 0) {
+		reader->is_compressed = false;
+		version_str = line + strlen("Version: ");
+	} else {
+		goto fail_close;
+	}
+
 	char *uuid_str = memtx_sort_data_header_expect(reader, "Instance: ");
 	if (uuid_str == NULL)
 		goto fail_close;
-	if (strlen(uuid_str) - 1 /* Newline. */ != UUID_STR_LEN) {
+	if (strlen(uuid_str) - 1 != UUID_STR_LEN) {
 		say_error("%s: invalid UUID length: %s",
 			  reader->filename, uuid_str);
 		goto fail_close;
@@ -488,11 +751,10 @@ memtx_sort_data_reader_new(const char *snap_filename,
 		goto fail_close;
 	}
 
-	/* Verify the vclock signature. */
 	char *vclock_str = memtx_sort_data_header_expect(reader, "VClock: ");
 	if (vclock_str == NULL)
 		goto fail_close;
-	vclock_str[strlen(vclock_str) - 1] = '\0'; /* Drop the newline. */
+	vclock_str[strlen(vclock_str) - 1] = '\0';
 	struct vclock sortdata_vclock = {};
 	if (vclock_from_string(&sortdata_vclock, vclock_str) != 0) {
 		say_error("%s: invalid VClock: %s",
@@ -508,28 +770,37 @@ memtx_sort_data_reader_new(const char *snap_filename,
 		goto fail_close;
 	}
 
-	/* Skip the newline. */
 	if (memtx_sort_data_header_expect(reader, "\n") == NULL)
 		goto fail_close;
 
-	/* Get the sort data entry count. */
 	unsigned entry_count;
 	if (fscanf(reader->fp, ENTRIES_FMT, &entry_count) != 1) {
 		say_error("%s: invalid entry count", reader->filename);
 		goto fail_close;
 	}
 
-	/* Get the sort data entries. */
 	for (unsigned i = 0; i < entry_count; i++) {
 		struct memtx_sort_data_reader_entry entry;
-		if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
-			   &entry.key.index_id, &entry.offset,
-			   &entry.psize, &entry.len) != 5) {
-			say_error("%s: entry read failed", reader->filename);
-			goto fail_close;
+		memset(&entry, 0, sizeof(entry));
+
+		if (reader->is_compressed) {
+			if (fscanf(reader->fp, ENTRY_FMT, &entry.key.space_id,
+				   &entry.key.index_id, &entry.offset,
+				   &entry.psize, &entry.csize, &entry.len) != 6) {
+				say_error("%s: entry read failed", reader->filename);
+				goto fail_close;
+			}
+		} else {
+			if (fscanf(reader->fp, ENTRY_FMT_UNCOMPRESSED, &entry.key.space_id,
+				   &entry.key.index_id, &entry.offset,
+				   &entry.psize, &entry.len) != 5) {
+				say_error("%s: entry read failed", reader->filename);
+				goto fail_close;
+			}
+			entry.csize = entry.psize;
 		}
-		mh_memtx_sort_data_entries_put(reader->entries,
-					       &entry, NULL, NULL);
+
+		mh_memtx_sort_data_entries_put(reader->entries, &entry, NULL, NULL);
 	}
 
 	say_info("using the memtx sort data from `%s'", reader->filename);
@@ -540,6 +811,9 @@ fail_close:
 	free(reader->buffer);
 	say_warn("memtx sort data file `%s' ignored", reader->filename);
 fail_free:
+	if (reader->zctx != NULL)
+		ZSTD_freeDCtx(reader->zctx);
+	free(reader->zsrc_buf);
 	mh_memtx_sort_data_entries_delete(reader->entries);
 	free(reader);
 	return NULL;
@@ -549,7 +823,6 @@ int
 memtx_sort_data_reader_space_init(struct memtx_sort_data_reader *reader,
 				  uint32_t space_id)
 {
-	/* Check if have sort data for the space in the file. */
 	struct memtx_sort_data_key key = {space_id, 0};
 	mh_int_t i = mh_memtx_sort_data_entries_find(reader->entries,
 						     key, NULL);
@@ -558,17 +831,11 @@ memtx_sort_data_reader_space_init(struct memtx_sort_data_reader *reader,
 		return 0;
 	}
 
-	/* Seek to the PK data and save the entry info to access later. */
 	struct memtx_sort_data_reader_entry *entry =
 		mh_memtx_sort_data_entries_node(reader->entries, i);
-	if (fseek(reader->fp, entry->offset, SEEK_SET) != 0) {
-		diag_set(SystemError, "%s: space %u PK seek failed",
-			 reader->filename, space_id);
+	if (reader_start_entry_stream(reader, entry) != 0)
 		return -1;
-	}
-	reader->curr_entry = entry;
 
-	/* Create a new old2new tuple map for the space. */
 	reader->old2new = mh_ptrptr_new();
 	mh_ptrptr_reserve(reader->old2new, entry->len, NULL);
 	return 0;
@@ -579,8 +846,12 @@ memtx_sort_data_reader_space_free(struct memtx_sort_data_reader *reader)
 {
 	if (reader->curr_entry != NULL) {
 		mh_ptrptr_delete(reader->old2new);
+		reader->old2new = NULL;
 		reader->curr_entry = NULL;
 	}
+	reader->compressed_left = 0;
+	reader->zsrc_size = 0;
+	reader->zsrc_pos = 0;
 }
 
 int
@@ -588,26 +859,28 @@ memtx_sort_data_reader_pk_add_tuple(struct memtx_sort_data_reader *reader,
 				    struct tuple *tuple)
 {
 	if (reader->curr_entry == NULL)
-		return 0; /* No sort data for the space. */
+		return 0;
 
-	/*
-	 * Associate the old tuple pointer (read from the sort data file) with
-	 * the new one (created on insertion). The fread is buffered with user
-	 * specified buffer of a large size, see the reader constructor.
-	 */
 	struct mh_ptrptr_node_t node;
-	if (fread(&node.key, sizeof(node.key), 1, reader->fp) != 1) {
-		if (feof(reader->fp)) {
-			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
-				 reader->filename, "EOF during PK read");
-			return -1;
-		} else {
-			diag_set(SystemError, "%s: space %u PK read failed",
-				 reader->filename,
-				 reader->curr_entry->key.space_id);
+
+	if (!reader->is_compressed) {
+		if (fread(&node.key, sizeof(node.key), 1, reader->fp) != 1) {
+			if (feof(reader->fp)) {
+				diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+					 reader->filename, "EOF during PK read");
+			} else {
+				diag_set(SystemError, "%s: space %u PK read failed",
+					 reader->filename,
+					 reader->curr_entry->key.space_id);
+			}
 			return -1;
 		}
+	} else {
+		if (memtx_sort_data_reader_read_exact_uncompressed(reader, &node.key,
+						   sizeof(node.key)) != 0)
+			return -1;
 	}
+
 	node.val = tuple;
 	mh_ptrptr_put(reader->old2new, &node, NULL, NULL);
 	return 0;
@@ -621,7 +894,7 @@ memtx_sort_data_reader_seek(struct memtx_sort_data_reader *reader,
 	assert(have_data != NULL);
 
 	if (reader->curr_entry == NULL) {
-		*have_data = false; /* No space sort data. */
+		*have_data = false;
 		return 0;
 	}
 
@@ -630,18 +903,15 @@ memtx_sort_data_reader_seek(struct memtx_sort_data_reader *reader,
 	mh_int_t i = mh_memtx_sort_data_entries_find(reader->entries,
 						     key, NULL);
 	if (i == mh_end(reader->entries)) {
-		*have_data = false; /* No SK sort data. */
+		*have_data = false;
 		return 0;
 	}
 
 	struct memtx_sort_data_reader_entry *entry =
 		mh_memtx_sort_data_entries_node(reader->entries, i);
-	if (fseek(reader->fp, entry->offset, SEEK_SET) != 0) {
-		diag_set(SystemError, "%s: space %u index %u seek failed",
-			 reader->filename, space_id, index_id);
+	if (reader_start_entry_stream(reader, entry) != 0)
 		return -1;
-	}
-	reader->curr_entry = entry;
+
 	*have_data = true;
 	return 0;
 }
@@ -649,7 +919,6 @@ memtx_sort_data_reader_seek(struct memtx_sort_data_reader *reader,
 size_t
 memtx_sort_data_reader_get_size(struct memtx_sort_data_reader *reader)
 {
-	/* Only called if sort data exists. */
 	assert(reader->curr_entry != NULL);
 	return reader->curr_entry->len;
 }
@@ -659,33 +928,41 @@ memtx_sort_data_reader_get(struct memtx_sort_data_reader *reader,
 			   void *buffer, long expected_data_size)
 {
 	struct memtx_sort_data_reader_entry *entry = reader->curr_entry;
-	assert(entry != NULL); /* Only called if sort data exists. */
+	assert(entry != NULL);
+
 	if (entry->psize != expected_data_size) {
 		diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
 			 reader->filename, "SK size is invalid");
 		return -1;
 	}
-	if (fread(buffer, 1, entry->psize,
-		  reader->fp) != (size_t)entry->psize) {
-		if (feof(reader->fp)) {
-			diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
-				 reader->filename, "EOF during SK read");
-			return -1;
-		} else {
-			diag_set(SystemError, "%s: space %u: failed to read "
-				 " index #%u data", reader->filename,
-				 entry->key.space_id, entry->key.index_id);
+	if (entry->psize == 0)
+		return 0;
+
+	if (!reader->is_compressed) {
+		if (fread(buffer, 1, entry->psize, reader->fp) !=
+		    (size_t)entry->psize) {
+			if (feof(reader->fp)) {
+				diag_set(ClientError, ER_INVALID_SORTDATA_FILE,
+					 reader->filename, "EOF during SK read");
+			} else {
+				diag_set(SystemError, "%s: space %u: failed to read "
+					 "index #%u data",
+					 reader->filename,
+					 entry->key.space_id, entry->key.index_id);
+			}
 			return -1;
 		}
+		return 0;
 	}
-	return 0;
+
+	return memtx_sort_data_reader_read_exact_uncompressed(reader, buffer,
+					      (size_t)entry->psize);
 }
 
 struct tuple *
 memtx_sort_data_reader_resolve_tuple(struct memtx_sort_data_reader *reader,
 				     struct tuple *old_ptr)
 {
-	/* Only called if sort data exists. */
 	assert(reader->curr_entry != NULL);
 	mh_int_t i = mh_ptrptr_find(reader->old2new, old_ptr, NULL);
 	if (i == mh_end(reader->old2new)) {
@@ -704,6 +981,8 @@ memtx_sort_data_reader_delete(struct memtx_sort_data_reader *reader)
 	memtx_sort_data_reader_space_free(reader);
 	fclose(reader->fp);
 	mh_memtx_sort_data_entries_delete(reader->entries);
+	ZSTD_freeDCtx(reader->zctx);
+	free(reader->zsrc_buf);
 	free(reader->buffer);
 	free(reader);
 }
