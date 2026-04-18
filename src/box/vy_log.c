@@ -1149,7 +1149,7 @@ vy_log_end_recovery(void)
 		return -1;
 	}
 
-	xdir_remove_temporary_files(&vy_log.dir);
+	xdir_remove_temporary_files(&vy_log.dir, ".vylog");
 	vy_log.recovery = NULL;
 	return 0;
 }

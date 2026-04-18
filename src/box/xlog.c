@@ -712,19 +712,36 @@ xdir_remove_file_by_vclock(struct xdir *dir, struct vclock *to_remove)
 	return 0;
 }
 
+bool
+xlog_file_is_temporary_impl(const char *filename, const char *target_ext,
+			    const char *temporary_ext)
+{
+	assert(temporary_ext[0] == '.');
+	assert(target_ext[0] == '.');
+	char suffix[PATH_MAX];
+	VERIFY((size_t)snprintf(suffix, sizeof(suffix), "%s%s", target_ext,
+				temporary_ext) < sizeof(suffix));
+	size_t filename_len = strlen(filename);
+	size_t suffix_len = strlen(suffix);
+	return filename_len >= suffix_len &&
+	       strncmp(filename + filename_len - suffix_len,
+		       suffix, suffix_len) == 0;
+}
+
 /** Default implementation of xlog_file_is_temporary(). */
 static bool
-xlog_file_is_temporary_default(const char *filename)
+xlog_file_is_temporary_default(const char *filename,
+			       const char *target_ext)
 {
-	const char *ext = strrchr(filename, '.');
-	return ext != NULL && strcmp(ext, inprogress_suffix) == 0;
+	return xlog_file_is_temporary_impl(filename, target_ext,
+					   inprogress_suffix);
 }
 
 xlog_file_is_temporary_f xlog_file_is_temporary =
 				xlog_file_is_temporary_default;
 
 void
-xdir_remove_temporary_files(struct xdir *xdir)
+xdir_remove_temporary_files(struct xdir *xdir, const char *filename_ext)
 {
 	const char *dirname = xdir->dirname;
 	DIR *dh = opendir(dirname);
@@ -737,7 +754,7 @@ xdir_remove_temporary_files(struct xdir *xdir)
 	while ((dent = readdir(dh)) != NULL) {
 		const char *filename = tt_snprintf(PATH_MAX, "%s/%s",
 						   dirname, dent->d_name);
-		if (xlog_file_is_temporary(filename))
+		if (xlog_file_is_temporary(filename, filename_ext))
 			xlog_remove_file(filename, XLOG_RM_VERBOSE);
 	}
 	closedir(dh);
