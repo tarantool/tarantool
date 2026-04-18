@@ -7,7 +7,7 @@ g.before_all(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
     cg.server:exec(function(engine)
-        local sql = [[SET SESSION "sql_default_engine" = '%s']]
+        local sql = [[SET SESSION "sql_default_engine" = '%s';]]
         box.execute(sql:format(engine))
     end, {cg.params.engine})
 end)
@@ -65,4 +65,30 @@ g.test_4745_table_info_assertion = function(cg)
         t.assert_equals(err, nil)
         T:drop()
     end, {cg.params.engine})
+end
+
+--
+-- This code checks that basic SQL query operations
+-- do not work without a primary key
+--
+g.test_no_pk_space = function(cg)
+    cg.server:exec(function()
+        local format = {{'id', 'integer'}}
+        local s = box.schema.create_space('test', {format = format})
+
+        local exp_err = [[SQL does not support spaces without primary key]]
+        local _, err = box.execute([[SELECT * FROM "test";]])
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[INSERT INTO "test" VALUES (1);]])
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[DELETE FROM "test";]])
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute([[UPDATE "test" SET id = 3;]])
+        t.assert_equals(tostring(err), exp_err)
+
+        s:drop()
+    end)
 end
