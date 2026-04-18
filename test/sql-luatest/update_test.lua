@@ -50,3 +50,32 @@ g.test_2251_multiple_update = function(cg)
         box.execute("DROP TABLE t2")
     end)
 end
+
+-- gh-3566: UPDATE OR IGNORE causes deletion of old entry.
+g.test_3566_update_ignore_delection_old_entry = function(cg)
+    cg.server:exec(function()
+        local sql = "CREATE TABLE tj (s0 INT PRIMARY KEY, "..
+                    "s1 INT UNIQUE, s2 INT);"
+        box.execute(sql)
+        box.execute("INSERT INTO tj VALUES (1, 1, 2), (2, 2, 3);")
+        box.execute("CREATE UNIQUE INDEX i ON tj (s2);")
+        box.execute("UPDATE OR IGNORE tj SET s1 = s1 + 1;")
+
+        local exp = {
+            {1, 2},
+            {3, 3},
+        }
+        local res = box.execute("SELECT s1, s2 FROM tj;")
+        t.assert_equals(res.rows, exp)
+
+        box.execute("UPDATE OR IGNORE tj SET s2 = s2 + 1;")
+
+        exp = {
+            {1, 2},
+            {3, 4},
+        }
+        res = box.execute("SELECT s1, s2 FROM tj;")
+        t.assert_equals(res.rows, exp)
+        box.execute("DROP TABLE tj;")
+    end)
+end
