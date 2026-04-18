@@ -110,7 +110,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	char c;
 	int day_offset, wday_offset;
 	int week_offset;
-	int i, len;
+	int i, j, len;
 	int Ealternative, Oalternative;
 	enum flags flags = FLAG_NONE;
 	int century = -1;
@@ -600,11 +600,24 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 					return NULL;
 			}
 
-			if (i > 1400 || (sign == -1 && i > 1200) ||
-			    (i % 100) >= 60)
+			if (i % 100 >= 60)
 				return NULL;
-			tm->tm_gmtoff =
-				sign * ((i / 100) * 3600 + i % 100 * 60);
+
+			/* Min/max as in datetime.h, converted to sec. */
+			#define MAX_TZOFFSET 913 * 60
+			#define MIN_TZOFFSET (-956) * 60
+			/*
+			 * TODO: This check must be moved to datetime.c,
+			 * there the range is defined. Here we must
+			 * check max range [-23:59..+23:59] as in
+			 * dt_parse_iso_zone_lenient.
+			 */
+			j = sign * ((i / 100) * 3600 + i % 100 * 60);
+			if (j < MIN_TZOFFSET || j > MAX_TZOFFSET)
+				return NULL;
+			tm->tm_gmtoff = j;
+			#undef MAX_TZOFFSET
+			#undef MIN_TZOFFSET
 		} break;
 
 		case 'n':

@@ -116,6 +116,10 @@ local TOSTRING_BUFSIZE  = 64
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
+-- See datetime.h.
+local MIN_TZOFFSET = -956
+local MAX_TZOFFSET = 913
+
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
 local MIN_DATE_MONTH = 6
@@ -648,9 +652,7 @@ local function extract_obj_tzoffset_tzindex(obj, base_epoch)
     elseif obj_tzoffset ~= nil then
         tzindex = 0
         tzoffset = get_timezone(obj_tzoffset, 'tzoffset', 1)
-        -- at the moment the range of known timezones is UTC-12:00..UTC+14:00
-        -- https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
-        check_range(tzoffset, -720, 840, 'tzoffset', nil, 1)
+        check_range(tzoffset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset', nil, 1)
     end
     return tzoffset, tzindex
 end
@@ -967,7 +969,7 @@ local function datetime_parse_from(str, obj)
 
     if tzoffset ~= nil then
         local offset = get_timezone(tzoffset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
+        check_range(offset, MIN_TZOFFSET, MAX_TZOFFSET, 'tzoffset')
     end
 
     if tzname ~= nil then

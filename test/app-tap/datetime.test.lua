@@ -17,6 +17,9 @@ local MIN_DATE_YEAR = -5879610
 -- maximum supported date - 5879611-07-11
 local MAX_DATE_YEAR = 5879611
 
+local MIN_TZOFFSET = -956
+local MAX_TZOFFSET = 913
+
 local SECS_PER_DAY      = 86400
 local AVERAGE_DAYS_YEAR = 365.25
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
@@ -2830,13 +2833,13 @@ test:test("Time invalid tzoffset in :set{} operations", function(test)
     end
 
     local bad_numbers = {
-        880,
-        -800,
-        10000,
-        -10000,
+        MAX_TZOFFSET + 100,
+        MIN_TZOFFSET - 100,
+        10 * MAX_TZOFFSET,
+        10 * MIN_TZOFFSET,
     }
     for _, val in ipairs(bad_numbers) do
-        assert_raises(test, range_check_error('tzoffset', val, {-720, 840}),
+        assert_raises(test, range_check_error('tzoffset', val, {MIN_TZOFFSET, MAX_TZOFFSET}),
                       function() ts:set{ tzoffset = val } end)
     end
 end)

@@ -64,11 +64,11 @@ struct tnt_tm;
 	(MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
 
 /**
- * At the moment the range of known timezones is UTC-12:00..UTC+14:00
- * https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+ * To calculate tzoffset range, use the script:
+ * tarantool src/lib/core/datetime_calc_tzoffset_range.lua
  */
-#define MAX_TZOFFSET (14L * 60)
-#define MIN_TZOFFSET (-12L * 60)
+#define MAX_TZOFFSET 913
+#define MIN_TZOFFSET (-956)
 
 /**
  * Actually we have lesser number of generated timezones, but 1024
