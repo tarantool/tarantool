@@ -5,8 +5,13 @@ local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
 local server = require('luatest.server')
+local is_macos = jit.os == 'OSX'
 
 local g = t.group()
+
+g.before_all(function()
+    t.skip_if(is_macos)
+end)
 
 local BASE_CONFIG = cbuilder:new()
     :set_global_option('credentials.users.admin.password', 'secret')

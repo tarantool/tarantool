@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+local is_macos = jit.os == 'OSX'
 
 local g_tweaks = t.group('read_view.tweaks')
 
@@ -2764,6 +2765,7 @@ end
 local g_threads = t.group('read_view.threads')
 
 g_threads.before_all(function(cg)
+    t.skip_if(is_macos)
     cg.server = server:new({
         box_cfg = {app_threads = 4},
         net_box_credentials = {user = 'admin'}

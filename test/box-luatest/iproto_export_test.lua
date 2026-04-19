@@ -2,6 +2,7 @@ local net = require('net.box')
 
 local t = require('luatest')
 local server = require('luatest.server')
+local is_macos = jit.os == 'OSX'
 
 local g1 = t.group('iproto_export', t.helpers.matrix({
     before_box_cfg = {false, true},
@@ -70,6 +71,7 @@ g2.test_invalid_arguments = function(cg)
 end
 
 g2.test_iproto_export_in_app_threads = function(cg)
+    t.skip_if(is_macos)
     cg.server = server:new({
         box_cfg = {app_threads = 2},
         net_box_credentials = {user = 'admin'},
@@ -115,6 +117,7 @@ g2.test_iproto_export_in_app_threads = function(cg)
 end
 
 g2.test_iproto_call_routing = function(cg)
+    t.skip_if(is_macos)
     cg.server = server:new({
         box_cfg = {
             iproto_threads = 5,
