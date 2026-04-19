@@ -15,7 +15,7 @@
 #include <zstd.h>
 
 uint64_t MEMTX_SORT_DATA_ZSTD_LEVEL = 3;
-TWEAK_UINT(MEMTX_SORT_DATA_ZSTD_LEVEL);
+TWEAK_INT(MEMTX_SORT_DATA_ZSTD_LEVEL);
 
 /**
  * Maps: (space_id, index_id) => (sort data entry information).

@@ -1,5 +1,5 @@
-local MIN_LEVEL = 1
-local MAX_LEVEL = 19
+local MIN_LEVEL = -20
+local MAX_LEVEL = 5
 
 local TARANTOOL_BIN = "./src/tarantool"
 local SNAP_SCRIPT   = "../perf/lua/box_snapshot.lua"
