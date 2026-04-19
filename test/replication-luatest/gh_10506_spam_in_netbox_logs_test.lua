@@ -74,16 +74,26 @@ g.test_no_connection_refused_logs_when_connection_succeeds = function()
 end
 
 g.test_no_spam_in_logs_while_connecting_to_non_existent_instance = function()
-    g.router:exec(function(reconnect_after)
+    -- Use a real ephemeral listen URI and then stop the instance. Connecting
+    -- to localhost:0 may fail with a platform-specific address error instead
+    -- of "Connection refused" and does not exercise the intended path.
+    g.storage:update_box_cfg({listen = "localhost:0"})
+    local storage_uri = g.storage:exec(function()
+        return box.info.listen[1]
+    end)
+    g.storage:stop()
+    wait_socket_state(storage_uri, "error")
+    g.router:exec(function(storage_uri, reconnect_after)
         local netbox_f = require("fiber").create(function()
-            require("net.box").connect("localhost:0",
+            require("net.box").connect(storage_uri,
                                        {reconnect_after = reconnect_after})
         end)
         rawset(_G, "netbox_f", netbox_f)
-    end, {g.reconnect_after})
+    end, {storage_uri, g.reconnect_after})
     test_only_one_record_appears_in_logs(g.router, g.connection_refused_pattern,
                                         g.reconnect_after * 2)
     g.router:exec(function() _G.netbox_f:cancel() end)
+    g.storage:start()
 end
 
 g.test_no_spam_in_logs_when_connection_cannot_be_restored_anymore = function()
