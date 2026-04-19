@@ -435,10 +435,8 @@ memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
 
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       struct index *index, struct tuple *tuple)
 {
-	(void)mk_index;
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
 	struct memtx_index_entry entry = {
