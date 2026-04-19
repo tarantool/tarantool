@@ -215,7 +215,7 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 		struct tuple *tuple = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
 		struct txn *txn = in_txn();
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, index_base, 0);
+		*ret = memtx_tx_tuple_clarify(txn, space, index_base, tuple);
 	} while (*ret == NULL);
 
 	return 0;
