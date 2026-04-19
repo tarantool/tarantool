@@ -3,8 +3,13 @@ local net = require('net.box')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local is_macos = jit.os == 'OSX'
 
 local g = t.group()
+
+g.before_all(function()
+    t.skip_if(is_macos)
+end)
 
 --
 -- FIXME(gh-12546): For server.exec to be able to find the luatest module,
