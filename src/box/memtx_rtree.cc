@@ -173,7 +173,7 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 		if (*ret == NULL)
 			break;
 		struct txn *txn = in_txn();
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+		*ret = memtx_tx_tuple_clarify(txn, space, index, *ret);
 	} while (*ret == NULL);
 	return 0;
 }
@@ -254,7 +254,7 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, base, tuple);
 	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;

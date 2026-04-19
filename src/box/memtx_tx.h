@@ -414,15 +414,10 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 }
 
 /**
- * Clean a tuple if it's dirty - finds a visible tuple in history.
+ * Return the visible version of a logical index entry.
  *
- * @param txn - current transactions.
- * @param space - space in which the tuple was found.
- * @param tuple - tuple to clean.
- * @param index - index in which the tuple was found.
- * @param mk_index - multikey index (iа the index is multikey).
- * @param is_prepared_ok - allow to return prepared tuples.
- * @return clean tuple (can be NULL).
+ * The complete entry identity is required for multikey and functional indexes.
+ * The returned tuple may be NULL if the entry is not visible.
  */
 static inline struct tuple *
 memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
@@ -434,12 +429,19 @@ memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
 	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry);
 }
 
+/**
+ * Adapt tuple-only index reads to memtx_tx_index_entry_clarify().
+ *
+ * This adapter is only valid for regular, non-functional, non-multikey
+ * indexes, where a tuple uniquely identifies an index entry. Indexes that need
+ * a hint to preserve entry identity must call memtx_tx_index_entry_clarify().
+ */
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       struct index *index, struct tuple *tuple)
 {
-	(void)mk_index;
+	assert(!index->def->key_def->is_multikey);
+	assert(!index->def->key_def->for_func_index);
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
 	struct memtx_index_entry entry = {
