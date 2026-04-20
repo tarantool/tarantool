@@ -106,6 +106,29 @@ local function log_destination(log)
     end
 end
 
+local function wait_if_not_bootstrap_leader()
+    -- Wait until the instance learns its id in the replicaset to
+    -- distinguish a bootstrap leader from a regular replica.
+    --
+    -- Default value for `replication.connect_timeout` is 30 seconds.
+    local TIMEOUT = 30
+    local deadline = fiber.time() + TIMEOUT
+    while box.info.id == 0 do
+        if fiber.time() > deadline then
+            error(string.format(
+                'failed to learn instance id in the replicaset within %d ' ..
+                'seconds; cannot distinguish bootstrap leader from a ' ..
+                'regular replica.', TIMEOUT), 0)
+        end
+        fiber.sleep(0.01)
+    end
+
+    if box.info.id ~= 1 then
+        -- Not really a bootstrap leader, just a replica. Go to RO.
+        box.cfg({read_only = true})
+    end
+end
+
 --------------------------------------------------------------------------------
 --  Instance/replicaset names
 --------------------------------------------------------------------------------
@@ -349,6 +372,7 @@ end
 -- Returns nothing or {needs_retry = true}.
 local function apply(config)
     local configdata = config._configdata
+    local post_box_cfg_bootstrap_leader_hook
     local box_cfg = configdata:filter(function(w)
         return w.schema.box_cfg ~= nil
     end, {use_default = true}):map(function(w)
@@ -560,24 +584,19 @@ local function apply(config)
         -- the replicaset bootstrap is needed, before a first
         -- box.cfg().
         --
-        -- However, after leaving box.cfg() or from a background
-        -- fiber after box.ctl.wait_rw() we can check that the
-        -- instance was a bootstrap leader using the
+        -- After box.cfg() returns, we can determine whether the
+        -- instance really became the bootstrap leader using the
         -- box.info.id == 1 condition.
         --
+        -- Note that box.ctl.wait_rw() is not sufficient here:
+        -- box_cfg.read_only is set above before the instance
+        -- learns its id, so RW status does not guarantee that
+        -- box.info.id has already been assigned.
+        --
         -- If box.info.id != 1, then the replicaset was already
-        -- bootstrapped and so we should go to RO.
+        -- bootstrapped and the instance should go to RO.
         if am_i_bootstrap_leader then
-            fiber.new(function()
-                local name = 'config_set_read_only_if_not_bootstrap_leader'
-                fiber.self():name(name, {truncate = true})
-                box.ctl.wait_rw()
-                if box.info.id ~= 1 then
-                    -- Not really a bootstrap leader, just a
-                    -- replica. Go to RO.
-                    box.cfg({read_only = true})
-                end
-            end)
+            post_box_cfg_bootstrap_leader_hook = wait_if_not_bootstrap_leader
         end
     else
         assert(false)
@@ -787,6 +806,9 @@ local function apply(config)
     -- If it is reload, just apply the new configuration.
     log.debug('box_cfg.apply')
     box.cfg(box_cfg)
+    if post_box_cfg_bootstrap_leader_hook ~= nil then
+        post_box_cfg_bootstrap_leader_hook()
+    end
 end
 
 return {
