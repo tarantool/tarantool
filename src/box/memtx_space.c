@@ -218,8 +218,9 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				struct tuple **result)
 {
 	struct tuple *successor;
-	if (memtx_index_replace(space->index[0], old_tuple, new_tuple, mode,
-				&old_tuple, &successor) != 0)
+	if (memtx_index_replace_with_results(space->index[0], old_tuple,
+					     new_tuple, mode, &old_tuple,
+					     &successor) != 0)
 		return -1;
 	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
@@ -1238,15 +1239,12 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 	assert(stmt->old_tuple == NULL ||
 	       memtx_tuple_validate(state->format, stmt->old_tuple) == 0);
 
-	struct tuple *delete = NULL;
-	struct tuple *successor = NULL;
 	/*
 	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
 	 * with a duplicate at a unique index, this trigger would not be called.
 	 */
 	state->rc = memtx_index_replace(state->index, stmt->new_tuple,
-					stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-					&delete, &successor);
+					stmt->old_tuple, DUP_REPLACE_OR_INSERT);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1304,14 +1302,11 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		return 0;
 	}
 
-	struct tuple *delete = NULL;
 	enum dup_replace_mode mode =
 		state->index->def->opts.is_unique ? DUP_INSERT :
 						    DUP_REPLACE_OR_INSERT;
-	struct tuple *successor;
 	state->rc = memtx_index_replace(state->index, stmt->old_tuple,
-					stmt->new_tuple, mode, &delete,
-					&successor);
+					stmt->new_tuple, mode);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1456,14 +1451,9 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		/*
 		 * @todo: better message if there is a duplicate.
 		 */
-		struct tuple *old_tuple;
-		struct tuple *successor;
-		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT,
-					 &old_tuple, &successor);
+		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT);
 		if (rc != 0)
 			break;
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
 		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
 				    thread_sleep(inj->dparam));
 		/*
