@@ -654,6 +654,11 @@ tx_status_update(struct cmsg *msg)
 	ack.vclock_sync = status->vclock_sync;
 	bool anon = status->relay->replica->anon;
 	/*
+	 * Zero component must be ignored at all stages and paths of ACKs. Local
+	 * txns acking makes no logical sense.
+	 */
+	assert(vclock_get(ack.vclock, REPLICA_ID_NIL) == 0);
+	/*
 	 * It is important to process the term first and freeze the limbo before
 	 * an ACK if the term was bumped. This is because majority of the
 	 * cluster might be already living in a new term and this ACK is coming
@@ -1017,7 +1022,7 @@ relay_check_status_needs_update(struct relay *relay)
 		{tx_status_update, NULL}
 	};
 	cmsg_init(&status_msg->msg, route);
-	vclock_copy(&status_msg->vclock, send_vclock);
+	vclock_copy_ignore0(&status_msg->vclock, send_vclock);
 	status_msg->txn_lag = relay->txn_lag;
 	status_msg->relay = relay;
 	status_msg->term = last_recv_ack->term;
