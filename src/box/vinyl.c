@@ -356,7 +356,6 @@ vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 static void
 vinyl_index_stat(struct index *index, struct info_handler *h)
 {
-	char buf[1024];
 	struct vy_lsm *lsm = vy_lsm(index);
 	struct vy_lsm_stat *stat = &lsm->stat;
 	struct vy_cache_stat *cache_stat = &lsm->cache.stat;
@@ -453,8 +452,8 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_int(h, "range_count", lsm->range_count);
 	info_append_int(h, "run_count", lsm->run_count);
 	info_append_int(h, "run_avg", lsm->run_count / lsm->range_count);
-	histogram_snprint(buf, sizeof(buf), lsm->run_hist);
-	info_append_str(h, "run_histogram", buf);
+	info_append_str(h, "run_histogram", TOSTR(histogram_snprint,
+						  lsm->run_hist));
 	info_append_int(h, "dumps_per_compaction",
 			vy_lsm_dumps_per_compaction(lsm));
 

@@ -336,7 +336,7 @@ create_unit_test(PREFIX trigger
 )
 create_unit_test(PREFIX trivia
                  SOURCES trivia.c
-                 LIBRARIES unit
+                 LIBRARIES unit small
 )
 
 if (NOT ENABLE_GCOV)

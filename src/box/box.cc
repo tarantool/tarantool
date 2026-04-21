@@ -427,9 +427,7 @@ box_ro_state_msg_snprint(char *buf, int size)
 static const char *
 box_ro_state_msg(void)
 {
-	char *buf = tt_static_buf();
-	VERIFY(box_ro_state_msg_snprint(buf, TT_STATIC_BUF_LEN) > 0);
-	return buf;
+	return TOSTR(box_ro_state_msg_snprint);
 }
 
 void

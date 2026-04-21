@@ -876,8 +876,5 @@ tuple_snprint(char *buf, int size, struct tuple *tuple)
 const char *
 tuple_str(struct tuple *tuple)
 {
-	char *buf = tt_static_buf();
-	if (tuple_snprint(buf, TT_STATIC_BUF_LEN, tuple) < 0)
-		return "<failed to format tuple>";
-	return buf;
+	return TOSTR(tuple_snprint, tuple);
 }
