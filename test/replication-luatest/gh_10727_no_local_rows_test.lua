@@ -54,12 +54,13 @@ end
 local function write_subscribe(s, version_id, instance_uuid, rs_uuid, vclock)
     local header = {
         [key.REQUEST_TYPE] = box.iproto.type.SUBSCRIBE,
-        [key.SYNC] = version_id,
+        [key.SYNC] = 1,
     }
     local body = {
         [key.REPLICASET_UUID] = rs_uuid,
         [key.INSTANCE_UUID] = instance_uuid,
         [key.VCLOCK] = encode_map(vclock),
+        [key.SERVER_VERSION] = version_id,
     }
     return socket_write(s, header, body)
 end
