@@ -270,7 +270,9 @@ struct request {
 };
 
 /**
- * Create a JSON-like string representation of a request. */
+ * Create a JSON-like string representation of a request.
+ * Crops at TT_STATIC_BUF_LEN.
+ */
 const char *
 request_str(const struct request *request);
 

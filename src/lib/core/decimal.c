@@ -470,12 +470,8 @@ decimal_from_uint64(decimal_t *dec, uint64_t num)
 const char *
 decimal_str(const decimal_t *dec)
 {
-	char *buf = tt_static_buf();
-	/* No errors are possible. */
-	char *tmp = decNumberToString(dec, buf);
-	assert(buf == tmp);
-	(void)tmp;
-	return buf;
+	assert(TT_STATIC_BUF_LEN > DECIMAL_MAX_STR_LEN);
+	return TOSTR(decimal_snprint, dec);
 }
 
 int

@@ -90,9 +90,7 @@ char *
 tt_uuid_str(const struct tt_uuid *uu)
 {
 	assert(TT_STATIC_BUF_LEN > UUID_STR_LEN);
-	char *buf = tt_static_buf();
-	tt_uuid_to_string(uu, buf);
-	return buf;
+	return TOSTR(tt_uuid_snprint, uu);
 }
 
 int

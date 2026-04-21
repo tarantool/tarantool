@@ -712,6 +712,7 @@ vy_stmt_snprint(char *buf, int size, struct tuple *stmt);
 
 /*
  * Format a statement into string using a static buffer.
+ * Crops at TT_STATIC_BUF_LEN.
  * Useful for gdb and say_debug().
  * \sa vy_stmt_snprint()
  */
