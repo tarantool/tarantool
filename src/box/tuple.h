@@ -778,6 +778,7 @@ tuple_snprint(char *buf, int size, struct tuple *tuple);
 
 /**
  * Format a tuple into string using a static buffer.
+ * Crops at TT_STATIC_BUF_LEN.
  * Useful for debugger. Example: [1, 2, "string"]
  * @param tuple to format
  * @return formatted null-terminated string

@@ -9,6 +9,7 @@
 #include "mp_datetime.h"
 #include "msgpuck.h"
 #include "mp_extension_types.h"
+#include "small/static.h"
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
 #include "tt_static.h"
@@ -477,10 +478,8 @@ parse_date_strptime_valid_test(void)
 		const char *text = format_tests[index].text;
 		struct tnt_tm date = { .tm_epoch = 0};
 		char *ptr = tnt_strptime(text, fmt, &date);
-		static char buff[DT_TO_STRING_BUFSIZE];
-		tnt_strftime(buff, sizeof(buff), "%FT%T%z", &date);
 		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
-		     text, fmt, buff);
+		     text, fmt, TOSTR(tnt_strftime, "%FT%T%z", &date));
 	}
 
 	check_plan();
@@ -752,10 +751,44 @@ interval_from_map_test(void)
 	check_plan();
 }
 
+static void
+snprint_test(void)
+{
+	plan(4);
+	header();
+
+	static char *zero_date = "1970-01-01T00:00:00Z";
+	static char *zero_fmt = "%FT%TZ";
+	struct datetime d;
+	memset(&d, 0, sizeof(d));
+	struct tnt_tm t;
+	datetime_to_tm(&d, &t);
+
+	char *res;
+	res = TOSTR(datetime_snprint, &d);
+	is(strcmp(res, zero_date), 0, res);
+
+	res = TOSTR(datetime_strftime, zero_fmt, &d);
+	is(strcmp(res, zero_date), 0, res);
+
+	res = TOSTR(tnt_strftime, zero_fmt, &t);
+	is(strcmp(res, zero_date), 0, res);
+
+	static char *zero_i = "+0 seconds";
+	struct interval i;
+	memset(&i, 0, sizeof(i));
+
+	res = TOSTR(interval_snprint, &i);
+	is(strcmp(res, zero_i), 0, res);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(12);
+	plan(13);
 	datetime_parse_full_ok_test();
 	datetime_parse_full_fail_test();
 	tostring_datetime_test();
@@ -768,6 +801,7 @@ main(void)
 	mp_datetime_test();
 	mp_print_test();
 	interval_from_map_test();
+	snprint_test();
 
 	return check_plan();
 }

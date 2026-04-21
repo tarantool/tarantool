@@ -759,6 +759,70 @@ json_syslog_escape_inplace(char *buf, int size);
 	}									\
 } while(0)
 
+/**
+ * Helper macro for stringization via snprintf-function `func` to dynamically
+ * allocated tt_static_buf().
+ *   - requires "tt_static.h".
+ *   - crops:
+ *     - max(strlen(result)) = TT_STATIC_BUF_LEN - 1.
+ *     - appends num of skipped bytes if crops.
+ *   - returns TOSTR_ERRRES_TEXT() message if `func` fails.
+ */
+#define TOSTR_ERRRES_TEXT(func) "<TOSTR(" #func ") err>"
+#define TOSTR_CROP_SUFFIX "<more ~%db>"
+#define TOSTR(func, ...) \
+({ \
+	char *_buf = tt_static_buf(); \
+	int _res = func(_buf, TT_STATIC_BUF_LEN, ##__VA_ARGS__); \
+	if (_res < 0) { \
+		_buf = (char *)TOSTR_ERRRES_TEXT(func); \
+	} else if (_res >= TT_STATIC_BUF_LEN) { \
+		int _more = _res - (TT_STATIC_BUF_LEN - 1) + \
+			    lengthof(TOSTR_CROP_SUFFIX); \
+		_res = snprintf(NULL, 0, TOSTR_CROP_SUFFIX, _more); \
+		if (_res > 0) { \
+			snprintf(_buf + (TT_STATIC_BUF_LEN - 1) - _res, \
+				 _res + 1, TOSTR_CROP_SUFFIX, _more); \
+		} \
+	} \
+	_buf; \
+})
+
+/**
+ * Helper macro for stringization via snprintf-function `func` to dynamically
+ * allocated buffer. Static allocator is used for allocations.
+ *   - requires "small/static.h".
+ *   - calculate allocation size in a cost of additional call to `func`.
+ *   - returns TOSTR_ERRRES_TEXT() message if `func` or allocation fails.
+ */
+#define TOSTR_DEBUG(func, ...) \
+({ \
+	char *_buf; \
+	do { \
+		/* Calc size. */ \
+		int _buf_size = func(NULL, 0, ##__VA_ARGS__); \
+		if (_buf_size < 0) { \
+			_buf = (char *)TOSTR_ERRRES_TEXT(func); \
+			break; \
+		} \
+		/* Allocate. */ \
+		_buf = (char *)static_alloc(_buf_size + 1); \
+		if (_buf == NULL) { \
+			_buf = (char *)TOSTR_ERRRES_TEXT(func); \
+			break; \
+		} \
+		/* Printing. */ \
+		int _res = func(_buf, _buf_size + 1, ##__VA_ARGS__); \
+		if (_res < 0) { \
+			_buf = (char *)TOSTR_ERRRES_TEXT(func); \
+			break; \
+		} \
+		/* Check consistensy between 1st and 2nd func call. */ \
+		assert(_res == _buf_size); \
+	} while (0); \
+	_buf; \
+})
+
 #define COMPARE_RESULT(a, b) (a < b ? -1 : a > b)
 
 /**
