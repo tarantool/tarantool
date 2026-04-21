@@ -207,14 +207,12 @@ invalid_enum_errmsg_snprint(char *buf, int size,
 
 /**
  * Calls invalid_enum_errmsg_snprint on tt_static_buf.
+ * Crops at TT_STATIC_BUF_LEN.
  */
 static const char *
 invalid_enum_errmsg(const char *const *enum_strs, int enum_max)
 {
-	char *buf = tt_static_buf();
-	invalid_enum_errmsg_snprint(buf, TT_STATIC_BUF_LEN,
-				    enum_strs, enum_max);
-	return buf;
+	return TOSTR(invalid_enum_errmsg_snprint, enum_strs, enum_max);
 }
 
 int
