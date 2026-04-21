@@ -1126,15 +1126,10 @@ fiber_check_gc(void)
 
 #ifdef ENABLE_BACKTRACE
 	if (fiber->first_alloc_bt) {
-		char *buf = tt_static_buf();
-		int rc = snprintf(buf, TT_STATIC_BUF_LEN,
-				  "Fiber gc leak is found. "
-				  "First leaked fiber gc allocation"
-				  " backtrace:\n");
-		assert(rc > 0 && rc < TT_STATIC_BUF_LEN);
-		backtrace_snprint(buf + rc, TT_STATIC_BUF_LEN - rc,
-				  fiber->first_alloc_bt);
-		say_error("%s", buf);
+		say_error("Fiber gc leak is found. "
+			  "First leaked fiber gc allocation"
+			  " backtrace:\n%s",
+			  TOSTR(backtrace_snprint, fiber->first_alloc_bt));
 	} else {
 		say_error("Fiber gc leak is found. "
 			  "Leak backtrace is not available. "

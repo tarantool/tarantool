@@ -5,6 +5,7 @@
 
 #include "core/fiber.h"
 #include "core/memory.h"
+#include "mp_datetime.h"
 
 #include "mpstream/mpstream.h"
 
@@ -275,9 +276,66 @@ test_mp_decode_tuple(void)
 }
 
 static int
+test_tuple_str_mp_snprint_ext(char *buf, int size, const char **data, int depth)
+{
+	const char *save = *data;
+	int8_t type;
+	uint32_t len = mp_decode_extl(data, &type);
+	if (type != MP_DATETIME) {
+		*data = save;
+		return mp_snprint_ext_default(buf, size, data, depth);
+	}
+	return mp_snprint_datetime(buf, size, data, len);
+}
+
+static int
+test_tuple_str(void)
+{
+	plan(4);
+	header();
+
+	struct tuple *tuple = NULL;
+
+	ok(strcmp(tuple_str(tuple), "<NULL>") == 0);
+
+	char map0[] = "\x91\x80";
+	tuple = tuple_new(tuple_format_runtime, map0, map0 + 2);
+	ok(strcmp(tuple_str(tuple), "[{}]") == 0);
+	tuple_delete(tuple);
+
+	mp_snprint_ext = test_tuple_str_mp_snprint_ext;
+
+/* https://github.com/tarantool/tarantool/wiki/Datetime-Internals#messagepack-encoding-schema. */
+#define DATETIME(epoch, nsec, tzoffset, tzindex) \
+	"\xd8\x04" epoch nsec tzoffset tzindex
+#define DATETIME_LEN 18
+	char datetime[] = "\x91" DATETIME("\0\0\0\0\0\0\0\0", "\0\0\0\0",
+					  "\0\0", "\0\0");
+	tuple = tuple_new(tuple_format_runtime,
+			  datetime, datetime + 1 + DATETIME_LEN);
+	ok(strcmp(tuple_str(tuple), "[1970-01-01T00:00:00Z]") == 0);
+	tuple_delete(tuple);
+
+	/* Bad tzoffset = INT16_MAX. */
+	char datetime_bad[] = "\x91" DATETIME("\0\0\0\0\0\0\0\0", "\0\0\0\0",
+					      "\xFF\x7F", "\0\0");
+	tuple = tuple_new(tuple_format_runtime,
+			  datetime_bad, datetime_bad + 1 + DATETIME_LEN);
+	ok(strcmp(tuple_str(tuple), TOSTR_ERRRES_TEXT(tuple_snprint)) == 0);
+	tuple_delete(tuple);
+#undef DATETIME
+#undef DATETIME_LEN
+
+	mp_snprint_ext = mp_snprint_ext_default;
+
+	footer();
+	return check_plan();
+}
+
+static int
 test_mp_tuple(void)
 {
-	plan(6);
+	plan(7);
 	header();
 
 	test_mp_sizeof_tuple();
@@ -286,6 +344,7 @@ test_mp_tuple(void)
 	test_mp_validate_tuple();
 	test_tuple_unpack();
 	test_mp_decode_tuple();
+	test_tuple_str();
 
 	footer();
 	return check_plan();

@@ -311,14 +311,12 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 /**
  * Return a string containing a human readable representation
  * of a log record.
+ * May crop at TT_STATIC_BUF_LEN.
  */
 static const char *
 vy_log_record_str(const struct vy_log_record *record)
 {
-	char *buf = tt_static_buf();
-	if (vy_log_record_snprint(buf, TT_STATIC_BUF_LEN, record) < 0)
-		return "<failed to format vy_log log record>";
-	return buf;
+	return TOSTR(vy_log_record_snprint, record);
 }
 
 /**

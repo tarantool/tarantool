@@ -884,8 +884,5 @@ vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 const char *
 vy_stmt_str(struct tuple *stmt)
 {
-	char *buf = tt_static_buf();
-	if (vy_stmt_snprint(buf, TT_STATIC_BUF_LEN, stmt) < 0)
-		return "<failed to format statement>";
-	return buf;
+	return TOSTR(vy_stmt_snprint, stmt);
 }

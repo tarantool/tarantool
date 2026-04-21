@@ -129,19 +129,25 @@ test_basic(void)
 	footer();
 }
 
+static int
+lsn_snprint(char *buf, int size, int64_t lsn)
+{
+	int total = 0;
+	if (lsn == INT64_MAX) {
+		SNPRINT(total, snprintf, buf, size, "INT64_MAX");
+	} else if (lsn > MAX_LSN) {
+		SNPRINT(total, snprintf, buf, size, "MAX_LSN+%lld",
+			(long long)(lsn - MAX_LSN));
+	} else {
+		SNPRINT(total, snprintf, buf, size, "%lld", (long long)lsn);
+	}
+	return total;
+}
+
 static const char *
 lsn_str(int64_t lsn)
 {
-	char *buf = tt_static_buf();
-	if (lsn == INT64_MAX) {
-		return "INT64_MAX";
-	} else if (lsn > MAX_LSN) {
-		snprintf(buf, TT_STATIC_BUF_LEN, "MAX_LSN+%lld",
-			 (long long)(lsn - MAX_LSN));
-	} else {
-		snprintf(buf, TT_STATIC_BUF_LEN, "%lld", (long long)lsn);
-	}
-	return buf;
+	return TOSTR(lsn_snprint, lsn);
 }
 
 static const char *
