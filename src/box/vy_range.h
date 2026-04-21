@@ -216,12 +216,14 @@ vy_range_delete(struct vy_range *range);
 int
 vy_range_snprint(char *buf, int size, const struct vy_range *range);
 
+/**
+ * Print boundaries of a range to static buffer for logging.
+ * Crops at TT_STATIC_BUF_LEN.
+ */
 static inline const char *
 vy_range_str(struct vy_range *range)
 {
-	char *buf = tt_static_buf();
-	vy_range_snprint(buf, TT_STATIC_BUF_LEN, range);
-	return buf;
+	return TOSTR(vy_range_snprint, range);
 }
 
 /** Add a run slice to the head of a range's list. */

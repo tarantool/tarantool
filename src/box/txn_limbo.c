@@ -82,14 +82,14 @@ synchro_request_snprint(char *buf, int size, const struct synchro_request *req)
 	return total;
 }
 
-/** Stringify the synchro request into the static buffer. */
+/**
+ * Stringify the synchro request into the static buffer for error logging.
+ * May crop at TT_STATIC_BUF_LEN.
+ */
 static const char *
 synchro_request_str(const struct synchro_request *req)
 {
-	char *buf = tt_static_buf();
-	if (synchro_request_snprint(buf, TT_STATIC_BUF_LEN, req) < 0)
-		panic("couldn't stringify a synchro request");
-	return buf;
+	return TOSTR(synchro_request_snprint, req);
 }
 
 /** Write the request into the journal. */
@@ -591,6 +591,7 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 /**
  * Fill the reject reason with request data.
  * The function is not reenterable, use with care.
+ * May crop at TT_STATIC_BUF_LEN.
  */
 static const char *
 reject_str(const struct synchro_request *req)

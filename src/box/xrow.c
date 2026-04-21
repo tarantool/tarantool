@@ -1110,10 +1110,7 @@ request_snprint(char *buf, int size, const struct request *request)
 const char *
 request_str(const struct request *request)
 {
-	char *buf = tt_static_buf();
-	if (request_snprint(buf, TT_STATIC_BUF_LEN, request) < 0)
-		return "<failed to format request>";
-	return buf;
+	return TOSTR(request_snprint, request);
 }
 
 void

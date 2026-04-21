@@ -37,10 +37,7 @@ mp_dup(const char *data)
 const char *
 mp_str(const char *data)
 {
-	char *buf = tt_static_buf();
-	if (mp_snprint(buf, TT_STATIC_BUF_LEN, data) < 0)
-		return "<failed to format message pack>";
-	return buf;
+	return TOSTR(mp_snprint, data);
 }
 
 const char *
