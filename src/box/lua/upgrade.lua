@@ -2252,6 +2252,7 @@ local downgrade_versions = {
     "3.6.0",
     "3.6.1",
     "3.6.2",
+    "3.7.0",
     -- DOWNGRADE VERSIONS END
 }
 
