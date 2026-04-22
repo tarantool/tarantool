@@ -139,6 +139,15 @@ app_thread_process_call(struct call_request *request, struct port *port)
 int
 app_thread_process_eval(struct call_request *request, struct port *port)
 {
+	struct runtime_credentials *runtime_cr =
+			fiber()->storage.runtime_credentials;
+	const char *uname = runtime_cr->user_name != NULL ?
+			    runtime_cr->user_name : "guest";
+	if (strcmp(uname, "admin") != 0) {
+		diag_set(AccessDeniedError, priv_name(PRIV_X),
+			 schema_object_name(SC_UNIVERSE), "", uname);
+		return -1;
+	}
 	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
 	struct mp_box_ctx ctx;
