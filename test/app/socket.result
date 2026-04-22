@@ -440,17 +440,17 @@ s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', true)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') > 0
 ---
-- 1
+- true
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEPORT', false)
 ---
 - true
 ...
-s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT')
+s:getsockopt('SOL_SOCKET', 'SO_REUSEPORT') == 0
 ---
-- 0
+- true
 ...
 s:bind('127.0.0.1', 0)
 ---
