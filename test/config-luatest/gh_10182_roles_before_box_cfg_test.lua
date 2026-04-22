@@ -1,4 +1,5 @@
 local t = require('luatest')
+local fio = require('fio')
 local helpers = require('test.config-luatest.helpers')
 
 ---@class luatest.group
@@ -43,6 +44,16 @@ local early_load_script = [[#!/usr/bin/env tarantool
     -- ...
 ]] .. simple_script
 
+--
+-- TODO(gh-12610): Remove the `seasearchroot = false` parameter and the LUA_PATH
+-- env variable. Until the issue is fixed this is necessary to prevent problems
+-- with the inability to find a module or role after setting
+-- the `package.searchroot`.
+--
+local luatest_path = fio.dirname(fio.dirname(package.search('luatest')))
+local LUA_PATH = luatest_path .. '/?.lua;' .. luatest_path .. '/?/init.lua;' ..
+                 (os.getenv('LUA_PATH') or ';')
+
 tg.test_role_without_early_load_tag = function(g)
     local verify = function()
         t.assert_equals(_G.on_load_status, 'running')
@@ -74,6 +85,8 @@ tg.test_role_with_early_load_tag = function(g)
             ['roles'] = {'one'}
         },
         verify = verify,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 end
 
@@ -102,6 +115,8 @@ tg.test_role_with_early_load_tag_added = function(g)
         },
         verify = function() end,
         verify_2 = function() end,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 
     t.assert_not(g.server:grep_log(
@@ -149,6 +164,8 @@ tg.test_app_with_early_load_tag = function(g)
                ['app.file'] = 'main.lua',
            },
         verify = verify,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 
     helpers.success_case(g, {
@@ -157,6 +174,8 @@ tg.test_app_with_early_load_tag = function(g)
                ['app.module'] = 'main',
            },
         verify = verify,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 end
 
@@ -178,6 +197,8 @@ tg.test_app_with_early_load_tag_added = function(g)
         verify = function() end,
         verify_2 = function() end,
         script_2 = early_load_script,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 
     t.assert(g.server:grep_log(
@@ -202,6 +223,8 @@ tg.test_app_with_early_load_tag_added = function(g)
         verify = function() end,
         verify_2 = function() end,
         script_2 = early_load_script,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 
     t.assert(g.server:grep_log(
@@ -229,6 +252,8 @@ tg.test_app_with_early_load_tag_added = function(g)
         verify_2 = function() end,
         script = simple_script,
         script_2 = early_load_script,
+        setsearchroot = false,
+        env = {LUA_PATH = LUA_PATH},
     })
 
     t.assert(g.server:grep_log(
