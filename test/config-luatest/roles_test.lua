@@ -1208,7 +1208,8 @@ g.test_tarantool_version_check = function(g)
             ['roles'] = {'two'}
         },
         exp_err = 'Role "two" failed the "fail_if" check: ' ..
-                  '"tarantool_version > 0.0.0"'
+                  '"tarantool_version > 0.0.0"',
+        setsearchroot = false,
     })
 
     helpers.failure_case({
@@ -1217,6 +1218,7 @@ g.test_tarantool_version_check = function(g)
             ['roles'] = {'three'}
         },
         exp_err = 'Role "three" has invalid "fail_if" expression: ' ..
-                  'Unexpected token "<"'
+                  'Unexpected token "<"',
+        setsearchroot = false,
     })
 end
