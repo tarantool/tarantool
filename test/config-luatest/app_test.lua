@@ -182,7 +182,8 @@ g.test_tarantool_version_check = function(g)
         script = two,
         options = {['app.module'] = 'main'},
         exp_err = 'App "main" failed the "fail_if" check: ' ..
-                  '"tarantool_version > 0.0.0"'
+                  '"tarantool_version > 0.0.0"',
+        setsearchroot = false,
     })
 
     helpers.failure_case({
@@ -196,6 +197,7 @@ g.test_tarantool_version_check = function(g)
         script = three,
         options = {['app.module'] = 'main'},
         exp_err = 'App "main" has invalid "fail_if" expression: ' ..
-                  'Unexpected token "<"'
+                  'Unexpected token "<"',
+        setsearchroot = false,
     })
 end

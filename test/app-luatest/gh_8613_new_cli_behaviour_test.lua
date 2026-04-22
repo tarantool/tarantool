@@ -31,7 +31,8 @@ g.before_all(function()
 end)
 
 local function simplerun(args)
-    return justrun(rundir, {}, args, {nojson = true, stderr = true})
+    local opts = {nojson = true, stderr = true, setsearchroot = false}
+    return justrun(rundir, {}, args, opts)
 end
 
 g.test_tarantool_no_arg_run = function()
