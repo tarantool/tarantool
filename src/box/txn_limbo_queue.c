@@ -680,6 +680,17 @@ txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 		queue->confirmed_lsn = lsn;
 		vclock_follow(&queue->confirmed_vclock, queue->owner_id, lsn);
 	}
+	if (queue->confirmed_lsn > queue->volatile_confirmed_lsn) {
+		/*
+		 * This can happen when CONFIRM was made with a smaller quorum
+		 * than known right now. Then the volatile LSN is collecting
+		 * acks by a bigger quorum and can actually be smaller. Bump it
+		 * forward when this happens to keep the invariant of the
+		 * volatile LSN being the present or the future of the confirmed
+		 * LSN.
+		 */
+		queue->volatile_confirmed_lsn = queue->confirmed_lsn;
+	}
 	if (queue_was_full && !txn_limbo_queue_is_full(queue))
 		fiber_cond_broadcast(&queue->cond);
 }
