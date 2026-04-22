@@ -39,7 +39,6 @@ g.before_all(function(cg)
         net_box_credentials = {user = 'admin'}
     })
     cg.server:start()
-    cg.server:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cg.server)
 end)
 
@@ -47,26 +46,9 @@ g.after_all(function(cg)
     cg.server:drop()
 end)
 
-g.test_thread_requests_disabled = function(cg)
-    local conn = net.connect(cg.server.net_box_uri,
-                             cg.server.net_box_credentials)
-    local err = {type = 'ClientError', name = 'THREAD_REQUESTS_DISABLED'}
-    t.assert_error_covers(err, conn.call, conn, 'tonumber', {'123'},
-                          {_thread_id = 1})
-    t.assert_error_covers(err, conn.eval, conn, 'return tonumber(...)', {'123'},
-                          {_thread_id = 1})
-    conn:call('box.iproto.internal.enable_thread_requests')
-    t.assert_equals(conn:call('tonumber', {'123'},
-                              {_thread_id = 1}), 123)
-    t.assert_equals(conn:eval('return tonumber(...)', {'123'},
-                              {_thread_id = 1}), 123)
-    conn:close()
-end
-
 g.test_no_such_thread = function(cg)
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     t.assert_error_covers({
         type = 'ClientError',
         name = 'NO_SUCH_THREAD',
@@ -103,7 +85,6 @@ g.test_unable_to_process_in_thread = function(cg)
     end
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     t.assert(conn:ping())
     t.assert(conn:ping({_thread_id = 0}))
     t.assert_not(conn:ping({_thread_id = 1}))
@@ -127,7 +108,6 @@ end
 g.test_call_eval = function(cg)
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     -- Call a box function in the main thread.
     t.assert_covers(conn:call('box.info', {}, {_thread_id = 0}),
                     {status = 'running'})
@@ -182,14 +162,12 @@ g.test_call_eval_access = function(cg)
     end, {}, {_thread_id = 1})
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     t.assert_equals(conn:call('test_func_1', {}, {_thread_id = 1}), 1)
     t.assert_equals(conn:call('test_func_2', {}, {_thread_id = 1}), 2)
     t.assert_equals(conn:eval([[return 123]], {}, {_thread_id = 1}), 123)
     conn:close()
     conn = net.connect(cg.server.net_box_uri,
                        {user = 'client', password = 'secret'})
-    conn:call('box.iproto.internal.enable_thread_requests')
     t.assert_equals(conn:call('test_func_1', {}, {_thread_id = 1}), 1)
     t.assert_error_covers({
             type = 'AccessDeniedError',
@@ -211,7 +189,6 @@ end
 g.test_builtin_types_serialization = function(cg)
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     -- Check basic types.
     local function check(obj)
         local ret_obj = conn:eval([[return ...]], {obj}, {_thread_id = 1})
@@ -265,7 +242,6 @@ g.test_call_ret_tuple_extension_unset = function(cg)
                             box.iproto.feature.call_ret_tuple_extension)
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
-    conn:call('box.iproto.internal.enable_thread_requests')
     local tuple = conn:eval([[
         local format = box.tuple.format.new({
             {'a', 'unsigned'}, {'b', 'unsigned'},
@@ -755,7 +731,6 @@ g.test_net_replicaset = function()
         net_box_credentials = {user = 'admin', password = 'secret'},
     })
     cluster:start()
-    cluster.router:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cluster.router)
     local connect_cfg = cluster.router:exec(function()
         local net_replicaset = require('internal.net.replicaset')
