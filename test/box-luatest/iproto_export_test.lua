@@ -75,7 +75,6 @@ g2.test_iproto_export_in_app_threads = function(cg)
         net_box_credentials = {user = 'admin'},
     })
     cg.server:start()
-    cg.server:call('box.iproto.internal.enable_thread_requests')
     cg.server:exec(function()
         box.schema.user.passwd('admin', 'secret')
     end)
@@ -94,7 +93,6 @@ g2.test_iproto_export_in_app_threads = function(cg)
     local conn = net.connect(cg.server.net_box_uri, {
         user = 'admin', password = 'secret',
     })
-    conn:call('box.iproto.internal.enable_thread_requests')
     local err = {type = 'ClientError', name = 'NO_SUCH_PROC'}
     t.assert_equals(conn:call('test.func_1', {'x'}, {_thread_id = 0}),
                     {1, 'x'})
@@ -130,7 +128,6 @@ g2.test_iproto_call_routing = function(cg)
         },
     })
     cg.server:start()
-    cg.server:call('box.iproto.internal.enable_thread_requests')
     cg.server:exec(function()
         box.schema.user.passwd('admin', 'secret')
     end)

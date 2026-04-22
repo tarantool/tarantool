@@ -242,15 +242,6 @@ lbox_iproto_drop_connections(struct lua_State *L)
 	return 0;
 }
 
-/** Lua wrapper around iproto_enable_thread_requests(). */
-static int
-lbox_iproto_enable_thread_requests(struct lua_State *L)
-{
-	(void)L;
-	iproto_enable_thread_requests();
-	return 0;
-}
-
 /** Lua wrapper around iproto_register_func(). */
 static int
 lbox_iproto_register_func(struct lua_State *L)
@@ -639,7 +630,6 @@ box_lua_iproto_init(struct lua_State *L)
 	static const struct luaL_Reg internal_funcs_main[] = {
 		{"session_new", lbox_iproto_session_new},
 		{"drop_connections", lbox_iproto_drop_connections},
-		{"enable_thread_requests", lbox_iproto_enable_thread_requests},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg internal_funcs_common[] = {
