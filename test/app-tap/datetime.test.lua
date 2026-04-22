@@ -7,6 +7,7 @@ local ffi = require('ffi')
 local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
+local compat = require('compat')
 
 test:plan(42)
 
@@ -2739,6 +2740,11 @@ test:test("Time :set{} operations", function(test)
     -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
             '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125' )
+    -- When 'new' is set, this leads to error. That is checked in luatest.
+    if compat.datetime_setfn_timestamp_type_check == 'old' then
+        test:is(tostring(ts:set{timestamp = '1630359071.125'}),
+                '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125')
+    end
     test:is(tostring(ts:set{ msec = 123}), '2021-08-30T21:31:11.123+0800',
             'msec = 123')
     test:is(tostring(ts:set{ usec = 123}), '2021-08-30T21:31:11.000123+0800',
