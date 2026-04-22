@@ -219,7 +219,6 @@ function box.internal.threads.init(cfg, group_name, thread_id, conn_fd)
     this_group_name = group_name
     this_thread_id = thread_id
     threads_conn = net.from_fd(conn_fd, {fetch_schema = false})
-    threads_conn:call('box.iproto.internal.enable_thread_requests')
     init_thread_groups(cfg)
 end
 

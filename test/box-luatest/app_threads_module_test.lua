@@ -104,7 +104,6 @@ g.test_threads_config_propagation = function()
     --
     -- Check configuration in other threads.
     --
-    cluster.server:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cluster.server)
     for i = 1, 10 do
         local group_name
@@ -367,7 +366,6 @@ g.test_threads_call = function()
     --
     -- Usage in other a non-tx thread.
     --
-    cluster.server:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cluster.server)
     cluster.server:exec(function()
         local threads = require('experimental.threads')
@@ -529,7 +527,6 @@ g.test_threads_eval = function()
     --
     -- Usage in other a non-tx thread.
     --
-    cluster.server:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cluster.server)
     cluster.server:exec(function()
         local threads = require('experimental.threads')
