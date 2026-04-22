@@ -54,6 +54,7 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "wal.h"
+#include "txn_limbo.h"
 #include "raft.h"
 #include "box.h"
 
@@ -653,11 +654,6 @@ tx_status_update(struct cmsg *msg)
 	ack.vclock_sync = status->vclock_sync;
 	bool anon = status->relay->replica->anon;
 	/*
-	 * Zero component must be ignored at all stages and paths of ACKs. Local
-	 * txns acking makes no logical sense.
-	 */
-	assert(vclock_get(ack.vclock, REPLICA_ID_NIL) == 0);
-	/*
 	 * It is important to process the term first and freeze the limbo before
 	 * an ACK if the term was bumped. This is because majority of the
 	 * cluster might be already living in a new term and this ACK is coming
@@ -667,13 +663,17 @@ tx_status_update(struct cmsg *msg)
 	 */
 	raft_process_term(box_raft(), status->term, ack.source);
 	/*
-	 * A replica can declare itself anon, but master might assign it an ID.
-	 * Or replica might be having an ID, but the master can remove it. A
-	 * true proper replica must declare itself not anon, and not be expelled
-	 * by the master.
+	 * Let pending synchronous transactions know, which of
+	 * them were successfully sent to the replica. Acks are
+	 * collected only by the transactions originator (which is
+	 * the single master in 100% so far). Other instances wait
+	 * for master's CONFIRM message instead.
 	 */
-	if (!anon && ack.source != REPLICA_ID_NIL)
-		trigger_run(&replicaset.on_ack, &ack);
+	if (txn_limbo.state == TXN_LIMBO_STATE_LEADER && !anon) {
+		txn_limbo_ack(&txn_limbo, ack.source,
+			      vclock_get(ack.vclock, instance_id));
+	}
+	trigger_run(&replicaset.on_ack, &ack);
 
 	if (!relay->tx.is_paired) {
 		/*
@@ -1017,7 +1017,7 @@ relay_check_status_needs_update(struct relay *relay)
 		{tx_status_update, NULL}
 	};
 	cmsg_init(&status_msg->msg, route);
-	vclock_copy_ignore0(&status_msg->vclock, send_vclock);
+	vclock_copy(&status_msg->vclock, send_vclock);
 	status_msg->txn_lag = relay->txn_lag;
 	status_msg->relay = relay;
 	status_msg->term = last_recv_ack->term;

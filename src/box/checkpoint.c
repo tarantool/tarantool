@@ -74,6 +74,17 @@ txn_journal_flush(struct journal_checkpoint *out, bool do_journal_rotation)
 	return journal_sync(&out->vclock);
 }
 
+int
+txn_persist_all_prepared(struct vclock *out)
+{
+	struct journal_checkpoint journal;
+	if (txn_journal_flush(&journal, false /* do journal rotation */) != 0)
+		return -1;
+	if (out != NULL)
+		vclock_copy(out, &journal.vclock);
+	return 0;
+}
+
 /** Build a checkpoint of all the transaction-related global states. */
 static int
 txn_checkpoint_build(struct box_checkpoint *out, bool do_journal_rotation)

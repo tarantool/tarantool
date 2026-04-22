@@ -67,7 +67,7 @@ local function capture_synchro_queue_and_push_sync_transaction(server)
         box.atomic({wait = "submit"}, function() box.space.s:replace{0} end)
         t.assert_equals(box.info.synchro.queue.len, 1)
         -- So that we have the opportunity to perform some actions during
-        -- hang in quorum waiting code, we wrap the last box.ctl.promote into
+        -- hang in box_wait_quorum, we wrap the last box.ctl.promote into
         -- fiber and join it after some actions. In our case this action
         -- is reconfiguring of replication_synchro_quorum.
         box.cfg{election_mode = "manual"}
@@ -81,7 +81,7 @@ end
 
 local function wait_until_synchro_queue_is_empty(server)
     -- In some rare cases the limbo may not be cleared in time after
-    -- successful completion of quorum wait. We should wrap it
+    -- successful completion of box_wait_quorum. We should wrap it
     -- into retrying block.
     server:exec(function()
         t.helpers.retrying({}, function()
@@ -96,8 +96,8 @@ g.test_box_wait_quorum_while_changing_replication_synchro_quorum = function(g)
     g.server1:exec(function()
         -- It is necessary to wait until the g.server1 enters the leader state,
         -- because otherwise the reconfiguration may appear earlier than
-        -- the quorum wait starts with higher quorum - 4.
-        -- The reconfiguration must be performed strctly after the quorum wait
+        -- the invocation of the box_wait_quorum with higher quorum - 4.
+        -- The reconfiguration must be performed strctly after box_wait_quorum
         -- starts and hangs.
         t.helpers.retrying({}, function()
             t.assert_equals(box.info.election.state, "leader")

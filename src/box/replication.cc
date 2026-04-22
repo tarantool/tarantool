@@ -1933,10 +1933,11 @@ check_vclock_sync_on_ack(struct trigger *trigger, void *event)
 		(struct sync_trigger_data *)trigger->data;
 	uint32_t id = ack->source;
 	/*
-	 * Messages from anon replicas are skipped on a lower level, as having
-	 * no weight on any decision making.
+	 * Anonymous replica acks are not counted for synchronous transactions,
+	 * so linearizable read shouldn't count them as well.
 	 */
-	assert(id != REPLICA_ID_NIL);
+	if (id == 0)
+		return 0;
 	uint64_t sync = data->vclock_syncs[id];
 	int accounted_count = bit_count_u32(data->collected_vclock_map);
 	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&
