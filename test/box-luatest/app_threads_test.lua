@@ -36,13 +36,11 @@ g.before_all(function(cg)
             iproto_threads = 2,
             app_threads = 4,
         },
+        net_box_credentials = {user = 'admin'}
     })
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cg.server)
-    cg.server:exec(function()
-        box.schema.user.passwd('admin', 'secret')
-    end)
 end)
 
 g.after_all(function(cg)
@@ -50,9 +48,8 @@ g.after_all(function(cg)
 end)
 
 g.test_thread_requests_disabled = function(cg)
-    local conn = net.connect(cg.server.net_box_uri, {
-        user = 'admin', password = 'secret',
-    })
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     local err = {type = 'ClientError', name = 'THREAD_REQUESTS_DISABLED'}
     t.assert_error_covers(err, conn.call, conn, 'tonumber', {'123'},
                           {_thread_id = 1})
@@ -67,7 +64,8 @@ g.test_thread_requests_disabled = function(cg)
 end
 
 g.test_no_such_thread = function(cg)
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     conn:call('box.iproto.internal.enable_thread_requests')
     t.assert_error_covers({
         type = 'ClientError',
@@ -103,7 +101,8 @@ g.test_unable_to_process_in_thread = function(cg)
             end
         end)
     end
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     conn:call('box.iproto.internal.enable_thread_requests')
     t.assert(conn:ping())
     t.assert(conn:ping({_thread_id = 0}))
@@ -126,9 +125,8 @@ g.test_unable_to_process_in_thread = function(cg)
 end
 
 g.test_call_eval = function(cg)
-    local conn = net.connect(cg.server.net_box_uri, {
-        user = 'admin', password = 'secret',
-    })
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     conn:call('box.iproto.internal.enable_thread_requests')
     -- Call a box function in the main thread.
     t.assert_covers(conn:call('box.info', {}, {_thread_id = 0}),
@@ -159,8 +157,60 @@ g.test_call_eval = function(cg)
     conn:close()
 end
 
+g.after_test('test_call_eval_access', function(cg)
+    cg.server:exec(function()
+        box.schema.user.drop('client', {if_exists = true})
+    end)
+    cg.server:exec(function()
+        rawset(_G, 'test_func_1', nil)
+        rawset(_G, 'test_func_2', nil)
+        box.internal.lua_call_runtime_priv_reset()
+    end, {}, {_thread_id = 1})
+end)
+
+g.test_call_eval_access = function(cg)
+    cg.server:exec(function()
+        box.schema.user.create('client', {password = 'secret'})
+        box.schema.user.grant('client', 'super')
+    end)
+    cg.server:exec(function()
+        box.internal.lua_call_runtime_priv_grant('client', 'test_func_1')
+    end, {}, {_thread_id = 1})
+    cg.server:exec(function()
+        rawset(_G, 'test_func_1', function() return 1 end)
+        rawset(_G, 'test_func_2', function() return 2 end)
+    end, {}, {_thread_id = 1})
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
+    conn:call('box.iproto.internal.enable_thread_requests')
+    t.assert_equals(conn:call('test_func_1', {}, {_thread_id = 1}), 1)
+    t.assert_equals(conn:call('test_func_2', {}, {_thread_id = 1}), 2)
+    t.assert_equals(conn:eval([[return 123]], {}, {_thread_id = 1}), 123)
+    conn:close()
+    conn = net.connect(cg.server.net_box_uri,
+                       {user = 'client', password = 'secret'})
+    conn:call('box.iproto.internal.enable_thread_requests')
+    t.assert_equals(conn:call('test_func_1', {}, {_thread_id = 1}), 1)
+    t.assert_error_covers({
+            type = 'AccessDeniedError',
+            access_type = 'Execute',
+            object_type = 'function',
+            object_name = 'test_func_2',
+            user = 'client'
+    }, conn.call, conn, 'test_func_2', {}, {_thread_id = 1})
+    t.assert_error_covers({
+            type = 'AccessDeniedError',
+            access_type = 'Execute',
+            object_type = 'universe',
+            object_name = '',
+            user = 'client'
+    }, conn.eval, conn, [[return 123]], {}, {_thread_id = 1})
+    conn:close()
+end
+
 g.test_builtin_types_serialization = function(cg)
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     conn:call('box.iproto.internal.enable_thread_requests')
     -- Check basic types.
     local function check(obj)
@@ -213,7 +263,8 @@ g.test_call_ret_tuple_extension_unset = function(cg)
     t.tarantool.skip_if_not_debug()
     box.error.injection.set('ERRINJ_NETBOX_FLIP_FEATURE',
                             box.iproto.feature.call_ret_tuple_extension)
-    local conn = net.connect(cg.server.net_box_uri)
+    local conn = net.connect(cg.server.net_box_uri,
+                             cg.server.net_box_credentials)
     conn:call('box.iproto.internal.enable_thread_requests')
     local tuple = conn:eval([[
         local format = box.tuple.format.new({
@@ -651,6 +702,7 @@ g.test_key_def = function(cg)
 end
 
 g.test_net_box = function(cg)
+    local connect_args = {cg.server.net_box_uri, cg.server.net_box_credentials}
     cg.server:eval([[
         local conn = require('net.box').connect(...)
         conn:eval("box.schema.space.create('test')")
@@ -660,18 +712,18 @@ g.test_net_box = function(cg)
         conn.space.test:insert({2, 'b'})
         conn.space.test:insert({3, 'c'})
         conn:close()
-    ]], {cg.server.net_box_uri}, {_thread_id = 1})
+    ]], connect_args, {_thread_id = 1})
     t.assert_equals(cg.server:eval([[
         local conn = require('net.box').connect(...)
         local ret = conn.space.test:select({}, {iterator = 'le'})
         conn:close()
         return ret
-    ]], {cg.server.net_box_uri}, {_thread_id = 2}), {
+    ]], connect_args, {_thread_id = 2}), {
         {3, 'c'}, {2, 'b'}, {1, 'a'},
     })
     t.assert(cg.server:eval([[
         return require('net.box').self == nil
-    ]], {cg.server.net_box_uri}, {_thread_id = 3}))
+    ]], {}, {_thread_id = 3}))
 end
 
 g.after_test('test_net_box', function(cg)
@@ -684,6 +736,7 @@ end)
 
 g.test_net_replicaset = function()
     local config = cbuilder:new()
+        :set_global_option('credentials.users.admin.password', 'secret')
         :set_global_option('credentials.users.storage.roles', {'super'})
         :set_global_option('credentials.users.storage.password', 'secret')
         :set_global_option('iproto.advertise.sharding.login', 'storage')
@@ -698,7 +751,9 @@ g.test_net_replicaset = function()
             {name = 'test', size = 1},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, {
+        net_box_credentials = {user = 'admin', password = 'secret'},
+    })
     cluster:start()
     cluster.router:call('box.iproto.internal.enable_thread_requests')
     setsearchroot(cluster.router)
