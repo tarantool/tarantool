@@ -6,6 +6,14 @@ local cluster = require('luatest.cluster')
 
 local g = t.group()
 
+local BASE_CONFIG = cbuilder:new()
+    :set_global_option('credentials.users.admin.password', 'secret')
+    :config()
+
+local SERVER_OPTS = {
+    net_box_credentials = {user = 'admin', password = 'secret'},
+}
+
 --
 -- FIXME(gh-12546): For server.exec to be able to find the luatest module,
 -- searchroot must be set in the test server. For the main thread, this is
@@ -28,7 +36,7 @@ g.test_threads_config_propagation = function()
     -- Check that the threads configuration is propagated to box.cfg
     -- and the threads module.
     --
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads.groups', {
             {name = 'test1', size = 1},
@@ -36,7 +44,7 @@ g.test_threads_config_propagation = function()
             {name = 'test3', size = 3},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     local expected_threads_info = {
         thread_id = 0,
@@ -57,7 +65,7 @@ g.test_threads_config_propagation = function()
     -- Check that the threads configuration is updated only after
     -- instance restart.
     --
-    config = cbuilder:new()
+    config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads.groups', {
             {name = 'test1', size = 1},
@@ -123,10 +131,10 @@ g.test_threads_not_configured = function()
     -- Check that if the threads configuration is unset, no thread groups
     -- are created, not even tx.
     --
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     cluster.server:exec(function()
         local threads = require('experimental.threads')
@@ -144,11 +152,11 @@ g.test_thread_groups_not_configured = function()
     -- module is configured and the tx group is created even if no thread
     -- groups are configured.
     --
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads', {})
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     cluster.server:exec(function()
         local threads = require('experimental.threads')
@@ -161,14 +169,14 @@ g.test_thread_groups_not_configured = function()
 end
 
 g.test_thread_function_export = function()
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads.groups', {
             {name = 'test1', size = 3},
             {name = 'test2', size = 2},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     --
     -- Argument checking.
@@ -199,14 +207,14 @@ g.test_thread_function_export = function()
 end
 
 g.test_threads_call = function()
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads.groups', {
             {name = 'test1', size = 3},
             {name = 'test2', size = 2},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     --
     -- Argument checking.
@@ -388,14 +396,14 @@ g.test_threads_call = function()
 end
 
 g.test_threads_eval = function()
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
         :set_instance_option('server', 'threads.groups', {
             {name = 'test1', size = 3},
             {name = 'test2', size = 2},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     --
     -- Argument checking.
@@ -544,7 +552,7 @@ g.test_threads_eval = function()
 end
 
 g.test_threads_priv = function()
-    local config = cbuilder:new()
+    local config = cbuilder:new(BASE_CONFIG)
         :set_global_option('credentials.users.guest.privileges', {
             {
                 permissions = {'execute'},
@@ -573,7 +581,7 @@ g.test_threads_priv = function()
             {name = 'test3', size = 3},
         })
         :config()
-    local cluster = cluster:new(config)
+    local cluster = cluster:new(config, SERVER_OPTS)
     cluster.server:start()
     cluster.server:exec(function()
         local threads = require('experimental.threads')

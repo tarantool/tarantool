@@ -70,7 +70,10 @@ g2.test_invalid_arguments = function(cg)
 end
 
 g2.test_iproto_export_in_app_threads = function(cg)
-    cg.server = server:new({box_cfg = {app_threads = 2}})
+    cg.server = server:new({
+        box_cfg = {app_threads = 2},
+        net_box_credentials = {user = 'admin'},
+    })
     cg.server:start()
     cg.server:call('box.iproto.internal.enable_thread_requests')
     cg.server:exec(function()
@@ -119,6 +122,7 @@ g2.test_iproto_call_routing = function(cg)
             iproto_threads = 5,
             app_threads = 3,
         },
+        net_box_credentials = {user = 'admin'},
         env = {
             TARANTOOL_RUN_BEFORE_BOX_CFG = [[
                 box.iproto.export('test_func_1', function() return 0 end)
