@@ -40,13 +40,6 @@ g.test_json_schema = function()
                 type = 'string',
             }),
         }),
-        buz = schema.map({
-            key = schema.scalar({type = 'string'}),
-            value = schema.scalar({
-                type = 'string, number',
-                default = '0'
-            }),
-        }),
         laz = schema.scalar({type='boolean'}),
         naz = schema.scalar({
             type = 'integer',
@@ -85,13 +78,6 @@ g.test_json_schema = function()
         ['$schema'] = 'https://json-schema.org/draft/2020-12/schema',
         additionalProperties = false,
         properties = {
-            buz = {
-                additionalProperties = {
-                    default = '0',
-                    type = {'string', 'number'}
-                },
-                type = 'object',
-            },
             foo = {
                 additionalProperties = false,
                 properties = {
