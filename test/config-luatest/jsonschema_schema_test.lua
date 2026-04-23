@@ -3,6 +3,25 @@ local schema = require('experimental.config.utils.schema')
 
 local g = t.group()
 
+local function variant_by_type(schema, schema_type)
+    for _, variant in ipairs(schema.variants) do
+        if variant.type == schema_type then
+            return variant
+        end
+    end
+    return nil
+end
+
+local function string_or_union_discriminator(data, w)
+    if type(data) == 'string' then
+        return variant_by_type(w.schema, 'string')
+    end
+    if type(data) == 'number' or type(data) == 'boolean' then
+        return variant_by_type(w.schema, 'union')
+    end
+    return nil
+end
+
 g.test_json_schema = function()
     local s = schema.new('basic', schema.record({
         foo = schema.record({
@@ -32,7 +51,34 @@ g.test_json_schema = function()
         naz = schema.scalar({
             type = 'integer',
             allowed_values = {0, 1},
-        })
+        }),
+        paz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+            description = 'union value',
+        }),
+        qaz = schema.array({
+            items = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.union({
+                    variants = {
+                        schema.scalar({type = 'number'}),
+                        schema.scalar({type = 'boolean'}),
+                    },
+                }),
+            },
+            discriminator = string_or_union_discriminator,
+        }),
     }))
 
     local expected = {
@@ -61,6 +107,33 @@ g.test_json_schema = function()
             fuz = {items = {type = 'string'}, type = 'array'},
             laz = {type = 'boolean'},
             naz = {enum = {0, 1}, type = 'integer'},
+            paz = {
+                anyOf = {
+                    {type = 'string'},
+                    {type = 'number'},
+                },
+                description = 'union value',
+            },
+            qaz = {
+                type = 'array',
+                items = {
+                    anyOf = {
+                        {type = 'string'},
+                        {type = 'number'},
+                    },
+                },
+            },
+            raz = {
+                anyOf = {
+                    {type = 'string'},
+                    {
+                        anyOf = {
+                            {type = 'number'},
+                            {type = 'boolean'},
+                        },
+                    },
+                },
+            },
         },
         type = 'object',
     }
