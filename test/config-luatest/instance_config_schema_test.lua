@@ -1874,15 +1874,29 @@ g.test_audit_spaces = function()
     instance_config:validate(iconfig)
 
     iconfig.audit_log.spaces = {'space1', {name = 'space2'}}
-    t.assert_error_msg_content_equals(
+    t.assert_error_msg_contains(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces must be a map or an array of strings',
+        'Data does not match any union variant',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #1: Unexpected data for scalar "string": ' ..
+        'Expected "string", got "table"',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #2: Expected a map, got an array',
         instance_config.validate, instance_config, iconfig)
 
     iconfig.audit_log.spaces = {{name = 'space1'}, 'space2'}
-    t.assert_error_msg_content_equals(
+    t.assert_error_msg_contains(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces must be a map or an array of strings',
+        'Data does not match any union variant',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #1: Unexpected data for scalar "string": ' ..
+        'Expected "string", got "table"',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #2: Expected a map, got an array',
         instance_config.validate, instance_config, iconfig)
 
     -- Check wildcard.
@@ -1901,15 +1915,28 @@ g.test_audit_spaces = function()
     instance_config:validate(iconfig)
 
     iconfig.audit_log.spaces = {space1 = {extract_key = 10}}
-    t.assert_error_msg_content_equals(
+    t.assert_error_msg_contains(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces.space1.extract_key must be boolean',
+        'Data does not match any union variant',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #1: An array contains a non-numeric key: "space1"',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #2: Unexpected data for scalar "boolean": ' ..
+        'Expected "boolean", got "number"',
         instance_config.validate, instance_config, iconfig)
 
     iconfig.audit_log.spaces = {space1 = {unexpected_option = true}}
-    t.assert_error_msg_content_equals(
+    t.assert_error_msg_contains(
         '[instance_config] audit_log.spaces: ' ..
-        'Unexpected field audit_log.spaces.space1.unexpected_option',
+        'Data does not match any union variant',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #1: An array contains a non-numeric key: "space1"',
+        instance_config.validate, instance_config, iconfig)
+    t.assert_error_msg_contains(
+        'variant #2: Unexpected field "unexpected_option"',
         instance_config.validate, instance_config, iconfig)
 end
 

@@ -199,10 +199,6 @@ I['audit_log.spaces.*'] = format_text([[
     - a map where the key is a space name and the value is a map with
       per-space options.
 
-    The following option is supported:
-    - `extract_key` - optional boolean field, having the same semantics as
-      `audit_log.extract_key`, but only for the given space.
-
     Also, space name can be a wildcard (`*`). If met, data operation events
     are logged for all spaces. Also, its `extract_key` option, if specified, is
     a default option for all spaces without explicitly specified `extract_key`.
@@ -232,6 +228,16 @@ I['audit_log.spaces.*'] = format_text([[
     But events of spaces `bands` and `singers` use primary keys instead of full
     tuples when logged. All other spaces' events still use full tuples because
     it's explicitly specified in the wildcard entry.
+]])
+
+I['audit_log.spaces.*.extract_key'] = format_text([[
+    Specify whether to log the tuple primary key instead of the full tuple for
+    the given space. This option has the same semantics as
+    `audit_log.extract_key`, but applies only to a specific space.
+
+    If the wildcard entry (`*`) is used in `audit_log.spaces`, its
+    `extract_key` option becomes the default for all spaces without an explicit
+    `extract_key` setting.
 ]])
 
 I['audit_log.to'] = 'Enable audit logging and define the log location.'
