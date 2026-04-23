@@ -970,8 +970,19 @@ txn_journal_entry_new(struct txn *txn)
 
 		if (stmt->row->type != IPROTO_NOP) {
 			is_fully_nop = false;
-			is_sync = is_sync || (stmt->space != NULL &&
-					      space_is_sync(stmt->space));
+			/*
+			 * _truncate is the only space which can be synchronous
+			 * and produce local rows at the same time (when
+			 * truncation is done for a local space). Do not treat
+			 * such row as synchronous.
+			 */
+			assert(stmt->row->group_id != GROUP_LOCAL ||
+			       !space_is_sync(stmt->space) ||
+			       space_id(stmt->space) == BOX_TRUNCATE_ID);
+			is_sync = is_sync ||
+				(stmt->space != NULL &&
+				 space_is_sync(stmt->space) &&
+				 stmt->row->group_id != GROUP_LOCAL);
 		}
 
 		if (stmt->row->replica_id == 0)
@@ -981,17 +992,19 @@ txn_journal_entry_new(struct txn *txn)
 
 		req->approx_len += xrow_approx_len(stmt->row);
 	}
-	/*
-	 * There is no a check for all-local rows, because a local
-	 * space can't be synchronous. So if there is at least one
-	 * synchronous space, the transaction is not local.
-	 */
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
 			/*
-			 * Can't commit a fully local transaction synchronously.
+			 * There is a check for all-local rows, because a fully
+			 * local transaction can be made synchronous by user
+			 * with `is_sync` (or `IPROTO_IS_SYNC`), that is
+			 * prohibited. Though, such transaction should not
+			 * become synchronous implicitly due to touching system
+			 * spaces, since space cannot be local and synchronous
+			 * at the same time.
 			 */
 			if (txn_is_fully_local(txn)) {
+				assert(txn_has_flag(txn, TXN_WAIT_ACK));
 				diag_set(IllegalParams,
 					 "An attempt to commit a fully local "
 					 "transaction synchronously");
