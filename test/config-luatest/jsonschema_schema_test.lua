@@ -32,7 +32,33 @@ g.test_json_schema = function()
         naz = schema.scalar({
             type = 'integer',
             allowed_values = {0, 1},
-        })
+        }),
+        paz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+            description = 'union value',
+        }),
+        qaz = schema.array({
+            items = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.union({
+                    variants = {
+                        schema.scalar({type = 'number'}),
+                        schema.scalar({type = 'boolean'}),
+                    },
+                }),
+            },
+        }),
     }))
 
     local expected = {
@@ -61,6 +87,33 @@ g.test_json_schema = function()
             fuz = {items = {type = 'string'}, type = 'array'},
             laz = {type = 'boolean'},
             naz = {enum = {0, 1}, type = 'integer'},
+            paz = {
+                anyOf = {
+                    {type = 'string'},
+                    {type = 'number'},
+                },
+                description = 'union value',
+            },
+            qaz = {
+                type = 'array',
+                items = {
+                    anyOf = {
+                        {type = 'string'},
+                        {type = 'number'},
+                    },
+                },
+            },
+            raz = {
+                anyOf = {
+                    {type = 'string'},
+                    {
+                        anyOf = {
+                            {type = 'number'},
+                            {type = 'boolean'},
+                        },
+                    },
+                },
+            },
         },
         type = 'object',
     }

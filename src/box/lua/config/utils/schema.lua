@@ -23,6 +23,8 @@ local schema_mt = {}
 
 local scalars = {}
 
+local table_is_array
+
 -- {{{ Walkthrough helpers
 
 -- Create walkthrough context.
@@ -50,8 +52,10 @@ local function walkthrough_path(ctx)
     for _, name in ipairs(ctx.path) do
         if type(name) == 'number' then
             res = res .. ('[%d]'):format(name)
-        else
+        elseif type(name) == 'string' then
             res = res .. '.' .. name
+        else
+            res = res .. ('[%s]'):format(tostring(name))
         end
     end
     if res:startswith('.') then
@@ -115,6 +119,17 @@ local function walkthrough_assert_table(ctx, schema, data)
     local article = schema.type == 'array' and 'an' or 'a'
     walkthrough_error(ctx, 'Unexpected data type for %s %s: %q', article,
         schema.type, type(data))
+end
+
+-- Verify that the data is an array and, if it is not so, produce
+-- a nice schema-aware error.
+--
+-- Useful as part of validation, but also as a lightweight
+-- consistency check.
+local function walkthrough_assert_array(ctx, data)
+    walkthrough_assert(ctx, type(data) == 'table',
+        'Unexpected data type for an array: %q', type(data))
+    walkthrough_assert(ctx, table_is_array(data))
 end
 
 -- }}} Walkthrough helpers
@@ -312,7 +327,7 @@ end
 
 -- }}} Scalar definitions
 
--- {{{ Schema node constructors: scalar, record, map, array
+-- {{{ Schema node constructors: scalar, record, map, array, union
 
 -- A schema node:
 --
@@ -412,7 +427,24 @@ local function array(array_def)
     return res
 end
 
--- }}} Schema node constructors: scalar, record, map, array
+-- Create a union.
+--
+-- Example:
+--
+-- schema.union({
+--     variants = <table of schema nodes>,
+--     <..annotations..>
+-- })
+local function union(union_def)
+    assert(type(union_def.variants) == 'table')
+    assert(next(union_def.variants) ~= nil)
+    assert(union_def.type == nil)
+    local res = table.copy(union_def)
+    res.type = 'union'
+    return res
+end
+
+-- }}} Schema node constructors: scalar, record, map, array, union
 
 -- {{{ Derived schema node type constructors: enum, set
 
@@ -458,7 +490,7 @@ end
 --   * all keys are numeric, without a fractional part
 --   * the lower key is 1
 --   * the higher key is equal to the number of items
-local function table_is_array(data)
+table_is_array = function(data)
     assert(type(data) == 'table')
 
     -- Check that all the keys are numeric.
@@ -538,12 +570,36 @@ local function never_accept_nonempty_array(schema)
     --  |
     --  | s:validate({'a', 'b', 'c'}) -- OK
     assert(schema.type == 'map')
-    if not is_scalar(schema.key) then
+    local function schema_never_accept_number(schema)
+        if is_scalar(schema) then
+            local scalar_def = scalars[schema.type]
+            assert(scalar_def ~= nil)
+            return scalar_def.never_accept_number
+        elseif schema.type == 'union' then
+            for _, variant in ipairs(schema.variants) do
+                if not schema_never_accept_number(variant) then
+                    return false
+                end
+            end
+            return true
+        end
         return true
     end
-    local scalar_def = scalars[schema.key.type]
-    assert(scalar_def ~= nil)
-    return scalar_def.never_accept_number
+    return schema_never_accept_number(schema.key)
+end
+
+local function can_parse_single_env_token(schema)
+    if is_scalar(schema) then
+        return schema.type ~= 'any'
+    elseif schema.type == 'union' then
+        for _, variant in ipairs(schema.variants) do
+            if not can_parse_single_env_token(variant) then
+                return false
+            end
+        end
+        return true
+    end
+    return false
 end
 
 -- If a record or a map is known as discarding any non-empty
@@ -711,13 +767,40 @@ local function validate_impl(schema, data, ctx)
             walkthrough_leave(ctx)
         end
     elseif schema.type == 'array' then
-        walkthrough_assert_table(ctx, schema, data)
-        walkthrough_assert(ctx, table_is_array(data))
+        walkthrough_assert_array(ctx, data)
 
         for i, v in ipairs(data) do
             walkthrough_enter(ctx, i)
             validate_impl(schema.items, v, ctx)
             walkthrough_leave(ctx)
+        end
+    elseif schema.type == 'union' then
+        walkthrough_assert_array(ctx, schema.variants)
+
+        local errors = {}
+        local pass = false
+
+        for i, variant in ipairs(schema.variants) do
+            -- Run variant validation in an isolated context,
+            -- so that path changes and error prefixes produced by
+            -- one variant do not affect another variant or the
+            -- parent union context.
+            local subctx = table.deepcopy(ctx)
+            walkthrough_enter(subctx, i)
+            local ok, variant_err = pcall(validate_impl, variant, data, subctx)
+            pass = pass or ok
+            if pass then
+                break
+            end
+            local error_prefix = walkthrough_error_prefix(subctx)
+            if variant_err:startswith(error_prefix) then
+                variant_err = variant_err:sub(#error_prefix + 1)
+            end
+            errors[#errors + 1] = ('variant #%d: %s'):format(i, variant_err)
+        end
+        if not pass then
+            walkthrough_error(ctx, 'Data does not match any union variant ' ..
+                '(%s)', table.concat(errors, '; '))
         end
     else
         assert(false)
@@ -884,6 +967,22 @@ local function get_impl(schema, data, ctx)
 
     if schema.type == 'any' then
         return get_schemaless(data, ctx)
+    elseif schema.type == 'union' then
+        local err = nil
+        for _, variant in ipairs(schema.variants) do
+            -- Try each variant in its own context. get_impl()
+            -- mutates ctx.path / ctx.journey while traversing.
+            -- On success, apply the successful context back.
+            local subctx = table.deepcopy(ctx)
+            local ok, res = pcall(get_impl, variant, data, subctx)
+            if ok then
+                ctx.path = subctx.path
+                ctx.journey = subctx.journey
+                return res
+            end
+            err = res
+        end
+        error(err, 0)
     elseif is_scalar(schema) then
         assert(schema.type ~= 'any')
         walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
@@ -1015,6 +1114,66 @@ local function set_impl(schema, data, rhs, ctx)
 
     if schema.type == 'any' then
         return set_schemaless(data, rhs, ctx)
+    elseif schema.type == 'union' then
+        -- Select a variant that is compatible with the requested
+        -- path and the right hand side value.
+        --
+        -- We intentionally don't require the existing value to match
+        -- the selected variant. It allows switching from one variant
+        -- to another, for example string -> number for
+        -- schema.union({string, number}).
+        --
+        -- For each variant, attempt to apply set() starting from
+        -- nil. This validates both path compatibility and
+        -- rhs against the candidate variant without mutating the
+        -- actual data.
+        --
+        -- If no variants are suitable, bubble up the last
+        -- schema-aware error.
+        local variant_to_use = nil
+        local can_reuse_data = false
+        local err = nil
+        for _, variant in ipairs(schema.variants) do
+            -- Check whether this variant accepts the target path and
+            -- rhs in an isolated context and starting from nil. This
+            -- probe must not mutate the real data.
+            local subctx = table.deepcopy(ctx)
+            local ok, res = pcall(set_impl, variant, nil, rhs, subctx)
+            if ok then
+                variant_to_use = variant
+                if data ~= nil then
+                    -- Validate existing data in its own context to
+                    -- decide whether we can reuse the table as is or
+                    -- should rebuild it during variant switch.
+                    subctx = table.deepcopy(ctx)
+                    can_reuse_data = pcall(validate_impl, variant, data,
+                                           subctx)
+                end
+                break
+            end
+            err = res
+        end
+        if variant_to_use == nil then
+            error(err, 0)
+        end
+        local data_to_set = can_reuse_data and data or nil
+        local res = set_impl(variant_to_use, data_to_set, rhs, ctx)
+
+        -- Keep in-place mutation semantics for table values passed to
+        -- schema:set(). If we switched to another variant, set_impl()
+        -- was run with nil and returned a fresh table. Copy it into
+        -- the original table.
+        if data_to_set == nil and type(data) == 'table' and
+           type(res) == 'table' then
+            for k, _ in pairs(data) do
+                data[k] = nil
+            end
+            for k, v in pairs(res) do
+                data[k] = v
+            end
+            return data
+        end
+        return res
     elseif is_scalar(schema) then
         walkthrough_error(ctx, 'Attempt to index a scalar value of type %s ' ..
             'by field %q', schema.type, requested_field)
@@ -1167,6 +1326,31 @@ end
 
 -- {{{ <schema object>:filter()
 
+-- Select a union variant that matches the given data.
+--
+-- Returns the matching variant on success, nil when the given
+-- data is nil/box.NULL, or nil plus the last schema-aware error
+-- when no variant matches.
+local function select_union_variant(schema, data, ctx)
+    assert(schema.type == 'union')
+
+    if data == nil then
+        return nil
+    end
+
+    local err = nil
+    for _, variant in ipairs(schema.variants) do
+        local subctx = table.deepcopy(ctx)
+        local ok, variant_err = pcall(validate_impl, variant, data, subctx)
+        if ok then
+            return variant
+        end
+        err = variant_err
+    end
+
+    return nil, err
+end
+
 local function filter_impl(schema, data, f, ctx)
     local w = {
         path = table.copy(ctx.path),
@@ -1186,6 +1370,14 @@ local function filter_impl(schema, data, f, ctx)
     -- luacheck: ignore 542 empty if branch
     if is_scalar(schema) then
         -- Nothing to do.
+    elseif schema.type == 'union' then
+        local variant, err = select_union_variant(schema, data, ctx)
+        if err ~= nil then
+            error(err, 0)
+        end
+        if variant ~= nil then
+            filter_impl(variant, data, f, ctx)
+        end
     elseif schema.type == 'record' then
         walkthrough_assert_table(ctx, schema, data)
 
@@ -1359,6 +1551,15 @@ local function map_impl(schema, data, f, ctx)
 
     if is_scalar(schema) then
         return data
+    elseif schema.type == 'union' then
+        local variant, err = select_union_variant(schema, data, ctx)
+        if err ~= nil then
+            error(err, 0)
+        end
+        if variant == nil then
+            return data
+        end
+        return map_impl(variant, data, f, ctx)
     elseif schema.type == 'record' then
         -- Traverse record's fields unconditionally: if the record
         -- itself is nil/box.NULL, if the fields are nil/box.NULL.
@@ -1677,6 +1878,19 @@ local function merge_impl(schema, a, b, ctx)
     -- preferred value, `b`.
     if is_scalar(schema) then
         return b
+    elseif schema.type == 'union' then
+        local a_variant, a_err = select_union_variant(schema, a, ctx)
+        if a_err ~= nil then
+            error(a_err, 0)
+        end
+        local b_variant, b_err = select_union_variant(schema, b, ctx)
+        if b_err ~= nil then
+            error(b_err, 0)
+        end
+        if a_variant ~= b_variant then
+            return b
+        end
+        return merge_impl(a_variant, a, b, ctx)
     elseif schema.type == 'array' then
         walkthrough_assert_table(ctx, schema, a)
         walkthrough_assert_table(ctx, schema, b)
@@ -1785,7 +1999,10 @@ local function schema_pairs_append_node(schema, ctx)
 end
 
 local function schema_pairs_impl(schema, ctx)
-    if is_scalar(schema) then
+    if is_scalar(schema) or schema.type == 'union' then
+        -- Keep unions as leaf nodes. Unlike :map()/:filter()/:merge(),
+        -- :pairs() has no data to select a matching variant, and
+        -- descending into all variants would produce ambiguous paths.
         schema_pairs_append_node(schema, ctx)
     elseif schema.type == 'record' then
         for k, v in pairs(schema.fields) do
@@ -1841,6 +2058,14 @@ local function jsonschema_impl(schema, ctx)
         -- copy the corresponding JSON schema.
         local scalar_copy = table.copy(scalars[schema.type].jsonschema)
         return set_common_jsonschema_fields(scalar_copy, schema)
+    elseif schema.type == 'union' then
+        local any_of = {}
+        for i, variant in ipairs(schema.variants) do
+            walkthrough_enter(ctx, i)
+            any_of[i] = jsonschema_impl(variant, ctx)
+            walkthrough_leave(ctx)
+        end
+        return set_common_jsonschema_fields({anyOf = any_of}, schema)
     elseif schema.type == 'record' then
         local properties = {}
         for field_name, field_def in pairs(schema.fields) do
@@ -1927,6 +2152,7 @@ local function preprocess_enter(ctx, schema)
         key = true,
         value = true,
         items = true,
+        variants = true,
     }
 
     -- There are known annotations that barely has any sense in
@@ -2029,6 +2255,12 @@ local function preprocess_schema(schema, ctx)
     -- luacheck: ignore 542 empty if branch
     if is_scalar(schema) then
         -- Nothing to do.
+    elseif schema.type == 'union' then
+        local variants = {}
+        for i, variant in ipairs(schema.variants) do
+            variants[i] = preprocess_schema(variant, ctx)
+        end
+        res.variants = variants
     elseif schema.type == 'record' then
         local fields = {}
         for field_name, field_def in pairs(schema.fields) do
@@ -2081,6 +2313,12 @@ local function validate_schema_impl(schema, ctx)
     -- luacheck: ignore 542 empty if branch
     if is_scalar(schema) then
         -- Nothing to do.
+    elseif schema.type == 'union' then
+        for i, variant in ipairs(schema.variants) do
+            walkthrough_enter(ctx, i)
+            validate_schema_impl(variant, ctx)
+            walkthrough_leave(ctx)
+        end
     elseif schema.type == 'record' then
         for field_name, field_def in pairs(schema.fields) do
             walkthrough_enter(ctx, field_name)
@@ -2164,6 +2402,10 @@ local function set_schema_annotations(schema, annotations)
                 set_schema_annotations_impl(field_def, ctx)
                 table.remove(ctx.path)
             end
+        elseif schema.type == 'union' then
+            for _, variant in ipairs(schema.variants) do
+                set_schema_annotations_impl(variant, ctx)
+            end
         elseif schema.type == 'map' then
             table.insert(ctx.path, '*')
             set_schema_annotations_impl(schema.value, ctx)
@@ -2227,7 +2469,7 @@ local fromenv
 -- scalar values of any type except 'any'.
 local function map_from_env(env_var_name, raw_value, schema)
     local can_have_simple_format = schema.key.type == 'string' and
-        is_scalar(schema.value) and schema.value.type ~= 'any'
+        can_parse_single_env_token(schema.value)
 
     local recommendation = can_have_simple_format and
         'Use either the simple "foo=bar,baz=fiz" object format or the JSON ' ..
@@ -2264,22 +2506,22 @@ local function map_from_env(env_var_name, raw_value, schema)
             schema.key.type), 0)
     end
 
-    -- Allow only scalar field values. Forbid composite ones.
-    if not is_scalar(schema.value) then
-        error(('Use the JSON object format for environment variable %q: the ' ..
-            'field values are supposed to have a composite type (%q) that ' ..
-            'is not supported by the simple "foo=bar,baz=fiz" object ' ..
-            'format. A JSON object value starts from "{".'):format(env_var_name,
-            schema.value.type), 0)
-    end
-
-    -- Forbid scalar field values of the 'any' type.
+    -- Forbid field values of the 'any' type.
     if schema.value.type == 'any' then
         error(('Use the JSON object format for environment variable %q: the ' ..
             'field values are supposed to have an arbitrary type ("any") ' ..
             'that is not supported by the simple "foo=bar,baz=fiz" object ' ..
             'format. A JSON object value starts from "{".'):format(
             env_var_name), 0)
+    end
+
+    -- Allow only scalar-like field values. Forbid composite ones.
+    if not can_parse_single_env_token(schema.value) then
+        error(('Use the JSON object format for environment variable %q: the ' ..
+            'field values are supposed to have a composite type (%q) that ' ..
+            'is not supported by the simple "foo=bar,baz=fiz" object ' ..
+            'format. A JSON object value starts from "{".'):format(env_var_name,
+            schema.value.type), 0)
     end
 
     -- Assume the simple foo=bar,baz=fiz object format.
@@ -2316,8 +2558,7 @@ end
 -- The simple format is applicable for an array with scalar item
 -- values of any type except 'any'.
 local function array_from_env(env_var_name, raw_value, schema)
-    local can_have_simple_format = is_scalar(schema.items) and
-        schema.items.type ~= 'any'
+    local can_have_simple_format = can_parse_single_env_token(schema.items)
 
     local recommendation = can_have_simple_format and
         'Use either the simple "foo,bar,baz" array format or the JSON ' ..
@@ -2345,22 +2586,22 @@ local function array_from_env(env_var_name, raw_value, schema)
     -- array format. If any check is not passed, suggest to use
     -- the JSON array format and describe why.
 
-    -- Allow only scalar item values. Forbid composite ones.
-    if not is_scalar(schema.items) then
-        error(('Use the JSON array format for environment variable %q: the ' ..
-            'item values are supposed to have a composite type (%q) that ' ..
-            'is not supported by the simple "foo,bar,baz" array format. ' ..
-            'A JSON array value starts from "[".'):format(env_var_name,
-            schema.items.type), 0)
-    end
-
-    -- Forbid scalar field values of the 'any' type.
+    -- Forbid item values of the 'any' type.
     if schema.items.type == 'any' then
         error(('Use the JSON array format for environment variable %q: the ' ..
             'item values are supposed to have an arbitrary type ("any") ' ..
             'that is not supported by the simple "foo,bar,baz" array ' ..
             'format. A JSON array value starts from "[".'):format(
             env_var_name), 0)
+    end
+
+    -- Allow only scalar-like item values. Forbid composite ones.
+    if not can_parse_single_env_token(schema.items) then
+        error(('Use the JSON array format for environment variable %q: the ' ..
+            'item values are supposed to have a composite type (%q) that ' ..
+            'is not supported by the simple "foo,bar,baz" array format. ' ..
+            'A JSON array value starts from "[".'):format(env_var_name,
+            schema.items.type), 0)
     end
 
     -- Assume the simple foo,bar,baz array format.
@@ -2370,6 +2611,32 @@ local function array_from_env(env_var_name, raw_value, schema)
         res[i] = fromenv(subname, v, schema.items)
     end
     return res
+end
+
+local function union_from_env(env_var_name, raw_value, schema)
+    local fallback = nil
+
+    for _, variant in ipairs(schema.variants) do
+        local ok, value = pcall(fromenv, env_var_name, raw_value, variant)
+        if ok then
+            local subctx = {path = {}, name = env_var_name}
+            if pcall(validate_impl, variant, value, subctx) then
+                if type(value) ~= 'string' or value ~= raw_value then
+                    return value
+                end
+                if fallback == nil then
+                    fallback = value
+                end
+            end
+        end
+    end
+
+    if fallback ~= nil then
+        return fallback
+    end
+
+    error(('Unable to decode a union value from environment ' ..
+        'variable %q, got %q'):format(env_var_name, raw_value), 0)
 end
 
 -- Parse data from an environment variable as a value of the given
@@ -2387,6 +2654,8 @@ fromenv = function(env_var_name, raw_value, schema)
         local scalar_def = scalars[schema.type]
         assert(scalar_def ~= nil)
         return scalar_def.fromenv(env_var_name, raw_value)
+    elseif schema.type == 'union' then
+        return union_from_env(env_var_name, raw_value, schema)
     elseif schema.type == 'record' then
         -- TODO: It is technically possible to implement parsing
         -- of records similarly how it is done for maps, but it is
@@ -2413,6 +2682,7 @@ return {
     record = record,
     map = map,
     array = array,
+    union = union,
 
     -- Constructors for 'derived types'.
     --
