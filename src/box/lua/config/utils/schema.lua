@@ -224,31 +224,6 @@ scalars.number = {
     jsonschema = {type = 'number'},
 }
 
--- TODO: This hack is needed until a union schema node will be
--- implemented.
-scalars['string, number'] = {
-    type = 'string, number',
-    validate_noexc = function(data)
-        return validate_type_noexc(data, {'string', 'number'})
-    end,
-    fromenv = function(_env_var_name, raw_value)
-        return tonumber(raw_value) or raw_value
-    end,
-    never_accept_number = false,
-    jsonschema = {type = {'string', 'number'}},
-}
-scalars['number, string'] = {
-    type = 'number, string',
-    validate_noexc = function(data)
-        return validate_type_noexc(data, {'string', 'number'})
-    end,
-    fromenv = function(_env_var_name, raw_value)
-        return tonumber(raw_value) or raw_value
-    end,
-    never_accept_number = false,
-    jsonschema = {type = {'string', 'number'}},
-}
-
 scalars.integer = {
     type = 'integer',
     validate_noexc = function(data)

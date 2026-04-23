@@ -625,8 +625,11 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = false,
         }),
-        level = schema.scalar({
-            type = 'number, string',
+        level = schema.union({
+            variants = {
+                schema.scalar({type = 'number'}),
+                schema.scalar({type = 'string'}),
+            },
             box_cfg = 'log_level',
             default = 5,
             allowed_values = {
@@ -660,8 +663,11 @@ return schema.new('instance_config', schema.record({
             key = schema.scalar({
                 type = 'string',
             }),
-            value = schema.scalar({
-                type = 'number, string',
+            value = schema.union({
+                variants = {
+                    schema.scalar({type = 'number'}),
+                    schema.scalar({type = 'string'}),
+                },
             }),
             box_cfg = 'log_modules',
             default = box.NULL,
@@ -1325,13 +1331,19 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_sync_lag',
             default = 10,
         }),
-        synchro_quorum = schema.scalar({
-            type = 'string, number',
+        synchro_quorum = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
             box_cfg = 'replication_synchro_quorum',
             default = 'N / 2 + 1',
         }),
-        linearizable_quorum = schema.scalar({
-            type = 'string, number',
+        linearizable_quorum = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
             box_cfg = 'replication_linearizable_quorum',
             default = 'N - Q + 1',
         }),

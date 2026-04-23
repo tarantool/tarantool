@@ -28,10 +28,6 @@ g.test_scalar_constructor = function()
         'integer',
         'boolean',
         'any',
-
-        -- TODO: Remove when a union node will be implemented.
-        'string, number',
-        'number, string',
     }
     for _, scalar_type in ipairs(types) do
         local def = {type = scalar_type}
@@ -728,35 +724,6 @@ g.test_validate_number = function()
     -- TODO: +inf, -inf, NaN.
 end
 
--- TODO: Remove when a union node will be implemented.
-g.test_validate_string_number = function()
-    local s1 = schema.new('myschema', schema.scalar({type = 'string, number'}))
-    local s2 = schema.new('myschema', schema.scalar({type = 'number, string'}))
-
-    -- Good cases.
-    for _, s in ipairs({s1, s2}) do
-        s:validate('')
-        s:validate('foo')
-        s:validate(-5.3)
-        s:validate(-5)
-        s:validate(0)
-        s:validate(5)
-        s:validate(5.3)
-    end
-
-    -- Bad cases.
-    for _, s in ipairs({s1, s2}) do
-        local exp_err_fmt = 'Expected one of "string", "number", got %q'
-        for i = 1, table.maxn(samples) do
-            local data = samples[i]
-            if type(data) ~= 'string' and type(data) ~= 'number' then
-                local exp_err_msg = exp_err_fmt:format(type(data))
-                assert_validate_scalar_error(s, data, exp_err_msg)
-            end
-        end
-    end
-end
-
 g.test_validate_union = function()
     local s = schema.new('myschema', schema.union({
         variants = {
@@ -1028,15 +995,20 @@ end
 g.test_validate_map_with_array_data = function()
     -- Good cases: an array is passed for a map that accepts
     -- numeric keys.
-    for _, key_type in ipairs({
-        'number',
-        'number, string',
-        'string, number',
-        'integer',
-        'any'})
+    for _, key_schema in ipairs({
+        schema.scalar({type = 'number'}),
+        schema.union({
+            variants = {
+                schema.scalar({type = 'number'}),
+                schema.scalar({type = 'string'}),
+            },
+        }),
+        schema.scalar({type = 'integer'}),
+        schema.scalar({type = 'any'}),
+    })
     do
         local s = schema.new('myschema', schema.map({
-            key = schema.scalar({type = key_type}),
+            key = key_schema,
             value = schema.scalar({type = 'string'}),
         }))
         s:validate({'a', 'b', 'c'})
@@ -4122,24 +4094,23 @@ local fromenv_cases = {
             '"MYVAR": Expected value but found invalid token on line 1 at ' ..
             'character 1 here \' >> foo\'',
     },
-    -- TODO: Remove when a union node will be implemented.
-    number_string_pass_number = {
-        schema = schema.scalar({type = 'number, string'}),
-        raw_value = '-4.7',
-        exp_value = -4.7,
+    union_string_number_number = {
+        schema = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
+        raw_value = '5.5',
+        exp_value = 5.5,
     },
-    number_string_pass_string = {
-        schema = schema.scalar({type = 'number, string'}),
-        raw_value = 'foo',
-        exp_value = 'foo',
-    },
-    string_number_pass_number = {
-        schema = schema.scalar({type = 'string, number'}),
-        raw_value = '-4.7',
-        exp_value = -4.7,
-    },
-    string_number_pass_string = {
-        schema = schema.scalar({type = 'string, number'}),
+    union_string_number_string = {
+        schema = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
         raw_value = 'foo',
         exp_value = 'foo',
     },
@@ -4182,6 +4153,19 @@ local fromenv_cases = {
         }),
         raw_value = 'foo=true,baz=0',
         exp_value = {foo = true, baz = false},
+    },
+    map_simple_union_value = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raw_value = 'foo=5.5,baz=fiz',
+        exp_value = {foo = 5.5, baz = 'fiz'},
     },
     map_simple_any_error = {
         schema = schema.map({
@@ -4327,6 +4311,18 @@ local fromenv_cases = {
         }),
         raw_value = 'true,false,1,0',
         exp_value = {true, false, true, false},
+    },
+    array_simple_union_items = {
+        schema = schema.array({
+            items = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raw_value = '5.5,fiz,-4',
+        exp_value = {5.5, 'fiz', -4},
     },
     array_simple_any_error = {
         schema = schema.array({
