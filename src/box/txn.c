@@ -880,8 +880,19 @@ txn_journal_entry_new(struct txn *txn)
 
 		if (stmt->row->type != IPROTO_NOP) {
 			is_fully_nop = false;
-			is_sync = is_sync || (stmt->space != NULL &&
-					      space_is_sync(stmt->space));
+			/*
+			 * _truncate is the only space which can be synchronous
+			 * and produce local rows at the same time (when
+			 * truncation is done for a local space). Do not treat
+			 * such row as synchronous.
+			 */
+			assert(stmt->row->group_id != GROUP_LOCAL ||
+			       !space_is_sync(stmt->space) ||
+			       space_id(stmt->space) == BOX_TRUNCATE_ID);
+			is_sync = is_sync ||
+				(stmt->space != NULL &&
+				 space_is_sync(stmt->space) &&
+				 stmt->row->group_id != GROUP_LOCAL);
 		}
 
 		if (stmt->row->replica_id == 0)
@@ -893,11 +904,13 @@ txn_journal_entry_new(struct txn *txn)
 	}
 	/*
 	 * There is no a check for all-local rows, because a local
-	 * space can't be synchronous. So if there is at least one
+	 * space can't be synchronous (the only exception is _truncate,
+	 * which is filtered above). So if there is at least one
 	 * synchronous space, the transaction is not local.
 	 */
 	if (!txn_has_flag(txn, TXN_FORCE_ASYNC) && !is_fully_nop) {
 		if (is_sync) {
+			assert(!txn_is_fully_local(txn));
 			txn_set_flags(txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		} else if (!txn_limbo_is_empty(&txn_limbo)) {
 			/*
