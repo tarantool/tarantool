@@ -5,6 +5,7 @@ local urilib = require('uri')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
 local validators = require('internal.config.validators')
+local discriminators = require('internal.config.discriminators')
 local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
 
@@ -1978,12 +1979,23 @@ return schema.new('instance_config', schema.record({
             "data_operations",
             "compatibility",
         }),
-        spaces = enterprise_edition(schema.scalar({
-            -- TODO: replace with union (gh-12539).
-            type = 'any',
+        spaces = enterprise_edition(schema.union({
+            variants = {
+                schema.array({
+                    items = schema.scalar({type = 'string'})
+                }),
+                schema.map({
+                    key = schema.scalar({type = 'string'}),
+                    value = schema.record({
+                        extract_key = schema.scalar({
+                            type = 'boolean',
+                        })
+                    })
+                }),
+            },
+            discriminator = discriminators['audit_log.spaces'],
             box_cfg_nondynamic = true,
             default = box.NULL,
-            validate = validators['audit_log.spaces'],
         })),
         extract_key = enterprise_edition(schema.scalar({
             type = 'boolean',

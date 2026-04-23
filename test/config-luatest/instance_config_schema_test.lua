@@ -1876,14 +1876,20 @@ g.test_audit_spaces = function()
     iconfig.audit_log.spaces = {'space1', {name = 'space2'}}
     t.assert_error_msg_content_equals(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces must be a map or an array of strings',
-        instance_config.validate, instance_config, iconfig)
+        'Data does not match selected union variant #1 (variant #1: ' ..
+        'Unexpected data for scalar "string": Expected "string", got ' ..
+        '"table")', function()
+            instance_config:validate(iconfig)
+        end)
 
     iconfig.audit_log.spaces = {{name = 'space1'}, 'space2'}
     t.assert_error_msg_content_equals(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces must be a map or an array of strings',
-        instance_config.validate, instance_config, iconfig)
+        'Data does not match selected union variant #1 (variant #1: ' ..
+        'Unexpected data for scalar "string": Expected "string", got ' ..
+        '"table")', function()
+            instance_config:validate(iconfig)
+        end)
 
     -- Check wildcard.
     iconfig.audit_log.spaces = {'space1', 'space2', '*'}
@@ -1903,14 +1909,19 @@ g.test_audit_spaces = function()
     iconfig.audit_log.spaces = {space1 = {extract_key = 10}}
     t.assert_error_msg_content_equals(
         '[instance_config] audit_log.spaces: ' ..
-        'audit_log.spaces.space1.extract_key must be boolean',
-        instance_config.validate, instance_config, iconfig)
+        'Data does not match selected union variant #2 (variant #2: ' ..
+        'Unexpected data for scalar "boolean": Expected "boolean", got ' ..
+        '"number")', function()
+            instance_config:validate(iconfig)
+        end)
 
     iconfig.audit_log.spaces = {space1 = {unexpected_option = true}}
     t.assert_error_msg_content_equals(
         '[instance_config] audit_log.spaces: ' ..
-        'Unexpected field audit_log.spaces.space1.unexpected_option',
-        instance_config.validate, instance_config, iconfig)
+        'Data does not match selected union variant #2 (variant #2: ' ..
+        'Unexpected field "unexpected_option")', function()
+            instance_config:validate(iconfig)
+        end)
 end
 
 g.test_failover = function()
