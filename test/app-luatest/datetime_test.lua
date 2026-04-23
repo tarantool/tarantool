@@ -2237,6 +2237,11 @@ local INVALID_NEW_AND_SET_TIME_UNITS_ERRORS = {
         t.fail_if(y == nil, msg)
         return ('date %d-%02d-%02d is invalid'):format(y, M, d)
     end,
+
+    invalid_tzoffset_fmt_error = function(set_arg)
+        local _, val = get_single_key_val(set_arg, true)
+        return ('invalid time-zone format %s'):format(val)
+    end,
 }
 
 local INVALID_NEW_AND_SET_TIME_UNITS = {
@@ -2399,6 +2404,21 @@ local INVALID_NEW_AND_SET_TIME_UNITS = {
         set = {tz = 400},
         err_fn = 'expected_type',
         err_fn_args = {'string', 'parse_tzname()'},
+    },
+    -- Tzoffset parse tests.
+    {
+        set_multiple = {
+            {tzoffset = '+03:00 what?'},
+            {tzoffset = '-0000 '},
+            {tzoffset = '+0000 '},
+            {tzoffset = 'bogus'},
+            {tzoffset = '0100'},
+            {tzoffset = '+-0100'},
+            {tzoffset = '+25:00'},
+            {tzoffset = '+9900'},
+            {tzoffset = '-99:00'},
+        },
+        err_fn = 'invalid_tzoffset_fmt_error',
     },
     -- Single unit range tests.
     {
