@@ -31,6 +31,9 @@ box.error.injection.set('ERRINJ_XLOG_RENAME_DELAY', true)
 c = fiber.channel()
 _ = fiber.create(function() local r = pcall(s.replace, s, {1}) c:put(r) end)
 _ = test_run:wait_cond(function() return count_inprogress() > 0 end)
+ls = fio.listdir(box.cfg.wal_dir)
+table.sort(ls)
+ls
 assert(count_inprogress() == 1)
 
 -- Resume GC and wait for it to delete old files.
@@ -42,6 +45,9 @@ for _, f in ipairs(files) do \
 end
 
 -- The xlog.inprogress file shouldn't be deleted by GC.
+ls = fio.listdir(box.cfg.wal_dir)
+table.sort(ls)
+ls
 assert(count_inprogress() == 1)
 
 -- Resume the blocked writer and check that it succeeds.
@@ -49,6 +55,9 @@ box.error.injection.set('ERRINJ_XLOG_RENAME_DELAY', false)
 assert(c:get() == true)
 
 -- The xlog.inprogress file was renamed.
+ls = fio.listdir(box.cfg.wal_dir)
+table.sort(ls)
+ls
 assert(count_inprogress() == 0)
 
 -- Cleanup.
