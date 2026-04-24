@@ -1278,6 +1278,18 @@ local function load_cfg(cfg)
         log.warn(msg)
     end
 
+    -- Create the default thread group if application threads are configured
+    -- from application code.
+    if cfg.app_threads > 0 and require('config')._status == 'uninitialized' then
+        box.internal.threads.cfg({
+            groups = {
+                {
+                    name = 'app',
+                    size = cfg.app_threads
+                },
+            },
+        })
+    end
     box.iproto.internal.register_funcs_after_box_cfg()
 end
 box.cfg = locked(load_cfg)
