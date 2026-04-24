@@ -3,6 +3,7 @@ local net = require('net.box')
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local server = require('luatest.server')
 
 local g = t.group()
 
@@ -664,3 +665,49 @@ g.test_threads_priv = function()
         check_err(conn_bob, 'test_func_3')
     end
 end
+
+g.before_test('test_box_cfg', function(cg)
+    cg.server = server:new()
+    cg.server:start()
+end)
+
+g.test_box_cfg = function(cg)
+    --
+    -- Check that the threads module is initialized with the default thread
+    -- group if box.cfg.app_threads is set from application code.
+    --
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        local err = {type = 'ClientError', name = 'THREADS_NOT_CONFIGURED'}
+        t.assert_error_covers(err, threads.info)
+        t.assert_error_covers(err, threads.call)
+        t.assert_error_covers(err, threads.eval)
+    end)
+    cg.server:restart({box_cfg = {app_threads = 4}})
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        t.assert_equals(threads.info(), {
+            thread_id = 0,
+            group_name = 'tx',
+            groups = {
+                {name = 'tx', size = 1},
+                {name = 'app', size = 4},
+            },
+        })
+        threads.eval('app', [[
+            local threads = require('experimental.threads')
+            threads.export('test_func', function()
+                local info = threads.info()
+                return info.group_name, info.thread_id
+            end)
+        ]])
+        t.assert_equals(threads.call('app', 'test_func'), {
+            {'app', 1}, {'app', 2}, {'app', 3}, {'app', 4},
+        })
+    end)
+end
+
+g.after_test('test_box_cfg', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
