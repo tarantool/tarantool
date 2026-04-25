@@ -48,6 +48,8 @@
 /**
  * Return a thread-local statically allocated temporary buffer of
  * size @a TT_STATIC_BUF_LEN.
+ *
+ * Post: @result != NULL
  */
 static inline char *
 tt_static_buf(void)
@@ -57,7 +59,10 @@ tt_static_buf(void)
 }
 
 /**
- * Return a null-terminated string for @a str of length @a len.
+ * Return a null-terminated string for @a str of length
+ * min( @a len , SMALL_STATIC_SIZE - 1).
+ *
+ * Post: @result != NULL
  */
 static inline const char *
 tt_cstr(const char *str, size_t len)
@@ -72,25 +77,40 @@ tt_cstr(const char *str, size_t len)
 /**
  * Wrapper around vsnprintf() that prints the result to
  * the static buffer.
+ *
+ * Post:
+ * 0 < size && size <= SMALL_STATIC_SIZE
+ *   @result != NULL
+ *   allocated_size = min(L + 1, size), where L is a real len of result string.
+ *
+ * size == 0 || size > SMALL_STATIC_SIZE || vsnprintf error occurs (EOVERFLOW)
+ *   assertion failed on debug build
+ *   undefined behaviour on release build, segmenation fault most likely
  */
 CFORMAT(printf, 2, 0)
 static inline const char *
 tt_vsnprintf(size_t size, const char *format, va_list ap)
 {
-	char *buf = (char *) static_reserve(size);
+	assert(size > 0 && size <= SMALL_STATIC_SIZE);
+	char *buf = (char *)static_reserve(size);
 	assert(buf != NULL);
 	int rc = vsnprintf(buf, size, format, ap);
-	if (rc >= 0) {
-		/* +1 for terminating zero. */
-		rc = MIN((int) size, rc + 1);
-		char *tmp = (char *) static_alloc(rc);
-		assert(tmp == buf);
-		(void) tmp;
-	}
+	assert(rc >= 0);
+	/* Release guard for vsnprintf error. */
+	if (unlikely(rc < 0))
+		return "<vsnprintf error>";
+	/* +1 for terminating zero. */
+	rc = MIN((int)size, rc + 1);
+	VERIFY(static_alloc(rc) == buf);
 	return buf;
 }
 
-/** @copydoc tt_vsnprintf() */
+/**
+ * Uses vsnprintf() to print the result to the static buffer.
+ * Maximum result length is TT_STATIC_BUF_LEN - 1.
+ *
+ * Post: @result != NULL
+ */
 CFORMAT(printf, 1, 2)
 static inline const char *
 tt_sprintf(const char *format, ...)
@@ -105,6 +125,9 @@ tt_sprintf(const char *format, ...)
 /**
  * The same as tt_sprintf() but allows to specify more precise
  * string limits.
+ * Maximum result length is SMALL_STATIC_SIZE - 1.
+ *
+ * Post: @result != NULL
  */
 CFORMAT(printf, 2, 3)
 static inline const char *
