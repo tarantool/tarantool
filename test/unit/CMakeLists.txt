@@ -673,6 +673,11 @@ create_unit_test(PREFIX tt_sort
                  LIBRARIES unit core
 )
 
+create_unit_test(PREFIX tt_static
+                 SOURCES tt_static.c
+                 LIBRARIES unit small
+)
+
 create_unit_test(PREFIX ev_signal_pid
                  SOURCES ev_signal_pid.cc core_test_utils.c
                  LIBRARIES unit core
