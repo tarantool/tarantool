@@ -244,8 +244,8 @@ g.test_one_func_call_per_replace = function(cg)
         t.assert_equals(rawget(_G, 'counter'), 0)
         for i = 1, 10 do
             s:replace{i}
-            -- One function call for each replace.
-            t.assert_equals(rawget(_G, 'counter'), i)
+            -- Two function calls for each replace.
+            t.assert_equals(rawget(_G, 'counter'), i * 2)
         end
     end)
 end

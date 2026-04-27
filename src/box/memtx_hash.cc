@@ -154,7 +154,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);	\
+		*ret = memtx_tx_tuple_clarify(txn, space, index, *ret);		\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
@@ -177,7 +177,7 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 	struct space *space;
 	struct index *index;
 	index_weak_ref_get_checked(&it->index_ref, &space, &index);
-	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+	*ret = memtx_tx_tuple_clarify(txn, space, index, *ret);
 	return 0;
 }
 
@@ -306,7 +306,7 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		assert(k != light_index_end);
 		*result = light_index_get(hash_table, k);
 		assert(*result != NULL);
-		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, base, *result);
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -337,7 +337,7 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, base, tuple);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}
@@ -441,15 +441,22 @@ fail:
 	return -1;
 }
 
+/** Replace old tuple with new tuple in the index. */
 static int
-memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
+memtx_hash_index_replace(struct index *base,
+			 struct memtx_index_entry old_entry,
+			 struct memtx_index_entry new_entry,
+			 enum dup_replace_mode mode,
+			 struct memtx_index_entry *result,
+			 struct memtx_index_entry *successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
 	/* HASH index doesn't support ordering. */
-	*successor = NULL;
+	*successor = memtx_index_entry_null;
+	struct tuple *old_tuple = old_entry.tuple;
+	struct tuple *new_tuple = new_entry.tuple;
+	*result = memtx_index_entry_null;
 
 	if (new_tuple != NULL) {
 		struct tuple *dup_tuple;
@@ -467,7 +474,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		}
 
 		if (dup_tuple) {
-			*result = dup_tuple;
+			result->tuple = dup_tuple;
 			return 0;
 		}
 	}
@@ -480,7 +487,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 			return -1;
 		}
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
 	return 0;
 }
 
@@ -745,6 +752,7 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 static const struct memtx_index_vtab memtx_hash_index_vtab = {
 	/* .base = */ memtx_hash_index_vtab_base,
 	/* .replace = */ memtx_hash_index_replace,
+	/* .replace_entry = */ memtx_hash_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

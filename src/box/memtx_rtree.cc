@@ -173,7 +173,7 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 		if (*ret == NULL)
 			break;
 		struct txn *txn = in_txn();
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+		*ret = memtx_tx_tuple_clarify(txn, space, index, *ret);
 	} while (*ret == NULL);
 	return 0;
 }
@@ -254,19 +254,26 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, base, tuple);
 	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;
 }
 
+/** Replace old tuple with new tuple in the index. */
 static int
-memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+memtx_rtree_index_replace(struct index *base,
+			  struct memtx_index_entry old_entry,
+			  struct memtx_index_entry new_entry,
+			  enum dup_replace_mode mode,
+			  struct memtx_index_entry *result,
+			  struct memtx_index_entry *successor)
 {
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
+
+	struct tuple *old_tuple = old_entry.tuple;
+	struct tuple *new_tuple = new_entry.tuple;
 
 	/*
 	 * There's no allocation failure handling in the tree, so it's required
@@ -280,7 +287,8 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		return -1;
 
 	/* RTREE index doesn't support ordering. */
-	*successor = NULL;
+	*successor = memtx_index_entry_null;
+	*result = memtx_index_entry_null;
 
 	struct rtree_rect rect;
 	if (new_tuple) {
@@ -294,7 +302,7 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (!rtree_remove(&index->tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
 	return 0;
 }
 
@@ -426,6 +434,7 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .base = */ memtx_rtree_index_vtab_base,
 	/* .replace = */ memtx_rtree_index_replace,
+	/* .replace_entry = */ memtx_rtree_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ memtx_rtree_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

@@ -35,6 +35,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "txn.h"
+#include "memtx_index.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -269,11 +270,10 @@ memtx_tx_prepare_finalize(struct txn *txn)
 void
 memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 
-/** Helper of memtx_tx_tuple_clarify */
 struct tuple *
-memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index);
+memtx_tx_index_entry_clarify_slow(struct txn *txn, struct space *space,
+				  struct index *index,
+				  struct memtx_index_entry entry);
 
 /** Helper of memtx_tx_track_point */
 void
@@ -306,8 +306,9 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
  */
 void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
-			struct tuple *successor, enum iterator_type type,
-			const char *key, uint32_t part_count);
+			struct memtx_index_entry successor,
+			enum iterator_type type, const char *key,
+			uint32_t part_count);
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
@@ -321,7 +322,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  */
 static inline void
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
-		   struct tuple *successor, enum iterator_type type,
+		   struct memtx_index_entry successor, enum iterator_type type,
 		   const char *key, uint32_t part_count)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
@@ -424,13 +425,25 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
  * @return clean tuple (can be NULL).
  */
 static inline struct tuple *
+memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
+			     struct index *index, struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return entry.tuple;
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry);
+}
+
+static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       struct index *index, struct tuple *tuple)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
+	struct memtx_index_entry entry = {
+		.tuple = tuple,
+		.hint = HINT_NONE,
+	};
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry);
 }
 
 /**
@@ -470,33 +483,23 @@ memtx_tx_index_invisible_count_matching_until(
 
 /** Helper of memtx_tx_tuple_is_visible. */
 bool
-memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
-				   struct index *index, struct tuple *tuple);
+memtx_tx_index_entry_is_visible_slow(struct txn *txn, struct space *space,
+				   struct index *index,
+				   struct memtx_index_entry entry);
 
 /**
  * Detect whether key of @a tuple from @a index of @a space is visible
  * to @a txn.
  */
 static inline bool
-memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
-			      struct index *index, struct tuple *tuple)
+memtx_tx_index_entry_is_visible(struct txn *txn, struct space *space,
+				struct index *index,
+				struct memtx_index_entry entry)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return true;
-	return memtx_tx_tuple_key_is_visible_slow(txn, space, index, tuple);
+	return memtx_tx_index_entry_is_visible_slow(txn, space, index, entry);
 }
-
-/**
- * Save functional key of a tuple to memtx_tx. It is not mandatory to call
- * this function outside memtx_tx - it is exported only for optimization.
- * If the functional key is manually saved, memtx_tx won't need to call the
- * index function again in order to obtain the key.
- *
- * Save to call when memtx_tx is disabled - in this case it's simply no-op.
- */
-void
-memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
-		       struct tuple *func_key);
 
 /**
  * Clean memtx_tx part of @a txn.
