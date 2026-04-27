@@ -264,6 +264,43 @@ scalars.integer = {
     jsonschema = {type = 'integer'},
 }
 
+scalars['integer, string'] = {
+    type = 'integer, string',
+    validate_noexc = function(data)
+        if type(data) == 'string' then
+            return true
+        end
+        return scalars.integer.validate_noexc(data)
+    end,
+    fromenv = function(_env_var_name, raw_value)
+        local n = tonumber64(raw_value)
+        if n ~= nil and n - math.floor(n) == 0 then
+            return n
+        end
+        return raw_value
+    end,
+    never_accept_number = false,
+    jsonschema = {type = {'string', 'integer'}},
+}
+scalars['string, integer'] = {
+    type = 'string, integer',
+    validate_noexc = function(data)
+        if type(data) == 'string' then
+            return true
+        end
+        return scalars.integer.validate_noexc(data)
+    end,
+    fromenv = function(_env_var_name, raw_value)
+        local n = tonumber(raw_value)
+        if n ~= nil and n - math.floor(n) == 0 then
+            return n
+        end
+        return raw_value
+    end,
+    never_accept_number = false,
+    jsonschema = {type = {'string', 'integer'}},
+}
+
 scalars.boolean = {
     type = 'boolean',
     validate_noexc = function(data)
