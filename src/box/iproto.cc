@@ -3792,7 +3792,7 @@ net_send_greeting(struct cmsg *m)
 static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
-		     struct session *session, char *user_name)
+		     struct session *session, const char *user_name)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
@@ -3801,8 +3801,12 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
 	msg->connect.session = session;
-	for (int i = 0; i < iproto_thread->srv_count; i++)
-		con->srv[i].runtime_credentials.user_name = user_name;
+	if (user_name != NULL) {
+		for (int i = 0; i < iproto_thread->srv_count; i++) {
+			con->srv[i].runtime_credentials.user_name =
+						(char *)xstrdup(user_name);
+		}
+	}
 	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
@@ -4501,6 +4505,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
 				     session, user_name);
+		free(user_name);
 		break;
 	}
 	case IPROTO_CFG_DROP_CONNECTIONS: {
