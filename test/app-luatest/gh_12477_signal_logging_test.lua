@@ -44,7 +44,7 @@ g.test_ev_signals = function(cg)
 
     -- Restart after each next test.
     test_signal(popen.signal.SIGINT)
-    cg.server:start()
+    cg.server:restart()
     test_signal(popen.signal.SIGTERM)
-    cg.server:start()
+    cg.server:restart()
 end
