@@ -215,7 +215,10 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 		struct tuple *tuple = value_to_tuple(value);
 #endif /* #ifndef OLD_GOOD_BITSET */
 		struct txn *txn = in_txn();
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, index_base, 0);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple, index_base, 0,
+					      is_prepared_ok);
 	} while (*ret == NULL);
 
 	return 0;
@@ -516,7 +519,8 @@ static const struct index_vtab memtx_bitset_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_bitset_index_count,
-	/* .get_internal = */ generic_index_get_internal,
+	/* .get_for_stmt = */ generic_index_get_for_stmt,
+	/* .get_for_ro_stmt = */ generic_index_get_for_ro_stmt,
 	/* .get = */ generic_index_get,
 	/* .create_iterator = */ memtx_bitset_index_create_iterator,
 	/* .create_iterator_with_offset = */

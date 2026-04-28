@@ -154,7 +154,10 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);	\
+		bool is_prepared_ok =						\
+			memtx_tx_detect_whether_prepared_ok(txn, space);	\
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0,	\
+					      is_prepared_ok);			\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
@@ -177,7 +180,10 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 	struct space *space;
 	struct index *index;
 	index_weak_ref_get_checked(&it->index_ref, &space, &index);
-	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+	bool is_prepared_ok =
+		memtx_tx_detect_whether_prepared_ok(txn, space);
+	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0,
+				      is_prepared_ok);
 	return 0;
 }
 
@@ -306,7 +312,10 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		assert(k != light_index_end);
 		*result = light_index_get(hash_table, k);
 		assert(*result != NULL);
-		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
+		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0,
+						 is_prepared_ok);
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -321,8 +330,9 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 }
 
 static int
-memtx_hash_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+memtx_hash_index_get_impl(struct index *base, const char *key,
+			  uint32_t part_count, struct tuple **result,
+			  bool is_prepared_ok)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -337,11 +347,33 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0,
+						 is_prepared_ok);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}
 	return 0;
+}
+
+/** Get a tuple for a write statement. */
+static int
+memtx_hash_index_get_for_stmt(struct index *base, const char *key,
+			      uint32_t part_count, struct tuple **result)
+{
+	return memtx_hash_index_get_impl(base, key, part_count, result, true);
+}
+
+/** Get a tuple for a read-only statement. */
+static int
+memtx_hash_index_get_for_ro_stmt(struct index *base, const char *key,
+				 uint32_t part_count, struct tuple **result)
+{
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	bool is_prepared_ok =
+		memtx_tx_detect_whether_prepared_ok(txn, space);
+	return memtx_hash_index_get_impl(base, key, part_count, result,
+					 is_prepared_ok);
 }
 
 /**
@@ -730,7 +762,8 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,
 	/* .count = */ memtx_hash_index_count,
-	/* .get_internal = */ memtx_hash_index_get_internal,
+	/* .get_for_stmt = */ memtx_hash_index_get_for_stmt,
+	/* .get_for_ro_stmt = */ memtx_hash_index_get_for_ro_stmt,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_iterator_with_offset = */

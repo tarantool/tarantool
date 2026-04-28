@@ -2566,7 +2566,7 @@ int
 memtx_index_get(struct index *index, const char *key, uint32_t part_count,
 		struct tuple **result)
 {
-	if (index->vtab->get_internal(index, key, part_count, result) != 0)
+	if (index_get_for_ro_stmt(index, key, part_count, result) != 0)
 		return -1;
 	struct space *space = space_by_id(index->def->space_id);
 	return memtx_prepare_result_tuple(space, result);

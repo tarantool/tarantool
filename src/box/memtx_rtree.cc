@@ -173,7 +173,10 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 		if (*ret == NULL)
 			break;
 		struct txn *txn = in_txn();
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0,
+					      is_prepared_ok);
 	} while (*ret == NULL);
 	return 0;
 }
@@ -231,8 +234,9 @@ memtx_rtree_index_count(struct index *base, enum iterator_type type,
 }
 
 static int
-memtx_rtree_index_get_internal(struct index *base, const char *key,
-			       uint32_t part_count, struct tuple **result)
+memtx_rtree_index_get_impl(struct index *base, const char *key,
+			   uint32_t part_count, struct tuple **result,
+			   bool is_prepared_ok)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_iterator iterator;
@@ -254,10 +258,32 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0,
+						 is_prepared_ok);
 	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;
+}
+
+/** Get a tuple for a write statement. */
+static int
+memtx_rtree_index_get_for_stmt(struct index *base, const char *key,
+			       uint32_t part_count, struct tuple **result)
+{
+	return memtx_rtree_index_get_impl(base, key, part_count, result, true);
+}
+
+/** Get a tuple for a read-only statement. */
+static int
+memtx_rtree_index_get_for_ro_stmt(struct index *base, const char *key,
+				  uint32_t part_count, struct tuple **result)
+{
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	bool is_prepared_ok =
+		memtx_tx_detect_whether_prepared_ok(txn, space);
+	return memtx_rtree_index_get_impl(base, key, part_count, result,
+					  is_prepared_ok);
 }
 
 static int
@@ -411,7 +437,8 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_rtree_index_count,
-	/* .get_internal = */ memtx_rtree_index_get_internal,
+	/* .get_for_stmt = */ memtx_rtree_index_get_for_stmt,
+	/* .get_for_ro_stmt = */ memtx_rtree_index_get_for_ro_stmt,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_rtree_index_create_iterator,
 	/* .create_iterator_with_offset = */

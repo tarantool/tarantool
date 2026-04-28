@@ -273,7 +273,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index);
+			    uint32_t mk_index, bool is_prepared_ok);
 
 /** Helper of memtx_tx_track_point */
 void
@@ -426,12 +426,17 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       uint32_t mk_index, bool is_prepared_ok)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
+					   is_prepared_ok);
 }
+
+/** Detect whether the transaction can see prepared, unconfirmed changes. */
+bool
+memtx_tx_detect_whether_prepared_ok(struct txn *txn, struct space *space);
 
 /**
  * Helper of memtx_tx_index_invisible_count_matching_until.
