@@ -163,15 +163,6 @@ txn_limbo_queue_rollback_volatile_up_to(struct txn_limbo_queue *queue,
 }
 
 static int
-txn_write_cb(struct trigger *trigger, void *event)
-{
-	(void)event;
-	struct fiber *fiber = (struct fiber *)trigger->data;
-	fiber_wakeup(fiber);
-	return 0;
-}
-
-static int
 txn_commit_cb(struct trigger *trigger, void *event)
 {
 	(void)event;
@@ -920,7 +911,7 @@ retry:
 	if (e->lsn > 0)
 		return 0;
 	struct trigger on_wal_write;
-	trigger_create(&on_wal_write, txn_write_cb, fiber(), NULL);
+	trigger_create(&on_wal_write, fiber_wakeup_trigger_cb, fiber(), NULL);
 	txn_on_wal_write(e->txn, &on_wal_write);
 	/*
 	 * There is no spurious wakeup. This whole function is entirely
