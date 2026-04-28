@@ -3027,11 +3027,8 @@ box_wait_limbo_acked(double timeout)
 		if (lsn > 0 && txn_limbo_has_quorum_for(&txn_limbo, lsn))
 			return lsn;
 		struct trigger on_ack;
-		trigger_create(
-			&on_ack, [](struct trigger *trigger, void *) -> int {
-			fiber_wakeup((struct fiber *)trigger->data);
-			return 0;
-		}, fiber(), NULL);
+		trigger_create(&on_ack, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
 		trigger_add(&replicaset.on_ack, &on_ack);
 		int rc = fiber_cond_wait_deadline(&txn_limbo.queue.cond,
 						  deadline);
@@ -3135,12 +3132,8 @@ box_wait_for_rw_while_leader(struct raft *raft)
 			return -1;
 		}
 		struct trigger on_update;
-		trigger_create(
-			&on_update,
-			[](struct trigger *t, void *) -> int {
-				fiber_wakeup((struct fiber *)t->data);
-				return 0;
-			}, fiber(), NULL);
+		trigger_create(&on_update, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
 		raft_on_update(raft, &on_update);
 		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
 		trigger_clear(&on_update);

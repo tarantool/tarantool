@@ -604,6 +604,7 @@ struct credentials;
 struct runtime_credentials;
 struct lua_State;
 struct ipc_wait_pad;
+struct trigger;
 
 /**
  * Warning and error slices.
@@ -1042,6 +1043,13 @@ fiber_signal_init(void);
  */
 void
 fiber_signal_reset(void);
+
+/**
+ * A trigger callback which just wakes up the fiber stored in the
+ * trigger's data.
+ */
+int
+fiber_wakeup_trigger_cb(struct trigger *trigger, void *event);
 
 /**
  * Set fiber name.
