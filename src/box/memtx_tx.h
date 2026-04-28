@@ -273,7 +273,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index);
+			    uint32_t mk_index, bool force_read_prepared);
 
 /** Helper of memtx_tx_track_point */
 void
@@ -419,8 +419,7 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
  * @param space - space in which the tuple was found.
  * @param tuple - tuple to clean.
  * @param index - index in which the tuple was found.
- * @param mk_index - multikey index (iа the index is multikey).
- * @param is_prepared_ok - allow to return prepared tuples.
+ * @param mk_index - multikey index (if the index is multikey).
  * @return clean tuple (can be NULL).
  */
 static inline struct tuple *
@@ -430,7 +429,30 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
+					   /*force_read_prepared=*/false);
+}
+
+/**
+ * Same as the previous function, but for writing statements -
+ * regardless of the isolation level, it always sees prepared statements.
+ *
+ * @param txn - current transactions.
+ * @param space - space in which the tuple was found.
+ * @param tuple - tuple to clean.
+ * @param index - index in which the tuple was found.
+ * @param mk_index - multikey index (if the index is multikey).
+ * @return clean tuple (can be NULL).
+ */
+static inline struct tuple *
+memtx_tx_tuple_clarify_rw(struct txn *txn, struct space *space,
+			  struct tuple *tuple, struct index *index,
+			  uint32_t mk_index)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return tuple;
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
+					   /*force_read_prepared=*/true);
 }
 
 /**

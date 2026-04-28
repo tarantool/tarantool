@@ -322,7 +322,8 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 
 static int
 memtx_hash_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+			      uint32_t part_count, struct tuple **result,
+			      bool is_rw)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -337,7 +338,9 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = is_rw ?
+			memtx_tx_tuple_clarify_rw(txn, space, tuple, base, 0) :
+			memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}
