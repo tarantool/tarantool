@@ -2281,6 +2281,14 @@ fiber_free(void)
 	cord_destroy(&main_cord);
 }
 
+int
+fiber_wakeup_trigger_cb(struct trigger *trigger, void *event)
+{
+	(void)event;
+	fiber_wakeup(trigger->data);
+	return 0;
+}
+
 /**
  * True if fiber_signal_init was called.
  * Needed for re-entrancy of fiber signal initialization.
