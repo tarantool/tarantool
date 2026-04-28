@@ -7,11 +7,13 @@
 
 int
 generic_memtx_index_get_internal(struct index *index, const char *key,
-				 uint32_t part_count, struct tuple **result)
+				 uint32_t part_count, struct tuple **result,
+				 bool is_rw)
 {
 	(void)key;
 	(void)part_count;
 	(void)result;
+	(void)is_rw;
 	diag_set(UnsupportedIndexFeature, index->def, "get_internal()");
 	return -1;
 }
