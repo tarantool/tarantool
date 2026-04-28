@@ -1314,7 +1314,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 template <bool USE_HINT>
 static int
 memtx_tree_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+			      uint32_t part_count, struct tuple **result,
+			      bool is_rw)
 {
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
@@ -1338,8 +1339,11 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	}
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
-					 mk_index);
+	*result = is_rw ?
+		memtx_tx_tuple_clarify_rw(txn, space, res->tuple,
+					  base, mk_index) :
+		memtx_tx_tuple_clarify(txn, space, res->tuple,
+				       base, mk_index);
 	return 0;
 }
 
