@@ -3311,13 +3311,14 @@ detect_whether_prepared_ok(struct txn *txn, struct space *space)
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
-			    uint32_t mk_index)
+			    uint32_t mk_index, bool force_read_prepared)
 {
 	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
 		memtx_tx_track_read(txn, space, tuple);
 		return tuple;
 	}
-	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
+	bool is_prepared_ok = force_read_prepared ||
+		detect_whether_prepared_ok(txn, space);
 	struct tuple *res =
 		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
 					    is_prepared_ok);
