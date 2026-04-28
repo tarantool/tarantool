@@ -154,7 +154,8 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);	\
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0,	\
+					      /*force_read_prepared=*/false);	\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
@@ -177,7 +178,8 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 	struct space *space;
 	struct index *index;
 	index_weak_ref_get_checked(&it->index_ref, &space, &index);
-	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0);
+	*ret = memtx_tx_tuple_clarify(txn, space, *ret, index, 0,
+				      /*force_read_prepared=*/false);
 	return 0;
 }
 
@@ -306,7 +308,8 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		assert(k != light_index_end);
 		*result = light_index_get(hash_table, k);
 		assert(*result != NULL);
-		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0,
+						 /*force_read_prepared=*/false);
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -322,7 +325,8 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 
 static int
 memtx_hash_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+			      uint32_t part_count, struct tuple **result,
+			      bool is_rw)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -337,7 +341,8 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0,
+						 /*force_read_prepared=*/is_rw);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}

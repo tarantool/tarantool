@@ -20,7 +20,8 @@ struct memtx_index_vtab {
 	 * without decompression, blessing, or space upgrade.
 	 */
 	int (*get_internal)(struct index *index, const char *key,
-			    uint32_t part_count, struct tuple **result);
+			    uint32_t part_count, struct tuple **result,
+			    bool is_rw);
 	/**
 	 * Main entrance point for changing data in index. Once built and
 	 * before deletion this is the only way to insert, replace and delete
@@ -55,10 +56,11 @@ struct memtx_index_vtab {
 
 static inline int
 memtx_index_get_internal(struct index *index, const char *key,
-			 uint32_t part_count, struct tuple **result)
+			 uint32_t part_count, struct tuple **result,
+			 bool is_rw)
 {
 	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
-	return vtab->get_internal(index, key, part_count, result);
+	return vtab->get_internal(index, key, part_count, result, is_rw);
 }
 
 static inline int
@@ -101,7 +103,8 @@ memtx_index_end_build(struct index *index)
 
 int
 generic_memtx_index_get_internal(struct index *index, const char *key,
-				 uint32_t part_count, struct tuple **result);
+				 uint32_t part_count, struct tuple **result,
+				 bool is_rw);
 
 /** No-op stub for the `begin_build` operation. */
 void
