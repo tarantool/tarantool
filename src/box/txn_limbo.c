@@ -137,6 +137,14 @@ txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 	return vclock_get(&limbo->queue.confirmed_vclock, replica_id);
 }
 
+bool
+txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
+{
+	assert(lsn > 0);
+	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
+	       replication_synchro_quorum;
+}
+
 static void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
@@ -316,6 +324,38 @@ end:
 	box_update_ro_summary();
 }
 
+int
+txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
+		      uint64_t term)
+{
+	txn_limbo_assert_locked(limbo);
+	/*
+	 * We make sure that promote is only written once everything this
+	 * instance has may be confirmed.
+	 */
+	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
+	VERIFY(e == NULL || e->lsn <= lsn);
+	struct synchro_request req = {
+		.type = type,
+		.queue_owner_id = limbo->queue.owner_id,
+		.origin_id = instance_id,
+		.promote = {
+			.lsn = lsn,
+			.term = term,
+		},
+	};
+	/*
+	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
+	 * appear in WALs and replication.
+	 */
+	vclock_clear(&req.promote.confirmed_vclock);
+	if (txn_limbo_req_prepare(limbo, &req) < 0)
+		return -1;
+	synchro_request_write_or_panic(&req);
+	txn_limbo_req_commit(limbo, &req);
+	return 0;
+}
+
 /*******************************************************************************
  * Public API
  ******************************************************************************/
@@ -462,39 +502,6 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 }
 
 int
-txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-		      uint64_t term)
-{
-	txn_limbo_assert_locked(limbo);
-	/*
-	 * We make sure that promote is only written once everything this
-	 * instance has may be confirmed.
-	 */
-	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
-	assert(e == NULL || e->lsn <= lsn);
-	(void) e;
-	struct synchro_request req = {
-		.type = type,
-		.queue_owner_id = limbo->queue.owner_id,
-		.origin_id = instance_id,
-		.promote = {
-			.lsn = lsn,
-			.term = term,
-		},
-	};
-	/*
-	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
-	 * appear in WALs and replication.
-	 */
-	vclock_clear(&req.promote.confirmed_vclock);
-	if (txn_limbo_req_prepare(limbo, &req) < 0)
-		return -1;
-	synchro_request_write_or_panic(&req);
-	txn_limbo_req_commit(limbo, &req);
-	return 0;
-}
-
-int
 txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			double timeout)
 {
@@ -506,14 +513,6 @@ int
 txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 {
 	return txn_limbo_queue_wait_empty(&limbo->queue, timeout);
-}
-
-bool
-txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
-{
-	assert(lsn > 0);
-	return vclock_count_ge(&limbo->queue.vclock, lsn) >=
-	       replication_synchro_quorum;
 }
 
 /**
