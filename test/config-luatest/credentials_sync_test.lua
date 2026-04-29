@@ -199,6 +199,35 @@ g.test_manual_then_config_then_removed_from_config = function(g)
     t.assert_equals(((perms_role.universe or {})[''] or {}).read, nil)
 end
 
+g.test_credentials_are_applied_after_upgrade = function()
+    local base_config = cbuilder:new()
+        :add_instance('i-001', {})
+        :set_global_option('credentials.users.guest', {roles = {'super'}})
+        :config()
+
+    local cluster = cluster:new(base_config)
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        box.schema.downgrade('3.0.0')
+        box.snapshot()
+    end)
+
+    local updated_config = cbuilder:new(base_config)
+        :set_global_option('credentials.users.not_guest', {roles = {'super'}})
+        :config()
+
+    cluster:reload(updated_config)
+
+    cluster['i-001']:exec(function()
+        box.schema.upgrade()
+    end)
+
+    cluster['i-001']:exec(function()
+        t.assert(box.schema.user.exists('not_guest'))
+    end)
+end
+
 local g2 = t.group("find-orphan-users")
 
 g2.test_find_orphan_users_script = function()
