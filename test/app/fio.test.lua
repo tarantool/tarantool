@@ -477,7 +477,7 @@ fio.mktree('/dev/null/dir')
 cwd = fio.cwd()
 old_tmpdir = os.getenv('TMPDIR')
 
-tmpdir = cwd..'/tmp-.dot.-'
+tmpdir = cwd..'/tmp-.dot.-'..tostring(fiber.time64())
 fio.mkdir(tmpdir)
 os.setenv('TMPDIR', tmpdir)
 dir = fio.tempdir()
