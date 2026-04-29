@@ -1812,3 +1812,19 @@ txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt)
 	txn_update_row_counts(txn, stmt, -1);
 	stmt->row = NULL;
 }
+
+void
+txn_shutdown(void)
+{
+	struct txn *txn, *tmp;
+	rlist_foreach_entry_safe_reverse(txn, &txns, in_txns, tmp) {
+		assert(in_txn() == NULL);
+		fiber_set_txn(fiber(), txn);
+		diag_set(ClientError, ER_SHUTDOWN);
+		if (txn->signature > 0)
+			txn_rollback_stmt(txn);
+		else
+			txn_abort(txn);
+		fiber_set_txn(fiber(), NULL);
+	}
+}

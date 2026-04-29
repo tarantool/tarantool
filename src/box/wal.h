@@ -252,6 +252,13 @@ wal_write_vy_log(struct journal_entry *req);
 void
 wal_rotate_vy_log(void);
 
+/**
+ * Make WAL thread stop accepting incoming writes to be able
+ * to perform shutdown correctly.
+ */
+void
+wal_start_shutdown(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
