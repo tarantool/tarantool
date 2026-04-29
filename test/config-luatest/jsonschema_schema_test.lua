@@ -21,31 +21,43 @@ g.test_json_schema = function()
                 type = 'string',
             }),
         }),
-        buz = schema.map({
-            key = schema.scalar({type = 'string'}),
-            value = schema.scalar({
-                type = 'string, number',
-                default = '0'
-            }),
-        }),
         laz = schema.scalar({type='boolean'}),
         naz = schema.scalar({
             type = 'integer',
             allowed_values = {0, 1},
-        })
+        }),
+        paz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+            description = 'union value',
+        }),
+        qaz = schema.array({
+            items = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raz = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.union({
+                    variants = {
+                        schema.scalar({type = 'number'}),
+                        schema.scalar({type = 'boolean'}),
+                    },
+                }),
+            },
+        }),
     }))
 
     local expected = {
         ['$schema'] = 'https://json-schema.org/draft/2020-12/schema',
         additionalProperties = false,
         properties = {
-            buz = {
-                additionalProperties = {
-                    default = '0',
-                    type = {'string', 'number'}
-                },
-                type = 'object',
-            },
             foo = {
                 additionalProperties = false,
                 properties = {
@@ -61,6 +73,33 @@ g.test_json_schema = function()
             fuz = {items = {type = 'string'}, type = 'array'},
             laz = {type = 'boolean'},
             naz = {enum = {0, 1}, type = 'integer'},
+            paz = {
+                anyOf = {
+                    {type = 'string'},
+                    {type = 'number'},
+                },
+                description = 'union value',
+            },
+            qaz = {
+                type = 'array',
+                items = {
+                    anyOf = {
+                        {type = 'string'},
+                        {type = 'number'},
+                    },
+                },
+            },
+            raz = {
+                anyOf = {
+                    {type = 'string'},
+                    {
+                        anyOf = {
+                            {type = 'number'},
+                            {type = 'boolean'},
+                        },
+                    },
+                },
+            },
         },
         type = 'object',
     }

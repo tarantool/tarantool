@@ -12,7 +12,7 @@ ffi.cdef([[
     };
 ]])
 
--- {{{ Schema node constructors: scalar, record, map, array
+-- {{{ Schema node constructors: scalar, record, map, array, union
 
 -- schema.scalar() must return a table of the following shape.
 --
@@ -28,10 +28,6 @@ g.test_scalar_constructor = function()
         'integer',
         'boolean',
         'any',
-
-        -- TODO: Remove when a union node will be implemented.
-        'string, number',
-        'number, string',
     }
     for _, scalar_type in ipairs(types) do
         local def = {type = scalar_type}
@@ -223,7 +219,44 @@ g.test_array_constructor = function()
     t.assert_equals((pcall(schema.array, def)), false)
 end
 
--- }}} Schema node constructors: scalar, record, map, array
+-- schema.union() must return a table of the following shape.
+--
+-- {
+--     type = 'union',
+--     variants = <...>,
+--     <..annotations..>
+-- }
+g.test_union_constructor = function()
+    local scalar_1 = schema.scalar({type = 'string'})
+    local scalar_2 = schema.scalar({type = 'number'})
+
+    t.assert_equals(schema.union({
+        variants = {scalar_1, scalar_2},
+    }), {
+        type = 'union',
+        variants = {scalar_1, scalar_2},
+    })
+
+    t.assert_equals(schema.union({
+        variants = {scalar_1, scalar_2},
+        my_annotation = 'info',
+    }), {
+        type = 'union',
+        variants = {scalar_1, scalar_2},
+        my_annotation = 'info',
+    })
+
+    t.assert_equals((pcall(schema.union)), false)
+    t.assert_equals((pcall(schema.union, {})), false)
+    t.assert_equals((pcall(schema.union, {variants = {}})), false)
+
+    local def = {variants = {scalar_1, scalar_2}, type = 'info'}
+    t.assert_equals((pcall(schema.union, def)), false)
+    local def = {variants = {scalar_1, scalar_2}, type = 'union'}
+    t.assert_equals((pcall(schema.union, def)), false)
+end
+
+-- }}} Schema node constructors: scalar, record, map, array, union
 
 -- {{{ Derived schema node type constructors: enum, set
 
@@ -327,6 +360,12 @@ local function remove_computed_fields(schema)
     elseif schema.type == 'map' then
         res.key = remove_computed_fields(res.key)
         res.value = remove_computed_fields(res.value)
+    elseif schema.type == 'union' then
+        local variants = {}
+        for i, v in ipairs(res.variants) do
+            variants[i] = remove_computed_fields(v)
+        end
+        res.variants = variants
     end
 
     return res
@@ -685,33 +724,147 @@ g.test_validate_number = function()
     -- TODO: +inf, -inf, NaN.
 end
 
--- TODO: Remove when a union node will be implemented.
-g.test_validate_string_number = function()
-    local s1 = schema.new('myschema', schema.scalar({type = 'string, number'}))
-    local s2 = schema.new('myschema', schema.scalar({type = 'number, string'}))
+g.test_validate_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.scalar({type = 'string'}),
+            schema.scalar({type = 'number'}),
+        },
+    }))
 
     -- Good cases.
-    for _, s in ipairs({s1, s2}) do
-        s:validate('')
-        s:validate('foo')
-        s:validate(-5.3)
-        s:validate(-5)
-        s:validate(0)
-        s:validate(5)
-        s:validate(5.3)
-    end
+    s:validate('')
+    s:validate('foo')
+    s:validate(-5.3)
+    s:validate(-5)
+    s:validate(0)
+    s:validate(5)
+    s:validate(5.3)
 
     -- Bad cases.
-    for _, s in ipairs({s1, s2}) do
-        local exp_err_fmt = 'Expected one of "string", "number", got %q'
-        for i = 1, table.maxn(samples) do
-            local data = samples[i]
-            if type(data) ~= 'string' and type(data) ~= 'number' then
-                local exp_err_msg = exp_err_fmt:format(type(data))
-                assert_validate_scalar_error(s, data, exp_err_msg)
-            end
+    local union_err_tmpl = '[myschema] Data does not match any union ' ..
+        'variant (variant #1: Unexpected data for scalar "string": ' ..
+        'Expected "string", got "%s"; variant #2: Unexpected data for ' ..
+        'scalar "number": Expected "number", got "%s")'
+
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= 'string' and type(data) ~= 'number' then
+            local data_type = type(data)
+            local exp_err_msg = union_err_tmpl:format(data_type, data_type)
+            assert_validate_error(s, data, exp_err_msg)
         end
     end
+end
+
+g.test_validate_union_nonarray_variants = function()
+    local s = schema.new('myschema', {
+        type = 'union',
+        variants = {
+            foo = schema.scalar({type = 'string'}),
+            bar = schema.scalar({type = 'number'}),
+        },
+    })
+
+    t.assert_equals(pcall(s.validate, s, 'foo'), false)
+end
+
+g.test_validate_nested_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.scalar({type = 'string'}),
+            schema.union({
+                variants = {
+                    schema.scalar({type = 'number'}),
+                    schema.scalar({type = 'boolean'}),
+                },
+            }),
+        },
+    }))
+
+    -- Good cases.
+    s:validate('foo')
+    s:validate(10)
+    s:validate(true)
+
+    -- Bad case.
+    local union_err_tmpl = '[myschema] Data does not match any union ' ..
+        'variant (variant #1: Unexpected data for scalar "string": ' ..
+        'Expected "string", got "%s"; variant #2: Data does not match ' ..
+        'any union variant (variant #1: Unexpected data for scalar ' ..
+        '"number": Expected "number", got "%s"; variant #2: Unexpected ' ..
+        'data for scalar "boolean": Expected "boolean", got "%s"))'
+
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= 'string' and type(data) ~= 'number' and
+           type(data) ~= 'boolean' then
+            local data_type = type(data)
+            local exp_err_msg = union_err_tmpl:format(data_type, data_type,
+                                                      data_type)
+            assert_validate_error(s, data, exp_err_msg)
+        end
+    end
+end
+
+g.test_validate_array_of_union = function()
+    local s = schema.new('myschema', schema.array({
+        items = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
+    }))
+
+    -- Good cases.
+    s:validate({})
+    s:validate({'foo', 1, 2.5})
+
+    -- Bad case.
+    t.assert_error_msg_contains(
+        '[myschema] [1]: Data does not match any union variant',
+        function()
+            s:validate({true})
+        end)
+end
+
+g.test_validate_map_with_union_key_and_union_value = function()
+    local s = schema.new('myschema', schema.map({
+        key = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
+        value = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
+    }))
+
+    -- Good cases.
+    s:validate({})
+    s:validate({foo = 'bar'})
+    s:validate({foo = 10, [1] = 'bar', [2] = 20})
+
+    -- Bad key.
+    t.assert_error_msg_contains(
+        '[myschema] [true]: Data does not match any union variant',
+        function()
+            s:validate({[true] = 'bar'})
+        end
+    )
+
+    -- Bad value.
+    t.assert_error_msg_contains(
+        '[myschema] foo: Data does not match any union variant',
+        function()
+            s:validate({foo = false})
+        end
+    )
 end
 
 g.test_validate_integer = function()
@@ -842,15 +995,20 @@ end
 g.test_validate_map_with_array_data = function()
     -- Good cases: an array is passed for a map that accepts
     -- numeric keys.
-    for _, key_type in ipairs({
-        'number',
-        'number, string',
-        'string, number',
-        'integer',
-        'any'})
+    for _, key_schema in ipairs({
+        schema.scalar({type = 'number'}),
+        schema.union({
+            variants = {
+                schema.scalar({type = 'number'}),
+                schema.scalar({type = 'string'}),
+            },
+        }),
+        schema.scalar({type = 'integer'}),
+        schema.scalar({type = 'any'}),
+    })
     do
         local s = schema.new('myschema', schema.map({
-            key = schema.scalar({type = key_type}),
+            key = key_schema,
             value = schema.scalar({type = 'string'}),
         }))
         s:validate({'a', 'b', 'c'})
@@ -960,6 +1118,37 @@ g.test_validate_by_allowed_values = function()
         allowed_values = {'orange', 'banana'},
     }))
     assert_validate_scalar_type_mismatch(s, 1, 'string')
+end
+
+g.test_validate_union_by_allowed_values = function()
+    local allowed_values = {'foo', 42}
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.scalar({type = 'string'}),
+            schema.scalar({type = 'number'}),
+        },
+        allowed_values = allowed_values,
+    }))
+
+    -- Good cases: the allowed values are accepted after a matching
+    -- union variant is selected.
+    s:validate('foo')
+    s:validate(42)
+
+    -- Bad case: the value matches a union variant, but is filtered
+    -- out by the union node allowed_values annotation.
+    assert_validate_error(s, 'bar', ('[myschema] Got %s, but only the ' ..
+        'following values are allowed: %s'):format('bar',
+        table.concat(allowed_values, ', ')))
+
+    -- Verify that union validation occurs before the allowed values
+    -- validation.
+    assert_validate_error(s, true,
+        '[myschema] Data does not match any union variant ' ..
+        '(variant #1: Unexpected data for scalar "string": ' ..
+        'Expected "string", got "boolean"; variant #2: ' ..
+        'Unexpected data for scalar "number": Expected "number", ' ..
+        'got "boolean")')
 end
 
 g.test_validate_unique_items = function()
@@ -1389,6 +1578,27 @@ g.test_get_index_scalar = function()
     t.assert_error_msg_equals(exp_err_msg, function()
         local data = 5
         s:get(data, 'foo')
+    end)
+end
+
+g.test_get_index_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.record({
+                bar = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    t.assert_equals(s:get({foo = 'x'}, 'foo'), 'x')
+    t.assert_equals(s:get({bar = 'y'}, 'bar'), 'y')
+
+    local exp_err_msg = '[myschema] baz: No such field in the schema'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:get({foo = 'x'}, 'baz')
     end)
 end
 
@@ -1846,6 +2056,54 @@ g.test_set_index_scalar = function()
     s:set(data, 'foo.bar.baz', rhs)
 
     t.assert_equals(data, { foo = { bar = { baz = { fiz = 'giz' } } } })
+end
+
+g.test_set_index_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.record({
+                bar = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    local s_switch = schema.new('myschema_switch', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.record({
+                foo = schema.scalar({type = 'number'}),
+            }),
+        },
+    }))
+
+    local data_1 = {foo = 'x'}
+    s:set(data_1, 'foo', 'z')
+    t.assert_equals(data_1, {foo = 'z'})
+
+    local data_2 = {bar = 'x'}
+    s:set(data_2, 'bar', 'z')
+    t.assert_equals(data_2, {bar = 'z'})
+
+    local data_3 = {}
+    s:set(data_3, 'bar', 'z')
+    t.assert_equals(data_3, {bar = 'z'})
+
+    local data_4 = {}
+    local exp_err_msg = '[myschema] baz: No such field in the schema'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        s:set(data_4, 'baz', 'z')
+    end)
+    t.assert_equals(data_4, {})
+
+    -- Allow switching between union variants while setting.
+    local data_5 = {foo = 'x'}
+    s_switch:set(data_5, 'foo', 10)
+    t.assert_equals(data_5, {foo = 10})
 end
 
 -- Attempt to set a value that doesn't correspond to the given
@@ -2933,7 +3191,53 @@ g.test_map_array_itself = function()
     t.assert_equals(res, {'foo', 'bar', 'baz'})
 end
 
+g.test_map_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.array({
+                items = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    local res = s:map({foo = 'a${b}c'}, apply_vars, {b = 'B'})
+    t.assert_equals(res, {foo = 'aBc'})
+
+    local res = s:map({'a${b}c'}, apply_vars, {b = 'B'})
+    t.assert_equals(res, {'aBc'})
+end
+
 -- }}} <schema object>:map()
+
+g.test_filter_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.array({
+                items = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    local res = s:filter({foo = 'bar'}, function(w)
+        return w.schema.type == 'string'
+    end):map(function(w)
+        return w.path
+    end):totable()
+    t.assert_equals(res, {{'foo'}})
+
+    local res = s:filter({'bar'}, function(w)
+        return w.schema.type == 'string'
+    end):map(function(w)
+        return w.path
+    end):totable()
+    t.assert_equals(res, {{1}})
+end
 
 -- {{{ <schema object>:apply_default()
 
@@ -3253,6 +3557,24 @@ g.test_apply_default_on_array = function()
     t.assert_equals(res, exp)
 end
 
+g.test_apply_default_on_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({
+                    type = 'string',
+                    default = 'def',
+                }),
+            }),
+            schema.array({
+                items = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    t.assert_equals(s:apply_default({foo = box.NULL}), {foo = 'def'})
+end
+
 -- }}} <schema object>:apply_default()
 
 -- {{{ Testing helpers for <schema object>:merge()
@@ -3366,6 +3688,26 @@ local function verify_merge(s)
     local res = s:merge(a, b)
     t.assert_equals(res, exp)
     assert_type_equals(res, exp)
+end
+
+g.test_merge_union = function()
+    local s = schema.new('myschema', schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+                bar = schema.scalar({type = 'string'}),
+            }),
+            schema.array({
+                items = schema.scalar({type = 'string'}),
+            }),
+        },
+    }))
+
+    t.assert_equals(s:merge({foo = 'aaa'}, {bar = 'bbb'}), {
+        foo = 'aaa',
+        bar = 'bbb',
+    })
+    t.assert_equals(s:merge({foo = 'aaa'}, {'bbb'}), {'bbb'})
 end
 
 -- }}} Testing helpers for <schema object>:merge()
@@ -3583,18 +3925,31 @@ g.test_pairs = function()
             foo = schema.scalar({type = 'number'}),
         }),
     })
+    local uni = schema.union({
+        variants = {
+            schema.record({
+                foo = schema.scalar({type = 'string'}),
+            }),
+            schema.array({
+                items = schema.scalar({type = 'number'}),
+            }),
+        },
+    })
     local s = schema.new('myschema', schema.record({
         str = str,
         map = map,
         arr = arr,
+        uni = uni,
         rec = schema.record({
             str = str,
             map = map,
             arr = arr,
+            uni = uni,
             rec = schema.record({
                 str = str,
                 map = map,
                 arr = arr,
+                uni = uni,
             }),
         }),
     }))
@@ -3606,14 +3961,17 @@ g.test_pairs = function()
         {str, {'str'}},
         {map, {'map'}},
         {arr, {'arr'}},
+        {uni, {'uni'}},
 
         {str, {'rec', 'str'}},
         {map, {'rec', 'map'}},
         {arr, {'rec', 'arr'}},
+        {uni, {'rec', 'uni'}},
 
         {str, {'rec', 'rec', 'str'}},
         {map, {'rec', 'rec', 'map'}},
         {arr, {'rec', 'rec', 'arr'}},
+        {uni, {'rec', 'rec', 'uni'}},
     })
 end
 
@@ -3736,24 +4094,23 @@ local fromenv_cases = {
             '"MYVAR": Expected value but found invalid token on line 1 at ' ..
             'character 1 here \' >> foo\'',
     },
-    -- TODO: Remove when a union node will be implemented.
-    number_string_pass_number = {
-        schema = schema.scalar({type = 'number, string'}),
-        raw_value = '-4.7',
-        exp_value = -4.7,
+    union_string_number_number = {
+        schema = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
+        raw_value = '5.5',
+        exp_value = 5.5,
     },
-    number_string_pass_string = {
-        schema = schema.scalar({type = 'number, string'}),
-        raw_value = 'foo',
-        exp_value = 'foo',
-    },
-    string_number_pass_number = {
-        schema = schema.scalar({type = 'string, number'}),
-        raw_value = '-4.7',
-        exp_value = -4.7,
-    },
-    string_number_pass_string = {
-        schema = schema.scalar({type = 'string, number'}),
+    union_string_number_string = {
+        schema = schema.union({
+            variants = {
+                schema.scalar({type = 'string'}),
+                schema.scalar({type = 'number'}),
+            },
+        }),
         raw_value = 'foo',
         exp_value = 'foo',
     },
@@ -3796,6 +4153,19 @@ local fromenv_cases = {
         }),
         raw_value = 'foo=true,baz=0',
         exp_value = {foo = true, baz = false},
+    },
+    map_simple_union_value = {
+        schema = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raw_value = 'foo=5.5,baz=fiz',
+        exp_value = {foo = 5.5, baz = 'fiz'},
     },
     map_simple_any_error = {
         schema = schema.map({
@@ -3941,6 +4311,18 @@ local fromenv_cases = {
         }),
         raw_value = 'true,false,1,0',
         exp_value = {true, false, true, false},
+    },
+    array_simple_union_items = {
+        schema = schema.array({
+            items = schema.union({
+                variants = {
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                },
+            }),
+        }),
+        raw_value = '5.5,fiz,-4',
+        exp_value = {5.5, 'fiz', -4},
     },
     array_simple_any_error = {
         schema = schema.array({
