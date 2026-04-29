@@ -51,6 +51,7 @@ vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 	return prev_lsn;
 }
 
+// XXX fmt P Ns En | vclock_snprint | snprintf
 int
 vclock_snprint(char *buf, int size, const struct vclock *vclock)
 {
@@ -70,6 +71,7 @@ vclock_snprint(char *buf, int size, const struct vclock *vclock)
 	return total;
 }
 
+// XXX fmt F Nf Es Mcf | vclock_to_string | tt_static_buf | vclock_snprint
 const char *
 vclock_to_string(const struct vclock *vclock)
 {

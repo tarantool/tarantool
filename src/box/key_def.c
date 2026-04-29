@@ -768,6 +768,7 @@ key_def_update_optionality(struct key_def *def, uint32_t min_field_count)
 	key_def_set_func(def);
 }
 
+// XXX fmt P Ns En | key_def_snprint_parts | snprintf
 int
 key_def_snprint_parts(char *buf, int size, const struct key_part_def *parts,
 		      uint32_t part_count)

@@ -1064,6 +1064,7 @@ done:
 	return 0;
 }
 
+// XXX fmt P Ns Ee | request_snprint | snprintf/mp_snprint
 static int
 request_snprint(char *buf, int size, const struct request *request)
 {
@@ -1111,6 +1112,7 @@ request_snprint(char *buf, int size, const struct request *request)
 	return total;
 }
 
+// XXX fmt F Nf Es Mc | request_str | tt_static_buf | request_snprint
 const char *
 request_str(const struct request *request)
 {

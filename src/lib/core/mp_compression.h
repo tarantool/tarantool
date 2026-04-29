@@ -20,6 +20,7 @@
 extern "C" {
 #endif
 
+// XXX fmt P Ns Ee | mp_snprint_compression | ...
 static inline int
 mp_snprint_compression(char *buf, int size, const char **data, uint32_t len)
 {

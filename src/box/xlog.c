@@ -648,6 +648,7 @@ xdir_set_retention_vclock(struct xdir *xdir, struct vclock *vclock)
 	retention_vclock_set(find, xdir->retention_period);
 }
 
+// XXX fmt F Ns E0 Mcf | xdir_format_filename | tt_snprintf
 const char *
 xdir_format_filename(struct xdir *dir, int64_t signature)
 {

@@ -861,6 +861,7 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format)
 
 /* }}} box_tuple_* */
 
+// XXX fmt P Np Ee | tuple_snprint | snprintf/mp_snprint
 int
 tuple_snprint(char *buf, int size, struct tuple *tuple)
 {
@@ -873,6 +874,7 @@ tuple_snprint(char *buf, int size, struct tuple *tuple)
 	return total;
 }
 
+// XXX fmt F Nf Es Mc | tuple_str | tt_static_buf | tuple_snprint
 const char *
 tuple_str(struct tuple *tuple)
 {

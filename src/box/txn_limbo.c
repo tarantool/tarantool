@@ -44,6 +44,7 @@ struct txn_limbo txn_limbo;
  * Private API
  ******************************************************************************/
 
+// XXX fmt P Ns En | synchro_request_snprint | snprintf/vclock_snprint
 /**
  * Stringify the synchro request into the given buffer. Same semantics as
  * snprintf().
@@ -82,6 +83,7 @@ synchro_request_snprint(char *buf, int size, const struct synchro_request *req)
 	return total;
 }
 
+// XXX fmt F Nf Ep Mcf(l+p) | synchro_request_str | tt_static_buf | synchro_request_snprint
 /** Stringify the synchro request into the static buffer. */
 static const char *
 synchro_request_str(const struct synchro_request *req)
@@ -516,6 +518,7 @@ txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
 	       replication_synchro_quorum;
 }
 
+// XXX fmt F Nf E0 Mcf | reject_str | tt_sprintf/synchro_request_str
 /**
  * Fill the reject reason with request data.
  * The function is not reenterable, use with care.

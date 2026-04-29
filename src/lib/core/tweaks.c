@@ -187,6 +187,7 @@ tweak_set_double(struct tweak *tweak, const struct tweak_value *val)
 	return 0;
 }
 
+// XXX fmt P Ns En | invalid_enum_errmsg_snprint | snprintf
 /**
  * snprintf(buf, size, "Invalid value, expected one of: '%s', '%s', ...",
  *          enum_strs[0], enum_strs[1], ...);
@@ -205,6 +206,7 @@ invalid_enum_errmsg_snprint(char *buf, int size,
 	return total;
 }
 
+// XXX fmt F Nf E0 Mc | invalid_enum_errmsg | tt_static_buf | invalid_enum_errmsg_snprint
 /**
  * Calls invalid_enum_errmsg_snprint on tt_static_buf.
  */

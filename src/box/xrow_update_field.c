@@ -36,6 +36,7 @@
 
 /* {{{ Error helpers. */
 
+// XXX fmt F Ns E0 Mc | xrow_update_op_field_str | tt_sprintf
 /** Take a string identifier of a field being updated by @a op. */
 static inline const char *
 xrow_update_op_field_str(const struct xrow_update_op *op)

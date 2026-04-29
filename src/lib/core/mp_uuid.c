@@ -91,6 +91,7 @@ mp_encode_uuid(char *data, const struct tt_uuid *uuid)
 	return uuid_pack(data, uuid);
 }
 
+// XXX fmt P Ns Ee | mp_snprint_uuid | uuid_unpack/snprintf
 int
 mp_snprint_uuid(char *buf, int size, const char **data, uint32_t len)
 {

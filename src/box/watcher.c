@@ -450,6 +450,7 @@ box_broadcast(const char *key, size_t key_len,
 	watchable_broadcast(&box_watchable, key, key_len, data, data_end);
 }
 
+// XXX fmt X | box_broadcast_fmt // похожая схема с макросом (длина, выделение, паника на ошибке) для формирования msgpack
 void
 box_broadcast_fmt(const char *key, const char *format, ...)
 {

@@ -440,6 +440,7 @@ enum vy_file_type {
 
 extern const char *vy_file_suffix[];
 
+// XXX fmt P Nn En | vy_space_snprint_path | snprintf
 static inline int
 vy_space_snprint_path(char *buf, int size, const char *dir,
 		      uint32_t space_id)
@@ -447,6 +448,7 @@ vy_space_snprint_path(char *buf, int size, const char *dir,
 	return snprintf(buf, size, "%s/%u", dir, (unsigned)space_id);
 }
 
+// XXX fmt P Nn En | vy_lsm_snprint_path | snprintf/vy_space_snprint_path
 static inline int
 vy_lsm_snprint_path(char *buf, int size, const char *dir,
 		    uint32_t space_id, uint32_t iid)
@@ -458,6 +460,7 @@ vy_lsm_snprint_path(char *buf, int size, const char *dir,
 	return total;
 }
 
+// XXX fmt P Nn En | vy_run_snprint_filename | snprintf
 static inline int
 vy_run_snprint_filename(char *buf, int size, int64_t run_id,
 			enum vy_file_type type)
@@ -466,6 +469,7 @@ vy_run_snprint_filename(char *buf, int size, int64_t run_id,
 			(long long)run_id, vy_file_suffix[type]);
 }
 
+// XXX fmt P Nn En | vy_run_snprint_path | vy_lsm_snprint_path/snprintf/vy_run_snprint_filename
 static inline int
 vy_run_snprint_path(char *buf, int size, const char *dir,
 		    uint32_t space_id, uint32_t iid,

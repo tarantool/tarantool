@@ -197,6 +197,7 @@ mp_decode_interval(const char **data, struct interval *itv)
 	return itv;
 }
 
+// XXX fmt P Ns Ee | mp_snprint_interval | interval_unpack/interval_to_string
 int
 mp_snprint_interval(char *buf, int size, const char **data, uint32_t len)
 {
@@ -206,6 +207,7 @@ mp_snprint_interval(char *buf, int size, const char **data, uint32_t len)
 	return interval_to_string(&itv, buf, size);
 }
 
+// XXX fmt R | mp_fprint_interval | interval_to_string+tt_static_buf // можно заменить на макрос
 int
 mp_fprint_interval(FILE *file, const char **data, uint32_t len)
 {

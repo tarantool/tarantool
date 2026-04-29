@@ -34,6 +34,7 @@ mp_dup(const char *data)
 	return copy;
 }
 
+// XXX fmt F Nf Es Mc | mp_str | tt_static_buf | mp_snprint
 const char *
 mp_str(const char *data)
 {

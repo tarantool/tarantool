@@ -111,6 +111,7 @@ tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
         return 0;
 }
 
+// XXX fmt Ps Ns En | tt_uuid_to_string | snprintf
 /**
  * \brief Format UUID to RFC 4122 string.
  * \param uu uuid

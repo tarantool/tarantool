@@ -286,6 +286,7 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 	return demangled_name;
 }
 
+// XXX fmt P Ns En | backtrace_snprint | snprintf
 int
 backtrace_snprint(char *buf, int buf_len, const struct backtrace *bt)
 {

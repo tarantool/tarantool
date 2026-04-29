@@ -158,6 +158,7 @@ histogram_percentile_lower(struct histogram *hist, int pct)
 	return hist->max;
 }
 
+// XXX fmt P Ns En | histogram_snprint | snprintf
 int
 histogram_snprint(char *buf, int size, struct histogram *hist)
 {

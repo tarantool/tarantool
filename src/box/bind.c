@@ -39,6 +39,7 @@
 #include "mp_decimal.h"
 #include "mp_uuid.h"
 
+// XXX fmt F Ns E0 Mc | sql_bind_name | tt_sprintf
 const char *
 sql_bind_name(const struct sql_bind *bind)
 {
