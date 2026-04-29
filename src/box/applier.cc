@@ -89,7 +89,7 @@ applier_set_state(struct applier *applier, enum applier_state state)
  * in applier_f().
  */
 static inline void
-applier_log_error(struct applier *applier, struct error *e)
+applier_log_error(struct applier *applier, struct error *e, bool try_reconnect)
 {
 	uint32_t errcode = box_error_code(e);
 	if (applier->last_logged_errcode == errcode)
@@ -116,26 +116,9 @@ applier_log_error(struct applier *applier, struct error *e)
 		break;
 	}
 	error_log(e);
-	switch (errcode) {
-	case ER_LOADING:
-	case ER_READONLY:
-	case ER_CFG:
-	case ER_ACCESS_DENIED:
-	case ER_NO_SUCH_USER:
-	case ER_SYSTEM:
-	case ER_SSL:
-	case ER_UNKNOWN_REPLICA:
-	case ER_CREDS_MISMATCH:
-	case ER_XLOG_GAP:
-	case ER_TOO_EARLY_SUBSCRIBE:
-	case ER_SYNC_QUORUM_TIMEOUT:
-	case ER_SYNC_ROLLBACK:
+	if (try_reconnect)
 		say_info("will retry every %.2lf second",
 			 replication_effective_reconnect_timeout());
-		break;
-	default:
-		break;
-	}
 	applier->last_logged_errcode = errcode;
 }
 
@@ -770,7 +753,7 @@ applier_connect(struct applier *applier)
 	applier_set_state(applier, APPLIER_READY);
 }
 
-static uint64_t
+static void
 applier_wait_snapshot(struct applier *applier)
 {
 	struct iostream *io = &applier->io;
@@ -833,15 +816,15 @@ applier_wait_snapshot(struct applier *applier)
 	/*
 	 * Receive initial data.
 	 */
-	uint64_t row_count = 0;
+	applier->row_count = 0;
 	while (true) {
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			if (apply_snapshot_row(&row) != 0)
 				diag_raise();
-			if (++row_count % ROWS_PER_LOG == 0) {
+			if (++applier->row_count % ROWS_PER_LOG == 0) {
 				say_info_ratelimited("%.1fM rows received",
-						     row_count / 1e6);
+						     applier->row_count / 1e6);
 			}
 		} else if (row.type == IPROTO_OK) {
 			if (applier->version_id < version_id(1, 7, 0)) {
@@ -865,8 +848,6 @@ applier_wait_snapshot(struct applier *applier)
 		}
 		coio_read_xrow(io, ibuf, &row);
 	}
-
-	return row_count;
 }
 
 static void
@@ -1042,8 +1023,8 @@ applier_thread_release_arrow(struct applier *applier)
 	}
 }
 
-static uint64_t
-applier_wait_register(struct applier *applier, uint64_t row_count)
+static void
+applier_wait_register(struct applier *applier)
 {
 	/*
 	 * Tarantool < 1.7.0: there is no "final join" stage.
@@ -1051,10 +1032,11 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	 * until replica id is received.
 	 */
 	if (applier->version_id < version_id(1, 7, 0))
-		return row_count;
+		return;
 
 	uint64_t next_log_cnt =
-		row_count + ROWS_PER_LOG - row_count % ROWS_PER_LOG;
+		applier->row_count + ROWS_PER_LOG -
+		applier->row_count % ROWS_PER_LOG;
 	/*
 	 * Receive final data.
 	 */
@@ -1068,9 +1050,9 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 	while (true) {
 		struct applier_tx tx;
 		RegionGuard region_guard(&fiber()->gc);
-		row_count += applier_read_tx(applier, &tx, &ctx,
+		applier->row_count += applier_read_tx(applier, &tx, &ctx,
 					     TIMEOUT_INFINITY);
-		while (row_count >= next_log_cnt) {
+		while (applier->row_count >= next_log_cnt) {
 			say_info_ratelimited("%.1fM rows received",
 					     next_log_cnt / 1e6);
 			next_log_cnt += ROWS_PER_LOG;
@@ -1087,8 +1069,6 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 		if (applier_apply_tx(applier, &tx.rows) != 0)
 			diag_raise();
 	}
-
-	return row_count;
 }
 
 static void
@@ -1114,7 +1094,8 @@ applier_register(struct applier *applier, bool was_anon)
 	 */
 	applier_set_state(applier, was_anon ? APPLIER_REGISTER :
 					      APPLIER_FINAL_JOIN);
-	applier_wait_register(applier, 0);
+	applier->row_count = 0;
+	applier_wait_register(applier);
 	applier_set_state(applier, was_anon ? APPLIER_REGISTERED :
 					      APPLIER_JOINED);
 	applier_set_state(applier, APPLIER_READY);
@@ -1129,7 +1110,7 @@ applier_join(struct applier *applier)
 	/* Send JOIN request */
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
-	uint64_t row_count;
+	uint64_t prev_row_count;
 	struct join_request req;
 	memset(&req, 0, sizeof(req));
 	req.instance_uuid = INSTANCE_UUID;
@@ -1141,13 +1122,15 @@ applier_join(struct applier *applier)
 
 	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
 
-	row_count = applier_wait_snapshot(applier);
+	applier_wait_snapshot(applier);
 
 	say_info("initial data received");
 
 	applier_set_state(applier, APPLIER_FINAL_JOIN);
 
-	if (applier_wait_register(applier, row_count) == row_count) {
+	prev_row_count = applier->row_count;
+	applier_wait_register(applier);
+	if (applier->row_count == prev_row_count) {
 		/*
 		 * We didn't receive any rows during registration.
 		 * Proceed to "subscribe" and do not finish bootstrap
@@ -2587,6 +2570,8 @@ applier_f(va_list ap)
 
 	/* Re-connect loop */
 	while (true) {
+		bool try_reconnect = true;
+		applier_state applier_next_state = APPLIER_OFF;
 		FiberGCChecker gc_check;
 		try {
 			/*
@@ -2650,14 +2635,11 @@ applier_f(va_list ap)
 			if (e->errcode() == ER_CONNECTION_TO_SELF &&
 			    tt_uuid_is_equal(&applier->uuid, &INSTANCE_UUID)) {
 				/* Connection to itself, stop applier */
-				applier_disconnect(applier, APPLIER_OFF);
-				break;
+				applier_next_state = APPLIER_OFF;
+				try_reconnect = false;
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_TOO_EARLY_SUBSCRIBE) {
 				/*
 				 * The instance is not anonymous, and is
@@ -2667,36 +2649,24 @@ applier_f(va_list ap)
 				 * until they receive _cluster record of this
 				 * instance. From some third node, for example.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_SYNC_QUORUM_TIMEOUT ||
 				   e->errcode() == ER_SYNC_ROLLBACK) {
 				/*
 				 * Join failure due to synchronous
 				 * transaction rollback.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_CFG ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||
 				   e->errcode() == ER_CREDS_MISMATCH) {
 				/* Invalid configuration */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_LOADING);
-				goto reconnect;
+				applier_next_state = APPLIER_LOADING;
 			} else if (e->errcode() == ER_SYSTEM ||
 				   e->errcode() == ER_SSL) {
 				/* System error from master instance. */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_DISCONNECTED);
-				goto reconnect;
+				applier_next_state = APPLIER_DISCONNECTED;
 			} else if (e->errcode() == ER_NIL_UUID) {
 				/*
 				 * Real tarantool can't have a nil UUID. This
@@ -2705,17 +2675,11 @@ applier_f(va_list ap)
 				 * will be replaced by a normal tarantool node
 				 * sooner or later.
 				 */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier,
-						   APPLIER_DISCONNECTED);
-				goto reconnect;
+				applier_next_state = APPLIER_DISCONNECTED;
 			} else {
 				/* Unrecoverable errors */
-				applier_set_last_error(applier, e);
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_STOPPED);
-				break;
+				applier_next_state = APPLIER_STOPPED;
+				try_reconnect = false;
 			}
 		} catch (XlogGapError *e) {
 			/*
@@ -2740,10 +2704,7 @@ applier_f(va_list ap)
 			 * and in the meantime try to get newer changes from
 			 * node1.
 			 */
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_LOADING);
-			goto reconnect;
+			applier_next_state = APPLIER_LOADING;
 		} catch (FiberIsCancelled *e) {
 			if (!diag_is_empty(&applier->diag)) {
 				applier_disconnect(applier, APPLIER_STOPPED);
@@ -2753,26 +2714,37 @@ applier_f(va_list ap)
 			}
 			break;
 		} catch (SocketError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (SystemError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (SSLError *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_DISCONNECTED);
-			goto reconnect;
+			applier_next_state = APPLIER_DISCONNECTED;
 		} catch (Exception *e) {
-			applier_set_last_error(applier, e);
-			applier_log_error(applier, e);
-			applier_disconnect(applier, APPLIER_STOPPED);
-			break;
+			applier_next_state = APPLIER_STOPPED;
+			try_reconnect = false;
 		}
+		/*
+		 * If the master restarts during the initial join state and
+		 * the replica has already applied some rows, the replica might
+		 * incorrectly conclude that it has all the data. Thus, we treat
+		 * errors during APPLIER_FETCH_SNAPSHOT as unrecoverable if
+		 * replica has some data.
+		 */
+		if (applier->state == APPLIER_FETCH_SNAPSHOT &&
+		    applier->row_count > 0) {
+			say_info("Error occurred during fetching snapshot, "
+				 "but some data has "
+				 "been applied. Stopping applier");
+			applier_next_state = APPLIER_STOPPED;
+			try_reconnect = false;
+		}
+
+		struct error *err = diag_last_error(diag_get());
+		applier_set_last_error(applier, err);
+		applier_log_error(applier, err, try_reconnect);
+		applier_disconnect(applier, applier_next_state);
+		if (!try_reconnect)
+			break;
 		/* Put fiber_sleep() out of catch block.
 		 *
 		 * This is done to avoid the case when two or more
@@ -2785,7 +2757,6 @@ applier_f(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-reconnect:
 		diag_clear(diag_get());
 		fiber_sleep(replication_effective_reconnect_timeout());
 	}
