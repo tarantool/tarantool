@@ -26,8 +26,8 @@ local MAX_DATE_YEAR = 5879611
 local MAX_DATE_MONTH = 7
 local MAX_DATE_DAY = 11
 
-local MIN_TZOFFSET = -12 * 60
-local MAX_TZOFFSET = 14 * 60
+local MIN_TZOFFSET = -956
+local MAX_TZOFFSET = 913
 
 local YEAR_RANGE = {MIN_DATE_YEAR, MAX_DATE_YEAR}
 local MONTH_RANGE = {1, 12}
@@ -2707,3 +2707,86 @@ g_fail_time_units.test_set = function(cg)
 end
 
 -- }}} new() and set() invalid args test.
+
+-- {{{ gh-12417 test.
+
+-- See https://github.com/tarantool/tarantool/wiki/datetime%E2%80%90calc%E2%80%90tzoffset%E2%80%90range.
+local HISTORICAL_TZOFFSET_OUT_OF_STD = {
+    {tz = 'Asia/Manila', tzoffset = -956, year = 1844},
+    {tz = 'Pacific/Guam', tzoffset = -861, year = 1844},
+    {tz = 'Pacific/Chuuk', tzoffset = -832, year = 1844},
+    {tz = 'Pacific/Pohnpei', tzoffset = -807, year = 1844},
+    {tz = 'Pacific/Kosrae', tzoffset = -788, year = 1844},
+    {tz = 'Pacific/Palau', tzoffset = -902, year = 1844},
+    {tz = 'America/Juneau', tzoffset = 902, year = 1867},
+    {tz = 'America/Sitka', tzoffset = 898, year = 1867},
+    {tz = 'America/Metlakatla', tzoffset = 913, year = 1867},
+    {tz = 'America/Yakutat', tzoffset = 881, year = 1867},
+}
+local HISTORICAL_TZOFFSET_OUT_OF_STD_REF = {}
+for i, v in ipairs(HISTORICAL_TZOFFSET_OUT_OF_STD) do
+    table.insert(HISTORICAL_TZOFFSET_OUT_OF_STD_REF,
+        {index = i, label = string.gsub(v.tz, '/', '_')})
+end
+
+local g_gh_12417 = t.group('gh-12417', HISTORICAL_TZOFFSET_OUT_OF_STD_REF)
+
+local function test_gh_12417_par(cg)
+    local par = HISTORICAL_TZOFFSET_OUT_OF_STD[cg.params.index]
+    local function check_par(_)
+        checks({tz = 'string', tzoffset = 'number', year = 'number'})
+    end
+    check_par(par)
+    return par
+end
+
+g_gh_12417.test_new = function(cg)
+    local par = test_gh_12417_par(cg)
+    local d1 = dt.new({year = par.year, tz = par.tz})
+    local d2 = dt.new({year = par.year, tzoffset = par.tzoffset})
+    t.assert_equals(d1.tzoffset, par.tzoffset)
+    t.assert_equals(d2.tzoffset, d1.tzoffset)
+end
+
+g_gh_12417.test_set = function(cg)
+    local par = test_gh_12417_par(cg)
+    local d1 = dt.new():set({year = par.year, tz = par.tz})
+    local d2 = dt.new():set({year = par.year, tzoffset = par.tzoffset})
+    t.assert_equals(d1.tzoffset, par.tzoffset)
+    t.assert_equals(d2.tzoffset, d1.tzoffset)
+end
+
+g_gh_12417.test_parse_iso = function(cg)
+    local par = test_gh_12417_par(cg)
+    local iso_str = ('%d-01-01T00:00:00'):format(par.year)
+    local d1 = dt.parse(iso_str, {tz = par.tz})
+    t.assert_equals(d1.tzoffset, par.tzoffset)
+    local d2 = dt.parse(iso_str, {tzoffset = par.tzoffset})
+    t.assert_equals(d2.tzoffset, par.tzoffset)
+    local d3 = dt.parse(iso_str..' '..par.tz)
+    t.assert_equals(d3.tzoffset, par.tzoffset)
+    local offs_str = ('%+03d:%02d')
+        :format(par.tzoffset / 60, math.abs(par.tzoffset) % 60)
+    local d4 = dt.parse(iso_str..' '..offs_str)
+    t.assert_equals(d4.tzoffset, par.tzoffset)
+end
+
+g_gh_12417.test_parse_format = function(cg)
+    local par = test_gh_12417_par(cg)
+    local year_str = ('%04d'):format(par.year)
+    local d1 = dt.parse(year_str, {format = '%Y', tz = par.tz})
+    t.assert_equals(d1.tzoffset, par.tzoffset)
+    local d2 = dt.parse(year_str, {format = '%Y', tzoffset = par.tzoffset})
+    t.assert_equals(d2.tzoffset, par.tzoffset)
+    -- Parsing timezones like 'Europe/Moscow' isn't supported yet,
+    -- the resulting timezone offset shall be wrong.
+    -- See https://github.com/tarantool/tarantool/issues/12560.
+    local d3 = dt.parse(year_str..' '..par.tz, {format = '%Y %Z'})
+    t.assert_not_equals(d3.tzoffset, par.tzoffset)
+    local offs_str = ('%+03d%02d')
+        :format(par.tzoffset / 60, math.abs(par.tzoffset) % 60)
+    local d4 = dt.parse(year_str..' '..offs_str, {format = '%Y %z'})
+    t.assert_equals(d4.tzoffset, par.tzoffset)
+end
+
+-- }}} gh-12417 test.
