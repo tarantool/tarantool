@@ -293,8 +293,10 @@ dt_epoch(dt_t dt)
 /** Common timezone suffix parser */
 static inline ssize_t
 parse_tz_suffix(const char *str, size_t len, time_t base,
-		int16_t *tzindex, int32_t *offset)
+		int16_t *tzindex, int16_t *offset)
 {
+	int32_t offset_internal;
+
 	/* 1st attempt: decode as MSK */
 	const struct date_time_zone *zone;
 	long gmtoff = 0;
@@ -303,17 +305,36 @@ parse_tz_suffix(const char *str, size_t len, time_t base,
 		return l;
 	if (l > 0) {
 		assert(zone != NULL);
-		*offset = gmtoff / 60;
 		*tzindex = timezone_index(zone);
-		assert(l <= (ssize_t)len);
-		return l;
+		offset_internal = gmtoff / 60;
+		/*
+		 * FIXME: gh-12417.
+		 * Strong check MIN_TZOFFSET <= offset_internal <= MAX_TZOFFSET
+		 * may not be performed due to gh-12417. For some historical
+		 * timezone offsets we can get valid tzdata offset, which is
+		 * out of our current 'valid' range.
+		 * So, we make weakened check for rude errors.
+		 */
+		assert(offset_internal > -24 * 3600);
+		assert(offset_internal < 24 * 3600);
+		goto out;
 	}
 
 	/* 2nd attempt: decode as +03:00 */
 	*tzindex = 0;
-	l = dt_parse_iso_zone_lenient(str, len, offset);
-	assert(l <= (ssize_t)len);
+	int parsed_offset = 0;
+	size_t l2 = dt_parse_iso_zone_lenient(str, len, &parsed_offset);
+	/* We ignore parse errors: (len > 0) && (l2 == 0). */
+	/* dt_parse_iso_zone_lenient allows any hh:mm, need to check. */
+	if (l2 != 0 && (parsed_offset < MIN_TZOFFSET ||
+			parsed_offset > MAX_TZOFFSET))
+		return -1;
+	offset_internal = parsed_offset;
+	l = (ssize_t)l2;
 
+out:
+	*offset = (int16_t)offset_internal;
+	assert(l <= (ssize_t)len);
 	return l;
 }
 
@@ -326,7 +347,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len)
 	char c;
 	int sec_of_day = 0, nanosecond = 0;
 	int16_t tzindex = 0;
-	int32_t offset = 0;
+	int16_t offset = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
 	if (n == 0)
@@ -379,13 +400,7 @@ ssize_t
 datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 		  int16_t *tzindex)
 {
-	int32_t offset = 0;
-	ssize_t l = parse_tz_suffix(str, len, base, tzindex, &offset);
-	if (l <= 0)
-		return l;
-	assert(offset <= INT16_MAX);
-	*tzoffset = offset;
-	return l;
+	return parse_tz_suffix(str, len, base, tzindex, tzoffset);
 }
 
 int
@@ -1080,7 +1095,7 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		      fields->nsec;
 	if (nsec < 0 || nsec >= MAX_NANOS_PER_SEC)
 		return -1;
-	if (fields->tzoffset < -720 || fields->tzoffset > 840)
+	if (fields->tzoffset < MIN_TZOFFSET || fields->tzoffset > MAX_TZOFFSET)
 		return -1;
 	if (fields->timestamp < (double)INT32_MIN * SECS_PER_DAY ||
 	    fields->timestamp > (double)INT32_MAX * SECS_PER_DAY)
