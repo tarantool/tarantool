@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pmatomic.h>
+#include <pthread.h>
 #include <tarantool_ev.h>
 
 #include "assoc.h"
@@ -44,7 +45,6 @@
 #include "trigger.h"
 #include "errinj.h"
 #include "clock.h"
-#include "tt_sigaction.h"
 #include "tt_static.h"
 
 extern void cord_on_yield(void);
@@ -2304,6 +2304,12 @@ static void
 signal_sigurg_cb(int signum)
 {
 	(void)signum;
+
+	/* Handle the signal in the main thread, if we're in an another one. */
+	if (!pthread_equal(pthread_self(), main_thread_id)) {
+		pthread_kill(main_thread_id, signum);
+		return;
+	}
 	assert(cord_is_main());
 	fiber_set_slice(zero_slice);
 }
@@ -2320,7 +2326,7 @@ fiber_signal_init(void)
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = signal_sigurg_cb;
-	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
+	if (sigaction(SIGURG, &sa, NULL) == -1)
 		panic_syserror("cannot set fiber sigurg handler");
 }
 
@@ -2335,7 +2341,7 @@ fiber_signal_reset(void)
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_DFL;
-	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
+	if (sigaction(SIGURG, &sa, NULL) == -1)
 		say_syserror("cannot reset fiber sigurg handler");
 }
 
