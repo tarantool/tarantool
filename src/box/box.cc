@@ -2974,19 +2974,6 @@ box_check_promote_term_intact(uint64_t promote_term)
 	return 0;
 }
 
-/**
- * Check whether the raft term has changed since it was last read.
- */
-static int
-box_check_election_term_intact(uint64_t term)
-{
-	if (box_raft()->volatile_term != term) {
-		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
-		return -1;
-	}
-	return 0;
-}
-
 /** Trigger a new election round but don't wait for its result. */
 static int
 box_trigger_elections(void)
@@ -3007,76 +2994,8 @@ box_try_wait_confirm(double timeout)
 	return box_check_promote_term_intact(promote_term);
 }
 
-/**
- * A helper to wait until all limbo entries are ready to be confirmed, i.e.
- * written to WAL and have gathered a quorum of ACKs from replicas.
- * Return lsn of the last limbo entry on success, -1 on error.
- */
-static int64_t
-box_wait_limbo_acked(double timeout)
-{
-	if (txn_limbo_is_empty(&txn_limbo))
-		return txn_limbo.queue.confirmed_lsn;
-#ifndef NDEBUG
-	++errinj(ERRINJ_WAIT_QUORUM_COUNT, ERRINJ_INT)->iparam;
-#endif
-	uint64_t promote_term = txn_limbo.term;
-	double deadline = fiber_clock() + timeout;
-	while (!fiber_is_cancelled()) {
-		int64_t lsn = txn_limbo_last_synchro_entry(&txn_limbo)->lsn;
-		if (lsn > 0 && txn_limbo_has_quorum_for(&txn_limbo, lsn))
-			return lsn;
-		struct trigger on_ack;
-		trigger_create(
-			&on_ack, [](struct trigger *trigger, void *) -> int {
-			fiber_wakeup((struct fiber *)trigger->data);
-			return 0;
-		}, fiber(), NULL);
-		trigger_add(&replicaset.on_ack, &on_ack);
-		int rc = fiber_cond_wait_deadline(&txn_limbo.queue.cond,
-						  deadline);
-		trigger_clear(&on_ack);
-		if (rc != 0)
-			return -1;
-		if (box_check_promote_term_intact(promote_term) != 0)
-			return -1;
-		if (txn_limbo_is_empty(&txn_limbo))
-			return txn_limbo.queue.confirmed_lsn;
-	}
-	diag_set(FiberIsCancelled);
-	return -1;
-}
-
 /** A guard to block multiple simultaneous promote()/demote() invocations. */
 static bool is_in_box_promote = false;
-
-static int
-box_change_limbo_ownership(int64_t confirmed_lsn, uint16_t type)
-{
-	int rc = 0;
-	uint64_t term = box_raft()->term;
-	uint64_t promote_term = txn_limbo.term;
-	assert(confirmed_lsn >= 0);
-	rc = box_check_election_term_intact(term);
-	if (rc != 0)
-		return rc;
-	txn_limbo_begin(&txn_limbo);
-	rc = box_check_election_term_intact(term);
-	if (rc != 0)
-		goto end;
-	rc = box_check_promote_term_intact(promote_term);
-	if (rc != 0)
-		goto end;
-	rc = txn_limbo_req_promote(&txn_limbo, type, confirmed_lsn, term);
-end:
-	if (rc == 0) {
-		txn_limbo_commit(&txn_limbo);
-		assert(txn_limbo_is_empty(&txn_limbo));
-	} else {
-		txn_limbo_rollback(&txn_limbo);
-	}
-	return rc;
-}
 
 int
 box_promote_qsync(void)
@@ -3086,22 +3005,13 @@ box_promote_qsync(void)
 		return -1;
 	}
 	assert(is_box_configured);
-	struct raft *raft = box_raft();
+	assert(box_raft()->state == RAFT_STATE_LEADER);
 	is_in_box_promote = true;
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-	assert(raft->state == RAFT_STATE_LEADER);
-	if (txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term)
-		return 0;
-	int64_t wait_lsn = box_wait_limbo_acked(TIMEOUT_INFINITY);
-	if (wait_lsn < 0)
-		return -1;
-	if (raft->state != RAFT_STATE_LEADER) {
-		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
-		return -1;
-	}
-	return box_change_limbo_ownership(wait_lsn, IPROTO_RAFT_PROMOTE);
+	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
+				 TIMEOUT_INFINITY);
 }
 
 int
@@ -3135,12 +3045,8 @@ box_wait_for_rw_while_leader(struct raft *raft)
 			return -1;
 		}
 		struct trigger on_update;
-		trigger_create(
-			&on_update,
-			[](struct trigger *t, void *) -> int {
-				fiber_wakeup((struct fiber *)t->data);
-				return 0;
-			}, fiber(), NULL);
+		trigger_create(&on_update, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
 		raft_on_update(raft, &on_update);
 		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
 		trigger_clear(&on_update);
@@ -3203,12 +3109,8 @@ box_promote(void)
 	default:
 		unreachable();
 	}
-
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
-	if (wait_lsn < 0)
-		return -1;
-
-	return box_change_limbo_ownership(wait_lsn, IPROTO_RAFT_PROMOTE);
+	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
+				 replication_synchro_timeout);
 }
 
 int
@@ -3250,10 +3152,8 @@ box_demote(void)
 		return -1;
 	if (box_try_wait_confirm(2 * replication_synchro_timeout) < 0)
 		return -1;
-	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
-	if (wait_lsn < 0)
-		return -1;
-	return box_change_limbo_ownership(wait_lsn, IPROTO_RAFT_DEMOTE);
+	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_DEMOTE,
+				 replication_synchro_timeout);
 }
 
 int
