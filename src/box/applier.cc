@@ -147,6 +147,7 @@ applier_log_error(struct applier *applier, struct error *e)
  * are prohibited. It assumes that APPLIER_FOLLOW triggers don't
  * yield. (Should we add a separate callback to be called on sync?)
  */
+__attribute__((no_sanitize("thread")))
 static inline void
 applier_check_sync(struct applier *applier)
 {
@@ -1162,6 +1163,7 @@ applier_join(struct applier *applier)
 	applier_set_state(applier, APPLIER_READY);
 }
 
+__attribute__((no_sanitize("thread")))
 static struct applier_tx_row *
 applier_read_tx_row(struct applier *applier, const struct applier_read_ctx *ctx,
 		    double timeout)
