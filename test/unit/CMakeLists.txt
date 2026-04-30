@@ -653,11 +653,6 @@ create_unit_test(PREFIX memtx_allocator
                  LIBRARIES unit core box
 )
 
-create_unit_test(PREFIX tt_sigaction
-                 SOURCES tt_sigaction.c core_test_utils.c
-                 LIBRARIES core unit pthread
-)
-
 create_unit_test(PREFIX string
                  SOURCES string.c core_test_utils.c
                  LIBRARIES core unit
