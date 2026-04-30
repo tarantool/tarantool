@@ -3266,12 +3266,15 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
  * Helper of @sa memtx_tx_tuple_clarify.
  * Do actual work.
  */
-static struct tuple *
-memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
+struct tuple *
+memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
+		memtx_tx_track_read(txn, space, tuple);
+		return tuple;
+	}
 	struct memtx_story *story = memtx_tx_story_get(tuple);
 	return memtx_tx_story_clarify_impl(txn, space, story, index,
 					   mk_index, is_prepared_ok);
@@ -3281,9 +3284,11 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
  * Helper of @sa memtx_tx_tuple_clarify.
  * Detect whether the transaction can see prepared, but unconfirmed commits.
  */
-static bool
-detect_whether_prepared_ok(struct txn *txn, struct space *space)
+bool
+memtx_tx_detect_whether_prepared_ok(struct txn *txn, struct space *space)
 {
+	if (space == NULL)
+		return false;
 	if (space_is_system(space))
 		return true;
 	if (txn == NULL)
@@ -3302,26 +3307,6 @@ detect_whether_prepared_ok(struct txn *txn, struct space *space)
 	 * changes in order to avoid conflicts.
 	 */
 	return !stailq_empty(&txn->stmts);
-}
-
-/**
- * Helper of @sa memtx_tx_tuple_clarify.
- * Detect is_prepared_ok flag and pass the job to memtx_tx_tuple_clarify_impl.
- */
-struct tuple *
-memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuple, struct index *index,
-			    uint32_t mk_index)
-{
-	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
-		memtx_tx_track_read(txn, space, tuple);
-		return tuple;
-	}
-	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
-	struct tuple *res =
-		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
-					    is_prepared_ok);
-	return res;
 }
 
 /**
@@ -3377,7 +3362,8 @@ memtx_tx_index_invisible_count_matching_until_slow(
 			continue;
 
 		struct tuple *visible = NULL;
-		bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		bool unused;
 		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 						  is_prepared_ok, &visible,
@@ -3401,7 +3387,7 @@ memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
 
 	struct memtx_story *story = memtx_tx_story_get(tuple);
 	struct tuple *visible = NULL;
-	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
+	bool is_prepared_ok = memtx_tx_detect_whether_prepared_ok(txn, space);
 	bool unused;
 	memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 					  is_prepared_ok, &visible,
@@ -4051,7 +4037,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 		 *
 		 * Let's count invisible BTW, it's free.
 		 */
-		bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		if (memtx_tx_story_clarify_impl(txn, space, story, index,
 						0, is_prepared_ok) == NULL)
 			invisible_count++;
@@ -4162,7 +4149,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
 		struct tuple *tuple = story->tuple;
 		struct tuple *clean =
-			memtx_tx_tuple_clarify_impl(NULL, space, tuple, index,
+			memtx_tx_tuple_clarify_slow(NULL, space, tuple, index,
 						    0, true);
 		if (clean == tuple)
 			continue;

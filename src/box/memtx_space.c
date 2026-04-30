@@ -428,7 +428,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	if (exact_key_validate(pk->def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_index_tuple;
-	if (index_get_internal(pk, key, part_count, &old_index_tuple) != 0)
+	if (index_get_for_stmt(pk, key, part_count, &old_index_tuple) != 0)
 		return -1;
 	if (old_index_tuple == NULL) {
 		*result = NULL;
@@ -467,7 +467,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (exact_key_validate(pk->def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_index_tuple;
-	if (index_get_internal(pk, key, part_count, &old_index_tuple) != 0)
+	if (index_get_for_stmt(pk, key, part_count, &old_index_tuple) != 0)
 		return -1;
 
 	if (old_index_tuple == NULL) {
@@ -558,7 +558,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_index_tuple;
-	int rc = index_get_internal(index, key, part_count, &old_index_tuple);
+	int rc = index_get_for_stmt(index, key, part_count, &old_index_tuple);
 	region_truncate(&fiber()->gc, region_svp);
 	if (rc != 0)
 		return -1;

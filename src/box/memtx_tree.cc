@@ -442,8 +442,11 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 		struct txn *txn = in_txn();
 		bool is_multikey = index_base->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+					      index_base, mk_index,
+					      is_prepared_ok);
 	}
 	/*
 	 * Pass no key because any write to the gap between that
@@ -484,8 +487,11 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 		struct txn *txn = in_txn();
 		bool is_multikey = index_base->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+					      index_base, mk_index,
+					      is_prepared_ok);
 	}
 	/*
 	 * Pass no key because any write to the gap between that
@@ -542,8 +548,11 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		struct txn *txn = in_txn();
 		bool is_multikey = index_base->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+					      index_base, mk_index,
+					      is_prepared_ok);
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
@@ -597,8 +606,11 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		struct txn *txn = in_txn();
 		bool is_multikey = index_base->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+					      index_base, mk_index,
+					      is_prepared_ok);
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
@@ -894,8 +906,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		tree_iterator_set_next_method(it);
 		bool is_multikey = index_base->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple,
-					      index_base, mk_index);
+					      index_base, mk_index,
+					      is_prepared_ok);
 	}
 
 	/*
@@ -1193,8 +1208,10 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 			memtx_tree_random(&index->tree, rnd++);
 		assert(res != NULL);
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-		*result = memtx_tx_tuple_clarify(txn, space, res->tuple,
-						 base, mk_index);
+		bool is_prepared_ok =
+			memtx_tx_detect_whether_prepared_ok(txn, space);
+		*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
+						 mk_index, is_prepared_ok);
 	} while (*result == NULL);
 	return memtx_prepare_result_tuple(space, result);
 }
@@ -1313,8 +1330,9 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 
 template <bool USE_HINT>
 static int
-memtx_tree_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+memtx_tree_index_get_impl(struct index *base, const char *key,
+			  uint32_t part_count, struct tuple **result,
+			  bool is_prepared_ok)
 {
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
@@ -1339,8 +1357,32 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
-					 mk_index);
+					 mk_index, is_prepared_ok);
 	return 0;
+}
+
+/** Get a tuple for a write statement. */
+template<bool USE_HINT>
+static int
+memtx_tree_index_get_for_stmt(struct index *base, const char *key,
+			      uint32_t part_count, struct tuple **result)
+{
+	return memtx_tree_index_get_impl<USE_HINT>(base, key, part_count,
+						  result, true);
+}
+
+/** Get a tuple for a read-only statement. */
+template<bool USE_HINT>
+static int
+memtx_tree_index_get_for_ro_stmt(struct index *base, const char *key,
+				 uint32_t part_count, struct tuple **result)
+{
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	bool is_prepared_ok =
+		memtx_tx_detect_whether_prepared_ok(txn, space);
+	return memtx_tree_index_get_impl<USE_HINT>(base, key, part_count,
+						  result, is_prepared_ok);
 }
 
 /**
@@ -2684,7 +2726,8 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
+	/* .get_for_stmt = */ generic_index_get_for_stmt,
+	/* .get_for_ro_stmt = */ generic_index_get_for_ro_stmt,
 	/* .get = */ generic_index_get,
 	/* .create_iterator = */ generic_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -2752,7 +2795,9 @@ get_memtx_tree_index_vtab(void)
 		/* .max = */ generic_index_max,
 		/* .random = */ memtx_tree_index_random<USE_HINT>,
 		/* .count = */ memtx_tree_index_count<USE_HINT>,
-		/* .get_internal */ memtx_tree_index_get_internal<USE_HINT>,
+		/* .get_for_stmt = */ memtx_tree_index_get_for_stmt<USE_HINT>,
+		/* .get_for_ro_stmt = */
+		memtx_tree_index_get_for_ro_stmt<USE_HINT>,
 		/* .get = */ memtx_index_get,
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,

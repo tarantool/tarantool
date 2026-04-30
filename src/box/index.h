@@ -643,10 +643,17 @@ struct index_vtab {
 	/*
 	 * Same as get(), but returns a tuple as it is stored in the index,
 	 * without any transformations. Used internally by engines. For
-	 * example, memtx returns a tuple without decompression.
+	 * example, memtx returns a tuple without decompression. Used for
+	 * write statements, for example, update, upsert, and delete.
 	 */
-	int (*get_internal)(struct index *index, const char *key,
+	int (*get_for_stmt)(struct index *index, const char *key,
 			    uint32_t part_count, struct tuple **result);
+	/*
+	 * Same as get_for_stmt(), but used for read-only statements, including
+	 * get(), with normal read visibility. Used internally by engines.
+	 */
+	int (*get_for_ro_stmt)(struct index *index, const char *key,
+			       uint32_t part_count, struct tuple **result);
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	/**
@@ -1014,10 +1021,17 @@ index_count(struct index *index, enum iterator_type type,
 }
 
 static inline int
-index_get_internal(struct index *index, const char *key,
+index_get_for_stmt(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result)
 {
-	return index->vtab->get_internal(index, key, part_count, result);
+	return index->vtab->get_for_stmt(index, key, part_count, result);
+}
+
+static inline int
+index_get_for_ro_stmt(struct index *index, const char *key,
+		      uint32_t part_count, struct tuple **result)
+{
+	return index->vtab->get_for_ro_stmt(index, key, part_count, result);
 }
 
 static inline int
@@ -1242,8 +1256,11 @@ generic_index_read_view_count(struct index_read_view *rv,
 			      enum iterator_type type, const char *key,
 			      uint32_t part_count);
 int
-generic_index_get_internal(struct index *index, const char *key,
+generic_index_get_for_stmt(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result);
+int
+generic_index_get_for_ro_stmt(struct index *index, const char *key,
+			      uint32_t part_count, struct tuple **result);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 struct index_read_view *
 generic_index_create_read_view(struct index *index);

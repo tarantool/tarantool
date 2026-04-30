@@ -1159,13 +1159,24 @@ generic_index_read_view_count(struct index_read_view *rv,
 }
 
 int
-generic_index_get_internal(struct index *index, const char *key,
+generic_index_get_for_stmt(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result)
 {
 	(void)key;
 	(void)part_count;
 	(void)result;
-	diag_set(UnsupportedIndexFeature, index->def, "get_internal()");
+	diag_set(UnsupportedIndexFeature, index->def, "get_for_stmt()");
+	return -1;
+}
+
+int
+generic_index_get_for_ro_stmt(struct index *index, const char *key,
+			      uint32_t part_count, struct tuple **result)
+{
+	(void)key;
+	(void)part_count;
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "get_for_ro_stmt()");
 	return -1;
 }
 
