@@ -92,3 +92,31 @@ g.test_no_pk_space = function(cg)
         s:drop()
     end)
 end
+
+-- gh-3473: Primary key can't be declared with NULL.
+g.test_3473_primary_key_not_declared_null = function(cg)
+    cg.server:exec(function()
+        local exp_err = "Primary index of space 'te17' "..
+                        "can not contain nullable parts"
+        local sql = "CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);"
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        _, err = box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Failed to execute SQL statement: "..
+                  "NULL declaration for column 'b' of table 'test' "..
+                  "has been already set to 'none'"
+        sql = "CREATE TABLE test (a int PRIMARY KEY, "..
+              "b int NULL ON CONFLICT IGNORE);"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Primary index of space 'test' can not contain nullable parts"
+        sql = "CREATE TABLE test (a int, b int NULL, "..
+              "c int, PRIMARY KEY(a, b, c));"
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+    end)
+end
