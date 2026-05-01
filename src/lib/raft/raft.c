@@ -207,6 +207,7 @@ raft_has_split_vote(const struct raft *raft)
 	return raft->max_vote + vote_vac < quorum;
 }
 
+// XXX fmt P Ns En | raft_scores_snprintf | snprintf
 static int
 raft_scores_snprintf(const struct raft *raft, char *buf, int size)
 {
@@ -227,6 +228,7 @@ raft_scores_snprintf(const struct raft *raft, char *buf, int size)
 	return total;
 }
 
+// XXX fmt F Nf Ea Mc | raft_scores_str | tt_static_buf | raft_scores_snprintf
 static const char *
 raft_scores_str(const struct raft *raft)
 {
@@ -370,6 +372,7 @@ raft_sm_follow_leader(struct raft *raft, uint32_t leader);
 static void
 raft_sm_become_candidate(struct raft *raft);
 
+// XXX fmt F Ns Ea Ma1 | raft_msg_to_string | tt_cstr | snprintf
 static const char *
 raft_msg_to_string(const struct raft_msg *req)
 {

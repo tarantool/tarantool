@@ -229,6 +229,7 @@ vy_log_prev_checkpoint(const struct vclock *vclock)
 	return prev;
 }
 
+// XXX fmt P Ns Ee | vy_log_record_snprint | snprintf/mp_snprint/key_def_snprint_parts
 /** An snprint-style function to print a log record. */
 static int
 vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
@@ -308,6 +309,7 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 	return total;
 }
 
+// XXX fmt F Nf Es Mc | vy_log_record_str | tt_static_buf | vy_log_record_snprint
 /**
  * Return a string containing a human readable representation
  * of a log record.

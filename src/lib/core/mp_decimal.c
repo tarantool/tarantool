@@ -71,6 +71,7 @@ mp_encode_decimal(char *data, const decimal_t *dec)
 	return data;
 }
 
+// XXX fmt P Ns Ee | mp_snprint_decimal | decimal_unpack/snprintf
 int
 mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len)
 {

@@ -467,9 +467,11 @@ decimal_from_uint64(decimal_t *dec, uint64_t num)
 	return decNumberFromUInt64(dec, num);
 }
 
+// XXX fmt F Nf E0 M? | decimal_str | tt_static_buf | decNumberToString
 const char *
 decimal_str(const decimal_t *dec)
 {
+	assert(DECIMAL_MAX_STR_LEN + 1 < TT_STATIC_BUF_LEN);
 	char *buf = tt_static_buf();
 	/* No errors are possible. */
 	char *tmp = decNumberToString(dec, buf);
@@ -478,6 +480,7 @@ decimal_str(const decimal_t *dec)
 	return buf;
 }
 
+// XXX fmt Ps | decimal_to_string
 void
 decimal_to_string(const decimal_t *dec, char *str)
 {

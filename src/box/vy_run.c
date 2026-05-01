@@ -932,6 +932,7 @@ vy_row_index_decode(uint32_t *row_index, uint32_t row_count,
 	return 0;
 }
 
+// XXX fmt F Ns E0 Mcf | vy_run_filename | tt_static_buf | vy_run_snprint_filename
 /** Return the name of a run data file. */
 static inline const char *
 vy_run_filename(struct vy_run *run)

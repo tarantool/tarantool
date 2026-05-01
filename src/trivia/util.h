@@ -759,6 +759,30 @@ json_syslog_escape_inplace(char *buf, int size);
 	}									\
 } while(0)
 
+/**
+ * Helper macro to allocate buffer of required size and to print obj via
+ * printer func to this buffer.
+ *
+ * The printer func expected to be snprintf-like. See point_snprint() in trivia
+ * unit test.
+ */
+#define print_static(func, obj, ...) \
+({ \
+	char *_buf = NULL; \
+	do { \
+		int _buf_size = func(NULL, 0, (obj), ##__VA_ARGS__); \
+		assert(_buf_size >= 0); \
+		_buf = (char *)static_alloc(_buf_size + 1); \
+		if (_buf == NULL) { \
+			_buf = "(error)"; \
+			break; \
+		} \
+		VERIFY(func(_buf, _buf_size + 1, (obj), ##__VA_ARGS__) == \
+		       _buf_size); \
+	} while (0); \
+	_buf; \
+})
+
 #define COMPARE_RESULT(a, b) (a < b ? -1 : a > b)
 
 /**

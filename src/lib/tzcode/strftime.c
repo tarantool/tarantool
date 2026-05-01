@@ -66,6 +66,7 @@ static ssize_t
 _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
      enum warn *warnp);
 
+// XXX fmt Ps Ns Ea | tnt_strftime
 size_t
 tnt_strftime(char *s, size_t maxsize, const char *format,
 	     const struct tnt_tm *t)

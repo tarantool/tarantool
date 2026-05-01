@@ -216,6 +216,7 @@ vy_range_delete(struct vy_range *range);
 int
 vy_range_snprint(char *buf, int size, const struct vy_range *range);
 
+// XXX fmt F Nf E0 Mc | vy_range_str | tt_static_buf | vy_range_snprint
 static inline const char *
 vy_range_str(struct vy_range *range)
 {

@@ -857,6 +857,7 @@ vy_key_from_xrow(struct xrow_header *xrow, struct key_def *cmp_def,
 	}
 }
 
+// XXX fmt P Np Ee | vy_stmt_snprint | snprintf/mp_snprint
 int
 vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 {
@@ -883,6 +884,7 @@ vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 	return total;
 }
 
+// XXX fmt F Nf Es Mc | vy_stmt_str | tt_static_buf | vy_stmt_snprint
 const char *
 vy_stmt_str(struct tuple *stmt)
 {

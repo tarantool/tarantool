@@ -127,6 +127,7 @@ mp_encode_datetime(char *data, const struct datetime *date)
 	return datetime_pack(data, date);
 }
 
+// XXX fmt P Ns Ee | mp_snprint_datetime | datetime_unpack/datetime_to_string
 int
 mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 {

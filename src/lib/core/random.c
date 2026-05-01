@@ -157,6 +157,7 @@ xoshiro_srand(uint64_t *seed)
 	state[3] = seed[3];
 }
 
+// XXX fmt F Nn E0 Mcf | xoshiro_state_str | tt_sprintf
 const char *
 xoshiro_state_str(void)
 {

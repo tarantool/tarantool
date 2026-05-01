@@ -70,6 +70,7 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 	}
 }
 
+// XXX fmt P Ns Ee | mp_snprint_decimal...mp_snprint_ext_default
 static int
 msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 {

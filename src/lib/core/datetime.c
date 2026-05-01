@@ -223,6 +223,7 @@ datetime_ev_now(struct datetime *now)
 	now->tzindex = 0;
 }
 
+// XXX fmt Ps Ns Ea | datetime_to_string | snprintf
 /**
  * NB! buf may be NULL, and we should handle it gracefully, returning
  * calculated length of output string
@@ -572,6 +573,7 @@ datetime_totable(const struct datetime *date, struct interval *out)
 		} \
 	} while (0)
 
+// XXX fmt Ps Ns En | interval_to_string | snprintf
 size_t
 interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 {

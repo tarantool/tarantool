@@ -83,6 +83,7 @@ tt_uuid_is_nil(const struct tt_uuid *uu);
 extern inline bool
 tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
 
+// XXX fmt F Nf E0 Ma1 | tt_uuid_str | tt_static_buf | tt_uuid_to_string
 char *
 tt_uuid_str(const struct tt_uuid *uu)
 {

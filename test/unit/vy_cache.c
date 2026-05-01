@@ -129,6 +129,7 @@ test_basic(void)
 	footer();
 }
 
+// XXX fmt F Nn E0 Mcf | (test vy_cache)lsn_str | tt_static_buf | snprintf // в один из базовых модулей _snprint, тут макрос
 static const char *
 lsn_str(int64_t lsn)
 {

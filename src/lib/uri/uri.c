@@ -273,6 +273,7 @@ uri_create(struct uri *uri, const char *str)
 	return 0;
 }
 
+// XXX fmt P Ns En | uri_format_param | snprintf
 static int
 uri_format_param(char *str, int len, const struct uri_param *param)
 {
@@ -290,6 +291,7 @@ uri_format_param(char *str, int len, const struct uri_param *param)
 	return total;
 }
 
+// XXX fmt P Ns En | uri_format_params | snprintf/uri_format_param
 /**
  * A function which displays uri parameters according to
  * write_sensitive option.
@@ -315,6 +317,7 @@ uri_format_params(char *str, int len, const struct uri *uri,
 	return total;
 }
 
+// XXX fmt P Ns En | uri_format | snprintf/uri_format_params
 int
 uri_format(char *str, int len, const struct uri *uri, bool write_sensitive)
 {
