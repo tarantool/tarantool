@@ -262,15 +262,8 @@ extern bool replication_skip_conflict;
 /** How many threads to use for decoding incoming replication stream. */
 extern int replication_threads;
 
-/**
- * A list of triggers fired once quorum of "healthy" connections is acquired.
- */
-extern struct rlist replicaset_on_quorum_gain;
-
-/**
- * A list of triggers fired once the quorum of "healthy" connections is lost.
- */
-extern struct rlist replicaset_on_quorum_loss;
+/** A list of triggers fired when quorum health flips. */
+extern struct rlist replicaset_on_quorum_change;
 
 /**
  * Wait for the given period of time before trying to reconnect
