@@ -60,11 +60,8 @@ enum election_fencing_mode box_election_fencing_mode =
  */
 static struct trigger box_raft_on_update;
 
-/** Triggers executed once the node gains a quorum of connected peers. */
-static struct trigger box_raft_on_quorum_gain;
-
-/** Triggers executed once the node loses a quorum of connected peers. */
-static struct trigger box_raft_on_quorum_loss;
+/** Triggers executed once the node quorum health state flips. */
+static struct trigger box_raft_on_quorum_change;
 
 struct event *box_raft_on_election_event;
 
@@ -637,17 +634,14 @@ box_raft_on_quorum_change_f(struct trigger *trigger, void *event)
 static inline void
 box_raft_add_quorum_triggers(void)
 {
-	trigger_add_unique(&replicaset_on_quorum_gain,
-			   &box_raft_on_quorum_gain);
-	trigger_add_unique(&replicaset_on_quorum_loss,
-			   &box_raft_on_quorum_loss);
+	trigger_add_unique(&replicaset_on_quorum_change,
+			   &box_raft_on_quorum_change);
 }
 
 static inline void
 box_raft_remove_quorum_triggers(void)
 {
-	trigger_clear(&box_raft_on_quorum_loss);
-	trigger_clear(&box_raft_on_quorum_gain);
+	trigger_clear(&box_raft_on_quorum_change);
 }
 
 void
@@ -706,9 +700,7 @@ box_raft_init(void)
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
 	raft_on_update(box_raft(), &box_raft_on_update);
 
-	trigger_create(&box_raft_on_quorum_gain, box_raft_on_quorum_change_f,
-		       NULL, NULL);
-	trigger_create(&box_raft_on_quorum_loss, box_raft_on_quorum_change_f,
+	trigger_create(&box_raft_on_quorum_change, box_raft_on_quorum_change_f,
 		       NULL, NULL);
 	struct watcher *watcher = xmalloc(sizeof(*watcher));
 	const char *key = "box.wal_error";
