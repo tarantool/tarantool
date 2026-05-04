@@ -243,12 +243,13 @@ g.test_threads_call = function()
         }, threads.call, 'test1', 'test_func', {123}, {foo = 'bar'})
         t.assert_error_covers({
             type = 'IllegalParams',
-            message = "options parameter 'target' should be of type string",
-        }, threads.call, 'test1', 'test_func', {123}, {target = 123})
+            message = "options parameter 'target' should be one of types: " ..
+                      "string, number",
+        }, threads.call, 'test1', 'test_func', {123}, {target = {}})
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "unexpected value for option parameter 'target': " ..
-                      "got 'foo', expected 'any' or 'all'",
+                      "got 'foo', expected 'any', 'all', or a number",
         }, threads.call, 'test1', 'test_func', {123}, {target = 'foo'})
     end)
     --
@@ -260,6 +261,21 @@ g.test_threads_call = function()
             type = 'ClientError',
             name = 'NO_SUCH_THREAD_GROUP',
         }, threads.call, 'test3', 'test_func', {}, {target = 'all'})
+    end)
+    --
+    -- Unknown thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('experimental.threads')
+        for _, p in ipairs({{'test1', -1}, {'test2', 0},
+                            {'test1', 4}, {'test2', 3}}) do
+            local group, target = unpack(p)
+            t.assert_error_covers({
+                type = 'ClientError',
+                name = 'NO_SUCH_THREAD',
+                thread_id = target,
+            }, threads.call, group, 'test_func', {}, {target = target})
+        end
     end)
     --
     -- Unknown function.
@@ -278,17 +294,24 @@ g.test_threads_call = function()
         local threads = require('experimental.threads')
         local group = 'test1'
         local func = 'test_func_1'
-        threads.eval(group, [[
+        local func_def = [[
             local threads = require('experimental.threads')
             threads.export('test_func_1', function()
                 return threads.info().thread_id
             end)
-        ]])
+        ]]
+        threads.eval('test1', func_def)
         local ret_all = threads.call(group, func, {}, {target = 'all'})
         t.assert_equals(ret_all, {{1}, {2}, {3}})
         local ret_any = threads.call(group, func, {}, {target = 'any'})
         t.assert_equals(#ret_any, 1)
         t.assert_items_include(ret_all, ret_any)
+        t.assert_equals(threads.call('test1', func, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.call('test1', func, {}, {target = 2}), {{2}})
+        t.assert_equals(threads.call('test1', func, {}, {target = 3}), {{3}})
+        threads.eval('test2', func_def)
+        t.assert_equals(threads.call('test2', func, {}, {target = 1}), {{4}})
+        t.assert_equals(threads.call('test2', func, {}, {target = 2}), {{5}})
     end)
     --
     -- Default arguments.
@@ -431,12 +454,13 @@ g.test_threads_eval = function()
         }, threads.eval, 'test1', 'return ...', {123}, {foo = 'bar'})
         t.assert_error_covers({
             type = 'IllegalParams',
-            message = "options parameter 'target' should be of type string",
-        }, threads.eval, 'test1', 'return ...', {123}, {target = 123})
+            message = "options parameter 'target' should be one of types: " ..
+                      "string, number",
+        }, threads.eval, 'test1', 'return ...', {123}, {target = {}})
         t.assert_error_covers({
             type = 'IllegalParams',
             message = "unexpected value for option parameter 'target': " ..
-                      "got 'foo', expected 'any' or 'all'",
+                      "got 'foo', expected 'any', 'all', or a number",
         }, threads.eval, 'test1', 'return ...', {123}, {target = 'foo'})
     end)
     --
@@ -448,6 +472,21 @@ g.test_threads_eval = function()
             type = 'ClientError',
             name = 'NO_SUCH_THREAD_GROUP',
         }, threads.eval, 'test3', 'return ...', {}, {target = 'all'})
+    end)
+    --
+    -- Unknown thread.
+    --
+    cluster.server:exec(function()
+        local threads = require('experimental.threads')
+        for _, p in ipairs({{'test1', -1}, {'test2', 0},
+                            {'test1', 4}, {'test2', 3}}) do
+            local group, target = unpack(p)
+            t.assert_error_covers({
+                type = 'ClientError',
+                name = 'NO_SUCH_THREAD',
+                thread_id = target,
+            }, threads.eval, group, 'return ...', {}, {target = target})
+        end
     end)
     --
     -- Target handling.
@@ -464,6 +503,11 @@ g.test_threads_eval = function()
         local ret_any = threads.eval(group, expr, {}, {target = 'any'})
         t.assert_equals(#ret_any, 1)
         t.assert_items_include(ret_all, ret_any)
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 2}), {{2}})
+        t.assert_equals(threads.eval('test1', expr, {}, {target = 3}), {{3}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 1}), {{4}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 2}), {{5}})
     end)
     --
     -- Default arguments.

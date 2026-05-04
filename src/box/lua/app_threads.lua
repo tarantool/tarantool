@@ -102,21 +102,29 @@ end
 -- future object.
 --
 -- Available options:
--- * target := all | any: determines whether the callback is invoked for
---   all threads of the group or just one picked randomly.
+-- * target := all | any | N: determines whether the callback is invoked for
+--   all threads of the group, just one thread picked randomly, or the thread
+--   with the given id N, 1 <= N <= thread group size.
 --
 -- On success returns an array of future results, one for each target thread.
 -- If any of the returned futures fails with an error, re-throws the last
 -- error.
 --
 function thread_group_methods:_dispatch(cb, args, opts)
-    local first_thread_id = self.first_thread_id
-    local last_thread_id = self.last_thread_id
-    if opts.target == 'any' then
-        local thread_id = math.random(first_thread_id, last_thread_id)
+    local first_thread_id, last_thread_id
+    if opts.target == nil or opts.target == 'all' then
+        first_thread_id = self.first_thread_id
+        last_thread_id = self.last_thread_id
+    elseif opts.target == 'any' then
+        local thread_id = math.random(self.first_thread_id, self.last_thread_id)
         first_thread_id, last_thread_id = thread_id, thread_id
     else
-        assert(opts.target == nil or opts.target == 'all')
+        local thread_id = self.first_thread_id + opts.target - 1
+        if thread_id < self.first_thread_id or
+                thread_id > self.last_thread_id then
+            box.error(box.error.NO_SUCH_THREAD, opts.target, 2)
+        end
+        first_thread_id, last_thread_id = thread_id, thread_id
     end
     local futures = {}
     for thread_id = first_thread_id, last_thread_id do
@@ -298,7 +306,7 @@ end
 
 -- call/eval options template used with utils.check_param_table().
 local CALL_EVAL_OPTS = {
-    target = 'string',
+    target = 'string, number',
 }
 
 --
@@ -307,10 +315,12 @@ local CALL_EVAL_OPTS = {
 --
 local function check_call_eval_opts(opts)
     utils.check_param_table(opts, CALL_EVAL_OPTS, 3)
-    if opts.target ~= nil and opts.target ~= 'all' and opts.target ~= 'any' then
+    if type(opts.target) == 'string' and
+            opts.target ~= 'all' and opts.target ~= 'any' then
         box.error(box.error.ILLEGAL_PARAMS,
                   "unexpected value for option parameter 'target': " ..
-                  "got '" .. opts.target .. "', expected 'any' or 'all'", 3)
+                  "got '" .. opts.target .. "', " ..
+                  "expected 'any', 'all', or a number", 3)
     end
 end
 
