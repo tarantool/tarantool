@@ -81,11 +81,8 @@ struct fiber *replication_anon_gc_fiber;
 
 struct replicaset replicaset;
 
-struct rlist replicaset_on_quorum_gain =
-	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_gain);
-
-struct rlist replicaset_on_quorum_loss =
-	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_loss);
+struct rlist replicaset_on_quorum_change =
+	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_change);
 
 enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
 
@@ -692,10 +689,7 @@ replicaset_has_healthy_quorum(void)
 void
 replicaset_on_health_change(void)
 {
-	if (replicaset_has_healthy_quorum())
-		trigger_run(&replicaset_on_quorum_gain, NULL);
-	else
-		trigger_run(&replicaset_on_quorum_loss, NULL);
+	trigger_run(&replicaset_on_quorum_change, NULL);
 }
 
 static void
