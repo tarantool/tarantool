@@ -48,7 +48,7 @@ g.test_threads_config_propagation = function()
     local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     local expected_threads_info = {
-        thread_id = 0,
+        thread_id = 1,
         group_name = 'tx',
         groups = {
             {name = 'tx', size = 1},
@@ -87,7 +87,7 @@ g.test_threads_config_propagation = function()
     end, {expected_threads_info})
     cluster.server:restart()
     local expected_threads_info = {
-        thread_id = 0,
+        thread_id = 1,
         group_name = 'tx',
         groups = {
             {name = 'tx', size = 1},
@@ -107,17 +107,21 @@ g.test_threads_config_propagation = function()
     --
     setsearchroot(cluster.server)
     for i = 1, 10 do
-        local group_name
+        local group_name, thread_id
         if i < 2 then
             group_name = 'test1'
+            thread_id = i
         elseif i < 4 then
             group_name = 'test2'
+            thread_id = i - 1
         elseif i < 7 then
             group_name = 'test3'
+            thread_id = i - 3
         else
             group_name = 'test4'
+            thread_id = i - 6
         end
-        expected_threads_info.thread_id = i
+        expected_threads_info.thread_id = thread_id
         expected_threads_info.group_name = group_name
         cluster.server:exec(function(expected_threads_info)
             t.assert_equals(require('experimental.threads').info(),
@@ -161,7 +165,7 @@ g.test_thread_groups_not_configured = function()
     cluster.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_equals(threads.info(), {
-            thread_id = 0,
+            thread_id = 1,
             group_name = 'tx',
             groups = {{name = 'tx', size = 1}},
         })
@@ -310,8 +314,8 @@ g.test_threads_call = function()
         t.assert_equals(threads.call('test1', func, {}, {target = 2}), {{2}})
         t.assert_equals(threads.call('test1', func, {}, {target = 3}), {{3}})
         threads.eval('test2', func_def)
-        t.assert_equals(threads.call('test2', func, {}, {target = 1}), {{4}})
-        t.assert_equals(threads.call('test2', func, {}, {target = 2}), {{5}})
+        t.assert_equals(threads.call('test2', func, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.call('test2', func, {}, {target = 2}), {{2}})
     end)
     --
     -- Default arguments.
@@ -394,7 +398,7 @@ g.test_threads_call = function()
     cluster.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_covers(threads.info(), {
-            thread_id = 5,
+            thread_id = 2,
             group_name = 'test2',
         })
         local func = 'test_func_6'
@@ -409,11 +413,11 @@ g.test_threads_call = function()
         threads.eval('test1', expr)
         threads.eval('test2', expr)
         t.assert_equals(threads.call('tx', func, {}, {target = 'all'}),
-                        {{'tx', 0}})
+                        {{'tx', 1}})
         t.assert_equals(threads.call('test1', func, {}, {target = 'all'}),
                         {{'test1', 1}, {'test1', 2}, {'test1', 3}})
         t.assert_equals(threads.call('test2', func, {}, {target = 'all'}),
-                        {{'test2', 4}, {'test2', 5}})
+                        {{'test2', 1}, {'test2', 2}})
     end, {}, {_thread_id = 5})
 end
 
@@ -506,8 +510,8 @@ g.test_threads_eval = function()
         t.assert_equals(threads.eval('test1', expr, {}, {target = 1}), {{1}})
         t.assert_equals(threads.eval('test1', expr, {}, {target = 2}), {{2}})
         t.assert_equals(threads.eval('test1', expr, {}, {target = 3}), {{3}})
-        t.assert_equals(threads.eval('test2', expr, {}, {target = 1}), {{4}})
-        t.assert_equals(threads.eval('test2', expr, {}, {target = 2}), {{5}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 1}), {{1}})
+        t.assert_equals(threads.eval('test2', expr, {}, {target = 2}), {{2}})
     end)
     --
     -- Default arguments.
@@ -576,7 +580,7 @@ g.test_threads_eval = function()
     cluster.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_covers(threads.info(), {
-            thread_id = 5,
+            thread_id = 2,
             group_name = 'test2',
         })
         local expr = [[
@@ -585,11 +589,11 @@ g.test_threads_eval = function()
             return info.group_name, info.thread_id
         ]]
         t.assert_equals(threads.eval('tx', expr, {}, {target = 'all'}),
-                        {{'tx', 0}})
+                        {{'tx', 1}})
         t.assert_equals(threads.eval('test1', expr, {}, {target = 'all'}),
                         {{'test1', 1}, {'test1', 2}, {'test1', 3}})
         t.assert_equals(threads.eval('test2', expr, {}, {target = 'all'}),
-                        {{'test2', 4}, {'test2', 5}})
+                        {{'test2', 1}, {'test2', 2}})
     end, {}, {_thread_id = 5})
 end
 
@@ -731,7 +735,7 @@ g.test_box_cfg = function(cg)
     cg.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_equals(threads.info(), {
-            thread_id = 0,
+            thread_id = 1,
             group_name = 'tx',
             groups = {
                 {name = 'tx', size = 1},

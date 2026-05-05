@@ -15,8 +15,8 @@ local threads_cfg
 -- Name of the group this thread belongs to.
 local this_group_name
 
--- Identifier of this thread.
-local this_thread_id
+-- Identifier of this thread in the group, 1 <= N <= group size.
+local this_thread_id_in_group
 
 -- Connection used to call threads.
 local threads_conn
@@ -61,6 +61,7 @@ local function create_thread_group(group_name, first_thread_id, last_thread_id)
     assert(thread_groups[group_name] == nil)
     assert(last_thread_id >= first_thread_id)
     thread_groups[group_name] = setmetatable({
+        name = group_name,
         first_thread_id = first_thread_id,
         last_thread_id = last_thread_id,
     }, thread_group_mt)
@@ -151,18 +152,19 @@ end
 --
 local function thread_init_cb(args, thread_id)
     assert(threads_conn ~= nil)
-    local cfg, group_name = unpack(args)
+    local cfg, group = unpack(args)
+    local id_in_group = thread_id - group.first_thread_id + 1
     return threads_conn:call('box.internal.threads.init',
-                             {cfg, group_name, thread_id, make_conn_fd()},
+                             {cfg, group.name, id_in_group, make_conn_fd()},
                              {_thread_id = thread_id, is_async = true})
 end
 
 --
 -- Initializes the subsystem in all threads of this group.
 --
-function thread_group_methods:init(cfg, group_name)
+function thread_group_methods:init(cfg)
     assert(threads_conn ~= nil)
-    return self:_dispatch(thread_init_cb, {cfg, group_name}, {target = 'all'})
+    return self:_dispatch(thread_init_cb, {cfg, self}, {target = 'all'})
 end
 
 --
@@ -221,11 +223,11 @@ end
 --
 -- Initializes the subsystem in the current thread.
 --
-function box.internal.threads.init(cfg, group_name, thread_id, conn_fd)
+function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     assert(threads_cfg == nil)
     threads_cfg = cfg
     this_group_name = group_name
-    this_thread_id = thread_id
+    this_thread_id_in_group = id_in_group
     threads_conn = net.from_fd(conn_fd, {fetch_schema = false})
     init_thread_groups(cfg)
 end
@@ -251,11 +253,11 @@ function box.internal.threads.cfg(cfg)
         return threads_cfg
     end
     assert(threads_cfg == nil)
-    box.internal.threads.init(cfg, 'tx', 0, make_conn_fd())
+    box.internal.threads.init(cfg, 'tx', 1, make_conn_fd())
     -- Initialize the subsystem in threads.
     for group_name, group in pairs(thread_groups) do
         if group_name ~= this_group_name then
-            group:init(cfg, group_name)
+            group:init(cfg)
         end
     end
 end
@@ -369,7 +371,7 @@ end
 function threads.info()
     check_configured()
     local info = {
-        thread_id = this_thread_id,
+        thread_id = this_thread_id_in_group,
         group_name = this_group_name,
         groups = {
             {name = 'tx', size = 1},
