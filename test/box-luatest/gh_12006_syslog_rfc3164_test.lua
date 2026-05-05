@@ -53,7 +53,7 @@ local function syslog_check_plain(cg, expected_msg)
     t.assert_str_matches(
         hdr,
         '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]:%s' ..
-        'main/%d+/main/test%.box%-luatest%.' .. TEST_NAME ..  '%s' ..
+        'main/%d+/pool/test%.box%-luatest%.' .. TEST_NAME ..  '%s' ..
         TEST_NAME .. '%.lua:37')
     t.assert_equals(msg, expected_msg)
 end
@@ -149,7 +149,7 @@ local function syslog_check_json(cg, expected_msg)
     result.file = nil
     t.assert_equals(result, {
         cord_name = 'main',
-        fiber_name = 'main',
+        fiber_name = 'pool',
         line = 37,
         level = 'WARN',
         module = 'test.box-luatest.' .. TEST_NAME,

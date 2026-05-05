@@ -46,7 +46,7 @@ g.before_all(function(cg)
         result.file = nil
         t.assert_equals(result, {
             cord_name = 'main',
-            fiber_name = 'main',
+            fiber_name = 'pool',
             line = 29,
             level = 'WARN',
             message = expected_msg,
@@ -61,7 +61,7 @@ g.before_all(function(cg)
         t.assert_str_matches(
             hdr,
             '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]:%s' ..
-            'main/%d+/main/test%.box%-luatest%.gh_7860_syslog_json_test%s' ..
+            'main/%d+/pool/test%.box%-luatest%.gh_7860_syslog_json_test%s' ..
             'gh_7860_syslog_json_test%.lua:29')
         t.assert_equals(msg, expected_msg)
     end
