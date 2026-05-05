@@ -143,7 +143,7 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 			 * by client then it can just set system flag during
 			 * it's execution.
 			 */
-			f = fiber_new_system(cord_name(cord()), fiber_pool_f);
+			f = fiber_new_system("pool", fiber_pool_f);
 			if (f == NULL) {
 				diag_log();
 				break;

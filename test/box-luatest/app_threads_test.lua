@@ -479,7 +479,8 @@ g.test_log = function(cg)
 
     -- Check that logging works and the thread name is logged.
     eval([[require('log').info('fuzzbuzz')]])
-    t.assert_str_contains(cg.server:grep_log('.*fuzzbuzz.*'), '/app1/')
+    t.assert_str_contains(cg.server:grep_log('.*fuzzbuzz.*'),
+                          'app1/%d+/pool', true)
 
     -- Check that log levels are propagated.
     local old_level = cg.server:exec(function()
