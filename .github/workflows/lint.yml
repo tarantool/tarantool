@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: docker.io/tarantool/testing:ubuntu-focal
+      image: docker.io/tarantool/testing:ubuntu-jammy
 
     steps:
       - name: Prepare checkout
@@ -75,7 +75,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: docker.io/tarantool/testing:ubuntu-focal
+      image: docker.io/tarantool/testing:ubuntu-jammy
 
     steps:
       - name: Prepare checkout

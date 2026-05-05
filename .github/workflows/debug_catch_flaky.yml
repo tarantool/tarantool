@@ -38,7 +38,7 @@ jobs:
     timeout-minutes: 60
 
     container:
-      image: docker.io/tarantool/testing:ubuntu-focal
+      image: docker.io/tarantool/testing:ubuntu-jammy
       # Mount /dev to the container to be able to mount a disk image inside it
       # for successful run of the .github/actions/environment action.
       volumes:
