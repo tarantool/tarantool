@@ -103,6 +103,11 @@ g_sigurg_redirection.test_sigurg_redirection = function(cg)
     ffi.cdef('int tgkill(int tgid, int tid, int sig);')
     ffi.C.tgkill(pid, tid, popen.signal.SIGURG)
     -- Also, the new fiber should fail immediately.
+    local signal_log_pattern = 'got signal #' .. popen.signal.SIGURG ..
+                               ' (.*) from PID ' .. box.info.pid
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log(signal_log_pattern))
+    end)
     t.helpers.retrying({}, function()
         t.assert(cg.server:grep_log('fiber slice is exceeded'))
     end)
@@ -110,6 +115,9 @@ g_sigurg_redirection.test_sigurg_redirection = function(cg)
     -- The same check, but send the signal to the main (TX) thread.
     cg.server:exec(start_a_long_fiber)
     ffi.C.tgkill(pid, pid, popen.signal.SIGURG)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log(signal_log_pattern))
+    end)
     t.helpers.retrying({}, function()
         t.assert(cg.server:grep_log('fiber slice is exceeded'))
     end)

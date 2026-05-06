@@ -1878,6 +1878,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->sched.flags = FIBER_IS_RUNNING | FIBER_IS_SYSTEM;
 	cord->sched.max_slice = zero_slice;
 	cord->max_slice = default_slice;
+	cord->sigurg_sender_pid = -1;
 
 	cord->next_fid = FIBER_ID_MAX_RESERVED + 1;
 	/*
@@ -2299,19 +2300,50 @@ fiber_free(void)
  */
 static bool signal_initialized;
 
+/** The PID of the original sender of the redirected SIGURG. */
+static pid_t redirected_sigurg_sender_pid = -1;
+
 /** Reset current slice on SIGURG. */
 static void
-signal_sigurg_cb(int signum)
+signal_sigurg_cb(int signum, siginfo_t *siginfo, void *unused)
 {
 	(void)signum;
+	(void)unused;
 
 	/* Handle the signal in the main thread, if we're in an another one. */
 	if (!pthread_equal(pthread_self(), main_thread_id)) {
+		pid_t uninitialized_sender_pid = -1;
+		/*
+		 * Save the signal sender PID.
+		 *
+		 * It could be so that someone have handled a SIGURG signal and
+		 * set the variable but the main thread haven't handled it yet.
+		 * So let's only set the signal sender PID it's unset.
+		 *
+		 * Effectively this means that, in case if there was a number of
+		 * signals received, the sender PID of the first handled one is
+		 * never lost.
+		 */
+		pm_atomic_compare_exchange_strong(&redirected_sigurg_sender_pid,
+						  &uninitialized_sender_pid,
+						  siginfo->si_pid);
 		pthread_kill(main_thread_id, signum);
 		return;
 	}
 	assert(cord_is_main());
+
+	/*
+	 * Ignore the siginfo if we've redirected SIGURG in another thread:
+	 * get the redirected sender ID (and reset it) if any.
+	 */
+	pid_t sender_pid =
+		pm_atomic_exchange(&redirected_sigurg_sender_pid, -1);
+	if (sender_pid == -1)
+		sender_pid = siginfo->si_pid;
+
+	/* The order is important: fiber_set_slice resets the sender PID. */
 	fiber_set_slice(zero_slice);
+	cord()->sigurg_sender_pid = sender_pid;
 }
 
 void
@@ -2325,7 +2357,8 @@ fiber_signal_init(void)
 
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = signal_sigurg_cb;
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = signal_sigurg_cb;
 	if (sigaction(SIGURG, &sa, NULL) == -1)
 		panic_syserror("cannot set fiber sigurg handler");
 }

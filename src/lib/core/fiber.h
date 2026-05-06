@@ -858,6 +858,11 @@ struct cord {
 	struct fiber_slice max_slice;
 	/** Slice for current fiber execution in seconds. */
 	struct fiber_slice slice;
+	/**
+	 * The SIGURG sender PID if the slice had been reset by the
+	 * signal. Any change in the fiber slice resets the field to -1.
+	 */
+	pid_t sigurg_sender_pid;
 	char name[FIBER_NAME_INLINE];
 	/** Cord main fiber started in case of cord_costart. */
 	struct fiber *main_fiber;
@@ -1081,6 +1086,7 @@ fiber_set_slice(struct fiber_slice slice)
 {
 	assert(fiber_slice_is_valid(slice));
 	cord()->slice = slice;
+	cord()->sigurg_sender_pid = -1;
 }
 
 /**
@@ -1093,6 +1099,7 @@ fiber_extend_slice(struct fiber_slice slice)
 	assert(fiber_slice_is_valid(slice));
 	cord()->slice.err += slice.err;
 	cord()->slice.warn += slice.warn;
+	cord()->sigurg_sender_pid = -1;
 }
 
 /**
@@ -1107,6 +1114,7 @@ fiber_set_default_max_slice(struct fiber_slice slice)
 	cord()->max_slice = slice;
 	if ((fiber()->flags & FIBER_CUSTOM_SLICE) == 0)
 		cord()->slice = slice;
+	cord()->sigurg_sender_pid = -1;
 }
 
 /**
@@ -1122,6 +1130,7 @@ fiber_set_max_slice(struct fiber *fib, struct fiber_slice slice)
 	fib->flags |= FIBER_CUSTOM_SLICE;
 	if (fiber() == fib)
 		cord()->slice = slice;
+	cord()->sigurg_sender_pid = -1;
 }
 
 /**
@@ -1148,6 +1157,11 @@ fiber_check_slice(void)
 		cord()->slice.warn = TIMEOUT_INFINITY;
 	}
 	if (unlikely(slice.err < time_from_call)) {
+		if (cord()->sigurg_sender_pid != -1)
+			say_warn("got signal #%d (%s) from PID %ld,"
+				 " fiber slice is zeroed",
+				 SIGURG, strsignal(SIGURG),
+				 (long)cord()->sigurg_sender_pid);
 		diag_set(FiberSliceIsExceeded);
 		return -1;
 	}
