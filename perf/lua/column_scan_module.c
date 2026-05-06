@@ -548,7 +548,6 @@ str_arrow_lua_func(struct lua_State *L)
 		stream.release(&stream);
 		return luaT_error(L);
 	}
-	int64_t k = 0;
 	struct ArrowArray array;
 	while (true) {
 		rc = stream.get_next(&stream, &array);
@@ -559,7 +558,7 @@ str_arrow_lua_func(struct lua_State *L)
 			const uint8_t *validity = array.children[0]->buffers[0];
 			const int32_t *offsets = array.children[0]->buffers[1];
 			const char *values = array.children[0]->buffers[2];
-			for (int64_t i = 0; i < count; i++, k++) {
+			for (int64_t i = 0; i < count; i++) {
 				if (validity != NULL && !bit_test(validity, i))
 					continue;
 				int32_t pos = offsets[i];
@@ -695,7 +694,6 @@ str_arrow_rv_lua_func(struct lua_State *L)
 		stream.release(&stream);
 		return luaT_error(L);
 	}
-	int64_t k = 0;
 	struct ArrowArray array;
 	while (true) {
 		rc = stream.get_next(&stream, &array);
@@ -706,7 +704,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 			const uint8_t *validity = column->buffers[0];
 			const int32_t *offsets = column->buffers[1];
 			const char *values = column->buffers[2];
-			for (int64_t i = 0; i < column->length; i++, k++) {
+			for (int64_t i = 0; i < column->length; i++) {
 				if (validity != NULL && !bit_test(validity, i))
 					continue;
 				int32_t pos = offsets[i];
@@ -722,7 +720,7 @@ str_arrow_rv_lua_func(struct lua_State *L)
 		} else if (touch_string && use_view_types) {
 			const uint8_t *validity = column->buffers[0];
 			const struct arrow_string *strings = column->buffers[1];
-			for (int64_t i = 0; i < column->length; i++, k++) {
+			for (int64_t i = 0; i < column->length; i++) {
 				if (validity != NULL && !bit_test(validity, i))
 					continue;
 				const struct arrow_string *str = &strings[i];
