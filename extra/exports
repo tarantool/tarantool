@@ -190,6 +190,7 @@ cord_ibuf_drop
 cord_ibuf_put
 cord_ibuf_take
 cord_is_main
+cord_set_name
 crc32_calc
 crypto_ERR_error_string
 crypto_ERR_get_error

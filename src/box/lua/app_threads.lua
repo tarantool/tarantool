@@ -1,7 +1,13 @@
 local errno = require('errno')
+local ffi = require('ffi')
 local net = require('net.box')
 local socket = require('socket')
 local utils = require('internal.utils')
+
+ffi.cdef([[
+    void
+    cord_set_name(const char *name);
+]])
 
 -- This module.
 local threads = {}
@@ -228,6 +234,9 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     threads_cfg = cfg
     this_group_name = group_name
     this_thread_id_in_group = id_in_group
+    if group_name ~= 'tx' then
+        ffi.C.cord_set_name(string.format('%s%d', group_name, id_in_group))
+    end
     threads_conn = net.from_fd(conn_fd, {fetch_schema = false})
     init_thread_groups(cfg)
 end
