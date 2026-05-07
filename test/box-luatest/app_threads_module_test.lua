@@ -759,3 +759,31 @@ g.after_test('test_box_cfg', function(cg)
     cg.server:drop()
     cg.server = nil
 end)
+
+g.test_thread_names_in_logs = function()
+    local config = cbuilder:new(BASE_CONFIG)
+        :add_instance('server', {})
+        :set_instance_option('server', 'threads.groups', {
+            {name = 'fuzz', size = 1},
+            {name = 'buzz', size = 2},
+        })
+        :config()
+    local cluster = cluster:new(config, SERVER_OPTS)
+    cluster:start()
+    cluster.server:exec(function()
+        local threads = require('experimental.threads')
+        require('log').info('foobar1')
+        threads.eval('fuzz', [[
+            require('log').info('foobar2')
+        ]], {}, {target = 1})
+        threads.eval('buzz', [[
+            require('log').info('foobar3')
+        ]], {}, {target = 2})
+    end)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar1'),
+                          'main/%d+/pool', true)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar2'),
+                          'fuzz1/%d+/pool', true)
+    t.assert_str_contains(cluster.server:grep_log('.*foobar3'),
+                          'buzz2/%d+/pool', true)
+end
