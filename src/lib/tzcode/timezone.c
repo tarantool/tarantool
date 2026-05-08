@@ -44,7 +44,7 @@ compare_zones(const void *a, const void *b)
 static void __attribute__((constructor))
 sort_array(void)
 {
-	size_t i;
+	size_t i, calculated_max_len = 0;
 	/* 1st save zones in id order for stringization */
 	for (i = 0; i < lengthof(zones_raw); i++) {
 		size_t id = zones_raw[i].id;
@@ -52,7 +52,13 @@ sort_array(void)
 		/* save to unsorted array if it's not an alias */
 		if ((zones_raw[i].flags & TZ_ALIAS) == 0)
 			zones_unsorted[id] = zones_raw[i];
+		/* Collect maximum name length. */
+		size_t name_len = strlen(zones_raw[i].name);
+		if (calculated_max_len < name_len)
+			calculated_max_len = name_len;
 	}
+	/* Check estimated maximum length. */
+	assert(calculated_max_len <= TZ_NAME_MAX_LEN);
 	/* 2nd copy raw to be sorted and prepare them for bsearch */
 	assert(sizeof(zones_sorted) == sizeof(zones_raw));
 	memcpy(zones_sorted, zones_raw, sizeof(zones_raw));
@@ -238,3 +244,13 @@ timezone_tzindex_lookup(int16_t tzindex, struct tnt_tm *tm)
 		return false;
 	return true;
 }
+
+int
+date_time_zone_snprint(char *buf, int len, struct date_time_zone *z)
+{
+	if (z == NULL)
+		return snprintf(buf, len, "<NULL>");
+	return snprintf(buf, len, "{name:\"%s\", id:%" PRId16
+		", flags:0x%" PRIX16 ", offset:%" PRId16 "}",
+		z->name, z->id, z->flags, z->offset);
+};

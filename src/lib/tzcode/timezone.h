@@ -24,6 +24,8 @@ enum {
 	TZ_DST = 0x80,
 
 	TZ_ERROR_MASK = TZ_AMBIGUOUS | TZ_NYI,
+
+	TZ_NAME_MAX_LEN = 64,
 };
 
 /**
@@ -90,6 +92,10 @@ timezone_isdst(const struct date_time_zone *zone);
 /** Translate tzindex to zone name */
 const char*
 timezone_name(int64_t index);
+
+/** JSON-like printer for @sa date_time_zone struct. */
+int
+date_time_zone_snprint(char *buf, int len, struct date_time_zone *z);
 
 #ifdef __cplusplus
 }
