@@ -2902,3 +2902,33 @@ g_fail_time_units.test_set = function(cg)
 end
 
 -- }}} new() and set() invalid args test.
+
+-- {{{ ghs-146 stack overflow test.
+
+local g_ghs_146_stack_overflow = t.group('ghs_146_stack_overflow')
+
+g_ghs_146_stack_overflow.test_too_long_zone_like_str = function()
+    -- The number was selected empirically to be large enough to trigger stack
+    -- overflow and to be not so large to broke the test due to any resource
+    -- limitation.
+    local n = 10 * 1024 * 1024
+    -- The pattern must be accepted by strptime() heuristic for '%Z'.
+    local buf = string.rep('Z', n)
+    local fmt = '%Z'
+    t.assert_error(function() dt.parse(buf, {format = fmt}) end)
+end
+
+g_ghs_146_stack_overflow.test_many_zones_pollutes_stack = function()
+    -- The number was selected empirically to be large enough to trigger stack
+    -- overflow and to be not so large to broke the test due to any resource
+    -- limitation. Also lesser n reduces test execution time.
+    local n = 50 * 1024
+    local buf = string.rep('HOVDST ', n)
+    local fmt = string.rep('%Z ', n)
+    -- Protect test log from pollution with too long message if any error
+    -- occurs (see gh-12715).
+    local ok, _ = pcall(function() dt.parse(buf, {format = fmt}) end)
+    t.assert(ok, 'expect success')
+end
+
+-- }}} ghs-146 stack overflow test.
