@@ -117,6 +117,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	int year = -1;
 	const char *ptr = fmt;
 	bool week_date = false;
+	char zonestr[TZ_NAME_MAX_LEN + 1];
 
 	static int start_of_month[2][13] = {
 		{ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 },
@@ -548,21 +549,29 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 
 		case 'Z': {
 			const char *cp;
-			char *zonestr;
 
+			/* Timezone name heuristic. */
 			for (cp = buf; *cp && isupper((u_char)*cp); ++cp)
 				/* empty */;
-			if (cp - buf) {
-				zonestr = alloca(cp - buf + 1);
-				strlcpy(zonestr, buf, cp - buf + 1);
+			int len = cp - buf;
+			if (0 < len && len <= TZ_NAME_MAX_LEN) {
+				strlcpy(zonestr, buf, sizeof(zonestr));
 
 				const struct date_time_zone *zone;
-				size_t n = timezone_tm_lookup(zonestr, cp - buf,
+				size_t n = timezone_tm_lookup(zonestr, len,
 							      &zone, tm);
 				if (n <= 0)
 					return NULL;
 
-				buf += cp - buf;
+				buf += len;
+			} else if (len > TZ_NAME_MAX_LEN) {
+				return NULL;
+			} else {
+				/*
+				 * XXX: is it good to ignore absence of
+				 * timezone name? E.g. in "1999" with "%Z%Y".
+				 */
+				assert(len == 0);
 			}
 		} break;
 
