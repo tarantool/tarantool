@@ -5,20 +5,14 @@ description: Install build and test dependencies on Debian-based systems
 runs:
   using: composite
   steps:
-    - uses: tarantool/setup-tarantool@v4
-      with:
-        tarantool-version: 2.11
     - run: |
-        # FIXME(tarantool/setup-tarantool#58): We set up the tarantool
-        # repository in order to install tt. Ideally, this should be done
-        # by the setup-tarantool action.
-        curl -L https://tarantool.io/release/2/installer.sh | sudo bash
         apt-get --allow-releaseinfo-change update
         apt-get -y -f install \
           build-essential \
           ninja-build \
           cmake \
           lua5.1 \
+          luarocks \
           lcov \
           ruby-dev \
           liblz4-dev \
@@ -26,8 +20,7 @@ runs:
           autoconf \
           automake \
           libtool \
-          util-linux \
-          tt
+          util-linux
         apt-get purge --auto-remove cmake -y
         # ubuntu 20.04 repos do not contain cmake 3.26.0
         # thus we require an alternative way of installing
@@ -35,7 +28,6 @@ runs:
         curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
         && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
         && rm cmake-3.26.0-linux-$(uname -i).tar.gz
-        tt rocks install luatest 1.4.3
-        tt rocks install luacheck 0.26.0
+        luarocks install luacheck 0.26.1
         gem install coveralls-lcov
       shell: bash
