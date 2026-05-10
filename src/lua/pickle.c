@@ -47,6 +47,8 @@ static inline void
 luaL_region_dup(struct lua_State *L, struct region *region,
 		const void *ptr, size_t size)
 {
+	if (size == 0)
+		return;
 	void *to = region_alloc(region, size);
 	if (to == NULL) {
 		diag_set(OutOfMemory, size, "region", "luaL_region_dup");
@@ -191,14 +193,19 @@ lbox_pack(struct lua_State *L)
 	}
 
 	size_t total_len = region_used(buf) - used;
-	const char *res = (char *) region_join(buf, total_len);
-	if (res == NULL) {
-		region_truncate(buf, used);
-		diag_set(OutOfMemory, total_len, "region", "region_join");
-		luaT_error(L);
+	const char *res = "";
+	if (total_len > 0) {
+		res = region_join(buf, total_len);
+		if (res == NULL) {
+			region_truncate(buf, used);
+			diag_set(OutOfMemory, total_len, "region",
+				 "region_join");
+			luaT_error(L);
+		}
 	}
 	lua_pushlstring(L, res, total_len);
-	region_truncate(buf, used);
+	if (total_len > 0)
+		region_truncate(buf, used);
 	return 1;
 }
 
