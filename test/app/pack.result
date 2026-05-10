@@ -50,6 +50,14 @@ pickle.pack('bsil', 84, 29541, 1802444916, 2338318684567380014ULL)
 ---
 - 'Test ok. Let`s '
 ...
+pickle.pack('')
+---
+- 
+...
+pickle.pack('a', '')
+---
+- 
+...
 pickle.unpack('b', 'T')
 ---
 - 84
@@ -75,6 +83,10 @@ pickle.unpack('bsil', pickle.pack('bsil', 255, 65535, 4294967295, tonumber64('18
 ...
 pickle.unpack('','')
 ---
+...
+pickle.unpack('a', '')
+---
+- 
 ...
 pickle.unpack('ii', pickle.pack('i', 1))
 ---
