@@ -7,6 +7,8 @@ local g = t.group()
 local byte_size_pattern = '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
     '(?:[Bb]|[Kk][Ii][Bb]|[Mm][Ii][Bb]|[Gg][Ii][Bb]|' ..
     '[Tt][Ii][Bb]|[Pp][Ii][Bb])?$'
+local duration_pattern = '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
+    '(?:ms|s|m|h|d|w|M|y)?$'
 
 local function remove_descriptions(tbl)
     if type(tbl) ~= 'table' then
@@ -67,16 +69,26 @@ g.test_json_schema_section_from_config = function()
                     'The time interval in seconds between periodic scans of ' ..
                     'the write-ahead-log file directory, when checking for ' ..
                     'changes to write-ahead-log files for the sake of ' ..
-                    'replication or hot standby.')
+                    'replication or hot standby.\n\nYou can specify the ' ..
+                    'value either as a number of seconds or as a ' ..
+                    'human-readable string with time units (for example, ' ..
+                    '`30s`, `5m`, `1h`).')
 
     remove_descriptions(wal_section)
 
     local expected = {
         additionalProperties = false,
         properties = {
-            cleanup_delay = {type = 'number'},
+            cleanup_delay = {
+                pattern = duration_pattern,
+                type = {'number', 'string'},
+            },
             dir = {default = 'var/lib/{{ instance_name }}', type = 'string'},
-            dir_rescan_delay = {default = 2, type = 'number'},
+            dir_rescan_delay = {
+                default = 2,
+                pattern = duration_pattern,
+                type = {'number', 'string'},
+            },
             ext = {
                 additionalProperties = false,
                 default = box.NULL,
@@ -112,7 +124,11 @@ g.test_json_schema_section_from_config = function()
                 pattern = byte_size_pattern,
                 type = {'integer', 'string'},
             },
-            retention_period = {default = 0, type = 'number'},
+            retention_period = {
+                default = 0,
+                pattern = duration_pattern,
+                type = {'number', 'string'},
+            },
         },
         type = 'object',
     }

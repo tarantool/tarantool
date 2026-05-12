@@ -24,6 +24,19 @@ local byte_size_unit_defs = {
 local byte_size_units, byte_size_unit_names_str =
     make_units(byte_size_unit_defs, string.upper)
 
+local duration_unit_defs = {
+    {'ms', 0.001},
+    {'s', 1},
+    {'m', 60},
+    {'h', 60 * 60},
+    {'d', 24 * 60 * 60},
+    {'w', 7 * 24 * 60 * 60},
+    {'M', 30 * 24 * 60 * 60},
+    {'y', 365 * 24 * 60 * 60},
+}
+
+local duration_units, duration_unit_names_str = make_units(duration_unit_defs)
+
 function units.parse_byte_size(value)
     if type(value) ~= 'number' and type(value) ~= 'string' then
         return nil, ('Expected byte size as number or string with optional ' ..
@@ -69,6 +82,44 @@ function units.parse_byte_size(value)
             :format(parsed)
     end
     return math.floor(parsed * multiplier)
+end
+
+function units.parse_duration(value)
+    if type(value) ~= 'number' and type(value) ~= 'string' then
+        return nil, ('Expected duration as number or string with optional ' ..
+                     'duration suffix, got %s'):format(type(value))
+    end
+
+    local number, unit = value, nil
+    if type(value) ~= 'number' then
+        number, unit = value:match('^([%-]?[%d%.]+)%s*([%a]*)$')
+    end
+
+    if number == nil then
+        return nil, ('Unable to parse a number from %q'):format(value)
+    end
+
+    local parsed = tonumber(number)
+    if parsed == nil then
+        return nil, ('Unable to parse a number from %q'):format(number)
+    end
+
+    if parsed < 0 then
+        return nil, ('Expected a non-negative duration, got %s')
+            :format(parsed)
+    end
+
+    if unit == nil or unit == '' then
+        return parsed
+    end
+
+    local multiplier = duration_units[unit]
+    if multiplier == nil then
+        return nil, ('Unknown duration suffix %q (use %s)')
+            :format(unit, duration_unit_names_str)
+    end
+
+    return parsed * multiplier
 end
 
 return units

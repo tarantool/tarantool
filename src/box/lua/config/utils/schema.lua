@@ -11,6 +11,7 @@
 -- * discriminator
 -- * description
 -- * byte_size
+-- * duration
 --
 -- Others are just stored.
 
@@ -38,6 +39,10 @@ local byte_size_jsonschema_pattern =
     '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
     '(?:[Bb]|[Kk][Ii][Bb]|[Mm][Ii][Bb]|[Gg][Ii][Bb]|' ..
     '[Tt][Ii][Bb]|[Pp][Ii][Bb])?$'
+
+local duration_jsonschema_pattern =
+    '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
+    '(?:ms|s|m|h|d|w|M|y)?$'
 
 -- {{{ Walkthrough helpers
 
@@ -219,20 +224,48 @@ scalars.string = {
 
 scalars.number = {
     type = 'number',
-    validate_noexc = function(data)
+    validate_noexc = function(data, schema)
+        if is_annotated(schema, 'duration') then
+            local _, err = units.parse_duration(data)
+            if err ~= nil then
+                return false, err
+            end
+            return true
+        end
+
         -- TODO: Should we accept cdata<int64_t> and
         -- cdata<uint64_t> here?
         return validate_type_noexc(data, 'number')
     end,
-    fromenv = function(env_var_name, raw_value)
+    fromenv = function(env_var_name, raw_value, schema)
         -- TODO: Accept large integers and return cdata<int64_t>
         -- or cdata<uint64_t>?
-        local res = tonumber(raw_value)
-        if res == nil then
-            error(('Unable to decode a number value from environment ' ..
-                'variable %q, got %q'):format(env_var_name, raw_value), 0)
+        local parser = is_annotated(schema, 'duration') and
+            units.parse_duration or tonumber
+        local res, err = parser(raw_value)
+        if res ~= nil then
+            return res
         end
-        return res
+
+        local msg = ('Unable to decode a number value from environment ' ..
+                     'variable %q, got %q'):format(env_var_name, raw_value)
+
+        -- tonumber() returns nil on parse failure without treating it as an
+        -- internal parser error, so err can be nil here.
+        if err ~= nil then
+            msg = ('%s: %s'):format(msg, err)
+        end
+
+        error(msg, 0)
+    end,
+    normalize = function(data, schema)
+        if type(data) ~= 'string' then
+            return data
+        end
+        if not is_annotated(schema, 'duration') then
+            return data
+        end
+        return units.parse_duration(data)
     end,
     never_accept_number = false,
     jsonschema = {type = 'number'},
@@ -241,9 +274,17 @@ scalars.number = {
 scalars.integer = {
     type = 'integer',
     validate_noexc = function(data, schema)
-        if is_annotated(schema, 'byte_size') then
-            local _, err = units.parse_byte_size(data)
+        if is_annotated(schema, 'byte_size') or
+           is_annotated(schema, 'duration') then
+            local parser = is_annotated(schema, 'byte_size') and
+                units.parse_byte_size or units.parse_duration
+            local parsed, err = parser(data)
             if err ~= nil then
+                return false, err
+            end
+            if parsed - math.floor(parsed) ~= 0 then
+                local err = ('Expected number without a fractional part, ' ..
+                    'got %s'):format(parsed)
                 return false, err
             end
             return true
@@ -265,12 +306,22 @@ scalars.integer = {
         return true
     end,
     fromenv = function(env_var_name, raw_value, schema)
-        local parser = is_annotated(schema, 'byte_size') and
-            units.parse_byte_size or tonumber64
+        local parser = tonumber64
+        if is_annotated(schema, 'byte_size') then
+            parser = units.parse_byte_size
+        elseif is_annotated(schema, 'duration') then
+            parser = units.parse_duration
+        end
         local res, err = parser(raw_value)
 
         if res ~= nil then
-            return res
+            if is_annotated(schema, 'duration') and
+                    res - math.floor(res) ~= 0 then
+                err = ('Expected number without a fractional part, got %s')
+                    :format(res)
+            else
+                return res
+            end
         end
 
         local msg = ('Unable to decode an integer value from environment ' ..
@@ -288,10 +339,13 @@ scalars.integer = {
         if type(data) ~= 'string' then
             return data
         end
-        if not is_annotated(schema, 'byte_size') then
+        if is_annotated(schema, 'byte_size') then
+            return units.parse_byte_size(data)
+        elseif is_annotated(schema, 'duration') then
+            return units.parse_duration(data)
+        else
             return data
         end
-        return units.parse_byte_size(data)
     end,
     never_accept_number = false,
     jsonschema = {type = 'integer'},
@@ -2227,6 +2281,9 @@ local function jsonschema_impl(schema, ctx)
         if is_annotated(schema, 'byte_size') then
             scalar_copy.type = {'integer', 'string'}
             scalar_copy.pattern = byte_size_jsonschema_pattern
+        elseif is_annotated(schema, 'duration') then
+            scalar_copy.type = {schema.type, 'string'}
+            scalar_copy.pattern = duration_jsonschema_pattern
         end
         return set_common_jsonschema_fields(scalar_copy, schema)
     elseif schema.type == 'union' then
@@ -2509,6 +2566,17 @@ local function validate_schema_node_unit_annotations(schema, ctx)
     if schema.byte_size and schema.type ~= 'integer' then
         walkthrough_error(ctx, '"byte_size" requires an integer scalar, ' ..
             'got %s', schema.type)
+    end
+
+    if schema.byte_size and schema.duration then
+        walkthrough_error(ctx, '"byte_size" and "duration" annotations are ' ..
+            'mutually exclusive')
+    end
+
+    if schema.duration and schema.type ~= 'number' and
+            schema.type ~= 'integer' then
+        walkthrough_error(ctx, '"duration" requires a numeric scalar, got %s',
+            schema.type)
     end
 end
 

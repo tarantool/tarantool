@@ -743,6 +743,46 @@ g.test_validate_schema = function()
             }),
         }))
     end)
+
+    schema.new('myschema', schema.record({
+        foo = schema.scalar({
+            type = 'integer',
+            duration = true,
+        }),
+    }))
+
+    exp_err_msg = '[myschema] foo: "duration" requires a numeric scalar, ' ..
+        'got string'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.scalar({
+                type = 'string',
+                duration = true,
+            }),
+        }))
+    end)
+
+    exp_err_msg = '[myschema] foo: "duration" requires a numeric scalar, ' ..
+        'got record'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.record({}, {
+                duration = true,
+            }),
+        }))
+    end)
+
+    exp_err_msg = '[myschema] foo: "byte_size" and "duration" annotations ' ..
+        'are mutually exclusive'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.scalar({
+                type = 'integer',
+                byte_size = true,
+                duration = true,
+            }),
+        }))
+    end)
 end
 
 g.test_validate_schema_union_discriminator = function()
@@ -884,8 +924,74 @@ g.test_validate_number = function()
 
     -- Bad cases.
     assert_validate_scalar_expects_only_given_type(s, 'number')
+    assert_validate_scalar_error(s, '5s', 'Expected "number", got "string"')
 
     -- TODO: +inf, -inf, NaN.
+end
+
+g.test_validate_duration = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'number',
+        duration = true,
+    }))
+
+    -- Good cases.
+    s:validate(0)
+    s:validate(5)
+    s:validate(5.3)
+    s:validate('1.5h')
+    s:validate('5ms')
+    s:validate('5s')
+    s:validate('5 m')
+    s:validate('5h')
+    s:validate('5d')
+    s:validate('5w')
+    s:validate('5M')
+    s:validate('5y')
+
+    -- Bad cases.
+    local exp_err_msg_tmpl = 'Expected duration as number or string with ' ..
+        'optional duration suffix, got %s'
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= 'number' and type(data) ~= 'string' then
+            t.assert_error_msg_contains(exp_err_msg_tmpl:format(type(data)),
+                                        s.validate, s, data)
+        end
+    end
+    assert_validate_scalar_error(s, -5,
+        'Expected a non-negative duration, got -5')
+    assert_validate_scalar_error(s, '-5m',
+        'Expected a non-negative duration, got -5')
+    assert_validate_scalar_error(s, 'foo',
+        'Unable to parse a number from "foo"')
+    assert_validate_scalar_error(s, '+5m',
+        'Unable to parse a number from "+5m"')
+    assert_validate_scalar_error(s, ' 5m',
+        'Unable to parse a number from " 5m"')
+    assert_validate_scalar_error(s, '5m ',
+        'Unable to parse a number from "5m "')
+end
+
+g.test_validate_integer_duration = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'integer',
+        duration = true,
+    }))
+
+    -- Good cases.
+    s:validate(0)
+    s:validate(5)
+    s:validate('2m')
+    s:validate('1000ms')
+
+    -- Bad cases.
+    assert_validate_scalar_error(s, 5.5,
+        'Expected number without a fractional part, got 5.5')
+    assert_validate_scalar_error(s, '1.5s',
+        'Expected number without a fractional part, got 1.5')
+    assert_validate_scalar_error(s, '1500ms',
+        'Expected number without a fractional part, got 1.5')
 end
 
 g.test_validate_union = function()
@@ -1687,6 +1793,25 @@ g.test_get_normalizes_integer = function()
     t.assert_equals(s:get({size = '1.3 GiB'}, 'size'),
                     math.floor(1.3 * 1024 * 1024 * 1024))
     t.assert_equals(s:get({size = '5 KiB'}), {size = 5 * 1024})
+end
+
+g.test_get_normalizes_number = function()
+    local s = schema.new('myschema', schema.record({
+        timeout = schema.scalar({type = 'number', duration = true}),
+    }))
+
+    t.assert_equals(s:get({timeout = '1.5 h'}, 'timeout'), 1.5 * 60 * 60)
+    t.assert_equals(s:get({timeout = '1.5 h'}),
+                    {timeout = 1.5 * 60 * 60})
+end
+
+g.test_get_normalizes_integer_duration = function()
+    local s = schema.new('myschema', schema.record({
+        timeout = schema.scalar({type = 'integer', duration = true}),
+    }))
+
+    t.assert_equals(s:get({timeout = '2m'}, 'timeout'), 2 * 60)
+    t.assert_equals(s:get({timeout = '2m'}), {timeout = 2 * 60})
 end
 
 -- Verify that there are no problems with composite data in a
@@ -4360,6 +4485,30 @@ local fromenv_cases = {
         schema = schema.scalar({type = 'number'}),
         raw_value = '-5.5',
         exp_value = -5.5,
+    },
+    number_duration = {
+        schema = schema.scalar({type = 'number', duration = true}),
+        raw_value = '300ms',
+        exp_value = 0.3,
+    },
+    number_duration_error = {
+        schema = schema.scalar({type = 'number', duration = true}),
+        raw_value = '5q',
+        exp_err_msg = 'Unable to decode a number value from environment ' ..
+            'variable "MYVAR", got "5q": Unknown duration suffix "q" ' ..
+            '(use ms, s, m, h, d, w, M, y)',
+    },
+    integer_duration = {
+        schema = schema.scalar({type = 'integer', duration = true}),
+        raw_value = '2m',
+        exp_value = 120,
+    },
+    integer_duration_error = {
+        schema = schema.scalar({type = 'integer', duration = true}),
+        raw_value = '1500ms',
+        exp_err_msg = 'Unable to decode an integer value from environment ' ..
+            'variable "MYVAR", got "1500ms": Expected number without a ' ..
+            'fractional part, got 1.5',
     },
     number_error = {
         schema = schema.scalar({type = 'number'}),
