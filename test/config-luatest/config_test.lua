@@ -120,11 +120,13 @@ local function verify_configdata()
             path = {"sql", "cache_size"},
             schema = {
                 box_cfg = "sql_cache_size",
+                byte_size = true,
                 default = 5242880,
                 type = "integer",
                 computed = {
                     annotations = {
                         box_cfg = "sql_cache_size",
+                        byte_size = true,
                     },
                 },
             },
@@ -134,11 +136,13 @@ local function verify_configdata()
             path = {"memtx", "memory"},
             schema = {
                 box_cfg = "memtx_memory",
+                byte_size = true,
                 default = 268435456,
                 type = "integer",
                 computed = {
                     annotations = {
                         box_cfg = "memtx_memory",
+                        byte_size = true,
                     },
                 },
             },

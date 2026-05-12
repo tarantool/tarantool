@@ -161,6 +161,12 @@ local function vshard_since(version, schema_node)
     return schema_node
 end
 
+-- Mark a schema node as representing a byte size value.
+local function byte_size(schema_node)
+    schema_node.byte_size = true
+    return schema_node
+end
+
 -- Accept a value of 'iproto.listen' option and return the first URI
 -- that is suitable to create a client socket (not just to listen
 -- on the server as, say, 0.0.0.0:3301 or localhost:0).
@@ -599,12 +605,12 @@ return schema.new('instance_config', schema.record({
         -- Maximum allowed memory allocated by Lua.
         -- The value can't be less than 256MB and can't be
         -- changed without restarting the Tarantool instance.
-        memory = schema.scalar({
+        memory = byte_size(schema.scalar({
             type = 'integer',
             -- Default value: 2GB.
             default = 2 * 1024 * 1024 * 1024,
             validate = validators['lua.memory'],
-        }),
+        })),
     }),
     console = schema.record({
         enabled = schema.scalar({
@@ -947,11 +953,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'net_msg_max',
             default = 768,
         }),
-        readahead = schema.scalar({
+        readahead = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'readahead',
             default = 16320,
-        }),
+        })),
         ssl = enterprise_edition(schema.record({
             ca_file = schema.scalar({
                 type = 'string',
@@ -1034,18 +1040,18 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     sql = schema.record({
-        cache_size = schema.scalar({
+        cache_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'sql_cache_size',
             default = 5 * 1024 * 1024,
-        }),
+        })),
     }),
     memtx = schema.record({
-        memory = schema.scalar({
+        memory = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_memory',
             default = 256 * 1024 * 1024,
-        }),
+        })),
         allocator = schema.enum({
             'small',
             'system',
@@ -1054,29 +1060,29 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 'small',
         }),
-        slab_alloc_granularity = schema.scalar({
+        slab_alloc_granularity = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'slab_alloc_granularity',
             box_cfg_nondynamic = true,
             default = 8,
-        }),
+        })),
         slab_alloc_factor = schema.scalar({
             type = 'number',
             box_cfg = 'slab_alloc_factor',
             box_cfg_nondynamic = true,
             default = 1.05,
         }),
-        min_tuple_size = schema.scalar({
+        min_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_min_tuple_size',
             box_cfg_nondynamic = true,
             default = 16,
-        }),
-        max_tuple_size = schema.scalar({
+        })),
+        max_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_max_tuple_size',
             default = 1024 * 1024,
-        }),
+        })),
         sort_threads = schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_sort_threads',
@@ -1096,11 +1102,11 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 0.05,
         }),
-        cache = schema.scalar({
+        cache = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_cache',
             default = 128 * 1024 * 1024,
-        }),
+        })),
         defer_deletes = schema.scalar({
             type = 'boolean',
             box_cfg = 'vinyl_defer_deletes',
@@ -1113,28 +1119,28 @@ return schema.new('instance_config', schema.record({
             mkdir = true,
             default = 'var/lib/{{ instance_name }}',
         }),
-        max_tuple_size = schema.scalar({
+        max_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_max_tuple_size',
             default = 1024 * 1024,
-        }),
-        memory = schema.scalar({
+        })),
+        memory = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_memory',
             default = 128 * 1024 * 1024,
-        }),
-        page_size = schema.scalar({
+        })),
+        page_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_page_size',
             box_cfg_nondynamic = true,
             default = 8 * 1024,
-        }),
-        range_size = schema.scalar({
+        })),
+        range_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_range_size',
             box_cfg_nondynamic = true,
             default = box.NULL,
-        }),
+        })),
         read_threads = schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_read_threads',
@@ -1173,16 +1179,16 @@ return schema.new('instance_config', schema.record({
             mkdir = true,
             default = 'var/lib/{{ instance_name }}',
         })),
-        memory = enterprise_edition(schema.scalar({
+        memory = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'quiver_memory',
             default = 128 * 1024 * 1024,
-        })),
-        run_size = enterprise_edition(schema.scalar({
+        }))),
+        run_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'quiver_run_size',
             default = 16 * 1024 * 1024,
-        })),
+        }))),
     })),
     wal = schema.record({
         dir = schema.scalar({
@@ -1201,22 +1207,22 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 'write',
         }),
-        max_size = schema.scalar({
+        max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'wal_max_size',
             box_cfg_nondynamic = true,
             default = 256 * 1024 * 1024,
-        }),
+        })),
         dir_rescan_delay = schema.scalar({
             type = 'number',
             box_cfg = 'wal_dir_rescan_delay',
             default = 2,
         }),
-        queue_max_size = schema.scalar({
+        queue_max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'wal_queue_max_size',
             default = 16 * 1024 * 1024,
-        }),
+        })),
         cleanup_delay = schema.scalar({
             type = 'number',
             box_cfg = 'wal_cleanup_delay',
@@ -1282,11 +1288,11 @@ return schema.new('instance_config', schema.record({
                 box_cfg = 'checkpoint_interval',
                 default = 3600,
             }),
-            wal_size = schema.scalar({
+            wal_size = byte_size(schema.scalar({
                 type = 'integer',
                 box_cfg = 'checkpoint_wal_threshold',
                 default = 1e18,
-            }),
+            })),
         }),
         count = schema.scalar({
             type = 'integer',
@@ -1391,11 +1397,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_synchro_timeout',
             default = 5,
         }),
-        synchro_queue_max_size = schema.scalar({
+        synchro_queue_max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'replication_synchro_queue_max_size',
             default = 16 * 1024 * 1024,
-        }),
+        })),
         connect_timeout = schema.scalar({
             type = 'number',
             box_cfg = 'replication_connect_timeout',
@@ -1696,13 +1702,13 @@ return schema.new('instance_config', schema.record({
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.interval'],
         }),
-        metrics_limit = schema.scalar({
+        metrics_limit = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'feedback_metrics_limit',
             default = 1024 * 1024,
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.metrics_limit'],
-        }),
+        })),
     }),
     flightrec = schema.record({
         enabled = enterprise_edition(schema.scalar({
@@ -1710,16 +1716,16 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'flightrec_enabled',
             default = false,
         })),
-        logs_size = enterprise_edition(schema.scalar({
+        logs_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_size',
             default = 10485760,
-        })),
-        logs_max_msg_size = enterprise_edition(schema.scalar({
+        }))),
+        logs_max_msg_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_max_msg_size',
             default = 4096,
-        })),
+        }))),
         logs_log_level = enterprise_edition(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_log_level',
@@ -1736,21 +1742,21 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'flightrec_metrics_period',
             default = 60 * 3,
         })),
-        requests_size = enterprise_edition(schema.scalar({
+        requests_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_size',
             default = 10485760,
-        })),
-        requests_max_req_size = enterprise_edition(schema.scalar({
+        }))),
+        requests_max_req_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_max_req_size',
             default = 16384,
-        })),
-        requests_max_res_size = enterprise_edition(schema.scalar({
+        }))),
+        requests_max_res_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_max_res_size',
             default = 16384,
-        })),
+        }))),
     }),
     security = schema.record({
         auth_type = schema.enum({
