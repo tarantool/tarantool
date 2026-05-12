@@ -93,13 +93,16 @@ g.test_json_schema_section_from_config = function()
                 },
                 type = 'object',
             },
-            max_size = {default = 268435456, type = 'integer'},
+            max_size = {default = 268435456, type = {'integer', 'string'}},
             mode = {
                 default = 'write',
                 enum = {'none', 'write', 'fsync'},
                 type = 'string'
             },
-            queue_max_size = {default = 16777216, type = 'integer'},
+            queue_max_size = {
+                default = 16777216,
+                type = {'integer', 'string'},
+            },
             retention_period = {default = 0, type = 'number'},
         },
         type = 'object',
