@@ -11,6 +11,7 @@
 -- * discriminator
 -- * description
 -- * byte_size
+-- * duration
 --
 -- Others are just stored.
 
@@ -216,20 +217,39 @@ scalars.string = {
 
 scalars.number = {
     type = 'number',
-    validate_noexc = function(data)
+    validate_noexc = function(data, schema)
+        if is_annotated(schema, 'duration') then
+            local _, err = units.parse_duration(data)
+            if err ~= nil then
+                return false, err
+            end
+            return true
+        end
+
         -- TODO: Should we accept cdata<int64_t> and
         -- cdata<uint64_t> here?
         return validate_type_noexc(data, 'number')
     end,
-    fromenv = function(env_var_name, raw_value)
+    fromenv = function(env_var_name, raw_value, schema)
         -- TODO: Accept large integers and return cdata<int64_t>
         -- or cdata<uint64_t>?
-        local res = tonumber(raw_value)
+        local parser = is_annotated(schema, 'duration') and
+            units.parse_duration or tonumber
+        local res = parser(raw_value)
         if res == nil then
             error(('Unable to decode a number value from environment ' ..
                 'variable %q, got %q'):format(env_var_name, raw_value), 0)
         end
         return res
+    end,
+    normalize = function(data, schema)
+        if type(data) ~= 'string' then
+            return data
+        end
+        if not is_annotated(schema, 'duration') then
+            return data
+        end
+        return units.parse_duration(data)
     end,
     never_accept_number = false,
     jsonschema = {type = 'number'},
@@ -2216,6 +2236,8 @@ local function jsonschema_impl(schema, ctx)
         local scalar_copy = table.copy(scalars[schema.type].jsonschema)
         if is_annotated(schema, 'byte_size') then
             scalar_copy.type = {'integer', 'string'}
+        elseif is_annotated(schema, 'duration') then
+            scalar_copy.type = {'number', 'string'}
         end
         return set_common_jsonschema_fields(scalar_copy, schema)
     elseif schema.type == 'union' then

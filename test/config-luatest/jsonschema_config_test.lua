@@ -63,16 +63,19 @@ g.test_json_schema_section_from_config = function()
                     'The time interval in seconds between periodic scans of ' ..
                     'the write-ahead-log file directory, when checking for ' ..
                     'changes to write-ahead-log files for the sake of ' ..
-                    'replication or hot standby.')
+                    'replication or hot standby.\n\nYou can specify the ' ..
+                    'value either as a number of seconds or as a ' ..
+                    'human-readable string with time units (for example, ' ..
+                    '`30s`, `5m`, `1h`).')
 
     remove_descriptions(wal_section)
 
     local expected = {
         additionalProperties = false,
         properties = {
-            cleanup_delay = {type = 'number'},
+            cleanup_delay = {type = {'number', 'string'}},
             dir = {default = 'var/lib/{{ instance_name }}', type = 'string'},
-            dir_rescan_delay = {default = 2, type = 'number'},
+            dir_rescan_delay = {default = 2, type = {'number', 'string'}},
             ext = {
                 additionalProperties = false,
                 default = box.NULL,
@@ -103,7 +106,7 @@ g.test_json_schema_section_from_config = function()
                 default = 16777216,
                 type = {'integer', 'string'},
             },
-            retention_period = {default = 0, type = 'number'},
+            retention_period = {default = 0, type = {'number', 'string'}},
         },
         type = 'object',
     }

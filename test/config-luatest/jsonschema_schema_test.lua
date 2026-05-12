@@ -76,6 +76,10 @@ g.test_json_schema = function()
             type = 'integer',
             byte_size = true,
         }),
+        taz = schema.scalar({
+            type = 'number',
+            duration = true,
+        }),
     }))
 
     local expected = {
@@ -125,6 +129,7 @@ g.test_json_schema = function()
                 },
             },
             saz = {type = {'integer', 'string'}},
+            taz = {type = {'number', 'string'}},
         },
         type = 'object',
     }

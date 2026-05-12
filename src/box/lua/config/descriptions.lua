@@ -33,6 +33,15 @@ local function format_bytes_text(s)
     ]])
 end
 
+local function format_duration_text(s)
+    return format_text(s .. [[
+
+        You can specify the value either as a number of seconds or as a
+        human-readable string with time units (for example, `30s`, `5m`,
+        `1h`).
+    ]])
+end
+
 -- {{{ Instance descriptions
 
 local I = {}
@@ -598,7 +607,7 @@ I['config.etcd.http.request.interface'] = format_text([[
 
     See https://curl.se/libcurl/c/CURLOPT_INTERFACE.html for details.
 ]])
-I['config.etcd.http.request.timeout'] = format_text([[
+I['config.etcd.http.request.timeout'] = format_duration_text([[
     A time period required to process an HTTP request to an etcd server:
     from sending a request to receiving a response.
 ]])
@@ -657,7 +666,7 @@ I['config.etcd.watchers.reconnect_max_attempts'] = format_text([[
     of connection failure.
 ]])
 
-I['config.etcd.watchers.reconnect_timeout'] = format_text([[
+I['config.etcd.watchers.reconnect_timeout'] = format_duration_text([[
     The timeout (in seconds) between attempts to reconnect to an etcd
     server in case of connection failure.
 ]])
@@ -738,11 +747,11 @@ I['config.storage.prefix'] = format_text([[
     Note that `<prefix>` should start with a slash (`/`).
 ]])
 
-I['config.storage.reconnect_after'] = format_text([[
+I['config.storage.reconnect_after'] = format_duration_text([[
     A number of seconds to wait before reconnecting to a configuration storage.
 ]])
 
-I['config.storage.timeout'] = format_text([[
+I['config.storage.timeout'] = format_duration_text([[
     The interval (in seconds) to perform the status check of a configuration
     storage.
 ]])
@@ -759,7 +768,7 @@ I['connpool'] = format_text([[
     instances within the cluster.
 ]])
 
-I['connpool.idle_timeout'] = format_text([[
+I['connpool.idle_timeout'] = format_duration_text([[
     Tarantool connection pool automatically manages connections to the
     instances and automatically closes the ones that are not needed for a
     while.
@@ -1035,11 +1044,11 @@ I['database.replicaset_uuid'] = format_text([[
 
 I['database.txn_isolation'] = 'A transaction isolation level.'
 
-I['database.txn_timeout'] = format_text([[
+I['database.txn_timeout'] = format_duration_text([[
     A timeout (in seconds) after which the transaction is rolled back.
 ]])
 
-I['database.txn_synchro_timeout'] = format_text([[
+I['database.txn_synchro_timeout'] = format_duration_text([[
     A timeout (in seconds) after which the fiber is detached from synchronous
     transaction that is currently collecting quorum. After the timeout expires,
     the transaction is not rolled back but continues to wait for a quorum in
@@ -1056,17 +1065,17 @@ I['failover'] = format_text([[
     The `failover` section defines parameters related to a supervised failover.
 ]])
 
-I['failover.call_timeout'] = format_text([[
+I['failover.call_timeout'] = format_duration_text([[
     A call timeout (in seconds) for connections
     used by monitoring and autofailover components.
 ]])
 
-I['failover.connect_timeout'] = format_text([[
+I['failover.connect_timeout'] = format_duration_text([[
     A connection timeout (in seconds) for connections
     used by monitoring and autofailover components.
 ]])
 
-I['failover.lease_interval'] = format_text([[
+I['failover.lease_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how long an instance should
     be a leader without renew requests from a coordinator. When this interval
     expires, the leader switches to read-only mode. This action is performed
@@ -1180,17 +1189,17 @@ I['failover.metrics.exporters.*.format'] = format_text([[
     the specified format.
 ]])
 
-I['failover.probe_interval'] = format_text([[
+I['failover.probe_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how often a monitoring service
     of the failover coordinator polls an instance for its status.
 ]])
 
-I['failover.renew_interval'] = format_text([[
+I['failover.renew_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how often a failover coordinator
     sends read-write deadline renewals.
 ]])
 
-I['failover.replication_lag_threshold'] = format_text([[
+I['failover.replication_lag_threshold'] = format_duration_text([[
     A replication lag threshold (in seconds). If an instance's replication lag
     exceeds this threshold, the supervised failover coordinator ignores the
     instance when selecting a new leader if `synchro_mode` is `true` for this
@@ -1417,7 +1426,7 @@ I['failover.stateboard.enabled'] = format_text([[
     Enable or disable the failover coordinator stateboard.
 ]])
 
-I['failover.stateboard.keepalive_interval'] = format_text([[
+I['failover.stateboard.keepalive_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how long a transient state
     information is stored and how quickly a lock expires.
 
@@ -1426,7 +1435,7 @@ I['failover.stateboard.keepalive_interval'] = format_text([[
     a replica set leader to go to read-only mode for some time.
 ]])
 
-I['failover.stateboard.renew_interval'] = format_text([[
+I['failover.stateboard.renew_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how often a failover
     coordinator writes its state information to etcd. This option also
     determines the frequency at which an active coordinator reads new
@@ -1462,9 +1471,11 @@ I['feedback.enabled'] = format_text([[
 
 I['feedback.host'] = 'The address to which information is sent.'
 
-I['feedback.interval'] = 'The interval (in seconds) of sending information.'
+I['feedback.interval'] = format_duration_text([[
+    The interval (in seconds) of sending information.
+]])
 
-I['feedback.metrics_collect_interval'] = format_text([[
+I['feedback.metrics_collect_interval'] = format_duration_text([[
     The interval (in seconds) for collecting metrics.
 ]])
 
@@ -1488,7 +1499,7 @@ I['fiber'] = format_text([[
     and cooperative multitasking.
 ]])
 
-I['fiber.io_collect_interval'] = format_text([[
+I['fiber.io_collect_interval'] = format_duration_text([[
     The time period (in seconds) a fiber sleeps between iterations of the
     event loop.
 
@@ -1503,15 +1514,15 @@ I['fiber.slice'] = format_text([[
     for fiber slices. See `fiber.set_max_slice` for details and examples.
 ]])
 
-I['fiber.slice.err'] = format_text([[
-    Set a time period (in seconds) that specifies the warning slice.
-]])
-
-I['fiber.slice.warn'] = format_text([[
+I['fiber.slice.err'] = format_duration_text([[
     Set a time period (in seconds) that specifies the error slice.
 ]])
 
-I['fiber.too_long_threshold'] = format_text([[
+I['fiber.slice.warn'] = format_duration_text([[
+    Set a time period (in seconds) that specifies the warning slice.
+]])
+
+I['fiber.too_long_threshold'] = format_duration_text([[
     If processing a request takes longer than the given period (in seconds),
     the fiber warns about it in the log.
 
@@ -1583,12 +1594,12 @@ I['flightrec.logs_size'] = format_bytes_text([[
     to 0 to disable the log storage.
 ]])
 
-I['flightrec.metrics_interval'] = format_text([[
+I['flightrec.metrics_interval'] = format_duration_text([[
     Specify the time interval (in seconds) that defines the frequency
     of dumping metrics. This value shouldn't exceed `flightrec.metrics_period`.
 ]])
 
-I['flightrec.metrics_period'] = format_text([[
+I['flightrec.metrics_period'] = format_duration_text([[
     Specify the time period (in seconds) that defines how long metrics
     are stored from the moment of dump. So, this value defines how much
     historical metrics data is collected up to the moment of crash. The
@@ -2272,7 +2283,7 @@ I['replication.anon'] = format_text([[
       or replica set leader.
 ]])
 
-I['replication.anon_ttl'] = format_text([[
+I['replication.anon_ttl'] = format_duration_text([[
     Time-to-live (in seconds) of disconnected anonymous replicas (see
     `replication.anon` for the definition of anonymous replica). If an anonymous
     replica hasn't been in touch for longer than `replication.anon_ttl`, it is
@@ -2375,7 +2386,7 @@ I['replication.bootstrap_strategy'] = format_text([[
     bootstrap.
 ]])
 
-I['replication.connect_timeout'] = format_text([[
+I['replication.connect_timeout'] = format_duration_text([[
     A timeout (in seconds) a replica waits when trying to connect to a master
     in a cluster.
 
@@ -2421,7 +2432,7 @@ I['replication.election_mode'] = format_text([[
       elections, it becomes a leader but won't participate in any new elections.
 ]])
 
-I['replication.election_timeout'] = format_text([[
+I['replication.election_timeout'] = format_duration_text([[
     Specifies the timeout (in seconds) between election rounds in the leader
     election process if the previous round ended up with a split vote.
 
@@ -2486,7 +2497,7 @@ I['replication.skip_conflict'] = format_text([[
     `replication.skip_conflict` is set to `true`, such errors are ignored.
 ]])
 
-I['replication.sync_lag'] = format_text([[
+I['replication.sync_lag'] = format_duration_text([[
     The maximum delay (in seconds) between the time when data is written to
     the master and the time when it is written to a replica.
 
@@ -2494,7 +2505,7 @@ I['replication.sync_lag'] = format_text([[
     network delay, set this option to a large value.
 ]])
 
-I['replication.sync_timeout'] = format_text([[
+I['replication.sync_timeout'] = format_duration_text([[
     The timeout (in seconds) that a node waits when trying to sync with other
     nodes in a replica set after connecting or during a configuration update.
     This could fail indefinitely if `replication.sync_lag` is smaller than
@@ -2561,7 +2572,7 @@ I['replication.linearizable_quorum'] = format_text([[
       perform requests to synchronous, local or temporary spaces.
 ]])
 
-I['replication.synchro_timeout'] = format_text([[
+I['replication.synchro_timeout'] = format_duration_text([[
     For synchronous replication only. Specify how many seconds to wait for a
     synchronous transaction quorum replication until it is declared failed and
     is rolled back.
@@ -2579,7 +2590,7 @@ I['replication.threads'] = format_text([[
     to serve are distributed evenly between the threads.
 ]])
 
-I['replication.timeout'] = format_text([[
+I['replication.timeout'] = format_duration_text([[
     A time interval (in seconds) used by a master to send heartbeat requests to
     a replica when there are no updates to send to this replica. For each
     request, a replica should return a heartbeat acknowledgment.
@@ -2590,7 +2601,7 @@ I['replication.timeout'] = format_text([[
 ]])
 
 
-I['replication.reconnect_timeout'] = format_text([[
+I['replication.reconnect_timeout'] = format_duration_text([[
     The timeout (in seconds) between attempts to reconnect to a master
     in case of connection failure. Default is box.NULL. If the option is
     set to box.NULL, then it equals to replication_timeout.
@@ -2631,7 +2642,7 @@ I['security'] = format_text([[
     security settings.
 ]])
 
-I['security.auth_delay'] = format_text([[
+I['security.auth_delay'] = format_duration_text([[
     Specify a period of time (in seconds) that a specific user should wait for
     the next attempt after failed authentication.
 
@@ -2724,7 +2735,7 @@ I['sharding.bucket_count'] = format_text([[
     The total number of buckets in a cluster.
 ]])
 
-I['sharding.connection_outdate_delay'] = format_text([[
+I['sharding.connection_outdate_delay'] = format_duration_text([[
     Time to outdate old objects on reload.
 ]])
 
@@ -2732,7 +2743,7 @@ I['sharding.discovery_mode'] = format_text([[
     A mode of the background discovery fiber used by the router to find buckets.
 ]])
 
-I['sharding.failover_ping_timeout'] = format_text([[
+I['sharding.failover_ping_timeout'] = format_duration_text([[
     The timeout (in seconds) after which a node is considered unavailable if
     there are no responses during this period. The failover fiber is used to
     detect if a node is down.
@@ -2821,7 +2832,7 @@ I['sharding.shard_index'] = format_text([[
     the index, other parts are optional.
 ]])
 
-I['sharding.sync_timeout'] = format_text([[
+I['sharding.sync_timeout'] = format_duration_text([[
     The timeout to wait for synchronization of the old master with replicas
     before demotion. Used when switching a master or when manually calling
     the `sync()` function.
@@ -2854,7 +2865,7 @@ I['snapshot.by'] = format_text([[
     exceeds a certain threshold.
 ]])
 
-I['snapshot.by.interval'] = format_text([[
+I['snapshot.by.interval'] = format_duration_text([[
     The interval in seconds between actions by the checkpoint daemon. If
     the option is set to a value greater than zero, and there is activity
     that causes change to a database, then the checkpoint daemon calls
@@ -2934,12 +2945,12 @@ I['stateboard.enabled'] = format_text([[
     Enable or disable the stateboard service.
 ]])
 
-I['stateboard.keepalive_interval'] = format_text([[
+I['stateboard.keepalive_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how long a transient state
     information is stored.
 ]])
 
-I['stateboard.renew_interval'] = format_text([[
+I['stateboard.renew_interval'] = format_duration_text([[
     A time interval (in seconds) that specifies how often a Tarantool instance
     writes its state information to the stateboard.
 ]])
@@ -3024,7 +3035,7 @@ I['vinyl.run_size_ratio'] = format_text([[
     run_size_ratio option passed to `space_object:create_index()`.
 ]])
 
-I['vinyl.timeout'] = format_text([[
+I['vinyl.timeout'] = format_duration_text([[
     The vinyl storage engine has a scheduler that performs compaction.
     When vinyl is low on available memory, the compaction scheduler may
     be unable to keep up with incoming update requests. In that situation,
@@ -3074,7 +3085,7 @@ I['wal'] = format_text([[
     This section defines configuration parameters related to write-ahead log.
 ]])
 
-I['wal.cleanup_delay'] = format_text([[
+I['wal.cleanup_delay'] = format_duration_text([[
     The delay in seconds used to prevent the Tarantool garbage collector from
     immediately removing write-ahead log files after a node restart. This
     delay eliminates possible erroneous situations when the master deletes
@@ -3094,7 +3105,7 @@ I['wal.dir'] = format_text([[
     options to store them on different physical disks for performance matters.
 ]])
 
-I['wal.dir_rescan_delay'] = format_text([[
+I['wal.dir_rescan_delay'] = format_duration_text([[
     The time interval in seconds between periodic scans of the write-ahead-log
     file directory, when checking for changes to write-ahead-log files for the
     sake of replication or hot standby.
@@ -3160,7 +3171,7 @@ I['wal.queue_max_size'] = format_bytes_text([[
     transactions faster than writing them to the WAL.
 ]])
 
-I['wal.retention_period'] = format_text([[
+I['wal.retention_period'] = format_duration_text([[
     The delay in seconds used to prevent the Tarantool garbage collector from
     removing a write-ahead log file after it has been closed. If a node is
     restarted, `wal.retention_period` counts down from the last modification

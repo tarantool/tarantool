@@ -1987,11 +1987,11 @@ g.test_failover = function()
             call_timeout = 2,
             lease_interval = 10,
             renew_interval = 1,
-            replication_lag_threshold = 10,
+            replication_lag_threshold = '10s',
             stateboard = {
                 enabled = true,
-                renew_interval = 1,
-                keepalive_interval = 5,
+                renew_interval = '1s',
+                keepalive_interval = '5s',
             },
             replicasets = {
                 replicaset001 = {
