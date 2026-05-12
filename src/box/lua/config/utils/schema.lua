@@ -10,11 +10,13 @@
 -- * apply_default_if
 -- * discriminator
 -- * description
+-- * byte_size
 --
 -- Others are just stored.
 
 local fun = require('fun')
 local json = require('json')
+local units = require('internal.config.utils.units')
 
 local json_noexc = json.new()
 json_noexc.cfg({encode_use_tostring = true})
@@ -25,6 +27,17 @@ local schema_mt = {}
 local scalars = {}
 
 local table_is_array
+local map_impl
+local normalize_f
+
+local function is_annotated(schema, name)
+    return schema ~= nil and schema[name] == true
+end
+
+local byte_size_jsonschema_pattern =
+    '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
+    '(?:[Bb]|[Kk][Ii][Bb]|[Mm][Ii][Bb]|[Gg][Ii][Bb]|' ..
+    '[Tt][Ii][Bb]|[Pp][Ii][Bb])?$'
 
 -- {{{ Walkthrough helpers
 
@@ -227,7 +240,15 @@ scalars.number = {
 
 scalars.integer = {
     type = 'integer',
-    validate_noexc = function(data)
+    validate_noexc = function(data, schema)
+        if is_annotated(schema, 'byte_size') then
+            local _, err = units.parse_byte_size(data)
+            if err ~= nil then
+                return false, err
+            end
+            return true
+        end
+
         -- TODO: Accept cdata<int64_t> and cdata<uint64_t>.
         local ok, err = validate_type_noexc(data, 'number')
         if not ok then
@@ -243,13 +264,34 @@ scalars.integer = {
         end
         return true
     end,
-    fromenv = function(env_var_name, raw_value)
-        local res = tonumber64(raw_value)
-        if res == nil then
-            error(('Unable to decode an integer value from environment ' ..
-                'variable %q, got %q'):format(env_var_name, raw_value), 0)
+    fromenv = function(env_var_name, raw_value, schema)
+        local parser = is_annotated(schema, 'byte_size') and
+            units.parse_byte_size or tonumber64
+        local res, err = parser(raw_value)
+
+        if res ~= nil then
+            return res
         end
-        return res
+
+        local msg = ('Unable to decode an integer value from environment ' ..
+                     'variable %q, got %q'):format(env_var_name, raw_value)
+
+        -- tonumber64() returns nil on parse failure without treating it as an
+        -- internal parser error, so err can be nil here.
+        if err ~= nil then
+            msg = ('%s: %s'):format(msg, err)
+        end
+
+        error(msg, 0)
+    end,
+    normalize = function(data, schema)
+        if type(data) ~= 'string' then
+            return data
+        end
+        if not is_annotated(schema, 'byte_size') then
+            return data
+        end
+        return units.parse_byte_size(data)
     end,
     never_accept_number = false,
     jsonschema = {type = 'integer'},
@@ -795,10 +837,19 @@ local function validate_impl(schema, data, ctx)
         local scalar_def = scalars[schema.type]
         assert(scalar_def ~= nil)
 
-        local ok, err = scalar_def.validate_noexc(data)
+        local ok, err = scalar_def.validate_noexc(data, schema)
         if not ok then
             walkthrough_error(ctx, 'Unexpected data for scalar %q: %s',
                 schema.type, err)
+        end
+        if scalar_def.normalize ~= nil and data ~= nil then
+            -- Node-specific validators below expect canonical scalar values.
+            local normalized, err = scalar_def.normalize(data, schema)
+            if err ~= nil then
+                walkthrough_error(ctx, 'Unexpected data for scalar %q: %s',
+                    schema.type, err)
+            end
+            data = normalized
         end
     elseif schema.type == 'record' then
         walkthrough_assert_table(ctx, schema, data)
@@ -1030,7 +1081,10 @@ end
 local function get_impl(schema, data, ctx)
     -- The journey is finished. Return what is under the feet.
     if #ctx.journey == 0 then
-        return data
+        if data == nil then
+            return data
+        end
+        return map_impl(schema, data, normalize_f, ctx)
     end
 
     -- There are more steps in the journey (at least one).
@@ -1147,7 +1201,8 @@ function methods.get(self, data, path)
     end
 
     if path == nil or next(path) == nil then
-        return data
+        local ctx = walkthrough_start(self)
+        return map_impl(schema, data, normalize_f, ctx)
     end
 
     local ctx = walkthrough_start(self, {
@@ -1614,7 +1669,7 @@ local function map_schemaless(old, f, ctx)
     return res
 end
 
-local function map_impl(schema, data, f, ctx)
+function map_impl(schema, data, f, ctx)
     if schema.type == 'any' then
         return map_schemaless(data, f, ctx)
     end
@@ -1789,6 +1844,36 @@ function methods.map(self, data, f, f_ctx)
 end
 
 -- }}} <schema object>:map()
+
+-- {{{ <schema object>:normalize()
+
+function normalize_f(data, w)
+    if data == nil or w.schema == nil or not is_scalar(w.schema) then
+        return data
+    end
+
+    local normalize = scalars[w.schema.type].normalize
+    if normalize == nil then
+        return data
+    end
+
+    local res, err = normalize(data, w.schema)
+    if err ~= nil then
+        w.error('%s', err)
+    end
+    return res
+end
+
+-- Normalize scalar values according to the schema.
+--
+-- Important: the data is assumed as already validated against
+-- the given schema. (A fast type check is performed on composite
+-- types, but it is not recommended to lean on it.)
+function methods.normalize(self, data)
+    return self:map(data, normalize_f)
+end
+
+-- }}} <schema object>:normalize()
 
 -- {{{ <schema object>:apply_default()
 
@@ -2139,6 +2224,10 @@ local function jsonschema_impl(schema, ctx)
         -- If the schema is a scalar type (string, number, etc.)
         -- copy the corresponding JSON schema.
         local scalar_copy = table.copy(scalars[schema.type].jsonschema)
+        if is_annotated(schema, 'byte_size') then
+            scalar_copy.type = {'integer', 'string'}
+            scalar_copy.pattern = byte_size_jsonschema_pattern
+        end
         return set_common_jsonschema_fields(scalar_copy, schema)
     elseif schema.type == 'union' then
         local any_of = {}
@@ -2416,9 +2505,17 @@ local function validate_schema_node_union(schema, ctx)
     end
 end
 
+local function validate_schema_node_unit_annotations(schema, ctx)
+    if schema.byte_size and schema.type ~= 'integer' then
+        walkthrough_error(ctx, '"byte_size" requires an integer scalar, ' ..
+            'got %s', schema.type)
+    end
+end
+
 local function validate_schema_impl(schema, ctx)
     validate_schema_node_unique_items(schema, ctx)
     validate_schema_node_union(schema, ctx)
+    validate_schema_node_unit_annotations(schema, ctx)
 
     -- luacheck: ignore 542 empty if branch
     if is_scalar(schema) then
@@ -2766,7 +2863,7 @@ fromenv = function(env_var_name, raw_value, schema)
     if is_scalar(schema) then
         local scalar_def = scalars[schema.type]
         assert(scalar_def ~= nil)
-        return scalar_def.fromenv(env_var_name, raw_value)
+        return scalar_def.fromenv(env_var_name, raw_value, schema)
     elseif schema.type == 'union' then
         return union_from_env(env_var_name, raw_value, schema)
     elseif schema.type == 'record' then

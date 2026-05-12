@@ -192,6 +192,7 @@ extern char session_lua[],
 	config_utils_textutils_lua[],
 	config_utils_funcutils_lua[],
 	config_utils_network_lua[],
+	config_utils_units_lua[],
 	/* }}} config */
 
 	connpool_lua[];
@@ -383,6 +384,10 @@ static const char * const lua_sources_main[] = {
 	"config/utils/funcutils",
 	"internal.config.utils.funcutils",
 	config_utils_funcutils_lua,
+
+	"config/utils/units",
+	"internal.config.utils.units",
+	config_utils_units_lua,
 
 	"config/utils/schema",
 	"experimental.config.utils.schema",

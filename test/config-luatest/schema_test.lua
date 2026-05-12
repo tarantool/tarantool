@@ -711,6 +711,38 @@ g.test_validate_schema = function()
             }),
         }))
     end)
+
+    exp_err_msg = '[myschema] foo: "byte_size" requires an integer scalar, ' ..
+        'got record'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.record({}, {
+                byte_size = true,
+            }),
+        }))
+    end)
+
+    exp_err_msg = '[myschema] foo: "byte_size" requires an integer scalar, ' ..
+        'got number'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.scalar({
+                type = 'number',
+                byte_size = true,
+            }),
+        }))
+    end)
+
+    exp_err_msg = '[myschema] foo: "byte_size" requires an integer scalar, ' ..
+        'got string'
+    t.assert_error_msg_equals(exp_err_msg, function()
+        schema.new('myschema', schema.record({
+            foo = schema.scalar({
+                type = 'string',
+                byte_size = true,
+            }),
+        }))
+    end)
 end
 
 g.test_validate_schema_union_discriminator = function()
@@ -1074,10 +1106,55 @@ g.test_validate_integer = function()
 
     -- Bad cases.
     assert_validate_scalar_expects_only_given_type(s, 'number')
+    assert_validate_scalar_error(s, '5 KiB',
+        'Expected "number", got "string"')
     assert_validate_scalar_error(s, 5.5,
         'Expected number without a fractional part, got 5.5')
 
     -- TODO: +inf, -inf, NaN.
+end
+
+g.test_validate_byte_size = function()
+    local s = schema.new('myschema', schema.scalar({
+        type = 'integer',
+        byte_size = true,
+    }))
+
+    -- Good cases.
+    s:validate(0)
+    s:validate(5)
+    s:validate('5B')
+    s:validate('5 KiB')
+    s:validate('1.5 GiB')
+
+    -- Bad cases.
+    local exp_err_msg_tmpl = ('Expected byte size as number or string with ' ..
+        'optional byte size suffix, got %s')
+    for i = 1, table.maxn(samples) do
+        local data = samples[i]
+        if type(data) ~= 'number' and type(data) ~= 'string' then
+            t.assert_error_msg_contains(exp_err_msg_tmpl:format(type(data)),
+                                        s.validate, s, data)
+        end
+    end
+    assert_validate_scalar_error(s, 5.5,
+        'Expected byte size without a fractional part, got 5.5')
+    assert_validate_scalar_error(s, '5.5',
+        'Expected byte size without a fractional part, got 5.5')
+    assert_validate_scalar_error(s, '5.5B',
+        'Expected byte size without a fractional part, got 5.5')
+    assert_validate_scalar_error(s, -5,
+        'Expected a non-negative byte size, got -5')
+    assert_validate_scalar_error(s, '-5KiB',
+        'Expected a non-negative byte size, got -5')
+    assert_validate_scalar_error(s, '5 MB',
+        'Unknown byte size suffix "MB" (use B, KiB, MiB, GiB, TiB, PiB)')
+    assert_validate_scalar_error(s, '+5KiB',
+        'Unable to parse a number from "+5KiB"')
+    assert_validate_scalar_error(s, ' 5KiB',
+        'Unable to parse a number from " 5KiB"')
+    assert_validate_scalar_error(s, '5KiB ',
+        'Unable to parse a number from "5KiB "')
 end
 
 g.test_validate_boolean = function()
@@ -1599,6 +1676,17 @@ g.test_get_nested_in_record = function()
     local data = {}
     t.assert_equals(s:get(data, 'foo'), nil)
     t.assert_equals(s:get(data, 'foo.bar'), nil)
+end
+
+g.test_get_normalizes_integer = function()
+    local s = schema.new('myschema', schema.record({
+        size = schema.scalar({type = 'integer', byte_size = true}),
+    }))
+
+    t.assert_equals(s:get({size = '5 KiB'}, 'size'), 5 * 1024)
+    t.assert_equals(s:get({size = '1.3 GiB'}, 'size'),
+                    math.floor(1.3 * 1024 * 1024 * 1024))
+    t.assert_equals(s:get({size = '5 KiB'}), {size = 5 * 1024})
 end
 
 -- Verify that there are no problems with composite data in a
@@ -3264,6 +3352,20 @@ g.test_map_any_traverses_tables = function()
     end)
 end
 
+g.test_normalize_any_traverses_tables = function()
+    local s = schema.new('myschema', schema.scalar({type = 'any'}))
+
+    local data = {
+        plain = '1 KiB',
+        nested = {
+            timeout = '1 h',
+            list = {'2 KiB', 42, box.NULL},
+        },
+    }
+
+    t.assert_equals(s:normalize(data), data)
+end
+
 g.test_cycle_under_any_tables = function()
     local config_yaml = [[
 app:
@@ -4274,6 +4376,18 @@ local fromenv_cases = {
         schema = schema.scalar({type = 'integer'}),
         raw_value = '-5',
         exp_value = -5,
+    },
+    integer_byte_size = {
+        schema = schema.scalar({type = 'integer', byte_size = true}),
+        raw_value = '5KiB',
+        exp_value = 5 * 1024,
+    },
+    integer_byte_size_error = {
+        schema = schema.scalar({type = 'integer', byte_size = true}),
+        raw_value = '5MB',
+        exp_err_msg = 'Unable to decode an integer value from environment ' ..
+            'variable "MYVAR", got "5MB": Unknown byte size suffix "MB" ' ..
+            '(use B, KiB, MiB, GiB, TiB, PiB)',
     },
     integer_error = {
         schema = schema.scalar({type = 'integer'}),

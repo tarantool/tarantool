@@ -3,6 +3,10 @@ local schema = require('experimental.config.utils.schema')
 
 local g = t.group()
 
+local byte_size_pattern = '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
+    '(?:[Bb]|[Kk][Ii][Bb]|[Mm][Ii][Bb]|[Gg][Ii][Bb]|' ..
+    '[Tt][Ii][Bb]|[Pp][Ii][Bb])?$'
+
 local function variant_by_type(schema, schema_type)
     for _, variant in ipairs(schema.variants) do
         if variant.type == schema_type then
@@ -72,6 +76,10 @@ g.test_json_schema = function()
             },
             discriminator = string_or_union_discriminator,
         }),
+        saz = schema.scalar({
+            type = 'integer',
+            byte_size = true,
+        }),
     }))
 
     local expected = {
@@ -119,6 +127,10 @@ g.test_json_schema = function()
                         },
                     },
                 },
+            },
+            saz = {
+                pattern = byte_size_pattern,
+                type = {'integer', 'string'},
             },
         },
         type = 'object',
