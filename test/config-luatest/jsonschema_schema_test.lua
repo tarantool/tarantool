@@ -6,6 +6,8 @@ local g = t.group()
 local byte_size_pattern = '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
     '(?:[Bb]|[Kk][Ii][Bb]|[Mm][Ii][Bb]|[Gg][Ii][Bb]|' ..
     '[Tt][Ii][Bb]|[Pp][Ii][Bb])?$'
+local duration_pattern = '^(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\s*' ..
+    '(?:ms|s|m|h|d|w|M|y)?$'
 
 local function variant_by_type(schema, schema_type)
     for _, variant in ipairs(schema.variants) do
@@ -80,6 +82,14 @@ g.test_json_schema = function()
             type = 'integer',
             byte_size = true,
         }),
+        taz = schema.scalar({
+            type = 'number',
+            duration = true,
+        }),
+        uaz = schema.scalar({
+            type = 'integer',
+            duration = true,
+        }),
     }))
 
     local expected = {
@@ -130,6 +140,14 @@ g.test_json_schema = function()
             },
             saz = {
                 pattern = byte_size_pattern,
+                type = {'integer', 'string'},
+            },
+            taz = {
+                pattern = duration_pattern,
+                type = {'number', 'string'},
+            },
+            uaz = {
+                pattern = duration_pattern,
                 type = {'integer', 'string'},
             },
         },
