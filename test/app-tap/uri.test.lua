@@ -97,7 +97,7 @@ local function test_parse(test)
 end
 
 local function test_format(test)
-    test:plan(14)
+    test:plan(20)
     local u = uri.parse("user:password@localhost")
     test:is(uri.format(u), "user@localhost", "password removed")
     test:is(uri.format(u, false), "user@localhost", "password removed")
@@ -158,6 +158,16 @@ local function test_format(test)
 
     test:is(uri.format{host = "unix/", service = "/tmp/unix.sock"},
             "unix/:/tmp/unix.sock", "URI format")
+
+    -- Check URI format with default length and boundaries.
+    local lens = { 1023, 1024, 1025 }
+    for _, len in ipairs(lens) do
+        local path = string.rep("x", len)
+        local url = uri.format({path = path})
+        local msg = ("format URI with length == %d"):format(len)
+        test:is(#url, #path, msg .. ", check length")
+        test:is(url, path,  msg .. ", check result")
+    end
 end
 
 local function test_parse_uri_query_params(test)
