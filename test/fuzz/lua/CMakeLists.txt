@@ -57,8 +57,6 @@ LIST(APPEND BROKEN_LUZER_TESTS
   box_execute_test.lua
   # To be enabled in scope tarantool/tarantool#11898.
   json_decode_test.lua
-  # To be enabled in scope tarantool/security#151.
-  uri_parse_test.lua
   # To be enabled in scope tarantool/tarantool#12063.
   pickle_unpack_test.lua
   # To be enabled in scope tarantool/security#153.
