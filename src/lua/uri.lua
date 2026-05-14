@@ -46,7 +46,7 @@ void
 uri_set_destroy(struct uri_set *uri_set);
 
 int
-uri_format(char *str, size_t len, struct uri *uri, bool write_password);
+uri_format(char *str, int len, struct uri *uri, bool write_password);
 
 size_t
 uri_escape(const char *src, size_t src_size, char *dst,
@@ -250,9 +250,15 @@ local function format(uri, write_password)
     end
     fill_uribuf_params(uribuf, uri)
     local ibuf = cord_ibuf_take()
-    local str = ibuf:alloc(1024)
-    local len = builtin.uri_format(str, 1024, uribuf,
-                                   write_password and 1 or 0)
+    local default_len = 1024
+    local str = ibuf:alloc(default_len)
+    local write_sensitive = write_password and 1 or 0
+    local len = builtin.uri_format(str, default_len, uribuf, write_sensitive)
+    if len >= default_len then
+        ibuf:reset()
+        str = ibuf:alloc(len + 1)
+        len = builtin.uri_format(str, len + 1, uribuf, write_sensitive)
+    end
     uri_stash_put(uribuf)
     str = ffi.string(str, len)
     cord_ibuf_put(ibuf)
