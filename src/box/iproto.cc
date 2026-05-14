@@ -413,6 +413,10 @@ enum iproto_cfg_op {
 	 * Command code to drop all current connections.
 	 */
 	IPROTO_CFG_DROP_CONNECTIONS,
+	/**
+	 * Command code to shutdown iproto. On shutdown we stop accepting
+	 * new connections.
+	 */
 	IPROTO_CFG_SHUTDOWN,
 };
 
@@ -1000,6 +1004,11 @@ struct iproto_connection
 	bool is_established;
 	/** Number of iproto requests in flight. */
 	size_t request_count;
+	/**
+	 * Whether connection is internal. Internal means that is not
+	 * accepted through iproto listening socket.
+	 */
+	bool is_internal;
 };
 
 /** Returns a string suitable for logging. */
@@ -1844,6 +1853,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->tx.is_push_sent = false;
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	con->request_count = 0;
+	con->is_internal = false;
 	return con;
 }
 
@@ -3792,11 +3802,13 @@ net_send_greeting(struct cmsg *m)
 static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
-		     struct session *session, const char *user_name)
+		     struct session *session, const char *user_name,
+		     bool is_internal)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
 	struct iproto_msg *msg = iproto_msg_new(con);
+	con->is_internal = is_internal;
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
@@ -3821,7 +3833,8 @@ iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
-			     /*session=*/NULL, /*user_name=*/NULL);
+			     /*session=*/NULL, /*user_name=*/NULL,
+			     /*is_internal=*/false);
 }
 
 /**
@@ -4504,7 +4517,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
-				     session, user_name);
+				     session, user_name, /*is_internal*/true);
 		free(user_name);
 		break;
 	}
@@ -4513,6 +4526,9 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		iproto_thread->drop_pending_connection_count = 0;
 		rlist_foreach_entry(con, &iproto_thread->connections,
 				    in_connections) {
+			if (con->is_internal &&
+			    !iproto_thread->is_shutting_down)
+				continue;
 			/*
 			 * Replication IO is done outside iproto so we
 			 * cannot close them as usual. Anyway we cancel
