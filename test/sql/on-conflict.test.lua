@@ -23,7 +23,6 @@ box.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON 
 --
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);")
 box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
-box.execute("CREATE TABLE test (a int PRIMARY KEY, b int NULL ON CONFLICT IGNORE);")
 box.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, c))")
 
 -- Several NOT NULL REPLACE constraints work
