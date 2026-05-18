@@ -120,6 +120,20 @@ g.test_duplicate_function = function(cg)
     end)
 end
 
+--
+-- gh-12701: remove the non-working ON CONFLICT clause for the NULL property
+-- in the column definition in the CREATE TABLE statement.
+--
+g.test_12701_remove_on_conflict_for_null = function(cg)
+    cg.server:exec(function()
+        local sql = [[
+            CREATE TABLE t(i INT PRIMARY KEY, a INT NULL ON CONFLICT ABORT);
+        ]]
+        local _, err = box.execute(sql)
+        t.assert_str_contains(err.message, "keyword 'ON' is reserved.")
+    end)
+end
+
 g = t.group("drop_table", {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_all(function(cg)
