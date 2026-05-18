@@ -309,11 +309,8 @@ ccons ::= DEFAULT MINUS(A) number(X). {
 // In addition to the type name, we also care about the primary key and
 // UNIQUE constraints.
 //
-ccons ::= NULL onconf(R).        {
+ccons ::= NULL.        {
     sql_column_add_nullable_action(pParse, ON_CONFLICT_ACTION_NONE);
-    /* Trigger nullability mismatch error if required. */
-    if (R != ON_CONFLICT_ACTION_ABORT)
-        sql_column_add_nullable_action(pParse, R);
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
 ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {

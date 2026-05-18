@@ -103,3 +103,17 @@ g.test_4422_allow_specify_engine_in_create_table = function(cg)
         t.assert_equals(tostring(err), exp_err)
     end)
 end
+
+--
+-- gh-12701: remove the non-working ON CONFLICT clause for the NULL property
+-- in the column definition in the CREATE TABLE statement.
+--
+g.test_12701_remove_on_conflict_for_null = function(cg)
+    cg.server:exec(function()
+        local sql = [[
+            CREATE TABLE t(i INT PRIMARY KEY, a INT NULL ON CONFLICT ABORT);
+        ]]
+        local _, err = box.execute(sql)
+        t.assert_str_contains(err.message, "keyword 'ON' is reserved.")
+    end)
+end
