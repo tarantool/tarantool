@@ -1644,8 +1644,11 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	nStr = argv[0].n;
 	zPattern = (const unsigned char *)argv[1].z;
 	nPattern = argv[1].n;
-	if (nPattern == 0) {
-		if (mem_copy(context->pOut, &argv[0]) != 0)
+	if (nPattern == 0 || nPattern > nStr) {
+		/* Copy string if it is not empty. */
+		if (nStr == 0)
+			mem_set_str_static(context->pOut, "", 0);
+		else if (mem_copy(context->pOut, &argv[0]) != 0)
 			context->is_aborted = true;
 		return;
 	}
