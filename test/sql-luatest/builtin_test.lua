@@ -24,3 +24,15 @@ g.test_segfault_in_replace = function(cg)
         t.assert_equals(res.rows, {{'a'}})
     end)
 end
+
+--
+-- ghs-161: The PRINTF built-in function could have an integer overflow.
+--
+g.test_integer_overflow_in_printf = function(cg)
+    cg.server:exec(function()
+        local exp = "Failed to execute SQL statement: string or blob too big"
+        local sql = [[SELECT LENGTH(PRINTF('%2200000000s', 'a'));]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, exp)
+    end)
+end
