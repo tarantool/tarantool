@@ -289,10 +289,19 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 		} else {
 			unsigned wx = 0;
 			while (c >= '0' && c <= '9') {
-				wx = wx * 10 + c - '0';
+				/*
+				 * If we know that we will get a value greater
+				 * than SQL_MAX_LENGTH, we replace it with
+				 * SQL_MAX_LENGTH + 1. This is done to prevent
+				 * integer overflow.
+				 */
+				if (wx > 0 && SQL_MAX_LENGTH / wx < 10)
+					wx = SQL_MAX_LENGTH + 1;
+				else
+					wx = wx * 10 + c - '0';
 				c = *++fmt;
 			}
-			width = wx & 0x7fffffff;
+			width = wx;
 		}
 		assert(width >= 0);
 
