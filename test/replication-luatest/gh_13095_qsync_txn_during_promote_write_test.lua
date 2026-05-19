@@ -80,7 +80,7 @@ g.after_each(function(cg)
     cg.replica_set:drop()
 end)
 
-g.test_txn_during_promote_write = function(cg)
+g.test_txn_during_promote_confirm = function(cg)
     -- Freeze the CONFIRM writing on node 1, so the first transaction stays in
     -- the queue even after gathering the quorum.
     cg.node1:exec(function()
@@ -118,36 +118,47 @@ g.test_txn_during_promote_write = function(cg)
         f:set_joinable(true)
         rawset(_G, 'promote_fiber', f)
     end)
-    cg.node1:exec(function(lsn)
-        --
-        -- Let the WAL writes (the election term and vote bumps) through one
-        -- by one until the one made under the limbo latch is reached - that
-        -- is the PROMOTE of the new leader.
-        --
-        -- Note that the CONFIRM from the beginning of this test is still
-        -- blocked. The limbo worker isn't processing anything right now.
-        --
+    --
+    -- Let the WAL writes (the election term and vote bumps) through one by
+    -- one until the one made under the limbo latch is reached - that is the
+    -- PROMOTE of the new leader.
+    --
+    -- Note that the CONFIRM from the beginning of this test is still blocked.
+    -- The limbo worker isn't processing anything right now.
+    --
+    cg.node1:play_wal_until_synchro_queue_is_busy()
+    -- The PROMOTE doesn't decide the fate of the queued transactions - it only
+    -- becomes pending, and takes effect later via its CONFIRM, once it gathers
+    -- a quorum. Hence the queue is not fenced for its write. Let it through,
+    -- keeping the next writes caught.
+    cg.node1:exec(function(lsn, node2_id)
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
         t.helpers.retrying({timeout = 60}, function()
-            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
-            if box.info.synchro.queue.busy then
-                return
-            end
-            box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-            box.error.injection.set('ERRINJ_WAL_DELAY', false)
-            t.fail('Not the synchro request write yet')
+            local node = box.info.synchro.nodes[node2_id]
+            t.assert_not_equals(node, nil)
+            t.assert_not_equals(node.promote, nil)
         end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        t.assert_equals(box.info.lsn, lsn)
+    end, {lsn, cg.node2:get_instance_id()})
+    -- The next synchro request is the CONFIRM of that PROMOTE - node 2 got the
+    -- quorum on it. This is the write which decides the fates, and the queue
+    -- is fenced off for its time.
+    cg.node1:play_wal_until_synchro_queue_is_busy()
+    cg.node1:exec(function(lsn)
         -- Give the parked transaction 2 a reason to wake up in the middle of
-        -- the PROMOTE write: raise the max size, which on its own doesn't
+        -- the CONFIRM write: raise the max size, which on its own doesn't
         -- wake anybody up, and then poke the queue with a synchro parameter
         -- change, which does.
         box.cfg{replication_synchro_queue_max_size = 1024 * 1024}
         box.cfg{replication_synchro_timeout = 59}
         _G.fiber.sleep(0.1)
         -- The transaction must not have gone to the journal while the
-        -- PROMOTE is in progress.
+        -- CONFIRM is in progress.
         t.assert_equals(box.info.synchro.queue.len, 1)
         t.assert_equals(box.info.lsn, lsn)
-        -- Release the PROMOTE.
+        -- Release the CONFIRM.
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', -1)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
     end, {lsn})
@@ -171,4 +182,102 @@ g.test_txn_during_promote_write = function(cg)
         t.assert_equals(box.info.synchro.queue.owner, node2_id)
         t.assert_equals(box.space.s:select(), {{1}})
     end, {lsn, cg.node2:get_instance_id()})
+end
+
+--
+-- The PROMOTE itself doesn't decide the fate of the queued transactions. It
+-- only becomes pending and takes effect later via its CONFIRM. Until then the
+-- transactions keep flowing under the old owner, the parked ones included. The
+-- ones getting into the journal after the PROMOTE row are rolled back by its
+-- CONFIRM - at runtime, on the new leader, and on the local recovery.
+--
+g.test_txn_during_promote_before_confirm = function(cg)
+    cg.node1:exec(function()
+        box.error.injection.set('ERRINJ_TXN_LIMBO_WORKER_DELAY', true)
+    end)
+    -- Transaction 1 - is written to the WAL of both nodes and fills the queue
+    -- up to its max size.
+    local lsn = cg.node1:exec(function()
+        local lsn = box.info.lsn
+        local f = _G.fiber.create(function() box.space.s:replace{1} end)
+        f:set_joinable(true)
+        rawset(_G, 'txn1_fiber', f)
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_gt(box.info.lsn, lsn)
+        end)
+        return box.info.lsn
+    end)
+    cg.node2:wait_for_vclock_of(cg.node1)
+    -- Transaction 2 - parks on the full queue.
+    cg.node1:exec(function(lsn)
+        local f = _G.fiber.create(function() box.space.s:replace{2} end)
+        f:set_joinable(true)
+        rawset(_G, 'txn2_fiber', f)
+        t.assert_equals(box.info.lsn, lsn)
+        t.assert_equals(box.info.synchro.queue.len, 1)
+        -- Catch the coming WAL writes.
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+    end, {lsn})
+    cg.node2:exec(function()
+        local f = require('fiber').create(function() box.ctl.promote() end)
+        f:set_joinable(true)
+        rawset(_G, 'promote_fiber', f)
+    end)
+    cg.node1:play_wal_until_synchro_queue_is_busy()
+    -- Wake the parked transaction 2 up in the middle of the PROMOTE write. The
+    -- queue is not fenced, so the transaction proceeds to the journal, right
+    -- behind the PROMOTE.
+    cg.node1:exec(function(lsn)
+        box.cfg{replication_synchro_queue_max_size = 1024 * 1024}
+        box.cfg{replication_synchro_timeout = 59}
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_equals(box.info.synchro.queue.len, 2)
+        end)
+        -- Not written yet - the WAL is still blocked.
+        t.assert_equals(box.info.lsn, lsn)
+        -- Release the PROMOTE and the transaction behind it.
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', -1)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_gt(box.info.lsn, lsn)
+        end)
+    end, {lsn})
+    cg.node2:exec(function()
+        local ok, err = rawget(_G, 'promote_fiber'):join(60)
+        t.assert_equals(err, nil)
+        t.assert(ok)
+    end)
+    -- The PROMOTE's CONFIRM commits the first transaction and rolls the second
+    -- one back, even though it is in the journal already.
+    cg.node1:exec(function(node2_id)
+        local ok, err = rawget(_G, 'txn1_fiber'):join(60)
+        t.assert_equals(err, nil)
+        t.assert(ok)
+        ok, err = rawget(_G, 'txn2_fiber'):join(60)
+        t.assert_not(ok)
+        t.assert_equals(err.code, box.error.SYNC_ROLLBACK)
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.info.synchro.queue.owner, node2_id)
+        t.assert_equals(box.space.s:select(), {{1}})
+    end, {cg.node2:get_instance_id()})
+    -- The new leader doesn't commit it either. Depending on the timing, it
+    -- either applies and rolls it back, or nopifies it right away.
+    cg.node2:wait_for_vclock_of(cg.node1)
+    cg.node2:exec(function()
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.space.s:select(), {{1}})
+    end)
+    -- The local recovery replays the same sequence and comes to the same
+    -- result, instead of resurrecting the transaction. The frozen limbo
+    -- worker doesn't react to the fiber cancellation, so it has to be
+    -- unfrozen first, or the shutdown would hang.
+    cg.node1:exec(function()
+        box.error.injection.set('ERRINJ_TXN_LIMBO_WORKER_DELAY', false)
+    end)
+    cg.node1:restart()
+    cg.node1:exec(function(node2_id)
+        t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.info.synchro.queue.owner, node2_id)
+        t.assert_equals(box.space.s:select(), {{1}})
+    end, {cg.node2:get_instance_id()})
 end

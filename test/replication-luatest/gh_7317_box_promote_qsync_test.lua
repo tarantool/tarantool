@@ -41,29 +41,48 @@ g.after_each(function(cg)
     cg.replica_set:drop()
 end)
 
-local function block_server_on_box_wait_limbo_acked(server)
+--
+-- Make the server start a promotion which can't finish. It wins the elections
+-- and writes its PROMOTE, but the PROMOTE confirms a pending transaction, so
+-- it needs the synchro quorum, which is unreachable.
+--
+local function block_server_on_promote_quorum(server)
     server:exec(function()
-        local wait_quorum_count =
-            box.error.injection.get('ERRINJ_WAIT_QUORUM_COUNT')
         box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
         t.assert_equals(box.info.synchro.queue.len, 1)
         box.cfg{election_mode = 'manual'}
-        require('fiber').new(function()
+        local f = require('fiber').new(function()
             box.ctl.demote()
-            box.ctl.promote()
+            local ok, err = pcall(box.ctl.promote)
+            return {ok, err}
         end)
+        f:set_joinable(true)
+        rawset(_G, 'promote_fiber', f)
         t.helpers.retrying({timeout = 120}, function()
-            t.assert_gt(box.error.injection.get('ERRINJ_WAIT_QUORUM_COUNT'),
-                        wait_quorum_count)
+            t.assert_not_equals(box.info.synchro.own_promote, nil)
         end)
+        t.assert_equals(box.info.synchro.queue.len, 1)
     end)
 end
 
--- This test covers the `box_wait_limbo_acked` failure path.
-g.test_wait_limbo_acked_failure = function(cg)
+-- Join the promotion started by block_server_on_promote_quorum(), expecting it
+-- to fail with the given error code.
+local function join_failed_promote(server, code)
+    server:exec(function(code)
+        local ok, res = rawget(_G, 'promote_fiber'):join(120)
+        t.assert(ok)
+        local promote_ok, promote_err = unpack(res)
+        t.assert_not(promote_ok)
+        t.assert_equals(promote_err.code, code)
+    end, {code})
+end
+
+-- The own PROMOTE's quorum wait is interrupted by another instance's promotion,
+-- which takes the queue over.
+g.test_promote_quorum_wait_interrupted_by_promote = function(cg)
     t.tarantool.skip_if_not_debug()
 
-    block_server_on_box_wait_limbo_acked(cg.replica1)
+    block_server_on_promote_quorum(cg.replica1)
 
     local term = cg.replica1:get_synchro_queue_term()
 
@@ -73,38 +92,35 @@ g.test_wait_limbo_acked_failure = function(cg)
         box.ctl.wait_rw()
     end)
 
+    -- The new leader's PROMOTE covers the pending transaction and drops the
+    -- old leader's own promotion.
     cg.replica1:exec(function(term)
         t.helpers.retrying({timeout = 120}, function()
             t.assert_gt(box.info.synchro.queue.term, term)
         end)
         t.assert_equals(box.info.synchro.queue.len, 0)
+        t.assert_equals(box.info.synchro.own_promote, nil)
     end, {term})
+    join_failed_promote(cg.replica1, box.error.INTERFERING_ELECTIONS)
 
+    -- The replication keeps working after the failed promotion.
     cg.replica2:exec(function()
         box.cfg{replication_synchro_quorum = 3}
         box.atomic({wait = 'submit'}, function() box.space.s:replace{0} end)
         t.assert_equals(box.info.synchro.queue.len, 1)
     end)
-
     cg.replica1:exec(function()
         t.helpers.retrying({timeout = 120}, function()
             t.assert_equals(box.info.synchro.queue.len, 1)
         end)
-
-        box.cfg{replication_synchro_quorum = 2}
-    end)
-
-    local msg = "Instance with replica id %d was promoted first"
-    t.helpers.retrying({timeout = 120}, function()
-        t.assert(cg.replica1:grep_log(msg))
     end)
 end
 
--- This test covers the `raft->state != RAFT_STATE_LEADER` check path.
-g.test_is_leader_check = function(cg)
+-- The own PROMOTE's quorum wait is interrupted by losing the leadership.
+g.test_promote_quorum_wait_interrupted_by_elections = function(cg)
     t.tarantool.skip_if_not_debug()
 
-    block_server_on_box_wait_limbo_acked(cg.replica1)
+    block_server_on_promote_quorum(cg.replica1)
 
     local term = cg.replica1:get_election_term()
 
@@ -114,34 +130,35 @@ g.test_is_leader_check = function(cg)
         end)
     end)
 
+    -- The new leader's PROMOTE stays pending too - the quorum is unreachable
+    -- for it as well. The old leader's transaction stays in the queue.
     cg.replica1:exec(function(term)
         t.helpers.retrying({timeout = 120}, function()
             t.assert_gt(box.info.election.term, term)
         end)
         t.assert_equals(box.info.synchro.queue.len, 1)
-
-        box.cfg{replication_synchro_quorum = 2}
     end, {term})
-
-    local msg = "The instance is not a leader. New leader is %d"
-    t.helpers.retrying({timeout = 120}, function()
-        t.assert(cg.replica1:grep_log(msg))
-    end)
+    join_failed_promote(cg.replica1, box.error.INTERFERING_ELECTIONS)
 end
 
--- This test covers the `box_issue_promote` failure path.
-g.test_box_issue_promote_failure = function(cg)
+-- The PROMOTE preparation fails, because the elections interfere while the
+-- promotion is waiting for the limbo latch.
+g.test_promote_prepare_interfering_elections = function(cg)
     t.tarantool.skip_if_not_debug()
-
-    block_server_on_box_wait_limbo_acked(cg.replica1)
 
     cg.replica1:exec(function()
         box.error.injection.set("ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN", 0)
-        box.cfg{replication_synchro_quorum = 2}
-
+        box.cfg{election_mode = 'manual'}
+        require('fiber').new(function()
+            box.ctl.demote()
+            box.ctl.promote()
+        end)
+        -- The elections are won, and the promotion is stuck right before
+        -- taking the limbo latch.
         t.helpers.retrying({timeout = 120}, function()
             t.assert(box.error.injection.get("ERRINJ_TXN_LIMBO_BEGIN_DELAY"))
         end)
+        t.assert_equals(box.info.election.state, 'leader')
     end)
 
     local term = cg.replica1:get_election_term()
