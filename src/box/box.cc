@@ -3064,6 +3064,17 @@ box_promote_qsync(void)
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
+	/*
+	 * XXX: with the elections disabled the votes can't guard the promotion,
+	 * and the election quorum is just 1. Hence the legacy protocol: the
+	 * transactions get their quorums collected before the PROMOTE, and the
+	 * PROMOTE itself doesn't wait for anything.
+	 *
+	 * Still, this scenario is broken even with the preliminary waiting, and
+	 * is expected to be deleted eventually.
+	 */
+	if (box_election_mode == ELECTION_MODE_OFF)
+		return txn_limbo_promote_legacy(&txn_limbo, TIMEOUT_INFINITY);
 	return txn_limbo_promote(&txn_limbo, TIMEOUT_INFINITY);
 }
 
@@ -3079,50 +3090,6 @@ box_check_promote(void) {
 			 "manual elections");
 		return -1;
 	}
-	return 0;
-}
-
-/**
- * Wait until this instance claims the limbo. Usually it means the node
- * becomes writable, but not necessarily. It might, for example, have
- * box.cfg.read_only = true and still claim the limbo successfully.
- */
-static int
-box_wait_for_limbo_claim(struct raft *raft)
-{
-	assert(is_box_configured);
-	double deadline = ev_monotonic_now(loop()) +
-		replication_synchro_timeout;
-	bool is_timed_out = false;
-	while (txn_limbo.state != TXN_LIMBO_STATE_LEADER) {
-		if (raft->state != RAFT_STATE_LEADER) {
-			diag_set(ClientError, ER_INTERFERING_ELECTIONS);
-			return -1;
-		}
-		if (fiber_is_cancelled()) {
-			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (is_timed_out) {
-			diag_set(TimedOut);
-			return -1;
-		}
-		/*
-		 * Raft updates are covered by the limbo updates. Enough to
-		 * subscribe to the latter to get notified about the former too.
-		 */
-		struct trigger on_state_update;
-		trigger_create(&on_state_update, fiber_wakeup_trigger_cb,
-			       fiber(), NULL);
-		trigger_add(&txn_limbo.on_state_update, &on_state_update);
-		/*
-		 * Even if timed out, firstly check the limbo and raft states -
-		 * perhaps they are right already.
-		 */
-		is_timed_out = fiber_yield_deadline(deadline);
-		trigger_clear(&on_state_update);
-	}
-	assert(raft->state == RAFT_STATE_LEADER);
 	return 0;
 }
 
@@ -3149,7 +3116,13 @@ box_promote(void)
 	if (box_raft_try_promote() != 0)
 		return -1;
 	assert(raft->state == RAFT_STATE_LEADER);
-	return box_wait_for_limbo_claim(raft);
+	/*
+	 * The Raft worker writes the PROMOTE. Wait for the claim: it doesn't
+	 * depend on the instance's writability, box.cfg.read_only = true can
+	 * still claim the limbo successfully.
+	 */
+	double deadline = ev_monotonic_now(loop()) + replication_synchro_timeout;
+	return txn_limbo_wait_for_claim(&txn_limbo, raft->term, deadline);
 }
 
 int
