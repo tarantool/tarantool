@@ -3063,6 +3063,17 @@ box_promote_qsync(void)
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
+	/*
+	 * XXX: with the elections disabled the votes can't guard the promotion,
+	 * and the election quorum is just 1. Hence the legacy protocol: the
+	 * transactions get their quorums collected before the PROMOTE, and the
+	 * PROMOTE itself doesn't wait for anything.
+	 *
+	 * Still, this scenario is broken even with the preliminary waiting, and
+	 * is expected to be deleted eventually.
+	 */
+	if (box_election_mode == ELECTION_MODE_OFF)
+		return txn_limbo_promote_legacy(&txn_limbo, TIMEOUT_INFINITY);
 	return txn_limbo_promote(&txn_limbo, TIMEOUT_INFINITY);
 }
 

@@ -503,9 +503,17 @@ send_join_meta(struct xstream *stream, const struct box_checkpoint *ckpt)
 	xstream_write(stream, &row);
 
 	char body[XROW_BODY_LEN_MAX];
-	xrow_encode_synchro(&row, body, &ckpt->limbo);
-	row.replica_id = ckpt->limbo.queue_owner_id;
+	const struct txn_limbo_checkpoint *limbo = &ckpt->limbo;
+	xrow_encode_synchro(&row, body, &limbo->state);
+	row.replica_id = limbo->state.origin_id;
 	xstream_write(stream, &row);
+	for (const struct synchro_request *req = limbo->promote_list;
+	     req->type != 0; req++) {
+		assert(req->type == IPROTO_RAFT_PROMOTE);
+		xrow_encode_synchro(&row, body, req);
+		row.replica_id = req->origin_id;
+		xstream_write(stream, &row);
+	}
 }
 
 void
