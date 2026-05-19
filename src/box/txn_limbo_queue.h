@@ -199,6 +199,14 @@ txn_limbo_queue_age(struct txn_limbo_queue *queue);
 struct txn_limbo_entry *
 txn_limbo_queue_last_synchro_entry(struct txn_limbo_queue *queue);
 
+/**
+ * The last synchronous transaction in the queue which was sent to the journal,
+ * i.e. is not volatile. Its WAL write might still be in progress. NULL when
+ * there is no such transaction.
+ */
+struct txn_limbo_entry *
+txn_limbo_queue_last_written_synchro_entry(struct txn_limbo_queue *queue);
+
 /** See if submission to the queue would yield if done right now. */
 bool
 txn_limbo_queue_would_block(struct txn_limbo_queue *queue);

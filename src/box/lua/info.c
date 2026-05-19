@@ -742,6 +742,58 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "confirm_lag");
 	lua_setfield(L, -2, "queue");
 
+#ifndef NDEBUG
+	/*
+	 * Extended introspection of the limbo internals. Debug-only, so it can
+	 * expose very internal things, and add/remove fields without caring
+	 * about backward compatibility.
+	 */
+	luaT_pushvclock(L, &queue->confirmed_vclock);
+	lua_setfield(L, -2, "confirmed_vclock");
+	struct vclock term_map;
+	vclock_create(&term_map);
+	for (uint32_t i = 0; i < VCLOCK_MAX; ++i) {
+		uint64_t term = limbo->nodes[i].latest_term;
+		if (term != 0)
+			vclock_reset(&term_map, i, term);
+	}
+	luaT_pushvclock(L, &term_map);
+	lua_setfield(L, -2, "term_map");
+	lua_createtable(L, 0, 0);
+	for (uint32_t i = 0; i < VCLOCK_MAX; ++i) {
+		const struct txn_limbo_node *n = &limbo->nodes[i];
+		const struct txn_limbo_promote_entry *p = &n->pending;
+		if (n->latest_term == 0 && p->raft_term == 0)
+			continue;
+		lua_createtable(L, 0, 2);
+		luaL_pushuint64(L, n->latest_term);
+		lua_setfield(L, -2, "term");
+		if (p->raft_term != 0) {
+			lua_createtable(L, 0, 5);
+			luaL_pushuint64(L, p->raft_term);
+			lua_setfield(L, -2, "term");
+			lua_pushnumber(L, p->queue_owner_id);
+			lua_setfield(L, -2, "owner");
+			luaL_pushint64(L, p->confirm_lsn);
+			lua_setfield(L, -2, "lsn");
+			luaT_pushvclock(L, &p->confirmed_vclock);
+			lua_setfield(L, -2, "confirmed_vclock");
+			luaT_pushvclock(L, &p->term_map);
+			lua_setfield(L, -2, "term_map");
+			lua_setfield(L, -2, "promote");
+		}
+		lua_rawseti(L, -2, i);
+	}
+	lua_setfield(L, -2, "nodes");
+	if (limbo->own_promote.journal_lsn != 0) {
+		lua_createtable(L, 0, 2);
+		luaL_pushint64(L, limbo->own_promote.journal_lsn);
+		lua_setfield(L, -2, "lsn");
+		luaT_pushvclock(L, &limbo->own_promote.acks);
+		lua_setfield(L, -2, "acks");
+		lua_setfield(L, -2, "own_promote");
+	}
+#endif
 	return 1;
 }
 
