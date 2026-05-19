@@ -40,6 +40,14 @@ extern "C" {
 struct raft;
 struct synchro_request;
 
+/** Per-instance limbo state, indexed by replica id. */
+struct txn_limbo_node {
+	/**
+	 * Biggest PROMOTE/DEMOTE term ever applied from this instance.
+	 */
+	uint64_t latest_term;
+};
+
 /** Limbo state. */
 enum txn_limbo_state {
 	/**
@@ -91,12 +99,11 @@ struct txn_limbo {
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
-	 * Latest terms received with PROMOTE entries from remote instances.
-	 * Limbo uses them to filter out the transactions coming not from the
-	 * limbo owner, but so outdated that they are rolled back everywhere
-	 * except outdated nodes.
+	 * Per-instance state. Limbo uses it to filter out the transactions
+	 * coming not from the limbo owner, but so outdated that they are
+	 * rolled back everywhere except outdated nodes.
 	 */
-	struct vclock promote_term_map;
+	struct txn_limbo_node nodes[VCLOCK_MAX];
 	/**
 	 * The biggest PROMOTE term seen by the instance and persisted in WAL.
 	 * It is related to raft term, but not the same. Synchronous replication
@@ -225,7 +232,8 @@ txn_limbo_would_block(struct txn_limbo *limbo);
 static inline uint64_t
 txn_limbo_replica_term(const struct txn_limbo *limbo, uint32_t replica_id)
 {
-	return vclock_get(&limbo->promote_term_map, replica_id);
+	assert(replica_id < VCLOCK_MAX);
+	return limbo->nodes[replica_id].latest_term;
 }
 
 /**

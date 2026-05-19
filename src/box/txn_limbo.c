@@ -305,7 +305,6 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 	rlist_create(&limbo->on_state_update);
 	limbo->is_in_recovery = true;
 	txn_limbo_queue_create(&limbo->queue);
-	vclock_create(&limbo->promote_term_map);
 	latch_create(&limbo->state_latch);
 	limbo->svp_confirmed_lsn = -1;
 	limbo->raft = raft;
@@ -1046,7 +1045,7 @@ txn_limbo_req_commit_promote_demote(struct txn_limbo *limbo,
 	uint64_t term = req->promote.term;
 	uint32_t origin = req->origin_id;
 	if (txn_limbo_replica_term(limbo, origin) < term) {
-		vclock_follow(&limbo->promote_term_map, origin, term);
+		limbo->nodes[origin].latest_term = term;
 		if (term > limbo->term)
 			limbo->term = term;
 	}
