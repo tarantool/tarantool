@@ -53,7 +53,7 @@ enum {
 	XROW_BODY_IOVMAX = 2,
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
 	XROW_HEADER_LEN_MAX = 52,
-	XROW_BODY_LEN_MAX = 512,
+	XROW_BODY_LEN_MAX = 1024,
 	IPROTO_HEADER_LEN = 32,
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
@@ -387,6 +387,22 @@ struct synchro_request {
 			uint64_t term;
 			/** Confirmed lsns of all the previous limbo owners. */
 			struct vclock confirmed_vclock;
+			/**
+			 * Latest known PROMOTE/DEMOTE term per instance from
+			 * the PoV of the entry's author. Empty only for legacy
+			 * entries written by older Tarantool versions.
+			 */
+			struct vclock term_map;
+			/**
+			 * If set, the PROMOTE is applied only after gathering
+			 * a quorum of acks for it and persisting that fact in
+			 * a CONFIRM. Travels in the request body under
+			 * IPROTO_FLAGS. It can't use the xrow_header flags -
+			 * those get reset when a replica writes a received
+			 * row into its own WAL, and further relaying of the
+			 * row would lose the flag.
+			 */
+			bool wait_ack;
 		} promote;
 		struct {
 			/** Confirm all txns having LSN <= this one. */

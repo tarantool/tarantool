@@ -239,6 +239,13 @@ extern const char *iproto_flag_bit_strs[];
 	  * true and CHECKPOINT_VCLOCK to be set.
 	  */								\
 	 _(CHECKPOINT_LSN, 0x64, MP_UINT)				\
+	 /**
+	  * A map of replica_id -> term, attached to a PROMOTE entry, with
+	  * the latest known PROMOTE/DEMOTE terms per instance from the PoV
+	  * of the PROMOTE author. Receivers use it to catch up the per-
+	  * instance latest term when applying a chained PROMOTE.
+	  */								\
+	 _(TERM_MAP, 0x65, MP_MAP)					\
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

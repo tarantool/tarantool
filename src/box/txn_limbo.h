@@ -40,12 +40,138 @@ extern "C" {
 struct raft;
 struct synchro_request;
 
+/**
+ * A pending PROMOTE entry, waiting until its own CONFIRM is applied.
+ *
+ * PROMOTE is technically a "transaction" in vanilla Raft terms. Indeed - this
+ * is the first thing made by a new leader once it gets elected, it needs a
+ * quorum, and must write CONFIRM later.
+ *
+ * The unusual thing about this transaction is that 1) no new normal
+ * transactions are allowed until this one is confirmed, 2) the "data" of this
+ * transaction is:
+ * - The term bump for the new owner.
+ * - The new owner ID.
+ * - The confirmed LSN bump for the old owner, to finalize the transactions of
+ *   the previous term.
+ *
+ * Even more unusual is that these "transactions" can still form a queue, like
+ * normal transactions, and the queue might even contain more than 1 entry from
+ * the same node (with different terms).
+ *
+ * The limbo however doesn't store such queue. The problem is that PROMOTEs can
+ * be generated in a real cluster potentially for unlimited amount of time
+ * without any of them getting confirmed. This would create an unbounded queue
+ * of PROMOTE transactions right in-memory, leading to OOM (unlikely but
+ * possible).
+ *
+ * Nonetheless the limbo manages to "compact" this queue in O(1) space, while
+ * keeping the effects of confirmation of any number of PROMOTEs in this
+ * non-existing queue.
+ *
+ * The main idea is that applying any N number of transactions is identical to
+ * applying a single transaction bringing the dataset to the same state in one
+ * go.
+ *
+ * The dataset here means the limbo state. Each single PROMOTE must change a few
+ * attributes of the limbo + potentially confirm and rollback some txns by a
+ * single provided border LSN.
+ *
+ * ## The term bumps
+ *
+ * Number N of PROMOTEs bumping terms by replica_ids is identical to just having
+ * one promote bumping all the needed terms in one go, from a single map of
+ * {node[id] = term}, whose size is limited by VCLOCK_MAX. Lets then make each
+ * squashed PROMOTE carry its own term bump merged with the term bumps of the
+ * previous squashed PROMOTE. The effect of the new one will include the effect
+ * of all the previous ones inductively.
+ *
+ * This is the `term_map` member below. And the `raft_term` field is the latest
+ * of the terms.
+ *
+ * ## The owner ID setting
+ *
+ * When N number of PROMOTEs assign the limbo owner ID, one by one, the final
+ * result is anyway what the newest PROMOTE says. So it is enough to assign the
+ * current instance ID in the new squashed PROMOTE, ignoring the owners of the
+ * previous PROMOTEs.
+ *
+ * This is the `origin_id`, used as an index in the map of squashed PROMOTEs.
+ *
+ * ## The confirmed LSN
+ *
+ * PROMOTE(queue_owner_id, confirm_lsn) means that if the currently confirmed
+ * owner of the limbo matches this PROMOTE's queue_owner_id, then it must
+ * apply all txns having LSN <= the confirmed one, and rollback the newer ones.
+ *
+ * If the owner doesn't match (can happen in some cases when this PROMOTE isn't
+ * the first one in the chain already). Then all txns are rolled back.
+ *
+ * Easy to see, that if there is a chain of PROMOTEs, then the first one of them
+ * will leave the limbo empty, either way. This means the new squashed PROMOTE
+ * must inherit the confirmation LSN from the first PROMOTE in the chain. This
+ * is done inductively as well.
+ *
+ * The map of confirmed {node[id] = lsn} though must still be updated with all
+ * the PROMOTEs in the confirmed chain. They are easy to merge into a single
+ * accumulative vclock.
+ *
+ * This is the `confirmed_vclock` field.
+ */
+struct txn_limbo_promote_entry {
+	/**
+	 * Raft term claimed by this PROMOTE. Zero means the slot holds no
+	 * pending PROMOTE - a valid one always has a non-zero term.
+	 */
+	uint64_t raft_term;
+	/**
+	 * The previous limbo owner. Their pending transactions will be
+	 * confirmed up to confirm_lsn when this PROMOTE is applied.
+	 */
+	uint32_t queue_owner_id;
+	/** Up to which queue_owner_id's transactions this PROMOTE confirms. */
+	int64_t confirm_lsn;
+	/**
+	 * Confirmed vclock the limbo will inherit when this PROMOTE is
+	 * applied. Accumulates all the previous confirmed LSNs from the chain
+	 * of confirmed PROMOTEs since this replicaset's bootstrap.
+	 */
+	struct vclock confirmed_vclock;
+	/**
+	 * Confirmed term bumps from all the nodes in the replicaset. This map
+	 * exists, because term bumps are sent as separate entries, not with
+	 * each transaction. So the terms of all nodes must be explicitly stored
+	 * and updated in memory. Accumulates all the previous term bumps from
+	 * the chain of confirmed PROMOTEs since this replicaset's bootstrap.
+	 */
+	struct vclock term_map;
+};
+
 /** Per-instance limbo state, indexed by replica id. */
 struct txn_limbo_node {
 	/**
 	 * Biggest PROMOTE/DEMOTE term ever applied from this instance.
 	 */
 	uint64_t latest_term;
+	/** Latest known pending PROMOTE from this instance, if any. */
+	struct txn_limbo_promote_entry pending;
+};
+
+/**
+ * State of this instance's own pending PROMOTE, kept while it gathers quorum
+ * and waits for its CONFIRM. Zeroed when there is no own pending PROMOTE.
+ *
+ * This technically could be stored in the node's promote entry member, but this
+ * would be a lot of unnecessary data, because this node is really only
+ * interested in confirming its own pending PROMOTE.
+ */
+struct txn_limbo_promote_state {
+	/** Journal LSN at which the own PROMOTE was written. */
+	int64_t journal_lsn;
+	/** Per-replica acked LSNs to track quorum of the pending PROMOTE. */
+	struct vclock acks;
+	/** Trigger to track replication acks. */
+	struct trigger on_ack;
 };
 
 /** Limbo state. */
@@ -99,24 +225,24 @@ struct txn_limbo {
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
-	 * Per-instance state. Limbo uses it to filter out the transactions
-	 * coming not from the limbo owner, but so outdated that they are
-	 * rolled back everywhere except outdated nodes.
+	 * Per-instance state. Tracks latest known control commands coming from
+	 * each node. It is in turn used for transaction filtering, split-brain
+	 * detection, pending PROMOTEs tracking.
 	 */
 	struct txn_limbo_node nodes[VCLOCK_MAX];
 	/**
-	 * The biggest PROMOTE term seen by the instance and persisted in WAL.
-	 * It is related to raft term, but not the same. Synchronous replication
-	 * represented by the limbo is interested only in the won elections
-	 * ended with PROMOTE request.
+	 * The biggest confirmed PROMOTE term seen by the instance and persisted
+	 * in WAL. It is related to raft term, but not the same. Synchronous
+	 * replication represented by the limbo is interested only in the won
+	 * elections ended with a confirmed PROMOTE request.
 	 *
 	 * It means the limbo's term might be smaller than the raft term, while
 	 * there are ongoing elections, or the leader is already known and this
-	 * instance hasn't read its PROMOTE request yet.
+	 * instance hasn't read its confirmed PROMOTE request yet.
 	 *
-	 * It can also be bigger than raft's term in case the limbo has received
-	 * and persisted a PROMOTE request before raft's own messages are
-	 * delivered.
+	 * It can also be bigger than raft's term in case the limbo has
+	 * received, persisted, and confirmed a PROMOTE request before raft's
+	 * own messages are delivered.
 	 *
 	 * During other times the limbo and raft are in sync and the terms are
 	 * the same.
@@ -142,11 +268,6 @@ struct txn_limbo {
 	 */
 	bool is_in_rollback;
 	/**
-	 * If there is an ongoing PROMOTE being applied. It is not immediate at
-	 * least because it needs to be written into the journal.
-	 */
-	bool is_transition_in_progress;
-	/**
 	 * If the limbo is being recovered right now and isn't serving new
 	 * requests. Only re-applying old ones. This is used in order to
 	 * distinguish between old and new promotion.
@@ -158,11 +279,8 @@ struct txn_limbo {
 	 * since its restart.
 	 */
 	bool saw_promote;
-	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
-	 */
-	int64_t svp_confirmed_lsn;
+	/** Bookkeeping for our own pending PROMOTE waiting for quorum. */
+	struct txn_limbo_promote_state own_promote;
 	/**
 	 * Whether this instance validates incoming synchro requests. When the
 	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
