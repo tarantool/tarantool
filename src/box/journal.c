@@ -85,6 +85,9 @@ diag_set_journal_res_detailed(const char *file, unsigned line, int64_t res)
 	case JOURNAL_ENTRY_ERR_CASCADE:
 		diag_set_detailed(file, line, ClientError, ER_CASCADE_ROLLBACK);
 		return;
+	case JOURNAL_ENTRY_ERR_CANCELLED:
+		diag_set_detailed(file, line, FiberIsCancelled);
+		return;
 	}
 	panic("Journal result code %lld can't be converted to an error "
 	      "at %s:%u", (long long)res, file, line);
