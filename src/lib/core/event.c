@@ -15,10 +15,10 @@
 #include "say.h"
 
 /** Registry of all events: name -> event. */
-static struct mh_strnptr_t *event_registry;
+static __thread struct mh_strnptr_t *event_registry;
 
 /** Internal triggers fired on event change. */
-RLIST_HEAD(on_change_triggers);
+static __thread struct rlist on_change_triggers;
 
 /**
  * A named node of the list, containing func_adapter. Every event_trigger is
@@ -400,6 +400,7 @@ void
 event_init(void)
 {
 	event_registry = mh_strnptr_new();
+	rlist_create(&on_change_triggers);
 }
 
 void
