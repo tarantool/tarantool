@@ -200,7 +200,7 @@ end
 --
 g.test_remote_promote_during_local_txn_including_it = function(g)
     -- Start synchro txns on server 1.
-    local fids = g.server1:exec(function()
+    g.server1:exec(function()
         box.ctl.promote()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
@@ -208,8 +208,12 @@ g.test_remote_promote_during_local_txn_including_it = function(g)
             -- To hang own transactions in the synchro queue.
             replication_synchro_quorum = 3,
         }
+    end)
+    g.server2:wait_for_vclock_of(g.server1)
+    local fids = g.server1:exec(function()
         box.error.injection.set('ERRINJ_RELAY_FASTER_THAN_TX', true)
         local fiber = require('fiber')
+        local s = box.space.test
         -- More than one transaction to ensure that it works not just for one.
         local f1 = fiber.new(s.replace, s, {1})
         f1:set_joinable(true)
@@ -289,15 +293,21 @@ end
 --
 g.test_remote_promote_during_local_txn_not_including_it = function(g)
     -- Start a synchro txn on server 1.
-    local fids = g.server1:exec(function()
+    g.server1:exec(function()
         box.ctl.promote()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
         box.cfg{
             replication_synchro_quorum = 3,
         }
+    end)
+    -- Deliver server 1 promotion to 2. Otherwise server 2 might fail trying to
+    -- start its own promotion simultaneously.
+    g.server2:wait_for_vclock_of(g.server1)
+    local fids = g.server1:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', true)
         local fiber = require('fiber')
+        local s = box.space.test
         -- More than one transaction to ensure that it works not just for one.
         local f1 = fiber.new(s.replace, s, {1})
         f1:set_joinable(true)
@@ -305,10 +315,6 @@ g.test_remote_promote_during_local_txn_not_including_it = function(g)
         f2:set_joinable(true)
         return {f1:id(), f2:id()}
     end)
-    -- Deliver server 1 promotion to 2. Otherwise server 2 might fail trying to
-    -- start its own promotion simultaneously.
-    g.server2:wait_for_vclock_of(g.server1)
-
     -- Server 2 sends a PROMOTE not covering the txns to server 1.
     g.server2:exec(function()
         box.cfg{
