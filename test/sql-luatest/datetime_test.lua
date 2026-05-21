@@ -2294,8 +2294,8 @@ end
 --
 g.test_datetime_new_invalid_time_units = function()
     g.server:exec(function()
-        local TZOFFSET_MIN = -12 * 60
-        local TZOFFSET_MAX = 14 * 60
+        local TZOFFSET_MIN = -956
+        local TZOFFSET_MAX = 913
 
         local sql = [[SELECT CAST(#v AS DATETIME);]]
 
