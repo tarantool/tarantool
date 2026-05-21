@@ -16,6 +16,7 @@
 #include "cord_buf.h"
 #include "call.h"
 #include "diag.h"
+#include "event.h"
 #include "fiber.h"
 #include "fiber_pool.h"
 #include "mp_box_ctx.h"
@@ -44,6 +45,7 @@ app_thread_f(void *arg)
 	app_thread_id = (intptr_t)arg;
 	assert(app_thread_id >= 1 && app_thread_id <= app_thread_count);
 	coio_enable();
+	event_init();
 	tuple_init();
 	app_thread_lua_init();
 	struct fiber_pool fiber_pool;
@@ -62,6 +64,7 @@ app_thread_f(void *arg)
 	app_thread_lua_free();
 	box_lua_call_runtime_priv_reset();
 	tuple_free();
+	event_free();
 	cord_buf_free();
 	return NULL;
 }

@@ -786,3 +786,30 @@ g.test_metrics = function(cg)
         })
     end, {}, {_thread_id = 1})
 end
+
+g.test_trigger = function(cg)
+    cg.server:exec(function()
+        local trigger = require('trigger')
+        t.assert_equals(trigger.info(), {})
+        local data = {}
+        local function f1(val) data.t1 = val end
+        local function f2(val) data.t2 = val end
+        trigger.set('test.event', 't1', f1)
+        trigger.set('test.event', 't2', f2)
+        t.assert_equals(trigger.info(), {
+            ['test.event'] = {{'t2', f2}, {'t1', f1}},
+        })
+        trigger.call('test.event', 1)
+        t.assert_equals(data, {t1 = 1, t2 = 1})
+        trigger.del('test.event', 't2')
+        t.assert_equals(trigger.info(), {
+            ['test.event'] = {{'t1', f1}},
+        })
+        trigger.call('test.event', 2)
+        t.assert_equals(data, {t1 = 2, t2 = 1})
+        trigger.del('test.event', 't1')
+        trigger.call('test.event', 3)
+        t.assert_equals(data, {t1 = 2, t2 = 1})
+        t.assert_equals(trigger.info(), {})
+    end)
+end
