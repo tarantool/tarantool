@@ -19,10 +19,10 @@ box.internal.threads = {}
 local threads_cfg
 
 -- Name of the group this thread belongs to.
-local this_group_name
+local this_group_name = 'tx'
 
 -- Identifier of this thread in the group, 1 <= N <= group size.
-local this_thread_id_in_group
+local this_thread_id_in_group = 1
 
 -- Connection used to call threads.
 local threads_conn
@@ -32,6 +32,39 @@ local thread_groups = {}
 
 -- Map: name -> function exported with threads.export().
 local exported_functions = {}
+
+-- Install a stub for calling the tx thread directly when thread groups
+-- are not configured.
+thread_groups.tx = {
+    _check_call_eval_opts = function(opts)
+        if type(opts.target) == 'number' and opts.target > 1 then
+            box.error(box.error.NO_SUCH_THREAD, opts.target, 3)
+        end
+    end,
+    _handle_call_eval_result = function(status, ...)
+        if status then
+            return {{...}}
+        end
+        local err = ...
+        if not box.error.is(err) then
+            err = box.error.new(box.error.PROC_LUA, err)
+        end
+        box.error(err, 2)
+    end,
+    call = function(self, func_name, args, opts)
+        self._check_call_eval_opts(opts)
+        return self._handle_call_eval_result(pcall(box.internal.threads.call,
+                                                   func_name, args))
+    end,
+    eval = function(self, expr, args, opts)
+        self._check_call_eval_opts(opts)
+        local proc, errmsg = loadstring(expr)
+        if proc == nil then
+            box.error(box.error.PROC_LUA, errmsg, 2)
+        end
+        return self._handle_call_eval_result(pcall(proc, unpack(args)))
+    end,
+}
 
 --
 -- Creates an IPROTO connection to the local instance over a socket pair.
@@ -91,6 +124,7 @@ end
 -- the main thread.
 --
 local function init_thread_groups(cfg)
+    thread_groups.tx = nil
     create_thread_group('tx', 0, 0)
     local thread_id = 1
     for _, group_cfg in ipairs(cfg.groups) do
@@ -306,15 +340,6 @@ function threads.export(func_name, func)
     exported_functions[func_name] = func
 end
 
---
--- Raises an error if the threads module hasn't been configured.
---
-local function check_configured()
-    if threads_cfg == nil then
-        box.error(box.error.THREADS_NOT_CONFIGURED, 3)
-    end
-end
-
 -- call/eval options template used with utils.check_param_table().
 local CALL_EVAL_OPTS = {
     target = 'string, number',
@@ -347,7 +372,6 @@ end
 function threads.call(group_name, func_name, args, opts)
     args = args or {}
     opts = opts or {}
-    check_configured()
     utils.check_param(group_name, 'group name', 'string', 2)
     utils.check_param(func_name, 'function name', 'string', 2)
     utils.check_param(args, 'function arguments', 'table', 2)
@@ -366,7 +390,6 @@ end
 function threads.eval(group_name, expr, args, opts)
     args = args or {}
     opts = opts or {}
-    check_configured()
     utils.check_param(group_name, 'group name', 'string', 2)
     utils.check_param(expr, 'expression', 'string', 2)
     utils.check_param(args, 'expression arguments', 'table', 2)
@@ -378,7 +401,6 @@ end
 -- Returns information about configured thread groups.
 --
 function threads.info()
-    check_configured()
     local info = {
         thread_id = this_thread_id_in_group,
         group_name = this_group_name,
@@ -386,7 +408,7 @@ function threads.info()
             {name = 'tx', size = 1},
         },
     }
-    for _, group_cfg in ipairs(threads_cfg.groups) do
+    for _, group_cfg in ipairs(threads_cfg and threads_cfg.groups or {}) do
         table.insert(info.groups, {
             name = group_cfg.name,
             size = group_cfg.size,

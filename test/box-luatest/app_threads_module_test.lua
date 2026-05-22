@@ -130,46 +130,63 @@ g.test_threads_config_propagation = function()
     end
 end
 
-g.test_threads_not_configured = function()
-    --
-    -- Check that if the threads configuration is unset, no thread groups
-    -- are created, not even tx.
-    --
-    local config = cbuilder:new(BASE_CONFIG)
-        :add_instance('server', {})
-        :config()
-    local cluster = cluster:new(config, SERVER_OPTS)
-    cluster:start()
-    cluster.server:exec(function()
-        local threads = require('experimental.threads')
-        t.assert_equals(box.cfg.app_threads, 0)
-        local err = {type = 'ClientError', name = 'THREADS_NOT_CONFIGURED'}
-        t.assert_error_covers(err, threads.info)
-        t.assert_error_covers(err, threads.call)
-        t.assert_error_covers(err, threads.eval)
+--
+-- Check the threads module when no thread groups are configured.
+--
+local function test_threads_not_configured()
+    local threads = require('experimental.threads')
+    t.assert_equals(box.cfg.app_threads, 0)
+    t.assert_equals(threads.info(), {
+        thread_id = 1,
+        group_name = 'tx',
+        groups = {{name = 'tx', size = 1}},
+    })
+    local err = {type = 'ClientError', name = 'NO_SUCH_THREAD_GROUP'}
+    t.assert_error_covers(err, threads.eval, 'app', [[return 123]])
+    t.assert_error_covers(err, threads.call, 'app', 'test_func')
+    local opts = {target = 2}
+    err = {type = 'ClientError', name = 'NO_SUCH_THREAD', thread_id = 2}
+    t.assert_error_covers(err, threads.eval, 'tx', [[return 123]], {}, opts)
+    t.assert_error_covers(err, threads.call, 'tx', 'test_func', {}, opts)
+    t.assert_error_msg_contains("unexpected symbol near '123'",
+                                threads.eval, 'tx', [[123]])
+    err = {type = 'ClientError', name = 'NO_SUCH_FUNCTION', func = 'test'}
+    t.assert_error_covers(err, threads.call, 'tx', 'test')
+    threads.export('test1', function(x, y) return y, x end)
+    threads.export('test2', function() error('foobar') end)
+    threads.export('test3', function()
+        box.error({type = 'Foo', name = 'Bar'})
     end)
+    t.assert_equals(threads.call('tx', 'test1', {1, 2}), {{2, 1}})
+    t.assert_error_msg_contains('foobar', threads.call, 'tx', 'test2')
+    t.assert_error_covers({type = 'Foo', name = 'Bar'},
+                          threads.call, 'tx', 'test3')
+    t.assert_equals(threads.eval('tx', [[return ...]], {1, 2}), {{1, 2}})
+    t.assert_error_msg_contains('foobar', threads.eval, 'tx',
+                                [[error('foobar')]])
+    t.assert_error_covers({type = 'Foo', name = 'Bar'}, threads.eval, 'tx',
+                          [[box.error({type = 'Foo', name = 'Bar'})]])
 end
 
-g.test_thread_groups_not_configured = function()
-    --
-    -- Check that if the threads section is set in the config, the threads
-    -- module is configured and the tx group is created even if no thread
-    -- groups are configured.
-    --
+g.test_threads_not_configured = function()
     local config = cbuilder:new(BASE_CONFIG)
         :add_instance('server', {})
-        :set_instance_option('server', 'threads', {})
         :config()
     local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
-    cluster.server:exec(function()
-        local threads = require('experimental.threads')
-        t.assert_equals(threads.info(), {
-            thread_id = 1,
-            group_name = 'tx',
-            groups = {{name = 'tx', size = 1}},
-        })
-    end)
+    cluster.server:exec(test_threads_not_configured)
+    config = cbuilder:new(config)
+        :set_instance_option('server', 'threads', {})
+        :config()
+    cluster:reload(config)
+    cluster.server:restart()
+    cluster.server:exec(test_threads_not_configured)
+    config = cbuilder:new(config)
+        :set_instance_option('server', 'threads.groups', {})
+        :config()
+    cluster:reload(config)
+    cluster.server:restart()
+    cluster.server:exec(test_threads_not_configured)
 end
 
 g.test_thread_function_export = function()
@@ -724,13 +741,7 @@ g.test_box_cfg = function(cg)
     -- Check that the threads module is initialized with the default thread
     -- group if box.cfg.app_threads is set from application code.
     --
-    cg.server:exec(function()
-        local threads = require('experimental.threads')
-        local err = {type = 'ClientError', name = 'THREADS_NOT_CONFIGURED'}
-        t.assert_error_covers(err, threads.info)
-        t.assert_error_covers(err, threads.call)
-        t.assert_error_covers(err, threads.eval)
-    end)
+    cg.server:exec(test_threads_not_configured)
     cg.server:restart({box_cfg = {app_threads = 4}})
     cg.server:exec(function()
         local threads = require('experimental.threads')
