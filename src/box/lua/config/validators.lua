@@ -110,6 +110,12 @@ end
 -- {{{ config
 
 M['config.context.*'] = function(var, w)
+    -- Scalar shorthand.
+    if type(var) ~= 'table' then
+        return
+    end
+
+    -- Record form.
     if var.from == nil then
         w.error('"from" field must be defined in a context ' ..
             'variable definition')

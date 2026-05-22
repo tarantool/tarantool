@@ -106,4 +106,13 @@ end
 
 M['metrics.exclude'] = M['metrics.include']
 
+M['config.context.*'] = function(data, w)
+    if type(data) == 'table' then
+        -- A table maps to the record form (env/file source).
+        return find_variant(w.schema, 'record')
+    end
+    -- Scalar variant type matches the Lua type of the data.
+    return find_variant(w.schema, type(data))
+end
+
 return M
