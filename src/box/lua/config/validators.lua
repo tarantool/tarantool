@@ -110,6 +110,15 @@ end
 -- {{{ config
 
 M['config.context.*'] = function(var, w)
+    -- Scalar shorthand.
+    if type(var) ~= 'table' then
+        if type(var) == 'string' and var == '' then
+            w.error('must not be an empty string')
+        end
+        return
+    end
+
+    -- Record form.
     if var.from == nil then
         w.error('"from" field must be defined in a context ' ..
             'variable definition')

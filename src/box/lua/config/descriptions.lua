@@ -482,13 +482,35 @@ I['config'] = format_text([[
 -- {{{ config.context configuration
 
 I['config.context'] = format_text([[
-    Defines custom variables in the cluster configuration by loading
-    values from an environment variable or a file.
+    Defines custom variables in the cluster configuration that can be
+    referenced using `{{ context.<name> }}` template substitution.
+
+    A variable can be set to a string, a number, or a boolean value
+    directly, or loaded from an environment variable or a file.
+
+    The `config.context` section can be defined at any level of the
+    configuration hierarchy (global, group, replicaset, instance).
+    Values defined at more specific levels override the ones from outer
+    levels for the same key.
+
+    A scalar value must not be an empty string.
+
+    Example:
+
+    ```yaml
+    config:
+      context:
+        port: 3301
+    iproto:
+      listen:
+        - uri: 'localhost:{{ context.port }}'
+    ```
 ]])
 
 I['config.context.*'] = format_text([[
-    A context variable definition that specifies how
-    to load it (e.g. from a file or an environment variable).
+    A context variable definition. Can be a string, a number, or a
+    boolean value directly, or a record that specifies how to load it
+    (e.g. from a file or an environment variable).
 ]])
 
 I['config.context.*.env'] = format_text([[

@@ -1,4 +1,7 @@
 local instance_config = require('internal.config.instance_config')
+local justrun = require('luatest.justrun')
+local server = require('luatest.server')
+local yaml = require('yaml')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
@@ -270,6 +273,12 @@ g.test_context_var_validation = function()
         '"file" field must define a file name if "from" field is set to ' ..
             '"file"',
     }, ': '))
+
+    -- Invalid: empty string scalar.
+    verify('', table.concat({
+        '[instance_config] config.context.myvar',
+        'must not be an empty string',
+    }, ': '))
 end
 
 -- No env variable -> apply error.
@@ -417,4 +426,224 @@ g.test_context_var_file_process_work_dir = function(g)
         verify = verify_option('process.title', 'needle'),
         verify_2 = verify_option('process.title', 'needle'),
     })
+end
+
+-- Verify a config.context variable with a scalar value.
+g.test_context_var_scalar = function(g)
+    helpers.success_case(g, {
+        options = {
+            ['config.context'] = {
+                myvar = 'needle',
+            },
+            ['process.title'] = '{{ context.myvar }}',
+        },
+        verify = verify_option('process.title', 'needle'),
+    })
+end
+
+-- Scalar number value.
+g.test_context_var_scalar_number = function(g)
+    helpers.success_case(g, {
+        options = {
+            ['config.context'] = { myvar = 42 },
+            ['process.title'] = '{{ context.myvar }}',
+        },
+        verify = verify_option('process.title', '42'),
+    })
+end
+
+-- Scalar boolean value.
+g.test_context_var_scalar_boolean = function(g)
+    helpers.success_case(g, {
+        options = {
+            ['config.context'] = { myvar = true },
+            ['process.title'] = '{{ context.myvar }}',
+        },
+        verify = verify_option('process.title', 'true'),
+    })
+end
+
+-- Mixed sources: env + file + scalar.
+g.test_context_var_mixed_sources = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'foo.txt', 'fromfile')
+
+    helpers.success_case(g, {
+        dir = dir,
+        env = { MY_ENV_VAR = 'fromenv' },
+        options = {
+            ['config.context'] = {
+                from_env = { from = 'env', env = 'MY_ENV_VAR' },
+                from_file = { from = 'file', file = 'foo.txt' },
+                from_value = 'fromvalue',
+            },
+            ['process.title'] = '{{ context.from_env }}:' ..
+                '{{ context.from_file }}:{{ context.from_value }}',
+        },
+        verify = verify_option('process.title', 'fromenv:fromfile:fromvalue'),
+    })
+end
+
+-- Same context variable used in multiple options.
+g.test_context_var_scalar_in_multiple_options = function(g)
+    helpers.success_case(g, {
+        options = {
+            ['config.context'] = { myvar = 'needle' },
+            ['process.title'] = '{{ context.myvar }}',
+            ['process.pid_file'] = '{{ context.myvar }}.pid',
+        },
+        verify = function()
+            local t = require('luatest')
+            local config = require('config')
+            t.assert_equals(config:get('process.title'), 'needle')
+            t.assert_equals(config:get('process.pid_file'), 'needle.pid')
+        end,
+    })
+end
+
+-- Reload config with changed scalar value.
+g.test_context_var_scalar_reload = function(g)
+    helpers.reload_success_case(g, {
+        options = {
+            ['config.context'] = { myvar = 'before' },
+            ['process.title'] = '{{ context.myvar }}',
+        },
+        verify = verify_option('process.title', 'before'),
+        options_2 = {
+            ['config.context'] = { myvar = 'after' },
+            ['process.title'] = '{{ context.myvar }}',
+        },
+        verify_2 = verify_option('process.title', 'after'),
+    })
+end
+
+-- Verify that process.title matches the expected value.
+local function assert_process_title(server, exp)
+    server:exec(function(exp)
+        local t = require('luatest')
+        local config = require('config')
+        t.assert_equals(config:get('process.title'), exp)
+    end, {exp})
+end
+
+-- Verify config.context at different hierarchy levels.
+g.test_context_var_hierarchical = function(g)
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+        iproto:
+          listen:
+            - uri: 'unix/:./{{ instance_name }}.iproto'
+        config:
+          context:
+            host: global.example.com
+        groups:
+          group-001:
+            config:
+              context:
+                host: group.example.com
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001:
+                    database:
+                      mode: rw
+                    process:
+                      title: '{{ context.host }}'
+                  instance-002:
+                    config:
+                      context:
+                        host: instance.example.com
+                    process:
+                      title: '{{ context.host }}'
+          group-002:
+            replicasets:
+              replicaset-002:
+                instances:
+                  instance-003:
+                    database:
+                      mode: rw
+                    process:
+                      title: '{{ context.host }}'
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+
+    g.server_1 = server:new({
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    })
+    g.server_2 = server:new({
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-002',
+    })
+    g.server_3 = server:new({
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-003',
+    })
+    g.server_1:start({wait_until_ready = false})
+    g.server_2:start({wait_until_ready = false})
+    g.server_3:start({wait_until_ready = false})
+    g.server_1:wait_until_ready()
+    g.server_2:wait_until_ready()
+    g.server_3:wait_until_ready()
+
+    -- instance-001: inherited from group-001.
+    assert_process_title(g.server_1, 'group.example.com')
+    -- instance-002: overridden at instance level.
+    assert_process_title(g.server_2, 'instance.example.com')
+    -- instance-003: fallback to global.
+    assert_process_title(g.server_3, 'global.example.com')
+end
+
+-- Verify the use case from the issue: a group-level template
+-- in iproto.listen URI using {{ context.<name> }} with
+-- per-instance config.context values.
+g.test_context_var_per_instance_ports = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+        config:
+          context:
+            port: 13301
+        groups:
+          group-001:
+            iproto:
+              listen:
+                - uri: 'unix/:./{{ context.port }}.iproto'
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001:
+                    config:
+                      context:
+                        port: 13302
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+    local script = [[
+        local config = require('config')
+        local yaml = require('yaml')
+        print(yaml.encode(config:get('iproto.listen')))
+        os.exit(0)
+    ]]
+    treegen.write_file(dir, 'main.lua', script)
+    local env = {TT_LOG_LEVEL = 0}
+    local opts = {nojson = true, stderr = true}
+
+    -- Verify instance-001: port from its own extras.
+    local args = {'--name', 'instance-001', '--config',
+                   'config.yaml', 'main.lua'}
+    local res = justrun.tarantool(dir, env, args, opts)
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert_equals(yaml.decode(res.stdout), {{uri = 'unix/:./13302.iproto'}})
 end

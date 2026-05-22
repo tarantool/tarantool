@@ -260,6 +260,17 @@ end
 -- Read a config.context[name] variable depending on its "from"
 -- type.
 local function read_context_var_noexc(base_dir, def)
+    -- Scalar shorthand: the value is defined right in
+    -- config.context.
+    if type(def) ~= 'table' then
+        if type(def) == 'boolean' then
+            return true, def and 'true' or 'false'
+        elseif type(def) == 'number' then
+            return true, tostring(def)
+        end
+        return true, def
+    end
+    -- Record form: resolve the value from env/file.
     if def.from == 'env' then
         local value = os.getenv(def.env)
         if value == nil then
@@ -288,7 +299,7 @@ local function apply_vars(self, iconfig, vars)
             error(('Unable to read config.context.%s variable value: ' ..
                 '%s'):format(name, res), 0)
         end
-        if def.rstrip then
+        if type(def) == 'table' and def.rstrip then
             res = res:rstrip()
         end
         vars['context.' .. name] = res
@@ -444,23 +455,23 @@ return schema.new('instance_config', schema.record({
             key = schema.scalar({
                 type = 'string',
             }),
-            value = schema.record({
-                from = schema.enum({
-                    'env',
-                    'file',
-                }),
-                env = schema.scalar({
-                    type = 'string',
-                }),
-                file = schema.scalar({
-                    type = 'string',
-                }),
-                rstrip = schema.scalar({
-                    type = 'boolean',
-                }, {
-                    default = false,
-                }),
-            }, {
+            value = schema.union({
+                variants = {
+                    -- Scalar shorthand
+                    schema.scalar({type = 'string'}),
+                    schema.scalar({type = 'number'}),
+                    schema.scalar({type = 'boolean'}),
+                    -- Record form (env/file source)
+                    schema.record({
+                        from = schema.enum({'env', 'file', }),
+                        env = schema.scalar({type = 'string'}),
+                        file = schema.scalar({type = 'string'}),
+                        rstrip = schema.scalar({
+                            type = 'boolean',
+                            default = false
+                        }),
+                    })
+                },
                 validate = validators['config.context.*'],
             }),
         }),
