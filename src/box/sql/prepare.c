@@ -195,6 +195,7 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	parser->line_pos = 1;
 	parser->has_autoinc = false;
 	region_create(&parser->region, &cord()->slabc);
+	parser->count_original_names = 0;
 }
 
 void

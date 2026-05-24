@@ -385,8 +385,11 @@ sql_reset_autoinc_id_list(struct Vdbe *v)
 int
 sql_bind_double(struct Vdbe *p, int i, double rValue)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "numeric");
 	mem_set_double(&p->aVar[i - 1], rValue);
 	return rc;
@@ -395,8 +398,11 @@ sql_bind_double(struct Vdbe *p, int i, double rValue)
 int
 sql_bind_boolean(struct Vdbe *p, int i, bool value)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "boolean");
 	mem_set_bool(&p->aVar[i - 1], value);
 	return rc;
@@ -411,8 +417,11 @@ sql_bind_int(struct Vdbe *p, int i, int iValue)
 int
 sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "integer");
 	mem_set_int(&p->aVar[i - 1], iValue);
 	return rc;
@@ -421,8 +430,11 @@ sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
 int
 sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "integer");
 	mem_set_uint(&p->aVar[i - 1], value);
 	return rc;
@@ -431,15 +443,24 @@ sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
 int
 sql_bind_null(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	return sql_bind_type(p, i, "boolean");
 }
 
 int
 sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 {
-	int rc = vdbeUnbind(p, i);
+	int rc = 0;
+	/*
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}*/
 	if (rc == 0) {
 		rc = sql_bind_type(p, i, "varbinary");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
@@ -478,7 +499,13 @@ sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 int
 sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "uuid") != 0)
 		return -1;
 	mem_set_uuid(&p->aVar[i - 1], uuid);
 	return 0;
@@ -487,7 +514,13 @@ sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
 int
 sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "decimal") != 0)
 		return -1;
 	mem_set_dec(&p->aVar[i - 1], dec);
 	return 0;
@@ -496,7 +529,13 @@ sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
 int
 sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "datetime") != 0)
 		return -1;
 	mem_set_datetime(&p->aVar[i - 1], dt);
 	return 0;
@@ -505,7 +544,13 @@ sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
 int
 sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "interval") != 0)
 		return -1;
 	mem_set_interval(&p->aVar[i - 1], itv);
 	return 0;
@@ -523,6 +568,33 @@ sql_bind_parameter_name(const struct Vdbe *p, int i)
 	if (p == NULL)
 		return NULL;
 	return sqlVListNumToName(p->pVList, i+1);
+}
+
+/**
+ * Return count of original names in request.
+ */
+uint32_t
+sql_get_count_original_names(const struct Vdbe *p)
+{
+	return p->count_original_names;
+}
+
+/**
+ * Return structure with original names in request.
+ */
+char *
+sql_get_original_names(const struct Vdbe *p, uint32_t i)
+{
+	return p->original_names[i];
+}
+
+/**
+ * Return structure with lengths original names in request.
+ */
+uint32_t
+sql_get_original_names_len(const struct Vdbe *p, uint32_t i)
+{
+	return p->original_names_len[i];
 }
 
 /*

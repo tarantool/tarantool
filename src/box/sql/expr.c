@@ -1205,6 +1205,26 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	assert(!ExprHasProperty
 	       (pExpr, EP_IntValue | EP_Reduced | EP_TokenOnly));
 	z = pExpr->u.zToken;
+	if (pParse->count_original_names == 0) {
+		pParse->original_names = xmalloc(sizeof(char *));
+		pParse->original_names_len = xmalloc(sizeof(u32 *));
+		pParse->max_count_original_names = 1;
+	} else if (pParse->max_count_original_names ==
+		   pParse->count_original_names) {
+		pParse->max_count_original_names = 2 *
+		    pParse->max_count_original_names;
+		pParse->original_names =
+		xrealloc(pParse->original_names,
+			 (pParse->max_count_original_names) *
+			 sizeof(char *));
+		pParse->original_names_len =
+		xrealloc(pParse->original_names_len,
+			 (pParse->max_count_original_names) *
+			 sizeof(u32 *));
+	}
+	pParse->original_names[pParse->count_original_names] = pExpr->u.zToken;
+	pParse->original_names_len[pParse->count_original_names] = n;
+	pParse->count_original_names += 1;
 	assert(z != 0);
 	assert(z[0] != 0);
 	assert(n == sqlStrlen30(z));

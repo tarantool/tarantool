@@ -289,3 +289,44 @@ g.test_4755_scalar_collation_metadata = function(cg)
         t.assert_equals(box.space.t, nil)
     end, {cg.params.engine})
 end
+
+g = t.group("gh-6551")
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+--
+-- gh-6551: check types in select request
+-- with bind variables.
+--
+g.test_6551_types_with_bind_variables = function(cg)
+    cg.server:exec(function()
+        local sql = [[SELECT :a, :a, :a, :b]]
+        local res = box.execute(sql, {{[':a'] = 123}, {[':b'] = 'asd'}})
+        local exp = {
+            {
+                name = "COLUMN_1",
+                type = "integer",
+            },
+            {
+                name = "COLUMN_2",
+                type = "integer",
+            },
+            {
+                name = "COLUMN_3",
+                type = "integer",
+            },
+            {
+                name = "COLUMN_4",
+                type = "text",
+            },
+        }
+        t.assert_equals(res.metadata, exp)
+    end)
+end

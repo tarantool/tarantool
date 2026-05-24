@@ -176,13 +176,10 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
-	if (p->name != NULL) {
-		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
-		if (pos == 0) {
-			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
-				 sql_bind_name(p));
-			return -1;
-		}
+	if (pos == 0) {
+		diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
+			 sql_bind_name(p));
+		return -1;
 	}
 	switch (p->type) {
 	case MP_INT:
@@ -227,6 +224,28 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 		}
 	default:
 		unreachable();
+	}
+	return 0;
+}
+
+int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
+{
+	assert(stmt != NULL);
+	if (bind_count > 0) {
+	    for (uint32_t i = 0; i < sql_get_count_original_names(stmt); i++) {
+		 uint32_t n = sql_get_original_names_len(stmt, i);
+		    char *name = sql_get_original_names(stmt, i);
+		    for (uint32_t j = 0; j < bind_count; j++) {
+			    if (bind[j].name_len == n) {
+				    if (strcmp(name, bind[j].name) == 0) {
+					    if (sql_bind_column(stmt, &bind[j], i + 1) != 0)
+						    return -1;
+					    break;
+				    }
+			    }
+		    }
+	    }
 	}
 	return 0;
 }

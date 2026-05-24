@@ -557,6 +557,24 @@ int
 sql_bind_parameter_count(const struct Vdbe *v);
 
 /**
+ * Return count of original names in request.
+ */
+uint32_t
+sql_get_count_original_names(const struct Vdbe *p);
+
+/**
+ * Return structure with original names in request.
+ */
+char *
+sql_get_original_names(const struct Vdbe *p, uint32_t i);
+
+/**
+ * Return structure with lengths original names in request.
+ */
+uint32_t
+sql_get_original_names_len(const struct Vdbe *p, uint32_t i);
+
+/**
  * Return the name of a wildcard parameter. Return NULL if the index
  * is out of range or if the wildcard is unnamed. Parameter's index
  * is 0-based.
@@ -1991,6 +2009,15 @@ struct Parse {
 	struct region region;
 	/** True, if error should be raised after parsing. */
 	bool is_aborted;
+
+	/** Array of names in original request. */
+	char **original_names;
+	/** Array of lens of names in original request. */
+	u32 *original_names_len;
+	/** Len of array of names in original request. */
+	u32 count_original_names;
+	/** Now max as possible len of array of names in original request. */
+	u32 max_count_original_names;
 
   /**************************************************************************
   * Fields above must be initialized to zero.  The fields that follow,
