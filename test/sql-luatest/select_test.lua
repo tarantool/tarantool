@@ -43,3 +43,43 @@ g.test_select_null = function(cg)
         box.execute([[DROP TABLE t3;]])
     end)
 end
+
+g = t.group("gh-12733")
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+--
+-- This test checks behaviour with positional request in select
+-- statement with bind variables.
+--
+g.test_12733_select_positional_bindings = function(cg)
+    cg.server:exec(function()
+        local res = box.execute([[select :a, $1;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select $1, :a;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select $1, :a;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{321, 123}})
+
+        res = box.execute([[select $2, :a;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select :a, $1;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 321}})
+
+        res = box.execute([[select :a, $2;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select $2, $1;]], {321, {['a'] = 123}})
+        t.assert_equals(res.rows, {{123, 321}})
+    end)
+end

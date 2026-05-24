@@ -1458,6 +1458,13 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	} while (true);
 
 	p->pVList = pParse->pVList;
+	p->count_original_names = pParse->count_original_names;
+	if (p->count_original_names > 0) {
+		p->original_names = pParse->original_names;
+		p->original_names_len = pParse->original_names_len;
+	}
+	pParse->original_names = 0;
+	pParse->original_names_len = 0;
 	pParse->pVList = 0;
 	p->explain = pParse->explain;
 	p->nCursor = nCursor;
@@ -1990,6 +1997,10 @@ sqlVdbeClearObject(struct Vdbe *p)
 		releaseMemArray(p->aVar, p->nVar);
 		sql_xfree(p->pVList);
 		sql_xfree(p->pFree);
+		if (p->count_original_names > 0) {
+			free(p->original_names);
+			free(p->original_names_len);
+		}
 	}
 	vdbeFreeOpArray(p->aOp, p->nOp);
 	sql_xfree(p->zSql);
