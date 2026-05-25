@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
  * @file
@@ -89,6 +90,9 @@ struct info_handler_vtab {
 	/** Set double value. */
 	void (*append_double)(struct info_handler *,
 			      const char *key, double value);
+	/** Set boolean value. */
+	void (*append_bool)(struct info_handler *info, const char *key,
+			    bool value);
 };
 
 /**
@@ -161,6 +165,18 @@ info_append_double(struct info_handler *info, const char *key,
 		   double value)
 {
 	return info->vtab->append_double(info, key, value);
+}
+
+/**
+ * Associates boolean value with @a key in the current associative array.
+ * @param info box.info() adapter.
+ * @param key key.
+ * @param value value.
+ */
+static inline void
+info_append_bool(struct info_handler *info, const char *key, bool value)
+{
+	return info->vtab->append_bool(info, key, value);
 }
 
 /*
