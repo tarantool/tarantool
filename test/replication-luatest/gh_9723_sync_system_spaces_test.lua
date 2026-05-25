@@ -60,6 +60,49 @@ local check_sync_system_spaces = [[
     end
 ]]
 
+--
+-- Execute a promote/demote operation, but in a way that 100% ensures the new
+-- term is persisted and replicated before the PROMOTE/DEMOTE entry. It is
+-- needed in tests which expect the next replicated entry to be PROMOTE/DEMOTE.
+--
+-- For example, when a test wants to fail a WAL write of the entry.
+--
+local function promote_after_term_sync_impl(master, replica, op)
+    local term = master:exec(function(op)
+        local term = box.info.election.term
+        box.error.injection.set('ERRINJ_TXN_LIMBO_BEGIN_DELAY', true)
+        rawset(_G, 'test_f', require('fiber').new(function()
+            if op == 'promote' then
+                box.ctl.promote()
+            else
+                box.ctl.demote()
+            end
+        end))
+        _G.test_f:set_joinable(true)
+        return term
+    end, {op})
+    replica:exec(function(term)
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_equals(box.info.election.term, term + 1)
+        end)
+    end, {term})
+    master:exec(function()
+        box.error.injection.set('ERRINJ_TXN_LIMBO_BEGIN_DELAY', false)
+        local ok, err = _G.test_f:join(60)
+        t.assert_equals(err, nil)
+        t.assert(ok)
+        _G.test_f = nil
+    end)
+end
+
+local function promote_after_term_sync(master, replica)
+    return promote_after_term_sync_impl(master, replica, 'promote')
+end
+
+local function demote_after_term_sync(master, replica)
+    return promote_after_term_sync_impl(master, replica, 'demote')
+end
+
 g_general.before_each(function(cg)
     cg.replica_set = replica_set:new{}
     local box_cfg = {
@@ -359,9 +402,7 @@ g_general.test_new_behaviour_corner_cases = function(cg)
         box.schema.func.call('check_sync_system_spaces', false)
         box.error.injection.set('ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN', 0)
     end)
-    cg.server1:exec(function()
-        box.ctl.promote()
-    end)
+    promote_after_term_sync(cg.server1, cg.server2)
     cg.server2:exec(function()
         -- Promote is received and blocked in applier.
         t.helpers.retrying({timeout = 60}, function()
@@ -410,9 +451,7 @@ g_general.test_new_behaviour_corner_cases = function(cg)
     cg.server2:exec(function()
         box.error.injection.set('ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN', 0)
     end)
-    cg.server1:exec(function()
-        box.ctl.promote()
-    end)
+    promote_after_term_sync(cg.server1, cg.server2)
     cg.server2:exec(function()
         -- Promote is received and blocked in applier.
         t.helpers.retrying({timeout = 60}, function()
@@ -448,9 +487,7 @@ g_general.test_new_behaviour_corner_cases = function(cg)
         box.schema.func.call('check_sync_system_spaces', true)
         box.error.injection.set('ERRINJ_TXN_LIMBO_BEGIN_DELAY_COUNTDOWN', 0)
     end)
-    cg.server1:exec(function()
-        box.ctl.demote()
-    end)
+    demote_after_term_sync(cg.server1, cg.server2)
     cg.server2:exec(function()
         t.helpers.retrying({timeout = 60}, function()
             t.assert(box.error.injection.get('ERRINJ_TXN_LIMBO_BEGIN_DELAY'))
