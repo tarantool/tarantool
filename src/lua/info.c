@@ -90,6 +90,16 @@ luaT_info_append_str(struct info_handler *info, const char *key,
 	lua_settable(L, -3);
 }
 
+/** Appends {key: boolean_value} to the table on the Lua stack. */
+static void
+luaT_info_append_bool(struct info_handler *info, const char *key, bool value)
+{
+	lua_State *L = (lua_State *)info->ctx;
+	lua_pushstring(L, key);
+	lua_pushboolean(L, value);
+	lua_settable(L, -3);
+}
+
 void
 luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 {
@@ -100,7 +110,8 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
 		.end_table = luaT_info_end_table,
 		.append_int = luaT_info_append_int,
 		.append_str = luaT_info_append_str,
-		.append_double = luaT_info_append_double
+		.append_double = luaT_info_append_double,
+		.append_bool = luaT_info_append_bool,
 	};
 	h->vtab = &lua_vtab;
 	h->ctx = L;
