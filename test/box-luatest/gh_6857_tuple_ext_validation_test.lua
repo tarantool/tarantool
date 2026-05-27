@@ -103,3 +103,26 @@ g.test_extension_tuple_validation = function()
     end
     c:close()
 end
+
+-- tarantool/security#162
+g.test_mp_check_recursion_limit = function()
+    local c = net_box.connect(g.cluster.servers[1].net_box_uri)
+    t.assert_equals(c.state, 'active', 'Connection established')
+
+    local arg = box.error.new({})
+    for _ = 1, 16 do
+        arg = box.error.new({arg = arg})
+    end
+    local ok, err = pcall(c.eval, c, 'return ...', {arg})
+    t.assert_not(ok)
+    while err.prev ~= nil do
+        err = err.prev
+    end
+    t.assert_covers(err:unpack(), {
+        type = 'ClientError',
+        code = box.error.INVALID_MSGPACK,
+        message = 'Invalid MsgPack - too much nesting',
+    })
+
+    c:close()
+end

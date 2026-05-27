@@ -99,60 +99,74 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 static int
 msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
 {
+	enum {
+		MSGPACK_MAX_NESTING = 16,
+	};
+	static __thread int msgpack_nesting;
+	int rc = -1;
+	msgpack_nesting++;
+	if (msgpack_nesting >= MSGPACK_MAX_NESTING) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "too much nesting");
+		goto out;
+	}
 	switch (type) {
 	case MP_DECIMAL:
 		if (mp_validate_decimal(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack decimal");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_UUID:
 		if (mp_validate_uuid(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack uuid");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_DATETIME:
 		if (mp_validate_datetime(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack datetime");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_ERROR:
 		if (mp_validate_error(data, len) != 0) {
 			/* The error is set by error_unpack(). */
 			diag_add(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack error");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_INTERVAL:
 		if (mp_validate_interval(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack interval");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_TUPLE:
 		if (mp_validate_tuple(data, len) != 0) {
 			diag_set(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack tuple");
-			return -1;
+			goto out;
 		}
-		return 0;
+		break;
 	case MP_ARROW:
 		/*
 		 * The Arrow payload is not validated here, because it requires
 		 * full deserialization that is too costly.
 		 */
-		return 0;
 	case MP_COMPRESSION:
 	default:
-		return mp_check_ext_data_default(type, data, len);
+		break;
 	}
+	rc = 0;
+out:
+	msgpack_nesting--;
+	return rc;
 }
 
 /** Our handler invoked on mp_check() error. */
