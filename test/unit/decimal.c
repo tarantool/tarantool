@@ -6,6 +6,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <float.h> /* DBL_DIG */
+#include "trivia/util.h"
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
@@ -494,7 +495,7 @@ test_mp_validate(void)
 static void
 test_print(void)
 {
-	plan(4);
+	plan(8);
 	header();
 
 	char buf[DECIMAL_MAX_STR_LEN + 1];
@@ -507,6 +508,25 @@ test_print(void)
 	is(decimal_from_string(&d, "1e-1000"), &d, "decimal(1e-1000)");
 	decimal_to_string(&d, buf);
 	is(strcmp("1E-1000", buf), 0, "checking to_string(1e-1000)");
+
+	/* decimal_snprint checks. */
+	char limited_buf[6];
+	const int limited_len = lengthof(limited_buf) - 1;
+	int total;
+	decimal_t one;
+	decimal_from_int64(&one, 1);
+	decimal_exp(&d, &one);
+	total = decimal_snprint(buf, sizeof(buf), &d);
+	is(total, DECIMAL_MAX_DIGITS + 1,
+	   "checking decimal_snprint(exp(1)) result (actual) len");
+	is(strlen(buf), DECIMAL_MAX_DIGITS + 1,
+	   "checking decimal_snprint(exp(1)) buf len");
+	total = decimal_snprint(limited_buf, limited_len + 1, &d);
+	is(total, DECIMAL_MAX_DIGITS + 1,
+	   "checking decimal_snprint(exp(1)) result (actual) len");
+	buf[limited_len] = '\0';
+	is(strcmp(limited_buf, buf), 0,
+	   "checking decimal_snprint(exp(1)) to limited_buf[%d]", limited_len);
 
 	footer();
 	check_plan();

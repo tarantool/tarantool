@@ -180,7 +180,7 @@ datetime_parse_full_ok_test(void)
 		 * time fields
 		 */
 		static char buff[DT_TO_STRING_BUFSIZE];
-		flen = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
+		flen = datetime_strftime(buff, sizeof(buff), "%F %T%z", &date);
 		ok(flen > 0, "datetime_strftime");
 		struct datetime date_strp;
 		plen = datetime_strptime(&date_strp, buff, "%F %T%z");
@@ -267,8 +267,8 @@ tostring_datetime_test(void)
 			tests[index].offset,
 			0
 		};
-		char buf[48];
-		datetime_to_string(&date, buf, sizeof(buf));
+		char buf[DT_TO_STRING_BUFSIZE];
+		datetime_snprint(buf, sizeof(buf), &date);
 		is(strcmp(buf, tests[index].string), 0,
 		   "string '%s' expected, received '%s'",
 		   tests[index].string, buf);
@@ -707,12 +707,12 @@ mp_print_test(void)
 	struct datetime date = {0, 0, 0, 0}; // 1970-01-01T00:00Z
 
 	mp_encode_datetime(buffer, &date);
-	int sz = datetime_to_string(&date, str, sizeof(str));
+	int sz = datetime_snprint(str, sizeof(str), &date);
 	int rc = mp_snprint(NULL, 0, buffer);
 	is(rc, sz, "correct mp_snprint size %u with empty buffer", rc);
 	rc = mp_snprint(str, sizeof(str), buffer);
 	is(rc, sz, "correct mp_snprint size %u", rc);
-	datetime_to_string(&date, sample, sizeof(sample));
+	datetime_snprint(sample, sizeof(sample), &date);
 	is(strcmp(str, sample), 0, "correct mp_snprint result");
 
 	FILE *f = tmpfile();

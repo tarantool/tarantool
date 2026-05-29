@@ -790,11 +790,11 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          len = strlen(str);
          break;
       case MP_DATETIME:
-         len = datetime_to_string(field.dateval, buf, sizeof(buf));
+         len = datetime_snprint(buf, sizeof(buf), field.dateval);
          str = buf;
          break;
       case MP_INTERVAL:
-         len = interval_to_string(field.interval, buf, sizeof(buf));
+         len = interval_snprint(buf, sizeof(buf), field.interval);
          str = buf;
          break;
       default:

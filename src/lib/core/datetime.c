@@ -126,8 +126,8 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 }
 
 size_t
-datetime_strftime(const struct datetime *date, char *buf, size_t len,
-		  const char *fmt)
+datetime_strftime(char *buf, size_t len, const char *fmt,
+		  const struct datetime *date)
 {
 	assert(date != NULL);
 	struct tnt_tm tm;
@@ -228,7 +228,7 @@ datetime_ev_now(struct datetime *now)
  * calculated length of output string
  */
 size_t
-datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
+datetime_snprint(char *buf, ssize_t len, const struct datetime *date)
 {
 	int offset = date->tzoffset;
 	int tzindex = date->tzindex;
@@ -588,7 +588,7 @@ datetime_totable(const struct datetime *date, struct interval *out)
 	} while (0)
 
 size_t
-interval_to_string(const struct interval *ival, char *buf, ssize_t len)
+interval_snprint(char *buf, ssize_t len, const struct interval *ival)
 {
 	static const char *const long_signed_fmt[] = {
 		"%" PRId64,	/* false */

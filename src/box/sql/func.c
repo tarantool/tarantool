@@ -1528,16 +1528,17 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	}
 	case MEM_TYPE_DATETIME: {
 		char buf[DT_TO_STRING_BUFSIZE];
-		uint32_t len = datetime_to_string(&context->pOut->u.dt, buf,
-						  DT_TO_STRING_BUFSIZE);
+		uint32_t len = datetime_snprint(buf, DT_TO_STRING_BUFSIZE,
+						&context->pOut->u.dt);
 		assert(len == strlen(buf));
 		mem_copy_str(context->pOut, buf, len);
 		break;
 	}
 	case MEM_TYPE_INTERVAL: {
 		char buf[DT_IVAL_TO_STRING_BUFSIZE];
-		uint32_t len = interval_to_string(&context->pOut->u.itv, buf,
-						  DT_IVAL_TO_STRING_BUFSIZE);
+		uint32_t len = interval_snprint(buf,
+						DT_IVAL_TO_STRING_BUFSIZE,
+						&context->pOut->u.itv);
 		assert(len == strlen(buf));
 		mem_copy_str(context->pOut, buf, len);
 		break;

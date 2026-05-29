@@ -35,7 +35,7 @@ struct tnt_tm;
 #define MAX_NANOS_PER_SEC     2000000000LL
 #endif
 
-/** Required size of datetime_to_string string buffer */
+/** Required size of datetime_snprint string buffer */
 #define DT_TO_STRING_BUFSIZE 64
 
 /**
@@ -132,7 +132,7 @@ struct interval {
 	dt_adjust_t adjust;
 };
 
-/*
+/**
  * Compare arguments of a datetime type
  * @param lhs left datetime argument
  * @param rhs right datetime argument
@@ -144,27 +144,28 @@ int
 datetime_compare(const struct datetime *lhs, const struct datetime *rhs);
 
 /**
- * Convert datetime to string using default format
- * @param date source datetime value
+ * Convert datetime to string using default format.
  * @param buf output character buffer
  * @param len size of output buffer
+ * @param date source datetime value
  * @retval length of a resultant text
  */
 size_t
-datetime_to_string(const struct datetime *date, char *buf, ssize_t len);
+datetime_snprint(char *buf, ssize_t len, const struct datetime *date);
 
 /**
- * Convert datetime to string using default format provided
- * Wrapper around standard strftime() function
- * @param date source datetime value
+ * Convert datetime to string using default format provided.
+ * Wrapper around standard strftime() function.
+ * Implements snprintf-style (may be used with SNPRINT macro).
  * @param buf output buffer
  * @param len size of output buffer
  * @param fmt format
+ * @param date source datetime value
  * @retval length of a resultant text
  */
 size_t
-datetime_strftime(const struct datetime *date, char *buf, size_t len,
-		      const char *fmt);
+datetime_strftime(char *buf, size_t len, const char *fmt,
+		  const struct datetime *date);
 
 void
 datetime_now(struct datetime *now);
@@ -241,14 +242,14 @@ bool
 datetime_totable(const struct datetime *date, struct interval *out);
 
 /**
- * Convert datetime interval to string using default format
- * @param ival source interval value
+ * Convert datetime interval to string using default format.
  * @param buf output buffer
  * @param len size of output buffer
+ * @param ival source interval value
  * @retval length of resultant text
  */
 size_t
-interval_to_string(const struct interval *ival, char *buf, ssize_t len);
+interval_snprint(char *buf, ssize_t len, const struct interval *ival);
 
 /**
  * Add/subtract datetime value by passed interval using direction as a hint
