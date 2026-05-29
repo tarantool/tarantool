@@ -29,6 +29,61 @@ local function drop_alert_if_exists(key)
     return true
 end
 
+-- {{{ THP (Transparent Huge Pages) check
+
+local THP_ALERT_KEY = 'transparent_huge_pages'
+local THP_SYSFS_PATH = '/sys/kernel/mm/transparent_hugepage/enabled'
+
+-- For testing purposes.
+local thp_sysfs_path = THP_SYSFS_PATH
+
+-- Read current THP mode from sysfs.
+-- Returns 'always', 'madvise', 'never' or nil (file doesn't exist).
+local function get_thp_mode()
+    if not fio.path.exists(thp_sysfs_path) then
+        return nil
+    end
+
+    local fh = fio.open(thp_sysfs_path, {'O_RDONLY'})
+    if fh == nil then
+        return nil
+    end
+
+    local content = fh:read(256)
+    fh:close()
+    if content == nil then
+        return nil
+    end
+
+    -- Format: "always [madvise] never".
+    return content:match('%[(%a+)%]')
+end
+
+local function check_thp(configdata)
+    if not configdata:get('config.checks.' ..
+        THP_ALERT_KEY, {use_default = true}) then
+        return drop_alert_if_exists(THP_ALERT_KEY)
+    end
+
+    local mode = get_thp_mode()
+    if mode == nil or mode == 'never' then
+        return drop_alert_if_exists(THP_ALERT_KEY)
+    end
+
+    return alert_ns:set(THP_ALERT_KEY, {
+        type = 'warn',
+        message = ('Transparent Huge Pages (THP) are set to "%s". ' ..
+            'This may cause latency spikes and memory overhead. ' ..
+            'Consider disabling THP temporarily: ' ..
+            'echo never > /sys/kernel/mm/transparent_hugepage/enabled ' ..
+            'For a persistent fix, configure THP according to your ' ..
+            'OS distribution.')
+            :format(mode),
+    })
+end
+
+-- }}} THP (Transparent Huge Pages) check
+
 -- {{{ System checks registry
 
 -- List of system checks to perform.
@@ -40,7 +95,9 @@ end
 --
 -- To add a new check, add an element to this array:
 --   {key = MY_ALERT_KEY, fn = my_check_function},
-local checks = {}
+local checks = {
+    {key = THP_ALERT_KEY, fn = check_thp},
+}
 
 -- }}} System checks registry
 
@@ -139,6 +196,9 @@ return {
         end,
         get_check_interval = function()
             return check_interval
+        end,
+        set_thp_sysfs_path = function(path)
+            thp_sysfs_path = path
         end,
     },
 }
