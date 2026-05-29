@@ -478,6 +478,30 @@ decimal_str(const decimal_t *dec)
 	return buf;
 }
 
+int
+decimal_snprint(char *buf, int size, const decimal_t *dec)
+{
+	assert(size >= 0);
+	if (size > DECIMAL_MAX_STR_LEN) {
+		char *tmp = decNumberToString(dec, buf);
+		VERIFY(buf == tmp);
+		int len = strnlen(buf, size);
+		VERIFY(len <= DECIMAL_MAX_STR_LEN);
+		return len;
+	}
+	/* 0 <= size <= DECIMAL_MAX_STR_LEN. */
+	char inner_buf[DECIMAL_MAX_STR_LEN + 1];
+	char *tmp = decNumberToString(dec, inner_buf);
+	VERIFY(inner_buf == tmp);
+	int len = strnlen(inner_buf, sizeof(inner_buf));
+	VERIFY(len <= DECIMAL_MAX_STR_LEN);
+	if (size > 1)
+		memcpy(buf, inner_buf, size - 1);
+	if (size > 0)
+		buf[size - 1] = '\0';
+	return len;
+}
+
 void
 decimal_to_string(const decimal_t *dec, char *str)
 {

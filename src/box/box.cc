@@ -369,7 +369,7 @@ title(const char *new_status)
  * Create a message describing the ro state and put it into a buffer.
  */
 static int
-box_ro_state_msg(char *buf, int size)
+box_ro_state_msg_snprint(char *buf, int size)
 {
 	int total = 0;
 	if (box_raft_is_ro()) {
@@ -419,8 +419,19 @@ box_ro_state_msg(char *buf, int size)
 		else
 			unreachable();
 	}
-	(void)total;
-	return 0;
+	return total;
+}
+
+/**
+ * Create a message describing the ro state in a static buffer for logging.
+ * May crop at TT_STATIC_BUF_LEN.
+ */
+static const char *
+box_ro_state_msg(void)
+{
+	char *buf = tt_static_buf();
+	VERIFY(box_ro_state_msg_snprint(buf, TT_STATIC_BUF_LEN) > 0);
+	return buf;
 }
 
 void
@@ -442,9 +453,7 @@ box_update_ro_summary(void)
 				txn_set_flags(txn, TXN_IS_ABORTED_RO_NODE);
 			}
 		}
-		char *buf = tt_static_buf();
-		VERIFY(box_ro_state_msg(buf, TT_STATIC_BUF_LEN) == 0);
-		say_info("box switched to read-only - %s", buf);
+		say_info("box switched to read-only - %s", box_ro_state_msg());
 	} else {
 		say_info("box switched to rw");
 	}
@@ -482,9 +491,7 @@ box_check_writable(void)
 		return 0;
 	struct error *e = diag_set(ClientError, ER_READONLY);
 	struct raft *raft = box_raft();
-	char *buf = tt_static_buf();
-	VERIFY(box_ro_state_msg(buf, TT_STATIC_BUF_LEN) == 0);
-	error_append_msg(e, " - %s", buf);
+	error_append_msg(e, " - %s", box_ro_state_msg());
 	error_set_str(e, "reason", box_ro_reason());
 	/*
 	 * In case of multiple reasons at the same time only one is reported.

@@ -864,13 +864,9 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format)
 int
 tuple_snprint(char *buf, int size, struct tuple *tuple)
 {
-	int total = 0;
-	if (tuple == NULL) {
-		SNPRINT(total, snprintf, buf, size, "<NULL>");
-		return total;
-	}
-	SNPRINT(total, mp_snprint, buf, size, tuple_data(tuple));
-	return total;
+	if (tuple == NULL)
+		return snprintf(buf, size, "<NULL>");
+	return mp_snprint(buf, size, tuple_data(tuple));
 }
 
 const char *

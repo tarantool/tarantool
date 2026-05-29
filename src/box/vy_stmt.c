@@ -860,12 +860,10 @@ vy_key_from_xrow(struct xrow_header *xrow, struct key_def *cmp_def,
 int
 vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 {
+	if (stmt == NULL)
+		return snprintf(buf, size, "<NULL>");
 	int total = 0;
 	uint32_t mp_size;
-	if (stmt == NULL) {
-		SNPRINT(total, snprintf, buf, size, "<NULL>");
-		return total;
-	}
 	if (vy_stmt_type(stmt) == 0) {
 		SNPRINT(total, mp_snprint, buf, size, tuple_data(stmt));
 		return total;

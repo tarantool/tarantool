@@ -154,23 +154,21 @@ mem_snprintf(char *buf, size_t size, const struct Mem *mem)
 		break;
 	}
 	case MEM_TYPE_DEC:
-		res = snprintf(buf, size, "%s", decimal_str(&mem->u.d));
+		res = decimal_snprint(buf, size, &mem->u.d);
 		break;
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY:
 		res = mp_snprint(buf, size, mem->z);
 		break;
 	case MEM_TYPE_UUID:
-		res = snprintf(buf, size, "%s", tt_uuid_str(&mem->u.uuid));
+		res = tt_uuid_snprint(buf, size, &mem->u.uuid);
 		break;
 	case MEM_TYPE_DATETIME: {
-		char str[DT_TO_STRING_BUFSIZE];
-		datetime_to_string(&mem->u.dt, str, DT_TO_STRING_BUFSIZE);
-		res = snprintf(buf, size, "%s", str);
+		res = datetime_snprint(buf, size, &mem->u.dt);
 		break;
 	}
 	case MEM_TYPE_INTERVAL:
-		res = interval_to_string(&mem->u.itv, buf, size);
+		res = interval_snprint(buf, size, &mem->u.itv);
 		break;
 	case MEM_TYPE_BOOL:
 		res = snprintf(buf, size, mem->u.b ? "TRUE" : "FALSE");
@@ -1282,8 +1280,7 @@ datetime_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DATETIME);
 	char buf[DT_TO_STRING_BUFSIZE];
-	size_t len = datetime_to_string(&mem->u.dt, buf,
-					DT_TO_STRING_BUFSIZE);
+	size_t len = datetime_snprint(buf, DT_TO_STRING_BUFSIZE, &mem->u.dt);
 	assert(len == strlen(buf));
 	mem_copy_str(mem, buf, len);
 	return 0;
@@ -1295,8 +1292,8 @@ interval_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_INTERVAL);
 	char buf[DT_IVAL_TO_STRING_BUFSIZE];
-	size_t len = interval_to_string(&mem->u.itv, buf,
-					DT_IVAL_TO_STRING_BUFSIZE);
+	size_t len = interval_snprint(buf, DT_IVAL_TO_STRING_BUFSIZE,
+				      &mem->u.itv);
 	assert(len == strlen(buf));
 	mem_copy_str(mem, buf, len);
 	return 0;

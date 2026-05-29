@@ -139,6 +139,9 @@ uri_set_copy(struct uri_set *dst, const struct uri_set *src);
 bool
 uri_set_is_equal(const struct uri_set *a, const struct uri_set *b);
 
+/**
+ * Implements snprintf-style (may be used with SNPRINT macro).
+ */
 int
 uri_format(char *str, int len, const struct uri *uri, bool write_password);
 
