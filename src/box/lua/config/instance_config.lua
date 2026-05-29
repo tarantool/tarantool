@@ -496,6 +496,12 @@ return schema.new('instance_config', schema.record({
                 schema.enum({
                     'off',
                 }),
+                schema.record({
+                    transparent_huge_pages = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                }),
             },
             discriminator = discriminators['config.checks'],
         }),
