@@ -166,6 +166,19 @@ I['config.checks'] = format_text([[
     via a background fiber, so that runtime changes are detected automatically.
 ]])
 
+I['config.checks.transparent_huge_pages'] = format_text([[
+    Whether to check if Transparent Huge Pages (THP) are enabled.
+    THP may cause memory fragmentation and latency spikes in
+    database workloads.
+
+    When enabled, the check generates a warning alert if THP is set
+    to `always` or `madvise` mode.
+
+    To disable THP temporarily:
+        `echo never > /sys/kernel/mm/transparent_hugepage/enabled`
+    For a persistent fix, configure THP according to your OS distribution.
+]])
+
 -- }}} checks configuration
 
 -- {{{ audit_log configuration
