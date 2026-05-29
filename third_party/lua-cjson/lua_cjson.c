@@ -413,13 +413,13 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
         case MP_DATETIME:
         {
             char buf[DT_TO_STRING_BUFSIZE];
-            size_t sz = datetime_to_string(field.dateval, buf, sizeof(buf));
+            size_t sz = datetime_snprint(buf, sizeof(buf), field.dateval);
             return json_append_string(cfg, json, buf, sz);
         }
         case MP_INTERVAL:
         {
             char buf[DT_IVAL_TO_STRING_BUFSIZE];
-            size_t sz = interval_to_string(field.interval, buf, sizeof(buf));
+            size_t sz = interval_snprint(buf, sizeof(buf), field.interval);
             return json_append_string(cfg, json, buf, sz);
         }
         default:

@@ -50,6 +50,7 @@ struct tnt_tm {
  * which has been extended with %f (fractions of second)
  * flag support. In all other aspect it's behaving exactly
  * like standard strftime.
+ * Implements snprintf-style (may be used with SNPRINT macro).
  * @sa strftime()
  */
 size_t

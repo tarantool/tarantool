@@ -140,7 +140,7 @@ mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len)
 	if (datetime_unpack(data, len, &date) == NULL)
 		return -1;
 
-	return datetime_to_string(&date, buf, size);
+	return datetime_snprint(buf, size, &date);
 }
 
 int
@@ -157,7 +157,7 @@ mp_fprint_datetime(FILE *file, const char **data, uint32_t len)
 		return -1;
 
 	char buf[DT_TO_STRING_BUFSIZE];
-	datetime_to_string(&date, buf, sizeof(buf));
+	datetime_snprint(buf, sizeof(buf), &date);
 
 	return fprintf(file, "%s", buf);
 }

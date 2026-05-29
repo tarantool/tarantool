@@ -203,7 +203,7 @@ mp_snprint_interval(char *buf, int size, const char **data, uint32_t len)
 	struct interval itv;
 	if (interval_unpack(data, len, &itv) == NULL)
 		return -1;
-	return interval_to_string(&itv, buf, size);
+	return interval_snprint(buf, size, &itv);
 }
 
 int
@@ -212,8 +212,8 @@ mp_fprint_interval(FILE *file, const char **data, uint32_t len)
 	struct interval itv;
 	if (interval_unpack(data, len, &itv) == NULL)
 		return -1;
-	char *buf = tt_static_buf();
-	interval_to_string(&itv, buf, TT_STATIC_BUF_LEN);
+	char buf[DT_IVAL_TO_STRING_BUFSIZE];
+	interval_snprint(buf, DT_IVAL_TO_STRING_BUFSIZE, &itv);
 	return fprintf(file, "%s", buf);
 }
 
