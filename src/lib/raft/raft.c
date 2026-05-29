@@ -208,7 +208,7 @@ raft_has_split_vote(const struct raft *raft)
 }
 
 static int
-raft_scores_snprintf(const struct raft *raft, char *buf, int size)
+raft_scores_snprintf(char *buf, int size, const struct raft *raft)
 {
 	int total = 0;
 	bool is_empty = true;
@@ -231,7 +231,7 @@ static const char *
 raft_scores_str(const struct raft *raft)
 {
 	char *buf = tt_static_buf();
-	int rc = raft_scores_snprintf(raft, buf, TT_STATIC_BUF_LEN);
+	int rc = raft_scores_snprintf(buf, TT_STATIC_BUF_LEN, raft);
 	assert(rc >= 0);
 	(void)rc;
 	return buf;
@@ -370,53 +370,43 @@ raft_sm_follow_leader(struct raft *raft, uint32_t leader);
 static void
 raft_sm_become_candidate(struct raft *raft);
 
+/** raft_msg snprint-stringization. */
+static int
+raft_msg_snprint(char *buf, int size, const struct raft_msg *req)
+{
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size,
+		"{term: %llu", (unsigned long long)req->term);
+	if (req->vote != 0)
+		SNPRINT(total, snprintf, buf, size,
+			", vote: %u", req->vote);
+	if (req->leader_id != 0)
+		SNPRINT(total, snprintf, buf, size,
+			", leader: %u", req->leader_id);
+	if (req->is_leader_seen)
+		SNPRINT(total, snprintf, buf, size,
+			", leader is seen: true");
+	if (req->state != 0)
+		SNPRINT(total, snprintf, buf, size,
+			", state: %s", raft_state_str(req->state));
+	if (req->vclock != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", vclock: ");
+		SNPRINT(total, vclock_snprint, buf, size, req->vclock);
+	}
+	SNPRINT(total, snprintf, buf, size, "}");
+	return total;
+}
+
+/**
+ * raft_msg stringization to static buffer for logging.
+ * May crop at TT_STATIC_BUF_LEN.
+ */
 static const char *
 raft_msg_to_string(const struct raft_msg *req)
 {
-	char buf[1024];
-	int size = sizeof(buf);
-	char *pos = buf;
-	int rc = snprintf(pos, size, "{term: %llu",
-			  (unsigned long long)req->term);
-	assert(rc >= 0 && rc < size);
-	pos += rc;
-	size -= rc;
-	if (req->vote != 0) {
-		rc = snprintf(pos, size, ", vote: %u", req->vote);
-		assert(rc >= 0 && rc < size);
-		pos += rc;
-		size -= rc;
-	}
-	if (req->leader_id != 0) {
-		rc = snprintf(pos, size, ", leader: %u", req->leader_id);
-		assert(rc >= 0 && rc < size);
-		pos += rc;
-		size -= rc;
-	}
-	if (req->is_leader_seen) {
-		rc = snprintf(pos, size, ", leader is seen: true");
-		assert(rc >= 0 && rc < size);
-		pos += rc;
-		size -= rc;
-	}
-	if (req->state != 0) {
-		rc = snprintf(pos, size, ", state: %s",
-			      raft_state_str(req->state));
-		assert(rc >= 0 && rc < size);
-		pos += rc;
-		size -= rc;
-	}
-	if (req->vclock != NULL) {
-		rc = snprintf(pos, size, ", vclock: %s",
-			      vclock_to_string(req->vclock));
-		assert(rc >= 0 && rc < size);
-		pos += rc;
-		size -= rc;
-	}
-	rc = snprintf(pos, size, "}");
-	assert(rc >= 0 && rc < size);
-	pos += rc;
-	return tt_cstr(buf, pos - buf);
+	char *buf = tt_static_buf();
+	raft_msg_snprint(buf, TT_STATIC_BUF_LEN, req);
+	return buf;
 }
 
 void

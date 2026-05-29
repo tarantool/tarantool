@@ -274,7 +274,7 @@ uri_create(struct uri *uri, const char *str)
 }
 
 static int
-uri_format_param(char *str, int len, const struct uri_param *param)
+uri_param_snprint(char *str, int len, const struct uri_param *param)
 {
 	int total = 0;
 	if (param->value_count == 0) {
@@ -295,8 +295,8 @@ uri_format_param(char *str, int len, const struct uri_param *param)
  * write_sensitive option.
  */
 static int
-uri_format_params(char *str, int len, const struct uri *uri,
-		  bool write_sensitive)
+uri_params_snprint(char *str, int len, const struct uri *uri,
+		   bool write_sensitive)
 {
 	if (uri->param_count == 0)
 		return 0;
@@ -309,7 +309,7 @@ uri_format_params(char *str, int len, const struct uri *uri,
 			continue;
 		if (!no_params_printed)
 			SNPRINT(total, snprintf, str, len, "&");
-		SNPRINT(total, uri_format_param, str, len, &uri->params[i]);
+		SNPRINT(total, uri_param_snprint, str, len, &uri->params[i]);
 		no_params_printed = false;
 	}
 	return total;
@@ -346,7 +346,7 @@ uri_format(char *str, int len, const struct uri *uri, bool write_sensitive)
 		SNPRINT(total, snprintf, str, len, "%s", uri->path);
 	}
 	if (uri->params != NULL) {
-		SNPRINT(total, uri_format_params, str, len, uri,
+		SNPRINT(total, uri_params_snprint, str, len, uri,
 			write_sensitive);
 	}
 	if (uri->fragment != NULL) {

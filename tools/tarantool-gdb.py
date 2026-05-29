@@ -1137,7 +1137,7 @@ if find_type('struct datetime') is not None:
                 return False
             return True
 
-        def __str__(self): # datetime_to_string
+        def __str__(self): # datetime_snprint
             offset = self.val['tzoffset']
             tzindex = self.val['tzindex']
             rd_seconds = self.val['epoch'] + offset * 60 + self.SECS_EPOCH_1970_OFFSET
@@ -1221,7 +1221,7 @@ if find_type('struct interval') is not None:
             self.nsec = 0
             self.adjust = 0
 
-        def __str__(self): # interval_to_string
+        def __str__(self): # interval_snprint
             signed_fmt = [
                 '{:d}',
                 '{:+d}',

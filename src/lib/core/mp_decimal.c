@@ -77,7 +77,7 @@ mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len)
 	decimal_t d;
 	if (decimal_unpack(data, len, &d) == NULL)
 		return -1;
-	return snprintf(buf, size, "%s", decimal_str(&d));
+	return decimal_snprint(buf, size, &d);
 }
 
 int
