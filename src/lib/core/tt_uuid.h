@@ -111,6 +111,18 @@ tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
         return 0;
 }
 
+/** snprint-version of tt_uuid_to_string. */
+inline int
+tt_uuid_snprint(char *buf, int size, const struct tt_uuid *uu)
+{
+	return snprintf(buf, size,
+			"%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+			uu->time_low, uu->time_mid, uu->time_hi_and_version,
+			uu->clock_seq_hi_and_reserved, uu->clock_seq_low,
+			uu->node[0], uu->node[1], uu->node[2], uu->node[3],
+			uu->node[4], uu->node[5]);
+}
+
 /**
  * \brief Format UUID to RFC 4122 string.
  * \param uu uuid
@@ -119,11 +131,7 @@ tt_uuid_compare(const struct tt_uuid *a, const struct tt_uuid *b)
 inline void
 tt_uuid_to_string(const struct tt_uuid *uu, char *out)
 {
-	snprintf(out, UUID_STR_LEN + 1,
-		"%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		uu->time_low, uu->time_mid, uu->time_hi_and_version,
-		uu->clock_seq_hi_and_reserved, uu->clock_seq_low, uu->node[0],
-		uu->node[1], uu->node[2], uu->node[3], uu->node[4], uu->node[5]);
+	tt_uuid_snprint(out, UUID_STR_LEN + 1, uu);
 }
 
 /**

@@ -97,7 +97,7 @@ mp_snprint_uuid(char *buf, int size, const char **data, uint32_t len)
 	struct tt_uuid uuid;
 	if (uuid_unpack(data, len, &uuid) == NULL)
 		return -1;
-	return snprintf(buf, size, "%s", tt_uuid_str(&uuid));
+	return tt_uuid_snprint(buf, size, &uuid);
 }
 
 int
