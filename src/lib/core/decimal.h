@@ -246,6 +246,10 @@ decimal_from_uint64(decimal_t *dec, uint64_t num);
 const char *
 decimal_str(const decimal_t *dec);
 
+/** snprint-interface for decimal_to_string. */
+int
+decimal_snprint(char *buf, int size, const decimal_t *dec);
+
 /** Write the decimal as a string into the passed buffer. */
 void
 decimal_to_string(const decimal_t *dec, char *str);

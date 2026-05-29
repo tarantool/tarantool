@@ -12,7 +12,7 @@ size_t
 tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
 		      const char *fmt)
 {
-	return datetime_strftime(date, buf, len, fmt);
+	return datetime_strftime(buf, len, fmt, date);
 }
 
 size_t
@@ -30,7 +30,7 @@ tnt_datetime_now(struct datetime *now)
 size_t
 tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 {
-	return datetime_to_string(date, buf, len);
+	return datetime_snprint(buf, len, date);
 }
 
 ssize_t
@@ -61,7 +61,7 @@ tnt_datetime_totable(const struct datetime *date, struct interval *out)
 size_t
 tnt_interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 {
-	return interval_to_string(ival, buf, len);
+	return interval_snprint(buf, len, ival);
 }
 
 int
