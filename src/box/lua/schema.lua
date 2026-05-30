@@ -2150,6 +2150,27 @@ base_index_mt.random_luac = function(index, rnd)
     return internal.random(index.space_id, index.id, rnd);
 end
 -- iteration
+
+-- Wrap an iterator generator so that it reschedules the current fiber once
+-- every `period` tuples it produces. Implements the `yield_period` pairs()
+-- option, letting a long scan cooperate with the event loop instead of
+-- hogging the cord. The counter lives in the closure, so each pairs() call
+-- gets its own independent state.
+local function iterator_gen_with_yield(gen, period)
+    local n = 0
+    return function(param, state)
+        local next_state, tuple = gen(param, state)
+        if next_state ~= nil then
+            n = n + 1
+            if n >= period then
+                n = 0
+                fiber.yield()
+            end
+        end
+        return next_state, tuple
+    end
+end
+
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
     -- Encode the key on cord ibuf. Note, since the ibuf may be
@@ -2160,7 +2181,8 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     tuple_encode(ibuf, key, 2)
     local key_size = ibuf:size()
     local svp = builtin.box_region_used()
-    local itype, after, offset = check_pairs_opts(opts, key_size <= 1, 2)
+    local itype, after, offset, yield_period =
+        check_pairs_opts(opts, key_size <= 1, 2)
     local ok = iterator_pos_set(index, after, ibuf, 2)
     local keybuf = ffi.string(ibuf.rpos, key_size)
     cord_ibuf_put(ibuf)
@@ -2175,18 +2197,27 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     if cdata == nil then
         box.error(box.error.last(), 2)
     end
-    return fun.wrap(iterator_gen, keybuf,
+    local gen = iterator_gen
+    if yield_period ~= nil and yield_period > 0 then
+        gen = iterator_gen_with_yield(iterator_gen, yield_period)
+    end
+    return fun.wrap(gen, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs', 2)
     key = keify(key)
-    local itype, after, offset = check_pairs_opts(opts, #key == 0, 2)
+    local itype, after, offset, yield_period =
+        check_pairs_opts(opts, #key == 0, 2)
     local keymp = msgpack.encode(key)
     local keybuf = ffi.string(keymp, #keymp)
     local cdata = internal.iterator(index.space_id, index.id, itype, keymp,
         after, offset, 2);
-    return fun.wrap(iterator_gen_luac, keybuf,
+    local gen = iterator_gen_luac
+    if yield_period ~= nil and yield_period > 0 then
+        gen = iterator_gen_with_yield(iterator_gen_luac, yield_period)
+    end
+    return fun.wrap(gen, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
 
