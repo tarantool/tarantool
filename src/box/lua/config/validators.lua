@@ -332,6 +332,25 @@ end
 
 -- }}} lua
 
+-- {{{ metrics
+
+M['metrics.include'] = function(data, w)
+    local seen = {}
+
+    for _, metric in ipairs(data) do
+        if seen[metric] then
+            return w.error(('Duplicate metric group or selector: %q')
+                :format(metric))
+        end
+
+        seen[metric] = true
+    end
+end
+
+M['metrics.exclude'] = M['metrics.include']
+
+-- }}} metrics
+
 -- {{{ replication
 
 M['replication.autoexpel'] = function(data, w)
