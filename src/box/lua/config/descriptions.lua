@@ -2112,20 +2112,18 @@ I['metrics'] = format_text([[
 ]])
 
 I['metrics.exclude'] = format_text([[
-    An array containing groups of metrics to turn off. The array can
-    contain the same values as the `exclude` configuration parameter
-    passed to `metrics.cfg()`.
+    An array containing built-in metric groups or custom metric selectors to
+    turn off. The values are passed to `metrics.cfg()`.
 ]])
 
-I['metrics.exclude.*'] = 'A name of a group of metrics.'
+I['metrics.exclude.*'] = 'A name of a metric group or selector.'
 
 I['metrics.include'] = format_text([[
-    An array containing groups of metrics to turn on. The array can
-    contain the same values as the `include` configuration parameter
-    passed to `metrics.cfg()`.
+    An array containing built-in metric groups or custom metric selectors to
+    turn on. The values are passed to `metrics.cfg()`.
 ]])
 
-I['metrics.include.*'] = 'A name of a group of metrics.'
+I['metrics.include.*'] = 'A name of a metric group or selector.'
 
 I['metrics.labels'] = 'Global labels to be added to every observation.'
 

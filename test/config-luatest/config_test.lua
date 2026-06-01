@@ -946,6 +946,74 @@ g.test_metrics_options = function()
     end)
 end
 
+g.test_metrics_custom_selectors = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+        metrics:
+          include:
+            - cpu
+            - roles.crud-router
+          exclude:
+            - roles.crud-router.crud_errors
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]
+
+    local config_file = treegen.write_file(dir, 'base_config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+    g.server:exec(function()
+        local metrics = require('metrics')
+        local crud = metrics.namespace('roles.crud-router')
+        local queue = metrics.namespace('roles.queue')
+
+        crud:gauge('crud_requests'):set(1)
+        crud:gauge('crud_errors'):set(1)
+        queue:gauge('queue_requests'):set(1)
+
+        local observations = metrics.collect()
+        local function has_metric(name)
+            for _, obs in ipairs(observations) do
+                if obs.metric_name == name then
+                    return true
+                end
+            end
+            return false
+        end
+
+        t.assert_equals(box.cfg.metrics.include, {
+            'cpu',
+            'roles.crud-router',
+        })
+        t.assert_equals(box.cfg.metrics.exclude, {
+            'roles.crud-router.crud_errors',
+        })
+        t.assert(has_metric('crud_requests'))
+        t.assert_not(has_metric('crud_errors'))
+        t.assert_not(has_metric('queue_requests'))
+    end)
+end
+
 g.test_metrics_1_3_0_options = function()
     local dir = treegen.prepare_directory({}, {})
     local config = [[

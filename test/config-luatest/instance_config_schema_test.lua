@@ -1728,8 +1728,8 @@ end
 g.test_metrics = function()
     local iconfig = {
         metrics = {
-            include = {'network', 'info', 'cpu'},
-            exclude = {'info'},
+            include = {'network', 'info', 'cpu', 'roles.crud-router'},
+            exclude = {'info', 'roles.crud-storage.custom_metric'},
             labels = {foo = 'bar'},
         }
     }
