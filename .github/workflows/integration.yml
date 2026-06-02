@@ -149,12 +149,11 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
-  # FIXME: Disabled due to https://jira.vk.team/browse/TNTP-7897
-  # crud:
-  #   needs: tarantool
-  #   uses: tarantool/crud/.github/workflows/reusable_test.yml@master
-  #   with:
-  #     artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
+  crud:
+    needs: tarantool
+    uses: tarantool/crud/.github/workflows/reusable_test.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
   # FIXME: Disabled due to tarantool/ddl#130.
   # ddl:
