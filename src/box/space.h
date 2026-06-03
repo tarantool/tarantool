@@ -236,6 +236,11 @@ struct space {
 	/** This space has foreign key constraints in its format. */
 	bool has_foreign_keys;
 	/**
+	 * This space has functional constraints in its format,
+	 * either at the tuple or field level.
+	 */
+	bool has_func_constraints;
+	/**
 	 * Space format, cannot be NULL.
 	 */
 	struct tuple_format *format;

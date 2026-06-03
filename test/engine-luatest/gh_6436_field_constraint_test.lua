@@ -303,7 +303,7 @@ g.test_field_constraint_upsert_update = function(cg)
         s:replace{1, 50}
     end, {engine})
 
-    local function check(engine)
+    local function check()
         local s = box.space.test
 
         t.assert_error_msg_content_equals(
@@ -311,28 +311,24 @@ g.test_field_constraint_upsert_update = function(cg)
             function() s:update({1}, {{'+', 2, 50}}) end
         )
 
-        if engine == 'memtx' then
-            t.assert_error_msg_content_equals(
-                "Check constraint 'field_constr' failed for field '2 (id2)'",
-                function() s:upsert({1, 50}, {{'+', 2, 50}}) end
-            )
-        else
-            s:upsert({1, 50}, {{'+', 2, 50}})
-        end
+        t.assert_error_msg_content_equals(
+            "Check constraint 'field_constr' failed for field '2 (id2)'",
+            function() s:upsert({1, 50}, {{'+', 2, 50}}) end
+        )
 
         t.assert_equals(s:select{}, {{1, 50}})
     end
 
-    cg.server:exec(check, {engine})
+    cg.server:exec(check)
 
     cg.server:restart()
 
-    cg.server:exec(check, {engine})
+    cg.server:exec(check)
 
     cg.server:eval('box.snapshot()')
     cg.server:restart()
 
-    cg.server:exec(check, {engine})
+    cg.server:exec(check)
 end
 
 g.test_field_constraint_nullable = function(cg)
