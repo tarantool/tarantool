@@ -149,7 +149,7 @@ msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
 		break;
 	case MP_TUPLE:
 		if (mp_validate_tuple(data, len) != 0) {
-			diag_set(ClientError, ER_INVALID_MSGPACK,
+			diag_add(ClientError, ER_INVALID_MSGPACK,
 				 "cannot unpack tuple");
 			goto out;
 		}

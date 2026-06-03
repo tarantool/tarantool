@@ -99,16 +99,35 @@ int
 mp_validate_tuple(const char *data, uint32_t len)
 {
 	const char *end = data + len;
-	if (data == end)
+	if (data == end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing format id");
 		return -1;
+	}
 	enum mp_type type = mp_typeof(*data);
-	if (type != MP_UINT || mp_check_uint(data, end) > 0)
+	if (type != MP_UINT || mp_check_uint(data, end) > 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "malformed format id");
 		return -1;
+	}
 
 	mp_next(&data);
-	if (data == end)
+	if (data == end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing tuple MsgPack");
 		return -1;
-	if (mp_typeof(*data) != MP_ARRAY)
+	}
+	if (mp_typeof(*data) != MP_ARRAY) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "tuple MsgPack is not array");
 		return -1;
-	return mp_check(&data, end) != 0 || data != end;
+	}
+	if (mp_check(&data, end) != 0)
+		return -1;
+	if (data != end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "junk after tuple MsgPack");
+		return -1;
+	}
+	return 0;
 }
