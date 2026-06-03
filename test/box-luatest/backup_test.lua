@@ -168,6 +168,105 @@ g.test_backup_xlogs_pinned = function(cg)
     end)
 end
 
+g.test_backup_info = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        -- Basic case.
+        for i = 1, 10 do
+            s:insert({i})
+        end
+        t.assert_equals(box.backup.info(), nil)
+        local vclock = box.info.vclock
+        local files = box.backup.start()
+        for i = 11, 20 do
+            s:insert({i})
+        end
+        t.assert_equals(box.backup.info(), {
+            files = files,
+            vclock = vclock,
+        })
+        box.backup.stop()
+        t.assert_equals(box.backup.info(), nil)
+
+        -- Case when there is no xlogs.
+        box.snapshot()
+        local vclock = box.info.vclock
+        local files = box.backup.start()
+        t.assert_equals(box.backup.info(), {
+            files = files,
+            vclock = vclock,
+        })
+        box.backup.stop()
+
+        -- Case when backup is not based on latest snapshot.
+        s:insert({21})
+        box.snapshot()
+        local files = box.backup.start(1)
+        t.assert_equals(box.backup.info(), {
+            files = files,
+            vclock = vclock,
+        })
+        box.backup.stop()
+    end)
+end
+
+g.after_test('test_backup_concurrent_info', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
+end)
+
+g.test_backup_concurrent_info = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        fiber.create(s.insert, s, {1})
+        fiber.create(box.backup.start)
+        t.assert_equals(box.backup.info(), nil)
+    end)
+end
+
+g.after_test('test_backup_concurrent_info', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
+end)
+
+g.test_backup_concurrent_start = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        fiber.create(s.insert, s, {1})
+        fiber.create(box.backup.start)
+        local f = fiber.new(box.backup.start)
+        f:set_joinable(true)
+        fiber.yield()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        local ok, err = f:join()
+        t.assert_not(ok)
+        t.assert_covers(err:unpack(), {
+            type = 'ClientError',
+            code = box.error.BACKUP_IN_PROGRESS,
+        })
+    end)
+end
+
 local g1 = t.group('replication')
 
 g1.before_all(function(cg)

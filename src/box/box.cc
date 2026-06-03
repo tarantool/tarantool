@@ -146,14 +146,8 @@ bool box_is_force_recovery = false;
 waiting_for_own_rows_trigger
 	box_check_waiting_for_own_rows_trigger;
 
-/**
- * If backup is in progress, this points to the gc reference
- * object that prevents the garbage collector from deleting
- * the checkpoint files that are currently being backed up.
- *
- * If there is no in-progress backup, is set to NULL.
- */
-static struct gc_checkpoint_ref *backup_gc;
+/** Backup in progress. */
+struct box_backup *box_backup;
 
 static struct latch backup_latch = LATCH_INITIALIZER(backup_latch);
 
@@ -5993,15 +5987,54 @@ box_checkpoint_async(void)
 	gc_trigger_checkpoint();
 }
 
+/**
+ * Add @path to backup passed in @arg.
+ */
+static int
+box_backup_add_path(const char *path, void *arg)
+{
+	struct box_backup *backup = (struct box_backup *)arg;
+	enum {
+#ifdef NDEBUG
+		START_FILE_CAPACITY = 16,
+#else
+		START_FILE_CAPACITY = 1,
+#endif
+	};
+	if (backup->file_count >= backup->file_capacity) {
+		if (backup->file_capacity != 0)
+			backup->file_capacity *= 2;
+		else
+			backup->file_capacity = START_FILE_CAPACITY;
+		backup->files = (char **)
+			xrealloc(backup->files,
+				 backup->file_capacity * sizeof(char *));
+	}
+	backup->files[backup->file_count++] = (char *)xstrdup(path);
+	return 0;
+}
+
+static void
+box_backup_free(struct box_backup *backup)
+{
+	for (int i = 0; i < backup->file_count; i++)
+		free(backup->files[i]);
+	free(backup->files);
+	gc_unref_checkpoint(backup->gc_checkpoint_ref);
+	TRASH(backup);
+	free(backup);
+}
+
 int
-box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
+box_backup_start(int checkpoint_idx)
 {
 	assert(checkpoint_idx >= 0);
-	if (backup_gc != NULL) {
+	latch_lock(&backup_latch);
+	if (box_backup != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
+		latch_unlock(&backup_latch);
 		return -1;
 	}
-	latch_lock(&backup_latch);
 	struct gc_checkpoint *checkpoint;
 	int i = 0;
 	gc_foreach_checkpoint_reverse(checkpoint) {
@@ -6013,24 +6046,31 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		latch_unlock(&backup_latch);
 		return -1;
 	}
-	backup_gc = gc_ref_checkpoint(checkpoint, "backup");
+	struct box_backup *backup =
+		(struct box_backup *)xmalloc(sizeof(*box_backup));
+	memset(backup, 0, sizeof(*backup));
+	backup->gc_checkpoint_ref = gc_ref_checkpoint(checkpoint, "backup");
 	if (checkpoint_idx == 0) {
 		struct box_checkpoint box_ckpt;
 		if (box_checkpoint_build_for_journal(&box_ckpt) != 0)
 			goto error;
-		if (engine_backup(&checkpoint->vclock, cb, cb_arg) != 0)
+		if (engine_backup(&checkpoint->vclock,
+				  box_backup_add_path, backup) != 0)
 			goto error;
 		wal_backup(&checkpoint->vclock, &box_ckpt.journal.vclock,
-			   cb, cb_arg);
+			   box_backup_add_path, backup);
+		vclock_copy(&backup->vclock, &box_ckpt.journal.vclock);
 	} else {
-		if (engine_backup(&checkpoint->vclock, cb, cb_arg) != 0)
+		if (engine_backup(&checkpoint->vclock,
+				  box_backup_add_path, backup) != 0)
 			goto error;
+		vclock_copy(&backup->vclock, &checkpoint->vclock);
 	}
+	box_backup = backup;
 	latch_unlock(&backup_latch);
 	return 0;
 error:
-	gc_unref_checkpoint(backup_gc);
-	backup_gc = NULL;
+	box_backup_free(backup);
 	latch_unlock(&backup_latch);
 	return -1;
 }
@@ -6038,12 +6078,10 @@ error:
 void
 box_backup_stop(void)
 {
-	latch_lock(&backup_latch);
-	if (backup_gc != NULL) {
-		gc_unref_checkpoint(backup_gc);
-		backup_gc = NULL;
+	if (box_backup != NULL) {
+		box_backup_free(box_backup);
+		box_backup = NULL;
 	}
-	latch_unlock(&backup_latch);
 }
 
 API_EXPORT const char *

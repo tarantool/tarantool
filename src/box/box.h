@@ -32,6 +32,7 @@
  */
 #include "trivia/util.h"
 #include "trigger.h"
+#include "vclock/vclock.h"
 
 #include <stdbool.h>
 
@@ -290,11 +291,30 @@ int box_checkpoint(void);
 void
 box_checkpoint_async(void);
 
-typedef int (*box_backup_cb)(const char *path, void *arg);
+/**
+ * Box backup.
+ */
+struct box_backup {
+	/** Files comprising backup. */
+	char **files;
+	/** Capacity of files. */
+	int file_capacity;
+	/** Number of files. */
+	int file_count;
+	/** Maximum vclock that can be restored using backup. */
+	struct vclock vclock;
+	/**
+	 * Point to the gc reference object that prevents the garbage
+	 * collector from deleting the checkpoint file (and implicitly
+	 * backup WAL files) that are currently being backed up.
+	 */
+	struct gc_checkpoint_ref *gc_checkpoint_ref;
+};
+
+extern struct box_backup *box_backup;
 
 /**
- * Start a backup. This function calls @cb for each file that
- * needs to be backed up to recover from the specified checkpoint.
+ * Start a backup.
  *
  * The checkpoint is given by @checkpoint_idx. If @checkpoint_idx
  * is 0, the last checkpoint will be backed up; if it is 1, next
@@ -304,7 +324,7 @@ typedef int (*box_backup_cb)(const char *path, void *arg);
  * done copying the files.
  */
 int
-box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg);
+box_backup_start(int checkpoint_idx);
 
 /**
  * Finish backup started with box_backup_start().
