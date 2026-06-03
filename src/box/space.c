@@ -180,10 +180,13 @@ space_init_constraints(struct space *space)
 	assert(space->def != NULL);
 	struct tuple_format *format = space->format;
 	bool has_foreign_keys = false;
+	bool has_func_constraints = false;
 	for (size_t j = 0; j < format->constraint_count; j++) {
 		struct tuple_constraint *constr = &format->constraint[j];
 		has_foreign_keys = has_foreign_keys ||
 				   constr->def.type == CONSTR_FKEY;
+		has_func_constraints = has_func_constraints ||
+				       constr->def.type == CONSTR_FUNC;
 		if (constr->check != tuple_constraint_noop_check)
 			continue;
 		if (constr->def.type == CONSTR_FUNC) {
@@ -202,6 +205,8 @@ space_init_constraints(struct space *space)
 			struct tuple_constraint *constr = &field->constraint[j];
 			has_foreign_keys = has_foreign_keys ||
 					   constr->def.type == CONSTR_FKEY;
+			has_func_constraints = has_func_constraints ||
+					       constr->def.type == CONSTR_FUNC;
 			if (constr->check != tuple_constraint_noop_check)
 				continue;
 			if (constr->def.type == CONSTR_FUNC) {
@@ -218,6 +223,7 @@ space_init_constraints(struct space *space)
 		}
 	}
 	space->has_foreign_keys = has_foreign_keys;
+	space->has_func_constraints = has_func_constraints;
 	return 0;
 }
 

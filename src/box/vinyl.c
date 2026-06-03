@@ -2219,7 +2219,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 
 	if (space->index_count == 1 && !space_has_on_replace_triggers(space) &&
-	    !space->has_foreign_keys && space->wal_ext == NULL)
+	    !space->has_foreign_keys && !space->has_func_constraints &&
+	    space->wal_ext == NULL)
 		return vy_lsm_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
 	const char *old_tuple, *old_tuple_end;
