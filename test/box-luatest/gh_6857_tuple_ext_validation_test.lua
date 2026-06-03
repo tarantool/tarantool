@@ -59,7 +59,7 @@ end
 -- msgpack encoded string of any of these types represents a valid value.
 -- This isn't true for extension types, however. Types like decimal, uuid and
 -- others have complex internal structure, which requires additional validation.
-g.test_extension_tuple_validation = function()
+g.test_extension_types_validation = function()
     local correct_data = {
         ['decimal'] = msgpack.encode(decimal.new(fiber.time())),
         ['uuid'] = msgpack.encode(uuid.new()),
@@ -123,6 +123,34 @@ g.test_mp_check_recursion_limit = function()
         code = box.error.INVALID_MSGPACK,
         message = 'Invalid MsgPack - too much nesting',
     })
+
+    c:close()
+end
+
+g.test_extension_tuple_validation = function()
+    local c = net_box.connect(g.cluster.servers[1].net_box_uri)
+    t.assert_equals(c.state, 'active', 'Connection established')
+
+    local function check(data, details)
+        local ok, err = pcall(inject_call, c, string.fromhex(data))
+        t.assert_not(ok)
+        while err.prev ~= nil do
+            err = err.prev
+        end
+        t.assert_covers(err:unpack(), {
+            type = 'ClientError',
+            name = 'INVALID_MSGPACK',
+            details = details,
+        })
+    end
+
+    -- Check tuple validation.
+    check('c70007', 'missing format id')
+    check('c70107c2', 'malformed format id')
+    check('c70107cc', 'malformed format id')
+    check('c7010701', 'missing tuple MsgPack')
+    check('c702070101', 'tuple MsgPack is not array')
+    check('c7040701910100', 'junk after tuple MsgPack')
 
     c:close()
 end
