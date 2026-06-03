@@ -792,24 +792,6 @@ lbox_snapshot(struct lua_State *L)
 	return luaT_error(L);
 }
 
-/** Argument passed to lbox_backup_fn(). */
-struct lbox_backup_arg {
-	/** Lua state. */
-	struct lua_State *L;
-	/** Number of files in the resulting table. */
-	int file_count;
-};
-
-static int
-lbox_backup_cb(const char *path, void *cb_arg)
-{
-	struct lbox_backup_arg *arg = cb_arg;
-	lua_pushinteger(arg->L, ++arg->file_count);
-	lua_pushstring(arg->L, path);
-	lua_settable(arg->L, -3);
-	return 0;
-}
-
 static int
 lbox_backup_start(struct lua_State *L)
 {
@@ -821,12 +803,15 @@ lbox_backup_start(struct lua_State *L)
 			return luaT_error(L);
 		}
 	}
-	lua_newtable(L);
-	struct lbox_backup_arg arg = {
-		.L = L,
-	};
-	if (box_backup_start(checkpoint_idx, lbox_backup_cb, &arg) != 0)
+	if (box_backup_start(checkpoint_idx) != 0)
 		return luaT_error(L);
+
+	lua_createtable(L, box_backup->file_count, 0);
+	for (int i = 0; i < box_backup->file_count; i++) {
+		lua_pushstring(L, box_backup->files[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+
 	return 1;
 }
 
@@ -836,6 +821,34 @@ lbox_backup_stop(struct lua_State *L)
 	(void)L;
 	box_backup_stop();
 	return 0;
+}
+
+/**
+ * Get info about backup in progress as table on stack. In case there
+ * is no backup nil is returned.
+ */
+static int
+lbox_backup_info(struct lua_State *L)
+{
+	struct box_backup *backup = box_backup;
+	if (backup == NULL) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_createtable(L, 0, 2);
+
+	lua_createtable(L, backup->file_count, 0);
+	for (int i = 0; i < backup->file_count; i++) {
+		lua_pushstring(L, backup->files[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+	lua_setfield(L, -2, "files");
+
+	luaT_pushvclock(L, &backup->vclock);
+	lua_setfield(L, -2, "vclock");
+
+	return 1;
 }
 
 static const struct luaL_Reg boxlib[] = {
@@ -851,6 +864,7 @@ static const struct luaL_Reg boxlib[] = {
 static const struct luaL_Reg boxlib_backup[] = {
 	{"start", lbox_backup_start},
 	{"stop", lbox_backup_stop},
+	{"info", lbox_backup_info},
 	{NULL, NULL}
 };
 
