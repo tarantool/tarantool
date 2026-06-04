@@ -57,8 +57,6 @@ LIST(APPEND BROKEN_LUZER_TESTS
   box_execute_test.lua
   # To be enabled in scope tarantool/tarantool#11898.
   json_decode_test.lua
-  # To be enabled in scope tarantool/security#153.
-  console_eval_test.lua
 )
 
 if(OSS_FUZZ)

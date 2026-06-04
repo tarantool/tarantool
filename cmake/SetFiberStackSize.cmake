@@ -1,12 +1,21 @@
 # This module provides a CMake configuration variable to set
 # fiber stack size. If no value is given the default size equals
-# to 512Kb (see https://github.com/tarantool/tarantool/issues/3418
-# for more info). Possible types of values are described below.
+# to 512Kb (see [1] and [2] for more info). Possible types of values
+# are described below.
 # The given size is converted to bytes and aligned up to be
 # multiple of 4Kb. As a result the corresponding define value is
 # propagated to the sources.
+# 1. https://github.com/tarantool/tarantool/issues/3418
+# 2. https://github.com/tarantool/security/issues/153
 
-set(FIBER_STACK_SIZE "524288" CACHE STRING "Fiber stack size")
+if (ENABLE_ASAN AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND
+    CMAKE_C_COMPILER_ID MATCHES "Clang")
+    set(FIBER_STACK_SIZE "1Mb" CACHE STRING "Fiber stack size")
+    set(FIBER_STACK_SIZE_IN_BYTES_MIN 1048576)
+else()
+    set(FIBER_STACK_SIZE "512Kb" CACHE STRING "Fiber stack size")
+    set(FIBER_STACK_SIZE_IN_BYTES_MIN 524288)
+endif()
 
 # Possible values of the stack size:
 # * Just a bunch of digits: the size is given in bytes
@@ -27,10 +36,10 @@ endif()
 math(EXPR FIBER_STACK_SIZE_IN_BYTES
     "((${FIBER_STACK_SIZE_IN_BYTES} >> 12) + 1) << 12")
 
-# See the rationale for the minimal fiber stack size in
-# https://github.com/tarantool/tarantool/issues/3418.
-if(FIBER_STACK_SIZE_IN_BYTES LESS 524288)
-    message(FATAL_ERROR "[SetFiberStackSize] Minimal fiber stack size is 512Kb,"
+# See the rationale for the minimal fiber stack size in [1] and [2].
+if(FIBER_STACK_SIZE_IN_BYTES LESS FIBER_STACK_SIZE_IN_BYTES_MIN)
+    message(FATAL_ERROR "[SetFiberStackSize] Minimal fiber stack size is"
+        " ${FIBER_STACK_SIZE_IN_BYTES_MIN},"
         " but ${FIBER_STACK_SIZE} is given as a default")
 else()
     message(STATUS "[SetFiberStackSize] Default fiber stack size: "
@@ -41,5 +50,6 @@ endif()
 add_definitions(-DFIBER_STACK_SIZE_DEFAULT=${FIBER_STACK_SIZE_IN_BYTES})
 
 # XXX: Unset variables to avoid spoiliing CMake environment.
+unset(FIBER_STACK_SIZE_IN_BYTES_MIN)
 unset(FIBER_STACK_SIZE_IN_BYTES)
 unset(FIBER_STACK_SIZE)
