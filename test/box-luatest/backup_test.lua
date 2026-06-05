@@ -280,7 +280,6 @@ g1.before_all(function(cg)
         replication_synchro_quorum = 2,
         election_mode = 'manual',
         replication = uris,
-        election_timeout = 1000,
     }
     for i = 1, 3 do
         cg.replica_set:build_and_add_server({
@@ -325,12 +324,16 @@ g1.test_backup_replication_commited_master = function(cg)
     local replica1 = cg.replica_set:get_server('replica1')
     local replica2 = cg.replica_set:get_server('replica2')
     replica1:exec(function()
-        local fiber = require('fiber')
-
         box.ctl.promote()
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
         s:insert({1})
+    end)
+    -- Otherwise promote may fail.
+    replica2:wait_for_vclock_of(replica1)
+    replica1:exec(function()
+        local fiber = require('fiber')
+
         box.error.injection.set('ERRINJ_RELAY_SEND_DELAY', true)
         box.cfg{replication_synchro_timeout = 1000}
         local f = fiber.new(function()
@@ -339,7 +342,7 @@ g1.test_backup_replication_commited_master = function(cg)
             end)
             f:set_joinable(true)
             rawset(_G, 'backup_fiber', f)
-            s:insert({2})
+            box.space.test:insert({2})
         end)
         f:set_joinable(true)
         rawset(_G, 'dml_fiber', f)
