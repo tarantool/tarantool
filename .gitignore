@@ -189,3 +189,6 @@ states/
 
 # Lua Rocks
 .rocks/
+
+# Per-developer local setup notes (agent-generated, machine-specific)
+doc/agents/local_setup.md
