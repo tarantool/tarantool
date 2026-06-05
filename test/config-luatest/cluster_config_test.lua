@@ -1,8 +1,18 @@
 local t = require('luatest')
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local server = require('luatest.server')
+local treegen = require('luatest.treegen')
+local yaml = require('yaml')
 
 local g = t.group()
+
+g.after_each(function()
+    if g.server ~= nil then
+        g.server:drop()
+        g.server = nil
+    end
+end)
 
 -- Verify cluster configuration access methods.
 --
@@ -93,6 +103,152 @@ g.test_basic = function()
             })
         end)
     end)
+end
+
+-- Verify access to a raw cluster configuration after merging all
+-- cluster configuration sources.
+g.test_cluster_config = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = {
+        include = {'dynamic.yaml'},
+        process = {
+            title = '{{ instance_name }}',
+        },
+        iproto = {
+            listen = {
+                {uri = 'unix/:./i-001.iproto'},
+            },
+        },
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        roles_cfg = {
+            myrole = {
+                mode = 'specific',
+            },
+        },
+        groups = {
+            g = {
+                roles_cfg = {
+                    myrole = {
+                        mode = 'general',
+                    },
+                },
+                replicasets = {
+                    r = {
+                        instances = {
+                            ['i-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+    local dynamic_config = {
+        roles_cfg = {
+            myrole = {
+                mode = 'dynamic',
+            },
+        },
+    }
+
+    local config_file = treegen.write_file(
+        dir, 'config.yaml', yaml.encode(config))
+    treegen.write_file(dir, 'dynamic.yaml', yaml.encode(dynamic_config))
+
+    g.server = server:new({
+        config_file = config_file,
+        alias = 'i-001',
+        chdir = dir,
+    })
+    g.server:start()
+
+    g.server:exec(function()
+        local config = require('config')
+
+        -- The instance config is built from global, group, replicaset
+        -- and instance levels, so the group-level value wins.
+        t.assert_equals(config:get('roles_cfg.myrole.mode'), 'general')
+        t.assert_equals(config:get('process.title'), 'i-001')
+        t.assert_equals(config:get('memtx.memory'), 256 * 1024 * 1024)
+
+        -- The raw cluster configuration shows the merged source data,
+        -- before instantiation, defaults and variable substitution.
+        local cconfig = config:cluster_config()
+        t.assert_equals(cconfig.roles_cfg.myrole.mode, 'dynamic')
+        t.assert_equals(cconfig.groups.g.roles_cfg.myrole.mode, 'general')
+        t.assert_equals(cconfig.process.title, '{{ instance_name }}')
+        t.assert_equals(cconfig.memtx, nil)
+        t.assert_equals(cconfig.include, nil)
+
+        -- The returned table is detached from the internal state.
+        cconfig.roles_cfg.myrole.mode = 'mutated'
+        t.assert_equals(config:cluster_config().roles_cfg.myrole.mode,
+                        'dynamic')
+    end)
+end
+
+-- Verify that the result of config:cluster_config() can be used as a
+-- complete cluster configuration.
+g.test_cluster_config_fix_point = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = {
+        process = {
+            title = '{{ instance_name }}',
+        },
+        iproto = {
+            listen = {
+                {uri = 'unix/:./i-001.iproto'},
+            },
+        },
+        credentials = {
+            users = {
+                guest = {
+                    roles = {'super'},
+                },
+            },
+        },
+        labels = {
+            title = '{{ instance_name }}',
+        },
+        groups = {
+            g = {
+                replicasets = {
+                    r = {
+                        instances = {
+                            ['i-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    local config_file = treegen.write_file(dir, 'config.yaml',
+                                           yaml.encode(config))
+    g.server = server:new({
+        config_file = config_file,
+        alias = 'i-001',
+        chdir = dir,
+    })
+    g.server:start()
+
+    local cconfig = g.server:exec(function()
+        return require('config'):cluster_config()
+    end)
+    t.assert_equals(cconfig, config)
+
+    treegen.write_file(dir, 'config.yaml', yaml.encode(cconfig))
+    g.server:exec(function(exp)
+        local config = require('config')
+
+        config:reload()
+        t.assert_equals(config:cluster_config(), exp)
+    end, {cconfig})
 end
 
 -- There is a difference in omitting the `instance` config:get()

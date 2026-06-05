@@ -738,7 +738,7 @@ function methods.has_role(self, role, opts)
     return false
 end
 
--- Cluster configuration (internal method).
+-- Cluster configuration.
 --
 -- It is given as is after merging from all the configuration
 -- sources. Default values are NOT applied. Variables are NOT
@@ -746,6 +746,14 @@ end
 --
 -- Use config:get() to receive an instance config for a particular
 -- instance with applied defaults and substituted variables.
+function methods.cluster_config(self)
+    selfcheck(self, 'cluster_config')
+    initcheck(self, 'cluster_config', 'cluster')
+
+    return table.deepcopy(self._configdata_applied:cconfig())
+end
+
+-- Cluster configuration (internal method).
 function methods._cconfig(self)
     selfcheck(self, '_cconfig')
     initcheck(self, '_cconfig', 'cluster')
