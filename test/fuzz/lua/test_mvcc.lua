@@ -151,7 +151,8 @@ local SPACE_FORMAT = {
     {'1', type = 'uint'},
     {'2', type = 'uint'},
     {'3', type = 'uint', is_nullable = true},
-    {'4', type = 'uint', is_nullable = true}
+    {'4', type = 'uint', is_nullable = true},
+    {'5', type = 'array'},
 }
 
 local generic_idx_meta = {
@@ -261,6 +262,8 @@ local ENGINES = {
             create_idx_meta({{is_nullable = false}, {is_nullable = false}},
                             'HASH'),
             create_idx_meta({{is_nullable = false}, {is_nullable = false}}),
+            create_idx_meta({{is_nullable = false}}),
+            create_idx_meta({{is_nullable = false}}),
         }
     },
     {
@@ -273,6 +276,7 @@ local ENGINES = {
             create_idx_meta({{is_nullable = true}, {is_nullable = true}}),
             create_idx_meta({{is_nullable = true}, {is_nullable = true}}),
             create_idx_meta({{is_nullable = false}, {is_nullable = true}}),
+            create_idx_meta({{is_nullable = false}}),
         }
     },
 }
@@ -339,8 +343,24 @@ end
 -- the ENGINES tables.
 local SCHEMA_CODE = [[
 box.schema.func.create('func',
-    {body = 'function(tuple) return tuple end', is_deterministic = true,
+    {body = 'function(tuple) return {tuple[1], tuple[2]} end',
+     is_deterministic = true,
      is_sandboxed = true, if_not_exists = true})
+box.schema.func.create('multikey_func', {
+    body = [=[
+        function(tuple)
+            local keys = {}
+            for _, key in ipairs(tuple[5]) do
+                table.insert(keys, {key})
+            end
+            return keys
+        end
+    ]=],
+    is_deterministic = true,
+    is_sandboxed = true,
+    if_not_exists = true,
+    opts = {is_multikey = true},
+})
 box.schema.space.create('m', {engine = 'memtx'})
 box.space.m:create_index('p', {parts = {
     {1, 'uint'},
@@ -366,6 +386,10 @@ box.space.m:create_index('s6', {type = 'HASH', parts = {
 box.space.m:create_index('s7', {parts = {
     {1, 'uint'},
     {2, 'uint'}}, func = 'func'})
+box.space.m:create_index('s8', {
+    parts = {{field = 5, path = '[*]'}}, unique = true})
+box.space.m:create_index('s9', {
+    parts = {{1, 'unsigned'}}, func = 'multikey_func', unique = true})
 box.schema.space.create('v', {engine = 'vinyl'})
 box.space.v:create_index('p', {parts = {
     {1, 'uint'},
@@ -385,6 +409,8 @@ box.space.v:create_index('s4', {parts = {
 box.space.v:create_index('s5', {unique = false, parts = {
     {1, 'uint', is_nullable = false},
     {4, 'uint', is_nullable = true}}})
+box.space.v:create_index('s6', {
+    parts = {{field = 5, path = '[*]'}}, unique = true})
 ]]
 
 local function generate_schema_code()
@@ -524,9 +550,20 @@ local function random_number()
     return math.random(ARG_MAX_KEY)
 end
 
+local function gen_array()
+    local array = {}
+    for _ = 1, math.random(4) do
+        table.insert(array, random_number())
+    end
+    return ('{%s}'):format(table.concat(array, ', '))
+end
+
 local function gen_field(field)
     if field.is_nullable and math.random() <= ARG_P_NULL_KEY then
         return 'box.NULL'
+    end
+    if field.type == 'array' then
+        return gen_array()
     end
     return random_number()
 end

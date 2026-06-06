@@ -67,8 +67,7 @@ memtx_index_replace_entry_impl(struct index *index,
 	return 0;
 }
 
-/** Replace or delete one exact logical index entry. */
-static int
+int
 memtx_index_replace_entry(struct index *index,
 			  struct memtx_index_entry old_entry,
 			  struct memtx_index_entry new_entry,
@@ -228,10 +227,10 @@ memtx_index_replace_multikey(struct index *index, struct tuple *old_tuple,
 						  index->def->key_def,
 						  (int)mk_idx))
 				continue;
-			struct memtx_index_entry unused;
 			if (memtx_index_replace_impl(
 					index, old_tuple, new_entry, mode,
-					&result->replaced, &unused) != 0)
+					&result->replaced,
+					&result->successor) != 0)
 				goto rollback;
 			result->inserted = new_entry;
 			if (result->replaced.tuple == new_entry.tuple) {
@@ -301,8 +300,6 @@ memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 		       key != NULL) {
 			struct memtx_index_replace_result *result =
 				memtx_index_replace_result_new(results);
-			/* Save functional key to MVCC, even excluded one. */
-			memtx_tx_save_func_key(new_tuple, index, key);
 			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
 				continue;
 			new_entry.hint = (uint64_t)key;
@@ -312,8 +309,6 @@ memtx_index_replace_func(struct index *index, struct tuple *old_tuple,
 						       &result->successor);
 			if (err != 0)
 				break;
-			if (it.func_is_multikey)
-				result->successor = memtx_index_entry_null;
 			result->inserted = new_entry;
 			tuple_ref(key);
 			struct memtx_index_entry successor = result->successor;
