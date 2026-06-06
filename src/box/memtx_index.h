@@ -54,6 +54,49 @@ struct memtx_index_replace_result_set {
 	struct rlist inserted;
 };
 
+/**
+ * One entry in a replace-result list.
+ *
+ * Replace-result records are allocated on the fiber region. The entry may be
+ * null when the corresponding logical replace step has no value of this kind.
+ * A non-null functional-key hint is referenced while stored in a result and
+ * must be released by rollback or result cleanup.
+ */
+struct memtx_index_replace_result {
+	/** Entry produced for this position in the replace-result stream. */
+	struct memtx_index_entry entry;
+	/** Link in one positional replace-result list. */
+	struct rlist link;
+};
+
+/**
+ * Result records allocated for one logical index-entry replace.
+ *
+ * Every field points to the record appended to the corresponding result list.
+ * Allocating all records before changing the index makes rollback allocation
+ * free and keeps the lists positional even when the step later stays empty.
+ */
+struct memtx_index_replace_step {
+	/** Result slot for the entry removed or replaced by this step. */
+	struct memtx_index_replace_result *replaced;
+	/** Result slot for the successor of the inserted entry. */
+	struct memtx_index_replace_result *successor;
+	/** Result slot for the entry inserted by this step. */
+	struct memtx_index_replace_result *inserted;
+};
+
+/** Typed iterator over complete logical steps of a replace-result set. */
+struct memtx_index_replace_result_iterator {
+	/** Result set being iterated. */
+	struct memtx_index_replace_result_set *result;
+	/** Cursor in the replaced-entry list. */
+	struct memtx_index_replace_result *replaced;
+	/** Cursor in the successor-entry list. */
+	struct memtx_index_replace_result *successor;
+	/** Cursor in the inserted-entry list. */
+	struct memtx_index_replace_result *inserted;
+};
+
 /** Virtual function table for memtx-specific index operations. */
 struct memtx_index_vtab {
 	/** Base index virtual table for common index operations. */
@@ -111,6 +154,23 @@ struct memtx_index_vtab {
 	/** Finish index build. */
 	void (*end_build)(struct index *index);
 };
+
+/** Initialize a typed iterator at the first result step. */
+void
+memtx_index_replace_result_iterator_create(
+	struct memtx_index_replace_result_iterator *it,
+	struct memtx_index_replace_result_set *result);
+
+/**
+ * Return the next complete logical replace step.
+ *
+ * The end-of-stream assertions enforce the result-set invariant that all three
+ * positional lists have equal length and are consumed together.
+ */
+bool
+memtx_index_replace_result_iterator_next(
+	struct memtx_index_replace_result_iterator *it,
+	struct memtx_index_replace_step *step);
 
 static inline int
 memtx_index_get_internal(struct index *index, const char *key,
@@ -177,6 +237,22 @@ memtx_index_replace(struct index *index, struct tuple *old_tuple,
 void
 memtx_index_replace_rollback(struct index *index,
 			     struct memtx_index_replace_result_set *result);
+
+/**
+ * Rebind one exact logical index entry to another one.
+ *
+ * This wrapper must be used when the caller already knows the full old and new
+ * entry identities, including multikey positions or functional-key hints. A
+ * null new entry represents deletion.
+ *
+ * The lifetime of the new entry's hint ends here.
+ */
+int
+memtx_index_replace_entry(struct index *index,
+			  struct memtx_index_entry old_entry,
+			  struct memtx_index_entry new_entry,
+			  enum dup_replace_mode mode,
+			  struct tuple **result);
 
 static inline void
 memtx_index_begin_build(struct index *index)
