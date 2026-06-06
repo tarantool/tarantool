@@ -37,6 +37,25 @@ static const struct memtx_index_entry memtx_index_entry_null = {
 	.hint = HINT_NONE,
 };
 
+/**
+ * One entry in a replace-result list.
+ *
+ * Replace-result records are allocated on the fiber region. The entry may be
+ * null when the corresponding logical replace step has no value of this kind.
+ * A non-null functional-key hint is referenced while stored in a result and
+ * must be released by rollback or result cleanup.
+ */
+struct memtx_index_replace_result {
+	/** Replaced entry for this position in the replace-result list. */
+	struct memtx_index_entry replaced;
+	/** Successor entry for this position in the replace-result list. */
+	struct memtx_index_entry successor;
+	/** Inserted entry for this position in the replace-result list. */
+	struct memtx_index_entry inserted;
+	/** Link in the replace-result list. */
+	struct rlist link;
+};
+
 /** Virtual function table for memtx-specific index operations. */
 struct memtx_index_vtab {
 	/** Base index virtual table for common index operations. */
@@ -106,11 +125,31 @@ memtx_index_get_internal(struct index *index, const char *key,
 
 /**
  * Replace a tuple in the index.
+ *
+ * If a non-null result set is passed and the replace succeeds, it is allocated
+ * on the fiber region and remains valid until the caller truncates it. The
+ * caller must then either clean up or roll back the result set before
+ * truncating the region.
  */
 int
 memtx_index_replace(struct index *index, struct tuple *old_tuple,
 		    struct tuple *new_tuple, enum dup_replace_mode mode,
-		    struct tuple **result, struct tuple **successor);
+		    struct rlist *results);
+
+/**
+ * Cleanup a replace-result list after a successful `replace`.
+ */
+void
+memtx_index_replace_results_cleanup(struct index *index, struct rlist *results);
+
+/**
+ * Rollback every complete step of a replace-result set.
+ *
+ * Handles both the complete prefix left by a failed replace and all steps of a
+ * successful replace being reverted.
+ */
+void
+memtx_index_replace_rollback(struct index *index, struct rlist *results);
 
 static inline void
 memtx_index_begin_build(struct index *index)

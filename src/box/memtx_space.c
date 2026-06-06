@@ -217,13 +217,21 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				enum dup_replace_mode mode,
 				struct tuple **result)
 {
+	size_t region_svp = region_used(&fiber()->gc);
+	struct rlist results;
 	if (memtx_index_replace(space->index[0], old_tuple, new_tuple, mode,
-				&old_tuple, NULL) != 0)
+				&results) != 0)
 		return -1;
+	struct memtx_index_replace_result *replace_result =
+		rlist_first_entry(&results, struct memtx_index_replace_result,
+				  link);
+	old_tuple = replace_result->replaced.tuple;
 	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
+	memtx_index_replace_results_cleanup(space->index[0], &results);
+	region_truncate(&fiber()->gc, region_svp);
 	return 0;
 }
 
@@ -1350,8 +1358,7 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 		 */
 		state->rc = memtx_index_replace(state->index,
 						undo->new_tuple, old_tuple,
-						DUP_REPLACE_OR_INSERT, NULL,
-						NULL);
+						DUP_REPLACE_OR_INSERT, NULL);
 		if (state->rc != 0) {
 			diag_move(diag_get(), &state->diag);
 			return 0;
@@ -1419,8 +1426,7 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		enum dup_replace_mode mode = state->index->def->opts.is_unique ?
 					     DUP_INSERT : DUP_REPLACE_OR_INSERT;
 		state->rc = memtx_index_replace(state->index, old_tuple,
-						undo->new_tuple, mode, NULL,
-						NULL);
+						undo->new_tuple, mode, NULL);
 		if (state->rc != 0) {
 			diag_move(diag_get(), &state->diag);
 			return 0;
@@ -1570,7 +1576,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 * @todo: better message if there is a duplicate.
 		 */
 		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT,
-					 NULL, NULL);
+					 NULL);
 		if (rc != 0)
 			break;
 		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
