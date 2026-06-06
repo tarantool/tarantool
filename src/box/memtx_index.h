@@ -152,6 +152,24 @@ memtx_index_replace_results_cleanup(struct index *index, struct rlist *results);
 void
 memtx_index_replace_rollback(struct index *index, struct rlist *results);
 
+/**
+ * Rebind one exact logical index entry to another one.
+ *
+ * This wrapper must be used when the full old and new entry identities,
+ * including multikey positions or functional keys, are available to the
+ * caller. A null new entry represents deletion.
+ *
+ * For a functional index, the index takes a reference to the key of the new
+ * entry and releases its reference to the key of the removed entry. The
+ * references held by the caller are not affected.
+ */
+int
+memtx_index_replace_entry(struct index *index,
+			  struct memtx_index_entry old_entry,
+			  struct memtx_index_entry new_entry,
+			  enum dup_replace_mode mode,
+			  struct tuple **result);
+
 static inline void
 memtx_index_begin_build(struct index *index)
 {

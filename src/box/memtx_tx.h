@@ -35,6 +35,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "txn.h"
+#include "memtx_index.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -112,7 +113,7 @@ extern const char *memtx_tx_story_status_strs[];
  */
 struct memtx_tx_snapshot_cleaner {
 	struct mh_snapshot_cleaner_t *ht;
-	/** Index whose entries are cleaned. */
+	/** Index whose entries are cleaned, used to compare logical keys. */
 	struct index *index;
 };
 
@@ -275,11 +276,12 @@ memtx_tx_prepare_finalize(struct txn *txn)
 void
 memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
 
-/** Helper of memtx_tx_tuple_clarify */
+/** Helper of memtx_tx_index_entry_clarify. */
 struct tuple *
-memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index, bool force_read_prepared);
+memtx_tx_index_entry_clarify_slow(struct txn *txn, struct space *space,
+				  struct index *index,
+				  struct memtx_index_entry entry,
+				  bool force_read_prepared);
 
 /** Helper of memtx_tx_track_point */
 void
@@ -312,8 +314,9 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
  */
 void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
-			struct tuple *successor, enum iterator_type type,
-			const char *key, uint32_t part_count);
+			struct memtx_index_entry successor,
+			enum iterator_type type, const char *key,
+			uint32_t part_count);
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
@@ -327,7 +330,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  */
 static inline void
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
-		   struct tuple *successor, enum iterator_type type,
+		   struct memtx_index_entry successor, enum iterator_type type,
 		   const char *key, uint32_t part_count)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
@@ -429,14 +432,48 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
  * @return clean tuple (can be NULL).
  */
 static inline struct tuple *
+memtx_tx_index_entry_clarify(struct txn *txn, struct space *space,
+			     struct index *index,
+			     struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return entry.tuple;
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/false);
+}
+
+/**
+ * Same as the previous function, but for writing statements -
+ * regardless of the isolation level, it always sees prepared statements.
+ *
+ * The complete entry identity is required for multikey and functional indexes.
+ * The returned tuple may be NULL if the entry is not visible.
+ */
+static inline struct tuple *
+memtx_tx_index_entry_clarify_rw(struct txn *txn, struct space *space,
+				struct index *index,
+				struct memtx_index_entry entry)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return entry.tuple;
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/true);
+}
+
+static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		       struct tuple *tuple, struct index *index,
 		       uint32_t mk_index)
 {
+	(void)mk_index;
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
-					   /*force_read_prepared=*/false);
+	struct memtx_index_entry entry = {
+		.tuple = tuple,
+		.key_data = HINT_NONE,
+	};
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/false);
 }
 
 /**
@@ -455,10 +492,15 @@ memtx_tx_tuple_clarify_rw(struct txn *txn, struct space *space,
 			  struct tuple *tuple, struct index *index,
 			  uint32_t mk_index)
 {
+	(void)mk_index;
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
-					   /*force_read_prepared=*/true);
+	struct memtx_index_entry entry = {
+		.tuple = tuple,
+		.key_data = HINT_NONE,
+	};
+	return memtx_tx_index_entry_clarify_slow(txn, space, index, entry,
+						 /*force_read_prepared=*/true);
 }
 
 /**
@@ -496,35 +538,24 @@ memtx_tx_index_invisible_count_matching_until(
 		txn, space, index, type, key, part_count, until, until_hint);
 }
 
-/** Helper of memtx_tx_tuple_is_visible. */
+/** Helper of memtx_tx_index_entry_is_visible. */
 bool
-memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
-				   struct index *index, struct tuple *tuple);
+memtx_tx_index_entry_is_visible_slow(struct txn *txn, struct space *space,
+				     struct index *index,
+				     struct memtx_index_entry entry);
 
 /**
- * Detect whether key of @a tuple from @a index of @a space is visible
- * to @a txn.
+ * Detect whether @a entry from @a index of @a space is visible to @a txn.
  */
 static inline bool
-memtx_tx_tuple_key_is_visible(struct txn *txn, struct space *space,
-			      struct index *index, struct tuple *tuple)
+memtx_tx_index_entry_is_visible(struct txn *txn, struct space *space,
+				struct index *index,
+				struct memtx_index_entry entry)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return true;
-	return memtx_tx_tuple_key_is_visible_slow(txn, space, index, tuple);
+	return memtx_tx_index_entry_is_visible_slow(txn, space, index, entry);
 }
-
-/**
- * Save functional key of a tuple to memtx_tx. It is not mandatory to call
- * this function outside memtx_tx - it is exported only for optimization.
- * If the functional key is manually saved, memtx_tx won't need to call the
- * index function again in order to obtain the key.
- *
- * Save to call when memtx_tx is disabled - in this case it's simply no-op.
- */
-void
-memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
-		       struct tuple *func_key);
 
 /**
  * Clean memtx_tx part of @a txn.
@@ -556,24 +587,26 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 				 struct space *space, struct index *index);
 
 /** Helper of txm_snapshot_clafify. */
-struct tuple *
+struct memtx_index_entry
 memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
-			       struct tuple *tuple);
+			       struct memtx_index_entry entry);
 
 /**
- * Like a common clarify that function returns proper tuple if original
- * tuple in index is dirty.
+ * Like a common clarify that function returns proper entry if original
+ * entry in index is dirty.
  * @param cleaner - pre-created snapshot cleaner.
- * @param tuple - tuple to clean.
- * @return cleaned tuple, can be NULL.
+ * @param entry - index entry to clean.
+ * @return cleaned entry, its tuple can be NULL. The key data of a cleaned
+ *  entry is the multikey position in the cleaned tuple, it is HINT_NONE
+ *  for a functional index.
  */
-static inline struct tuple *
+static inline struct memtx_index_entry
 memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
-			  struct tuple *tuple)
+			  struct memtx_index_entry entry)
 {
 	if (cleaner->ht == NULL)
-		return tuple;
-	return memtx_tx_snapshot_clarify_slow(cleaner, tuple);
+		return entry;
+	return memtx_tx_snapshot_clarify_slow(cleaner, entry);
 }
 
 /**
@@ -629,14 +662,14 @@ memtx_tx_snapshot_invisible_count_matching_until(
 }
 
 /**
- * Detect whether the key of @a tuple from an index with the given @a key_def
- * is visible in the snapshot with the given @a cleaner.
+ * Detect whether the index @a entry is visible in the snapshot with the given
+ * @a cleaner.
  */
 static inline bool
-memtx_tx_snapshot_tuple_key_is_visible(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct tuple *tuple)
+memtx_tx_snapshot_entry_is_visible(struct memtx_tx_snapshot_cleaner *cleaner,
+				   struct memtx_index_entry entry)
 {
-	return memtx_tx_snapshot_clarify(cleaner, tuple) != NULL;
+	return memtx_tx_snapshot_clarify(cleaner, entry).tuple != NULL;
 }
 
 #if defined(__cplusplus)

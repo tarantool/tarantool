@@ -46,6 +46,7 @@
 #include "sysalloc.h"
 #include "trivia/util.h"
 #include "tuple.h"
+#include "memtx_index.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -424,7 +425,7 @@ memtx_prepare_result_tuple(struct space *space, struct tuple **result);
  * Returns 0 on success. On error returns -1 and sets diag.
  */
 int
-memtx_prepare_read_view_tuple(struct tuple *tuple,
+memtx_prepare_read_view_tuple(struct memtx_index_entry entry,
 			      struct index_read_view *index,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
 			      struct read_view_tuple *result);
