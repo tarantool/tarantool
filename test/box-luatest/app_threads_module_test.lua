@@ -1,3 +1,4 @@
+local fio = require('fio')
 local net = require('net.box')
 
 local t = require('luatest')
@@ -798,3 +799,50 @@ g.test_thread_names_in_logs = function()
     t.assert_str_contains(cluster.server:grep_log('.*foobar3'),
                           'buzz2/%d+/pool', true)
 end
+
+g.before_test('test_threads_connection_on_shutdown', function(cg)
+    cg.server = server:new({box_cfg = {app_threads = 1}})
+    cg.server:start()
+end)
+
+g.test_threads_connection_on_shutdown = function(cg)
+    --
+    -- Check that application threads can be called from shutdown triggers.
+    --
+    local path = fio.pathjoin(cg.server.workdir, 'test.txt')
+    cg.server:exec(function(path)
+        local fio = require('fio')
+        local threads = require('experimental.threads')
+        box.ctl.on_shutdown(function()
+            local fh = fio.open(path, {'O_CREAT', 'O_WRONLY', 'O_TRUNC'},
+                                tonumber('666', 8))
+            for _ = 1, 10 do
+                local ok, err = pcall(threads.eval, 'app', [[return true]])
+                if ok then
+                    fh:write('OK')
+                else
+                    fh:write(tostring(err))
+                end
+                fh:write('\n')
+            end
+            fh:close()
+        end)
+    end, {path})
+    cg.server:stop()
+    local fh, err = fio.open(path, {'O_RDONLY'})
+    t.assert_is(err, nil)
+    local actual = fh:read(1024)
+    fh:close()
+    local expected = {}
+    for _ = 1, 10 do
+        table.insert(expected, 'OK')
+    end
+    table.insert(expected, '')
+    expected = table.concat(expected, '\n')
+    t.assert_equals(actual, expected)
+end
+
+g.after_test('test_threads_connection_on_shutdown', function(cg)
+    cg.server:drop()
+    cg.server = nil
+end)
