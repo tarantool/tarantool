@@ -271,7 +271,15 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     if group_name ~= 'tx' then
         ffi.C.cord_set_name(string.format('%s%d', group_name, id_in_group))
     end
-    threads_conn = net.from_fd(conn_fd, {fetch_schema = false})
+    threads_conn = net.from_fd(conn_fd, {
+        -- We only send CALL/EVAL requests to application threads so
+        -- there's no need to sync the database schema.
+        fetch_schema = false,
+        -- Disable graceful shutdown handling so that connections to
+        -- application threads aren't closed while shutdown triggers
+        -- are running.
+        _disable_graceful_shutdown = true,
+    })
     init_thread_groups(cfg)
 end
 
