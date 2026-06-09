@@ -33,6 +33,34 @@ local function checks_disabled(configdata)
     return configdata:get('config.checks', {use_default = true}) == 'off'
 end
 
+-- {{{ Readahead check
+
+local READAHEAD_ALERT_KEY = 'readahead'
+local READAHEAD_THRESHOLD = 1024 * 1024 - 64
+
+local function check_readahead(configdata)
+    if not configdata:get('config.checks.' ..
+        READAHEAD_ALERT_KEY, {use_default = true}) then
+        return drop_alert_if_exists(READAHEAD_ALERT_KEY)
+    end
+
+    local readahead = box.cfg.readahead
+    if readahead < READAHEAD_THRESHOLD then
+        return drop_alert_if_exists(READAHEAD_ALERT_KEY)
+    end
+
+    return alert_ns:set(READAHEAD_ALERT_KEY, {
+        type = 'warn',
+        message = ('readahead is set to %d, which is >= %d. ' ..
+            'A large readahead value may cause high memory ' ..
+            'consumption that is difficult to predict. ' ..
+            'Consider lowering readahead.')
+            :format(readahead, READAHEAD_THRESHOLD),
+    })
+end
+
+-- }}} Readahead check
+
 -- {{{ System checks registry
 
 -- List of system checks to perform.
@@ -44,7 +72,9 @@ end
 --
 -- To add a new check, add an element to this array:
 --   {key = MY_ALERT_KEY, fn = my_check_function},
-local checks = {}
+local checks = {
+    {key = READAHEAD_ALERT_KEY, fn = check_readahead},
+}
 
 -- }}} System checks registry
 

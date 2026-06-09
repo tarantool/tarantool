@@ -563,6 +563,12 @@ return schema.new('instance_config', schema.record({
                 schema.enum({
                     'off',
                 }),
+                schema.record({
+                    readahead = schema.scalar({
+                        type = 'boolean',
+                        default = true,
+                    }),
+                }),
             },
             discriminator = discriminators['config.checks'],
         }),
