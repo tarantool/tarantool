@@ -8,7 +8,9 @@ local varbinary = require('varbinary')
 
 local cbuilder = require('luatest.cbuilder')
 local cluster = require('luatest.cluster')
+local justrun = require('luatest.justrun')
 local server = require('luatest.server')
+local treegen = require('luatest.treegen')
 local t = require('luatest')
 
 local g = t.group()
@@ -812,4 +814,21 @@ g.test_trigger = function(cg)
         t.assert_equals(data, {t1 = 2, t2 = 1})
         t.assert_equals(trigger.info(), {})
     end)
+end
+
+g.test_fiber_cond_exit = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'test.lua', [=[
+        local threads = require('experimental.threads')
+        box.cfg{app_threads = 1, log_level = 'warn'}
+        threads.eval('app', [[
+            local fiber = require('fiber')
+            local cond = fiber.cond()
+            fiber.create(cond.wait, cond)
+        ]])
+        os.exit(0)
+    ]=])
+    local res = justrun.tarantool(dir, {}, {'test.lua'},
+                                  {stderr = true, nojson = true})
+    t.assert_covers(res, {exit_code = 0, stderr = ''})
 end
