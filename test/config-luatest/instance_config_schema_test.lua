@@ -63,6 +63,7 @@ g.test_config = function()
             context = {},
             checks = {
                 transparent_huge_pages = true,
+                readahead = true,
             },
         },
     }
@@ -77,6 +78,7 @@ g.test_config = function()
         },
         checks = {
             transparent_huge_pages = true,
+            readahead = true,
         },
     }
     local res = instance_config:apply_default({}).config
@@ -166,6 +168,7 @@ g.test_config_enterprise = function()
         },
         checks = {
             transparent_huge_pages = true,
+            readahead = true,
         },
     }
     local res = instance_config:apply_default({}).config

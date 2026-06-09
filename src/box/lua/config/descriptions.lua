@@ -159,6 +159,18 @@ I['config.checks.transparent_huge_pages'] = format_text([[
     For a persistent fix, configure THP according to your OS distribution.
 ]])
 
+I['config.checks.readahead'] = format_text([[
+    Whether to check if `readahead` is set to a large value.
+
+    When enabled, the check generates a warning alert if
+    `readahead` is greater than or equal to 1048512 (1 MiB - 64).
+
+    A large `readahead` value may cause high memory consumption
+    that is difficult to predict. Consider lowering `readahead`
+    if memory usage is a concern.
+]])
+
+
 -- }}} checks configuration
 
 -- {{{ audit_log configuration

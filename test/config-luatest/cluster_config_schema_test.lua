@@ -364,6 +364,7 @@ g.test_defaults = function()
             },
             checks = {
                 transparent_huge_pages = true,
+                readahead = true,
             },
         },
         feedback = box.internal.feedback_daemon ~= nil and {
