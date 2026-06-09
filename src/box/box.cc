@@ -151,6 +151,9 @@ struct box_backup *box_backup;
 
 static struct latch backup_latch = LATCH_INITIALIZER(backup_latch);
 
+static double box_backup_default_ttl = TIMEOUT_INFINITY;
+TWEAK_DOUBLE(box_backup_default_ttl);
+
 bool box_read_ffi_is_disabled;
 
 /**
@@ -6021,6 +6024,7 @@ box_backup_free(struct box_backup *backup)
 		free(backup->files[i]);
 	free(backup->files);
 	gc_unref_checkpoint(backup->gc_checkpoint_ref);
+	ev_timer_stop(loop(), &backup->ttl_timer);
 	TRASH(backup);
 	free(backup);
 }
@@ -6061,8 +6065,19 @@ box_backup_collect_incremental(const struct vclock *from_vclock,
 	return 0;
 }
 
+static void
+backup_ttl_timeout(ev_loop *loop, ev_timer *watcher, int revents)
+{
+	(void)loop;
+	(void)watcher;
+	(void)revents;
+
+	box_backup_stop();
+}
+
 int
-box_backup_start(int checkpoint_idx, const struct vclock *from_vclock)
+box_backup_start(int checkpoint_idx, const struct vclock *from_vclock,
+		 double ttl)
 {
 	assert(checkpoint_idx >= 0);
 	latch_lock(&backup_latch);
@@ -6082,10 +6097,13 @@ box_backup_start(int checkpoint_idx, const struct vclock *from_vclock)
 		latch_unlock(&backup_latch);
 		return -1;
 	}
+	if (ttl == 0)
+		ttl = box_backup_default_ttl;
 	struct box_backup *backup =
 		(struct box_backup *)xmalloc(sizeof(*box_backup));
 	memset(backup, 0, sizeof(*backup));
 	backup->gc_checkpoint_ref = gc_ref_checkpoint(checkpoint, "backup");
+	ev_timer_init(&backup->ttl_timer, backup_ttl_timeout, ttl, 0);
 	if (checkpoint_idx == 0) {
 		struct box_checkpoint box_ckpt;
 		if (box_checkpoint_build_for_journal(&box_ckpt) != 0)
@@ -6107,6 +6125,10 @@ box_backup_start(int checkpoint_idx, const struct vclock *from_vclock)
 			goto error;
 	}
 	box_backup = backup;
+	/* Start here so that ttl doesn't run out while start is in progress. */
+	ev_timer_start(loop(), &backup->ttl_timer);
+	backup->start_time = ev_now(loop());
+	backup->ttl = ttl;
 	latch_unlock(&backup_latch);
 	return 0;
 error:

@@ -2348,6 +2348,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        box_backup_default_ttl = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({

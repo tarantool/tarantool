@@ -3,6 +3,7 @@
 
 local NEW = true
 local OLD = false
+local TIMEOUT_INFINITY = 100 * 365 * 86400
 
 local ffi = require('ffi')
 local tweaks = require('internal.tweaks')
@@ -197,6 +198,10 @@ contain names yet.
 https://tarantool.io/compat/skip_replication_names
 ]]
 
+local BOX_BACKUP_DEFAULT_TTL_BRIEF = [[
+Default backup TTL values when it is not set explicitly in box.backup.start().
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -238,7 +243,7 @@ local options = {
         obsolete = nil,
         brief = FIBER_SLICE_DEFAULT_BRIEF,
         action = function(is_new)
-            local slice = 100 * 365 * 86400 -- TIMEOUT_INFINITY
+            local slice = TIMEOUT_INFINITY
             -- ASAN build is slow. Turn slice check off to suppress noisy
             -- failures on exceeding slice limit in this case.
             if is_new and not tarantool.build.asan then
@@ -367,6 +372,13 @@ local options = {
         obsolete = nil,
         brief = SKIP_REPLICATION_NAMES_BRIEF,
         action = function() end,
+    },
+    box_backup_default_ttl = {
+        default = 'old',
+        obsolete = nil,
+        brief = BOX_BACKUP_DEFAULT_TTL_BRIEF,
+        action = tweak_action(
+            'box_backup_default_ttl', TIMEOUT_INFINITY, 3600),
     },
 }
 

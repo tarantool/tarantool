@@ -802,6 +802,7 @@ lbox_backup_start(struct lua_State *L)
 {
 	int checkpoint_idx = 0;
 	struct vclock from_vclock;
+	double ttl = 0;
 	vclock_clear(&from_vclock);
 	if (lua_gettop(L) > 0) {
 		if (lua_isnumber(L, 1)) {
@@ -820,13 +821,28 @@ lbox_backup_start(struct lua_State *L)
 				return luaT_error(L);
 			}
 			lua_pop(L, 1);
+			lua_getfield(L, 1, "ttl");
+			if (!lua_isnil(L, -1)) {
+				if (!lua_isnumber(L, -1)) {
+					diag_set(IllegalParams,
+						 "invalid ttl");
+					return luaT_error(L);
+				}
+				ttl = lua_tonumber(L, -1);
+				if (ttl <= 0) {
+					diag_set(IllegalParams,
+						 "invalid ttl");
+					return luaT_error(L);
+				}
+			}
+			lua_pop(L, 1);
 		} else {
 			diag_set(IllegalParams,
 				 "expected number or table as 1 argument");
 			return luaT_error(L);
 		}
 	}
-	if (box_backup_start(checkpoint_idx, &from_vclock) != 0)
+	if (box_backup_start(checkpoint_idx, &from_vclock, ttl) != 0)
 		return luaT_error(L);
 
 	lua_createtable(L, box_backup->file_count, 0);
@@ -879,6 +895,11 @@ lbox_backup_info(struct lua_State *L)
 	} else {
 		lua_pushstring(L, "full");
 		lua_setfield(L, -2, "type");
+	}
+
+	if (backup->ttl != TIMEOUT_INFINITY) {
+		lua_pushnumber(L, backup->start_time + backup->ttl);
+		lua_setfield(L, -2, "expires_at");
 	}
 
 	return 1;
