@@ -61,6 +61,17 @@ app_thread_f(void *arg)
 	cbus_endpoint_destroy(&fiber_pool.endpoint, NULL);
 	while (!rlist_empty(&fiber_pool.idle))
 		rlist_shift(&fiber_pool.idle);
+	/*
+	 * XXX: There may be fibers waiting on a condition variable created
+	 * from Lua code. If we don't wake them up, we'll get an assertion
+	 * failure in fiber_cond_destroy() when we try to destroy this
+	 * condition variable in lua_close(). Waking them up here like this
+	 * looks like a hack. We need to implement something like
+	 * fiber_shutdown() for application threads.
+	 */
+	struct fiber *fiber;
+	rlist_foreach_entry(fiber, &cord()->alive, link)
+		fiber_wakeup(fiber);
 	app_thread_lua_free();
 	box_lua_call_runtime_priv_reset();
 	tuple_free();
