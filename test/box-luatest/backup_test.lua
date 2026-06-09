@@ -351,6 +351,44 @@ g.test_backup_from_vclock = function(cg)
     end)
 end
 
+g.test_backup_ttl = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local compat = require('compat')
+        local fiber = require('fiber')
+
+        -- Error cases.
+        local err = {
+            type = 'IllegalParams',
+            message = 'invalid ttl',
+        }
+        t.assert_error_covers(err, box.backup.start, {ttl = 'unexpected'})
+        t.assert_error_covers(err, box.backup.start, {ttl = 0})
+        t.assert_error_covers(err, box.backup.start, {ttl = -1})
+
+        -- TTL functionality.
+        box.backup.start({ttl = 0.01})
+        t.assert_not_equals(box.backup.info(), nil)
+        t.helpers.retrying({}, function()
+            t.assert_equals(box.backup.info(), nil)
+        end)
+        box.backup.start({ttl = 7000})
+        t.assert_equals(box.backup.info().expires_at, fiber.time() + 7000)
+        box.backup.stop()
+
+        -- TTL compat.
+        compat.box_backup_default_ttl = 'old'
+        box.backup.start()
+        t.assert_equals(box.backup.info().expires_at, nil)
+        box.backup.stop()
+        compat.box_backup_default_ttl = 'new'
+        box.backup.start()
+        t.assert_equals(box.backup.info().expires_at, fiber.time() + 3600)
+        box.backup.stop()
+    end)
+end
+
 local g1 = t.group('replication')
 
 g1.before_all(function(cg)

@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include "trigger.h"
 #include "vclock/vclock.h"
+#include "tarantool_ev.h"
 
 #include <stdbool.h>
 
@@ -314,6 +315,12 @@ struct box_backup {
 	 * backup WAL files) that are currently being backed up.
 	 */
 	struct gc_checkpoint_ref *gc_checkpoint_ref;
+	/** Backup start time. */
+	double start_time;
+	/** Backup TTL. */
+	double ttl;
+	/** Backup TTL timer. Backup will be stopped when it expires. */
+	struct ev_timer ttl_timer;
 };
 
 extern struct box_backup *box_backup;
@@ -331,11 +338,15 @@ extern struct box_backup *box_backup;
  * include only xlogs since @from_vclock. It is error if there is no xlog
  * starting precisely at this vclock.
  *
+ * @ttl defines backup time to live. After this time backup will be
+ * stopped. if @ttl is 0 then default time to live will be used.
+ *
  * The caller is supposed to call box_backup_stop() after he's
  * done copying the files.
  */
 int
-box_backup_start(int checkpoint_idx, const struct vclock *from_vclock);
+box_backup_start(int checkpoint_idx, const struct vclock *from_vclock,
+		 double ttl);
 
 /**
  * Finish backup started with box_backup_start().

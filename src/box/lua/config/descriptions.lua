@@ -274,6 +274,13 @@ I['compat'] = format_text([[
     to the previous or the next major version.
 ]])
 
+I['compat.box_backup_default_ttl'] = format_text([[
+    Define default backup time to live:
+
+    - `new` (4.x default): 1 hour
+    - `old` (3.x default): infinity
+]])
+
 I['compat.binary_data_decoding'] = format_text([[
     Define how to store binary data fields in Lua after decoding:
 

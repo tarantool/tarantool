@@ -456,6 +456,7 @@ g.test_defaults = function()
             box_recovery_triggers_deprecation = 'old',
             skip_replication_names = 'new',
             datetime_setfn_timestamp_type_check = 'old',
+            box_backup_default_ttl = 'old',
         },
         isolated = false,
         stateboard = {
