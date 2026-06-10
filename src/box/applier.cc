@@ -213,6 +213,14 @@ applier_thread_writer_f(va_list ap)
 						timeout);
 			ERROR_INJECT_YIELD_CANCELLABLE(
 				ERRINJ_APPLIER_WRITER_DELAY, return 0);
+			/*
+			 * For peers >= 1.7.7 the wait is infinite, so a wakeup
+			 * with no pending ACK is spurious. For older peers we
+			 * still send a periodic keepalive ACK on timeout.
+			 */
+			if (!applier->thread.has_acks_to_send &&
+			    applier->version_id >= version_id(1, 7, 7))
+				continue;
 		}
 		try {
 			applier->thread.has_acks_to_send = false;
