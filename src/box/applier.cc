@@ -211,6 +211,8 @@ applier_thread_writer_f(va_list ap)
 				timeout = TIMEOUT_INFINITY;
 			fiber_cond_wait_timeout(&applier->thread.writer_cond,
 						timeout);
+			ERROR_INJECT_YIELD_CANCELLABLE(
+				ERRINJ_APPLIER_WRITER_DELAY, return 0);
 		}
 		try {
 			applier->thread.has_acks_to_send = false;
@@ -2286,8 +2288,9 @@ applier_thread_attach_applier(struct cbus_call_msg *base)
 	fiber_cond_create(&applier->thread.writer_cond);
 	applier_thread_ibuf_init(applier);
 	applier_thread_msgs_init(applier);
-	applier_thread_fiber_init(applier);
+	applier->thread.has_acks_to_send = false;
 	memset(&applier->thread.next_ack, 0, sizeof(applier->thread.next_ack));
+	applier_thread_fiber_init(applier);
 
 	return 0;
 }
