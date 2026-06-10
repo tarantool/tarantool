@@ -196,6 +196,10 @@ applier_thread_writer_f(va_list ap)
 						timeout);
 			ERROR_INJECT_YIELD_CANCELLABLE(
 				ERRINJ_APPLIER_WRITER_DELAY, return 0);
+			if (fiber_is_cancelled())
+				break;
+			assert(applier->version_id < version_id(1, 7, 7) ||
+			       applier->thread.has_acks_to_send);
 		}
 		try {
 			applier->thread.has_acks_to_send = false;
