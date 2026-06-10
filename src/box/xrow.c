@@ -74,7 +74,7 @@ mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 					     mp_sizeof_uint(UINT64_MAX));
 }
 
-static inline uint32_t
+uint32_t
 mp_sizeof_vclock(const struct vclock *vclock)
 {
 	uint32_t size = vclock_size(vclock);
@@ -105,7 +105,7 @@ mp_encode_vclock_ignore0(char *data, const struct vclock *vclock)
 	return mp_encode_vclock_impl(data, vclock, true);
 }
 
-static inline char *
+char *
 mp_encode_vclock(char *data, const struct vclock *vclock)
 {
 	data = mp_encode_map(data, vclock_size(vclock));

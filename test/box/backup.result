@@ -13,7 +13,7 @@ test_run:cleanup_cluster()
 -- Basic argument check.
 box.backup.start('test')
 ---
-- error: expected integer as 1 argument
+- error: expected number or table as 1 argument
 ...
 box.backup.start(-1)
 ---

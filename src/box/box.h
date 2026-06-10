@@ -304,6 +304,11 @@ struct box_backup {
 	/** Maximum vclock that can be restored using backup. */
 	struct vclock vclock;
 	/**
+	 * vclock of previous backup (@vclock) for incremental backups. Unset
+	 * vclock for full backups.
+	 */
+	struct vclock prev_vclock;
+	/**
 	 * Point to the gc reference object that prevents the garbage
 	 * collector from deleting the checkpoint file (and implicitly
 	 * backup WAL files) that are currently being backed up.
@@ -317,14 +322,20 @@ extern struct box_backup *box_backup;
  * Start a backup.
  *
  * The checkpoint is given by @checkpoint_idx. If @checkpoint_idx
- * is 0, the last checkpoint will be backed up; if it is 1, next
- * to last, and so on.
+ * is 0, the last checkpoint will be backed up together with xlogs
+ * to the moment of the backup, the last xlog will be rotated.
+ * If @checkpoint_idx is 1 or more then only snapshot will be backed up.
+ * Next to last if @checkpoint_idx is 1, and so on.
+ *
+ * If @from_vclock is not cleared then backup will be incremental. It will
+ * include only xlogs since @from_vclock. It is error if there is no xlog
+ * starting precisely at this vclock.
  *
  * The caller is supposed to call box_backup_stop() after he's
  * done copying the files.
  */
 int
-box_backup_start(int checkpoint_idx);
+box_backup_start(int checkpoint_idx, const struct vclock *from_vclock);
 
 /**
  * Finish backup started with box_backup_start().

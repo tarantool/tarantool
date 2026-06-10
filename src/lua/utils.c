@@ -63,6 +63,9 @@ __thread uint32_t CTID_INTERVAL = 0;
 void
 (*tarantool_lua_exit_function)(int code) = exit;
 
+static inline int
+luaL_convertint64(lua_State *L, int idx, bool unsignd, int64_t *result);
+
 struct lua_State *
 luaT_newstate(void)
 {
@@ -171,6 +174,37 @@ luaT_pushvclock(struct lua_State *L, const struct vclock *vclock)
 		lua_settable(L, -3);
 	}
 	luaL_setmaphint(L, -1); /* compact flow */
+}
+
+bool
+luaT_tovclock(struct lua_State *L, int idx, struct vclock *vclock)
+{
+	if (!lua_istable(L, idx))
+		goto error;
+	int stable_idx = idx;
+	if (stable_idx < 0)
+		stable_idx += lua_gettop(L) + 1;
+	/* Push first key. */
+	lua_pushnil(L);
+	vclock_create(vclock);
+	while (lua_next(L, stable_idx) != 0) {
+		int64_t lsn;
+		int64_t replica_id;
+		if (luaL_convertint64(L, -2, /*unsigned=*/false,
+				      &replica_id) != 0)
+			goto error;
+		if (luaL_convertint64(L, -1, /*unsigned=*/false, &lsn) != 0)
+			goto error;
+		if (replica_id < 0 || replica_id >= VCLOCK_MAX)
+			goto error;
+		vclock_reset(vclock, replica_id, lsn);
+		/* Pop value */
+		lua_pop(L, 1);
+	}
+	return true;
+error:
+	vclock_clear(vclock);
+	return false;
 }
 
 /*

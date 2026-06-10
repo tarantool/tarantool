@@ -245,8 +245,12 @@ wal_collect_garbage(const struct vclock *vclock);
 
 /**
  * Backup up WAL. Calls @cb on every xlog from @begin_vclock to @end_vclock.
+ *
+ * It is error @begin_vclock does not point to some xlog.
+ *
+ * Return 0 on success, -1 on error (diag is set).
  */
-void
+int
 wal_backup(const struct vclock *begin_vclock, const struct vclock *end_vclock,
 	   wal_backup_cb cb, void *cb_arg);
 

@@ -14,16 +14,20 @@ g.after_each(function(cg)
     end
 end)
 
-local backup = function(cg, files)
-    if cg.backup_dir ~= nil then
-        fio.rmtree(cg.backup_dir)
-    end
-    cg.backup_dir = fio.tempdir()
+local backup_files = function(cg, files)
     for _, file in ipairs(files) do
         local path_src = fio.pathjoin(cg.server.workdir, file)
         local path_dst = fio.pathjoin(cg.backup_dir, file)
         fio.copyfile(path_src, path_dst)
     end
+end
+
+local backup = function(cg, files)
+    if cg.backup_dir ~= nil then
+        fio.rmtree(cg.backup_dir)
+    end
+    cg.backup_dir = fio.tempdir()
+    backup_files(cg, files)
 end
 
 local restore = function(cg)
@@ -188,6 +192,7 @@ g.test_backup_info = function(cg)
         t.assert_equals(box.backup.info(), {
             files = files,
             vclock = vclock,
+            type = 'full',
         })
         box.backup.stop()
         t.assert_equals(box.backup.info(), nil)
@@ -199,6 +204,7 @@ g.test_backup_info = function(cg)
         t.assert_equals(box.backup.info(), {
             files = files,
             vclock = vclock,
+            type = 'full',
         })
         box.backup.stop()
 
@@ -209,6 +215,7 @@ g.test_backup_info = function(cg)
         t.assert_equals(box.backup.info(), {
             files = files,
             vclock = vclock,
+            type = 'full',
         })
         box.backup.stop()
     end)
@@ -263,6 +270,83 @@ g.test_backup_concurrent_start = function(cg)
         t.assert_covers(err:unpack(), {
             type = 'ClientError',
             code = box.error.BACKUP_IN_PROGRESS,
+        })
+    end)
+end
+
+g.test_backup_from_vclock = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    local info_0 = cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        for i = 1, 10 do
+            s:insert({i})
+        end
+        box.backup.start()
+        for i = 11, 20 do
+            s:insert({i})
+        end
+        return box.backup.info()
+    end)
+    backup(cg, info_0.files)
+    local info_1 = cg.server:exec(function(prev_vclock)
+        box.backup.stop()
+        local vclock = box.info.vclock
+        local files = box.backup.start({from_vclock = prev_vclock})
+        local s = box.space.test
+        for i = 21, 30 do
+            s:insert({i})
+        end
+        t.assert_equals(box.backup.info(), {
+            files = files,
+            vclock = vclock,
+            prev_vclock = prev_vclock,
+            type = 'incremental',
+        })
+        return box.backup.info()
+    end, {info_0.vclock})
+    t.assert_items_exclude(info_0.files, info_1.files)
+    backup_files(cg, info_1.files)
+    cg.server:stop()
+    restore(cg)
+    cg.server:start()
+    cg.server:exec(function()
+        local s = box.space.test
+        local expected = {}
+        for i = 1, 20 do
+            table.insert(expected, {i})
+        end
+        t.assert_equals(s:select(), expected)
+
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'expected number or table as 1 argument',
+        }, box.backup.start, function() end)
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'invalid from_vclock',
+        }, box.backup.start, {from_vclock = 1})
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'XLOG_NOT_FOUND',
+            vclock = '{1: 100500}',
+        }, box.backup.start, {from_vclock = {100500}})
+        -- The {1, 100500} is not comparable with some for xlog vclocks.
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'XLOG_NOT_FOUND',
+            vclock = '{1: 1, 2: 100500}',
+        }, box.backup.start, {from_vclock = {1, 100500}})
+
+        -- Empty incremental backup.
+        local vclock = box.info.vclock
+        t.assert_equals(box.backup.start({from_vclock = vclock}), {})
+        t.assert_equals(box.backup.info(), {
+            files = {},
+            vclock = vclock,
+            prev_vclock = vclock,
+            type = 'incremental',
         })
     end)
 end

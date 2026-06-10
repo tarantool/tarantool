@@ -792,14 +792,26 @@ int
 xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
-/** Encode vclock including 0th component. */
-/** Return the number of bytes an encoded vclock takes. */
+/**
+ * Return the number of bytes a vclock encoded ignoring local component takes.
+ */
 uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock);
 
-/** Encode a vclock to a buffer as MP_MAP. Never fails. */
+/** Return the number of bytes an encoded vclock takes. */
+uint32_t
+mp_sizeof_vclock(const struct vclock *vclock);
+
+/**
+ * Encode a vclock to a buffer as MP_MAP ignoring local component.
+ * Never fails.
+ */
 char *
 mp_encode_vclock_ignore0(char *data, const struct vclock *vclock);
+
+/** Encode a vclock to a buffer as MP_MAP. Never fails. */
+char *
+mp_encode_vclock(char *data, const struct vclock *vclock);
 
 /**
  * Decode a vclock from MsgPack data, it should be MP_MAP.
