@@ -6025,8 +6025,44 @@ box_backup_free(struct box_backup *backup)
 	free(backup);
 }
 
+/**
+ * Collect backup info for full backup starting from checkpoint at
+ * @checkpoint_vclock to xlog ending at @vclock. In particular if vclocks are
+ * the same then no xlogs are included.
+ */
+static int
+box_backup_collect_full(const struct vclock *checkpoint_vclock,
+			const struct vclock *vclock,
+			struct box_backup *backup)
+{
+	if (engine_backup(checkpoint_vclock, box_backup_add_path, backup) != 0)
+		return -1;
+	VERIFY(wal_backup(checkpoint_vclock, vclock, box_backup_add_path,
+			  backup) == 0);
+	vclock_copy(&backup->vclock, vclock);
+	vclock_clear(&backup->prev_vclock);
+	return 0;
+}
+
+/**
+ * Collect backup info for incremental backup starting from xlog immediately
+ * following @from_vclock to xlog ending at @vclock. In particular if vclocks
+ * are the same then no xlogs are included.
+ */
+static int
+box_backup_collect_incremental(const struct vclock *from_vclock,
+			       const struct vclock *vclock,
+			       struct box_backup *backup)
+{
+	if (wal_backup(from_vclock, vclock, box_backup_add_path, backup) != 0)
+		return -1;
+	vclock_copy(&backup->vclock, vclock);
+	vclock_copy(&backup->prev_vclock, from_vclock);
+	return 0;
+}
+
 int
-box_backup_start(int checkpoint_idx)
+box_backup_start(int checkpoint_idx, const struct vclock *from_vclock)
 {
 	assert(checkpoint_idx >= 0);
 	latch_lock(&backup_latch);
@@ -6054,17 +6090,21 @@ box_backup_start(int checkpoint_idx)
 		struct box_checkpoint box_ckpt;
 		if (box_checkpoint_build_for_journal(&box_ckpt) != 0)
 			goto error;
-		if (engine_backup(&checkpoint->vclock,
-				  box_backup_add_path, backup) != 0)
+		int rc;
+		if (vclock_is_set(from_vclock))
+			rc = box_backup_collect_incremental(
+				from_vclock, &box_ckpt.journal.vclock, backup);
+		else
+			rc = box_backup_collect_full(
+				&checkpoint->vclock, &box_ckpt.journal.vclock,
+				backup);
+		if (rc != 0)
 			goto error;
-		wal_backup(&checkpoint->vclock, &box_ckpt.journal.vclock,
-			   box_backup_add_path, backup);
-		vclock_copy(&backup->vclock, &box_ckpt.journal.vclock);
 	} else {
-		if (engine_backup(&checkpoint->vclock,
-				  box_backup_add_path, backup) != 0)
+		assert(!vclock_is_set(from_vclock));
+		if (box_backup_collect_full(&checkpoint->vclock,
+					    &checkpoint->vclock, backup) != 0)
 			goto error;
-		vclock_copy(&backup->vclock, &checkpoint->vclock);
 	}
 	box_backup = backup;
 	latch_unlock(&backup_latch);

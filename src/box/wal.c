@@ -1017,6 +1017,24 @@ wal_backup_f(struct cbus_call_msg *data)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_backup_msg *msg = (struct wal_backup_msg *)data;
+
+	struct vclock *vclock = vclockset_search(&writer->wal_dir.index,
+						 msg->begin_vclock);
+	/*
+	 * Begin vclock should point either to some existing xlog or
+	 * to xlog that will be created on next write.
+	 *
+	 * Note that msg->begin_vclock can be not comparable with vclocks
+	 * of index, in this case vclock is not NULL.
+	 */
+	if ((vclock == NULL ||
+	     vclock_compare(vclock, msg->begin_vclock) != 0) &&
+	    (xlog_is_open(&writer->current_wal) ||
+	     vclock_compare(&writer->vclock, msg->begin_vclock) != 0)) {
+		diag_set(ClientError, ER_XLOG_NOT_FOUND,
+			 vclock_to_string(msg->begin_vclock));
+		return -1;
+	}
 	enum {
 #ifdef NDEBUG
 		START_ARRAY_CAPACITY = 16,
@@ -1048,7 +1066,7 @@ wal_backup_f(struct cbus_call_msg *data)
 	return 0;
 }
 
-void
+int
 wal_backup(const struct vclock *begin_vclock, const struct vclock *end_vclock,
 	   wal_backup_cb cb, void *cb_arg)
 {
@@ -1056,13 +1074,15 @@ wal_backup(const struct vclock *begin_vclock, const struct vclock *end_vclock,
 	struct wal_backup_msg msg;
 	msg.begin_vclock = begin_vclock;
 	msg.end_vclock = end_vclock;
-	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
-		  wal_backup_f);
+	if (cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
+		      wal_backup_f) != 0)
+		return -1;
 	for (int i = 0; i < msg.filename_count; i++) {
 		cb(msg.filenames[i], cb_arg);
 		free(msg.filenames[i]);
 	}
 	free(msg.filenames);
+	return 0;
 }
 
 static void

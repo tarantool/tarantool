@@ -801,14 +801,32 @@ static int
 lbox_backup_start(struct lua_State *L)
 {
 	int checkpoint_idx = 0;
+	struct vclock from_vclock;
+	vclock_clear(&from_vclock);
 	if (lua_gettop(L) > 0) {
-		checkpoint_idx = luaT_checkint(L, 1);
-		if (checkpoint_idx < 0) {
-			diag_set(IllegalParams, "invalid checkpoint index");
+		if (lua_isnumber(L, 1)) {
+			checkpoint_idx = lua_tonumber(L, 1);
+			if (checkpoint_idx < 0) {
+				diag_set(IllegalParams,
+					 "invalid checkpoint index");
+				return luaT_error(L);
+			}
+		} else if (lua_istable(L, 1)) {
+			lua_getfield(L, 1, "from_vclock");
+			if (!lua_isnil(L, -1) &&
+			    !luaT_tovclock(L, -1, &from_vclock)) {
+				diag_set(IllegalParams,
+					 "invalid from_vclock");
+				return luaT_error(L);
+			}
+			lua_pop(L, 1);
+		} else {
+			diag_set(IllegalParams,
+				 "expected number or table as 1 argument");
 			return luaT_error(L);
 		}
 	}
-	if (box_backup_start(checkpoint_idx) != 0)
+	if (box_backup_start(checkpoint_idx, &from_vclock) != 0)
 		return luaT_error(L);
 
 	lua_createtable(L, box_backup->file_count, 0);
@@ -841,7 +859,7 @@ lbox_backup_info(struct lua_State *L)
 		return 1;
 	}
 
-	lua_createtable(L, 0, 2);
+	lua_createtable(L, 0, 4);
 
 	lua_createtable(L, backup->file_count, 0);
 	for (int i = 0; i < backup->file_count; i++) {
@@ -852,6 +870,16 @@ lbox_backup_info(struct lua_State *L)
 
 	luaT_pushvclock(L, &backup->vclock);
 	lua_setfield(L, -2, "vclock");
+
+	if (vclock_is_set(&backup->prev_vclock)) {
+		luaT_pushvclock(L, &backup->prev_vclock);
+		lua_setfield(L, -2, "prev_vclock");
+		lua_pushstring(L, "incremental");
+		lua_setfield(L, -2, "type");
+	} else {
+		lua_pushstring(L, "full");
+		lua_setfield(L, -2, "type");
+	}
 
 	return 1;
 }

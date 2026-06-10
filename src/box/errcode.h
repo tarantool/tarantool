@@ -447,6 +447,7 @@ struct errcode_record {
 	_(ER_UNABLE_TO_PROCESS_IN_THREAD, 300,	"Unable to process request in thread", "request", STRING, "thread_id", UINT) \
 	_(ER_DICT_OVERFLOW, 301,		"Dictionary has no space - too many unique values are used", "max_size", UINT) \
 	_(ER_NO_SUCH_THREAD_GROUP, 302,		"Thread group does not exist", "thread_group", STRING) \
+	_(ER_XLOG_NOT_FOUND, 303,		"xlog file not found", "vclock", STRING) \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*

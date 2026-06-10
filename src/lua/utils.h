@@ -115,6 +115,14 @@ void
 luaT_pushvclock(struct lua_State *L, const struct vclock *vclock);
 
 /**
+ * Checks whether the argument idx is vclock as table and returns it in
+ * @vclock output argument.
+ * \return true on success or false if argument can't be converted.
+ */
+bool
+luaT_tovclock(struct lua_State *L, int idx, struct vclock *vclock);
+
+/**
  * Allocate a new uuid on the Lua stack and return a pointer to it.
  */
 struct tt_uuid *

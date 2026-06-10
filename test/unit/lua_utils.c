@@ -5,6 +5,7 @@
 #include "lualib.h"
 #include "memory.h"
 #include "reflection.h"
+#include "vclock/vclock.h"
 
 #include "lua/utils.h"
 
@@ -466,10 +467,103 @@ test_optint(lua_State *L)
 	check_plan();
 }
 
+static void
+test_tovclock(lua_State *L)
+{
+	plan(16);
+	header();
+
+	struct vclock vclock;
+	int64_t lsn;
+
+	lua_pushnil(L);
+	TRASH(&vclock);
+	ok(!luaT_tovclock(L, -1, &vclock), "vclock is not a table");
+	ok(!vclock_is_set(&vclock), "vclock is set");
+	lua_pop(L, 1);
+
+	lua_createtable(L, 0, 0);
+	lua_pushboolean(L, true);
+	lua_pushinteger(L, 100);
+	lua_settable(L, -3);
+	TRASH(&vclock);
+	ok(!luaT_tovclock(L, -1, &vclock), "unexpected replica_id type");
+	ok(!vclock_is_set(&vclock), "vclock is set");
+	lua_pop(L, 1);
+
+	lua_createtable(L, 0, 0);
+	lua_pushinteger(L, 32);
+	lua_pushinteger(L, 100);
+	lua_settable(L, -3);
+	TRASH(&vclock);
+	ok(!luaT_tovclock(L, -1, &vclock),
+	   "replica_id value is larger than maximum");
+	ok(!vclock_is_set(&vclock), "vclock is set");
+	lua_pop(L, 1);
+
+	lua_createtable(L, 0, 0);
+	lua_pushinteger(L, -1);
+	lua_pushinteger(L, 100);
+	lua_settable(L, -3);
+	TRASH(&vclock);
+	ok(!luaT_tovclock(L, -1, &vclock), "replica_id value is less than 0");
+	ok(!vclock_is_set(&vclock), "vclock is set");
+	lua_pop(L, 1);
+
+	lua_createtable(L, 0, 0);
+	lua_pushinteger(L, 0);
+	lua_pushboolean(L, true);
+	lua_settable(L, -3);
+	TRASH(&vclock);
+	ok(!luaT_tovclock(L, -1, &vclock), "unexpected lsn type");
+	ok(!vclock_is_set(&vclock), "vclock is set");
+	lua_pop(L, 1);
+
+	/* Empty vclock. */
+	lua_createtable(L, 0, 0);
+	TRASH(&vclock);
+	luaT_tovclock(L, -1, &vclock);
+	ok(vclock_is_set(&vclock), "vclock is set");
+	int i;
+	for (i = 0; i < VCLOCK_MAX; i++) {
+		if (vclock_get(&vclock, i) != 0)
+			break;
+	}
+	ok(i == VCLOCK_MAX, "got %d", i);
+	lua_pop(L, 1);
+
+	/* Non empty vclock. */
+	lua_createtable(L, 0, 0);
+	lua_pushinteger(L, 0);
+	lua_pushinteger(L, 100);
+	lua_settable(L, -3);
+	lua_pushinteger(L, 31);
+	lua_pushinteger(L, 200);
+	lua_settable(L, -3);
+	TRASH(&vclock);
+	luaT_tovclock(L, -1, &vclock);
+	ok(vclock_is_set(&vclock), "vclock is set");
+	lsn = vclock_get(&vclock, 0);
+	ok(lsn == 100, "got %ld", lsn);
+	lsn = vclock_get(&vclock, 31);
+	ok(lsn == 200, "got %ld", 200);
+	for (i = 0; i < VCLOCK_MAX; i++) {
+		if (i == 0 || i == 31)
+			continue;
+		if (vclock_get(&vclock, i) != 0)
+			break;
+	}
+	ok(i == VCLOCK_MAX, "got %d", i);
+	lua_pop(L, 1);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(12);
+	plan(13);
 	header();
 
 	struct lua_State *L = luaL_newstate();
@@ -490,6 +584,7 @@ main(void)
 	test_checkudata(L);
 	test_checktype(L);
 	test_optint(L);
+	test_tovclock(L);
 
 	fiber_free();
 	memory_free();
