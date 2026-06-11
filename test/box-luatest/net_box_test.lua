@@ -386,3 +386,46 @@ g.test_worker_yield_from_on_connect_trigger = function()
 
     t.assert_equals(c:wait_state('closed'), true)
 end
+
+--
+-- ghs-165: decoding of deeply nested MsgPack values received over the network
+-- or passed to a server must be limited to prevent a stack overflow.
+--
+-- Check that net.box decoding of a deeply nested response received from a
+-- server raises an error instead of overflowing the C stack (net_box.c).
+g.test_netbox_deep_response = function()
+    g.server:exec(function()
+        rawset(_G, 'ghs_165_deep', function(depth)
+            return require('msgpack').object_from_raw(
+                string.rep('\x91', depth) .. '\xc0')
+        end)
+    end)
+    local c = net.connect(g.server.net_box_uri)
+    local msg = 'msgpack.decode: too high nest level - 129'
+    t.assert_error_msg_content_equals(msg, function()
+        c:call('ghs_165_deep', { 200000 })
+    end)
+    c:close()
+end
+
+-- Check that decoding of deeply nested arguments received by a server
+-- raises an error instead of overflowing the C stack (misc.cc). The server
+-- must survive.
+g.test_server_deep_call_args = function()
+    g.server:exec(function()
+        rawset(_G, 'ghs_165_noop', function()
+            return true
+        end)
+    end)
+    local function nested_array(depth)
+        return string.rep('\x91', depth) .. '\xc0'
+    end
+    local c = net.connect(g.server.net_box_uri)
+    local args = msgpack.object_from_raw(nested_array(200000))
+    local msg = 'msgpack.decode: too high nest level - 129'
+    t.assert_error_msg_content_equals(msg, function()
+        c:call('ghs_165_noop', args)
+    end)
+    t.assert(c:ping())
+    c:close()
+end

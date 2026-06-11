@@ -546,3 +546,75 @@ g.test_object_autocomplete = function()
     local r = tabcomplete('mp:')
     t.assert_equals(r, {'mp:', 'mp:get(', 'mp:decode(', 'mp:iterator('})
 end
+
+--
+-- ghs-165: decoding of deeply nested MsgPack arrays and maps must be
+-- limited by `decode_max_depth` to prevent the C stack overflow.
+--
+local function nested_array(depth)
+    return string.rep('\x91', depth) .. '\xc0'
+end
+
+local function nested_map(depth)
+    return string.rep('\x81\xa1k', depth) .. '\xc0'
+end
+
+-- Check that `decode_max_depth` is enforced for arrays and maps: a value
+-- nested exactly at the limit is decoded, a deeper one is rejected.
+g.test_decode_max_depth = function()
+    local depth = 3
+    local serializer = msgpack.new()
+    serializer.cfg({decode_max_depth = depth})
+
+    t.assert_type(serializer.decode(nested_array(depth)), 'table')
+    t.assert_type(serializer.decode(nested_map(depth)), 'table')
+
+    local msg = 'msgpack.decode: too high nest level - 4'
+    t.assert_error_msg_content_equals(msg, function()
+        serializer.decode(nested_array(depth + 1))
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        serializer.decode(nested_map(depth + 1))
+    end)
+end
+
+-- Check that decoding of deeply nested values raises an error instead of
+-- overflowing the C stack.
+g.test_decode_deep_nesting = function()
+    local msg = 'msgpack.decode: too high nest level - 129'
+    -- The depth is big enough to overflow the C stack when the
+    -- recursion is not limited.
+    local deep_depth = 200 * 1000
+    local deep_array = nested_array(deep_depth)
+    local deep_map = nested_map(deep_depth)
+
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode(deep_array)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode(deep_map)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode_unchecked(deep_array)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode_unchecked(deep_map)
+    end)
+
+    local obj = msgpack.object_from_raw(deep_array)
+    t.assert_error_msg_content_equals(msg, function()
+        obj:decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_array):iterator():decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        obj:get(1)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_map):decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_map):get('k')
+    end)
+end
