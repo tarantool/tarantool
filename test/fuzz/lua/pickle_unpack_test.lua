@@ -12,6 +12,10 @@ local function TestOneInput(buf)
   local res = {pcall(pickle.unpack, format_string, binary_string)}
   if res[1] then
     table.remove(res, 1)
+    local is_unpack_safe = pcall(unpack, res)
+    if not is_unpack_safe then
+      return
+    end
     local packed = pickle.pack(format_string, unpack(res))
     assert(#packed == #binary_string)
   end
