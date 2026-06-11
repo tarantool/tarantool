@@ -398,9 +398,9 @@ cleanup:
 	return rc;
 }
 
-void
-luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
-	     const char **data)
+static void
+luamp_decode_r(struct lua_State *L, struct luaL_serializer *cfg,
+	       const char **data, int level)
 {
 	double d;
 	switch (mp_typeof(**data)) {
@@ -443,10 +443,13 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		return;
 	case MP_ARRAY:
 	{
+		if (level >= cfg->decode_max_depth)
+			luaL_error(L, "msgpack.decode: too high nest level - "
+				   "%d", level + 1);
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, cfg, data);
+			luamp_decode_r(L, cfg, data, level + 1);
 			lua_rawseti(L, -2, i + 1);
 		}
 		if (cfg->decode_save_metatables)
@@ -455,11 +458,14 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 	case MP_MAP:
 	{
+		if (level >= cfg->decode_max_depth)
+			luaL_error(L, "msgpack.decode: too high nest level - "
+				   "%d", level + 1);
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, cfg, data);
-			luamp_decode(L, cfg, data);
+			luamp_decode_r(L, cfg, data, level + 1);
+			luamp_decode_r(L, cfg, data, level + 1);
 			lua_settable(L, -3);
 		}
 		if (cfg->decode_save_metatables)
@@ -518,6 +524,13 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 ext_decode_err:
 	lua_pop(L, -1);
 	luaL_error(L, "msgpack.decode: invalid MsgPack");
+}
+
+void
+luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
+	     const char **data)
+{
+	luamp_decode_r(L, cfg, data, 0);
 }
 
 
