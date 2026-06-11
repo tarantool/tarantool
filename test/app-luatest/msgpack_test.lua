@@ -1,9 +1,11 @@
 local buffer = require('buffer')
 local console = require('console')
 local msgpack = require('msgpack')
+local net_box = require('net.box')
 local ffi = require('ffi')
 local fun = require('fun')
 local t = require('luatest')
+local server = require('luatest.server')
 
 local g = t.group()
 
@@ -821,4 +823,122 @@ g_error_details.test_error_details = function(cg)
             },
         },
     })
+end
+
+--
+-- ghs-165: decoding of deeply nested MsgPack arrays and maps must be
+-- limited by `decode_max_depth` to prevent the C stack overflow.
+--
+local g_ghs_165 = t.group('ghs_165')
+
+-- The depth is big enough to overflow the C stack when the recursion is
+-- not limited.
+local deep_depth = 200 * 1000
+
+local function nested_array(depth)
+    return string.rep('\x91', depth) .. '\xc0'
+end
+
+local function nested_map(depth)
+    return string.rep('\x81\xa1k', depth) .. '\xc0'
+end
+
+g_ghs_165.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        rawset(_G, 'ghs_165_noop', function()
+            return true
+        end)
+        rawset(_G, 'ghs_165_deep', function(depth)
+            return require('msgpack').object_from_raw(
+                string.rep('\x91', depth) .. '\xc0')
+        end)
+    end)
+end)
+
+g_ghs_165.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Check that `decode_max_depth` is enforced for arrays and maps: a value
+-- nested exactly at the limit is decoded, a deeper one is rejected.
+g_ghs_165.test_decode_max_depth = function()
+    local depth = 3
+    local serializer = msgpack.new()
+    serializer.cfg({decode_max_depth = depth})
+
+    t.assert_type(serializer.decode(nested_array(depth)), 'table')
+    t.assert_type(serializer.decode(nested_map(depth)), 'table')
+
+    local msg = 'msgpack.decode: too high nest level'
+    t.assert_error_msg_content_equals(msg, function()
+        serializer.decode(nested_array(depth + 1))
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        serializer.decode(nested_map(depth + 1))
+    end)
+end
+
+-- Check that decoding of deeply nested values raises an error instead of
+-- overflowing the C stack.
+g_ghs_165.test_decode_deep_nesting = function()
+    local msg = 'msgpack.decode: too high nest level'
+    local deep_array = nested_array(deep_depth)
+    local deep_map = nested_map(deep_depth)
+
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode(deep_array)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode(deep_map)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode_unchecked(deep_array)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.decode_unchecked(deep_map)
+    end)
+
+    local obj = msgpack.object_from_raw(deep_array)
+    t.assert_error_msg_content_equals(msg, function()
+        obj:decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_array):iterator():decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        obj:get(1)
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_map):decode()
+    end)
+    t.assert_error_msg_content_equals(msg, function()
+        msgpack.object_from_raw(deep_map):get('k')
+    end)
+end
+
+-- Check that net.box decoding of a deeply nested response received from a
+-- server raises an error instead of overflowing the C stack (net_box.c).
+g_ghs_165.test_netbox_deep_response = function(cg)
+    local c = net_box.connect(cg.server.net_box_uri)
+    t.assert_error_msg_content_equals('msgpack.decode: too high nest level',
+        function()
+            c:call('ghs_165_deep', {deep_depth})
+        end)
+    c:close()
+end
+
+-- Check that decoding of deeply nested arguments received by a server
+-- raises an error instead of overflowing the C stack (misc.cc). The server
+-- must survive.
+g_ghs_165.test_server_deep_call_args = function(cg)
+    local c = net_box.connect(cg.server.net_box_uri)
+    local args = msgpack.object_from_raw(nested_array(deep_depth))
+    t.assert_error_msg_content_equals('msgpack.decode: too high nest level',
+        function()
+            c:call('ghs_165_noop', args)
+        end)
+    t.assert(c:ping())
+    c:close()
 end
