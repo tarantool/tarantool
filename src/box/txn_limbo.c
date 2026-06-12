@@ -1068,9 +1068,8 @@ void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
 	/* The replication_synchro_quorum value may have changed. */
-	if (txn_limbo_is_owned_by_current_instance(limbo) &&
-	    txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
-		fiber_wakeup(limbo->worker);
+	txn_limbo_queue_bump_volatile_confirm(&limbo->queue);
+	fiber_wakeup(limbo->worker);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM
