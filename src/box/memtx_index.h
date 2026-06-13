@@ -31,8 +31,11 @@ struct memtx_index_vtab {
 	 * Main entrance point for changing data in index. Once built and
 	 * before deletion this is the only way to insert, replace and delete
 	 * data from the index.
+	 * Insert a tuple into the index, replacing a duplicate if allowed.
+	 *
+	 * @param new_tuple must not be NULL.
 	 * @param mode - @sa dup_replace_mode description
-	 * @param result - here the replaced or deleted tuple is placed.
+	 * @param result - here the replaced tuple is placed.
 	 * @param successor - if the index supports ordering, then in case of
 	 *  insert (!) here the successor tuple is returned. In other words,
 	 *  here will be stored the tuple, before which new tuple is inserted.
@@ -40,9 +43,18 @@ struct memtx_index_vtab {
 	 * NB: do not use the same object for @a result and @a successor - they
 	 *     are different returned values and implementation can rely on it.
 	 */
-	int (*replace)(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
+	int (*replace_tuple)(struct index *index, struct tuple *old_tuple,
+			     struct tuple *new_tuple,
+			     enum dup_replace_mode mode,
+			     struct tuple **result,
+			     struct tuple **successor);
+	/**
+	 * Delete a tuple from the index.
+	 *
+	 * @param result - here the deleted tuple is placed.
+	 */
+	int (*delete_tuple)(struct index *index, struct tuple *tuple,
+			    struct tuple **result);
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
@@ -68,15 +80,13 @@ memtx_index_get_internal(struct index *index, const char *key,
 	return vtab->get_internal(index, key, part_count, result, is_rw);
 }
 
-static inline int
+/**
+ * Replace a tuple in the index.
+ */
+int
 memtx_index_replace(struct index *index, struct tuple *old_tuple,
 		    struct tuple *new_tuple, enum dup_replace_mode mode,
-		    struct tuple **result, struct tuple **successor)
-{
-	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
-	return vtab->replace(index, old_tuple, new_tuple, mode, result,
-			     successor);
-}
+		    struct tuple **result, struct tuple **successor);
 
 static inline void
 memtx_index_begin_build(struct index *index)
