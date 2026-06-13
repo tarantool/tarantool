@@ -32,6 +32,14 @@ g.test_json_schema = function()
         naz = schema.scalar({
             type = 'integer',
             allowed_values = {0, 1},
+        }),
+        deprecated = schema.scalar({
+            type = 'string',
+            deprecated = {
+                since = '3.5.0',
+                msg = 'Use another option',
+                see = 'foo.baz',
+            },
         })
     }))
 
@@ -61,6 +69,7 @@ g.test_json_schema = function()
             fuz = {items = {type = 'string'}, type = 'array'},
             laz = {type = 'boolean'},
             naz = {enum = {0, 1}, type = 'integer'},
+            deprecated = {deprecated = true, type = 'string'},
         },
         type = 'object',
     }
