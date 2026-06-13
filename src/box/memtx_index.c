@@ -5,6 +5,72 @@
  */
 #include "memtx_index.h"
 
+/** Wrapper around `replace_tuple`. */
+static int
+memtx_index_replace_impl(struct index *index, struct tuple *old_tuple,
+			 struct tuple *new_tuple, enum dup_replace_mode mode,
+			 struct tuple **result, struct tuple **successor)
+{
+	assert(new_tuple != NULL);
+	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
+	return vtab->replace_tuple(index, old_tuple, new_tuple, mode, result,
+				   successor);
+}
+
+/** Wrapper around `delete_tuple`. */
+static int
+memtx_index_delete_impl(struct index *index, struct tuple *tuple,
+			struct tuple **result)
+{
+	struct memtx_index_vtab *vtab = (struct memtx_index_vtab *)index->vtab;
+	return vtab->delete_tuple(index, tuple, result);
+}
+
+int
+memtx_index_replace(struct index *index, struct tuple *old_tuple,
+		    struct tuple *new_tuple, enum dup_replace_mode mode,
+		    struct tuple **result, struct tuple **successor)
+{
+	*result = NULL;
+	*successor = NULL;
+	if (old_tuple != NULL && old_tuple == new_tuple) {
+		*result = old_tuple;
+		return 0;
+	}
+	struct tuple *replaced = NULL;
+	if (new_tuple != NULL &&
+	    memtx_index_replace_impl(index, old_tuple, new_tuple, mode,
+				     &replaced, successor) != 0)
+		return -1;
+	if (old_tuple == NULL) {
+		*result = replaced;
+		return 0;
+	}
+	bool is_mk_or_func = index->def->key_def->is_multikey ||
+			     index->def->key_def->for_func_index;
+	if (replaced != NULL && !is_mk_or_func) {
+		*result = replaced;
+		return 0;
+	}
+	struct tuple *deleted = NULL;
+	if (memtx_index_delete_impl(index, old_tuple, &deleted) != 0) {
+		if (new_tuple != NULL) {
+			struct tuple *unused;
+			VERIFY(memtx_index_delete_impl(index, new_tuple,
+						       &unused) == 0);
+		}
+		if (replaced != NULL) {
+			struct tuple *unused, *unused_successor;
+			VERIFY(memtx_index_replace_impl(
+				index, NULL, replaced, DUP_INSERT, &unused,
+				&unused_successor) == 0);
+		}
+		return -1;
+	}
+	*result = replaced != NULL ? replaced : deleted;
+	return 0;
+}
+
 void
 generic_memtx_index_begin_build(struct index *index)
 {
