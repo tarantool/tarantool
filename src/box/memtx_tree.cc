@@ -1519,10 +1519,12 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
+	assert(new_tuple != NULL);
 	struct key_def *key_def = base->def->key_def;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-	if (new_tuple != NULL &&
-	    !tuple_key_is_excluded(new_tuple, key_def, MULTIKEY_NONE)) {
+	*result = NULL;
+	*successor = NULL;
+	if (!tuple_key_is_excluded(new_tuple, key_def, MULTIKEY_NONE)) {
 		struct memtx_tree_data<USE_HINT> new_data;
 		new_data.tuple = new_tuple;
 		if (USE_HINT)
@@ -1545,37 +1547,37 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 						NULL) == 0);
 			return -1;
 		}
+		*result = dup_data.tuple;
 		*successor = suc_data.tuple;
-		if (dup_data.tuple != NULL) {
-			*result = dup_data.tuple;
-			return 0;
-		}
 	}
-	if (old_tuple != NULL &&
-	    !tuple_key_is_excluded(old_tuple, key_def, MULTIKEY_NONE)) {
-		struct memtx_tree_data<USE_HINT> old_data;
-		old_data.tuple = old_tuple;
-		if (USE_HINT)
-			old_data.set_hint(tuple_hint(old_tuple, cmp_def));
-		if (memtx_tree_index_delete_impl<USE_HINT>(
-					index, old_data, NULL) != 0) {
-			if (new_tuple != NULL &&
-			    !tuple_key_is_excluded(new_tuple, key_def,
-						   MULTIKEY_NONE)) {
-				struct memtx_tree_data<USE_HINT> new_data;
-				new_data.tuple = new_tuple;
-				if (USE_HINT)
-					new_data.set_hint(tuple_hint(new_tuple,
-								     cmp_def));
-				VERIFY(memtx_tree_index_delete_impl<USE_HINT>(
-						index, new_data, NULL) == 0);
-			}
-			return -1;
-		}
-		*result = old_tuple;
-	} else {
-		*result = NULL;
-	}
+	return 0;
+}
+
+/** Delete one exact value from the tree. */
+template<bool USE_HINT>
+static int
+memtx_tree_index_delete(struct index *base, struct tuple *tuple,
+			struct tuple **result)
+{
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+	struct key_def *key_def = base->def->key_def;
+	*result = NULL;
+	assert(tuple != NULL);
+	if (tuple_key_is_excluded(tuple, key_def, MULTIKEY_NONE))
+		return 0;
+	struct memtx_tree_data<USE_HINT> data;
+	data.tuple = tuple;
+	if (USE_HINT)
+		data.set_hint(tuple_hint(tuple,
+					 memtx_tree_cmp_def(&index->tree)));
+	struct memtx_tree_data<USE_HINT> deleted_data;
+	deleted_data.tuple = NULL;
+	if (memtx_tree_index_delete_impl<USE_HINT>(index, data,
+						   &deleted_data) != 0)
+		return -1;
+	assert(deleted_data.tuple == data.tuple);
+	*result = tuple;
 	return 0;
 }
 
@@ -1722,6 +1724,7 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 {
 	struct memtx_tree_index<true> *index =
 		(struct memtx_tree_index<true> *)base;
+	assert(new_tuple != NULL);
 
 	/* MUTLIKEY doesn't support successor for now. */
 	*successor = NULL;
@@ -1729,64 +1732,59 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 	struct key_def *key_def = base->def->key_def;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	*result = NULL;
-	if (new_tuple != NULL) {
-		int multikey_idx = 0, err = 0;
-		uint32_t multikey_count =
-			tuple_multikey_count(new_tuple, cmp_def);
-		for (; (uint32_t) multikey_idx < multikey_count;
-		     multikey_idx++) {
-			if (tuple_key_is_excluded(new_tuple, key_def,
-						  multikey_idx))
-				continue;
-			bool is_multikey_conflict;
-			struct memtx_tree_data<true> replaced_data;
-			err = memtx_tree_index_replace_multikey_one(index,
-						old_tuple, new_tuple, mode,
-						multikey_idx, &replaced_data,
-						NULL, &is_multikey_conflict);
-			if (err != 0)
-				break;
-			if (replaced_data.tuple != NULL &&
-			    !is_multikey_conflict) {
-				assert(*result == NULL ||
-				       *result == replaced_data.tuple);
-				*result = replaced_data.tuple;
-			}
+	int multikey_idx = 0, err = 0;
+	uint32_t multikey_count = tuple_multikey_count(new_tuple, cmp_def);
+	for (; (uint32_t)multikey_idx < multikey_count; multikey_idx++) {
+		if (tuple_key_is_excluded(new_tuple, key_def, multikey_idx))
+			continue;
+		bool is_multikey_conflict;
+		struct memtx_tree_data<true> replaced_data;
+		err = memtx_tree_index_replace_multikey_one(
+			index, old_tuple, new_tuple, mode, multikey_idx,
+			&replaced_data, NULL, &is_multikey_conflict);
+		if (err != 0)
+			break;
+		if (replaced_data.tuple != NULL && !is_multikey_conflict) {
+			assert(*result == NULL ||
+			       *result == replaced_data.tuple);
+			*result = replaced_data.tuple;
 		}
-		if (err != 0) {
-			memtx_tree_index_replace_multikey_rollback(index,
-					new_tuple, *result, multikey_idx);
+	}
+	if (err != 0) {
+		memtx_tree_index_replace_multikey_rollback(index, new_tuple,
+							   *result,
+							   multikey_idx);
+		return -1;
+	}
+	return 0;
+}
+
+/** Delete all entries of a tuple from a multikey tree index. */
+static int
+memtx_tree_index_delete_multikey(struct index *base, struct tuple *tuple,
+				 struct tuple **result)
+{
+	struct memtx_tree_index<true> *index =
+		(struct memtx_tree_index<true> *)base;
+	*result = NULL;
+	assert(tuple != NULL);
+	struct key_def *key_def = base->def->key_def;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	struct memtx_tree_data<true> data;
+	data.tuple = tuple;
+	uint32_t multikey_count = tuple_multikey_count(tuple, cmp_def);
+	for (uint32_t i = 0; i < multikey_count; i++) {
+		if (tuple_key_is_excluded(tuple, key_def, i))
+			continue;
+		data.hint = i;
+		if (memtx_tree_index_delete_value_impl<true>(
+				index, data, NULL) != 0) {
+			memtx_tree_index_replace_multikey_rollback(index, NULL,
+								   tuple, 0);
 			return -1;
 		}
-		if (*result != NULL) {
-			assert(old_tuple == NULL || old_tuple == *result);
-			old_tuple = *result;
-		}
 	}
-	if (old_tuple != NULL) {
-		struct memtx_tree_data<true> data;
-		data.tuple = old_tuple;
-		uint32_t multikey_count =
-			tuple_multikey_count(old_tuple, cmp_def);
-		for (int i = 0; (uint32_t) i < multikey_count; i++) {
-			if (tuple_key_is_excluded(old_tuple, key_def, i))
-				continue;
-			data.hint = i;
-			if (memtx_tree_index_delete_value_impl<true>(
-					index, data, NULL) != 0) {
-				uint32_t multikey_count = 0;
-				if (new_tuple != 0)
-					multikey_count =
-						tuple_multikey_count(new_tuple,
-								     cmp_def);
-				memtx_tree_index_replace_multikey_rollback(
-					index, new_tuple, old_tuple,
-					multikey_count);
-				return -1;
-			}
-		}
-		*result = old_tuple;
-	}
+	*result = tuple;
 	return 0;
 }
 
@@ -1841,6 +1839,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			struct tuple *new_tuple, enum dup_replace_mode mode,
 			struct tuple **result, struct tuple **successor)
 {
+	assert(new_tuple != NULL);
 	/* The successor will be set only if the function is not multikey. */
 	*successor = NULL;
 
@@ -1861,102 +1860,117 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 	struct rlist old_keys, new_keys;
 	rlist_create(&old_keys);
 	rlist_create(&new_keys);
-	if (new_tuple != NULL) {
-		if (key_list_iterator_create(&it, new_tuple, index_def, true,
-					     memtx->func_key_format) != 0)
-			goto end;
-		int err = 0;
-		struct tuple *key;
-		struct func_key_undo *undo;
-		struct key_def *key_def = index_def->key_def;
-		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
-			key != NULL) {
-			/* Save functional key to MVCC, even excluded one. */
-			memtx_tx_save_func_key(new_tuple, base, key);
-			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
-				continue;
-			/* Perform insertion, log it in list. */
-			undo = xregion_alloc_object(region, typeof(*undo));
-			tuple_ref(key);
-			undo->key.tuple = new_tuple;
-			undo->key.hint = (hint_t)key;
-			rlist_add(&new_keys, &undo->link);
-			bool is_multikey_conflict;
-			struct memtx_tree_data<true> old_data, successor_data;
-			old_data.tuple = NULL;
-			successor_data.tuple = NULL;
-			err = memtx_tree_index_replace_multikey_one(index,
-						old_tuple, new_tuple,
-						mode, (hint_t)key, &old_data,
-						&successor_data,
-						&is_multikey_conflict);
+	int err = 0;
+	struct tuple *key = NULL;
+	struct func_key_undo *undo;
+	struct key_def *key_def = index_def->key_def;
+	if (key_list_iterator_create(&it, new_tuple, index_def, true,
+				     memtx->func_key_format) != 0)
+		goto end;
+	while ((err = key_list_iterator_next(&it, &key)) == 0 && key != NULL) {
+		/* Save functional key to MVCC, even excluded one. */
+		memtx_tx_save_func_key(new_tuple, base, key);
+		if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
+			continue;
+		/* Perform insertion, log it in list. */
+		undo = xregion_alloc_object(region, typeof(*undo));
+		tuple_ref(key);
+		undo->key.tuple = new_tuple;
+		undo->key.hint = (hint_t)key;
+		rlist_add(&new_keys, &undo->link);
+		bool is_multikey_conflict;
+		struct memtx_tree_data<true> old_data, successor_data;
+		old_data.tuple = NULL;
+		successor_data.tuple = NULL;
+		err = memtx_tree_index_replace_multikey_one(
+			index, old_tuple, new_tuple, mode, (hint_t)key,
+			&old_data, &successor_data, &is_multikey_conflict);
 			if (err != 0)
 				break;
-			if (!it.func_is_multikey)
-				*successor = successor_data.tuple;
-			if (old_data.tuple != NULL && !is_multikey_conflict) {
-				undo = xregion_alloc_object(region,
-							    typeof(*undo));
-				undo->key = old_data;
-				rlist_add(&old_keys, &undo->link);
-				*result = old_data.tuple;
-			} else if (old_data.tuple != NULL &&
-				   is_multikey_conflict) {
-				/*
-				 * Remove the replaced tuple undo
-				 * from undo list.
-				 */
-				tuple_unref((struct tuple *)old_data.hint);
-				rlist_foreach_entry(undo, &new_keys, link) {
-					if (undo->key.hint == old_data.hint) {
-						rlist_del(&undo->link);
-						break;
-					}
+		if (!it.func_is_multikey)
+			*successor = successor_data.tuple;
+		if (old_data.tuple != NULL && !is_multikey_conflict) {
+			undo = xregion_alloc_object(region, typeof(*undo));
+			undo->key = old_data;
+			rlist_add(&old_keys, &undo->link);
+			*result = old_data.tuple;
+		} else if (old_data.tuple != NULL && is_multikey_conflict) {
+			/*
+			 * Remove the replaced tuple undo from the undo list.
+			 */
+			tuple_unref((struct tuple *)old_data.hint);
+			rlist_foreach_entry(undo, &new_keys, link) {
+				if (undo->key.hint == old_data.hint) {
+					rlist_del(&undo->link);
+					break;
 				}
 			}
 		}
-		if (key != NULL || err != 0) {
-			memtx_tree_func_index_replace_rollback(index,
-						&old_keys, &new_keys);
-			goto end;
+	}
+	if (key != NULL || err != 0) {
+		memtx_tree_func_index_replace_rollback(index, &old_keys,
+						       &new_keys);
+		goto end;
+	}
+	/*
+	 * Commit changes: release hints for
+	 * replaced entries.
+	 */
+	rlist_foreach_entry(undo, &old_keys, link)
+		tuple_unref((struct tuple *)undo->key.hint);
+	rc = 0;
+end:
+	region_truncate(region, region_svp);
+	return rc;
+}
+
+/** Delete all entries of a tuple from a functional tree index. */
+static int
+memtx_tree_func_index_delete(struct index *base, struct tuple *tuple,
+			     struct tuple **result)
+{
+	struct memtx_tree_index<true> *index =
+		(struct memtx_tree_index<true> *)base;
+	struct index_def *index_def = index->base.def;
+	assert(index_def->key_def->for_func_index);
+	assert(!index_def->key_def->is_multikey);
+	*result = NULL;
+	assert(tuple != NULL);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	struct key_list_iterator it;
+	/*
+	 * Use the runtime format to avoid OOM while deleting a tuple
+	 * from a space. It's okay, because we are not going to store
+	 * the keys in the index.
+	 */
+	if (key_list_iterator_create(&it, tuple, index_def, false,
+				     tuple_format_runtime) != 0)
+		goto fail;
+	struct rlist old_keys, new_keys;
+	rlist_create(&old_keys);
+	rlist_create(&new_keys);
+	struct memtx_tree_data<true> data, deleted_data;
+	data.tuple = tuple;
+	struct tuple *key;
+	while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
+		data.hint = (hint_t)key;
+		deleted_data.tuple = NULL;
+		if (memtx_tree_index_delete_value_impl(
+				index, data, &deleted_data) != 0) {
+			memtx_tree_func_index_replace_rollback(index, &old_keys,
+							       &new_keys);
+			goto fail;
 		}
-		if (*result != NULL) {
-			assert(old_tuple == NULL || old_tuple == *result);
-			old_tuple = *result;
+		if (deleted_data.tuple != NULL) {
+			struct func_key_undo *undo =
+				xregion_alloc_object(region, typeof(*undo));
+			undo->key = deleted_data;
+			rlist_add(&old_keys, &undo->link);
+			*result = tuple;
 		}
 	}
-	if (old_tuple != NULL) {
-		/*
-		 * Use the runtime format to avoid OOM while deleting a tuple
-		 * from a space. It's okay, because we are not going to store
-		 * the keys in the index.
-		 */
-		if (key_list_iterator_create(&it, old_tuple, index_def, false,
-					     tuple_format_runtime) != 0)
-			goto end;
-		struct memtx_tree_data<true> data, deleted_data;
-		data.tuple = old_tuple;
-		struct tuple *key;
-		while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
-			data.hint = (hint_t) key;
-			deleted_data.tuple = NULL;
-			if (memtx_tree_index_delete_value_impl(
-					index, data, &deleted_data) != 0) {
-				memtx_tree_func_index_replace_rollback(
-					index, &old_keys, &new_keys);
-				return -1;
-			}
-			if (deleted_data.tuple != NULL) {
-				*result = old_tuple;
-				struct func_key_undo *undo =
-					xregion_alloc_object(region,
-							     typeof(*undo));
-				undo->key = deleted_data;
-				rlist_add(&old_keys, &undo->link);
-			}
-		}
-		assert(key == NULL);
-	}
+	assert(key == NULL);
 	/*
 	 * Commit changes: release hints for
 	 * replaced entries.
@@ -1964,10 +1978,11 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 	struct func_key_undo *undo;
 	rlist_foreach_entry(undo, &old_keys, link)
 		tuple_unref((struct tuple *)undo->key.hint);
-	rc = 0;
-end:
 	region_truncate(region, region_svp);
-	return rc;
+	return 0;
+fail:
+	region_truncate(region, region_svp);
+	return -1;
 }
 
 template <bool USE_HINT>
@@ -2345,6 +2360,16 @@ memtx_tree_disabled_index_replace(struct index *index, struct tuple *old_tuple,
 	return 0;
 }
 
+static int
+memtx_tree_disabled_index_delete(struct index *index, struct tuple *tuple,
+				 struct tuple **result)
+{
+	(void)index;
+	(void)tuple;
+	*result = NULL;
+	return 0;
+}
+
 /** Read view implementation. */
 template <bool USE_HINT>
 struct tree_read_view {
@@ -2702,7 +2727,8 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 static const struct memtx_index_vtab memtx_tree_disabled_index_vtab = {
 	/* .base = */ memtx_tree_disabled_index_vtab_base,
 	/* .get_internal = */ generic_memtx_index_get_internal,
-	/* .replace = */ memtx_tree_disabled_index_replace,
+	/* .replace_tuple = */ memtx_tree_disabled_index_replace,
+	/* .delete_tuple = */ memtx_tree_disabled_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ memtx_tree_disabled_index_build_next,
@@ -2771,9 +2797,14 @@ get_memtx_tree_index_vtab(void)
 	static const struct memtx_index_vtab vtab = {
 		/* .base = */ vtab_base,
 		/* .get_internal = */ memtx_tree_index_get_internal<USE_HINT>,
-		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
-				 is_func ? memtx_tree_func_index_replace :
-				 memtx_tree_index_replace<USE_HINT>,
+		/* .replace_tuple = */
+		is_mk ? memtx_tree_index_replace_multikey :
+		is_func ? memtx_tree_func_index_replace :
+			  memtx_tree_index_replace<USE_HINT>,
+		/* .delete_tuple = */
+		is_mk ? memtx_tree_index_delete_multikey :
+		is_func ? memtx_tree_func_index_delete :
+			  memtx_tree_index_delete<USE_HINT>,
 		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
 		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
 		/* .build_next = */ is_mk ? memtx_tree_index_build_next_multikey :

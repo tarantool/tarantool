@@ -444,46 +444,47 @@ fail:
 	return -1;
 }
 
+/** Insert a new tuple into the index and check for duplicates. */
 static int
 memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 			 struct tuple *new_tuple, enum dup_replace_mode mode,
 			 struct tuple **result, struct tuple **successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	assert(new_tuple != NULL);
 
 	/* HASH index doesn't support ordering. */
 	*successor = NULL;
+	*result = NULL;
 
-	if (new_tuple != NULL) {
-		struct tuple *dup_tuple;
-		uint32_t pos;
-		if (memtx_hash_index_replace_impl(
-				index, new_tuple, &dup_tuple, &pos) != 0)
-			return -1;
-		if (index_check_dup(base, old_tuple, new_tuple,
-				    dup_tuple, mode) != 0) {
-			VERIFY(memtx_hash_index_delete_impl(index, pos) == 0);
-			if (dup_tuple)
-				VERIFY(memtx_hash_index_insert_impl(
-						index, dup_tuple) == 0);
-			return -1;
-		}
-
-		if (dup_tuple) {
-			*result = dup_tuple;
-			return 0;
-		}
+	struct tuple *dup_tuple;
+	uint32_t pos;
+	if (memtx_hash_index_replace_impl(index, new_tuple, &dup_tuple,
+					  &pos) != 0)
+		return -1;
+	if (index_check_dup(base, old_tuple, new_tuple, dup_tuple, mode) != 0) {
+		VERIFY(memtx_hash_index_delete_impl(index, pos) == 0);
+		if (dup_tuple)
+			VERIFY(memtx_hash_index_insert_impl(index,
+							    dup_tuple) == 0);
+		return -1;
 	}
+	if (dup_tuple)
+		*result = dup_tuple;
+	return 0;
+}
 
-	if (old_tuple != NULL) {
-		if (memtx_hash_index_delete_value_impl(index, old_tuple) != 0) {
-			if (new_tuple != NULL)
-				VERIFY(memtx_hash_index_delete_value_impl(
-						index, new_tuple) == 0);
-			return -1;
-		}
-	}
-	*result = old_tuple;
+/** Delete one exact tuple from the index. */
+static int
+memtx_hash_index_delete(struct index *base, struct tuple *tuple,
+			struct tuple **result)
+{
+	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	*result = NULL;
+	assert(tuple != NULL);
+	if (memtx_hash_index_delete_value_impl(index, tuple) != 0)
+		return -1;
+	*result = tuple;
 	return 0;
 }
 
@@ -747,7 +748,8 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 static const struct memtx_index_vtab memtx_hash_index_vtab = {
 	/* .base = */ memtx_hash_index_vtab_base,
 	/* .get_internal = */ memtx_hash_index_get_internal,
-	/* .replace = */ memtx_hash_index_replace,
+	/* .replace_tuple = */ memtx_hash_index_replace,
+	/* .delete_tuple = */ memtx_hash_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,

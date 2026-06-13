@@ -280,6 +280,34 @@ make_key(const char *field, uint32_t *key_len)
 	}
 }
 
+/** Delete one exact tuple from the index. */
+static int
+memtx_bitset_index_delete(struct index *base, struct tuple *tuple,
+			  struct tuple **result)
+{
+	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
+	assert(tuple != NULL);
+#ifndef OLD_GOOD_BITSET
+	uint32_t value = memtx_bitset_index_tuple_to_value(index, tuple);
+#else /* #ifndef OLD_GOOD_BITSET */
+	size_t value = tuple_to_value(old_tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	VERIFY(tt_bitset_index_contains_value(&index->index, (size_t)value));
+	*result = tuple;
+	tt_bitset_index_remove_value(&index->index, value);
+#ifndef OLD_GOOD_BITSET
+	memtx_bitset_index_unregister_tuple(index, tuple);
+#endif /* #ifndef OLD_GOOD_BITSET */
+	return 0;
+}
+
+/**
+ * Replace an old tuple with a new tuple in the index.
+ *
+ * BITSET values use numeric IDs that may be retained by concurrent iterators.
+ * Replacing a tuple must reuse the old ID atomically so that an iterator never
+ * resolves a retained ID through a free-list slot.
+ */
 static int
 memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 			   struct tuple *new_tuple, enum dup_replace_mode mode,
@@ -292,56 +320,37 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 
 	assert(!base->def->opts.is_unique);
 	assert(!base->def->key_def->is_multikey);
-	assert(old_tuple != NULL || new_tuple != NULL);
+	assert(new_tuple != NULL);
 	(void) mode;
 
 	*result = NULL;
+	if (old_tuple != NULL)
+		VERIFY(memtx_bitset_index_delete(base, old_tuple, result) == 0);
 
-	if (old_tuple != NULL) {
+	const char *field = tuple_field_by_part(new_tuple,
+						base->def->key_def->parts,
+						MULTIKEY_NONE);
+	uint32_t key_len;
+	const void *key = make_key(field, &key_len);
 #ifndef OLD_GOOD_BITSET
-		uint32_t value = memtx_bitset_index_tuple_to_value(index, old_tuple);
-#else /* #ifndef OLD_GOOD_BITSET */
-		size_t value = tuple_to_value(old_tuple);
-#endif /* #ifndef OLD_GOOD_BITSET */
-		if (tt_bitset_index_contains_value(&index->index,
-						   (size_t) value)) {
-			*result = old_tuple;
-
-			assert(old_tuple != new_tuple);
-			tt_bitset_index_remove_value(&index->index, value);
-#ifndef OLD_GOOD_BITSET
-			memtx_bitset_index_unregister_tuple(index, old_tuple);
-#endif /* #ifndef OLD_GOOD_BITSET */
-		}
+	if (memtx_bitset_index_register_tuple(index, new_tuple) != 0) {
+		/*
+		 * If the old tuple was removed, its ID is first on the spare
+		 * list and registration cannot fail.
+		 */
+		assert(*result == NULL);
+		return -1;
 	}
-
-	if (new_tuple != NULL) {
-		const char *field = tuple_field_by_part(new_tuple,
-				base->def->key_def->parts, MULTIKEY_NONE);
-		uint32_t key_len;
-		const void *key = make_key(field, &key_len);
-#ifndef OLD_GOOD_BITSET
-		if (memtx_bitset_index_register_tuple(index, new_tuple) != 0) {
-			/*
-			 * We can't fail to allocate a new tuple pointer if we
-			 * have just deregistered the old one - it will be moved
-			 * to the spare list and reused.
-			 */
-			assert(*result == NULL);
-			return -1;
-		}
-		uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
+	uint32_t value = memtx_bitset_index_tuple_to_value(index, new_tuple);
 #else /* #ifndef OLD_GOOD_BITSET */
-		uint32_t value = tuple_to_value(new_tuple);
+	uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (tt_bitset_index_insert(&index->index, key, key_len,
-					   value) < 0) {
+	if (tt_bitset_index_insert(&index->index, key, key_len, value) < 0) {
 #ifndef OLD_GOOD_BITSET
-			memtx_bitset_index_unregister_tuple(index, new_tuple);
+		memtx_bitset_index_unregister_tuple(index, new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-			diag_set(OutOfMemory, 0, "memtx_bitset_index", "insert");
-			return -1;
-		}
+		diag_set(OutOfMemory, 0, "memtx_bitset_index", "insert");
+		return -1;
 	}
 	return 0;
 }
@@ -530,7 +539,8 @@ static const struct index_vtab memtx_bitset_index_vtab_base = {
 static const struct memtx_index_vtab memtx_bitset_index_vtab = {
 	/* .base = */ memtx_bitset_index_vtab_base,
 	/* .get_internal = */ generic_memtx_index_get_internal,
-	/* .replace = */ memtx_bitset_index_replace,
+	/* .replace_tuple = */ memtx_bitset_index_replace,
+	/* .delete_tuple = */ memtx_bitset_index_delete,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
 	/* .build_next = */ generic_memtx_index_build_next,
