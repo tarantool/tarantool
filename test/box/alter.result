@@ -249,6 +249,10 @@ _index:select{}
   - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
   - [380, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
   - [388, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [396, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [396, 1, 'timestamp', 'tree', {'unique': true}, [{'field': 1, 'type': 'double',
+        'is_nullable': true}, {'field': 2, 'type': 'unsigned', 'is_nullable': true},
+      {'field': 3, 'type': 'unsigned', 'is_nullable': true}]]
 ...
 -- modify indexes of a system space
 _index:delete{_index.id, 0}
