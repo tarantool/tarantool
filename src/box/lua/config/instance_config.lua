@@ -1772,6 +1772,10 @@ return schema.new('instance_config', schema.record({
             key = schema.scalar({type = 'string'}),
             value = schema.scalar({type = 'string'}),
         }),
+        export = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'any'}),
+        }),
     }),
     sharding = schema.record({
         -- Instance vshard options.
