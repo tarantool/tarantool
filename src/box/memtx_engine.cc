@@ -580,10 +580,11 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 * We use transaction in case of force recovery merely to
 	 * simplify the code.
 	 */
-	if (recovering_system_spaces ||
+	if (recovering_system_spaces || !space_is_memtx(space) ||
 	    space_events_are_enabled() || txn_events_are_enabled() ||
 	    memtx->force_recovery) {
-		if (!recovering_system_spaces && !memtx->force_recovery)
+		if (!recovering_system_spaces && space_is_memtx(space) &&
+		    !memtx->force_recovery)
 			say_warn_once(
 				"snapshot recovery performance is better with"
 				" new value of"
