@@ -640,13 +640,6 @@ struct index_vtab {
 	int (*random)(struct index *index, uint32_t rnd, struct tuple **result);
 	ssize_t (*count)(struct index *index, enum iterator_type type,
 			 const char *key, uint32_t part_count);
-	/*
-	 * Same as get(), but returns a tuple as it is stored in the index,
-	 * without any transformations. Used internally by engines. For
-	 * example, memtx returns a tuple without decompression.
-	 */
-	int (*get_internal)(struct index *index, const char *key,
-			    uint32_t part_count, struct tuple **result);
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	/**
@@ -1014,13 +1007,6 @@ index_count(struct index *index, enum iterator_type type,
 }
 
 static inline int
-index_get_internal(struct index *index, const char *key,
-		   uint32_t part_count, struct tuple **result)
-{
-	return index->vtab->get_internal(index, key, part_count, result);
-}
-
-static inline int
 index_get(struct index *index, const char *key,
 	   uint32_t part_count, struct tuple **result)
 {
@@ -1241,9 +1227,6 @@ ssize_t
 generic_index_read_view_count(struct index_read_view *rv,
 			      enum iterator_type type, const char *key,
 			      uint32_t part_count);
-int
-generic_index_get_internal(struct index *index, const char *key,
-			   uint32_t part_count, struct tuple **result);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 struct index_read_view *
 generic_index_create_read_view(struct index *index);
