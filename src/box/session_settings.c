@@ -279,7 +279,6 @@ static const struct index_vtab session_settings_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ session_settings_index_get,
 	/* .create_iterator = */ session_settings_index_create_iterator,
 	/* .create_iterator_with_offset = */
