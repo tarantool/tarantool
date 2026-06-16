@@ -730,7 +730,6 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,
 	/* .count = */ memtx_hash_index_count,
-	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -744,6 +743,7 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_hash_index_vtab = {
 	/* .base = */ memtx_hash_index_vtab_base,
+	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
