@@ -204,7 +204,6 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ sysview_index_get,
 	/* .create_iterator = */ sysview_index_create_iterator,
 	/* .create_iterator_with_offset = */

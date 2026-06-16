@@ -411,7 +411,6 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_rtree_index_count,
-	/* .get_internal = */ memtx_rtree_index_get_internal,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_rtree_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -425,6 +424,7 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .base = */ memtx_rtree_index_vtab_base,
+	/* .get_internal = */ memtx_rtree_index_get_internal,
 	/* .replace = */ memtx_rtree_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ memtx_rtree_index_reserve,
