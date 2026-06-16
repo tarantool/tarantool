@@ -1519,8 +1519,8 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 
 	struct wal_msg *batch;
 	if (!stailq_empty(&writer->wal_pipe.input) &&
-	    (batch = wal_msg(stailq_first_entry(&writer->wal_pipe.input,
-						struct cmsg, fifo)))) {
+	    (batch = wal_msg(stailq_last_entry(&writer->wal_pipe.input,
+					       struct cmsg, fifo)))) {
 
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 	} else {
