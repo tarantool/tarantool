@@ -438,6 +438,26 @@ generic_session_fd(struct session *session);
 int64_t
 generic_session_sync(struct session *session);
 
+/** Drops the whole per-user session idle timeout configuration. */
+void
+session_idle_timeout_reset(void);
+
+/**
+ * Sets the idle timeout (in seconds) for the given user name. A timeout of
+ * zero removes the entry (no timeout). The user need not exist yet: the
+ * timeout is resolved by name at authentication time.
+ */
+void
+session_idle_timeout_set(const char *name, uint32_t name_len,
+			 double timeout);
+
+/**
+ * Return the idle timeout (in seconds) configured for the user the given
+ * authentication token belongs to. Zero means no timeout.
+ */
+double
+session_idle_timeout(uint8_t auth_token);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

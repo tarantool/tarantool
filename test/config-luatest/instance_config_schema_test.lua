@@ -955,6 +955,23 @@ for case_name, case in pairs({
     end
 end
 
+g.test_session = function()
+    local iconfig = {
+        session = {
+            users = {
+                guest = {
+                    idle_timeout = 1,
+                },
+                alice = {
+                    idle_timeout = 30,
+                },
+            },
+        },
+    }
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.session, instance_config.schema.fields.session)
+end
+
 g.test_database = function()
     local iconfig = {
         database = {
