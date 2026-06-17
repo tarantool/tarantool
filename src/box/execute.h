@@ -120,7 +120,7 @@ sql_stmt_busy(const struct Vdbe *stmt);
  * @param port Port to store request response.
  */
 int
-sql_prepare(const char *sql, int len, struct port *port);
+sql_prepare(const char *sql, size_t len, struct port *port);
 
 /**
  * Process an SQL request received over IPROTO.
