@@ -310,6 +310,11 @@ struct box_backup {
 	 */
 	struct vclock prev_vclock;
 	/**
+	 * vclock of checkpoint for full backups. Unset vclock for incremental
+	 * backups.
+	 */
+	struct vclock checkpoint_vclock;
+	/**
 	 * Point to the gc reference object that prevents the garbage
 	 * collector from deleting the checkpoint file (and implicitly
 	 * backup WAL files) that are currently being backed up.
@@ -353,6 +358,26 @@ box_backup_start(int checkpoint_idx, const struct vclock *from_vclock,
  */
 void
 box_backup_stop(void);
+
+/** Recovery point. */
+struct recovery_point {
+	/**
+	 * LSN of last statement of transaction with recovery point INSERT.
+	 * By design it is not statement with changes to local space.
+	 */
+	int64_t lsn;
+	/**
+	 * Timestamp of transaction with recovery point INSERT taken from
+	 * entry written to WAL.
+	 */
+	double timestamp;
+};
+
+/**
+ * Create recovery point with @label (can be NULL).
+ */
+int
+box_recovery_point_create(const char *label, struct recovery_point *point);
 
 /** \cond public */
 
