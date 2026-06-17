@@ -128,6 +128,7 @@ sql_reprepare(struct Vdbe **stmt)
 	if (sql_stmt_compile(sql_str, strlen(sql_str), NULL,
 			     &new_stmt, NULL) != 0)
 		return -1;
+	sql_stmt_set_id(new_stmt, sql_stmt_get_id(*stmt));
 	if (sql_stmt_cache_update(*stmt, new_stmt) != 0)
 		return -1;
 	*stmt = new_stmt;
@@ -148,6 +149,7 @@ sql_prepare(const char *sql, int len, struct port *port)
 	if (stmt == NULL) {
 		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
 			return -1;
+		sql_stmt_set_id(stmt, stmt_id);
 		if (sql_stmt_cache_insert(stmt) != 0) {
 			sql_stmt_finalize(stmt);
 			return -1;
