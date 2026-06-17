@@ -139,17 +139,8 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos);
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
-static inline int
-sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
-{
-	assert(stmt != NULL);
-	uint32_t pos = 1;
-	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
-		if (sql_bind_column(stmt, &bind[i], pos) != 0)
-			return -1;
-	}
-	return 0;
-}
+int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

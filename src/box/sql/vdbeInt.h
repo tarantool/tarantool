@@ -304,6 +304,21 @@ struct Vdbe {
 	uint32_t sql_flags;
 	/* Anonymous savepoint for aborts only */
 	struct txn_savepoint *anonymous_savepoint;
+	/** Array of names in original request. */
+	char **original_names;
+	/** Array of lens of names in original request. */
+	u32 *original_names_len;
+	/** Len of array of names in original request. */
+	u32 count_original_names;
+	/** Now max as possible len of array of names in original request. */
+	u32 max_count_original_names;
+
+	/** Array with names of bind variables. */
+	const char **bind_names;
+	/** Array with lens of names of bind variables. */
+	uint32_t *bind_names_len;
+	/** Count of bind variables. */
+	uint32_t count_bind_names;
 };
 
 /*

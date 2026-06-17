@@ -382,64 +382,185 @@ sql_reset_autoinc_id_list(struct Vdbe *v)
 	stailq_create(&v->autoinc_id_list);
 }
 
-int
-sql_bind_double(struct Vdbe *p, int i, double rValue)
+void
+mem_set_double2(struct Vdbe *p, int i, double rValue)
 {
-	if (vdbeUnbind(p, i) != 0)
+	mem_set_double(&p->aVar[i], rValue);
+}
+
+void
+mem_set_boolean2(struct Vdbe *p, int i, bool value)
+{
+	mem_set_bool(&p->aVar[i], value);
+}
+
+void
+mem_set_datetime2(struct Vdbe *p, int i, const struct datetime *dt)
+{
+	mem_set_datetime(&p->aVar[i], dt);
+}
+
+void
+mem_set_interval2(struct Vdbe *p, int i, const struct interval *itv)
+{
+	mem_set_interval(&p->aVar[i], itv);
+}
+
+void
+mem_set_int2(struct Vdbe *stmt, uint32_t i, int64_t value)
+{
+	mem_set_int(&stmt->aVar[i], value);
+}
+
+void
+mem_set_uint2(struct Vdbe *stmt, uint32_t i, uint64_t val)
+{
+	mem_set_uint(&stmt->aVar[i], val);
+}
+
+void
+mem_set_ptr2(struct Vdbe *stmt, uint32_t i, void *ptr)
+{
+	mem_set_ptr(&stmt->aVar[i], ptr);
+}
+
+void
+mem_set_str_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
+{
+	mem_set_str_static(&vdbe->aVar[i], (char *)str, len);
+}
+
+void
+mem_set_bin_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+{
+	mem_set_bin_static(&vdbe->aVar[i], (char *)str, size);
+}
+
+void
+mem_set_array_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+{
+	mem_set_array_static(&vdbe->aVar[i], (char *)str, size);
+}
+
+void
+mem_set_map_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+{
+	mem_set_map_static(&vdbe->aVar[i], (char *)str, size);
+}
+
+void
+mem_set_uuid2(struct Vdbe *p, int i, const struct tt_uuid *uuid)
+{
+	mem_set_uuid(&p->aVar[i], uuid);
+}
+
+void
+mem_set_dec2(struct Vdbe *p, int i, const decimal_t *dec)
+{
+	mem_set_dec(&p->aVar[i], dec);
+}
+
+int
+sql_set_bind(struct Vdbe *stmt, const char *name,
+	     uint32_t name_len, int i)
+{
+	stmt->bind_names[i] = name;
+	stmt->bind_names_len[i] = name_len;
+	return 0;
+}
+
+int
+sql_set_bind_count(struct Vdbe *stmt, int bind_count)
+{
+	stmt->count_bind_names = bind_count;
+	stmt->bind_names = xmalloc(sizeof(char *) * bind_count);
+	stmt->bind_names_len = xmalloc(sizeof(u32 *) * bind_count);
+	return 0;
+}
+
+int
+sql_free_bind(struct Vdbe *stmt)
+{
+	free(stmt->bind_names);
+	free(stmt->bind_names_len);
+	return 0;
+}
+
+int
+sql_bind_double(struct Vdbe *p, int i)
+{
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "numeric");
-	mem_set_double(&p->aVar[i - 1], rValue);
 	return rc;
 }
 
 int
-sql_bind_boolean(struct Vdbe *p, int i, bool value)
+sql_bind_boolean(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "boolean");
-	mem_set_bool(&p->aVar[i - 1], value);
 	return rc;
 }
 
 int
-sql_bind_int(struct Vdbe *p, int i, int iValue)
+sql_bind_int(struct Vdbe *p, int i)
 {
-	return sql_bind_int64(p, i, (i64) iValue);
+	return sql_bind_int64(p, i);
 }
 
 int
-sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
+sql_bind_int64(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "integer");
-	mem_set_int(&p->aVar[i - 1], iValue);
 	return rc;
 }
 
 int
-sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
+sql_bind_uint64(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	int rc = sql_bind_type(p, i, "integer");
-	mem_set_uint(&p->aVar[i - 1], value);
 	return rc;
 }
 
 int
 sql_bind_null(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
 		return -1;
+	}
 	return sql_bind_type(p, i, "boolean");
 }
 
 int
 sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 {
-	int rc = vdbeUnbind(p, i);
+	int rc = 0;
+	
+	if ((uint32_t)i > (uint32_t)p->nVar) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
 	if (rc == 0) {
 		rc = sql_bind_type(p, i, "varbinary");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
@@ -448,66 +569,82 @@ sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 }
 
 int
-sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
+sql_bind_str_static(struct Vdbe *vdbe, int i)
 {
-	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_bin_static(struct Vdbe *vdbe, int i)
 {
-	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_array_static(struct Vdbe *vdbe, int i)
 {
-	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "array");
 }
 
 int
-sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_map_static(struct Vdbe *vdbe, int i)
 {
-	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "map");
 }
 
 int
-sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
+sql_bind_uuid(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "uuid") != 0)
 		return -1;
-	mem_set_uuid(&p->aVar[i - 1], uuid);
 	return 0;
 }
 
 int
-sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
+sql_bind_dec(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "decimal") != 0)
 		return -1;
-	mem_set_dec(&p->aVar[i - 1], dec);
 	return 0;
 }
 
 int
-sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
+sql_bind_datetime(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "datetime") != 0)
 		return -1;
-	mem_set_datetime(&p->aVar[i - 1], dt);
 	return 0;
 }
 
 int
-sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
+sql_bind_interval(struct Vdbe *p, int i)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
+	int rc = 0;
+	if ((uint32_t)i > p->res_var_count) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "
+			 "parameters is too large");
+		rc = -1;
+	}
+	if (rc != 0 || sql_bind_type(p, i, "interval") != 0)
 		return -1;
-	mem_set_interval(&p->aVar[i - 1], itv);
 	return 0;
 }
 
@@ -523,6 +660,33 @@ sql_bind_parameter_name(const struct Vdbe *p, int i)
 	if (p == NULL)
 		return NULL;
 	return sqlVListNumToName(p->pVList, i+1);
+}
+
+/**
+ * Return count of original names in request.
+ */
+uint32_t
+sql_get_count_original_names(const struct Vdbe *p)
+{
+	return p->count_original_names;
+}
+
+/**
+ * Return structure with original names in request.
+ */
+char *
+sql_get_original_names(const struct Vdbe *p, uint32_t i)
+{
+	return p->original_names[i];
+}
+
+/**
+ * Return structure with lengths original names in request.
+ */
+uint32_t
+sql_get_original_names_len(const struct Vdbe *p, uint32_t i)
+{
+	return p->original_names_len[i];
 }
 
 /*

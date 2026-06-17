@@ -176,24 +176,21 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
-	if (p->name != NULL) {
-		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
-		if (pos == 0) {
-			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
-				 sql_bind_name(p));
-			return -1;
-		}
+	if (pos == 0) {
+		diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
+			 sql_bind_name(p));
+		return -1;
 	}
 	switch (p->type) {
 	case MP_INT:
-		return sql_bind_int64(stmt, pos, p->i64);
+		return sql_bind_int64(stmt, pos);
 	case MP_UINT:
-		return sql_bind_uint64(stmt, pos, p->u64);
+		return sql_bind_uint64(stmt, pos);
 	case MP_BOOL:
-		return sql_bind_boolean(stmt, pos, p->b);
+		return sql_bind_boolean(stmt, pos);
 	case MP_DOUBLE:
 	case MP_FLOAT:
-		return sql_bind_double(stmt, pos, p->d);
+		return sql_bind_double(stmt, pos);
 	case MP_STR:
 		/*
 		 * Parameters are allocated within message pack,
@@ -203,30 +200,141 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 		 * there is no need to copy the packet and we can
 		 * use SQL_STATIC.
 		 */
-		return sql_bind_str_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_str_static(stmt, pos);
 	case MP_NIL:
 		return sql_bind_null(stmt, pos);
 	case MP_BIN:
-		return sql_bind_bin_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_bin_static(stmt, pos);
 	case MP_ARRAY:
-		return sql_bind_array_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_array_static(stmt, pos);
 	case MP_MAP:
-		return sql_bind_map_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_map_static(stmt, pos);
 	case MP_EXT:
 		switch (p->ext_type) {
 		case MP_UUID:
-			return sql_bind_uuid(stmt, pos, &p->uuid);
+			return sql_bind_uuid(stmt, pos);
 		case MP_DECIMAL:
-			return sql_bind_dec(stmt, pos, &p->dec);
+			return sql_bind_dec(stmt, pos);
 		case MP_DATETIME:
-			return sql_bind_datetime(stmt, pos, &p->dt);
+			return sql_bind_datetime(stmt, pos);
 		case MP_INTERVAL:
-			return sql_bind_interval(stmt, pos, &p->itv);
+			return sql_bind_interval(stmt, pos);
 		default:
 			unreachable();
 		}
 	default:
 		unreachable();
+	}
+	return 0;
+}
+
+int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
+{
+	assert(stmt != NULL);
+	uint32_t last_idx = 0;
+	if (bind_count > 0) {
+	    for (uint32_t i = 0; i < sql_get_count_original_names(stmt); i++) {
+		    uint32_t n = sql_get_original_names_len(stmt, i);
+		    char *name = sql_get_original_names(stmt, i);
+		    int flag = 1;
+		    if (n == 1) {
+			    if (name[0] == '?') {
+				    if (sql_bind_column(stmt, &bind[last_idx], i + 1) != 0)
+					    return -1;
+				    last_idx++;
+			    }
+		    }
+		    else if (n > 1) {
+			    if (name[0] == '$') {
+				    flag = 0;
+				    uint32_t number = 0;
+				    for (uint32_t idx = 1; idx < n; idx++) {
+					    number += name[idx] - '0';
+				    }
+				    if (number > bind_count) {
+					    printf("Very Bad\n");
+				    }
+				    last_idx = number;
+				    if (sql_bind_column(stmt, &bind[number - 1], i + 1) != 0)
+					    return -1;
+			    }
+		    }
+		    if (flag) {
+			    for (uint32_t j = 0; j < bind_count; j++) {
+				    if (bind[j].name_len == n) {
+					    if (strcmp(name, bind[j].name) == 0) {
+						    last_idx = j;
+						    if (sql_bind_column(stmt, &bind[j], i + 1) != 0)
+							    return -1;
+						    break;
+					    }
+				    }
+			    }
+		    }
+	    }
+	}
+	for (uint32_t i = 0; i < bind_count; i++) {
+		const struct sql_bind *p = &bind[i];
+		switch (p->type) {
+		case MP_INT:
+			mem_set_int2(stmt, i, (int64_t)p->i64);
+			break;
+		case MP_UINT:
+			mem_set_uint2(stmt, i, p->u64);
+			break;
+		case MP_BOOL:
+			mem_set_boolean2(stmt, i, p->b);
+			break;
+		case MP_DOUBLE:
+		case MP_FLOAT:
+			mem_set_double2(stmt, i, p->d);
+			break;
+		case MP_STR:
+			/*
+			 * Parameters are allocated within message pack,
+			 * received from the iproto thread. IProto thread
+			 * now is waiting for the response and it will not
+			 * free the packet until sql_stmt_finalize. So
+			 * there is no need to copy the packet and we can
+			 * use SQL_STATIC.
+			 */
+			mem_set_str_static2(stmt, i, p->s, p->bytes);
+			break;
+		case MP_NIL:
+			break;
+		case MP_BIN:
+			mem_set_bin_static2(stmt, i, p->s, p->bytes);
+			break;
+		case MP_ARRAY:
+			mem_set_array_static2(stmt, i, p->s, p->bytes);
+			break;
+		case MP_MAP:
+			mem_set_map_static2(stmt, i, p->s, p->bytes);
+			break;
+		case MP_EXT:
+			switch (p->ext_type) {
+			case MP_UUID:
+				mem_set_uuid2(stmt, i, &p->uuid);
+				break;
+			case MP_DECIMAL:
+				mem_set_dec2(stmt, i, &p->dec);
+				break;
+			case MP_DATETIME:
+				mem_set_datetime2(stmt, i, &p->dt);
+				break;
+			case MP_INTERVAL:
+				mem_set_interval2(stmt, i, &p->itv);
+				break;
+			default:
+				unreachable();
+				break;
+			}
+			break;
+		default:
+			unreachable();
+			break;
+		}
 	}
 	return 0;
 }
