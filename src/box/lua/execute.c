@@ -218,9 +218,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L,
 		 */
 		lua_createtable(L, 0, 6);
 		/* query_id */
-		const char *sql_str = sql_stmt_query_str(port_sql->stmt);
-		luaL_pushuint64(L, sql_stmt_calculate_id(sql_str,
-							 strlen(sql_str)));
+		luaL_pushuint64(L, sql_stmt_get_id(port_sql->stmt));
 		lua_setfield(L, -2, "stmt_id");
 		/* param_count */
 		luaL_pushuint64(L, sql_bind_parameter_count(stmt));
@@ -249,9 +247,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L,
 		 */
 		lua_createtable(L, 0, 5);
 		/* query_id */
-		const char *sql_str = sql_stmt_query_str(port_sql->stmt);
-		luaL_pushuint64(L, sql_stmt_calculate_id(sql_str,
-							 strlen(sql_str)));
+		luaL_pushuint64(L, sql_stmt_get_id(port_sql->stmt));
 		lua_setfield(L, -2, "stmt_id");
 		/* param_count */
 		luaL_pushuint64(L, sql_bind_parameter_count(stmt));
