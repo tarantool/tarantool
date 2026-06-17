@@ -11,6 +11,7 @@ import struct
 import itertools
 import re
 import sys
+from collections import namedtuple
 
 if sys.version_info[0] == 2:
     map = itertools.imap
@@ -21,6 +22,21 @@ elif sys.version_info[0] == 3:
 
 logger = logging.getLogger('gdb.tarantool')
 logger.setLevel(logging.WARNING)
+
+log_depth = 0
+
+def log(msg):
+    global log_depth
+    # gdb.write('    '*log_depth + msg + '\n')
+    pass
+def log_enter(title):
+    global log_depth
+    log(title)
+    log_depth += 1
+def log_leave():
+    global log_depth
+    log_depth -= 1
+    log('end')
 
 def dump_type(type):
     return 'tag={} code={} sizeof={}'.format(type.tag, type.code, type.sizeof)
@@ -80,714 +96,593 @@ pp = gdb.printing.RegexpCollectionPrettyPrinter("tarantool")
 gdb.printing.register_pretty_printer(gdb.current_objfile(), pp, True)
 
 
-class InputStream(object):
-    """
-Helper class that implements stream reading from bytes buffer
-Also it provides a few methods to read the basic primitives (considering byte order):
-- signed/unsigned integers (of 1, 2, 4 and 8 bytes long)
-- floating point numbers of single and double precision (float and double)
-    """
-    def __init__(self, data):
-        self.__data = data.cast(gdb.lookup_type('uint8_t').pointer())
-        self.__pos = 0
+class MsgPackError(Exception):
+    def __init__(self, address):
+        self.address = address
 
-    @property
-    def pos(self):
-        return self.__pos
+class MsgPackInvalidFormatError(MsgPackError): pass
 
-    def seek(self, offs):
-        self.__pos += offs
+class MsgPackExtError(MsgPackError):
+    def __init__(self, address, ext_type):
+        super(MsgPackExtError, self).__init__(address)
+        self.ext_type = ext_type
 
-    def read(self, size):
-        buf = bytearray(size)
-        for i in range(0, size):
-            buf[i] = int(self.__data[self.__pos + i])
-        self.__pos += size
-        return buf
+class MsgPackExtLengthMismatchError(MsgPackExtError):
+    def __init__(self, address, ext_type, len_decoded, len_expected):
+        super(MsgPackExtLengthMismatchError, self).__init__(address, ext_type)
+        self.len_decoded = len_decoded
+        self.len_expected = len_expected
 
-def make_stream_read_method(size, fmt):
-    return lambda self, big_endian=True: \
-        struct.unpack_from(('>' if big_endian else '<') + fmt, self.read(size))[0]
-
-stream_read_methods = {
-    'read_u8': (1, 'B'),
-    'read_i8': (1, 'b'),
-    'read_u16': (2, 'H'),
-    'read_i16': (2, 'h'),
-    'read_u32': (4, 'I'),
-    'read_i32': (4, 'i'),
-    'read_u64': (8, 'Q'),
-    'read_i64': (8, 'q'),
-    'read_float': (4, 'f'),
-    'read_double': (8, 'd'),
-}
-
-for method in stream_read_methods:
-    size, fmt = stream_read_methods[method]
-    setattr(InputStream, method, make_stream_read_method(size, fmt))
 
 class MsgPack(object):
-    # base types
-    MP_NIL = gdb.parse_and_eval('MP_NIL')
-    MP_UINT = gdb.parse_and_eval('MP_UINT')
-    MP_INT = gdb.parse_and_eval('MP_INT')
-    MP_STR = gdb.parse_and_eval('MP_STR')
-    MP_BIN = gdb.parse_and_eval('MP_BIN')
-    MP_ARRAY = gdb.parse_and_eval('MP_ARRAY')
-    MP_MAP = gdb.parse_and_eval('MP_MAP')
-    MP_BOOL = gdb.parse_and_eval('MP_BOOL')
-    MP_FLOAT = gdb.parse_and_eval('MP_FLOAT')
-    MP_DOUBLE = gdb.parse_and_eval('MP_DOUBLE')
-    MP_EXT = gdb.parse_and_eval('MP_EXT')
+    # types
+    enumauto = itertools.count().__next__
+    TYPE_INVALID = enumauto()
+    TYPE_NIL = enumauto()
+    TYPE_BOOL = enumauto()
+    TYPE_INT = enumauto()
+    TYPE_UINT = enumauto()
+    TYPE_FLOAT = enumauto()
+    TYPE_STR = enumauto()
+    TYPE_BIN = enumauto()
+    TYPE_ARRAY = enumauto()
+    TYPE_MAP = enumauto()
+    TYPE_EXT = enumauto()
 
-    # parser hints
-    MP_HINT = gdb.parse_and_eval('MP_HINT')
-    MP_HINT_STR_8 = gdb.parse_and_eval('MP_HINT_STR_8')
-    MP_HINT_STR_16 = gdb.parse_and_eval('MP_HINT_STR_16')
-    MP_HINT_STR_32 = gdb.parse_and_eval('MP_HINT_STR_32')
-    MP_HINT_ARRAY_16 = gdb.parse_and_eval('MP_HINT_ARRAY_16')
-    MP_HINT_ARRAY_32 = gdb.parse_and_eval('MP_HINT_ARRAY_32')
-    MP_HINT_MAP_16 = gdb.parse_and_eval('MP_HINT_MAP_16')
-    MP_HINT_MAP_32 = gdb.parse_and_eval('MP_HINT_MAP_32')
-    MP_HINT_EXT_8 = gdb.parse_and_eval('MP_HINT_EXT_8')
-    MP_HINT_EXT_16 = gdb.parse_and_eval('MP_HINT_EXT_16')
-    MP_HINT_EXT_32 = gdb.parse_and_eval('MP_HINT_EXT_32')
+    # number types
+    enumauto = itertools.count().__next__
+    NUM_INT = enumauto()
+    NUM_UINT = enumauto()
+    NUM_FLOAT = enumauto()
 
-    # lookup tables
-    mp_type_hint = gdb.parse_and_eval('mp_type_hint')
-    mp_parser_hint = gdb.parse_and_eval('mp_parser_hint')
-    mp_char2escape = gdb.parse_and_eval('mp_char2escape')
+    def decode_invalid(self):
+        raise MsgPackInvalidFormatError(int_from_address(self.__val))
 
     @classmethod
-    def typeof(cls, data): # mp_typeof
-        c = data.read_u8()
-        data.seek(-1)
-        return cls.mp_type_hint[c]
-
-    @staticmethod
-    def decode_nil(data): # mp_decode_nil
-        c = data.read_u8()
-        if c != 0xc0:
-            raise gdb.GdbError("mp_decode_nil: unexpected data ({})".format(c))
-
-    @staticmethod
-    def decode_bool(data): # mp_decode_bool
-        c = data.read_u8()
-        if c == 0xc3:
-            return True
-        elif c == 0xc2:
-            return False
-        else:
-            raise gdb.GdbError("mp_decode_bool: unexpected data ({})".format(c))
-
-    @staticmethod
-    def decode_uint(data): # mp_decode_uint
-        c = data.read_u8()
-        if c == 0xcc:
-            return data.read_u8()
-        elif c == 0xcd:
-            return data.read_u16()
-        elif c == 0xce:
-            return data.read_u32()
-        elif c == 0xcf:
-            return data.read_u64()
-        else:
-            if c > 0x7f:
-                raise gdb.GdbError("mp_decode_uint: unexpected data ({})".format(c))
-            return c
-
-    @staticmethod
-    def decode_int(data): # mp_decode_int
-        c = data.read_u8()
-        if c == 0xd0:
-            return data.read_i8()
-        elif c == 0xd1:
-            return data.read_i16()
-        elif c == 0xd2:
-            return data.read_i32()
-        elif c == 0xd3:
-            return data.read_i64()
-        else:
-            if c < 0xe0:
-                raise gdb.GdbError("mp_decode_int: unexpected data ({})".format(c))
-            data.seek(-1)
-            return data.read_i8()
-
-    @staticmethod
-    def decode_strl(data): # mp_decode_strl
-        c = data.read_u8()
-        if c == 0xd9:
-            return data.read_u8()
-        elif c == 0xda:
-            return data.read_u16()
-        elif c == 0xdb:
-            return data.read_u32()
-        else:
-            if c < 0xa0 or c > 0xbf:
-                raise gdb.GdbError("mp_decode_strl: unexpected data ({})".format(c))
-            return c & 0x1f
-
-    @staticmethod
-    def decode_binl(data): # mp_decode_binl
-        c = data.read_u8()
-        if c == 0xc4:
-            return data.read_u8()
-        elif c == 0xc5:
-            return data.read_u16()
-        elif c == 0xc6:
-            return data.read_u32()
-        else:
-            raise gdb.GdbError("mp_decode_binl: unexpected data ({})".format(c))
-
-    @staticmethod
-    def decode_float(data): # mp_decode_float
-        c = data.read_u8()
-        if c != 0xca:
-            raise gdb.GdbError("mp_decode_float: unexpected data ({})".format(c))
-        return data.read_float()
-
-    @staticmethod
-    def decode_double(data): # mp_decode_double
-        c = data.read_u8()
-        if c != 0xcb:
-            raise gdb.GdbError("mp_decode_double: unexpected data ({})".format(c))
-        return data.read_double()
-
-    @staticmethod
-    def decode_array_slowpath(c, data): # mp_decode_array_slowpath
-        if c & 0x1 == 0xdc & 0x1:
-            return data.read_u16()
-        elif c & 0x1 == 0xdd & 0x1:
-            return data.read_u32()
-        else:
-            raise gdb.GdbError("mp_decode_array_slowpath: unexpected data ({})".format(c))
-
-    @staticmethod
-    def decode_array(data): # mp_decode_array
-        c = data.read_u8();
-        if not (c & 0x40):
-            return c & 0xf
-        return MsgPack.decode_array_slowpath(c, data)
-
-    @staticmethod
-    def decode_map(data): # mp_decode_map
-        c = data.read_u8();
-        if c == 0xde:
-            return data.read_u16()
-        elif c == 0xdf:
-            return data.read_u32()
-        else:
-            if c < 0x80 or c > 0x8f:
-                raise gdb.GdbError("mp_decode_map: unexpected data ({})".format(c))
-            return c & 0xf
-
-    @staticmethod
-    def decode_extl(data): # mp_decode_extl
-        c = data.read_u8()
-        if c in [0xd4, 0xd5, 0xd6, 0xd7, 0xd8]:
-            len = 1 << (c - 0xd4)
-        elif c == 0xc7:
-            len = data.read_u8()
-        elif c == 0xc8:
-            len = data.read_u16()
-        elif c == 0xc9:
-            len = data.read_u32()
-        else:
-            raise gdb.GdbError("mp_decode_extl: unexpected data ({})".format(c))
-        type = data.read_u8()
-        return len, type
+    def read(cls, val, offset, size):
+        tmp = val.cast(gdb.lookup_type('uint8_t').pointer())
+        buf = bytearray(size)
+        for i in range(size):
+            buf[i] = int(tmp[offset + i])
+        return buf
 
     @classmethod
-    def to_string_ext(cls, data, depth, ext_len, ext_type): # mp_snprint_ext_default
-        data.seek(ext_len)
-        return '(extension: type {}, len {})'.format(ext_type, ext_len)
+    def decode_num(cls, val, offset, num_type, num_len, big_endian=True):
+        packfmt = ('>' if big_endian else '<') + {
+            cls.NUM_UINT: {
+                1: 'B',
+                2: 'H',
+                4: 'I',
+                8: 'Q',
+            },
+            cls.NUM_INT: {
+                1: 'b',
+                2: 'h',
+                4: 'i',
+                8: 'q',
+            },
+            cls.NUM_FLOAT: {
+                4: 'f',
+                8: 'd',
+            },
+        }[num_type][num_len]
+        return struct.unpack_from(packfmt, cls.read(val, offset, num_len))[0]
+
+    # UINT
+    def decode_uint(self):
+        return self.decode_num(self.__val, 1, self.NUM_UINT, len(self) - 1)
+
+    # INT
+    def decode_int(self):
+        return self.decode_num(self.__val, 1, self.NUM_INT, len(self) - 1)
+
+    # FLOAT
+    def decode_float(self):
+        return self.decode_num(self.__val, 1, self.NUM_FLOAT, len(self) - 1)
+
+    # STR
+    def len_str(self, len_size):
+        return len_size + self.decode_num(self.__val, 1, self.NUM_UINT, len_size)
+    def decode_str(self, len_size=0):
+        offset = 1 + len_size
+        return self.read(self.__val, offset, len(self) - offset)
+
+    # BIN
+    len_bin = len_str
+    decode_bin = decode_str
+
+    # Collection helpers
+    def decode_and_advance(self, offset):
+        mp = self.decode(self.__val + offset)
+        return mp, offset + len(mp)
+
+    def len_collection(self, len_size, len_item_func):
+        return len_size + sum(map(len_item_func, self.value))
+    def decode_collection_items(self, num_items, offset, decode_item_func):
+        items = []
+        for _ in range(num_items):
+            item, offset = decode_item_func(offset)
+            yield item
+            items.append(item)
+        self.__decode = items
+    def decode_fixcollection(self, num_items, decode_item_func):
+        return self.decode_collection_items(num_items, 1, decode_item_func)
+    def decode_collection(self, len_size, decode_item_func):
+        num_items = self.decode_num(self.__val, 1, self.NUM_UINT, len_size)
+        return self.decode_collection_items(num_items, 1 + len_size, decode_item_func)
+
+    # ARRAY
+    decode_array_item = decode_and_advance
+    def decode_fixarray(self, num_items):
+        return self.decode_fixcollection(num_items, self.decode_array_item)
+    def decode_array(self, len_size):
+        return self.decode_collection(len_size, self.decode_array_item)
+    def len_array(self, len_size=0):
+        return self.len_collection(len_size, len)
+
+    # MAP
+    def decode_map_item(self, offset):
+        k, offset = self.decode_and_advance(offset)
+        v, offset = self.decode_and_advance(offset)
+        return (k, v), offset
+    def decode_fixmap(self, num_items):
+        return self.decode_fixcollection(num_items, self.decode_map_item)
+    def decode_map(self, len_size):
+        return self.decode_collection(len_size, self.decode_map_item)
+    def len_map(self, len_size=0):
+        return self.len_collection(len_size, lambda item: len(item[0]) + len(item[1]))
+
+    # EXT
+    __ext_decoders = {}
+    __ext_default_decoder = lambda ext_type, ext_len, val, offset: \
+        MsgPack.read(val, offset, ext_len)
 
     @classmethod
-    def next_slowpath(cls, data, k): # mp_next_slowpath
-        while k > 0:
-            c = data.read_u8()
-            l = cls.mp_parser_hint[c]
-            if l >= 0:
-                if l == 0 and k % 64 == 0:
-                    while k > 8:
-                        u = data.read_u64()
-                        if u != c * 0x0101010101010101:
-                            data.seek(-8)
-                            break
-                        k -= 8
-                    k -= 1
-                    continue
+    def set_ext_default_decoder(cls, decoder):
+        cls.__ext_default_decoder = decoder
 
-                data.seek(l)
-                k -= 1
-                continue
+    @classmethod
+    def register_ext_decoder(cls, type, decoder):
+        cls.__ext_decoders[type] = decoder
 
-            elif l > cls.MP_HINT:
-                k -= l
-                k -= 1
-                continue
+    @classmethod
+    def ext_decoder(cls, type):
+        return cls.__ext_decoders.get(type, cls.__ext_default_decoder)
 
-            if l == cls.MP_HINT_STR_8:
-                len = data.read_u8()
-                data.seek(len)
+    def len_ext(self, len_size):
+        return len_size + 1 + self.decode_num(self.__val, 1, self.NUM_UINT, len_size)
+    def decode_ext(self, len_size=0):
+        ext_type = self.decode_num(self.__val, 1 + len_size, self.NUM_INT, 1)
+        offset = 1 + len_size + 1 # fmt | [ext_len] | ext_type
+        ext_len = len(self) - offset
+        ext_decoder = self.ext_decoder(ext_type)(ext_type, ext_len, self.__val, offset)
+        if len(ext_decoder) != ext_len:
+            raise MsgPackExtLengthMismatchError(
+                int_from_address(self.val), ext_type, len(ext_decoder), ext_len)
+        return ext_decoder
 
-            elif l == cls.MP_HINT_STR_16:
-                len = data.read_u16()
-                data.seek(len)
+    class FmtTraits(namedtuple('FmtTraits', [
+        'type',
+        'len', # number of bytes beyond the first byte (either number or function)
+        'decode', # function that decodes value or the value itself
+    ])):
+        __slots__ = ()
 
-            elif l == cls.MP_HINT_STR_32:
-                len = data.read_u32()
-                data.seek(len)
-
-            elif l == cls.MP_HINT_ARRAY_16:
-                k += data.read_u16()
-
-            elif l == cls.MP_HINT_ARRAY_32:
-                k += data.read_u32()
-
-            elif l == cls.MP_HINT_MAP_16:
-                k += 2 * data.read_u16()
-
-            elif l == cls.MP_HINT_MAP_32:
-                k += 2 * data.read_u32()
-
-            elif l == cls.MP_HINT_EXT_8:
-                len = data.read_u8()
-                data.read_u8()
-                data.seek(len)
-
-            elif l == cls.MP_HINT_EXT_16:
-                len = data.read_u16()
-                data.read_u8()
-                data.seek(len)
-
-            elif l == cls.MP_HINT_EXT_32:
-                len = data.read_u32()
-                data.read_u8()
-                data.seek(len)
-
+        def __new__(cls, type, len, decode, len_size=None):
+            if len_size is None:
+                return cls._make((type, len, decode))
             else:
-                raise gdb.GdbError("next_slowpath: unexpected data ({})".format(l))
+                return cls._make((
+                    type,
+                    lambda self: len(self, len_size),
+                    lambda self: decode(self, len_size),
+                ))
+
+    # prepare LUT for quick decoding
+    __lut = []
+    for i in range(0x80): # 0x00 - 0x7f
+        __lut.append(FmtTraits(TYPE_UINT, 0, i))
+    for i in range(0x10): # 0x80 - 0x8f
+        __lut.append(FmtTraits(TYPE_MAP, len_map,
+                                lambda self, n=i: self.decode_fixmap(n)))
+    for i in range(0x10): # 0x90 - 0x9f
+        __lut.append(FmtTraits(TYPE_ARRAY, len_array,
+                                lambda self, n=i: self.decode_fixarray(n)))
+    for i in range(0x20): # 0xa0 - 0xbf
+        __lut.append(FmtTraits(TYPE_STR, i, decode_str))
+    __lut.extend([
+        FmtTraits(TYPE_NIL, 0, None), # 0xc0
+        FmtTraits(TYPE_INVALID, 0, decode_invalid), # 0xc1
+        FmtTraits(TYPE_BOOL, 0, False), # 0xc2
+        FmtTraits(TYPE_BOOL, 0, True), # 0xc3
+        FmtTraits(TYPE_BIN, len_bin, decode_bin, 1), # 0xc4
+        FmtTraits(TYPE_BIN, len_bin, decode_bin, 2), # 0xc5
+        FmtTraits(TYPE_BIN, len_bin, decode_bin, 4), # 0xc6
+        FmtTraits(TYPE_EXT, len_ext, decode_ext, 1), # 0xc7
+        FmtTraits(TYPE_EXT, len_ext, decode_ext, 2), # 0xc8
+        FmtTraits(TYPE_EXT, len_ext, decode_ext, 4), # 0xc9
+        FmtTraits(TYPE_FLOAT, 4, decode_float), # 0xca
+        FmtTraits(TYPE_FLOAT, 8, decode_float), # 0xcb
+        FmtTraits(TYPE_UINT, 1, decode_uint), # 0xcc
+        FmtTraits(TYPE_UINT, 2, decode_uint), # 0xcd
+        FmtTraits(TYPE_UINT, 4, decode_uint), # 0xce
+        FmtTraits(TYPE_UINT, 8, decode_uint), # 0xcf
+        FmtTraits(TYPE_INT, 1, decode_int), # 0xd0
+        FmtTraits(TYPE_INT, 2, decode_int), # 0xd1
+        FmtTraits(TYPE_INT, 4, decode_int), # 0xd2
+        FmtTraits(TYPE_INT, 8, decode_int), # 0xd3
+        FmtTraits(TYPE_EXT, 1+1, decode_ext), # 0xd4
+        FmtTraits(TYPE_EXT, 1+2, decode_ext), # 0xd5
+        FmtTraits(TYPE_EXT, 1+4, decode_ext), # 0xd6
+        FmtTraits(TYPE_EXT, 1+8, decode_ext), # 0xd7
+        FmtTraits(TYPE_EXT, 1+16, decode_ext), # 0xd8
+        FmtTraits(TYPE_STR, len_str, decode_str, 1), # 0xd9
+        FmtTraits(TYPE_STR, len_str, decode_str, 2), # 0xda
+        FmtTraits(TYPE_STR, len_str, decode_str, 4), # 0xdb
+        FmtTraits(TYPE_ARRAY, len_array, decode_array, 2), # 0xdc
+        FmtTraits(TYPE_ARRAY, len_array, decode_array, 4), # 0xdd
+        FmtTraits(TYPE_MAP, len_map, decode_map, 2), # 0xde
+        FmtTraits(TYPE_MAP, len_map, decode_map, 4), # 0xdf
+    ])
+    for i in range(0x20): # 0xe0 - 0xff
+        __lut.append(FmtTraits(TYPE_INT, 0, i-0x20))
 
     @classmethod
-    def next(cls, data): # mp_next
-        k = 1
-        while k > 0:
-            c = data.read_u8()
-            l = cls.mp_parser_hint[c];
-            if l >= 0:
-                data.seek(l)
-                k -= 1
-                continue
-            elif c == 0xd9:
-                len = data.read_u8()
-                data.seek(len)
-                k -= 1
-                continue
-            elif l > cls.MP_HINT:
-                k -= l
-                k -= 1
-                continue
-            else:
-                data.seek(-1)
-                cls.next_slowpath(data, k)
-                return
+    def decode(cls, val):
+        fmt_traits = cls.__lut[cls.decode_num(val, 0, cls.NUM_UINT, 1)]
+        return cls(val, fmt_traits)
 
-    @classmethod
-    def to_string_data(cls, data, depth, expected_type=None):
-        s = str()
-        mp_type = cls.typeof(data)
-        if expected_type is not None and mp_type != expected_type:
-            gdb.write('Invalid msgpack: unexpected type {actual_type} at pos {data_pos} (expected {expected_type})\n'.format(
-                actual_type = mp_type,
-                data_pos = data.pos,
-                expected_type = expected_type,
-            ))
-            cls.next(data)
-            return '!error'
+    def __init__(self, val, fmt_traits):
+        self.__val = val
+        self.__type = fmt_traits.type
+        self.__len = fmt_traits.len
+        self.__decode = fmt_traits.decode
 
-        if mp_type == cls.MP_NIL:
-            cls.decode_nil(data)
-            s += 'null'
+    @property
+    def val(self):
+        return self.__val
 
-        elif mp_type == cls.MP_UINT:
-            s += str(cls.decode_uint(data)) + 'U'
+    @property
+    def type(self):
+        return self.__type
 
-        elif mp_type == cls.MP_INT:
-            s += str(cls.decode_int(data))
+    @property
+    def value(self):
+        if callable(self.__decode):
+            self.__decode = self.__decode(self)
+        return self.__decode
 
-        elif mp_type == cls.MP_STR:
-            len = cls.decode_strl(data)
-            val = bytes(data.read(len))
+    def __len__(self):
+        if callable(self.__len):
+            self.__len = self.__len(self)
+        return 1 + self.__len
+
+
+class ExplicitPrinter(gdb.printing.PrettyPrinter):
+    def __init__(self, printer):
+        super(ExplicitPrinter, self).__init__(printer.name + ' (explicit)')
+        self.activated = False
+        self.printer = printer
+
+    def __call__(self, val):
+        return self.printer(val) if self.activated else None
+
+
+class MsgPackExtUnexpectedTypeError(MsgPackExtError):
+    def __init__(self, address, ext_type, offset, actual, *expected):
+        super(MsgPackExtUnexpectedTypeError, self).__init__(address, ext_type)
+        self.offset = offset
+        self.actual = actual
+        self.expected = expected
+
+
+class MsgPackPrinter(gdb.printing.PrettyPrinter):
+    """Print a MsgPack."""
+
+    gdb_type = gdb.lookup_type('char').pointer()
+    mp_gdb_type = gdb.lookup_type('uint8_t').pointer()
+
+    class Printer(object):
+        __mappers = []
+
+        @classmethod
+        def push_mapper(cls, mapper):
+            cls.__mappers.append(mapper)
+
+        @classmethod
+        def pop_mapper(cls):
+            return cls.__mappers.pop() if len(cls.__mappers) > 0 else None
+
+        __ext_names = {}
+
+        @classmethod
+        def ext_name(cls, ext_type):
+            return cls.__ext_names.get(ext_type, "UNKNOWN({})".format(ext_type))
+
+        @classmethod
+        def register_ext_printer(cls, ext_type, ext_name, printer):
+            MsgPack.set_ext_default_decoder(cls.ExtPrinterDefault)
+            MsgPack.register_ext_decoder(ext_type, printer)
+            cls.__ext_names[ext_type] = ext_name
+
+        def __init__(self, val):
+            self.mp = MsgPack.decode(val)
+            self.mapper = self.pop_mapper()
+
+            # Setup pretty-printer methods according to MsgPack type
+
+            self.display_hint = {
+                MsgPack.TYPE_ARRAY: self.display_hint_array,
+                MsgPack.TYPE_MAP: self.display_hint_map,
+                MsgPack.TYPE_STR: self.display_hint_str,
+                MsgPack.TYPE_EXT: self.display_hint_ext,
+            }.get(self.mp.type, self.display_hint_default)
+
+            self.to_string = {
+                MsgPack.TYPE_INVALID: self.to_string_invalid,
+                MsgPack.TYPE_NIL: self.to_string_nil,
+                MsgPack.TYPE_BOOL: self.to_string_bool,
+                MsgPack.TYPE_INT: self.to_string_num,
+                MsgPack.TYPE_UINT: self.to_string_unsigned,
+                MsgPack.TYPE_FLOAT: self.to_string_num,
+                MsgPack.TYPE_STR: self.to_string_str,
+                MsgPack.TYPE_BIN: self.to_string_bin,
+                MsgPack.TYPE_ARRAY: self.to_string_array,
+                MsgPack.TYPE_MAP: self.to_string_map,
+                MsgPack.TYPE_EXT: self.to_string_ext,
+            }[self.mp.type]
+
+            self.children = {
+                MsgPack.TYPE_ARRAY: self.children_array,
+                MsgPack.TYPE_MAP: self.children_map,
+                MsgPack.TYPE_EXT: self.children_ext,
+            }.get(self.mp.type, None)
+            if self.children is None:
+                del self.children
+
+            # NOTE: MP_STR might contain binary data that should be
+            # displayed differently. It might be done by affecting
+            # display_hint method within to_string_str, so we should:
+            # 1. call to_string at the end of this printer c-tor
+            # 2. replace current to_string method with the one that
+            #    just returns the string calculated at #1
+            if self.mp.type == MsgPack.TYPE_STR:
+                self.to_string = lambda s=self.to_string(): s
+
+        def display_hint_default(self): return None
+        def display_hint_array(self): return 'array'
+        def display_hint_map(self): return 'map'
+        def display_hint_str(self): return 'string'
+        def display_hint_ext(self): return self.mp_value().display_hint()
+        display_hint_bin_as_str = display_hint_default
+
+        def to_string_invalid(self): return self.mp_value()
+        def to_string_nil(self): return 'null'
+        def to_string_bool(self): return 'true' if self.mp_value() else 'false'
+        def to_string_num(self): return str(self.mp_value())
+        def to_string_unsigned(self): return str(self.mp_value()) + 'U'
+        def to_string_str(self):
             # MP_STR may actually contain a binary string, in which case
             # we encode the value in base64, like we do for MP_BIN.
-            is_bin = False
             try:
-                val = unicode(val, 'utf-8')
+                s = unicode(self.mp_value(), 'utf-8')
             except UnicodeDecodeError:
-                is_bin = True
-            if not is_bin:
-                s += '"'
-                # Escape backslash and double quotes.
-                s += val.replace('\\', '\\\\').replace('"', '\\"')
-                s += '"'
-            else:
-                s += 'str:'
-                s += unicode(base64.b64encode(val), 'utf-8')
+                self.display_hint = self.display_hint_bin_as_str
+                s = 'str:' + unicode(base64.b64encode(self.mp_value()), 'utf-8')
+            return s
+        def to_string_bin(self): return 'bin:' + unicode(base64.b64encode(self.mp_value()), 'utf-8')
+        def to_string_array(self): return None
+        def to_string_map(self): return None
+        def to_string_ext(self): return self.mp_value().to_string()
 
-        elif mp_type == cls.MP_BIN:
-            len = cls.decode_binl(data)
-            val = bytes(data.read(len))
-            s += 'bin:'
-            s += unicode(base64.b64encode(val), 'utf-8')
+        def children_array(self):
+            mapper = self.mapper if self.mapper is not None else lambda item: item.val
+            for i, item in enumerate(map(mapper, self.mp_value())):
+                yield str(i), item
 
-        elif mp_type == cls.MP_ARRAY:
-            s += '['
-            if depth == 0:
-                s += '...'
-                cls.next(data)
-            else:
-                depth -= 1
-                count = cls.decode_array(data)
-                for i in range(0, count):
-                    if i > 0:
-                        s += ', '
-                    s += cls.to_string_data(data, depth)
-                depth += 1
-            s += ']'
+        def children_map(self):
+            mapper = self.mapper if self.mapper is not None else lambda item: (item[0].val, item[1].val)
+            for i, (k, v) in enumerate(map(mapper, self.mp_value())):
+                yield str(2 * i), k
+                yield str(2 * i + 1), v
 
-        elif mp_type == cls.MP_MAP:
-            s += '{'
-            if depth == 0:
-                s += '...'
-                cls.next(data)
-            else:
-                depth -= 1
-                count = cls.decode_map(data)
-                for i in range(0, count):
-                    if i > 0:
-                        s += ', '
-                    s += cls.to_string_data(data, depth)
-                    s += ': '
-                    s += cls.to_string_data(data, depth)
-                depth += 1
-            s += '}'
+        def children_ext(self):
+            return self.mp_value().children()
 
-        elif mp_type == cls.MP_BOOL:
-            s += 'true' if cls.decode_bool(data) else 'false'
+        def mp_value(self):
+            def mp_type_str(mp_type):
+                return {
+                    MsgPack.TYPE_INVALID: 'INVALID',
+                    MsgPack.TYPE_NIL: 'NIL',
+                    MsgPack.TYPE_BOOL: 'BOOL',
+                    MsgPack.TYPE_INT: 'INT',
+                    MsgPack.TYPE_UINT: 'UINT',
+                    MsgPack.TYPE_FLOAT: 'FLOAT',
+                    MsgPack.TYPE_STR: 'STR',
+                    MsgPack.TYPE_BIN: 'BIN',
+                    MsgPack.TYPE_ARRAY: 'ARRAY',
+                    MsgPack.TYPE_MAP: 'MAP',
+                    MsgPack.TYPE_EXT: 'EXT',
+                }[mp_type]
+            # MsgPack implements lazy decoding. It is done
+            # when mp.value is accessed the first time, thus here
+            # is the best place to catch all the problems
+            try:
+                return self.mp.value
+            except MsgPackInvalidFormatError as e:
+                raise gdb.GdbError("MsgPack: invalid format at {:#x}".format(e.address))
+            except MsgPackExtLengthMismatchError as e:
+                raise gdb.GdbError("MsgPack: Ext:{} at {:#x}: decoded length {} doesn't match the expected {}".format(
+                    self.ext_name(e.ext_type),
+                    e.address,
+                    e.len_decoded,
+                    e.len_expected,
+                ))
+            except MsgPackExtUnexpectedTypeError as e:
+                raise gdb.GdbError("MsgPack: Ext:{} at {:#x}: got type {} at offset {} (expected - {})".format(
+                    self.ext_name(e.ext_type),
+                    e.address,
+                    mp_type_str(e.actual),
+                    e.offset,
+                    ', '.join(map(mp_type_str, e.expected)),
+                ))
 
-        elif mp_type == cls.MP_FLOAT:
-            s += str(cls.decode_float(data))
+        class ExtPrinter(object):
+            """This class is to be used to support MsgPack extensions.
+            In order to support the new extension you need to subclass it
+            and implement the 'decode' method. This method is used to decode
+            extension data bytes (that follows extension type).
+            After decoding is done the number of the decoded bytes is checked
+            against the expected length, which is specified either implicitly
+            (over one of the FIXEXT formats) or explicitly (with the number
+            that follows EXT format), so there are 2 requirements for subclass:
+            1. All decoding must be done within the 'decode'
+            2. __len__ method must return the decoded length
 
-        elif mp_type == cls.MP_DOUBLE:
-            s += str(cls.decode_double(data))
+            It is highly recommended to use the following methods:
+               decode_mp, decode_num, read, seek
+            because they handle decoded length automatically, and you wouldn't
+            need to override __len__ method
 
-        elif mp_type == cls.MP_EXT:
-            ext_len, ext_type = cls.decode_extl(data)
-            s += cls.to_string_ext(data, depth, ext_len, ext_type)
+            Please, refer to already implemented extensions to see its usage"""
 
-        else:
-            raise gdb.GdbError("print_recursive: unexpected type ({})".format(mp_type))
+            def __init__(self, ext_type, ext_len, val, offset):
+                self.__ext_type = ext_type
+                self.__ext_len = ext_len
+                self.__len = 0
+                self.__val = val
+                self.__offset = offset
+                self.decode()
 
-        return s
+            def decode(self):
+                raise NotImplementedError("{}.decode not implemented".format(self.__class__.__name__))
 
-    def __init__(self, val):
-        self.val = val
+            def display_hint(self): return None
+            def to_string(self): return None
+            def children(self): return iter(())
 
-    def to_string(self, max_depth=None, max_len=None):
-        if max_depth is None:
-            max_depth = -1
-        s = self.to_string_data(InputStream(self.val), max_depth)
-        return s if max_len is None else s[:max_len]
+            def seek(self, offset):
+                self.__len += offset
 
-    def __str__(self):
-        return self.to_string()
+            def read(self, size):
+                data = MsgPack.read(self.val, self.offset, size)
+                self.seek(size)
+                return data
 
+            def decode_num(self, num_type, num_len, big_endian=True):
+                num = MsgPack.decode_num(self.val, self.offset, num_type, num_len, big_endian)
+                self.seek(num_len)
+                return num
 
-class TtMsgPack(MsgPack):
-    # extension types
-    MP_DECIMAL = find_value('MP_DECIMAL')
-    MP_UUID = find_value('MP_UUID')
-    MP_DATETIME = find_value('MP_DATETIME')
-    MP_ERROR = find_value('MP_ERROR')
-    MP_COMPRESSION = find_value('MP_COMPRESSION')
-    MP_INTERVAL = find_value('MP_INTERVAL')
-    MP_TUPLE = find_value('MP_TUPLE')
+            def assert_type(self, mp, *expected_types):
+                if len(expected_types) > 0 and mp.type not in expected_types:
+                    raise MsgPackExtUnexpectedTypeError(
+                        int_from_address(self.val),
+                        self.ext_type,
+                        int_from_address(mp.val) - int_from_address(self.val),
+                        mp.type,
+                        *expected_types
+                    )
 
-    UUID_PACKED_LEN = find_value('UUID_PACKED_LEN')
+            def decode_mp(self, *expected_types):
+                mp = MsgPack.decode(self.val + self.offset)
+                self.assert_type(mp, *expected_types)
+                self.seek(len(mp))
+                return mp
 
-    MP_ERROR_STACK = find_value('MP_ERROR_STACK')
-    MP_ERROR_MAX = find_value('MP_ERROR_MAX')
-    mp_error_field_to_json_key = find_value('mp_error_field_to_json_key')
+            def __len__(self):
+                return self.__len
+
+            @property
+            def ext_type(self):
+                return self.__ext_type
+
+            @property
+            def ext_len(self):
+                return self.__ext_len
+
+            @property
+            def ext_len_undecoded(self):
+                return self.__ext_len - len(self)
+
+            @property
+            def val(self):
+                return self.__val
+
+            @property
+            def offset(self):
+                return self.__offset + self.__len
+
+        class ExtPrinterDefault(ExtPrinter):
+            def decode(self):
+                self.seek(self.ext_len)
+
+            def to_string(self):
+                return 'ext:{} of len {}'.format(self.type, self.ext_len)
+
+    ExtPrinter = Printer.ExtPrinter
 
     @classmethod
-    def decode_decimal(cls, data, len): # decimal_unpack
-        pos = data.pos
-
-        mp_type = cls.typeof(data)
-        if mp_type == cls.MP_UINT:
-            scale = cls.decode_uint(data)
-        elif mp_type == cls.MP_INT:
-            scale = cls.decode_int(data)
-        else:
-            return None, "decode_decimal: unexpected scale type ({})".format(mp_type)
-
-        bcd = data.read(len - (data.pos - pos))
-        return DecNumber.from_bcd(bcd, scale)
+    def register_ext_printer(cls, ext_type, ext_name, printer):
+        cls.Printer.register_ext_printer(ext_type, ext_name, printer)
 
     @classmethod
-    def to_string_decimal(cls, data, len): # mp_snprint_decimal
-        d, err = cls.decode_decimal(data, len)
-        if err is not None:
-            gdb.write(err, gdb.STDERR)
-        if d is None:
-            return
-        return 'dec:' + str(d)
+    def to_print(cls, val, mapper_func):
+        cls.Printer.push_mapper(mapper_func)
+        return val
 
-    @classmethod
-    def decode_uuid(cls, data, len): # uuid_unpack
-        if len != cls.UUID_PACKED_LEN:
-            return None, "uuid_unpack: unexpected length ({})".format(len)
-        uuid = Uuid(dict(
-            time_low = data.read_u32(),
-            time_mid = data.read_u16(),
-            time_hi_and_version = data.read_u16(),
-            clock_seq_hi_and_reserved = data.read_u8(),
-            clock_seq_low = data.read_u8(),
-            node = [ data.read_u8() for _ in range(0, 6) ],
-        ))
-        return uuid, None
-
-    @classmethod
-    def to_string_uuid(cls, data, len): # mp_snprint_uuid
-        uuid, err = cls.decode_uuid(data, len)
-        if err is not None:
-            gdb.write(err, gdb.STDERR)
-        if uuid is None:
-            return
-        return str(uuid)
-
-    @classmethod
-    def decode_datetime(cls, data, len): # datetime_unpack
-        SZ_TAIL = gdb.parse_and_eval('sizeof(struct datetime) - sizeof(((struct datetime *)0)->epoch)')
-
-        if len != 8 and len != 8 + SZ_TAIL:
+    def __call__(self, val):
+        if val.type.code not in [gdb.TYPE_CODE_PTR, gdb.TYPE_CODE_ARRAY] \
+            or val.type.target() != self.gdb_type.target():
             return None
+        if val.type.code == gdb.TYPE_CODE_ARRAY:
+            val = val.cast(self.gdb_type)
+        return self.Printer(val)
 
-        epoch = data.read_i64(False)
-        if len == 8:
-            date = Datetime(dict(
-                epoch = epoch,
-                nsec = 0,
-                tzoffset = 0,
-                tzindex = 0,
-            ))
-        else:
-            date = Datetime(dict(
-                epoch = epoch,
-                nsec = data.read_i32(False),
-                tzoffset = data.read_i16(False),
-                tzindex = data.read_i16(False),
-            ))
-
-        if not date.is_valid():
-            return date, 'invalid date'
-
-        return date, None
-
-    @classmethod
-    def to_string_datetime(cls, data, len): # mp_snprint_datetime
-        date, err = cls.decode_datetime(data, len)
-        if err is not None:
-            gdb.write(err, gdb.STDERR)
-        return str(date)
+pp_msgpack = ExplicitPrinter(MsgPackPrinter('MsgPack'))
+gdb.printing.register_pretty_printer(gdb.current_objfile(), pp_msgpack, True)
 
 
-    @classmethod
-    def to_string_error_one(cls, data, depth): # mp_print_error_one
-        s += '{'
-        if depth == 0:
-            s += '...}'
-            return
-        depth -= 1
-        if cls.typeof(data) != cls.MP_MAP:
-            raise gdb.GdbError("print_error_one: wrong type {} (expected {})", cls.typeof(data), cls.MP_MAP)
-        map_size = cls.decode_map(data)
-        for i in range(0, map_size):
-            if i != 0:
-                s += ', '
-            if cls.typeof(data) != cls.MP_UINT:
-                raise gdb.GdbError("print_error_one: wrong type {} (expected {})", cls.typeof(data), cls.MP_UINT)
-            key = cls.decode_uint(data)
-            if key < cls.MP_ERROR_MAX:
-                s += cls.mp_error_field_to_json_key[key].string()
-            else:
-                s += '{}: '.format(key)
-            s += cls.to_string_data(data, depth)
-        s += '}'
+class MsgPackPrint(gdb.Command):
+    """
+Decode and print MsgPack referred by EXP in a human-readable form
+Usage: tt-mp [[OPTION]... --] EXP
 
-    @classmethod
-    def to_string_error_stack(cls, data, depth): # mp_print_error_stack
-        s += '['
-        if depth == 0:
-            s += '...]'
-            return
-        depth -= 1
-        if cls.typeof(data) != cls.MP_ARRAY:
-            return -1
-        arr_size = cls.decode_array(data)
-        for i in range(0, arr_size):
-            if i != 0:
-                s += ', '
-            s += cls.to_string_error_one(data, depth)
-        s += ']'
+Options:
+  Any print option (see 'help print').
+    """
+    def __init__(self):
+        super(MsgPackPrint, self).__init__('tt-mp', gdb.COMMAND_DATA)
 
-    @classmethod
-    def to_string_error(cls, data, depth): # mp_print_error
-        s = str()
-        s += '{'
-        if depth == 0:
-            s += '...}'
-            return
-        depth -= 1
-        if cls.typeof(data) != cls.MP_MAP:
-            return -1
-        map_size = cls.decode_map(data)
-        for i in range(0, map_size):
-            if i != 0:
-                s += ', '
-            if cls.typeof(data) != cls.MP_UINT:
-                return -1
-            key = cls.decode_uint(data)
-            if key == cls.MP_ERROR_STACK:
-                s += '"stack": '
-                s += cls.to_string_error_stack(data, depth)
-            else:
-                s += '{}: '.format(key)
-                s += cls.to_string_data(data, depth)
-        s += '}'
+    def invoke(self, arg, from_tty):
+        pp_msgpack.activated = True
+        try:
+            gdb.execute('print {}'.format(arg))
+        except Exception as e:
+            raise e
+        finally:
+            pp_msgpack.activated = False
 
-    @classmethod
-    def decode_compression(cls, data, len):
-        pos = data.pos
-        self = Compression(dict(
-            type = cls.decode_uint(data),
-            raw_size = cls.decode_uint(data),
-            size = len - (data.pos - pos),
-        ))
-        data.seek(self.size)
-        return self
+MsgPackPrint()
 
-    @classmethod
-    def to_string_compression(cls, data, len): # mp_snprint_compression
-        ext = cls.decode_compression(data, len)
-        if ext is None:
-            return
-        return str(ext)
 
-    @classmethod
-    def decode_interval_field(cls, data):
-        mp_type = cls.typeof(data)
-        if mp_type == cls.MP_UINT:
-            value = cls.decode_uint(data)
-        elif mp_type == cls.MP_INT:
-            value = cls.decode_int(data)
-        else:
-            raise gdb.GdbError("Interval.decode_field: unexpected type ({})".format(mp_type))
-        return value
+################################################################
+# MsgPack extension: MP_DECIMAL
 
-    INTERVAL_FIELD_YEAR = find_value('FIELD_YEAR')
-    INTERVAL_FIELD_MONTH = find_value('FIELD_MONTH')
-    INTERVAL_FIELD_WEEK = find_value('FIELD_WEEK')
-    INTERVAL_FIELD_DAY = find_value('FIELD_DAY')
-    INTERVAL_FIELD_HOUR = find_value('FIELD_HOUR')
-    INTERVAL_FIELD_MINUTE = find_value('FIELD_MINUTE')
-    INTERVAL_FIELD_SECOND = find_value('FIELD_SECOND')
-    INTERVAL_FIELD_NANOSECOND = find_value('FIELD_NANOSECOND')
-    INTERVAL_FIELD_ADJUST = find_value('FIELD_ADJUST')
+MP_DECIMAL = find_value('MP_DECIMAL')
+if MP_DECIMAL is not None:
+    class MsgPackExtPrinterDecimal(MsgPackPrinter.ExtPrinter):
+        def decode(self):
+            scale = self.decode_mp(MsgPack.TYPE_UINT, MsgPack.TYPE_INT)
+            bcd = self.read(self.ext_len_undecoded)
 
-    DT_SNAP = find_value('DT_SNAP')
+            self.dn = DecNumber.from_bcd(bcd, scale.value)
 
-    @classmethod
-    def decode_interval(cls, data, len): # interval_unpack
-        pos = data.pos
-        itv = cls()
-        num_fields = data.read_u8()
-        for _ in range(0, num_fields):
-            field = data.read_u8()
-            value = cls.decode_interval_field(data)
-            if field == cls.INTERVAL_FIELD_YEAR:
-                itv.year = value
-            elif field == cls.INTERVAL_FIELD_MONTH:
-                itv.month = value
-            elif field == cls.INTERVAL_FIELD_WEEK:
-                itv.week = value
-            elif field == cls.INTERVAL_FIELD_DAY:
-                itv.day = value
-            elif field == cls.INTERVAL_FIELD_HOUR:
-                itv.hour = value
-            elif field == cls.INTERVAL_FIELD_MINUTE:
-                itv.min = value
-            elif field == cls.INTERVAL_FIELD_SECOND:
-                itv.sec = value
-            elif field == cls.INTERVAL_FIELD_NANOSECOND:
-                itv.nsec = value
-            elif field == cls.INTERVAL_FIELD_ADJUST:
-                if value > cls.DT_SNAP:
-                    return None, "unexpected adjust value ({})".format(value)
-                itv.adjust = value
-            else:
-                return None, "unexpected field type ({})".format(field)
-        if data.pos - pos != len:
-            data.seek(pos + len)
-            return None, "unexpected length: expected - {}, actual - {}".format(len, data.pos - pos)
-        return itv, None
+        def to_string(self):
+            return 'dec:' + str(self.dn)
 
-    @classmethod
-    def to_string_interval(cls, data, len): # mp_snprint_interval
-        itv, err = cls.decode_interval(data, len)
-        if err is not None:
-            gdb.write(err, gdb.STDERR)
-            return
-        return str(itv)
+    MsgPackPrinter.register_ext_printer(int(MP_DECIMAL), 'DECIMAL', MsgPackExtPrinterDecimal)
 
-    @classmethod
-    def to_string_tuple(cls, data, depth):
-        format_id = cls.to_string_data(data, depth, cls.MP_UINT)
-        payload = cls.to_string_data(data, depth, cls.MP_ARRAY)
-        return 'tuple(format_id={}):{}'.format(format_id, payload)
-
-    @classmethod
-    def to_string_ext(cls, data, depth, ext_len, ext_type): # msgpack_snprint_ext
-        pos = data.pos
-
-        if ext_type == cls.MP_DECIMAL:
-            s = cls.to_string_decimal(data, ext_len)
-        elif ext_type == cls.MP_UUID:
-            s = cls.to_string_uuid(data, ext_len)
-        elif ext_type == cls.MP_DATETIME:
-            s = cls.to_string_datetime(data, ext_len)
-        elif ext_type == cls.MP_ERROR:
-            s = cls.to_string_error(data, depth)
-        elif ext_type == cls.MP_COMPRESSION:
-            s = cls.to_string_compression(data, ext_len)
-        elif ext_type == cls.MP_INTERVAL:
-            s = cls.to_string_interval(data, ext_len)
-        elif ext_type == cls.MP_TUPLE:
-            s = cls.to_string_tuple(data, depth)
-        else:
-            return super(TtMsgPack, cls).to_string_ext(data, depth, ext_len, ext_type)
-
-        # make sure decoding ended up exactly where expected
-        actual_ext_len = data.pos - pos
-        if actual_ext_len != ext_len:
-            gdb.write(cls.__name__ + ".to_string_ext: decoded length {} (expected {})".format(actual_ext_len, ext_len))
-            data.seek(-actual_ext_len)
-            return super(TtMsgPack, cls).to_string_ext(data, depth, ext_len, ext_type)
-
-        return s
-
-if find_type('struct decNumber') is not None:
     class DecNumber:
         DECIMAL_MAX_DIGITS = 38
         DECNUMDIGITS = DECIMAL_MAX_DIGITS
@@ -838,7 +733,7 @@ if find_type('struct decNumber') is not None:
         @classmethod
         def from_bcd(cls, bcd, scale): # decPackedToNumber
             if scale > cls.DECIMAL_MAX_DIGITS or scale <= -cls.DECIMAL_MAX_DIGITS:
-                return None, "from_bcd: unexpected scale ({})".format(scale)
+                raise RuntimeError("DecNumber.from_bcd: unexpected scale ({})".format(scale))
 
             last = len(bcd) - 1
             first = 0
@@ -856,7 +751,7 @@ if find_type('struct decNumber') is not None:
             if nib == cls.DECPMINUS or nib == cls.DECPMINUSALT:
                 dn.val['bits'] = cls.DECNEG
             elif nib <= 9:
-                return None, "not a sign nibble"
+                raise RuntimeError("DecNumber.from_bcd: not a sign nibble")
 
             while bcd[first] == 0:
                 first += 1
@@ -870,17 +765,19 @@ if find_type('struct decNumber') is not None:
             dn.val['exponent'] = -scale
             if scale >= 0:
                 if (dn.val['digits'] - scale - 1) < -cls.DECNUMMAXE:
-                    return None, "underflow"
+                    raise RuntimeError("DecNumber.from_bcd: underflow")
 
             else:
                 if scale < -cls.DECNUMMAXE or (dn.val['digits'] - scale - 1) > cls.DECNUMMAXE:
-                    return None, "overflow"
+                    raise RuntimeError("DecNumber.from_bcd: overflow")
 
             if digits == 0: return dn
 
             while True:
-                nib = (bcd[last] & 0xf0) >> 4;
-                if nib > 9: return None, "unexpected digit in high nibble: bcd[{}]={:02x}".format(last, bcd[last])
+                nib = (bcd[last] & 0xf0) >> 4
+                if nib > 9:
+                    raise RuntimeError("DecNumber.from_bcd: unexpected digit in high nibble: \
+                                       bcd[{}]={:02x}".format(last, bcd[last]))
 
                 if cut == 0: dn.val['lsu'][up] = nib
                 else: dn.val['lsu'][up] += nib * cls.DECPOWERS[cut]
@@ -893,7 +790,9 @@ if find_type('struct decNumber') is not None:
 
                 last -= 1
                 nib = bcd[last] & 0x0f
-                if nib > 9: return None, "unexpected digit in low nibble: bcd[{}]={:02x}".format(last, bcd[last])
+                if nib > 9:
+                    raise RuntimeError("DecNumber.from_bcd: unexpected digit in low nibble:\
+                                       bcd[{}]={:02x}".format(last, bcd[last]))
 
                 if cut == 0: dn.val['lsu'][up] = nib
                 else: dn.val['lsu'][up] += nib * cls.DECPOWERS[cut]
@@ -904,7 +803,7 @@ if find_type('struct decNumber') is not None:
                     up += 1
                     cut = 0
 
-            return dn, None
+            return dn
 
         def is_negative(self): # decNumberIsNegative
             return (self.val['bits'] & self.DECNEG) != 0
@@ -945,10 +844,11 @@ if find_type('struct decNumber') is not None:
             cut -= 1
 
             if self_exp == 0:
-                for i in range(num_units, 0, -1):
-                    u = self_lsu[up]
+                for i in range(num_units):
+                    u = self_lsu[num_units - 1 - i]
                     for j in range(cut, -1, -1):
                         s += self.to_digit(u, j)
+                    cut = self.DECDPUN - 1
                 return s
 
             pre = self_digits + self_exp
@@ -976,7 +876,7 @@ if find_type('struct decNumber') is not None:
                         s += self.to_digit(u, cut)
                         cut -= 1
                 else:
-                    for i in range(pre, 0, -1):
+                    for _ in range(self_exp):
                         s += '0'
 
             else:
@@ -1003,16 +903,45 @@ if find_type('struct decNumber') is not None:
 
     pp.add_printer('DecNumber', '^decNumber$', DecNumberPrinter)
 
-if find_type('struct tt_uuid') is not None:
+
+################################################################
+# MsgPack extension: MP_UUID
+
+MP_UUID = find_value('MP_UUID')
+if MP_UUID is not None:
+    class MsgPackExtPrinterUuid(MsgPackPrinter.ExtPrinter):
+        def decode(self): # uuid_unpack
+            self.uuid = Uuid(dict(
+                time_low = self.decode_num(MsgPack.NUM_UINT, 4),
+                time_mid = self.decode_num(MsgPack.NUM_UINT, 2),
+                time_hi_and_version = self.decode_num(MsgPack.NUM_UINT, 2),
+                clock_seq_hi_and_reserved = self.decode_num(MsgPack.NUM_UINT, 1),
+                clock_seq_low = self.decode_num(MsgPack.NUM_UINT, 1),
+                node = [ self.decode_num(MsgPack.NUM_UINT, 1) for _ in range(6) ],
+            ))
+
+        def to_string(self):
+            return str(self.uuid)
+
+    MsgPackPrinter.register_ext_printer(int(MP_UUID), 'UUID', MsgPackExtPrinterUuid)
+
     class Uuid:
         def __init__(self, val):
             self.val = val
 
+        def is_valid(self): # tt_uuid_validate
+            n = self.val['clock_seq_hi_and_reserved']
+            if (n & 0x80) != 0x00 and (n & 0xc0) != 0x80 and (n & 0xe0) != 0xc0:
+                return False
+            return True
+
         def __str__(self): # tt_uuid_to_string
-            return '{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}'.format(
+            sfx = '' if self.is_valid() else '[invalid]'
+            return '{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{}'.format(
                 self.val['time_low'], self.val['time_mid'], self.val['time_hi_and_version'],
                 self.val['clock_seq_hi_and_reserved'], self.val['clock_seq_low'], self.val['node'][0],
-                self.val['node'][1], self.val['node'][2], self.val['node'][3], self.val['node'][4], self.val['node'][5])
+                self.val['node'][1], self.val['node'][2], self.val['node'][3], self.val['node'][4], self.val['node'][5],
+                sfx)
 
     class UuidPrinter:
         def __init__(self, val):
@@ -1023,7 +952,35 @@ if find_type('struct tt_uuid') is not None:
 
     pp.add_printer('Uuid', '^tt_uuid$', UuidPrinter)
 
-if find_type('struct datetime') is not None:
+
+################################################################
+# MsgPack extension: MP_DATETIME
+
+MP_DATETIME = find_value('MP_DATETIME')
+if MP_DATETIME is not None:
+    class MsgPackExtPrinterDatetime(MsgPackPrinter.ExtPrinter):
+        def decode(self): # datetime_unpack
+            epoch = self.decode_num(MsgPack.NUM_INT, 8, False)
+            if self.ext_len_undecoded == 0:
+                self.date = Datetime(dict(
+                    epoch = epoch,
+                    nsec = 0,
+                    tzoffset = 0,
+                    tzindex = 0,
+                ))
+            else:
+                self.date = Datetime(dict(
+                    epoch = epoch,
+                    nsec = self.decode_num(MsgPack.NUM_INT, 4, False),
+                    tzoffset = self.decode_num(MsgPack.NUM_INT, 2, False),
+                    tzindex = self.decode_num(MsgPack.NUM_INT, 2, False),
+                ))
+
+        def to_string(self):
+            return str(self.date)
+
+    MsgPackPrinter.register_ext_printer(int(MP_DATETIME), 'DATETIME', MsgPackExtPrinterDatetime)
+
     class Datetime:
         ######################################################
         # this section corresponds to c-dt library
@@ -1176,12 +1133,14 @@ if find_type('struct datetime') is not None:
 
             else:
                 if offset < 0:
-                    sign = '-';
-                    offset = -offset;
+                    sign = '-'
+                    offset = -offset
                 else:
-                    sign = '+';
+                    sign = '+'
                 s += '{}{:02d}{:02d}'.format(sign, offset // 60, offset % 60)
 
+            if not self.is_valid():
+                s += '[invalid]'
             return s
 
     class DatetimePrinter:
@@ -1193,7 +1152,73 @@ if find_type('struct datetime') is not None:
 
     pp.add_printer('Datetime', '^datetime$', DatetimePrinter)
 
-if TtMsgPack.MP_COMPRESSION is not None:
+
+################################################################
+# MsgPack extension: MP_ERROR
+
+MP_ERROR = find_value('MP_ERROR')
+if MP_ERROR is not None:
+    class MsgPackExtPrinterError(MsgPackPrinter.ExtPrinter):
+        MP_ERROR_MAX = int(gdb.parse_and_eval('MP_ERROR_MAX'))
+        mp_error_field_to_json_key = gdb.parse_and_eval('mp_error_field_to_json_key')
+
+        MP_ERROR_STACK = int(gdb.parse_and_eval('MP_ERROR_STACK'))
+
+        def decode(self):
+            self.mp = self.decode_mp(MsgPack.TYPE_MAP)
+
+        def to_string(self):
+
+            def map_single_error(item):
+                k, v = item
+                self.assert_type(k, MsgPack.TYPE_UINT)
+                if k.value < self.MP_ERROR_MAX:
+                    key = self.mp_error_field_to_json_key[k.value].string()
+                    key = key.strip().split(':', 1)[0]
+                else:
+                    key = k.val
+                return key, v.val
+
+            def map_error_stack(item):
+                self.assert_type(item, MsgPack.TYPE_MAP)
+                return MsgPackPrinter.to_print(item.val, map_single_error)
+
+            def map_error(item):
+                k, v = item
+                self.assert_type(k, MsgPack.TYPE_UINT)
+                if k.value == MsgPackExtPrinterError.MP_ERROR_STACK:
+                    self.assert_type(v, MsgPack.TYPE_ARRAY)
+                    return '"stack"', MsgPackPrinter.to_print(v.val, map_error_stack)
+                return k.val, v.val
+
+            return MsgPackPrinter.to_print(self.mp.val, map_error)
+
+    MsgPackPrinter.register_ext_printer(int(MP_ERROR), 'ERROR', MsgPackExtPrinterError)
+
+
+################################################################
+# MsgPack extension: MP_COMPRESSION
+
+MP_COMPRESSION = find_value('MP_COMPRESSION')
+if MP_COMPRESSION is not None:
+    class MsgPackExtPrinterCompression(MsgPackPrinter.ExtPrinter):
+        def decode(self):
+            cmpr_type = self.decode_mp(MsgPack.TYPE_UINT)
+            raw_size = self.decode_mp(MsgPack.TYPE_UINT)
+
+            self.cmpr = Compression(dict(
+                type = cmpr_type.value,
+                raw_size = raw_size.value,
+                size = self.ext_len_undecoded,
+            ))
+
+            self.seek(self.ext_len_undecoded)
+
+        def to_string(self):
+            return str(self.cmpr)
+
+    MsgPackPrinter.register_ext_printer(int(MP_COMPRESSION), 'COMPRESSION', MsgPackExtPrinterCompression)
+
     class Compression:
         COMPRESSION_TYPE_NONE = gdb.parse_and_eval('COMPRESSION_TYPE_NONE')
         COMPRESSION_TYPE_MAX = gdb.parse_and_eval('compression_type_MAX')
@@ -1208,79 +1233,101 @@ if TtMsgPack.MP_COMPRESSION is not None:
                 type = self.compression_type_strs[type].string()
             return 'compression({}):[{}]->[{}]'.format(type, self.val['raw_size'], self.val['size'])
 
-if find_type('struct interval') is not None:
-    class Interval:
-        def __init__(self):
-            self.year = 0
-            self.month = 0
-            self.week = 0
-            self.day = 0
-            self.hour = 0
-            self.min = 0
-            self.sec = 0
-            self.nsec = 0
-            self.adjust = 0
 
-        def __str__(self): # interval_to_string
-            signed_fmt = [
-                '{:d}',
-                '{:+d}',
-            ]
+################################################################
+# MsgPack extension: MP_INTERVAL
+
+MP_INTERVAL = find_value('MP_INTERVAL')
+if MP_INTERVAL is not None:
+    class MsgPackExtPrinterInterval(MsgPackPrinter.ExtPrinter):
+        FIELD_YEAR = int(gdb.parse_and_eval('FIELD_YEAR'))
+        FIELD_MONTH = int(gdb.parse_and_eval('FIELD_MONTH'))
+        FIELD_WEEK = int(gdb.parse_and_eval('FIELD_WEEK'))
+        FIELD_DAY = int(gdb.parse_and_eval('FIELD_DAY'))
+        FIELD_HOUR = int(gdb.parse_and_eval('FIELD_HOUR'))
+        FIELD_MINUTE = int(gdb.parse_and_eval('FIELD_MINUTE'))
+        FIELD_SECOND = int(gdb.parse_and_eval('FIELD_SECOND'))
+        FIELD_NANOSECOND = int(gdb.parse_and_eval('FIELD_NANOSECOND'))
+        FIELD_ADJUST = int(gdb.parse_and_eval('FIELD_ADJUST'))
+
+        DT_EXCESS = int(gdb.parse_and_eval('DT_EXCESS'))
+        DT_LIMIT = int(gdb.parse_and_eval('DT_LIMIT'))
+        DT_SNAP = int(gdb.parse_and_eval('DT_SNAP'))
+
+        def decode(self):
+            field_units = {
+                self.FIELD_YEAR: 'years',
+                self.FIELD_MONTH: 'months',
+                self.FIELD_WEEK: 'weeks',
+                self.FIELD_DAY: 'days',
+                self.FIELD_HOUR: 'hours',
+                self.FIELD_MINUTE: 'minutes',
+                self.FIELD_SECOND: 'seconds',
+                self.FIELD_NANOSECOND: 'nanoseconds',
+            }
+
+            val = {}
+            num_fields = self.decode_num(MsgPack.NUM_UINT, 1)
+            for _ in range(num_fields):
+                field_id = self.decode_num(MsgPack.NUM_UINT, 1)
+                field_value = self.decode_mp(MsgPack.TYPE_UINT, MsgPack.TYPE_INT)
+                val[field_id] = field_value.value
+
             s = []
-            if self.year != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.year) + ' years')
-            if self.month != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.month) + ' months')
-            if self.week != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.week) + ' weeks')
-            if self.day != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.day) + ' days')
-            if self.hour != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.hour) + ' hours')
-            if self.min != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.min) + ' minutes')
-            if self.sec != 0 or len(s) == 0:
-                s.append(signed_fmt[len(s) == 0].format(self.sec) + ' seconds')
-            if self.nsec != 0:
-                s.append(signed_fmt[len(s) == 0].format(self.nsec) + ' nanoseconds')
-            return ' '.join(s)
-
-    class IntervalPrinter:
-        def __init__(self, val):
-            self.val = Interval(val)
+            field_fmt = '{:+} {}'
+            for field in (
+                self.FIELD_YEAR,
+                self.FIELD_MONTH,
+                self.FIELD_WEEK,
+                self.FIELD_DAY,
+                self.FIELD_HOUR,
+                self.FIELD_MINUTE,
+                self.FIELD_SECOND,
+                self.FIELD_NANOSECOND,
+            ):
+                if field in val and val[field] != 0:
+                    s.append(field_fmt.format(val[field], field_units[field]))
+                    field_fmt = '{} {}'
+            if len(s) == 0:
+                s.append(field_fmt.format(0, field_units[self.FIELD_SECOND]))
+            if self.FIELD_ADJUST in val:
+                adjust = {
+                    self.DT_EXCESS: 'excess',
+                    self.DT_LIMIT: 'none',
+                    self.DT_SNAP: 'last',
+                }.get(val[self.FIELD_ADJUST], 'UNKNOWN')
+                s.append('({})'.format(adjust))
+            self.str = ' '.join(s)
 
         def to_string(self):
-            return str(self.val)
+            return self.str
 
-    pp.add_printer('Interval', '^interval$', IntervalPrinter)
+    MsgPackPrinter.register_ext_printer(int(MP_INTERVAL), 'INTERVAL', MsgPackExtPrinterInterval)
 
 
-class MsgPackPrint(gdb.Command):
-    """
-Decode and print MsgPack referred by EXP in a human-readable form
-Usage: tt-mp [OPTIONS]... EXP
+################################################################
+# MsgPack extension: MP_TUPLE
 
-Options:
-  -max-depth NUMBER
-    Set maximum depth for nested arrays and maps.
-    When arrays or maps are nested beyond this depth then they
-    will be replaced with either [...] or {...}
+MP_TUPLE = find_value('MP_TUPLE')
+if MP_TUPLE is not None:
+    class MsgPackExtPrinterTuple(MsgPackPrinter.ExtPrinter):
+        def decode(self):
+            self.format_id = self.decode_mp(MsgPack.TYPE_UINT)
+            self.payload = self.decode_mp(MsgPack.TYPE_ARRAY)
 
-  -max-length NUMBER
-    Set limit on string chars to print.
-    """
-    def __init__(self):
-        super(MsgPackPrint, self).__init__('tt-mp', gdb.COMMAND_DATA)
+        def to_string(self):
+            return None
 
-    def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument('-max-depth', type=int)
-        parser.add_argument('-max-length', type=int)
-        args, exp_args = parser.parse_known_args(gdb.string_to_argv(arg))
-        if not exp_args:
-            raise gdb.GdbError("MsgPack is missing")
-        mp = TtMsgPack(gdb.parse_and_eval(' '.join(exp_args)))
-        gdb.write(mp.to_string(args.max_depth, args.max_length) + '\n')
+        def children(self):
+            yield str(0), "format_id"
+            yield str(0), self.format_id.val
+            yield str(1), "payload"
+            yield str(1), self.payload.val
+
+        def display_hint(self):
+            return 'map'
+
+    MsgPackPrinter.register_ext_printer(int(MP_TUPLE), 'TUPLE', MsgPackExtPrinterTuple)
 
 
 class JsonTokenPrinter:
@@ -1352,36 +1399,10 @@ class TuplePrinter(object):
     ptr_uint32 = gdb.lookup_type('uint32_t').pointer()
     slot_extent_t = find_type('struct field_map_builder_slot_extent')
 
-    # Printer configuration.
-    # Initialization of config with default values is deferred so it can be
-    # done in a single place to avoid duplication of default constants
-    __config = None
-
-    @classmethod
-    def reset_config(cls,
-                    mp_max_depth=None,
-                    mp_max_length=None):
-        cls.__config = dict(
-            mp_max_depth=mp_max_depth,
-            mp_max_length=mp_max_length,
-        )
-
-    def __new__(cls, val):
-        # Deferred initialization of config
-        if cls.__config is None:
-            cls.reset_config()
-        return super(TuplePrinter, cls).__new__(cls)
-
     def __init__(self, val):
         if not equal_types(val.type, self.tuple_type):
             raise gdb.GdbError("expression doesn't evaluate to tuple")
         self.val = val
-        # Pull configuration from class variables into the instance for
-        # convenience
-        config = self.__class__.__config
-        assert config is not None
-        self.mp_max_depth = config['mp_max_depth']
-        self.mp_max_length = config['mp_max_length']
 
     def is_compact(self): # tuple_is_compact
         return self.support_compact and self.val['data_offset_bsize_raw'] & 0x8000
@@ -1408,7 +1429,8 @@ class TuplePrinter(object):
         slots = self.data().cast(self.ptr_int32)
         num_slots = int(self.format()['field_map_size']) // slots.type.target().sizeof
         fields = []
-        key_by_offset = lambda offs: '{}(+{})'.format(str(TtMsgPack(self.data() + offs)), offs)
+        # key_by_offset = lambda offs: '{}(+{})'.format(str(TtMsgPack(self.data() + offs)), offs)
+        key_by_offset = lambda offs: '(+{})'.format(offs)
         for i in range(1, num_slots + 1):
             field_offs = slots[-i]
             key = str()
@@ -1453,47 +1475,11 @@ class TuplePrinter(object):
         if self.support_compact:
             yield 'is_compact', self.is_compact()
         yield 'data_offset', self.data_offset()
-        mp = TtMsgPack(self.data())
-        yield 'data', mp.to_string(self.mp_max_depth, self.mp_max_length)
+        pp_msgpack.activated = True
+        yield 'data', self.data()
+        pp_msgpack.activated = False
 
 pp.add_printer('Tuple', '^tuple$', TuplePrinter)
-
-
-class TuplePrint(gdb.Command):
-    """
-Decode and print tuple referred by EXP
-Usage: tt-tuple [OPTIONS]... EXP
-
-Options:
-  -mp-max-depth NUMBER
-    See '-max-depth' option of 'tt-mp' command
-
-  -mp-max-length NUMBER
-    See '-max-length' option of 'tt-mp' command
-    """
-
-    def __init__(self):
-        super(TuplePrint, self).__init__('tt-tuple', gdb.COMMAND_DATA)
-
-    def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument('-mp-max-depth', type=int)
-        parser.add_argument('-mp-max-length', type=int)
-        args, print_args = parser.parse_known_args(gdb.string_to_argv(arg))
-
-        TuplePrinter.reset_config(
-            mp_max_depth = args.mp_max_depth,
-            mp_max_length = args.mp_max_length,
-        )
-        try:
-            gdb.execute('print {}'.format(' '.join(print_args)), from_tty)
-        except Exception as e:
-            raise e
-        finally:
-            TuplePrinter.reset_config()
-
-MsgPackPrint()
-TuplePrint()
 
 
 class ContainerFieldInfo(object):
