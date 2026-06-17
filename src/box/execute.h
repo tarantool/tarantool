@@ -100,6 +100,14 @@ sql_stmt_est_size(const struct Vdbe *stmt);
 const char *
 sql_stmt_query_str(const struct Vdbe *stmt);
 
+/** Store the ID in the prepared statement cache within the statement itself. */
+int
+sql_stmt_set_id(struct Vdbe *stmt, uint32_t id);
+
+/** Get the ID in the prepared statement cache from the statement. */
+uint32_t
+sql_stmt_get_id(const struct Vdbe *stmt);
+
 /** Return true if statement executes right now. */
 int
 sql_stmt_busy(const struct Vdbe *stmt);

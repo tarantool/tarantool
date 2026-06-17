@@ -304,6 +304,8 @@ struct Vdbe {
 	uint32_t sql_flags;
 	/* Anonymous savepoint for aborts only */
 	struct txn_savepoint *anonymous_savepoint;
+	/* The statement ID in the prepared statement cache. */
+	uint32_t id;
 };
 
 /*
