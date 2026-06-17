@@ -1058,7 +1058,9 @@ next:
 		struct replica *other = replica_hash_search(&uniq, replica);
 		if (keep_connect && other != NULL &&
 		    (replica->applier->state == APPLIER_FOLLOW ||
-		     replica->applier->state == APPLIER_SYNC)) {
+		     replica->applier->state == APPLIER_SYNC) &&
+		    uri_is_equal(&replica->applier->uri,
+				 &other->applier->uri)) {
 			/*
 			 * Try not to interrupt working appliers upon
 			 * reconfiguration.
