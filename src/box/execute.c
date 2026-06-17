@@ -141,11 +141,28 @@ sql_reprepare(struct Vdbe **stmt)
  * it's not already there).
  */
 int
-sql_prepare(const char *sql, int len, struct port *port)
+sql_prepare(const char *sql, size_t len, struct port *port)
 {
 	uint32_t stmt_id = sql_stmt_calculate_id(sql, len);
 	struct Vdbe *stmt = sql_stmt_cache_find(stmt_id);
 	rmean_collect(rmean_box, IPROTO_PREPARE, 1);
+	uint32_t count = 0;
+	ERROR_INJECT(ERRINJ_SQL_PREPARED_STATEMENT_ID_OVERFLOW, {
+		count = UINT32_MAX;
+	});
+	while (stmt != NULL) {
+		const char *old_sql = sql_stmt_query_str(stmt);
+		if (strlen(old_sql) == len && strncmp(sql, old_sql, len) == 0)
+			break;
+		stmt = sql_stmt_cache_find(++stmt_id);
+		if (count == UINT32_MAX) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "Number of prepare statements cannot be "
+				 "more than 4294967296");
+			return -1;
+		}
+		count++;
+	}
 	if (stmt == NULL) {
 		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
 			return -1;
