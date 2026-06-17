@@ -1874,6 +1874,29 @@ I['iproto.threads'] = format_text([[
 
 -- }}} iproto configuration
 
+-- {{{ session configuration
+
+I['session'] = format_text([[
+    The session section configures parameters of client IPROTO sessions.
+]])
+
+I['session.users'] = format_text([[
+    A map from a user name to the session options for connections
+    authenticated as that user.
+]])
+
+I['session.users.*'] = "A user's session options."
+
+I['session.users.*.idle_timeout'] = format_text([[
+    An idle timeout, in seconds, for binary connections authenticated as the
+    given user. A connection inactive for longer than the timeout is closed,
+    the client must reconnect and re-authenticate to resume. A connection with
+    in-flight requests is not closed until the requests complete. A timeout
+    of zero disables the idle timeout for the user.
+]])
+
+-- }}} session configuration
+
 -- {{{ failover.iproto configuration
 
 I['failover.iproto'] = format_text([[

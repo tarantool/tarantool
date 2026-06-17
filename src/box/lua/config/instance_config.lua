@@ -973,6 +973,23 @@ return schema.new('instance_config', schema.record({
             })),
         })),
     }),
+    session = schema.record({
+        -- Per-user client IPROTO session options.
+        -- Currently supports only `idle_timeout` after each inactive user
+        -- is disconnected, zero value disables it.
+        users = schema.map({
+            key = schema.scalar({
+                type = 'string',
+            }),
+            value = schema.record({
+                idle_timeout = schema.scalar({
+                    type = 'number',
+                    validate = validators['session.users.*.idle_timeout'],
+                }),
+            }),
+            default = box.NULL,
+        }),
+    }),
     database = schema.record({
         instance_uuid = schema.scalar({
             type = 'string',
