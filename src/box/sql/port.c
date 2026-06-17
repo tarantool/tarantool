@@ -184,8 +184,7 @@ sql_get_params_metadata(struct Vdbe *stmt, struct obuf *out)
 static int
 sql_get_prepare_common_keys(struct Vdbe *stmt, struct obuf *out, int keys)
 {
-	const char *sql_str = sql_stmt_query_str(stmt);
-	uint32_t stmt_id = sql_stmt_calculate_id(sql_str, strlen(sql_str));
+	uint32_t stmt_id = sql_stmt_get_id(stmt);
 	int size = mp_sizeof_map(keys) +
 		   mp_sizeof_uint(IPROTO_STMT_ID) +
 		   mp_sizeof_uint(stmt_id) +
