@@ -292,6 +292,18 @@ sql_stmt_query_str(const struct Vdbe *v)
 	return v->zSql;
 }
 
+void
+sql_stmt_set_id(struct Vdbe *stmt, uint32_t id)
+{
+	stmt->id = id;
+}
+
+uint32_t
+sql_stmt_get_id(const struct Vdbe *stmt)
+{
+	return stmt->id;
+}
+
 /******************************* sql_bind_  **************************
  *
  * Routines used to attach values to wildcards in a compiled SQL statement.
