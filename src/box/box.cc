@@ -107,6 +107,7 @@
 #include "memtx_tx.h"
 #include "coll_id_cache.h"
 #include "latch.h"
+#include "clock.h"
 
 static char status[64] = "unconfigured";
 
@@ -221,6 +222,9 @@ struct event *box_on_recovery_state_event;
 
 /** Cached event 'tarantool.trigger.on_change'. */
 static struct event *tarantool_trigger_on_change_event;
+
+static uint64_t box_recovery_point_count_max = 10000;
+TWEAK_UINT(box_recovery_point_count_max);
 
 /**
  * Recovery states supported by on_recovery_state triggers.
@@ -6050,6 +6054,7 @@ box_backup_collect_full(const struct vclock *checkpoint_vclock,
 			  backup) == 0);
 	vclock_copy(&backup->vclock, vclock);
 	vclock_clear(&backup->prev_vclock);
+	vclock_copy(&backup->checkpoint_vclock, checkpoint_vclock);
 	return 0;
 }
 
@@ -6067,6 +6072,7 @@ box_backup_collect_incremental(const struct vclock *from_vclock,
 		return -1;
 	vclock_copy(&backup->vclock, vclock);
 	vclock_copy(&backup->prev_vclock, from_vclock);
+	vclock_clear(&backup->checkpoint_vclock);
 	return 0;
 }
 
@@ -6149,6 +6155,115 @@ box_backup_stop(void)
 		box_backup_free(box_backup);
 		box_backup = NULL;
 	}
+}
+
+/** On commit trigger callback for recovery point creation. */
+static int
+box_recovery_point_on_commit(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct recovery_point *point = (struct recovery_point *)trigger->data;
+	struct xrow_header *last_row = NULL;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &in_txn()->stmts, next) {
+		if (stmt->row != NULL)
+			last_row = stmt->row;
+	}
+	assert(last_row != NULL);
+	if (last_row->replica_id == instance_id) {
+		point->lsn = last_row->lsn;
+		point->timestamp = clock_realtime64();
+	} else {
+		point->lsn = -1;
+	}
+	return 0;
+}
+
+int
+box_recovery_point_create(const char *label, struct recovery_point *point)
+{
+	static struct latch latch = LATCH_INITIALIZER(latch);
+	latch_lock(&latch);
+	struct region *gc = &fiber()->gc;
+	size_t region_svp = region_used(gc);
+	auto guard = make_scoped_guard([=] {
+		region_truncate(gc, region_svp);
+		latch_unlock(&latch);
+	});
+	struct txn *txn;
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	auto txn_guard1 = make_scoped_guard([=] {
+		txn_abort(txn);
+	});
+	size_t opts_size;
+	const char *opts;
+	if (label == NULL)
+		opts = mp_format_on_region(gc, &opts_size, "{}");
+	else
+		opts = mp_format_on_region(gc, &opts_size, "{%s%s}",
+					   "label", label);
+	if (boxk(IPROTO_UPDATE, BOX_RECOVERY_POINT_ID,
+		 "[%u%u%u][[%s%s%p]]",
+		 0, 0, 0, "=", "opts", opts) != 0)
+		return -1;
+	struct trigger on_commit;
+	trigger_create(&on_commit, box_recovery_point_on_commit, point,
+		       NULL);
+	txn_on_commit(txn, &on_commit);
+	txn_guard1.is_active = false;
+	if (txn_commit(txn) != 0)
+		return -1;
+	if (point->lsn == -1) {
+		diag_set(ClientError, ER_RECOVERY_POINT_TXN_LAST_ROW);
+		return -1;
+	}
+
+	txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	auto txn_guard2 = make_scoped_guard([=] {
+		txn_abort(txn);
+	});
+	ssize_t count = box_index_len(BOX_RECOVERY_POINT_ID, /*index_id=*/0);
+	if (count < 0)
+		return -1;
+	if ((uint64_t)count >= box_recovery_point_count_max) {
+		char key[1];
+		char *key_end;
+		key_end = mp_encode_array(key, 0);
+		box_tuple_t *tuple;
+		if (box_index_min(BOX_RECOVERY_POINT_ID, /*index_id=*/0,
+				  key, key_end, &tuple) != 0)
+			return -1;
+		assert(tuple != NULL);
+		const char *data = box_tuple_data(tuple, /*bsize=*/NULL);
+		VERIFY(mp_decode_array(&data) >= 3);
+		int64_t timestamp;
+		uint32_t replica_id;
+		int64_t lsn;
+		assert(mp_typeof(*data) == MP_UINT);
+		timestamp = mp_decode_uint(&data);
+		assert(mp_typeof(*data) == MP_UINT);
+		replica_id = mp_decode_uint(&data);
+		assert(mp_typeof(*data) == MP_UINT);
+		lsn = mp_decode_uint(&data);
+		if (boxk(IPROTO_DELETE, BOX_RECOVERY_POINT_ID,
+			 "[%" PRIi64 " %u%" PRIi64 "]",
+			 timestamp, replica_id, lsn) != 0)
+			return -1;
+	}
+	if (boxk(IPROTO_INSERT, BOX_RECOVERY_POINT_ID,
+		 "[%" PRIi64 "%u%" PRIi64 "%p]",
+		 point->timestamp, instance_id, point->lsn, opts) != 0)
+		return -1;
+	txn_guard2.is_active = false;
+	return txn_commit(txn);
 }
 
 API_EXPORT const char *
