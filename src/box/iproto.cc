@@ -1037,6 +1037,8 @@ struct iproto_connection
 	double idle_timeout;
 	/** Idle timeout watcher. */
 	struct ev_timer idle_timer;
+	/** Set when the connection was closed by the idle timeout. */
+	bool disconnected_by_timeout;
 };
 
 /** Returns a string suitable for logging. */
@@ -1356,6 +1358,7 @@ iproto_connection_idle_timeout_cb(ev_loop *loop, struct ev_timer *watcher,
 	assert(!con->is_internal);
 	say_info("closing connection %s: idle for %.1f second(s)",
 		 iproto_connection_name(con), con->idle_timeout);
+	con->disconnected_by_timeout = true;
 	iproto_connection_close(con);
 }
 
@@ -1924,6 +1927,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->request_count = 0;
 	con->is_internal = false;
 	con->idle_timeout = 0;
+	con->disconnected_by_timeout = false;
 	con->idle_timer.data = con;
 	ev_timer_init(&con->idle_timer, iproto_connection_idle_timeout_cb,
 		      0, 0);
@@ -2336,6 +2340,8 @@ tx_process_disconnect(struct cmsg *m)
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_connection *con = msg->connection;
 	if (con->session != NULL) {
+		con->session->disconnected_by_timeout =
+			con->disconnected_by_timeout;
 		session_close(con->session);
 		/*
 		 * When kharon returns, it should not go back - the socket is
@@ -3812,6 +3818,7 @@ tx_process_connect(struct cmsg *m)
 		con->session->credentials.auth_token);
 	session_set_peer_addr(con->session, &msg->connect.addr,
 			      msg->connect.addrlen);
+	con->session->connect_time = ev_now(loop());
 	iproto_features_create(&con->session->meta.features);
 	tx_fiber_init(con->session, 0);
 	char *greeting = (char *)static_alloc(IPROTO_GREETING_SIZE);
