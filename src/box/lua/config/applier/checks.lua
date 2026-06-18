@@ -33,6 +33,55 @@ local function checks_disabled(configdata)
     return configdata:get('config.checks', {use_default = true}) == 'off'
 end
 
+-- {{{ Mixed sync/async spaces check
+
+local MIXED_SYNC_ALERT_KEY = 'mixed_sync_async_spaces'
+
+-- Detect whether there are user spaces with different is_sync flags.
+-- Returns true if both sync and async user spaces exist, false otherwise.
+-- System spaces are ignored.
+local function has_mixed_sync_spaces()
+    local has_sync = false
+    local has_async = false
+
+    for _, sp in pairs(box.space) do
+        -- Skip system spaces.
+        if sp.id > box.schema.SYSTEM_ID_MAX then
+            if sp.is_sync then
+                has_sync = true
+            else
+                has_async = true
+            end
+            if has_async and has_sync then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function check_mixed_sync(configdata)
+    if not configdata:get('config.checks.' .. MIXED_SYNC_ALERT_KEY,
+        {use_default = true}) then
+        return drop_alert_if_exists(MIXED_SYNC_ALERT_KEY)
+    end
+
+    if not has_mixed_sync_spaces() then
+        return drop_alert_if_exists(MIXED_SYNC_ALERT_KEY)
+    end
+
+    return alert_ns:set(MIXED_SYNC_ALERT_KEY, {
+        type = 'warn',
+        message = 'The replicaset has spaces with different is_sync ' ..
+            'flags. Mixing synchronous and asynchronous spaces in ' ..
+            'the same replicaset may lead to unexpected behavior. ' ..
+            'Consider using only synchronous or only asynchronous ' ..
+            'spaces within a replicaset.',
+    })
+end
+
+-- }}} Mixed sync/async spaces check
+
 -- {{{ System checks registry
 
 -- List of system checks to perform.
@@ -44,7 +93,9 @@ end
 --
 -- To add a new check, add an element to this array:
 --   {key = MY_ALERT_KEY, fn = my_check_function},
-local checks = {}
+local checks = {
+    {key = MIXED_SYNC_ALERT_KEY, fn = check_mixed_sync},
+}
 
 -- }}} System checks registry
 
