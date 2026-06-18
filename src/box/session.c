@@ -272,6 +272,8 @@ session_new(enum session_type type)
 	session->sql_stmts = NULL;
 	session->watchers = NULL;
 	rlist_create(&session->in_shutdown_list);
+	session->connect_time = 0;
+	session->disconnected_by_timeout = false;
 
 	/* For on_connect triggers. */
 	credentials_create(&session->credentials, guest_user);
@@ -417,6 +419,15 @@ session_peer(const struct session *session)
 		return NULL;
 	return sio_strfaddr(&session->meta.peer.addr,
 			    session->meta.peer.addrlen);
+}
+
+const char *
+session_local(const struct session *session)
+{
+	if (session->meta.local.addrlen == 0)
+		return NULL;
+	return sio_strfaddr(&session->meta.local.addr,
+			    session->meta.local.addrlen);
 }
 
 void

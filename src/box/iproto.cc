@@ -599,6 +599,14 @@ struct iproto_msg
 			};
 			/** Peer address size. */
 			socklen_t addrlen;
+			union {
+				/** Local address. */
+				struct sockaddr local_addr;
+				/** Local address storage. */
+				struct sockaddr_storage local_addrstorage;
+			};
+			/** Local address size. */
+			socklen_t local_addrlen;
 			/**
 			 * Session to use for the new connection.
 			 * Optional. If omitted, a new session object
@@ -1044,6 +1052,8 @@ struct iproto_connection
 	 * timeout is 0.
 	 */
 	struct ev_timer idle_timer;
+	/** Set when the connection was closed by the idle timeout. */
+	bool disconnected_by_timeout;
 };
 
 /** Returns a string suitable for logging. */
@@ -1366,6 +1376,7 @@ iproto_connection_idle_timeout_cb(ev_loop *loop, struct ev_timer *watcher,
 	assert(!con->is_internal);
 	say_info("closing connection %s: idle for %.1f second(s)",
 		 iproto_connection_name(con), con->idle_timeout);
+	con->disconnected_by_timeout = true;
 	iproto_connection_close(con);
 }
 
@@ -1932,6 +1943,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->request_count = 0;
 	con->is_internal = false;
 	con->idle_timeout = 0;
+	con->disconnected_by_timeout = false;
 	con->idle_timer.data = con;
 	ev_timer_init(&con->idle_timer, iproto_connection_idle_timeout_cb,
 		      0, 0);
@@ -2344,6 +2356,8 @@ tx_process_disconnect(struct cmsg *m)
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_connection *con = msg->connection;
 	if (con->session != NULL) {
+		con->session->disconnected_by_timeout =
+			con->disconnected_by_timeout;
 		session_close(con->session);
 		/*
 		 * When kharon returns, it should not go back - the socket is
@@ -3820,6 +3834,9 @@ tx_process_connect(struct cmsg *m)
 		con->session->credentials.auth_token);
 	session_set_peer_addr(con->session, &msg->connect.addr,
 			      msg->connect.addrlen);
+	session_set_local_addr(con->session, &msg->connect.local_addr,
+			       msg->connect.local_addrlen);
+	con->session->connect_time = ev_time();
 	iproto_features_create(&con->session->meta.features);
 	tx_fiber_init(con->session, 0);
 	char *greeting = (char *)static_alloc(IPROTO_GREETING_SIZE);
@@ -3896,6 +3913,7 @@ static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
 		     struct session *session, const char *user_name,
+		     struct sockaddr *local_addr, socklen_t local_addrlen,
 		     bool is_internal)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
@@ -3905,6 +3923,11 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
+	assert(local_addrlen <= sizeof(msg->connect.local_addrstorage));
+	if (local_addr != NULL)
+		memcpy(&msg->connect.local_addrstorage, local_addr,
+		       local_addrlen);
+	msg->connect.local_addrlen = local_addrlen;
 	msg->connect.session = session;
 	if (user_name != NULL) {
 		for (int i = 0; i < iproto_thread->srv_count; i++) {
@@ -3925,8 +3948,14 @@ iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
 {
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
+	struct sockaddr_storage local_addr;
+	socklen_t local_addrlen = sizeof(local_addr);
+	if (getsockname(io->fd, (struct sockaddr *)&local_addr,
+			&local_addrlen) != 0)
+		local_addrlen = 0;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
 			     /*session=*/NULL, /*user_name=*/NULL,
+			     (struct sockaddr *)&local_addr, local_addrlen,
 			     /*is_internal=*/false);
 }
 
@@ -4610,7 +4639,9 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
-				     session, user_name, /*is_internal*/true);
+				     session, user_name,
+				     /*local_addr*/NULL, /*local_addrlen*/0,
+				     /*is_internal*/true);
 		free(user_name);
 		break;
 	}
