@@ -148,6 +148,14 @@ I['config.checks'] = format_text([[
     via a background fiber, so that runtime changes are detected automatically.
 ]])
 
+I['config.checks.mixed_sync_async_spaces'] = format_text([[
+    Whether to check for spaces with different `is_sync` flags.
+
+    When enabled, the check generates a warning alert if both
+    synchronous and asynchronous spaces exist in the same
+    replicaset.
+]])
+
 -- }}} checks configuration
 
 -- {{{ audit_log configuration
