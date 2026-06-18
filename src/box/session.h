@@ -134,6 +134,10 @@ struct session {
 	struct trigger fiber_on_stop;
 	/** Link in shutdown_list. */
 	struct rlist in_shutdown_list;
+	/** Timestamp (ev_now) when the connection was established. */
+	double connect_time;
+	/** Set when the session was closed by the idle timeout. */
+	bool disconnected_by_timeout;
 };
 
 struct session_vtab {
