@@ -27,14 +27,12 @@ local log = require('internal.config.utils.log')
 --
 -- A timestamp is saved on the :set() method call to show it in
 -- an :alerts() result.
+--
+-- If `opts.key` is given and an alert with the same key and the
+-- same message already exists, the alert is not updated and
+-- `false` is returned. Otherwise `true` is returned.
 local function aboard_set(self, alert, opts)
     assert(alert.type == 'error' or alert.type == 'warn')
-    if alert.type == 'error' then
-        log.error(alert.message)
-    else
-        log.warn(alert.message)
-    end
-    alert.timestamp = datetime.now()
 
     local key
     if opts == nil or opts.key == nil then
@@ -42,9 +40,22 @@ local function aboard_set(self, alert, opts)
         self._next_key = self._next_key + 1
     else
         key = opts.key
+        local existing = self._alerts[key]
+        if existing ~= nil and existing.message == alert.message
+            and existing.type == alert.type then
+            return false
+        end
     end
 
+    if alert.type == 'error' then
+        log.error(alert.message)
+    else
+        log.warn(alert.message)
+    end
+    alert.timestamp = datetime.now()
+
     self._alerts[key] = alert
+    return true
 end
 
 -- Return an alert pointed by the given `key` or nil.
@@ -58,14 +69,18 @@ end
 --
 -- The `on_drop` callback (see the aboard.new() function) is
 -- called if the alert had existed.
+--
+-- Returns `true` if the alert was dropped, `false` if it didn't
+-- exist.
 local function aboard_drop(self, key)
     if self._alerts[key] == nil then
-        return
+        return false
     end
     self._alerts[key] = nil
     if self._on_drop ~= nil then
         self._on_drop(self, key)
     end
+    return true
 end
 
 -- Drop alerts that fit the given criteria.
@@ -79,6 +94,8 @@ end
 --
 -- The `on_drop` callback (see the aboard.new() function) is
 -- called for each of the dropped alert.
+--
+-- Returns `true` if any alert was dropped, `false` otherwise.
 local function aboard_drop_if(self, filter_f)
     local to_drop = {}
     for key, alert in pairs(self._alerts) do
@@ -90,6 +107,7 @@ local function aboard_drop_if(self, filter_f)
     for _, key in ipairs(to_drop) do
         self:drop(key)
     end
+    return #to_drop > 0
 end
 
 -- Traverse all alerts and apply the provided callback function to each of them.
@@ -102,9 +120,14 @@ end
 -- Drop all the alerts.
 --
 -- The `on_drop` callback is NOT called.
+--
+-- Returns `true` if any alert was dropped, `false` if the board
+-- was already empty.
 local function aboard_clean(self)
+    local was_empty = next(self._alerts) == nil
     self._alerts = {}
     self._next_key = 1
+    return not was_empty
 end
 
 -- Serialize the alerts to show them to a user.
@@ -208,23 +231,32 @@ end
 function namespace_methods.add(self, alert)
     namespace_selfcheck(self, 'add')
     local a = process_alert(self, alert)
-    self._aboard:set(a)
+    return self._aboard:set(a)
+end
+
+function namespace_methods.get(self, key)
+    namespace_selfcheck(self, 'get')
+    local alert = self._aboard:get(process_key(self, key))
+    if alert ~= nil then
+        alert = table.copy(alert)
+    end
+    return alert
 end
 
 function namespace_methods.set(self, key, alert)
     namespace_selfcheck(self, 'set')
     local a = process_alert(self, alert)
-    self._aboard:set(a, {key = process_key(self, key)})
+    return self._aboard:set(a, {key = process_key(self, key)})
 end
 
 function namespace_methods.unset(self, key)
     namespace_selfcheck(self, 'unset')
-    self._aboard:drop(process_key(self, key))
+    return self._aboard:drop(process_key(self, key))
 end
 
 function namespace_methods.clear(self)
     namespace_selfcheck(self, 'clear')
-    self._aboard:drop_if(function(_key, alert)
+    return self._aboard:drop_if(function(_key, alert)
         return alert._namespace == self._name
     end)
 end

@@ -210,6 +210,110 @@ g.test_alerts_cleaned_by_aboard = function(g)
     })
 end
 
+g.test_alert_set_unset_clear_return_values = function(g)
+    local verify = function()
+        local alerts = require('config'):new_alerts_namespace('my_alerts')
+
+        t.assert_is(alerts:set('key1', {message = 'msg1'}), true)
+        t.assert_is(alerts:set('key1', {message = 'msg1'}), false)
+        t.assert_is(alerts:set('key1', {message = 'msg2'}), true)
+
+        t.assert_is(alerts:unset('key1'), true)
+        t.assert_is(alerts:unset('key1'), false)
+
+        t.assert_is(alerts:set('key2', {message = 'msg2'}), true)
+        t.assert_is(alerts:clear(), true)
+        t.assert_is(alerts:clear(), false)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
+-- Ensure that add returns true, and that namespace:get() returns the alert
+-- by key or nil.
+g.test_alert_add_return_value_and_get = function(g)
+    local verify = function()
+        local alerts = require('config'):new_alerts_namespace('my_alerts')
+
+        t.assert_is(alerts:add({message = 'msg1'}), true)
+
+        alerts:set('key1', {message = 'msg2', my_field = 'val'})
+        local alert = alerts:get('key1')
+        t.assert_equals(alert.message, 'msg2')
+        t.assert_equals(alert.my_field, 'val')
+
+        t.assert_is(alerts:get('nonexistent'), nil)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
+-- Ensure that aboard-level set, get, drop_if, and clean return bool
+-- (or alert/nil for :get()).
+g.test_aboard_set_get_drop_if_clean_return_values = function(g)
+    local verify = function()
+        local aboard = require('config')._aboard
+
+        t.assert_is(aboard:set({type = 'warn', message = 'msg1'},
+                               {key = 'key1'}), true)
+        t.assert_is(aboard:set({type = 'warn', message = 'msg1'},
+                               {key = 'key1'}), false)
+        t.assert_is(aboard:set({type = 'warn', message = 'msg2'},
+                               {key = 'key1'}), true)
+        t.assert_is(aboard:set({type = 'warn', message = 'msg3'},
+                               {key = 'key2'}), true)
+
+        -- Different type, same message: should update
+        t.assert_is(aboard:set({type = 'error', message = 'x'},
+                               {key = 'k'}), true)
+        t.assert_is(aboard:set({type = 'warn', message = 'x'},
+                               {key = 'k'}), true)
+
+        t.assert_equals(aboard:get('key1').message, 'msg2')
+        t.assert_is(aboard:get('nonexistent'), nil)
+
+        t.assert_is(aboard:drop('nonexistent'), false)
+        t.assert_is(aboard:drop('key1'), true)
+        t.assert_is(aboard:drop('key1'), false)
+
+        t.assert_is(aboard:drop_if(function() return false end), false)
+        t.assert_is(aboard:drop_if(function() return true end), true)
+        t.assert_is(aboard:drop_if(function() return true end), false)
+
+        aboard:set({type = 'warn', message = 'msg4'}, {key = 'key4'})
+        t.assert_is(aboard:clean(), true)
+        t.assert_is(aboard:clean(), false)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
+-- Ensure that namespace:get() returns a copy.
+g.test_alert_get_returns_copy = function(g)
+    local verify = function()
+        local alerts = require('config'):new_alerts_namespace('my_alerts')
+
+        alerts:set('key1', {message = 'msg1', my_field = 'val'})
+        local alert = alerts:get('key1')
+        alert.message = 'modified'
+        alert.my_field = 'modified'
+
+        local stored = alerts:get('key1')
+        t.assert_equals(stored.message, 'msg1')
+        t.assert_equals(stored.my_field, 'val')
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
 -- Ensure that all faults are caught and reported correctly.
 g.test_alerts_assertions = function()
     local cases = {
@@ -297,6 +401,14 @@ g.test_alerts_assertions = function()
                 alerts:set("my:key", {message = 'Test alert'})
             ]],
             err = 'alert key cannot contain a colon',
+        },
+        {
+            script = [[
+                local config = require('config')
+                local alerts = config:new_alerts_namespace('my_alerts')
+                alerts.get("my_key")
+            ]],
+            err = 'Use alerts_namespace:get',
         },
         {
             script = [[
