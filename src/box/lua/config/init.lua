@@ -1,5 +1,6 @@
 local fiber = require('fiber')
 local fio = require('fio')
+local yaml = require('yaml')
 local instance_config = require('internal.config.instance_config')
 local cluster_config = require('internal.config.cluster_config')
 local configdata = require('internal.config.configdata')
@@ -477,6 +478,17 @@ end
 function methods._startup(self, instance_name, config_file)
     local ok, err = pcall(self._startup_impl, self, instance_name, config_file)
     if not ok then
+        if self._configdata ~= nil then
+            local ok, iconfig = pcall(self._configdata.masked_iconfig,
+                                      self._configdata)
+            if ok then
+                log.debug('Instance configuration at startup failure:\n%s',
+                          yaml.encode(iconfig))
+            else
+                log.debug('Unable to prepare instance configuration for ' ..
+                          'startup failure report: %s', iconfig)
+            end
+        end
         log.error(err)
         os.exit(1)
     end
