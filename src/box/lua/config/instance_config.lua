@@ -1968,6 +1968,8 @@ return schema.new('instance_config', schema.record({
             "space_insert",
             "space_replace",
             "space_delete",
+            "integrity_check_ok",
+            "integrity_check_fail",
             -- Groups of events.
             "none",
             "all",
@@ -1978,6 +1980,7 @@ return schema.new('instance_config', schema.record({
             "dml",
             "data_operations",
             "compatibility",
+            "integrity_check",
         }),
         spaces = enterprise_edition(schema.union({
             variants = {

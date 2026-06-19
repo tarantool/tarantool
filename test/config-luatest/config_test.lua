@@ -996,8 +996,9 @@ g.test_audit_options = function()
         'role_grant_rights', 'role_revoke_rights', 'password_change',
         'access_denied', 'eval', 'call', 'space_select', 'space_create',
         'space_alter', 'space_drop', 'space_insert', 'space_replace',
-        'space_delete', 'none', 'all', 'audit', 'auth', 'priv', 'ddl', 'dml',
-        'data_operations', 'compatibility'
+        'space_delete', 'integrity_check_ok', 'integrity_check_fail',
+        'none', 'all', 'audit', 'auth', 'priv', 'ddl', 'dml',
+        'data_operations', 'compatibility', 'integrity_check'
     }
 
     local verify = function(events, audit_spaces)
