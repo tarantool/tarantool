@@ -65,6 +65,16 @@ function methods.filter(self, f, opts)
     return instance_config:filter(data, f)
 end
 
+function methods.masked_iconfig(self, opts)
+    local data = table.deepcopy(choose_iconfig(self, opts))
+    self:filter(function(w)
+        return w.schema.computed.annotations.sensitive
+    end, opts):each(function(w)
+        instance_config:set(data, w.path, '<hidden>')
+    end)
+    return data
+end
+
 -- List of names of the instances in the same replicaset.
 --
 -- The names are useful to pass to other methods as opts.peer.
