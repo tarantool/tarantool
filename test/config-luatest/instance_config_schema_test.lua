@@ -55,6 +55,46 @@ g.test_general = function()
     t.assert_equals(instance_config.name, 'instance_config')
 end
 
+g.test_sensitive_annotations = function()
+    local iconfig = {
+        credentials = {
+            users = {
+                client = {
+                    password = 'topsecret',
+                },
+            },
+        },
+        iproto = {
+            advertise = {
+                peer = {
+                    uri = 'localhost:3301',
+                    login = 'replicator',
+                    password = 'replication-secret',
+                },
+                sharding = {
+                    uri = 'localhost:3302',
+                    login = 'storage',
+                    password = 'sharding-secret',
+                },
+            },
+        },
+    }
+    instance_config:validate(iconfig)
+
+    local paths = instance_config:filter(iconfig, function(w)
+        return w.schema.computed.annotations.sensitive
+    end):map(function(w)
+        return table.concat(w.path, '.')
+    end):totable()
+    table.sort(paths)
+
+    t.assert_equals(paths, {
+        'credentials.users.client.password',
+        'iproto.advertise.peer.password',
+        'iproto.advertise.sharding.password',
+    })
+end
+
 g.test_config = function()
     t.tarantool.skip_if_enterprise()
     local iconfig = {

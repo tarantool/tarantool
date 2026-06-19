@@ -44,6 +44,10 @@ local network = require('internal.config.utils.network')
 -- * mk_parent_dir (boolean)
 --
 --   Create a parent directory for the given file before box.cfg().
+--
+-- * sensitive (boolean)
+--
+--   Hide the value from diagnostic configuration dumps.
 
 local function enterprise_edition_validate(data, w)
     -- OK if we're on Tarantool EE.
@@ -91,6 +95,15 @@ local function enterprise_edition(schema_node)
         enterprise_edition_apply_default_if)
 
     return schema_node
+end
+
+local function sensitive(schema_node)
+    schema_node.sensitive = true
+    return schema_node
+end
+
+local function sensitive_ee(schema_node)
+    return sensitive(enterprise_edition(schema_node))
 end
 
 -- Accept a value of 'iproto.listen' option and return the first URI
@@ -340,9 +353,9 @@ return schema.new('instance_config', schema.record({
             username = schema.scalar({
                 type = 'string',
             }),
-            password = schema.scalar({
+            password = sensitive(schema.scalar({
                 type = 'string',
-            }),
+            })),
             http = schema.record({
                 request = schema.record({
                     timeout = schema.scalar({
@@ -412,9 +425,9 @@ return schema.new('instance_config', schema.record({
                     login = schema.scalar({
                         type = 'string',
                     }),
-                    password = schema.scalar({
+                    password = sensitive(schema.scalar({
                         type = 'string',
-                    }),
+                    })),
                     params = schema.record({
                         transport = schema.enum({
                             'plain',
@@ -432,10 +445,10 @@ return schema.new('instance_config', schema.record({
                         ssl_ciphers = enterprise_edition(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_password = enterprise_edition(schema.scalar({
+                        ssl_password = sensitive_ee(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_password_file = enterprise_edition(schema.scalar({
+                        ssl_password_file = sensitive_ee(schema.scalar({
                             type = 'string',
                         })),
                     }),
@@ -715,10 +728,10 @@ return schema.new('instance_config', schema.record({
                     ssl_ciphers = enterprise_edition(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password = enterprise_edition(schema.scalar({
+                    ssl_password = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password_file = enterprise_edition(schema.scalar({
+                    ssl_password_file = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -795,9 +808,9 @@ return schema.new('instance_config', schema.record({
                 login = schema.scalar({
                     type = 'string',
                 }),
-                password = schema.scalar({
+                password = sensitive(schema.scalar({
                     type = 'string',
-                }),
+                })),
                 uri = schema.scalar({
                     type = 'string',
                     validate = validators['iproto.advertise.peer.uri'],
@@ -819,10 +832,10 @@ return schema.new('instance_config', schema.record({
                     ssl_key_file = enterprise_edition(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password = enterprise_edition(schema.scalar({
+                    ssl_password = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password_file = enterprise_edition(schema.scalar({
+                    ssl_password_file = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -833,9 +846,9 @@ return schema.new('instance_config', schema.record({
                 login = schema.scalar({
                     type = 'string',
                 }),
-                password = schema.scalar({
+                password = sensitive(schema.scalar({
                     type = 'string',
-                }),
+                })),
                 uri = schema.scalar({
                     type = 'string',
                     validate = validators['iproto.advertise.sharding.uri'],
@@ -857,10 +870,10 @@ return schema.new('instance_config', schema.record({
                     ssl_key_file = enterprise_edition(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password = enterprise_edition(schema.scalar({
+                    ssl_password = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_password_file = enterprise_edition(schema.scalar({
+                    ssl_password_file = sensitive_ee(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -897,12 +910,12 @@ return schema.new('instance_config', schema.record({
             ssl_key = schema.scalar({
                 type = 'string',
             }),
-            ssl_password = schema.scalar({
+            ssl_password = sensitive(schema.scalar({
                 type = 'string',
-            }),
-            ssl_password_file = schema.scalar({
+            })),
+            ssl_password_file = sensitive(schema.scalar({
                 type = 'string',
-            }),
+            })),
         })),
     }),
     database = schema.record({
@@ -1505,9 +1518,9 @@ return schema.new('instance_config', schema.record({
             }),
             -- Parameters of the user.
             value = schema.record({
-                password = schema.scalar({
+                password = sensitive(schema.scalar({
                     type = 'string',
-                }),
+                })),
                 privileges = schema.array({
                     items = schema.record({
                         permissions = schema.set({
@@ -2184,10 +2197,10 @@ return schema.new('instance_config', schema.record({
                         ssl_ciphers = enterprise_edition(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_password = enterprise_edition(schema.scalar({
+                        ssl_password = sensitive_ee(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_password_file = enterprise_edition(schema.scalar({
+                        ssl_password_file = sensitive_ee(schema.scalar({
                             type = 'string',
                         })),
                         ssl_verify_client = schema.enum({
@@ -2230,8 +2243,10 @@ return schema.new('instance_config', schema.record({
                 ssl_cert = schema.scalar({ type = 'string' }),
                 ssl_key = schema.scalar({ type = 'string' }),
                 ssl_ciphers = schema.scalar({ type = 'string' }),
-                ssl_password = schema.scalar({ type = 'string' }),
-                ssl_password_file = schema.scalar({ type = 'string' }),
+                ssl_password = sensitive(schema.scalar({ type = 'string' })),
+                ssl_password_file = sensitive(schema.scalar({
+                    type = 'string',
+                })),
             }),
         })),
     }, {
