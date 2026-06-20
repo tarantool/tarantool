@@ -98,6 +98,8 @@ bool
 decimal_fits_fixed_point(decimal_t *dec, int precision, int scale)
 {
 	decimal_t tmp = *dec;
+	if (decNumberIsZero(&tmp))
+		return true;
 	decNumberReduce(&tmp, dec, &decimal_context);
 	VERIFY(decimal_check_status(&tmp, &decimal_context) != NULL);
 	int d = tmp.exponent + scale;
