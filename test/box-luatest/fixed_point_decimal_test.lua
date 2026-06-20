@@ -412,3 +412,32 @@ g.test_mp_null_values = function(cg)
         t.assert_equals(s.index.sk:select({box.NULL}), {{2, box.NULL}})
     end)
 end
+
+g.test_decimal_zero_fits_fixed_point = function(cg)
+    cg.server:exec(function()
+        local decimal = require('decimal')
+        local cases = {
+            decimal32  = {-9, -5, -1, 0, 1, 5, 9},
+            decimal64  = {-18, -15, -1, 0, 1, 15, 18},
+            decimal128 = {-38, -30, -1, 0, 1, 30, 38},
+            decimal256 = {-76, -68, -1, 0, 1, 68, 76},
+        }
+        for decimal_type, scales in pairs(cases) do
+            for _, scale in pairs(scales) do
+                local s = box.schema.space.create('test', {
+                    format = {
+                        {name = 'a', type = 'unsigned'},
+                        {name = 'b', type = decimal_type, scale = scale},
+                    },
+                })
+                s:create_index('pk')
+                s:replace{1, decimal.new('0')}
+                s:replace{1, decimal.new(0)}
+                s:replace{1, decimal.new('0.' .. string.rep('0', scale))}
+                s:replace{1, decimal.new('-0.' .. string.rep('0', 1000))}
+                s:replace{1, decimal.new('0.' .. string.rep('0', 1000))}
+                s:drop()
+            end
+        end
+    end)
+end
