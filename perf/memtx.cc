@@ -321,15 +321,15 @@ BENCHMARK_F(MemtxFixture, TreeGetRandomExistingKeys)
 }
 
 /**
- * Benchmark a `get` of one random exist key from the tree index. This benchmark
- * is supposed to exercise the CPU.
+ * Benchmark a `get` of one exist key from the tree index. This benchmark is
+ * supposed to exercise the CPU.
  */
-BENCHMARK_F(MemtxFixture, TreeGet1RandomExistingKey)
+BENCHMARK_F(MemtxFixture, TreeGet1ExistingKey)
 (benchmark::State &state)
 {
 	int64_t counter = 0;
 	struct tuple *t;
-	const auto &k = key_set[distr(rng) % key_set.size()];
+	const auto &k = key_set[key_set.size() / 2];
 	for (MAYBE_UNUSED auto _ : state) {
 		benchmark::DoNotOptimize(::box_index_get(sid, tree_index_id,
 							 k.first, k.second,
