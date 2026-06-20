@@ -34,6 +34,7 @@ local HELP = [[
    transaction <number, 150>  - number of replaces in one transaction
    wal_mode <string, 'write'> - WAL synchronization mode
    warmup <number, 10>        - percent of ops to skip before measurement
+   memtx_use_mvcc <boolean>   - enable memtx MVCC engine
 
  Being run without options, this benchmark tests the HASH index of the memtx
  engine by running 50 fibers that replace 150 integers, using each as a primary
@@ -51,6 +52,7 @@ local parsed_params = {
     {'transaction', 'number'},
     {'wal_mode', 'string'},
     {'warmup', 'number'},
+    {'memtx_use_mvcc', 'boolean'},
 }
 
 local params
@@ -143,6 +145,9 @@ end
 local warmup_thr = params.warmup or 10
 warmup_thr = warmup_thr > 100 and 100 or warmup_thr
 warmup_thr = warmup_thr < 0 and 0 or warmup_thr
+
+-- memtx MVCC engine
+local memtx_use_mvcc = params.memtx_use_mvcc
 -- END OF TUNABLE OPTIONS
 
 -- transactions per fiber
@@ -163,9 +168,11 @@ print(string.format([[
 # in a replicaset of %d nodes,
 # using %s index type%s
 # with WAL mode %s
+# and memtx mvcc %s
 # ]],
       num_ops, ops_per_txn, num_fibers, nodes,
-      index_config.type, hints_msg, wal_mode))
+      index_config.type, hints_msg, wal_mode,
+      memtx_use_mvcc and 'enabled' or 'disabled'))
 
 box.cfg{
     log_level = 0,
@@ -174,6 +181,7 @@ box.cfg{
     memtx_memory = 2*1024*1024*1024,
     work_dir = test_dir,
     wal_mode = wal_mode,
+    memtx_use_mvcc_engine = memtx_use_mvcc,
 }
 
 box.schema.user.create('replicator', {password = 'password'})
@@ -202,8 +210,9 @@ if (nodes > 1) then
                     log_level = 5,
                     replication = {'replicator:password@%s'},
                     work_dir = '%s',
-                    replication_connect_quorum=1
-                }]], box.info.listen, i)
+                    replication_connect_quorum=1,
+                    memtx_use_mvcc_engine = %s
+                }]], box.info.listen, i, tostring(memtx_use_mvcc == true))
             }
             local res, err = popen.new(cmd, std_redirect)
             if (res) then
