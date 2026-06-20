@@ -4,6 +4,8 @@
 /* Select the tree flavor to test. */
 #if defined(TEST_INNER_CARD)
 # define BPS_INNER_CARD
+#elif defined(TEST_TIME_SERIES_OPTIMIZED)
+# define BPS_TIME_SERIES_OPTIMIZED
 #elif defined(TEST_INNER_CHILD_CARDS)
 # define BPS_INNER_CHILD_CARDS
 #elif !defined(TEST_DEFAULT)
