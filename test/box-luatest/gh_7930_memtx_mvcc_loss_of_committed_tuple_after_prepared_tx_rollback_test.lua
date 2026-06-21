@@ -9,7 +9,6 @@ g.before_all(function(cg)
         box_cfg = {
             memtx_use_mvcc_engine = true,
             replication_synchro_quorum = 2,
-            replication_synchro_timeout = 0.0001,
         }
     }
     cg.server:start()
@@ -19,7 +18,9 @@ g.before_all(function(cg)
         local as = box.schema.space.create("as")
         as:create_index("pk")
 
+        box.cfg{replication_synchro_timeout = 10}
         box.ctl.promote()
+        box.cfg{replication_synchro_timeout = 0.0001}
     end)
 end)
 
