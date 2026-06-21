@@ -13,7 +13,7 @@ old_synchro_quorum = box.cfg.replication_synchro_quorum
 old_synchro_timeout = box.cfg.replication_synchro_timeout
  | ---
  | ...
-box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 0.001}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 10}
  | ---
  | ...
 engine = test_run:get_cfg('engine')
@@ -32,6 +32,9 @@ _ = sync:create_index('pk')
  | ---
  | ...
 box.ctl.promote()
+ | ---
+ | ...
+box.cfg{replication_synchro_timeout = 0.001}
  | ---
  | ...
 

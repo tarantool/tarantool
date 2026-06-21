@@ -6,13 +6,14 @@ test_run = require('test_run').new()
 --
 old_synchro_quorum = box.cfg.replication_synchro_quorum
 old_synchro_timeout = box.cfg.replication_synchro_timeout
-box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 0.001}
+box.cfg{replication_synchro_quorum = 2, replication_synchro_timeout = 10}
 engine = test_run:get_cfg('engine')
 async = box.schema.create_space('async', {engine = engine})
 _ = async:create_index('pk')
 sync = box.schema.create_space('sync', {is_sync = true, engine = engine})
 _ = sync:create_index('pk')
 box.ctl.promote()
+box.cfg{replication_synchro_timeout = 0.001}
 
 -- The transaction fails, but is written to the log anyway.
 box.begin() async:insert{1} sync:insert{1} box.commit()
