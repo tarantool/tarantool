@@ -222,8 +222,6 @@ sqlStartTable(Parse *pParse, Token *pName)
 		ENGINE_NAME_MAX + 1);
 
 	assert(v == sqlGetVdbe(pParse));
-	if (!sql_get()->init.busy)
-		sql_set_multi_write(pParse, true);
 	return new_space;
 }
 
@@ -2966,7 +2964,6 @@ sql_create_index(struct Parse *parse) {
 		int cursor = parse->nTab++;
 
 		vdbe = sqlGetVdbe(parse);
-		sql_set_multi_write(parse, true);
 		int reg = ++parse->nMem;
 		sqlVdbeAddOp2(vdbe, OP_OpenSpace, reg, BOX_INDEX_ID);
 		sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, 0, reg);
@@ -3398,17 +3395,6 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 			      P4_DYNAMIC);
 	}
 	sqlVdbeAddOp4(v, OP_Savepoint, op, 0, old_name_reg, zName, P4_DYNAMIC);
-}
-
-/**
- * Set flag in parse context, which indicates that during query
- * execution multiple insertion/updates may occur.
- */
-void
-sql_set_multi_write(struct Parse *parse_context, bool is_set)
-{
-	Parse *pToplevel = sqlParseToplevel(parse_context);
-	pToplevel->isMultiWrite |= is_set;
 }
 
 /*
