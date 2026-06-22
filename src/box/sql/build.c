@@ -1526,29 +1526,34 @@ sql_create_view(struct Parse *parse_context)
 					    &create_entity_def->name);
 	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
-	struct space *select_res_space =
-		sqlResultSetOfSelect(parse_context, view_def->select);
-	if (select_res_space == NULL)
+
+	/* Find result of SELECT. */
+	struct Select *select = view_def->select;
+	uint32_t saved_flags = parse_context->sql_flags;
+	parse_context->sql_flags = 0;
+	sqlSelectPrep(parse_context, select, 0);
+	if (parse_context->is_aborted)
 		goto create_view_fail;
-	struct ExprList *aliases = view_def->aliases;
-	if (aliases != NULL) {
-		if ((int)select_res_space->def->field_count != aliases->nExpr) {
+	while (select->pPrior)
+		select = select->pPrior;
+	parse_context->sql_flags = saved_flags;
+
+	struct ExprList *columns = view_def->aliases;
+	if (columns != NULL) {
+		if (select->pEList->nExpr != columns->nExpr) {
 			diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 				 "number of aliases doesn't match provided "\
 				 "columns");
 			parse_context->is_aborted = true;
 			goto create_view_fail;
 		}
-		sqlColumnsFromExprList(parse_context, aliases, space->def);
-		sqlSelectAddColumnTypeAndCollation(parse_context, space->def,
-						   view_def->select);
+		select = view_def->select;
 	} else {
-		assert(select_res_space->def->opts.is_ephemeral);
-		space->def->fields = select_res_space->def->fields;
-		space->def->field_count = select_res_space->def->field_count;
-		select_res_space->def->fields = NULL;
-		select_res_space->def->field_count = 0;
+		columns = select->pEList;
 	}
+	sqlColumnsFromExprList(parse_context, columns, space->def);
+	sqlSelectAddColumnTypeAndCollation(parse_context, space->def, select);
+
 	space->def->opts.is_view = true;
 	/*
 	 * Locate the end of the CREATE VIEW statement.
