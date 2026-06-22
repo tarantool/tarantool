@@ -2117,15 +2117,12 @@ sqlSelectAddColumnTypeAndCollation(struct Parse *pParse,
 				       struct space_def *def,
 				       struct Select *pSelect)
 {
-	NameContext sNC;
 	Expr *p;
 	struct ExprList_item *a;
 
 	assert(pSelect != 0);
 	assert((pSelect->selFlags & SF_Resolved) != 0);
 	assert((int)def->field_count == pSelect->pEList->nExpr);
-	memset(&sNC, 0, sizeof(sNC));
-	sNC.pSrcList = pSelect->pSrc;
 	a = pSelect->pEList->a;
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		p = a[i].pExpr;
