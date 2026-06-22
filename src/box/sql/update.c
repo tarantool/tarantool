@@ -164,7 +164,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	if (v == NULL)
 		goto update_cleanup;
 	sqlVdbeCountChanges(v);
-	sql_set_multi_write(pParse, true);
 
 	/* Allocate required registers. */
 	regOldPk = regNewPk = ++pParse->nMem;
