@@ -2707,7 +2707,6 @@ sqlColumnsFromExprList(struct Parse *parse, struct ExprList *expr_list,
 
 void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
-struct space *sqlResultSetOfSelect(Parse *, Select *);
 
 struct space *
 sqlStartTable(Parse *, Token *);

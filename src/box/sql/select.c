@@ -2140,31 +2140,6 @@ sqlSelectAddColumnTypeAndCollation(struct Parse *pParse,
 	}
 }
 
-/*
- * Given a SELECT statement, generate a space structure that describes
- * the result set of that SELECT.
- */
-struct space *
-sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
-{
-	uint32_t saved_flags = pParse->sql_flags;
-	pParse->sql_flags = 0;
-	sqlSelectPrep(pParse, pSelect, 0);
-	if (pParse->is_aborted)
-		return NULL;
-	while (pSelect->pPrior)
-		pSelect = pSelect->pPrior;
-	pParse->sql_flags = saved_flags;
-	struct space *space = sql_template_space_new(pParse, NULL);
-	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
-	 * is disabled
-	 */
-	assert(sql_get()->lookaside.bDisable);
-	sqlColumnsFromExprList(pParse, pSelect->pEList, space->def);
-	sqlSelectAddColumnTypeAndCollation(pParse, space->def, pSelect);
-	return space;
-}
-
 /** Get a VDBE for the given parser context. Create a new one if necessary. */
 static SQL_NOINLINE Vdbe *
 allocVdbe(Parse * pParse)
