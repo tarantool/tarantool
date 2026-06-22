@@ -126,7 +126,7 @@ sql_reprepare(struct Vdbe **stmt)
 	const char *sql_str = sql_stmt_query_str(*stmt);
 	struct Vdbe *new_stmt;
 	if (sql_stmt_compile(sql_str, strlen(sql_str), NULL,
-			     &new_stmt, NULL) != 0)
+			     &new_stmt, NULL, 0, NULL, NULL) != 0)
 		return -1;
 	if (sql_stmt_cache_update(*stmt, new_stmt) != 0)
 		return -1;
@@ -146,7 +146,7 @@ sql_prepare(const char *sql, int len, struct port *port)
 	struct Vdbe *stmt = sql_stmt_cache_find(stmt_id);
 	rmean_collect(rmean_box, IPROTO_PREPARE, 1);
 	if (stmt == NULL) {
-		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
+		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL, 0, NULL, NULL) != 0)
 			return -1;
 		if (sql_stmt_cache_insert(stmt) != 0) {
 			sql_stmt_finalize(stmt);
@@ -256,13 +256,22 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					       DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, false);
+
+	const char **bind_names = xmalloc(sizeof(char *) * bind_count);
+	uint32_t *bind_names_len = xmalloc(sizeof(uint32_t *) * bind_count);
+	for (uint32_t j = 0; j < bind_count; j++) {
+		bind_names[j] = bind[j].name;
+		bind_names_len[j] = bind[j].name_len;
+	}
+	sql_set_bind_count(stmt, bind_count, bind_names, bind_names_len);
 	if (sql_execute(stmt, port, region) != 0) {
 		port_destroy(port);
 		sql_stmt_reset(stmt);
 		return -1;
 	}
 	sql_stmt_reset(stmt);
-
+	free(bind_names);
+	free(bind_names_len);
 	return 0;
 }
 
@@ -272,7 +281,13 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			struct region *region)
 {
 	struct Vdbe *stmt;
-	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
+	const char **bind_names = xmalloc(sizeof(char *) * bind_count);
+	uint32_t *bind_names_len = xmalloc(sizeof(uint32_t *) * bind_count);
+	for (uint32_t j = 0; j < bind_count; j++) {
+		bind_names[j] = bind[j].name;
+		bind_names_len[j] = bind[j].name_len;
+	}
+	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL, bind_count, bind_names, bind_names_len) != 0)
 		return -1;
 	assert(stmt != NULL);
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
@@ -282,6 +297,8 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	    sql_execute(stmt, port, region) == 0)
 		return 0;
 	port_destroy(port);
+	free(bind_names);
+	free(bind_names_len);
 	return -1;
 }
 

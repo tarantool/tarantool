@@ -41,12 +41,18 @@
 
 int
 sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
-		 struct Vdbe **ppStmt, const char **pzTail)
+		 struct Vdbe **ppStmt, const char **pzTail,
+		 uint32_t bind_count, const char **bind_names,
+		 uint32_t *bind_names_len)
 {
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
+	sParse.count_bind_names = bind_count;
+	sParse.bind_names = bind_names;
+	sParse.bind_names_len = bind_names_len;
 	sParse.pReprepare = pReprepare;
+	sParse.nVar2 = 0;
 	*ppStmt = NULL;
 
 	/* Check to verify that it is possible to get a read lock on all
@@ -174,7 +180,7 @@ sqlReprepare(Vdbe * p)
 
 	zSql = sql_sql(p);
 	assert(zSql != 0);
-	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
+	if (sql_stmt_compile(zSql, -1, p, &pNew, 0, 0, NULL, NULL) != 0) {
 		assert(pNew == 0);
 		return -1;
 	}
@@ -195,6 +201,8 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	parser->line_pos = 1;
 	parser->has_autoinc = false;
 	region_create(&parser->region, &cord()->slabc);
+	parser->count_original_names = 0;
+	parser->last_idx = 0;
 	parser->count_original_names = 0;
 }
 

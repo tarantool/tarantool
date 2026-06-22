@@ -1463,6 +1463,11 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		p->original_names = pParse->original_names;
 		p->original_names_len = pParse->original_names_len;
 	}
+	p->count_bind_names = pParse->count_bind_names;
+	if (pParse->count_bind_names > 0) {
+		p->bind_names = pParse->bind_names;
+		p->bind_names_len = pParse->bind_names_len;
+	}
 	pParse->original_names = 0;
 	pParse->original_names_len = 0;
 	pParse->pVList = 0;

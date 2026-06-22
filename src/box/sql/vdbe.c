@@ -861,9 +861,20 @@ case OP_Blob: {                /* out2 */
  */
 case OP_Variable: {            /* out2 */
 	Mem *pVar;       /* Value being transferred */
-
-	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
+	if (pOp->p1 == 0) {
+	    if (pOp->p4.z != 0) {
+		for (uint32_t i = 0; i < p->count_bind_names; i++) {
+			if (p->bind_names[i] != 0) {
+			    if (strcmp(p->bind_names[i], pOp->p4.z) == 0)
+				pOp->p1 = i + 1;
+			}
+		}
+	    }
+	}
+	assert(pOp->p1>0);
+	assert(((uint32_t) pOp->p1<=p->count_bind_names) || (p->count_bind_names == 0));
+	//assert(pOp->p1>0 && pOp->p1<=p->nVar);
+	//assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
 	pVar = &p->aVar[pOp->p1 - 1];
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;

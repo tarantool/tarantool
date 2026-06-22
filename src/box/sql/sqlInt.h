@@ -314,7 +314,9 @@ sql_vsnprintf(int, char *, const char *, va_list);
  */
 int
 sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
-		 struct Vdbe **stmt, const char **sql_tail);
+		 struct Vdbe **stmt, const char **sql_tail,
+		 uint32_t bind_count, const char **bind_names,
+		 uint32_t *bind_names_len);
 
 /** This is the top-level implementation of sqlStep(). */
 int
@@ -489,7 +491,7 @@ sql_reset_autoinc_id_list(struct Vdbe *stmt);
 
 /** Perform double parameter binding for the sql statement. */
 int
-sql_bind_double(struct Vdbe *v, int i, double value);
+sql_bind_double(struct Vdbe *v, int i);
 
 /**
  * Perform boolean parameter binding for the prepared sql
@@ -500,19 +502,19 @@ sql_bind_double(struct Vdbe *v, int i, double value);
  * @retval 0 On Success, not 0 otherwise.
  */
 int
-sql_bind_boolean(struct Vdbe *v, int i, bool value);
+sql_bind_boolean(struct Vdbe *v, int i);
 
 /** Perform integer parameter binding for the sql statement. */
 int
-sql_bind_int(struct Vdbe *v, int i, int value);
+sql_bind_int(struct Vdbe *v, int i);
 
 /** Perform 64-bit negative integer parameter binding for the sql statement. */
 int
-sql_bind_int64(struct Vdbe *v, int i, int64_t value);
+sql_bind_int64(struct Vdbe *v, int i);
 
 /** Perform 64-bit unsigned integer parameter binding for the sql statement. */
 int
-sql_bind_uint64(struct Vdbe *v, int i, uint64_t value);
+sql_bind_uint64(struct Vdbe *v, int i);
 
 /** Perform NULL parameter binding for the sql statement. */
 int
@@ -520,35 +522,87 @@ sql_bind_null(struct Vdbe *v, int i);
 
 /** Perform string parameter binding for the sql statement. */
 int
-sql_bind_str_static(struct Vdbe *v, int i, const char *str, uint32_t len);
+sql_bind_str_static(struct Vdbe *v, int i);
 
 /** Perform binary string parameter binding for the sql statement. */
 int
-sql_bind_bin_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_bin_static(struct Vdbe *v, int i);
 
 /** Perform array parameter binding for the sql statement. */
 int
-sql_bind_array_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_array_static(struct Vdbe *v, int i);
 
 /** Perform map parameter binding for the sql statement. */
 int
-sql_bind_map_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_map_static(struct Vdbe *v, int i);
 
 /** Perform UUID parameter binding for the sql statement. */
 int
-sql_bind_uuid(struct Vdbe *v, int i, const struct tt_uuid *uuid);
+sql_bind_uuid(struct Vdbe *v, int i);
 
 /** Perform decimal parameter binding for the sql statement. */
 int
-sql_bind_dec(struct Vdbe *v, int i, const decimal_t *dec);
+sql_bind_dec(struct Vdbe *v, int i);
 
 /** Perform DATETIME parameter binding for the sql statement. */
 int
-sql_bind_datetime(struct Vdbe *v, int i, const struct datetime *dt);
+sql_bind_datetime(struct Vdbe *v, int i);
 
 /** Perform INTERVAL parameter binding for the SQL statement. */
 int
-sql_bind_interval(struct Vdbe *v, int i, const struct interval *itv);
+sql_bind_interval(struct Vdbe *v, int i);
+
+/** Request function mem_set_double. */
+void
+mem_set_double2(struct Vdbe *p, int i, double rValue);
+
+/** Request function mem_set_boolean. */
+void
+mem_set_boolean2(struct Vdbe *p, int i, bool value);
+
+/** Request function mem_set_datetime. */
+void
+mem_set_datetime2(struct Vdbe *p, int i, const struct datetime *dt);
+
+/** Request function mem_set_interval. */
+void
+mem_set_interval2(struct Vdbe *p, int i, const struct interval *itv);
+
+/** Request function mem_set_int. */
+void
+mem_set_int2(struct Vdbe *stmt, uint32_t i, int64_t value);
+
+/** Request function mem_set_uint. */
+void
+mem_set_uint2(struct Vdbe *stmt, uint32_t i, uint64_t val);
+
+/** Request function mem_set_ptr. */
+void
+mem_set_ptr2(struct Vdbe *stmt, uint32_t i, void *ptr);
+
+/** Request function mem_set_str_static. */
+void
+mem_set_str_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t len);
+
+/** Request function mem_set_bin_static. */
+void
+mem_set_bin_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size);
+
+/** Request function mem_array_static. */
+void
+mem_set_array_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size);
+
+/** Request function mem_map_static. */
+void
+mem_set_map_static2(struct Vdbe *vdbe, int i, const char *str, uint32_t size);
+
+/** Request function mem_set_uuid. */
+void
+mem_set_uuid2(struct Vdbe *p, int i, const struct tt_uuid *uuid);
+
+/** Request function mem_set_dec. */
+void
+mem_set_dec2(struct Vdbe *p, int i, const decimal_t *dec);
 
 /**
  * Return the number of wildcards that should be bound to.
@@ -573,6 +627,19 @@ sql_get_original_names(const struct Vdbe *p, uint32_t i);
  */
 uint32_t
 sql_get_original_names_len(const struct Vdbe *p, uint32_t i);
+
+/** Put in struct Vdbe bind names and lens. */
+int
+sql_set_bind(struct Vdbe *stmt, const char *name,
+	     uint32_t name_len, int i);
+
+/** Free in struct Vdbe arrays with bind names and lens. */
+int
+sql_free_bind(struct Vdbe *stmt);
+
+/** Put in struct Vdbe count bind variables. */
+int
+sql_set_bind_count(struct Vdbe *stmt, int bind_count, const char **bind_names, uint32_t *bind_names_len);
 
 /**
  * Return the name of a wildcard parameter. Return NULL if the index
@@ -2052,6 +2119,7 @@ struct Parse {
 	 */
 	int line_pos;
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
+	ynVar nVar2;
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
 	int iSelectId;		/* ID of current select for EXPLAIN output */
@@ -2131,6 +2199,15 @@ struct Parse {
 		struct Select *select;
 		struct sql_trigger *trigger;
 	} parsed_ast;
+
+	/** Array with names of bind variables. */
+	const char **bind_names;
+	/** Array with lens of names of bind variables. */
+	uint32_t *bind_names_len;
+	/** Count of bind variables. */
+	uint32_t count_bind_names;
+
+	uint32_t last_idx;
 };
 
 /*
