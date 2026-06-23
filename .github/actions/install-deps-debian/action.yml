@@ -10,7 +10,6 @@ runs:
         apt-get -y -f install \
           build-essential \
           ninja-build \
-          cmake \
           lua5.1 \
           luarocks \
           lcov \
@@ -21,13 +20,21 @@ runs:
           automake \
           libtool \
           util-linux
-        apt-get purge --auto-remove cmake -y
-        # ubuntu 20.04 repos do not contain cmake 3.26.0
-        # thus we require an alternative way of installing
-        # this version
-        curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
-        && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
-        && rm cmake-3.26.0-linux-$(uname -i).tar.gz
+        # Install cmake 3.26.0 if cmake was missing or the cmake version was
+        # less than 3.26.0.
+        version_gt() {
+          [ "$1" != "$2" ] && [ "$2" = "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" ]
+        }
+        CURRENT_VERSION="0.0.0"
+        if command -v cmake >/dev/null 2>&1; then
+          CURRENT_VERSION=$(cmake --version | head -n 1 | awk '{print $3}')
+        fi
+        if version_gt "3.26.0" "$CURRENT_VERSION"; then
+          apt-get purge --auto-remove cmake -y
+          curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
+          && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
+          && rm cmake-3.26.0-linux-$(uname -i).tar.gz
+        fi
         luarocks install luacheck 0.26.1
         gem install coveralls-lcov
       shell: bash
