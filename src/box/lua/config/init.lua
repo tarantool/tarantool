@@ -120,6 +120,130 @@ local function normalize_waited_statuses(statuses)
     return res
 end
 
+-- The metrics filter helpers below mirror the logic from `metrics.cfg()`
+-- (see third_party/metrics/metrics/cfg.lua).
+local metrics_tarantool
+
+local function is_default_metric(name)
+    if name == 'all' then
+        return true
+    end
+
+    if metrics_tarantool == nil then
+        metrics_tarantool = require('metrics.tarantool')
+    end
+    return metrics_tarantool.is_default_metric(name)
+end
+
+local metrics_filter_cache = {
+    configdata = nil,
+}
+
+local function split_metric_groups_and_selectors(values, default_value,
+                                                 empty_default,
+                                                 empty_selectors)
+    values = values or default_value
+
+    if type(values) == 'string' then
+        return values, values
+    end
+
+    assert(type(values) == 'table')
+
+    local default_metrics = {}
+    local custom_selectors = {}
+    for _, value in ipairs(values) do
+        if value == 'all' then
+            table.insert(default_metrics, value)
+            return default_metrics, 'all'
+        elseif is_default_metric(value) then
+            table.insert(default_metrics, value)
+        else
+            table.insert(custom_selectors, value)
+        end
+    end
+
+    if next(default_metrics) == nil then
+        default_metrics = empty_default
+    end
+
+    if next(custom_selectors) == nil then
+        custom_selectors = empty_selectors
+    end
+
+    return default_metrics, custom_selectors
+end
+
+local function metrics_filter(self)
+    local configdata = self._configdata_applied
+    if rawequal(metrics_filter_cache.configdata, configdata) then
+        return metrics_filter_cache
+    end
+
+    local default_include, selector_include =
+        split_metric_groups_and_selectors(self:get('metrics.include'), 'all',
+                                          'none', 'all')
+    local default_exclude, selector_exclude =
+        split_metric_groups_and_selectors(self:get('metrics.exclude'), {}, {},
+                                          {})
+
+    metrics_filter_cache = {
+        configdata = configdata,
+        default_include = default_include,
+        selector_include = selector_include,
+        default_exclude = default_exclude,
+        selector_exclude = selector_exclude,
+    }
+    return metrics_filter_cache
+end
+
+local function metric_group_matches(name, rules)
+    if rules == 'all' then
+        return true
+    elseif rules == 'none' then
+        return false
+    end
+
+    for _, rule in ipairs(rules) do
+        if rule == 'all' or name == rule then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function metric_selector_matches(name, rules)
+    if rules == 'all' then
+        return true
+    elseif rules == 'none' then
+        return false
+    end
+
+    for _, rule in ipairs(rules) do
+        if name == rule or name:startswith(rule .. '.') then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function metric_is_enabled(name, filter)
+    if is_default_metric(name) then
+        if metric_group_matches(name, filter.default_exclude) then
+            return false
+        end
+        return metric_group_matches(name, filter.default_include)
+    end
+
+    if metric_selector_matches(name, filter.selector_exclude) then
+        return false
+    end
+
+    return metric_selector_matches(name, filter.selector_include)
+end
+
 function methods._meta(self, source_name, key, value)
     local data = self._metadata[source_name] or {}
     data[key] = value
@@ -748,6 +872,24 @@ function methods.has_role(self, role, opts)
         end
     end
     return false
+end
+
+-- Check the effective metrics filter from the applied configuration.
+-- This method answers whether a metric group or selector is enabled by
+-- metrics.include / metrics.exclude, not whether a collector exists in the
+-- metrics registry at the moment.
+function methods.is_metric_enabled(self, name)
+    selfcheck(self, 'is_metric_enabled')
+    initcheck(self, 'is_metric_enabled', 'instance')
+
+    if type(name) ~= 'string' then
+        error(('Expected string, got %s'):format(type(name)), 0)
+    end
+    if name == '' then
+        error('Expected non-empty metric name', 0)
+    end
+
+    return metric_is_enabled(name, metrics_filter(self))
 end
 
 -- Cluster configuration.
