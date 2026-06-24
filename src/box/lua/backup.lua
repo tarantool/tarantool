@@ -19,7 +19,7 @@ box.internal.recovery_point_yield_loops = 1000
 
 box.backup.recovery_point = {}
 
-box.backup.info = function()
+local box_backup_info = function()
     local info = box.internal.backup_info()
     if info == nil then
         return nil
@@ -52,6 +52,9 @@ box.backup.info = function()
     info.checkpoint_vclock = nil
     return info
 end
+
+box.backup.info = suid(box_backup_info)
+box.backup.info = api_trace(box.backup.info)
 
 box.backup.recovery_point.create = suid(box.internal.recovery_point_create)
 box.backup.recovery_point.create = api_trace(box.backup.recovery_point.create)
