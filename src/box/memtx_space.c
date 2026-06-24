@@ -342,6 +342,26 @@ memtx_space_prepare_index_tuple(struct tuple_format *format,
 }
 
 /**
+ * Prepare the MemTX statement rollback info:
+ * set, ref tuples and set the savepoint.
+ */
+static void
+memtx_set_replace_rollback_info(struct txn_stmt *stmt,
+				struct tuple *old_index_tuple,
+				struct tuple *new_index_tuple,
+				struct region *region)
+{
+	struct memtx_stmt_rollback_info *undo =
+		memtx_stmt_rollback_info_new(region);
+	if (old_index_tuple != NULL)
+		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple,
+						       region);
+	if (new_index_tuple != NULL)
+		memtx_stmt_rollback_info_set_new_tuple(undo, new_index_tuple);
+	stmt->engine_savepoint = undo;
+}
+
+/**
  * Take actions required after replace in space is finished:
  * - set transactional information
  * - track new tuple in space upgrade
@@ -356,9 +376,11 @@ memtx_space_complete_replace(struct space *space, struct txn *txn,
 		memtx_space_upgrade_track_tuple(space->upgrade,
 						new_index_tuple);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_stmt_prepare_rollback_info(stmt, old_index_tuple, new_index_tuple);
+	struct region *region = tx_region_acquire(txn);
+	memtx_set_replace_rollback_info(stmt, old_index_tuple,
+					new_index_tuple, region);
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
 	txn_stmt_set_tuples(stmt, old_tuple, new_tuple);
-	stmt->engine_savepoint = stmt;
 }
 
 static int
@@ -719,7 +741,8 @@ memtx_space_execute_delete_range(struct space *space, struct txn *txn,
 	if (it == NULL)
 		return -1;
 	struct region *region = tx_region_acquire(txn);
-	struct memtx_tuple_list *old_tuples = NULL;
+	struct memtx_stmt_rollback_info *undo =
+		memtx_stmt_rollback_info_new(region);
 	while (true) {
 		struct tuple *old_index_tuple;
 		if (iterator_next_internal(it, &old_index_tuple) != 0)
@@ -740,9 +763,8 @@ memtx_space_execute_delete_range(struct space *space, struct txn *txn,
 					 &deleted) != 0)
 			goto end;
 		assert(deleted == old_index_tuple);
-		memtx_tuple_list_push_front(&old_tuples,
-					    old_index_tuple, region);
-		tuple_ref(old_index_tuple);
+		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple,
+						       region);
 		tuple_unref(deleted); /* Unref the "result" as not used. */
 	}
 	iterator_delete(it);
@@ -752,8 +774,8 @@ end:
 	/* Set the rollback info. */
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	if (old_tuples != NULL)
-		stmt->engine_savepoint = old_tuples;
+	if (undo->old_tuples != NULL)
+		stmt->engine_savepoint = undo;
 	return rc;
 }
 

@@ -45,6 +45,7 @@
 #include "salad/stailq.h"
 #include "sysalloc.h"
 #include "trivia/util.h"
+#include "tuple.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -57,7 +58,6 @@ struct info_handler;
 struct iterator;
 struct fiber;
 struct read_view_tuple;
-struct tuple;
 struct tuple_format;
 struct memtx_tx_snapshot_cleaner;
 
@@ -196,9 +196,15 @@ struct memtx_tuple_list {
 
 /**
  * Traverse all the tuples in the list.
+ *
+ * Handle NULL if there's no tuples in the list and @a or_null_ is set to true.
  */
-#define memtx_tuple_list_foreach(list_, tuple_, code_) do { \
-		struct memtx_tuple_list *list__ = (typeof(list__))list_; \
+#define memtx_tuple_list_foreach_impl(or_null_, list_, tuple_, code_) do { \
+		struct memtx_tuple_list *list__ = list_; \
+		if ((or_null_) && list__ == NULL) { \
+			tuple_ = NULL; \
+			code_ \
+		} \
 		while (list__ != NULL) { \
 			tuple_ = list__->tuple; \
 			code_ \
@@ -207,16 +213,80 @@ struct memtx_tuple_list {
 } while (false)
 
 /**
- * Add an item to the front of a MemTX delete list.
+ * Traverse all the tuples in the list.
+ */
+#define memtx_tuple_list_foreach(list_, tuple_, code_) \
+	memtx_tuple_list_foreach_impl(false, list_, tuple_, code_)
+
+/**
+ * Traverse all the tuples in the list or a single NULL if there's none.
+ */
+#define memtx_tuple_list_foreach_or_null(list_, tuple_, code_) \
+	memtx_tuple_list_foreach_impl(true, list_, tuple_, code_)
+
+/**
+ * Structure which contains pointers to the tuples,
+ * that are used in rollback.
+ */
+struct memtx_stmt_rollback_info {
+	/* A list of deleted tuples (NULL if no tuple deleted).*/
+	struct memtx_tuple_list *old_tuples;
+	/* The inserted tuple (NULL if no tuple inserted). */
+	struct tuple *new_tuple;
+};
+
+/**
+ * Allocate and zero-initialize a rollback info on the region.
+ */
+static inline struct memtx_stmt_rollback_info *
+memtx_stmt_rollback_info_new(struct region *region)
+{
+	struct memtx_stmt_rollback_info *undo =
+		xregion_alloc_object(region, typeof(*undo));
+	memset(undo, 0, sizeof(*undo));
+	return undo;
+}
+
+/**
+ * Unref the tuples referenced by the rollback info.
  */
 static inline void
-memtx_tuple_list_push_front(struct memtx_tuple_list **del_list,
-			    struct tuple *tuple, struct region *region)
+memtx_stmt_rollback_info_delete(struct memtx_stmt_rollback_info *undo)
 {
-	struct memtx_tuple_list *next = *del_list;
-	*del_list = xregion_alloc_object(region, typeof(**del_list));
-	(*del_list)->tuple = tuple;
-	(*del_list)->next = next;
+	struct tuple *old_tuple;
+	memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+		tuple_unref(old_tuple);
+	});
+	if (undo->new_tuple != NULL)
+		tuple_unref(undo->new_tuple);
+}
+
+/**
+ * Add a deleted tuple to the rollback info.
+ */
+static inline void
+memtx_stmt_rollback_info_add_old_tuple(struct memtx_stmt_rollback_info *undo,
+				       struct tuple *old_tuple,
+				       struct region *region)
+{
+	struct memtx_tuple_list *prev_deleted = undo->old_tuples;
+	undo->old_tuples =
+		xregion_alloc_object(region, struct memtx_tuple_list);
+	undo->old_tuples->tuple = old_tuple;
+	undo->old_tuples->next = prev_deleted;
+	tuple_ref(old_tuple);
+}
+
+/**
+ * Set the new tuple in the rollback info.
+ */
+static inline void
+memtx_stmt_rollback_info_set_new_tuple(struct memtx_stmt_rollback_info *undo,
+				       struct tuple *new_tuple)
+{
+	assert(undo->new_tuple == NULL);
+	undo->new_tuple = new_tuple;
+	tuple_ref(new_tuple);
 }
 
 struct memtx_gc_task;

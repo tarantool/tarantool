@@ -2930,36 +2930,41 @@ memtx_tx_history_rollback_deleted_stories(struct txn_stmt *stmt)
  *    also removed their stories on DDL, so here we should roll them back
  *    without stories if they have failed to commit.
  */
-void
+static void
 memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 {
-	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
-	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
+	struct memtx_stmt_rollback_info *undo =
+		(typeof(undo))stmt->engine_savepoint;
+	struct memtx_tuple_list *old_tuples = undo->old_tuples;
+	struct tuple *new_tuple = undo->new_tuple;
 	if (!stmt->txn->is_schema_changed && stmt->txn->psn == 0)
 		return;
 	if (stmt->space->def->opts.is_ephemeral ||
-	    (old_tuple == NULL && new_tuple == NULL))
+	    (old_tuples == NULL && new_tuple == NULL))
 		return;
+	struct tuple *old_tuple;
 	for (size_t i = 0; i < stmt->space->index_count; i++) {
 		struct tuple *unused;
-		if (memtx_index_replace(stmt->space->index[i], new_tuple,
-					old_tuple, DUP_REPLACE_OR_INSERT,
-					&unused, &unused) != 0) {
-			panic("failed to rebind story in index on "
-			      "rollback of statement without story");
-		}
-	}
-	/* We have no stories here so reference bare tuples instead. */
-	if (stmt->type == IPROTO_DELETE_RANGE) {
-		struct tuple *old_tuple;
-		memtx_tuple_list_foreach(stmt->engine_savepoint, old_tuple, {
-			tuple_ref(old_tuple);
+		/*
+		 * It's either <= 1 in old_tuples or no new new_tuple
+		 * (see a comment in the memtx_engine_rollback_statement).
+		 */
+		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
+			if (memtx_index_replace(stmt->space->index[i],
+						new_tuple, old_tuple,
+						DUP_REPLACE_OR_INSERT,
+						&unused, &unused) != 0) {
+				panic("failed to rebind story in index on "
+				      "rollback of statement without story");
+			}
 		});
 	}
+	/* We have no stories here so reference bare tuples instead. */
+	memtx_tuple_list_foreach(old_tuples, old_tuple, {
+		tuple_ref(old_tuple);
+	});
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
-	if (old_tuple != NULL)
-		tuple_ref(old_tuple);
 }
 
 void
@@ -2967,7 +2972,9 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
 	/* Consistency asserts. */
 	if (stmt->add_story != NULL) {
-		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
+		struct memtx_stmt_rollback_info *undo =
+			(typeof(undo))stmt->engine_savepoint;
+		assert(stmt->add_story->tuple == undo->new_tuple);
 		assert(stmt->add_story->add_psn == stmt->txn->psn);
 	}
 	if (stmt->del_stories != NULL) {
@@ -3690,8 +3697,13 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 			continue;
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
-			if (stmt->space == space)
+			if (stmt->space == space) {
+				struct memtx_stmt_rollback_info *undo =
+					(typeof(undo))stmt->engine_savepoint;
+				if (undo != NULL)
+					memtx_stmt_rollback_info_delete(undo);
 				stmt->engine_savepoint = NULL;
+			}
 		}
 	}
 
