@@ -1053,6 +1053,125 @@ g.test_metrics_1_3_0_options = function()
     end)
 end
 
+local function start_server_with_metrics_config(metrics_config)
+    local dir = treegen.prepare_directory({}, {})
+    local config = ([[
+        credentials:
+          users:
+            guest:
+              roles:
+              - super
+
+        iproto:
+          listen:
+            - uri: unix/:./{{ instance_name }}.iproto
+
+%s
+
+        groups:
+          group-001:
+            replicasets:
+              replicaset-001:
+                instances:
+                  instance-001: {}
+    ]]):format(metrics_config or '')
+
+    local config_file = treegen.write_file(dir, 'base_config.yaml', config)
+    local opts = {
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+end
+
+g.test_is_metric_enabled_default = function()
+    start_server_with_metrics_config()
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_equals(config:is_metric_enabled('info'), true)
+        t.assert_equals(config:is_metric_enabled('cpu_extended'), true)
+        t.assert_equals(config:is_metric_enabled('roles.crud-router'), true)
+    end)
+end
+
+g.test_is_metric_enabled_include_with_exclude_all = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include: [cpu]
+          exclude: [all]
+    ]])
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_equals(config:is_metric_enabled('cpu'), false)
+        t.assert_equals(config:is_metric_enabled('info'), false)
+        t.assert_equals(config:is_metric_enabled('roles.crud-router'), false)
+    end)
+end
+
+g.test_is_metric_enabled_include_all_with_exclude_all = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include: [all]
+          exclude: [all]
+    ]])
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_equals(config:is_metric_enabled('info'), false)
+        t.assert_equals(config:is_metric_enabled('cpu_extended'), false)
+        t.assert_equals(config:is_metric_enabled('roles.crud-router'), false)
+    end)
+end
+
+g.test_is_metric_enabled_exclude_has_priority = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include: [all]
+          exclude: [cpu_extended]
+    ]])
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_equals(config:is_metric_enabled('info'), true)
+        t.assert_equals(config:is_metric_enabled('cpu_extended'), false)
+    end)
+end
+
+g.test_is_metric_enabled_custom_selectors = function()
+    start_server_with_metrics_config([[
+        metrics:
+          include:
+            - roles.crud-router
+          exclude:
+            - roles.crud-router.crud_errors
+    ]])
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_equals(config:is_metric_enabled(
+            'roles.crud-router.crud_requests'), true)
+        t.assert_equals(config:is_metric_enabled(
+            'roles.crud-router.crud_errors'), false)
+        t.assert_equals(config:is_metric_enabled('roles.queue'), false)
+    end)
+end
+
+g.test_is_metric_enabled_argument_validation = function()
+    start_server_with_metrics_config()
+    g.server:exec(function()
+        local config = require('config')
+
+        t.assert_error_msg_equals('Expected string, got number',
+            config.is_metric_enabled, config, 1)
+        t.assert_error_msg_equals('Expected non-empty metric name',
+            config.is_metric_enabled, config, '')
+    end)
+end
+
 g.test_audit_options = function()
     t.tarantool.skip_if_not_enterprise()
     local dir = treegen.prepare_directory({}, {})
