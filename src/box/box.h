@@ -496,6 +496,12 @@ int
 box_promote_qsync(void);
 
 /**
+ * Restart replication reconnecting all the instances.
+ */
+int
+box_check_restart_replication(void);
+
+/**
  * Wait for a linearization point. That is, wait until every operation that
  * might be committed on a quorum at the moment this function is called, reaches
  * this instance.
