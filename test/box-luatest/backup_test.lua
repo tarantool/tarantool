@@ -1036,3 +1036,11 @@ g2.test_recovery_point_suid = function(cg)
         box.session.su('stranger', box.backup.recovery_point.create)
     end)
 end
+
+g2.test_backup_info_suid = function(cg)
+    cg.server:exec(function()
+        box.backup.start()
+        box.session.su('stranger', box.backup.info)
+        box.backup.stop()
+    end)
+end
