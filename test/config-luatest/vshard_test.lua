@@ -973,3 +973,120 @@ g.test_vshard_too_old = function(g)
             'version is 0.1.25')
     end)
 end
+
+--
+-- Make sure the sharding.rebalancer_bucket_send_timeout configuration
+-- parameter is forwarded to vshard.
+--
+g.test_rebalancer_bucket_send_timeout = function(g)
+    t.skip_if(not helpers.has_vshard_since('0.1.41'),
+              'vshard module accepting rebalancer_bucket_send_timeout ' ..
+              'is required')
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+      rebalancer_bucket_send_timeout: 42
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, rebalancer, router]
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    local res = g.server:eval('return vshard.storage.internal.current_cfg')
+    t.assert_equals(res.rebalancer_bucket_send_timeout, 42)
+end
+
+--
+-- sharding.rebalancer_bucket_send_timeout requires vshard 0.1.41. A vshard
+-- that is new enough for sharding in general (>= 0.1.25) but older than
+-- 0.1.41 must reject the option at the configuration validation stage.
+--
+g.test_rebalancer_bucket_send_timeout_vshard_too_old = function(g)
+    t.skip_if(not helpers.has_vshard_since('0.1.41'),
+              'vshard module accepting rebalancer_bucket_send_timeout ' ..
+              'is required')
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+      rebalancer_bucket_send_timeout: 42
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            sharding:
+              roles: [storage, rebalancer, router]
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        chdir = dir,
+        alias = 'instance-001',
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    g.server:exec(function()
+        local loaders = require('internal.loaders')
+        local config = require('config')
+        local vshard = loaders.require_first('vshard-ee', 'vshard')
+
+        -- New enough for sharding (0.1.25), too old for the option (0.1.41).
+        local saved = vshard.consts.VERSION
+        vshard.consts.VERSION = '0.1.30'
+        local ok, err = pcall(config.reload, config)
+        vshard.consts.VERSION = saved
+
+        t.assert_not(ok)
+        t.assert_str_contains(tostring(err),
+            'rebalancer_bucket_send_timeout: The vshard module is too old: ' ..
+            'the minimum supported version is 0.1.41')
+    end)
+end

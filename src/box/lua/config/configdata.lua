@@ -271,6 +271,7 @@ function methods.sharding(self)
         'discovery_mode',
         'sched_ref_quota',
         'sched_move_quota',
+        'rebalancer_bucket_send_timeout',
     }
     for _, v in pairs(vshard_global_options) do
         cfg[v] = instance_config:get(self._iconfig_def, 'sharding.'..v)

@@ -393,6 +393,8 @@ g.test_defaults = function()
             bucket_count = 3000,
             discovery_mode = "on",
             failover_ping_timeout = 5,
+            rebalancer_bucket_send_timeout = helpers.has_vshard_since('0.1.41')
+                                             and 500 * 365 * 86400,
             rebalancer_disbalance_threshold = 1,
             rebalancer_max_receiving = 100,
             rebalancer_max_sending = 1,
@@ -921,6 +923,19 @@ g.test_scope = function()
             global = true,
             group = true,
             replicaset = true,
+            instance = false,
+        },
+        {
+            name = 'sharding.rebalancer_bucket_send_timeout',
+            vshard_since = '0.1.41',
+            data = {
+                sharding = {
+                    rebalancer_bucket_send_timeout = 42,
+                },
+            },
+            global = true,
+            group = false,
+            replicaset = false,
             instance = false,
         },
         {

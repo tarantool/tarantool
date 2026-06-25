@@ -451,6 +451,10 @@ M['sharding.rebalancer_max_sending'] = function(_data, w)
     validate_scope(w, {'global'})
 end
 
+M['sharding.rebalancer_bucket_send_timeout'] = function(_data, w)
+    validate_scope(w, {'global'})
+end
+
 M['sharding.rebalancer_mode'] = function(_data, w)
     validate_scope(w, {'global'})
 end

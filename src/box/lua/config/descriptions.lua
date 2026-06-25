@@ -2734,6 +2734,11 @@ I['sharding.lock'] = format_text([[
     buckets nor migrate its own buckets.
 ]])
 
+I['sharding.rebalancer_bucket_send_timeout'] = format_text([[
+    The timeout (in seconds) for sending a single bucket during rebalancing.
+    Requires vshard 0.1.41 or newer.
+]])
+
 I['sharding.rebalancer_disbalance_threshold'] = format_text([[
     The maximum bucket disbalance threshold (in percent). The disbalance
     is calculated for each replica set using the following formula:
