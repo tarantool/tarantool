@@ -1492,6 +1492,10 @@ return schema.new('instance_config', schema.record({
             }),
             -- Parameters of the user.
             value = schema.record({
+                no_default = schema.scalar({
+                    type = 'boolean',
+                    default = false,
+                }),
                 password = schema.scalar({
                     type = 'string',
                 }),
