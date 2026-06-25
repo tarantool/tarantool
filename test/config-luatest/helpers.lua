@@ -2,10 +2,33 @@ local fun = require('fun')
 local yaml = require('yaml')
 local fio = require('fio')
 local cluster_config = require('internal.config.cluster_config')
+local expression = require('internal.config.utils.expression')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local server = require('luatest.server')
+
+--
+-- Returns true if the available vshard module is recent enough to accept the
+-- sharding options annotated with the vshard_since version, nil otherwise.
+--
+local function has_vshard_since(version)
+    local ok, vshard = pcall(require, 'vshard-ee')
+    if not ok then
+        ok, vshard = pcall(require, 'vshard')
+    end
+    if not ok then
+        return nil
+    end
+    if expression.eval('v < ' .. version, {v = vshard.consts.VERSION}) then
+        return nil
+    end
+    return true
+end
+
+local function has_vshard()
+    return has_vshard_since('0.1.25')
+end
 
 local function group(name, params)
     local g = t.group(name, params)
@@ -370,6 +393,11 @@ return {
     -- Use require('myluatest') instead of require('luatest')
     -- inside the test case to get better diagnostics at failure.
     run_as_script = run_as_script,
+
+    -- Whether the available vshard module accepts the sharding options
+    -- annotated with the given vshard_since version.
+    has_vshard_since = has_vshard_since,
+    has_vshard = has_vshard,
 
     -- Start a three instance replicaset with the given config
     -- file.

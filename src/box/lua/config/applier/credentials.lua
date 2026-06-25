@@ -1,4 +1,3 @@
-local expression = require('internal.config.utils.expression')
 local log = require('internal.config.utils.log')
 local textutils = require('internal.config.utils.textutils')
 local loaders = require('internal.loaders')
@@ -327,19 +326,15 @@ local function sharding_role(configdata)
         return {}
     end
 
+    -- VShard availability and its minimum version are ensured by the sharding
+    -- configuration validation (the `vshard_since` schema annotation).
     local funcs = {}
-    --
-    -- The error will be thrown later, in sharding.lua. Here we are simply
-    -- trying to avoid the "module not found" error.
-    --
-    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
-    if ok and expression.eval('v >= 0.1.25', {v = vshard.consts.VERSION}) then
-        local vexports = loaders.require_first('vshard-ee.storage.exports',
-            'vshard.storage.exports')
-        local exports = vexports.compile(vexports.log[#vexports.log])
-        for name in pairs(exports.funcs) do
-            table.insert(funcs, name)
-        end
+    local vexports = loaders.require_first('vshard-ee.storage.exports',
+        'vshard.storage.exports')
+    assert(vexports)
+    local exports = vexports.compile(vexports.log[#vexports.log])
+    for name in pairs(exports.funcs) do
+        table.insert(funcs, name)
     end
     return {
         privileges = {{

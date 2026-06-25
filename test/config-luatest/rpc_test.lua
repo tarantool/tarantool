@@ -12,13 +12,9 @@ local helpers = require('test.config-luatest.helpers')
 
 local g = helpers.group()
 
-local has_vshard = pcall(require, 'vshard-ee')
-if not has_vshard then
-    has_vshard = pcall(require, 'vshard')
-end
-
 local function skip_if_no_vshard()
-    t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
+    t.skip_if(not helpers.has_vshard(),
+              'Module "vshard-ee/vshard" is not available')
 end
 
 local function start_stub_servers(g, dir, instances)

@@ -2,6 +2,7 @@ local fun = require('fun')
 local log = require('log')
 local t = require('luatest')
 local instance_config = require('internal.config.instance_config')
+local helpers = require('test.config-luatest.helpers')
 
 local g = t.group()
 
@@ -1779,6 +1780,9 @@ g.test_metrics = function()
 end
 
 g.test_sharding = function()
+    -- The sharding section is validated only with the vshard module available.
+    t.skip_if(not helpers.has_vshard(),
+              'vshard module is required to validate sharding')
     local iconfig = {
         sharding = {
             roles = {'router', 'storage'},

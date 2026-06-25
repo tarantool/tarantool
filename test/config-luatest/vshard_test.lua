@@ -9,13 +9,9 @@ local cluster = require('luatest.cluster')
 
 local g = helpers.group()
 
-local has_vshard = pcall(require, 'vshard-ee')
-if not has_vshard then
-    has_vshard = pcall(require, 'vshard')
-end
-
 local function skip_if_no_vshard()
-    t.skip_if(not has_vshard, 'Module "vshard-ee/vshard" is not available')
+    t.skip_if(not helpers.has_vshard(),
+              'Module "vshard-ee/vshard" is not available')
 end
 
 g.test_fixed_masters = function(g)
@@ -909,5 +905,71 @@ g.test_has_sharding_role = function()
         t.assert(config:is_router({instance = 'r-001'}))
         t.assert(config:is_storage({instance = 'rs-001'}))
         t.assert(config:is_router({instance = 'rs-001'}))
+    end)
+end
+
+--
+-- The whole sharding section is annotated with vshard_since('0.1.25'), so
+-- configuring sharding with an older vshard must be rejected at the
+-- configuration validation stage.
+--
+g.test_vshard_too_old = function(g)
+    skip_if_no_vshard()
+    local dir = treegen.prepare_directory({}, {})
+    -- Note, that none of the nodes has `sharding.roles` set, the error will
+    -- still be thrown, since it's now checked on config validation stage.
+    local config = [[
+    credentials:
+      users:
+        guest:
+          roles: [super]
+        storage:
+          roles: [sharding]
+          password: "storage"
+
+    iproto:
+      listen:
+        - uri: 'unix/:./{{ instance_name }}.iproto'
+      advertise:
+        sharding:
+          login: 'storage'
+
+    sharding:
+      bucket_count: 1234
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    local config_file = treegen.write_file(dir, 'config.yaml', config)
+    local opts = {
+        env = {LUA_PATH = os.environ()['LUA_PATH']},
+        config_file = config_file,
+        alias = 'instance-001',
+        chdir = dir,
+    }
+    g.server = server:new(opts)
+    g.server:start()
+
+    g.server:exec(function()
+        local loaders = require('internal.loaders')
+        local config = require('config')
+        local vshard = loaders.require_first('vshard-ee', 'vshard')
+
+        local saved = vshard.consts.VERSION
+        vshard.consts.VERSION = '0.1.20'
+        local ok, err = pcall(config.reload, config)
+        vshard.consts.VERSION = saved
+
+        t.assert_not(ok)
+        -- The error must come from the configuration validation stage: it
+        -- carries the schema path prefix ("...sharding:"). This distinguishes
+        -- it from any apply-stage check producing a bare message.
+        t.assert_str_contains(tostring(err),
+            'sharding: The vshard module is too old: the minimum supported ' ..
+            'version is 0.1.25')
     end)
 end

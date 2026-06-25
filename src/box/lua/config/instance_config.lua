@@ -8,12 +8,19 @@ local validators = require('internal.config.validators')
 local discriminators = require('internal.config.discriminators')
 local funcutils = require('internal.config.utils.funcutils')
 local network = require('internal.config.utils.network')
+local loaders = require('internal.loaders')
+local expression = require('internal.config.utils.expression')
 
 -- List of annotations:
 --
 -- * enterprise_edition (boolean)
 --
 --   Available only in Tarantool Enterprise Edition.
+--
+-- * vshard_since (string)
+--
+--   The minimum vshard version that accepts this sharding option.
+--   Enforced in configdata's sharding() method.
 --
 -- * default (any)
 --
@@ -104,6 +111,52 @@ end
 
 local function sensitive_ee(schema_node)
     return sensitive(enterprise_edition(schema_node))
+end
+
+local function vshard_since_validate(data, w)
+    -- OK if the option is not set.
+    if data == nil then
+        return
+    end
+
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    if not ok then
+        w.error('The vshard-ee/vshard module is not available')
+    end
+
+    if expression.eval('v < '..w.schema.vshard_since,
+                       {v = vshard.consts.VERSION}) then
+        w.error('The vshard module is too old: the minimum supported ' ..
+                'version is %s', w.schema.vshard_since)
+    end
+end
+
+local function vshard_since_apply_default_if(_data, w)
+    -- Apply the default only when the installed vshard accepts the option.
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    if not ok then
+        return false
+    end
+    return not expression.eval('v < '..w.schema.vshard_since,
+                               {v = vshard.consts.VERSION})
+end
+
+-- Accepted by vshard only since the given version. Configuring the annotated
+-- node (an option or the whole sharding section) with an older vshard is a
+-- configuration error.
+local function vshard_since(version, schema_node)
+    schema_node.vshard_since = version
+
+    -- Perform a domain specific validation first and only then check the
+    -- vshard version, consistent with the data type validation order.
+    schema_node.validate = funcutils.chain2(
+        schema_node.validate,
+        vshard_since_validate)
+    schema_node.apply_default_if = funcutils.chain2(
+        schema_node.apply_default_if,
+        vshard_since_apply_default_if)
+
+    return schema_node
 end
 
 -- Accept a value of 'iproto.listen' option and return the first URI
@@ -1834,7 +1887,7 @@ return schema.new('instance_config', schema.record({
             value = schema.scalar({type = 'string'}),
         }),
     }),
-    sharding = schema.record({
+    sharding = vshard_since('0.1.25', schema.record({
         -- Instance vshard options.
         zone = schema.scalar({type = 'integer'}),
         -- Replicaset vshard options.
@@ -1920,7 +1973,7 @@ return schema.new('instance_config', schema.record({
             default = 1,
             validate = validators['sharding.sched_move_quota'],
         }),
-    }),
+    })),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
         -- is handled separately in the box_cfg applier, so there are no
