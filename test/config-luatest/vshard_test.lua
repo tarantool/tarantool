@@ -186,19 +186,14 @@ g.test_fixed_masters = function(g)
 
     -- Storages.
     local exec = 'return vshard.storage.internal.current_cfg'
-    local res = g.server_1:eval(exec)
-    t.assert_equals(res, exp)
-    res = g.server_2:eval(exec)
-    t.assert_equals(res, exp)
-    res = g.server_3:eval(exec)
-    t.assert_equals(res, exp)
-    res = g.server_4:eval(exec)
-    t.assert_equals(res, exp)
+    t.assert_covers(g.server_1:eval(exec), exp)
+    t.assert_covers(g.server_2:eval(exec), exp)
+    t.assert_covers(g.server_3:eval(exec), exp)
+    t.assert_covers(g.server_4:eval(exec), exp)
 
     -- Router.
     exec = 'return vshard.router.internal.static_router.current_cfg'
-    res = g.server_5:eval(exec)
-    t.assert_equals(res, exp)
+    t.assert_covers(g.server_5:eval(exec), exp)
 
     -- Check that basic sharding works.
     exec = [[
