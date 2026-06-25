@@ -991,6 +991,7 @@ relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 	return 0;
 }
 
+__attribute__((no_sanitize("thread")))
 static void
 relay_check_status_needs_update(struct relay *relay)
 {

@@ -152,6 +152,31 @@ test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
                                     --server-start-timeout 610
 test-debug-asan: build run-luajit-test run-test
 
+# *_TSAN variables are common part of respective variables for all TSAN builds.
+CMAKE_PARAMS_TSAN = -DENABLE_WERROR=ON \
+                    -DENABLE_TSAN=ON \
+                    -DENABLE_UB_SANITIZER=ON \
+                    -DTEST_BUILD=ON
+
+TEST_RUN_ENV_TSAN = TSAN_OPTIONS=suppressions=${PWD}/asan/tsan.supp
+
+# Debug TSAN build
+
+.PHONY: test-debug-tsan
+# We need even larger fiber stacks in ASAN debug build for luajit tests
+# to pass. Value twice as big as in ASAN release is just a wild guess.
+test-debug-tsan: CMAKE_PARAMS = ${CMAKE_PARAMS_TSAN} \
+                                -DCMAKE_BUILD_TYPE=Debug \
+                                -DFIBER_STACK_SIZE=1280Kb
+test-debug-tsan: TEST_RUN_ENV = ${TEST_RUN_ENV_TSAN}
+test-debug-tsan: LUAJIT_TEST_ENV = ${TEST_RUN_ENV_TSAN}
+# Increase timeouts as some tests in TSAN debug build take quite a lot
+# of time to finish.
+test-debug-tsan: TEST_RUN_PARAMS += --test-timeout 620 \
+                                    --no-output-timeout 630 \
+                                    --server-start-timeout 610
+test-debug-tsan: build run-test
+
 # Debug build
 
 .PHONY: test-debug
