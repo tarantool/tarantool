@@ -7,6 +7,7 @@ local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 local utils    = require('internal.utils')
+local compat   = require('compat')
 
 local this_module
 
@@ -1392,18 +1393,43 @@ local function rollback()
     end
 end
 
+local decode_func = nil
+
+local update_decode_func = function(is_new)
+    if is_new then
+        decode_func = function(...) return ... end
+    else
+        decode_func = function(...)
+            local size = select('#', ...)
+            if size == 0 then
+                return
+            end
+            local args = {...}
+            for i = 1, size do
+                if is_tuple(args[i]) then
+                    args[i] = msgpack.decode(msgpack.encode(args[i]))
+                end
+            end
+            return unpack(args, 1, size)
+        end
+    end
+end
+
+update_decode_func(compat.box_tuple_extension:is_new())
+
+local opts = compat._options()
+local orig_action = opts.box_tuple_extension.action
+opts.box_tuple_extension.action = function(is_new)
+    orig_action(is_new)
+    update_decode_func(is_new)
+end
+
 local function handle_eval_result(status, ...)
     if not status then
         rollback()
         return box.error(E_PROC_LUA, (...))
     end
-    local results = {...}
-    for i = 1, select('#', ...) do
-        if type(results[i]) == 'cdata' then
-            results[i] = msgpack.decode(msgpack.encode(results[i]))
-        end
-    end
-    return unpack(results)
+    return decode_func(...)
 end
 
 this_module.self = {
