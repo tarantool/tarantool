@@ -33,6 +33,12 @@ local function validate_fields(config, record)
 
     local record_fields = {}
     for k, v in pairs(record.fields) do
+        -- An option accepted only by a newer vshard is not expected in the
+        -- config when the available vshard is too old.
+        if v.vshard_since ~= nil and
+           not helpers.has_vshard_since(v.vshard_since) then
+            goto continue
+        end
         if v.type == 'record' then
             validate_fields(config[k], v)
         elseif v.type == 'map' and v.value.type == 'record' then
@@ -47,6 +53,7 @@ local function validate_fields(config, record)
         if not v.enterprise_edition or is_enterprise then
             table.insert(record_fields, k)
         end
+        ::continue::
     end
 
     t.assert_items_equals(config_fields, record_fields)
@@ -1795,6 +1802,8 @@ g.test_sharding = function()
             discovery_mode = 'once',
             bucket_count = 5,
             shard_index = 'six',
+            rebalancer_bucket_send_timeout = helpers.has_vshard_since('0.1.41')
+                                             and 12,
             rebalancer_disbalance_threshold = 7,
             rebalancer_max_receiving = 8,
             rebalancer_max_sending = 9,
@@ -1821,6 +1830,8 @@ g.test_sharding = function()
         bucket_count = 3000,
         discovery_mode = "on",
         failover_ping_timeout = 5,
+        rebalancer_bucket_send_timeout = helpers.has_vshard_since('0.1.41')
+                                         and 500 * 365 * 86400,
         rebalancer_disbalance_threshold = 1,
         rebalancer_max_receiving = 100,
         rebalancer_max_sending = 1,

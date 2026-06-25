@@ -11,6 +11,8 @@ local network = require('internal.config.utils.network')
 local loaders = require('internal.loaders')
 local expression = require('internal.config.utils.expression')
 
+local TIMEOUT_INFINITY = 500 * 365 * 86400
+
 -- List of annotations:
 --
 -- * enterprise_edition (boolean)
@@ -1973,6 +1975,11 @@ return schema.new('instance_config', schema.record({
             default = 1,
             validate = validators['sharding.sched_move_quota'],
         }),
+        rebalancer_bucket_send_timeout = vshard_since('0.1.41', schema.scalar({
+            type = 'number',
+            default = TIMEOUT_INFINITY,
+            validate = validators['sharding.rebalancer_bucket_send_timeout'],
+        })),
     })),
     audit_log = enterprise_edition(schema.record({
         -- The same as the destination for the logger, audit logger destination
