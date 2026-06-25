@@ -2656,7 +2656,7 @@ if support_unwinders:
             self.__frame_filter = None
 
             # Initialize architecture specific parameters of coro context
-            arch = gdb.selected_inferior().architecture().name().lower()
+            arch = gdb.newest_frame().architecture().name().lower()
             if arch.find('x86-64') != -1:
                 self.__coro_ctx_regs = [
                     'r15',
