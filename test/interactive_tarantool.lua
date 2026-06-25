@@ -314,6 +314,10 @@ end
 function mt.close(self)
     self:_stop_stderr_logger()
     self.ph:close()
+    if self._workdir ~= nil then
+        fio.rmtree(self._workdir)
+        self._workdir = nil
+    end
 end
 
 -- Run a command and return its response.
@@ -378,6 +382,7 @@ function M._new_internal(opts)
         ph = ph,
         _readahead_buffer = '',
         _prompt = prompt or 'tarantool> ',
+        _workdir = fio.tempdir(),
     }, mt)
 
     return res
@@ -415,6 +420,13 @@ function M.new(opts)
 
     -- Disable stdout line buffering in the child.
     res:execute_command("io.stdout:setvbuf('no')")
+    assert(res:read_response(), true)
+
+    -- Isolate box.cfg() from the inherited cwd. Some tests create an
+    -- interactive child while another Tarantool instance is already running
+    -- in the current workdir. If the child later calls box.cfg({}), it may
+    -- try to lock the same WAL directory and exit with ALREADY_RUNNING.
+    res:execute_command(("require('fio').chdir(%q)"):format(res._workdir))
     assert(res:read_response(), true)
 
     -- Log child's stderr.
