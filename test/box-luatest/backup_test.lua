@@ -1,5 +1,7 @@
 local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 local fio = require('fio')
 local t = require('luatest')
 
@@ -1075,4 +1077,28 @@ g2.test_backup_info_suid = function(cg)
         box.session.su('stranger', box.backup.info)
         box.backup.stop()
     end)
+end
+
+--
+-- The box.backup table is reachable before box.cfg(), but every
+-- cfg-requiring backup operation must raise ER_UNCONFIGURED.
+--
+g2.test_backup_api_before_box_cfg = function()
+    local dir = treegen.prepare_directory({}, {})
+    -- Each operation raises "Please call box.cfg{} first".
+    local script = [[
+        local t = require('luatest')
+        t.assert_equals(box.info.status, 'unconfigured')
+        -- Every cfg-requiring backup operation raises ER_UNCONFIGURED.
+        local err = {type = 'ClientError', name = 'UNCONFIGURED'}
+        t.assert_error_covers(err, box.backup.start)
+        t.assert_error_covers(err, box.backup.stop)
+        t.assert_error_covers(err, box.backup.info)
+        t.assert_error_covers(err, box.backup.recovery_point.create, 'x')
+        os.exit(0)
+    ]]
+    treegen.write_file(dir, 'before_box.lua', script)
+    local res = justrun.tarantool(dir, {}, {'before_box.lua'},
+                                  {nojson = true, stderr = true})
+    t.assert_equals(res.exit_code, 0, res.stderr)
 end
