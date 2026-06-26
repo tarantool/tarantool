@@ -117,6 +117,7 @@ extern char session_lua[],
 	checks_version_lua[],
 	checks_lua[],
 	backup_lua[],
+	recovery_point_manager_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
 	metrics_cartridge_issues_lua[],
@@ -229,6 +230,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
+	"box/recovery_point_manager", NULL, recovery_point_manager_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
 	 * must be loaded after decimal and datetime lua modules
