@@ -362,7 +362,9 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			sqlTreeViewLine(pView, "%s", pExpr->u.zToken);
 			break;
 		}
-	case TK_VARIABLE:{
+	case TK_VAR_NUM:
+	case TK_VAR_ANON:
+	case TK_VAR_NAME:{
 			sqlTreeViewLine(pView, "VARIABLE(%s,%d)",
 					    pExpr->u.zToken, pExpr->iColumn);
 			break;

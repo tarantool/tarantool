@@ -293,7 +293,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	op = pRight->op;
 	struct region *region = &pParse->region;
 	size_t svp = region_used(region);
-	if (op == TK_VARIABLE) {
+	if (is_expr_variable(op)) {
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
 		const struct Mem *var = vdbe_get_bound_value(pReprepare, iCol);
@@ -304,7 +304,8 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			str[var->n] = '\0';
 			z = str;
 		}
-		assert(pRight->op == TK_VARIABLE || pRight->op == TK_REGISTER);
+		assert(is_expr_variable(pRight->op) ||
+		       pRight->op == TK_REGISTER);
 	} else if (op == TK_STRING) {
 		z = pRight->u.zToken;
 	}
@@ -320,7 +321,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			pPrefix = sql_expr_new_named(TK_STRING, z);
 			pPrefix->u.zToken[cnt] = 0;
 			*ppPrefix = pPrefix;
-			if (op == TK_VARIABLE) {
+			if (is_expr_variable(op)) {
 				Vdbe *v = pParse->pVdbe;
 				if (*pisComplete && pRight->u.zToken[1]) {
 					/* If the rhs of the LIKE expression is a variable, and the current
