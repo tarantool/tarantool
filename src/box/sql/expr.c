@@ -52,7 +52,7 @@ static int exprCodeVector(Parse * pParse, Expr * p, int *piToFree);
 static enum field_type
 sql_highest_type(enum field_type a, struct Expr *expr)
 {
-	if (a == FIELD_TYPE_ANY || expr->op == TK_VARIABLE)
+	if (a == FIELD_TYPE_ANY || sql_token_is_variable(expr->op))
 		return FIELD_TYPE_ANY;
 	if (expr->op == TK_NULL)
 		return a;
@@ -134,7 +134,7 @@ sql_expr_type(struct Expr *pExpr)
 		if (i >= count)
 			return FIELD_TYPE_ANY;
 		enum field_type res_type = sql_expr_type(cs->a[i].pExpr);
-		if (cs->a[i].pExpr->op == TK_VARIABLE)
+		if (sql_token_is_variable(cs->a[i].pExpr->op))
 			res_type = FIELD_TYPE_ANY;
 		for (i += 2; i < count; i += 2)
 			res_type = sql_highest_type(res_type, cs->a[i].pExpr);
@@ -1269,10 +1269,74 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 }
 
 struct Expr *
-expr_new_variable(struct Parse *parse, const struct Token *spec,
+expr_new_var_name(struct Parse *parse, const struct Token *spec,
 		  const struct Token *id)
 {
-	assert(spec != NULL && spec->n == 1);
+	assert(spec != NULL);
+	uint32_t len = spec->n;
+	if (parse->parse_only) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS,
+			 parse->line_count, parse->line_pos,
+			 "bindings are not allowed in DDL");
+		parse->is_aborted = true;
+		return NULL;
+	}
+	/*
+	 * The check exists only for the `:` case,
+	 * because the other variants (`@`, `#`)
+	 * are checked during tokenization.
+	 */
+	if (spec->z[0] == ':' && ((IdChar(id->z[0]) == 0) ||
+				  (id->z - spec->z + id->n !=
+				   id->n + spec->n))) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 tt_sprintf("Wrong bind variable name '%.*s'",
+				    spec->n, spec->z));
+		parse->is_aborted = true;
+		return NULL;
+	}
+	if (id != NULL)
+		len += id->n;
+	struct Expr *expr = sql_expr_new_empty(TK_VAR_NAME, len + 1);
+	expr->type = FIELD_TYPE_BOOLEAN;
+	expr->flags = EP_Leaf;
+	expr->u.zToken = (char *)(expr + 1);
+	memcpy(expr->u.zToken, spec->z, spec->n);
+	if (id != NULL)
+		memcpy(expr->u.zToken + spec->n, id->z, id->n);
+	expr->u.zToken[len] = '\0';
+
+	sqlExprAssignVarNumber(parse, expr, len);
+	return expr;
+}
+
+struct Expr *
+expr_new_var_num(struct Parse *parse, const struct Token *spec)
+{
+	assert(spec != NULL);
+	uint32_t len = spec->n;
+	if (parse->parse_only) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS,
+			 parse->line_count, parse->line_pos,
+			 "bindings are not allowed in DDL");
+		parse->is_aborted = true;
+		return NULL;
+	}
+	struct Expr *expr = sql_expr_new_empty(TK_VAR_NUM, len + 1);
+	expr->type = FIELD_TYPE_BOOLEAN;
+	expr->flags = EP_Leaf;
+	expr->u.zToken = (char *)(expr + 1);
+	memcpy(expr->u.zToken, spec->z, spec->n);
+	expr->u.zToken[len] = '\0';
+
+	sqlExprAssignVarNumber(parse, expr, len);
+	return expr;
+}
+
+struct Expr *
+expr_new_var_anon(struct Parse *parse, const struct Token *id)
+{
+	assert(id != NULL);
 	uint32_t len = 1;
 	if (parse->parse_only) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS,
@@ -1281,30 +1345,11 @@ expr_new_variable(struct Parse *parse, const struct Token *spec,
 		parse->is_aborted = true;
 		return NULL;
 	}
-	if (id != NULL) {
-		assert(spec->z[0] != '?');
-		if (id->z - spec->z != 1) {
-			diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-				 parse->line_count, spec->z - parse->zTail + 1,
-				 tt_cstr(spec->z, spec->n));
-			parse->is_aborted = true;
-			return NULL;
-		}
-		if (spec->z[0] == '#' && sqlIsdigit(id->z[0])) {
-			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 parse->line_count, tt_cstr(spec->z, spec->n));
-			parse->is_aborted = true;
-			return NULL;
-		}
-		len += id->n;
-	}
-	struct Expr *expr = sql_expr_new_empty(TK_VARIABLE, len + 1);
+	struct Expr *expr = sql_expr_new_empty(TK_VAR_ANON, len + 1);
 	expr->type = FIELD_TYPE_BOOLEAN;
 	expr->flags = EP_Leaf;
 	expr->u.zToken = (char *)(expr + 1);
-	expr->u.zToken[0] = spec->z[0];
-	if (id != NULL)
-		memcpy(expr->u.zToken + 1, id->z, id->n);
+	expr->u.zToken[0] = id->z[0];
 	expr->u.zToken[len] = '\0';
 
 	sqlExprAssignVarNumber(parse, expr, len);
@@ -1996,7 +2041,9 @@ exprNodeIsConstant(Walker * pWalker, Expr * pExpr)
 			pWalker->eCode = 0;
 			return WRC_Abort;
 		}
-	case TK_VARIABLE:
+	case TK_VAR_NUM:
+	case TK_VAR_ANON:
+	case TK_VAR_NAME:
 		if (pWalker->eCode == 4) {
 			/* A bound parameter in a CREATE statement that originates from
 			 * sql_prepare() causes an error
@@ -3257,8 +3304,10 @@ expr_code_map(struct Parse *parser, struct Expr *expr, int reg)
 	for (int i = 0; i < count; ++i) {
 		struct Expr *expr = list->a[2 * i].pExpr;
 		enum field_type type = sql_expr_type(expr);
-		if (expr->op != TK_VARIABLE && type != FIELD_TYPE_INTEGER &&
-		    type != FIELD_TYPE_UNSIGNED && type != FIELD_TYPE_STRING &&
+		if (!sql_token_is_variable(expr->op) &&
+		    type != FIELD_TYPE_INTEGER &&
+		    type != FIELD_TYPE_UNSIGNED &&
+		    type != FIELD_TYPE_STRING &&
 		    type != FIELD_TYPE_UUID) {
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Only "
 				 "integer, string and uuid can be keys in map");
@@ -3300,7 +3349,7 @@ expr_code_getitem(struct Parse *parser, struct Expr *expr, int reg)
 
 	enum field_type type = value->op != TK_NULL ? sql_expr_type(value) :
 			       field_type_MAX;
-	if (value->op != TK_VARIABLE &&
+	if (!sql_token_is_variable(value->op) &&
 	    type != FIELD_TYPE_MAP && type != FIELD_TYPE_ARRAY) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Selecting is "
 			 "only possible from map and array values");
@@ -3741,21 +3790,27 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					  P4_DYNAMIC);
 			return target;
 		}
-	case TK_VARIABLE:{
+	case TK_VAR_NUM:
+	case TK_VAR_NAME: {
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 					  target);
-			if (pExpr->u.zToken[1] != 0) {
-				const char *z =
-				    sqlVListNumToName(pParse->pVList,
+			assert(pExpr->u.zToken[1] != 0);
+			const char *z = sqlVListNumToName(pParse->pVList,
 							  pExpr->iColumn);
-				assert(pExpr->u.zToken[0] == '$'
-				       || strcmp(pExpr->u.zToken, z) == 0);
-				pParse->pVList[0] = 0;	/* Indicate VList may no longer be enlarged */
-				sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
-			}
+			assert(pExpr->u.zToken[0] == '$' ||
+			       strcmp(pExpr->u.zToken, z) == 0);
+			/* Indicate VList may no longer be enlarged */
+			pParse->pVList[0] = 0;
+			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+			return target;
+		}
+	case TK_VAR_ANON: {
+			assert(pExpr->u.zToken[0] == '?');
+			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
+				      target);
 			return target;
 		}
 	case TK_REGISTER:{
