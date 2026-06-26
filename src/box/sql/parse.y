@@ -992,17 +992,21 @@ number(A) ::= INTEGER(X). {
   A.zEnd = X.z + X.n;
   A.pExpr->flags |= EP_Leaf;
 }
-expr(A) ::= VARNUM(X). {
-  A.pExpr = expr_new_variable(pParse, &X, NULL);
+expr(A) ::= COLON(X) id(Y). {
+  A.pExpr = expr_new_variable(pParse, &X, &Y, TK_VAR_NAME);
+  spanSet(&A, &X, &Y);
+}
+expr(A) ::= VAR_NAME(X). {
+  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_NAME);
   spanSet(&A, &X, &X);
 }
-expr(A) ::= COLON|VARIABLE(X) id(Y).     {
-  A.pExpr = expr_new_variable(pParse, &X, &Y);
-  spanSet(&A, &X, &Y);
+expr(A) ::= VAR_NUM(X). {
+  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_NUM);
+  spanSet(&A, &X, &X);
 }
-expr(A) ::= COLON|VARIABLE(X) INTEGER(Y).     {
-  A.pExpr = expr_new_variable(pParse, &X, &Y);
-  spanSet(&A, &X, &Y);
+expr(A) ::= VAR_ANON(X). {
+  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_ANON);
+  spanSet(&A, &X, &X);
 }
 expr(A) ::= expr(A) COLLATE id(C). {
   A.pExpr = sqlExprAddCollateToken(A.pExpr, &C, 1);

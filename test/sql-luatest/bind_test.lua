@@ -15,7 +15,8 @@ end)
 g.test_bind_1 = function()
     g.server:exec(function()
         local sql = [[SELECT @1asd;]]
-        local res = "At line 1 at or near position 9: unrecognized token '1asd'"
+        local res = "At line 1 at or near position 8: " ..
+                    "unrecognized token '@1asd'"
         local _, err = box.execute(sql, {{['@1asd'] = 123}})
         t.assert_equals(err.message, res)
     end)
@@ -24,9 +25,103 @@ end
 g.test_bind_2 = function()
     local conn = g.server.net_box
     local sql = [[SELECT @1asd;]]
-    local res = [[At line 1 at or near position 9: unrecognized token '1asd']]
+    local res = [[At line 1 at or near position 8: unrecognized token '@1asd']]
     local _, err = pcall(conn.execute, conn, sql, {{['@1asd'] = 123}})
     t.assert_equals(err.message, res)
+end
+
+g.test_bind_3 = function()
+    g.server:exec(function()
+        local sql = [[SELECT @1;]]
+        local exp_err = "At line 1 at or near position 8: " ..
+                        "unrecognized token '@1'"
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT #1;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '#1'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT $a;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '$a'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT $F1;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '$F1'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT ?asd;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '?asd'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT :1;]]
+        exp_err = "Syntax error at line 1 near '1'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT :1asd;]]
+        exp_err = "At line 1 at or near position 9: unrecognized token '1asd'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT :"asd";]]
+        exp_err = [[Wrong bind variable name ':"asd"']]
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT $;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '$'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT #;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '#'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT @;]]
+        exp_err = "At line 1 at or near position 8: unrecognized token '@'"
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[select : asd;]]
+        exp_err = "Wrong bind variable name ': asd'"
+        _, err = box.execute(sql, {{[': asd'] = '123'}})
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[SELECT :a;]]
+        local res = box.execute(sql, {{[':a'] = 'a'}})
+        t.assert_equals(res.rows, {{'a'}})
+
+        sql = [[SELECT @a;]]
+        local res = box.execute(sql, {{['@a'] = 'a'}})
+        t.assert_equals(res.rows, {{'a'}})
+
+        sql = [[SELECT #a;]]
+        res = box.execute(sql, {{['#a'] = 'a'}})
+        t.assert_equals(res.rows, {{'a'}})
+
+        sql = [[SELECT $1;]]
+        res = box.execute(sql, {'a'})
+        t.assert_equals(res.rows, {{'a'}})
+
+        sql = [[SELECT ? asd;]]
+        local exp = {
+            metadata = {
+                 {
+                    name =  "asd",
+                    type = "text",
+                 },
+            },
+            rows = {{'a'}},
+        }
+        res = box.execute(sql, {'a'})
+        t.assert_equals(res, exp)
+    end)
 end
 
 g = t.group("bind2", {{remote = true}, {remote = false}})
