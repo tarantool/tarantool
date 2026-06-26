@@ -832,3 +832,41 @@ g.test_fiber_cond_exit = function()
                                   {stderr = true, nojson = true})
     t.assert_covers(res, {exit_code = 0, stderr = ''})
 end
+
+g.test_recovery_point_manager = function(cg)
+    cg.server:exec(function()
+        local rp = box.backup.recovery_point
+        t.assert_type(rp.manager_create, 'function')
+        -- Neither box.info nor config is available in an application thread.
+        t.assert_equals(box.info, nil)
+        t.assert_equals(pcall(require, 'config'), false)
+
+        local created = {}
+        local backend = {new = function()
+            return setmetatable({}, {__index = {
+                create_point = function(_, id)
+                    table.insert(created, id)
+                    return {id = id}
+                end,
+            }})
+        end}
+        local m = rp.manager_create('thr', {
+            backend = backend, backend_cfg = {}, create_interval = 0.01,
+        })
+        t.assert_is(rp.managers['thr'], m)
+        -- No config -> no alerts namespace, but the manager still runs.
+        t.assert_equals(m.alert_namespace, nil)
+
+        -- The loop creates points. With no box.info the id carries no instance
+        -- segment: <manager>.<uuid>.
+        t.helpers.retrying({timeout = 10}, function()
+            t.assert_ge(#created, 2)
+        end)
+        for _, id in ipairs(created) do
+            t.assert_str_matches(id, 'thr%.[^.]+')
+        end
+
+        m:drop()
+        t.assert_equals(rp.managers['thr'], nil)
+    end, {}, {_thread_id = 1})
+end

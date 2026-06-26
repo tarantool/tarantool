@@ -17,7 +17,8 @@ end
 
 box.internal.recovery_point_yield_loops = 1000
 
-box.backup.recovery_point = {}
+-- The manager API (recovery_point.manager_*) is installed earlier.
+assert(box.backup.recovery_point)
 
 local box_backup_info = function()
     local info = box.internal.backup_info()
