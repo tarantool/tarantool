@@ -803,6 +803,8 @@ lbox_snapshot(struct lua_State *L)
 static int
 lbox_backup_start(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	int checkpoint_idx = 0;
 	struct vclock from_vclock;
 	double ttl = 0;
@@ -860,7 +862,8 @@ lbox_backup_start(struct lua_State *L)
 static int
 lbox_backup_stop(struct lua_State *L)
 {
-	(void)L;
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	box_backup_stop();
 	return 0;
 }
