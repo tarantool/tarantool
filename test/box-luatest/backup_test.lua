@@ -13,34 +13,62 @@ g.after_each(function(cg)
     end
     if cg.backup_dir ~= nil then
         fio.rmtree(cg.backup_dir)
+        cg.backup_dir = nil
     end
 end)
 
-local backup_files = function(cg, files)
+local xlog_replace_uuid = function(filename, uuid)
+    local f = fio.open(filename, {'O_RDWR'})
+    assert(f, filename)
+    local header = f:read(1024)
+    assert(header)
+    local prefix = 'Instance: '
+    local pos = header:find(prefix, 1, true)
+    assert(pos)
+    local offset = pos - 1 + #prefix
+    f:seek(offset, 'SEEK_SET')
+    assert(f:write(uuid))
+    f:close()
+end
+
+local backup = function(server, files, options)
+    options = options or {}
+    local backup_dir = options.backup_dir
+    if options.backup_dir == nil then
+        backup_dir = fio.tempdir()
+    end
     for _, file in ipairs(files) do
-        local path_src = fio.pathjoin(cg.server.workdir, file)
-        local path_dst = fio.pathjoin(cg.backup_dir, file)
+        local path_src = fio.pathjoin(server.workdir, file)
+        local path_dst = fio.pathjoin(backup_dir, file)
         fio.copyfile(path_src, path_dst)
     end
+    return backup_dir
 end
 
-local backup = function(cg, files)
-    if cg.backup_dir ~= nil then
-        fio.rmtree(cg.backup_dir)
+local restore_server = function(server, backup_dir)
+    fio.rmtree(server.workdir)
+    fio.mkdir(server.workdir)
+    fio.copytree(backup_dir, server.workdir)
+end
+
+local fix_instance_uuid = function(server, uuid)
+    -- fio.glob does not support GLOB_BRACE.
+    local pattern = fio.pathjoin(server.workdir, '*.snap')
+    for _, filename in ipairs(fio.glob(pattern)) do
+        xlog_replace_uuid(filename, uuid)
     end
-    cg.backup_dir = fio.tempdir()
-    backup_files(cg, files)
+    local pattern = fio.pathjoin(server.workdir, '*.xlog')
+    for _, filename in ipairs(fio.glob(pattern)) do
+        xlog_replace_uuid(filename, uuid)
+    end
 end
 
-local restore = function(cg)
-    assert(cg.backup_dir)
-    fio.rmtree(cg.server.workdir)
-    fio.mkdir(cg.server.workdir)
-    fio.copytree(cg.backup_dir, cg.server.workdir)
-    fio.rmtree(cg.backup_dir)
-    cg.backup_dir = nil
+local restore_replicaset = function(replica_set, backup_dir)
+    for _, server in ipairs(replica_set.servers) do
+        restore_server(server, backup_dir)
+        fix_instance_uuid(server, server:get_instance_uuid())
+    end
 end
-
 g.test_backup_rotated_xlog = function(cg)
     cg.server = server:new()
     cg.server:start()
@@ -62,7 +90,7 @@ g.test_backup_rotated_xlog = function(cg)
         return files
     end)
     t.assert_equals(#files, 2)
-    backup(cg, files)
+    cg.backup_dir = backup(cg.server, files)
     cg.server:exec(function()
         local s = box.space.test
         box.backup.stop()
@@ -71,7 +99,7 @@ g.test_backup_rotated_xlog = function(cg)
         end
     end)
     cg.server:stop()
-    restore(cg)
+    restore_server(cg.server, cg.backup_dir)
     cg.server:start()
     cg.server:exec(function()
         local s = box.space.test
@@ -105,9 +133,9 @@ g.test_backup_many_xlogs = function(cg)
         return files
     end)
     t.assert_equals(#files, 11)
-    backup(cg, files)
+    cg.backup_dir = backup(cg.server, files)
     cg.server:stop()
-    restore(cg)
+    restore_server(cg.server, cg.backup_dir)
     cg.server:start()
     cg.server:exec(function()
         local s = box.space.test
@@ -132,9 +160,9 @@ g.test_backup_no_xlogs = function(cg)
         return files
     end)
     t.assert_equals(#files, 1)
-    backup(cg, files)
+    cg.backup_dir = backup(cg.server, files)
     cg.server:stop()
-    restore(cg)
+    restore_server(cg.server, cg.backup_dir)
     cg.server:start()
     cg.server:exec(function()
         local s = box.space.test
@@ -164,9 +192,9 @@ g.test_backup_xlogs_pinned = function(cg)
         local path = fio.pathjoin(g.server.workdir, file)
         t.assert(fio.path.exists(path))
     end
-    backup(cg, files)
+    cg.backup_dir = backup(cg.server, files)
     cg.server:stop()
-    restore(cg)
+    restore_server(cg.server, cg.backup_dir)
     cg.server:start()
     cg.server:exec(function()
         local s = box.space.test
@@ -294,7 +322,7 @@ g.test_backup_from_vclock = function(cg)
         end
         return box.backup.info()
     end)
-    backup(cg, info_0.files)
+    local backup_dir = backup(cg.server, info_0.files)
     local info_1 = cg.server:exec(function(prev_vclock)
         box.backup.stop()
         local vclock = box.info.vclock
@@ -313,9 +341,9 @@ g.test_backup_from_vclock = function(cg)
         return box.backup.info()
     end, {info_0.vclock})
     t.assert_items_exclude(info_0.files, info_1.files)
-    backup_files(cg, info_1.files)
+    backup(cg.server, info_1.files, {backup_dir = backup_dir})
     cg.server:stop()
-    restore(cg)
+    restore_server(cg.server, backup_dir)
     cg.server:start()
     cg.server:exec(function()
         local s = box.space.test
@@ -471,6 +499,11 @@ g1.before_all(function(cg)
     cg.replication_synchro_timeout_default = replica1:exec(function()
         return box.cfg.replication_synchro_timeout
     end)
+    -- Cache instance uuid, otherwise it will be not available when
+    -- servers are stopped.
+    for _, server in ipairs(cg.replica_set.servers) do
+        server:get_instance_uuid()
+    end
 end)
 
 g1.after_all(function(cg)
@@ -491,6 +524,40 @@ g1.after_each(function(cg)
         end
     end, cg.replication_synchro_timeout)
 end)
+
+g1.test_replicaset_recovery = function(cg)
+    local replica1 = cg.replica_set:get_server('replica1')
+    local files = replica1:exec(function()
+        box.ctl.promote()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+        for i = 1, 10 do
+            s:insert({i})
+        end
+        local files = box.backup.start()
+        for i = 11, 20 do
+            s:insert({i})
+        end
+        return files
+    end)
+    local backup_dir = backup(replica1, files)
+    replica1:exec(function()
+        box.backup.stop()
+    end)
+    cg.replica_set:stop()
+    restore_replicaset(cg.replica_set, backup_dir, replica1)
+    cg.replica_set:start()
+    cg.replica_set:wait_for_fullmesh()
+    for _, server in ipairs(cg.replica_set.servers) do
+        server:exec(function()
+            local expected = {}
+            for i = 1, 10 do
+                table.insert(expected, {i})
+            end
+            t.assert_equals(box.space.test:select(), expected)
+        end)
+    end
+end
 
 g1.after_test('test_backup_replication_commited_master', function(cg)
     local replica1 = cg.replica_set:get_server('replica1')
