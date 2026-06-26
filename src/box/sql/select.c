@@ -1850,7 +1850,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 		p = pEList->a[i].pExpr;
 		if (NEVER(p == 0))
 			continue;
-		if (p->op == TK_VARIABLE)
+		if (sql_token_is_variable(p->op))
 			var_count++;
 		enum field_type type = sql_expr_type(p);
 		vdbe_metadata_set_col_type(v, i, field_type_strs[type]);
@@ -1930,7 +1930,7 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
 	for (int i = 0, j = 0; i < pEList->nExpr; i++) {
 		struct Expr *e = pEList->a[i].pExpr;
 		assert(e != NULL);
-		if (e->op == TK_VARIABLE)
+		if (sql_token_is_variable(e->op))
 			var_pos[j++] = i;
 	}
 	v->var_pos = var_pos;

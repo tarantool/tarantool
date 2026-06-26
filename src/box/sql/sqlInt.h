@@ -1234,9 +1234,10 @@ typedef int ynVar;
  *
  * If the expression is an SQL literal (TK_INTEGER, TK_FLOAT, TK_BLOB,
  * or TK_STRING), then Expr.token contains the text of the SQL literal. If
- * the expression is a variable (TK_VARIABLE), then Expr.token contains the
- * variable name. Finally, if the expression is an SQL function (TK_FUNCTION),
- * then Expr.token contains the name of the function.
+ * the expression is a variable (TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON),
+ * then Expr.token contains the variable name. Finally, if the expression
+ * is an SQL function (TK_FUNCTION), then Expr.token contains the name of
+ * the function.
  *
  * Expr.pRight and Expr.pLeft are the left and right subexpressions of a
  * binary operator. Either or both may be NULL.
@@ -1326,7 +1327,8 @@ struct Expr {
 				 * TK_SELECT: 1st register of result vector
 				 */
 	ynVar iColumn;		/* TK_COLUMN_REF: column index.
-				 * TK_VARIABLE: variable number (always >= 1).
+				 * TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON:
+				 * variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
 	i16 iAgg;		/* Which entry in pAggInfo->aCol[] or ->aFunc[] */
@@ -2530,7 +2532,14 @@ sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr);
 Expr *sqlExprFunction(Parse *, ExprList *, Token *);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 
-/*
+/** Check if the token type denotes a bind variable. */
+static inline bool
+sql_token_is_variable(int op)
+{
+	return op == TK_VAR_NAME || op == TK_VAR_NUM || op == TK_VAR_ANON;
+}
+
+/**
  * pColumns and pExpr form a vector assignment which is part of the SET
  * clause of an UPDATE statement.  Like this:
  *
