@@ -897,16 +897,11 @@ expr(A) ::= nm(X) DOT nm(Y). {
   A->left = ast_expr_new(pParse, X.z, X.n, TK_ID);
   A->right = ast_expr_new(pParse, Y.z, Y.n, TK_ID);
 }
-expr(A) ::= VARNUM(X). {
-  A = ast_expr_new(pParse, X.z, X.n, TK_VARIABLE);
+expr(A) ::= VAR_ANON|VAR_NUM|VAR_NAME(X). {
+  A = ast_expr_new(pParse, X.z, X.n, @X);
 }
-expr(A) ::= COLON|VARIABLE(X) id(Y).     {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
-  A->left = ast_expr_new(pParse, Y.z, Y.n, TK_STRING);
-}
-expr(A) ::= COLON|VARIABLE(X) INTEGER(Y).     {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
-  A->left = ast_expr_new(pParse, Y.z, Y.n, TK_INTEGER);
+expr(A) ::= COLON(X) id(Y). {
+  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_VAR_NAME);
 }
 expr(A) ::= expr(X) COLLATE id(C). {
   A = ast_expr_new(pParse, X->str, (C.z - X->str) + C.n, TK_COLLATE);

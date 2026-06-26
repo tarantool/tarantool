@@ -623,7 +623,7 @@ test:do_test(
 test:do_test(
     "builtins-4.10",
     function()
-        return box.execute([[SELECT REPLACE(@1, @1, @1);]], {'a'}).metadata[1]
+        return box.execute([[SELECT REPLACE($1, $1, $1);]], {{['$1'] = 'a'}}).metadata[1]
     end, {
         name = "COLUMN_1", type = 'string'
     })
