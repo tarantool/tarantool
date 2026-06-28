@@ -196,6 +196,7 @@ extern char session_lua[],
 	config_utils_funcutils_lua[],
 	config_utils_network_lua[],
 	config_utils_units_lua[],
+	config_roles_rpm_backends_net_replicaset_lua[],
 	/* }}} config */
 
 	connpool_lua[];
@@ -501,6 +502,10 @@ static const char * const lua_sources_main[] = {
 	"config/applier/box_status",
 	"internal.config.applier.box_status",
 	config_applier_box_status_lua,
+
+	"config/roles/recovery-point-manager/backends/net-replicaset",
+	"roles.recovery-point-manager.backends.net-replicaset",
+	config_roles_rpm_backends_net_replicaset_lua,
 
 	"config/init",
 	"config",
