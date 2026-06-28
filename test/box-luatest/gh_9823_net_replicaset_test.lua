@@ -531,3 +531,131 @@ g.test_connection_override = function()
             end)
     end)
 end
+
+-- Test the replicaset connection info.
+g.test_net_replicaset_info = function()
+    local config = test_config()
+    local cluster = cluster:new(config)
+    cluster:start()
+    local net_replicaset = require('internal.net.replicaset')
+    local rs = net_replicaset.connect(get_connect_cfg(cluster))
+
+    -- Wait until the replicaset is healthy: a leader is seen and there are no
+    -- alerts (every instance is reachable).
+    t.helpers.retrying({timeout = 10, delay = 0.1}, function()
+        t.assert_equals(next(rs:info().alerts), nil)
+    end)
+
+    local info = rs:info()
+    t.assert_equals(info.replicaset, 'storage')
+    t.assert_not_equals(info.leader, nil)
+    t.assert_equals(info.alerts, {})
+    -- Every instance is reported, and the leader is rw.
+    local count = 0
+    for _ in pairs(info.instances) do
+        count = count + 1
+    end
+    t.assert_equals(count, REDUNDANCY_FACTOR)
+    -- The leader is a healthy, connected instance with full per-instance info.
+    local leader = info.instances[info.leader]
+    t.assert_equals(leader.name, info.leader)
+    t.assert_equals(leader.status, 'rw')
+    t.assert_equals(leader.state, 'active')
+    t.assert_equals(leader.error, nil)
+    t.assert_type(leader.uri, 'string')
+    -- The URI keeps the login but strips the password.
+    t.assert_str_contains(leader.uri, 'storage@')
+    t.assert_not_str_contains(leader.uri, 'secret_storage')
+    t.assert_type(leader.uuid, 'string')
+
+    rs:close()
+end
+
+-- Test the connection-health alerts reported by rs:info(). Each alert is
+-- induced by connecting to a crafted set of endpoints; the cluster itself is
+-- only observed.
+g.test_net_replicaset_alerts = function()
+    local config = test_config()
+    local cluster = cluster:new(config)
+    cluster:start()
+    local net_replicaset = require('internal.net.replicaset')
+    -- A unix socket nobody listens on: a connection to it stays 'unknown'.
+    local unreachable = 'unix/:/tmp/net_replicaset_no_such.sock'
+
+    local function connect(instances)
+        local cfg = {name = 'storage', instances = {}}
+        for name, uri in pairs(instances) do
+            cfg.instances[name] = {endpoint = {
+                uri = uri, login = 'storage', password = 'secret_storage'}}
+        end
+        return net_replicaset.connect(cfg)
+    end
+
+    -- Wait until rs:info() reports exactly the given alerts (matched by a
+    -- substring each, in any order). The alerts are independent, so a case may
+    -- expect more than one.
+    local function wait_alerts(rs, ...)
+        local needles = {...}
+        t.helpers.retrying({timeout = 60}, function()
+            local alerts = rs:info().alerts
+            t.assert_equals(#alerts, #needles)
+            local joined = ''
+            for _, alert in ipairs(alerts) do
+                joined = joined .. alert.message .. '\n'
+            end
+            for _, needle in ipairs(needles) do
+                t.assert_str_contains(joined, needle)
+            end
+        end)
+    end
+
+    -- Find the current leader and its read-only followers.
+    local leader_uri
+    local follower_uris = {}
+    t.helpers.retrying({timeout = 60}, function()
+        leader_uri = nil
+        follower_uris = {}
+        cluster:each(function(server)
+            if server.alias:startswith('storage') then
+                if server:exec(function() return box.info.ro end) then
+                    follower_uris[server.alias] = server.net_box_uri
+                else
+                    leader_uri = server.net_box_uri
+                end
+            end
+        end)
+        t.assert_not_equals(leader_uri, nil)
+    end)
+
+    -- The whole replicaset is unreachable: the only instance never connects, so
+    -- it is both missing and leaderless.
+    local rs = connect({bogus = unreachable})
+    wait_alerts(rs, '1 instance(s) unreachable', 'has no writable leader')
+    rs:close()
+
+    -- No writable leader: only the read-only followers are reachable.
+    t.assert_not_equals(next(follower_uris), nil)
+    rs = connect(follower_uris)
+    wait_alerts(rs, 'has no writable leader')
+    rs:close()
+
+    -- Split-brain: more than one writable leader. Two instance entries pointing
+    -- at the same writable leader both advertise 'rw', so status_count.rw == 2.
+    rs = connect({leader_a = leader_uri, leader_b = leader_uri})
+    wait_alerts(rs, 'more than one writable leader')
+    rs:close()
+
+    -- A degraded but writable replicaset: the leader is reachable, one extra
+    -- instance is not.
+    rs = connect({leader = leader_uri, bogus = unreachable})
+    wait_alerts(rs, '1 instance(s) unreachable')
+    rs:close()
+
+    -- The alerts are independent: a split-brained replicaset that is also
+    -- missing an instance surfaces both problems at once, not just the first.
+    rs = connect({leader_a = leader_uri, leader_b = leader_uri,
+                  bogus = unreachable})
+    wait_alerts(rs, 'more than one writable leader',
+                '1 instance(s) unreachable')
+    rs:close()
+end
