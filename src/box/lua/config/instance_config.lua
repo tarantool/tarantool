@@ -275,11 +275,26 @@ local function instance_uri(self, iconfig, advertise_type, opts)
         return nil
     end
 
+    if opts and opts.login ~= nil then
+        uri = table.copy(uri)
+        uri.login = opts.login
+        uri.password = opts.password
+    end
+
     -- If there is a login. but there are no password: lookup the
     -- credentials section.
     if uri.password == nil and uri.login ~= nil then
         uri = table.copy(uri)
         uri.password = find_password(self, iconfig, uri.login)
+    end
+
+    -- enhance_uri_ssl_params() below still fills any ssl_* gaps.
+    if opts and opts.params ~= nil then
+        uri = table.copy(uri)
+        uri.params = table.copy(uri.params or {})
+        for k, v in pairs(opts.params) do
+            uri.params[k] = v
+        end
     end
 
     if opts and opts.self_iconfig then
