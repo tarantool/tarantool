@@ -196,6 +196,7 @@ extern char session_lua[],
 	config_utils_funcutils_lua[],
 	config_utils_network_lua[],
 	config_roles_rpm_backends_net_replicaset_lua[],
+	config_roles_rpm_lua[],
 	/* }}} config */
 
 	connpool_lua[];
@@ -501,6 +502,10 @@ static const char * const lua_sources_main[] = {
 	"config/roles/recovery-point-manager/backends/net-replicaset",
 	"roles.recovery-point-manager.backends.net-replicaset",
 	config_roles_rpm_backends_net_replicaset_lua,
+
+	"config/roles/recovery-point-manager",
+	"roles.recovery-point-manager",
+	config_roles_rpm_lua,
 
 	"config/init",
 	"config",
