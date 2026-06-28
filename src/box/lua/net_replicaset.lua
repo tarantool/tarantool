@@ -323,6 +323,10 @@ end
 -- Allowed options and their types in cfg.instances.x of connect by name.
 local connect_opts_template = {
     reconnect_timeout = 'number or nil',
+    -- Connection identity/transport override forwarded to instance_uri().
+    login = 'string or nil',
+    password = 'string or nil',
+    params = 'table or nil',
 }
 
 -- Given a replicaset name and connection options, return a configuration
@@ -346,8 +350,12 @@ local function get_connect_cfg(replicaset_name, opts)
     for _, instance_info in pairs(config:instances()) do
         if instance_info.replicaset_name == replicaset_name then
             local instance_name = instance_info.instance_name
-            local endpoint = config:instance_uri('sharding',
-                                                 {instance = instance_name})
+            local endpoint = config:instance_uri('sharding', {
+                instance = instance_name,
+                login = opts.login,
+                password = opts.password,
+                params = opts.params,
+            })
             connect_cfg.instances[instance_name] = {endpoint = endpoint}
         end
     end

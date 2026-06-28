@@ -964,10 +964,25 @@ function methods.instance_uri(self, uri_type, opts)
     if opts.instance ~= nil and type(opts.instance) ~= 'string' then
         error(('Expected string, got %s'):format(type(opts.instance)), 0)
     end
+    if opts.login ~= nil and type(opts.login) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.login)), 0)
+    end
+    if opts.password ~= nil and type(opts.password) ~= 'string' then
+        error(('Expected string, got %s'):format(type(opts.password)), 0)
+    end
+    if opts.params ~= nil and type(opts.params) ~= 'table' then
+        error(('Expected table, got %s'):format(type(opts.params)), 0)
+    end
+    if opts.password ~= nil and opts.login == nil then
+        error('Password cannot be set without setting login', 0)
+    end
 
     local uri_opts = {
         instance = opts.instance,
         use_default = true,
+        login = opts.login,
+        password = opts.password,
+        params = opts.params,
     }
     return self._configdata_applied:_instance_uri(uri_type, uri_opts)
 end
