@@ -64,6 +64,8 @@ lua_source(lua_sources lua/config/utils/tabulate.lua       config_utils_tabulate
 lua_source(lua_sources lua/config/utils/textutils.lua      config_utils_textutils_lua)
 lua_source(lua_sources lua/config/utils/funcutils.lua      config_utils_funcutils_lua)
 lua_source(lua_sources lua/config/utils/network.lua        config_utils_network_lua)
+lua_source(lua_sources lua/config/roles/recovery-point-manager/backends/net-replicaset.lua
+           config_roles_rpm_backends_net_replicaset_lua)
 # }}} config
 
 lua_source(lua_sources lua/connpool.lua connpool_lua)
