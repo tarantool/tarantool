@@ -14,6 +14,7 @@ local function test_config()
     :set_global_option('credentials.roles.sharding', sharding_role)
     :set_global_option('credentials.users.storage.roles', {'sharding'})
     :set_global_option('credentials.users.storage.password', 'secret_storage')
+    :set_global_option('credentials.users.backup.password', 'secret_backup')
     :set_global_option('iproto.advertise.sharding.login', 'storage')
     :use_group('test')
     builder:use_replicaset('router'):add_instance('router', {})
@@ -453,4 +454,80 @@ g.test_watch_leader = function()
     watcher2:unregister()
     long_watcher:unregister()
     rs:close()
+end
+
+-- Test the login/password/params override threaded through instance_uri() and
+-- forwarded by get_connect_cfg().
+g.test_connection_override = function()
+    local config = test_config()
+    local cluster = cluster:new(config)
+    cluster:start()
+
+    cluster.router:exec(function()
+        local config = require('config')
+        local net_replicaset = require('internal.net.replicaset')
+
+        -- No override: the sharding login/password come from the config.
+        local uri = config:instance_uri('sharding', {instance = 'storage1'})
+        t.assert_equals(uri.login, 'storage')
+        t.assert_equals(uri.password, 'secret_storage')
+
+        -- A login override re-resolves the password from the credentials.
+        uri = config:instance_uri('sharding',
+                                  {instance = 'storage1', login = 'backup'})
+        t.assert_equals(uri.login, 'backup')
+        t.assert_equals(uri.password, 'secret_backup')
+
+        -- An explicit password is honored as-is.
+        uri = config:instance_uri('sharding', {instance = 'storage1',
+            login = 'backup', password = 'literal'})
+        t.assert_equals(uri.login, 'backup')
+        t.assert_equals(uri.password, 'literal')
+
+        -- A params override is merged into the endpoint params.
+        uri = config:instance_uri('sharding', {instance = 'storage1',
+            params = {connect_timeout = 42}})
+        t.assert_equals(uri.params.connect_timeout, 42)
+
+        -- A login with no matching config user errors via find_password().
+        t.assert_error_msg_contains('Cannot find user nobody in the config',
+            function()
+                config:instance_uri('sharding',
+                                    {instance = 'storage1', login = 'nobody'})
+            end)
+
+        -- The override fields are type-checked.
+        t.assert_error_msg_contains('Expected string, got number', function()
+            config:instance_uri('sharding', {login = 5})
+        end)
+        t.assert_error_msg_contains('Expected string, got number', function()
+            config:instance_uri('sharding', {password = 5})
+        end)
+        t.assert_error_msg_contains('Expected table, got number', function()
+            config:instance_uri('sharding', {params = 5})
+        end)
+
+        -- A password without a login is rejected, not silently dropped.
+        t.assert_error_msg_contains(
+            'Password cannot be set without setting login', function()
+                config:instance_uri('sharding', {instance = 'storage1',
+                                                  password = 'literal'})
+            end)
+
+        -- get_connect_cfg() forwards the override to every instance endpoint.
+        local cfg = net_replicaset.get_connect_cfg('storage',
+            {login = 'backup', params = {connect_timeout = 7}})
+        t.assert_not_equals(next(cfg.instances), nil)
+        for _, instance in pairs(cfg.instances) do
+            t.assert_equals(instance.endpoint.login, 'backup')
+            t.assert_equals(instance.endpoint.password, 'secret_backup')
+            t.assert_equals(instance.endpoint.params.connect_timeout, 7)
+        end
+
+        -- get_connect_cfg() rejects an unexpected override type.
+        t.assert_error_msg_contains("option 'login' of opts is 'number'",
+            function()
+                net_replicaset.get_connect_cfg('storage', {login = 5})
+            end)
+    end)
 end

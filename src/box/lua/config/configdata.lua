@@ -97,6 +97,11 @@ function methods._instance_uri(self, uri_type, opts, log_opts)
     assert(uri_type == 'peer' or uri_type == 'sharding')
     local instance_uri_opts = table.copy(log_opts or {})
     instance_uri_opts.self_iconfig = self._iconfig_def
+    if opts ~= nil then
+        instance_uri_opts.login = opts.login
+        instance_uri_opts.password = opts.password
+        instance_uri_opts.params = opts.params
+    end
     return instance_config:instance_uri(choose_iconfig(self, opts), uri_type,
                                         instance_uri_opts)
 end
