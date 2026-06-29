@@ -1057,11 +1057,22 @@ g.test_call_picks_any = function(g)
         -- Connect to the local instance to avoid possible race
         -- conditions when connecting to non-local instance could
         -- be faster than connecting to a local one.
-        connpool.connect('instance-001')
+        local conn = connpool.connect('instance-001')
 
         -- The connection timeout for filter() and call() methods
         -- is hardcoded in connpool and equals 10 seconds.
         local CONNECT_TIMEOUT = 10
+
+        -- connpool.connect() returns as soon as the connection
+        -- becomes active, but the instance mode is fetched
+        -- asynchronously via a 'box.status' watcher. Until the mode
+        -- is known, call() doesn't consider the local instance a
+        -- ready candidate (the 'no wait' filter skips it), falls back
+        -- to waiting for any instance and may pick a non-local one.
+        -- Wait for the local mode to be fetched.
+        t.helpers.retrying({timeout = CONNECT_TIMEOUT}, function()
+            t.assert_not_equals(conn:mode(), nil)
+        end)
 
         -- call() should wait for any available instance matching
         -- the requirements and not wait for the unavailable instance
