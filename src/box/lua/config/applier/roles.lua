@@ -2,6 +2,7 @@ local log = require('internal.config.utils.log')
 local file = require('internal.config.utils.file')
 local expression = require('internal.config.utils.expression')
 local fiber = require('fiber')
+local health = require('internal.healthcheck')
 
 local fail_if_vars = {
     tarantool_version = _TARANTOOL:match('^%d+%.%d+%.%d+'),
@@ -293,6 +294,24 @@ local function stop_roles(roles_to_skip)
         if not ok then
             error(('Error stopping role %s: %s'):format(role_name, err), 0)
         end
+        health.remove_health_check(('role.%s'):format(role_name), {
+            if_exists = true,
+        })
+    end
+end
+
+local function register_role_health_check(role_name, role, cfg)
+    if type(role.health_check) ~= 'function' then
+        return
+    end
+    local check_name = ('role.%s'):format(role_name)
+    health.remove_health_check(check_name, {if_exists = true})
+    local ok, err = health.add_health_check(check_name, function()
+        return role.health_check(cfg)
+    end)
+    if not ok then
+        error(('Failed to register health check for the role %s: %s'):format(
+            role_name, err), 0)
     end
 end
 
@@ -398,6 +417,8 @@ local function post_apply(config)
         if not ok then
             error(('Error applying role %s: %s'):format(role_name, err), 0)
         end
+        register_role_health_check(role_name, loaded[role_name],
+                                   roles_cfg[role_name])
     end
 
     roles_state.last_loaded = loaded
