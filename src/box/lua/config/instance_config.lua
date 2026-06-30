@@ -465,6 +465,16 @@ return schema.new('instance_config', schema.record({
                 validate = validators['config.context.*'],
             }),
         }),
+        checks = schema.record({
+            transparent_huge_pages = schema.scalar({
+                type = 'boolean',
+                default = true,
+            }),
+            readahead = schema.scalar({
+                type = 'boolean',
+                default = true,
+            }),
+        }),
     }),
     process = schema.record({
         strip_core = schema.scalar({

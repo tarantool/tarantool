@@ -362,6 +362,10 @@ g.test_defaults = function()
                 timeout = 3,
                 reconnect_after = 3,
             },
+            checks = {
+                transparent_huge_pages = true,
+                readahead = true,
+            },
         },
         feedback = box.internal.feedback_daemon ~= nil and {
             crashinfo = true,

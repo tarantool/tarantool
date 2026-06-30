@@ -135,6 +135,44 @@ I['app.module'] = 'A Lua module to load an application from.'
 
 -- }}} app configuration
 
+-- {{{ checks configuration
+
+I['config.checks'] = format_text([[
+    The `checks` section controls which system checks are enabled.
+    When a check is enabled and detects an issue, a warning alert
+    appears in `box.info.config.alerts`.
+
+    The checks run on every config apply/reload and also periodically
+    via a background fiber, so that runtime changes are detected automatically.
+]])
+
+I['config.checks.transparent_huge_pages'] = format_text([[
+    Whether to check if Transparent Huge Pages (THP) are enabled.
+    THP may cause memory fragmentation and latency spikes in
+    database workloads.
+
+    When enabled, the check generates a warning alert if THP is set
+    to `always` or `madvise` mode.
+
+    To disable THP temporarily:
+        `echo never > /sys/kernel/mm/transparent_hugepage/enabled`
+    For a persistent fix, configure THP according to your OS distribution.
+]])
+
+I['config.checks.readahead'] = format_text([[
+    Whether to check if `readahead` is set to a large value.
+
+    When enabled, the check generates a warning alert if
+    `readahead` is greater than or equal to 1048512 (1 MiB - 64).
+
+    A large `readahead` value may cause high memory consumption
+    that is difficult to predict. Consider lowering `readahead`
+    if memory usage is a concern.
+]])
+
+
+-- }}} checks configuration
+
 -- {{{ audit_log configuration
 
 I['audit_log'] = format_text([[
