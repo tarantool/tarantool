@@ -150,12 +150,6 @@ crash_signal_init(void);
 void
 crash_report_stderr(struct crash_info *cinfo);
 
-/**
- * Reset crash signal handlers.
- */
-void
-crash_signal_reset(void);
-
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */

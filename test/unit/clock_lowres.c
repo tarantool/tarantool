@@ -39,6 +39,5 @@ main(void)
 	ok(success, "Check that monotonic lowres clock does not diverge "
 		    "too much from monotonic clock");
 
-	clock_lowres_signal_reset();
 	return check_plan();
 }

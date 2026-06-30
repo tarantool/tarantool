@@ -259,11 +259,6 @@
 	tt_pthread_error(e__);			\
 })
 
-#define tt_pthread_atfork(prepare, parent, child)\
-({	int e__ = pthread_atfork(prepare, parent, child);\
-	tt_pthread_error(e__);			\
-})
-
 /**
  * Make sure the created thread blocks all signals, they are handled in the main
  * thread. Except SIGILL, SIGBUS, SIGFPE and SIGSEGV, that cannot be blocked and
