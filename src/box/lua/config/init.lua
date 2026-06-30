@@ -598,6 +598,11 @@ end
 function methods.info(self, version)
     selfcheck(self, 'info')
     version = version == nil and 'v1' or version
+    local health = package.loaded['internal.healthcheck']
+    if type(health) == 'table' and
+       type(health._sync_alerts) == 'function' then
+        pcall(health._sync_alerts, {skip = {config = true}})
+    end
     local info = {}
     local alerts = self._aboard:alerts()
     local hierarchy = self:_hierarchy_info()

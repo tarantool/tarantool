@@ -114,6 +114,7 @@ extern char session_lua[],
 	iproto_lua[],
 	app_threads_lua[],
 	healthcheck_lua[],
+	healthcheck_defaults_lua[],
 	checks_version_lua[],
 	checks_lua[],
 	metrics_api_lua[],
@@ -332,6 +333,8 @@ static const char * const lua_sources_main[] = {
 	"box/session", NULL, session_lua,
 	"box/schema", NULL, schema_lua,
 	"box/healthcheck", "internal.healthcheck", healthcheck_lua,
+	"box/healthcheck_defaults", "internal.healthcheck.defaults",
+	healthcheck_defaults_lua,
 #if ENABLE_FEEDBACK_DAEMON
 	/*
 	 * It is important to initialize the daemon before

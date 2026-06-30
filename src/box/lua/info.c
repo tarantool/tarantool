@@ -804,13 +804,13 @@ error:
 	return 1;
 }
 
-/** Return health check information. */
+/** Return default health check information. */
 static int
 lbox_info_health(struct lua_State *L)
 {
-	/* require('internal.healthcheck').info() */
+	/* require('internal.healthcheck.defaults').info() */
 	lua_getglobal(L, "require");
-	lua_pushliteral(L, "internal.healthcheck");
+	lua_pushliteral(L, "internal.healthcheck.defaults");
 	if (lua_pcall(L, 1, 1, 0) != 0)
 		goto error;
 	/* Stack: health. */

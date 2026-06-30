@@ -40,6 +40,48 @@ g.test_single_role_success = function(g)
     })
 end
 
+g.test_role_health_check = function(g)
+    local one = [[
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+            health_check = function(cfg)
+                return cfg.ready, cfg.reason
+            end,
+        }
+    ]]
+    local verify = function()
+        local check = box.info.health.readiness.checks['role.one']
+        t.assert_equals(check, {
+            status = 'not_ready',
+            reason = 'warming up',
+            alert_code = 'health.readiness.role.one',
+        })
+        t.assert_equals(box.info.health.readiness.status, false)
+        t.assert_equals(#box.info.config.alerts, 1)
+        t.assert_items_include(box.info.config.alerts[1], {
+            type = 'warn',
+            message = 'Readiness health check "role.one" failed: warming up',
+            alert_code = 'health.readiness.role.one',
+        })
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles_cfg'] = {
+                one = {
+                    ready = false,
+                    reason = 'warming up',
+                },
+            },
+            ['roles'] = {'one'},
+        },
+        verify = verify,
+    })
+end
+
 -- Make sure the role is loaded only once during each run.
 g.test_role_repeat_success = function(g)
     local one = [[
