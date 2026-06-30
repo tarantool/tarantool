@@ -162,7 +162,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	/* Begin generating code.  */
 	struct Vdbe *v = sqlGetVdbe(parse);
 	sqlVdbeCountChanges(v);
-	sql_set_multi_write(parse, true);
 
 	/* If we are trying to delete from a view, realize that
 	 * view into an ephemeral table.
