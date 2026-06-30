@@ -215,6 +215,22 @@ lbox_ctl_replica_gc(struct lua_State *L)
 	return 0;
 }
 
+/** Register a Lua liveness probe callback. */
+static int
+lbox_ctl_liveness_probe(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "internal.healthcheck");
+	if (lua_pcall(L, 1, 1, 0) != 0)
+		return luaT_error(L);
+	lua_getfield(L, -1, "liveness_probe");
+	lua_remove(L, -2);
+	lua_insert(L, 1);
+	lua_call(L, argc, LUA_MULTRET);
+	return lua_gettop(L);
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -232,6 +248,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
 	{"replica_gc", lbox_ctl_replica_gc},
+	{"liveness_probe", lbox_ctl_liveness_probe},
 	{NULL, NULL}
 };
 

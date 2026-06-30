@@ -1,4 +1,5 @@
 local expression = require('internal.config.utils.expression')
+local health = require('internal.healthcheck')
 local log = require('internal.config.utils.log')
 local loaders = require('internal.loaders')
 _G.vshard = nil
@@ -6,10 +7,34 @@ _G.vshard = nil
 -- Watcher which will create all the necessary functions.
 local watcher = nil
 
+local function unregister_vshard_health_checks()
+    health.remove_health_check('vshard.router', {if_exists = true})
+end
+
+local function register_vshard_router_health_check()
+    unregister_vshard_health_checks()
+    local ok, err = health.add_health_check('vshard.router', function()
+        local info = _G.vshard.router.info()
+        local bucket = info and info.bucket
+        if bucket == nil or bucket.unknown == nil then
+            return false, 'bucket discovery status is unknown'
+        end
+        if bucket.unknown > 0 then
+            return false, 'buckets are not discovered yet'
+        end
+        return true
+    end)
+    if not ok then
+        error(('Failed to register vshard.router health check: %s'):format(
+            err), 0)
+    end
+end
+
 local function apply(config)
     local configdata = config._configdata
     local roles = configdata:get('sharding.roles')
     if roles == nil then
+        unregister_vshard_health_checks()
         return
     end
     -- Make sure vshard is available and its version is not too old.
@@ -60,6 +85,9 @@ local function apply(config)
     if is_router then
         log.info('sharding: apply router config')
         _G.vshard.router.cfg(cfg)
+        register_vshard_router_health_check()
+    else
+        health.remove_health_check('vshard.router', {if_exists = true})
     end
 end
 

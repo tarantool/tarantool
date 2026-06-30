@@ -82,6 +82,7 @@ t
   - config
   - election
   - gc
+  - health
   - hostname
   - id
   - listen

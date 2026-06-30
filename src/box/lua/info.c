@@ -804,6 +804,35 @@ error:
 	return 1;
 }
 
+/** Return default health check information. */
+static int
+lbox_info_health(struct lua_State *L)
+{
+	/* require('internal.healthcheck.defaults').info() */
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "internal.healthcheck.defaults");
+	if (lua_pcall(L, 1, 1, 0) != 0)
+		goto error;
+	/* Stack: health. */
+	lua_getfield(L, -1, "info");
+	/* Stack: health, health.info. */
+	lua_insert(L, -2);
+	/* Stack: health.info, health. */
+	if (lua_pcall(L, 1, 1, 0) != 0)
+		goto error;
+	return 1;
+
+error:
+	/*
+	 * box.info() should keep working even if a Lua part of the
+	 * health implementation is broken.
+	 */
+	lua_newtable(L);
+	lua_insert(L, -2);
+	lua_setfield(L, -2, "error");
+	return 1;
+}
+
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
@@ -830,6 +859,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"schema_version", lbox_schema_version},
 	{"hostname", lbox_info_hostname},
 	{"config", lbox_info_config},
+	{"health", lbox_info_health},
 	{NULL, NULL}
 };
 
