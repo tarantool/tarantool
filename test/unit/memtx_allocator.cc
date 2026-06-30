@@ -674,7 +674,6 @@ main()
 	tuple_free();
 	fiber_free();
 	memory_free();
-	clock_lowres_signal_reset();
 	say_logger_free();
 	return rc;
 }

@@ -515,6 +515,8 @@ log_pipe_init(struct log *log, const char *init_str)
 	}
 
 	if (log->pid == 0) {
+		/* Unblock all signals in the child process. */
+		sigfillset(&mask);
 		pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
 
 		close(pipefd[1]);

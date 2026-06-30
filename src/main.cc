@@ -272,37 +272,6 @@ signal_free(void)
 		ev_signal_stop(loop(), &ev_sigs[i]);
 }
 
-/** Make sure the child has a default signal disposition. */
-static void
-signal_reset(void)
-{
-	for (int i = 0; i < ev_sig_count; i++)
-		ev_signal_stop(loop(), &ev_sigs[i]);
-
-	struct sigaction sa;
-
-	/* Reset all signals to their defaults. */
-	memset(&sa, 0, sizeof(sa));
-	sigemptyset(&sa.sa_mask);
-	sa.sa_handler = SIG_DFL;
-
-	if (sigaction(SIGUSR1, &sa, NULL) == -1 ||
-	    sigaction(SIGINT, &sa, NULL) == -1 ||
-	    sigaction(SIGTERM, &sa, NULL) == -1 ||
-	    sigaction(SIGHUP, &sa, NULL) == -1 ||
-	    sigaction(SIGWINCH, &sa, NULL) == -1)
-		say_syserror("sigaction");
-
-	fiber_signal_reset();
-	crash_signal_reset();
-
-	/* Unblock any signals blocked by libev. */
-	sigset_t sigset;
-	sigfillset(&sigset);
-	if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1)
-		say_syserror("pthread_sigmask");
-}
-
 /**
  * Adjust the process signal mask and add handlers for signals.
  */
@@ -329,8 +298,6 @@ signal_init(void)
 	ev_signal_init(&ev_sigs[5], broadcast_sigusr2, SIGUSR2);
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_start(loop(), &ev_sigs[i]);
-
-	tt_pthread_atfork(NULL, NULL, signal_reset);
 }
 
 /** Run in the background. */
@@ -367,12 +334,6 @@ daemonize(void)
 	 * kqueue on FreeBSD.
 	 */
 	ev_loop_fork(cord()->loop);
-
-	/*
-	 * reinit signals after fork, because fork() implicitly calls
-	 * signal_reset() via pthread_atfork() hook installed by signal_init().
-	 */
-	signal_init();
 
 	/* redirect stdin; stdout and stderr handled in say_logger_init */
 	fd = open("/dev/null", O_RDONLY);
