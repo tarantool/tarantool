@@ -28,6 +28,7 @@ lua_source(lua_sources lua/app_threads.lua app_threads_lua)
 lua_source(lua_sources lua/version.lua internal_version_lua)
 lua_source(lua_sources lua/backup.lua backup_lua)
 lua_source(lua_sources lua/recovery_point_manager.lua recovery_point_manager_lua)
+lua_source(lua_sources lua/healthcheck.lua healthcheck_lua)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)
