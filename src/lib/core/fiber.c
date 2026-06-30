@@ -2277,7 +2277,6 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 	if (main_cord.loop == NULL)
 		panic("can't init event loop");
 	cord_create(&main_cord, "main");
-	fiber_signal_init();
 }
 
 void
@@ -2296,12 +2295,6 @@ fiber_wakeup_trigger_cb(struct trigger *trigger, void *event)
 	return 0;
 }
 
-/**
- * True if fiber_signal_init was called.
- * Needed for re-entrancy of fiber signal initialization.
- */
-static bool signal_initialized;
-
 /** Reset current slice on SIGURG. */
 static void
 signal_sigurg_cb(int signum)
@@ -2315,9 +2308,6 @@ void
 fiber_signal_init(void)
 {
 	assert(cord_is_main());
-	if (signal_initialized)
-		return;
-	signal_initialized = true;
 	clock_lowres_signal_init();
 
 	struct sigaction sa;
@@ -2325,21 +2315,6 @@ fiber_signal_init(void)
 	sa.sa_handler = signal_sigurg_cb;
 	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
 		panic_syserror("cannot set fiber sigurg handler");
-}
-
-void
-fiber_signal_reset(void)
-{
-	assert(cord_is_main());
-	assert(signal_initialized);
-	signal_initialized = false;
-	clock_lowres_signal_reset();
-
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
-		say_syserror("cannot reset fiber sigurg handler");
 }
 
 int fiber_stat(fiber_stat_cb cb, void *cb_ctx)

@@ -1028,21 +1028,10 @@ void
 fiber_free(void);
 
 /**
- * Manually init signals needed for fiber module.
- * This function is re-entrant.
- * All needed signals are initialized in fiber_init,
- * but you may need this functions to init signals
- * after they have been reset before fork.
+ * Init signals needed for fiber module.
  */
 void
 fiber_signal_init(void);
-
-/**
- * Reset signals needed for fiber module.
- * See fiber_signal_init description.
- */
-void
-fiber_signal_reset(void);
 
 /**
  * A trigger callback which just wakes up the fiber stored in the

@@ -51,18 +51,3 @@ clock_lowres_signal_init(void)
 	if (setitimer(ITIMER_REAL, &timer, NULL) == -1)
 		panic_syserror("cannot set low resolution clock timer");
 }
-
-void
-clock_lowres_signal_reset(void)
-{
-	struct itimerval timer;
-	memset(&timer, 0, sizeof(timer));
-	if (setitimer(ITIMER_REAL, &timer, NULL) == -1)
-		say_syserror("cannot reset low resolution clock timer");
-
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	if (sigaction(SIGALRM, &sa, NULL) == -1)
-		say_syserror("cannot reset low resolution clock timer signal");
-}

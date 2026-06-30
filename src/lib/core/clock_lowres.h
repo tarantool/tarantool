@@ -34,10 +34,6 @@ clock_lowres_monotonic(void)
 void
 clock_lowres_signal_init(void);
 
-/** Reset signal handler and interval timer. */
-void
-clock_lowres_signal_reset(void);
-
 #if __cplusplus
 }
 #endif

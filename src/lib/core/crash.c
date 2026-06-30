@@ -210,21 +210,6 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 static const int crash_signals[] = { SIGILL, SIGBUS, SIGFPE, SIGSEGV };
 
 void
-crash_signal_reset(void)
-{
-	struct sigaction sa = {
-		.sa_handler = SIG_DFL,
-	};
-	sigemptyset(&sa.sa_mask);
-
-	for (size_t i = 0; i < lengthof(crash_signals); i++) {
-		if (sigaction(crash_signals[i], &sa, NULL) == 0)
-			continue;
-		say_syserror("reset sigaction %d", crash_signals[i]);
-	}
-}
-
-void
 crash_signal_init(void)
 {
 	/*
