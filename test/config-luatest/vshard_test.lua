@@ -191,6 +191,13 @@ g.test_fixed_masters = function(g)
     exec = 'return vshard.router.internal.static_router.current_cfg'
     t.assert_covers(g.server_5:eval(exec), exp)
 
+    -- Check that vshard router readiness check is registered from config
+    -- roles.
+    exec = "return box.info.health.readiness.checks['vshard.router']"
+    local res = g.server_5:eval(exec)
+    t.assert_equals(res.status, 'not_ready')
+    t.assert_equals(res.alert_code, 'health.readiness.vshard.router')
+
     -- Check that basic sharding works.
     exec = [[
         function put(v)
@@ -235,6 +242,9 @@ g.test_fixed_masters = function(g)
         t.assert_equals(res, {{1, 1}})
         res = g.server_4:eval([[return box.space.a:select()]])
         t.assert_equals(res, {{800, 800}})
+        res = g.server_5:eval(
+            "return box.info.health.readiness.checks['vshard.router']")
+        t.assert_equals(res, {status = 'ready'})
     end)
 
     -- Make sure that the new master is auto-discovered when master is changed.
