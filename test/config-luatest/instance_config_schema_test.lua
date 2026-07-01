@@ -101,6 +101,7 @@ g.test_config = function()
         config = {
             reload = 'auto',
             context = {},
+            checks = 'off',
         },
     }
     instance_config:validate(iconfig)
@@ -111,7 +112,7 @@ g.test_config = function()
         storage = {
             timeout = 3,
             reconnect_after = 3,
-        }
+        },
     }
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
@@ -197,7 +198,7 @@ g.test_config_enterprise = function()
         storage = {
             timeout = 3,
             reconnect_after = 3,
-        }
+        },
     }
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
