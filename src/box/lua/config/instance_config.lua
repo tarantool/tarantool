@@ -1,6 +1,5 @@
 local schema = require('experimental.config.utils.schema')
 local descriptions = require('internal.config.descriptions')
-local tarantool = require('tarantool')
 local urilib = require('uri')
 local file = require('internal.config.utils.file')
 local log = require('internal.config.utils.log')
@@ -13,11 +12,10 @@ local expression = require('internal.config.utils.expression')
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
+-- Available only in Tarantool Enterprise Edition.
+local enterprise_edition = schema.enterprise_edition
+
 -- List of annotations:
---
--- * enterprise_edition (boolean)
---
---   Available only in Tarantool Enterprise Edition.
 --
 -- * vshard_since (string)
 --
@@ -57,54 +55,6 @@ local TIMEOUT_INFINITY = 500 * 365 * 86400
 -- * sensitive (boolean)
 --
 --   Hide the value from diagnostic configuration dumps.
-
-local function enterprise_edition_validate(data, w)
-    -- OK if we're on Tarantool EE.
-    if tarantool.package == 'Tarantool Enterprise' then
-        return
-    end
-
-    assert(tarantool.package == 'Tarantool')
-
-    -- OK, if the value is nil or box.NULL.
-    if data == nil then
-        return
-    end
-
-    -- NB: Let's fail the validation for an empty table, because
-    -- otherwise we will get a less descriptive error from a lower
-    -- level API. For example, box.cfg({wal_ext = {}}) on Tarantool
-    -- Community Edition says the following:
-    --
-    -- > Incorrect value for option 'wal_ext': unexpected option
-
-    w.error('This configuration parameter is available only in Tarantool ' ..
-        'Enterprise Edition')
-end
-
-local function enterprise_edition_apply_default_if(_data, _w)
-    return tarantool.package == 'Tarantool Enterprise'
-end
-
--- Available only in Tarantool Enterprise Edition.
-local function enterprise_edition(schema_node)
-    schema_node.enterprise_edition = true
-
-    -- Perform a domain specific validation first and only then
-    -- check, whether the option is to be used with Tarantool
-    -- Enterprise Edition.
-    --
-    -- This order is consistent with data type validation, which
-    -- is also performed before the EE check.
-    schema_node.validate = funcutils.chain2(
-        schema_node.validate,
-        enterprise_edition_validate)
-    schema_node.apply_default_if = funcutils.chain2(
-        schema_node.apply_default_if,
-        enterprise_edition_apply_default_if)
-
-    return schema_node
-end
 
 local function sensitive(schema_node)
     schema_node.sensitive = true
@@ -275,11 +225,26 @@ local function instance_uri(self, iconfig, advertise_type, opts)
         return nil
     end
 
+    if opts and opts.login ~= nil then
+        uri = table.copy(uri)
+        uri.login = opts.login
+        uri.password = opts.password
+    end
+
     -- If there is a login. but there are no password: lookup the
     -- credentials section.
     if uri.password == nil and uri.login ~= nil then
         uri = table.copy(uri)
         uri.password = find_password(self, iconfig, uri.login)
+    end
+
+    -- enhance_uri_ssl_params() below still fills any ssl_* gaps.
+    if opts and opts.params ~= nil then
+        uri = table.copy(uri)
+        uri.params = table.copy(uri.params or {})
+        for k, v in pairs(opts.params) do
+            uri.params[k] = v
+        end
     end
 
     if opts and opts.self_iconfig then

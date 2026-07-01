@@ -187,6 +187,7 @@ local trace_check_required_modules = {
     ['builtin/box/session.lua'] = true,
     ['builtin/box/app_threads.lua'] = true,
     ['builtin/box/iproto.lua'] = true,
+    ['builtin/box/backup.lua'] = true,
     ['builtin/digest.lua'] = true,
     ['builtin/error.lua'] = true,
     ['builtin/tarantool.lua']= true,

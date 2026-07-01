@@ -1,6 +1,7 @@
 local ffi = require('ffi')
 local fiber = require('fiber')
 local net_box = require('net.box')
+local uri_lib = require('uri')
 
 ffi.cdef[[
     bool
@@ -206,6 +207,52 @@ function replicaset_methods:close()
     end
 end
 
+-- Replicaset connection info: the leader, the per-instance statuses, and the
+-- alerts that explain an unhealthy replicaset.
+function replicaset_methods:info()
+    replicaset_check(self, 'info')
+    local rs_name = self.replicaset_name or 'unnamed'
+    local count = self.status_count
+    local info = {
+        replicaset = self.replicaset_name,
+        leader = self.leader_instance and
+                 self.leader_instance.instance_name or nil,
+        instances = {},
+        alerts = {},
+    }
+    for _, instance in pairs(self.instances) do
+        local conn = instance.conn
+        info.instances[instance.instance_name] = {
+            name = instance.instance_name,
+            uri = instance.uri,
+            status = instance.status,
+            uuid = conn.peer_uuid,
+            state = conn.state,
+            error = conn.error,
+        }
+    end
+    if count.rw == 1 then
+        -- A writable leader exists; degraded only if a replica is unreachable.
+        if count.unknown > 0 then
+            table.insert(info.alerts, {message = string.format(
+                'replicaset %q: %d instance(s) unreachable', rs_name,
+                count.unknown)})
+        end
+    elseif count.rw > 1 then
+        -- Split-brain: several instances advertise themselves as writable.
+        table.insert(info.alerts, {message = string.format(
+            'replicaset %q has more than one writable leader (%d)', rs_name,
+            count.rw)})
+    elseif count.ro > 0 then
+        table.insert(info.alerts, {message = string.format(
+            'replicaset %q has no writable leader', rs_name)})
+    else
+        table.insert(info.alerts, {message = string.format(
+            'replicaset %q is unreachable', rs_name)})
+    end
+    return info
+end
+
 -- Callback that called if the status of an instance is (possibly) changed.
 -- Called from watcher ('ro' or 'rw') or from on_disconnect ('unknown').
 local function on_instance_status_change(replicaset, instance, status)
@@ -291,6 +338,8 @@ local function connect_by_cfg(cfg)
             instance_name = instance_name,
             -- Net.box connection to that instance.
             conn = conn,
+            -- The endpoint URI without the sensitive parts, reported by info().
+            uri = uri_lib.format(uri_lib.parse(instance_cfg.endpoint)),
             -- 'unknown' by default, will be updated to 'ro' or 'rw' when
             -- the remote instance will send status event to local watcher,
             -- and will be set to 'unknown' again on disconnect.
@@ -323,6 +372,10 @@ end
 -- Allowed options and their types in cfg.instances.x of connect by name.
 local connect_opts_template = {
     reconnect_timeout = 'number or nil',
+    -- Connection identity/transport override forwarded to instance_uri().
+    login = 'string or nil',
+    password = 'string or nil',
+    params = 'table or nil',
 }
 
 -- Given a replicaset name and connection options, return a configuration
@@ -346,8 +399,12 @@ local function get_connect_cfg(replicaset_name, opts)
     for _, instance_info in pairs(config:instances()) do
         if instance_info.replicaset_name == replicaset_name then
             local instance_name = instance_info.instance_name
-            local endpoint = config:instance_uri('sharding',
-                                                 {instance = instance_name})
+            local endpoint = config:instance_uri('sharding', {
+                instance = instance_name,
+                login = opts.login,
+                password = opts.password,
+                params = opts.params,
+            })
             connect_cfg.instances[instance_name] = {endpoint = endpoint}
         end
     end

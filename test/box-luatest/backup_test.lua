@@ -1,5 +1,7 @@
 local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 local fio = require('fio')
 local t = require('luatest')
 
@@ -193,6 +195,7 @@ g.test_backup_info = function(cg)
             files = files,
             vclock = vclock,
             type = 'full',
+            recovery_points = {},
         })
         box.backup.stop()
         t.assert_equals(box.backup.info(), nil)
@@ -205,6 +208,7 @@ g.test_backup_info = function(cg)
             files = files,
             vclock = vclock,
             type = 'full',
+            recovery_points = {},
         })
         box.backup.stop()
 
@@ -216,6 +220,7 @@ g.test_backup_info = function(cg)
             files = files,
             vclock = vclock,
             type = 'full',
+            recovery_points = {},
         })
         box.backup.stop()
     end)
@@ -303,6 +308,7 @@ g.test_backup_from_vclock = function(cg)
             vclock = vclock,
             prev_vclock = prev_vclock,
             type = 'incremental',
+            recovery_points = {},
         })
         return box.backup.info()
     end, {info_0.vclock})
@@ -347,6 +353,7 @@ g.test_backup_from_vclock = function(cg)
             vclock = vclock,
             prev_vclock = vclock,
             type = 'incremental',
+            recovery_points = {},
         })
     end)
 end
@@ -387,6 +394,57 @@ g.test_backup_ttl = function(cg)
         t.assert_equals(box.backup.info().expires_at, fiber.time() + 3600)
         box.backup.stop()
     end)
+end
+
+-- The test requires fresh server with empty vclock.
+g.test_recovery_point_list_filtering_empty_vclock = function(cg)
+    cg.server = server:new({})
+    cg.server:start()
+    cg.server:exec(function()
+        box.backup.start()
+        for i = 1, 10 do
+            box.backup.recovery_point.create(tostring(i))
+        end
+        -- Covers case when backup begin vclock is empty.
+        t.assert_equals(box.backup.info().recovery_points, {})
+        box.backup.stop()
+    end)
+end
+
+g.test_recovery_point_persistence = function(cg)
+    cg.server = server:new({box_cfg = {checkpoint_count = 2}})
+    cg.server:start()
+    local prev_vclock, recovery_points = cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        box.backup.start()
+        local prev_vclock = box.backup.info().vclock
+        box.backup.stop()
+
+        for i = 1, 10 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+
+        box.snapshot()
+
+        for i = 11, 20 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+
+        box.backup.start({from_vclock = prev_vclock})
+        local recovery_points = box.backup.info().recovery_points
+        box.backup.stop()
+        return prev_vclock, recovery_points
+    end)
+    cg.server:restart()
+    cg.server:exec(function(prev_vclock, recovery_points)
+        box.backup.start({from_vclock = prev_vclock})
+        t.assert_equals(box.backup.info().recovery_points, recovery_points)
+        box.backup.stop()
+    end, {prev_vclock, recovery_points})
 end
 
 local g1 = t.group('replication')
@@ -610,4 +668,434 @@ g1.test_backup_concurrent_stop = function(cg)
         t.assert_not(ok)
         t.assert_covers(err:unpack(), {type = 'TimedOut'})
     end)
+end
+
+g1.test_recovery_point_replication = function(cg)
+    local replica1 = cg.replica_set:get_server('replica1')
+    local replica2 = cg.replica_set:get_server('replica2')
+    local recovery_points = replica1:exec(function()
+        box.ctl.promote()
+
+        local s = box.schema.create_space('test', {is_sync = true})
+        s:create_index('pk')
+
+        for i = 1, 10 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+
+        box.backup.start()
+        local recovery_points = box.backup.info().recovery_points
+        box.backup.stop()
+        return recovery_points
+    end)
+    replica2:wait_for_vclock_of(replica1)
+    replica2:exec(function(recovery_points)
+        box.backup.start()
+        t.assert_equals(box.backup.info().recovery_points, recovery_points)
+        box.backup.stop()
+    end, {recovery_points})
+end
+
+-- No server restart between tests.
+local g2 = t.group('fast')
+
+g2.before_all(function(cg)
+    cg.server = server:new()
+    cg.server:start()
+    cg.server:exec(function()
+        local tweaks = require('internal.tweaks')
+        rawset(_G, 'box_recovery_point_count_max',
+               tweaks.box_recovery_point_count_max)
+        box.schema.user.create('stranger')
+    end)
+end)
+
+g2.after_all(function(cg)
+    if cg.server ~= nil then
+        cg.server:drop()
+    end
+end)
+
+g2.after_each(function(cg)
+    cg.server:exec(function()
+        local tweaks = require('internal.tweaks')
+
+        box.backup.stop()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+        -- Truncation of a system space is not possible.
+        for _, tuple in box.space._recovery_point:pairs() do
+            box.space._recovery_point:delete(tuple.name)
+        end
+        tweaks.box_recovery_point_count_max =
+                rawget(_G, 'box_recovery_point_count_max')
+    end)
+end)
+
+g2.test_recovery_point_create_args_checks = function(cg)
+    cg.server:exec(function()
+        local err = {
+            type = 'IllegalParams',
+            message = "expected string as 1 argument",
+        }
+        t.assert_error_covers(err, box.backup.recovery_point.create)
+        t.assert_error_covers(err, box.backup.recovery_point.create, {})
+    end)
+end
+
+g2.test_recovery_point_create_same_timestamp = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        -- We can make same timestamp for sure with recovery point API.
+        local timestamp = fiber.time()
+        box.space._recovery_point:insert({'1', timestamp, 1, 1})
+        box.space._recovery_point:insert({'2', timestamp, 1, 2})
+    end)
+end
+
+g2.test_recovery_point_create_result = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        for i = 1, 10 do
+            local p = box.backup.recovery_point.create(tostring(i))
+            t.assert_almost_equals(p.timestamp, fiber.time(), 1)
+            p.timestamp = nil
+            t.assert_equals(p, {
+                name = tostring(i),
+                replica_id = box.info.id,
+                -- recovery point lsn is one less due to UPDATE.
+                lsn = box.info.lsn - 1,
+            })
+        end
+    end)
+end
+
+g2.test_recovery_point_list_filtering_incremental = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        for i = 1, 10 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+
+        box.backup.start()
+        local prev_vclock = box.backup.info().vclock
+        box.backup.stop()
+
+        local expected = {}
+        for i = 11, 20 do
+            s:insert({i})
+            table.insert(expected,
+                         box.backup.recovery_point.create(tostring(i)))
+        end
+
+        box.backup.start({from_vclock = prev_vclock})
+        for i = 21, 30 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+        t.assert_equals(box.backup.info().recovery_points, expected)
+        box.backup.stop()
+    end)
+end
+
+g2.test_recovery_point_list_filtering_full = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        for i = 1, 10 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+        box.snapshot()
+
+        local expected = {}
+        for i = 11, 20 do
+            s:insert({i})
+            table.insert(expected,
+                         box.backup.recovery_point.create(tostring(i)))
+        end
+
+        box.backup.start()
+        for i = 21, 30 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+        t.assert_equals(box.backup.info().recovery_points, expected)
+        box.backup.stop()
+    end)
+end
+
+g2.test_recovery_point_limit = function(cg)
+    cg.server:exec(function()
+        local tweaks = require('internal.tweaks')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        tweaks.box_recovery_point_count_max = 10
+        local expected = {}
+        for i = 1, 12 do
+            s:insert({i})
+            table.insert(expected,
+                         box.backup.recovery_point.create(tostring(i)))
+        end
+        table.remove(expected, 1)
+        table.remove(expected, 1)
+
+        box.backup.start()
+        t.assert_equals(box.backup.info().recovery_points, expected)
+        box.backup.stop()
+    end)
+end
+
+g2.after_test('test_recovery_point_may_leave_garbage', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_INDEX_OOM_COUNTDOWN', -1)
+        box.error.injection.set('ERRINJ_INDEX_OOM', false)
+    end)
+end)
+
+-- This test does not test contract by itself. We check that this
+-- situation is possible and in the other tests create it just
+-- by directly inserting into _recovery_point.
+g2.test_recovery_point_may_leave_garbage = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_INDEX_OOM_COUNTDOWN', 2)
+        t.assert_error_covers({
+            type = 'OutOfMemory',
+        }, box.backup.recovery_point.create, '1')
+        t.assert_equals(box.space._recovery_point:select(), {
+            {'1', box.NULL, box.NULL, box.NULL}
+        })
+    end)
+end
+
+g2.test_recovery_point_filter_incomplete = function(cg)
+    cg.server:exec(function()
+        box.space._recovery_point:insert({'1', box.NULL, box.NULL, box.NULL})
+        box.backup.start()
+        t.assert_equals(box.backup.info().recovery_points, {})
+        box.backup.stop()
+    end)
+end
+
+g2.test_recovery_point_incomplete_purged_first = function(cg)
+    cg.server:exec(function()
+        local tweaks = require('internal.tweaks')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        tweaks.box_recovery_point_count_max = 10
+        local expected = {}
+        for i = 1, 9 do
+            s:insert({i})
+            table.insert(expected,
+                         box.backup.recovery_point.create(tostring(i)))
+        end
+        s:insert({10})
+        box.space._recovery_point:insert({'g', box.NULL, box.NULL, box.NULL})
+        table.insert(expected,
+                     box.backup.recovery_point.create(tostring(10)))
+        box.backup.start()
+        t.assert_equals(box.backup.info().recovery_points, expected)
+        box.backup.stop()
+    end)
+end
+
+g2.after_test('test_recovery_point_concurrent_create', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+    end)
+end)
+
+-- Test we don't purge incomplete point being created.
+g2.test_recovery_point_concurrent_create = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local tweaks = require('internal.tweaks')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        tweaks.box_recovery_point_count_max = 10
+        local expected = {}
+        for i = 1, 9 do
+            s:insert({i})
+            table.insert(expected,
+                         box.backup.recovery_point.create(tostring(i)))
+        end
+
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        local f1 = fiber.new(function()
+            table.insert(expected,
+                         box.backup.recovery_point.create('10'))
+        end)
+        f1:set_joinable(true)
+        fiber.yield()
+        local f2 = fiber.new(function()
+            table.insert(expected,
+                         box.backup.recovery_point.create('11'))
+        end)
+        f2:set_joinable(true)
+        fiber.yield()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.assert(f1:join())
+        t.assert(f2:join())
+        table.remove(expected, 1)
+        box.backup.start()
+        t.assert_equals(box.backup.info().recovery_points, expected)
+        box.backup.stop()
+    end)
+end
+
+g2.test_recovery_point_disable_from_txn = function(cg)
+    cg.server:exec(function()
+        box.begin()
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'ACTIVE_TRANSACTION',
+        }, box.backup.recovery_point.create, '1')
+        box.rollback()
+    end)
+end
+
+g2.after_test('test_recovery_point_check_txn_last_row', function(cg)
+    cg.server:exec(function()
+        local trigger = require('trigger')
+
+        trigger.del('box.before_commit', 'test')
+    end)
+end)
+
+g2.test_recovery_point_check_txn_last_row = function(cg)
+    cg.server:exec(function()
+        local trigger = require('trigger')
+
+        local s = box.schema.create_space('test', {is_local = true})
+        s:create_index('pk')
+
+        local i = 1
+        trigger.set('box.before_commit', 'test', function()
+            s:insert({i})
+            i = i + 1
+        end)
+
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'RECOVERY_POINT_TXN_LAST_ROW',
+        }, box.backup.recovery_point.create, '1')
+    end)
+end
+
+-- To cover case in on commit trigger when statement in txn has no row.
+g2.test_recovery_point_temporary_space_in_txn = function(cg)
+    cg.server:exec(function()
+        local trigger = require('trigger')
+
+        local s = box.schema.create_space('test1', {temporary = true})
+        s:create_index('pk')
+
+        local i = 1
+        trigger.set('box.before_commit', 'test', function()
+            s:insert({i})
+            i = i + 1
+        end)
+
+        box.backup.recovery_point.create('1')
+    end)
+end
+
+g2.test_recovery_point_list_yields = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        for i = 1, 10 do
+            s:insert({i})
+            box.backup.recovery_point.create(tostring(i))
+        end
+
+        box.internal.recovery_point_yield_loops = 10
+        box.backup.start()
+        local csw = fiber.self():csw()
+        box.backup.info()
+        t.assert_gt(fiber.self():csw(), csw)
+        box.backup.stop()
+    end)
+end
+
+--
+-- Test case when _recovery_point has tuples with extra fields inserted
+-- manually.
+--
+g2.test_recovery_point_extra_fields = function(cg)
+    cg.server:exec(function()
+        local tweaks = require('internal.tweaks')
+
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        tweaks.box_recovery_point_count_max = 10
+        box.space._recovery_point:insert({'xxx', 1.1, 1, 1, 'something'})
+        for i = 1, 20 do
+             box.backup.recovery_point.create(tostring(i))
+        end
+        box.backup.start()
+        t.assert_equals(#box.backup.info().recovery_points, 10)
+        box.backup.stop()
+    end)
+end
+
+g2.test_recovery_point_suid = function(cg)
+    cg.server:exec(function()
+        box.session.su('stranger', box.backup.recovery_point.create, '1')
+    end)
+end
+
+g2.test_backup_info_suid = function(cg)
+    cg.server:exec(function()
+        box.backup.start()
+        box.session.su('stranger', box.backup.info)
+        box.backup.stop()
+    end)
+end
+
+--
+-- The box.backup table is reachable before box.cfg(), but every
+-- cfg-requiring backup operation must raise ER_UNCONFIGURED.
+--
+g2.test_backup_api_before_box_cfg = function()
+    local dir = treegen.prepare_directory({}, {})
+    -- Each operation raises "Please call box.cfg{} first".
+    local script = [[
+        local t = require('luatest')
+        t.assert_equals(box.info.status, 'unconfigured')
+        -- Every cfg-requiring backup operation raises ER_UNCONFIGURED.
+        local err = {type = 'ClientError', name = 'UNCONFIGURED'}
+        t.assert_error_covers(err, box.backup.start)
+        t.assert_error_covers(err, box.backup.stop)
+        t.assert_error_covers(err, box.backup.info)
+        t.assert_error_covers(err, box.backup.recovery_point.create, 'x')
+        os.exit(0)
+    ]]
+    treegen.write_file(dir, 'before_box.lua', script)
+    local res = justrun.tarantool(dir, {}, {'before_box.lua'},
+                                  {nojson = true, stderr = true})
+    t.assert_equals(res.exit_code, 0, res.stderr)
 end

@@ -26,6 +26,8 @@ lua_source(lua_sources lua/merger.lua merger_lua)
 lua_source(lua_sources lua/iproto.lua iproto_lua)
 lua_source(lua_sources lua/app_threads.lua app_threads_lua)
 lua_source(lua_sources lua/version.lua internal_version_lua)
+lua_source(lua_sources lua/backup.lua backup_lua)
+lua_source(lua_sources lua/recovery_point_manager.lua recovery_point_manager_lua)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)
@@ -62,6 +64,10 @@ lua_source(lua_sources lua/config/utils/tabulate.lua       config_utils_tabulate
 lua_source(lua_sources lua/config/utils/textutils.lua      config_utils_textutils_lua)
 lua_source(lua_sources lua/config/utils/funcutils.lua      config_utils_funcutils_lua)
 lua_source(lua_sources lua/config/utils/network.lua        config_utils_network_lua)
+lua_source(lua_sources lua/config/roles/recovery-point-manager/backends/net-replicaset.lua
+           config_roles_rpm_backends_net_replicaset_lua)
+lua_source(lua_sources lua/config/roles/recovery-point-manager/init.lua
+           config_roles_rpm_lua)
 # }}} config
 
 lua_source(lua_sources lua/connpool.lua connpool_lua)

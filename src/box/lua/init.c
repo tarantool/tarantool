@@ -44,6 +44,7 @@
 #include "lua/builtin_modcache.h"
 
 #include "box/box.h"
+#include "box/replication.h"
 #include "box/txn.h"
 #include "box/func.h"
 #include "box/mp_error.h"
@@ -115,6 +116,8 @@ extern char session_lua[],
 	app_threads_lua[],
 	checks_version_lua[],
 	checks_lua[],
+	backup_lua[],
+	recovery_point_manager_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
 	metrics_cartridge_issues_lua[],
@@ -192,6 +195,8 @@ extern char session_lua[],
 	config_utils_textutils_lua[],
 	config_utils_funcutils_lua[],
 	config_utils_network_lua[],
+	config_roles_rpm_backends_net_replicaset_lua[],
+	config_roles_rpm_lua[],
 	/* }}} config */
 
 	connpool_lua[];
@@ -226,6 +231,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
+	"box/recovery_point_manager", NULL, recovery_point_manager_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
 	 * must be loaded after decimal and datetime lua modules
@@ -342,6 +348,7 @@ static const char * const lua_sources_main[] = {
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/console", "console", console_lua,
+	"box/backup", NULL, backup_lua,
 
 	/* {{{ config */
 
@@ -491,6 +498,14 @@ static const char * const lua_sources_main[] = {
 	"config/applier/box_status",
 	"internal.config.applier.box_status",
 	config_applier_box_status_lua,
+
+	"config/roles/recovery-point-manager/backends/net-replicaset",
+	"roles.recovery-point-manager.backends.net-replicaset",
+	config_roles_rpm_backends_net_replicaset_lua,
+
+	"config/roles/recovery-point-manager",
+	"roles.recovery-point-manager",
+	config_roles_rpm_lua,
 
 	"config/init",
 	"config",
@@ -800,6 +815,8 @@ lbox_snapshot(struct lua_State *L)
 static int
 lbox_backup_start(struct lua_State *L)
 {
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	int checkpoint_idx = 0;
 	struct vclock from_vclock;
 	double ttl = 0;
@@ -857,7 +874,8 @@ lbox_backup_start(struct lua_State *L)
 static int
 lbox_backup_stop(struct lua_State *L)
 {
-	(void)L;
+	if (box_check_configured() != 0)
+		return luaT_error(L);
 	box_backup_stop();
 	return 0;
 }
@@ -893,6 +911,8 @@ lbox_backup_info(struct lua_State *L)
 		lua_pushstring(L, "incremental");
 		lua_setfield(L, -2, "type");
 	} else {
+		luaT_pushvclock(L, &backup->checkpoint_vclock);
+		lua_setfield(L, -2, "checkpoint_vclock");
 		lua_pushstring(L, "full");
 		lua_setfield(L, -2, "type");
 	}
@@ -901,6 +921,30 @@ lbox_backup_info(struct lua_State *L)
 		lua_pushnumber(L, backup->start_time + backup->ttl);
 		lua_setfield(L, -2, "expires_at");
 	}
+
+	return 1;
+}
+
+/**
+ * Create recovery point. Arguments: name.
+ */
+static int
+lbox_recovery_point_create(struct lua_State *L)
+{
+	const char *name = luaT_checkstring(L, 1);
+	struct recovery_point point;
+	if (box_recovery_point_create(name, &point) != 0)
+		return luaT_error(L);
+
+	lua_createtable(L, /*narray=*/0, /*nrec=*/4);
+	lua_pushstring(L, name);
+	lua_setfield(L, -2, "name");
+	lua_pushnumber(L, point.timestamp);
+	lua_setfield(L, -2, "timestamp");
+	lua_pushinteger(L, instance_id);
+	lua_setfield(L, -2, "replica_id");
+	luaL_pushuint64(L, point.lsn);
+	lua_setfield(L, -2, "lsn");
 
 	return 1;
 }
@@ -918,7 +962,12 @@ static const struct luaL_Reg boxlib[] = {
 static const struct luaL_Reg boxlib_backup[] = {
 	{"start", lbox_backup_start},
 	{"stop", lbox_backup_stop},
-	{"info", lbox_backup_info},
+	{NULL, NULL}
+};
+
+static const struct luaL_Reg boxlib_internal[] = {
+	{"backup_info", lbox_backup_info},
+	{"recovery_point_create", lbox_recovery_point_create},
 	{NULL, NULL}
 };
 
@@ -1043,6 +1092,11 @@ box_lua_init(struct lua_State *L)
 	/* box.backup = {<...>} */
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.backup", 0);
 	luaL_setfuncs(L, boxlib_backup, 0);
+	lua_pop(L, 1);
+
+	/* box.internal = {<...>} */
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	luaL_setfuncs(L, boxlib_internal, 0);
 	lua_pop(L, 1);
 
 	box_lua_init_minimal(L);
