@@ -724,7 +724,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	    (stmt->old_tuple || stmt->new_tuple)) {
 		if (space_has_on_replace_triggers(stmt->space)) {
 			txn->space_on_replace_triggers_depth++;
-			int rc = space_on_replace(stmt->space, txn);
+			int rc = space_on_replace(stmt->space, stmt);
 			txn->space_on_replace_triggers_depth--;
 			if (rc != 0)
 				goto fail;
@@ -1805,10 +1805,10 @@ txn_attach(struct txn *txn)
 }
 
 void
-txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt)
+txn_stmt_mark_as_temporary(struct txn_stmt *stmt)
 {
 	assert(stmt->row != NULL);
 	/* Revert row counter increases. */
-	txn_update_row_counts(txn, stmt, -1);
+	txn_update_row_counts(stmt->txn, stmt, -1);
 	stmt->row = NULL;
 }

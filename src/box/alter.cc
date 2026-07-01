@@ -2139,13 +2139,12 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
  * this replica.
  */
 static int
-filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
+filter_temporary_ddl_stmt(struct txn_stmt *stmt, const struct space_def *def)
 {
 	if (def == NULL)
 		return 0;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
 	if (space_opts_is_temporary(&def->opts)) {
-		txn_stmt_mark_as_temporary(txn, stmt);
+		txn_stmt_mark_as_temporary(stmt);
 		return 0;
 	}
 	if (stmt->row->replica_id == 0 && recovery_state != INITIAL_RECOVERY)
@@ -2180,8 +2179,7 @@ filter_temporary_ddl_stmt(struct txn *txn, const struct space_def *def)
 static int
 before_replace_dd_space_index(struct trigger *trigger, void *event)
 {
-	struct txn *txn = (struct txn *)event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	uint32_t id;
@@ -2264,8 +2262,7 @@ before_replace_dd_space_index(struct trigger *trigger, void *event)
 static int
 on_replace_dd_space(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct region *region = &fiber()->gc;
@@ -2301,7 +2298,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		if (def != NULL)
 			space_def_delete(def);
 	});
-	if (filter_temporary_ddl_stmt(txn, old_space != NULL ?
+	if (filter_temporary_ddl_stmt(stmt, old_space != NULL ?
 				      old_space->def : def) != 0)
 		return -1;
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
@@ -2625,8 +2622,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 static int
 on_replace_dd_index(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	uint32_t id, iid;
@@ -2642,7 +2638,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct space *old_space = space_cache_find(id);
 	if (old_space == NULL)
 		return -1;
-	if (filter_temporary_ddl_stmt(txn, old_space->def) != 0)
+	if (filter_temporary_ddl_stmt(stmt, old_space->def) != 0)
 		return -1;
 	if (old_space->def->opts.is_view) {
 		diag_set(ClientError, ER_ALTER_SPACE, space_name(old_space),
@@ -2862,8 +2858,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 static int
 on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *new_tuple = stmt->new_tuple;
 
 	if (recovery_state == INITIAL_RECOVERY) {
@@ -2882,7 +2877,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	if (old_space == NULL)
 		return -1;
 	if (space_is_temporary(old_space))
-		txn_stmt_mark_as_temporary(txn, stmt);
+		txn_stmt_mark_as_temporary(stmt);
 
 	if (new_tuple == NULL) {
 		/* Space drop - nothing else to do. */
@@ -2943,7 +2938,7 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 		 * The trigger is invoked after txn->n_local_rows
 		 * is counted, so don't forget to update it here.
 		 */
-		++txn->n_local_rows;
+		++stmt->txn->n_local_rows;
 	}
 
 	try {
@@ -3162,8 +3157,7 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_user(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -3571,8 +3565,7 @@ on_drop_func_rollback(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_func(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -3835,8 +3828,7 @@ on_drop_collation_rollback(struct trigger *trigger, void *event)
 static int
 on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	if (new_tuple == NULL && old_tuple != NULL) {
@@ -4219,8 +4211,7 @@ modify_priv(struct trigger *trigger, void *event)
 static int
 on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	struct priv_def priv;
@@ -4352,8 +4343,7 @@ on_commit_cluster_name(struct trigger *trigger, void * /* event */)
 static int
 before_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *)event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	const char *key = tuple_field_cstr(new_tuple != NULL ?
@@ -4449,8 +4439,8 @@ on_commit_schema_set_bootstrap_leader_uuid(struct trigger *trigger, void *event)
 static int
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
+	struct txn *txn = stmt->txn;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	const char *key = tuple_field_cstr(new_tuple ? new_tuple : old_tuple,
@@ -4739,10 +4729,9 @@ on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
 
 /** Set instance name on _cluster update. */
 static int
-on_replace_dd_cluster_set_name(struct replica *replica,
-			       const char *new_name)
+on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
+			       struct txn_stmt *stmt)
 {
-	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	assert(replica->id != REPLICA_ID_NIL);
 	if (strcmp(replica->name, new_name) == 0)
 		return 0;
@@ -4783,7 +4772,8 @@ on_replace_dd_cluster_set_name(struct replica *replica,
 /** Set instance UUID on _cluster update. */
 static int
 on_replace_dd_cluster_set_uuid(struct replica *replica,
-			       const struct replica_def *new_def)
+			       const struct replica_def *new_def,
+			       struct txn_stmt *stmt)
 {
 	struct replica *old_replica = replica;
 	if (replica_has_connections(old_replica)) {
@@ -4830,7 +4820,6 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 	replica_set_name(new_replica, old_def->name);
 	on_rollback_drop_new->data = new_replica;
 	on_rollback_add_old->data = old_def;
-	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
 	txn_stmt_on_rollback(stmt, on_rollback_add_old);
 	return 0;
@@ -4839,7 +4828,8 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 /** _cluster update - both old and new tuples are present. */
 static int
 on_replace_dd_cluster_update(const struct replica_def *old_def,
-			     const struct replica_def *new_def)
+			     const struct replica_def *new_def,
+			     struct txn_stmt *stmt)
 {
 	assert(new_def->id == old_def->id);
 	struct replica *replica = replica_by_id(new_def->id);
@@ -4859,19 +4849,19 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 		if (recovery_state == FINISHED_RECOVERY &&
 		    gc_erase_consumer(&replica->uuid) != 0)
 			return -1;
-		if (on_replace_dd_cluster_set_uuid(replica, new_def) != 0)
+		if (on_replace_dd_cluster_set_uuid(replica, new_def, stmt) != 0)
 			return -1;
 		/* The replica was re-created. */
 		replica = replica_by_id(new_def->id);
 	}
-	return on_replace_dd_cluster_set_name(replica, new_def->name);
+	return on_replace_dd_cluster_set_name(replica, new_def->name, stmt);
 }
 
 /** _cluster insert - only a new tuple is present. */
 static int
-on_replace_dd_cluster_insert(const struct replica_def *new_def)
+on_replace_dd_cluster_insert(const struct replica_def *new_def,
+			     struct txn_stmt *stmt)
 {
-	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	struct replica *replica = replica_by_id(new_def->id);
 	/*
 	 * With read-views enabled there might be already a replica whose
@@ -4919,14 +4909,14 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def)
 		replica = replicaset_add(new_def->id, &new_def->uuid);
 	on_rollback->data = replica;
 	txn_stmt_on_rollback(stmt, on_rollback);
-	return on_replace_dd_cluster_set_name(replica, new_def->name);
+	return on_replace_dd_cluster_set_name(replica, new_def->name, stmt);
 }
 
 /** _cluster delete - only the old tuple is present. */
 static int
-on_replace_dd_cluster_delete(const struct replica_def *old_def)
+on_replace_dd_cluster_delete(const struct replica_def *old_def,
+			     struct txn_stmt *stmt)
 {
-	struct txn_stmt *stmt = txn_current_stmt(in_txn());
 	/*
 	 * It's okay to delete the instance id when the deletion is coming from
 	 * the master or doing recovery (i.e., after we already applied the
@@ -4988,29 +4978,29 @@ static int
 on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct replica_def *new_def = NULL;
 	struct replica_def *old_def = NULL;
 	if (stmt->new_tuple != NULL) {
 		new_def = replica_def_new_from_tuple(stmt->new_tuple,
-						     &txn->region);
+						     &stmt->txn->region);
 		if (new_def == NULL)
 			return -1;
 	}
 	if (stmt->old_tuple != NULL) {
 		old_def = replica_def_new_from_tuple(stmt->old_tuple,
-						     &txn->region);
+						     &stmt->txn->region);
 		if (old_def == NULL)
 			return -1;
 	}
 	if (new_def != NULL) {
 		if (old_def != NULL)
-			return on_replace_dd_cluster_update(old_def, new_def);
-		return on_replace_dd_cluster_insert(new_def);
+			return on_replace_dd_cluster_update(old_def, new_def,
+							    stmt);
+		return on_replace_dd_cluster_insert(new_def, stmt);
 	}
 	assert(old_def != NULL);
-	return on_replace_dd_cluster_delete(old_def);
+	return on_replace_dd_cluster_delete(old_def, stmt);
 }
 
 /* }}} cluster configuration */
@@ -5141,8 +5131,7 @@ on_alter_sequence_rollback(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -5259,8 +5248,7 @@ on_drop_sequence_data_rollback(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_sequence_data(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -5408,8 +5396,7 @@ clear_space_sequence(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *tuple = stmt->new_tuple ? stmt->new_tuple : stmt->old_tuple;
 	uint32_t space_id;
 	if (tuple_field_u32(tuple, BOX_SPACE_SEQUENCE_FIELD_ID, &space_id) != 0)
@@ -5589,8 +5576,7 @@ on_replace_trigger_commit(struct trigger *trigger, void * /* event */)
 static int
 on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 {
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 
@@ -5710,8 +5696,7 @@ static int
 on_replace_dd_func_index(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 

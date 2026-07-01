@@ -202,7 +202,8 @@ static int
 on_replace_dd_system_space(struct trigger *trigger, void *event)
 {
 	(void) trigger;
-	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
+	struct txn *txn = stmt->txn;
 	if (txn->space_on_replace_triggers_depth > 1) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 "Space on_replace trigger", "DDL operations");
