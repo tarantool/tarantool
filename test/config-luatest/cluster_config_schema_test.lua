@@ -363,6 +363,7 @@ g.test_defaults = function()
                 timeout = 3,
                 reconnect_after = 3,
             },
+            checks = 'off',
         },
         feedback = box.internal.feedback_daemon ~= nil and {
             crashinfo = true,
