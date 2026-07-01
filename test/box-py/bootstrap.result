@@ -116,6 +116,8 @@ box.space._space:select{}
   - [396, 1, '_recovery_point', 'memtx', 0, {}, [{'name': 'timestamp', 'type': 'double'},
       {'name': 'replica_id', 'type': 'unsigned'}, {'name': 'lsn', 'type': 'unsigned'},
       {'name': 'opts', 'type': 'map'}]]
+  - [404, 1, '_replicaset_ctl', 'blackhole', 0, {}, [{'name': 'name', 'type': 'string'},
+      {'name': 'opts', 'type': 'map'}]]
 ...
 box.space._index:select{}
 ---

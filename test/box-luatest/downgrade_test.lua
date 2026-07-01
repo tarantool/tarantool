@@ -1114,3 +1114,33 @@ g.test_downgrade_recovery_point = function(cg)
         check_after_downgrade()
     end)
 end
+
+g.test_downgrade_replicaset_ctl = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local setmap = require('internal.utils').setmap
+
+        box.space._replicaset_ctl:insert({'recovery_point_create', setmap({})})
+        box.space._replicaset_ctl:insert({'recovery_point_create', setmap({})})
+
+        local function check_before_downgrade()
+            t.assert_not_equals(box.space._replicaset_ctl, nil)
+        end
+        local function check_after_downgrade()
+            t.assert_equals(box.space._recovery_point, nil)
+        end
+
+        local app_version = helper.app_version('3.8.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        check_before_downgrade()
+
+        local prev_version = helper.prev_version('3.8.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        check_before_downgrade()
+        box.schema.downgrade(prev_version)
+        check_after_downgrade()
+        box.schema.downgrade(prev_version)
+        check_after_downgrade()
+    end)
+end

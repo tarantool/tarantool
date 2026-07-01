@@ -1536,8 +1536,22 @@ local function create_recovery_point()
     _index:insert{space_id, 0, 'primary', 'tree', {unique = true}, parts}
 end
 
+local function create_replicaset_ctl()
+    local _space = box.space[box.schema.SPACE_ID]
+    local space_id = box.schema.REPLICASET_CTL_ID
+
+    log.info("create space _replicaset_ctl")
+    local format = {
+        {name = 'name', type = 'string'},
+        {name = 'opts', type = 'map'},
+    }
+    _space:insert{space_id, ADMIN, '_replicaset_ctl', 'blackhole', 0,
+                  utils.setmap({}), format}
+end
+
 local function upgrade_to_3_8_0()
     create_recovery_point()
+    create_replicaset_ctl()
 end
 
 --------------------------------------------------------------------------------
@@ -2162,8 +2176,21 @@ local function drop_recovery_point(issue_handler)
     _space:delete{space_id}
 end
 
+local function drop_replicaset_ctl(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+
+    local _space = box.space[box.schema.SPACE_ID]
+    local space_id = box.schema.REPLICASET_CTL_ID
+
+    log.info("drop space _replicaset_ctl")
+    _space:delete{space_id}
+end
+
 local function downgrade_from_3_8_0(issue_handler)
     drop_recovery_point(issue_handler)
+    drop_replicaset_ctl(issue_handler)
 end
 
 -- Versions should be ordered from newer to older.

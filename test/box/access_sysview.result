@@ -246,7 +246,7 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 29
+- 30
 ...
 #box.space._vindex:select{}
 ---
