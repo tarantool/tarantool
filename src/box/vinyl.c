@@ -2177,6 +2177,34 @@ request_normalize_ops(struct request *request)
 }
 
 /**
+ * Check whether UPSERT operations may modify a field guarded by a
+ * constraint, or the space has tuple-level constraints.
+ *
+ * @param format      Space format.
+ * @param column_mask Bitmask of the upsert operation.
+ *
+ * @retval true  Slow path is required: apply ops and validate the result.
+ * @retval false Deferred UPSERT is safe w.r.t. constraints.
+ */
+static bool
+vy_upsert_touch_constrained_fields(struct tuple_format *format,
+				   uint64_t column_mask)
+{
+	if (format->constraint_count > 0)
+		return true;
+
+	uint32_t field_count = tuple_format_field_count(format);
+	for (uint32_t i = 0; i < field_count; i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		if (field->constraint_count == 0)
+			continue;
+		if (column_mask_fieldno_is_set(column_mask, field->id))
+			return true;
+	}
+	return false;
+}
+
+/**
  * Execute UPSERT in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -2200,9 +2228,16 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 	if (vy_is_committed(env, pk))
 		return 0;
-	/* Check update operations. */
-	if (xrow_update_check_ops(request->ops, request->ops_end,
-				  pk->format, request->index_base) != 0) {
+
+	struct xrow_update update;
+	xrow_update_init(&update, request->index_base);
+	size_t region_svp = region_used(&fiber()->gc);
+	/* Check update operations and fill column mask. */
+	int rc = xrow_update_read_ops(&update, request->ops, request->ops_end,
+				      pk->format->dict, 0);
+	region_truncate(&fiber()->gc, region_svp);
+
+	if (rc != 0) {
 		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
@@ -2219,7 +2254,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 
 	if (space->index_count == 1 && !space_has_on_replace_triggers(space) &&
-	    !space->has_foreign_keys && space->wal_ext == NULL)
+	    !space->has_foreign_keys && space->wal_ext == NULL &&
+	    !vy_upsert_touch_constrained_fields(pk->format, update.column_mask))
 		return vy_lsm_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
 	const char *old_tuple, *old_tuple_end;
@@ -2241,7 +2277,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					MULTIKEY_NONE);
 	if (key == NULL)
 		return -1;
-	int rc = vy_get(pk, tx, vy_tx_read_view(tx), key, &stmt->old_tuple);
+	rc = vy_get(pk, tx, vy_tx_read_view(tx), key, &stmt->old_tuple);
 	tuple_unref(key);
 	if (rc != 0)
 		return -1;
@@ -2260,7 +2296,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	old_tuple = tuple_data_range(stmt->old_tuple, &old_size);
 	old_tuple_end = old_tuple + old_size;
 
-	size_t region_svp = region_used(&fiber()->gc);
+	region_svp = region_used(&fiber()->gc);
 	/* Apply upsert operations to the old tuple. */
 	new_tuple = xrow_upsert_execute(ops, ops_end, old_tuple, old_tuple_end,
 					pk->format, &new_size, 0, false,
