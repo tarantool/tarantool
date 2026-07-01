@@ -28,6 +28,11 @@ local function drop_alert_if_exists(key)
     return true
 end
 
+-- Return true if all checks are disabled via config.checks = 'off'.
+local function checks_disabled(configdata)
+    return configdata:get('config.checks', {use_default = true}) == 'off'
+end
+
 -- {{{ System checks registry
 
 -- List of system checks to perform.
@@ -64,7 +69,17 @@ end
 
 -- {{{ Check if any check is enabled
 
+-- Drop all alerts created by the checks applier.
+local function drop_all_alerts()
+    for _, check in ipairs(checks) do
+        drop_alert_if_exists(check.key)
+    end
+end
+
 local function any_check_enabled(configdata)
+    if checks_disabled(configdata) then
+        return false
+    end
     for _, check in ipairs(checks) do
         if configdata:get('config.checks.' .. check.key,
             {use_default = true}) then
@@ -88,7 +103,8 @@ local function checks_fiber_f(config)
         check_cond:wait(check_interval)
         local status = config._status
         if status ~= 'startup_in_progress' and
-           status ~= 'reload_in_progress' then
+           status ~= 'reload_in_progress' and
+           not checks_disabled(config._configdata) then
             local changed = run_checks(config)
             if changed then
                 config:_set_status_based_on_alerts()
@@ -119,6 +135,12 @@ local function apply(config)
     end
 
     local configdata = config._configdata
+
+    if checks_disabled(configdata) then
+        drop_all_alerts()
+        stop_fiber()
+        return
+    end
 
     run_checks(config)
     if any_check_enabled(configdata) then
