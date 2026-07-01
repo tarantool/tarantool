@@ -222,6 +222,9 @@ struct event *box_on_recovery_state_event;
 /** Cached event 'tarantool.trigger.on_change'. */
 static struct event *tarantool_trigger_on_change_event;
 
+static uint64_t box_recovery_point_count_max = 10000;
+TWEAK_UINT(box_recovery_point_count_max);
+
 /**
  * Recovery states supported by on_recovery_state triggers.
  * Are positioned in the order of appearance during initial box.cfg().
@@ -6050,6 +6053,7 @@ box_backup_collect_full(const struct vclock *checkpoint_vclock,
 			  backup) == 0);
 	vclock_copy(&backup->vclock, vclock);
 	vclock_clear(&backup->prev_vclock);
+	vclock_copy(&backup->checkpoint_vclock, checkpoint_vclock);
 	return 0;
 }
 
@@ -6067,6 +6071,7 @@ box_backup_collect_incremental(const struct vclock *from_vclock,
 		return -1;
 	vclock_copy(&backup->vclock, vclock);
 	vclock_copy(&backup->prev_vclock, from_vclock);
+	vclock_clear(&backup->checkpoint_vclock);
 	return 0;
 }
 
@@ -6149,6 +6154,105 @@ box_backup_stop(void)
 		box_backup_free(box_backup);
 		box_backup = NULL;
 	}
+}
+
+/** On commit trigger callback for recovery point creation. */
+static int
+box_recovery_point_on_commit(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct recovery_point *point = (struct recovery_point *)trigger->data;
+	struct xrow_header *last_row = NULL;
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &in_txn()->stmts, next) {
+		if (stmt->row != NULL)
+			last_row = stmt->row;
+	}
+	assert(last_row != NULL);
+	if (last_row->replica_id == instance_id) {
+		point->lsn = last_row->lsn;
+		point->timestamp = last_row->tm;
+	} else {
+		point->lsn = -1;
+	}
+	return 0;
+}
+
+int
+box_recovery_point_create(const char *label, struct recovery_point *point)
+{
+	static struct latch latch = LATCH_INITIALIZER(latch);
+	latch_lock(&latch);
+	auto latch_guard = make_scoped_guard([=] {
+		latch_unlock(&latch);
+	});
+	struct txn *txn;
+	if (in_txn() != NULL) {
+		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
+		return -1;
+	}
+	txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	auto txn_guard = make_scoped_guard([=] {
+		txn_abort(txn);
+	});
+	char key[1];
+	char *key_end;
+	ssize_t count;
+	key_end = mp_encode_array(key, 0);
+	count = box_index_count(BOX_RECOVERY_POINT_ID, /*index_id=*/0,
+				ITER_GE, key, key_end);
+	if (count < 0)
+		return -1;
+	if ((uint64_t)count >= box_recovery_point_count_max) {
+		box_tuple_t *tuple;
+		if (box_index_min(BOX_RECOVERY_POINT_ID, /*index_id=*/0,
+				  key, key_end, &tuple) != 0)
+			return -1;
+		assert(tuple != NULL);
+		const char *data = box_tuple_data(tuple, /*bsize=*/NULL);
+		VERIFY(mp_decode_array(&data) >= 3);
+		double timestamp;
+		uint32_t replica_id;
+		int64_t lsn;
+		assert(mp_typeof(*data) == MP_DOUBLE);
+		timestamp = mp_decode_double(&data);
+		assert(mp_typeof(*data) == MP_UINT);
+		replica_id = mp_decode_uint(&data);
+		assert(mp_typeof(*data) == MP_UINT);
+		lsn = mp_decode_uint(&data);
+		if (boxk(IPROTO_DELETE, BOX_RECOVERY_POINT_ID, "[%lf%u%u]",
+			 timestamp, replica_id, lsn) != 0)
+			return -1;
+	}
+	if (boxk(IPROTO_INSERT, BOX_REPLICASET_CTL_ID, "[%s{}]",
+		 "recovery_point_create") != 0)
+		return -1;
+	struct trigger on_commit;
+	trigger_create(&on_commit, box_recovery_point_on_commit, point, NULL);
+	txn_on_commit(txn, &on_commit);
+	txn_guard.is_active = false;
+	if (txn_commit(txn) != 0)
+		return -1;
+
+	if (point->lsn == -1) {
+		diag_set(ClientError, ER_RECOVERY_POINT_TXN_LAST_ROW);
+		return -1;
+	}
+	if (label == NULL) {
+		if (boxk(IPROTO_INSERT, BOX_RECOVERY_POINT_ID,
+			 "[%lf%u%" PRIi64 "{}]",
+			 point->timestamp, instance_id, point->lsn) != 0)
+			return -1;
+	} else {
+		if (boxk(IPROTO_INSERT, BOX_RECOVERY_POINT_ID,
+			 "[%lf%u%" PRIi64 "{%s%s}]",
+			 point->timestamp, instance_id, point->lsn,
+			 "label", label) != 0)
+			return -1;
+	}
+	return 0;
 }
 
 API_EXPORT const char *

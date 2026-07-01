@@ -44,6 +44,7 @@
 #include "lua/builtin_modcache.h"
 
 #include "box/box.h"
+#include "box/replication.h"
 #include "box/txn.h"
 #include "box/func.h"
 #include "box/mp_error.h"
@@ -115,6 +116,7 @@ extern char session_lua[],
 	app_threads_lua[],
 	checks_version_lua[],
 	checks_lua[],
+	backup_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
 	metrics_cartridge_issues_lua[],
@@ -342,6 +344,7 @@ static const char * const lua_sources_main[] = {
 	"box/version", NULL, internal_version_lua,
 	"box/upgrade", NULL, upgrade_lua,
 	"box/console", "console", console_lua,
+	"box/backup", NULL, backup_lua,
 
 	/* {{{ config */
 
@@ -893,6 +896,8 @@ lbox_backup_info(struct lua_State *L)
 		lua_pushstring(L, "incremental");
 		lua_setfield(L, -2, "type");
 	} else {
+		luaT_pushvclock(L, &backup->checkpoint_vclock);
+		lua_setfield(L, -2, "checkpoint_vclock");
 		lua_pushstring(L, "full");
 		lua_setfield(L, -2, "type");
 	}
@@ -900,6 +905,49 @@ lbox_backup_info(struct lua_State *L)
 	if (backup->ttl != TIMEOUT_INFINITY) {
 		lua_pushnumber(L, backup->start_time + backup->ttl);
 		lua_setfield(L, -2, "expires_at");
+	}
+
+	return 1;
+}
+
+/**
+ * Create recovery point. Arguments: name.
+ */
+static int
+lbox_recovery_point_create(struct lua_State *L)
+{
+	const char *label = NULL;
+	if (lua_gettop(L) != 0) {
+		if (!lua_istable(L, 1)) {
+			diag_set(IllegalParams, "expected table as 1 argument");
+			luaT_error(L);
+		}
+		lua_getfield(L, 1, "label");
+		if (!lua_isnil(L, -1)) {
+			label = lua_tostring(L, -1);
+			if (label == NULL) {
+				diag_set(IllegalParams,
+					 "label option should be string");
+				luaT_error(L);
+			}
+		}
+		lua_pop(L, 1);
+	}
+
+	struct recovery_point point;
+	if (box_recovery_point_create(label, &point) != 0)
+		return luaT_error(L);
+
+	lua_createtable(L, /*narray=*/0, /*nrec=*/4);
+	lua_pushnumber(L, point.timestamp);
+	lua_setfield(L, -2, "timestamp");
+	lua_pushinteger(L, instance_id);
+	lua_setfield(L, -2, "replica_id");
+	luaL_pushuint64(L, point.lsn);
+	lua_setfield(L, -2, "lsn");
+	if (label != NULL) {
+		lua_pushstring(L, label);
+		lua_setfield(L, -2, "label");
 	}
 
 	return 1;
@@ -918,7 +966,12 @@ static const struct luaL_Reg boxlib[] = {
 static const struct luaL_Reg boxlib_backup[] = {
 	{"start", lbox_backup_start},
 	{"stop", lbox_backup_stop},
-	{"info", lbox_backup_info},
+	{NULL, NULL}
+};
+
+static const struct luaL_Reg boxlib_internal[] = {
+	{"backup_info", lbox_backup_info},
+	{"recovery_point_create", lbox_recovery_point_create},
 	{NULL, NULL}
 };
 
@@ -1043,6 +1096,11 @@ box_lua_init(struct lua_State *L)
 	/* box.backup = {<...>} */
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.backup", 0);
 	luaL_setfuncs(L, boxlib_backup, 0);
+	lua_pop(L, 1);
+
+	/* box.internal = {<...>} */
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	luaL_setfuncs(L, boxlib_internal, 0);
 	lua_pop(L, 1);
 
 	box_lua_init_minimal(L);
