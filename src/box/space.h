@@ -51,6 +51,7 @@ struct space;
 struct engine;
 struct sequence;
 struct txn;
+struct txn_stmt;
 struct request;
 struct port;
 struct tuple;
@@ -582,7 +583,7 @@ space_has_before_replace_event_triggers(struct space *space)
  * Run on_replace triggers registered for a space.
  */
 int
-space_on_replace(struct space *space, struct txn *txn);
+space_on_replace(struct space *space, struct txn_stmt *stmt);
 
 /**
  * Execute a DML request on the given space.

@@ -880,12 +880,8 @@ space_index_def(struct space *space, int n)
  * to port_c. Transaction mustn't be aborted.
  */
 static void
-space_push_replace_trigger_arguments(struct port *args, struct txn *txn)
+space_push_replace_trigger_arguments(struct port *args, struct txn_stmt *stmt)
 {
-	assert(txn_check_can_continue(txn) == 0);
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt != NULL);
-
 	if (stmt->old_tuple != NULL)
 		port_c_add_tuple(args, stmt->old_tuple);
 	else
@@ -924,7 +920,7 @@ space_push_replace_trigger_arguments(struct port *args, struct txn *txn)
  * Updated tuple is validated against the space format.
  */
 static int
-space_run_replace_triggers(struct event *event, struct txn *txn,
+space_run_replace_triggers(struct event *event, struct txn_stmt *stmt,
 			   bool update_tuple)
 {
 	if (!space_events_enabled)
@@ -932,11 +928,9 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 	/** Return early if event has no triggers or if txn can't continue. */
 	if (!event_has_triggers(event))
 		return 0;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt != NULL);
 	if (stmt->space->run_recovery_triggers)
 		say_warn_once("space on recovery triggers are deprecated");
-	int rc = txn_check_can_continue(txn);
+	int rc = txn_check_can_continue(stmt->txn);
 	if (rc != 0)
 		return -1;
 
@@ -948,7 +942,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 	/* Don't pass port for returned values if we don't update tuple. */
 	struct port *ret_ptr = update_tuple ? &ret : NULL;
 	port_c_create(&args);
-	space_push_replace_trigger_arguments(&args, txn);
+	space_push_replace_trigger_arguments(&args, stmt);
 	while (rc == 0 && event_trigger_iterator_next(&it, &trigger, &name)) {
 		bool has_ret = false;
 		uint32_t region_svp = region_used(&fiber()->gc);
@@ -956,7 +950,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		 * The transaction could be aborted while the previous trigger
 		 * was running (e.g. if the trigger callback yielded).
 		 */
-		rc = txn_check_can_continue(txn);
+		rc = txn_check_can_continue(stmt->txn);
 		if (rc != 0)
 			goto out;
 		rc = func_adapter_call(trigger, &args, ret_ptr);
@@ -972,7 +966,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		 * The transaction could be aborted while the trigger was
 		 * running (e.g. if the trigger callback yielded).
 		 */
-		rc = txn_check_can_continue(txn);
+		rc = txn_check_can_continue(stmt->txn);
 		if (rc != 0)
 			goto out;
 		/*
@@ -1016,7 +1010,7 @@ space_run_replace_triggers(struct event *event, struct txn *txn,
 		/* Can't update values in port - destroy it and create again. */
 		port_destroy(&args);
 		port_c_create(&args);
-		space_push_replace_trigger_arguments(&args, txn);
+		space_push_replace_trigger_arguments(&args, stmt);
 out:
 		if (has_ret)
 			port_destroy(&ret);
@@ -1028,7 +1022,7 @@ out:
 }
 
 int
-space_on_replace(struct space *space, struct txn *txn)
+space_on_replace(struct space *space, struct txn_stmt *stmt)
 {
 	/*
 	 * Since the triggers can yield, a space can be dropped
@@ -1041,9 +1035,9 @@ space_on_replace(struct space *space, struct txn *txn)
 	};
 	for (size_t i = 0; i < lengthof(events); ++i)
 		event_ref(events[i]);
-	int rc = trigger_run(&space->on_replace, txn);
+	int rc = trigger_run(&space->on_replace, stmt);
 	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
-		rc = space_run_replace_triggers(events[i], txn, false);
+		rc = space_run_replace_triggers(events[i], stmt, false);
 	for (size_t i = 0; i < lengthof(events); ++i)
 		event_unref(events[i]);
 	return rc;
@@ -1295,9 +1289,9 @@ after_old_tuple_lookup:;
 	 */
 	for (size_t i = 0; i < lengthof(events); ++i)
 		event_ref(events[i]);
-	int rc = trigger_run(&space->before_replace, txn);
+	int rc = trigger_run(&space->before_replace, stmt);
 	for (size_t i = 0; i < lengthof(events) && rc == 0; ++i)
-		rc = space_run_replace_triggers(events[i], txn, true);
+		rc = space_run_replace_triggers(events[i], stmt, true);
 	for (size_t i = 0; i < lengthof(events); ++i)
 		event_unref(events[i]);
 

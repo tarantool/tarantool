@@ -980,7 +980,7 @@ txn_is_nop(const struct txn *txn)
  * The downside of confusing control flow is outweighed by the efficiency.
  */
 void
-txn_stmt_mark_as_temporary(struct txn *txn, struct txn_stmt *stmt);
+txn_stmt_mark_as_temporary(struct txn_stmt *stmt);
 
 /**
  * End a statement. In autocommit mode, end
