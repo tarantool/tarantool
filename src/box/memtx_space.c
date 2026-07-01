@@ -1072,9 +1072,8 @@ struct memtx_ddl_state {
 static int
 memtx_check_on_replace(struct trigger *trigger, void *event)
 {
-	struct txn *txn = event;
 	struct memtx_ddl_state *state = trigger->data;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 
 	/* Nothing to check on DELETE. */
 	if (stmt->new_tuple == NULL)
@@ -1283,9 +1282,8 @@ memtx_build_on_replace_commit(struct trigger *base, void *event)
 static int
 memtx_build_on_replace(struct trigger *trigger, void *event)
 {
-	struct txn *txn = event;
 	struct memtx_ddl_state *state = trigger->data;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = (struct txn_stmt *)event;
 
 	struct tuple *cmp_tuple = stmt->new_tuple != NULL ? stmt->new_tuple :
 							    stmt->old_tuple;

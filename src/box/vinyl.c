@@ -1076,8 +1076,7 @@ struct vy_check_format_ctx {
 static int
 vy_check_format_on_replace(struct trigger *trigger, void *event)
 {
-	struct txn *txn = event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = event;
 	struct vy_check_format_ctx *ctx = trigger->data;
 
 	if (stmt->new_tuple == NULL)
@@ -4080,12 +4079,11 @@ struct vy_build_ctx {
 static int
 vy_build_on_replace(struct trigger *trigger, void *event)
 {
-	struct txn *txn = event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = event;
 	struct vy_build_ctx *ctx = trigger->data;
 	struct tuple_format *format = ctx->format;
 	struct vy_lsm *lsm = ctx->lsm;
-	struct vy_tx *tx = txn->engines_tx[lsm->base.engine->id];
+	struct vy_tx *tx = stmt->txn->engines_tx[lsm->base.engine->id];
 
 	if (ctx->is_failed)
 		return 0; /* already failed, nothing to do */
@@ -4607,8 +4605,8 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 {
 	(void)trigger;
 
-	struct txn *txn = event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct txn_stmt *stmt = event;
+	struct txn *txn = stmt->txn;
 	bool is_first_statement = txn_is_first_statement(txn);
 
 	if (stmt->new_tuple == NULL)
