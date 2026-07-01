@@ -54,10 +54,27 @@ static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
 	      "There must be a range for TX manager's internal use");
 
 /**
- * Link that connects a memtx_story with older and newer stories of the same
- * key in index.
+ * Link that connects a memtx story with older and newer stories of one logical
+ * index entry.
+ *
+ * Links are created lazily for clean tuples: a caller that has read or
+ * replaced a concrete memtx_index_entry asks memtx_tx_story_link_get() for
+ * that entry, and the missing link is materialized from the entry hint.
+ * Operations that walk or rewrite all entries of a story must force all links
+ * first. Excluded entries are not physically stored in indexes and never get
+ * story links. Functional-key hints are referenced by their links and released
+ * when the links are destroyed.
  */
 struct memtx_story_link {
+	/** Backlink to the story this key is associated with. */
+	struct memtx_story *story;
+	/**
+	 * Entry discriminator; see memtx_index_entry::hint. Regular links keep
+	 * HINT_NONE and are resolved directly from story->link[index_id].
+	 */
+	hint_t hint;
+	/** Whether this link owns a reference to the functional key in hint. */
+	bool is_func;
 	/**
 	 * For a statement in transaction `TXN`, `is_own_change == true`
 	 * in story `A` for index `I` means:
@@ -71,9 +88,9 @@ struct memtx_story_link {
 	 */
 	bool is_own_change;
 	/** Story that was happened after that story was ended. */
-	struct memtx_story *newer_story;
+	struct memtx_story_link *newer_link;
 	/** Story that was happened before that story was started. */
-	struct memtx_story *older_story;
+	struct memtx_story_link *older_link;
 	/** List of gap items @sa gap_item. */
 	struct rlist read_gaps;
 	/**
@@ -81,13 +98,15 @@ struct memtx_story_link {
 	 * to that index is stored.
 	 */
 	struct index *in_index;
+	/** Link in the list of the story's entries. */
+	struct rlist link;
 };
 
 /**
  * A part of a history of a value in space.
  * It's a story about a tuple, from the point it was added to space to the
- * point when it was deleted from a space.
- * All stories are linked into a list of stories of the same key of each index.
+ * point when it was deleted from a space. Materialized story links connect
+ * stories into lists of the same key of each index.
  */
 struct memtx_story {
 	/** The story is about this tuple. The tuple is referenced. */
@@ -130,6 +149,11 @@ struct memtx_story {
 	 */
 	struct rlist in_space_stories;
 	/**
+	 * Space that owns this story. Used to force lazily-created links
+	 * before GC and full index rewrites.
+	 */
+	struct space *space;
+	/**
 	 * Number of indexes in this space - and the count of link[].
 	 */
 	uint32_t index_count;
@@ -144,15 +168,13 @@ struct memtx_story {
 	 * the story is the only reason why @a tuple cannot be deleted.
 	 */
 	bool tuple_is_retained;
-	/**
-	 * Whether there is an associated functional key in `func_key_storage`.
-	 */
-	bool has_func_key;
+	/* Total memory overhead of this story. */
+	size_t size;
 	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
 	 */
-	struct memtx_story_link link[];
+	struct rlist link[];
 };
 
 static uint32_t
@@ -376,10 +398,8 @@ memtx_tx_delete_gap(struct gap_item_base *item);
 struct point_hole_key {
 	/** Index in which we are looking. */
 	struct index *index;
-	/** We use tuple as a key - it is compared to key of point_hole_item. */
-	struct tuple *tuple;
-	/** Functional key of the tuple, must be set if index is functional. */
-	struct tuple *func_key;
+	/* Index entry which we are looking for. */
+	struct memtx_index_entry entry;
 };
 
 /** Combine hash of index with hash of tuple. */
@@ -396,14 +416,25 @@ point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
 	uint32_t tuple_hash = 0;
-	if (likely(!def->for_func_index)) {
-		assert(key->func_key == NULL);
-		tuple_hash = def->tuple_hash(key->tuple, def);
-	} else {
-		assert(key->func_key != NULL);
-		const char *data = tuple_data(key->func_key);
+	if (likely(!def->is_multikey && !def->for_func_index)) {
+		assert(key->entry.hint == HINT_NONE);
+		tuple_hash = def->tuple_hash(key->entry.tuple, def);
+	} else if (def->for_func_index) {
+		assert(key->entry.hint != HINT_NONE);
+		const char *data = tuple_data((struct tuple *)key->entry.hint);
 		mp_decode_array(&data);
 		tuple_hash = key_hash(data, def);
+	} else {
+		assert(key->entry.hint != HINT_NONE);
+		uint32_t key_size;
+		struct region *region = &fiber()->gc;
+		size_t region_svp = region_used(region);
+		const char *data = tuple_extract_key(key->entry.tuple, def,
+						     (int)key->entry.hint,
+						     &key_size);
+		mp_decode_array(&data);
+		tuple_hash = key_hash(data, def);
+		region_truncate(region, region_svp);
 	}
 	return point_hole_storage_combine_index_and_tuple_hash(key->index,
 							       tuple_hash);
@@ -431,17 +462,15 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 	if (key->index != object->index)
 		return 1;
 	assert(key->index != NULL);
-	assert(key->tuple != NULL);
+	assert(key->entry.tuple != NULL);
 	struct key_def *def = key->index->def->key_def;
-	uint64_t tuple_hint = HINT_NONE;
-	if (unlikely(def->for_func_index))
-		tuple_hint = (uint64_t)key->func_key;
 	/*
 	 * Note that it's OK to always pass HINT_NONE for the key - hints
 	 * won't be used then if the index is not functional.
 	 */
-	return tuple_compare_with_key(key->tuple, tuple_hint, object->key,
-				      def->part_count, HINT_NONE, def);
+	return tuple_compare_with_key(key->entry.tuple, key->entry.hint,
+				      object->key, def->part_count, HINT_NONE,
+				      def);
 }
 
 /**
@@ -463,63 +492,87 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #define MH_SOURCE
 #include "salad/mhash.h"
 
-/** Key for search in `func_key_storage`. */
-struct func_key_storage_key {
-	/** Tuple whose functional key we are searching for. */
-	struct tuple *tuple;
-	/** Dense id of the functional index. */
+/** Key for search in story_link_storage. */
+struct story_link_storage_key {
+	/** Index entry whose `memtx_story_link` we are searching for. */
+	struct memtx_index_entry entry;
+	/** Dense id of the index. */
 	uint32_t index_id;
 };
 
-/** Hash calculator for key of `func_key_storage`. */
+/**
+ * Hash a story-link lookup by tuple and index.
+ *
+ * Different hints may identify equal keys: functional hints are pointers and
+ * duplicate multikey positions may compare equal. Hashing the hint would give
+ * equal entries different hashes, so equality compares the hinted keys after
+ * the tuple and index hash match.
+ */
 static uint32_t
-func_key_storage_key_hash(const struct func_key_storage_key *key)
+story_link_storage_key_hash(const struct story_link_storage_key *key)
 {
 	static_assert(sizeof(uintptr_t) > sizeof(uint32_t),
 		      "The following code relies on it");
-	uintptr_t u = (uintptr_t)key->tuple;
-	u ^= (u >> 32);
+	uintptr_t u = (uintptr_t)key->entry.tuple;
+	u ^= u >> 32;
 	return key->index_id ^ u;
 }
 
-/** An element of `func_key_storage`. */
-struct func_key_storage_item {
-	/** Original tuple. */
-	struct tuple *tuple;
-	/** Functional key. Must be referenced by the item. */
-	struct tuple *func_key;
-	/** Dense id of the functional index. */
+/** An element of story_link_storage. */
+struct story_link_storage_item {
+	/** Stored story link. */
+	struct memtx_story_link *link;
+	/** Index used to compare colliding logical entries. */
+	struct index *index;
+	/** Dense index identifier. */
 	uint32_t index_id;
 	/** Hash of the item. */
 	uint32_t hash;
 };
 
-/** Comparator for elements of `func_key_storage`. */
+/** Compare two stored logical index entries. */
 static int
-func_key_storage_equal(const struct func_key_storage_item *obj1,
-		       const struct func_key_storage_item *obj2)
+story_link_storage_equal(const struct story_link_storage_item *obj1,
+			 const struct story_link_storage_item *obj2)
 {
-	return obj1->index_id != obj2->index_id ||
-	       obj1->tuple != obj2->tuple;
+	if (obj1->index_id != obj2->index_id ||
+	    obj1->link->story->tuple != obj2->link->story->tuple)
+		return 1;
+	if (obj1->link->hint == HINT_NONE) {
+		assert(obj2->link->hint == HINT_NONE);
+		return 0;
+	}
+	return tuple_compare(obj1->link->story->tuple, obj1->link->hint,
+			     obj2->link->story->tuple, obj2->link->hint,
+			     obj1->index->def->key_def);
 }
 
-/** Comparator for element and key of `func_key_storage`. */
+/** Compare a lookup key with a stored logical index entry. */
 static int
-func_key_storage_key_equal(const struct func_key_storage_key *key,
-			   const struct func_key_storage_item *object)
+story_link_storage_key_equal(
+	const struct story_link_storage_key *key,
+	const struct story_link_storage_item *object)
 {
-	return key->index_id != object->index_id ||
-	       key->tuple != object->tuple;
+	if (key->index_id != object->index_id ||
+	    key->entry.tuple != object->link->story->tuple)
+		return 1;
+	if (key->entry.hint == HINT_NONE) {
+		assert(object->link->hint == HINT_NONE);
+		return 0;
+	}
+	return tuple_compare(key->entry.tuple, key->entry.hint,
+			     object->link->story->tuple, object->link->hint,
+			     object->index->def->key_def);
 }
 
-#define mh_name _func_key_storage
-#define mh_key_t struct func_key_storage_key *
-#define mh_node_t struct func_key_storage_item
+#define mh_name _story_link_storage
+#define mh_key_t struct story_link_storage_key *
+#define mh_node_t struct story_link_storage_item
 #define mh_arg_t int
 #define mh_hash(a, arg) ((a)->hash)
-#define mh_hash_key(a, arg) func_key_storage_key_hash(a)
-#define mh_cmp(a, b, arg) func_key_storage_equal((a), (b))
-#define mh_cmp_key(a, b, arg) func_key_storage_key_equal((a), (b))
+#define mh_hash_key(a, arg) story_link_storage_key_hash(a)
+#define mh_cmp(a, b, arg) story_link_storage_equal((a), (b))
+#define mh_cmp_key(a, b, arg) story_link_storage_key_equal((a), (b))
 #define MH_SOURCE
 #include "salad/mhash.h"
 
@@ -530,6 +583,15 @@ static inline void
 memtx_tx_stats_collect(struct memtx_tx_stats *stats, size_t size)
 {
 	stats->count++;
+	stats->total += size;
+}
+
+/**
+ * Add size to an already collected allocation.
+ */
+static inline void
+memtx_tx_stats_add_size(struct memtx_tx_stats *stats, size_t size)
+{
 	stats->total += size;
 }
 
@@ -703,10 +765,16 @@ struct tx_manager
 	struct rlist read_view_txs;
 	/**
 	 * Mempools for tx_story objects with different index count.
-	 * It's the only case when we use bare mempool in memtx_tx because
-	 * we cannot account story allocation to any particular txn.
+	 * We use bare mempool in memtx_tx because we cannot account story
+	 * allocation to any particular txn.
 	 */
 	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
+	/**
+	 * Mempool for tx_story_link objects.
+	 * We use bare mempool in memtx_tx because we cannot account link entry
+	 * allocation to any particular txn.
+	 */
+	struct mempool memtx_tx_story_link_pool;
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
 	/**
@@ -715,6 +783,11 @@ struct tx_manager
 	 * here - it will be created on demand.
 	 */
 	struct mh_func_key_storage_t *func_key_storage;
+	/**
+	 * Hash table of lazily created multikey and functional story links for
+	 * dirty tuples. Regular links are resolved directly from the story.
+	 */
+	struct mh_story_link_storage_t *story_link_storage;
 	/** Mempool for point_hole_item objects. */
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
@@ -752,170 +825,91 @@ bool memtx_tx_manager_use_mvcc_engine = false;
 /** The one and only instance of tx_manager. */
 static struct tx_manager txm;
 
-/** Forward declaration, description will be later along with definition. */
+/** Find a story of a dirty tuple. */
 static struct memtx_story *
 memtx_tx_story_get(struct tuple *tuple);
 
-/**
- * A general-purpose helper for saving/calculating functional keys.
- * The function searches for a functional key of @a tuple from @a index
- * in @a tx_manager::func_key_storage. If the key is not found, the function
- * saves @a func_key to the storage, if it is passed, or calculates the key
- * if @a func_key is NULL.
- *
- * Returns functional key of the tuple. Never fails - panics on any error.
- */
-static struct tuple *
-memtx_tx_tuple_func_key_impl(struct tuple *tuple, struct index *index,
-			     struct tuple *func_key)
+/** Return true if an index has more than one logical entry per tuple. */
+static inline bool
+memtx_tx_index_uses_story_link_storage(struct index *index)
 {
-	assert(index->def->key_def->for_func_index);
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
+	return index->def->key_def->is_multikey ||
+	       index->def->key_def->for_func_index;
+}
 
-	struct func_key_storage_key key = {
-		.tuple = tuple,
+/** Look up the at-most-one regular link in a story. */
+static struct memtx_story_link *
+memtx_tx_story_link_find_regular(struct memtx_story *story, uint32_t index_id)
+{
+	if (rlist_empty(&story->link[index_id]))
+		return NULL;
+	assert(rlist_first(&story->link[index_id]) ==
+	       rlist_last(&story->link[index_id]));
+	struct memtx_story_link *link =
+		rlist_first_entry(&story->link[index_id],
+				  struct memtx_story_link, link);
+	assert(link->hint == HINT_NONE);
+	assert(!link->is_func);
+	return link;
+}
+
+/** Look up a story link by its complete logical index entry identity. */
+static struct memtx_story_link *
+memtx_tx_story_link_find(struct memtx_story *story, struct index *index,
+			 hint_t hint)
+{
+	if (!memtx_tx_index_uses_story_link_storage(index))
+		return memtx_tx_story_link_find_regular(story,
+							index->dense_id);
+	struct story_link_storage_key key = {
+		.entry = {
+			.tuple = story->tuple,
+			.hint = hint,
+		},
 		.index_id = index->dense_id,
 	};
-	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
-	if (pos != mh_end(txm.func_key_storage)) {
-		return mh_func_key_storage_node(txm.func_key_storage,
-						pos)->func_key;
-	}
-
-	if (func_key == NULL) {
-		/* Key list uses region under the hood. */
-		uint32_t region_svp = region_used(&fiber()->gc);
-
-		/* The key is not found and not passed - calculate it. */
-		struct key_list_iterator it;
-		if (key_list_iterator_create(&it, tuple, index->def, false,
-					     tuple_format_runtime) != 0) {
-			diag_log();
-			panic("failed to obtain functional index key");
-		}
-
-		/* A single step - only singe-key indexes are supported. */
-		if (key_list_iterator_next(&it, &func_key) != 0) {
-			diag_log();
-			panic("failed to obtain functional index key");
-		}
-
-		/* Check if not multikey. */
-		struct tuple *next_key = NULL;
-		assert(key_list_iterator_next(&it, &next_key) == 0 &&
-		       next_key == NULL);
-		(void)next_key;
-
-		/* Truncate the region when we are done. */
-		region_truncate(&fiber()->gc, region_svp);
-	}
-
-	/* Reference the key and save it to the hash table. */
-	tuple_ref(func_key);
-	struct func_key_storage_item item = {
-		.tuple = tuple,
-		.index_id = index->dense_id,
-		.func_key = func_key,
-		.hash = func_key_storage_key_hash(&key),
-	};
-	pos = mh_func_key_storage_put(txm.func_key_storage, &item, NULL, 0);
-	VERIFY(pos != mh_end(txm.func_key_storage));
-
-	/* Mark that the story has a func key. */
-	memtx_tx_story_get(tuple)->has_func_key = true;
-
-	return func_key;
+	mh_int_t pos =
+		mh_story_link_storage_find(txm.story_link_storage, &key,
+					   /*arg=*/0);
+	if (pos == mh_end(txm.story_link_storage))
+		return NULL;
+	return mh_story_link_storage_node(txm.story_link_storage, pos)->link;
 }
 
-void
-memtx_tx_save_func_key(struct tuple *tuple, struct index *index,
-		       struct tuple *func_key)
+/** Create the missing link for a dirty tuple entry and return it. */
+static struct memtx_story_link *
+memtx_tx_story_link_get(struct index *index, struct memtx_index_entry entry);
+
+/** Return the sole link of a regular index for a story. */
+static struct memtx_story_link *
+memtx_tx_story_link_get_single(struct memtx_story *story, uint32_t index_id)
 {
-	assert(func_key != NULL);
-	if (!memtx_tx_manager_use_mvcc_engine ||
-	    !tuple_has_flag(tuple, TUPLE_IS_DIRTY))
-		return;
-	/*
-	 * Since the stories account only committed schema, we shouldn't
-	 * save keys for indexes that are being built. We check that by
-	 * looking at the space cache.
-	 */
-	struct space *space = space_by_id(index->def->space_id);
-	if (space == NULL || index->dense_id >= space->index_count ||
-	    space->index[index->dense_id] != index)
-		return;
-	memtx_tx_tuple_func_key_impl(tuple, index, func_key);
+	struct memtx_story_link *link =
+		memtx_tx_story_link_find_regular(story, index_id);
+	assert(link != NULL);
+	return link;
 }
 
 /**
- * Returns functional key of the tuple. Must be called only for dirty tuples.
- * Never fails - panics in case of any error.
+ * Return the comparison hint for a story link.
  *
- * NB: can call a Lua function from the index under the hood.
- */
-static struct tuple *
-memtx_tx_tuple_func_key(struct tuple *tuple, struct index *index)
-{
-	return memtx_tx_tuple_func_key_impl(tuple, index, NULL);
-}
-
-/**
- * Removes functional key of @a tuple from `func_key_storage`.
- * Must be called for dirty tuples.
- */
-static void
-memtx_tx_clear_func_key(struct tuple *tuple, uint32_t index_id)
-{
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-
-	struct func_key_storage_key key = {
-		.tuple = tuple,
-		.index_id = index_id,
-	};
-	mh_int_t pos = mh_func_key_storage_find(txm.func_key_storage, &key, 0);
-	if (pos == mh_end(txm.func_key_storage))
-		return;
-	struct tuple *fkey =
-		mh_func_key_storage_node(txm.func_key_storage, pos)->func_key;
-	mh_func_key_storage_del(txm.func_key_storage, pos, 0);
-	tuple_unref(fkey);
-}
-
-/**
- * A helper to calculate tuple hint. Encapsulates functional indexes.
+ * Multikey and functional links retain their entry discriminator. Regular
+ * indexes calculate comparison-only hints on demand.
  *
  * NB: must be called only for dirty tuples. Can call a Lua function
  *     from the index under the hood.
  */
 static hint_t
-memtx_tx_tuple_hint(struct tuple *tuple, struct index *index, struct key_def *def)
+memtx_tx_story_link_hint(struct memtx_story_link *link, struct index *index,
+			 struct key_def *def)
 {
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	/* R-tree does not support tuple hint. */
 	if (unlikely(index->def->type == RTREE))
 		return HINT_NONE;
-	if (unlikely(index->def->key_def->for_func_index))
-		return (hint_t)memtx_tx_tuple_func_key(tuple, index);
-	return tuple_hint(tuple, def);
-}
-
-/**
- * A helper to check if tuple key is excluded. Encapsulates functional indexes.
- *
- * NB: must be called only for dirty tuples. Can call a Lua function
- *     from the index under the hood.
- */
-static bool
-memtx_tx_tuple_key_is_excluded(struct tuple *tuple, struct index *index,
-			       struct key_def *def)
-{
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-	/* Return early to avoid func key calculation. */
-	if (likely(!def->has_exclude_null))
-		return false;
-	if (def->for_func_index)
-		tuple = memtx_tx_tuple_func_key(tuple, index);
-	return tuple_key_is_excluded(tuple, def, MULTIKEY_NONE);
+	if (unlikely(index->def->key_def->is_multikey ||
+		     index->def->key_def->for_func_index))
+		return link->hint;
+	return tuple_hint(link->story->tuple, def);
 }
 
 void
@@ -1033,17 +1027,6 @@ memtx_tx_send_to_read_view(struct txn *txn, int64_t psn)
 }
 
 /**
- * Calculate size of story with its links.
- */
-static inline size_t
-memtx_story_size(struct memtx_story *story)
-{
-	assert(story->index_count > 0);
-	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count - 1];
-	return pool->objsize;
-}
-
-/**
  * Notify memory manager that a tuple referenced by @a story
  * was replaced from primary key and that is why @a story
  * is the only reason why the tuple cannot be deleted.
@@ -1088,9 +1071,8 @@ memtx_tx_story_set_status(struct memtx_story *story,
 	story->status = new_status;
 	struct memtx_tx_stats *old_story_stats = &txm.story_stats[old_status];
 	struct memtx_tx_stats *new_story_stats = &txm.story_stats[new_status];
-	size_t story_size = memtx_story_size(story);
-	memtx_tx_stats_discard(old_story_stats, story_size);
-	memtx_tx_stats_collect(new_story_stats, story_size);
+	memtx_tx_stats_discard(old_story_stats, story->size);
+	memtx_tx_stats_collect(new_story_stats, story->size);
 	if (story->tuple_is_retained) {
 		size_t tuplesize = tuple_size(story->tuple);
 		struct memtx_tx_stats *old =
@@ -1129,19 +1111,257 @@ memtx_tx_unref_from_primary(struct memtx_story *story)
 }
 
 /**
+ * Create and register one owned story link.
+ *
+ * Functional-key hints are referenced by the link. Existing links are returned
+ * unchanged, so each story owns at most one link for a logical index entry.
+ * Only non-excluded entries that have a physical index value may be linked.
+ * Regular links are stored directly in story->link[index_id]. Multikey and
+ * functional links are additionally indexed in story_link_storage by the full
+ * entry identity because one story may have several entries in the same index.
+ */
+static struct memtx_story_link *
+memtx_tx_story_add_link(struct memtx_story *story, struct index *index,
+			hint_t hint)
+{
+	struct key_def *key_def = index->def->key_def;
+	struct tuple *tuple = story->tuple;
+	int mk_idx;
+	if (key_def->for_func_index) {
+		assert(!key_def->is_multikey);
+		assert(hint != HINT_NONE);
+		tuple = (struct tuple *)hint;
+		mk_idx = MULTIKEY_NONE;
+	} else if (key_def->is_multikey) {
+		assert(hint != HINT_NONE);
+		mk_idx = (int)hint;
+	} else {
+		assert(hint == HINT_NONE);
+		mk_idx = MULTIKEY_NONE;
+	}
+	(void)tuple;
+	(void)mk_idx;
+	assert(!tuple_key_is_excluded(tuple, key_def, mk_idx));
+	struct memtx_index_entry entry = {
+		.tuple = story->tuple,
+		.hint = hint,
+	};
+	struct memtx_story_link *existing =
+		memtx_tx_story_link_find(story, index, entry.hint);
+	if (existing != NULL)
+		return existing;
+	struct mempool *pool = &txm.memtx_tx_story_link_pool;
+	struct memtx_story_link *link = xmempool_alloc(pool);
+	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
+	memtx_tx_stats_add_size(stats, pool->objsize);
+	story->size += pool->objsize;
+	link->story = story;
+	assert(hint == HINT_NONE || index->def->key_def->is_multikey ||
+	       index->def->key_def->for_func_index);
+	link->hint = hint;
+	if (index->def->key_def->for_func_index) {
+		link->is_func = true;
+		tuple_ref((struct tuple *)hint);
+	} else {
+		link->is_func = false;
+	}
+	link->is_own_change = false;
+	link->newer_link = NULL;
+	link->older_link = NULL;
+	rlist_create(&link->read_gaps);
+	link->in_index = index;
+	rlist_add(&story->link[index->dense_id], &link->link);
+	if (!memtx_tx_index_uses_story_link_storage(index))
+		return link;
+	struct story_link_storage_key key = {
+		.entry = {
+			.tuple = link->story->tuple,
+			.hint = link->hint,
+		},
+		.index_id = index->dense_id,
+	};
+	struct story_link_storage_item node = {
+		.link = link,
+		.index = index,
+		.index_id = index->dense_id,
+		.hash = story_link_storage_key_hash(&key),
+	};
+	struct story_link_storage_item replaced;
+	struct story_link_storage_item *preplaced = &replaced;
+	mh_story_link_storage_put(txm.story_link_storage, &node, &preplaced, 0);
+	assert(preplaced == NULL);
+	return link;
+}
+
+/**
+ * Return a story link by its complete logical index entry identity.
+ *
+ * Clean stories may not have all links materialized. If the requested link is
+ * absent, create exactly that link using the entry hint provided by the caller.
+ */
+static struct memtx_story_link *
+memtx_tx_story_link_get(struct index *index, struct memtx_index_entry entry)
+{
+	assert(entry.tuple != NULL);
+	assert(tuple_has_flag(entry.tuple, TUPLE_IS_DIRTY));
+	struct memtx_story *story = memtx_tx_story_get(entry.tuple);
+	hint_t hint = memtx_tx_index_uses_story_link_storage(index) ?
+		      entry.hint : HINT_NONE;
+	return memtx_tx_story_add_link(story, index, hint);
+}
+
+/**
+ * Add all story links for an index by inspecting the tuple.
+ *
+ * This forces lazy links for full-link walks. Existing links are reused, so it
+ * is safe to call before GC, full index rewrites, and index-wide scans. This
+ * is required for multikey and functional indexes: a partial chain may have
+ * been materialized by point reads or replace results, while old-only keys are
+ * still physically present and must be visited before unlinking a story.
+ * Excluded entries are skipped because they have no physical index value.
+ */
+static void
+memtx_tx_story_add_index_links(struct memtx_story *story, struct index *index)
+{
+	struct tuple *tuple = story->tuple;
+	struct index_def *index_def = index->def;
+	struct key_def *key_def = index_def->key_def;
+	if (key_def->is_multikey) {
+		size_t mk_count =
+			tuple_multikey_count(tuple, index_def->cmp_def);
+		for (size_t i = 0; i < mk_count; ++i) {
+			if (tuple_key_is_excluded(tuple, key_def, (int)i))
+				continue;
+			memtx_tx_story_add_link(story, index, i);
+		}
+	} else if (key_def->for_func_index) {
+		struct region *region = &fiber()->gc;
+		size_t region_svp = region_used(region);
+		struct key_list_iterator it;
+		VERIFY(key_list_iterator_create(&it, tuple, index_def, false,
+						tuple_format_runtime) == 0);
+		struct tuple *key;
+		while ((VERIFY(key_list_iterator_next(&it, &key) == 0), true) &&
+		       key != NULL) {
+			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
+				continue;
+			memtx_tx_story_add_link(story, index, (hint_t)key);
+		}
+		region_truncate(region, region_svp);
+	} else if (!tuple_key_is_excluded(tuple, key_def, MULTIKEY_NONE)) {
+		memtx_tx_story_add_link(story, index, HINT_NONE);
+	}
+}
+
+/** Force all story links for one index. */
+static void
+memtx_tx_story_force_index_links(struct memtx_story *story, struct index *index)
+{
+	memtx_tx_story_add_index_links(story, index);
+}
+
+/** Force all story links for all indexes of the story's space. */
+static void
+memtx_tx_story_force_all_links(struct memtx_story *story, struct space *space)
+{
+	assert(story->space == space);
+	assert(story->index_count == space->index_count);
+	for (uint32_t i = 0; i < story->index_count; i++)
+		memtx_tx_story_force_index_links(story, space->index[i]);
+}
+
+/** Force all story links for one index before an index-wide story walk. */
+static void
+memtx_tx_space_force_index_story_links(struct space *space,
+				       struct index *index)
+{
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories)
+		memtx_tx_story_force_index_links(story, index);
+}
+
+/** Force all story links before a full space/index rewrite. */
+static void
+memtx_tx_space_force_all_story_links(struct space *space)
+{
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories)
+		memtx_tx_story_force_all_links(story, space);
+}
+
+/**
+ * Add story links for a newly inserted tuple from the corresponding index
+ * replace results. Multikey result streams have one step per new multikey
+ * position, including excluded positions; null inserted records keep positions
+ * aligned and do not create links. Later delete-only steps do not describe
+ * entries of the new story. Functional inserted entries carry their already
+ * calculated non-excluded keys.
+ */
+static void
+memtx_tx_story_add_insert_links(struct memtx_story *story, struct space *space,
+				struct memtx_index_replace_result_set *results)
+{
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		struct index *index = space->index[i];
+		struct key_def *key_def = index->def->key_def;
+		struct memtx_index_replace_result_iterator it;
+		memtx_index_replace_result_iterator_create(&it, &results[i]);
+		struct memtx_index_replace_step step;
+		if (key_def->is_multikey) {
+			uint32_t count =
+				tuple_multikey_count(story->tuple,
+						     index->def->cmp_def);
+			for (hint_t hint = 0; hint < count; hint++) {
+				VERIFY(memtx_index_replace_result_iterator_next(
+					&it, &step));
+				if (step.inserted->entry.tuple == NULL)
+					continue;
+				memtx_tx_story_add_link(story, index, hint);
+			}
+			while (memtx_index_replace_result_iterator_next(
+					&it, &step))
+				assert(step.inserted->entry.tuple == NULL);
+		} else if (key_def->for_func_index) {
+			while (memtx_index_replace_result_iterator_next(
+					&it, &step)) {
+				if (step.inserted->entry.tuple == NULL)
+					continue;
+				hint_t hint = step.inserted->entry.hint;
+				memtx_tx_story_add_link(story, index, hint);
+			}
+		} else {
+			bool has_step =
+				memtx_index_replace_result_iterator_next(
+					&it, &step);
+			if (has_step &&
+			    step.inserted->entry.tuple != NULL)
+				memtx_tx_story_add_link(story, index,
+							HINT_NONE);
+			assert(!memtx_index_replace_result_iterator_next(
+				&it, &step));
+		}
+	}
+}
+
+/**
  * Create a new story and link it with the @a tuple.
  * There are two known scenarios of using this function:
  * * The story is created for a clean tuple that is in space (and thus in
- *   space indexes) now. Such a story is a top of degenerate chains that
- *   consist of this story only.
+ *   space indexes) now. In this case @a direct_inserts is NULL and links are
+ *   created lazily from actual read/replaced entries or forced before full
+ *   walks. Such a story is a top of degenerate chains that consist of this
+ *   story only.
  * * The story is created for a new tuple that is to be inserted into space.
- *   Such a story will become the top of chains, and a special function
+ *   In this case @a direct_inserts contains the index entries produced by the
+ *   insertion, so functional keys are reused instead of calculated again. Such
+ *   a story will become the top of chains, and a special function
  *   memtx_tx_story_link_top must be called for that.
- * In any case this story is expected to be a top of chains, so we set
- * in_index members in story links to appropriate values.
+ * In any case this story is expected to be a top of chains, so materialized
+ * links get in_index members set to appropriate values.
  */
 static struct memtx_story *
-memtx_tx_story_new(struct space *space, struct tuple *tuple)
+memtx_tx_story_new(struct space *space, struct tuple *tuple,
+		   struct memtx_index_replace_result_set *results)
 {
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
@@ -1150,6 +1370,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	struct mempool *pool = &txm.memtx_tx_story_pool[index_count - 1];
 	struct memtx_story *story = (struct memtx_story *)xmempool_alloc(pool);
 	story->tuple = tuple;
+	story->space = space;
 
 	const struct memtx_story **put_story =
 		(const struct memtx_story **) &story;
@@ -1161,23 +1382,21 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	tuple_ref(tuple);
 	story->status = MEMTX_TX_STORY_USED;
 	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
-	memtx_tx_stats_collect(stats, pool->objsize);
+	story->size = pool->objsize;
 	story->tuple_is_retained = false;
-	story->has_func_key = false;
 	story->index_count = index_count;
 	story->add_stmt = NULL;
 	story->add_psn = 0;
 	story->del_stmt = NULL;
 	story->del_psn = 0;
 	rlist_create(&story->reader_list);
+	memtx_tx_stats_collect(stats, story->size);
 	rlist_add_tail(&txm.all_stories, &story->in_all_stories);
 	rlist_add(&space->memtx_stories, &story->in_space_stories);
-	for (uint32_t i = 0; i < index_count; i++) {
-		story->link[i].is_own_change = false;
-		story->link[i].newer_story = story->link[i].older_story = NULL;
-		rlist_create(&story->link[i].read_gaps);
-		story->link[i].in_index = space->index[i];
-	}
+	for (uint32_t i = 0; i < index_count; i++)
+		rlist_create(&story->link[i]);
+	if (results != NULL)
+		memtx_tx_story_add_insert_links(story, space, results);
 	return story;
 }
 
@@ -1191,19 +1410,34 @@ memtx_tx_story_delete(struct memtx_story *story)
 	assert(story->del_stmt == NULL);
 	assert(rlist_empty(&story->reader_list));
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		assert(story->link[i].newer_story == NULL);
-		assert(story->link[i].older_story == NULL);
-		assert(rlist_empty(&story->link[i].read_gaps));
+		struct memtx_story_link *link;
+		struct memtx_story_link *tmp;
+		rlist_foreach_entry_safe(link, &story->link[i], link, tmp) {
+			assert(link->newer_link == NULL);
+			assert(link->older_link == NULL);
+			assert(rlist_empty(&link->read_gaps));
+			if (link->is_func || link->hint != HINT_NONE) {
+				struct story_link_storage_key key = {
+					.entry = {
+						.tuple = story->tuple,
+						.hint = link->hint,
+					},
+					.index_id = i,
+				};
+				mh_int_t pos = mh_story_link_storage_find(
+					txm.story_link_storage, &key, 0);
+				assert(pos != mh_end(txm.story_link_storage));
+				mh_story_link_storage_del(
+					txm.story_link_storage, pos, 0);
+			}
+			if (link->is_func)
+				tuple_unref((struct tuple *)link->hint);
+			rlist_del_entry(link, link);
+			mempool_free(&txm.memtx_tx_story_link_pool, link);
+		}
 	}
 
-	/* Clear associated functional keys only if there are any. */
-	if (unlikely(story->has_func_key)) {
-		for (uint32_t i = 0; i < story->index_count; i++)
-			memtx_tx_clear_func_key(story->tuple, i);
-	}
-
-	memtx_tx_stats_discard(&txm.story_stats[story->status],
-			       memtx_story_size(story));
+	memtx_tx_stats_discard(&txm.story_stats[story->status], story->size);
 	if (story->tuple_is_retained)
 		memtx_tx_story_untrack_retained_tuple(story);
 
@@ -1225,13 +1459,12 @@ memtx_tx_story_delete(struct memtx_story *story)
 }
 
 /**
- * Find a story of a @a tuple. The story expected to be present (assert).
+ * Find a story of a @a tuple and validate its statement/PSN snapshot.
  */
 static struct memtx_story *
 memtx_tx_story_get(struct tuple *tuple)
 {
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-
 	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
 	assert(pos != mh_end(txm.history));
 	struct memtx_story *story = *mh_history_node(txm.history, pos);
@@ -1310,23 +1543,15 @@ memtx_tx_story_unlink_deleted_by(struct memtx_story *story,
  * @a old_story is allowed to be NULL.
  */
 static void
-memtx_tx_story_link(struct memtx_story *story,
-		    struct memtx_story *old_story,
-		    uint32_t idx)
+memtx_tx_story_link_old_link(struct memtx_story_link *link,
+			     struct memtx_story_link *old_link)
 {
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	assert(link->older_story == NULL);
-
-	if (old_story == NULL)
+	assert(link->older_link == NULL);
+	if (old_link == NULL)
 		return;
-
-	assert(idx < old_story->index_count);
-	struct memtx_story_link *old_link = &old_story->link[idx];
-	assert(old_link->newer_story == NULL);
-
-	link->older_story = old_story;
-	old_link->newer_story = story;
+	assert(old_link->newer_link == NULL);
+	link->older_link = old_link;
+	old_link->newer_link = link;
 }
 
 /**
@@ -1334,23 +1559,15 @@ memtx_tx_story_link(struct memtx_story *story,
  * Older story is allowed to be NULL.
  */
 static void
-memtx_tx_story_unlink(struct memtx_story *story,
-		      struct memtx_story *old_story,
-		      uint32_t idx)
+memtx_tx_story_link_old_unlink(struct memtx_story_link *link,
+			       struct memtx_story_link *old_link)
 {
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	assert(link->older_story == old_story);
-
-	if (old_story == NULL)
+	assert(link->older_link == old_link);
+	if (old_link == NULL)
 		return;
-
-	assert(idx < old_story->index_count);
-	struct memtx_story_link *old_link = &old_story->link[idx];
-	assert(old_link->newer_story == story);
-
-	link->older_story = NULL;
-	old_link->newer_story = NULL;
+	assert(old_link->newer_link == link);
+	link->older_link = NULL;
+	old_link->newer_link = NULL;
 }
 
 /**
@@ -1369,55 +1586,62 @@ memtx_tx_story_unlink(struct memtx_story *story,
  *   physical replacement in index - it will point to new_top->tuple.
  */
 static void
-memtx_tx_story_link_top(struct memtx_story *new_top,
-			struct memtx_story *old_top,
-			uint32_t idx, bool is_new_tuple)
+memtx_tx_story_link_top(struct memtx_story_link *new_top,
+			struct memtx_story_link *old_top,
+			bool is_new_tuple)
 {
 	assert(old_top != NULL || is_new_tuple);
 	if (is_new_tuple && old_top == NULL) {
-		if (idx == 0)
-			memtx_tx_ref_to_primary(new_top);
+		if (new_top->in_index->dense_id == 0)
+			memtx_tx_ref_to_primary(new_top->story);
 		return;
 	}
-	struct memtx_story_link *new_link = &new_top->link[idx];
-	struct memtx_story_link *old_link = &old_top->link[idx];
-	assert(old_link->in_index != NULL);
-	assert(old_link->newer_story == NULL);
+	assert(old_top->in_index != NULL);
+	assert(old_top->newer_link == NULL);
+	struct index *index = old_top->in_index;
 	if (is_new_tuple) {
-		assert(new_link->newer_story == NULL);
-		assert(new_link->older_story == NULL);
+		assert(new_top->newer_link == NULL);
+		assert(new_top->older_link == NULL);
 	} else {
-		assert(new_link->newer_story == old_top);
-		assert(old_link->older_story == new_top);
+		assert(new_top->newer_link == old_top);
+		assert(old_top->older_link == new_top);
 	}
 
 	if (!is_new_tuple) {
 		/* Make the change in index. */
-		struct index *index = old_link->in_index;
-		struct tuple *removed, *unused;
-		if (memtx_index_replace(index, old_top->tuple, new_top->tuple,
-					DUP_REPLACE, &removed, &unused) != 0) {
+		struct memtx_index_entry old_entry = {
+			.tuple = old_top->story->tuple,
+			.hint = old_top->hint,
+		};
+		struct memtx_index_entry new_entry = {
+			.tuple = new_top->story->tuple,
+			.hint = new_top->hint,
+		};
+		struct memtx_index_entry removed;
+		if (memtx_index_replace_entry(index, old_entry, new_entry,
+					      DUP_REPLACE, &removed) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rebind story in index");
 		}
-		assert(old_top->tuple == removed);
+		assert(old_entry.tuple == removed.tuple);
 	}
 
 	/* Link the list. */
 	if (is_new_tuple) {
-		memtx_tx_story_link(new_top, old_top, idx);
+		memtx_tx_story_link_old_link(new_top, old_top);
 		/* in_index must be set in story_new. */
-		assert(new_link->in_index == old_link->in_index);
-		old_link->in_index = NULL;
+		assert(new_top->in_index == old_top->in_index);
+		old_top->in_index = NULL;
 	} else {
-		struct memtx_story *older_story = new_link->older_story;
-		memtx_tx_story_unlink(old_top, new_top, idx);
-		memtx_tx_story_unlink(new_top, older_story, idx);
-		memtx_tx_story_link(new_top, old_top, idx);
-		memtx_tx_story_link(old_top, older_story, idx);
-		new_link->in_index = old_link->in_index;
-		old_link->in_index = NULL;
+		struct memtx_story_link *older_link =
+			new_top->older_link;
+		memtx_tx_story_link_old_unlink(old_top, new_top);
+		memtx_tx_story_link_old_unlink(new_top, older_link);
+		memtx_tx_story_link_old_link(new_top, old_top);
+		memtx_tx_story_link_old_link(old_top, older_link);
+		new_top->in_index = old_top->in_index;
+		old_top->in_index = NULL;
 	}
 
 	/*
@@ -1426,31 +1650,26 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	 * Thus we have to reference the tuple that was added to the primary
 	 * index and dereference the tuple that was removed from it.
 	 */
-	if (idx == 0) {
-		memtx_tx_ref_to_primary(new_top);
-		memtx_tx_unref_from_primary(old_top);
+	if (index->dense_id == 0) {
+		memtx_tx_ref_to_primary(new_top->story);
+		memtx_tx_unref_from_primary(old_top->story);
 	}
 
 	/* Rebind gap records to the top of the list */
-	rlist_splice(&new_link->read_gaps, &old_link->read_gaps);
+	rlist_splice(&new_top->read_gaps, &old_top->read_gaps);
 }
 
 /**
  * Change the order of stories in history chain.
  */
 static void
-memtx_tx_story_reorder(struct memtx_story *story,
-		       struct memtx_story *old_story,
-		       uint32_t idx)
+memtx_tx_story_link_reorder(struct memtx_story_link *link,
+			    struct memtx_story_link *old_link)
 {
-	assert(idx < story->index_count);
-	assert(idx < old_story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-	struct memtx_story_link *old_link = &old_story->link[idx];
-	assert(link->older_story == old_story);
-	assert(old_link->newer_story == story);
-	struct memtx_story *newer_story = link->newer_story;
-	struct memtx_story *older_story = old_link->older_story;
+	assert(link->older_link == old_link);
+	assert(old_link->newer_link == link);
+	struct memtx_story_link *newer_link = link->newer_link;
+	struct memtx_story_link *older_link = old_link->older_link;
 
 	/*
 	 * We have a list of stories, and we have to reorder it.
@@ -1460,20 +1679,20 @@ memtx_tx_story_reorder(struct memtx_story *story,
 	 *      [     old_story     ]        [       story       ]
 	 *      [    older_story    ]        [    older_story    ]
 	 */
-	if (newer_story != NULL) {
+	if (newer_link != NULL) {
 		/* Simple relink in list. */
-		memtx_tx_story_unlink(newer_story, story, idx);
-		memtx_tx_story_unlink(story, old_story, idx);
-		memtx_tx_story_unlink(old_story, older_story, idx);
+		memtx_tx_story_link_old_unlink(newer_link, link);
+		memtx_tx_story_link_old_unlink(link, old_link);
+		memtx_tx_story_link_old_unlink(old_link, older_link);
 
-		memtx_tx_story_link(newer_story, old_story, idx);
-		memtx_tx_story_link(old_story, story, idx);
-		memtx_tx_story_link(story, older_story, idx);
+		memtx_tx_story_link_old_link(newer_link, old_link);
+		memtx_tx_story_link_old_link(old_link, link);
+		memtx_tx_story_link_old_link(link, older_link);
 	} else {
 		/*
 		 * story was in the top of history chain. In terms of reorder,
 		 * we have to make old_story the new top of chain. */
-		memtx_tx_story_link_top(old_story, story, idx, false);
+		memtx_tx_story_link_top(old_link, link, false);
 	}
 }
 
@@ -1486,18 +1705,21 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 {
 	/* Unlink from all story chains. */
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct memtx_story_link *link = &story->link[i];
-		if (link->newer_story == NULL) {
-			assert(link->in_index == NULL);
-			memtx_tx_story_unlink(story, link->older_story, i);
-		} else {
-			/* Just unlink from list */
-			link->newer_story->link[i].older_story = link->older_story;
-			if (link->older_story != NULL)
-				link->older_story->link[i].newer_story =
-					link->newer_story;
-			link->older_story = NULL;
-			link->newer_story = NULL;
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			if (link->newer_link == NULL) {
+				assert(link->in_index == NULL);
+				memtx_tx_story_link_old_unlink(
+					link, link->older_link);
+			} else {
+				/* Just unlink from list */
+				link->newer_link->older_link = link->older_link;
+				if (link->older_link != NULL)
+					link->older_link->newer_link =
+						link->newer_link;
+				link->older_link = NULL;
+				link->newer_link = NULL;
+			}
 		}
 	}
 
@@ -1511,13 +1733,16 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 	 * is going to be deleted.
 	 */
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct rlist *read_gaps = &story->link[i].read_gaps;
-		while (!rlist_empty(&story->link[i].read_gaps)) {
-			struct gap_item_base *item =
-				rlist_first_entry(read_gaps,
-						  struct gap_item_base,
-						  in_read_gaps);
-			memtx_tx_delete_gap(item);
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			struct rlist *read_gaps = &link->read_gaps;
+			while (!rlist_empty(&link->read_gaps)) {
+				struct gap_item_base *item =
+					rlist_first_entry(read_gaps,
+							  struct gap_item_base,
+							  in_read_gaps);
+				memtx_tx_delete_gap(item);
+			}
 		}
 	}
 	/*
@@ -1537,12 +1762,85 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 /**
  * Find a top story in chain of @a story by index @a ind.
  */
-static struct memtx_story *
-memtx_tx_story_find_top(struct memtx_story *story, uint32_t ind)
+static struct memtx_story_link *
+memtx_tx_story_link_find_top(struct memtx_story_link *link)
 {
-	while (story->link[ind].newer_story != NULL)
-		story = story->link[ind].newer_story;
-	return story;
+	while (link->newer_link != NULL)
+		link = link->newer_link;
+	return link;
+}
+
+/**
+ * Unlink one story link during story garbage collection.
+ */
+static void
+memtx_tx_story_full_unlink_story_link_gc_step(struct memtx_story_link *link)
+{
+	if (link->newer_link == NULL) {
+		/*
+		 * We are at the top of the chain. That means
+		 * that story->tuple is in index or the story is a
+		 * rollbacked one. If the story actually deletes the
+		 * tuple and is present in index, it must be deleted
+		 * from index.
+		 */
+		assert(link->in_index != NULL);
+		/*
+		 * Invariant that the top of the history chain
+		 * is always in the index: here we delete
+		 * (sic: not replace) a tuple from the index,
+		 * and  it must be the last story left in the
+		 * history chain, otherwise `link->older_story`
+		 * starts to be at the top of the history chain
+		 * and is not present in index, which violates
+		 * our invariant.
+		 */
+		assert(link->older_link == NULL);
+		if (link->story->del_psn > 0 && link->in_index != NULL) {
+			struct index *index = link->in_index;
+			struct memtx_index_entry removed =
+				memtx_index_entry_null;
+			struct memtx_index_entry old_entry = {
+				.tuple = link->story->tuple,
+				.hint = link->hint,
+			};
+			struct key_def *key_def = index->def->key_def;
+			if (memtx_index_replace_entry(index, old_entry,
+						      memtx_index_entry_null,
+						      DUP_INSERT,
+						      &removed) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rollback change");
+			}
+			bool is_mk_or_func =
+				key_def->is_multikey || key_def->for_func_index;
+			bool is_expected = old_entry.tuple == removed.tuple ||
+					   (removed.tuple == NULL &&
+					    is_mk_or_func);
+			(void)key_def;
+			(void)is_mk_or_func;
+			(void)is_expected;
+			assert(is_expected);
+			link->in_index = NULL;
+			/*
+			 * All tuples in pk are referenced.
+			 * Once removed it must be unreferenced.
+			 */
+			if (index->dense_id == 0)
+				memtx_tx_unref_from_primary(link->story);
+		}
+
+		memtx_tx_story_link_old_unlink(link, link->older_link);
+	} else {
+		/* Just unlink from list */
+		link->newer_link->older_link =
+			link->older_link;
+		if (link->older_link != NULL)
+			link->older_link->newer_link = link->newer_link;
+		link->older_link = NULL;
+		link->newer_link = NULL;
+	}
 }
 
 /**
@@ -1559,64 +1857,9 @@ static void
 memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 {
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct memtx_story_link *link = &story->link[i];
-		if (link->newer_story == NULL) {
-			/*
-			 * We are at the top of the chain. That means
-			 * that story->tuple is in index or the story is a
-			 * rollbacked one. If the story actually deletes the
-			 * tuple and is present in index, it must be deleted
-			 * from index.
-			 */
-			assert(link->in_index != NULL);
-			/*
-			 * Invariant that the top of the history chain
-			 * is always in the index: here we delete
-			 * (sic: not replace) a tuple from the index,
-			 * and  it must be the last story left in the
-			 * history chain, otherwise `link->older_story`
-			 * starts to be at the top of the history chain
-			 * and is not present in index, which violates
-			 * our invariant.
-			 */
-			assert(link->older_story == NULL);
-			if (story->del_psn > 0 && link->in_index != NULL) {
-				struct index *index = link->in_index;
-				struct tuple *removed, *unused;
-				if (memtx_index_replace(index, story->tuple,
-							NULL, DUP_INSERT,
-							&removed,
-							&unused) != 0) {
-					diag_log();
-					unreachable();
-					panic("failed to rollback change");
-				}
-				struct key_def *key_def = index->def->key_def;
-				assert(story->tuple == removed ||
-				       (removed == NULL &&
-					memtx_tx_tuple_key_is_excluded(
-						story->tuple, index, key_def)));
-				(void)key_def;
-				link->in_index = NULL;
-				/*
-				 * All tuples in pk are referenced.
-				 * Once removed it must be unreferenced.
-				 */
-				if (i == 0)
-					memtx_tx_unref_from_primary(story);
-			}
-
-			memtx_tx_story_unlink(story, link->older_story, i);
-		} else {
-			/* Just unlink from list */
-			link->newer_story->link[i].older_story =
-				link->older_story;
-			if (link->older_story != NULL)
-				link->older_story->link[i].newer_story =
-					link->newer_story;
-			link->older_story = NULL;
-			link->newer_story = NULL;
-		}
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link)
+			memtx_tx_story_full_unlink_story_link_gc_step(link);
 	}
 }
 
@@ -1652,6 +1895,15 @@ memtx_tx_story_gc_step()
 		rlist_entry(txm.traverse_all_stories, struct memtx_story,
 			    in_all_stories);
 	txm.traverse_all_stories = txm.traverse_all_stories->next;
+	if (story->del_psn != 0 || story->del_stmt != NULL) {
+		/*
+		 * A deleted story may have only the links touched by reads or
+		 * replacement overlap materialized. Force the rest before GC so
+		 * value-delete removes old entries without touching a surviving
+		 * newer entry with the same multikey or functional key.
+		 */
+		memtx_tx_story_force_all_links(story, story->space);
+	}
 
 	/**
 	 * The order in which conditions are checked is important,
@@ -1670,37 +1922,42 @@ memtx_tx_story_gc_step()
 		return;
 	}
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct memtx_story_link *link = &story->link[i];
-		if (link->newer_story == NULL) {
-			assert(link->in_index != NULL);
-			/*
-			 * We would have to unlink this tuple (and perhaps
-			 * delete it from index if story->del_psn > 0), but we
-			 * cannot do this since after that `link->older_story`
-			 * starts to be at the top of the history chain, and it
-			 * is not present in index, which violates our
-			 * invariant.
-			 */
-			if (link->older_story != NULL) {
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			if (link->newer_link == NULL) {
+				assert(link->in_index != NULL);
+				/*
+				 * We would have to unlink this tuple (and
+				 * perhaps delete it from index if
+				 * story->del_psn > 0), but we cannot do this
+				 * since after that `link->older_story` starts
+				 * to be at the top of the history chain, and it
+				 * is not present in index, which violates our
+				 * invariant.
+				 */
+				if (link->older_link != NULL) {
+					memtx_tx_story_set_status(
+						story, MEMTX_TX_STORY_USED);
+					return;
+				}
+			} else if (i > 0 &&
+				   link->newer_link->story->add_stmt != NULL) {
+				/*
+				 * We need to retain the story since the newer
+				 * story can get rolled back (this is maintained
+				 * by delete statement list in case of primary
+				 * index).
+				 */
 				memtx_tx_story_set_status(story,
 							  MEMTX_TX_STORY_USED);
 				return;
 			}
-		} else if (i > 0 && link->newer_story->add_stmt != NULL) {
-			/*
-			 * We need to retain the story since the newer story
-			 * can get rolled back (this is maintained by delete
-			 * statement list in case of primary index).
-			 */
-			memtx_tx_story_set_status(story,
-						  MEMTX_TX_STORY_USED);
-			return;
-		}
-		if (!rlist_empty(&link->read_gaps)) {
-			memtx_tx_story_set_status(story,
-						  MEMTX_TX_STORY_TRACK_GAP);
-			/* The story is used for gap tracking. */
-			return;
+			if (!rlist_empty(&link->read_gaps)) {
+				memtx_tx_story_set_status(
+					story, MEMTX_TX_STORY_TRACK_GAP);
+				/* The story is used for gap tracking. */
+				return;
+			}
 		}
 	}
 
@@ -1847,25 +2104,40 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
  * added or deleted) by `txn`.
  */
 static void
-memtx_tx_story_find_visible_tuple(struct memtx_story *story, struct txn *tnx,
-				  uint32_t index, bool is_prepared_ok,
-				  struct tuple **visible_tuple,
-				  bool *is_own_change)
+memtx_tx_story_link_find_visible_entry(struct memtx_story_link *link,
+				       struct txn *txn, bool is_prepared_ok,
+				       struct memtx_index_entry *visible_entry,
+				       bool *is_own_change)
 {
-	for (; story != NULL; story = story->link[index].older_story) {
-		assert(index < story->index_count);
-		if (memtx_tx_story_delete_is_visible(story, tnx, is_prepared_ok,
+	for (; link != NULL; link = link->older_link) {
+		if (memtx_tx_story_delete_is_visible(link->story, txn,
+						     is_prepared_ok,
 						     is_own_change)) {
-			*visible_tuple = NULL;
+			*visible_entry = memtx_index_entry_null;
 			return;
 		}
-		if (memtx_tx_story_insert_is_visible(story, tnx, is_prepared_ok,
+		if (memtx_tx_story_insert_is_visible(link->story, txn,
+						     is_prepared_ok,
 						     is_own_change)) {
-			*visible_tuple = story->tuple;
+			visible_entry->tuple = link->story->tuple;
+			visible_entry->hint = link->hint;
 			return;
 		}
 	}
-	*visible_tuple = NULL;
+	*visible_entry = memtx_index_entry_null;
+}
+
+/** Find the visible tuple in a story-link chain. */
+static void
+memtx_tx_story_link_find_visible_tuple(struct memtx_story_link *link,
+				       struct txn *txn, bool is_prepared_ok,
+				       struct tuple **visible_tuple,
+				       bool *is_own_change)
+{
+	struct memtx_index_entry entry;
+	memtx_tx_story_link_find_visible_entry(link, txn, is_prepared_ok,
+					       &entry, is_own_change);
+	*visible_tuple = entry.tuple;
 }
 
 /**
@@ -1881,8 +2153,8 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
  * by no tuple was visible here. The @a story must be on top of chain.
  */
 static void
-memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
-			 uint32_t ind);
+memtx_tx_track_story_gap(struct txn *txn,
+			 struct memtx_story_link *link);
 
 /**
  * Deletes the point hole item. The deletion of the item from the point hole
@@ -1908,18 +2180,15 @@ point_hole_item_delete(struct point_hole_item *object)
  * point hole tracker and will be rebind as normal reader of given tuple.
  */
 static void
-memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
-				 uint32_t ind)
+memtx_tx_handle_point_hole_write(struct memtx_story_link *link)
 {
-	assert(story->link[ind].newer_story == NULL);
-	struct index *index = space->index[ind];
+	assert(link->newer_link == NULL);
+	struct index *index = link->in_index;
 	struct mh_point_holes_t *ht = txm.point_holes;
 	struct point_hole_key key;
 	key.index = index;
-	key.tuple = story->tuple;
-	key.func_key = NULL;
-	if (index->def->key_def->for_func_index)
-		key.func_key = memtx_tx_tuple_func_key(story->tuple, index);
+	key.entry.tuple = link->story->tuple;
+	key.entry.hint = link->hint;
 	mh_int_t pos = mh_point_holes_find(ht, &key, 0);
 	if (pos == mh_end(ht))
 		return;
@@ -1932,7 +2201,7 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 
 	bool has_more_items;
 	do {
-		memtx_tx_track_story_gap(item->txn, story, ind);
+		memtx_tx_track_story_gap(item->txn, link);
 
 		struct point_hole_item *next_item =
 			rlist_entry(item->ring.next,
@@ -2018,14 +2287,12 @@ memtx_tx_tuple_matches_until(struct key_def *cmp_def, struct tuple *tuple,
  * of the tuple.
  */
 static void
-memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
-			      uint32_t ind)
+memtx_tx_handle_counted_write(struct space *space, struct index *index,
+			      struct memtx_story_link *link)
 {
-	bool is_insert = story->del_stmt == NULL;
+	bool is_insert = link->story->del_stmt == NULL;
 
-	assert(story->link[ind].newer_story == NULL || !is_insert);
-
-	struct index *index = space->index[ind];
+	assert(link->newer_link == NULL || !is_insert);
 
 	struct gap_item_base *item_base, *tmp;
 	rlist_foreach_entry_safe(item_base, &index->read_gaps,
@@ -2036,11 +2303,11 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 		struct count_gap_item *item =
 			(struct count_gap_item *)item_base;
 
-		hint_t hint = memtx_tx_tuple_hint(story->tuple, index,
-						  index->def->cmp_def);
+		hint_t hint = memtx_tx_story_link_hint(link, index,
+						       index->def->cmp_def);
 		bool tuple_matches = memtx_tx_tuple_matches_until(
-			index->def->cmp_def, story->tuple, hint, item->type,
-			item->key, item->part_count, item->until,
+			index->def->cmp_def, link->story->tuple, hint,
+			item->type, item->key, item->part_count, item->until,
 			item->until_hint);
 
 		/*
@@ -2055,14 +2322,15 @@ memtx_tx_handle_counted_write(struct space *space, struct memtx_story *story,
 				 * there. Now this insertion is conflicting.
 				 */
 				memtx_tx_track_story_gap(item_base->txn,
-							 story, ind);
+							 link);
 			} else {
 				/*
 				 * Record like the counted transaction had read
 				 * the tuple. Now this deletion is conflicting.
 				 */
 				memtx_tx_track_read_story(item_base->txn,
-							  space, story);
+							  space,
+							  link->story);
 			}
 		}
 	}
@@ -2085,8 +2353,10 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
  * added or deleted) by `stmt`'s transaction.
  */
 static int
-check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
-	  struct tuple **old_tuple, enum dup_replace_mode mode)
+check_dup(struct txn_stmt *stmt,
+	  struct memtx_index_replace_result_set *results,
+	  struct tuple **old_tuple,
+	  enum dup_replace_mode mode)
 {
 	struct space *space = stmt->space;
 	struct txn *txn = stmt->txn;
@@ -2095,16 +2365,28 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 	struct tuple *new_tuple = add_story->tuple;
 
 	struct tuple *visible_replaced;
-	if (directly_replaced[0] == NULL ||
-	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
-		add_story->link[0].is_own_change = false;
-		visible_replaced = directly_replaced[0];
+	struct memtx_index_entry primary_replaced_entry =
+		memtx_index_entry_null;
+	struct memtx_index_replace_result_iterator it;
+	memtx_index_replace_result_iterator_create(&it, &results[0]);
+	struct memtx_index_replace_step step;
+	VERIFY(memtx_index_replace_result_iterator_next(&it, &step));
+	primary_replaced_entry = step.replaced->entry;
+	assert(!memtx_index_replace_result_iterator_next(&it, &step));
+	struct tuple *primary_replaced = primary_replaced_entry.tuple;
+	struct memtx_story_link *pk_link =
+		memtx_tx_story_link_get_single(add_story, /*index_id=*/0);
+	if (primary_replaced == NULL ||
+	    !tuple_has_flag(primary_replaced, TUPLE_IS_DIRTY)) {
+		pk_link->is_own_change = false;
+		visible_replaced = primary_replaced;
 	} else {
-		struct memtx_story *story =
-			memtx_tx_story_get(directly_replaced[0]);
-		memtx_tx_story_find_visible_tuple(
-			story, txn, 0, true, &visible_replaced,
-			&add_story->link[0].is_own_change);
+		struct memtx_story_link *link =
+			memtx_tx_story_link_get(space->index[0],
+						primary_replaced_entry);
+		memtx_tx_story_link_find_visible_tuple(link, txn, true,
+						       &visible_replaced,
+						       &pk_link->is_own_change);
 	}
 
 	if (index_check_dup(space->index[0], *old_tuple, new_tuple,
@@ -2118,30 +2400,46 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 		 * Check that visible tuple is NULL or the same as in the
 		 * primary index, namely replaced[0].
 		 */
-		if (directly_replaced[i] == NULL)
-			continue; /* NULL is OK in any case. */
+		struct memtx_index_replace_result_iterator it;
+		memtx_index_replace_result_iterator_create(&it, &results[i]);
+		struct memtx_index_replace_step step;
+		while (memtx_index_replace_result_iterator_next(&it, &step)) {
+			if (step.inserted->entry.tuple == NULL)
+				continue;
+			struct memtx_story_link *link =
+				memtx_tx_story_link_get(space->index[i],
+							step.inserted->entry);
+			struct tuple *secondary_replaced =
+				step.replaced->entry.tuple;
+			if (secondary_replaced == NULL)
+				continue; /* NULL is OK in any case. */
+			struct tuple *visible;
+			if (!tuple_has_flag(secondary_replaced,
+					    TUPLE_IS_DIRTY)) {
+				visible = secondary_replaced;
+				link->is_own_change = false;
+			} else {
+				/*
+				 * The replaced tuple is dirty. A chain of
+				 * changes cannot lead to clean tuple, but in
+				 * can lead to NULL, that's the only chance to
+				 * be OK.
+				 */
+				struct memtx_story_link *secondary_link =
+					memtx_tx_story_link_get(
+						space->index[i],
+						step.replaced->entry);
+				memtx_tx_story_link_find_visible_tuple(
+					secondary_link, txn, true, &visible,
+					&link->is_own_change);
+			}
 
-		struct tuple *visible;
-		if (!tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY)) {
-			visible = directly_replaced[i];
-			add_story->link[i].is_own_change = false;
-		} else {
-			/*
-			 * The replaced tuple is dirty. A chain of changes
-			 * cannot lead to clean tuple, but in can lead to NULL,
-			 * that's the only chance to be OK.
-			 */
-			struct memtx_story *story =
-				memtx_tx_story_get(directly_replaced[i]);
-			memtx_tx_story_find_visible_tuple(
-				story, txn, i, true, &visible,
-				&add_story->link[i].is_own_change);
-		}
-
-		if (index_check_dup(space->index[i], visible_replaced,
-				    new_tuple, visible, DUP_INSERT) != 0) {
-			memtx_tx_track_read(txn, space, visible);
-			return -1;
+			if (index_check_dup(space->index[i], visible_replaced,
+					    new_tuple, visible,
+					    DUP_INSERT) != 0) {
+				memtx_tx_track_read(txn, space, visible);
+				return -1;
+			}
 		}
 	}
 
@@ -2150,17 +2448,18 @@ check_dup(struct txn_stmt *stmt, struct tuple **directly_replaced,
 }
 
 static void
-memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
-			 uint32_t ind)
+memtx_tx_track_story_gap(struct txn *txn,
+			 struct memtx_story_link *link)
 {
-	assert(story->link[ind].newer_story == NULL);
+	assert(link->newer_link == NULL);
 	assert(txn != NULL);
 	bool unused;
 	bool abort_on_rollback =
-		!memtx_tx_story_is_deleted_by_txn(story, txn, &unused);
+		!memtx_tx_story_is_deleted_by_txn(link->story, txn,
+						  &unused);
 	struct inplace_gap_item *item =
 		memtx_tx_inplace_gap_item_new(txn, abort_on_rollback);
-	rlist_add(&story->link[ind].read_gaps, &item->base.in_read_gaps);
+	rlist_add(&link->read_gaps, &item->base.in_read_gaps);
 }
 
 /**
@@ -2168,28 +2467,29 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
  * have read from this gap and thus must be sent to read view or conflicted.
  */
 static void
-memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
-			  struct tuple *successor, uint32_t ind)
+memtx_tx_handle_gap_write(struct memtx_story_link *link,
+			  struct memtx_index_entry successor)
 {
-	assert(story->link[ind].newer_story == NULL);
-	struct tuple *tuple = story->tuple;
-	struct index *index = space->index[ind];
+	assert(link->newer_link == NULL);
+	struct tuple *tuple = link->story->tuple;
+	struct index *index = link->in_index;
 	struct gap_item_base *item_base, *tmp;
 	rlist_foreach_entry_safe(item_base, &index->read_gaps,
 				 in_read_gaps, tmp) {
 		if (item_base->type != GAP_FULL_SCAN)
 			continue;
-		memtx_tx_track_story_gap(item_base->txn, story, ind);
+		memtx_tx_track_story_gap(item_base->txn, link);
 	}
-	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
+	if (successor.tuple != NULL &&
+	    !tuple_has_flag(successor.tuple, TUPLE_IS_DIRTY))
 		return; /* no gap records */
 
 	struct rlist *list = &index->read_gaps;
-	if (successor != NULL) {
-		assert(tuple_has_flag(successor, TUPLE_IS_DIRTY));
-		struct memtx_story *succ_story = memtx_tx_story_get(successor);
-		assert(ind < succ_story->index_count);
-		list = &succ_story->link[ind].read_gaps;
+	if (successor.tuple != NULL) {
+		assert(tuple_has_flag(successor.tuple, TUPLE_IS_DIRTY));
+		struct memtx_story_link *succ_link =
+			memtx_tx_story_link_get(index, successor);
+		list = &succ_link->read_gaps;
 		assert(list->next != NULL && list->prev != NULL);
 	}
 	rlist_foreach_entry_safe(item_base, list, in_read_gaps, tmp) {
@@ -2201,7 +2501,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
 			hint_t oh = key_hint(item->key, item->part_count, def);
-			hint_t kh = memtx_tx_tuple_hint(tuple, index, def);
+			hint_t kh = memtx_tx_story_link_hint(link, index, def);
 			cmp = tuple_compare_with_key(tuple, kh, item->key,
 						     item->part_count, oh,
 						     def);
@@ -2222,7 +2522,7 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
 		if (need_track)
-			memtx_tx_track_story_gap(item_base->txn, story, ind);
+			memtx_tx_track_story_gap(item_base->txn, link);
 		if (need_split) {
 			/*
 			 * The insertion divided the gap into two parts.
@@ -2235,12 +2535,12 @@ memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 							     item->key,
 							     item->part_count);
 
-			rlist_add(&story->link[ind].read_gaps,
+			rlist_add(&link->read_gaps,
 				  &copy->base.in_read_gaps);
 		} else if (need_move) {
 			/* The tracker must be moved to the left gap. */
 			rlist_del(&item->base.in_read_gaps);
-			rlist_add(&story->link[ind].read_gaps,
+			rlist_add(&link->read_gaps,
 				  &item->base.in_read_gaps);
 		} else {
 			assert((dir > 0 && cmp < 0) ||
@@ -2276,61 +2576,77 @@ memtx_tx_history_add_stmt_prepare_result(struct tuple *old_tuple,
  * REPLACE, and old_tuple is NULL because it is unknown yet.
  * INSERT, and old_tuple is NULL because there's no such tuple.
  * UPDATE, and old_tuple is not NULL and is the updated tuple.
+ *
+ * This helper is the sole creator of the story for @a new_tuple. It runs after
+ * all index replacements succeed and deletes the story if late conflict
+ * resolution fails.
  */
 static int
 memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple *new_tuple,
-				 struct tuple **directly_replaced,
-				 struct tuple **direct_successor,
+				 struct memtx_index_replace_result_set *
+					direct_results,
 				 enum dup_replace_mode mode,
 				 struct tuple **result)
 {
 	assert(new_tuple != NULL);
 	struct space *space = stmt->space;
 
-	/* Link add_story. */
-	struct memtx_story *add_story = memtx_tx_story_get(new_tuple);
+	/* Create and link add_story after all index replacements succeed. */
+	struct memtx_story *add_story =
+		memtx_tx_story_new(space, new_tuple, direct_results);
 	memtx_tx_story_link_added_by(add_story, stmt);
 
 	/* Check overwritten tuple. */
-	if (check_dup(stmt, directly_replaced, &old_tuple, mode) != 0) {
-		/* Unlink add_story. */
+	if (check_dup(stmt, direct_results, &old_tuple, mode) != 0) {
 		memtx_tx_story_unlink_added_by(add_story, stmt);
+		memtx_tx_story_delete(add_story);
 		return -1;
 	}
 
 	/* Create next story in the primary index if necessary. */
-	struct tuple *next_pk = directly_replaced[0];
+	struct tuple *next_pk =
+		memtx_index_replace_result_list_to_tuple(
+			space->index[0], &direct_results[0].replaced);
 	struct memtx_story *next_pk_story = NULL;
 	if (next_pk != NULL && tuple_has_flag(next_pk, TUPLE_IS_DIRTY)) {
 		next_pk_story = memtx_tx_story_get(next_pk);
 	} else if (next_pk != NULL) {
-		next_pk_story = memtx_tx_story_new(space, next_pk);
+		next_pk_story = memtx_tx_story_new(space, next_pk, NULL);
 	}
 
 	/* Collect conflicts or form chains. */
 	for (uint32_t i = 0; i < space->index_count; i++) {
-		struct tuple *next = directly_replaced[i];
-		struct tuple *succ = direct_successor[i];
-		struct index *index = space->index[i];
-		bool tuple_is_excluded = memtx_tx_tuple_key_is_excluded(
-			new_tuple, index, index->def->key_def);
-		if (next == NULL && !tuple_is_excluded) {
-			/* Collect conflicts. */
-			memtx_tx_handle_gap_write(space, add_story, succ, i);
-			memtx_tx_handle_point_hole_write(space, add_story, i);
-			memtx_tx_handle_counted_write(space, add_story, i);
-			memtx_tx_story_link_top(add_story, NULL, i, true);
-		}
-		if (next != NULL) {
-			/* Form chains. */
-			struct memtx_story *next_story = next_pk_story;
-			if (next != next_pk) {
-				assert(tuple_has_flag(next, TUPLE_IS_DIRTY));
-				next_story = memtx_tx_story_get(next);
+		struct memtx_index_replace_result_iterator it;
+		memtx_index_replace_result_iterator_create(
+			&it, &direct_results[i]);
+		struct memtx_index_replace_step step;
+		while (memtx_index_replace_result_iterator_next(&it, &step)) {
+			if (step.inserted->entry.tuple == NULL)
+				continue;
+			struct tuple *next = step.replaced->entry.tuple;
+			struct memtx_story_link *link =
+				memtx_tx_story_link_get(space->index[i],
+							step.inserted->entry);
+			if (next == NULL) {
+				/* Collect conflicts. */
+				struct memtx_index_entry successor =
+					step.successor->entry;
+				memtx_tx_handle_gap_write(link, successor);
+				memtx_tx_handle_point_hole_write(link);
+				struct index *index = space->index[i];
+				memtx_tx_handle_counted_write(space, index,
+							      link);
+				memtx_tx_story_link_top(link, NULL, true);
+			} else {
+				/* Form chains. */
+				struct memtx_story_link *next_link =
+					memtx_tx_story_link_get(
+						space->index[i],
+						step.replaced->entry);
+				memtx_tx_story_link_top(link, next_link, true);
 			}
-			memtx_tx_story_link_top(add_story, next_story, i, true);
 		}
 	}
 
@@ -2362,13 +2678,15 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	 * transaction can interfere with insert: due to serialization the
 	 * previous delete statement guarantees that the insert will not fail.
 	 */
-	if (!add_story->link[0].is_own_change &&
+	struct memtx_story_link *pk_link =
+		memtx_tx_story_link_get_single(add_story, 0);
+	if (!pk_link->is_own_change &&
 	    (mode == DUP_INSERT ||
 	     space_has_before_replace_triggers(stmt->space) ||
 	     space_has_on_replace_triggers(stmt->space))) {
 		assert(mode != DUP_INSERT || del_story == NULL);
 		if (del_story == NULL)
-			memtx_tx_track_story_gap(stmt->txn, add_story, 0);
+			memtx_tx_track_story_gap(stmt->txn, pk_link);
 		else
 			memtx_tx_track_read_story(stmt->txn, space, del_story);
 	}
@@ -2401,6 +2719,7 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	 */
 	assert(tuple_has_flag(old_tuple, TUPLE_IS_DIRTY));
 	struct memtx_story *del_story = memtx_tx_story_get(old_tuple);
+	struct space *space = stmt->space;
 	if (del_story->add_stmt != NULL)
 		stmt->is_own_delete = del_story->add_stmt->txn == stmt->txn;
 	memtx_tx_story_link_deleted_by(del_story, stmt);
@@ -2409,13 +2728,12 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	 * The tuple is deleted from the space, let's see if anyone had
 	 * counted it in the indexes the tuple is contained in.
 	 */
-	struct space *space = stmt->space;
+	memtx_tx_story_force_all_links(del_story, space);
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		if (!memtx_tx_tuple_key_is_excluded(del_story->tuple, index,
-						    index->def->key_def)) {
-			memtx_tx_handle_counted_write(space, del_story, i);
-		}
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &del_story->link[i], link)
+			memtx_tx_handle_counted_write(space, index, link);
 	}
 
 	/* Notify statistics. */
@@ -2464,20 +2782,16 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	}
 
 	/*
-	 * Create story to make `new_tuple` dirty during replace.
+	 * Save the positional replace result of each index to track read and
+	 * write sets in the transaction manager.
 	 */
-	if (use_mvcc)
-		memtx_tx_story_new(stmt->space, new_tuple);
-
-	/*
-	 * Save directly replaced and successor tuples per each
-	 * `memtx_index_replace` to track read and write sets in transaction
-	 * manager.
-	 */
-	static_assert(BOX_INDEX_MAX == 128, "size of `directly_replaced` and "
-		      "`direct_successor` arrays on the stack");
-	struct tuple *directly_replaced[space->index_count];
-	struct tuple *direct_successor[space->index_count];
+	static_assert(BOX_INDEX_MAX == 128,
+		      "size of `direct_results` array on the stack");
+	struct memtx_index_replace_result_set
+		direct_results[space->index_count];
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	int rc = -1;
 
 	/*
 	 * Update primary index.
@@ -2490,12 +2804,15 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 * defer conflict resolution to `memtx_tx_add_insert_stmt`.
 	 */
 	uint32_t i = 0;
-	if (memtx_index_replace(pk, use_mvcc ? NULL : old_tuple, new_tuple,
-				use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
-				&directly_replaced[i],
-				&direct_successor[i]) != 0)
+	if (memtx_index_replace_with_results(
+			pk, use_mvcc ? NULL : old_tuple, new_tuple,
+			use_mvcc ? DUP_REPLACE_OR_INSERT : mode,
+			&direct_results[i]) != 0)
 		goto rollback;
-	assert(directly_replaced[i] || new_tuple);
+	struct tuple *primary_replaced =
+		memtx_index_replace_result_list_to_tuple(
+			pk, &direct_results[i].replaced);
+	assert(primary_replaced != NULL || new_tuple != NULL);
 
 	/*
 	 * Update secondary indexes.
@@ -2509,13 +2826,11 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 	 */
 	for (i++; i < space->index_count; i++) {
 		struct index *index = space->index[i];
-		if (memtx_index_replace(index,
-					use_mvcc ? NULL : directly_replaced[0],
-					new_tuple,
-					use_mvcc ? DUP_REPLACE_OR_INSERT
-						: DUP_INSERT,
-					&directly_replaced[i],
-					&direct_successor[i]) != 0)
+		if (memtx_index_replace_with_results(
+				index, use_mvcc ? NULL : primary_replaced,
+				new_tuple,
+				use_mvcc ? DUP_REPLACE_OR_INSERT : DUP_INSERT,
+				&direct_results[i]) != 0)
 			goto rollback;
 	}
 
@@ -2523,12 +2838,11 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 		/*
 		 * With MVCC, we perform late conflict resolution, determine
 		 * `result` tuple and track `old_tuple`, `new_tuple`,
-		 * `directly_replaced`, `direct_successor` tuples.
+		 * positional index replace results.
 		 */
 		if (memtx_tx_history_add_insert_stmt(stmt, old_tuple, new_tuple,
-						     directly_replaced,
-						     direct_successor, mode,
-						     result) != 0)
+						     direct_results,
+						     mode, result) != 0)
 			goto rollback;
 	} else {
 		/*
@@ -2536,36 +2850,27 @@ memtx_tx_add_stmt(struct space *space, struct tuple *old_tuple,
 		 * `new_tuple` and set `result` tuples using the tuple that we
 		 * replaced in the primary index.
 		 */
-		memtx_space_update_tuple_stat(space, directly_replaced[0],
+		memtx_space_update_tuple_stat(space, primary_replaced,
 					      new_tuple);
 		if (new_tuple != NULL)
 			tuple_ref(new_tuple);
-		*result = directly_replaced[0];
+		*result = primary_replaced;
 	}
-	return 0;
-
+	rc = 0;
+	for (; i > 0; i--)
+		memtx_index_replace_result_set_cleanup(
+			space->index[i - 1], &direct_results[i - 1]);
+	goto end;
 rollback:
 	/*
 	 * Rollback index changes.
 	 */
-	for (; i > 0; i--) {
-		struct tuple *delete;
-		struct tuple *successor;
-		struct index *index = space->index[i - 1];
-		if (memtx_index_replace(index, new_tuple,
-					directly_replaced[i - 1], DUP_INSERT,
-					&delete, &successor) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
-	}
-	/*
-	 * Delete story created for `new_tuple`.
-	 */
-	if (use_mvcc)
-		memtx_tx_story_delete(memtx_tx_story_get(new_tuple));
-	return -1;
+	for (; i > 0; i--)
+		memtx_index_replace_rollback(space->index[i - 1],
+					     &direct_results[i - 1]);
+end:
+	region_truncate(region, region_svp);
+	return rc;
 }
 
 /*
@@ -2586,27 +2891,24 @@ memtx_tx_abort_story_readers(struct memtx_story *story)
  * subsequent transactions may become duplicates. This function aborts all
  * in-progress transactions that would lead to duplicates.
  *
- * @param story - the story that became the last prepared/committed in the
+ * @param link - the link that became the last prepared/committed in the
  * chain.
  * @return a top story in chain of @a story by index @a ind.
  */
-static struct memtx_story *
-memtx_tx_handle_dups_in_secondary_index(
-	struct memtx_story *story, uint32_t ind)
+static struct memtx_story_link *
+memtx_tx_handle_dups_in_secondary_index(struct memtx_story_link *link)
 {
-	if (story == NULL)
+	if (link == NULL)
 		return NULL;
 
 	/* The last prepared/committed story in the chain. */
-	assert(story->add_psn != 0 || story->add_stmt == NULL);
-	assert(story->link[ind].newer_story == NULL ||
-	       (story->link[ind].newer_story->add_psn == 0 &&
-		story->link[ind].newer_story->add_stmt != NULL));
+	assert(link->story->add_psn != 0 || link->story->add_stmt == NULL);
+	assert(link->newer_link == NULL ||
+	       (link->newer_link->story->add_psn == 0 &&
+		link->newer_link->story->add_stmt != NULL));
 
-	struct txn_stmt *stmt = story->add_stmt;
+	struct txn_stmt *stmt = link->story->add_stmt;
 
-	/* Handle conflicts in the secondary indexes. */
-	assert(ind > 0);
 	/*
 	 * Handle secondary cross-write conflict. This case is too
 	 * complicated and deserves an explanation with example.
@@ -2625,10 +2927,10 @@ memtx_tx_handle_dups_in_secondary_index(
 	 * To handle those conflicts in general we must scan chains
 	 * towards the top and check insert statements.
 	 */
-	struct memtx_story *newer_story = story;
-	while (newer_story->link[ind].newer_story != NULL) {
-		newer_story = newer_story->link[ind].newer_story;
-		struct txn_stmt *test_stmt = newer_story->add_stmt;
+	struct memtx_story_link *newer_link = link;
+	while (newer_link->newer_link != NULL) {
+		newer_link = newer_link->newer_link;
+		struct txn_stmt *test_stmt = newer_link->story->add_stmt;
 		/* Don't conflict own changes. */
 		if (stmt != NULL && test_stmt->txn == stmt->txn)
 			continue;
@@ -2637,19 +2939,19 @@ memtx_tx_handle_dups_in_secondary_index(
 		 * Ignore case when other TX executes insert after
 		 * precedence delete.
 		 */
-		if (newer_story->link[ind].is_own_change &&
+		if (newer_link->is_own_change &&
 		    test_stmt->del_story == NULL)
 			continue;
 		/*
 		 * Ignore the case when other TX overwrites in both
 		 * primary and secondary index.
 		 */
-		if (test_stmt->del_story == story)
+		if (test_stmt->del_story == link->story)
 			continue;
 		txn_abort_with_conflict(test_stmt->txn);
 	}
 
-	return newer_story;
+	return newer_link;
 }
 
 /**
@@ -2657,8 +2959,7 @@ memtx_tx_handle_dups_in_secondary_index(
  * corresponding to the @top_story->link[@ind] chain.
  */
 static void
-memtx_tx_abort_gap_readers_on_rollback(
-	struct memtx_story *top_story, uint32_t ind);
+memtx_tx_abort_gap_readers_on_rollback(struct memtx_story_link *top_link);
 
 /**
  * A rollback helper that combines the abortion of duplicates in secondary
@@ -2670,16 +2971,23 @@ memtx_tx_abort_gap_readers_on_rollback(
 static void
 memtx_tx_handle_dups_and_gaps_on_rollback(struct memtx_story *story)
 {
-	struct memtx_story *top_story = memtx_tx_story_find_top(story, 0);
-	memtx_tx_abort_gap_readers_on_rollback(top_story, 0);
+	struct memtx_story_link *pk_link =
+		memtx_tx_story_link_get_single(story, /*index_id=*/0);
+	struct memtx_story_link *top_link =
+		memtx_tx_story_link_find_top(pk_link);
+	memtx_tx_abort_gap_readers_on_rollback(top_link);
 
 	for (uint32_t i = 1; i < story->index_count; i++) {
-		top_story = memtx_tx_handle_dups_in_secondary_index(story, i);
-		/*
-		 * If a transaction managed to read absence this story it must
-		 * be aborted.
-		 */
-		memtx_tx_abort_gap_readers_on_rollback(top_story, i);
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			top_link =
+				memtx_tx_handle_dups_in_secondary_index(link);
+			/*
+			 * If a transaction managed to read absence this story
+			 * it must be aborted.
+			 */
+			memtx_tx_abort_gap_readers_on_rollback(top_link);
+		}
 	}
 }
 
@@ -2698,14 +3006,15 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	 * be invisible to any reader (that's what is needed) and still be
 	 * able to store read set, if necessary.
 	 */
-	for (uint32_t i = 0; i < add_story->index_count; ) {
-		struct memtx_story *old_story = add_story->link[i].older_story;
-		if (old_story == NULL) {
-			/* Old story is absent. */
-			i++; /* Go to the next index. */
-			continue;
+	for (uint32_t i = 0; i < add_story->index_count; ++i) {
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &add_story->link[i], link) {
+			struct memtx_story_link *old_link = link->older_link;
+			while (old_link != NULL) {
+				memtx_tx_story_link_reorder(link, old_link);
+				old_link = link->older_link;
+			}
 		}
-		memtx_tx_story_reorder(add_story, old_story, i);
 	}
 
 	/*
@@ -2734,8 +3043,12 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			assert(test_stmt->txn != stmt->txn);
 			struct memtx_story *test_story = test_stmt->add_story;
 			(void)test_story;
+			struct memtx_story_link *pk_link =
+				memtx_tx_story_link_get_single(test_story,
+							       /*index_id=*/0);
 			assert(!(test_story == NULL ? test_stmt->is_own_delete :
-			       test_story->link[0].is_own_change));
+			       pk_link->is_own_change));
+			(void)pk_link;
 			assert(test_stmt->txn->psn == 0);
 
 			/* Unlink from add_story list. */
@@ -2775,18 +3088,17 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 }
 
 static void
-memtx_tx_abort_gap_readers_on_rollback(
-	struct memtx_story *top_story, uint32_t ind)
+memtx_tx_abort_gap_readers_on_rollback(struct memtx_story_link *top_link)
 {
 	/*
 	 * We rely on the fact that all gap trackers are stored in the
 	 * top story of history chain.
 	 */
-	assert(top_story->link[ind].newer_story == NULL);
+	assert(top_link->newer_link == NULL);
 
 	struct gap_item_base *item_base, *tmp;
-	rlist_foreach_entry_safe(item_base, &top_story->link[ind].read_gaps,
-				 in_read_gaps, tmp) {
+	rlist_foreach_entry_safe(item_base, &top_link->read_gaps, in_read_gaps,
+				 tmp) {
 		if (item_base->type != GAP_INPLACE)
 			continue;
 		struct inplace_gap_item *item =
@@ -2822,12 +3134,15 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 		 * transactions are surely conflicted because of read-write
 		 * conflict and thus does not matter anymore.
 		 */
-		struct memtx_story *test_story;
-		for (test_story = del_story->link[0].newer_story;
-		     test_story != NULL;
-		     test_story = test_story->link[0].newer_story) {
-			struct txn_stmt *test_stmt = test_story->add_stmt;
-			if (test_story->link[0].is_own_change)
+		struct memtx_story_link *test_link;
+		struct memtx_story_link *pk_link =
+			memtx_tx_story_link_get_single(del_story,
+						       /*index_id=*/0);
+		for (test_link = pk_link->newer_link;
+		     test_link != NULL;
+		     test_link = test_link->newer_link) {
+			struct txn_stmt *test_stmt = test_link->story->add_stmt;
+			if (test_link->is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
 			assert(test_stmt->del_story == NULL);
@@ -2872,10 +3187,9 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 	    (old_tuple == NULL && new_tuple == NULL))
 		return;
 	for (size_t i = 0; i < stmt->space->index_count; i++) {
-		struct tuple *unused;
 		if (memtx_index_replace(stmt->space->index[i], new_tuple,
-					old_tuple, DUP_REPLACE_OR_INSERT,
-					&unused, &unused) != 0) {
+					old_tuple,
+					DUP_REPLACE_OR_INSERT) != 0) {
 			panic("failed to rebind story in index on "
 			      "rollback of statement without story");
 		}
@@ -2938,13 +3252,13 @@ memtx_tx_handle_conflict_story_readers(struct memtx_story *story,
  * @a writer that is actually deletes the story.
  */
 static void
-memtx_tx_handle_conflict_gap_readers(struct memtx_story *top_story,
-				     uint32_t ind, struct txn *writer)
+memtx_tx_handle_conflict_gap_readers(struct memtx_story_link *top_link,
+				     struct txn *writer)
 {
-	assert(top_story->link[ind].newer_story == NULL);
+	assert(top_link->newer_link == NULL);
 	struct gap_item_base *item, *tmp;
-	rlist_foreach_entry_safe(item, &top_story->link[ind].read_gaps,
-				 in_read_gaps, tmp) {
+	rlist_foreach_entry_safe(item, &top_link->read_gaps, in_read_gaps,
+				 tmp) {
 		if (item->txn == writer || item->type != GAP_INPLACE)
 			continue;
 		txn_send_to_read_view(item->txn, writer->psn);
@@ -2978,27 +3292,33 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	 * If a statement becomes prepared, the story it adds must be 'sunk' to
 	 * the level of prepared stories.
 	 */
-	for (uint32_t i = 0; i < story->index_count; ) {
-		struct memtx_story *old_story = story->link[i].older_story;
-		if (old_story == NULL || old_story->add_psn != 0 ||
-		    old_story->add_stmt == NULL) {
-			/* Old story is absent or prepared or committed. */
-			i++; /* Go to the next index. */
-			continue;
+	for (uint32_t i = 0; i < story->index_count; ++i) {
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			struct memtx_story_link *old_link = link->older_link;
+			while (old_link != NULL &&
+			       old_link->story->add_psn == 0 &&
+			       old_link->story->add_stmt != NULL) {
+				memtx_tx_story_link_reorder(link, old_link);
+				old_link = link->older_link;
+			}
 		}
-		memtx_tx_story_reorder(story, old_story, i);
 	}
 
+	struct memtx_story_link *pk_link =
+				memtx_tx_story_link_get_single(story,
+							       /*index_id=*/0);
 	/* Consistency asserts. */
 	{
 		assert(story->del_stmt == NULL ||
 		       story->del_stmt->next_in_del_list == NULL);
-		struct memtx_story *old_story = story->link[0].older_story;
+		struct memtx_story_link *old_link = pk_link->older_link;
 		if (stmt->del_story == NULL)
-			assert(old_story == NULL || old_story->del_psn != 0);
+			assert(old_link == NULL ||
+			       old_link->story->del_psn != 0);
 		else
-			assert(old_story == stmt->del_story);
-		(void)old_story;
+			assert(old_link->story == stmt->del_story);
+		(void)old_link;
 	}
 
 	/*
@@ -3014,12 +3334,12 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * that the replaced nothing. They must be told that they
 		 * replace this tuple now.
 		 */
-		struct memtx_story *test_story;
-		for (test_story = story->link[0].newer_story;
-		     test_story != NULL;
-		     test_story = test_story->link[0].newer_story) {
-			struct txn_stmt *test_stmt = test_story->add_stmt;
-			if (test_story->link[0].is_own_change)
+		struct memtx_story_link *test_link;
+		for (test_link = pk_link->newer_link;
+		     test_link != NULL;
+		     test_link = test_link->newer_link) {
+			struct txn_stmt *test_stmt = test_link->story->add_stmt;
+			if (test_link->is_own_change)
 				continue;
 			assert(test_stmt->txn != stmt->txn);
 			assert(test_stmt->del_story == NULL);
@@ -3072,9 +3392,9 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		 * We check only primary index here, we will check all other
 		 * indexes below.
 		 */
-		struct memtx_story *top_story =
-			memtx_tx_story_find_top(story, 0);
-		memtx_tx_handle_conflict_gap_readers(top_story, 0, stmt->txn);
+		struct memtx_story_link *top_link =
+			memtx_tx_story_link_find_top(pk_link);
+		memtx_tx_handle_conflict_gap_readers(top_link, stmt->txn);
 	}
 
 	/* Finally set PSNs in stories to mark them add/delete as prepared. */
@@ -3083,18 +3403,23 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		stmt->del_story->del_psn = stmt->txn->psn;
 
 	for (uint32_t i = 1; i < story->index_count; i++) {
-		struct memtx_story *top_story =
-			memtx_tx_handle_dups_in_secondary_index(story, i);
-		/*
-		 * We have already checked gap readers before for the case
-		 * of insertion to the primary index.
-		 * In any (replace or insert) case we must handle gap readers
-		 * in the secondary indexes as well since in all kinds of
-		 * statements can insert new value to secondary index.
-		 * Note that newer_story is in top of chain due to previous
-		 * manipulations.
-		 */
-		memtx_tx_handle_conflict_gap_readers(top_story, i, stmt->txn);
+		struct memtx_story_link *link;
+		rlist_foreach_entry(link, &story->link[i], link) {
+			struct memtx_story_link *top_link =
+				memtx_tx_handle_dups_in_secondary_index(link);
+			/*
+			 * We have already checked gap readers before for the
+			 * case of insertion to the primary index.
+			 * In any (replace or insert) case we must handle gap
+			 * readers in the secondary indexes as well since in all
+			 * kinds of statements can insert new value to secondary
+			 * index.
+			 * Note that newer_link is in top of chain due to
+			 * previous manipulations.
+			 */
+			memtx_tx_handle_conflict_gap_readers(top_link,
+							     stmt->txn);
+		}
 	}
 }
 
@@ -3191,56 +3516,62 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 }
 
 /**
- * Helper of @sa memtx_tx_tuple_clarify.
+ * Helper of @sa memtx_tx_index_entry_clarify.
  * Do actual work.
  */
 static struct tuple *
-memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
-			    struct memtx_story *top_story, struct index *index,
-			    uint32_t mk_index, bool is_prepared_ok)
+memtx_tx_story_link_clarify_impl(struct txn *txn, struct space *space,
+				 struct memtx_story_link *top_link,
+				 bool is_prepared_ok)
 {
-	struct memtx_story *story = top_story;
+	struct memtx_story_link *link = top_link;
 	bool own_change = false;
 	struct tuple *result = NULL;
 
 	while (true) {
-		if (memtx_tx_story_delete_is_visible(story, txn, is_prepared_ok,
+		if (memtx_tx_story_delete_is_visible(link->story, txn,
+						     is_prepared_ok,
 						     &own_change)) {
 			result = NULL;
 			break;
 		}
-		if (story->del_psn != 0 && story->del_stmt != NULL &&
-		    txn != NULL) {
-			assert(story->del_psn == story->del_stmt->txn->psn);
+		if (link->story->del_psn != 0 &&
+		    link->story->del_stmt != NULL && txn != NULL) {
+			assert(link->story->del_psn ==
+			       link->story->del_stmt->txn->psn);
 			/*
 			 * If we skip deletion of a tuple by prepared
 			 * transaction then the transaction must be before
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			txn_send_to_read_view(txn, story->del_stmt->txn->psn);
+			txn_send_to_read_view(txn,
+					      link->story->del_stmt->txn->psn);
 		}
 
-		if (memtx_tx_story_insert_is_visible(story, txn, is_prepared_ok,
+		if (memtx_tx_story_insert_is_visible(link->story, txn,
+						     is_prepared_ok,
 						     &own_change)) {
-			result = story->tuple;
+			result = link->story->tuple;
 			break;
 		}
-		if (story->add_psn != 0 && story->add_stmt != NULL &&
-		    txn != NULL) {
-			assert(story->add_psn == story->add_stmt->txn->psn);
+		if (link->story->add_psn != 0 &&
+		    link->story->add_stmt != NULL && txn != NULL) {
+			assert(link->story->add_psn ==
+			       link->story->add_stmt->txn->psn);
 			/*
 			 * If we skip addition of a tuple by prepared
 			 * transaction then the transaction must be before
 			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
-			txn_send_to_read_view(txn, story->add_stmt->txn->psn);
+			txn_send_to_read_view(txn,
+					      link->story->add_stmt->txn->psn);
 		}
 
-		if (story->link[index->dense_id].older_story == NULL)
+		if (link->older_link == NULL)
 			break;
-		story = story->link[index->dense_id].older_story;
+		link = link->older_link;
 	}
 	if (txn != NULL && !own_change) {
 		/*
@@ -3250,35 +3581,31 @@ memtx_tx_story_clarify_impl(struct txn *txn, struct space *space,
 		 * have found nothing by this key.
 		 */
 		if (result == NULL)
-			memtx_tx_track_story_gap(txn, top_story,
-						 index->dense_id);
+			memtx_tx_track_story_gap(txn, top_link);
 		else
-			memtx_tx_track_read_story(txn, space, story);
-	}
-	if (mk_index != 0) {
-		assert(false); /* TODO: multiindex */
-		panic("multikey indexes are not supported int TX manager");
+			memtx_tx_track_read_story(txn, space, link->story);
 	}
 	return result;
 }
 
 /**
- * Helper of @sa memtx_tx_tuple_clarify.
+ * Helper of @sa memtx_tx_index_entry_clarify.
  * Do actual work.
  */
 static struct tuple *
-memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
-			    struct tuple *tuple, struct index *index,
-			    uint32_t mk_index, bool is_prepared_ok)
+memtx_tx_index_entry_clarify_impl(struct txn *txn, struct space *space,
+				  struct index *index,
+				  struct memtx_index_entry entry,
+				  bool is_prepared_ok)
 {
-	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-	struct memtx_story *story = memtx_tx_story_get(tuple);
-	return memtx_tx_story_clarify_impl(txn, space, story, index,
-					   mk_index, is_prepared_ok);
+	struct memtx_story_link *link =
+		memtx_tx_story_link_get(index, entry);
+	return memtx_tx_story_link_clarify_impl(txn, space, link,
+						is_prepared_ok);
 }
 
 /**
- * Helper of @sa memtx_tx_tuple_clarify.
+ * Helper of @sa memtx_tx_index_entry_clarify.
  * Detect whether the transaction can see prepared, but unconfirmed commits.
  */
 static bool
@@ -3305,46 +3632,46 @@ detect_whether_prepared_ok(struct txn *txn, struct space *space)
 }
 
 /**
- * Helper of @sa memtx_tx_tuple_clarify.
- * Detect is_prepared_ok flag and pass the job to memtx_tx_tuple_clarify_impl.
+ * Helper of @sa memtx_tx_index_entry_clarify.
+ * Detect is_prepared_ok flag and pass the job to
+ * `memtx_tx_index_entry_clarify_impl`.
  */
 struct tuple *
-memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuple, struct index *index,
-			    uint32_t mk_index)
+memtx_tx_index_entry_clarify_slow(struct txn *txn, struct space *space,
+				  struct index *index,
+				  struct memtx_index_entry entry)
 {
-	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
-		memtx_tx_track_read(txn, space, tuple);
-		return tuple;
+	if (!tuple_has_flag(entry.tuple, TUPLE_IS_DIRTY)) {
+		memtx_tx_track_read(txn, space, entry.tuple);
+		return entry.tuple;
 	}
 	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
 	struct tuple *res =
-		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
-					    is_prepared_ok);
+		memtx_tx_index_entry_clarify_impl(txn, space, index, entry,
+						  is_prepared_ok);
 	return res;
 }
 
 /**
  * Run @a code on stories of tuples actually existing in @a index of @a space.
- * Excluded tuples have their own chains consisting of the only excluded story,
- * these are skipped since they are not actually inserted to index.
+ * Excluded entries are not actually inserted into indexes and therefore have
+ * no story links to visit.
  */
-#define memtx_tx_foreach_in_index_tuple_story(space, index, story, code) do {  \
+#define memtx_tx_foreach_in_index_tuple_story_link(space, index, link, code)   \
+do {									       \
+	memtx_tx_space_force_index_story_links((space), (index));	       \
+	struct memtx_story *story;					       \
 	rlist_foreach_entry(story, &(space)->memtx_stories, in_space_stories) {\
 		assert((index)->dense_id < story->index_count);		       \
-		struct memtx_story_link *link =				       \
-			&story->link[index->dense_id];			       \
-		if (link->in_index == NULL) {				       \
-			assert(link->newer_story != NULL);		       \
-			continue;					       \
+		rlist_foreach_entry(link, &story->link[(index)->dense_id],     \
+				    link) {				       \
+			if ((link)->in_index == NULL) {			       \
+				assert((link)->newer_link != NULL);	       \
+				continue;				       \
+			}						       \
+			assert((link)->newer_link == NULL);		       \
+			code;						       \
 		}							       \
-		assert(link->newer_story == NULL);			       \
-		if (memtx_tx_tuple_key_is_excluded(story->tuple, index,        \
-						   index->def->key_def)) {     \
-			assert(link->older_story == NULL);		       \
-			continue;					       \
-		}							       \
-		code;							       \
 	}								       \
 } while (0)
 
@@ -3367,9 +3694,9 @@ memtx_tx_index_invisible_count_matching_until_slow(
 				      type, key, part_count));
 
 	uint32_t res = 0;
-	struct memtx_story *story;
-	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
-		hint_t hint = memtx_tx_tuple_hint(story->tuple, index, cmp_def);
+	struct memtx_story_link *link;
+	memtx_tx_foreach_in_index_tuple_story_link(space, index, link, {
+		hint_t hint = memtx_tx_story_link_hint(link, index, cmp_def);
 		/* All tuples in the story chain share the same key. */
 		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple, hint,
 						  type, key, part_count,
@@ -3379,9 +3706,9 @@ memtx_tx_index_invisible_count_matching_until_slow(
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
 		bool unused;
-		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
-						  is_prepared_ok, &visible,
-						  &unused);
+		memtx_tx_story_link_find_visible_tuple(link, txn,
+						       is_prepared_ok, &visible,
+						       &unused);
 		if (visible == NULL)
 			res++;
 	});
@@ -3393,19 +3720,21 @@ memtx_tx_index_invisible_count_matching_until_slow(
  * to @a txn.
  */
 bool
-memtx_tx_tuple_key_is_visible_slow(struct txn *txn, struct space *space,
-				   struct index *index, struct tuple *tuple)
+memtx_tx_index_entry_is_visible_slow(struct txn *txn, struct space *space,
+				     struct index *index,
+				     struct memtx_index_entry entry)
 {
-	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY))
+	if (!tuple_has_flag(entry.tuple, TUPLE_IS_DIRTY))
 		return true;
 
-	struct memtx_story *story = memtx_tx_story_get(tuple);
+	struct memtx_story_link *link =
+		memtx_tx_story_link_get(index, entry);
+
 	struct tuple *visible = NULL;
 	bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
 	bool unused;
-	memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
-					  is_prepared_ok, &visible,
-					  &unused);
+	memtx_tx_story_link_find_visible_tuple(link, txn, is_prepared_ok,
+					       &visible, &unused);
 	return visible != NULL;
 }
 
@@ -3453,14 +3782,17 @@ memtx_tx_abort_space_schema_readers(struct space *space, struct txn *ddl_owner)
 		}
 
 		for (uint32_t i = 0; i < story->index_count; i++) {
-			if (story->link[i].newer_story != NULL)
-				continue;
-			struct gap_item_base *item, *tmp;
-			rlist_foreach_entry_safe(item,
-						 &story->link[i].read_gaps,
-						 in_read_gaps, tmp) {
-				if (item->txn != ddl_owner)
-					txn_abort_with_conflict(item->txn);
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link, &story->link[i], link) {
+				if (link->newer_link != NULL)
+					continue;
+				struct gap_item_base *item, *tmp;
+				rlist_foreach_entry_safe(item, &link->read_gaps,
+							 in_read_gaps, tmp) {
+					if (item->txn != ddl_owner)
+						txn_abort_with_conflict(
+							item->txn);
+				}
 			}
 		}
 	}
@@ -3517,6 +3849,7 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 	memtx_tx_abort_space_schema_readers(space, ddl_owner);
 
 	struct memtx_story *story;
+	memtx_tx_space_force_all_story_links(space);
 	/*
 	 * Phase one: fill the indexes with actual tuples. Here we insert
 	 * all tuples visible to `ddl_owner`.
@@ -3525,44 +3858,61 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 		assert(story->index_count == space->index_count);
 
 		for (uint32_t i = 0; i < story->index_count; i++) {
-			struct index *index = story->link[i].in_index;
-			if (index == NULL)
-				continue;
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link, &story->link[i], link) {
+				struct index *index = link->in_index;
+				if (index == NULL)
+					continue;
 
-			/* Mark as not in index. */
-			story->link[i].in_index = NULL;
+				/* Mark as not in index. */
+				link->in_index = NULL;
 
-			/* Skip chains of excluded tuples. */
-			if (memtx_tx_tuple_key_is_excluded(story->tuple, index,
-							   index->def->key_def))
-				continue;
+				struct memtx_index_entry new_entry;
+				bool unused;
+				memtx_tx_story_link_find_visible_entry(
+					link, ddl_owner, /*is_prepared_ok*/true,
+					&new_entry, &unused);
 
-			struct tuple *new_tuple = NULL;
-			bool is_own_change;
-			memtx_tx_story_find_visible_tuple(story, ddl_owner, i,
-							  true, &new_tuple,
-							  &is_own_change);
-
-			/* Visible tuple is already in index - do nothing. */
-			if (new_tuple == story->tuple)
-				continue;
-
-			struct tuple *unused;
-			if (memtx_index_replace(index, story->tuple, new_tuple,
-						DUP_REPLACE, &unused,
-						&unused) != 0) {
-				diag_log();
-				unreachable();
-				panic("failed to rebind story in index on "
-				      "space invalidation");
-			}
-
-			if (i == 0) {
-				if (new_tuple != NULL) {
-					memtx_tx_ref_to_primary(
-						memtx_tx_story_get(new_tuple));
+				/* Visible tuple is already in index. */
+				if (new_entry.tuple == story->tuple &&
+				    new_entry.hint == link->hint)
+					continue;
+				struct memtx_index_entry old_entry = {
+					.tuple = story->tuple,
+					.hint = link->hint,
+				};
+				struct memtx_index_entry result;
+				if (memtx_index_replace_entry(index, old_entry,
+							      new_entry,
+							      DUP_REPLACE,
+							      &result) != 0) {
+					diag_log();
+					unreachable();
+					panic("failed to delete story in index "
+					      "on space invalidation");
 				}
-				memtx_tx_unref_from_primary(story);
+				bool is_mk_or_func =
+					index->def->key_def->is_multikey ||
+					index->def->key_def->for_func_index;
+				bool is_expected =
+					old_entry.tuple == result.tuple ||
+					(result.tuple == NULL &&
+					 is_mk_or_func);
+				(void)is_expected;
+				assert(is_expected);
+				(void)is_mk_or_func;
+				if (i == 0) {
+					if (new_entry.tuple != NULL) {
+						struct tuple *new_tuple =
+							new_entry.tuple;
+						struct memtx_story *new_story =
+							memtx_tx_story_get(
+								new_tuple);
+						memtx_tx_ref_to_primary(
+							new_story);
+					}
+					memtx_tx_unref_from_primary(story);
+				}
 			}
 		}
 	}
@@ -3686,7 +4036,8 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 		struct memtx_story *story = memtx_tx_story_get(tuple);
 		memtx_tx_track_read_story(txn, space, story);
 	} else {
-		struct memtx_story *story = memtx_tx_story_new(space, tuple);
+		struct memtx_story *story =
+			memtx_tx_story_new(space, tuple, NULL);
 		struct tx_read_tracker *tracker;
 		tracker = tx_read_tracker_new(txn, story);
 		rlist_add(&story->reader_list, &tracker->in_reader_list);
@@ -3909,8 +4260,9 @@ memtx_tx_full_scan_gap_item_new(struct txn *txn)
  */
 void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
-			struct tuple *successor, enum iterator_type type,
-			const char *key, uint32_t part_count)
+			struct memtx_index_entry successor,
+			enum iterator_type type, const char *key,
+			uint32_t part_count)
 {
 	if (txn->status != TXN_INPROGRESS)
 		return;
@@ -3918,17 +4270,13 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	struct nearby_gap_item *item =
 		memtx_tx_nearby_gap_item_new(txn, type, key, part_count);
 
-	if (successor != NULL) {
-		struct memtx_story *story;
-		if (tuple_has_flag(successor, TUPLE_IS_DIRTY)) {
-			story = memtx_tx_story_get(successor);
-		} else {
-			story = memtx_tx_story_new(space, successor);
-		}
-		assert(index->dense_id < story->index_count);
-		assert(story->link[index->dense_id].in_index != NULL);
-		rlist_add(&story->link[index->dense_id].read_gaps,
-			  &item->base.in_read_gaps);
+	if (successor.tuple != NULL) {
+		if (!tuple_has_flag(successor.tuple, TUPLE_IS_DIRTY))
+			memtx_tx_story_new(space, successor.tuple, NULL);
+		struct memtx_story_link *link =
+			memtx_tx_story_link_get(index, successor);
+		assert(link->in_index != NULL);
+		rlist_add(&link->read_gaps, &item->base.in_read_gaps);
 	} else {
 		rlist_add(&index->read_gaps, &item->base.in_read_gaps);
 	}
@@ -4036,12 +4384,12 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 	 * deletions, but also with replace stories.
 	 */
 	uint32_t invisible_count = 0;
-	struct memtx_story *story;
-	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
-		hint_t hint = memtx_tx_tuple_hint(story->tuple, index, cmp_def);
+	struct memtx_story_link *link;
+	memtx_tx_foreach_in_index_tuple_story_link(space, index, link, {
+		hint_t hint = memtx_tx_story_link_hint(link, index, cmp_def);
 		/* All tuples in the story chain share the same key. */
-		if (!memtx_tx_tuple_matches_until(cmp_def, story->tuple, hint,
-						  type, key, part_count,
+		if (!memtx_tx_tuple_matches_until(cmp_def, link->story->tuple,
+						  hint, type, key, part_count,
 						  until, until_hint))
 			continue;
 
@@ -4052,8 +4400,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 		 * Let's count invisible BTW, it's free.
 		 */
 		bool is_prepared_ok = detect_whether_prepared_ok(txn, space);
-		if (memtx_tx_story_clarify_impl(txn, space, story, index,
-						0, is_prepared_ok) == NULL)
+		if (memtx_tx_story_link_clarify_impl(txn, space, link,
+						     is_prepared_ok) == NULL)
 			invisible_count++;
 	});
 
@@ -4158,19 +4506,20 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	    rlist_empty(&space->alter_stmts))
 		return;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
-	struct memtx_story *story;
-	memtx_tx_foreach_in_index_tuple_story(space, index, story, {
-		struct tuple *tuple = story->tuple;
+	struct memtx_story_link *link;
+	memtx_tx_foreach_in_index_tuple_story_link(space, index, link, {
+		struct tuple *tuple = link->story->tuple;
 		struct tuple *clean =
-			memtx_tx_tuple_clarify_impl(NULL, space, tuple, index,
-						    0, true);
+			memtx_tx_story_link_clarify_impl(NULL, space, link,
+							 true);
 		if (clean == tuple)
 			continue;
 
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = tuple;
 		entry.to = clean;
-		entry.hint = memtx_tx_tuple_hint(tuple, index,
+		entry.hint =
+			memtx_tx_story_link_hint(link, index,
 						 index->def->cmp_def);
 		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	});
@@ -4239,12 +4588,14 @@ memtx_tx_manager_init(void)
 		mempool_create(&txm.memtx_tx_story_pool[i],
 			       cord_slab_cache(), item_size);
 	}
+	mempool_create(&txm.memtx_tx_story_link_pool, cord_slab_cache(),
+		       sizeof(struct memtx_story_link));
 	txm.history = mh_history_new();
 	memtx_tx_mempool_create(&txm.point_hole_item_pool,
 				sizeof(struct point_hole_item),
 				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes = mh_point_holes_new();
-	txm.func_key_storage = mh_func_key_storage_new();
+	txm.story_link_storage = mh_story_link_storage_new();
 	memtx_tx_mempool_create(&txm.inplace_gap_item_mempoool,
 				sizeof(struct inplace_gap_item),
 				MEMTX_TX_ALLOC_TRACKER);
@@ -4272,18 +4623,23 @@ memtx_tx_manager_free(void)
 
 	struct memtx_story *story, *tmp;
 	rlist_foreach_entry_safe(story, &txm.all_stories, in_all_stories, tmp) {
-		for (size_t i = 0; i < story->index_count; i++)
-			story->link[i].in_index = NULL;
+		for (size_t i = 0; i < story->index_count; i++) {
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link, &story->link[i], link) {
+				link->in_index = NULL;
+			}
+		}
 		memtx_tx_story_full_unlink_on_space_delete(story);
 		memtx_tx_story_delete(story);
 	}
 
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
+	mempool_destroy(&txm.memtx_tx_story_link_pool);
 	assert(mh_size(txm.history) == 0);
 	mh_history_delete(txm.history);
-	assert(mh_size(txm.func_key_storage) == 0);
-	mh_func_key_storage_delete(txm.func_key_storage);
+	assert(mh_size(txm.story_link_storage) == 0);
+	mh_story_link_storage_delete(txm.story_link_storage);
 	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	assert(mh_size(txm.point_holes) == 0);
 	mh_point_holes_delete(txm.point_holes);
