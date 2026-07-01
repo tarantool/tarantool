@@ -1264,19 +1264,20 @@ after_old_tuple_lookup:;
 	 * Execute all registered BEFORE triggers.
 	 *
 	 * We pass the log row, old and new tuples to the triggers
-	 * in txn_current_stmt(), which should be empty, because
-	 * the engine method (execute_replace or similar) has not
-	 * been called yet. Triggers may update new_tuple in place
-	 * so the next trigger sees the result of the previous one.
-	 * After we are done, we clear row, old_tuple and new_tuple
-	 * in txn_current_stmt() to be set by the engine.
+	 * in a fake statement allocated on stack so as not to mess
+	 * with txn_current_stmt(), which may be updated internally
+	 * by the transaction manager, for example, if the trigger
+	 * yields.
 	 */
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	assert(stmt->old_tuple == NULL && stmt->new_tuple == NULL);
-	assert(stmt->row == NULL);
-	stmt->old_tuple = old_tuple;
-	stmt->new_tuple = new_tuple;
-	stmt->row = request->header;
+	struct txn_stmt fake_stmt = {
+		.txn = txn,
+		.space = space,
+		.old_tuple = old_tuple,
+		.new_tuple = new_tuple,
+		.row = request->header,
+		.type = type,
+	};
+	struct txn_stmt *stmt = &fake_stmt;
 
 	struct event *events[] = {
 		space->before_replace_event.by_id,
@@ -1302,9 +1303,6 @@ after_old_tuple_lookup:;
 	bool request_changed = (stmt->new_tuple != new_tuple);
 	new_tuple = stmt->new_tuple;
 	assert(stmt->old_tuple == old_tuple);
-	stmt->old_tuple = NULL;
-	stmt->new_tuple = NULL;
-	stmt->row = NULL;
 
 	if (rc != 0)
 		goto out;
