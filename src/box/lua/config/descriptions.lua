@@ -135,6 +135,21 @@ I['app.module'] = 'A Lua module to load an application from.'
 
 -- }}} app configuration
 
+-- {{{ checks configuration
+
+I['config.checks'] = format_text([[
+    The `checks` section controls which system checks are enabled.
+    When a check is enabled and detects an issue, a warning alert
+    appears in `box.info.config.alerts`.
+
+    Set `config.checks` to `'off'` to disable all system checks at once.
+
+    The checks run on every config apply/reload and also periodically
+    via a background fiber, so that runtime changes are detected automatically.
+]])
+
+-- }}} checks configuration
+
 -- {{{ audit_log configuration
 
 I['audit_log'] = format_text([[

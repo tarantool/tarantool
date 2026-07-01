@@ -112,6 +112,9 @@ local simple_config = {
     iproto = {
         listen = {{uri = 'unix/:./{{ instance_name }}.iproto'}}
     },
+    config = {
+        checks = 'off',
+    },
     groups = {
         ['group-001'] = {
             replicasets = {
