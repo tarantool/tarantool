@@ -516,6 +516,14 @@ struct replica *
 replica_by_name(const char *name);
 
 /**
+ * Return representation of the replica in the next format:
+ * <replica_name or replica_uuid> (id = <replica_id>).
+ * If addr is not NULL, appends ", addr: <addr>" to the result.
+ */
+const char *
+replica_to_string(const struct replica *replica, const char *addr);
+
+/**
  * Find a replica by ID
  */
 struct replica *
