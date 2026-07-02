@@ -471,6 +471,23 @@ invalid_uri:
 	return -1;
 }
 
+const char *
+sio_get_sockaddr_str_by_fd(int fd)
+{
+	struct sockaddr_storage addr;
+	socklen_t addr_len = sizeof(addr);
+	if (sio_getsockname(fd, (struct sockaddr *)&addr, &addr_len) == 0) {
+		return sio_strfaddr((struct sockaddr *)&addr, addr_len);
+	}
+	/*
+	 * Since only transient ENOBUFS is reachable during
+	 * sio_getsockname, we need to make diag_clear in order to
+	 * avoid spurious setting of SocketError in diag.
+	 */
+	diag_clear(diag_get());
+	return "<unresolved>";
+}
+
 #ifdef __APPLE__
 /**
  * 'man' on getprotobyname/number() on MacOS locally says "These functions use

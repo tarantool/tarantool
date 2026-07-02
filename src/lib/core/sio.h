@@ -114,6 +114,10 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
 int
 sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
+/** Return a string representation of sockaddr which is hidden behind the fd.*/
+const char *
+sio_get_sockaddr_str_by_fd(int fd);
+
 /**
  * Advance write position in the iovec array
  * based on its current value and the number of
