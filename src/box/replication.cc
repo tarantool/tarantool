@@ -1481,8 +1481,7 @@ replicaset_needs_rejoin(struct replica **master)
 		}
 
 		const char *uuid_str = tt_uuid_str(&replica->uuid);
-		const char *addr_str = sio_strfaddr(&applier->addr,
-						applier->addr_len);
+		const char *addr_str = applier_addr_str(applier);
 		const char *local_vclock_str =
 			vclock_to_string(instance_vclock);
 		const char *remote_vclock_str = vclock_to_string(&ballot->vclock);

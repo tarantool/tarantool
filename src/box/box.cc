@@ -5305,7 +5305,7 @@ bootstrap_from_master(struct replica *master)
 	vclock_clear(&instance_vclock_storage);
 	say_info("bootstrapping replica from %s at %s",
 		 tt_uuid_str(&master->uuid),
-		 sio_strfaddr(&applier->addr, applier->addr_len));
+		 applier_addr_str(applier));
 
 	/*
 	 * Send JOIN request to master
