@@ -487,6 +487,18 @@ sio_getsockname_str(int fd)
 	return "<unresolved>";
 }
 
+const char *
+sio_getpeername_str(int fd)
+{
+	struct sockaddr_storage addr;
+	socklen_t addr_len = sizeof(addr);
+	if (sio_getpeername(fd, (struct sockaddr *)&addr, &addr_len) == 0)
+		return sio_strfaddr((struct sockaddr *)&addr, addr_len);
+	/** The same as in sio_getsockname_str. */
+	diag_clear(diag_get());
+	return "<unresolved>";
+}
+
 #ifdef __APPLE__
 /**
  * 'man' on getprotobyname/number() on MacOS locally says "These functions use
