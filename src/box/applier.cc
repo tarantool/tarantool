@@ -115,6 +115,12 @@ applier_log_error(struct applier *applier, struct error *e, bool try_reconnect)
 	default:
 		break;
 	}
+	const char *remote_addr = applier_addr_str(applier);
+	struct replica *remote = replica_by_uuid(&applier->uuid);
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	say_error("Applier to %s disconnected. Self: %s",
+		  replica_format(remote, remote_addr),
+		  replica_format(self, applier->local_addr_str));
 	error_log(e);
 	if (try_reconnect)
 		say_info("will retry every %.2lf second",
@@ -661,6 +667,10 @@ applier_connect(struct applier *applier)
 	applier_connection_init(io, &applier->uri, &applier->addr,
 				&applier->addr_len, &applier->io_ctx,
 				&greeting);
+
+	/* Cache the local address of this connection. */
+	strlcpy(applier->local_addr_str, sio_get_sockaddr_str_by_fd(io->fd),
+		sizeof(applier->local_addr_str));
 
 	applier->last_row_time = ev_monotonic_now(loop());
 	applier->txn_last_tm = 0;
