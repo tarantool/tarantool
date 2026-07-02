@@ -599,12 +599,30 @@ struct iproto_msg
 			};
 			/** Peer address size. */
 			socklen_t addrlen;
+			union {
+				/** Local address. */
+				struct sockaddr local_addr;
+				/** Local address storage. */
+				struct sockaddr_storage local_addrstorage;
+			};
+			/** Local address size. */
+			socklen_t local_addrlen;
 			/**
 			 * Session to use for the new connection.
 			 * Optional. If omitted, a new session object
 			 * will be created in the TX thread.
 			 */
 			struct session *session;
+			/**
+			 * Idle timeout for the initial user (guest). Set
+			 * in TX thread on successful auth. Zero if guest
+			 * user has no idle timeout.
+			 *
+			 * This timeout is used before the user is
+			 * authenticated in order to close idle
+			 * non-authenticated users.
+			 */
+			double guest_idle_timeout;
 		} connect;
 		/** Box request, if this is a DML */
 		struct request dml;
@@ -617,6 +635,12 @@ struct iproto_msg
 			struct auth_request auth;
 			/** Set if the request was successfully processed. */
 			bool auth_successful;
+			/**
+			 * Idle timeout for the newly authenticated user.
+			 * Set in TX thread on successful auth. Zero if the
+			 * user has no idle timeout.
+			 */
+			double auth_idle_timeout;
 		};
 		/** Features request. */
 		struct id_request id;
@@ -691,6 +715,13 @@ struct iproto_msg
  */
 static void
 iproto_resume(struct iproto_thread *iproto_thread);
+
+/**
+ * (Re)evaluate the connection's idle timer (defined below; driven by the
+ * in-flight request count from iproto_msg_new()/iproto_msg_delete()).
+ */
+static inline void
+iproto_connection_update_idle_timer(struct iproto_connection *con);
 
 /**
  * Prepares IPROTO message: decodes the message header, checks the message's
@@ -1009,6 +1040,20 @@ struct iproto_connection
 	 * accepted through iproto listening socket.
 	 */
 	bool is_internal;
+	/**
+	 * Session idle timeout. Resolved by the TX thread at
+	 * connect/auth time (session_idle_timeout) and cached here so
+	 * the IPROTO thread can set the timer without a cross-thread lookup.
+	 */
+	double idle_timeout;
+	/**
+	 * Idle timeout watcher. Fires when no input is received
+	 * for the per-user timeout. Disabled when the user's
+	 * timeout is 0.
+	 */
+	struct ev_timer idle_timer;
+	/** Set when the connection was closed by the idle timeout. */
+	bool disconnected_by_timeout;
 };
 
 /** Returns a string suitable for logging. */
@@ -1081,10 +1126,12 @@ iproto_check_msg_max(struct iproto_thread *iproto_thread)
 static inline void
 iproto_msg_delete(struct iproto_msg *msg)
 {
-	assert(msg->connection->request_count > 0);
-	msg->connection->request_count--;
-	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
-	mempool_free(&msg->connection->iproto_thread->iproto_msg_pool, msg);
+	struct iproto_connection *con = msg->connection;
+	assert(con->request_count > 0);
+	con->request_count--;
+	iproto_connection_update_idle_timer(con);
+	struct iproto_thread *iproto_thread = con->iproto_thread;
+	mempool_free(&iproto_thread->iproto_msg_pool, msg);
 	iproto_resume(iproto_thread);
 }
 
@@ -1110,6 +1157,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->fiber = NULL;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
 	con->request_count++;
+	iproto_connection_update_idle_timer(con);
 	return msg;
 }
 
@@ -1249,6 +1297,7 @@ iproto_connection_close(struct iproto_connection *con)
 		/* Clears all pending events. */
 		ev_io_stop(con->loop, &con->input);
 		ev_io_stop(con->loop, &con->output);
+		ev_timer_stop(con->loop, &con->idle_timer);
 		/*
 		 * Invalidate fd to prevent undefined behavior in case
 		 * we mistakenly try to use it after this point.
@@ -1292,6 +1341,43 @@ iproto_connection_close(struct iproto_connection *con)
 		assert(con->state == IPROTO_CONNECTION_CLOSED);
 	}
 	rlist_del(&con->in_stop_list);
+}
+
+/**
+ * (Re)evaluate the idle timer, safe to call multiple times. The connection
+ * counts as idle only while it has a timeout configured, is alive, is not
+ * internal and has no requests in flight.
+ * NB: the function must be called after `con->request_count` is updated.
+ */
+static inline void
+iproto_connection_update_idle_timer(struct iproto_connection *con)
+{
+	ev_timer_stop(con->loop, &con->idle_timer);
+	if (con->idle_timeout > 0 && con->state == IPROTO_CONNECTION_ALIVE &&
+	    con->request_count == 0 && !con->is_internal) {
+		ev_timer_set(&con->idle_timer, con->idle_timeout, /*repeat=*/0);
+		ev_timer_start(con->loop, &con->idle_timer);
+	}
+}
+
+/**
+ * Libev callback: the connection has had no requests in flight and no
+ * incoming data for the configured timeout. Close it.
+ */
+static void
+iproto_connection_idle_timeout_cb(ev_loop *loop, struct ev_timer *watcher,
+				  int /*revents*/)
+{
+	(void)loop;
+	struct iproto_connection *con =
+		(struct iproto_connection *)watcher->data;
+	assert(con->state == IPROTO_CONNECTION_ALIVE);
+	assert(con->request_count == 0);
+	assert(!con->is_internal);
+	say_info("closing connection %s: idle for %.1f second(s)",
+		 iproto_connection_name(con), con->idle_timeout);
+	con->disconnected_by_timeout = true;
+	iproto_connection_close(con);
 }
 
 static inline struct ibuf *
@@ -1652,6 +1738,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	}
 	/* Count statistics */
 	rmean_collect(con->iproto_thread->rmean, IPROTO_RECEIVED, nrd);
+	/* Update idle timer. */
+	iproto_connection_update_idle_timer(con);
 
 	/* Update the read position and connection state. */
 	ibuf_alloc(in, nrd);
@@ -1854,6 +1942,11 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	con->request_count = 0;
 	con->is_internal = false;
+	con->idle_timeout = 0;
+	con->disconnected_by_timeout = false;
+	con->idle_timer.data = con;
+	ev_timer_init(&con->idle_timer, iproto_connection_idle_timeout_cb,
+		      0, 0);
 	return con;
 }
 
@@ -2263,6 +2356,8 @@ tx_process_disconnect(struct cmsg *m)
 	struct iproto_service_msg *msg = (struct iproto_service_msg *)m;
 	struct iproto_connection *con = msg->connection;
 	if (con->session != NULL) {
+		con->session->disconnected_by_timeout =
+			con->disconnected_by_timeout;
 		session_close(con->session);
 		/*
 		 * When kharon returns, it should not go back - the socket is
@@ -3081,6 +3176,8 @@ tx_process_auth(struct cmsg *m)
 	if (box_process_auth(&msg->auth, con->salt, IPROTO_SALT_SIZE) != 0)
 		goto error;
 	msg->auth_successful = true;
+	msg->auth_idle_timeout = session_idle_timeout(
+		con->session->credentials.auth_token);
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
 	tx_end_msg(msg, &svp);
@@ -3133,6 +3230,13 @@ net_finish_auth(struct cmsg *m)
 			cpipe_push(&iproto_thread->srv[i].pipe,
 				   &finish_auth_msg->base);
 		}
+		/*
+		 * Cache the new user's idle timeout (con->idle_timeout is
+		 * owned by the IPROTO thread). The timer is re-armed for the
+		 * new user by the iproto_msg_delete() of this auth request,
+		 * once it is the last one in flight.
+		 */
+		con->idle_timeout = msg->auth_idle_timeout;
 	}
 	net_send_msg(m);
 }
@@ -3726,8 +3830,13 @@ tx_process_connect(struct cmsg *m)
 		con->session = session_new(SESSION_TYPE_BINARY);
 	}
 	con->session->meta.connection = con;
+	msg->connect.guest_idle_timeout = session_idle_timeout(
+		con->session->credentials.auth_token);
 	session_set_peer_addr(con->session, &msg->connect.addr,
 			      msg->connect.addrlen);
+	session_set_local_addr(con->session, &msg->connect.local_addr,
+			       msg->connect.local_addrlen);
+	con->session->connect_time = ev_time();
 	iproto_features_create(&con->session->meta.features);
 	tx_fiber_init(con->session, 0);
 	char *greeting = (char *)static_alloc(IPROTO_GREETING_SIZE);
@@ -3777,6 +3886,7 @@ net_send_greeting(struct cmsg *m)
 		return;
 	}
 	con->is_established = true;
+	con->idle_timeout = msg->connect.guest_idle_timeout;
 	con->srv[msg->srv_id].wend = msg->wpos;
 	/*
 	 * Connect is synchronous, so no one could have been
@@ -3803,6 +3913,7 @@ static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
 		     struct session *session, const char *user_name,
+		     struct sockaddr *local_addr, socklen_t local_addrlen,
 		     bool is_internal)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
@@ -3812,6 +3923,11 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
+	assert(local_addrlen <= sizeof(msg->connect.local_addrstorage));
+	if (local_addr != NULL)
+		memcpy(&msg->connect.local_addrstorage, local_addr,
+		       local_addrlen);
+	msg->connect.local_addrlen = local_addrlen;
 	msg->connect.session = session;
 	if (user_name != NULL) {
 		for (int i = 0; i < iproto_thread->srv_count; i++) {
@@ -3832,8 +3948,14 @@ iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
 {
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
+	struct sockaddr_storage local_addr;
+	socklen_t local_addrlen = sizeof(local_addr);
+	if (getsockname(io->fd, (struct sockaddr *)&local_addr,
+			&local_addrlen) != 0)
+		local_addrlen = 0;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
 			     /*session=*/NULL, /*user_name=*/NULL,
+			     (struct sockaddr *)&local_addr, local_addrlen,
 			     /*is_internal=*/false);
 }
 
@@ -4517,7 +4639,9 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
-				     session, user_name, /*is_internal*/true);
+				     session, user_name,
+				     /*local_addr*/NULL, /*local_addrlen*/0,
+				     /*is_internal*/true);
 		free(user_name);
 		break;
 	}

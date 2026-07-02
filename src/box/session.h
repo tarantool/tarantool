@@ -91,6 +91,16 @@ struct session_meta {
 		/** Peer address size or 0 if the session is local. */
 		socklen_t addrlen;
 	} peer;
+	struct {
+		union {
+			/** Local address. */
+			struct sockaddr addr;
+			/** Local address storage. */
+			struct sockaddr_storage addrstorage;
+		};
+		/** Size of the local address, zero if not set. */
+		socklen_t addrlen;
+	} local;
 	/** Console output format. */
 	enum output_format output_format;
 	/** IPROTO client features. */
@@ -134,6 +144,10 @@ struct session {
 	struct trigger fiber_on_stop;
 	/** Link in shutdown_list. */
 	struct rlist in_shutdown_list;
+	/** Timestamp (ev_time) when the TCP connection was established. */
+	double connect_time;
+	/** Set when the session was closed by the idle timeout. */
+	bool disconnected_by_timeout;
 };
 
 struct session_vtab {
@@ -340,11 +354,30 @@ session_set_peer_addr(struct session *session,
 }
 
 /**
+ * Set session local address.
+ */
+static inline void
+session_set_local_addr(struct session *session,
+		       const struct sockaddr *addr, socklen_t addrlen)
+{
+	assert(addrlen <= sizeof(session->meta.local.addrstorage));
+	memcpy(&session->meta.local.addrstorage, addr, addrlen);
+	session->meta.local.addrlen = addrlen;
+}
+
+/**
  * Return session peer name or NULL if the session is local.
  * The string is allocated in the static buffer.
  */
 const char *
 session_peer(const struct session *session);
+
+/**
+ * Return session local address or NULL if not set.
+ * The string is allocated in the static buffer.
+ */
+const char *
+session_local(const struct session *session);
 
 /** Run on-connect triggers */
 int
@@ -437,6 +470,26 @@ generic_session_fd(struct session *session);
 /** Return 0 from any session. */
 int64_t
 generic_session_sync(struct session *session);
+
+/** Drops the whole per-user session idle timeout configuration. */
+void
+session_idle_timeout_reset(void);
+
+/**
+ * Sets the idle timeout (in seconds) for the given user name. A timeout of
+ * zero removes the entry (no timeout). The user need not exist yet: the
+ * timeout is resolved by name at authentication time.
+ */
+void
+session_idle_timeout_set(const char *name, uint32_t name_len,
+			 double timeout);
+
+/**
+ * Return the idle timeout (in seconds) configured for the user the given
+ * authentication token belongs to. Zero means no timeout.
+ */
+double
+session_idle_timeout(uint8_t auth_token);
 
 #if defined(__cplusplus)
 } /* extern "C" */

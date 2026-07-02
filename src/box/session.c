@@ -272,6 +272,8 @@ session_new(enum session_type type)
 	session->sql_stmts = NULL;
 	session->watchers = NULL;
 	rlist_create(&session->in_shutdown_list);
+	session->connect_time = 0;
+	session->disconnected_by_timeout = false;
 
 	/* For on_connect triggers. */
 	credentials_create(&session->credentials, guest_user);
@@ -417,6 +419,15 @@ session_peer(const struct session *session)
 		return NULL;
 	return sio_strfaddr(&session->meta.peer.addr,
 			    session->meta.peer.addrlen);
+}
+
+const char *
+session_local(const struct session *session)
+{
+	if (session->meta.local.addrlen == 0)
+		return NULL;
+	return sio_strfaddr(&session->meta.local.addr,
+			    session->meta.local.addrlen);
 }
 
 void
@@ -598,4 +609,75 @@ generic_session_sync(struct session *session)
 {
 	(void) session;
 	return 0;
+}
+
+/**
+ * Per-user session idle timeout, keyed by user name. Lives in the TX thread.
+ * Keyed by name (not user id) on purpose: no need to handle DDL operations
+ * like user rename.
+ *
+ * The configuration is rebuilt by the declarative configuration
+ * `session_settings` applier. Mirroring the runtime-privilege machinery
+ * (box_lua_call_runtime_priv_reset/grant), reset() drops the whole
+ * configuration and set() is then called once per user.
+ */
+static struct mh_strnptr_t *session_idle_timeout_hash;
+
+void
+session_idle_timeout_reset(void)
+{
+	if (session_idle_timeout_hash == NULL)
+		return;
+	mh_int_t k;
+	mh_foreach(session_idle_timeout_hash, k) {
+		struct mh_strnptr_node_t *n =
+			mh_strnptr_node(session_idle_timeout_hash, k);
+		free((void *)n->str);
+		free(n->val);
+	}
+	mh_strnptr_delete(session_idle_timeout_hash);
+	session_idle_timeout_hash = NULL;
+}
+
+void
+session_idle_timeout_set(const char *name, uint32_t name_len,
+			 double timeout)
+{
+	assert(timeout >= 0);
+	/* A zero timeout means "no timeout": nothing to store. */
+	if (timeout == 0)
+		return;
+	if (session_idle_timeout_hash == NULL)
+		session_idle_timeout_hash = mh_strnptr_new();
+
+	char *key = xstrdup(name);
+	double *val = xmalloc(sizeof(*val));
+	*val = timeout;
+	struct mh_strnptr_node_t n = {
+		key, name_len, mh_strn_hash(key, name_len), val
+	};
+	struct mh_strnptr_node_t prev;
+	struct mh_strnptr_node_t *prev_ptr = &prev;
+	mh_strnptr_put(session_idle_timeout_hash, &n, &prev_ptr, NULL);
+	/* Free the replaced key/value, if the user was already configured. */
+	if (prev_ptr != NULL) {
+		free((void *)prev.str);
+		free(prev.val);
+	}
+}
+
+double
+session_idle_timeout(uint8_t auth_token)
+{
+	if (session_idle_timeout_hash == NULL)
+		return 0;
+	struct user *user = user_find_by_token(auth_token);
+	if (user == NULL)
+		return 0;
+	const char *name = user->def->name;
+	mh_int_t i = mh_strnptr_find_str(session_idle_timeout_hash, name,
+					 strlen(name));
+	if (i == mh_end(session_idle_timeout_hash))
+		return 0;
+	return *(double *)mh_strnptr_node(session_idle_timeout_hash, i)->val;
 }
