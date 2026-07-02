@@ -1869,6 +1869,21 @@ replica_by_id(uint32_t replica_id)
 	return replicaset.replica_by_id[replica_id];
 }
 
+const char *
+replica_to_string(const struct replica *replica, const char *addr)
+{
+	if (replica == NULL)
+		return tt_sprintf("unknown");
+
+	const char *replica_label = *replica->name != 0 ?
+		replica->name : tt_uuid_str(&replica->uuid);
+
+	if (addr != NULL)
+		return tt_sprintf("%s (id = %u, addr: %s)", replica_label,
+				  replica->id, addr);
+	return tt_sprintf("%s (id = %u)", replica_label, replica->id);
+}
+
 int
 replica_find_new_id(uint32_t *replica_id)
 {

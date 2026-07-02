@@ -32,6 +32,7 @@
 #include "raft/raft_ev.h"
 #include "raft_test_utils.h"
 #include "random.h"
+#include "tt_static.h"
 
 #include <fcntl.h>
 
@@ -75,10 +76,14 @@ raft_node_write_f(struct raft *raft, const struct raft_msg *msg);
 static void
 raft_node_schedule_async_f(struct raft *raft);
 
+static const char *
+raft_node_to_string_f(uint32_t node_id);
+
 static struct raft_vtab raft_vtab = {
 	.broadcast = raft_node_broadcast_f,
 	.write = raft_node_write_f,
 	.schedule_async = raft_node_schedule_async_f,
+	.node_to_string = raft_node_to_string_f,
 };
 
 static int
@@ -590,6 +595,12 @@ raft_node_schedule_async_f(struct raft *raft)
 	struct raft_node *node = container_of(raft, struct raft_node, raft);
 	node->has_work = true;
 	fiber_wakeup(node->worker);
+}
+
+static const char *
+raft_node_to_string_f(uint32_t node_id)
+{
+	return tt_sprintf("%u", node_id);
 }
 
 static int
