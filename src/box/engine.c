@@ -340,6 +340,12 @@ generic_engine_rollback_statement(struct engine *engine, struct txn *txn,
 }
 
 void
+generic_engine_destroy_statement(struct txn_stmt *stmt)
+{
+	(void)stmt;
+}
+
+void
 generic_engine_rollback(struct engine *engine, struct txn *txn)
 {
 	(void)engine;

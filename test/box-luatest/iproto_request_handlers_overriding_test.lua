@@ -29,6 +29,7 @@ local basic_rq_types = {
     VOTE = box.iproto.type.VOTE,
     AUTH = box.iproto.type.AUTH,
     INSERT_ARROW = box.iproto.type.INSERT_ARROW,
+    DELETE_RANGE = box.iproto.type.DELETE_RANGE,
 }
 
 -- Grep server logs for error messages about unsupported request types.

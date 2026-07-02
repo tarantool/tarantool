@@ -5,13 +5,17 @@ local g = t.group()
 
 -- Sizes of objects from transaction manager.
 -- Please update them, if you changed the relevant structures.
-local SIZE_OF_STMT = 160
+local SIZE_OF_STMT = 136
 -- Size of story with one link (for spaces with 1 index).
 local SIZE_OF_STORY = 152
+-- Size of a deleted story list entry.
+local SIZE_OF_DEL_STORY_LINK = 24
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
 local SIZE_OF_XROW = 163
+-- Size of rollback info.
+local SIZE_OF_UNDO = 16
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 80
@@ -97,9 +101,9 @@ g.test_simple = function()
                 ["max"] = SIZE_OF_STMT,
             },
             ["system"] = {
-                ["total"] = SIZE_OF_XROW,
-                ["max"] = SIZE_OF_XROW,
-                ["avg"] = math.floor(SIZE_OF_XROW / 2),
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
             }
         },
         ["mvcc"] = {
@@ -121,8 +125,9 @@ g.test_simple = function()
                 ["total"] = SIZE_OF_STMT,
             },
             ["system"] = {
-                ["total"] = SIZE_OF_XROW,
-                ["avg"] = math.floor(SIZE_OF_XROW / 2) + 1,
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW +
+                                      SIZE_OF_UNDO) / 2) + 1,
             }
         },
         ["mvcc"] = {
@@ -149,9 +154,9 @@ g.test_simple = function()
                 ["max"] = SIZE_OF_STMT,
             },
             ["system"] = {
-                ["total"] = SIZE_OF_XROW,
-                ["avg"] = math.floor(SIZE_OF_XROW / 2),
-                ["max"] = SIZE_OF_XROW,
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
             }
         },
         ["mvcc"] = {
@@ -176,12 +181,18 @@ g.test_simple = function()
                 ["max"] = -1 * SIZE_OF_STMT,
             },
             ["system"] = {
-                ["total"] = -2 * SIZE_OF_XROW,
-                ["avg"] = -1 * math.floor(SIZE_OF_XROW / 2),
-                ["max"] = -1 * SIZE_OF_XROW,
+                ["total"] = -2 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * math.floor((SIZE_OF_XROW +
+                                           SIZE_OF_UNDO) / 2),
+                ["max"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
             }
         },
         ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = SIZE_OF_DEL_STORY_LINK,
+                ["avg"] = SIZE_OF_DEL_STORY_LINK,
+                ["total"] = SIZE_OF_DEL_STORY_LINK,
+            },
             ["tuples"] = {
                 ["used"] = {
                     ["stories"] = {
@@ -202,12 +213,17 @@ g.test_simple = function()
                 ["max"] = -1 * SIZE_OF_STMT,
             },
             ["system"] = {
-                ["total"] = -1 * SIZE_OF_XROW,
-                ["avg"] = -1 * SIZE_OF_XROW,
-                ["max"] = -1 * SIZE_OF_XROW,
+                ["total"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
+                ["max"] = -1 * (SIZE_OF_XROW + SIZE_OF_UNDO),
             },
         },
         ["mvcc"] = {
+            ["trackers"] = {
+                ["total"] = -SIZE_OF_DEL_STORY_LINK,
+                ["avg"] = -SIZE_OF_DEL_STORY_LINK,
+                ["max"] = -SIZE_OF_DEL_STORY_LINK,
+            },
             ["tuples"] = {
                 ["used"] = {
                     ["stories"] = {
@@ -418,9 +434,9 @@ g.test_conflict = function()
                 ["total"] = SIZE_OF_STMT,
             },
             ["system"] = {
-                ["max"] = SIZE_OF_XROW,
-                ["avg"] = math.floor(SIZE_OF_XROW / 2),
-                ["total"] = SIZE_OF_XROW,
+                ["max"] = SIZE_OF_XROW + SIZE_OF_UNDO,
+                ["avg"] = math.floor((SIZE_OF_XROW + SIZE_OF_UNDO) / 2),
+                ["total"] = SIZE_OF_XROW + SIZE_OF_UNDO,
             },
         },
         ["mvcc"] = {
