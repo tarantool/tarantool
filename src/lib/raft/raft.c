@@ -54,6 +54,12 @@ raft_state_str(uint64_t state)
 	return "invalid (x)";
 };
 
+static const char *
+raft_node_info(struct raft *raft, uint32_t node_id)
+{
+	return raft->vtab->get_node_info(node_id);
+}
+
 /** Shortcut for vtab 'broadcast' method. */
 static inline void
 raft_broadcast(struct raft *raft, const struct raft_msg *req)
@@ -487,7 +493,8 @@ raft_leader_resign(struct raft *raft)
 int
 raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 {
-	say_info("RAFT: message %s from %u", raft_msg_to_string(req), source);
+	say_info("RAFT: message %s from %s", raft_msg_to_string(req),
+		 raft_node_info(raft, source));
 	assert(source > 0);
 	assert(source != raft->self);
 	if (req->term == 0 || req->state == 0 || req->state >= raft_state_MAX) {
@@ -532,8 +539,8 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			}
 			if (raft->leader != 0) {
 				say_info("RAFT: vote request is skipped - the "
-					 "leader is already known - %u",
-					 raft->leader);
+					 "leader is already known - %s",
+					 raft_node_info(raft, raft->leader));
 				break;
 			}
 			if (req->vote == raft->self) {
@@ -588,8 +595,9 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	}
 	if (req->state != RAFT_STATE_LEADER) {
 		if (source == raft->leader) {
-			say_info("RAFT: the node %u has resigned from the "
-				 "leader role", raft->leader);
+			say_info("RAFT: the node %s has resigned from the "
+				 "leader role",
+				 raft_node_info(raft, raft->leader));
 			/*
 			 * Candidate node clears leader and stops the timer
 			 * implicitly when starts a new term, but non-candidate
@@ -621,7 +629,9 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	 */
 	if (raft->leader != 0) {
 		say_warn("RAFT: conflicting leader detected in one term - "
-			 "known is %u, received %u", raft->leader, source);
+			 "known is %s, received %s",
+			 raft_node_info(raft, raft->leader),
+			 raft_node_info(raft, source));
 		return 0;
 	}
 
@@ -743,9 +753,9 @@ end_dump:
 		if (raft->volatile_term > raft->term)
 			goto do_dump;
 		if (!raft_can_vote_for(raft, &raft->candidate_vclock)) {
-			say_info("RAFT: vote request for %u is canceled - the "
+			say_info("RAFT: vote request for %s is canceled - the "
 				 "vclock is not acceptable anymore",
-				 raft->volatile_vote);
+				 raft_node_info(raft, raft->volatile_vote));
 			raft_revoke_vote(raft);
 			assert(raft_is_fully_on_disk(raft));
 			goto end_dump;
@@ -838,7 +848,8 @@ raft_sm_become_leader(struct raft *raft)
 static void
 raft_sm_follow_leader(struct raft *raft, uint32_t leader)
 {
-	say_info("RAFT: leader is %u, follow", leader);
+	say_info("RAFT: leader is %s, follow",
+		 raft_node_info(raft, leader));
 	assert(raft->state != RAFT_STATE_LEADER);
 	assert(raft->leader == 0);
 	raft->state = RAFT_STATE_FOLLOWER;
@@ -909,7 +920,8 @@ static void
 raft_sm_schedule_new_vote(struct raft *raft, uint32_t candidate_id,
 			  const struct vclock *candidate_vclock)
 {
-	say_info("RAFT: vote for %u, follow", candidate_id);
+	say_info("RAFT: vote for %s, follow",
+		 raft_node_info(raft, candidate_id));
 	assert(raft_can_vote_for(raft, candidate_vclock));
 	assert(raft->volatile_vote == 0);
 	assert(!vclock_is_set(&raft->candidate_vclock));
@@ -929,8 +941,9 @@ raft_sm_try_new_vote(struct raft *raft, uint32_t candidate_id,
 {
 	if (!raft_can_vote_for(raft, candidate_vclock)) {
 		assert(candidate_id != raft->self);
-		say_info("RAFT: vote request for %u is skipped - the vclock "
-			 "is not acceptable", candidate_id);
+		say_info("RAFT: vote request for %s is skipped - the vclock "
+			 "is not acceptable",
+			 raft_node_info(raft, candidate_id));
 		return;
 	}
 	raft_sm_schedule_new_vote(raft, candidate_id, candidate_vclock);
@@ -1320,7 +1333,8 @@ raft_process_term(struct raft *raft, uint64_t term, uint32_t source)
 {
 	if (term <= raft->volatile_term)
 		return;
-	say_info("RAFT: received a newer term from %u", (unsigned)source);
+	say_info("RAFT: received a newer term from %s",
+		 raft_node_info(raft, source));
 	raft_sm_schedule_new_term(raft, term);
 }
 

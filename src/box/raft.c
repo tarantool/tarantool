@@ -722,6 +722,24 @@ box_raft_finish_recovery(void)
 	raft_cfg_is_enabled(box_raft(), true);
 }
 
+/*
+ * Return a string representation of a Raft node for logging.
+ * Unlike relay/applier, Raft operates without a direct connection
+ * context - it only knows the node ID. For remote nodes the address
+ * is taken from the corresponding applier.
+ */
+static const char *
+raft_format_node(uint32_t node_id)
+{
+	const char *addr = NULL;
+	if (node_id != instance_id) {
+		struct replica *replica = replica_by_id(node_id);
+		if (replica != NULL && replica->applier != NULL)
+			addr = applier_addr_str(replica->applier);
+	}
+	return replica_format(replica_by_id(node_id), addr);
+}
+
 void
 box_raft_init(void)
 {
@@ -729,6 +747,7 @@ box_raft_init(void)
 		.broadcast = box_raft_broadcast,
 		.write = box_raft_write,
 		.schedule_async = box_raft_schedule_async,
+		.get_node_info = raft_format_node,
 	};
 	raft_create(&box_raft_global, &box_raft_vtab);
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
