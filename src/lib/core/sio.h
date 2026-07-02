@@ -115,6 +115,13 @@ int
 sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
 /**
+ * Return a string representation of sockaddr (a socket of the current node)
+ * which is hidden behind the fd.
+ */
+const char *
+sio_getsockname_str(int fd);
+
+/**
  * Advance write position in the iovec array
  * based on its current value and the number of
  * bytes written.

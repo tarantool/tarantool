@@ -110,3 +110,43 @@ g.test_server_info_prefers_name_over_uuid = function(g)
     t.assert(g.server_b:grep_log(string.format(
         'RAFT: vote for %s', remote_a_info_with_name)))
 end
+
+local APPLIER_NET_ERR = 'Applier to %s.*disconnected. Self: %s'
+
+g.test_relay_applier_net_errors_has_extended_node_info = function(g)
+    local remote_a_eph_info = get_remote_node_info(
+        g.server_a, {is_ephemeral = true})
+    local remote_b_info = get_remote_node_info(
+        g.server_b, {is_ephemeral = false})
+
+    g.server_b:stop()
+    t.assert(g.server_a:grep_log(string.format(
+        APPLIER_NET_ERR, remote_b_info, 'server_a')))
+    g.server_b:start()
+end
+
+g.test_anon_replica_applier_net_error_has_extended_node_info = function(g)
+    g.anon_server = g.replica_set:build_and_add_server{
+        alias = 'anon_replica',
+        box_cfg = {
+            replication = {
+                server.build_listen_uri('server_a', g.replica_set.id),
+                server.build_listen_uri('server_b', g.replica_set.id),
+            },
+            replication_anon = true,
+            read_only = true,
+        },
+    }
+    g.anon_server:start()
+    g.anon_server:wait_until_ready()
+
+    local remote_a_info = get_remote_node_info(
+        g.server_a, {is_ephemeral = false})
+    g.server_a:stop()
+
+    local anon_server_uuid = g.anon_server:get_instance_uuid():gsub(
+        '([%-%(%)])', '%%%1')
+    t.assert(g.anon_server:grep_log(string.format(
+        APPLIER_NET_ERR, remote_a_info, anon_server_uuid)))
+    g.server_a:start()
+end
