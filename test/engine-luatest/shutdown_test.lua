@@ -49,7 +49,11 @@ g.test_shutdown_secondary_index_build = function(cg)
 end
 
 -- Luatest server currently does not allow to check process exit code.
-local g_crash = t.group('crash', {{engine = 'memtx'}, {engine = 'vinyl'}})
+local g_crash = t.group('crash', {
+    {engine = 'memtx', memtx_use_mvcc_engine = true},
+    {engine = 'memtx', memtx_use_mvcc_engine = false},
+    {engine = 'vinyl'}
+})
 
 g_crash.before_each(function(cg)
     local id = ('%s-%s'):format('server', utils.generate_id())
@@ -60,7 +64,10 @@ end)
 -- Test shutdown when there is an active transaction.
 g_crash.test_shutdown_with_active_txn = function(cg)
     local script_base = [[
-        box.cfg{memtx_use_mvcc_engine = true}
+        box.cfg{
+            memtx_use_mvcc_engine = %s,
+            log_level = 'error',
+        }
 
         box.schema.space.create('test', {engine = '%s'})
         box.space.test:create_index('pk')
@@ -70,9 +77,11 @@ g_crash.test_shutdown_with_active_txn = function(cg)
         box.space.test:select()
         os.exit()
     ]]
-    local script = script_base:format(cg.params.engine)
+    local script = script_base:format(cg.params.memtx_use_mvcc_engine,
+                                      cg.params.engine)
 
     local result = justrun.tarantool(cg.workdir, {}, {'-e', script},
-                                    {nojson = true, quote_args = true})
-    t.assert_equals(result.exit_code, 0)
+                                     {nojson = true, quote_args = true,
+                                      stderr = true})
+    t.assert_covers(result, {exit_code = 0, stderr = ''})
 end
