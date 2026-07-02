@@ -1479,8 +1479,7 @@ replicaset_needs_rejoin(struct replica **master)
 		}
 
 		const char *uuid_str = tt_uuid_str(&replica->uuid);
-		const char *addr_str = sio_strfaddr(&applier->addr,
-						applier->addr_len);
+		const char *addr_str = applier_addr_str(applier);
 		const char *local_vclock_str =
 			vclock_to_string(instance_vclock);
 		const char *remote_vclock_str = vclock_to_string(&ballot->vclock);
@@ -1866,6 +1865,21 @@ struct replica *
 replica_by_id(uint32_t replica_id)
 {
 	return replicaset.replica_by_id[replica_id];
+}
+
+const char *
+replica_format(struct replica *replica, const char *addr)
+{
+	if (replica == NULL)
+		return tt_sprintf("unknown");
+
+	const char *replica_label = strlen(replica->name) > 0 ?
+		replica->name : tt_uuid_str(&replica->uuid);
+
+	if (addr != NULL)
+		return tt_sprintf("%s (id = %u, addr: %s)", replica_label,
+				  replica->id, addr);
+	return tt_sprintf("%s (id = %u)", replica_label, replica->id);
 }
 
 int

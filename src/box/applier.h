@@ -39,6 +39,7 @@
 
 #include "fiber_cond.h"
 #include "iostream.h"
+#include "sio.h"
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tt_uuid.h"
@@ -177,6 +178,8 @@ struct applier {
 	struct iostream_ctx io_ctx;
 	/** I/O stream */
 	struct iostream io;
+	/** Local address string (ephemeral addr:port) cached at connect. */
+	char local_addr_str[SERVICE_NAME_MAXLEN];
 	/** Input buffer */
 	struct ibuf ibuf;
 	/** Triggers invoked on state change or ballot update. */
@@ -368,6 +371,10 @@ applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier);
  */
 const char *
 applier_uri_str(const struct applier *applier);
+
+/** Return string, which represents remote addr for this @a applier. */
+const char *
+applier_addr_str(const struct applier *applier);
 
 #if defined(__cplusplus)
 } /* extern "C" */

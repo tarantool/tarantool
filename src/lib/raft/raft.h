@@ -129,6 +129,8 @@ struct raft_msg {
 typedef void (*raft_broadcast_f)(struct raft *raft, const struct raft_msg *req);
 typedef void (*raft_write_f)(struct raft *raft, const struct raft_msg *req);
 typedef void (*raft_schedule_async_f)(struct raft *raft);
+typedef const char*
+(*raft_node_info_f)(uint32_t node_id);
 
 /**
  * Raft connection to the environment, via which it talks to other nodes, to
@@ -144,6 +146,8 @@ struct raft_vtab {
 	 * right now.
 	 */
 	raft_schedule_async_f schedule_async;
+	/** Get an extended information about raft node: name/uuid, id, uri. */
+	raft_node_info_f get_node_info;
 };
 
 /** Vote descriptor of a single node. */

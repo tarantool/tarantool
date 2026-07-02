@@ -115,6 +115,12 @@ applier_log_error(struct applier *applier, struct error *e, bool try_reconnect)
 	default:
 		break;
 	}
+	const char *remote_addr = applier_addr_str(applier);
+	struct replica *remote = replica_by_uuid(&applier->uuid);
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	say_error("Applier to %s disconnected. Self: %s",
+		  replica_format(remote, remote_addr),
+		  replica_format(self, applier->local_addr_str));
 	error_log(e);
 	if (try_reconnect)
 		say_info("will retry every %.2lf second",
@@ -662,13 +668,17 @@ applier_connect(struct applier *applier)
 				&applier->addr_len, &applier->io_ctx,
 				&greeting);
 
+	/* Cache the local address of this connection. */
+	strlcpy(applier->local_addr_str, sio_get_sockaddr_str_by_fd(io->fd),
+		sizeof(applier->local_addr_str));
+
 	applier->last_row_time = ev_monotonic_now(loop());
 	applier->txn_last_tm = 0;
 
 	if (applier->version_id != greeting.version_id) {
 		say_info("remote master %s at %s running Tarantool %s",
 			 tt_uuid_str(&greeting.uuid),
-			 sio_strfaddr(&applier->addr, applier->addr_len),
+			 applier_addr_str(applier),
 			 version_id_to_string(greeting.version_id));
 	}
 
@@ -2962,4 +2972,10 @@ applier_uri_str(const struct applier *applier)
 	char *uri = (char *)static_alloc(APPLIER_SOURCE_MAXLEN);
 	uri_format(uri, APPLIER_SOURCE_MAXLEN, &applier->uri, false);
 	return uri;
+}
+
+const char *
+applier_addr_str(const struct applier *applier)
+{
+	return sio_strfaddr(&applier->addr, applier->addr_len);
 }
