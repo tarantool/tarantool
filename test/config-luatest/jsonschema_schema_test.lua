@@ -72,6 +72,14 @@ g.test_json_schema = function()
             },
             discriminator = string_or_union_discriminator,
         }),
+        saz = schema.scalar({
+            type = 'integer',
+            byte_size = true,
+        }),
+        taz = schema.scalar({
+            type = 'number',
+            duration = true,
+        }),
     }))
 
     local expected = {
@@ -120,6 +128,8 @@ g.test_json_schema = function()
                     },
                 },
             },
+            saz = {type = {'integer', 'string'}},
+            taz = {type = {'number', 'string'}},
         },
         type = 'object',
     }

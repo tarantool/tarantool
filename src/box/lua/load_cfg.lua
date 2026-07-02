@@ -8,6 +8,7 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
+local units = require('internal.config.utils.units')
 
 local function nop() end
 
@@ -453,6 +454,92 @@ local function normalize_node_name(name)
     -- possible to use normal comparison functions and display also always
     -- lowercase.
     return string.lower(name)
+end
+
+-- box.cfg options that accept a human-readable byte size string.
+--
+-- Keep legacy behavior for plain numeric strings: they should be
+-- rejected as a wrong type ("should be of type number").
+local byte_size_cfg = {
+    memtx_memory = true,
+    memtx_min_tuple_size = true,
+    memtx_max_tuple_size = true,
+    slab_alloc_granularity = true,
+    vinyl_memory = true,
+    vinyl_cache = true,
+    vinyl_max_tuple_size = true,
+    vinyl_range_size = true,
+    vinyl_page_size = true,
+    quiver_memory = true,
+    quiver_run_size = true,
+    flightrec_logs_size = true,
+    flightrec_logs_max_msg_size = true,
+    flightrec_requests_size = true,
+    flightrec_requests_max_req_size = true,
+    flightrec_requests_max_res_size = true,
+    readahead = true,
+    wal_max_size = true,
+    checkpoint_wal_threshold = true,
+    wal_queue_max_size = true,
+    replication_synchro_queue_max_size = true,
+    feedback_metrics_limit = true,
+    sql_cache_size = true,
+}
+
+-- box.cfg options that accept a human-readable duration string.
+--
+-- Keep legacy behavior for plain numeric strings: they should be
+-- rejected as a wrong type ("should be of type number").
+local duration_cfg = {
+    io_collect_interval = true,
+    txn_timeout = true,
+    txn_synchro_timeout = true,
+    vinyl_timeout = true,
+    wal_dir_rescan_delay = true,
+    wal_cleanup_delay = true,
+    wal_retention_period = true,
+    checkpoint_interval = true,
+    replication_anon_ttl = true,
+    replication_timeout = true,
+    replication_reconnect_timeout = true,
+    replication_synchro_timeout = true,
+    replication_connect_timeout = true,
+    replication_sync_timeout = true,
+    replication_sync_lag = true,
+    election_timeout = true,
+    feedback_metrics_collect_interval = true,
+    feedback_interval = true,
+    flightrec_metrics_interval = true,
+    flightrec_metrics_period = true,
+    auth_delay = true,
+}
+
+local function normalize_byte_size_option(option_name, value)
+    if type(value) ~= 'string' then
+        return value
+    end
+    if value:match('^%s*[%+%-]?[%d%.]+%s*$') ~= nil then
+        return value
+    end
+    local parsed, err = units.parse_byte_size(value)
+    if parsed == nil then
+        box.error(box.error.CFG, option_name, err)
+    end
+    return parsed
+end
+
+local function normalize_duration_option(option_name, value)
+    if type(value) ~= 'string' then
+        return value
+    end
+    if value:match('^%s*[%+%-]?[%d%.]+%s*$') ~= nil then
+        return value
+    end
+    local parsed, err = units.parse_duration(value)
+    if parsed == nil then
+        box.error(box.error.CFG, option_name, err)
+    end
+    return parsed
 end
 
 -- options that require special handling
@@ -923,6 +1010,11 @@ local function prepare_cfg(cfg, old_cfg, default_cfg, template_cfg, modify_cfg)
             -- "" and NULL = ffi.cast('void *', 0) set option to default value
             v = default_cfg[k]
         else
+            if byte_size_cfg[k] then
+                v = normalize_byte_size_option(k, v)
+            elseif duration_cfg[k] then
+                v = normalize_duration_option(k, v)
+            end
             check_cfg_option_type(template_cfg[k], k, v)
         end
         if modify_cfg ~= nil and type(modify_cfg[k]) == 'function' then

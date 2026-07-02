@@ -161,6 +161,18 @@ local function vshard_since(version, schema_node)
     return schema_node
 end
 
+-- Mark a schema node as representing a byte size value.
+local function byte_size(schema_node)
+    schema_node.byte_size = true
+    return schema_node
+end
+
+-- Mark a schema node as representing a duration value.
+local function duration(schema_node)
+    schema_node.duration = true
+    return schema_node
+end
+
 -- Accept a value of 'iproto.listen' option and return the first URI
 -- that is suitable to create a client socket (not just to listen
 -- on the server as, say, 0.0.0.0:3301 or localhost:0).
@@ -413,12 +425,12 @@ return schema.new('instance_config', schema.record({
             })),
             http = schema.record({
                 request = schema.record({
-                    timeout = schema.scalar({
+                    timeout = duration(schema.scalar({
                         type = 'number',
                         -- default = 0.3 is applied right in the
                         -- etcd source. See a comment above
                         -- regarding defaults in config.etcd.
-                    }),
+                    })),
                     unix_socket = schema.scalar({
                         type = 'string',
                     }),
@@ -431,12 +443,12 @@ return schema.new('instance_config', schema.record({
                 }),
             }),
             watchers = schema.record({
-                reconnect_timeout = schema.scalar({
+                reconnect_timeout = duration(schema.scalar({
                     type = 'number',
                     -- default = 1.0 is applied right in the
                     -- etcd source. See a comment above
                     -- regarding defaults in config.etcd.
-                }),
+                })),
                 reconnect_max_attempts = schema.scalar({
                     type = 'integer',
                     -- default = 10 is applied right in the
@@ -510,14 +522,14 @@ return schema.new('instance_config', schema.record({
                 }),
                 validate = validators['config.storage.endpoints'],
             }),
-            timeout = schema.scalar({
+            timeout = duration(schema.scalar({
                 type = 'number',
                 default = 3,
-            }),
-            reconnect_after = schema.scalar({
+            })),
+            reconnect_after = duration(schema.scalar({
                 type = 'number',
                 default = 3,
-            })
+            }))
         }, {
             validate = validators['config.storage'],
         })),
@@ -599,12 +611,12 @@ return schema.new('instance_config', schema.record({
         -- Maximum allowed memory allocated by Lua.
         -- The value can't be less than 256MB and can't be
         -- changed without restarting the Tarantool instance.
-        memory = schema.scalar({
+        memory = byte_size(schema.scalar({
             type = 'integer',
             -- Default value: 2GB.
             default = 2 * 1024 * 1024 * 1024,
             validate = validators['lua.memory'],
-        }),
+        })),
     }),
     console = schema.record({
         enabled = schema.scalar({
@@ -621,16 +633,16 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     fiber = schema.record({
-        io_collect_interval = schema.scalar({
+        io_collect_interval = duration(schema.scalar({
             type = 'number',
             box_cfg = 'io_collect_interval',
             default = box.NULL,
-        }),
-        too_long_threshold = schema.scalar({
+        })),
+        too_long_threshold = duration(schema.scalar({
             type = 'number',
             box_cfg = 'too_long_threshold',
             default = 0.5,
-        }),
+        })),
         worker_pool_threads = schema.scalar({
             type = 'number',
             box_cfg = 'worker_pool_threads',
@@ -641,14 +653,14 @@ return schema.new('instance_config', schema.record({
             default = 768,
         }),
         slice = schema.record({
-            warn = schema.scalar({
+            warn = duration(schema.scalar({
                 type = 'number',
                 default = 0.5,
-            }),
-            err = schema.scalar({
+            })),
+            err = duration(schema.scalar({
                 type = 'number',
                 default = 1,
-            }),
+            })),
         }),
         top = schema.record({
             enabled = schema.scalar({
@@ -947,11 +959,11 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'net_msg_max',
             default = 768,
         }),
-        readahead = schema.scalar({
+        readahead = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'readahead',
             default = 16320,
-        }),
+        })),
         ssl = enterprise_edition(schema.record({
             ca_file = schema.scalar({
                 type = 'string',
@@ -1008,16 +1020,16 @@ return schema.new('instance_config', schema.record({
         }, {
             default = box.NULL,
         }),
-        txn_timeout = schema.scalar({
+        txn_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'txn_timeout',
             default = 365 * 100 * 86400,
-        }),
-        txn_synchro_timeout = schema.scalar({
+        })),
+        txn_synchro_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'txn_synchro_timeout',
             default = 5,
-        }),
+        })),
         txn_isolation = schema.enum({
             'read-committed',
             'read-confirmed',
@@ -1034,18 +1046,18 @@ return schema.new('instance_config', schema.record({
         }),
     }),
     sql = schema.record({
-        cache_size = schema.scalar({
+        cache_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'sql_cache_size',
             default = 5 * 1024 * 1024,
-        }),
+        })),
     }),
     memtx = schema.record({
-        memory = schema.scalar({
+        memory = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_memory',
             default = 256 * 1024 * 1024,
-        }),
+        })),
         allocator = schema.enum({
             'small',
             'system',
@@ -1054,29 +1066,29 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 'small',
         }),
-        slab_alloc_granularity = schema.scalar({
+        slab_alloc_granularity = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'slab_alloc_granularity',
             box_cfg_nondynamic = true,
             default = 8,
-        }),
+        })),
         slab_alloc_factor = schema.scalar({
             type = 'number',
             box_cfg = 'slab_alloc_factor',
             box_cfg_nondynamic = true,
             default = 1.05,
         }),
-        min_tuple_size = schema.scalar({
+        min_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_min_tuple_size',
             box_cfg_nondynamic = true,
             default = 16,
-        }),
-        max_tuple_size = schema.scalar({
+        })),
+        max_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_max_tuple_size',
             default = 1024 * 1024,
-        }),
+        })),
         sort_threads = schema.scalar({
             type = 'integer',
             box_cfg = 'memtx_sort_threads',
@@ -1096,11 +1108,11 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 0.05,
         }),
-        cache = schema.scalar({
+        cache = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_cache',
             default = 128 * 1024 * 1024,
-        }),
+        })),
         defer_deletes = schema.scalar({
             type = 'boolean',
             box_cfg = 'vinyl_defer_deletes',
@@ -1113,28 +1125,28 @@ return schema.new('instance_config', schema.record({
             mkdir = true,
             default = 'var/lib/{{ instance_name }}',
         }),
-        max_tuple_size = schema.scalar({
+        max_tuple_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_max_tuple_size',
             default = 1024 * 1024,
-        }),
-        memory = schema.scalar({
+        })),
+        memory = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_memory',
             default = 128 * 1024 * 1024,
-        }),
-        page_size = schema.scalar({
+        })),
+        page_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_page_size',
             box_cfg_nondynamic = true,
             default = 8 * 1024,
-        }),
-        range_size = schema.scalar({
+        })),
+        range_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_range_size',
             box_cfg_nondynamic = true,
             default = box.NULL,
-        }),
+        })),
         read_threads = schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_read_threads',
@@ -1153,11 +1165,11 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 3.5,
         }),
-        timeout = schema.scalar({
+        timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'vinyl_timeout',
             default = 60,
-        }),
+        })),
         write_threads = schema.scalar({
             type = 'integer',
             box_cfg = 'vinyl_write_threads',
@@ -1173,16 +1185,16 @@ return schema.new('instance_config', schema.record({
             mkdir = true,
             default = 'var/lib/{{ instance_name }}',
         })),
-        memory = enterprise_edition(schema.scalar({
+        memory = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'quiver_memory',
             default = 128 * 1024 * 1024,
-        })),
-        run_size = enterprise_edition(schema.scalar({
+        }))),
+        run_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'quiver_run_size',
             default = 16 * 1024 * 1024,
-        })),
+        }))),
     })),
     wal = schema.record({
         dir = schema.scalar({
@@ -1201,33 +1213,33 @@ return schema.new('instance_config', schema.record({
             box_cfg_nondynamic = true,
             default = 'write',
         }),
-        max_size = schema.scalar({
+        max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'wal_max_size',
             box_cfg_nondynamic = true,
             default = 256 * 1024 * 1024,
-        }),
-        dir_rescan_delay = schema.scalar({
+        })),
+        dir_rescan_delay = duration(schema.scalar({
             type = 'number',
             box_cfg = 'wal_dir_rescan_delay',
             default = 2,
-        }),
-        queue_max_size = schema.scalar({
+        })),
+        queue_max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'wal_queue_max_size',
             default = 16 * 1024 * 1024,
-        }),
-        cleanup_delay = schema.scalar({
+        })),
+        cleanup_delay = duration(schema.scalar({
             type = 'number',
             box_cfg = 'wal_cleanup_delay',
             -- No default value here - the option is deprecated
             -- and shouldn't be used by default.
-        }),
-        retention_period = enterprise_edition(schema.scalar({
+        })),
+        retention_period = enterprise_edition(duration(schema.scalar({
             type = 'number',
             box_cfg = 'wal_retention_period',
             default = 0,
-        })),
+        }))),
         -- box.cfg({wal_ext = <...>}) replaces the previous
         -- value without any merging. See explanation why it is
         -- important in the log.modules description.
@@ -1277,16 +1289,16 @@ return schema.new('instance_config', schema.record({
             default = 'var/lib/{{ instance_name }}',
         }),
         by = schema.record({
-            interval = schema.scalar({
+            interval = duration(schema.scalar({
                 type = 'number',
                 box_cfg = 'checkpoint_interval',
                 default = 3600,
-            }),
-            wal_size = schema.scalar({
+            })),
+            wal_size = byte_size(schema.scalar({
                 type = 'integer',
                 box_cfg = 'checkpoint_wal_threshold',
                 default = 1e18,
-            }),
+            })),
         }),
         count = schema.scalar({
             type = 'integer',
@@ -1364,55 +1376,55 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'replication_anon',
             default = false,
         }),
-        anon_ttl = schema.scalar({
+        anon_ttl = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_anon_ttl',
             default = 60 * 60,
-        }),
+        })),
         threads = schema.scalar({
             type = 'integer',
             box_cfg = 'replication_threads',
             box_cfg_nondynamic = true,
             default = 1,
         }),
-        timeout = schema.scalar({
+        timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_timeout',
             default = 1,
-        }),
-        reconnect_timeout = schema.scalar({
+        })),
+        reconnect_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_reconnect_timeout',
             -- The effective default is replication_timeout.
             default = box.NULL,
-        }),
-        synchro_timeout = schema.scalar({
+        })),
+        synchro_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_synchro_timeout',
             default = 5,
-        }),
-        synchro_queue_max_size = schema.scalar({
+        })),
+        synchro_queue_max_size = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'replication_synchro_queue_max_size',
             default = 16 * 1024 * 1024,
-        }),
-        connect_timeout = schema.scalar({
+        })),
+        connect_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_connect_timeout',
             default = 30,
-        }),
-        sync_timeout = schema.scalar({
+        })),
+        sync_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_sync_timeout',
             -- The effective default is determined depending on
             -- the compat.box_cfg_replication_sync_timeout option.
             default = box.NULL,
-        }),
-        sync_lag = schema.scalar({
+        })),
+        sync_lag = duration(schema.scalar({
             type = 'number',
             box_cfg = 'replication_sync_lag',
             default = 10,
-        }),
+        })),
         synchro_quorum = schema.union({
             variants = {
                 schema.scalar({type = 'string'}),
@@ -1445,11 +1457,11 @@ return schema.new('instance_config', schema.record({
             -- the replication.failover option.
             default = box.NULL,
         }),
-        election_timeout = schema.scalar({
+        election_timeout = duration(schema.scalar({
             type = 'number',
             box_cfg = 'election_timeout',
             default = 5,
-        }),
+        })),
         election_fencing_mode = schema.enum({
             'off',
             'soft',
@@ -1675,13 +1687,13 @@ return schema.new('instance_config', schema.record({
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.host'],
         }),
-        metrics_collect_interval = schema.scalar({
+        metrics_collect_interval = duration(schema.scalar({
             type = 'number',
             box_cfg = 'feedback_metrics_collect_interval',
             default = 60,
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.metrics_collect_interval'],
-        }),
+        })),
         send_metrics = schema.scalar({
             type = 'boolean',
             box_cfg = 'feedback_send_metrics',
@@ -1689,20 +1701,20 @@ return schema.new('instance_config', schema.record({
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.send_metrics'],
         }),
-        interval = schema.scalar({
+        interval = duration(schema.scalar({
             type = 'number',
             box_cfg = 'feedback_interval',
             default = 3600,
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.interval'],
-        }),
-        metrics_limit = schema.scalar({
+        })),
+        metrics_limit = byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'feedback_metrics_limit',
             default = 1024 * 1024,
             apply_default_if = feedback_apply_default_if,
             validate = validators['feedback.metrics_limit'],
-        }),
+        })),
     }),
     flightrec = schema.record({
         enabled = enterprise_edition(schema.scalar({
@@ -1710,47 +1722,47 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'flightrec_enabled',
             default = false,
         })),
-        logs_size = enterprise_edition(schema.scalar({
+        logs_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_size',
             default = 10485760,
-        })),
-        logs_max_msg_size = enterprise_edition(schema.scalar({
+        }))),
+        logs_max_msg_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_max_msg_size',
             default = 4096,
-        })),
+        }))),
         logs_log_level = enterprise_edition(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_logs_log_level',
             default = 6,
             allowed_values = {0, 1, 2, 3, 4, 5, 6, 7},
         })),
-        metrics_interval = enterprise_edition(schema.scalar({
+        metrics_interval = enterprise_edition(duration(schema.scalar({
             type = 'number',
             box_cfg = 'flightrec_metrics_interval',
             default = 1.0,
-        })),
-        metrics_period = enterprise_edition(schema.scalar({
+        }))),
+        metrics_period = enterprise_edition(duration(schema.scalar({
             type = 'number',
             box_cfg = 'flightrec_metrics_period',
             default = 60 * 3,
-        })),
-        requests_size = enterprise_edition(schema.scalar({
+        }))),
+        requests_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_size',
             default = 10485760,
-        })),
-        requests_max_req_size = enterprise_edition(schema.scalar({
+        }))),
+        requests_max_req_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_max_req_size',
             default = 16384,
-        })),
-        requests_max_res_size = enterprise_edition(schema.scalar({
+        }))),
+        requests_max_res_size = enterprise_edition(byte_size(schema.scalar({
             type = 'integer',
             box_cfg = 'flightrec_requests_max_res_size',
             default = 16384,
-        })),
+        }))),
     }),
     security = schema.record({
         auth_type = schema.enum({
@@ -1761,11 +1773,11 @@ return schema.new('instance_config', schema.record({
             default = 'chap-sha1',
             validate = validators['security.auth_type'],
         }),
-        auth_delay = enterprise_edition(schema.scalar({
+        auth_delay = enterprise_edition(duration(schema.scalar({
             type = 'number',
             default = 0,
             box_cfg = 'auth_delay',
-        })),
+        }))),
         auth_retries = enterprise_edition(schema.scalar({
             type = 'integer',
             default = 0,
@@ -1943,20 +1955,20 @@ return schema.new('instance_config', schema.record({
             default = 1,
             validate = validators['sharding.rebalancer_max_sending'],
         }),
-        sync_timeout = schema.scalar({
+        sync_timeout = duration(schema.scalar({
             type = 'number',
             default = 1,
             validate = validators['sharding.sync_timeout'],
-        }),
-        connection_outdate_delay = schema.scalar({
+        })),
+        connection_outdate_delay = duration(schema.scalar({
             type = 'number',
             validate = validators['sharding.connection_outdate_delay'],
-        }),
-        failover_ping_timeout = schema.scalar({
+        })),
+        failover_ping_timeout = duration(schema.scalar({
             type = 'number',
             default = 5,
             validate = validators['sharding.failover_ping_timeout'],
-        }),
+        })),
         discovery_mode = schema.enum({
             'on',
             'off',
@@ -2124,30 +2136,30 @@ return schema.new('instance_config', schema.record({
     }),
     -- Options of the failover coordinator service.
     failover = schema.record({
-        probe_interval = schema.scalar({
+        probe_interval = duration(schema.scalar({
             type = 'number',
             default = 10,
-        }),
-        connect_timeout = schema.scalar({
+        })),
+        connect_timeout = duration(schema.scalar({
             type = 'number',
             default = 1,
-        }),
-        call_timeout = schema.scalar({
+        })),
+        call_timeout = duration(schema.scalar({
             type = 'number',
             default = 1,
-        }),
-        lease_interval = schema.scalar({
+        })),
+        lease_interval = duration(schema.scalar({
             type = 'number',
             default = 30,
-        }),
-        renew_interval = schema.scalar({
+        })),
+        renew_interval = duration(schema.scalar({
             type = 'number',
             default = 10,
-        }),
-        replication_lag_threshold = schema.scalar({
+        })),
+        replication_lag_threshold = duration(schema.scalar({
             type = 'number',
             default = 1,
-        }),
+        })),
         -- Configure how to work with a remote storage, where
         -- failover coordinators leave its state information.
         --
@@ -2173,10 +2185,10 @@ return schema.new('instance_config', schema.record({
                 default = true,
             }),
             -- How often information in the stateboard is updated.
-            renew_interval = schema.scalar({
+            renew_interval = duration(schema.scalar({
                 type = 'number',
                 default = 2,
-            }),
+            })),
             -- How long a transient state information is stored.
             --
             -- Beware: it affects how fast a coordinator assumes
@@ -2186,10 +2198,10 @@ return schema.new('instance_config', schema.record({
             -- failover.lease_interval. Otherwise the coordinator
             -- switching causes replicaset leaders to go to the
             -- read-only mode for some time interval.
-            keepalive_interval = schema.scalar({
+            keepalive_interval = duration(schema.scalar({
                 type = 'number',
                 default = 10,
-            }),
+            })),
         }),
         replicasets = schema.map({
             -- Name of the replica.
@@ -2488,20 +2500,20 @@ return schema.new('instance_config', schema.record({
             type = 'boolean',
             default = false,
         }),
-        renew_interval = schema.scalar({
+        renew_interval = duration(schema.scalar({
             type = 'number',
             default = 2,
-        }),
-        keepalive_interval = schema.scalar({
+        })),
+        keepalive_interval = duration(schema.scalar({
             type = 'number',
             default = 10,
-        }),
+        })),
     })),
     connpool = schema.record({
-        idle_timeout = schema.scalar({
+        idle_timeout = duration(schema.scalar({
             type = 'number',
             default = 60,
-        }),
+        })),
     }),
     threads = schema.record({
         groups = schema.array({
