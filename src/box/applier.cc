@@ -668,7 +668,7 @@ applier_connect(struct applier *applier)
 	if (applier->version_id != greeting.version_id) {
 		say_info("remote master %s at %s running Tarantool %s",
 			 tt_uuid_str(&greeting.uuid),
-			 sio_strfaddr(&applier->addr, applier->addr_len),
+			 applier_addr_str(applier),
 			 version_id_to_string(greeting.version_id));
 	}
 
@@ -2962,4 +2962,10 @@ applier_uri_str(const struct applier *applier)
 	char *uri = (char *)static_alloc(APPLIER_SOURCE_MAXLEN);
 	uri_format(uri, APPLIER_SOURCE_MAXLEN, &applier->uri, false);
 	return uri;
+}
+
+const char *
+applier_addr_str(const struct applier *applier)
+{
+	return sio_strfaddr(&applier->addr, applier->addr_len);
 }
