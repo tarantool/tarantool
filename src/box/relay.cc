@@ -236,6 +236,10 @@ struct relay {
 	 * be cancelled through it.
 	 */
 	struct fiber *subscribe_fiber;
+	/** Local address the remote replica connected to us. */
+	char listen_addr_str[SERVICE_NAME_MAXLEN];
+	/** Remote peer address (the replica that connected to us). */
+	char peer_addr_str[SERVICE_NAME_MAXLEN];
 };
 
 struct diag*
@@ -345,6 +349,12 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	/* Never send rows for REPLICA_ID_NIL to anyone */
 	relay->id_filter = 1 << REPLICA_ID_NIL;
 	memset(&relay->status_msg, 0, sizeof(relay->status_msg));
+	/* Store the local address the remote connected to. */
+	strlcpy(relay->listen_addr_str, sio_getsockname_str(io->fd),
+		sizeof(relay->listen_addr_str));
+	/* Store the peer address of the connected replica. */
+	strlcpy(relay->peer_addr_str, sio_getpeername_str(io->fd),
+		sizeof(relay->peer_addr_str));
 }
 
 /**
@@ -1141,7 +1151,12 @@ relay_subscribe_f(va_list ap)
 	 * Don't clear the error for status reporting.
 	 */
 	assert(!diag_is_empty(&relay->diag));
-	diag_set_error(diag_get(), diag_last_error(&relay->diag));
+	struct error *err = diag_last_error(&relay->diag);
+	diag_set_error(diag_get(), err);
+	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
+	say_error("Relay to %s disconnected. Self: %s",
+		  replica_to_string(relay->replica, relay->peer_addr_str),
+		  replica_to_string(self, relay->listen_addr_str));
 	diag_log();
 	say_info("exiting the relay loop");
 

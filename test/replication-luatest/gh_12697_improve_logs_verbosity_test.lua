@@ -113,6 +113,8 @@ end
 
 local APPLIER_NET_ERR = 'Applier to %s.*disconnected. Self: %s'
 
+local RELAY_NET_ERR = 'Relay to %s.*disconnected. Self: %s'
+
 g.test_relay_applier_net_errors_has_extended_node_info = function(g)
     local remote_a_eph_info = get_remote_node_info(
         g.server_a, {is_ephemeral = true})
@@ -122,6 +124,11 @@ g.test_relay_applier_net_errors_has_extended_node_info = function(g)
     g.server_b:stop()
     t.assert(g.server_a:grep_log(string.format(
         APPLIER_NET_ERR, remote_b_info, 'server_a')))
+
+    local server_b_uuid = g.server_b:get_instance_uuid():gsub(
+        '([%-%(%)])', '%%%1')
+    t.assert(g.server_b:grep_log(string.format(
+        RELAY_NET_ERR, remote_a_eph_info, server_b_uuid)))
     g.server_b:start()
 end
 
@@ -149,4 +156,16 @@ g.test_anon_replica_applier_net_error_has_extended_node_info = function(g)
     t.assert(g.anon_server:grep_log(string.format(
         APPLIER_NET_ERR, remote_a_info, anon_server_uuid)))
     g.server_a:start()
+end
+
+g.test_relay_net_errors_to_anon_replica_has_extended_node_info = function(g)
+    local anon_server_eph_info = get_remote_node_info(
+        g.anon_server, {is_ephemeral = true})
+    g.anon_server:stop()
+
+    local server_b_uuid = g.server_b:get_instance_uuid():gsub(
+        '([%-%(%)])', '%%%1')
+    t.assert(g.server_b:grep_log(string.format(
+                RELAY_NET_ERR, anon_server_eph_info, server_b_uuid)))
+    g.anon_server:start()
 end
