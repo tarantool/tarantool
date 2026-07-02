@@ -1314,7 +1314,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 template <bool USE_HINT>
 static int
 memtx_tree_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+			      uint32_t part_count, struct tuple **result,
+			      bool is_rw)
 {
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
@@ -1338,8 +1339,11 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	}
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
-	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
-					 mk_index);
+	*result = is_rw ?
+		memtx_tx_tuple_clarify_rw(txn, space, res->tuple,
+					  base, mk_index) :
+		memtx_tx_tuple_clarify(txn, space, res->tuple,
+				       base, mk_index);
 	return 0;
 }
 
@@ -2684,7 +2688,6 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
 	/* .create_iterator = */ generic_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -2698,6 +2701,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_tree_disabled_index_vtab = {
 	/* .base = */ memtx_tree_disabled_index_vtab_base,
+	/* .get_internal = */ generic_memtx_index_get_internal,
 	/* .replace = */ memtx_tree_disabled_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
@@ -2752,7 +2756,6 @@ get_memtx_tree_index_vtab(void)
 		/* .max = */ generic_index_max,
 		/* .random = */ memtx_tree_index_random<USE_HINT>,
 		/* .count = */ memtx_tree_index_count<USE_HINT>,
-		/* .get_internal */ memtx_tree_index_get_internal<USE_HINT>,
 		/* .get = */ memtx_index_get,
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,
@@ -2767,6 +2770,7 @@ get_memtx_tree_index_vtab(void)
 	};
 	static const struct memtx_index_vtab vtab = {
 		/* .base = */ vtab_base,
+		/* .get_internal = */ memtx_tree_index_get_internal<USE_HINT>,
 		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
 				 is_func ? memtx_tree_func_index_replace :
 				 memtx_tree_index_replace<USE_HINT>,

@@ -232,7 +232,8 @@ memtx_rtree_index_count(struct index *base, enum iterator_type type,
 
 static int
 memtx_rtree_index_get_internal(struct index *base, const char *key,
-			       uint32_t part_count, struct tuple **result)
+			       uint32_t part_count, struct tuple **result,
+			       bool is_rw)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_iterator iterator;
@@ -254,7 +255,9 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = is_rw ?
+			memtx_tx_tuple_clarify_rw(txn, space, tuple, base, 0) :
+			memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
 	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;
@@ -411,7 +414,6 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_rtree_index_count,
-	/* .get_internal = */ memtx_rtree_index_get_internal,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_rtree_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -425,6 +427,7 @@ static const struct index_vtab memtx_rtree_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_rtree_index_vtab = {
 	/* .base = */ memtx_rtree_index_vtab_base,
+	/* .get_internal = */ memtx_rtree_index_get_internal,
 	/* .replace = */ memtx_rtree_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ memtx_rtree_index_reserve,

@@ -322,7 +322,8 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 
 static int
 memtx_hash_index_get_internal(struct index *base, const char *key,
-			      uint32_t part_count, struct tuple **result)
+			      uint32_t part_count, struct tuple **result,
+			      bool is_rw)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -337,7 +338,9 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		*result = is_rw ?
+			memtx_tx_tuple_clarify_rw(txn, space, tuple, base, 0) :
+			memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}
@@ -730,7 +733,6 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,
 	/* .count = */ memtx_hash_index_count,
-	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .get = */ memtx_index_get,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_iterator_with_offset = */
@@ -744,6 +746,7 @@ static const struct index_vtab memtx_hash_index_vtab_base = {
 
 static const struct memtx_index_vtab memtx_hash_index_vtab = {
 	/* .base = */ memtx_hash_index_vtab_base,
+	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .begin_build = */ generic_memtx_index_begin_build,
 	/* .reserve = */ generic_memtx_index_reserve,
