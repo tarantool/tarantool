@@ -36,7 +36,7 @@ list(APPEND LUA_TESTS_CMAKE_FLAGS
 
 include(ExternalProject)
 
-set(GIT_REF "854eba8e865ee1ac4c602fcb71836219c5d2f046")
+set(GIT_REF "533b7bd46c0a3e3543f97b8e0b69e056da52235d")
 # Git reference can be overridden with environment variable. It is
 # needed for checking build by project itself.
 if (DEFINED ENV{LUA_TESTS_GIT_REF})
