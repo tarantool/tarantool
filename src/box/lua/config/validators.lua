@@ -417,6 +417,16 @@ end
 
 -- }}} security
 
+-- {{{ session
+
+M['session.users.*.idle_timeout'] = function(data, w)
+    if data ~= nil and data < 0 then
+        w.error('must be a non-negative number, got %s', data)
+    end
+end
+
+-- }}} session
+
 -- {{{ sharding
 
 M['sharding.bucket_count'] = function(_data, w)

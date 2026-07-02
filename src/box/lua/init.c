@@ -162,6 +162,7 @@ extern char session_lua[],
 	config_applier_autoexpel_lua[],
 	config_applier_box_cfg_lua[],
 	config_applier_runtime_priv_lua[],
+	config_applier_session_settings_lua[],
 	config_applier_compat_lua[],
 	config_applier_connpool_lua[],
 	config_applier_console_lua[],
@@ -463,6 +464,10 @@ static const char * const lua_sources_main[] = {
 	"config/applier/runtime_priv",
 	"internal.config.applier.runtime_priv",
 	config_applier_runtime_priv_lua,
+
+	"config/applier/session_settings",
+	"internal.config.applier.session_settings",
+	config_applier_session_settings_lua,
 
 	"config/applier/credentials",
 	"internal.config.applier.credentials",

@@ -518,6 +518,45 @@ exit:
 	lua_settop(L, top);
 }
 
+/** Drop the whole per-user session idle timeout configuration. */
+static int
+lbox_session_idle_timeout_reset(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0) {
+		diag_set(IllegalParams,
+			 "Usage: box.internal.session.idle_timeout_reset()");
+		return luaT_error(L);
+	}
+	session_idle_timeout_reset();
+	return 0;
+}
+
+/** Set the idle timeout (in seconds) for a single user. */
+static int
+lbox_session_idle_timeout_set(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || lua_type(L, 1) != LUA_TSTRING) {
+		diag_set(ClientError, ER_CFG, "session_idle_timeout",
+			 "user name must be a string");
+		return luaT_error(L);
+	}
+	if (!lua_isnumber(L, 2)) {
+		diag_set(ClientError, ER_CFG, "session_idle_timeout",
+			 "timeout must be a number");
+		return luaT_error(L);
+	}
+	double timeout = lua_tonumber(L, 2);
+	if (timeout < 0) {
+		diag_set(ClientError, ER_CFG, "session_idle_timeout",
+			 "timeout must be >= 0");
+		return luaT_error(L);
+	}
+	size_t name_len;
+	const char *name = lua_tolstring(L, 1, &name_len);
+	session_idle_timeout_set(name, (uint32_t)name_len, timeout);
+	return 0;
+}
+
 void
 box_lua_session_init(struct lua_State *L)
 {
@@ -526,6 +565,8 @@ box_lua_session_init(struct lua_State *L)
 		{"run_on_connect",    lbox_session_run_on_connect},
 		{"run_on_disconnect", lbox_session_run_on_disconnect},
 		{"run_on_auth", lbox_session_run_on_auth},
+		{"idle_timeout_reset", lbox_session_idle_timeout_reset},
+		{"idle_timeout_set", lbox_session_idle_timeout_set},
 		{NULL, NULL}
 	};
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.session", 0);
