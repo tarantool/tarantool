@@ -296,6 +296,7 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 {
 	memset(limbo, 0, sizeof(*limbo));
 	limbo->state = TXN_LIMBO_STATE_INACTIVE;
+	rlist_create(&limbo->on_state_update);
 	limbo->is_in_recovery = true;
 	txn_limbo_queue_create(&limbo->queue);
 	vclock_create(&limbo->promote_term_map);
@@ -345,6 +346,12 @@ make_leader:
 make_inactive:
 	limbo->state = TXN_LIMBO_STATE_INACTIVE;
 end:
+	/*
+	 * Run before the ro summary update. A trigger might need to finish
+	 * setting things up before the new state's effects, such as the box
+	 * becoming writable, can be observed.
+	 */
+	trigger_run(&limbo->on_state_update, limbo);
 	box_update_ro_summary();
 }
 
@@ -431,6 +438,7 @@ static inline void
 txn_limbo_destroy(struct txn_limbo *limbo)
 {
 	trigger_clear(&limbo->on_ack);
+	trigger_destroy(&limbo->on_state_update);
 	txn_limbo_queue_destroy(&limbo->queue);
 	TRASH(limbo);
 }
