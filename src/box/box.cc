@@ -2993,31 +2993,42 @@ box_check_promote(void) {
 }
 
 /**
- * Wait until this instance becomes writable, as long as it remains the Raft
- * leader.
+ * Wait until this instance claims the limbo. Usually it means the node
+ * becomes writable, but not necessarily. It might, for example, have
+ * box.cfg.read_only = true and still claim the limbo successfully.
  */
 static int
-box_wait_for_rw_while_leader(struct raft *raft)
+box_wait_for_limbo_claim(struct raft *raft)
 {
 	assert(is_box_configured);
 	double deadline = ev_monotonic_now(loop()) +
 		replication_synchro_timeout;
-	while (box_is_ro()) {
+	while (txn_limbo.state != TXN_LIMBO_STATE_LEADER) {
 		if (raft->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_ELECTIONS);
 			return -1;
 		}
-		struct trigger on_update;
-		trigger_create(&on_update, fiber_wakeup_trigger_cb,
-			       fiber(), NULL);
-		raft_on_update(raft, &on_update);
-		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
-		trigger_clear(&on_update);
-		if (rc != 0)
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
 			return -1;
+		}
+		/*
+		 * Raft updates are seen too - every one of them is propagated
+		 * into txn_limbo_update_state() by the Raft machine's own
+		 * trigger.
+		 */
+		struct trigger on_state_update;
+		trigger_create(&on_state_update, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
+		trigger_add(&txn_limbo.on_state_update, &on_state_update);
+		bool is_timed_out = fiber_yield_deadline(deadline);
+		trigger_clear(&on_state_update);
+		if (is_timed_out) {
+			diag_set(TimedOut);
+			return -1;
+		}
 	}
 	assert(raft->state == RAFT_STATE_LEADER);
-	assert(!box_is_ro());
 	return 0;
 }
 
@@ -3044,7 +3055,7 @@ box_promote(void)
 	if (box_raft_try_promote() != 0)
 		return -1;
 	assert(raft->state == RAFT_STATE_LEADER);
-	return box_wait_for_rw_while_leader(raft);
+	return box_wait_for_limbo_claim(raft);
 }
 
 int

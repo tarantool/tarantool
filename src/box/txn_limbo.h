@@ -81,6 +81,13 @@ enum txn_limbo_state {
 struct txn_limbo {
 	/** Limbo state. */
 	enum txn_limbo_state state;
+	/**
+	 * Triggers run on every limbo state update, even when the state
+	 * itself ends up unchanged, and on any other state-related limbo
+	 * changes. Anything waiting for a certain limbo state condition
+	 * should subscribe here and re-check its condition on each run.
+	 */
+	struct rlist on_state_update;
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
