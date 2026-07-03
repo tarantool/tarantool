@@ -67,3 +67,7 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
+
+    - name: Cleanup CodeQL files
+      run: |
+        ls --directory -t ${{ runner.tool_cache }}/CodeQL/* | tail -n +2 | xargs -r rm -rf
