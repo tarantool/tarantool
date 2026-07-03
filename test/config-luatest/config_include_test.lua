@@ -522,13 +522,10 @@ g.test_include_recursion = function()
         )
     end)
 
-    t.helpers.retrying({timeout = 10}, function()
-        t.assert(g.server:grep_log(
-            ('skipping already processed config file: ' ..
-            '"%s/config.yaml"'):format(g.dir),
-            1024, {filename = g.dir .. '/var/log/instance-001/tarantool.log'}
-        ))
-    end)
+    t.assert(g.server:grep_log(
+        'skipping already processed config file: ".*/config.yaml"',
+        1024, {filename = g.dir .. '/var/log/instance-001/tarantool.log'}
+    ))
 end
 
 g.test_include_erroneous = function()
