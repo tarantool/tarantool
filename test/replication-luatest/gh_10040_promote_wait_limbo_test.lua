@@ -75,11 +75,15 @@ g.test_promote_waits_for_quorum = function(cg)
 end
 
 g.test_promote_aborts_wait_when_not_leader = function(cg)
+    t.tarantool.skip_if_not_debug()
     cg.master:exec(function()
         local fiber = require('fiber')
         box.ctl.demote()
         t.assert_equals(box.info.election.leader, 0)
-        box.cfg{read_only = true}
+        --
+        -- Block the next WAL write batch.
+        --
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local is_promote_finished = false
         local f = fiber.new(function()
             local ok, err = pcall(box.ctl.promote)
@@ -87,25 +91,80 @@ g.test_promote_aborts_wait_when_not_leader = function(cg)
             return {ok, err}
         end)
         f:set_joinable(true)
+        --
+        -- Step the WAL writes one by one until the PROMOTE request gets
+        -- stuck in its own WAL write. The steps before it are the Raft term
+        -- and vote persistence of the elections.
+        --
         t.helpers.retrying({timeout = 60}, function()
-            local info = box.info
-            t.assert_equals(info.election.leader, info.id)
-            t.assert_equals(info.election.term, info.synchro.queue.term)
-            t.assert_equals(info.synchro.queue.owner, info.id)
+            t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
         end)
-        t.assert(box.info.ro)
+        while not box.info.synchro.queue.busy do
+            box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+            box.error.injection.set('ERRINJ_WAL_DELAY', false)
+            t.helpers.retrying({timeout = 60}, function()
+                t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
+            end)
+        end
+        --
+        -- The elections are won, but the limbo can't get claimed - the
+        -- PROMOTE is not going anywhere.
+        --
+        t.assert_equals(box.info.election.state, 'leader')
         t.assert_not(is_promote_finished)
-        box.ctl.demote()
-        local ok, err = f:join(60)
+        --
+        -- Losing the leadership aborts the wait. Can't use
+        -- box.ctl.demote() for that - it would be rejected as an interfering
+        -- promotion while the PROMOTE is in progress. The mode switch makes
+        -- the leader resign without any WAL writes.
+        --
+        box.cfg{election_mode = 'voter'}
+        local ok, res = f:join(60)
         t.assert(ok)
-        ok, err = unpack(err)
-        t.assert(err)
-        t.assert_not(ok)
+        local promote_ok, promote_err = unpack(res)
+        t.assert_not(promote_ok)
+        t.assert_equals(promote_err.code, box.error.INTERFERING_ELECTIONS)
+        --
+        -- Cleanup.
+        --
+        box.cfg{election_mode = 'manual'}
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_not(box.info.synchro.queue.busy)
+        end)
+        box.ctl.promote()
+        local info = box.info
+        t.assert_equals(info.election.leader, info.id)
+        t.assert_equals(info.synchro.queue.owner, info.id)
+    end)
+    cg.replica:wait_for_vclock_of(cg.master)
+end
+
+g.test_promote_succeeds_when_read_only = function(cg)
+    cg.master:exec(function()
+        box.ctl.demote()
+        t.assert_equals(box.info.election.leader, 0)
+        --
+        -- The limbo claim doesn't depend on the instance's writability. An
+        -- explicitly read-only instance can still win the elections and
+        -- claim the queue.
+        --
+        box.cfg{read_only = true}
+        local ok, err = pcall(box.ctl.promote)
+        t.assert_equals(err, nil)
+        t.assert(ok)
+        local info = box.info
+        t.assert(info.ro)
+        t.assert_equals(info.election.leader, info.id)
+        t.assert_equals(info.election.term, info.synchro.queue.term)
+        t.assert_equals(info.synchro.queue.owner, info.id)
         --
         -- Cleanup.
         --
         box.cfg{read_only = false}
-        box.ctl.promote()
+        t.helpers.retrying({timeout = 60}, function()
+            t.assert_not(box.info.ro)
+        end)
     end)
     cg.replica:wait_for_vclock_of(cg.master)
 end
