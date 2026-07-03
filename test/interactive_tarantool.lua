@@ -214,13 +214,14 @@ end
 -- * ReadLine 6: <space><CR>.
 --
 -- This function drop duplicates that goes in row, strips <CR>,
--- spaces, tabs and ANSI color codes. Applying of this function
--- to a source command and readline's echoed command allows to
--- compare them for equality.
+-- spaces, tabs, and ANSI control sequences and color codes.
+-- Applying of this function to a source command and readline's
+-- echoed command allows to compare them for equality.
 local function _prepare_command_for_compare(x)
     x = x:gsub(' ', '')
          :gsub(M.CR, '')
          :gsub(M.TAB, '')
+         :gsub(M.ESC .. '%[[ACK]', '')
 
     x = decolor(x)
     local acc = fun.iter(x):reduce(function(acc, c)
