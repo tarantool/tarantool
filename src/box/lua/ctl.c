@@ -215,6 +215,21 @@ lbox_ctl_replica_gc(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Restart replication reconnecting all the instances.
+ */
+static int
+lbox_ctl_restart_replication(struct lua_State *L)
+{
+	if (!box_is_configured()) {
+		diag_set(ClientError, ER_UNCONFIGURED);
+		return luaT_error(L);
+	}
+	if (box_check_restart_replication() != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
@@ -232,6 +247,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"iproto_lockdown", lbox_ctl_set_iproto_lockdown},
 	{"wal_sync", lbox_ctl_wal_sync},
 	{"replica_gc", lbox_ctl_replica_gc},
+	{"restart_replication", lbox_ctl_restart_replication},
 	{NULL, NULL}
 };
 

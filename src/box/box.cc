@@ -2325,6 +2325,19 @@ box_restart_replication(void)
 	box_sync_replication(demand_quorum, keep_connect, wait_all);
 }
 
+int
+box_check_restart_replication(void)
+{
+	try {
+		box_restart_replication();
+		return 0;
+	} catch (Exception *e) {
+		return -1;
+	} catch (...) {
+		panic("Unknown exception on instance name set failure");
+	}
+}
+
 static inline void
 box_update_replication(void)
 {
