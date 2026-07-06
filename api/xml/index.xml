@@ -464,6 +464,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea15c8bceebd29412cc4735538d210676f" kind="enumvalue"><name>ER_DICT_OVERFLOW</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea1cea780634f08bbcc9c020e4eadd3c89" kind="enumvalue"><name>ER_NO_SUCH_THREAD_GROUP</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaee6804ff553d5d74d7033d43cafc4f0b" kind="enumvalue"><name>ER_XLOG_NOT_FOUND</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea42b26ee8ab168cc9e3c1225d2b77759c" kind="enumvalue"><name>ER_RECOVERY_POINT_TXN_LAST_ROW</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
