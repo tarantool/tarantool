@@ -1038,15 +1038,6 @@ enum {
 #define SQL_MAGIC_OPEN     0xa029a697	/* Database is open */
 #define SQL_MAGIC_BUSY     0xf03b7906	/* Database currently in use */
 
-/**
- * SQL type definition. Now it is an alias to type, but in
- * future it will have some attributes like number of chars in
- * VARCHAR(<number of chars>).
- */
-struct type_def {
-	enum field_type type;
-};
-
 /*
  * Value constraints (enforced via assert()):
  *     NC_MinMaxAgg      == SF_MinMaxAgg

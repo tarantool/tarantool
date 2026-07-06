@@ -350,7 +350,7 @@ sql_create_column_start(struct Parse *parse)
 	 */
 	column_def->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	column_def->is_nullable = true;
-	column_def->type = create_column_def->type_def->type;
+	column_def->type = create_column_def->type;
 	def->field_count++;
 
 	sqlSrcListDelete(alter_entity_def->entity_name);
