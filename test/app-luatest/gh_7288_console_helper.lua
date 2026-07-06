@@ -5,32 +5,28 @@ local server = require('luatest.server')
 local string = require('string')
 local t = require('luatest')
 
+local function StartRemote()
+    local server = server:new{
+        alias = 'remote',
+        box_cfg = {memtx_use_mvcc_engine = true},
+    }
+    server:start()
+    local console_uri = fio.pathjoin(server.vardir, 'gh-7288.sock')
+    server:eval(string.format('require("console").listen("%s")', console_uri))
+    return {
+        server = server,
+        uri = {
+            txt = console_uri,
+            bin = server.net_box_uri,
+        },
+    }
+end
+
 local remote_mt = {
-    start = function(self)
-        local server = server:new{
-            alias = 'remote',
-            box_cfg = {memtx_use_mvcc_engine = true},
-        }
-        server:start()
-        if not self.bin then
-            self.uri = fio.pathjoin(server.vardir, 'gh-7288.sock')
-            server:eval(string.format('require("console").listen("%s")', self.uri))
-        else
-            self.uri = server.net_box_uri
-        end
-        self.server = server
-    end,
-
-    stop = function(self)
-        self.server:stop()
-        self.server = nil
-        self.uri = nil
-    end,
-
     connect = function(self, console)
-        console:send(string.format('require("console").connect("%s")', self.uri))
+        local uri = self.bin and console.uri.bin or console.uri.txt
+        console:send(string.format('require("console").connect("%s")', uri))
     end,
-
     disconnect = true,
 }
 
@@ -46,24 +42,13 @@ local flavours = {
 --
 local TestConsole = {}
 
-TestConsole.new = function(self, flavour_name)
-    local o = { flavour = flavours[flavour_name] }
+TestConsole.new = function(self, remote_uri, flavour_name)
+    local o = {uri = remote_uri, flavour = flavours[flavour_name]}
     setmetatable(o, self)
     return o
 end
 
 TestConsole.__index = {}
-TestConsole.__index.start = function(self)
-    if self.flavour.start then
-        self.flavour:start()
-    end
-end
-
-TestConsole.__index.stop = function(self)
-    if self.flavour.stop then
-        self.flavour:stop()
-    end
-end
 
 TestConsole.__index.connect = function(self)
     self.ich = fiber.channel(10)
@@ -108,5 +93,6 @@ TestConsole.__index.disconnect = function(self)
 end
 
 return {
+    StartRemote = StartRemote,
     TestConsole = TestConsole,
 }
