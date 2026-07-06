@@ -236,7 +236,7 @@ struct create_column_def {
 	/** Shallow space copy. */
 	struct space *space;
 	/** Column type. */
-	struct type_def *type_def;
+	enum field_type type;
 };
 
 struct create_ck_constraint_parse_def {
@@ -480,11 +480,11 @@ create_table_def_init(struct create_table_def *table_def, struct Token *name,
 static inline void
 create_column_def_init(struct create_column_def *column_def,
 		       struct SrcList *table_name, struct Token *name,
-		       struct type_def *type_def)
+		       enum field_type type)
 {
 	create_entity_def_init(&column_def->base, ENTITY_TYPE_COLUMN,
 			       table_name, name, false);
-	column_def->type_def = type_def;
+	column_def->type = type;
 }
 
 static inline void

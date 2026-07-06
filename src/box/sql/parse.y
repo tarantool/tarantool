@@ -225,7 +225,7 @@ columnlist ::= column_def create_column_end.
 column_def ::= column_name_and_type carglist.
 
 column_name_and_type ::= nm(A) typedef(Y). {
-  create_column_def_init(&pParse->create_column_def, NULL, &A, &Y);
+  create_column_def_init(&pParse->create_column_def, NULL, &A, Y);
   sql_create_column_start(pParse);
 }
 
@@ -1007,7 +1007,7 @@ expr(A) ::= expr(A) COLLATE id(C). {
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sql_expr_new_dequoted(TK_CAST, NULL);
-  A.pExpr->type = T.type;
+  A.pExpr->type = T;
   sqlExprAttachSubtrees(A.pExpr, E.pExpr, 0);
 }
 
@@ -1682,7 +1682,7 @@ column_name(N) ::= nm(A). { N = A; }
 cmd ::= alter_column_def carglist create_column_end.
 
 alter_column_def ::= alter_add_column(N) typedef(Y). {
-  create_column_def_init(&pParse->create_column_def, N.table_name, &N.name, &Y);
+  create_column_def_init(&pParse->create_column_def, N.table_name, &N.name, Y);
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
   sql_create_column_start(pParse);
@@ -1773,30 +1773,20 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 }
 
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
-%type typedef {struct type_def}
-typedef(A) ::= TEXT . { A.type = FIELD_TYPE_STRING; }
-typedef(A) ::= STRING_KW . { A.type = FIELD_TYPE_STRING; }
-typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
+%type typedef {enum field_type}
+typedef(A) ::= TEXT . { A = FIELD_TYPE_STRING; }
+typedef(A) ::= STRING_KW . { A = FIELD_TYPE_STRING; }
+typedef(A) ::= SCALAR . { A = FIELD_TYPE_SCALAR; }
 /** BOOL | BOOLEAN is not used due to possible bug in Lemon. */
-typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }
-typedef(A) ::= BOOLEAN . { A.type = FIELD_TYPE_BOOLEAN; }
-typedef(A) ::= VARBINARY . { A.type = FIELD_TYPE_VARBINARY; }
-typedef(A) ::= UUID . { A.type = FIELD_TYPE_UUID; }
-typedef(A) ::= ANY . { A.type = FIELD_TYPE_ANY; }
-typedef(A) ::= ARRAY . { A.type = FIELD_TYPE_ARRAY; }
-typedef(A) ::= MAP . { A.type = FIELD_TYPE_MAP; }
-typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_DATETIME; }
-typedef(A) ::= INTERVAL . { A.type = FIELD_TYPE_INTERVAL; }
-
-/**
- * Time-like types are temporary disabled, until they are
- * implemented as a native Tarantool types (gh-3694).
- *
- typedef(A) ::= DATE . { A.type = FIELD_TYPE_NUMBER; }
- typedef(A) ::= TIME . { A.type = FIELD_TYPE_NUMBER; }
- typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_NUMBER; }
-*/
-
+typedef(A) ::= BOOL . { A = FIELD_TYPE_BOOLEAN; }
+typedef(A) ::= BOOLEAN . { A = FIELD_TYPE_BOOLEAN; }
+typedef(A) ::= VARBINARY . { A = FIELD_TYPE_VARBINARY; }
+typedef(A) ::= UUID . { A = FIELD_TYPE_UUID; }
+typedef(A) ::= ANY . { A = FIELD_TYPE_ANY; }
+typedef(A) ::= ARRAY . { A = FIELD_TYPE_ARRAY; }
+typedef(A) ::= MAP . { A = FIELD_TYPE_MAP; }
+typedef(A) ::= DATETIME . { A = FIELD_TYPE_DATETIME; }
+typedef(A) ::= INTERVAL . { A = FIELD_TYPE_INTERVAL; }
 
 char_len(A) ::= LP INTEGER(B) RP . {
   (void) A;
@@ -1805,38 +1795,14 @@ char_len(A) ::= LP INTEGER(B) RP . {
 
 %type char_len {int}
 typedef(A) ::= VARCHAR char_len(B) . {
-  A.type = FIELD_TYPE_STRING;
+  A = FIELD_TYPE_STRING;
   (void) B;
 }
 
-%type number_typedef {struct type_def}
+%type number_typedef {enum field_type}
 typedef(A) ::= number_typedef(A) .
-number_typedef(A) ::= NUMBER . { A.type = FIELD_TYPE_NUMBER; }
-number_typedef(A) ::= DOUBLE . { A.type = FIELD_TYPE_DOUBLE; }
-number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
-number_typedef(A) ::= UNSIGNED . { A.type = FIELD_TYPE_UNSIGNED; }
-number_typedef(A) ::= DECIMAL . { A.type = FIELD_TYPE_DECIMAL; }
-
-/**
- * NUMERIC type is temporary disabled. To be enabled when
- * it will be implemented as native Tarantool type.
- *
- * %type number_len_typedef {struct type_def}
- * number_typedef(A) ::= DECIMAL|NUMERIC|NUM number_len_typedef(B) . {
- *   A.type = FIELD_TYPE_NUMBER;
- *   (void) B;
- * }
- *
- *
- * number_len_typedef(A) ::= . { (void) A; }
- * number_len_typedef(A) ::= LP INTEGER(B) RP . {
- *   (void) A;
- *   (void) B;
- * }
- *
- * number_len_typedef(A) ::= LP INTEGER(B) COMMA INTEGER(C) RP . {
- *   (void) A;
- *   (void) B;
- *   (void) C;
- *}
- */
+number_typedef(A) ::= NUMBER . { A = FIELD_TYPE_NUMBER; }
+number_typedef(A) ::= DOUBLE . { A = FIELD_TYPE_DOUBLE; }
+number_typedef(A) ::= INT|INTEGER_KW . { A = FIELD_TYPE_INTEGER; }
+number_typedef(A) ::= UNSIGNED . { A = FIELD_TYPE_UNSIGNED; }
+number_typedef(A) ::= DECIMAL . { A = FIELD_TYPE_DECIMAL; }
