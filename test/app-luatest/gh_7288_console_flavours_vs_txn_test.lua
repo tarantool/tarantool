@@ -1,6 +1,8 @@
 local server = require('luatest.server')
 local t = require('luatest')
 
+local helper = require('test.app-luatest.gh_7288_console_helper')
+
 local g = t.group('gh-7288', {
     {flavour = 'alocal'},
     {flavour = 'remote_txt'},
@@ -8,14 +10,14 @@ local g = t.group('gh-7288', {
 })
 
 g.before_all(function(cg)
+    cg.remote = helper.StartRemote()
     cg.server = server:new{alias = 'main',
                            box_cfg = {memtx_use_mvcc_engine = true}}
     cg.server:start()
-    cg.server:exec(function(flavour)
+    cg.server:exec(function(uri, flavour)
         local helper = require('test.app-luatest.gh_7288_console_helper')
 
-        local console = helper.TestConsole:new(flavour)
-        console:start()
+        local console = helper.TestConsole:new(uri, flavour)
         rawset(_G, 'console', console)
 
         local true_output = [[
@@ -32,14 +34,12 @@ g.before_all(function(cg)
 ]]
         rawset(_G, 'false_output', false_output)
 
-    end, {cg.params.flavour})
+    end, {cg.remote.uri, cg.params.flavour})
 end)
 
 g.after_all(function(cg)
-    cg.server:exec(function()
-        _G.console:stop()
-    end)
     cg.server:drop()
+    cg.remote.server:drop()
 end)
 
 g.before_each(function(cg)
@@ -87,10 +87,11 @@ end
 g = t.group('gh-7288-bin-backcompat')
 
 g.before_all(function()
+    g.remote = helper.StartRemote()
     g.server = server:new{alias = 'backcompat',
                            box_cfg = {memtx_use_mvcc_engine = true}}
     g.server:start()
-    g.server:exec(function()
+    g.server:exec(function(uri)
         local helper = require('test.app-luatest.gh_7288_console_helper')
         local netbox = require('net.box')
 
@@ -100,17 +101,14 @@ g.before_all(function()
             remote.peer_protocol_features.streams = false
             return remote
         end
-        local console = helper.TestConsole:new('remote_bin')
-        console:start()
+        local console = helper.TestConsole:new(uri, 'remote_bin')
         rawset(_G, 'console', console)
-    end)
+    end, {g.remote.uri})
 end)
 
 g.after_all(function()
-    g.server:exec(function()
-        _G.console:stop()
-    end)
     g.server:drop()
+    g.remote.server:drop()
 end)
 
 g.before_each(function()
