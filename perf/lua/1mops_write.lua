@@ -32,6 +32,7 @@ local HELP = [[
    ops <number, 10000000>     - total amount of replaces to be performed
    sync <boolean>             - to turn the synchro replication on
    transaction <number, 150>  - number of replaces in one transaction
+   insert_ratio <number, 0.1> - ratio of insertions, defines the space size
    wal_mode <string, 'write'> - WAL synchronization mode
    warmup <number, 10>        - percent of ops to skip before measurement
 
@@ -49,6 +50,7 @@ local parsed_params = {
     {'ops', 'number'},
     {'sync', 'boolean'},
     {'transaction', 'number'},
+    {'insert_ratio', 'number'},
     {'wal_mode', 'string'},
     {'warmup', 'number'},
 }
@@ -111,6 +113,7 @@ local num_fibers = params.fibers or 50
 
 -- number of operations per transaction
 local ops_per_txn = params.transaction or 150
+assert(ops_per_txn <= num_ops, 'one transaction ops is more than total ops')
 
 -- number of nodes - master and replicas
 local nodes = params.nodes or 1
@@ -147,6 +150,14 @@ warmup_thr = warmup_thr < 0 and 0 or warmup_thr
 
 -- transactions per fiber
 local trans_per_fiber = math.floor(num_ops/ops_per_txn/num_fibers)
+assert(trans_per_fiber > 0, 'transaction count is less than fiber count')
+
+-- max size of the test space
+local insert_ratio = params.insert_ratio or 0.1
+assert(insert_ratio > 0 and insert_ratio <= 1)
+local max_space_size = math.floor(num_fibers * trans_per_fiber *
+                                  ops_per_txn * insert_ratio)
+assert(max_space_size > 0, 'the estimated space size is zero')
 
 -- by default no output from replicas are received
 -- redirect it into master's one breaks terminal
@@ -249,12 +260,15 @@ end
 
 -- THE load fiber
 local function fiber_load(start, s)
-    start = start % 1000000 -- limit the size of space to 1M elements
+    start = start % max_space_size
     for _ = 1, trans_per_fiber do
         box.begin()
         for _ = 1, ops_per_txn do
             s:replace{start}
             start = start + 1
+            if start == max_space_size then
+                start = 0
+            end
         end
         box.commit()
         fiber.yield()
@@ -318,6 +332,9 @@ for i = 1, num_fibers do
         fiber.sleep(0.001)
     end -- the loop is needed for backward compatibility with 1.7
 end
+
+-- check the resulting space size
+assert(space:len() == max_space_size)
 
 ops_done = box.stat().REPLACE.total - ops_done
 
