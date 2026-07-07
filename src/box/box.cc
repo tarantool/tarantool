@@ -5987,7 +5987,8 @@ box_cfg(void)
 int
 box_checkpoint(void)
 {
-	assert(is_box_configured);
+	if (box_check_configured() != 0)
+		return -1;
 	return gc_checkpoint();
 }
 
