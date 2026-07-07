@@ -2598,17 +2598,6 @@ struct ExprList *
 sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
 			struct ast_id_list *columns, struct Expr *pExpr);
 
-/**
- * Parse tokens as a name or a position of bound variable.
- *
- * @param parse Parse context.
- * @param spec Special symbol for bound variable.
- * @param id Name or position number of bound variable.
- */
-struct Expr *
-expr_new_variable(struct Parse *parse, const struct Token *spec,
-		  const struct Token *id);
-
 /** Return TRUE if expression is term, FALSE otherwise. */
 static inline bool
 sql_expr_is_term(const struct Expr *expr)
@@ -2634,7 +2623,7 @@ void sqlExprListSetName(Parse *, ExprList *, Token *, int);
  * expression list.
  */
 void
-sqlExprListSetSpan(struct ExprList *pList, struct ExprSpan *pSpan);
+sqlExprListSetSpan(struct ExprList *pList, const char *str, uint32_t len);
 
 u32 sqlExprListFlags(const ExprList *);
 
