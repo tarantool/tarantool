@@ -1272,49 +1272,6 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	}
 }
 
-struct Expr *
-expr_new_variable(struct Parse *parse, const struct Token *spec,
-		  const struct Token *id)
-{
-	assert(spec != NULL && spec->n == 1);
-	uint32_t len = 1;
-	if (parse->parse_only) {
-		diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS,
-			 parse->line_count, parse->line_pos,
-			 "bindings are not allowed in DDL");
-		parse->is_aborted = true;
-		return NULL;
-	}
-	if (id != NULL) {
-		assert(spec->z[0] != '?');
-		if (id->z - spec->z != 1) {
-			diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-				 parse->line_count, spec->z - parse->zTail + 1,
-				 tt_cstr(spec->z, spec->n));
-			parse->is_aborted = true;
-			return NULL;
-		}
-		if (spec->z[0] == '#' && sqlIsdigit(id->z[0])) {
-			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 parse->line_count, tt_cstr(spec->z, spec->n));
-			parse->is_aborted = true;
-			return NULL;
-		}
-		len += id->n;
-	}
-	struct Expr *expr = sql_expr_new_empty(TK_VARIABLE, len + 1);
-	expr->type = FIELD_TYPE_BOOLEAN;
-	expr->flags = EP_Leaf;
-	expr->u.zToken = (char *)(expr + 1);
-	expr->u.zToken[0] = spec->z[0];
-	if (id != NULL)
-		memcpy(expr->u.zToken + 1, id->z, id->n);
-	expr->u.zToken[len] = '\0';
-
-	sqlExprAssignVarNumber(parse, expr, len);
-	return expr;
-}
-
 /*
  * Recursively delete an expression tree.
  */
@@ -1871,14 +1828,13 @@ sqlExprListSetName(Parse * pParse,	/* Parsing context */
 }
 
 void
-sqlExprListSetSpan(struct ExprList *pList, struct ExprSpan *pSpan)
+sqlExprListSetSpan(struct ExprList *pList, const char *str, uint32_t len)
 {
 	assert(pList != NULL);
 	struct ExprList_item *pItem = &pList->a[pList->nExpr - 1];
 	assert(pList->nExpr > 0);
-	assert(pItem->pExpr == pSpan->pExpr);
 	sql_xfree(pItem->zSpan);
-	pItem->zSpan = sql_xstrndup(pSpan->zStart, pSpan->zEnd - pSpan->zStart);
+	pItem->zSpan = sql_xstrndup(str, len);
 }
 
 /*
