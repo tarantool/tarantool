@@ -112,3 +112,34 @@ g.test_new_no_command = function()
     }
     t.assert_error_covers(exp_err, popen.new, {})
 end
+
+-- gh-4914: popen's .command must quote empty arguments, not just
+-- multiword ones, so that they stay visible in the rendered
+-- command line.
+g.test_command_quote_empty_args = function()
+    local cases = {
+        -- Empty arguments are quoted.
+        {
+            argv = {'/usr/bin/printf', '%s', ''},
+            exp_command = "/usr/bin/printf %s ''",
+        },
+        -- Non-empty single-word arguments stay unquoted.
+        {
+            argv = {'/usr/bin/printf', '%s', 'foo'},
+            exp_command = '/usr/bin/printf %s foo',
+        },
+        -- Multiword arguments are still quoted.
+        {
+            argv = {'/usr/bin/printf', '%s', 'a b'},
+            exp_command = "/usr/bin/printf %s 'a b'",
+        },
+    }
+
+    for _, case in ipairs(cases) do
+        local ph = popen.new(case.argv, {
+            stdout = popen.opts.DEVNULL,
+            stderr = popen.opts.DEVNULL,
+        })
+        t.assert_equals(ph.command, case.exp_command)
+    end
+end

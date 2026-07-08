@@ -221,12 +221,15 @@ handle_new(struct popen_opts *opts)
 	for (i = 0; i < opts->nr_argv-1; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
+		size_t len = strlen(opts->argv[i]);
 		bool is_multiword = strchr(opts->argv[i], ' ') != NULL;
-		if (is_multiword)
+		/* Quote empty and multiword arguments. */
+		bool use_quotes = len == 0 || is_multiword;
+		if (use_quotes)
 			*pos++ = '\'';
 		strlcpy(pos, opts->argv[i], pos_max - pos);
-		pos += strlen(opts->argv[i]);
-		if (is_multiword)
+		pos += len;
+		if (use_quotes)
 			*pos++ = '\'';
 		*pos++ = ' ';
 	}
