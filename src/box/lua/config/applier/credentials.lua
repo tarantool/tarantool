@@ -477,6 +477,19 @@ end
 -- }}} Triggers for grants after obj creation
 
 -- {{{ Main sync logic
+local actions_applied = {}
+
+local function record_txn_action(action)
+    table.insert(actions_applied, action)
+end
+
+local function get_txn_actions_str()
+    return table.concat(actions_applied, ', ')
+end
+
+local function clear_txn_actions()
+    actions_applied = {}
+end
 
 -- Grant or revoke some user/role privileges for an object.
 local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
@@ -491,9 +504,11 @@ local privileges_action_f = function(grant_or_revoke, role_or_user, name, privs,
                           {_origin = CONFIG_ORIGIN})
 
     if ok then
-        log.verbose('credentials.apply: box.schema.%s.%s(%q, %q, %q, %q)',
-                    role_or_user, grant_or_revoke, name, privs,
+        local action = ('box.schema.%s.%s(%q, %q, %q, %q)')
+            :format(role_or_user, grant_or_revoke, name, privs,
                     obj_type, obj_name)
+        log.verbose('credentials.apply: ' .. action)
+        record_txn_action(action)
         return
     end
     if err.code ~= box.error.NO_SUCH_SPACE and
@@ -690,6 +705,7 @@ local function create_role(role_name)
     else
         log.verbose('credentials.apply: create role %q', role_name)
         box.schema.role.create(role_name, {_origin = CONFIG_ORIGIN})
+        record_txn_action(('box.schema.role.create(%q)'):format(role_name))
     end
 end
 
@@ -711,6 +727,7 @@ local function create_user(user_name)
     else
         log.verbose('credentials.apply: create user %q', user_name)
         box.schema.user.create(user_name, {_origin = CONFIG_ORIGIN})
+        record_txn_action(('box.schema.user.create(%q)'):format(user_name))
     end
 end
 
@@ -731,6 +748,8 @@ local function set_password(user_name, password)
         end
 
         log.verbose('credentials.apply: remove password for user %q', user_name)
+        record_txn_action(('box.schema.user.passwd(%q, nil)')
+            :format(user_name))
         -- No password is set, so remove it for the user.
         -- There is no handy function for it, so remove it directly in
         -- system space _user. Users are described in the following way:
@@ -758,6 +777,8 @@ local function set_password(user_name, password)
         -- No password is currently set for the user, just set a new one.
         log.verbose('credentials.apply: set a password for user %q', user_name)
         box.schema.user.passwd(user_name, password)
+        record_txn_action(('box.schema.user.passwd(%q)')
+            :format(user_name))
         return
     end
 
@@ -796,11 +817,15 @@ local function set_password(user_name, password)
             log.verbose('credentials.apply: a password for user %q has ' ..
                         'different auth_type, resetting it', user_name)
             box.schema.user.passwd(user_name, password)
+            record_txn_action(('box.schema.user.passwd(%q)')
+                :format(user_name))
         end
     else
         log.verbose('credentials.apply: set a password for user %q',
                     user_name)
         box.schema.user.passwd(user_name, password)
+        record_txn_action(('box.schema.user.passwd(%q)')
+            :format(user_name))
     end
 
 end
@@ -837,6 +862,7 @@ local function drop_users_not_in_config(user_map)
     for _, name in ipairs(to_drop) do
         log.verbose('credentials.apply: drop user %q', name)
         box.schema.user.drop(name, {_origin = CONFIG_ORIGIN})
+        record_txn_action(('box.schema.user.drop(%q)'):format(name))
     end
 end
 
@@ -854,6 +880,7 @@ local function drop_roles_not_in_config(role_map)
     for _, name in ipairs(to_drop) do
         log.verbose('credentials.apply: drop role %q', name)
         box.schema.role.drop(name, {_origin = CONFIG_ORIGIN})
+        record_txn_action(('box.schema.role.drop(%q)'):format(name))
     end
 end
 
@@ -934,6 +961,28 @@ end
 -- of main fiber in case of 'BLOCKING_FULL_SYNC'.
 local wait_sync
 
+local function credentials_atomic(func, ...)
+    local is_changes_applied = false
+    clear_txn_actions()
+
+    local ok, err = pcall(box.atomic, function(...)
+       func(...)
+       is_changes_applied = true
+    end, ...)
+
+    if ok then
+        return
+    end
+
+    if is_changes_applied and #actions_applied > 0 then
+        local msg = 'credentials.apply: failed to commit credentials ' ..
+                    'transaction with pending operation(s): %s: %s'
+        local actions = get_txn_actions_str()
+        error(msg:format(actions, err), 0)
+    end
+    error(err, 0)
+end
+
 local function sync_object(obj_to_sync)
     if obj_to_sync.type == 'BLOCKING_FULL_SYNC' or
         obj_to_sync.type == 'BACKGROUND_FULL_SYNC' then
@@ -962,7 +1011,7 @@ local function sync_object(obj_to_sync)
         register_objects(credentials.roles)
         register_objects(credentials.users)
 
-        box.atomic(function()
+        credentials_atomic(function()
             drop_roles_not_in_config(credentials.roles)
             drop_users_not_in_config(credentials.users)
             create_roles(credentials.roles)
@@ -974,7 +1023,7 @@ local function sync_object(obj_to_sync)
     else
         local credentials = get_credentials(config)
 
-        box.atomic(sync_privileges, credentials, obj_to_sync)
+        credentials_atomic(sync_privileges, credentials, obj_to_sync)
     end
     refresh_unmanaged_subjects_alert()
 end
