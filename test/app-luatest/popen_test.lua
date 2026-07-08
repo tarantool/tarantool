@@ -103,3 +103,12 @@ g.test_popen_is_closed = function()
     }
     t.assert_error_covers(exp_err, ph.info, ph)
 end
+
+-- popen.new({}) fails with a proper diagnostic (gh-4913).
+g.test_new_no_command = function()
+    local exp_err = {
+        type = 'IllegalParams',
+        message = 'popen: no command to run',
+    }
+    t.assert_error_covers(exp_err, popen.new, {})
+end
