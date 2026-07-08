@@ -430,8 +430,8 @@ local function test_new_invalid_args(test)
         [{false}]                            = argerr('argv', 'boolean'),
         [{0}]                                = argerr('argv', 'number'),
         [{''}]                               = argerr('argv', 'string'),
-        -- FIXME: A table is ok, but not an empty one.
-        [{{}}]                               = nil,
+        -- A table is ok, but not an empty one.
+        [{{}}]                               = 'popen: no command to run',
         [{popen.shell}]                      = argerr('argv', 'function'),
         [{io.stdin}]                         = argerr('argv', 'userdata'),
         [{coroutine.create(function() end)}] = argerr('argv', 'thread'),

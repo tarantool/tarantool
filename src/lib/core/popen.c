@@ -195,6 +195,18 @@ handle_new(struct popen_opts *opts)
 		return NULL;
 	}
 
+	/*
+	 * Reject empty argv earlier (it has no sense to run
+	 * anyway).
+	 *
+	 * This way we don't have to take this case into account
+	 * in size/pointer calculations below.
+	 */
+	if (opts->argv[0] == NULL) {
+		diag_set(IllegalParams, "popen: no command to run");
+		return NULL;
+	}
+
 	for (i = 0; i < opts->nr_argv; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
