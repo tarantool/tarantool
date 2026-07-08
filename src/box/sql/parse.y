@@ -1076,30 +1076,24 @@ expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
 %type trim_operands {struct ExprList *}
 %destructor trim_operands {sql_expr_list_delete($$);}
 
-trim_operands(A) ::= trim_specification(N) expr(Z) FROM expr(Y). {
+trim_operands(A) ::= LEADING|TRAILING|BOTH(N) expr(Z) FROM expr(Y). {
   A = sql_expr_list_append(NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[N]);
-  A = sql_expr_list_append(A, p);
+  A = sql_expr_list_append(A, sql_expr_new_anon(@N));
   A = sql_expr_list_append(A, Z.pExpr);
 }
 
-trim_operands(A) ::= trim_specification(N) FROM expr(Y). {
+trim_operands(A) ::= LEADING|TRAILING|BOTH(N) FROM expr(Y). {
   A = sql_expr_list_append(NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[N]);
-  A = sql_expr_list_append(A, p);
+  A = sql_expr_list_append(A, sql_expr_new_anon(@N));
 }
 
 trim_operands(A) ::= expr(Z) FROM expr(Y). {
   A = sql_expr_list_append(NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[TRIM_BOTH]);
-  A = sql_expr_list_append(A, p);
   A = sql_expr_list_append(A, Z.pExpr);
 }
 
 trim_operands(A) ::= expr(Y). {
   A = sql_expr_list_append(NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[TRIM_BOTH]);
-  A = sql_expr_list_append(A, p);
 }
 
 %type expr_optional {struct Expr *}
@@ -1107,12 +1101,6 @@ trim_operands(A) ::= expr(Y). {
 
 expr_optional(A) ::= .        { A = NULL; }
 expr_optional(A) ::= expr(X). { A = X.pExpr; }
-
-%type trim_specification {enum trim_side_mask}
-
-trim_specification(A) ::= LEADING.  { A = TRIM_LEADING; }
-trim_specification(A) ::= TRAILING. { A = TRIM_TRAILING; }
-trim_specification(A) ::= BOTH.     { A = TRIM_BOTH; }
 
 expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
   if (Y != NULL && Y->nExpr > SQL_MAX_FUNCTION_ARG){
