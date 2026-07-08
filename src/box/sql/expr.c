@@ -167,6 +167,10 @@ sql_expr_type(struct Expr *pExpr)
 	case TK_BITNOT:
 		assert(pExpr->pRight == NULL);
 		return sql_expr_type(pExpr->pLeft);
+	case TK_LEADING:
+	case TK_TRAILING:
+	case TK_BOTH:
+		return FIELD_TYPE_INTEGER;
 	}
 	return pExpr->type;
 }
@@ -4083,6 +4087,15 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			return target;
 		}
+	case TK_LEADING:
+		sqlVdbeAddOp2(v, OP_Integer, TRIM_LEADING, target);
+		break;
+	case TK_TRAILING:
+		sqlVdbeAddOp2(v, OP_Integer, TRIM_TRAILING, target);
+		break;
+	case TK_BOTH:
+		sqlVdbeAddOp2(v, OP_Integer, TRIM_BOTH, target);
+		break;
 	case TK_EXISTS:
 	case TK_SELECT:{
 			if (pParse->vdbe_field_ref_reg > 0) {

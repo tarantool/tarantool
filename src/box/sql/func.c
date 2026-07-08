@@ -411,23 +411,44 @@ trim_bin_start(const char *str, size_t end, const char *octets,
 static void
 func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
-	if (mem_is_null(&argv[0]) || (argc == 3 && mem_is_null(&argv[2])))
+	if (mem_is_null(&argv[0]))
 		return;
-	assert(argc == 2 || (argc == 3 && mem_is_bin(&argv[2])));
-	assert(mem_is_bin(&argv[0]) && mem_is_uint(&argv[1]));
+	int flags = TRIM_BOTH;
 	const char *str = argv[0].z;
 	size_t size = argv[0].n;
-	const char *octets;
-	size_t octets_size;
-	if (argc == 3) {
+	const char *octets = "\0";
+	size_t octets_size = 1;
+	if (argc == 2) {
+		if (mem_is_null(&argv[1]))
+			return;
+		if (mem_is_bin(&argv[1])) {
+			if (argv[1].n > SQL_MAX_LENGTH) {
+				ctx->is_aborted = true;
+				diag_set(ClientError, ER_SQL_EXECUTE,
+					 "string or blob too big");
+				return;
+			}
+			octets = argv[1].z;
+			octets_size = argv[1].n;
+		} else {
+			assert(mem_is_uint(&argv[1]));
+			flags = argv[1].u.u;
+		}
+	} else if (argc == 3) {
+		if (mem_is_null(&argv[2]))
+			return;
+		assert(mem_is_uint(&argv[1]) && mem_is_bin(&argv[2]));
+		flags = argv[1].u.u;
+		if (argv[2].n > SQL_MAX_LENGTH) {
+			ctx->is_aborted = true;
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "string or blob too big");
+			return;
+		}
 		octets = argv[2].z;
 		octets_size = argv[2].n;
-	} else {
-		octets = "\0";
-		octets_size = 1;
 	}
 
-	int flags = argv[1].u.u;
 	size_t end = trim_bin_end(str, size, octets, octets_size, flags);
 	size_t start = trim_bin_start(str, end, octets, octets_size, flags);
 
@@ -492,10 +513,8 @@ trim_str_start(const char *str, int32_t end, const char *chars,
 static void
 func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
-	if (mem_is_null(&argv[0]) || (argc == 3 && mem_is_null(&argv[2])))
+	if (mem_is_null(&argv[0]))
 		return;
-	assert(argc == 2 || (argc == 3 && mem_is_str(&argv[2])));
-	assert(mem_is_str(&argv[0]) && mem_is_uint(&argv[1]));
 	const char *str = argv[0].z;
 	if (argv[0].n > SQL_MAX_LENGTH) {
 		ctx->is_aborted = true;
@@ -503,9 +522,30 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return;
 	}
 	int32_t size = argv[0].n;
-	const char *chars;
-	int32_t chars_size;
-	if (argc == 3) {
+	uint64_t flags = TRIM_BOTH;
+	const char *chars = " ";
+	int32_t chars_size = 1;
+	if (argc == 2) {
+		if (mem_is_null(&argv[1]))
+			return;
+		if (mem_is_str(&argv[1])) {
+			if (argv[1].n > SQL_MAX_LENGTH) {
+				ctx->is_aborted = true;
+				diag_set(ClientError, ER_SQL_EXECUTE,
+					 "string or blob too big");
+				return;
+			}
+			chars = argv[1].z;
+			chars_size = argv[1].n;
+		} else {
+			assert(mem_is_uint(&argv[1]));
+			flags = argv[1].u.u;
+		}
+	} else if (argc == 3) {
+		if (mem_is_null(&argv[2]))
+			return;
+		assert(mem_is_uint(&argv[1]) && mem_is_str(&argv[2]));
+		flags = argv[1].u.u;
 		if (argv[2].n > SQL_MAX_LENGTH) {
 			ctx->is_aborted = true;
 			diag_set(ClientError, ER_SQL_EXECUTE,
@@ -514,9 +554,6 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 		}
 		chars = argv[2].z;
 		chars_size = argv[2].n;
-	} else {
-		chars = " ";
-		chars_size = 1;
 	}
 
 	struct region *region = &fiber()->gc;
@@ -534,7 +571,6 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 		chars_len[chars_count++] = offset - prev;
 	}
 
-	uint64_t flags = argv[1].u.u;
 	int32_t end = trim_str_end(str, size, chars, chars_len, chars_count,
 				   flags);
 	int32_t start = trim_str_start(str, end, chars, chars_len, chars_count,
@@ -1838,7 +1874,7 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"SUBSTR", 2, 3, SQL_FUNC_DERIVEDCOLL, true, 0, NULL},
 	{"SUM", 1, 1, SQL_FUNC_AGG, false, 0, NULL},
 	{"TOTAL", 1, 1, SQL_FUNC_AGG, false, 0, NULL},
-	{"TRIM", 2, 3, SQL_FUNC_DERIVEDCOLL, true, 0, NULL},
+	{"TRIM", 1, 3, SQL_FUNC_DERIVEDCOLL, true, 0, NULL},
 	{"TYPEOF", 1, 1, SQL_FUNC_TYPEOF, true, 0, NULL},
 	{"UNICODE", 1, 1, 0, true, 0, NULL},
 	{"UNLIKELY", 1, 1, SQL_FUNC_UNLIKELY, true, 0, NULL},
@@ -2055,10 +2091,18 @@ static struct sql_func_definition definitions[] = {
 	{"TOTAL", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_total,
 	 fin_total},
 
-	{"TRIM", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},
-	 FIELD_TYPE_STRING, func_trim_str, NULL},
+	{"TRIM", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_trim_str,
+	 NULL},
+	{"TRIM", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
+	 func_trim_str, NULL},
+	{"TRIM", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER}, FIELD_TYPE_STRING,
+	 func_trim_str, NULL},
 	{"TRIM", 3, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER, FIELD_TYPE_STRING},
 	 FIELD_TYPE_STRING, func_trim_str, NULL},
+	{"TRIM", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, func_trim_bin,
+	 NULL},
+	{"TRIM", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
+	 FIELD_TYPE_VARBINARY, func_trim_bin, NULL},
 	{"TRIM", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER},
 	 FIELD_TYPE_VARBINARY, func_trim_bin, NULL},
 	{"TRIM", 3,
