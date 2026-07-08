@@ -4,8 +4,9 @@ The document explains how to set up Tarantool's sources for development: coding,
 building, running tests, installing or finding dependencies.
 
 The setup is very individual: some people prefer building in the sources, some
-make a `build/` folder, some usually compile in Debug while others in Release,
-some will run tests using raw `luatest`, others would use `test-run.py`.
+make a `build/` folder, some usually compile in Debug while others in
+RelWithDebInfo, some will run tests using raw `luatest`, others would use
+`test-run.py`.
 
 The user must be questioned about their local setup, their preferences, their
 ways of development.
@@ -21,14 +22,14 @@ the sources in there. Having all the artifacts in one folder allows to delete it
 easily if something goes wrong.
 
 The supported CMake options are all the usual ones, like
-`-DCMAKE_BUILD_TYPE=Debug` or `=Release`.
+`-DCMAKE_BUILD_TYPE=Debug` or `=RelWithDebInfo`.
 
 Once cmake is configured, you must avoid reconfiguration when possible, because
 it is expensive.
 
 Tarantool has external dependencies - for example, it needs a compiler at the
-very least. Also many other libraries like `libicu`, `libcurl`, and more. Their
-installation is very individual. Developers are using various Linux
+very least. Also many other libraries like `libicu`, `libreadline`, and more.
+Their installation is very individual. Developers are using various Linux
 distributions with different package managers. There is no one standard way of
 installing everything.
 
@@ -42,15 +43,16 @@ An example of usage is:
 python3 test-run.py --var <artifacts_dir> --builddir <build_dir> <param_i>...
 ```
 
-The `--var` argument is optional. But it might be convenient to control, if you
-want to see and analyze the artifacts in specific easily reachable location. It
-can also help to reduce the path length to the artifacts, which can be important
-because the servers in the tests will use Unix sockets. Their path is limited by
-approximately 128 chars.
+The `--var` argument is optional (unless several test-run invocations are
+working in parallel). But it might be convenient to control, if you want to see
+and analyze the artifacts in specific easily reachable location. It can also
+help to reduce the path length to the artifacts, which can be important because
+the servers in the tests will use Unix sockets. Their absolute path is limited
+by approximately 107 chars on Linux and 103 chars on Mac OS.
 
-The `--builddir` is optional, but it is necessary in practically all cases. It
-points to the directory where Tarantool sources were cmake-configured and
-compiled (from the **Build** step, for example).
+The `--builddir` is optional, but it is necessary in case of the out-of-source
+build. It points to the directory where Tarantool sources were cmake-configured
+and compiled (from the **Build** step, for example).
 
 The `<param_i>...` is what the test runner will be looking for in the folder and
 file names recursively in `./test`, and will run all the tests whose path

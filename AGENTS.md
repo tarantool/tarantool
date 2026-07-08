@@ -87,11 +87,19 @@ depending on what is being tested. The most widely used ones are listed below.
   `test/unit/`. They are fast, simple, and offer very low-level access to
   internals of Tarantool.
 
-- Lua Diff tests. These are legacy tests, their files all end with `.test.lua`.
-  Code in such Lua files is executed like in an interactive console, the correct
-  output is saved into `.result` files, and on each run the actual output is
-  compared to the `.result` file. They must match. New tests do not use this
-  method anymore.
+- Lua Diff tests. These are legacy tests, their files all end with `.test.lua`
+  or `.test.py`, test suite's `suite.ini` file has `core = tarantool`. Code in
+  such Lua and Python files is executed like in an interactive console, the
+  correct output is saved into `.result` files, and on each run the actual
+  output is compared to the `.result` file. They must match. New tests do not
+  use this method anymore.
+
+- Lua App tests. These are legacy tests, their files all end with `.test.lua`,
+  test suite's `suite.ini` file has `core = app`, located in `test/*-tap`
+  folders. The test file is passed as the script argument to tarantool's
+  command line. The result usually TAP13 compliant and doesn't require a
+  `.result` file, however, if it exists, test-run compares against it. New
+  tests do not use this method anymore.
 
 - Lua Luatest tests. These are the majority of all tests. They all end with
   `_test.lua`, and are usually located in folders `test/*-luatest`, grouped by
