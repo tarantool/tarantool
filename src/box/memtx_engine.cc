@@ -840,10 +840,12 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			(typeof(undo))stmt->engine_savepoint;
 		if (undo != NULL) {
 			struct space *space = stmt->space;
-			struct tuple *old_tuple = undo->old_tuple;
-			if (space->upgrade != NULL && old_tuple != NULL)
-				memtx_space_upgrade_untrack_tuple(
+			struct tuple *old_tuple;
+			memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+				if (space->upgrade != NULL)
+					memtx_space_upgrade_untrack_tuple(
 						space->upgrade, old_tuple);
+			});
 			/* Not going to be required anymore. */
 			memtx_stmt_rollback_info_delete(undo);
 		}
@@ -865,10 +867,17 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		/* Not going to be required once used below. */
 		memtx_stmt_rollback_info_delete(undo);
 	});
-	struct tuple *old_tuple = undo->old_tuple;
+	struct memtx_tuple_list *old_tuples = undo->old_tuples;
 	struct tuple *new_tuple = undo->new_tuple;
 	/* The savepoint is only set if anything has changed. */
-	assert(old_tuple != NULL || new_tuple != NULL);
+	assert(old_tuples != NULL || new_tuple != NULL);
+	/*
+	 * Can only have more than one old tuple if no inserts were made
+	 * (that is, the op is delete_range, that only sets old_tuples).
+	 * So it's either <= 1 of old_tuples or no new_tuple.
+	 */
+	assert(old_tuples == NULL || old_tuples->next == NULL ||
+	       new_tuple == NULL);
 	struct space *space = stmt->space;
 	if (space == NULL) {
 		/* The space was deleted. Nothing to rollback. */
@@ -882,8 +891,8 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 
 	/*
 	 * With MVCC, we do not physically rollback the state of the indexes.
-	 * Instead, we mark the `new_tuple`, if any, as deleted and `old_tuple`,
-	 * if any, as visible again.
+	 * Instead, we mark the `new_tuple`, if any, as deleted and everything
+	 * in the `old_tuples` list, if any, as visible again.
 	 */
 	if (memtx_tx_manager_use_mvcc_engine)
 		return memtx_tx_history_rollback_stmt(stmt);
@@ -895,23 +904,30 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	else
 		panic("transaction rolled back during snapshot recovery");
 
+	struct tuple *old_tuple;
 	for (uint32_t i = 0; i < index_count; i++) {
 		struct tuple *unused;
 		struct index *index = space->index[i];
-		/* Rollback must not fail. */
-		if (memtx_index_replace(index, new_tuple, old_tuple, DUP_INSERT,
-					&unused, &unused) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
+		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
+			/* Rollback must not fail. */
+			if (memtx_index_replace(index, new_tuple,
+						old_tuple, DUP_INSERT,
+						&unused, &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rollback change");
+			}
+		});
 	}
 
-	memtx_space_update_tuple_stat(space, new_tuple, old_tuple);
-	if (old_tuple != NULL)
+	memtx_tuple_list_foreach(old_tuples, old_tuple, {
+		memtx_space_update_tuple_stat(space, NULL, old_tuple);
 		tuple_ref(old_tuple);
-	if (new_tuple != NULL)
+	});
+	if (new_tuple != NULL) {
+		memtx_space_update_tuple_stat(space, new_tuple, NULL);
 		tuple_unref(new_tuple);
+	}
 }
 
 static void
