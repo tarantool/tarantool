@@ -305,8 +305,6 @@ txn_stmt_new(struct txn *txn, uint16_t type)
 	stmt->new_tuple = NULL;
 	stmt->min_key = NULL;
 	stmt->max_key = NULL;
-	stmt->rollback_info.old_tuple = NULL;
-	stmt->rollback_info.new_tuple = NULL;
 	stmt->add_story = NULL;
 	stmt->del_story = NULL;
 	stmt->next_in_del_list = NULL;
@@ -329,22 +327,6 @@ txn_stmt_destroy(struct txn_stmt *stmt)
 		tuple_unref(stmt->old_tuple);
 	if (stmt->new_tuple != NULL)
 		tuple_unref(stmt->new_tuple);
-	if (stmt->rollback_info.old_tuple != NULL)
-		tuple_unref(stmt->rollback_info.old_tuple);
-	if (stmt->rollback_info.new_tuple != NULL)
-		tuple_unref(stmt->rollback_info.new_tuple);
-}
-
-void
-txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
-			       struct tuple *new_tuple)
-{
-	stmt->rollback_info.old_tuple = old_tuple;
-	if (stmt->rollback_info.old_tuple != NULL)
-		tuple_ref(stmt->rollback_info.old_tuple);
-	stmt->rollback_info.new_tuple = new_tuple;
-	if (stmt->rollback_info.new_tuple != NULL)
-		tuple_ref(stmt->rollback_info.new_tuple);
 }
 
 void
