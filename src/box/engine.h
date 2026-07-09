@@ -195,6 +195,10 @@ struct engine_vtab {
 	 */
 	void (*rollback)(struct engine *, struct txn *);
 	/**
+	 * Free the resources held by the engine_savepoint.
+	 */
+	void (*destroy_savepoint)(void *engine_savepoint);
+	/**
 	 * Send the transaction to a read view in which it can't see changes
 	 * done with the given PSN or newer.
 	 */
@@ -444,6 +448,12 @@ engine_rollback(struct engine *engine, struct txn *txn)
 }
 
 static inline void
+engine_destroy_savepoint(struct engine *engine, void *engine_savepoint)
+{
+	engine->vtab->destroy_savepoint(engine_savepoint);
+}
+
+static inline void
 engine_send_to_read_view(struct engine *engine, struct txn *txn, int64_t psn)
 {
 	engine->vtab->send_to_read_view(engine, txn, psn);
@@ -562,6 +572,7 @@ void generic_engine_commit(struct engine *, struct txn *);
 void generic_engine_rollback_statement(struct engine *, struct txn *,
 				       struct txn_stmt *);
 void generic_engine_rollback(struct engine *, struct txn *);
+void generic_engine_destroy_savepoint(void *);
 void generic_engine_send_to_read_view(struct engine *, struct txn *, int64_t);
 void generic_engine_abort_with_conflict(struct engine *, struct txn *);
 int generic_engine_bootstrap(struct engine *);
