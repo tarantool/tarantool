@@ -836,12 +836,16 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			assert(stmt->space->engine == engine);
 			memtx_tx_history_commit_stmt(stmt);
 		}
-		if (stmt->engine_savepoint != NULL) {
+		struct memtx_stmt_rollback_info *undo =
+			(typeof(undo))stmt->engine_savepoint;
+		if (undo != NULL) {
 			struct space *space = stmt->space;
-			struct tuple *old_tuple = stmt->rollback_info.old_tuple;
+			struct tuple *old_tuple = undo->old_tuple;
 			if (space->upgrade != NULL && old_tuple != NULL)
 				memtx_space_upgrade_untrack_tuple(
 						space->upgrade, old_tuple);
+			/* Not going to be required anymore. */
+			memtx_stmt_rollback_info_delete(undo);
 		}
 	}
 }
@@ -852,10 +856,19 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 {
 	(void)engine;
 	(void)txn;
-	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
-	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
-	if (old_tuple == NULL && new_tuple == NULL)
+	/* Only roll back the changes if they were made. */
+	if (stmt->engine_savepoint == NULL)
 		return;
+	struct memtx_stmt_rollback_info *undo =
+		(typeof(undo))stmt->engine_savepoint;
+	auto destroy_rollback_info = make_scoped_guard([&]() {
+		/* Not going to be required once used below. */
+		memtx_stmt_rollback_info_delete(undo);
+	});
+	struct tuple *old_tuple = undo->old_tuple;
+	struct tuple *new_tuple = undo->new_tuple;
+	/* The savepoint is only set if anything has changed. */
+	assert(old_tuple != NULL || new_tuple != NULL);
 	struct space *space = stmt->space;
 	if (space == NULL) {
 		/* The space was deleted. Nothing to rollback. */
@@ -863,10 +876,6 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	}
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	uint32_t index_count;
-
-	/* Only roll back the changes if they were made. */
-	if (stmt->engine_savepoint == NULL)
-		return;
 
 	if (space->upgrade != NULL && new_tuple != NULL)
 		memtx_space_upgrade_untrack_tuple(space->upgrade, new_tuple);

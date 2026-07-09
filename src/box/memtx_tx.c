@@ -2861,11 +2861,13 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
  *    also removed their stories on DDL, so here we should roll them back
  *    without stories if they have failed to commit.
  */
-void
+static void
 memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 {
-	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
-	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
+	struct memtx_stmt_rollback_info *undo =
+		(typeof(undo))stmt->engine_savepoint;
+	struct tuple *old_tuple = undo->old_tuple;
+	struct tuple *new_tuple = undo->new_tuple;
 	if (!stmt->txn->is_schema_changed && stmt->txn->psn == 0)
 		return;
 	if (stmt->space->def->opts.is_ephemeral ||
@@ -2892,7 +2894,9 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
 	/* Consistency asserts. */
 	if (stmt->add_story != NULL) {
-		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
+		struct memtx_stmt_rollback_info *undo =
+			(typeof(undo))stmt->engine_savepoint;
+		assert(stmt->add_story->tuple == undo->new_tuple);
 		assert(stmt->add_story->add_psn == stmt->txn->psn);
 	}
 	if (stmt->del_story != NULL)
@@ -3585,15 +3589,24 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 	 * they won't be rolled back because we already did it. Moreover, they
 	 * could access the old space that is going to be deleted leading to
 	 * use-after-free.
+	 *
+	 * Skip oneselves as we could be invalidating the space during rollback,
+	 * so our status can be TXN_ABORTED too.
 	 */
 	struct txn *txn;
 	rlist_foreach_entry(txn, &txns, in_txns) {
-		if (txn->status != TXN_ABORTED || txn->psn != 0)
+		if (txn == ddl_owner ||
+		    txn->status != TXN_ABORTED || txn->psn != 0)
 			continue;
 		struct txn_stmt *stmt;
 		stailq_foreach_entry(stmt, &txn->stmts, next) {
-			if (stmt->space == space)
+			if (stmt->space == space) {
+				struct memtx_stmt_rollback_info *undo =
+					(typeof(undo))stmt->engine_savepoint;
+				if (undo != NULL)
+					memtx_stmt_rollback_info_delete(undo);
 				stmt->engine_savepoint = NULL;
+			}
 		}
 	}
 
