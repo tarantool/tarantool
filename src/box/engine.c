@@ -347,6 +347,12 @@ generic_engine_rollback(struct engine *engine, struct txn *txn)
 }
 
 void
+generic_engine_destroy_savepoint(void *engine_savepoint)
+{
+	(void)engine_savepoint;
+}
+
+void
 generic_engine_send_to_read_view(struct engine *engine, struct txn *txn,
 				 int64_t psn)
 {

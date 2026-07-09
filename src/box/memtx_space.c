@@ -342,6 +342,25 @@ memtx_space_prepare_index_tuple(struct tuple_format *format,
 }
 
 /**
+ * Prepare the MemTX statement rollback info:
+ * set, ref tuples and set the savepoint.
+ */
+static void
+memtx_set_replace_rollback_info(struct txn_stmt *stmt,
+				struct tuple *old_index_tuple,
+				struct tuple *new_index_tuple,
+				struct region *region)
+{
+	struct memtx_stmt_rollback_info *undo =
+		memtx_stmt_rollback_info_new(region);
+	if (old_index_tuple != NULL)
+		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple);
+	if (new_index_tuple != NULL)
+		memtx_stmt_rollback_info_set_new_tuple(undo, new_index_tuple);
+	stmt->engine_savepoint = undo;
+}
+
+/**
  * Take actions required after replace in space is finished:
  * - set transactional information
  * - track new tuple in space upgrade
@@ -355,8 +374,10 @@ memtx_space_complete_replace(struct space *space, struct txn *txn,
 		memtx_space_upgrade_track_tuple(space->upgrade,
 						new_index_tuple);
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	txn_stmt_prepare_rollback_info(stmt, old_index_tuple, new_index_tuple);
-	stmt->engine_savepoint = stmt;
+	struct region *region = tx_region_acquire(txn);
+	memtx_set_replace_rollback_info(stmt, old_index_tuple,
+					new_index_tuple, region);
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
 }
 
 static int
