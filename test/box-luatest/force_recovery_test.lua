@@ -62,3 +62,48 @@ g.test_force_recovery_ignores_lsn_gap = function(cg)
         })
     end)
 end
+
+-- gh-716: force recovery used to loop forever if an xlog with inserts was
+-- missing while a later xlog held deletes for the same, now absent, tuples. The
+-- deletes match nothing and get no LSN, which used to break the gap handling. A
+-- normal recovery stops at the gap; force recovery reports it and continues.
+g.test_force_recovery_ignores_delete_for_lost_tuple = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+    end)
+
+    -- The xlog opened on this restart will hold the inserts. Remember it.
+    cg.server:restart()
+    local lsn = cg.server:exec(function() return box.info.lsn end)
+    local wal = fio.pathjoin(cg.server.workdir,
+                             string.format('%020d.xlog', lsn))
+    cg.server:exec(function()
+        local s = box.space.test
+        s:insert({1, 'first tuple'})
+        s:insert({2, 'second tuple'})
+        s:insert({3, 'third tuple'})
+    end)
+
+    -- Put the deletes into a separate xlog.
+    cg.server:restart()
+    cg.server:exec(function()
+        local s = box.space.test
+        s:delete({1})
+        s:delete({2})
+        s:delete({3})
+    end)
+
+    -- Remove the xlog with the inserts and recover from the resulting gap.
+    cg.server:stop()
+    t.assert_equals(#fio.glob(wal), 1, 'the xlog to remove exists')
+    fio.unlink(wal)
+    cg.server:start()
+
+    t.assert(cg.server:grep_log('ignoring a gap in LSN'))
+
+    -- The inserts are gone, the deletes matched nothing: the space is empty.
+    cg.server:exec(function()
+        t.assert_equals(box.space.test:select(), {})
+    end)
+end
