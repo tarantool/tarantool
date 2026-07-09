@@ -702,9 +702,14 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 *   work for it
 	 * - perhaps we should run triggers even for deletes which
 	 *   doesn't find any rows
+	 *
+	 * The DELETE_RANGE request doesn't set old/new tuples, but
+	 * we have to run the on_replace trigger on it too in order
+	 * to support it during a background index build.
 	 */
 	if (stmt->space != NULL && stmt->space->run_triggers &&
-	    (stmt->old_tuple || stmt->new_tuple)) {
+	    (stmt->old_tuple || stmt->new_tuple ||
+	     stmt->type == IPROTO_DELETE_RANGE)) {
 		if (space_has_on_replace_triggers(stmt->space)) {
 			txn->space_on_replace_triggers_depth++;
 			int rc = space_on_replace(stmt->space, stmt);

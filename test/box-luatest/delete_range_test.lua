@@ -286,6 +286,147 @@ g.test_api = function(cg)
     end)
 end
 
+-- Test the range delete during background index build.
+g.test_background_index_build = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        -- Create space.
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+
+        -- Do the test function during the SK build and check that the PK
+        -- operations are applied to the SK after the build is finished.
+        local function check(test_function)
+            -- Initialize the space.
+            s:truncate()
+            for i = 1, 2000 do
+                s:replace{i}
+            end
+
+            -- Start the background index build and make us
+            -- able to check when the index build is finished.
+            local index_built = false
+            local f = fiber.new(function()
+                s:create_index('sk')
+                index_built = true
+            end)
+            f:set_joinable(true)
+            fiber.yield() -- Start the background index build.
+
+            -- Do the test.
+            test_function()
+
+            -- Wait until the build completes.
+            assert(not index_built)
+            local ok, err = f:join()
+            t.assert(ok, err)
+            t.assert(index_built)
+
+            -- Check the resulting SK contents (should match with PK).
+            t.assert_equals(s.index.sk:select(), s.index.pk:select())
+
+            -- Drop the new index.
+            s.index.sk:drop()
+        end
+
+        -- Same as above but wrap the function into transaction and rollback it.
+        local function check_rollback(test_function)
+            check(function()
+                box.begin()
+                test_function()
+                box.rollback()
+            end)
+        end
+
+        -- Concurrently delete tuple range before the build cursor.
+        check(function() box.space.test:delete_range({}, {11}) end)
+        check(function() box.space.test:delete_range({1}, {11}) end)
+        check(function() box.space.test:delete_range({1}, {6}) end)
+        check(function() box.space.test:delete_range({6}, {11}) end)
+        check(function() box.space.test:delete_range({3}, {8}) end)
+
+        -- Concurrently delete tuple range after the build cursor.
+        check(function() box.space.test:delete_range({1001}, {}) end)
+        check(function() box.space.test:delete_range({1001}, {2001}) end)
+        check(function() box.space.test:delete_range({1501}, {2001}) end)
+        check(function() box.space.test:delete_range({1301}, {1801}) end)
+
+        -- Rollback a concurrent delete of a tuple
+        -- range before and after the build cursor.
+        check_rollback(function() box.space.test:delete_range({}, {}) end)
+        check_rollback(function() box.space.test:delete_range({}, {2001}) end)
+        check_rollback(function() box.space.test:delete_range({1}, {}) end)
+        check_rollback(function() box.space.test:delete_range({1}, {2001}) end)
+        check_rollback(function() box.space.test:delete_range({6}, {}) end)
+        check_rollback(function() box.space.test:delete_range({6}, {2001}) end)
+        check_rollback(function() box.space.test:delete_range({6}, {1501}) end)
+    end)
+end
+
+-- Test the range delete during background index build (using error injections).
+g.test_background_index_build_errinj = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
+        -- Create space with tuples.
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        for i = 1, 2000 do
+            s:replace{i}
+        end
+
+        -- Start the background index build and make us
+        -- able to check when the index build is finished.
+        local index_built = false
+        local index_builder = fiber.new(function()
+            s:create_index('sk')
+            index_built = true
+        end)
+        index_builder:set_joinable(true)
+        fiber.yield() -- Start the background index build.
+
+        -- Rollback a concurrent delete of a tuple range before and after the
+        -- build cursor, but advance the cursor further before the rollback:
+        -- 1. Create a fiber and wait till it yields on commit. The background
+        --    SK build cursor makes it further while the fiber waits for WAL.
+        -- 2. Make that fiber continue, but inject an error, so it fails to
+        --    commit. This will cause it to roll back. But the index build has
+        --    advanced its cursor since the on_replace has been fired for the
+        --    range delete, so now we roll back more deletes than we've applied
+        --    during the `memtx_build_on_replace`.
+        -- 3. Drop the injection so the background index build can successfully
+        --    commit itself and check that the range delete is rolled back
+        --    correctly.
+        local errinj = box.error.injection
+        local range_deleter = fiber.new(function()
+            t.assert_error_msg_content_equals('Failed to write to disk',
+                                              box.space.test.delete_range,
+                                              box.space.test, {6}, {1501})
+        end)
+        range_deleter:set_joinable(true)
+        -- Let the fiber do the range delete and start commit.
+        fiber.yield()
+        -- Make the fiber fail to commit and roll back.
+        -- Don't complete the index build yet.
+        errinj.set('ERRINJ_BUILD_INDEX_DELAY', true)
+        errinj.set('ERRINJ_WAL_WRITE', true)
+        range_deleter:join()
+
+        -- Let the SK build end successfully.
+        assert(not index_built)
+        errinj.set('ERRINJ_BUILD_INDEX_DELAY', false)
+        errinj.set('ERRINJ_WAL_WRITE', false)
+        local ok, err = index_builder:join()
+        t.assert(ok, err)
+        t.assert(index_built)
+
+        -- Check the resulting SK contents (should match with PK).
+        t.assert_equals(s.index.sk:select(), s.index.pk:select())
+    end)
+end
+
 local g_mvcc = t.group('delete_range-mvcc')
 
 g_mvcc.before_all(function(cg)
