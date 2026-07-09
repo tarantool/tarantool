@@ -2866,27 +2866,36 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 {
 	struct memtx_stmt_rollback_info *undo =
 		(typeof(undo))stmt->engine_savepoint;
-	struct tuple *old_tuple = undo->old_tuple;
+	struct memtx_tuple_list *old_tuples = undo->old_tuples;
 	struct tuple *new_tuple = undo->new_tuple;
 	if (!stmt->txn->is_schema_changed && stmt->txn->psn == 0)
 		return;
 	if (stmt->space->def->opts.is_ephemeral ||
-	    (old_tuple == NULL && new_tuple == NULL))
+	    (old_tuples == NULL && new_tuple == NULL))
 		return;
+	struct tuple *old_tuple;
 	for (size_t i = 0; i < stmt->space->index_count; i++) {
 		struct tuple *unused;
-		if (memtx_index_replace(stmt->space->index[i], new_tuple,
-					old_tuple, DUP_REPLACE_OR_INSERT,
-					&unused, &unused) != 0) {
-			panic("failed to rebind story in index on "
-			      "rollback of statement without story");
-		}
+		/*
+		 * It's either <= 1 in old_tuples or no new new_tuple
+		 * (see a comment in the memtx_engine_rollback_statement).
+		 */
+		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
+			if (memtx_index_replace(stmt->space->index[i],
+						new_tuple, old_tuple,
+						DUP_REPLACE_OR_INSERT,
+						&unused, &unused) != 0) {
+				panic("failed to rebind story in index on "
+				      "rollback of statement without story");
+			}
+		});
 	}
 	/* We have no stories here so reference bare tuples instead. */
+	memtx_tuple_list_foreach(old_tuples, old_tuple, {
+		tuple_ref(old_tuple);
+	});
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
-	if (old_tuple != NULL)
-		tuple_ref(old_tuple);
 }
 
 void
