@@ -42,6 +42,8 @@
 #include "xlog.h"
 #include "salad/stailq.h"
 #include "sysalloc.h"
+#include "trivia/util.h"
+#include "tuple.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -54,7 +56,6 @@ struct info_handler;
 struct iterator;
 struct fiber;
 struct read_view_tuple;
-struct tuple;
 struct tuple_format;
 struct memtx_tx_snapshot_cleaner;
 
@@ -180,6 +181,65 @@ struct memtx_engine {
 		struct memtx_sort_data_reader *sort_data_reader;
 	} recovery;
 };
+
+/**
+ * Structure which contains pointers to the tuples,
+ * that are used in rollback.
+ */
+struct memtx_stmt_rollback_info {
+	/* The deleted tuple (NULL if no tuple deleted).*/
+	struct tuple *old_tuple;
+	/* The inserted tuple (NULL if no tuple inserted). */
+	struct tuple *new_tuple;
+};
+
+/**
+ * Allocate and zero-initialize a rollback info on the region.
+ */
+static inline struct memtx_stmt_rollback_info *
+memtx_stmt_rollback_info_new(struct region *region)
+{
+	struct memtx_stmt_rollback_info *undo =
+		xregion_alloc_object(region, typeof(*undo));
+	memset(undo, 0, sizeof(*undo));
+	return undo;
+}
+
+/**
+ * Unref the tuples referenced by the rollback info.
+ */
+static inline void
+memtx_stmt_rollback_info_delete(struct memtx_stmt_rollback_info *undo)
+{
+	if (undo->old_tuple != NULL)
+		tuple_unref(undo->old_tuple);
+	if (undo->new_tuple != NULL)
+		tuple_unref(undo->new_tuple);
+}
+
+/**
+ * Add a deleted tuple to the rollback info.
+ */
+static inline void
+memtx_stmt_rollback_info_add_old_tuple(struct memtx_stmt_rollback_info *undo,
+				       struct tuple *old_tuple)
+{
+	assert(undo->old_tuple == NULL);
+	undo->old_tuple = old_tuple;
+	tuple_ref(old_tuple);
+}
+
+/**
+ * Set the new tuple in the rollback info.
+ */
+static inline void
+memtx_stmt_rollback_info_set_new_tuple(struct memtx_stmt_rollback_info *undo,
+				       struct tuple *new_tuple)
+{
+	assert(undo->new_tuple == NULL);
+	undo->new_tuple = new_tuple;
+	tuple_ref(new_tuple);
+}
 
 struct memtx_gc_task;
 
