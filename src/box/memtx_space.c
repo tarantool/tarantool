@@ -1323,36 +1323,55 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 
 	/* The trigger is fired and will be deleted - remove from the state. */
 	rlist_del_entry(trigger, in_state);
-	/*
-	 * Old tuple's format is valid if it exists.
-	 */
 	assert(stmt != NULL);
-	assert(stmt->old_tuple == NULL ||
-	       memtx_tuple_validate(state->format, stmt->old_tuple) == 0);
 
 	struct tuple *delete = NULL;
 	struct tuple *successor = NULL;
-	/*
-	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
-	 * with a duplicate at a unique index, this trigger would not be called.
-	 */
-	state->rc = memtx_index_replace(state->index, stmt->new_tuple,
-					stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-					&delete, &successor);
-	if (state->rc != 0) {
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
+
+	struct memtx_stmt_rollback_info *undo =
+		(typeof(undo))stmt->engine_savepoint;
+	struct tuple *old_tuple;
+	memtx_tuple_list_foreach_or_null(undo->old_tuples, old_tuple, {
+		struct tuple *cmp_tuple = undo->new_tuple != NULL ?
+					  undo->new_tuple : old_tuple;
+		/*
+		 * Only rollback the already built part of an index. In case of
+		 * a range delete, this can be more tuples than deleted in the
+		 * `memtx_build_on_replace` if the build cursor has advanced
+		 * after the range delete and before this rollback, so we check
+		 * all deleted tuples again.
+		 */
+		if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple,
+				  HINT_NONE, state->cmp_def) < 0)
+			continue;
+		/* Old tuple's format is valid if it exists. */
+		assert(old_tuple == NULL ||
+		       memtx_tuple_validate(state->format, old_tuple) == 0);
+		/*
+		 * Use DUP_REPLACE_OR_INSERT mode because if we tried to
+		 * replace a tuple with a duplicate at a unique index,
+		 * this trigger would not be called.
+		 */
+		state->rc = memtx_index_replace(state->index,
+						undo->new_tuple, old_tuple,
+						DUP_REPLACE_OR_INSERT,
+						&delete, &successor);
+		if (state->rc != 0) {
+			diag_move(diag_get(), &state->diag);
+			return 0;
+		}
+	});
 	/*
 	 * All tuples stored in a memtx space are
 	 * referenced by the primary index. That is
 	 * why we need to ref new tuple and unref old tuple.
 	 */
 	if (state->index->def->iid == 0) {
-		if (stmt->old_tuple != NULL)
-			tuple_ref(stmt->old_tuple);
-		if (stmt->new_tuple != NULL)
-			tuple_unref(stmt->new_tuple);
+		memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+			tuple_ref(old_tuple);
+		});
+		if (undo->new_tuple != NULL)
+			tuple_unref(undo->new_tuple);
 	}
 
 	return 0;
@@ -1378,45 +1397,54 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 	struct memtx_ddl_state *state = trigger->data;
 	struct txn_stmt *stmt = (struct txn_stmt *)event;
 
-	struct tuple *cmp_tuple = stmt->new_tuple != NULL ? stmt->new_tuple :
-							    stmt->old_tuple;
-	/*
-	 * Only update the already built part of an index. All the other
-	 * tuples will be inserted when build continues.
-	 */
-	if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple, HINT_NONE,
-			  state->cmp_def) < 0)
-		return 0;
+	struct memtx_stmt_rollback_info *undo =
+		(typeof(undo))stmt->engine_savepoint;
+	struct tuple *old_tuple;
+	bool replaced_in_built_range = false;
+	memtx_tuple_list_foreach_or_null(undo->old_tuples, old_tuple, {
+		struct tuple *cmp_tuple = undo->new_tuple != NULL ?
+					  undo->new_tuple : old_tuple;
+		/*
+		 * Only update the already built part of an index. All the
+		 * other tuples will be inserted when build continues.
+		 */
+		if (tuple_compare(state->cursor, HINT_NONE, cmp_tuple,
+				  HINT_NONE, state->cmp_def) < 0)
+			continue;
 
-	if (stmt->new_tuple != NULL &&
-	    memtx_tuple_validate(state->format, stmt->new_tuple) != 0) {
-		state->rc = -1;
-		diag_move(diag_get(), &state->diag);
-		return 0;
-	}
+		replaced_in_built_range = true;
+		if (undo->new_tuple != NULL &&
+		    memtx_tuple_validate(state->format, undo->new_tuple) != 0) {
+			state->rc = -1;
+			diag_move(diag_get(), &state->diag);
+			return 0;
+		}
 
-	struct tuple *delete = NULL;
-	enum dup_replace_mode mode =
-		state->index->def->opts.is_unique ? DUP_INSERT :
-						    DUP_REPLACE_OR_INSERT;
-	struct tuple *successor;
-	state->rc = memtx_index_replace(state->index, stmt->old_tuple,
-					stmt->new_tuple, mode, &delete,
-					&successor);
-	if (state->rc != 0) {
-		diag_move(diag_get(), &state->diag);
+		struct tuple *delete = NULL;
+		enum dup_replace_mode mode = state->index->def->opts.is_unique ?
+					     DUP_INSERT : DUP_REPLACE_OR_INSERT;
+		struct tuple *successor;
+		state->rc = memtx_index_replace(state->index, old_tuple,
+						undo->new_tuple, mode,
+						&delete, &successor);
+		if (state->rc != 0) {
+			diag_move(diag_get(), &state->diag);
+			return 0;
+		}
+	});
+	if (!replaced_in_built_range)
 		return 0;
-	}
 	/*
 	 * All tuples stored in a memtx space are
 	 * referenced by the primary index. That is
 	 * why we need to ref new tuple and unref old tuple.
 	 */
 	if (state->index->def->iid == 0) {
-		if (stmt->new_tuple != NULL)
-			tuple_ref(stmt->new_tuple);
-		if (stmt->old_tuple != NULL)
-			tuple_unref(stmt->old_tuple);
+		if (undo->new_tuple != NULL)
+			tuple_ref(undo->new_tuple);
+		memtx_tuple_list_foreach(undo->old_tuples, old_tuple, {
+			tuple_unref(old_tuple);
+		});
 	}
 	/*
 	 * Set on_rollback trigger on stmt to avoid
