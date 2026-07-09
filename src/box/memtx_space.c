@@ -699,6 +699,82 @@ out:
 }
 
 /**
+ * Implementation of range delete.
+ */
+static int
+memtx_space_execute_delete_range(struct space *space, struct txn *txn,
+				 struct request *request)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	/*
+	 * It might so happen that during WAL recovery secondary indexes of the
+	 * space are not yet built (it's been deyaled up until the recovery has
+	 * finished). So we won't be able to use SKs for delete. It might change
+	 * in the future but let's only support range delete through primary key
+	 * for now.
+	 */
+	if (request->index_id != 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Engine 'memtx'",
+			 "delete_range() on secondary index");
+		return -1;
+	}
+	struct index *pk = index_find(space, request->index_id);
+	if (pk == NULL)
+		return -1;
+	const char *begin_key = request->begin_key;
+	const char *end_key = request->end_key;
+	uint32_t begin_part_count = mp_decode_array(&begin_key);
+	uint32_t end_part_count = mp_decode_array(&end_key);
+	if (delete_range_validate(pk->def, begin_key, begin_part_count,
+				  end_key, end_part_count) != 0)
+		return -1;
+
+	/* Find and delete the tuples. */
+	int rc = -1;
+	struct iterator *it = index_create_iterator(pk, ITER_GE, begin_key,
+						    begin_part_count);
+	if (it == NULL)
+		return -1;
+	struct region *region = tx_region_acquire(txn);
+	struct memtx_stmt_rollback_info *undo =
+		memtx_stmt_rollback_info_new(region);
+	while (true) {
+		struct tuple *old_index_tuple;
+		if (iterator_next_internal(it, &old_index_tuple) != 0)
+			goto end;
+
+		/* Up to the end if end key part count is 0. */
+		if (old_index_tuple == NULL ||
+		    (end_part_count != 0 &&
+		     tuple_compare_with_key(old_index_tuple, HINT_NONE, end_key,
+					    end_part_count, HINT_NONE,
+					    pk->def->key_def) >= 0))
+			break;
+
+		/* Delete the tuple. */
+		struct tuple *deleted;
+		if (memtx_space->replace(space, old_index_tuple, NULL,
+					 DUP_REPLACE_OR_INSERT,
+					 &deleted) != 0)
+			goto end;
+		assert(deleted == old_index_tuple);
+		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple,
+						       region);
+		tuple_unref(deleted); /* Unref the "result" as not used. */
+	}
+	iterator_delete(it);
+	rc = 0;
+
+end:
+	/* Set the rollback info. */
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (undo->old_tuples != NULL)
+		stmt->engine_savepoint = undo;
+	return rc;
+}
+
+/**
  * This function simply creates new memtx tuple, refs it and calls space's
  * replace function. In constrast to original memtx_space_execute_replace(), it
  * doesn't handle any transaction routine.
@@ -1602,7 +1678,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_update = */ memtx_space_execute_update,
 	/* .execute_upsert = */ memtx_space_execute_upsert,
 	/* .execute_insert_arrow = */ generic_space_execute_insert_arrow,
-	/* .execute_delete_range = */ generic_space_execute_delete_range,
+	/* .execute_delete_range = */ memtx_space_execute_delete_range,
 	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
 	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
 	/* .ephemeral_rowid_next = */ memtx_space_ephemeral_rowid_next,
