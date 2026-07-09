@@ -354,7 +354,8 @@ memtx_set_replace_rollback_info(struct txn_stmt *stmt,
 	struct memtx_stmt_rollback_info *undo =
 		memtx_stmt_rollback_info_new(region);
 	if (old_index_tuple != NULL)
-		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple);
+		memtx_stmt_rollback_info_add_old_tuple(undo, old_index_tuple,
+						       region);
 	if (new_index_tuple != NULL)
 		memtx_stmt_rollback_info_set_new_tuple(undo, new_index_tuple);
 	stmt->engine_savepoint = undo;
