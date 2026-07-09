@@ -107,3 +107,59 @@ g.test_force_recovery_ignores_delete_for_lost_tuple = function(cg)
         t.assert_equals(box.space.test:select(), {})
     end)
 end
+
+-- https://bugs.launchpad.net/tarantool/+bug/1052018: a duplicate key error
+-- while replaying an xlog must not stop recovery under force_recovery. The
+-- error is logged and the conflicting row is skipped, so the row recovered
+-- from the earlier (authoritative) xlog wins.
+--
+-- Two xlogs carrying inserts for the same keys are produced by writing the
+-- first pair, moving that xlog aside, writing a conflicting pair (which lands
+-- in a different xlog since recovery advanced the vclock past the missing
+-- one), and then restoring the first xlog next to the second.
+g.test_force_recovery_ignores_duplicate_key = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+        box.snapshot()
+    end)
+
+    -- The xlog opened by the snapshot holds the first pair of inserts.
+    local lsn = cg.server:exec(function() return box.info.lsn end)
+    local wal = fio.pathjoin(cg.server.workdir,
+                             string.format('%020d.xlog', lsn))
+    cg.server:exec(function()
+        box.space.test:insert({1, 'first tuple'})
+        box.space.test:insert({2, 'second tuple'})
+    end)
+
+    -- Move the first xlog aside.
+    cg.server:stop()
+    t.assert_equals(#fio.glob(wal), 1, 'the first xlog exists')
+    local wal_saved = wal:gsub('%.xlog$', '_old.xlog')
+    fio.rename(wal, wal_saved)
+
+    -- Recover without it and write a conflicting pair for the same keys.
+    cg.server:start()
+    cg.server:exec(function()
+        box.space.test:insert({1, 'third tuple'})
+        box.space.test:insert({2, 'fourth tuple'})
+    end)
+    cg.server:stop()
+
+    -- The conflicting inserts must have landed in a different xlog, otherwise
+    -- restoring the first one below would just overwrite them and there would
+    -- be no conflict to recover from.
+    t.assert_equals(#fio.glob(wal), 0, 'the conflicting inserts went elsewhere')
+    fio.rename(wal_saved, wal)
+
+    -- Recovery replays the restored xlog first, then hits the duplicate keys
+    -- in the other one and, thanks to force_recovery, skips them.
+    cg.server:start()
+    t.assert(cg.server:grep_log('Duplicate key exists in unique index'))
+    cg.server:exec(function()
+        t.assert_equals(box.space.test:get({1}), {1, 'first tuple'})
+        t.assert_equals(box.space.test:get({2}), {2, 'second tuple'})
+        t.assert_equals(box.space.test:len(), 2)
+    end)
+end
