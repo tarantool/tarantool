@@ -704,15 +704,13 @@ local function test_box_delete_range(test, module)
     test:ok(box.stat().DELETE_RANGE.total == 0, "stats: 0")
 
     -- Test range delete in MemTX.
-    local memtx_err_msg = "memtx does not support range delete"
-    local _, err_msg = pcall(module.box_delete_range, box.space.test.id)
-    test:like(err_msg, memtx_err_msg, "memtx: failure")
+    test:is(module.box_delete_range(box.space.test.id), nil, "memtx: success")
     test:ok(box.stat().DELETE_RANGE.total == 1, "stats: 1")
 
     -- Test range delete in Vinyl.
     local vinyl_space = box.schema.space.create("vinyl", {engine = "vinyl"})
     local vinyl_err_msg = "vinyl does not support range delete"
-    _, err_msg = pcall(module.box_delete_range, vinyl_space.id)
+    local _, err_msg = pcall(module.box_delete_range, vinyl_space.id)
     test:like(err_msg, vinyl_err_msg, "vinyl: failure")
     test:ok(box.stat().DELETE_RANGE.total == 2, "stats: 2")
 
