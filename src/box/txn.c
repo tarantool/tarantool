@@ -702,7 +702,8 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 *   doesn't find any rows
 	 */
 	if (stmt->space != NULL && stmt->space->run_triggers &&
-	    (stmt->old_tuple || stmt->new_tuple)) {
+	    (stmt->old_tuple || stmt->new_tuple ||
+	     stmt->type == IPROTO_DELETE_RANGE)) {
 		if (space_has_on_replace_triggers(stmt->space)) {
 			txn->space_on_replace_triggers_depth++;
 			int rc = space_on_replace(stmt->space, stmt);
