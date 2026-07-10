@@ -25,6 +25,19 @@ local function newest_xlog(cg)
     return xlogs[#xlogs]
 end
 
+local function read_file(path)
+    local fh = fio.open(path, {'O_RDONLY'})
+    local data = fh:read()
+    fh:close()
+    return data
+end
+
+local function write_file(path, data)
+    local fh = fio.open(path, {'O_WRONLY', 'O_CREAT', 'O_TRUNC'})
+    fh:write(data)
+    fh:close()
+end
+
 -- The first write creates the WAL: a fresh bootstrap leaves only the snapshot,
 -- and the first DML opens the initial xlog.
 --
@@ -160,4 +173,52 @@ g.test_snap_inprogress_is_ignored = function(cg)
         t.assert_equals(box.space.tweedledum:get({1}), {1})
         t.assert_equals(box.space.tweedledum:get({2}), nil)
     end, {baseline_lsn})
+end
+
+-- gh-4033: tarantool must cope with huge LSNs.
+--
+-- NB: There is no public API to jump the LSN, so inject one by rewriting the
+-- vclock in an xlog's file header.
+--
+-- Check that DML, box.snapshot(), recovery all work after a huge LSN.
+g.test_recovery_with_huge_lsn = function(cg)
+    cg.server = server:new()
+    cg.server:start()
+
+    -- :start() already wrote a first operation, so a new xlog file is written
+    -- on :stop(). Look for a comment in test_clean_shutdown_opens_new_xlog
+    -- above for details.
+    local lsn = cg.server:exec(function() return box.info.lsn end)
+    t.assert_gt(lsn, 0)
+    cg.server:stop()
+
+    -- Replace the vclock in the xlog file header and rename the file
+    -- accordingly.
+    local new_lsn = 123456789123
+    local old_wal = xlog_at(cg, lsn)
+    local new_wal = xlog_at(cg, new_lsn)
+    local data, n = read_file(old_wal):gsub(
+        ('VClock: {1: %d}'):format(lsn),
+        ('VClock: {1: %d}'):format(new_lsn))
+    t.assert_equals(n, 1, 'the VClock header line was found and rewritten')
+    write_file(new_wal, data)
+    fio.unlink(old_wal)
+
+    cg.server:start()
+    cg.server:exec(function(lsn)
+        -- Verify that recovery correctly reads the injected vclock.
+        t.assert_equals(box.info.lsn, lsn)
+
+        -- Verify a write after a huge LSN.
+        box.space._schema:delete('dummy')
+
+        -- Verify creating a snapshot after a huge LSN.
+        box.snapshot()
+    end, {new_lsn})
+
+    -- Verify recovery from a snapshot after a huge LSN.
+    cg.server:restart()
+    cg.server:exec(function(lsn)
+        t.assert_equals(box.info.lsn, lsn + 1)
+    end, {new_lsn})
 end
