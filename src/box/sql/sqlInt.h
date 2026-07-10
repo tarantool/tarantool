@@ -2736,13 +2736,9 @@ sqlAddPrimaryKey(struct Parse *parse);
 void
 sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
 
-/** Add a default literal to the last created column. */
+/** Add a DEFAULT clause to the last created column. */
 void
-sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span);
-
-/** Add a default expression to the last created column. */
-void
-sql_add_func_default(struct Parse *parser, struct ExprSpan *span);
+sql_column_add_default(struct Parse *parser, struct ExprSpan *expr_span);
 
 void sqlAddCollateType(Parse *, Token *);
 

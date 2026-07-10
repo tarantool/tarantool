@@ -290,20 +290,17 @@ carglist ::= .
 %type cconsname { struct Token }
 cconsname(N) ::= CONSTRAINT nm(X). { N = X; }
 cconsname(N) ::= . { N = Token_nil; }
-ccons ::= DEFAULT term(X).            {sql_add_term_default(pParse, &X);}
-ccons ::= DEFAULT LP expr(X) RP.      {
-  if (sql_expr_is_term(X.pExpr))
-    sql_add_term_default(pParse, &X);
-  else
-    sql_add_func_default(pParse, &X);
-}
-ccons ::= DEFAULT PLUS number(X).     {sql_add_term_default(pParse, &X);}
-ccons ::= DEFAULT MINUS(A) number(X). {
-  ExprSpan v;
-  v.pExpr = sqlPExpr(pParse, TK_UMINUS, X.pExpr, 0);
-  v.zStart = A.z;
-  v.zEnd = X.zEnd;
-  sql_add_term_default(pParse, &v);
+
+/**
+ * Rule precedence [COLLATE] forces the parser to reduce this rule rather
+ * than shift a follow-up NOT or COLLATE token into the expression: the
+ * token NOT come earlier in the precedence table than COLLATE,
+ * and COLLATE itself is %left - so both shift-reduce conflicts
+ * with `expr NOT ...` / `expr COLLATE ...` resolve as reduce, and the
+ * tokens go to the next ccons instead.
+ */
+ccons ::= DEFAULT expr(X). [COLLATE] {
+  sql_column_add_default(pParse, &X);
 }
 
 // In addition to the type name, we also care about the primary key and
@@ -894,8 +891,6 @@ idlist(A) ::= nm(Y). {
 %destructor expr {sql_expr_delete($$.pExpr);}
 %type term {ExprSpan}
 %destructor term {sql_expr_delete($$.pExpr);}
-%type number {ExprSpan}
-%destructor number {sql_expr_delete($$.pExpr);}
 
 %include {
   /* This is a utility routine used to set the ExprSpan.zStart and
@@ -977,10 +972,9 @@ term(A) ::= STRING(X).     {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= FALSE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= TRUE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 term(A) ::= UNKNOWN(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
-term(A) ::= number(A).
-number(A) ::= FLOAT(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
-number(A) ::= DECIMAL(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
-number(A) ::= INTEGER(X). {
+term(A) ::= FLOAT(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= DECIMAL(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= INTEGER(X). {
   A.pExpr = sql_expr_new_dequoted(TK_INTEGER, &X);
   A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
