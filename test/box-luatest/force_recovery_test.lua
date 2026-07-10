@@ -163,3 +163,54 @@ g.test_force_recovery_ignores_duplicate_key = function(cg)
         t.assert_equals(box.space.test:len(), 2)
     end)
 end
+
+-- A header-less xlog at the current vclock (e.g. a write torn by a crash) must
+-- not abort recovery under force_recovery: the corrupt xlog is renamed aside, a
+-- fresh one takes its place and the data written before it is recovered. The
+-- server stays writable. Without force_recovery it refuses to start with
+-- "Unexpected end of file".
+g.test_force_recovery_ignores_xlog_without_header = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+        s:insert({1, 'first tuple'})
+    end)
+
+    -- A clean stop opens an xlog with a header but without operations.
+    -- Save the LSN to find the xlog file below. Stop the server.
+    local lsn = cg.server:exec(function() return box.info.lsn end)
+    local wal = fio.pathjoin(cg.server.workdir,
+                             string.format('%020d.xlog', lsn))
+    cg.server:stop()
+    t.assert_equals(#fio.glob(wal), 1, 'the xlog without operations exists')
+
+    -- Truncate the last xlog to zero bytes so it has no header at all.
+    -- Imitate a failed write to disk.
+    local fh = fio.open(wal, {'O_WRONLY', 'O_TRUNC'})
+    fh:close()
+    t.assert_equals(fio.stat(wal).size, 0, 'the xlog is now header-less')
+
+    -- Self-check: the normal recovery doesn't tolerate such a broken xlog file.
+    -- The header-less xlog aborts startup.
+    cg.server.box_cfg.force_recovery = false
+    cg.server:start({wait_until_ready = false})
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log('Unexpected end of file'))
+        t.assert_not(cg.server.process:is_alive())
+    end)
+    cg.server:stop()
+
+    -- With force_recovery the corrupt xlog is renamed aside, a fresh one takes
+    -- its place and the data written before it is recovered.
+    cg.server.box_cfg.force_recovery = true
+    cg.server:start()
+    t.assert(cg.server:grep_log('renaming corrupted'))
+
+    -- The tuple written before the corrupt xlog is recovered and the server
+    -- accepts new writes.
+    cg.server:exec(function()
+        t.assert_equals(box.space.test:get({1}), {1, 'first tuple'})
+        box.space.test:insert({2, 'second tuple'})
+        t.assert_equals(box.space.test:len(), 2)
+    end)
+end
