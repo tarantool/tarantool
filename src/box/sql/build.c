@@ -494,7 +494,7 @@ sql_expr_uint(const struct Expr *expr, uint64_t *res)
 	return errno == 0 ? 0 : -1;
 }
 
-void
+static void
 sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 {
 	assert(parser->create_column_def.space != NULL);
@@ -533,9 +533,21 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		break;
 	}
 	case FIELD_TYPE_DOUBLE: {
+		const char *str;
+		if (expr->op == TK_UMINUS) {
+			assert(expr->pLeft != NULL &&
+			       expr->pLeft->op == TK_FLOAT);
+			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
+		} else if (expr->op == TK_UPLUS) {
+			assert(expr->pLeft != NULL &&
+			       expr->pLeft->op == TK_FLOAT);
+			str = expr->pLeft->u.zToken;
+		} else {
+			assert(expr->op == TK_FLOAT);
+			str = expr->u.zToken;
+		}
 		double val;
-		sqlAtoF(expr_span->zStart, &val,
-			expr_span->zEnd - expr_span->zStart);
+		sqlAtoF(str, &val, strlen(str));
 		assert(!sqlIsNaN(val));
 		size = mp_sizeof_double(val);
 		buf = xregion_alloc(region, size);
@@ -543,8 +555,19 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		break;
 	}
 	case FIELD_TYPE_DECIMAL: {
-		const char *str = tt_cstr(expr_span->zStart,
-					  expr_span->zEnd - expr_span->zStart);
+		const char *str;
+		if (expr->op == TK_UMINUS) {
+			assert(expr->pLeft != NULL &&
+			       expr->pLeft->op == TK_DECIMAL);
+			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
+		} else if (expr->op == TK_UPLUS) {
+			assert(expr->pLeft != NULL &&
+			       expr->pLeft->op == TK_DECIMAL);
+			str = expr->pLeft->u.zToken;
+		} else {
+			assert(expr->op == TK_DECIMAL);
+			str = expr->u.zToken;
+		}
 		decimal_t val;
 		if (decimal_from_string(&val, str) == NULL) {
 			diag_set(ClientError, ER_INVALID_DEC, str);
@@ -573,6 +596,11 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 				 tt_sprintf("%s%s", "-", str));
 			parser->is_aborted = true;
 			break;
+		}
+		if (expr->op == TK_UPLUS) {
+			assert(expr->pLeft != NULL &&
+			       expr->pLeft->op == TK_INTEGER);
+			expr = expr->pLeft;
 		}
 		uint64_t val;
 		if (sql_expr_uint(expr, &val) == 0) {
@@ -1226,7 +1254,7 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeCountChanges(v);
 }
 
-void
+static void
 sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
 {
 	assert(parser->create_column_def.space != NULL);
@@ -1256,6 +1284,27 @@ sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
 	parser->default_funcs = sql_xrealloc(parser->default_funcs, size);
 	parser->default_funcs[id].fieldno = fieldno;
 	parser->default_funcs[id].reg_func_id = reg_id;
+}
+
+static bool
+sql_expr_is_number_term(const struct Expr *expr)
+{
+	return expr->op == TK_INTEGER || expr->op == TK_FLOAT ||
+	       expr->op == TK_DECIMAL;
+}
+
+void
+sql_column_add_default(struct Parse *parser, struct ExprSpan *expr_span)
+{
+	struct Expr *expr = expr_span->pExpr;
+	if (sql_expr_is_term(expr))
+		sql_add_term_default(parser, expr_span);
+	else if (expr->op == TK_UPLUS && sql_expr_is_number_term(expr->pLeft))
+		sql_add_term_default(parser, expr_span);
+	else if (expr->op == TK_UMINUS && sql_expr_is_number_term(expr->pLeft))
+		sql_add_term_default(parser, expr_span);
+	else
+		sql_add_func_default(parser, expr_span);
 }
 
 /**

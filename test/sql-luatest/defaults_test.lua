@@ -104,132 +104,100 @@ g.test_sql_expr_default_func = function()
     end)
 end
 
-g.test_only_numbers_with_signs = function()
+-- Make sure that numeric values with sign are encoded as the literal defaults.
+g.test_numbers_with_signs = function()
     g.server:exec(function()
-        -- Make sure STRING literal with '-' before it cannot be the default.
-        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -'a');]]
-        local res, err = box.execute(sql)
-        local exp = [[Syntax error at line 1 near ''a'']]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure STRING literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +'a');]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure NULL literal with '-' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -NULL);]]
-        res, err = box.execute(sql)
-        exp = [[At line 1 at or near position 50: keyword 'NULL' is ]]..
-              [[reserved. Please use double quotes if 'NULL' is an identifier.]]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure NULL literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +NULL);]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure UNKNOWN literal with '-' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -unknown);]]
-        res, err = box.execute(sql)
-        exp = [[At line 1 at or near position 50: keyword 'unknown' is ]]..
-              [[reserved. Please use double quotes if 'unknown' is an ]]..
-              [[identifier.]]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure UNKNOWN literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +unknown);]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure VARBINARY literal with '-' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -x'aa');]]
-        res, err = box.execute(sql)
-        exp = [[Syntax error at line 1 near 'x'aa'']]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure VARBINARY literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +x'aa');]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure TRUE literal with '-' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -true);]]
-        res, err = box.execute(sql)
-        exp = [[At line 1 at or near position 50: keyword 'true' is ]]..
-              [[reserved. Please use double quotes if 'true' is an identifier.]]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure TRUE literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +true);]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure FALSE literal with '-' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -false);]]
-        res, err = box.execute(sql)
-        exp = [[At line 1 at or near position 50: keyword 'false' is ]]..
-              [[reserved. Please use double quotes if 'false' is an ]]..
-              [[identifier.]]
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure FALSE literal with '+' before it cannot be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +false);]]
-        res, err = box.execute(sql)
-        t.assert(res == nil);
-        t.assert_equals(err.message, exp)
-
-        -- Make sure INTEGER literal with '-' before it can be the default.
-        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -1);]]
+        local decimal = require('decimal')
+        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -1);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1}})
+        t.assert_equals(box.space.t:format()[2].default, -1)
         box.execute([[DROP TABLE t;]])
 
-        -- Make sure INTEGER literal with '+' before it can be the default.
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (-1));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1}})
+        t.assert_equals(box.space.t:format()[2].default, -1)
+        box.execute([[DROP TABLE t;]])
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (+1));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1}})
+        t.assert_equals(box.space.t:format()[2].default, 1)
+        box.execute([[DROP TABLE t;]])
+
         sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +1);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1}})
+        t.assert_equals(box.space.t:format()[2].default, 1)
         box.execute([[DROP TABLE t;]])
 
-        -- Make sure DOUBLE literal with '-' before it can be the default.
         sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -1.1e0);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1.1}})
+        t.assert_equals(box.space.t:format()[2].default, -1.1)
+        t.assert_equals(type(box.space.t:format()[2].default), 'number')
         box.execute([[DROP TABLE t;]])
 
-        -- Make sure DOUBLE literal with '+' before it can be the default.
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (-1.1e0));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1.1}})
+        t.assert_equals(box.space.t:format()[2].default, -1.1)
+        t.assert_equals(type(box.space.t:format()[2].default), 'number')
+        box.execute([[DROP TABLE t;]])
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (+1.1e0));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1.1}})
+        t.assert_equals(box.space.t:format()[2].default, 1.1)
+        t.assert_equals(type(box.space.t:format()[2].default), 'number')
+        box.execute([[DROP TABLE t;]])
+
         sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +1.1e0);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1.1}})
+        t.assert_equals(box.space.t:format()[2].default, 1.1)
+        t.assert_equals(type(box.space.t:format()[2].default), 'number')
         box.execute([[DROP TABLE t;]])
 
-        -- Make sure DECIMAL literal with '-' before it can be the default.
         sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT -1.1);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1.1}})
+        t.assert_equals(box.space.t:format()[2].default, -1.1)
+        t.assert(decimal.is_decimal(box.space.t:format()[2].default))
         box.execute([[DROP TABLE t;]])
 
-        -- Make sure DECIMAL literal with '+' before it can be the default.
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (-1.1));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{-1.1}})
+        t.assert_equals(box.space.t:format()[2].default, -1.1)
+        t.assert(decimal.is_decimal(box.space.t:format()[2].default))
+        box.execute([[DROP TABLE t;]])
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT (+1.1));]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        box.execute([[INSERT INTO t(i) VALUES (1);]])
+        t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1.1}})
+        t.assert_equals(box.space.t:format()[2].default, 1.1)
+        t.assert(decimal.is_decimal(box.space.t:format()[2].default))
+        box.execute([[DROP TABLE t;]])
+
         sql = [[CREATE TABLE t(i INT PRIMARY KEY, a ANY DEFAULT +1.1);]]
         t.assert_equals(box.execute(sql), {row_count = 1})
         box.execute([[INSERT INTO t(i) VALUES (1);]])
         t.assert_equals(box.execute([[SELECT a FROM t;]]).rows, {{1.1}})
+        t.assert_equals(box.space.t:format()[2].default, 1.1)
+        t.assert(decimal.is_decimal(box.space.t:format()[2].default))
         box.execute([[DROP TABLE t;]])
     end)
 end
@@ -253,7 +221,7 @@ g.test_new_func_defaults = function()
         box.execute(sql)
         local s = box.space.T
         local func = box.func.default_T_A
-        t.assert_equals(func.body, '9 * 7')
+        t.assert_equals(func.body, '(9 * 7)')
         t.assert_equals(s:format()[2].default_func, func.id)
         s:insert({1})
         t.assert_equals(s:select(), {{1, 63}})
@@ -261,5 +229,59 @@ g.test_new_func_defaults = function()
         t.assert_equals(s:select(), {{1, 63}, {2, 63}})
         s:drop()
         func:drop()
+    end)
+end
+
+--
+-- Make sure that function expressions are processed correctly when specified
+-- in the DEFAULT clause without parentheses.
+--
+g.test_func_defaults_without_parentheses = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE T(I INT PRIMARY KEY,
+                      A ANY DEFAULT 1 + 1, B ANY DEFAULT (1 + 1));]]
+        box.execute(sql)
+        local func_id_2 = box.space.T:format()[2].default_func
+        t.assert_equals(box.space._func:get{func_id_2}.body, '1 + 1')
+        local func_id_3 = box.space.T:format()[3].default_func
+        t.assert_equals(box.space._func:get{func_id_3}.body, '(1 + 1)')
+        box.space.T:drop()
+        box.schema.func.drop(func_id_2)
+        box.schema.func.drop(func_id_3)
+    end)
+end
+
+--
+-- Make sure that the NULL, NOT NULL, and COLLATE column properties do not cause
+-- an error when using the DEFAULT clause with these keywords.
+--
+g.test_func_defaults_with_null_and_collate = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE T(I INT PRIMARY KEY,
+                      A ANY DEFAULT 'a' COLLATE "unicode" COLLATE "unicode_ci",
+                      B ANY DEFAULT NULL IS NULL NULL,
+                      C ANY DEFAULT NULL NULL,
+                      D ANY DEFAULT NULL NOT NULL);]]
+        box.execute(sql)
+
+        local exp = box.space._collation.index.name:get{'unicode_ci'}.id;
+        t.assert_equals(box.space.T:format()[2].collation, exp)
+        t.assert_equals(box.space.T:format()[2].default, 'a')
+
+        local func_id = box.space.T:format()[3].default_func
+        t.assert_equals(box.space._func:get{func_id}.body, 'NULL IS NULL')
+        t.assert_equals(box.space.T:format()[3].is_nullable, true)
+
+        t.assert_equals(box.space.T:format()[4].is_nullable, true)
+
+        t.assert_equals(box.space.T:format()[5].is_nullable, false)
+
+        local exp_err = "Failed to execute SQL statement: " ..
+                        "NOT NULL constraint failed: T.D"
+        local _, err = box.execute([[INSERT INTO T(I) VALUES(1);]])
+        t.assert_equals(err.message, exp_err)
+
+        box.space.T:drop()
+        box.schema.func.drop(func_id)
     end)
 end
