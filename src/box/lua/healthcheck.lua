@@ -35,8 +35,17 @@ local health_checks = {
 
 -- {{{ Alert helpers
 
-local function alert_key(alert_code)
-    return alert_code:gsub(':', '.')
+local function sorted_keys(tbl)
+    local keys = {}
+    for key, _ in pairs(tbl) do
+        table.insert(keys, key)
+    end
+    table.sort(keys)
+    return keys
+end
+
+local function alert_key(alert_code, name)
+    return ('%s:%s'):format(alert_code, name):gsub(':', '.')
 end
 
 local function alert_message(kind, name, check)
@@ -57,7 +66,7 @@ local function set_alert(kind, name, message, code)
         return
     end
 
-    local key = alert_key(code)
+    local key = alert_key(code, name)
     local issued = health_checks[kind].alerts[name]
 
     if issued ~= nil and issued.message == message and issued.key == key then
@@ -94,12 +103,29 @@ local function unset_alert(kind, name)
     health_checks[kind].alerts[name] = nil
 end
 
+local function unset_alerts_by_prefix(kind, prefix)
+    assert(health_checks[kind] ~= nil)
+
+    local subchecks_prefix = prefix .. '.'
+    local alerts_to_unset = {}
+    for name, _ in pairs(health_checks[kind].alerts) do
+        if name == prefix or name:sub(1, #subchecks_prefix) ==
+           subchecks_prefix then
+            table.insert(alerts_to_unset, name)
+        end
+    end
+    for _, name in ipairs(alerts_to_unset) do
+        unset_alert(kind, name)
+    end
+end
+
 local function sync_alerts(kind, results, ok_status)
     assert(health_checks[kind] ~= nil)
 
     local failed = {}
 
-    for name, check in pairs(results) do
+    for _, name in ipairs(sorted_keys(results)) do
+        local check = results[name]
         if check.status ~= ok_status then
             failed[name] = true
             if check.alert_code ~= nil then
@@ -109,7 +135,7 @@ local function sync_alerts(kind, results, ok_status)
         end
     end
 
-    for name, _ in pairs(health_checks[kind].alerts) do
+    for _, name in ipairs(sorted_keys(health_checks[kind].alerts)) do
         if not failed[name] then
             unset_alert(kind, name)
         end
@@ -149,6 +175,7 @@ local HEALTHCHECK_OPTION_TYPES = {
     if_not_exists = 'boolean',
     alert = 'boolean',
     alert_code = 'string',
+    multi_result = 'boolean',
 }
 
 local LIVENESS_PROBE_TYPES = {
@@ -172,13 +199,16 @@ local function add_check(kind, name, fn, opts)
 
     if registry[name] == nil then
         local alert_code
-        if opts.alert ~= false then
+        local alert = opts.alert ~= false
+        if alert then
             alert_code = opts.alert_code or default_alert_code(kind, name)
         end
         registry[name] = {
             fn = fn,
+            alert = alert,
             alert_code = alert_code,
-            status = nil,
+            multi_result = opts.multi_result,
+            statuses = {},
         }
     end
 
@@ -196,26 +226,105 @@ local function remove_check(kind, name, opts)
         return false, ('health check %q does not exist'):format(name)
     end
 
-    unset_alert(kind, name)
+    unset_alerts_by_prefix(kind, name)
     registry[name] = nil
 
     return true
 end
 
-local function evaluate(check, ok_status, fail_status, use_degraded)
-    local fn = check.fn
-    local alert_code = check.alert_code
-    local function fail(reason)
-        local status = fail_status
-        if use_degraded and
-           (check.status == ok_status or check.status == 'degraded') then
-            status = 'degraded'
+local function full_check_name(name, subname)
+    return ('%s.%s'):format(name, subname)
+end
+
+local function check_alert_code(check, kind, name, item)
+    if not check.alert then
+        return nil
+    end
+    if type(item) == 'table' and type(item.alert_code) == 'string' then
+        return item.alert_code
+    end
+    if type(item) == 'table' then
+        return default_alert_code(kind, name)
+    end
+    return check.alert_code
+end
+
+local function check_fail_status(check, name, ok_status, fail_status,
+                                 use_degraded)
+    local status = fail_status
+    if use_degraded and
+       (check.statuses[name] == ok_status or check.statuses[name] ==
+        'degraded') then
+        status = 'degraded'
+    end
+    check.statuses[name] = status
+    return status
+end
+
+local function cleanup_check_statuses(check, prefix, active)
+    local subchecks_prefix = prefix .. '.'
+    for name, _ in pairs(check.statuses) do
+        if (name == prefix or name:sub(1, #subchecks_prefix) ==
+            subchecks_prefix) and not active[name] then
+            check.statuses[name] = nil
         end
-        check.status = status
+    end
+end
+
+local function validate_check_result_item(subname, item, ok_status,
+                                          fail_status, use_degraded)
+    if type(subname) ~= 'string' or subname == '' then
+        return 'health check result key must be a non-empty string'
+    end
+    if type(item) ~= 'table' then
+        return ('health check result %q must be a table'):format(subname)
+    end
+    if item.status ~= ok_status and item.status ~= fail_status and
+       (not use_degraded or item.status ~= 'degraded') then
+        return ('health check result %q must have status %q or %q'):
+               format(subname, ok_status, fail_status)
+    end
+    if item.reason ~= nil and type(item.reason) ~= 'string' then
+        return ('health check result %q reason must be a string'):
+               format(subname)
+    end
+    if item.alert_code ~= nil and type(item.alert_code) ~= 'string' then
+        return ('health check result %q alert_code must be a string'):
+               format(subname)
+    end
+    return nil
+end
+
+local function evaluate_check_result_item(check, kind, fullname, item,
+                                          ok_status, fail_status,
+                                          use_degraded, reason)
+    if reason ~= nil then
+        local status = check_fail_status(check, fullname, ok_status,
+                                         fail_status, use_degraded)
         return {
             status = status,
             reason = reason,
-            alert_code = alert_code,
+            alert_code = check_alert_code(check, kind, fullname, item),
+        }
+    end
+    check.statuses[fullname] = item.status
+    return {
+        status = item.status,
+        reason = item.reason,
+        alert_code = item.status ~= ok_status and
+                     check_alert_code(check, kind, fullname, item) or nil,
+    }
+end
+
+local function evaluate(check, kind, name, ok_status, fail_status, use_degraded)
+    local fn = check.fn
+    local function fail(reason)
+        local status = check_fail_status(check, name, ok_status, fail_status,
+                                         use_degraded)
+        return {
+            status = status,
+            reason = reason,
+            alert_code = check_alert_code(check, kind, name),
         }
     end
     local csw = fiber.self():csw()
@@ -230,12 +339,41 @@ local function evaluate(check, ok_status, fail_status, use_degraded)
     end
 
     if res == true then
-        check.status = ok_status
+        check.statuses[name] = ok_status
         return { status = ok_status }
     end
 
     if (res == false or res == nil) and type(reason) == 'string' then
         return fail(reason)
+    end
+
+    if type(res) == 'table' and check.multi_result then
+        local results = {}
+        local active = {}
+        if next(res) == nil then
+            check.statuses[name] = ok_status
+            active[name] = true
+            cleanup_check_statuses(check, name, active)
+            return {
+                [name] = { status = ok_status },
+            }
+        end
+        for subname, item in pairs(res) do
+            local fullname = name
+            if type(subname) == 'string' and subname ~= '' then
+                fullname = full_check_name(name, subname)
+            end
+            active[fullname] = true
+            local err = validate_check_result_item(subname, item, ok_status,
+                                                   fail_status, use_degraded)
+            results[fullname] = evaluate_check_result_item(check, kind,
+                                                           fullname, item,
+                                                           ok_status,
+                                                           fail_status,
+                                                           use_degraded, err)
+        end
+        cleanup_check_statuses(check, name, active)
+        return results
     end
 
     return fail('health check must return true or false, <string>')
@@ -246,7 +384,15 @@ local function evaluate_registry(kind, ok_status, fail_status, skip)
     local use_degraded = kind == 'readiness'
     for name, check in pairs(checks[kind]) do
         if skip == nil or not skip[name] then
-            res[name] = evaluate(check, ok_status, fail_status, use_degraded)
+            local check_res = evaluate(check, kind, name, ok_status,
+                                       fail_status, use_degraded)
+            if check_res.status ~= nil then
+                res[name] = check_res
+            else
+                for check_name, item in pairs(check_res) do
+                    res[check_name] = item
+                end
+            end
         end
     end
     return res

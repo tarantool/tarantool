@@ -82,6 +82,164 @@ g.test_role_health_check = function(g)
     })
 end
 
+g.test_role_health_check_result_map = function(g)
+    local one = [[
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+            health_check = function()
+                return {
+                    ['manager.main'] = rawget(_G, 'check_manager_main'),
+                    ['manager.archive'] = rawget(_G, 'check_manager_archive'),
+                }
+            end,
+        }
+    ]]
+    local verify = function()
+        local function set_manager(name, check)
+            rawset(_G, ('check_manager_%s'):format(name), check)
+        end
+
+        local function check_name(name)
+            return ('role.one.manager.%s'):format(name)
+        end
+
+        local function assert_alert(alert, name, reason, code)
+            t.assert_items_include(alert, {
+                type = 'warn',
+                message = ('Readiness health check %q failed: %s'):
+                          format(check_name(name), reason),
+                alert_code = code,
+            })
+        end
+
+        set_manager('main', {status = 'ready'})
+        set_manager('archive', {
+            status = 'not_ready',
+            reason = 'last backup is too old',
+            alert_code = 'backup.manager.archive.stale',
+        })
+
+        local health = box.info.health.readiness
+        t.assert_equals(health.checks[check_name('main')], {
+            status = 'ready',
+        })
+        t.assert_equals(health.checks[check_name('archive')], {
+            status = 'not_ready',
+            reason = 'last backup is too old',
+            alert_code = 'backup.manager.archive.stale',
+        })
+        t.assert_equals(health.status, false)
+        t.assert_equals(#box.info.config.alerts, 1)
+        assert_alert(box.info.config.alerts[1], 'archive',
+                     'last backup is too old',
+                     'backup.manager.archive.stale')
+
+        set_manager('main', {
+            status = 'not_ready',
+            reason = 'backup target is unavailable',
+            alert_code = 'backup.manager.unavailable',
+        })
+        set_manager('archive', {
+            status = 'not_ready',
+            reason = 'backup target is unavailable',
+            alert_code = 'backup.manager.unavailable',
+        })
+        t.assert_equals(#box.info.config.alerts, 2)
+
+        set_manager('main', {status = 'ready'})
+        health = box.info.health.readiness
+        t.assert_equals(health.checks[check_name('main')], {
+            status = 'ready',
+        })
+        t.assert_equals(health.checks[check_name('archive')], {
+            status = 'not_ready',
+            reason = 'backup target is unavailable',
+            alert_code = 'backup.manager.unavailable',
+        })
+        t.assert_equals(health.status, false)
+        t.assert_equals(#box.info.config.alerts, 1)
+        assert_alert(box.info.config.alerts[1], 'archive',
+                     'backup target is unavailable',
+                     'backup.manager.unavailable')
+
+        set_manager('archive', nil)
+        health = box.info.health.readiness
+        t.assert_equals(health.checks[check_name('archive')], nil)
+        t.assert_equals(box.info.health.readiness.status, true)
+        t.assert_equals(box.info.config.alerts, {})
+
+        set_manager('archive', {
+            status = 'not_ready',
+            reason = 'last backup is too old',
+            alert_code = 'backup.manager.archive.stale',
+        })
+        health = box.info.health.readiness
+        t.assert_equals(health.checks[check_name('archive')], {
+            status = 'not_ready',
+            reason = 'last backup is too old',
+            alert_code = 'backup.manager.archive.stale',
+        })
+        t.assert_equals(health.status, false)
+        t.assert_equals(#box.info.config.alerts, 1)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'},
+        },
+        verify = verify,
+    })
+end
+
+g.test_role_health_check_invalid_result_item = function(g)
+    local one = [[
+        return {
+            validate = function() end,
+            apply = function() end,
+            stop = function() end,
+            health_check = function()
+                return {
+                    ['manager.main'] = {
+                        status = 'bad',
+                        alert_code = 'backup.manager.main.bad',
+                    },
+                    [42] = {
+                        status = 'not_ready',
+                        reason = 'nameless',
+                    },
+                }
+            end,
+        }
+    ]]
+    local verify = function()
+        local checks = box.info.health.readiness.checks
+        t.assert_equals(checks['role.one.manager.main'], {
+            status = 'not_ready',
+            reason = 'health check result "manager.main" must have ' ..
+                     'status "ready" or "not_ready"',
+            alert_code = 'backup.manager.main.bad',
+        })
+        t.assert_equals(checks['role.one'], {
+            status = 'not_ready',
+            reason = 'health check result key must be a non-empty string',
+            alert_code = 'health.readiness.role.one',
+        })
+        t.assert_equals(box.info.health.readiness.status, false)
+        t.assert_equals(#box.info.config.alerts, 2)
+    end
+
+    helpers.success_case(g, {
+        roles = {one = one},
+        options = {
+            ['roles'] = {'one'},
+        },
+        verify = verify,
+    })
+end
+
 -- Make sure the role is loaded only once during each run.
 g.test_role_repeat_success = function(g)
     local one = [[

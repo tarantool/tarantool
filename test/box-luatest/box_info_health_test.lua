@@ -384,5 +384,24 @@ g.test_invalid_check_result = function(cg)
         })
 
         t.assert_equals(health.remove_health_check('invalid'), true)
+
+        t.assert_equals(health.add_health_check('invalid', function()
+            return {
+                app = {
+                    status = 'not_ready',
+                    reason = 'failed',
+                },
+            }
+        end), true)
+
+        info = box.info.health.readiness
+        t.assert_equals(info.status, false)
+        t.assert_equals(info.checks.invalid, {
+            status = 'not_ready',
+            reason = 'health check must return true or false, <string>',
+            alert_code = 'health.readiness.invalid',
+        })
+
+        t.assert_equals(health.remove_health_check('invalid'), true)
     end)
 end
