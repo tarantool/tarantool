@@ -308,7 +308,7 @@ local function register_role_health_check(role_name, role, cfg)
     health.remove_health_check(check_name, {if_exists = true})
     local ok, err = health.add_health_check(check_name, function()
         return role.health_check(cfg)
-    end)
+    end, {multi_result = true})
     if not ok then
         error(('Failed to register health check for the role %s: %s'):format(
             role_name, err), 0)
