@@ -34,6 +34,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <pmatomic.h>
 #include "tt_pthread.h"
 #include <tarantool_ev.h>
 #include "cord_on_demand.h"
@@ -1070,6 +1071,13 @@ fiber_time_from_call(void)
 }
 
 /**
+ * The SIGURG sender PID if the main cord fiber slice had been reset by the
+ * signal, -1 otherwise. Checking the fiber slice in the main cord resets the
+ * field back to -1.
+ */
+extern pid_t fiber_sigurg_pid;
+
+/**
  * Set slice for current fiber execution.
  * Slices must be greater than 0.
  */
@@ -1137,6 +1145,12 @@ fiber_get_max_slice(struct fiber *fib)
 static inline int
 fiber_check_slice(void)
 {
+	if (cord_is_main() && unlikely(fiber_sigurg_pid != -1)) {
+		say_warn("got signal #%d (%s) from PID %ld,"
+			 " fiber slice has been zeroed",
+			 SIGURG, strsignal(SIGURG), (long)fiber_sigurg_pid);
+		fiber_sigurg_pid = -1;
+	}
 	double time_from_call = fiber_time_from_call();
 	struct fiber_slice slice = cord()->slice;
 	if (unlikely(slice.warn < time_from_call)) {
