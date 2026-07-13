@@ -64,6 +64,8 @@ static struct fiber_slice default_slice = {
 static struct fiber_slice default_slice = {.warn = 0.5, .err = 1.0};
 #endif
 
+pid_t fiber_sigurg_pid = -1;
+
 /** Number of cord-threads still running right now. */
 static int cord_count = 0;
 
@@ -2300,10 +2302,19 @@ static void
 signal_sigurg_cb(int signum, siginfo_t *info, void *ctx)
 {
 	(void)signum;
-	(void)info;
 	(void)ctx;
+
 	assert(cord_is_main());
+
+	/*
+	 * Reset the slice and remember the first SIGURG
+	 * sender to log it in the next fiber slice check.
+	 *
+	 * Pass if a SIGURG was received before and not logged.
+	 */
 	fiber_set_slice(zero_slice);
+	if (fiber_sigurg_pid == -1)
+		fiber_sigurg_pid = info->si_pid;
 }
 
 void

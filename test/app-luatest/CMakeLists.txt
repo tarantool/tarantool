@@ -16,6 +16,12 @@ _add_test_suite_target(${TEST_SUITE_NAME}
   DEPENDS libyield
 )
 
+# The module is built only on Linux (see lib/CMakeLists.txt); make the
+# suite's deps target build it too.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_dependencies(app-luatest-deps gh_12477_signal_logging)
+endif()
+
 list(APPEND TEST_ENV
   "LUA_PATH=${LUATEST_LUA_PATH}"
   "LUA_CPATH=${LUA_CPATH}"
