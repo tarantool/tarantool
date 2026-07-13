@@ -10,6 +10,7 @@ set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua load_cfg_lua)
 lua_source(lua_sources lua/utils.lua box_utils_lua)
 lua_source(lua_sources lua/schema.lua schema_lua)
+lua_source(lua_sources lua/read_view.lua read_view_lua)
 lua_source(lua_sources lua/tuple.lua tuple_lua)
 lua_source(lua_sources lua/tuple_format.lua tuple_format_lua)
 lua_source(lua_sources lua/session.lua session_lua)
@@ -165,6 +166,7 @@ set(tuple_sources
     tuple_bloom.c
     tuple_dictionary.c
     key_def.c
+    key_def_raw.cc
     coll_id_def.c
     coll_id.c
     coll_id_cache.c
@@ -281,6 +283,8 @@ set(box_sources
     watcher.c
     decimal.c
     read_view.c
+    read_view_util.c
+    index_read_view.c
     mp_box_ctx.c
     xlog_reader.c
     ${sql_sources}
@@ -296,6 +300,7 @@ set(box_sources
     lua/index.c
     lua/space.cc
     lua/sequence.c
+    lua/read_view.c
     lua/misc.cc
     lua/info.c
     lua/stat.c
@@ -334,8 +339,8 @@ if(ENABLE_WAL_EXT)
     list(APPEND box_sources ${WAL_EXT_SOURCES})
 endif()
 
-if(ENABLE_READ_VIEW)
-    list(APPEND box_sources ${READ_VIEW_SOURCES})
+if(ENABLE_RAW_READ_VIEW)
+    list(APPEND box_sources ${RAW_READ_VIEW_SOURCES})
 endif()
 
 if(ENABLE_SECURITY)

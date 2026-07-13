@@ -793,3 +793,8 @@ create_unit_test(PREFIX func_adapter_func
                  SOURCES func_adapter_func.c box_test_utils.c
                  LIBRARIES box unit
 )
+
+create_unit_test(PREFIX key_def_raw
+                 SOURCES key_def_raw.c box_test_utils.c
+                 LIBRARIES unit box core
+)

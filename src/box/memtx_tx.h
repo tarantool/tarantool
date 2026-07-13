@@ -582,9 +582,56 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 void
 memtx_tx_story_gc_step(void);
 
-#if defined(ENABLE_READ_VIEW)
-# include "memtx_tx_read_view.h"
-#endif /* defined(ENABLE_READ_VIEW) */
+/** Helper of memtx_tx_snapshot_invisible_count_matching. */
+size_t
+memtx_tx_snapshot_invisible_count_matching_until_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint);
+
+/**
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type. The tuples are matched using the key_def.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_until_slow(
+		cleaner, index_def, type, key, part_count, NULL, HINT_NONE);
+}
+
+/**
+ * Count the amount of invisible tuples matching to the given @a key and
+ * iterator @a type up to the given tuple (exclusively) according to the
+ * index order in the snapshot. The tuples are matched using the key_def,
+ * the @a until tuple is compared using the cmp_def.
+ */
+static inline size_t
+memtx_tx_snapshot_invisible_count_matching_until(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	if (cleaner->ht == NULL)
+		return 0;
+	return memtx_tx_snapshot_invisible_count_matching_until_slow(
+		cleaner, index_def, type, key, part_count, until, until_hint);
+}
+
+/**
+ * Detect whether the key of @a tuple from an index with the given @a key_def
+ * is visible in the snapshot with the given @a cleaner.
+ */
+static inline bool
+memtx_tx_snapshot_tuple_key_is_visible(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct tuple *tuple)
+{
+	return memtx_tx_snapshot_clarify(cleaner, tuple) != NULL;
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

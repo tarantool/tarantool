@@ -60,6 +60,7 @@
 #include "box/lua/index.h"
 #include "box/lua/space.h"
 #include "box/lua/sequence.h"
+#include "box/lua/read_view.h"
 #include "box/lua/misc.h"
 #include "box/lua/stat.h"
 #include "box/lua/info.h"
@@ -101,6 +102,7 @@ extern char session_lua[],
 	key_def_lua[],
 	box_utils_lua[],
 	schema_lua[],
+	read_view_lua[],
 	load_cfg_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
@@ -340,6 +342,7 @@ static const char * const lua_sources_minimal[] = {
 static const char * const lua_sources_main[] = {
 	"box/session", NULL, session_lua,
 	"box/schema", NULL, schema_lua,
+	"box/read_view", NULL, read_view_lua,
 	"box/healthcheck", "internal.healthcheck", healthcheck_lua,
 	"box/healthcheck_defaults", "internal.healthcheck.defaults",
 	healthcheck_defaults_lua,
@@ -1142,6 +1145,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_index_init(L);
 	box_lua_space_init(L);
 	box_lua_sequence_init(L);
+	box_lua_read_view_init(L);
 	box_lua_misc_init(L);
 	box_lua_info_init(L);
 	box_lua_stat_init(L);

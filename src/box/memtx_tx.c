@@ -4226,9 +4226,53 @@ memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 		mh_snapshot_cleaner_delete(cleaner->ht);
 }
 
-#if defined(ENABLE_READ_VIEW)
-# include "memtx_tx_read_view.c"
-#endif /* defined(ENABLE_READ_VIEW) */
+size_t
+memtx_tx_snapshot_invisible_count_matching_until_slow(
+	struct memtx_tx_snapshot_cleaner *cleaner, struct index_def *index_def,
+	enum iterator_type type, const char *key, uint32_t part_count,
+	struct tuple *until, hint_t until_hint)
+{
+	assert(cleaner->ht != NULL);
+
+	struct key_def *cmp_def = index_def->cmp_def;
+
+	/*
+	 * The border is only valid if it's located at or after the first
+	 * tuple in the index according to the iterator direction and key.
+	 */
+	assert(until == NULL ||
+	       memtx_tx_tuple_matches(cmp_def, until, until_hint,
+				      type == ITER_EQ ? ITER_GE :
+				      type == ITER_REQ ? ITER_LE :
+				      type, key, part_count));
+
+	size_t res = 0;
+	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
+	mh_int_t i;
+	mh_foreach(ht, i) {
+		struct memtx_tx_snapshot_cleaner_entry *entry =
+			mh_snapshot_cleaner_node(ht, i);
+
+		/* Only in-index tuples must exist in the snapshot. */
+		assert(!tuple_key_is_excluded(cmp_def->for_func_index ?
+					      (struct tuple *)entry->hint :
+					      entry->from,
+					      cmp_def,
+					      MULTIKEY_NONE));
+
+		/* Does not match with the key and border. */
+		if (!memtx_tx_tuple_matches_until(cmp_def, entry->from,
+						  entry->hint, type,
+						  key, part_count,
+						  until, until_hint))
+			continue;
+
+		/* Count the invisible tuple. */
+		if (entry->to == NULL)
+			res++;
+	}
+	return res;
+}
 
 void
 memtx_tx_manager_init(void)
