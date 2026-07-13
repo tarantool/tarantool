@@ -18,7 +18,7 @@
 # define ENABLE_ARROW 1
 #endif /* ENABLE_MEMCS_ENGINE || ENABLE_QUIVER_ENGINE */
 
-#if defined(ENABLE_READ_VIEW)
+#if defined(ENABLE_RAW_READ_VIEW)
 static box_raw_read_view_t *rv;
 
 static void
@@ -30,7 +30,7 @@ init_rv(struct lua_State *L)
 			luaT_error(L);
 	}
 }
-#endif /* ENABLE_READ_VIEW */
+#endif /* ENABLE_RAW_READ_VIEW */
 
 #if defined(ENABLE_ARROW)
 struct arrow_string {
@@ -334,7 +334,7 @@ str_iterator_lua_func(struct lua_State *L)
 	return 1;
 }
 
-#if defined(ENABLE_READ_VIEW)
+#if defined(ENABLE_RAW_READ_VIEW)
 static int
 sum_iterator_rv_lua_func(struct lua_State *L)
 {
@@ -459,7 +459,7 @@ str_iterator_rv_lua_func(struct lua_State *L)
 	lua_pushboolean(L, true);
 	return 1;
 }
-#endif /* defined(ENABLE_READ_VIEW) */
+#endif /* defined(ENABLE_RAW_READ_VIEW) */
 
 #if defined(ENABLE_ARROW)
 static int
@@ -589,7 +589,7 @@ out:
 }
 #endif /* defined(ENABLE_ARROW) */
 
-#if defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW)
+#if defined(ENABLE_ARROW) && defined(ENABLE_RAW_READ_VIEW)
 static int
 sum_arrow_rv_lua_func(struct lua_State *L)
 {
@@ -765,7 +765,7 @@ out:
 	lua_pushboolean(L, true);
 	return 1;
 }
-#endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
+#endif /* defined(ENABLE_ARROW) && defined(ENABLE_RAW_READ_VIEW) */
 
 LUA_API int
 luaopen_column_scan_module(struct lua_State *L)
@@ -776,18 +776,18 @@ luaopen_column_scan_module(struct lua_State *L)
 #endif /* defined(ENABLE_ARROW) */
 		{"sum_iterator", sum_iterator_lua_func},
 		{"str_iterator", str_iterator_lua_func},
-#if defined(ENABLE_READ_VIEW)
+#if defined(ENABLE_RAW_READ_VIEW)
 		{"sum_iterator_rv", sum_iterator_rv_lua_func},
 		{"str_iterator_rv", str_iterator_rv_lua_func},
-#endif /* defined(ENABLE_READ_VIEW) */
+#endif /* defined(ENABLE_RAW_READ_VIEW) */
 #if defined(ENABLE_ARROW)
 		{"sum_arrow", sum_arrow_lua_func},
 		{"str_arrow", str_arrow_lua_func},
 #endif /* defined(ENABLE_ARROW) */
-#if defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW)
+#if defined(ENABLE_ARROW) && defined(ENABLE_RAW_READ_VIEW)
 		{"sum_arrow_rv", sum_arrow_rv_lua_func},
 		{"str_arrow_rv", str_arrow_rv_lua_func},
-#endif /* defined(ENABLE_ARROW) && defined(ENABLE_READ_VIEW) */
+#endif /* defined(ENABLE_ARROW) && defined(ENABLE_RAW_READ_VIEW) */
 		{NULL, NULL},
 	};
 	luaL_register(L, "column_scan_module", lib);

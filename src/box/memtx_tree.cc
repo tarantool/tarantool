@@ -30,6 +30,7 @@
  */
 #include "memtx_tree.h"
 #include "index.h"
+#include "key_def_raw.h"
 #include "memtx_engine.h"
 #include "memtx_sort_data.h"
 #include "memtx_tuple_compression.h"
@@ -2399,69 +2400,350 @@ tree_read_view_free(struct index_read_view *base)
 	free(rv);
 }
 
-#if defined(ENABLE_READ_VIEW)
-# include "memtx_tree_read_view.cc"
-#else /* !defined(ENABLE_READ_VIEW) */
-
+/**
+ * Creates an iterator based on the given key, after data and iterator type.
+ *
+ * @param tree_view - the tree to lookup in;
+ * @param start_data - the key to lookup with, updated if pos != NULL;
+ * @param pos - the after key, can be NULL if not specified;
+ * @param type - the lookup iterator type, may be updated;
+ * @param[out] iterator - the result of the lookup;
+ * @param[out] offset - the offset @a iterator points to;
+ *
+ * @retval true on success;
+ * @retval false if the iteration must be stopped without an error.
+ */
 template<bool USE_HINT>
-static ssize_t
-tree_read_view_count(struct index_read_view *rv, enum iterator_type type,
-		     const char *key, uint32_t part_count)
+static bool
+memtx_tree_view_lookup(memtx_tree_view_t<USE_HINT> *tree_view,
+		       struct memtx_tree_key_data<USE_HINT> *start_data,
+		       const char *pos, enum iterator_type *type,
+		       memtx_tree_iterator_t<USE_HINT> *iterator,
+		       size_t *offset)
 {
-	return generic_index_read_view_count(rv, type, key, part_count);
+	struct key_def *cmp_def = tree_view->common.arg;
+
+	if (pos != NULL) {
+		start_data->key = pos;
+		start_data->part_count = cmp_def->part_count;
+		if (USE_HINT)
+			start_data->set_hint(key_hint(pos, cmp_def->part_count,
+						      cmp_def));
+	}
+
+	bool skip_equal_tuple = pos != NULL;
+	if (skip_equal_tuple && *type != ITER_EQ && *type != ITER_REQ)
+		*type = iterator_direction(*type) > 0 ? ITER_GT : ITER_LT;
+
+	if (start_data->key == NULL) {
+		assert(*type == ITER_GE || *type == ITER_LE);
+		invalidate_tree_iterator(iterator);
+		*offset = *type == ITER_GE ? SIZE_MAX /* + 1 == 0 */ :
+					     memtx_tree_view_size(tree_view);
+	} else {
+		bool need_lower_bound = *type == ITER_EQ || *type == ITER_GE ||
+					*type == ITER_LT;
+
+		/*
+		 * If we need to skip first tuple in EQ and REQ iterators, let's
+		 * just change lower_bound to upper_bound or vice-versa.
+		 */
+		if (skip_equal_tuple && (*type == ITER_EQ || *type == ITER_REQ))
+			need_lower_bound = !need_lower_bound;
+
+		bool equals;
+		if (need_lower_bound) {
+			*iterator = memtx_tree_view_lower_bound_get_offset(
+				tree_view, start_data, &equals, offset);
+		} else {
+			*iterator = memtx_tree_view_upper_bound_get_offset(
+				tree_view, start_data, &equals, offset);
+		}
+
+		/*
+		 * Equality iterators require exact key match: if the result is
+		 * not equal to the key, iteration ends. If start_data differs
+		 * from passed key (pos != NULL), equals flag is not actual and
+		 * we should not check it. In the case we can simply skip the
+		 * check - equality is checked in `next` method.
+		 */
+		if ((*type == ITER_EQ || *type == ITER_REQ) && !equals &&
+		    pos == NULL)
+			return false;
+
+		if (!iterator_type_is_reverse(*type)) {
+			/*
+			 * lower_bound and upper_bound position the iterator to
+			 * the key >= and > the target one, respectively, so
+			 * for LT, LE, and REQ the found position is to the
+			 * right of the target key while for GT, GE, and EQ
+			 * it's at the target key. Since the 'next' method
+			 * advances the iterator *before* returning the value,
+			 * we need to take a step back for forward iterators.
+			 */
+			memtx_tree_view_iterator_prev(tree_view, iterator);
+			--*offset;
+		}
+	}
+
+	return true;
 }
 
+/** index_read_view_vtab::count */
+template<bool USE_HINT>
+static ssize_t
+tree_read_view_count(struct index_read_view *base, enum iterator_type type,
+		     const char *key, uint32_t part_count)
+{
+	if (type == ITER_PP || type == ITER_NP) {
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "requested iterator type");
+		return -1;
+	}
+	canonicalize_lookup(&type, &key, part_count);
+
+	/* Perform the lookup. */
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	memtx_tree_view_t<USE_HINT> *tree_view = &rv->tree_view;
+	struct key_def *cmp_def = tree_view->common.arg;
+	struct memtx_tree_key_data<USE_HINT> start_data;
+	start_data.key = key;
+	start_data.part_count = part_count;
+	if (USE_HINT)
+		start_data.set_hint(key_hint(key, part_count, cmp_def));
+	memtx_tree_iterator_t<USE_HINT> unused;
+	size_t begin_offset;
+	if (!memtx_tree_view_lookup(tree_view, &start_data, NULL,
+				    &type, &unused, &begin_offset))
+		return 0; /* No match. */
+
+	/*
+	 * Now, when we have the first tuple and its offset, let's find the
+	 * boundary of the iteration.
+	 */
+	size_t end_offset;
+	if (type == ITER_EQ) {
+		memtx_tree_view_upper_bound_get_offset(tree_view, &start_data,
+						       NULL, &end_offset);
+		end_offset--; /* Unsigned underflow possible. */
+	} else if (type == ITER_REQ) {
+		memtx_tree_view_lower_bound_get_offset(tree_view, &start_data,
+						       NULL, &end_offset);
+	} else {
+		end_offset = iterator_type_is_reverse(type) ? 0 :
+			     memtx_tree_view_size(tree_view) - 1;
+	}
+
+	size_t full_count = ((ssize_t)end_offset - begin_offset) *
+			    iterator_direction(type);
+
+	/*
+	 * The view could be created when the index had concurrent transactions
+	 * running, so some tuples in the view may be invisible. Let's count the
+	 * amount of invisible tuples counted.
+	 */
+	size_t invisible_count = memtx_tx_snapshot_invisible_count_matching(
+		&rv->cleaner, base->def, type, key, part_count);
+
+	return full_count - invisible_count;
+}
+
+/** index_read_view_vtab::quantile */
 template<bool USE_HINT>
 static int
-tree_read_view_quantile(struct index_read_view *rv, double level,
+tree_read_view_quantile(struct index_read_view *base, double level,
 			const char *begin_key, uint32_t begin_part_count,
 			const char *end_key, uint32_t end_part_count,
 			const char **quantile_key,
 			uint32_t *quantile_key_size)
 {
-	return generic_index_read_view_quantile(
-		rv, level, begin_key, begin_part_count, end_key, end_part_count,
-		quantile_key, quantile_key_size);
-}
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	memtx_tree_view_t<USE_HINT> *tree = &rv->tree_view;
+	struct key_def *key_def = base->def->key_def;
 
-template <bool USE_HINT>
-static int
-tree_read_view_get_raw(struct index_read_view *rv,
-		       const char *key, uint32_t part_count,
-		       struct read_view_tuple *result)
-{
-	(void)rv;
-	(void)key;
-	(void)part_count;
-	(void)result;
-	unreachable();
+	struct memtx_tree_key_data<USE_HINT> begin_data;
+	begin_data.key = begin_key;
+	begin_data.part_count = begin_part_count;
+	if (USE_HINT)
+		begin_data.set_hint(
+			key_hint(begin_key, begin_part_count, key_def));
+
+	struct memtx_tree_key_data<USE_HINT> end_data;
+	end_data.key = end_key;
+	end_data.part_count = end_part_count;
+	if (USE_HINT)
+		end_data.set_hint(
+			key_hint(end_key, end_part_count, key_def));
+
+	size_t begin_offset;
+	memtx_tree_view_lower_bound_get_offset(tree, &begin_data, NULL,
+					       &begin_offset);
+	size_t end_offset;
+	if (end_data.part_count > 0) {
+		memtx_tree_view_lower_bound_get_offset(tree, &end_data, NULL,
+						       &end_offset);
+	} else {
+		end_offset = memtx_tree_view_size(tree);
+	}
+	if (end_offset <= begin_offset) {
+		*quantile_key = NULL;
+		*quantile_key_size = 0;
+		return 0;
+	}
+
+	assert(level > 0 && level < 1);
+	size_t offset = begin_offset + (end_offset - begin_offset) * level;
+	memtx_tree_iterator_t<USE_HINT> itr =
+		memtx_tree_view_iterator_at(tree, offset);
+	assert(!memtx_tree_iterator_is_invalid(&itr));
+	struct memtx_tree_data<USE_HINT> *data =
+		memtx_tree_view_iterator_get_elem(tree, &itr);
+	if (key_def->for_func_index) {
+		*quantile_key = tuple_data_range((struct tuple *)data->hint,
+						 quantile_key_size);
+		void *buf = xregion_alloc(&fiber()->gc, *quantile_key_size);
+		memcpy(buf, *quantile_key, *quantile_key_size);
+		*quantile_key = (const char *)buf;
+	} else {
+		int multikey_idx = key_def->is_multikey ?
+				   (int)data->hint : MULTIKEY_NONE;
+		*quantile_key = tuple_extract_key(data->tuple, key_def,
+						  multikey_idx,
+						  quantile_key_size);
+	}
 	return 0;
 }
 
-/** Implementation of next_raw index_read_view_iterator callback. */
+/** Implementation of get_raw index_read_view callback. */
 template <bool USE_HINT>
 static int
-tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
-				 struct read_view_tuple *result)
+tree_read_view_get_raw(struct index_read_view *base,
+		       const char *key, uint32_t part_count,
+		       struct read_view_tuple *result)
+{
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	assert(base->def->opts.is_unique);
+	assert(part_count == base->def->key_def->part_count);
+	struct memtx_tree_key_data<USE_HINT> key_data;
+	struct key_def *cmp_def = rv->tree_view.common.arg;
+	key_data.key = key;
+	key_data.part_count = part_count;
+	if (USE_HINT)
+		key_data.set_hint(key_hint(key, part_count, cmp_def));
+	struct memtx_tree_data<USE_HINT> *res =
+		memtx_tree_view_find(&rv->tree_view, &key_data);
+	if (res == NULL) {
+		*result = read_view_tuple_none();
+		return 0;
+	}
+	return memtx_prepare_read_view_tuple(res->tuple, &rv->base,
+					     &rv->cleaner, result);
+}
+
+/** EQ iterator step. */
+template <bool USE_HINT>
+struct TreeReadViewIteratorEQ {
+	struct memtx_tree_data<USE_HINT> *
+	operator()(struct tree_read_view_iterator<USE_HINT> *it)
+	{
+		struct tree_read_view<USE_HINT> *rv =
+			(struct tree_read_view<USE_HINT> *)it->base.index;
+		memtx_tree_view_iterator_next(&rv->tree_view,
+					      &it->tree_iterator);
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_view_iterator_get_elem(&rv->tree_view,
+							  &it->tree_iterator);
+		return res != NULL &&
+		       tuple_compare_with_key(res->tuple, res->hint,
+					      it->key_data.key,
+					      it->key_data.part_count,
+					      it->key_data.hint,
+					      rv->base.def->key_def) == 0 ?
+		       res : NULL;
+	}
+};
+
+/** REQ iterator step. */
+template<bool USE_HINT>
+struct TreeReadViewIteratorREQ {
+	struct memtx_tree_data<USE_HINT> *
+	operator()(struct tree_read_view_iterator<USE_HINT> *it)
+	{
+		struct tree_read_view<USE_HINT> *rv =
+			(struct tree_read_view<USE_HINT> *)it->base.index;
+		memtx_tree_view_iterator_prev(&rv->tree_view,
+					      &it->tree_iterator);
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_view_iterator_get_elem(&rv->tree_view,
+							  &it->tree_iterator);
+		return res != NULL &&
+		       tuple_compare_with_key(res->tuple, res->hint,
+					      it->key_data.key,
+					      it->key_data.part_count,
+					      it->key_data.hint,
+					      rv->base.def->key_def) == 0 ?
+		       res : NULL;
+	}
+};
+
+/** LE/LT iterator step. */
+template<bool USE_HINT>
+struct TreeReadViewIteratorLE {
+	struct memtx_tree_data<USE_HINT> *
+	operator()(struct tree_read_view_iterator<USE_HINT> *it)
+	{
+		struct tree_read_view<USE_HINT> *rv =
+			(struct tree_read_view<USE_HINT> *)it->base.index;
+		memtx_tree_view_iterator_prev(&rv->tree_view,
+					      &it->tree_iterator);
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_view_iterator_get_elem(&rv->tree_view,
+							  &it->tree_iterator);
+		return res;
+	}
+};
+
+/** GE/GT iterator step. */
+template<bool USE_HINT>
+struct TreeReadViewIteratorGE {
+	struct memtx_tree_data<USE_HINT> *
+	operator()(struct tree_read_view_iterator<USE_HINT> *it)
+	{
+		struct tree_read_view<USE_HINT> *rv =
+			(struct tree_read_view<USE_HINT> *)it->base.index;
+		memtx_tree_view_iterator_next(&rv->tree_view,
+					      &it->tree_iterator);
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_view_iterator_get_elem(&rv->tree_view,
+							  &it->tree_iterator);
+		return res;
+	}
+};
+
+/** Wrapper around Next() that skips data invisible from the read view. */
+template<bool USE_HINT, template <bool> class Next>
+static int
+tree_read_view_iterator_next_raw_impl(struct index_read_view_iterator *iterator,
+				      struct read_view_tuple *result)
 {
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)it->base.index;
-
 	while (true) {
-		struct memtx_tree_data<USE_HINT> *res =
-			memtx_tree_view_iterator_get_elem(&rv->tree_view,
-							  &it->tree_iterator);
-
-		if (res == NULL) {
+		struct memtx_tree_data<USE_HINT> *tree_data =
+			Next<USE_HINT>()(it);
+		if (tree_data == NULL) {
+			it->base.next_raw =
+				exhausted_index_read_view_iterator_next_raw;
 			*result = read_view_tuple_none();
 			return 0;
 		}
-
-		memtx_tree_view_iterator_next(&rv->tree_view,
-					      &it->tree_iterator);
-		if (memtx_prepare_read_view_tuple(res->tuple, &rv->base,
+		it->last = tree_data;
+		if (memtx_prepare_read_view_tuple(tree_data->tuple, &rv->base,
 						  &rv->cleaner, result) != 0)
 			return -1;
 		if (result->data != NULL)
@@ -2469,7 +2751,15 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	}
 }
 
-/** Positions the iterator to the given key. */
+/**
+ * Positions the iterator to the given key.
+ *
+ * Note, the 'next' iterator method advances the iterator *before* returning
+ * the value so we need to position the iterator to the value *preceding*
+ * the key. We can do that because the BPS tree iterator has an interesting
+ * property: a forward/backward step from an invalid iterator sets its position
+ * to the first/last element.
+ */
 template <bool USE_HINT>
 static int
 tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
@@ -2477,31 +2767,129 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 			      const char *key, uint32_t part_count,
 			      const char *pos, uint32_t offset)
 {
-	assert(type == ITER_ALL);
-	assert(key == NULL);
-	assert(part_count == 0);
-	assert(pos == NULL);
-	assert(offset == 0);
-	(void)type;
-	(void)key;
-	(void)part_count;
-	(void)pos;
-	(void)offset;
+	if (type == ITER_PP || type == ITER_NP) {
+		diag_set(UnsupportedIndexFeature, it->base.index->def,
+			 "requested iterator type");
+		return -1;
+	}
+	canonicalize_lookup(&type, &key, part_count);
+
+	/* Exhaust the iterator by default. */
+	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
+
+	/* Save the original key. */
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)it->base.index;
-	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
-	it->tree_iterator = memtx_tree_view_first(&rv->tree_view);
+	memtx_tree_view_t<USE_HINT> *tree_view = &rv->tree_view;
+	struct key_def *cmp_def = tree_view->common.arg;
+	it->key_data.key = key;
+	it->key_data.part_count = part_count;
+	if (USE_HINT)
+		it->key_data.set_hint(key_hint(key, part_count, cmp_def));
+
+	/* Perform the lookup. */
+	struct memtx_tree_key_data<USE_HINT> start_data = it->key_data;
+	size_t curr_offset;
+	if (!memtx_tree_view_lookup(tree_view, &start_data, pos, &type,
+				    &it->tree_iterator, &curr_offset))
+		return 0; /* The iterator is exhausted. */
+
+	/* Skip the amount of tuples required. */
+	if (offset != 0) {
+		/* Logarithmically skip raw tuples. */
+		bool reverse = iterator_type_is_reverse(type);
+		curr_offset = reverse ? MAX(-1, (ssize_t)curr_offset - offset) :
+					curr_offset + offset;
+		it->tree_iterator = memtx_tree_view_iterator_at(tree_view,
+								curr_offset);
+
+		/* We're potentially at the element prior to the target one. */
+		struct memtx_tree_data<USE_HINT> *prev =
+			memtx_tree_view_iterator_get_elem(tree_view,
+							  &it->tree_iterator);
+
+		/* Check if we've logarithmically skipped too much. */
+		if (prev == NULL)
+			return 0; /* The iterator is exhausted. */
+
+		/*
+		 * Calculate the amount of invisible to the read view tuples
+		 * skipped. The snapshot invisible count function returns the
+		 * amount of tuples matching a key exclusively until the given
+		 * tuple. But the given `until` tuple is the one prior to the
+		 * target (potentially), so it's skipped too and also must be
+		 * checked for visibility so we do it manually.
+		 */
+		size_t skip_more_visible =
+			memtx_tx_snapshot_invisible_count_matching_until(
+				&rv->cleaner, rv->base.def, type,
+				start_data.key, start_data.part_count,
+				prev->tuple, prev->hint) +
+			!memtx_tx_snapshot_tuple_key_is_visible(&rv->cleaner,
+								prev->tuple);
+		memtx_tree_iterator_t<USE_HINT> *iterator = &it->tree_iterator;
+		while (skip_more_visible != 0) {
+			if (iterator_type_is_reverse(type)) {
+				memtx_tree_view_iterator_prev(tree_view,
+							      iterator);
+			} else {
+				memtx_tree_view_iterator_next(tree_view,
+							      iterator);
+			}
+			prev = memtx_tree_view_iterator_get_elem(tree_view,
+								 iterator);
+
+			/* Check if we've skipped too much. */
+			if (prev == NULL)
+				return 0; /* The iterator is exhausted. */
+
+			if (memtx_tx_snapshot_tuple_key_is_visible(
+					&rv->cleaner, prev->tuple))
+				skip_more_visible--;
+		}
+	}
+
+	/* Set the corresponding step method. */
+	switch (type) {
+	case ITER_EQ:
+		it->base.next_raw = tree_read_view_iterator_next_raw_impl<
+				USE_HINT, TreeReadViewIteratorEQ>;
+		break;
+	case ITER_REQ:
+		it->base.next_raw = tree_read_view_iterator_next_raw_impl<
+				USE_HINT, TreeReadViewIteratorREQ>;
+		break;
+	case ITER_LT:
+	case ITER_LE:
+		it->base.next_raw = tree_read_view_iterator_next_raw_impl<
+				USE_HINT, TreeReadViewIteratorLE>;
+		break;
+	case ITER_GE:
+	case ITER_GT:
+		it->base.next_raw = tree_read_view_iterator_next_raw_impl<
+				USE_HINT, TreeReadViewIteratorGE>;
+		break;
+	default:
+		unreachable();
+	}
 	return 0;
 }
 
+/**
+ * Sets read view key_def to 'raw' version, which doesn't access tuple format,
+ * because tuples stored in a read view may have no format.
+ */
 template <bool USE_HINT>
 static void
 tree_read_view_reset_key_def(struct tree_read_view<USE_HINT> *rv)
 {
-	rv->tree_view.common.arg = NULL;
+	struct index_def *def = rv->base.def;
+	key_def_set_func_raw(def->key_def);
+	key_def_set_func_raw(def->cmp_def);
+	rv->tree_view.common.arg = def->opts.is_unique &&
+				   !def->key_def->is_nullable ?
+				   def->key_def : def->cmp_def;
 }
-
-#endif /* !defined(ENABLE_READ_VIEW) */
 
 /**
  * Implementation of iterator position for general and multikey read views.

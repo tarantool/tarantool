@@ -32,6 +32,7 @@
 #include "say.h"
 #include "fiber.h"
 #include "index.h"
+#include "key_def_raw.h"
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tx.h"
@@ -596,32 +597,35 @@ hash_read_view_free(struct index_read_view *base)
 	free(rv);
 }
 
-#if defined(ENABLE_READ_VIEW)
-# include "memtx_hash_read_view.cc"
-#else /* !defined(ENABLE_READ_VIEW) */
-
+/** Implementation of get_raw index_read_view callback. */
 static int
-hash_read_view_get_raw(struct index_read_view *rv,
+hash_read_view_get_raw(struct index_read_view *base,
 		       const char *key, uint32_t part_count,
 		       struct read_view_tuple *result)
 {
-	(void)rv;
-	(void)key;
+	struct hash_read_view *rv = (struct hash_read_view *)base;
+	assert(base->def->opts.is_unique);
+	assert(part_count == base->def->key_def->part_count);
 	(void)part_count;
-	(void)result;
-	unreachable();
-	return 0;
+	uint32_t h = key_hash(key, base->def->key_def);
+	uint32_t k = light_index_view_find_key(&rv->view, h, key);
+	if (k == light_index_end) {
+		*result = read_view_tuple_none();
+		return 0;
+	}
+	struct tuple *tuple = light_index_view_get(&rv->view, k);
+	return memtx_prepare_read_view_tuple(tuple, &rv->base,
+					     &rv->cleaner, result);
 }
 
-/** Implementation of next_raw index_read_view_iterator callback. */
+/** Implementation of next_raw index_read_view_iterator callback for ITER_GE. */
 static int
-hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
-				 struct read_view_tuple *result)
+hash_read_view_iterator_ge(struct index_read_view_iterator *iterator,
+			   struct read_view_tuple *result)
 {
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
 	struct hash_read_view *rv = (struct hash_read_view *)it->base.index;
-
 	while (true) {
 		struct tuple **res = light_index_view_iterator_get_and_next(
 			&rv->view, &it->iterator);
@@ -638,31 +642,78 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	return 0;
 }
 
+/** Implementation of next_raw index_read_view_iterator callback for ITER_GT. */
+static int
+hash_read_view_iterator_gt(struct index_read_view_iterator *iterator,
+			   struct read_view_tuple *result)
+{
+	iterator->base.next_raw = hash_read_view_iterator_ge;
+	if (hash_read_view_iterator_ge(iterator, result) != 0)
+		return -1;
+	if (result->data == NULL)
+		return 0;
+	return hash_read_view_iterator_ge(iterator, result);
+}
+
+/** Implementation of next_raw index_read_view_iterator callback for ITER_EQ. */
+static int
+hash_read_view_iterator_eq(struct index_read_view_iterator *iterator,
+			   struct read_view_tuple *result)
+{
+	iterator->base.next_raw = exhausted_index_read_view_iterator_next_raw;
+	return hash_read_view_iterator_ge(iterator, result);
+}
+
 /** Positions the iterator to the given key. */
 static int
 hash_read_view_iterator_start(struct hash_read_view_iterator *it,
 			      enum iterator_type type,
 			      const char *key, uint32_t part_count)
 {
-	assert(type == ITER_ALL);
-	assert(key == NULL);
-	assert(part_count == 0);
-	(void)type;
-	(void)key;
-	(void)part_count;
 	struct hash_read_view *rv = (struct hash_read_view *)it->base.index;
-	it->base.next_raw = hash_read_view_iterator_next_raw;
-	light_index_view_iterator_begin(&rv->view, &it->iterator);
+	struct key_def *key_def = rv->base.def->key_def;
+	switch (type) {
+	case ITER_GT:
+		if (part_count != 0) {
+			light_index_view_iterator_key(
+				&rv->view, &it->iterator,
+				key_hash(key, key_def), key);
+			it->base.next_raw = hash_read_view_iterator_gt;
+		} else {
+			light_index_view_iterator_begin(&rv->view,
+							&it->iterator);
+			it->base.next_raw = hash_read_view_iterator_ge;
+		}
+		break;
+	case ITER_ALL:
+		light_index_view_iterator_begin(&rv->view, &it->iterator);
+		it->base.next_raw = hash_read_view_iterator_ge;
+		break;
+	case ITER_EQ:
+		assert(part_count > 0);
+		light_index_view_iterator_key(
+			&rv->view, &it->iterator,
+			key_hash(key, key_def), key);
+		it->base.next_raw = hash_read_view_iterator_eq;
+		break;
+	default:
+		unreachable();
+	}
 	return 0;
 }
 
+/**
+ * Sets read view key_def to 'raw' version, which doesn't access tuple format,
+ * because tuples stored in a read view may have no format.
+ */
 static void
 hash_read_view_reset_key_def(struct hash_read_view *rv)
 {
-	rv->view.common.arg = NULL;
+	struct index_def *def = rv->base.def;
+	key_def_set_func_raw(def->key_def);
+	key_def_set_func_raw(def->cmp_def);
+	rv->view.common.arg = def->key_def;
 }
-
-#endif /* !defined(ENABLE_READ_VIEW) */
 
 /** Implementation of create_iterator index_read_view callback. */
 static int
