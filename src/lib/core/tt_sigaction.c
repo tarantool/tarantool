@@ -4,6 +4,7 @@
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
 #include <assert.h>
+#include <pmatomic.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include "tt_sigaction.h"
@@ -15,21 +16,47 @@ static bool main_thread_initialized;
 /** Main thread id, it is set on first tt_sigaction call. */
 static pthread_t main_thread_id;
 
-static void (*sighandlers[SIGMAX])(int signum);
+static void (*sighandlers[SIGMAX])(int, siginfo_t *, void *);
+static pid_t redirected_sender_pids[SIGMAX];
 
 /**
  * Check that signal has been delivered to the main thread
  * and call signal handler or redirect it if thread is not main.
  */
 static void
-sighandler_dispatcher(int signum)
+sighandler_dispatcher(int signum, siginfo_t *info, void *ctx)
 {
 	if (!pthread_equal(pthread_self(), main_thread_id)) {
-		pthread_kill(main_thread_id, signum);
+		pid_t uninitialized_sender_pid = -1;
+		/*
+		 * Redirect the signal sender PID in case it's uninitialized.
+		 *
+		 * It could be so that someone has handled a SIGURG signal and
+		 * set the variable but the main thread haven't handled it yet.
+		 * So let's only set the signal sender PID if it's unset.
+		 *
+		 * Effectively this means that, in case if there was a number of
+		 * signals received, only the PID of the first signal sender is
+		 * redirected to the main cord.
+		 */
+		bool success = pm_atomic_compare_exchange_strong(
+				&redirected_sender_pids[signum],
+				&uninitialized_sender_pid, info->si_pid);
+		if (success)
+			pthread_kill(main_thread_id, signum);
 		return;
 	}
+	/* Use the redirected sender PID in case it's provided. */
+	if (redirected_sender_pids[signum] != -1) {
+		/*
+		 * We're in a critical section: no handler will change the
+		 * redirected sender ID until we reset it to -1 below.
+		 */
+		info->si_pid = redirected_sender_pids[signum];
+		redirected_sender_pids[signum] = -1;
+	}
 	assert(sighandlers[signum] != NULL);
-	sighandlers[signum](signum);
+	sighandlers[signum](signum, info, ctx);
 }
 
 int
@@ -44,15 +71,23 @@ tt_sigaction(int signum, struct sigaction *sa, struct sigaction *osa)
 		main_thread_initialized = true;
 	}
 
-	void (*old_handler)(int) = sighandlers[signum];
+	void *old_handler = sighandlers[signum];
 	if (sa->sa_handler == SIG_DFL || sa->sa_handler == SIG_IGN) {
 		sighandlers[signum] = NULL;
 	} else {
-		sighandlers[signum] = sa->sa_handler;
-		sa->sa_handler = sighandler_dispatcher;
+		assert(sa->sa_flags | SA_SIGINFO);
+		assert(sa->sa_sigaction != NULL);
+		sighandlers[signum] = sa->sa_sigaction;
+		sa->sa_sigaction = sighandler_dispatcher;
 	}
 	int rc = sigaction(signum, sa, osa);
-	if (osa != NULL && old_handler != NULL)
-		osa->sa_handler = old_handler;
+	if (osa != NULL && old_handler != NULL) {
+		if (old_handler == SIG_DFL || old_handler == SIG_IGN) {
+			osa->sa_handler = old_handler;
+		} else {
+			assert(osa->sa_flags & SA_SIGINFO);
+			osa->sa_sigaction = old_handler;
+		}
+	}
 	return rc;
 }

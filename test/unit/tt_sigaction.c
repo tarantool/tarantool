@@ -30,9 +30,11 @@ thread_f(void *arg)
 }
 
 static void
-handler_f(int signum)
+handler_f(int signum, siginfo_t *info, void *ctx)
 {
 	(void)signum;
+	(void)info;
+	(void)ctx;
 	if (!pthread_equal(pthread_self(), main_thread))
 		pm_atomic_fetch_add_explicit(&false_handle_cnt, 1,
 					     pm_memory_order_relaxed);
@@ -46,7 +48,8 @@ main(void)
 	int rc;
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = handler_f;
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = handler_f;
 	rc = tt_sigaction(SIGALRM, &sa, NULL);
 	fail_if(rc != 0);
 
