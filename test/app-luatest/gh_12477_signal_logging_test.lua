@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local popen = require('popen')
+local ffi = require('ffi')
 local fio = require('fio')
 local t = require('luatest')
 
@@ -21,7 +22,6 @@ end)
 -- Test all the signals handled by libev are logged.
 g.test_ev_signals = function(cg)
     -- Send a signal with own sender PID and check if it's logged.
-    local ffi = require("ffi")
     ffi.cdef('int kill(int pid, int signum);')
     local function test_signal(signum)
         -- The pattern to search for in the log.
@@ -48,4 +48,68 @@ g.test_ev_signals = function(cg)
     cg.server:restart()
     test_signal(popen.signal.SIGTERM)
     cg.server:restart()
+end
+
+g.test_sigurg_redirection = function(cg)
+    t.skip_if(jit.os ~= 'Linux', "Used a linux-specific syscall: tgkill")
+
+    -- Create a "foreign" thread in a dynamically linked module.
+    local pid, tid = cg.server:exec(function()
+        -- The foreign thread is created in a dynamically linked module.
+        local fio = require('fio')
+        local tarantool = require('tarantool')
+        local mod_pattern = '?.' .. tarantool.build.mod_format
+        local test_dir = fio.abspath(fio.pathjoin(os.getenv('BUILDDIR') or '.',
+                                     'test', 'app-luatest'))
+        local test_mod_cpath = fio.pathjoin(test_dir, mod_pattern)
+            package.cpath = test_mod_cpath .. ';' .. package.cpath
+        local lib = box.lib.load('gh_12477_signal_logging')
+        local run_a_thread = lib:load('run_a_thread')
+        local tid = run_a_thread()
+        return box.info.pid, tid
+    end)
+    t.assert_equals(pid, cg.server.process.pid)
+
+    -- Run a long-running fiber with a big slice.
+    cg.server:exec(function()
+        -- The test timeouts if SIGURG not handled.
+        require('fiber').set_max_slice(999999)
+    end)
+    local infinite_loop = [[
+        local fiber = require('fiber')
+        while true do
+            fiber.testcancel()
+            fiber.check_slice()
+            os.execute('sleep 0.1')
+        end
+    ]]
+    local loop = cg.server.net_box:eval(infinite_loop, nil, {is_async = true})
+    -- A new request should not return if the fiber started execution.
+    t.assert_equals(cg.server.net_box:ping({timeout = 0.1}), false)
+
+    -- Send SIGURG to the foreign thread: no assertion fail expected.
+    ffi.cdef('int tgkill(int tgid, int tid, int sig);')
+    ffi.C.tgkill(pid, tid, popen.signal.SIGURG)
+    local signal_log_pattern = 'got signal #' .. popen.signal.SIGURG ..
+                               ' (.*) from PID ' .. box.info.pid
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log(signal_log_pattern))
+    end)
+    -- Also, the new fiber should fail.
+    t.assert_equals(loop:is_ready(), true)
+    local res, err = loop:result()
+    t.assert_equals(res, nil)
+    t.assert_equals(err.message, 'fiber slice is exceeded')
+
+    -- The same check, but send the signal to the main (TX) thread.
+    loop = cg.server.net_box:eval(infinite_loop, nil, {is_async = true})
+    t.assert_equals(cg.server.net_box:ping({timeout = 0.1}), false)
+    ffi.C.tgkill(pid, pid, popen.signal.SIGURG)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log(signal_log_pattern))
+    end)
+    t.assert_equals(loop:is_ready(), true)
+    local res, err = loop:result()
+    t.assert_equals(res, nil)
+    t.assert_equals(err.message, 'fiber slice is exceeded')
 end

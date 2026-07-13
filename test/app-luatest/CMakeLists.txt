@@ -1,5 +1,8 @@
 add_subdirectory(lib)
 
+build_module(gh_12477_signal_logging gh_12477_signal_logging.c)
+target_link_libraries(gh_12477_signal_logging msgpuck)
+
 tarantool_make_lua_path(LUA_CPATH
   PATHS
   ${CMAKE_CURRENT_BINARY_DIR}/lib/?${CMAKE_SHARED_LIBRARY_SUFFIX}
