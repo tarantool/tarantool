@@ -8,12 +8,19 @@ end
 
 local loaders = require('internal.loaders')
 
--- The bundled roles capture the module on load. The proxy makes them use
+-- The bundled roles capture the modules on load. The proxies make them use
 -- an installed rock if there is one.
 package.loaded['http.server'] = {
     new = function(...)
         local http_server = loaders.require_first('http.server',
                                                   'internal.http.server')
         return http_server.new(...)
+    end,
+}
+
+package.loaded['roles.httpd'] = {
+    DEFAULT_SERVER_NAME = 'default',
+    get_server = function(...)
+        return require('roles.httpd').get_server(...)
     end,
 }

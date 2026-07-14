@@ -197,6 +197,7 @@ rawset(searchers, 'croot.cwd', gen_croot_searcher(searchers['cpath.package']))
 -- Builtin modules, which are used only if no other searcher finds them.
 local fallback_modules = {
     ['roles.httpd'] = 'internal.roles.httpd',
+    ['roles.metrics-export'] = 'internal.roles.metrics-export',
 }
 
 rawset(searchers, 'fallback', function(name)

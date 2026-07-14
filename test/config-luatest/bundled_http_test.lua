@@ -57,7 +57,7 @@ g.before_each(function(cg)
     cg.httpd_sock = fio.pathjoin(cg.dir, 'httpd.sock')
 end)
 
-local function start(cg, files, roles)
+local function start(cg, files, roles, export)
     for path, content in pairs(files) do
         treegen.write_file(cg.dir, path, content)
     end
@@ -69,6 +69,10 @@ local function start(cg, files, roles)
                 default = {listen = 'unix/:' .. cg.httpd_sock},
             },
         })
+    if export ~= nil then
+        builder:set_instance_option('i-001', 'metrics',
+                                    {export = {http = export}})
+    end
     local lua_path = cg.dir .. '/?.lua;' .. (os.getenv('LUA_PATH') or ';')
     cg.cluster = cluster:new(builder:config(), {env = {LUA_PATH = lua_path}})
     cg.cluster:start()
@@ -125,6 +129,41 @@ g.test_rock_http_server_and_role = function(cg)
         t.assert_gt(_G.rock_role_calls, 0)
         t.assert_equals(_G.user_role, {from_rock = true, http_server = true})
     end)
+end
+
+local ENDPOINTS = {{path = '/metrics', format = 'json'}}
+
+g.test_metrics_export_no_rock = function(cg)
+    local sock = fio.pathjoin(cg.dir, 'export.sock')
+    local export = {{listen = {uri = 'unix/:' .. sock}, endpoints = ENDPOINTS}}
+    local server = start(cg, {}, {'roles.httpd'}, export)
+    server:exec(function()
+        t.assert_is(require('roles.metrics-export'),
+                    require('internal.roles.metrics-export'))
+    end)
+    t.assert_equals(status(sock, '/metrics'), 200)
+end
+
+g.test_metrics_export_rock_http_server = function(cg)
+    local sock = fio.pathjoin(cg.dir, 'export.sock')
+    local export = {{listen = {uri = 'unix/:' .. sock}, endpoints = ENDPOINTS}}
+    local server = start(cg, {['http/server.lua'] = ROCK_HTTP_SERVER},
+                         {'roles.httpd'}, export)
+    server:exec(function(sock)
+        t.assert_items_include(_G.rock_ports, {sock})
+    end, {sock})
+    t.assert_equals(status(sock, '/metrics'), 200)
+end
+
+g.test_metrics_export_rock_role = function(cg)
+    local server = start(cg, {
+        ['http/server.lua'] = ROCK_HTTP_SERVER,
+        ['roles/httpd.lua'] = ROCK_ROLES_HTTPD,
+    }, {'roles.httpd'}, {{endpoints = ENDPOINTS}})
+    server:exec(function()
+        t.assert_gt(_G.rock_role_calls, 0)
+    end)
+    t.assert_equals(status(cg.httpd_sock, '/metrics'), 200)
 end
 
 g.test_app_thread = function(cg)

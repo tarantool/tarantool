@@ -355,6 +355,20 @@ end
 
 M['metrics.exclude'] = M['metrics.include']
 
+M['metrics.export.http.*.listen'] = function(data, w)
+    if data.uri == nil then
+        w.error('The URI is required')
+    end
+    local params = data.params or {}
+    if params.transport == 'ssl' and
+       (params.ssl_key_file == nil or params.ssl_cert_file == nil) then
+        w.error('ssl_key_file and ssl_cert_file are required for the ' ..
+                'ssl transport')
+    end
+end
+
+M['metrics.export.http.*.listen.uri'] = validate_uri_field(false, false)
+
 -- }}} metrics
 
 -- {{{ replication

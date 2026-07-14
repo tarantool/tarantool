@@ -2188,6 +2188,93 @@ I['metrics.exclude'] = format_text([[
 
 I['metrics.exclude.*'] = 'A name of a metric group or selector.'
 
+I['metrics.export'] = format_text([[
+    Configuration for exporting metrics using the `metrics-export-role`
+    module.
+]])
+
+I['metrics.export.graphite'] = 'Graphite servers to send metrics to.'
+
+I['metrics.export.graphite.*'] = 'A Graphite server to send metrics to.'
+
+I['metrics.export.graphite.*.host'] = 'A host of the Graphite server.'
+
+I['metrics.export.graphite.*.port'] = 'A UDP port of the Graphite server.'
+
+I['metrics.export.graphite.*.prefix'] = format_text([[
+    A prefix of the metric names. Metrics are sent as
+    `<prefix>.<metric_name>`.
+]])
+
+I['metrics.export.graphite.*.send_interval'] = format_text([[
+    An interval in seconds between sending metrics. The default is 2.
+]])
+
+I['metrics.export.http'] = 'HTTP servers to export metrics from.'
+
+I['metrics.export.http.*'] = format_text([[
+    An HTTP server to export metrics from. It is either started on
+    `listen` or is a `roles.httpd` server set by `server`. If neither is
+    set, the `default` server of `roles.httpd` is used.
+]])
+
+I['metrics.export.http.*.endpoints'] = 'Endpoints to export metrics from.'
+
+I['metrics.export.http.*.endpoints.*'] = 'An endpoint to export metrics from.'
+
+I['metrics.export.http.*.endpoints.*.format'] = format_text([[
+    A format of the exported metrics: `json` or `prometheus`.
+]])
+
+I['metrics.export.http.*.endpoints.*.metrics'] = format_text([[
+    HTTP metrics of the requests to the endpoint.
+]])
+
+I['metrics.export.http.*.endpoints.*.metrics.enabled'] = format_text([[
+    Whether to collect HTTP metrics of the requests to the endpoint.
+]])
+
+I['metrics.export.http.*.endpoints.*.path'] = format_text([[
+    A path of the endpoint, for example, `/metrics`.
+]])
+
+I['metrics.export.http.*.listen'] = format_text([[
+    A listening socket of the HTTP server. It is set the same way as an
+    `iproto.listen` item: a URI and SSL parameters.
+]])
+
+I['metrics.export.http.*.listen.params'] = I['<uri>.params']
+
+I['metrics.export.http.*.listen.params.ssl_ca_file'] =
+    I['<uri>.params.ssl_ca_file']
+
+I['metrics.export.http.*.listen.params.ssl_cert_file'] =
+    I['<uri>.params.ssl_cert_file']
+
+I['metrics.export.http.*.listen.params.ssl_ciphers'] =
+    I['<uri>.params.ssl_ciphers']
+
+I['metrics.export.http.*.listen.params.ssl_key_file'] =
+    I['<uri>.params.ssl_key_file']
+
+I['metrics.export.http.*.listen.params.ssl_password'] =
+    I['<uri>.params.ssl_password']
+
+I['metrics.export.http.*.listen.params.ssl_password_file'] =
+    I['<uri>.params.ssl_password_file']
+
+I['metrics.export.http.*.listen.params.transport'] = format_text([[
+    `plain` (default) for HTTP, `ssl` for HTTPS.
+]])
+
+I['metrics.export.http.*.listen.uri'] = format_text([[
+    A URI to listen on: `host:port`, `port`, or `unix/:<path>`.
+]])
+
+I['metrics.export.http.*.server'] = format_text([[
+    A name of the `roles.httpd` server to add the endpoints to.
+]])
+
 I['metrics.include'] = format_text([[
     An array containing built-in metric groups or custom metric selectors to
     turn on. The values are passed to `metrics.cfg()`.

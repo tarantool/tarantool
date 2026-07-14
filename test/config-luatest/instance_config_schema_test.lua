@@ -86,6 +86,22 @@ g.test_sensitive_annotations = function()
                 },
             },
         },
+        metrics = {
+            export = {
+                http = {{
+                    listen = {
+                        uri = 'localhost:8081',
+                        params = {
+                            transport = 'ssl',
+                            ssl_key_file = 'server.key',
+                            ssl_cert_file = 'server.crt',
+                            ssl_password = 'secret',
+                            ssl_password_file = 'passwords',
+                        },
+                    },
+                }},
+            },
+        },
     }
     instance_config:validate(iconfig)
 
@@ -100,6 +116,8 @@ g.test_sensitive_annotations = function()
         'credentials.users.client.password',
         'iproto.advertise.peer.password',
         'iproto.advertise.sharding.password',
+        'metrics.export.http.1.listen.params.ssl_password',
+        'metrics.export.http.1.listen.params.ssl_password_file',
     })
 end
 
@@ -1796,11 +1814,72 @@ g.test_metrics = function()
             include = {'network', 'info', 'cpu', 'roles.crud-router'},
             exclude = {'info', 'roles.crud-storage.custom_metric'},
             labels = {foo = 'bar'},
+            export = {
+                http = {{
+                    listen = {
+                        uri = 'localhost:8081',
+                        params = {
+                            transport = 'ssl',
+                            ssl_key_file = 'server.key',
+                            ssl_cert_file = 'server.crt',
+                            ssl_ca_file = 'ca.crt',
+                            ssl_ciphers = 'ECDHE-RSA-AES256-GCM-SHA384',
+                            ssl_password = 'secret',
+                            ssl_password_file = 'passwords',
+                        },
+                    },
+                    server = 'default',
+                    endpoints = {{
+                        path = '/metrics/json',
+                        format = 'json',
+                        metrics = {
+                            enabled = true,
+                        },
+                    }},
+                }},
+                graphite = {{
+                    prefix = 'tarantool',
+                    host = '127.0.0.1',
+                    port = 2003,
+                    send_interval = 1,
+                }},
+            },
         }
     }
 
     instance_config:validate(iconfig)
     validate_fields(iconfig.metrics, instance_config.schema.fields.metrics)
+end
+
+g.test_metrics_export_listen = function()
+    local cases = {
+        {
+            listen = {params = {transport = 'plain'}},
+            err = '[instance_config] metrics.export.http[1].listen: ' ..
+                  'The URI is required',
+        },
+        {
+            listen = {
+                uri = 'localhost:8081',
+                params = {transport = 'ssl', ssl_cert_file = 'server.crt'},
+            },
+            err = '[instance_config] metrics.export.http[1].listen: ' ..
+                  'ssl_key_file and ssl_cert_file are required for the ' ..
+                  'ssl transport',
+        },
+        {
+            listen = {uri = 'localhost:8081?transport=ssl'},
+            err = '[instance_config] metrics.export.http[1].listen.uri: ' ..
+                  "URI parameters should be described in the 'params' " ..
+                  'field, not as the part of URI',
+        },
+    }
+    for _, case in ipairs(cases) do
+        local iconfig = {metrics = {export = {http = {{listen = case.listen}}}}}
+        t.assert_error_msg_equals(case.err, function()
+            instance_config:validate(iconfig)
+        end)
+    end
 end
 
 g.test_sharding = function()
