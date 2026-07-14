@@ -620,17 +620,6 @@ sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName);
 #define SQL_DEFAULT_RECURSIVE_TRIGGERS 0
 #endif
 
-/**
- * Default count of allowed compound selects.
- *
- * Tarantool: gh-2548, gh-3382: Fiber stack is 64KB by default,
- * so maximum number of entities should be less than 30 or stack
- * guard will be triggered (triggered with clang).
-*/
-#ifndef SQL_DEFAULT_COMPOUND_SELECT
-#define SQL_DEFAULT_COMPOUND_SELECT 30
-#endif
-
 /*
  * Macros to compute minimum and maximum of two numbers.
  */

@@ -118,7 +118,7 @@ enum {
  * any limit on the number of terms in a compount SELECT.
  */
 #ifndef SQL_MAX_COMPOUND_SELECT
-#define SQL_MAX_COMPOUND_SELECT 50
+#define SQL_MAX_COMPOUND_SELECT 30
 #endif
 
 /*
