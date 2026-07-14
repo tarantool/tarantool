@@ -194,6 +194,19 @@ rawset(searchers, 'cpath.cwd.rocks', gen_file_searcher(load_lib, cpath.cwd.rocks
 --      ignored for the overridden paths as a result.
 rawset(searchers, 'croot.cwd', gen_croot_searcher(searchers['cpath.package']))
 
+-- Builtin modules, which are used only if no other searcher finds them.
+local fallback_modules = {
+    ['roles.httpd'] = 'internal.roles.httpd',
+}
+
+rawset(searchers, 'fallback', function(name)
+    local module = builtin_modules[fallback_modules[name]]
+    if module ~= nil then
+        return yield_builtin_loader(function(_) return module end,
+                                    ':fallback:')
+    end
+end)
+
 -- Indices in <searchers> table must represent the order of the
 -- functions in <package.loaders> below.
 rawset(searchers, 2, searchers['path.cwd.dot'])
@@ -203,6 +216,7 @@ rawset(searchers, 5, searchers['cpath.cwd.rocks'])
 rawset(searchers, 6, searchers['path.package'])
 rawset(searchers, 7, searchers['cpath.package'])
 rawset(searchers, 8, searchers['croot.cwd'])
+rawset(searchers, 9, searchers['fallback'])
 
 -- Compose a loader function from options. The function accepts
 -- the table with the searchers and the index, so the user can
@@ -492,6 +506,7 @@ rawset(searchers, 1, chain_searchers({
 -- [6]: package.path
 -- [7]: package.cpath
 -- [8]: croot
+-- [9]: fallback
 for index, _ in ipairs(searchers) do
     rawset(package.loaders, index, gen_legacy_loader(searchers, index))
 end
@@ -550,6 +565,7 @@ return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
     builtin = builtin_modules,
+    fallback = fallback_modules,
     searchers = searchers,
     override_builtin_enable = function()
         override_searcher_is_enabled = true

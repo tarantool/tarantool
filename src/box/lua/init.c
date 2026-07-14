@@ -164,6 +164,9 @@ extern char session_lua[],
 	metrics_tarantool_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
+	bundled_http_lua[],
+	httpd_role_lua[],
+	bundled_http_done_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
 	config_applier_autoexpel_lua[],
@@ -359,6 +362,9 @@ static const char * const lua_sources_main[] = {
 	"box/upgrade", NULL, upgrade_lua,
 	"box/console", "console", console_lua,
 	"box/backup", NULL, backup_lua,
+	"box/bundled_http", NULL, bundled_http_lua,
+	"third_party/http/roles/httpd", "internal.roles.httpd", httpd_role_lua,
+	"box/bundled_http_done", NULL, bundled_http_done_lua,
 
 	/* {{{ config */
 

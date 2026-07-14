@@ -226,6 +226,9 @@ local function get_module_metadata(module_name)
     end
 
     if res == nil then
+        if loaders.fallback[module_name] ~= nil then
+            return {}
+        end
         error(('Unable to locate package %q'):format(module_name), 0)
     end
 

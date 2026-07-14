@@ -108,6 +108,10 @@ LUALIB_API int
 luaopen_zip(lua_State *L);
 #endif
 
+/** Initialize the built-in HTTP server C module. */
+LUALIB_API int
+luaopen_http_lib(lua_State *L);
+
 #define MAX_MODNAME 64
 
 /**
@@ -139,6 +143,11 @@ extern char minifio_lua[],
 	errno_lua[],
 	fiber_lua[],
 	httpc_lua[],
+	http_codes_lua[],
+	http_mime_types_lua[],
+	http_sslsocket_lua[],
+	http_server_lua[],
+	http_version_lua[],
 	log_lua[],
 	uri_lua[],
 	socket_lua[],
@@ -269,6 +278,11 @@ static const char * const lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
+	"http.codes", http_codes_lua,
+	"http.mime_types", http_mime_types_lua,
+	"http.sslsocket", http_sslsocket_lua,
+	"http.version", http_version_lua,
+	"internal.http.server", http_server_lua,
 	EXTRA_LUA_MODULES
 	NULL
 };
@@ -891,6 +905,8 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 #if defined(ENABLE_BACKTRACE)
 	backtrace_lua_init();
 #endif /* defined(ENABLE_BACKTRACE) */
+	luaopen_http_lib(L);
+	luaT_setmodule(L, "http.lib");
 	for (const char * const *s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
 		const char *modsrc = *(s + 1);
