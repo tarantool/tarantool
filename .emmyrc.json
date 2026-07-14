@@ -46,7 +46,6 @@
       "redefined-local",
       "redundant-parameter",
       "return-type-mismatch",
-      "unbalanced-assignments",
       "undefined-field",
       "unnecessary-assert",
       "unnecessary-if",
