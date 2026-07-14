@@ -631,7 +631,8 @@ g.test_double_close = function(cg)
     cg.server:exec(function()
         local rv = box.read_view.open()
         rv:close()
-        t.assert_error_msg_contains('read view is closed', rv.close, rv)
+        local err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, rv.close, rv)
     end)
 end
 
@@ -678,10 +679,9 @@ g.test_get_after_close = function(cg)
         local rv = box.read_view.open()
         local idx = rv.space.test.index.primary
         rv:close()
-        t.assert_error_msg_contains(
-            "read view is closed", idx.get, idx, {1})
-        t.assert_error_msg_contains(
-            "read view is closed", idx.get, idx, {2})
+        local err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, idx.get, idx, {1})
+        t.assert_error_covers(err, idx.get, idx, {2})
     end)
 end
 
@@ -922,10 +922,9 @@ g.test_select_after_close = function(cg)
         local rv = box.read_view.open()
         local idx = rv.space.test.index.primary
         rv:close()
-        t.assert_error_msg_contains(
-            "read view is closed", idx.select, idx, {1})
-        t.assert_error_msg_contains(
-            "read view is closed", idx.select, idx, {2})
+        local err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, idx.select, idx, {1})
+        t.assert_error_covers(err, idx.select, idx, {2})
     end)
 end
 
@@ -1769,10 +1768,9 @@ g.test_pairs_after_close = function(cg)
         local idx = rv.space.test.index.primary
         local gen, param, state = idx:pairs()
         rv:close()
-        t.assert_error_msg_contains(
-            "read view is closed", idx.pairs, idx)
-        t.assert_error_msg_contains(
-            "read view is closed", gen, param, state)
+        local err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, idx.pairs, idx)
+        t.assert_error_covers(err, gen, param, state)
     end)
 end
 
@@ -1918,8 +1916,8 @@ g.test_quantile_after_close = function(cg)
         local rv = box.read_view.open()
         local idx = rv.space.test.index.primary
         rv:close()
-        t.assert_error_msg_contains(
-            "read view is closed", idx.quantile, idx, 0.5, {}, {})
+        local err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, idx.quantile, idx, 0.5, {}, {})
     end)
 end
 

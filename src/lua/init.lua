@@ -184,6 +184,7 @@ end
 --
 local trace_check_required_modules = {
     ['builtin/box/schema.lua'] = true,
+    ['builtin/box/read_view.lua'] = true,
     ['builtin/box/session.lua'] = true,
     ['builtin/box/app_threads.lua'] = true,
     ['builtin/box/iproto.lua'] = true,

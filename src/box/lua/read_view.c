@@ -91,12 +91,20 @@ lbox_check_index_read_view(struct lua_State *L, int idx)
 
 /** Get an index read view from Lua stack. Raise if it's closed. */
 static struct lbox_index_read_view *
-lbox_check_open_index_read_view(struct lua_State *L, int idx)
+lbox_check_open_index_read_view_at(struct lua_State *L, int idx, int level)
 {
 	struct lbox_index_read_view *rv = lbox_check_index_read_view(L, idx);
-	if (rv->read_view->is_closed)
-		luaL_error(L, "read view is closed");
+	if (rv->read_view->is_closed) {
+		diag_set(ClientError, ER_READ_VIEW_CLOSED);
+		luaT_error_at(L, level);
+	}
 	return rv;
+}
+
+static inline struct lbox_index_read_view *
+lbox_check_open_index_read_view(struct lua_State *L, int idx)
+{
+	return lbox_check_open_index_read_view_at(L, idx, 1);
 }
 
 /**
@@ -143,8 +151,10 @@ lbox_check_open_index_read_view_iterator(struct lua_State *L, int idx)
 {
 	struct lbox_index_read_view_iterator *it =
 		lbox_check_index_read_view_iterator(L, idx);
-	if (it->read_view->is_closed)
-		luaL_error(L, "read view is closed");
+	if (it->read_view->is_closed) {
+		diag_set(ClientError, ER_READ_VIEW_CLOSED);
+		luaT_error(L);
+	}
 	return it;
 }
 
@@ -317,10 +327,10 @@ lbox_read_view_open(struct lua_State *L)
 	opts.enable_space_upgrade = true;
 	opts.enable_data_temporary_spaces = true;
 	if (read_view_open(&rv->obj, &opts) != 0)
-		return luaT_error(L);
+		return luaT_error_at(L, 2);
 	if (read_view_activate(&rv->obj) != 0) {
 		read_view_close(&rv->obj);
-		return luaT_error(L);
+		return luaT_error_at(L, 2);
 	}
 	rv->is_closed = false;
 
@@ -569,7 +579,8 @@ lbox_index_read_view_iterator_next(struct lua_State *L)
 static int
 lbox_index_read_view_iterator(struct lua_State *L)
 {
-	struct lbox_index_read_view *rv = lbox_check_open_index_read_view(L, 1);
+	struct lbox_index_read_view *rv =
+		lbox_check_open_index_read_view_at(L, 1, 2);
 	int iterator = luaL_checkinteger(L, 2);
 
 	/*
@@ -612,7 +623,7 @@ lbox_index_read_view_iterator(struct lua_State *L)
 	return 1;
 error:
 	region_truncate(region, region_svp);
-	return luaT_error(L);
+	return luaT_error_at(L, 2);
 }
 
 void
