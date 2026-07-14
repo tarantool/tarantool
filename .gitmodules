@@ -67,3 +67,6 @@
 [submodule "luatest"]
 	path = luatest
 	url = https://github.com/tarantool/luatest.git
+[submodule "third_party/http"]
+	path = third_party/http
+	url = https://github.com/tarantool/http.git
