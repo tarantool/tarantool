@@ -108,6 +108,10 @@ LUALIB_API int
 luaopen_zip(lua_State *L);
 #endif
 
+/** Initialize the built-in HTTP server C module. */
+LUALIB_API int
+luaopen_http_lib(lua_State *L);
+
 #define MAX_MODNAME 64
 
 /**
@@ -139,6 +143,11 @@ extern char minifio_lua[],
 	errno_lua[],
 	fiber_lua[],
 	httpc_lua[],
+	http_codes_lua[],
+	http_mime_types_lua[],
+	http_sslsocket_lua[],
+	http_server_lua[],
+	http_version_lua[],
 	log_lua[],
 	uri_lua[],
 	socket_lua[],
@@ -223,6 +232,11 @@ static const char * const lua_modules_minimal[] = {
 	"datetime", datetime_lua,
 	"msgpackffi", msgpackffi_lua,
 	"http.client", httpc_lua,
+	"http.codes", http_codes_lua,
+	"http.mime_types", http_mime_types_lua,
+	"http.sslsocket", http_sslsocket_lua,
+	"http.version", http_version_lua,
+	"http.server", http_server_lua,
 	NULL
 };
 
@@ -805,6 +819,8 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	lua_pop(L, 1);
 	luaopen_http_client_driver(L);
 	lua_pop(L, 1);
+	luaopen_http_lib(L);
+	luaT_setmodule(L, "http.lib");
 
 	luaopen_tarantool(L);
 	for (const char * const *s = lua_modules_minimal; *s; s += 2) {
