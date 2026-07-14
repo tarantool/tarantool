@@ -1479,6 +1479,9 @@ g.test_box_cfg_coverage = function()
         -- handled by the box_cfg applier.
         read_only = true,
 
+        -- Supplied by the box_cfg applier along with read_only.
+        ro_details = true,
+
         -- Deliberately moved out of the config, because the
         -- box.cfg() options is deprecated.
         replication_connect_quorum = true,

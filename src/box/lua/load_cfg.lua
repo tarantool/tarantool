@@ -184,6 +184,7 @@ local default_cfg = {
     username            = nil,
     coredump            = false,
     read_only           = false,
+    ro_details          = nil,
     hot_standby         = false,
     memtx_use_mvcc_engine = false,
     checkpoint_interval = 3600,
@@ -398,6 +399,7 @@ local template_cfg = {
     wal_queue_max_size  = 'number',
     checkpoint_count    = 'number',
     read_only           = 'boolean, string',
+    ro_details          = 'string',
     hot_standby         = 'boolean',
     memtx_use_mvcc_engine = 'boolean',
     txn_isolation = 'string, number',
@@ -623,7 +625,6 @@ local dynamic_cfg = {
     readahead               = private.cfg_set_readahead,
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
-    read_only               = private.cfg_set_read_only,
     memtx_memory            = private.cfg_set_memtx_memory,
     memtx_use_sort_data     = private.cfg_set_memtx_use_sort_data,
     memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
@@ -714,6 +715,13 @@ local dynamic_cfg = {
 -- to "safe" value given in `revert_fallback`. "safe" in sense that
 -- reverting to it should always be successful.
 local dynamic_cfg_modules = {
+    read_only = {
+        cfg = private.cfg_set_read_only,
+        options = {
+            read_only = true,
+            ro_details = true,
+        },
+    },
     listen = {
         cfg = private.cfg_set_listen,
         options = {
@@ -1135,6 +1143,42 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
     end
 end
 
+-- The details are passed to the C side via cfg_gets(), which copies them into a
+-- fixed-size buffer. Reject values that would not survive the round-trip.
+local ro_details_max_len = 511
+
+local function normalize_ro_details(cfg)
+    if cfg.ro_details == nil then
+        if cfg.read_only ~= nil then
+            -- Keep the key in cfg so that the read_only module clears an
+            -- earlier custom description.
+            cfg.ro_details = box.NULL
+        end
+        return
+    end
+
+    if cfg.read_only ~= true then
+        box.error(box.error.CFG, 'ro_details',
+                  'may be set only when read_only is true')
+    end
+
+    -- Let prepare_cfg() report the usual type error for non-string values.
+    if type(cfg.ro_details) ~= 'string' then
+        return
+    end
+
+    if #cfg.ro_details > ro_details_max_len then
+        box.error(box.error.CFG, 'ro_details',
+                  'the value must not exceed ' .. ro_details_max_len ..
+                  ' bytes')
+    end
+
+    if cfg.ro_details:find('\0', 1, true) ~= nil then
+        box.error(box.error.CFG, 'ro_details',
+                  'the value must not contain a zero byte')
+    end
+end
+
 local function reload_cfg(oldcfg, cfg)
     if cfg == nil then
         cfg = {}
@@ -1142,6 +1186,7 @@ local function reload_cfg(oldcfg, cfg)
         error("Error: cfg should be a table")
     end
     cfg = upgrade_cfg(cfg, translate_cfg)
+    normalize_ro_details(cfg)
     local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
                                modify_cfg)
     local module_keys = {}
@@ -1257,6 +1302,7 @@ local function load_cfg(cfg)
     apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
 
     cfg = upgrade_cfg(cfg, translate_cfg)
+    normalize_ro_details(cfg)
 
     cfg = prepare_cfg(cfg, pre_load_cfg, default_cfg, template_cfg, modify_cfg)
 
