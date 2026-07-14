@@ -163,6 +163,7 @@ extern char session_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
 	httpd_role_lua[],
+	metrics_export_role_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
 	config_applier_autoexpel_lua[],
@@ -174,6 +175,7 @@ extern char session_lua[],
 	config_applier_console_lua[],
 	config_applier_credentials_lua[],
 	config_applier_fiber_lua[],
+	config_applier_metrics_export_lua[],
 	config_applier_lua_lua[],
 	config_applier_mkdir_lua[],
 	config_applier_roles_lua[],
@@ -358,6 +360,8 @@ static const char * const lua_sources_main[] = {
 	"box/console", "console", console_lua,
 	"box/backup", NULL, backup_lua,
 	"third_party/http/roles/httpd", "roles.httpd", httpd_role_lua,
+	"third_party/metrics-export-role/roles/metrics-export",
+	"roles.metrics-export", metrics_export_role_lua,
 
 	/* {{{ config */
 
@@ -495,6 +499,10 @@ static const char * const lua_sources_main[] = {
 	"config/applier/fiber",
 	"internal.config.applier.fiber",
 	config_applier_fiber_lua,
+
+	"config/applier/metrics_export",
+	"internal.config.applier.metrics_export",
+	config_applier_metrics_export_lua,
 
 	"config/applier/lua",
 	"internal.config.applier.lua",

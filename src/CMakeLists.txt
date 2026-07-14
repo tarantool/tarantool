@@ -136,6 +136,9 @@ lua_source(lua_sources ../third_party/http/http/sslsocket.lua
 lua_source(lua_sources ../third_party/http/http/server.lua http_server_lua)
 lua_source(lua_sources ../third_party/http/http/version.lua http_version_lua)
 lua_source(lua_sources ../third_party/http/roles/httpd.lua httpd_role_lua)
+lua_source(lua_sources
+           ../third_party/metrics-export-role/roles/metrics-export.lua
+           metrics_export_role_lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
