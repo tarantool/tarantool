@@ -314,7 +314,6 @@ sql_init_db(sql **out_db)
 
 	assert(sizeof(db->aLimit) == sizeof(aHardLimit));
 	memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
-	db->aLimit[SQL_LIMIT_COMPOUND_SELECT] = SQL_DEFAULT_COMPOUND_SELECT;
 	db->szMmap = sqlGlobalConfig.szMmap;
 	db->nMaxSorterMmap = 0x7FFFFFFF;
 
