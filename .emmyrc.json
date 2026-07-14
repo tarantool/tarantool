@@ -1,0 +1,163 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
+  "workspace": {
+    "ignoreGlobs": [
+      "build/**/*.lua",
+      "luatest/**/*.lua",
+      "test-run/**/*.lua",
+      "test/app/*.test.lua",
+      "test/box/*.test.lua",
+      "test/engine/*.test.lua",
+      "test/engine_long/*.test.lua",
+      "test/replication/*.test.lua",
+      "test/metrics-luatest/test/*.lua",
+      "test/metrics-luatest/test/**/*.lua",
+      "test/sql/**/*.lua",
+      "test/swim/*.test.lua",
+      "test/var/**/*.lua",
+      "test/vinyl/*.test.lua",
+      "test/wal_off/*.test.lua",
+      "test/xlog/*.test.lua",
+      "test/static/corpus/luaL_loadbuffer/*.lua",
+      "third_party/**/*.lua",
+      ".rocks/**/*.lua",
+      ".git/**/*.lua"
+    ]
+  },
+  "diagnostics": {
+    "disable": [
+      "access-invisible",
+      "assign-type-mismatch",
+      "await-in-sync",
+      "call-non-callable",
+      "deprecated",
+      "discard-returns",
+      "duplicate-require",
+      "duplicate-type",
+      "generic-constraint-mismatch",
+      "global-in-non-module",
+      "inject-field",
+      "missing-parameter",
+      "need-check-nil",
+      "param-type-mismatch",
+      "preferred-local-alias",
+      "redefined-local",
+      "redundant-parameter",
+      "return-type-mismatch",
+      "unbalanced-assignments",
+      "undefined-field",
+      "unnecessary-assert",
+      "unnecessary-if",
+      "unresolved-require",
+      "unused"
+    ],
+    "severity": {
+      "redefined-local": "information",
+      "shadow-local": "information",
+      "shadow-upvalue": "information",
+      "unused-arg": "information",
+      "unused-local": "information"
+    },
+    "globals": [
+      "box",
+      "misc",
+      "package",
+      "tonumber64",
+      "utf8",
+      "_TARANTOOL"
+    ]
+  },
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "config": {
+    "override": [
+      {
+        "files": [
+          "src/lua/help.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "help",
+            "tutorial"
+          ]
+        }
+      },
+      {
+        "files": [
+          "src/lua/init.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "dostring"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box/box.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "cfg_filter",
+            "sorted",
+            "iproto_request"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box-tap/session.test.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "session",
+            "space",
+            "f1",
+            "f2"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box-tap/extended_error.test.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "error_access_denied",
+            "error_new",
+            "error_new_stacked",
+            "error_throw",
+            "error_throw_stacked",
+            "error_throw_access_denied",
+            "forbidden_function"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/swim/box.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "listen_port",
+            "listen_uri",
+            "uuid",
+            "uri"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/replication/replica_quorum.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "INSTANCE_URI",
+            "nonexistent_uri"
+          ]
+        }
+      }
+    ]
+  }
+}
