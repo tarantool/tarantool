@@ -402,7 +402,7 @@ ifexists(A) ::= .            {A = 0;}
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
 cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
-          AS select(S). {
+          AS select_old(S). {
   if (!pParse->parse_only) {
     create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
     pParse->initiateTTrans = true;
@@ -416,7 +416,7 @@ cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
-cmd ::= select(X).  {
+cmd ::= select_old(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
   if(pParse->parse_only) {
     diag_set(ClientError, ER_SQL_PARSER_GENERIC,
@@ -428,128 +428,81 @@ cmd ::= select(X).  {
   sql_select_delete(X);
 }
 
-%type select {Select*}
-%destructor select {sql_select_delete($$);}
-%type selectnowith {Select*}
-%destructor selectnowith {sql_select_delete($$);}
-%type oneselect {Select*}
-%destructor oneselect {sql_select_delete($$);}
-
-%include {
-  /**
-   * For a compound SELECT statement, make sure
-   * p->pPrior->pNext==p for all elements in the list. And make
-   * sure list length does not exceed SQL_MAX_COMPOUND_SELECT.
-   */
-  static void parserDoubleLinkSelect(Parse *pParse, Select *p){
-    if( p->pPrior ){
-      Select *pNext = 0, *pLoop;
-      int mxSelect, cnt = 0;
-      for(pLoop=p; pLoop; pNext=pLoop, pLoop=pLoop->pPrior, cnt++){
-        pLoop->pNext = pNext;
-        pLoop->selFlags |= SF_Compound;
-      }
-      if((p->selFlags & SF_MultiValue) == 0 &&
-         (mxSelect = sql_get()->aLimit[SQL_LIMIT_COMPOUND_SELECT]) > 0 &&
-         cnt > mxSelect) {
-          diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of UNION or "\
-                   "EXCEPT or INTERSECT operations", cnt,
-                   sql_get()->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
-         pParse->is_aborted = true;
-      }
-    }
-  }
+/**
+ * A temporary rule that converts `struct ast_select` values to `struct Select`.
+ */
+%type select_old {Select*}
+%destructor select_old {sql_select_delete($$);}
+select_old(A) ::= select(X). {
+  A = select_from_ast(pParse, X);
 }
 
+%type select {struct ast_select *}
+%destructor select {ast_select_list_destroy($$);}
+%type selectnowith {struct ast_select *}
+%destructor selectnowith {ast_select_list_destroy($$);}
+%type oneselect {struct ast_select *}
+%destructor oneselect {ast_select_list_destroy($$);}
+
 select(A) ::= with(W) selectnowith(X). {
-  Select *p = X;
-  if( p ){
-    p->pWith = W;
-    parserDoubleLinkSelect(pParse, p);
-  }else{
-    sqlWithDelete(W);
-  }
-  A = p; /*A-overwrites-W*/
+  A = X;
+  A->with = W;
 }
 
 selectnowith(A) ::= oneselect(A).
 
-selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
-  Select *pRhs = Z;
-  Select *pLhs = A;
-  if( pRhs && pRhs->pPrior ){
-    SrcList *pFrom;
-    Token x;
-    x.n = 0;
-    parserDoubleLinkSelect(pParse, pRhs);
-    pFrom = sqlSrcListAppendFromTerm(0, 0, &x, pRhs, 0, 0, false);
-    pRhs = sqlSelectNew(pParse,0,pFrom,0,0,0,0,0,0,0);
+selectnowith(A) ::= selectnowith(X) multiselect_op(Y) oneselect(Z).  {
+  A = Z;
+  if (!rlist_empty(&Z->link)) {
+    struct ast_source *new = ast_source_new(pParse);
+    new->select = Z;
+    A = ast_select_new(pParse);
+    A->sources = ast_source_list_append(pParse, NULL, new);
   }
-  if( pRhs ){
-    pRhs->op = (u8)Y;
-    pRhs->pPrior = pLhs;
-    if( ALWAYS(pLhs) ) pLhs->selFlags &= ~SF_MultiValue;
-    pRhs->selFlags &= ~SF_MultiValue;
-    if( Y!=TK_ALL ) pParse->hasCompound = 1;
-  }else{
-    sql_select_delete(pLhs);
-  }
-  A = pRhs;
+  A->op = Y;
+  A->flags |= SF_Compound;
+  A->flags &= ~SF_MultiValue;
+  X->flags |= SF_Compound;
+  X->flags &= ~SF_MultiValue;
+  rlist_add(&X->link, &A->link);
+  if(Y != TK_ALL)
+    pParse->hasCompound = 1;
 }
-%type multiselect_op {int}
+%type multiselect_op {uint8_t}
 multiselect_op(A) ::= UNION(OP).             {A = @OP; /*A-overwrites-OP*/}
 multiselect_op(A) ::= UNION ALL.             {A = TK_ALL;}
 multiselect_op(A) ::= EXCEPT|INTERSECT(OP).  {A = @OP; /*A-overwrites-OP*/}
 
-oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
+oneselect(A) ::= SELECT distinct(D) selcollist(W) from(X) where_opt(Y)
                  groupby_opt(P) having_opt(Q) orderby_opt(Z) limit_opt(L). {
-#ifdef SQL_DEBUG
-  Token s = S; /*A-overwrites-S*/
-#endif
-  A = sqlSelectNew(pParse,W,X,Y,P,Q,Z,D,L.pLimit,L.pOffset);
-#ifdef SQL_DEBUG
-  /* Populate the Select.zSelName[] string that is used to help with
-  ** query planner debugging, to differentiate between multiple Select
-  ** objects in a complex query.
-  **
-  ** If the SELECT keyword is immediately followed by a C-style comment
-  ** then extract the first few alphanumeric characters from within that
-  ** comment to be the zSelName value.  Otherwise, the label is #N where
-  ** is an integer that is incremented with each SELECT statement seen.
-  */
-  if( A!=0 ){
-    const char *z = s.z+6;
-    int i;
-    sql_snprintf(sizeof(A->zSelName), A->zSelName, "#%d",
-                     ++pParse->nSelect);
-    while( z[0]==' ' ) z++;
-    if( z[0]=='/' && z[1]=='*' ){
-      z += 2;
-      while( z[0]==' ' ) z++;
-      for(i=0; sqlIsalnum(z[i]); i++){}
-      sql_snprintf(sizeof(A->zSelName), A->zSelName, "%.*s", i, z);
-    }
-  }
-#endif /* SQL_DEBUG */
+  A = ast_select_new(pParse);
+  A->columns = W;
+  A->sources = X;
+  A->where = Y;
+  A->group_by = P;
+  A->having = Q;
+  A->order_by = Z;
+  A->flags = D;
+  A->limit = L.pLimit;
+  A->offset = L.pOffset;
 }
 oneselect(A) ::= values(A).
 
-%type values {Select*}
-%destructor values {sql_select_delete($$);}
+%type values {struct ast_select *}
+%destructor values {ast_select_list_destroy($$);}
 values(A) ::= VALUES LP nexprlist(X) RP. {
-  A = sqlSelectNew(pParse,X,0,0,0,0,0,SF_Values,0,0);
+  A = ast_select_new(pParse);
+  A->columns = X;
+  A->flags = SF_Values;
 }
-values(A) ::= values(A) COMMA LP exprlist(Y) RP. {
-  Select *pRight, *pLeft = A;
-  pRight = sqlSelectNew(pParse,Y,0,0,0,0,0,SF_Values|SF_MultiValue,0,0);
-  if( ALWAYS(pLeft) ) pLeft->selFlags &= ~SF_MultiValue;
-  if( pRight ){
-    pRight->op = TK_ALL;
-    pRight->pPrior = pLeft;
-    A = pRight;
-  }else{
-    A = pLeft;
-  }
+values(A) ::= values(X) COMMA LP exprlist(Y) RP. {
+  X->flags |= SF_Compound;
+  X->flags &= ~SF_MultiValue;
+  A = ast_select_new(pParse);
+  A->columns = Y;
+  A->flags = SF_Values|SF_MultiValue|SF_Compound;
+  A->op = TK_ALL;
+  rlist_add(&X->link, &A->link);
 }
 
 // The "distinct" nonterminal is true (1) if the DISTINCT keyword is
@@ -598,12 +551,13 @@ as(X) ::= .            {X.n = 0; X.z = 0;}
 seqscan(X) ::= SEQSCAN.     {X = 0;}
 seqscan(X) ::= .            {X = 1;}
 
-%type from {SrcList*}
-%destructor from {sqlSrcListDelete($$);}
-
-from(A) ::= .                {A = sql_xmalloc0(sizeof(*A));}
+%type from {struct ast_source_list *}
+%destructor from {ast_source_list_destroy($$);}
+from(A) ::= . {
+  A = NULL;
+}
 from(A) ::= FROM source_list(X). {
-  A = src_list_from_ast(X);
+  A = X;
 }
 
 %type source_list {struct ast_source_list *}
@@ -623,14 +577,13 @@ source_list(A) ::= LP source_list(F) RP as(Z). {
     new->select = old->select;
     A = ast_source_list_append(pParse, NULL, new);
   } else {
-    struct SrcList *list = src_list_from_ast(F);
-    if (list != NULL) {
-      Select *pSubquery = sqlSelectNew(pParse,0,list,0,0,0,0,SF_NestedFrom,0,0);
-      struct ast_source *src = ast_source_new(pParse);
-      src->alias = Z;
-      src->select = pSubquery;
-      A = ast_source_list_append(pParse, NULL, src);
-    }
+    struct ast_select *subquery = ast_select_new(pParse);
+    subquery->sources = F;
+    subquery->flags = SF_NestedFrom;
+    struct ast_source *src = ast_source_new(pParse);
+    src->alias = Z;
+    src->select = subquery;
+    A = ast_source_list_append(pParse, NULL, src);
   }
 }
 source_list(A) ::= source_list(A) joinop(Y) source(X) on_opt(N) using_opt(U). {
@@ -653,17 +606,16 @@ source_list(A) ::= source_list(X) joinop(Y) LP source_list(F) RP as(Z) on_opt(N)
     new->join_using = U;
     A = ast_source_list_append(pParse, X, new);
   } else {
-    struct SrcList *list = src_list_from_ast(F);
-    if (list != NULL) {
-      Select *pSubquery = sqlSelectNew(pParse,0,list,0,0,0,0,SF_NestedFrom,0,0);
-      struct ast_source *src = ast_source_new(pParse);
-      src->alias = Z;
-      src->select = pSubquery;
-      src->join_type = Y;
-      src->join_on = N;
-      src->join_using = U;
-      A = ast_source_list_append(pParse, X, src);
-    }
+    struct ast_select *subquery = ast_select_new(pParse);
+    subquery->sources = F;
+    subquery->flags = SF_NestedFrom;
+    struct ast_source *src = ast_source_new(pParse);
+    src->alias = Z;
+    src->select = subquery;
+    src->join_type = Y;
+    src->join_on = N;
+    src->join_using = U;
+    A = ast_source_list_append(pParse, X, src);
   }
 }
 
@@ -883,7 +835,7 @@ setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
 
 ////////////////////////// The INSERT command /////////////////////////////////
 //
-cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) select(S). {
+cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) select_old(S). {
   sqlWithPush(pParse, W, 1);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
@@ -1353,12 +1305,12 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
   }
   A.zEnd = &E.z[E.n];
 }
-expr(A) ::= LP(B) select(X) RP(E). {
+expr(A) ::= LP(B) select_old(X) RP(E). {
   spanSet(&A,&B,&E); /*A-overwrites-B*/
   A.pExpr = sqlPExpr(pParse, TK_SELECT, 0, 0);
   sqlPExprAddSelect(pParse, A.pExpr, X);
 }
-expr(A) ::= expr(A) in_op(N) LP select(Y) RP(E).  [IN] {
+expr(A) ::= expr(A) in_op(N) LP select_old(Y) RP(E).  [IN] {
   A.pExpr = sqlPExpr(pParse, TK_IN, A.pExpr, 0);
   sqlPExprAddSelect(pParse, A.pExpr, Y);
   exprNot(pParse, N, &A);
@@ -1374,7 +1326,7 @@ expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
   exprNot(pParse, N, &A);
   A.zEnd = &Y.z[Y.n];
 }
-expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
+expr(A) ::= EXISTS(B) LP select_old(Y) RP(E). {
   Expr *p;
   spanSet(&A,&B,&E); /*A-overwrites-B*/
   p = A.pExpr = sqlPExpr(pParse, TK_EXISTS, 0, 0);
@@ -1630,7 +1582,7 @@ trigger_cmd(A) ::=
    }
 
 // INSERT
-trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select(S). {
+trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select_old(S). {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, S, R);
 }
@@ -1641,7 +1593,7 @@ trigger_cmd(A) ::= DELETE FROM trnm(X) tridxby where_opt(Y). {
 }
 
 // SELECT
-trigger_cmd(A) ::= select(X). {
+trigger_cmd(A) ::= select_old(X). {
   /* A-overwrites-X. */
   A = sql_trigger_select_step(X);
 }
@@ -1789,10 +1741,10 @@ with(A) ::= . {A = 0;}
 with(A) ::= WITH wqlist(W).              { A = W; }
 with(A) ::= WITH RECURSIVE wqlist(W).    { A = W; }
 
-wqlist(A) ::= nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
+wqlist(A) ::= nm(X) eidlist_opt(Y) AS LP select_old(Z) RP. {
   A = sqlWithAdd(pParse, 0, &X, Y, Z); /*A-overwrites-X*/
 }
-wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
+wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select_old(Z) RP. {
   A = sqlWithAdd(pParse, A, &X, Y, Z);
 }
 

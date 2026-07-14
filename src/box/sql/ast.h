@@ -9,6 +9,7 @@
 
 #include "parse_def.h"
 #include "salad/stailq.h"
+#include "small/rlist.h"
 
 /** List of IDs received from parser. */
 struct ast_id_list {
@@ -45,7 +46,7 @@ struct ast_source {
 	/** Name of the index specified via INDEXED BY, if any. */
 	struct Token indexed_by;
 	/** SELECT statement of a subquery. */
-	struct Select *select;
+	struct ast_select *select;
 	/** Expression of a join's ON clause. */
 	struct Expr *join_on;
 	/** Column names of a join's USING clause. */
@@ -58,6 +59,34 @@ struct ast_source {
 	bool is_tab_func;
 	/** True if scanning is not allowed for this source. */
 	bool disallow_scan;
+};
+
+/** Structure that describes SELECT. */
+struct ast_select {
+	/** Link to other SELECTs. */
+	struct rlist link;
+	/** The FROM clause of the SELECT. */
+	struct ast_source_list *sources;
+	/** Resulting expressions of the SELECT. */
+	struct ExprList *columns;
+	/** GROUP BY clause of the SELECT. */
+	struct ExprList *group_by;
+	/** ORDER BY clause of the SELECT. */
+	struct ExprList *order_by;
+	/** WHERE clause of the SELECT. */
+	struct Expr *where;
+	/** HAVING clause of the SELECT. */
+	struct Expr *having;
+	/** LIMIT clause of the SELECT. */
+	struct Expr *limit;
+	/** OFFSET clause of the SELECT. */
+	struct Expr *offset;
+	/** WITH clause of the SELECT. */
+	struct With *with;
+	/** Flags of the SELECT. */
+	uint32_t flags;
+	/** Link type between linked SELECTs. */
+	uint8_t op;
 };
 
 /** Append an ID to ID list. */
@@ -88,4 +117,16 @@ ast_source_list_destroy(struct ast_source_list *list);
 
 /** Convert `struct ast_source_list` to `struct SrcList`. */
 struct SrcList *
-src_list_from_ast(struct ast_source_list *list);
+src_list_from_ast(struct Parse *parser, struct ast_source_list *list);
+
+/** Create new empty SELECT structure. */
+struct ast_select *
+ast_select_new(struct Parse *parser);
+
+/** Clear the SELECT and all linked SELECTs. */
+void
+ast_select_list_destroy(struct ast_select *select);
+
+/** Build `struct Select` object from `struct ast_select` object. */
+struct Select *
+select_from_ast(struct Parse *parser, struct ast_select *select);

@@ -47,7 +47,7 @@ void
 ast_source_destroy(struct ast_source *src)
 {
 	sql_expr_list_delete(src->func_args);
-	sql_select_delete(src->select);
+	ast_select_list_destroy(src->select);
 	sql_expr_delete(src->join_on);
 }
 
@@ -77,23 +77,108 @@ ast_source_list_destroy(struct ast_source_list *list)
 }
 
 struct SrcList *
-src_list_from_ast(struct ast_source_list *list)
+src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 {
 	if (list == NULL)
 		return NULL;
 	struct SrcList *res = NULL;
 	struct ast_source *src;
 	stailq_foreach_entry(src, &list->head, link) {
+		struct Select *select = select_from_ast(parser, src->select);
 		struct Token *name = src->name.n > 0 ? &src->name: NULL;
-		res = sqlSrcListAppendFromTerm(res, name, &src->alias,
-					       src->select, src->join_on,
-					       src->join_using,
+		res = sqlSrcListAppendFromTerm(res, name, &src->alias, select,
+					       src->join_on, src->join_using,
 					       src->disallow_scan);
 		if (src->indexed_by.n != 0)
 			sqlSrcListIndexedBy(res, &src->indexed_by);
 		if (src->is_tab_func)
 			sqlSrcListFuncArgs(res, src->func_args);
 		res->a[res->nSrc - 1].fg.jointype = src->join_type;
+	}
+	if (parser->is_aborted) {
+		sqlSrcListDelete(res);
+		return NULL;
+	}
+	return res;
+}
+
+struct ast_select *
+ast_select_new(struct Parse *parser)
+{
+	struct ast_select *res = xregion_alloc(&parser->region, sizeof(*res));
+	memset(res, 0, sizeof(*res));
+	rlist_create(&res->link);
+	res->op = TK_SELECT;
+	return res;
+}
+
+/** Clear single `struct Select` object. */
+static void
+ast_select_destroy(struct ast_select *select)
+{
+	ast_source_list_destroy(select->sources);
+	sql_expr_list_delete(select->columns);
+	sql_expr_list_delete(select->group_by);
+	sql_expr_list_delete(select->order_by);
+	sql_expr_delete(select->where);
+	sql_expr_delete(select->having);
+	sql_expr_delete(select->limit);
+	sql_expr_delete(select->offset);
+	sqlWithDelete(select->with);
+}
+
+void
+ast_select_list_destroy(struct ast_select *select)
+{
+	if (select == NULL)
+		return;
+	ast_select_destroy(select);
+	struct ast_select *next;
+	struct ast_select *tmp;
+	rlist_foreach_entry_safe(next, &select->link, link, tmp) {
+		ast_select_destroy(select);
+	}
+}
+
+/** Build single `struct Select` object from `struct ast_select` object. */
+static struct Select *
+select_from_ast_single(struct Parse *parser, struct ast_select *select)
+{
+	struct SrcList *list = src_list_from_ast(parser, select->sources);
+	struct Select *res = sqlSelectNew(parser, select->columns, list,
+					  select->where, select->group_by,
+					  select->having, select->order_by,
+					  select->flags, select->limit,
+					  select->offset);
+	res->op = select->op;
+	res->pWith = select->with;
+	return res;
+}
+
+struct Select *
+select_from_ast(struct Parse *parser, struct ast_select *select)
+{
+	if (select == NULL)
+		return NULL;
+	struct Select *res = select_from_ast_single(parser, select);
+	struct Select *next = res;
+	struct ast_select *prev;
+	int count = 1;
+	rlist_foreach_entry_reverse(prev, &select->link, link) {
+		struct Select *prior = select_from_ast_single(parser, prev);
+		next->pPrior = prior;
+		prior->pNext = next;
+		next = prior;
+		count++;
+	}
+	if ((res->selFlags & SF_MultiValue) == 0 &&
+	    count > SQL_MAX_COMPOUND_SELECT) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of "
+			 "UNION or EXCEPT or INTERSECT operations", count,
+			 SQL_MAX_COMPOUND_SELECT);
+		parser->is_aborted = true;
+		sql_select_delete(res);
+		return NULL;
 	}
 	return res;
 }
