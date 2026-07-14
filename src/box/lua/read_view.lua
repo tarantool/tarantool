@@ -1,3 +1,4 @@
+local fun = require('fun')
 local utils = require('internal.utils')
 
 local check_index_arg = box.internal.check_index_arg
@@ -65,6 +66,14 @@ local READ_VIEW_OPTIONS_TEMPLATE = {
     name = 'string',
 }
 
+local function check_read_view_arg(rv, method, level)
+    if type(rv) ~= 'table' then
+        local fmt = 'Use read_view:%s(...) instead of read_view.%s(...)'
+        box.error(box.error.ILLEGAL_PARAMS,
+                  string.format(fmt, method, method), level + 1)
+    end
+end
+
 -- Helper function that returns a copy of the given object with private fields
 -- (fields whose names start with an underscore) filtered out. It is used for
 -- object serialization.
@@ -120,6 +129,78 @@ for k, v in pairs(read_view_index_mt_base) do
     read_view_index_mt_ffi[k] = v
 end
 
+local read_view_methods = {}
+local read_view_properties = {
+    -- System read views are closed asynchronously so we have to query
+    -- the status.
+    status = internal.status,
+}
+
+local read_view_mt = {
+    __index = function(self, key)
+        if rawget(self, key) ~= nil then
+            return rawget(self, key)
+        elseif read_view_properties[key] ~= nil then
+            return read_view_properties[key](self)
+        elseif read_view_methods[key] ~= nil then
+            return read_view_methods[key]
+        end
+    end,
+    __autocomplete = function(self)
+        -- Make sure that everything that can be returned by __index is
+        -- auto-completed in console. Replace property callbacks with scalars
+        -- so that they are auto-completed as data members, not as methods.
+        return fun.tomap(fun.chain(fun.map(function(k) return k, true end,
+                                           fun.iter(read_view_properties)),
+                                   fun.iter(read_view_methods)))
+    end,
+}
+
+--
+-- Table of open read views: id -> read view object.
+--
+-- We use weak ref, because we don't want to pin a read view object after
+-- the user drops the last reference to it.
+--
+local read_view_registry = setmetatable({}, {__mode = 'v'})
+
+--
+-- Sets a metatable for a new read view object and adds it to the registry so
+-- that it can be returned by box.read_view.list().
+--
+local function register_read_view(rv)
+    assert(rv.id ~= nil)
+    assert(read_view_registry[rv.id] == nil)
+    assert(getmetatable(rv) == nil)
+    setmetatable(rv, read_view_mt)
+    read_view_registry[rv.id] = rv
+    return rv
+end
+
+box.read_view = {}
+
+--
+-- Returns an array of all open read views sorted by id, ascending.
+--
+-- Since read view ids grow incrementally and never wrap around,
+-- the most recent read view will always be last.
+--
+function box.read_view.list()
+    local list = {}
+    for _, rv in ipairs(internal.list()) do
+        local registered_rv = read_view_registry[rv.id]
+        if registered_rv == nil then
+            -- This is a new read view object that hasn't been used from Lua
+            -- yet. Add it to the registry for the next listing to return the
+            -- same object.
+            registered_rv = register_read_view(rv)
+        end
+        table.insert(list, registered_rv)
+    end
+    table.sort(list, function(rv1, rv2) return rv1.id < rv2.id end)
+    return list
+end
+
 --
 -- Opens a new read view.
 --
@@ -147,8 +228,33 @@ function box.read_view.open(opts)
             end
         end
     end
-    return box.internal.read_view_register(rv)
+    return register_read_view(rv)
 end
+
+--
+-- Returns a read view info table:
+--  - 'id' - unique read view identifier.
+--  - 'name' - read view name.
+--  - 'is_system' - true if the read view is used for system purposes.
+--  - 'timestamp' - fiber.clock() at the time of read view open.
+--  - 'vclock' - box.info.vclock at the time of read view open.
+--  - 'signature' - box.info.signature at the time of read view open.
+--  - 'status' - 'open' or 'closed'.
+--
+function read_view_methods:info()
+    check_read_view_arg(self, 'info', 2)
+    return {
+        id = self.id,
+        name = self.name,
+        is_system = self.is_system,
+        timestamp = self.timestamp,
+        vclock = self.vclock,
+        signature = self.signature,
+        status = self.status,
+    }
+end
+
+read_view_mt.__serialize = read_view_methods.info
 
 --
 -- If the given read view was created with box.read_view.open(), the function
@@ -156,12 +262,16 @@ end
 -- Otherwise, it's unsafe to close this read view, because it may be used from
 -- the C code so in this case this function does nothing and raises an error.
 --
-function box.internal.read_view_close(rv, level)
-    if rv._impl == nil then
-        -- System read view. Can't be closed.
-        box.error(box.error.READ_VIEW_BUSY, level + 1)
+function read_view_methods:close()
+    check_read_view_arg(self, 'close', 2)
+    if self.status == 'closed' then
+        box.error(box.error.READ_VIEW_CLOSED, 2)
     end
-    for _, space in pairs(rv.space) do
+    if self._impl == nil then
+        -- System read view. Can't be closed.
+        box.error(box.error.READ_VIEW_BUSY, 2)
+    end
+    for _, space in pairs(self.space) do
         for _, index in pairs(space.index) do
             -- Reset cdata because it's going to be invalidated by 'close'.
             -- From now on, FFI methods will assume that the read view is
@@ -169,7 +279,7 @@ function box.internal.read_view_close(rv, level)
             index._cdata = nil
         end
     end
-    rv._impl:close()
+    self._impl:close()
 end
 
 --

@@ -42,7 +42,6 @@ extern "C" {
 #include "lua/msgpack.h"
 
 struct lua_State;
-struct read_view;
 struct key_def;
 struct port;
 
@@ -62,13 +61,6 @@ int
 lbox_index_normalize_position(lua_State *L, int idx, int space_id,
 			      int index_id, const char **packed_pos,
 			      const char **packed_pos_end);
-
-/**
- * Pushes a table that contains information about the given read view to
- * the Lua stack. Used in the Tarantool EE source code.
- */
-void
-lbox_push_read_view(struct lua_State *L, const struct read_view *rv);
 
 void
 box_lua_misc_init(struct lua_State *L);
