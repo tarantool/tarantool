@@ -149,6 +149,28 @@ lbox_check_open_index_read_view_iterator(struct lua_State *L, int idx)
 }
 
 /**
+ * Pushes a table that contains information about the given read view to
+ * the Lua stack.
+ */
+static void
+lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
+{
+	lua_newtable(L);
+	luaL_pushuint64(L, rv->id);
+	lua_setfield(L, -2, "id");
+	lua_pushstring(L, rv->name);
+	lua_setfield(L, -2, "name");
+	lua_pushboolean(L, rv->is_system);
+	lua_setfield(L, -2, "is_system");
+	lua_pushnumber(L, rv->timestamp);
+	lua_setfield(L, -2, "timestamp");
+	luaT_pushvclock(L, &rv->vclock);
+	lua_setfield(L, -2, "vclock");
+	luaL_pushint64(L, vclock_sum(&rv->vclock));
+	lua_setfield(L, -2, "signature");
+}
+
+/**
  * Helper function for lbox_read_view_open() that pushes a table for the given
  * index read view to the Lua stack.
  *
@@ -318,6 +340,46 @@ lbox_read_view_open(struct lua_State *L)
 	lua_setfield(L, 1, "space");
 	lua_setfield(L, 1, "_impl");
 	lua_settop(L, 1);
+	return 1;
+}
+
+static bool
+lbox_read_view_list_cb(struct read_view *rv, void *arg)
+{
+	struct lua_State *L = (struct lua_State *)arg;
+	assert(lua_gettop(L) >= 1);
+	assert(lua_type(L, -1) == LUA_TTABLE);
+	lbox_push_read_view(L, rv);
+	lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	return true;
+}
+
+/**
+ * Pushes an unsored array of all open read views to the Lua stack.
+ * Each read view is represented by a plain Lua table.
+ */
+static int
+lbox_read_view_list(struct lua_State *L)
+{
+	lua_newtable(L);
+	read_view_foreach(lbox_read_view_list_cb, L);
+	return 1;
+}
+
+/**
+ * Given a read view object (a table that has the 'id' field), pushes
+ * the read view status string ('open' or 'closed') to the Lua stack.
+ */
+static int
+lbox_read_view_status(struct lua_State *L)
+{
+	lua_getfield(L, 1, "id");
+	uint64_t id = luaL_checkuint64(L, -1);
+	struct read_view *rv = read_view_by_id(id);
+	if (rv == NULL)
+		lua_pushliteral(L, "closed");
+	else
+		lua_pushliteral(L, "open");
 	return 1;
 }
 
@@ -558,6 +620,8 @@ box_lua_read_view_init(struct lua_State *L)
 {
 	const struct luaL_Reg module_methods[] = {
 		{"open", lbox_read_view_open },
+		{"list", lbox_read_view_list},
+		{"status", lbox_read_view_status},
 		{ NULL, NULL }
 	};
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.read_view", 0);
