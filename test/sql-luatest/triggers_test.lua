@@ -720,3 +720,42 @@ end
         box.execute([[DROP TABLE t2;]])
     end)
 end
+
+--
+-- ghs-163: Check access privileges when dropping triggers.
+--
+ g.test_163_check_privileges_on_drop_trigger = function(cg)
+    cg.server:exec(function()
+        local admin = box.session.user()
+        box.execute([[CREATE TABLE t1 (i INT PRIMARY KEY);]])
+        box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY);]])
+        box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1
+                      FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;]])
+
+        box.schema.user.create('user')
+        box.schema.user.grant('user', 'read,write,create', 'space', '_trigger')
+        box.schema.user.grant('user', 'read', 'space', '_space')
+        box.session.su('user')
+        local exp_err = "Alter access to space 't1' is denied for user 'user'"
+        local _, err = box.execute([[DROP TRIGGER t1t;]])
+        t.assert_equals(err.message, exp_err)
+
+        box.session.su(admin)
+        box.schema.user.grant('user', 'read,write,create', 'space', 't1')
+        box.session.su('user')
+        _, err = box.execute([[DROP TRIGGER t1t;]])
+        t.assert_equals(err.message, exp_err)
+
+        box.session.su(admin)
+        box.schema.user.grant('user', 'alter', 'space', 't1')
+        box.session.su('user')
+        local res, err = box.execute([[DROP TRIGGER t1t;]])
+        t.assert_equals(res, {row_count = 1})
+        t.assert_equals(err, nil)
+
+        box.session.su(admin)
+        box.schema.user.drop('user')
+        box.execute([[DROP TABLE t1;]])
+        box.execute([[DROP TABLE t2;]])
+    end)
+end
