@@ -17,7 +17,7 @@ static bool main_thread_initialized;
 static pthread_t main_thread_id;
 
 static void (*sighandlers[SIGMAX])(int, siginfo_t *, void *);
-static pid_t redirected_sender_pids[SIGMAX];
+static pid_t signal_sender_pid[SIGMAX];
 
 /**
  * Check that signal has been delivered to the main thread
@@ -26,37 +26,40 @@ static pid_t redirected_sender_pids[SIGMAX];
 static void
 sighandler_dispatcher(int signum, siginfo_t *info, void *ctx)
 {
+	/* Sync point - common atomic operation for main and other threads. */
+	pid_t uninitialized_sender_pid = 0;
+	bool success = pm_atomic_compare_exchange_strong(
+			&signal_sender_pid[signum],
+			&uninitialized_sender_pid, info->si_pid);
 	if (!pthread_equal(pthread_self(), main_thread_id)) {
-		pid_t uninitialized_sender_pid = -1;
 		/*
-		 * Redirect the signal sender PID in case it's uninitialized.
-		 *
-		 * It could be so that someone has handled a SIGURG signal and
-		 * set the variable but the main thread haven't handled it yet.
-		 * So let's only set the signal sender PID if it's unset.
+		 * Redirect the signal sender PID in case it was uninitialized.
 		 *
 		 * Effectively this means that, in case if there was a number of
 		 * signals received, only the PID of the first signal sender is
 		 * redirected to the main cord.
 		 */
-		bool success = pm_atomic_compare_exchange_strong(
-				&redirected_sender_pids[signum],
-				&uninitialized_sender_pid, info->si_pid);
 		if (success)
 			pthread_kill(main_thread_id, signum);
 		return;
-	}
-	/* Use the redirected sender PID in case it's provided. */
-	if (redirected_sender_pids[signum] != -1) {
+	} else {
 		/*
 		 * We're in a critical section: no handler will change the
-		 * redirected sender ID until we reset it to -1 below.
+		 * redirected sender ID until we reset it to 0 below.
+		 *
+		 * If we've succeeed, that means no redirection happened before
+		 * and we set the signal_sender_pid[signum] to our si_pid. If we
+		 * have failed, the signal_sender_pid[signum] contains the PID
+		 * of the original redirected signal sender.
+		 *
+		 * Either way, the signal_sender_pid[signum] is the PID we need
+		 * to pass to the user signal handler.
 		 */
-		info->si_pid = redirected_sender_pids[signum];
-		redirected_sender_pids[signum] = -1;
+		info->si_pid = signal_sender_pid[signum];
+		assert(sighandlers[signum] != NULL);
+		sighandlers[signum](signum, info, ctx);
+		signal_sender_pid[signum] = 0;
 	}
-	assert(sighandlers[signum] != NULL);
-	sighandlers[signum](signum, info, ctx);
 }
 
 int
