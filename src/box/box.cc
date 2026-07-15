@@ -6488,15 +6488,6 @@ box_storage_free(void)
 	wal_free();
 	iproto_free();
 	txn_limbo_free();
-
-	/*
-	 * We free the transactions from the limbo queue above.
-	 * Free the remained transactions here.
-	 */
-	struct txn *txn, *tmp;
-	rlist_foreach_entry_safe(txn, &txns, in_txns, tmp)
-		txn_free(txn);
-
 	replication_free();
 	gc_free();
 	engine_free();
