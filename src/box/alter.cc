@@ -5590,6 +5590,11 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		if (tuple_field_u32(old_tuple, BOX_TRIGGER_FIELD_SPACE_ID,
 				    &space_id) != 0)
 			return -1;
+		struct space *space = space_cache_find(space_id);
+		assert(space != NULL);
+		if (access_check_ddl(space->def->name, space->def->uid,
+				     space->access, SC_SPACE, PRIV_A) != 0)
+			return -1;
 		RegionGuard region_guard(&fiber()->gc);
 		char *trigger_name = (char *)region_alloc(&fiber()->gc,
 							  trigger_name_len + 1);
