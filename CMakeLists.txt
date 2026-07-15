@@ -719,12 +719,6 @@ if (TARGET_OS_DARWIN)
     # LuaJIT is unusable on OS X without enabled GC64
     # See https://github.com/tarantool/tarantool/issues/2643
     set(LUAJIT_ENABLE_GC64_DEFAULT ON)
-    # To improve customer experience JIT engine is turned off on
-    # Tarantool startup for macOS builds. Either way, JIT will be
-    # aboard as a result of the changes and more adventurous users
-    # will be able to enable it via jit.on() in their code.
-    # See https://github.com/tarantool/tarantool/issues/8252.
-    set(LUAJIT_JIT_STATUS_DEFAULT OFF)
 endif()
 option(LUAJIT_ENABLE_GC64 "Use 64-bit GC objects by default."
        ${LUAJIT_ENABLE_GC64_DEFAULT})
