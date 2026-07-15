@@ -285,3 +285,17 @@ g.test_func_defaults_with_null_and_collate = function()
         box.schema.func.drop(func_id)
     end)
 end
+
+--
+-- Make sure that -0 and -0x0 does not cause an error.
+--
+g.test_negative_zero_int = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE T(I INT PRIMARY KEY,
+                      A INT DEFAULT -0, B INT DEFAULT -0x0);]]
+        box.execute(sql)
+        t.assert_equals(box.space.T:format()[2].default, 0)
+        t.assert_equals(box.space.T:format()[3].default, 0)
+        box.space.T:drop()
+    end)
+end

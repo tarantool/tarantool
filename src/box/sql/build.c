@@ -583,6 +583,12 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		if (expr->op == TK_UMINUS) {
 			int64_t val;
 			if (sql_expr_nint(expr->pLeft, &val) == 0) {
+				if (val == 0) {
+					size = mp_sizeof_uint(val);
+					buf = xregion_alloc(region, size);
+					mp_encode_uint(buf, val);
+					break;
+				}
 				size = mp_sizeof_int(val);
 				buf = xregion_alloc(region, size);
 				mp_encode_int(buf, val);
