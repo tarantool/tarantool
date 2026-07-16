@@ -482,7 +482,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
     Token x;
     x.n = 0;
     parserDoubleLinkSelect(pParse, pRhs);
-    pFrom = sqlSrcListAppendFromTerm(pParse,0,0,&x,pRhs,0,0,false);
+    pFrom = sqlSrcListAppendFromTerm(0, 0, &x, pRhs, 0, 0, false);
     pRhs = sqlSelectNew(pParse,0,pFrom,0,0,0,0,0,0,0);
   }
   if( pRhs ){
@@ -598,63 +598,96 @@ as(X) ::= .            {X.n = 0; X.z = 0;}
 seqscan(X) ::= SEQSCAN.     {X = 0;}
 seqscan(X) ::= .            {X = 1;}
 
-%type seltablist {SrcList*}
-%destructor seltablist {sqlSrcListDelete($$);}
-%type stl_prefix {SrcList*}
-%destructor stl_prefix {sqlSrcListDelete($$);}
 %type from {SrcList*}
 %destructor from {sqlSrcListDelete($$);}
 
-// A complete FROM clause.
-//
 from(A) ::= .                {A = sql_xmalloc0(sizeof(*A));}
-from(A) ::= FROM seltablist(X). {
-  A = X;
-  sqlSrcListShiftJoinType(A);
+from(A) ::= FROM source_list(X). {
+  A = src_list_from_ast(X);
 }
 
-// "seltablist" is a "Select Table List" - the content of the FROM clause
-// in a SELECT statement.  "stl_prefix" is a prefix of this list.
-//
-stl_prefix(A) ::= seltablist(A) joinop(Y).    {
-   if( ALWAYS(A && A->nSrc>0) ) A->a[A->nSrc-1].fg.jointype = (u8)Y;
+%type source_list {struct ast_source_list *}
+%destructor source_list {ast_source_list_destroy($$);}
+source_list(A) ::= source(X). {
+  A = ast_source_list_append(pParse, NULL, X);
 }
-stl_prefix(A) ::= .                           {A = 0;}
-seltablist(A) ::= stl_prefix(A) seqscan(X) nm(Y) as(Z) indexed_opt(I)
-                  on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U,X);
-  sqlSrcListIndexedBy(A, &I);
-}
-seltablist(A) ::= stl_prefix(A) seqscan(X) nm(Y) LP exprlist(E) RP as(Z)
-                  on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U,X);
-  sqlSrcListFuncArgs(A, E);
-}
-seltablist(A) ::= stl_prefix(A) LP select(S) RP
-                  as(Z) on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,S,N,U,false);
-}
-seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
-                  as(Z) on_opt(N) using_opt(U). {
-  if( A==0 && Z.n==0 && N==0 && U==0 ){
+source_list(A) ::= LP source_list(F) RP as(Z). {
+  if (Z.n == 0) {
     A = F;
-  }else if( F->nSrc==1 ){
-    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,0,N,U,false);
-    if( A ){
-      struct SrcList_item *pNew = &A->a[A->nSrc-1];
-      struct SrcList_item *pOld = F->a;
-      pNew->zName = pOld->zName;
-      pNew->pSelect = pOld->pSelect;
-      pOld->zName =  0;
-      pOld->pSelect = 0;
+  } else if (F->len == 1) {
+    struct ast_source *old = stailq_first_entry(&F->head, struct ast_source,
+                                                link);
+    struct ast_source *new = ast_source_new(pParse);
+    new->name = old->name;
+    new->alias = Z;
+    new->select = old->select;
+    A = ast_source_list_append(pParse, NULL, new);
+  } else {
+    struct SrcList *list = src_list_from_ast(F);
+    if (list != NULL) {
+      Select *pSubquery = sqlSelectNew(pParse,0,list,0,0,0,0,SF_NestedFrom,0,0);
+      struct ast_source *src = ast_source_new(pParse);
+      src->alias = Z;
+      src->select = pSubquery;
+      A = ast_source_list_append(pParse, NULL, src);
     }
-    sqlSrcListDelete(F);
-  }else{
-    Select *pSubquery;
-    sqlSrcListShiftJoinType(F);
-    pSubquery = sqlSelectNew(pParse,0,F,0,0,0,0,SF_NestedFrom,0,0);
-    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U,false);
   }
+}
+source_list(A) ::= source_list(A) joinop(Y) source(X) on_opt(N) using_opt(U). {
+  X->join_type = Y;
+  X->join_on = N;
+  X->join_using = U;
+  A = ast_source_list_append(pParse, A, X);
+}
+source_list(A) ::= source_list(X) joinop(Y) LP source_list(F) RP as(Z) on_opt(N)
+                   using_opt(U). {
+  if (F->len == 1) {
+    struct ast_source *old = stailq_first_entry(&F->head, struct ast_source,
+                                                link);
+    struct ast_source *new = ast_source_new(pParse);
+    new->name = old->name;
+    new->alias = Z;
+    new->select = old->select;
+    new->join_type = Y;
+    new->join_on = N;
+    new->join_using = U;
+    A = ast_source_list_append(pParse, X, new);
+  } else {
+    struct SrcList *list = src_list_from_ast(F);
+    if (list != NULL) {
+      Select *pSubquery = sqlSelectNew(pParse,0,list,0,0,0,0,SF_NestedFrom,0,0);
+      struct ast_source *src = ast_source_new(pParse);
+      src->alias = Z;
+      src->select = pSubquery;
+      src->join_type = Y;
+      src->join_on = N;
+      src->join_using = U;
+      A = ast_source_list_append(pParse, X, src);
+    }
+  }
+}
+
+%type source {struct ast_source *}
+%destructor source {ast_source_destroy($$);}
+source(A) ::= seqscan(X) nm(Y) as(Z) indexed_opt(I). {
+  A = ast_source_new(pParse);
+  A->name = Y;
+  A->alias = Z;
+  A->indexed_by = I;
+  A->disallow_scan = X;
+}
+source(A) ::= seqscan(X) nm(Y) LP exprlist(E) RP as(Z). {
+  A = ast_source_new(pParse);
+  A->name = Y;
+  A->alias = Z;
+  A->func_args = E;
+  A->is_tab_func = true;
+  A->disallow_scan = X;
+}
+source(A) ::= LP select(S) RP as(Z). {
+  A = ast_source_new(pParse);
+  A->alias = Z;
+  A->select = S;
 }
 
 %type fullname {SrcList*}

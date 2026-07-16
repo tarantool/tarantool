@@ -577,7 +577,8 @@ test:do_catchsql_test(
         SELECT * FROM t1 USING(a);
     ]], {
         -- <join-3.5>
-        1, "Syntax error at line 1 at or near position 34: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 26: keyword 'USING' is reserved. " ..
+        "Please use double quotes if 'USING' is an identifier."
         -- </join-3.5>
     })
 
