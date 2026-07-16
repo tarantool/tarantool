@@ -26,12 +26,77 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  debug_catch_flaky:
+  collect_tests:
     # Run on pull request if the 'notest' or 'noflaky' label is not set.
     if: github.repository_owner == 'tarantool' &&
         github.event_name == 'pull_request' &&
         !contains(github.event.pull_request.labels.*.name, 'noflaky') &&
         !contains(github.event.pull_request.labels.*.name, 'notest')
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    timeout-minutes: 10
+
+    outputs:
+      shard_count: ${{ steps.collect.outputs.shard_count }}
+      shards: ${{ steps.collect.outputs.shards }}
+      test_count: ${{ steps.collect.outputs.test_count }}
+      tests: ${{ steps.collect.outputs.tests }}
+
+    steps:
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
+      - name: Sources checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repository: tarantool/tarantool
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Collect changed tests
+        id: collect
+        env:
+          COMMIT_RANGE: HEAD~${{ github.event.pull_request.commits }}..HEAD
+        run: |
+          tests=$(cd test && git diff --relative=test --name-only \
+            --diff-filter=AMRT "${COMMIT_RANGE}" -- './*/*test.lua' \
+            './unit/*.c*' | sed 's/\.\(c\|cpp\|cc\)$//' | sort -u)
+          if [ -z "${tests}" ]; then
+            test_count=0
+          else
+            test_count=$(printf '%s\n' "${tests}" | wc -l | tr -d ' ')
+          fi
+          if [ "${test_count}" -lt 4 ]; then
+            shard_count=${test_count}
+          else
+            shard_count=4
+          fi
+          case "${shard_count}" in
+            0) shards='[]' ;;
+            1) shards='[1]' ;;
+            2) shards='[1, 2]' ;;
+            3) shards='[1, 2, 3]' ;;
+            4) shards='[1, 2, 3, 4]' ;;
+          esac
+          {
+            echo 'tests<<EOF'
+            echo "${tests}"
+            echo 'EOF'
+            echo "test_count=${test_count}"
+            echo "shard_count=${shard_count}"
+            echo "shards=${shards}"
+          } >> "${GITHUB_OUTPUT}"
+
+  debug_catch_flaky:
+    name: debug_catch_flaky (shard ${{ matrix.shard }})
+    needs: collect_tests
+    if: needs.collect_tests.outputs.test_count != '0'
+
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: ${{ fromJSON(needs.collect_tests.outputs.shards) }}
 
     runs-on: ubuntu-20.04-self-hosted
 
@@ -69,15 +134,21 @@ jobs:
 
       - name: Run the changed tests
         env:
-          COMMIT_RANGE: HEAD~${{ github.event.pull_request.commits }}..HEAD
+          ALL_TESTS: ${{ needs.collect_tests.outputs.tests }}
+          SHARD: ${{ matrix.shard }}
+          SHARD_COUNT: ${{ needs.collect_tests.outputs.shard_count }}
         run: |
-          make -f .test.mk test-debug-flaky
+          selected_tests=$(printf '%s\n' "${ALL_TESTS}" | awk \
+            -v shard="${SHARD}" -v count="${SHARD_COUNT}" \
+            '(NR - 1) % count == shard - 1' | paste -sd ' ' -)
+          make -f .test.mk test-debug-flaky \
+            FLAKY_TESTS="${selected_tests}"
 
       - name: Collect artifacts
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: failure-logs
+          name: failure-logs-${{ matrix.shard }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
 
