@@ -1378,7 +1378,29 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 		tx_region_release(txn, TX_ALLOC_SYSTEM);
 		if (rc != 0)
 			goto eof;
-	} else if (array == NULL) {
+	} else {
+		const char *arrow_ipc;
+		const char *arrow_ipc_end;
+		struct region *txn_region = tx_region_acquire(txn);
+		rc = arrow_ipc_upgrade_legacy_boolean(request->arrow_ipc,
+						      request->arrow_ipc_end, space,
+						      txn_region, &arrow_ipc,
+						      &arrow_ipc_end);
+		tx_region_release(txn, TX_ALLOC_SYSTEM);
+		if (rc != 0)
+			goto eof;
+		if (arrow_ipc != request->arrow_ipc) {
+			request->arrow_ipc = arrow_ipc;
+			request->arrow_ipc_end = arrow_ipc_end;
+			if (array != NULL && array->release != NULL)
+				array->release(array);
+			if (schema != NULL && schema->release != NULL)
+				schema->release(schema);
+			array = NULL;
+			schema = NULL;
+		}
+	}
+	if (array == NULL) {
 		assert(schema == NULL);
 		assert(request->arrow_ipc_end != NULL);
 		array = xregion_alloc_object(gc, struct ArrowArray);

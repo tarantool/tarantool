@@ -20,6 +20,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct region;
+struct space;
 
 static inline int
 arrow_ipc_encode(struct ArrowArray *array, struct ArrowSchema *schema,
@@ -43,6 +44,36 @@ arrow_ipc_decode(struct ArrowArray *array, struct ArrowSchema *schema,
 	(void)schema;
 	(void)data;
 	(void)data_end;
+	diag_set(ClientError, ER_UNSUPPORTED, "CE version", "arrow format");
+	return -1;
+}
+
+static inline int
+arrow_ipc_downgrade_boolean(const char *data, const char *data_end,
+			    struct region *region, const char **ret_data,
+			    const char **ret_data_end)
+{
+	(void)data;
+	(void)data_end;
+	(void)region;
+	(void)ret_data;
+	(void)ret_data_end;
+	diag_set(ClientError, ER_UNSUPPORTED, "CE version", "arrow format");
+	return -1;
+}
+
+static inline int
+arrow_ipc_upgrade_legacy_boolean(const char *data, const char *data_end,
+				 struct space *space, struct region *region,
+				 const char **ret_data,
+				 const char **ret_data_end)
+{
+	(void)data;
+	(void)data_end;
+	(void)space;
+	(void)region;
+	(void)ret_data;
+	(void)ret_data_end;
 	diag_set(ClientError, ER_UNSUPPORTED, "CE version", "arrow format");
 	return -1;
 }
