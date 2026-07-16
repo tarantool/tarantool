@@ -4482,12 +4482,12 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 static int
 convertCompoundSelectToSubquery(Walker * pWalker, Select * p)
 {
+	(void)pWalker;
 	int i;
 	Select *pNew;
 	Select *pX;
 	struct ExprList_item *a;
 	SrcList *pNewSrc;
-	Parse *pParse;
 	Token dummy;
 
 	if (p->pPrior == 0)
@@ -4509,13 +4509,9 @@ convertCompoundSelectToSubquery(Walker * pWalker, Select * p)
 
 	/* If we reach this point, that means the transformation is required. */
 
-	pParse = pWalker->pParse;
 	pNew = sql_xmalloc0(sizeof(*pNew));
 	memset(&dummy, 0, sizeof(dummy));
-	pNewSrc = sqlSrcListAppendFromTerm(pParse, 0, 0, &dummy, pNew, 0, 0,
-					   false);
-	if (pNewSrc == 0)
-		return WRC_Abort;
+	pNewSrc = sqlSrcListAppendFromTerm(0, 0, &dummy, pNew, 0, 0, false);
 	*pNew = *p;
 	p->pSrc = pNewSrc;
 	struct Expr *expr = sql_expr_new_anon(TK_ASTERISK);

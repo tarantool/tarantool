@@ -57,7 +57,8 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b USING(a);
     ]], {
         -- <tkt3935.4>
-        1, "Syntax error at line 1 at or near position 46: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 33: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.4>
     })
 
@@ -67,7 +68,8 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b;
     ]], {
         -- <tkt3935.5>
-        1, "Syntax error at line 1 at or near position 37: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 33: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.5>
     })
 
@@ -77,7 +79,8 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b USING(a);
     ]], {
         -- <tkt3935.6>
-        1, "Syntax error at line 1 at or near position 60: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 47: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.6>
     })
 
@@ -87,7 +90,8 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b;
     ]], {
         -- <tkt3935.7>
-        1, "Syntax error at line 1 at or near position 51: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 47: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.7>
     })
 
@@ -97,7 +101,8 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b;
     ]], {
         -- <tkt3935.8>
-        1, "Syntax error at line 1 at or near position 35: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 31: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.8>
     })
 
@@ -107,7 +112,8 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b USING(a);
     ]], {
         -- <tkt3935.9>
-        1, "Syntax error at line 1 at or near position 44: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 31: keyword 'ON' is reserved. " ..
+        "Please use double quotes if 'ON' is an identifier."
         -- </tkt3935.9>
     })
 
@@ -117,7 +123,8 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t USING(a);
     ]], {
         -- <tkt3935.10>
-        1, "Syntax error at line 1 at or near position 39: a JOIN clause is required before ON and USING"
+        1, "At line 1 at or near position 31: keyword 'USING' is reserved. " ..
+        "Please use double quotes if 'USING' is an identifier."
         -- </tkt3935.10>
     })
 

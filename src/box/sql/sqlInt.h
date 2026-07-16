@@ -1555,9 +1555,7 @@ typedef u64 Bitmask;
  * now be identified by a database name, a dot, then the table name: ID.ID.
  *
  * The jointype starts out showing the join type between the current table
- * and the next table on the list.  The parser builds the list this way.
- * But sqlSrcListShiftJoinType() later shifts the jointypes so that each
- * jointype expresses the join between the table and the previous table.
+ * and the previous table on the list.
  *
  * In the colUsed field, the high-order bit (bit 63) is set if the table
  * contains more than 63 columns and the 64-th or later column is used.
@@ -2897,10 +2895,10 @@ sql_src_list_append(struct SrcList *list, struct Token *name_token);
  * Return a new SrcList that encodes FROM with the new term added.
  */
 struct SrcList *
-sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
-			 struct Token *pTable, struct Token *pAlias,
-			 struct Select *pSubquery, struct Expr *pOn,
-			 struct ast_id_list *join_using, int disallow_scan);
+sqlSrcListAppendFromTerm(struct SrcList *p, struct Token *pTable,
+			 struct Token *pAlias, struct Select *pSubquery,
+			 struct Expr *pOn, struct ast_id_list *join_using,
+			 int disallow_scan);
 
 /**
  * Add an INDEXED BY or NOT INDEXED clause to the most recently added element of
@@ -2917,7 +2915,6 @@ void
 sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList);
 
 int sqlIndexedByLookup(Parse *, struct SrcList_item *);
-void sqlSrcListShiftJoinType(SrcList *);
 void sqlSrcListAssignCursors(Parse *, SrcList *);
 
 /** Delete an IdList. */

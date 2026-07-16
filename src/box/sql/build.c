@@ -3273,19 +3273,13 @@ sqlSrcListDelete(struct SrcList *pList)
 }
 
 struct SrcList *
-sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
-			 struct Token *pTable, struct Token *pAlias,
-			 struct Select *pSubquery, struct Expr *pOn,
-			 struct ast_id_list *join_using, int disallow_scan)
+sqlSrcListAppendFromTerm(struct SrcList *p, struct Token *pTable,
+			 struct Token *pAlias, struct Select *pSubquery,
+			 struct Expr *pOn, struct ast_id_list *join_using,
+			 int disallow_scan)
 {
 	struct SrcList_item *pItem;
-	if (p == NULL && (pOn != NULL || join_using != NULL)) {
-		diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS,
-			 pParse->line_count, pParse->line_pos, "a JOIN clause "\
-			 "is required before ON and USING");
-		pParse->is_aborted = true;
-		goto append_from_error;
-	}
+	assert((pOn == NULL && join_using == NULL) || p != NULL);
 	p = sql_src_list_append(p, pTable);
 	assert(p->nSrc != 0);
 	pItem = &p->a[p->nSrc - 1];
@@ -3298,12 +3292,6 @@ sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
 	pItem->pUsing = id_list_from_ast(join_using);
 	pItem->fg.disallow_scan = disallow_scan;
 	return p;
-
- append_from_error:
-	assert(p == 0);
-	sql_expr_delete(pOn);
-	sql_select_delete(pSubquery);
-	return 0;
 }
 
 /*
@@ -3352,33 +3340,6 @@ sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList)
 		pItem->fg.isTabFunc = 1;
 	} else {
 		sql_expr_list_delete(pList);
-	}
-}
-
-/*
- * When building up a FROM clause in the parser, the join operator
- * is initially attached to the left operand.  But the code generator
- * expects the join operator to be on the right operand.  This routine
- * Shifts all join operators from left to right for an entire FROM
- * clause.
- *
- * Example: Suppose the join is like this:
- *
- *           A natural cross join B
- *
- * The operator is "natural cross join".  The A and B operands are stored
- * in p->a[0] and p->a[1], respectively.  The parser initially stores the
- * operator with A.  This routine shifts that operator over to B.
- */
-void
-sqlSrcListShiftJoinType(SrcList * p)
-{
-	if (p) {
-		int i;
-		for (i = p->nSrc - 1; i > 0; i--) {
-			p->a[i].fg.jointype = p->a[i - 1].fg.jointype;
-		}
-		p->a[0].fg.jointype = 0;
 	}
 }
 
