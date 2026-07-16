@@ -92,9 +92,12 @@ struct LimitVal {
 **
 **      UPDATE ON (a,b,c)
 **
-** Then the "b" IdList records the list "a,b,c".
+** Then the "b" records the list "a,b,c".
 */
-struct TrigEvent { int a; IdList * b; };
+struct TrigEvent {
+  int a;
+  struct ast_id_list *b;
+};
 
 /*
 ** Disable lookaside memory allocation for objects that might be
@@ -693,11 +696,9 @@ indexed_opt(A) ::= .                 {A.z=0; A.n=0;}
 indexed_opt(A) ::= INDEXED BY nm(X). {A = X;}
 indexed_opt(A) ::= NOT INDEXED.      {A.z=0; A.n=1;}
 
-%type using_opt {IdList*}
-%destructor using_opt {sqlIdListDelete($$);}
+%type using_opt {struct ast_id_list *}
 using_opt(U) ::= USING LP idlist(L) RP.  {U = L;}
 using_opt(U) ::= .                        {U = 0;}
-
 
 %type orderby_opt {ExprList*}
 %destructor orderby_opt {sql_expr_list_delete($$);}
@@ -854,7 +855,7 @@ cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) select(S). {
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
-  sqlInsert(pParse, X, S, F, R);
+  sqlInsert(pParse, X, S, id_list_from_ast(F), R);
 }
 cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
 {
@@ -862,26 +863,23 @@ cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
-  sqlInsert(pParse, X, 0, F, R);
+  sqlInsert(pParse, X, 0, id_list_from_ast(F), R);
 }
 
 %type insert_cmd {int}
 insert_cmd(A) ::= INSERT orconf(R).   {A = R;}
 insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
 
-%type idlist_opt {IdList*}
-%destructor idlist_opt {sqlIdListDelete($$);}
-%type idlist {IdList*}
-%destructor idlist {sqlIdListDelete($$);}
+%type idlist_opt {struct ast_id_list *}
+%type idlist {struct ast_id_list *}
 
 idlist_opt(A) ::= .                       {A = 0;}
 idlist_opt(A) ::= LP idlist(X) RP.    {A = X;}
 idlist(A) ::= idlist(A) COMMA nm(Y). {
-  A = sql_id_list_append(A, &Y);
+  A = ast_id_list_append(pParse, A, &Y);
 }
 idlist(A) ::= nm(Y). {
-  /* A-overwrites-Y. */
-  A = sql_id_list_append(NULL, &Y);
+  A = ast_id_list_append(pParse, NULL, &Y);
 }
 
 /////////////////////////// Expression Processing /////////////////////////////
@@ -1510,8 +1508,8 @@ cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
 trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
-  create_trigger_def_init(&pParse->create_trigger_def, E, &B, C, D.a, D.b, G,
-                          NOERR);
+  create_trigger_def_init(&pParse->create_trigger_def, E, &B, C, D.a,
+                          id_list_from_ast(D.b), G, NOERR);
   sql_trigger_begin(pParse);
   A = B; /*A-overwrites-T*/
 }
@@ -1523,7 +1521,6 @@ trigger_time(A) ::= INSTEAD OF.  { A = TK_INSTEAD;}
 trigger_time(A) ::= .            { A = TK_BEFORE; }
 
 %type trigger_event {struct TrigEvent}
-%destructor trigger_event {sqlIdListDelete($$.b);}
 trigger_event(A) ::= DELETE|INSERT(X).   {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE(X).          {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE OF idlist(X).{A.a = TK_UPDATE; A.b = X;}

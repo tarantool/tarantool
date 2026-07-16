@@ -87,6 +87,7 @@ bin_source(bin_sources bootstrap.snap bootstrap.h bootstrap_bin)
 set(sql_sources
     sql/opcodes.c
     sql/parse.c
+    sql/ast.c
     sql/alter.c
     sql/cursor.c
     sql/build.c

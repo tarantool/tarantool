@@ -69,6 +69,7 @@
 
 #include "box/column_mask.h"
 #include "parse_def.h"
+#include "ast.h"
 #include "box/field_def.h"
 #include "box/func.h"
 #include "box/func_def.h"
@@ -2578,7 +2579,26 @@ sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr);
 
 Expr *sqlExprFunction(Parse *, ExprList *, Token *);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
-ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
+
+/*
+ * pColumns and pExpr form a vector assignment which is part of the SET
+ * clause of an UPDATE statement.  Like this:
+ *
+ *        (a,b,c) = (expr1,expr2,expr3)
+ * Or:    (a,b,c) = (SELECT x,y,z FROM ....)
+ *
+ * For each term of the vector assignment, append new entries to the
+ * expression list pList.  In the case of a subquery on the LHS, append
+ * TK_SELECT_COLUMN expressions.
+ *
+ * @param pParse Parsing context.
+ * @param pList List to which to append. Might be NULL.
+ * @param columns List of names of LHS of the assignment.
+ * @param pExpr Vector expression to be appended. Might be NULL.
+ */
+struct ExprList *
+sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
+			struct ast_id_list *columns, struct Expr *pExpr);
 
 /**
  * Parse tokens as a name or a position of bound variable.
@@ -2870,7 +2890,7 @@ sql_src_list_append(struct SrcList *list, struct Token *name_token);
  * FROM clause. "pTable" is the name of the table in the FROM clause term. If
  * the term has an alias, then "pAlias" points to the alias token. If the term
  * is a subquery, then "pSubquery" is the SELECT statement that the subquery
- * encodes. The "pTable" is NULL for subqueries. The "pOn" and "pUsing"
+ * encodes. The "pTable" is NULL for subqueries. The "pOn" and "join_using"
  * parameters are the content of the ON and USING clauses. Flag disallow_scan
  * shows if scannig SELECT can be executed for this source.
  *
@@ -2880,7 +2900,7 @@ struct SrcList *
 sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
 			 struct Token *pTable, struct Token *pAlias,
 			 struct Select *pSubquery, struct Expr *pOn,
-			 struct IdList *pUsing, int disallow_scan);
+			 struct ast_id_list *join_using, int disallow_scan);
 
 /**
  * Add an INDEXED BY or NOT INDEXED clause to the most recently added element of
@@ -3622,7 +3642,7 @@ sql_trigger_select_step(struct Select *select);
  * @retval Not NULL TriggerStep object on success.
  */
 struct TriggerStep *
-sql_trigger_insert_step(struct Token *table_name, struct IdList *column_list,
+sql_trigger_insert_step(struct Token *table_name, struct ast_id_list *columns,
 			struct Select *select, enum on_conflict_action orconf);
 
 /**

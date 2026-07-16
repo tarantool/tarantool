@@ -1768,32 +1768,14 @@ sql_expr_list_append(struct ExprList *expr_list, struct Expr *expr)
 	return expr_list;
 }
 
-/*
- * pColumns and pExpr form a vector assignment which is part of the SET
- * clause of an UPDATE statement.  Like this:
- *
- *        (a,b,c) = (expr1,expr2,expr3)
- * Or:    (a,b,c) = (SELECT x,y,z FROM ....)
- *
- * For each term of the vector assignment, append new entries to the
- * expression list pList.  In the case of a subquery on the LHS, append
- * TK_SELECT_COLUMN expressions.
- */
-ExprList *
-sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
-			    ExprList * pList,	/* List to which to append. Might be NULL */
-			    IdList * pColumns,	/* List of names of LHS of the assignment */
-			    Expr * pExpr	/* Vector expression to be appended. Might be NULL */
-    )
+struct ExprList *
+sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
+			struct ast_id_list *columns, struct Expr *pExpr)
 {
 	int n;
 	int i;
 	int iFirst = pList ? pList->nExpr : 0;
-	/* pColumns can only be NULL due to an OOM but an OOM will cause an
-	 * exit prior to this routine being invoked
-	 */
-	if (NEVER(pColumns == 0))
-		goto vector_append_error;
+	struct IdList *pColumns = id_list_from_ast(columns);
 	if (pExpr == 0)
 		goto vector_append_error;
 

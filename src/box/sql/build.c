@@ -3276,10 +3276,10 @@ struct SrcList *
 sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
 			 struct Token *pTable, struct Token *pAlias,
 			 struct Select *pSubquery, struct Expr *pOn,
-			 struct IdList *pUsing, int disallow_scan)
+			 struct ast_id_list *join_using, int disallow_scan)
 {
 	struct SrcList_item *pItem;
-	if (!p && (pOn || pUsing)) {
+	if (p == NULL && (pOn != NULL || join_using != NULL)) {
 		diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS,
 			 pParse->line_count, pParse->line_pos, "a JOIN clause "\
 			 "is required before ON and USING");
@@ -3295,14 +3295,13 @@ sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
 	}
 	pItem->pSelect = pSubquery;
 	pItem->pOn = pOn;
-	pItem->pUsing = pUsing;
+	pItem->pUsing = id_list_from_ast(join_using);
 	pItem->fg.disallow_scan = disallow_scan;
 	return p;
 
  append_from_error:
 	assert(p == 0);
 	sql_expr_delete(pOn);
-	sqlIdListDelete(pUsing);
 	sql_select_delete(pSubquery);
 	return 0;
 }
