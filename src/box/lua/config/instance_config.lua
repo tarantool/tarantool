@@ -20,7 +20,8 @@ local enterprise_edition = schema._enterprise_edition
 -- * vshard_since (string)
 --
 --   The minimum vshard version that accepts this sharding option.
---   Enforced in configdata's sharding() method.
+--   The option's default value is applied only when the installed
+--   vshard accepts the option.
 --
 -- * default (any)
 --
@@ -65,26 +66,14 @@ local function sensitive_ee(schema_node)
     return sensitive(enterprise_edition(schema_node))
 end
 
-local function vshard_since_validate(data, w)
-    -- OK if the option is not set.
-    if data == nil then
-        return
-    end
-
-    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
-    if not ok then
-        w.error('The vshard-ee/vshard module is not available')
-    end
-
-    if expression.eval('v < '..w.schema.vshard_since,
-                       {v = vshard.consts.VERSION}) then
-        w.error('The vshard module is too old: the minimum supported ' ..
-                'version is %s', w.schema.vshard_since)
-    end
-end
-
 local function vshard_since_apply_default_if(_data, w)
     -- Apply the default only when the installed vshard accepts the option.
+    --
+    -- Note: the vshard module availability must not be checked here or on
+    -- the validation stage. Both happen before box.cfg(), while the module
+    -- may become available only later: for example, when it is installed
+    -- into process.work_dir, the module can be resolved only after box.cfg()
+    -- chdir()s there. The availability is verified by the sharding applier.
     local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
     if not ok then
         return false
@@ -93,17 +82,12 @@ local function vshard_since_apply_default_if(_data, w)
                                {v = vshard.consts.VERSION})
 end
 
--- Accepted by vshard only since the given version. Configuring the annotated
--- node (an option or the whole sharding section) with an older vshard is a
--- configuration error.
+-- Accepted by vshard only since the given version (an option or the whole
+-- sharding section). A default value of the annotated node is not applied
+-- when the installed vshard is older.
 local function vshard_since(version, schema_node)
     schema_node.vshard_since = version
 
-    -- Perform a domain specific validation first and only then check the
-    -- vshard version, consistent with the data type validation order.
-    schema_node.validate = funcutils.chain2(
-        schema_node.validate,
-        vshard_since_validate)
     schema_node.apply_default_if = funcutils.chain2(
         schema_node.apply_default_if,
         vshard_since_apply_default_if)

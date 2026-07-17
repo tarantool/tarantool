@@ -1,3 +1,4 @@
+local expression = require('internal.config.utils.expression')
 local health = require('internal.healthcheck')
 local log = require('internal.config.utils.log')
 local loaders = require('internal.loaders')
@@ -36,10 +37,22 @@ local function apply(config)
         unregister_vshard_health_checks()
         return
     end
-    -- VShard availability and its minimum version are ensured by the sharding
-    -- configuration validation (the `vshard_since` schema annotation).
-    _G.vshard = loaders.require_first('vshard-ee', 'vshard')
-    assert(_G.vshard)
+    -- Make sure vshard is available and its version is not too old.
+    --
+    -- It can't be done earlier, on the configuration validation stage: it
+    -- occurs before box.cfg() and if the module is installed into the
+    -- configured process.work_dir, it can be resolved only after box.cfg()
+    -- chdir()s there.
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    if not ok then
+        error('The vshard-ee/vshard module is not available', 0)
+    end
+    if expression.eval('v < 0.1.25', {v = vshard.consts.VERSION}) then
+        error('The vshard module is too old: the minimum supported version ' ..
+              'is 0.1.25.', 0)
+    end
+
+    _G.vshard = vshard
     local is_storage = false
     local is_router = false
     for _, role in pairs(roles) do
