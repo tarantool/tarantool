@@ -535,23 +535,18 @@ g.test_defaults = function()
 end
 
 local examples = {
-    single = {path = 'single.yaml'},
-    upgrade = {path = 'upgrade.yaml'},
-    sharding = {path = 'sharding.yaml', vshard_since = '0.1.25'},
-    replicaset = {path = 'replicaset.yaml'},
-    replicaset_manual_failover = {path = 'replicaset_manual_failover.yaml'},
-    replicaset_election_failover = {path = 'replicaset_election_failover.yaml'},
+    single = 'single.yaml',
+    upgrade = 'upgrade.yaml',
+    sharding = 'sharding.yaml',
+    replicaset = 'replicaset.yaml',
+    replicaset_manual_failover = 'replicaset_manual_failover.yaml',
+    replicaset_election_failover = 'replicaset_election_failover.yaml',
 }
 
-for case, example in pairs(examples) do
+for case, path in pairs(examples) do
     local test_name = ('test_example_%s'):format(case)
-    local config_path = ('test/config-luatest/examples/config/%s'):format(
-        example.path)
+    local config_path = ('test/config-luatest/examples/config/%s'):format(path)
     g[test_name] = function()
-        if example.vshard_since ~= nil then
-            t.skip_if(not helpers.has_vshard_since(example.vshard_since),
-                      'Module "vshard-ee/vshard" is not available')
-        end
         local config_file = fio.abspath(config_path)
         local fh = fio.open(config_file, {'O_RDONLY'})
         local config = yaml.decode(fh:read())
@@ -866,7 +861,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.bucket_count',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     bucket_count = 30000,
@@ -879,7 +873,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.connection_outdate_delay',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     connection_outdate_delay = 10,
@@ -892,7 +885,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.discovery_mode',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     discovery_mode = 'off',
@@ -905,7 +897,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.failover_ping_timeout',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     failover_ping_timeout = 10,
@@ -918,7 +909,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.lock',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     lock = true,
@@ -931,7 +921,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.rebalancer_bucket_send_timeout',
-            vshard_since = '0.1.41',
             data = {
                 sharding = {
                     rebalancer_bucket_send_timeout = 42,
@@ -944,7 +933,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.rebalancer_disbalance_threshold',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     rebalancer_disbalance_threshold = 7,
@@ -957,7 +945,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.rebalancer_max_receiving',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     rebalancer_max_receiving = 1000,
@@ -970,7 +957,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.rebalancer_max_sending',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     rebalancer_max_sending = 10,
@@ -983,7 +969,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.rebalancer_mode',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     rebalancer_mode = 'off',
@@ -996,7 +981,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.sched_move_quota',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     sched_move_quota = 10,
@@ -1009,7 +993,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.sched_ref_quota',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     sched_ref_quota = 1000,
@@ -1022,7 +1005,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.shard_index',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     shard_index = 'my_bucket_id',
@@ -1035,7 +1017,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.sync_timeout',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     sync_timeout = 10,
@@ -1048,7 +1029,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.weight',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     weight = 10,
@@ -1061,7 +1041,6 @@ g.test_scope = function()
         },
         {
             name = 'sharding.roles',
-            vshard_since = '0.1.25',
             data = {
                 sharding = {
                     roles = {'storage'},
@@ -1075,13 +1054,6 @@ g.test_scope = function()
     }
 
     for _, case in ipairs(cases) do
-        -- The sharding section is validated only with a vshard module that
-        -- accepts the option, so its scope cannot be checked otherwise.
-        if case.vshard_since ~= nil and
-           not helpers.has_vshard_since(case.vshard_since) then
-            goto continue
-        end
-
         -- Global level.
         local global_data = case.data
         if case.global then
@@ -1154,7 +1126,6 @@ g.test_scope = function()
         -- Validation against the instance config: accepted for
         -- all the options.
         instance_config:validate(case.data)
-    ::continue::
     end
 end
 
