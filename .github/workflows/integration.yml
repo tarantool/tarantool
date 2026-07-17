@@ -123,12 +123,11 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
-  # FIXME: Disabled due to tarantool/tarantool-python#334.
-  # tarantool-python:
-  #   needs: tarantool
-  #   uses: tarantool/tarantool-python/.github/workflows/reusable_testing.yml@master
-  #   with:
-  #     artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
+  tarantool-python:
+    needs: tarantool
+    uses: tarantool/tarantool-python/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-noble-${{ needs.tarantool.outputs.sha }}
 
   # FIXME: Disabled due to tarantool-php/client#100
   # php-client:
