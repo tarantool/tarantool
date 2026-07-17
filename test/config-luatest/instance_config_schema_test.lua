@@ -1804,9 +1804,6 @@ g.test_metrics = function()
 end
 
 g.test_sharding = function()
-    -- The sharding section is validated only with the vshard module available.
-    t.skip_if(not helpers.has_vshard(),
-              'vshard module is required to validate sharding')
     local iconfig = {
         sharding = {
             roles = {'router', 'storage'},

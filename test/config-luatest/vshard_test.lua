@@ -919,15 +919,12 @@ g.test_has_sharding_role = function()
 end
 
 --
--- The whole sharding section is annotated with vshard_since('0.1.25'), so
--- configuring sharding with an older vshard must be rejected at the
--- configuration validation stage.
+-- The vshard availability and its minimum version are verified when the
+-- sharding configuration is applied.
 --
 g.test_vshard_too_old = function(g)
     skip_if_no_vshard()
     local dir = treegen.prepare_directory({}, {})
-    -- Note, that none of the nodes has `sharding.roles` set, the error will
-    -- still be thrown, since it's now checked on config validation stage.
     local config = [[
     credentials:
       users:
@@ -951,6 +948,8 @@ g.test_vshard_too_old = function(g)
       group-001:
         replicasets:
           replicaset-001:
+            sharding:
+              roles: [storage]
             instances:
               instance-001: {}
     ]]
@@ -975,13 +974,64 @@ g.test_vshard_too_old = function(g)
         vshard.consts.VERSION = saved
 
         t.assert_not(ok)
-        -- The error must come from the configuration validation stage: it
-        -- carries the schema path prefix ("...sharding:"). This distinguishes
-        -- it from any apply-stage check producing a bare message.
         t.assert_str_contains(tostring(err),
-            'sharding: The vshard module is too old: the minimum supported ' ..
-            'version is 0.1.25')
+            'The vshard module is too old: the minimum supported ' ..
+            'version is 0.1.25.')
     end)
+end
+
+--
+-- The vshard module installed into the configured process.work_dir can be
+-- resolved only after box.cfg() chdir()s there. Make sure the configuration
+-- is not rejected due to the unavailable vshard before that.
+--
+g.test_vshard_in_work_dir = function()
+    local dir = treegen.prepare_directory({}, {})
+    -- A fake vshard module: the test verifies where the module is searched
+    -- for, not how it is configured.
+    treegen.write_file(dir, 'wd/.rocks/share/tarantool/vshard/init.lua', [[
+        return {
+            consts = {VERSION = '0.1.25'},
+            storage = {cfg = function() end, internal = {}},
+            router = {
+                cfg = function() end,
+                info = function() return {bucket = {unknown = 0}} end,
+            },
+        }
+    ]])
+    treegen.write_file(dir, 'wd/main.lua', [[
+        print(('vshard version: %s'):format(_G.vshard.consts.VERSION))
+        os.exit(0)
+    ]])
+    local config = ([[
+    process:
+      work_dir: wd
+
+    app:
+      file: %s/wd/main.lua
+
+    sharding:
+      roles: [router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]):format(dir)
+    treegen.write_file(dir, 'config.yaml', config)
+
+    -- Start tarantool in a directory from which the module is not
+    -- resolvable. LUA_PATH is emptied to not resolve the real vshard from
+    -- the testing environment. justrun by default pins package.searchroot()
+    -- to the testing source tree, which would disable the cwd-relative
+    -- module search this test verifies, so it is turned off.
+    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert_str_contains(res.stdout, 'vshard version: 0.1.25')
 end
 
 --
@@ -1033,70 +1083,4 @@ g.test_rebalancer_bucket_send_timeout = function(g)
 
     local res = g.server:eval('return vshard.storage.internal.current_cfg')
     t.assert_equals(res.rebalancer_bucket_send_timeout, 42)
-end
-
---
--- sharding.rebalancer_bucket_send_timeout requires vshard 0.1.41. A vshard
--- that is new enough for sharding in general (>= 0.1.25) but older than
--- 0.1.41 must reject the option at the configuration validation stage.
---
-g.test_rebalancer_bucket_send_timeout_vshard_too_old = function(g)
-    t.skip_if(not helpers.has_vshard_since('0.1.41'),
-              'vshard module accepting rebalancer_bucket_send_timeout ' ..
-              'is required')
-    local dir = treegen.prepare_directory({}, {})
-    local config = [[
-    credentials:
-      users:
-        guest:
-          roles: [super]
-        storage:
-          roles: [sharding]
-          password: "storage"
-
-    iproto:
-      listen:
-        - uri: 'unix/:./{{ instance_name }}.iproto'
-      advertise:
-        sharding:
-          login: 'storage'
-
-    sharding:
-      rebalancer_bucket_send_timeout: 42
-
-    groups:
-      group-001:
-        replicasets:
-          replicaset-001:
-            sharding:
-              roles: [storage, rebalancer, router]
-            instances:
-              instance-001: {}
-    ]]
-    local config_file = treegen.write_file(dir, 'config.yaml', config)
-    local opts = {
-        env = {LUA_PATH = os.environ()['LUA_PATH']},
-        config_file = config_file,
-        chdir = dir,
-        alias = 'instance-001',
-    }
-    g.server = server:new(opts)
-    g.server:start()
-
-    g.server:exec(function()
-        local loaders = require('internal.loaders')
-        local config = require('config')
-        local vshard = loaders.require_first('vshard-ee', 'vshard')
-
-        -- New enough for sharding (0.1.25), too old for the option (0.1.41).
-        local saved = vshard.consts.VERSION
-        vshard.consts.VERSION = '0.1.30'
-        local ok, err = pcall(config.reload, config)
-        vshard.consts.VERSION = saved
-
-        t.assert_not(ok)
-        t.assert_str_contains(tostring(err),
-            'rebalancer_bucket_send_timeout: The vshard module is too old: ' ..
-            'the minimum supported version is 0.1.41')
-    end)
 end
