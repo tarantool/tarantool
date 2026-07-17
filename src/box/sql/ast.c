@@ -124,7 +124,7 @@ ast_select_destroy(struct ast_select *select)
 	sql_expr_delete(select->having);
 	sql_expr_delete(select->limit);
 	sql_expr_delete(select->offset);
-	sqlWithDelete(select->with);
+	ast_with_destroy(select->with);
 }
 
 void
@@ -151,7 +151,7 @@ select_from_ast_single(struct Parse *parser, struct ast_select *select)
 					  select->flags, select->limit,
 					  select->offset);
 	res->op = select->op;
-	res->pWith = select->with;
+	res->pWith = with_from_ast(parser, select->with);
 	return res;
 }
 
@@ -181,4 +181,70 @@ select_from_ast(struct Parse *parser, struct ast_select *select)
 		return NULL;
 	}
 	return res;
+}
+
+struct ast_with_list *
+ast_with_list_append(struct Parse *parser, struct ast_with_list *list,
+		     const struct Token *name, struct ast_id_list *columns,
+		     struct ast_select *select)
+{
+	if (list == NULL) {
+		list = xregion_alloc(&parser->region, sizeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	struct ast_with_entry *entry = xregion_alloc(&parser->region,
+						     sizeof(*entry));
+	entry->name = *name;
+	entry->columns = columns;
+	entry->select = select;
+	stailq_add_tail(&list->head, &entry->link);
+	list->len++;
+	return list;
+}
+
+/** Convert `struct ast_id_list` to `struct ExprList` of column names. */
+static struct ExprList *
+expr_list_from_ids(struct Parse *parser, struct ast_id_list *list)
+{
+	if (list == NULL)
+		return NULL;
+	struct ExprList *res = NULL;
+	struct ast_id_entry *entry;
+	stailq_foreach_entry(entry, &list->head, link) {
+		res = sql_expr_list_append(res, NULL);
+		sqlExprListSetName(parser, res, &entry->id, 1);
+	}
+	return res;
+}
+
+struct With *
+with_from_ast(struct Parse *parser, struct ast_with_list *list)
+{
+	if (list == NULL)
+		return NULL;
+	struct With *res = NULL;
+	struct ast_with_entry *entry;
+	stailq_foreach_entry(entry, &list->head, link) {
+		struct ExprList *cols =
+			expr_list_from_ids(parser, entry->columns);
+		struct Select *select = select_from_ast(parser, entry->select);
+		res = sqlWithAdd(parser, res, &entry->name, cols, select);
+	}
+	if (parser->is_aborted) {
+		sqlWithDelete(res);
+		return NULL;
+	}
+	return res;
+}
+
+void
+ast_with_destroy(struct ast_with_list *list)
+{
+	if (list == NULL)
+		return;
+	struct ast_with_entry *entry;
+	stailq_foreach_entry(entry, &list->head, link) {
+		ast_select_list_destroy(entry->select);
+	}
 }

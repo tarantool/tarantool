@@ -82,11 +82,31 @@ struct ast_select {
 	/** OFFSET clause of the SELECT. */
 	struct Expr *offset;
 	/** WITH clause of the SELECT. */
-	struct With *with;
+	struct ast_with_list *with;
 	/** Flags of the SELECT. */
 	uint32_t flags;
 	/** Link type between linked SELECTs. */
 	uint8_t op;
+};
+
+/** List of WITH clauses received from parser. */
+struct ast_with_list {
+	/** Head of the list. */
+	struct stailq head;
+	/** Length of the list. */
+	uint32_t len;
+};
+
+/** Element of the WITH clause list, describing one entry of a WITH clause. */
+struct ast_with_entry {
+	/** Link to the next element of the list. */
+	struct stailq_entry link;
+	/** Name of the table in the WITH clause. */
+	struct Token name;
+	/** Column names of the table, if specified explicitly. */
+	struct ast_id_list *columns;
+	/** SELECT statement of the WITH clause. */
+	struct ast_select *select;
 };
 
 /** Append an ID to ID list. */
@@ -130,3 +150,19 @@ ast_select_list_destroy(struct ast_select *select);
 /** Build `struct Select` object from `struct ast_select` object. */
 struct Select *
 select_from_ast(struct Parse *parser, struct ast_select *select);
+
+/**
+ * Append a WITH clause to the WITH clause list, creating the list if needed.
+ */
+struct ast_with_list *
+ast_with_list_append(struct Parse *parser, struct ast_with_list *list,
+		     const struct Token *name, struct ast_id_list *columns,
+		     struct ast_select *select);
+
+/** Convert `struct ast_with_list` to `struct With`. */
+struct With *
+with_from_ast(struct Parse *parser, struct ast_with_list *list);
+
+/** Destroy the resources owned by the WITH clauses in the list. */
+void
+ast_with_destroy(struct ast_with_list *list);

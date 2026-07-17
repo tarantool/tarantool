@@ -783,7 +783,7 @@ limit_opt(A) ::= LIMIT expr(X) COMMA expr(Y).
 
 /////////////////////////// The DELETE statement /////////////////////////////
 //
-cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
+cmd ::= with_old(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
   sqlWithPush(pParse, C, 1);
   sqlSrcListIndexedBy(X, &I);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
@@ -807,7 +807,7 @@ where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
 
 ////////////////////////// The UPDATE command ////////////////////////////////
 //
-cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
+cmd ::= with_old(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
         where_opt(W).  {
   sqlWithPush(pParse, C, 1);
   sqlSrcListIndexedBy(X, &I);
@@ -842,14 +842,15 @@ setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
 
 ////////////////////////// The INSERT command /////////////////////////////////
 //
-cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) select_old(S). {
+cmd ::= with_old(W) insert_cmd(R) INTO fullname(X) idlist_opt(F)
+        select_old(S). {
   sqlWithPush(pParse, W, 1);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
   sqlInsert(pParse, X, S, id_list_from_ast(F), R);
 }
-cmd ::= with(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
+cmd ::= with_old(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
 {
   sqlWithPush(pParse, W, 1);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
@@ -1739,20 +1740,25 @@ cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////
-%type with {With*}
-%type wqlist {With*}
-%destructor with {sqlWithDelete($$);}
-%destructor wqlist {sqlWithDelete($$);}
+%type with_old {With*}
+%destructor with_old {sqlWithDelete($$);}
+with_old(A) ::= with(X). {
+  A = with_from_ast(pParse, X);
+}
 
+%type with {struct ast_with_list *}
+%destructor with {ast_with_destroy($$);}
 with(A) ::= . {A = 0;}
 with(A) ::= WITH wqlist(W).              { A = W; }
 with(A) ::= WITH RECURSIVE wqlist(W).    { A = W; }
 
-wqlist(A) ::= nm(X) eidlist_opt(Y) AS LP select_old(Z) RP. {
-  A = sqlWithAdd(pParse, 0, &X, Y, Z); /*A-overwrites-X*/
+%type wqlist {struct ast_with_list *}
+%destructor wqlist {ast_with_destroy($$);}
+wqlist(A) ::= nm(X) idlist_opt(Y) AS LP select(Z) RP. {
+  A = ast_with_list_append(pParse, NULL, &X, Y, Z);
 }
-wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select_old(Z) RP. {
-  A = sqlWithAdd(pParse, A, &X, Y, Z);
+wqlist(A) ::= wqlist(A) COMMA nm(X) idlist_opt(Y) AS LP select(Z) RP. {
+  A = ast_with_list_append(pParse, A, &X, Y, Z);
 }
 
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
