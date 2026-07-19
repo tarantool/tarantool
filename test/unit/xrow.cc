@@ -1390,13 +1390,49 @@ test_xrow_decode_error_gh_9136(void)
 	footer();
 }
 
+/*
+ * xrow_decode() only guarantees that a request body is well-formed
+ * MsgPack, not that it is a map. A raft request whose body is any other
+ * type must be rejected rather than handed to mp_decode_map(), which
+ * treats a non-map marker as unreachable.
+ */
+static void
+test_xrow_decode_raft_no_map(void)
+{
+	header();
+	plan(2);
+
+	char buf[16];
+	struct xrow_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_RAFT;
+	row.group_id = GROUP_LOCAL;
+	row.bodycnt = 1;
+	row.body[0].iov_base = buf;
+
+	struct raft_request raft;
+
+	/* An empty array is valid MsgPack but not a map. */
+	row.body[0].iov_len = mp_format(buf, sizeof(buf), "[]");
+	is(xrow_decode_raft(&row, &raft), -1, "array body is rejected");
+	box_error_clear();
+
+	/* A scalar is valid MsgPack but not a map. */
+	row.body[0].iov_len = mp_format(buf, sizeof(buf), "%u", 42);
+	is(xrow_decode_raft(&row, &raft), -1, "scalar body is rejected");
+	box_error_clear();
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(15);
+	plan(16);
 
 	random_init();
 
@@ -1416,6 +1452,7 @@ main(void)
 	test_xrow_decode_error_gh_9098();
 	test_xrow_decode_error_gh_9136();
 	test_xrow_decode_synchro_types();
+	test_xrow_decode_raft_no_map();
 
 	random_free();
 	fiber_free();
