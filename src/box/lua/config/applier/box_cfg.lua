@@ -227,7 +227,10 @@ local function wait_if_not_bootstrap_leader()
 
     if box.info.id ~= 1 then
         -- Not really a bootstrap leader, just a replica. Go to RO.
-        box.cfg({read_only = true})
+        box.cfg({
+            read_only = true,
+            ro_reason = 'joined an existing replicaset as a replica',
+        })
     end
 end
 
@@ -260,6 +263,7 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         local mode = configdata:get('database.mode', {use_default = true})
         if mode == 'ro' then
             box_cfg.read_only = true
+            box_cfg.ro_reason = 'database.mode is set to "ro"'
         elseif mode == 'rw' then
             box_cfg.read_only = false
         elseif #configdata:peers() == 1 then
@@ -268,6 +272,8 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         elseif #configdata:peers() > 1 then
             assert(mode == nil)
             box_cfg.read_only = true
+            box_cfg.ro_reason = 'database.mode defaults to "ro" for a ' ..
+                'multi-instance replicaset'
         else
             assert(false)
         end
@@ -280,6 +286,9 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         -- NB: configdata.lua verifies that an anonymous replica
         -- is not set as a leader.
         box_cfg.read_only = not configdata:is_leader()
+        if box_cfg.read_only then
+            box_cfg.ro_reason = 'not the leader in manual failover mode'
+        end
     elseif failover == 'election' then
         -- Enable leader election on non-anonymous instances.
         if box_cfg.election_mode == nil then
@@ -322,6 +331,7 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         -- underneath logic).
         if box_cfg.election_mode == 'off' then
             box_cfg.read_only = true  -- forced RO
+            box_cfg.ro_reason = 'replication.election_mode is set to "off"'
         elseif box_cfg.election_mode == 'voter' then
             box_cfg.read_only = false -- means no restrictions
         elseif box_cfg.election_mode == 'manual' then
@@ -348,6 +358,8 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         if externally_managed_mode_strategies[bootstrap_strategy] then
             if is_startup then
                 box_cfg.read_only = true
+                box_cfg.ro_reason = 'waiting for an external failover ' ..
+                    'coordinator'
             else
                 -- Don't change the read_only flag on the
                 -- reconfiguration. It is managed by an external
@@ -400,6 +412,10 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
                 snapshot.get_path(configdata._iconfig_def) == nil and
                 instance_name == configdata:bootstrap_leader_name()
             box_cfg.read_only = not am_i_bootstrap_leader
+            if box_cfg.read_only then
+                box_cfg.ro_reason = 'not the bootstrap leader in supervised ' ..
+                    'failover mode'
+            end
         end
 
         -- It is possible that an instance with the minimal
@@ -900,8 +916,8 @@ local function switch_isolated_mode_before_box_cfg(config, box_cfg)
     -- [^1]: Unless the data operations are carefully designed to
     --       be idempotent to use in the master-master mode.
     --
-    -- TODO(gh-10404): Set ro_reason=isolated.
     box_cfg.read_only = true
+    box_cfg.ro_reason = 'isolated mode is enabled'
 
     -- Don't accept new iproto connections.
     --
@@ -1165,6 +1181,7 @@ local function force_ro_on_startup(configdata, box_cfg)
 
     if force_read_only then
         box_cfg.read_only = true
+        box_cfg.ro_reason = 'safe startup mode is enabled'
     end
 
     -- NB: needs_retry should be true when force_read_only is
