@@ -473,7 +473,7 @@ multiselect_op(A) ::= UNION(OP).             {A = @OP; /*A-overwrites-OP*/}
 multiselect_op(A) ::= UNION ALL.             {A = TK_ALL;}
 multiselect_op(A) ::= EXCEPT|INTERSECT(OP).  {A = @OP; /*A-overwrites-OP*/}
 
-oneselect(A) ::= SELECT distinct(D) selcollist(W) from(X) where_opt(Y)
+oneselect(A) ::= SELECT distinct(D) select_list(W) from(X) where_opt(Y)
                  groupby_opt(P) having_opt(Q) orderby_opt(Z) limit_opt(L). {
   A = ast_select_new(pParse);
   A->columns = W;
@@ -513,28 +513,35 @@ distinct(A) ::= DISTINCT.   {A = SF_Distinct;}
 distinct(A) ::= ALL.        {A = SF_All;}
 distinct(A) ::= .           {A = 0;}
 
-// selcollist is a list of expressions that are to become the return
-// values of the SELECT statement.  The "*" in statements like
-// "SELECT * FROM ..." is encoded as a special expression with an
-// opcode of TK_ASTERISK.
-//
-%type selcollist {ExprList*}
-%destructor selcollist {sql_expr_list_delete($$);}
-%type sclp {ExprList*}
-%destructor sclp {sql_expr_list_delete($$);}
-sclp(A) ::= selcollist(A) COMMA.
-sclp(A) ::= .                                {A = 0;}
-selcollist(A) ::= sclp(A) expr(X) as(Y).     {
-   A = sql_expr_list_append(A, X.pExpr);
-   if( Y.n>0 ) sqlExprListSetName(pParse, A, &Y, 1);
-   sqlExprListSetSpan(A, &X);
+%type select_list {struct ExprList *}
+%destructor select_list {sql_expr_list_delete($$);}
+select_list(A) ::= expr(X) as(Y). {
+  A = sql_expr_list_append(NULL, X.pExpr);
+  if(Y.n > 0)
+    sqlExprListSetName(pParse, A, &Y, 1);
+  sqlExprListSetSpan(A, &X);
 }
-selcollist(A) ::= sclp(A) STAR. {
+select_list(A) ::= STAR. {
+  A = sql_expr_list_append(NULL, sql_expr_new_anon(TK_ASTERISK));
+}
+select_list(A) ::= nm(X) DOT STAR. {
+  struct Expr *pLeft = sql_expr_new_dequoted(TK_ID, &X);
+  Expr *pRight = sql_expr_new_anon(TK_ASTERISK);
+  Expr *pDot = sqlPExpr(pParse, TK_DOT, pLeft, pRight);
+  A = sql_expr_list_append(NULL, pDot);
+}
+select_list(A) ::= select_list(A) COMMA expr(X) as(Y). {
+  A = sql_expr_list_append(A, X.pExpr);
+  if(Y.n > 0)
+    sqlExprListSetName(pParse, A, &Y, 1);
+  sqlExprListSetSpan(A, &X);
+}
+select_list(A) ::= select_list(A) COMMA STAR. {
   A = sql_expr_list_append(A, sql_expr_new_anon(TK_ASTERISK));
 }
-selcollist(A) ::= sclp(A) nm(X) DOT STAR. {
+select_list(A) ::= select_list(A) COMMA nm(X) DOT STAR. {
   struct Expr *pLeft = sql_expr_new_dequoted(TK_ID, &X);
-  Expr *pRight = sqlPExpr(pParse, TK_ASTERISK, 0, 0);
+  Expr *pRight = sql_expr_new_anon(TK_ASTERISK);
   Expr *pDot = sqlPExpr(pParse, TK_DOT, pLeft, pRight);
   A = sql_expr_list_append(A, pDot);
 }
