@@ -319,7 +319,7 @@ void eio_set_thread_on_stop(int (*on_stop_cb)(void *), void *data);
  * maximum wanted number
  * or maximum idle number of threads */
 void eio_set_min_parallel (unsigned int nthreads);
-void eio_set_max_parallel (unsigned int nthreads);
+int  eio_set_max_parallel (unsigned int nthreads);
 void eio_set_max_idle     (unsigned int nthreads);
 void eio_set_idle_timeout (unsigned int seconds);
 

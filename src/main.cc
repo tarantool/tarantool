@@ -312,6 +312,9 @@ daemonize(void)
 	fflush(stdin);
 	fflush(stdout);
 	fflush(stderr);
+
+	coio_prefork();
+
 	pid = fork();
 	switch (pid) {
 	case -1:
@@ -334,6 +337,8 @@ daemonize(void)
 	 * kqueue on FreeBSD.
 	 */
 	ev_loop_fork(cord()->loop);
+
+	coio_postfork();
 
 	/* redirect stdin; stdout and stderr handled in say_logger_init */
 	fd = open("/dev/null", O_RDONLY);

@@ -533,10 +533,10 @@ eio_set_min_parallel (unsigned int nthreads)
   etp_set_min_parallel (EIO_POOL, nthreads);
 }
 
-void ecb_cold
+int ecb_cold
 eio_set_max_parallel (unsigned int nthreads)
 {
-  etp_set_max_parallel (EIO_POOL, nthreads);
+  return etp_set_max_parallel (EIO_POOL, nthreads);
 }
 
 int eio_poll (void)
@@ -1718,26 +1718,11 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 
 /*****************************************************************************/
 
-static int eio_threads;
-
-static void ecb_cold
-eio_prefork()
-{
-    eio_threads = etp_set_max_parallel(EIO_POOL, 0);
-}
-
-static void ecb_cold
-eio_postfork()
-{
-    etp_set_min_parallel(EIO_POOL, eio_threads);
-}
-
 static void ecb_cold
 eio_init_once()
 {
   etp_init (EIO_POOL);
   eio_main_user = &eio_pool_user;
-  X_THREAD_ATFORK(eio_prefork, eio_postfork, eio_postfork);
 }
 
 int ecb_cold
