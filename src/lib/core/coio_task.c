@@ -156,6 +156,29 @@ coio_shutdown(void)
 	eio_set_max_parallel(0);
 }
 
+/**
+ * We store the number of configured coio threads in this variable in
+ * coio_prefork() so as to restore it in coio_postfork().
+ */
+static int coio_prefork_threads;
+
+void
+coio_prefork(void)
+{
+	assert(cord_is_main());
+	assert(coio_prefork_threads == 0);
+	coio_prefork_threads = eio_set_max_parallel(0);
+}
+
+void
+coio_postfork(void)
+{
+	assert(cord_is_main());
+	assert(coio_prefork_threads > 0);
+	eio_set_min_parallel(coio_prefork_threads);
+	coio_prefork_threads = 0;
+}
+
 static void
 coio_on_feed(eio_req *req)
 {
