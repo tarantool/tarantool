@@ -163,6 +163,7 @@ extern char session_lua[],
 	metrics_utils_lua[],
 	metrics_version_lua[],
 	httpd_role_lua[],
+	httpd_role_wrapper_lua[],
 	metrics_export_role_lua[],
 	/* {{{ config */
 	config_applier_app_lua[],
@@ -359,7 +360,8 @@ static const char * const lua_sources_main[] = {
 	"box/upgrade", NULL, upgrade_lua,
 	"box/console", "console", console_lua,
 	"box/backup", NULL, backup_lua,
-	"third_party/http/roles/httpd", "roles.httpd", httpd_role_lua,
+	"third_party/http/roles/httpd", "internal.httpd_role", httpd_role_lua,
+	"box/httpd_role", "roles.httpd", httpd_role_wrapper_lua,
 	"third_party/metrics-export-role/roles/metrics-export",
 	"roles.metrics-export", metrics_export_role_lua,
 
