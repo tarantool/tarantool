@@ -293,12 +293,15 @@ enum {
 /* undocumented/unsupported/private helper */
 /*void eio_page_align (void **addr, size_t *length);*/
 
-/* returns < 0 on error, errno set
+/* initialize eio subsystem */
+void eio_init (void);
+
+/* enable eio in the calling thread
  * need_poll, if non-zero, will be called when results are available
  * and eio_poll_cb needs to be invoked (it MUST NOT call eio_poll_cb itself).
  * done_poll is called when the need to poll is gone.
  */
-int eio_init (void *, void (*want_poll)(void *), void (*done_poll)(void *));
+void eio_enable (void *, void (*want_poll)(void *), void (*done_poll)(void *));
 
 /* must be called regularly to handle pending requests */
 /* returns 0 if all requests were handled, -1 if not, or the value of EIO_FINISH if != 0 */
