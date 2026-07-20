@@ -129,6 +129,7 @@ coio_on_stop(void *data)
 void
 coio_init(void)
 {
+	eio_init();
 	eio_set_thread_on_start(coio_on_start, NULL);
 	eio_set_thread_on_stop(coio_on_stop, NULL);
 }
@@ -141,7 +142,7 @@ coio_init(void)
 void
 coio_enable(void)
 {
-	eio_init(&coio_manager, coio_want_poll_cb, coio_done_poll_cb);
+	eio_enable(&coio_manager, coio_want_poll_cb, coio_done_poll_cb);
 	coio_manager.loop = loop();
 
 	ev_idle_init(&coio_manager.coio_idle, coio_idle_cb);

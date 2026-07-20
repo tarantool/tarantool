@@ -368,20 +368,10 @@ static void eio_execute (struct etp_worker *self, eio_req *req);
 
 #include "etp.c"
 
-static void
-eio_warn_uninitialized()
-{
-  fputs("Please initialize libeio in this thread.\n", stderr);
-  assert(0);
-}
-
 static struct etp_pool eio_pool;
 static __thread struct etp_pool_user eio_pool_user;
-static struct etp_pool_user *eio_main_user;
 #define EIO_POOL (&eio_pool)
-#define EIO_POOL_USER (ecb_expect_true(eio_pool_user.pool) ? \
-  &eio_pool_user : \
-  (eio_warn_uninitialized(), eio_main_user))
+#define EIO_POOL_USER (&eio_pool_user)
 
 /*****************************************************************************/
 
@@ -1718,23 +1708,17 @@ eio__statvfsat (int dirfd, const char *path, struct statvfs *buf)
 
 /*****************************************************************************/
 
-static void ecb_cold
-eio_init_once()
+void ecb_cold
+eio_init()
 {
   etp_init (EIO_POOL);
-  eio_main_user = &eio_pool_user;
 }
 
-int ecb_cold
-eio_init (void *user, void (*want_poll)(void *), void (*done_poll)(void *))
+void ecb_cold
+eio_enable (void *user, void (*want_poll)(void *), void (*done_poll)(void *))
 {
-  static pthread_once_t once = PTHREAD_ONCE_INIT;
-  pthread_once(&once, eio_init_once);
-
   etp_user_init (&eio_pool_user, user, want_poll, done_poll);
-
   eio_pool_user.pool = EIO_POOL;
-  return 0;
 }
 
 ecb_inline void
