@@ -254,3 +254,20 @@ g.test_require_module_via_l = function(cg)
             'true',
         }, '\n'))
 end
+
+-- gh-4775: crash on option concatenated with value.
+--
+-- `-lfoo` or `-e<...>` led to a crash before the fix, while `-l foo` or
+-- `-e <...>` worked as expected.
+g.test_option_concatenated_with_value = function(cg)
+    verify_output(catch_output(cg.dir, {
+        '-ljson',
+        '-e', "print(type(rawget(_G, 'json')))",
+    }))
+        :exit_success()
+        :stdout_equals('table')
+
+    verify_output(catch_output(cg.dir, {'-eprint(100) os.exit()'}))
+        :exit_success()
+        :stdout_equals('100')
+end
