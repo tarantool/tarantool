@@ -266,16 +266,23 @@ local function instance_uri(self, iconfig, advertise_type, opts)
     return uri
 end
 
-local function apply_vars_f(data, w, vars)
-    if data ~= nil and type(data) == 'string' then
-        return (data:gsub('{{ *(.-) *}}', function(var_name)
-            if vars[var_name] ~= nil then
-                return vars[var_name]
-            end
-            w.error(('Unknown variable %q'):format(var_name))
-        end))
+-- Substitute {{ var_name }} tokens in a string. ctx.vars holds the
+-- static template variables; ctx.context resolves
+-- config.context.<name> on demand, raising on a read failure.
+local function apply_vars_f(data, w, ctx)
+    if type(data) ~= 'string' then
+        return data
     end
-    return data
+    return (data:gsub('{{ *(.-) *}}', function(var_name)
+        if ctx.vars[var_name] ~= nil then
+            return ctx.vars[var_name]
+        end
+        local name = var_name:match('^context%.(.+)$')
+        if name ~= nil then
+            return ctx.context(name, w)
+        end
+        w.error(('Unknown variable %q'):format(var_name))
+    end))
 end
 
 -- The file path is interpreted as relative to `process.work_dir`.
@@ -304,7 +311,8 @@ local function prepare_file_path(self, iconfig, path)
 end
 
 -- Read a config.context[name] variable depending on its "from"
--- type.
+-- type. Returns (true, value) on success or (false, err_msg) on a
+-- read failure (an unset 'env' variable or an unreadable 'file').
 local function read_context_var_noexc(base_dir, def)
     -- Scalar shorthand: the value is defined right in
     -- config.context.
@@ -323,36 +331,74 @@ local function read_context_var_noexc(base_dir, def)
         if value == nil then
             return false, ('no %q environment variable'):format(def.env)
         end
-        return true, value
+        return true, def.rstrip and value:rstrip() or value
     elseif def.from == 'file' then
         local path = file.rebase_file_path(base_dir, def.file)
-        return pcall(file.universal_read, path, 'file')
+        local ok, value = pcall(file.universal_read, path, 'file')
+        if not ok then
+            return false, value
+        end
+        return true, def.rstrip and value:rstrip() or value
     else
         assert(false)
     end
 end
 
-local function apply_vars(self, iconfig, vars)
+-- opts.warn, when true, logs a warning for each declared
+-- config.context variable that is unreferenced and cannot be read
+-- (such variables no longer abort startup; referenced ones still do).
+-- Set only for the real apply, not the defaults-only one, to avoid
+-- duplicate warnings (see build_iconfig() in configdata.lua).
+local function apply_vars(self, iconfig, vars, opts)
     vars = table.copy(vars)
 
     local base_dir = self:base_dir(iconfig)
+    local context_vars = self:get(iconfig, 'config.context') or {}
 
-    -- Read config.context.* variables and add them into the
-    -- variables list.
-    local context_vars = self:get(iconfig, 'config.context')
-    for name, def in pairs(context_vars or {}) do
-        local ok, res = read_context_var_noexc(base_dir, def)
-        if not ok then
-            error(('Unable to read config.context.%s variable value: ' ..
-                '%s'):format(name, res), 0)
+    -- Names of the config.context variables that got referenced.
+    local used = {}
+    -- Per-call cache of resolved variables ({ok, res} by name).
+    local cache = {}
+
+    -- Read a declared config.context.<name>, at most once per call.
+    local function resolve_cached(name)
+        local cached = cache[name]
+        if cached == nil then
+            cached = {read_context_var_noexc(base_dir, context_vars[name])}
+            cache[name] = cached
         end
-        if type(def) == 'table' and def.rstrip then
-            res = res:rstrip()
-        end
-        vars['context.' .. name] = res
+        return cached[1], cached[2]
     end
 
-    return self:map(iconfig, apply_vars_f, vars)
+    -- Resolve a config.context.<name> reference, raising if it is
+    -- declared but cannot be read.
+    local function context(name, w)
+        used[name] = true
+        if context_vars[name] == nil then
+            w.error(('Unknown variable "context.%s"'):format(name))
+        end
+        local ok, res = resolve_cached(name)
+        if not ok then
+            w.error(('Unable to read config.context.%s variable value: %s')
+                :format(name, res))
+        end
+        return res
+    end
+
+    local res = self:map(iconfig, apply_vars_f,
+                         {vars = vars, context = context})
+
+    -- Warn about unreferenced variables that can't be read.
+    if opts ~= nil and opts.warn then
+        for name in pairs(context_vars) do
+            if not used[name] and not (resolve_cached(name)) then
+                log.warn(('config.context.%s: cannot read the variable ' ..
+                    'value, it is left unset'):format(name))
+            end
+        end
+    end
+
+    return res
 end
 
 local function feedback_apply_default_if(_data, _w)
