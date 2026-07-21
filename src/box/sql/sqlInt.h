@@ -1281,9 +1281,10 @@ typedef int ynVar;
  *
  * If the expression is an SQL literal (TK_INTEGER, TK_FLOAT, TK_BLOB,
  * or TK_STRING), then Expr.token contains the text of the SQL literal. If
- * the expression is a variable (TK_VARIABLE), then Expr.token contains the
- * variable name. Finally, if the expression is an SQL function (TK_FUNCTION),
- * then Expr.token contains the name of the function.
+ * the expression is a variable (TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON),
+ * then Expr.token contains the variable name. Finally, if the expression
+ * is an SQL function (TK_FUNCTION), then Expr.token contains the name of
+ * the function.
  *
  * Expr.pRight and Expr.pLeft are the left and right subexpressions of a
  * binary operator. Either or both may be NULL.
@@ -1373,7 +1374,8 @@ struct Expr {
 				 * TK_SELECT: 1st register of result vector
 				 */
 	ynVar iColumn;		/* TK_COLUMN_REF: column index.
-				 * TK_VARIABLE: variable number (always >= 1).
+				 * TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON:
+				 * variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
 	i16 iAgg;		/* Which entry in pAggInfo->aCol[] or ->aFunc[] */
@@ -2592,6 +2594,17 @@ void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 
 /**
+ * Check what op is type variable.
+ */
+static inline int
+is_expr_variable(int op)
+{
+	return (op == TK_VAR_NAME ||
+		op == TK_VAR_NUM ||
+		op == TK_VAR_ANON);
+}
+
+/**
  * Parse tokens as a name or a position of bound variable.
  *
  * @param parse Parse context.
@@ -2601,6 +2614,32 @@ ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 struct Expr *
 expr_new_variable(struct Parse *parse, const struct Token *spec,
 		  const struct Token *id);
+
+/**
+ * Return an expression for named bind variable.
+ *
+ * @param parse Parse context.
+ * @param id Name.
+ */
+struct Expr *
+expr_new_var_name(struct Parse *parse, const struct Token *id);
+
+/**
+ * Return an expression for a position of bound variable.
+ *
+ * @param parse Parse context.
+ * @param id position number of bound variable.
+ */
+struct Expr *
+expr_new_var_num(struct Parse *parse, const struct Token *id);
+
+/**
+ * Return an expression for a anonymous name.
+ *
+ * @param parse Parse context.
+ */
+struct Expr *
+expr_new_var_anon(struct Parse *parse);
 
 /** Return TRUE if expression is term, FALSE otherwise. */
 static inline bool

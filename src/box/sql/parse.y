@@ -981,15 +981,19 @@ term(A) ::= INTEGER(X). {
   A.zEnd = X.z + X.n;
   A.pExpr->flags |= EP_Leaf;
 }
-expr(A) ::= VARNUM(X). {
-  A.pExpr = expr_new_variable(pParse, &X, NULL);
+expr(A) ::= VAR_ANON(X). {
+  A.pExpr = expr_new_var_anon(pParse);
   spanSet(&A, &X, &X);
 }
-expr(A) ::= COLON|VARIABLE(X) id(Y).     {
-  A.pExpr = expr_new_variable(pParse, &X, &Y);
-  spanSet(&A, &X, &Y);
+expr(A) ::= VAR_NUM(X). {
+  A.pExpr = expr_new_var_num(pParse, &X);
+  spanSet(&A, &X, &X);
 }
-expr(A) ::= COLON|VARIABLE(X) INTEGER(Y).     {
+expr(A) ::= VAR_NAME(X). {
+  A.pExpr = expr_new_var_name(pParse, &X);
+  spanSet(&A, &X, &X);
+}
+expr(A) ::= COLON(X) id(Y).     {
   A.pExpr = expr_new_variable(pParse, &X, &Y);
   spanSet(&A, &X, &Y);
 }

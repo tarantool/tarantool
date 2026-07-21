@@ -285,13 +285,14 @@ g.test_2948_remove_unnecessary_temlates = function(cg)
         space:replace{1, 2, '3'}
         space:replace{7, 8.5, '9'}
         cn:execute('INSERT INTO test VALUES (10, 11, NULL);')
-        local exp_err = "Syntax error at line 1 near '1'"
+        local exp_err = "At line 1 at or near position 8: "..
+                        "unrecognized token '?1'"
         local sql = 'SELECT ?1, ?2, ?3;'
         t.assert_error_msg_content_equals(exp_err,
                                           cn.execute,
                                           cn, sql, {1, 2, 3})
 
-        exp_err = 'Index of binding slots must start from 1'
+        exp_err = "At line 1 at or near position 8: unrecognized token '$name'"
         sql = 'SELECT $name, $name2;'
         t.assert_error_msg_content_equals(exp_err, cn.execute, cn, sql, {1, 2})
 
@@ -303,7 +304,7 @@ g.test_2948_remove_unnecessary_temlates = function(cg)
         local res = cn:execute('SELECT $2, $1, $3;', parameters)
         t.assert_equals(res.rows, {{22, 11, 33}})
 
-        res = cn:execute('SELECT * FROM test WHERE id = :1;', {1})
+        res = cn:execute('SELECT * FROM test WHERE id = $1;', {1})
         t.assert_equals(res.rows, {{1, 2, '3'}})
         box.execute([[DROP TABLE test;]])
         cn:close()
