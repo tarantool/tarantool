@@ -1074,7 +1074,7 @@ local function new(iconfig, cconfig, instance_name)
     iconfig = instance_config:normalize(
         instance_config:apply_vars(iconfig, vars))
     iconfig_def = instance_config:normalize(
-        instance_config:apply_vars(iconfig_def, vars))
+        instance_config:apply_vars(iconfig_def, vars, {warn = true}))
 
     local replicaset_uuid = instance_config:get(iconfig_def,
         'database.replicaset_uuid')
