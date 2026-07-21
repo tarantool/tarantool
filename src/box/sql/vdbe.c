@@ -353,11 +353,30 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 }
 
 /*
+ * Return number of same bind variable.
+ * Returns 0 if no same bind_variable.
+ */
+static inline uint32_t
+vdbe_find_bind_names(Vdbe *p, const char *p4_name)
+{
+	for (uint32_t i = 0; i < p->count_bind_names; i++) {
+		if (p->bind_names[i] != NULL) {
+			if (strncmp(p->bind_names[i], p4_name,
+				    p->bind_names_len[i]) == 0) {
+				return (++i);
+			}
+		}
+	}
+	return 0;
+}
+
+/*
  * Execute as much of a VDBE program as we can.
  * This is the core of sql_step().
  */
 int sqlVdbeExec(Vdbe *p)
 {
+	ynVar last_p1 = 0;
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
 #if defined(SQL_DEBUG)
@@ -405,6 +424,19 @@ int sqlVdbeExec(Vdbe *p)
 			printf("VDBE Trace:\n");
 	}
 #endif
+	for (pOp = &aOp[p->pc]; pOp < &aOp[p->nOp]; pOp++) {
+		if (pOp->opcode == OP_Variable) {
+			if (pOp->p4.z != NULL) {
+				uint32_t p1 =
+					vdbe_find_bind_names(p, pOp->p4.z);
+				if (p1 > 0)
+					pOp->p1 = p1;
+			} else {
+				pOp->p1 = last_p1 + 1;
+			}
+			last_p1 = pOp->p1;
+		}
+	}
 	for(pOp=&aOp[p->pc]; 1; pOp++) {
 		/* Errors are detected by individual opcodes, with an immediate
 		 * jumps to abort_due_to_error.
@@ -861,9 +893,8 @@ case OP_Blob: {                /* out2 */
  */
 case OP_Variable: {            /* out2 */
 	Mem *pVar;       /* Value being transferred */
+	assert(pOp->p1 > 0);
 
-	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
 	pVar = &p->aVar[pOp->p1 - 1];
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;
@@ -1717,7 +1748,6 @@ case OP_And:              /* same as TK_AND, in1, in2, out3 */
 case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	int v1;    /* Left operand:  0==FALSE, 1==TRUE, 2==UNKNOWN or NULL */
 	int v2;    /* Right operand: 0==FALSE, 1==TRUE, 2==UNKNOWN or NULL */
-
 	pIn1 = &aMem[pOp->p1];
 	if (mem_is_null(pIn1)) {
 		v1 = 2;
@@ -4315,7 +4345,6 @@ case OP_Expire: {
 case OP_Init: {          /* jump */
 	char *zTrace;
 	int i;
-
 	/* If the P4 argument is not NULL, then it must be an SQL comment string.
 	 * The "--" string is broken up to prevent false-positives with srcck1.c.
 	 *
@@ -4519,6 +4548,9 @@ default: {          /* This is really OP_Noop and OP_Explain */
 	/* If we reach this point, it means that execution is finished with
 	 * an error of some kind.
 	 */
+	free(p->bind_names);
+	free(p->bind_names_len);
+	p->count_bind_names = 0;
 abort_due_to_error:
 	rc = -1;
 	p->is_aborted = true;

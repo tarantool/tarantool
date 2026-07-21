@@ -173,12 +173,20 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 	return bind_count;
 }
 
+void
+set_bind_variables_in_vdbe(struct Vdbe *stmt, const char **bind_names,
+			   uint32_t *bind_names_len, uint32_t bind_count)
+{
+	sql_set_bind_variables_in_vdbe(stmt, bind_names,
+				       bind_names_len, bind_count);
+}
+
 int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
 	if (p->name != NULL) {
-		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
-		if (pos == 0) {
+		if (sql_bind_parameter_lindex(stmt, p->name,
+					      p->name_len) == 0) {
 			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
 				 sql_bind_name(p));
 			return -1;
