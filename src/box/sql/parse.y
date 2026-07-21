@@ -153,25 +153,28 @@ cmdx ::= cmd.
 //
 
 cmd ::= START TRANSACTION. {
-  sql_ast_init_start_transaction(pParse);
+  pParse->ast.type = SQL_AST_TX_START;
 }
 cmd ::= COMMIT. {
-  sql_ast_init_commit(pParse);
+  pParse->ast.type = SQL_AST_TX_COMMIT;
 }
 cmd ::= ROLLBACK. {
-  sql_ast_init_rollback(pParse);
+  pParse->ast.type = SQL_AST_TX_ROLLBACK;
 }
 
 savepoint_opt ::= SAVEPOINT.
 savepoint_opt ::= .
 cmd ::= SAVEPOINT nm(X). {
-  sql_ast_init_savepoint(pParse, &X);
+  pParse->ast.type = SQL_AST_TX_SAVEPOINT_NEW;
+  pParse->ast.savepoint = X;
 }
 cmd ::= RELEASE savepoint_opt nm(X). {
-  sql_ast_init_release_savepoint(pParse, &X);
+  pParse->ast.type = SQL_AST_TX_SAVEPOINT_RELEASE;
+  pParse->ast.savepoint = X;
 }
 cmd ::= ROLLBACK TO savepoint_opt nm(X). {
-  sql_ast_init_rollback_to_savepoint(pParse, &X);
+  pParse->ast.type = SQL_AST_TX_SAVEPOINT_ROLLBACK;
+  pParse->ast.savepoint = X;
 }
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////

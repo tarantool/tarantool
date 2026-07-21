@@ -451,26 +451,26 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	if (parse->is_aborted)
 		return;
 	switch (ast->type) {
-	case SQL_AST_TYPE_START_TRANSACTION:
+	case SQL_AST_TX_START:
 		sql_transaction_begin(parse);
 		break;
-	case SQL_AST_TYPE_COMMIT:
+	case SQL_AST_TX_COMMIT:
 		sql_transaction_commit(parse);
 		break;
-	case SQL_AST_TYPE_ROLLBACK:
+	case SQL_AST_TX_ROLLBACK:
 		sql_transaction_rollback(parse);
 		break;
-	case SQL_AST_TYPE_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_BEGIN, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_NEW:
+		sqlSavepoint(parse, SAVEPOINT_BEGIN, &ast->savepoint);
 		break;
-	case SQL_AST_TYPE_RELEASE_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_RELEASE, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_RELEASE:
+		sqlSavepoint(parse, SAVEPOINT_RELEASE, &ast->savepoint);
 		break;
-	case SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_ROLLBACK:
+		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint);
 		break;
 	default:
-		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}
 	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
 		sql_finish_coding(parse);

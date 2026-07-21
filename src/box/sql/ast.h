@@ -11,6 +11,25 @@
 #include "salad/stailq.h"
 #include "small/rlist.h"
 
+/** Type of parsed statement. */
+enum sql_ast_type {
+	/** Type of the statement is unknown. */
+	SQL_AST_UNKNOWN = 0,
+
+	/** START TRANSACTION statement. */
+	SQL_AST_TX_START,
+	/** COMMIT statement. */
+	SQL_AST_TX_COMMIT,
+	/** ROLLBACK statement. */
+	SQL_AST_TX_ROLLBACK,
+	/** SAVEPOINT statement. */
+	SQL_AST_TX_SAVEPOINT_NEW,
+	/** RELEASE SAVEPOINT statement. */
+	SQL_AST_TX_SAVEPOINT_RELEASE,
+	/** ROLLBACK TO SAVEPOINT statement. */
+	SQL_AST_TX_SAVEPOINT_ROLLBACK,
+};
+
 /** List of IDs received from parser. */
 struct ast_id_list {
 	/** Head of the list. */
@@ -159,6 +178,17 @@ struct ast_expr_list_entry {
 	enum sort_order order;
 	/** AUTOINCREMENT feature indicator for primary key columns. */
 	bool autoinc;
+};
+
+/** A structure describing the AST of the parsed SQL statement. */
+struct sql_ast {
+	/** Parsed statement type. */
+	enum sql_ast_type type;
+	/** Definition of the statement. */
+	union {
+		/** Name of the savepoint. */
+		struct Token savepoint;
+	};
 };
 
 /** Append an ID to ID list. */
