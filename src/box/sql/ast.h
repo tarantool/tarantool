@@ -28,6 +28,9 @@ enum sql_ast_type {
 	SQL_AST_TX_SAVEPOINT_RELEASE,
 	/** ROLLBACK TO SAVEPOINT statement. */
 	SQL_AST_TX_SAVEPOINT_ROLLBACK,
+
+	/** SELECT statement. */
+	SQL_AST_SELECT,
 };
 
 /** List of IDs received from parser. */
@@ -188,6 +191,8 @@ struct sql_ast {
 	union {
 		/** Name of the savepoint. */
 		struct Token savepoint;
+		/** SELECT statement. */
+		struct ast_select *select;
 	};
 };
 
