@@ -40,6 +40,9 @@ enum sql_ast_type {
 	SQL_AST_DROP_INDEX,
 	/** DROP TRIGGER statement. */
 	SQL_AST_DROP_TRIGGER,
+
+	/** ALTER TABLE RENAME statement. */
+	SQL_AST_ALTER_RENAME,
 };
 
 /** List of IDs received from parser. */
@@ -218,6 +221,14 @@ struct ast_drop_trigger {
 	bool if_exists;
 };
 
+/** Description of ALTER TABLE RENAME statement. */
+struct ast_alter_rename {
+	/** Old name of the table. */
+	struct Token old_name;
+	/** New name of the table. */
+	struct Token new_name;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -234,6 +245,8 @@ struct sql_ast {
 		struct ast_drop_trigger drop_trigger;
 		/** DROP INDEX statement. */
 		struct ast_drop_index drop_index;
+		/** ALTER TABLE RENAME statement. */
+		struct ast_alter_rename alter_rename;
 	};
 };
 
