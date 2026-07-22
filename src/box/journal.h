@@ -385,9 +385,10 @@ journal_set(struct journal *new_journal)
 }
 
 static inline void
-journal_create(struct journal *journal, journal_submit_f submit,
-	       journal_sync_f sync, journal_begin_checkpoint_f begin_checkpoint,
-	       journal_commit_checkpoint_f commit_checkpoint)
+journal_set_callbacks(struct journal *journal,
+		      journal_submit_f submit, journal_sync_f sync,
+		      journal_begin_checkpoint_f begin_checkpoint,
+		      journal_commit_checkpoint_f commit_checkpoint)
 {
 	journal->submit = submit;
 	journal->sync = sync;
