@@ -291,15 +291,6 @@ struct create_fk_def {
 	struct ExprList *parent_cols;
 };
 
-struct create_index_def {
-	struct create_constraint_def base;
-	/** List of indexed columns. */
-	struct ExprList *cols;
-	/** One of _PRIMARY_KEY, _UNIQUE, _NON_UNIQUE. */
-	enum sql_index_type idx_type;
-	enum sort_order sort_order;
-};
-
 /** Basic initialisers of parse structures.*/
 static inline void
 alter_entity_def_init(struct alter_entity_def *alter_def,
@@ -352,19 +343,6 @@ create_ck_def_init(struct create_ck_def *ck_def, struct SrcList *table_name,
 	create_constraint_def_init(&ck_def->base, table_name, name, false,
 				   ENTITY_TYPE_CK);
 	ck_def->expr = expr;
-}
-
-static inline void
-create_index_def_init(struct create_index_def *index_def,
-		      struct SrcList *table_name,  struct Token *name,
-		      struct ExprList *cols, enum sql_index_type idx_type,
-		      enum sort_order sort_order, bool if_not_exists)
-{
-	create_constraint_def_init(&index_def->base, table_name, name,
-				   if_not_exists, ENTITY_TYPE_INDEX);
-	index_def->cols = cols;
-	index_def->idx_type = idx_type;
-	index_def->sort_order = sort_order;
 }
 
 static inline void
