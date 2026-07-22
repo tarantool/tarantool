@@ -395,10 +395,9 @@ cmd ::= VIEW_ENTRY createkw VIEW ifnotexists nm eidlist_opt AS select_old(S). {
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
-cmd ::= select_old(X).  {
-  SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
-  sqlSelect(pParse, X, &dest);
-  sql_select_delete(X);
+cmd ::= select(X). {
+  pParse->ast.type = SQL_AST_SELECT;
+  pParse->ast.select = X;
 }
 
 /**
