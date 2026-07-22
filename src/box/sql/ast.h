@@ -36,6 +36,8 @@ enum sql_ast_type {
 	SQL_AST_DROP_TABLE,
 	/** DROP VIEW statement. */
 	SQL_AST_DROP_VIEW,
+	/** DROP INDEX statement. */
+	SQL_AST_DROP_INDEX,
 	/** DROP TRIGGER statement. */
 	SQL_AST_DROP_TRIGGER,
 };
@@ -198,6 +200,16 @@ struct ast_drop_table {
 	bool if_exists;
 };
 
+/** Description of DROP INDEX statement. */
+struct ast_drop_index {
+	/** Index name. */
+	struct Token name;
+	/** Table name. */
+	struct Token table;
+	/** Flag to throw an error if index not exists. */
+	bool if_exists;
+};
+
 /** Description of DROP TRIGGER statement. */
 struct ast_drop_trigger {
 	/** Trigger name. */
@@ -220,6 +232,8 @@ struct sql_ast {
 		struct ast_drop_table drop_table;
 		/** DROP TRIGGER statement. */
 		struct ast_drop_trigger drop_trigger;
+		/** DROP INDEX statement. */
+		struct ast_drop_index drop_index;
 	};
 };
 
