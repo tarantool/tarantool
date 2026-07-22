@@ -26,5 +26,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[DROP TRIGGER t 4;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '4'")
+
+        _, err = box.execute([[DROP INDEX I ON t 5;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '5'")
     end)
 end
