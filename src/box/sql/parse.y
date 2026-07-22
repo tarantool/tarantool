@@ -1466,8 +1466,9 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
 cmd ::= DROP TRIGGER ifexists(E) nm(X). {
-  pParse->initiateTTrans = true;
-  sql_drop_trigger(pParse, &X, E);
+  pParse->ast.type = SQL_AST_DROP_TRIGGER;
+  pParse->ast.drop_trigger.name = X;
+  pParse->ast.drop_trigger.if_exists = E;
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
