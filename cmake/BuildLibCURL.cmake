@@ -100,9 +100,21 @@ macro(curl_build)
     # Additionaly disable some more protocols.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMB=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_GOPHER=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BASIC_AUTH=ON")
+
+    # Enable basic and digest auth methods, disable all the others.
+    #
+    # The built-in http client uses the libcurl's basic auth functionality, when
+    # proxy or target URI is in the https://user:pass@<...> form or when the
+    # `proxy_user_pwd` Lua API option is provided.
+    #
+    # The external smtp module may use the digest auth method.
+    #
+    # Enabling other auth methods would only add dead code, because the built-in
+    # http client has no API to use them. Also, kerberos/negotiate require a new
+    # GSSAPI dependency.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BASIC_AUTH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_BEARER_AUTH=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_DIGEST_AUTH=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_DIGEST_AUTH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_KERBEROS_AUTH=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_NEGOTIATE_AUTH=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_AWS=ON")
