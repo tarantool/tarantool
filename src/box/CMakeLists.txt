@@ -285,7 +285,6 @@ set(box_sources
     decimal.c
     read_view.c
     read_view_util.c
-    index_read_view.c
     mp_box_ctx.c
     xlog_reader.c
     ${sql_sources}

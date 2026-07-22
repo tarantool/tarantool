@@ -17,7 +17,6 @@
 #include "fiber.h"
 #include "port.h"
 #include "box/index.h"
-#include "box/index_read_view.h"
 #include "box/read_view.h"
 #include "box/read_view_util.h"
 #include "say.h"
