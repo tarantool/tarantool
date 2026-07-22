@@ -87,3 +87,26 @@ g.test_13010_repeat_adding_constraint_column = function(cg)
         t.assert_equals(box.space.t:format()[2]['foreign_key'], exp)
     end)
 end
+
+-- gh-5485: Check changed errors for `ALTER TABLE` rules.
+g.test_alter_table_reserved_keyword_error = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (id INT PRIMARY KEY, a INT);]])
+
+        local exp_err = "Syntax error at line 1 near 'REFERENCES'"
+        local queries = {
+            [[ALTER TABLE t ADD COLUMN REFERENCES INT;]],
+            [[ALTER TABLE t ADD REFERENCES INT;]],
+            [[ALTER TABLE t ADD CONSTRAINT fk FOREIGN KEY REFERENCES t(id);]],
+            [[ALTER TABLE t ADD CONSTRAINT ck CHECK REFERENCES;]],
+            [[ALTER TABLE t ADD CONSTRAINT uq UNIQUE REFERENCES;]],
+            [[ALTER TABLE t ADD CONSTRAINT pk PRIMARY KEY REFERENCES;]],
+        }
+        for _, query in ipairs(queries) do
+            local _, err = box.execute(query)
+            t.assert_equals(err.message, exp_err)
+        end
+
+        box.space.t:drop()
+    end)
+end
