@@ -1526,43 +1526,60 @@ cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
-  pParse->initiateTTrans = true;
-  sql_drop_table_constraint(pParse, &X, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.table = X;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) FOREIGN KEY. {
-  pParse->initiateTTrans = true;
-  sql_drop_tuple_foreign_key(pParse, &X, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) PRIMARY KEY. {
-  pParse->initiateTTrans = true;
-  sql_drop_primary_key(pParse, &X, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_PRIMARY_KEY;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) UNIQUE. {
-  pParse->initiateTTrans = true;
-  sql_drop_unique(pParse, &X, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_UNIQUE;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) CHECK. {
-  pParse->initiateTTrans = true;
-  sql_drop_tuple_check(pParse, &X, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z). {
-  pParse->initiateTTrans = true;
-  sql_drop_field_constraint(pParse, &X, &F, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.column = F;
+  pParse->ast.alter_drop_constraint.table = X;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) FOREIGN KEY. {
-  pParse->initiateTTrans = true;
-  sql_drop_field_foreign_key(pParse, &X, &F, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.column = F;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
-  pParse->initiateTTrans = true;
-  sql_drop_field_check(pParse, &X, &F, &Z);
+  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  pParse->ast.alter_drop_constraint.name = Z;
+  pParse->ast.alter_drop_constraint.column = F;
+  pParse->ast.alter_drop_constraint.table = X;
+  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

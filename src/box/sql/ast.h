@@ -43,6 +43,22 @@ enum sql_ast_type {
 
 	/** ALTER TABLE RENAME statement. */
 	SQL_AST_ALTER_RENAME,
+	/** ALTER TABLE DROP CONSTRAINT statement. */
+	SQL_AST_ALTER_DROP_CONSTRAINT,
+};
+
+/** Columns and table properties. */
+enum ast_property_type {
+	/** Property type not set. */
+	SQL_AST_PROPERTY_ANY = 0,
+	/** Property is CHECK constraint. */
+	SQL_AST_PROPERTY_CHECK,
+	/** Property is UNIQUE constraint. */
+	SQL_AST_PROPERTY_UNIQUE,
+	/** Property is PRIMARY KEY constraint. */
+	SQL_AST_PROPERTY_PRIMARY_KEY,
+	/** Property is FOREIGN KEY constraint. */
+	SQL_AST_PROPERTY_FOREIGN_KEY,
 };
 
 /** List of IDs received from parser. */
@@ -229,6 +245,18 @@ struct ast_alter_rename {
 	struct Token new_name;
 };
 
+/** Description of ALTER TABLE DROP CONSTRAINT statement. */
+struct ast_alter_drop_constraint {
+	/** Name of the constraint. */
+	struct Token name;
+	/** Constraint column name for column constraints. */
+	struct Token column;
+	/** Name of the table name that contains the constraint. */
+	struct Token table;
+	/** Type of constraint. */
+	enum ast_property_type type;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -247,6 +275,8 @@ struct sql_ast {
 		struct ast_drop_index drop_index;
 		/** ALTER TABLE RENAME statement. */
 		struct ast_alter_rename alter_rename;
+		/** ALTER TABLE DROP CONSTRAINT statement. */
+		struct ast_alter_drop_constraint alter_drop_constraint;
 	};
 };
 

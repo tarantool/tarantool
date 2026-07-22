@@ -55,5 +55,29 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[ALTER TABLE t RENAME TO t1 6;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '6'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c 7;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '7'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c FOREIGN KEY 8;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '8'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c PRIMARY KEY 9;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '9'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c UNIQUE 0;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '0'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c CHECK 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.c 2;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '2'")
+
+        _, err = box.execute("ALTER TABLE t DROP CONSTRAINT a.c FOREIGN KEY 3;")
+        t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.c CHECK 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
     end)
 end
