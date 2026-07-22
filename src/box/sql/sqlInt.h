@@ -1995,7 +1995,6 @@ struct Parse {
 	union {
 		struct create_ck_def create_ck_def;
 		struct create_fk_def create_fk_def;
-		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 	};
@@ -2679,8 +2678,17 @@ void
 sql_column_add_nullable_action(struct Parse *parser,
 			       enum on_conflict_action nullable_action);
 
+/*
+ * Designate the PRIMARY KEY for the table.
+ *
+ * @param parse Parser context.
+ * @param name Name of the index.
+ * @param col_list Column list of the index.
+ * @param sort_order Sort order in case of column PRIMARY KEY constraint.
+ */
 void
-sqlAddPrimaryKey(struct Parse *parse);
+sqlAddPrimaryKey(struct Parse *parse, struct Token *name,
+		 struct ExprList *col_list, enum sort_order sort_order);
 
 /**
  * Add a new CHECK constraint to the table currently under
@@ -2890,9 +2898,17 @@ sqlIdListDelete(struct IdList *pList);
  * being constructed by a CREATE TABLE statement.
  *
  * @param parse All information about this parse.
+ * @param table Name of the table on which the index will be created.
+ * @param name Name of the index.
+ * @param col_list Column list of the index.
+ * @param idx_type UNIQUE, NOT UNIQUE or PRIMARY KEY type of the index.
+ * @param sort_order Sort order in case of column UNIQUE/PRIMARY KEY constraint.
+ * @param if_not_exists If TRUE do not raise an error when the index exists.
  */
 void
-sql_create_index(struct Parse *parse);
+sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
+		 struct ExprList *col_list, enum sql_index_type idx_type,
+		 enum sort_order sort_order, bool if_not_exists);
 
 /**
  * This routine will drop an existing named index.  This routine
