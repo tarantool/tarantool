@@ -118,6 +118,12 @@ int
 wal_enable(void);
 
 /**
+ * Stop handling new write requests and handle the remaining ones.
+ */
+void
+wal_shutdown(void);
+
+/**
  * Stop WAL thread and free WAL writer resources.
  */
 void

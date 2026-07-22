@@ -71,6 +71,10 @@ RLIST_HEAD(wal_on_write);
 static int
 wal_write_async(struct journal *, struct journal_entry *);
 
+/** Override of the method always setting the ER_SHUTDOWN. */
+static int
+wal_write_fail_async(struct journal *journal, struct journal_entry *entry);
+
 static int
 wal_write_none_async(struct journal *, struct journal_entry *);
 
@@ -661,20 +665,31 @@ wal_enable(void)
 }
 
 void
+wal_shutdown(void)
+{
+	/*
+	 * Abort new WAL write requests.
+	 *
+	 * The callback is called in the TX thread, so it's safe to
+	 * override it here (this function is called from TX too).
+	 */
+	struct wal_writer *writer = &wal_writer_singleton;
+	journal_override_submit_method(&writer->base, wal_write_fail_async);
+	/* Handle the requests remained.  */
+	VERIFY(journal_sync(NULL) == 0);
+}
+
+void
 wal_free(void)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
-
 	cbus_stop_loop(&writer->wal_pipe);
 	cpipe_destroy(&writer->wal_pipe);
-
 	if (cord_join(&writer->cord)) {
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}
-
 	trigger_destroy(&wal_on_write);
-
 	wal_writer_destroy(writer);
 }
 
@@ -1575,6 +1590,17 @@ wal_write_async(struct journal *journal, struct journal_entry *entry)
 
 fail:
 	assert(entry->res == JOURNAL_ENTRY_ERR_UNKNOWN);
+	return -1;
+}
+
+static int
+wal_write_fail_async(struct journal *journal, struct journal_entry *entry)
+{
+	VERIFY(entry->res == JOURNAL_ENTRY_ERR_UNKNOWN);
+	struct wal_writer *writer = (struct wal_writer *)journal;
+	say_error("Aborting transaction %lld during shutdown",
+		  (long long)vclock_sum(&writer->vclock));
+	diag_set(ClientError, ER_SHUTDOWN);
 	return -1;
 }
 

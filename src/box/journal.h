@@ -395,6 +395,14 @@ journal_create(struct journal *journal, journal_submit_f submit,
 	journal->commit_checkpoint = commit_checkpoint;
 }
 
+static inline void
+journal_override_submit_method(struct journal *journal,
+			       journal_submit_f new_submit)
+{
+	assert(journal->submit != NULL);
+	journal->submit = new_submit;
+}
+
 static inline bool
 journal_is_initialized(struct journal *journal)
 {
