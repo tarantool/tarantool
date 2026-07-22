@@ -1306,8 +1306,10 @@ eidlist(A) ::= nm(Y). {
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
 cmd ::= DROP INDEX ifexists(E) nm(X) ON nm(Y). {
-  pParse->initiateTTrans = true;
-  sql_drop_index(pParse, &X, &Y, E);
+  pParse->ast.type = SQL_AST_DROP_INDEX;
+  pParse->ast.drop_index.name = X;
+  pParse->ast.drop_index.table = Y;
+  pParse->ast.drop_index.if_exists = E;
 }
 
 ///////////////////////////// The SET SESSION command ////////////////////////

@@ -496,6 +496,12 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		sql_drop_trigger(parse, &ast->drop_trigger.name,
 				 ast->drop_trigger.if_exists);
 		break;
+	case SQL_AST_DROP_INDEX:
+		parse->initiateTTrans = true;
+		sql_drop_index(parse, &ast->drop_index.name,
+			       &ast->drop_index.table,
+			       ast->drop_index.if_exists);
+		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}
