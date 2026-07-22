@@ -321,15 +321,11 @@ ccons ::= NULL.        {
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
 ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, Z, false);
-  sqlAddPrimaryKey(pParse);
+  sqlAddPrimaryKey(pParse, &N, NULL, Z);
 }
 ccons ::= cconsname(N) UNIQUE. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
-                        false);
-  sql_create_index(pParse);
+  sql_create_index(pParse, &Token_nil, &N, NULL,
+                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC, false);
 }
 
 ccons ::= cconsname(N) CHECK LP expr_old(X) RP. {
@@ -351,15 +347,12 @@ autoinc(X) ::= AUTOINCR.  {X = 1;}
 // The next group of rules parses the arguments to a REFERENCES clause.
 tcons ::= cconsname(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
   struct ExprList *columns = expr_list_from_ast(pParse, X);
-  create_index_def_init(&pParse->create_index_def, NULL, &N, columns,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
-  sqlAddPrimaryKey(pParse);
+  if (!pParse->is_aborted)
+    sqlAddPrimaryKey(pParse, &N, columns, SORT_ORDER_ASC);
 }
 tcons ::= cconsname(N) UNIQUE LP sortlist_old(X) RP. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
-                        false);
-  sql_create_index(pParse);
+  sql_create_index(pParse, &Token_nil, &N, X, SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+                   SORT_ORDER_ASC, false);
 }
 tcons ::= cconsname(N) CHECK LP expr_old(X) RP. {
   create_ck_def_init(&pParse->create_ck_def, NULL, &N, &X);
@@ -1290,11 +1283,8 @@ nexprlist(A) ::= expr(Y). {
 //
 cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist_old(Z) RP. {
-  struct SrcList *src_list = sql_src_list_append(NULL ,&Y);
-  create_index_def_init(&pParse->create_index_def, src_list, &X, Z, U,
-                        SORT_ORDER_ASC, NE);
   pParse->initiateTTrans = true;
-  sql_create_index(pParse);
+  sql_create_index(pParse, &Y, &X, Z, U, SORT_ORDER_ASC, NE);
 }
 
 %type uniqueflag {int}
@@ -1551,21 +1541,16 @@ cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) CHECK LP expr_old(X) RP. {
 
 cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) UNIQUE LP sortlist_old(X) RP. {
   pParse->initiateTTrans = true;
-  struct SrcList *table = sql_src_list_append(NULL, &T);
-  create_index_def_init(&pParse->create_index_def, table, &N, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
-                        false);
-  sql_create_index(pParse);
+  sql_create_index(pParse, &T, &N, X, SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+                   SORT_ORDER_ASC, false);
 }
 
 cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
         LP sortlist_autoinc(X) RP. {
   pParse->initiateTTrans = true;
   struct ExprList *columns = expr_list_from_ast(pParse, X);
-  struct SrcList *table = sql_src_list_append(NULL, &T);
-  create_index_def_init(&pParse->create_index_def, table, &N, columns,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
-  sql_create_index(pParse);
+  sql_create_index(pParse, &T, &N, columns, SQL_INDEX_TYPE_CONSTRAINT_PK,
+                   SORT_ORDER_ASC, false);
 }
 
 cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {
