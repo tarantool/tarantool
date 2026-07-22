@@ -484,6 +484,13 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	case SQL_AST_SELECT:
 		sql_code_select(parse, ast->select);
 		break;
+	case SQL_AST_DROP_VIEW:
+	case SQL_AST_DROP_TABLE:
+		parse->initiateTTrans = true;
+		sql_drop_table(parse, &ast->drop_table.name,
+			       ast->drop_table.if_exists,
+			       ast->type == SQL_AST_DROP_VIEW);
+		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}
