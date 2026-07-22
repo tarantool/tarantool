@@ -17,5 +17,11 @@ g.test_syntax_errors = function(cg)
     cg.server:exec(function()
         local _, err = box.execute([[SELECT i FROM t 1;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+
+        _, err = box.execute([[DROP TABLE t 2;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '2'")
+
+        _, err = box.execute([[DROP VIEW v 3;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '3'")
     end)
 end

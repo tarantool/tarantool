@@ -369,13 +369,15 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 //
 
 cmd ::= DROP TABLE ifexists(E) nm(X) . {
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse, &X, E, false);
+  pParse->ast.type = SQL_AST_DROP_TABLE;
+  pParse->ast.drop_table.name = X;
+  pParse->ast.drop_table.if_exists = E;
 }
 
 cmd ::= DROP VIEW ifexists(E) nm(X) . {
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse, &X, E, true);
+  pParse->ast.type = SQL_AST_DROP_VIEW;
+  pParse->ast.drop_table.name = X;
+  pParse->ast.drop_table.if_exists = E;
 }
 
 %type ifexists {int}
