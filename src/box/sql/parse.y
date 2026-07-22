@@ -1520,8 +1520,9 @@ cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
 }
 
 cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {
-    pParse->initiateTTrans = true;
-    sql_alter_table_rename(pParse, &T, &N);
+  pParse->ast.type = SQL_AST_ALTER_RENAME;
+  pParse->ast.alter_rename.old_name = T;
+  pParse->ast.alter_rename.new_name = N;
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {

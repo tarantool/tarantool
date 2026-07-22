@@ -52,5 +52,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[DROP INDEX I ON t 5;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[ALTER TABLE t RENAME TO t1 6;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '6'")
     end)
 end

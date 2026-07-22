@@ -502,6 +502,11 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			       &ast->drop_index.table,
 			       ast->drop_index.if_exists);
 		break;
+	case SQL_AST_ALTER_RENAME:
+		parse->initiateTTrans = true;
+		sql_alter_table_rename(parse, &ast->alter_rename.old_name,
+				       &ast->alter_rename.new_name);
+		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}
