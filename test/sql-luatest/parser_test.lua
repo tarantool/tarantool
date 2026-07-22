@@ -34,3 +34,11 @@ g.test_alter_table_reserved_keyword_error = function(cg)
         box.space.t:drop()
     end)
 end
+
+-- Make sure that syntax errors occur before semantic errors.
+g.test_syntax_errors = function(cg)
+    cg.server:exec(function()
+        local _, err = box.execute([[SELECT i FROM t 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

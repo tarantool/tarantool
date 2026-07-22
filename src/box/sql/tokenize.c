@@ -444,6 +444,18 @@ new_xmalloc(size_t n)
 	return xmalloc(n);
 }
 
+/** Code AST for SELECT statement. */
+static void
+sql_code_select(struct Parse *parser, struct ast_select *select)
+{
+	struct Select *res = select_from_ast(parser, select);
+	if (parser->is_aborted)
+		return;
+	struct SelectDest dest = {SRT_Output, NULL, 0, 0, 0, 0, NULL};
+	sqlSelect(parser, res, &dest);
+	sql_select_delete(res);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast)
@@ -468,6 +480,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		break;
 	case SQL_AST_TX_SAVEPOINT_ROLLBACK:
 		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint);
+		break;
+	case SQL_AST_SELECT:
+		sql_code_select(parse, ast->select);
 		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
