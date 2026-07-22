@@ -1503,70 +1503,55 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
-%include {
-  struct alter_args {
-    struct SrcList *table_name;
-    /** Name of constraint OR new name of table in case of RENAME. */
-    struct Token name;
-  };
-}
-
-%type alter_table_start {struct SrcList *}
-alter_table_start(A) ::= ALTER TABLE fullname(T) . { A = T; }
-
-%type alter_add_constraint {struct alter_args}
-alter_add_constraint(A) ::= alter_table_start(T) ADD CONSTRAINT nm(N). {
-   A.table_name = T;
-   A.name = N;
-   pParse->initiateTTrans = true;
- }
-
-%type alter_add_column {struct alter_args}
-alter_add_column(A) ::= alter_table_start(T) ADD column_name(N). {
-  A.table_name = T;
-  A.name = N;
-  pParse->initiateTTrans = true;
-}
-
 column_name(N) ::= COLUMN nm(A). { N = A; }
 column_name(N) ::= nm(A). { N = A; }
 
 cmd ::= alter_column_def carglist create_column_end.
 
-alter_column_def ::= alter_add_column(N) typedef(Y). {
-  create_column_def_init(&pParse->create_column_def, N.table_name, &N.name, Y);
+alter_column_def ::= ALTER TABLE nm(T) ADD column_name(N) typedef(Y). {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_column_def_init(&pParse->create_column_def, table, &N, Y);
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
   sql_create_column_start(pParse);
 }
 
-cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
-        nm(T) eidlist_opt(TA). {
-  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA);
+cmd ::= ALTER TABLE nm(X) ADD CONSTRAINT nm(N) FOREIGN KEY
+        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA). {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &X);
+  create_fk_def_init(&pParse->create_fk_def, table, &N, FA, &T, TA);
   sql_create_foreign_key(pParse);
 }
 
-cmd ::= alter_add_constraint(N) CHECK LP expr_old(X) RP. {
-    create_ck_def_init(&pParse->create_ck_def, N.table_name, &N.name, &X);
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) CHECK LP expr_old(X) RP. {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_ck_def_init(&pParse->create_ck_def, table, &N, &X);
     sql_create_check_contraint(pParse, false);
 }
 
-cmd ::= alter_add_constraint(N) UNIQUE LP sortlist_old(X) RP. {
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-                        SORT_ORDER_ASC, false);
-  sql_create_index(pParse);
-}
-
-cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
-  struct ExprList *columns = expr_list_from_ast(pParse, X);
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name,
-                        columns, SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC,
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) UNIQUE LP sortlist_old(X) RP. {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_index_def_init(&pParse->create_index_def, table, &N, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
                         false);
   sql_create_index(pParse);
 }
 
-cmd ::= alter_table_start(A) RENAME TO nm(N). {
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
+        LP sortlist_autoinc(X) RP. {
+  pParse->initiateTTrans = true;
+  struct ExprList *columns = expr_list_from_ast(pParse, X);
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_index_def_init(&pParse->create_index_def, table, &N, columns,
+                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
+  sql_create_index(pParse);
+}
+
+cmd ::= ALTER TABLE fullname(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);
     pParse->initiateTTrans = true;
     sql_alter_table_rename(pParse);
