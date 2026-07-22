@@ -36,6 +36,8 @@ enum sql_ast_type {
 	SQL_AST_DROP_TABLE,
 	/** DROP VIEW statement. */
 	SQL_AST_DROP_VIEW,
+	/** DROP TRIGGER statement. */
+	SQL_AST_DROP_TRIGGER,
 };
 
 /** List of IDs received from parser. */
@@ -196,6 +198,14 @@ struct ast_drop_table {
 	bool if_exists;
 };
 
+/** Description of DROP TRIGGER statement. */
+struct ast_drop_trigger {
+	/** Trigger name. */
+	struct Token name;
+	/** Flag to throw an error if trigger not exists. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -208,6 +218,8 @@ struct sql_ast {
 		struct ast_select *select;
 		/** DROP TABLE and DROP VIEW statements. */
 		struct ast_drop_table drop_table;
+		/** DROP TRIGGER statement. */
+		struct ast_drop_trigger drop_trigger;
 	};
 };
 

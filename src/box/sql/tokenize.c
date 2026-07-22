@@ -491,6 +491,11 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			       ast->drop_table.if_exists,
 			       ast->type == SQL_AST_DROP_VIEW);
 		break;
+	case SQL_AST_DROP_TRIGGER:
+		parse->initiateTTrans = true;
+		sql_drop_trigger(parse, &ast->drop_trigger.name,
+				 ast->drop_trigger.if_exists);
+		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}

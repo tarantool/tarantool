@@ -46,5 +46,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[DROP VIEW v 3;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[DROP TRIGGER t 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
     end)
 end
