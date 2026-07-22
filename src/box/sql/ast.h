@@ -31,6 +31,11 @@ enum sql_ast_type {
 
 	/** SELECT statement. */
 	SQL_AST_SELECT,
+
+	/** DROP TABLE statement. */
+	SQL_AST_DROP_TABLE,
+	/** DROP VIEW statement. */
+	SQL_AST_DROP_VIEW,
 };
 
 /** List of IDs received from parser. */
@@ -183,6 +188,14 @@ struct ast_expr_list_entry {
 	bool autoinc;
 };
 
+/** Description of DROP TABLE and DROP VIEW statements. */
+struct ast_drop_table {
+	/** Table or view name. */
+	struct Token name;
+	/** Flag to throw an error if table not exists. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -193,6 +206,8 @@ struct sql_ast {
 		struct Token savepoint;
 		/** SELECT statement. */
 		struct ast_select *select;
+		/** DROP TABLE and DROP VIEW statements. */
+		struct ast_drop_table drop_table;
 	};
 };
 
