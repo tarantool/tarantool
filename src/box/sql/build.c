@@ -654,17 +654,9 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 	return 0;
 }
 
-/*
- * Designate the PRIMARY KEY for the table.  pList is a list of names
- * of columns that form the primary key.  If pList is NULL, then the
- * most recently added column of the table is the primary key.
- *
- * A table can have at most one primary key.  If the table already has
- * a primary key (and this is the second primary key) then create an
- * error.
- */
 void
-sqlAddPrimaryKey(struct Parse *pParse)
+sqlAddPrimaryKey(struct Parse *pParse, struct Token *name,
+		 struct ExprList *col_list, enum sort_order sort_order)
 {
 	struct space *space = pParse->create_table_def.new_space;
 	if (space == NULL)
@@ -674,10 +666,11 @@ sqlAddPrimaryKey(struct Parse *pParse)
 		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 			 "primary key has been already declared");
 		pParse->is_aborted = true;
-		sql_expr_list_delete(pParse->create_index_def.cols);
+		sql_expr_list_delete(col_list);
 		return;
 	}
-	sql_create_index(pParse);
+	sql_create_index(pParse, &Token_nil, name, col_list,
+			 SQL_INDEX_TYPE_CONSTRAINT_PK, sort_order, false);
 	if (pParse->is_aborted)
 		return;
 
@@ -2693,27 +2686,17 @@ constraint_is_named(const char *name)
 }
 
 void
-sql_create_index(struct Parse *parse) {
+sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
+		 struct ExprList *col_list, enum sql_index_type idx_type,
+		 enum sort_order sort_order, bool if_not_exists)
+{
 	/* The index to be created. */
 	struct index *index = NULL;
 	/* Name of the index. */
-	char *name = NULL;
-	struct create_index_def *create_idx_def = &parse->create_index_def;
-	struct create_entity_def *create_entity_def = &create_idx_def->base.base;
-	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_INDEX);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	/*
-	 * Get list of columns to be indexed. It will be NULL if
-	 * this is a primary key or unique-constraint on the most
-	 * recent column added to the table under construction.
-	 */
-	struct ExprList *col_list = create_idx_def->cols;
-	struct SrcList *tbl_name = alter_entity_def->entity_name;
+	char *index_name = NULL;
 
 	if (parse->is_aborted)
 		goto exit_create_index;
-	enum sql_index_type idx_type = create_idx_def->idx_type;
 	if (idx_type == SQL_INDEX_TYPE_UNIQUE ||
 	    idx_type == SQL_INDEX_TYPE_NON_UNIQUE) {
 		Vdbe *v = sqlGetVdbe(parse);
@@ -2728,21 +2711,18 @@ sql_create_index(struct Parse *parse) {
 	if (space == NULL)
 		space = parse->create_column_def.space;
 	bool is_create_table_or_add_col = space != NULL;
-	struct Token token = create_entity_def->name;
-	if (tbl_name != NULL) {
-		assert(token.n > 0 && token.z != NULL);
-		const struct space *origin = sql_space_by_src(&tbl_name->a[0]);
+	if (!is_create_table_or_add_col) {
+		assert(table != NULL && table->n > 0);
+		const struct space *origin = sql_space_by_token(table);
 		if (origin == NULL) {
-			if (! create_entity_def->if_not_exist) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE,
-					 tbl_name->a[0].zName);
+					 sql_tt_name_from_token(table));
 				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
 		space = space_by_id(origin->def->id);
-	} else if (!is_create_table_or_add_col) {
-		goto exit_create_index;
 	}
 	struct space_def *def = space->def;
 
@@ -2777,22 +2757,20 @@ sql_create_index(struct Parse *parse) {
 	 *    auto-index name will be generated.
 	 */
 	if (!is_create_table_or_add_col) {
-		assert(token.z != NULL);
-		name = sql_name_from_token(&token);
-		if (space_index_by_name0(space, name) != NULL) {
-			if (! create_entity_def->if_not_exist) {
+		assert(name->z != NULL);
+		index_name = sql_name_from_token(name);
+		if (space_index_by_name0(space, index_name) != NULL) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
-					 name, def->name);
+					 index_name, def->name);
 				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
 	} else {
 		char *constraint_name = NULL;
-		if (create_entity_def->name.n > 0) {
-			constraint_name =
-				sql_name_from_token(&create_entity_def->name);
-		}
+		if (name->n > 0)
+			constraint_name = sql_name_from_token(name);
 
 	       /*
 		* This naming is temporary. Now it's not
@@ -2807,24 +2785,26 @@ sql_create_index(struct Parse *parse) {
 		uint32_t idx_count = space->index_count;
 		if (constraint_name == NULL) {
 			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) {
-				name = sqlMPrintf("unique_unnamed_%s_%d",
-						  def->name, idx_count + 1);
+				index_name = sqlMPrintf("unique_unnamed_%s_%d",
+							def->name,
+							idx_count + 1);
 			} else {
-				name = sqlMPrintf("pk_unnamed_%s_%d",
-						  def->name, idx_count + 1);
+				index_name = sqlMPrintf("pk_unnamed_%s_%d",
+							def->name,
+							idx_count + 1);
 			}
 		} else {
-			name = sql_xstrdup(constraint_name);
+			index_name = sql_xstrdup(constraint_name);
 		}
 		sql_xfree(constraint_name);
 	}
 
-	assert(name != NULL);
-	if (sqlCheckIdentifierName(parse, name) != 0)
+	assert(index_name != NULL);
+	if (sqlCheckIdentifierName(parse, index_name) != 0)
 		goto exit_create_index;
 
-	if (tbl_name != NULL && space_is_system(space)) {
-		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
+	if (table->n > 0 && space_is_system(space)) {
+		diag_set(ClientError, ER_MODIFY_INDEX, index_name, def->name,
 			 "can't create index on system space");
 		parse->is_aborted = true;
 		goto exit_create_index;
@@ -2843,7 +2823,7 @@ sql_create_index(struct Parse *parse) {
 		struct Expr *expr = sql_expr_new(TK_ID, &prev_col);
 		col_list = sql_expr_list_append(NULL, expr);
 		assert(col_list->nExpr == 1);
-		sqlExprListSetSortOrder(col_list, create_idx_def->sort_order);
+		sqlExprListSetSortOrder(col_list, sort_order);
 	} else {
 		if (col_list->nExpr > SQL_MAX_COLUMN) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
@@ -2866,8 +2846,8 @@ sql_create_index(struct Parse *parse) {
 		iid = space->index_id_max + 1;
 	else
 		iid = 0;
-	if (index_fill_def(parse, index, def, iid, name, strlen(name),
-			   col_list, idx_type) != 0)
+	if (index_fill_def(parse, index, def, iid, index_name,
+			   strlen(index_name), col_list, idx_type) != 0)
 		goto exit_create_index;
 	/*
 	 * Remove all redundant columns from the PRIMARY KEY.
@@ -2962,7 +2942,6 @@ sql_create_index(struct Parse *parse) {
 			    !constraint_is_named(index->def->name))
 				goto exit_create_index;
 		}
-	}
 
 	/*
 	 * If this is the initial CREATE INDEX statement (or
@@ -2972,13 +2951,13 @@ sql_create_index(struct Parse *parse) {
 	 * we are simply parsing the schema, or if this index is
 	 * the PRIMARY KEY index.
 	 *
-	 * If tbl_name == NULL it means this index is generated as
+	 * If table == Token_nil it means this index is generated as
 	 * an implied PRIMARY KEY or UNIQUE index in a CREATE
 	 * TABLE statement.  Since the table has just been
 	 * created, it contains no data and the index
 	 * initialization step can be skipped.
 	 */
-	else if (tbl_name != NULL) {
+	} else {
 		Vdbe *vdbe;
 		int cursor = parse->nTab++;
 
@@ -3034,8 +3013,7 @@ sql_create_index(struct Parse *parse) {
 	if (index != NULL && index->def != NULL)
 		index_def_delete(index->def);
 	sql_expr_list_delete(col_list);
-	sqlSrcListDelete(tbl_name);
-	sql_xfree(name);
+	sql_xfree(index_name);
 }
 
 void
