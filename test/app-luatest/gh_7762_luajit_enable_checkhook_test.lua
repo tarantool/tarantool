@@ -74,6 +74,9 @@ g.test_luajit_enable_checkhook = function()
     -- on trace compiled for the payload above, there is no need
     -- to check the actual value of the line for the both
     -- aforementioned cases and we can simply skip the assertion.
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1176
+    ---@diagnostic disable-next-line: redundant-parameter
     debug.sethook(function(hookname, line)
         -- XXX: Only line hooks are fired.
         assert(hookname == 'line', 'Unexpected hook type is fired')

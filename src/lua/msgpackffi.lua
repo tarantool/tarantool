@@ -339,7 +339,7 @@ local function encode_r(buf, obj, level, trace_level)
         encode_bool(buf, obj)
     elseif type(obj) == "cdata" then
         if obj == nil then -- a workaround for nil
-            encode_nil(buf, obj)
+            encode_nil(buf)
             return
         end
         local ctypeid = tonumber(ffi.typeof(obj))

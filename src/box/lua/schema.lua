@@ -796,7 +796,7 @@ local function update_index_parts(format, parts, level)
         if parts[3] == nil then
             parts = {parts} -- one part only
         else
-            parts = update_index_parts_1_6_0(parts, 2, level + 1)
+            parts = update_index_parts_1_6_0(parts, 2)
         end
     end
 
@@ -3178,6 +3178,7 @@ end
 -- Return opts field for user/role based on origins map.
 local function user_opts_from_origins(origins)
     if origins[DEFAULT_ORIGIN] ~= nil and
+       ---@diagnostic disable-next-line: redundant-parameter
        next(origins, next(origins)) == nil then
         return nil
     end
@@ -3683,7 +3684,7 @@ box.schema.role.exists = function(name, opts)
         check_param_table(opts, { _origin = 'string' }, 2)
         origin = opts._origin
     end
-    local uid = role_resolve(name, 2)
+    local uid = role_resolve(name)
     if uid == nil then
         return false
     end

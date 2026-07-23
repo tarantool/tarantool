@@ -144,7 +144,7 @@ local function get_next_token(context)
         elseif c == ' ' or c == '\n' or c == '\t' then
             read_spaces(context)
         elseif c == "'" or c == '"' then
-            read_string(context, c)
+            read_string(context)
         elseif c ~= '' then
             return read_text(context)
         end
