@@ -231,7 +231,7 @@ local function registry()
             return var
         end
     end
-    assert(false)
+    error("unreachable")
 end
 
 -- Look on the maximum ID in the internal key<->id mappings.

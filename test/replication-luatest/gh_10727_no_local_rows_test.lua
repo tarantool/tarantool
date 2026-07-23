@@ -65,11 +65,11 @@ local function write_subscribe(s, version_id, instance_uuid, rs_uuid, vclock)
     return socket_write(s, header, body)
 end
 
-local function parse_replication_stream(s, assert, cond)
+local function parse_replication_stream(s, check, cond)
     local h, b
     while true do
         h, b = socket_read(s)
-        assert(h)
+        check(h)
         if cond(h, b) then
             break
         end
@@ -85,7 +85,7 @@ local function until_promote_cond(h, _)
     return h[key.REQUEST_TYPE] == type.RAFT_PROMOTE
 end
 
-local function test_replication_stream(cg, version_id, assert)
+local function test_replication_stream(cg, version_id, check)
     local s = socket_connect(cg.master)
     --
     -- JOIN stage.
@@ -93,11 +93,11 @@ local function test_replication_stream(cg, version_id, assert)
     local instance_uuid = uuid.str()
     write_join(s, version_id, instance_uuid)
     -- Start of initial join.
-    parse_replication_stream(s, assert, until_vclock_cond)
+    parse_replication_stream(s, check, until_vclock_cond)
     -- End of initial join.
-    parse_replication_stream(s, assert, until_vclock_cond)
+    parse_replication_stream(s, check, until_vclock_cond)
     -- End of final join.
-    local b = parse_replication_stream(s, assert, until_vclock_cond)
+    local b = parse_replication_stream(s, check, until_vclock_cond)
     local expected_vclock = cg.master:get_vclock()
     expected_vclock[0] = nil
     t.assert_equals(b[key.VCLOCK], expected_vclock)
@@ -107,7 +107,7 @@ local function test_replication_stream(cg, version_id, assert)
     local rs_uuid = cg.master:eval('return box.info.replicaset.uuid')
     write_subscribe(s, version_id, instance_uuid, rs_uuid, b[key.VCLOCK])
     cg.master:eval('pcall(box.ctl.promote)')
-    parse_replication_stream(s, assert, until_promote_cond)
+    parse_replication_stream(s, check, until_promote_cond)
 end
 
 g.before_each(function(cg)

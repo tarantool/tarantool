@@ -1537,7 +1537,7 @@ box.internal.cfg = setmetatable({}, {
         if key == 'env' then
             return env_cfg(template_cfg)
         end
-        assert(false)
+        error('unreachable')
     end,
     __newindex = function(self, key, value) -- luacheck: no unused args
         error('Attempt to modify a read-only table')

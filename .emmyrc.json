@@ -45,7 +45,6 @@
       "redundant-parameter",
       "return-type-mismatch",
       "undefined-field",
-      "unnecessary-assert",
       "unnecessary-if",
       "unresolved-require",
       "unused"

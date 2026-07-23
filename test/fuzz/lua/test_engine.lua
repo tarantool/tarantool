@@ -244,6 +244,8 @@ local function unique_ids(max_num_ids)
     return function()
         local id = math.random(#ids)
         local v = ids[id]
+        -- The analyzer considers ids[id] to be always falsy.
+        ---@diagnostic disable-next-line: unnecessary-assert
         assert(v)
         table.remove(ids, id)
         return v

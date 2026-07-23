@@ -127,7 +127,7 @@ local function get_snapshot_schema_version(snap_path)
         ::continue::
     end
 
-    assert(false)
+    error('unreachable')
 end
 
 return {

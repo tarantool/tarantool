@@ -2942,7 +2942,7 @@ g.test_filter_array = function()
                 data = data[path],
             }
         else
-            assert(false)
+            error("unreachable")
         end
     end
 
@@ -4072,7 +4072,7 @@ local function verify_merge(s)
             bv = 'bbb'
         end
     else
-        assert(false)
+        error("unreachable")
     end
 
     -- 1. A scalar/array field is present only in record/map A.
