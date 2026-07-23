@@ -226,14 +226,6 @@ struct create_table_def {
 	struct space *new_space;
 };
 
-struct create_column_def {
-	struct create_entity_def base;
-	/** Shallow space copy. */
-	struct space *space;
-	/** Column type. */
-	enum field_type type;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -316,16 +308,6 @@ create_table_def_init(struct create_table_def *table_def, struct Token *name,
 {
 	create_entity_def_init(&table_def->base, ENTITY_TYPE_TABLE, NULL, name,
 			       if_not_exists);
-}
-
-static inline void
-create_column_def_init(struct create_column_def *column_def,
-		       struct SrcList *table_name, struct Token *name,
-		       enum field_type type)
-{
-	create_entity_def_init(&column_def->base, ENTITY_TYPE_COLUMN,
-			       table_name, name, false);
-	column_def->type = type;
 }
 
 static inline void
