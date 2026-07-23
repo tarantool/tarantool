@@ -523,6 +523,14 @@ return schema.new('instance_config', schema.record({
                 validate = validators['config.context.*'],
             }),
         }),
+        checks = schema.union({
+            variants = {
+                schema.enum({
+                    'off',
+                }),
+            },
+            discriminator = discriminators['config.checks'],
+        }),
     }),
     process = schema.record({
         strip_core = schema.scalar({
