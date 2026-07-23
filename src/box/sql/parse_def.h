@@ -274,17 +274,6 @@ struct create_trigger_def {
 	struct Expr *when;
 };
 
-struct create_constraint_def {
-	struct create_entity_def base;
-};
-
-struct create_fk_def {
-	struct create_constraint_def base;
-	struct ExprList *child_cols;
-	struct Token *parent_name;
-	struct ExprList *parent_cols;
-};
-
 /** Basic initialisers of parse structures.*/
 static inline void
 alter_entity_def_init(struct alter_entity_def *alter_def,
@@ -308,15 +297,6 @@ create_entity_def_init(struct create_entity_def *create_def,
 }
 
 static inline void
-create_constraint_def_init(struct create_constraint_def *constr_def,
-			   struct SrcList *parent_name, struct Token *name,
-			   bool if_not_exists, enum entity_type entity_type)
-{
-	create_entity_def_init(&constr_def->base, entity_type,
-			       parent_name, name, if_not_exists);
-}
-
-static inline void
 create_trigger_def_init(struct create_trigger_def *trigger_def,
 			struct SrcList *table_name, struct Token *name,
 			int tr_tm, int op, struct IdList *cols,
@@ -328,18 +308,6 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 	trigger_def->op = op;
 	trigger_def->cols = cols;
 	trigger_def->when = when;
-}
-
-static inline void
-create_fk_def_init(struct create_fk_def *fk_def, struct SrcList *table_name,
-		   struct Token *name, struct ExprList *child_cols,
-		   struct Token *parent_name, struct ExprList *parent_cols)
-{
-	create_constraint_def_init(&fk_def->base, table_name, name,
-				   false, ENTITY_TYPE_FK);
-	fk_def->child_cols = child_cols;
-	fk_def->parent_name = parent_name;
-	fk_def->parent_cols = parent_cols;
 }
 
 static inline void
