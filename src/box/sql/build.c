@@ -222,8 +222,6 @@ sqlStartTable(Parse *pParse, Token *pName)
 		ENGINE_NAME_MAX + 1);
 
 	assert(v == sqlGetVdbe(pParse));
-	if (!sql_get()->init.busy)
-		sql_set_multi_write(pParse, true);
 	return new_space;
 }
 
@@ -1526,29 +1524,34 @@ sql_create_view(struct Parse *parse_context)
 					    &create_entity_def->name);
 	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
-	struct space *select_res_space =
-		sqlResultSetOfSelect(parse_context, view_def->select);
-	if (select_res_space == NULL)
+
+	/* Find result of SELECT. */
+	struct Select *select = view_def->select;
+	uint32_t saved_flags = parse_context->sql_flags;
+	parse_context->sql_flags = 0;
+	sqlSelectPrep(parse_context, select, 0);
+	if (parse_context->is_aborted)
 		goto create_view_fail;
-	struct ExprList *aliases = view_def->aliases;
-	if (aliases != NULL) {
-		if ((int)select_res_space->def->field_count != aliases->nExpr) {
+	while (select->pPrior)
+		select = select->pPrior;
+	parse_context->sql_flags = saved_flags;
+
+	struct ExprList *columns = view_def->aliases;
+	if (columns != NULL) {
+		if (select->pEList->nExpr != columns->nExpr) {
 			diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 				 "number of aliases doesn't match provided "\
 				 "columns");
 			parse_context->is_aborted = true;
 			goto create_view_fail;
 		}
-		sqlColumnsFromExprList(parse_context, aliases, space->def);
-		sqlSelectAddColumnTypeAndCollation(parse_context, space->def,
-						   view_def->select);
+		select = view_def->select;
 	} else {
-		assert(select_res_space->def->opts.is_ephemeral);
-		space->def->fields = select_res_space->def->fields;
-		space->def->field_count = select_res_space->def->field_count;
-		select_res_space->def->fields = NULL;
-		select_res_space->def->field_count = 0;
+		columns = select->pEList;
 	}
+	sqlColumnsFromExprList(parse_context, columns, space->def);
+	sqlSelectAddColumnTypeAndCollation(parse_context, space->def, select);
+
 	space->def->opts.is_view = true;
 	/*
 	 * Locate the end of the CREATE VIEW statement.
@@ -2945,7 +2948,6 @@ sql_create_index(struct Parse *parse) {
 		int cursor = parse->nTab++;
 
 		vdbe = sqlGetVdbe(parse);
-		sql_set_multi_write(parse, true);
 		int reg = ++parse->nMem;
 		sqlVdbeAddOp2(vdbe, OP_OpenSpace, reg, BOX_INDEX_ID);
 		sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, 0, reg);
@@ -3377,17 +3379,6 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 			      P4_DYNAMIC);
 	}
 	sqlVdbeAddOp4(v, OP_Savepoint, op, 0, old_name_reg, zName, P4_DYNAMIC);
-}
-
-/**
- * Set flag in parse context, which indicates that during query
- * execution multiple insertion/updates may occur.
- */
-void
-sql_set_multi_write(struct Parse *parse_context, bool is_set)
-{
-	Parse *pToplevel = sqlParseToplevel(parse_context);
-	pToplevel->isMultiWrite |= is_set;
 }
 
 /*

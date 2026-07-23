@@ -1954,7 +1954,6 @@ struct Parse {
 	Vdbe *pVdbe;		/* An engine for executing database bytecode */
 	u8 colNamesSet;		/* TRUE after OP_ColumnName has been issued to pVdbe */
 	u8 nTempReg;		/* Number of temporary registers in aTempReg[] */
-	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
 	u8 hasCompound;		/* Need to invoke convertCompoundSelectToSubquery() */
 	u8 okConstFactor;	/* OK to factor out constants */
 	u8 disableLookaside;	/* Number of times lookaside has been disabled */
@@ -2700,7 +2699,6 @@ sqlColumnsFromExprList(struct Parse *parse, struct ExprList *expr_list,
 
 void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
-struct space *sqlResultSetOfSelect(Parse *, Select *);
 
 struct space *
 sqlStartTable(Parse *, Token *);
@@ -3427,9 +3425,6 @@ vdbe_emit_insertion_completion(struct Vdbe *v, int space_reg,
 			       int raw_data_reg, uint32_t tuple_len,
 			       enum on_conflict_action on_conflict,
 			       int autoinc_reg);
-
-void
-sql_set_multi_write(Parse *, bool);
 
 /**
  * The following group of routines make deep copies of expressions,
