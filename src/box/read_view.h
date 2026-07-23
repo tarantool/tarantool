@@ -25,6 +25,7 @@ struct index_read_view_iterator;
 struct port;
 struct space;
 struct space_upgrade_read_view;
+struct space_upgrade_read_view_handle;
 struct tuple;
 struct tuple_format;
 
@@ -56,21 +57,6 @@ struct space_read_view {
 	/** Length of tuple format data. */
 	size_t format_data_len;
 	/**
-	 * Runtime tuple format needed to access tuple field names by name.
-	 * Referenced (ref counter incremented).
-	 *
-	 * A new format is created only if read_view_opts::enable_field_names
-	 * is set, otherwise runtime_tuple_format is used.
-	 *
-	 * We can't just use the space tuple format as is because it allocates
-	 * tuples from the space engine arena, which is single-threaded, while
-	 * a read view may be used from threads other than tx. Good news is
-	 * runtime tuple formats are reusable so if we create more than one
-	 * read view of the same space, we will use just one tuple format for
-	 * them all.
-	 */
-	struct tuple_format *format;
-	/**
 	 * Upgrade function for this space read view or NULL if there wasn't
 	 * a space upgrade in progress at the time when this read view was
 	 * created or read_view_opts::enable_space_upgrade wasn't set.
@@ -91,6 +77,37 @@ struct space_read_view {
 	 * indexed by index id.
 	 */
 	struct index_read_view **index_map;
+};
+
+/**
+ * Space read view handle.
+ *
+ * See the comment to read_view_handle for details what handles are used for.
+ */
+struct space_read_view_handle {
+	/** Link in read_view_handle::spaces. */
+	struct rlist link;
+	/** Pointer to the space read view this handle is for. */
+	struct space_read_view *ptr;
+	/** Thread that exclusively owns this handle. */
+	struct cord *owner;
+	/**
+	 * Runtime tuple format needed to access tuple field names by name.
+	 * Referenced (ref counter incremented).
+	 *
+	 * A new format is created only if read_view_opts::enable_field_names
+	 * is set, otherwise runtime_tuple_format is used.
+	 *
+	 * We can't just use the space tuple format as is because it allocates
+	 * tuples from the space engine arena, which is single-threaded, while
+	 * a read view may be used from threads other than tx. Good news is
+	 * runtime tuple formats are reusable so if we create more than one
+	 * read view of the same space, we will use just one tuple format for
+	 * them all.
+	 */
+	struct tuple_format *format;
+	/** Handle for space_read_view::upgrade. */
+	struct space_upgrade_read_view_handle *upgrade;
 };
 
 static inline struct index_read_view *
@@ -123,11 +140,34 @@ struct read_view {
 	struct rlist engines;
 	/** List of space read views, linked by space_read_view::link. */
 	struct rlist spaces;
-	/**
-	 * Thread that exclusively owns this read view or NULL if the read view
-	 * may be used by any thread.
-	 */
+};
+
+/**
+ * Database read view handle.
+ *
+ * The read view core is MT-safe: it's okay to concurrently access the same
+ * read view object from different threads. However, to implement a box-like
+ * API with support for field names and space upgrade, we need some extra info
+ * that is stored in thread-local objects, such as tuple formats. To attach
+ * this info to a read view, we introduce the notion of a read view handle,
+ * which stores a pointer to the read view plus thread-local objects. A read
+ * view handle may only be used from the thread where it was created, and the
+ * read view core for which the handle was created must not be destroyed while
+ * the handle is in use.
+ *
+ * Note that there's no handle for an index read view because an index read
+ * view by itself doesn't store any thread-local information.
+ */
+struct read_view_handle {
+	/** Pointer to the database read view this handle is for. */
+	struct read_view *ptr;
+	/** Thread that exclusively owns this handle. */
 	struct cord *owner;
+	/**
+	 * List of space read view handles, linked by
+	 * space_read_view_handle::link.
+	 */
+	struct rlist spaces;
 };
 
 #define read_view_foreach_space(space_rv, rv) \
@@ -235,53 +275,48 @@ bool
 read_view_foreach(read_view_foreach_f cb, void *arg);
 
 /**
- * Activates a read view for exclusive use in the current thread.
+ * Allocates a read view handle for exclusive use in the current thread.
  *
- * A read view must be activated before any of the box API functions declared
- * below may be used. After a read view is activated, it may only be used in
- * the thread that activated it. A read view must be deactivated in the same
- * thread before it may be closed.
- *
- * Returns 0 on success. On error, returns -1 and sets diag.
+ * On error, returns NULL and sets diag.
  */
-int
-read_view_activate(struct read_view *rv);
+struct read_view_handle *
+read_view_handle_new(struct read_view *rv);
 
 /**
- * Deactivates a read view activated by read_view_activate().
+ * Frees a read view handle.
  *
- * A read view may only be deactivated by the thread that activated it.
+ * A handle may only be destroyed in the thread where it was created.
  */
 void
-read_view_deactivate(struct read_view *rv);
+read_view_handle_delete(struct read_view_handle *h);
 
 /**
  * Gets a tuple from an index read view by a key.
  * Returns 0 on success. On error, returns -1 and sets diag.
- * The read view must be activated, see read_view_activate().
  */
 int
-box_index_read_view_get(struct index_read_view *rv, const char *key,
-			const char *key_end, struct tuple **result);
+box_index_read_view_get(
+	struct space_read_view_handle *space, uint32_t index_id,
+	const char *key, const char *key_end, struct tuple **result);
 
 /**
  * Counts tuples matching the given key in an index read view.
  * On error, returns -1 and sets diag.
- * The read view must be activated, see read_view_activate().
  */
 ssize_t
-box_index_read_view_count(struct index_read_view *rv, int iterator,
-			  const char *key, const char *key_end);
+box_index_read_view_count(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end);
 
 /**
  * Returns a quantile point in an indexed range allocated on the fiber region.
  * Returns 0 on success. On error, returns -1 and sets diag.
- * The read view must be activated, see read_view_activate().
  */
 int
 box_index_read_view_quantile(
-	struct index_read_view *rv, double level, const char *begin_key,
-	const char *begin_key_end, const char *end_key, const char *end_key_end,
+	struct space_read_view_handle *space, uint32_t index_id,
+	double level, const char *begin_key, const char *begin_key_end,
+	const char *end_key, const char *end_key_end,
 	const char **quantile_key, const char **quantile_key_end);
 
 /**
@@ -293,14 +328,14 @@ box_index_read_view_quantile(
  * on the fiber region. If update_pos is true, packed_pos and packed_pos_end
  * must not be NULL.
  * Returns 0 on success. On error, returns -1 and sets diag.
- * The read view must be activated, see read_view_activate().
  */
 int
-box_index_read_view_select(struct index_read_view *rv, int iterator,
-			   uint32_t offset, uint32_t limit, const char *key,
-			   const char *key_end, const char **packed_pos,
-			   const char **packed_pos_end, bool update_pos,
-			   struct port *port);
+box_index_read_view_select(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, uint32_t offset, uint32_t limit,
+	const char *key, const char *key_end,
+	const char **packed_pos, const char **packed_pos_end,
+	bool update_pos, struct port *port);
 
 /**
  * Gets packed position of tuple in index, which can be passed to box_select
@@ -308,10 +343,10 @@ box_index_read_view_select(struct index_read_view *rv, int iterator,
  * is allocated on the fiber region.
  */
 int
-box_index_read_view_tuple_position(struct index_read_view *rv,
-				   const char *tuple, const char *tuple_end,
-				   const char **packed_pos,
-				   const char **packed_pos_end);
+box_index_read_view_tuple_position(
+	struct space_read_view_handle *space, uint32_t index_id,
+	const char *tuple, const char *tuple_end,
+	const char **packed_pos, const char **packed_pos_end);
 
 /**
  * Creates an iterator over an index read view, positioned after passed
@@ -319,11 +354,11 @@ box_index_read_view_tuple_position(struct index_read_view *rv,
  * Returns 0 on success. On error, returns -1 and sets diag.
  */
 int
-box_index_read_view_create_iterator(struct index_read_view *rv, int iterator,
-				    const char *key, const char *key_end,
-				    const char *packed_pos,
-				    const char *packed_pos_end,
-				    struct index_read_view_iterator *it);
+box_index_read_view_create_iterator(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end,
+	const char *packed_pos, const char *packed_pos_end,
+	struct index_read_view_iterator *it);
 
 /**
  * Same as box_index_read_view_create_iterator, but skips the specified by the
@@ -331,18 +366,19 @@ box_index_read_view_create_iterator(struct index_read_view *rv, int iterator,
  */
 int
 box_index_read_view_create_iterator_with_offset(
-	struct index_read_view *rv, int iterator, const char *key,
-	const char *key_end, const char *packed_pos, const char *packed_pos_end,
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end,
+	const char *packed_pos, const char *packed_pos_end,
 	uint32_t offset, struct index_read_view_iterator *it);
 
 /**
  * Retrieves the next tuple from an index read view iterator.
  * Returns 0 on success. On error, returns -1 and sets diag.
  * The tuple is returned in the 'result' argument. On EOF, it's set to NULL.
- * The read view must be activated, see read_view_activate().
  */
 int
 box_index_read_view_iterator_next(struct index_read_view_iterator *it,
+				  struct space_read_view_handle *space,
 				  struct tuple **result);
 
 /**
