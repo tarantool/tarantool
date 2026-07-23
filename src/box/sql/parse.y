@@ -329,8 +329,9 @@ ccons ::= cconsname(N) UNIQUE. {
 }
 
 ccons ::= cconsname(N) CHECK LP expr_old(X) RP. {
-  create_ck_def_init(&pParse->create_ck_def, NULL, &N, &X);
-  sql_create_check_contraint(pParse, true);
+  sql_expr_delete(X.pExpr);
+  sql_create_check_constraint(pParse, NULL, &N, X.zStart, X.zEnd - X.zStart,
+                              true);
 }
 
 ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA). {
@@ -355,8 +356,9 @@ tcons ::= cconsname(N) UNIQUE LP sortlist_old(X) RP. {
                    SORT_ORDER_ASC, false);
 }
 tcons ::= cconsname(N) CHECK LP expr_old(X) RP. {
-  create_ck_def_init(&pParse->create_ck_def, NULL, &N, &X);
-  sql_create_check_contraint(pParse, false);
+  sql_expr_delete(X.pExpr);
+  sql_create_check_constraint(pParse, NULL, &N, X.zStart, X.zEnd - X.zStart,
+                              false);
 }
 tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA). {
@@ -1515,10 +1517,10 @@ cmd ::= ALTER TABLE nm(X) ADD CONSTRAINT nm(N) FOREIGN KEY
 }
 
 cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) CHECK LP expr_old(X) RP. {
+  sql_expr_delete(X.pExpr);
   pParse->initiateTTrans = true;
-  struct SrcList *table = sql_src_list_append(NULL, &T);
-  create_ck_def_init(&pParse->create_ck_def, table, &N, &X);
-    sql_create_check_contraint(pParse, false);
+  sql_create_check_constraint(pParse, &T, &N, X.zStart, X.zEnd - X.zStart,
+                              false);
 }
 
 cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) UNIQUE LP sortlist_old(X) RP. {

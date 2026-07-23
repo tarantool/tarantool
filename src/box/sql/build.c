@@ -788,22 +788,16 @@ ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
 }
 
 void
-sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
+sql_create_check_constraint(struct Parse *parser, struct Token *table,
+			    struct Token *name_token, const char *expr_str,
+			    uint32_t expr_str_len, bool is_field_ck)
 {
-	struct create_ck_def *create_ck_def = &parser->create_ck_def;
-	struct ExprSpan *expr_span = create_ck_def->expr;
-	sql_expr_delete(expr_span->pExpr);
-
-	struct alter_entity_def *alter_def =
-		(struct alter_entity_def *) create_ck_def;
-	assert(alter_def->entity_type == ENTITY_TYPE_CK);
 	struct space *space = parser->create_column_def.space;
 	if (space == NULL)
 		space = parser->create_table_def.new_space;
 	bool is_alter_add_constr = space == NULL;
 
 	/* Prepare payload for ck constraint definition. */
-	struct Token *name_token = &create_ck_def->base.base.name;
 	char *name;
 	if (name_token->n != 0)
 		name = sql_name_from_token(name_token);
@@ -811,9 +805,6 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 		name = sql_ck_unique_name_new(parser, is_field_ck);
 	assert(name != NULL);
 	size_t name_len = strlen(name);
-
-	uint32_t expr_str_len = (uint32_t)(expr_span->zEnd - expr_span->zStart);
-	const char *expr_str = expr_span->zStart;
 
 	/*
 	 * Allocate memory for ck constraint parse structure and
@@ -854,11 +845,11 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	sql_xfree(name);
 	ck_def->name[name_len] = '\0';
 	if (is_alter_add_constr) {
-		const struct space *space =
-			sql_space_by_src(&alter_def->entity_name->a[0]);
+		assert(table != NULL);
+		const struct space *space = sql_space_by_token(table);
 		if (space == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 alter_def->entity_name->a[0].zName);
+				 sql_tt_name_from_token(table));
 			parser->is_aborted = true;
 			return;
 		}

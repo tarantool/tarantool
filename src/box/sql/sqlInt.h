@@ -1993,7 +1993,6 @@ struct Parse {
 	 * from parse.y
 	 */
 	union {
-		struct create_ck_def create_ck_def;
 		struct create_fk_def create_fk_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
@@ -2694,10 +2693,16 @@ sqlAddPrimaryKey(struct Parse *parse, struct Token *name,
  * Add a new CHECK constraint to the table currently under
  * construction.
  * @param parser Parsing context.
+ * @param table Name of table where constraint is created.
+ * @param name_token Name of constraint.
+ * @param expr_str String representation of the expression.
+ * @param expr_str_len Length of string representation of expression.
  * @param is_field_ck True if this is a field constraint, false otherwise.
  */
 void
-sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
+sql_create_check_constraint(struct Parse *parser, struct Token *table,
+			    struct Token *name_token, const char *expr_str,
+			    uint32_t expr_str_len, bool is_field_ck);
 
 /** Add a DEFAULT clause to the last created column. */
 void
