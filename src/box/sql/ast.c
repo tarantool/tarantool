@@ -10,12 +10,12 @@ ast_id_list_append(struct Parse *parser, struct ast_id_list *list,
 		   const struct Token *id)
 {
 	if (list == NULL) {
-		list = xregion_alloc(&parser->region, sizeof(*list));
+		list = xregion_alloc_object(&parser->region, typeof(*list));
 		stailq_create(&list->head);
 		list->len = 0;
 	}
-	struct ast_id_entry *entry = xregion_alloc(&parser->region,
-						   sizeof(*entry));
+	struct ast_id_entry *entry =
+		xregion_alloc_object(&parser->region, typeof(*entry));
 	entry->id = *id;
 	stailq_add_tail(&list->head, &entry->link);
 	list->len++;
@@ -38,7 +38,8 @@ id_list_from_ast(struct ast_id_list *list)
 struct ast_source *
 ast_source_new(struct Parse *parser)
 {
-	struct ast_source *src = xregion_alloc(&parser->region, sizeof(*src));
+	struct ast_source *src =
+		xregion_alloc_object(&parser->region, typeof(*src));
 	memset(src, 0, sizeof(*src));
 	return src;
 }
@@ -48,7 +49,7 @@ ast_source_list_append(struct Parse *parser, struct ast_source_list *list,
 		       struct ast_source *src)
 {
 	if (list == NULL) {
-		list = xregion_alloc(&parser->region, sizeof(*list));
+		list = xregion_alloc_object(&parser->region, typeof(*list));
 		stailq_create(&list->head);
 		list->len = 0;
 	}
@@ -90,7 +91,8 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 struct ast_select *
 ast_select_new(struct Parse *parser)
 {
-	struct ast_select *res = xregion_alloc(&parser->region, sizeof(*res));
+	struct ast_select *res =
+		xregion_alloc_object(&parser->region, typeof(*res));
 	memset(res, 0, sizeof(*res));
 	rlist_create(&res->link);
 	res->op = TK_SELECT;
@@ -153,12 +155,12 @@ ast_with_list_append(struct Parse *parser, struct ast_with_list *list,
 		     struct ast_select *select)
 {
 	if (list == NULL) {
-		list = xregion_alloc(&parser->region, sizeof(*list));
+		list = xregion_alloc_object(&parser->region, typeof(*list));
 		stailq_create(&list->head);
 		list->len = 0;
 	}
-	struct ast_with_entry *entry = xregion_alloc(&parser->region,
-						     sizeof(*entry));
+	struct ast_with_entry *entry =
+		xregion_alloc_object(&parser->region, typeof(*entry));
 	entry->name = *name;
 	entry->columns = columns;
 	entry->select = select;
@@ -205,7 +207,8 @@ with_from_ast(struct Parse *parser, struct ast_with_list *list)
 struct ast_expr *
 ast_expr_new(struct Parse *parser, const char *str, uint32_t len, uint8_t op)
 {
-	struct ast_expr *expr = xregion_alloc(&parser->region, sizeof(*expr));
+	struct ast_expr *expr =
+		xregion_alloc_object(&parser->region, typeof(*expr));
 	expr->left = NULL;
 	expr->right = NULL;
 	expr->str = str;
@@ -218,13 +221,13 @@ struct ast_expr_list *
 ast_expr_list_append(struct Parse *parser, struct ast_expr_list *list,
 		     struct ast_expr *expr)
 {
-	size_t n = sizeof(struct ast_expr_list_entry);
-	struct ast_expr_list_entry *entry = xregion_alloc(&parser->region, n);
+	struct ast_expr_list_entry *entry =
+		xregion_alloc_object(&parser->region, typeof(*entry));
 	entry->name = Token_nil;
 	entry->expr = expr;
 	entry->order = SORT_ORDER_ASC;
 	if (list == NULL) {
-		list = xregion_alloc(&parser->region, sizeof(*list));
+		list = xregion_alloc_object(&parser->region, typeof(*list));
 		stailq_create(&list->head);
 		list->len = 0;
 		list->is_select_list = false;
