@@ -562,8 +562,14 @@ local function local_eval(storage, line)
     -- case try to run the original string.
     --
     create_env_on_demand(storage)
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1274
+    ---@diagnostic disable-next-line: redundant-parameter
     local fun, errmsg = loadstring("return "..line, nil, nil, storage.env)
     if not fun then
+        -- emmylua_check: false positive, see
+        -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1274
+        ---@diagnostic disable-next-line: redundant-parameter
         fun, errmsg = loadstring(line, nil, nil, storage.env)
     end
     if not fun then

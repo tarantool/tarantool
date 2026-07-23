@@ -545,7 +545,7 @@ g1.test_replicaset_recovery = function(cg)
         box.backup.stop()
     end)
     cg.replica_set:stop()
-    restore_replicaset(cg.replica_set, backup_dir, replica1)
+    restore_replicaset(cg.replica_set, backup_dir)
     cg.replica_set:start()
     cg.replica_set:wait_for_fullmesh()
     for _, server in ipairs(cg.replica_set.servers) do
