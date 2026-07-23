@@ -484,14 +484,14 @@ sql_expr_uint(const struct Expr *expr, uint64_t *res)
 	return errno == 0 ? 0 : -1;
 }
 
+/** This function adds literal default value for a column. */
 static void
-sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
+sql_add_term_default(struct Parse *parser, struct Expr *expr)
 {
 	assert(parser->space != NULL);
 	char *buf = NULL;
 	uint32_t size = 0;
 	struct region *region = &parser->region;
-	struct Expr *expr = expr_span->pExpr;
 	switch (sql_expr_type(expr)) {
 	case FIELD_TYPE_BOOLEAN: {
 		assert(expr->op == TK_TRUE || expr->op == TK_FALSE);
@@ -593,20 +593,21 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 			parser->is_aborted = true;
 			break;
 		}
+		const struct Expr *int_expr = expr;
 		if (expr->op == TK_UPLUS) {
 			assert(expr->pLeft != NULL &&
 			       expr->pLeft->op == TK_INTEGER);
-			expr = expr->pLeft;
+			int_expr = expr->pLeft;
 		}
 		uint64_t val;
-		if (sql_expr_uint(expr, &val) == 0) {
+		if (sql_expr_uint(int_expr, &val) == 0) {
 			size = mp_sizeof_uint(val);
 			buf = xregion_alloc(region, size);
 			mp_encode_uint(buf, val);
 			break;
 		}
 		int errcode = ER_INT_LITERAL_MAX;
-		const char *str = expr->u.zToken;
+		const char *str = int_expr->u.zToken;
 		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
 			errcode = ER_HEX_LITERAL_MAX;
 		diag_set(ClientError, errcode, str);
@@ -619,7 +620,7 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		assert(buf == NULL);
 		assert(size == 0);
 	}
-	sql_expr_delete(expr_span->pExpr);
+	sql_expr_delete(expr);
 	if (parser->is_aborted)
 		return;
 	struct space_def *def = parser->space->def;
@@ -1233,26 +1234,28 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeCountChanges(v);
 }
 
+/** This function adds function to calculate default value for a column. */
 static void
-sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
+sql_add_func_default(struct Parse *parser, struct Expr *expr, const char *str,
+		     uint32_t len)
 {
 	assert(parser->space != NULL);
 	struct space_def *def = parser->space->def;
 	uint32_t fieldno = def->field_count - 1;
 	const char *field_name = def->fields[fieldno].name;
 
-	if (!sqlExprIsConstantOrFunction(span->pExpr)) {
+	if (!sqlExprIsConstantOrFunction(expr)) {
 		diag_set(ClientError, ER_CREATE_SPACE, def->name,
 			 tt_sprintf("default value of column '%s' is not "
 				    "constant", field_name));
 		parser->is_aborted = true;
-		sql_expr_delete(span->pExpr);
+		sql_expr_delete(expr);
 		return;
 	}
-	sql_expr_delete(span->pExpr);
+	sql_expr_delete(expr);
 
 	char *name = sqlMPrintf("default_%s_%s", def->name, field_name);
-	char *body = sql_xstrndup(span->zStart, span->zEnd - span->zStart);
+	char *body = sql_xstrndup(str, len);
 	int reg_id = ++parser->nMem;
 	vdbe_emit_create_function(parser, reg_id, name, body);
 	sql_xfree(name);
@@ -1273,17 +1276,17 @@ sql_expr_is_number_term(const struct Expr *expr)
 }
 
 void
-sql_column_add_default(struct Parse *parser, struct ExprSpan *expr_span)
+sql_column_add_default(struct Parse *parser, struct Expr *expr, const char *str,
+		       uint32_t len)
 {
-	struct Expr *expr = expr_span->pExpr;
 	if (sql_expr_is_term(expr))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else if (expr->op == TK_UPLUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else if (expr->op == TK_UMINUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else
-		sql_add_func_default(parser, expr_span);
+		sql_add_func_default(parser, expr, str, len);
 }
 
 /**
