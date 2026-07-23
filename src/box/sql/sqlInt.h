@@ -1997,14 +1997,19 @@ struct Parse {
 		struct create_view_def create_view_def;
 	};
 	/**
-	 * Table def or column def is not part of union since
+	 * Table def is not part of union since
 	 * information being held must survive till the end of
-	 * parsing of whole <CREATE TABLE> or
-	 * <ALTER TABLE ADD COLUMN> statement (to pass it to
-	 * sqlEndTable() sql_create_column_end() function).
+	 * parsing of whole <CREATE TABLE> statement (to pass it to
+	 * sqlEndTable() function).
 	 */
 	struct create_table_def create_table_def;
-	struct create_column_def create_column_def;
+	/**
+	 * The space into which the column is added in the CREATE TABLE and
+	 * ALTER TABLE ADD COLUMN statements. Note that in the CREATE TABLE
+	 * statement, after column creation begins, this space is the same as
+	 * the new_space created for CREATE TABLE.
+	 */
+	struct space *space;
 	/** Array of default function descriptions. */
 	struct sql_default_func *default_funcs;
 	/** Length of array of default function descriptions. */
@@ -2646,12 +2651,13 @@ struct space *
 sqlStartTable(Parse *, Token *);
 
 /**
- * Add new field to the format of ephemeral space in
- * create_column_def. If it is <ALTER TABLE> create shallow copy
- * of the existing space and add field to its format.
+ * Add new field to the format of ephemeral space in parser.
+ * If it is <ALTER TABLE> create shallow copy of the existing space
+ * and add field to its format.
  */
 void
-sql_create_column_start(struct Parse *parse);
+sql_create_column_start(struct Parse *parse, struct Token *table,
+			struct Token *name, enum field_type type);
 
 /**
  * Emit code to update entry in _space and code to create

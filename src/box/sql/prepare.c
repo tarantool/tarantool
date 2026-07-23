@@ -217,7 +217,7 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 static void
 parser_space_delete(struct Parse *parser)
 {
-	struct space *space = parser->create_column_def.space;
+	struct space *space = parser->space;
 	if (space == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
