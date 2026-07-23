@@ -1856,7 +1856,7 @@ columnno_by_name(struct Parse *parse_context, const struct space *space,
 
 /** Generate unique name for foreign key constraint. */
 static char *
-sql_fk_unique_name_new(struct Parse *parse)
+sql_fk_unique_name_new(struct Parse *parse, struct ExprList *child_cols)
 {
 	struct space *space = parse->create_column_def.space;
 	if (space == NULL)
@@ -1866,7 +1866,7 @@ sql_fk_unique_name_new(struct Parse *parse)
 	struct fk_constraint_parse *fk;
 	struct rlist *fkeys = &parse->create_fk_constraint_parse_def.fkeys;
 	uint32_t n = 1;
-	if (parse->create_fk_def.child_cols != NULL) {
+	if (child_cols != NULL) {
 		rlist_foreach_entry(fk, fkeys, link) {
 			if (!fk->fk_def->is_field_fk)
 				++n;
@@ -1907,14 +1907,10 @@ fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
 }
 
 void
-sql_create_foreign_key(struct Parse *parse_context)
+sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
+		       struct Token *name, struct ExprList *child_cols,
+		       struct Token *parent, struct ExprList *parent_cols)
 {
-	struct create_fk_def *create_fk_def = &parse_context->create_fk_def;
-	struct create_constraint_def *create_constr_def = &create_fk_def->base;
-	struct create_entity_def *create_def = &create_constr_def->base;
-	struct alter_entity_def *alter_def = &create_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_FK);
-	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
 	/*
 	 * Beforehand initialization for correct clean-up
 	 * while emergency exiting in case of error.
@@ -1934,26 +1930,25 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 */
 	bool is_alter_add_constr = space == NULL;
 	uint32_t child_cols_count;
-	struct ExprList *child_cols = create_fk_def->child_cols;
 	if (child_cols == NULL) {
 		assert(!is_alter_add_constr);
 		child_cols_count = 1;
 	} else {
 		child_cols_count = child_cols->nExpr;
 	}
-	struct ExprList *parent_cols = create_fk_def->parent_cols;
 	struct space *child_space = NULL;
-	if (create_def->name.n != 0)
-		constraint_name = sql_name_from_token(&create_def->name);
-	else
-		constraint_name = sql_fk_unique_name_new(parse_context);
+	if (name->n != 0) {
+		constraint_name = sql_name_from_token(name);
+	} else {
+		constraint_name = sql_fk_unique_name_new(parse_context,
+							 child_cols);
+	}
 	assert(constraint_name != NULL);
 	if (is_alter_add_constr) {
-		const struct space *origin =
-			sql_space_by_src(&alter_def->entity_name->a[0]);
+		const struct space *origin = sql_space_by_token(table);
 		if (origin == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 alter_def->entity_name->a[0].zName);
+				 sql_tt_name_from_token(table));
 			goto tnt_error;
 		}
 		child_space = space_by_id(origin->def->id);
@@ -1972,7 +1967,6 @@ sql_create_foreign_key(struct Parse *parse_context)
 			&parse_context->create_fk_constraint_parse_def.fkeys;
 		rlist_add_entry(fkeys, fk_parse, link);
 	}
-	struct Token *parent = create_fk_def->parent_name;
 	assert(parent != NULL);
 	parent_name = sql_name_from_token(parent);
 	/*

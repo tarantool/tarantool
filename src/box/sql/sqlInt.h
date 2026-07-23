@@ -1993,7 +1993,6 @@ struct Parse {
 	 * from parse.y
 	 */
 	union {
-		struct create_fk_def create_fk_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 	};
@@ -3719,9 +3718,16 @@ sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
  * OR to handle <CREATE TABLE ...>
  *
  * @param parse_context Parsing context.
+ * @param table Name of table where constraint is created.
+ * @param name Constraint name.
+ * @param child_cols Local columns of FOREIGN KEY constraint.
+ * @param parent Foreign table.
+ * @param parent_cols Foreign columns of FOREIGN KEY constraint.
  */
 void
-sql_create_foreign_key(struct Parse *parse_context);
+sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
+		       struct Token *name, struct ExprList *child_cols,
+		       struct Token *parent, struct ExprList *parent_cols);
 
 /** Emit code to drop UNIQUE, tuple FOREIGN KEY or tuple CHECK constraint. */
 void
