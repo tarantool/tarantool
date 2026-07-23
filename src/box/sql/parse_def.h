@@ -278,12 +278,6 @@ struct create_constraint_def {
 	struct create_entity_def base;
 };
 
-struct create_ck_def {
-	struct create_constraint_def base;
-	/** AST representing check expression. */
-	struct ExprSpan *expr;
-};
-
 struct create_fk_def {
 	struct create_constraint_def base;
 	struct ExprList *child_cols;
@@ -334,15 +328,6 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 	trigger_def->op = op;
 	trigger_def->cols = cols;
 	trigger_def->when = when;
-}
-
-static inline void
-create_ck_def_init(struct create_ck_def *ck_def, struct SrcList *table_name,
-		   struct Token *name, struct ExprSpan *expr)
-{
-	create_constraint_def_init(&ck_def->base, table_name, name, false,
-				   ENTITY_TYPE_CK);
-	ck_def->expr = expr;
 }
 
 static inline void
