@@ -2699,7 +2699,8 @@ sql_create_check_constraint(struct Parse *parser, struct Token *table,
 
 /** Add a DEFAULT clause to the last created column. */
 void
-sql_column_add_default(struct Parse *parser, struct ExprSpan *expr_span);
+sql_column_add_default(struct Parse *parser, struct Expr *expr, const char *str,
+		       uint32_t len);
 
 void sqlAddCollateType(Parse *, Token *);
 
