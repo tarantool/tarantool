@@ -147,7 +147,7 @@ box.schema.user.drop('testus')
 session.su('guest')
 ---
 ...
-session.uid()
+session.euid()
 ---
 - 0
 ...
@@ -214,7 +214,7 @@ box.schema.user.grant('uniuser', 'read, write, execute, create', 'universe')
 session.su('uniuser')
 ---
 ...
-uid = session.uid()
+uid = session.euid()
 ---
 ...
 --
@@ -356,7 +356,7 @@ box.schema.user.grant('testuser', 'create', 'universe')
 session.su('testuser')
 ---
 ...
-testuser_uid = session.uid()
+testuser_uid = session.euid()
 ---
 ...
 _ = box.space._user:delete(2)
@@ -367,7 +367,7 @@ box.space._user:select(1)
 ---
 - error: Read access to space '_user' is denied for user 'testuser'
 ...
-uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
+uid = box.space._user:insert{maxuid+1, session.euid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
 ---
 ...
 _ = box.space._user:delete(uid)

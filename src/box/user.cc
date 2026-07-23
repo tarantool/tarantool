@@ -959,6 +959,7 @@ credentials_create(struct credentials *cr, struct user *user)
 	cr->auth_token = user->auth_token;
 	cr->universal_access = universe.access[user->auth_token].effective;
 	cr->uid = user->def->uid;
+	cr->auth_uid = user->def->uid;
 	rlist_add_entry(&user->credentials_list, cr, in_user);
 }
 
@@ -968,6 +969,7 @@ credentials_create_empty(struct credentials *cr)
 	cr->auth_token = BOX_USER_MAX;
 	cr->universal_access = 0;
 	cr->uid = BOX_USER_MAX;
+	cr->auth_uid = BOX_USER_MAX;
 	rlist_create(&cr->in_user);
 }
 
