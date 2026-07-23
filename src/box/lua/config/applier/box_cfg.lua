@@ -1030,7 +1030,8 @@ local function force_ro_on_startup(configdata, box_cfg)
 
     -- Require at least one writable instance in the
     -- replicaset if the instance is to be bootstrapped (has
-    -- no existing snapshot). Otherwise there is no one who
+    -- no existing snapshot) and the instance itself is not
+    -- configured as writable. Otherwise there is no one who
     -- would register the instance in the _cluster system
     -- space.
     --
@@ -1043,15 +1044,17 @@ local function force_ro_on_startup(configdata, box_cfg)
     --
     -- Note: an anonymous replica is not to be registered in
     -- _cluster. So, it can subscribe to such a replicaset.
-    if in_replicaset and not has_snap and not is_anon then
+    if not configured_as_rw and not has_snap and not is_anon then
         local has_rw = false
         if failover == 'off' then
             for _, peer_name in ipairs(configdata:peers()) do
                 local opts = {instance = peer_name, use_default = true}
                 local mode = configdata:get('database.mode', opts)
-                -- NB: The default is box.NULL that is
-                -- interpreted as 'ro' for a replicaset with
-                -- more than one instance.
+                assert(in_replicaset or mode ~= nil or configured_as_rw)
+
+                -- NB: The default is box.NULL. It means 'rw'
+                -- for a singleton replicaset and 'ro' for a
+                -- replicaset with more than one instance.
                 if mode == 'rw' then
                     has_rw = true
                     break
