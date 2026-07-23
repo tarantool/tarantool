@@ -293,12 +293,7 @@ cconsname(N) ::= . { N = Token_nil; }
  * tokens go to the next ccons instead.
  */
 ccons ::= DEFAULT expr(X). [COLLATE] {
-  struct ExprSpan res;
-  struct Expr *e = expr_from_ast(pParse, X);
-  res.pExpr = e;
-  res.zStart = X->str;
-  res.zEnd = &X->str[X->len];
-  sql_column_add_default(pParse, &res);
+  sql_column_add_default(pParse, expr_from_ast(pParse, X), X->str, X->len);
 }
 
 // In addition to the type name, we also care about the primary key and
