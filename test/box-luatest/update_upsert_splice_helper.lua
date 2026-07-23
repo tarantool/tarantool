@@ -136,7 +136,6 @@ end
 -- This function is required both on host and on server, and unfortunately now
 -- test engine cannot pass functions as exec arguments, so define source code.
 local function field_type(field)
-    local varbinary = require('varbinary')
     if type(field) == 'string' then
         return 'str'
     elseif varbinary.is(field) then
