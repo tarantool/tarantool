@@ -31,6 +31,9 @@ local common_config = {
                                 value_1 = 'from config.yaml',
                                 value_2 = 'from config.yaml',
                             },
+                            config = {
+                                checks = 'off',
+                            },
                         },
                     },
                 },

@@ -153,6 +153,32 @@ I['app.module'] = 'A Lua module to load an application from.'
 
 -- }}} app configuration
 
+-- {{{ checks configuration
+
+I['config.checks'] = format_text([[
+    The `checks` section controls which system checks are enabled.
+    When a check is enabled and detects an issue, a warning alert
+    appears in `box.info.config.alerts`.
+
+    Set `config.checks` to `'off'` to disable all system checks at once.
+
+    The checks run on every config apply/reload and also periodically
+    via a background fiber, so that runtime changes are detected automatically.
+]])
+
+I['config.checks.readahead'] = format_text([[
+    Whether to check if `readahead` is set to a large value.
+
+    When enabled, the check generates a warning alert if
+    `readahead` is greater than or equal to 1048512 (1 MiB - 64).
+
+    A large `readahead` value may cause high memory consumption
+    that is difficult to predict. Consider lowering `readahead`
+    if memory usage is a concern.
+]])
+
+-- }}} checks configuration
+
 -- {{{ audit_log configuration
 
 I['audit_log'] = format_text([[
