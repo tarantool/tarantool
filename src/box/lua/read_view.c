@@ -34,8 +34,8 @@
 static bool box_read_view_ffi = true;
 TWEAK_BOOL(box_read_view_ffi);
 
-/** Lua ctype ID of struct index_read_view pointer. */
-static uint32_t CTID_STRUCT_INDEX_READ_VIEW_PTR;
+/** Lua ctype ID of struct space_read_view_handle pointer. */
+static uint32_t CTID_STRUCT_SPACE_READ_VIEW_HANDLE;
 
 /**
  * Wrapper around a database read view object pushed to Lua as user data.
@@ -43,6 +43,8 @@ static uint32_t CTID_STRUCT_INDEX_READ_VIEW_PTR;
 struct lbox_read_view {
 	/** Wrapped database read view object. */
 	struct read_view obj;
+	/** Read view handle. */
+	struct read_view_handle *handle;
 	/**
 	 * Set to true if the read view was closed.
 	 * If set, the wrapped object is invalid and must not be used.
@@ -64,8 +66,10 @@ lbox_check_read_view(struct lua_State *L, int idx)
  * Wrapper around an index read view object pushed to Lua as user data.
  */
 struct lbox_index_read_view {
-	/** Wrapped index read view object. */
-	struct index_read_view *obj;
+	/** Space which this index belongs to. */
+	struct space_read_view_handle *space;
+	/* Ordinal number of this index in the space. */
+	uint32_t index_id;
 	/**
 	 * Pointer to the read view that owns this index.
 	 * The wrapped object is valid if and only if it hasn't been closed.
@@ -113,6 +117,8 @@ lbox_check_open_index_read_view(struct lua_State *L, int idx)
 struct lbox_index_read_view_iterator {
 	/** Wrapped index read view iterator object. */
 	struct index_read_view_iterator obj;
+	/** Space which the iterated index belongs to. */
+	struct space_read_view_handle *space;
 	/**
 	 * Pointer to the read view that owns this iterator.
 	 * The wrapped object is valid if and only if it hasn't been closed.
@@ -188,18 +194,20 @@ lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
 static void
 lbox_read_view_push_index(struct lua_State *L, int rv_idx,
 			  struct lbox_read_view *rv,
-			  struct index_read_view *index_rv)
+			  struct index_read_view *index,
+			  struct space_read_view_handle *space)
 {
 	assert(rv_idx >= 0);
 	lua_newtable(L);
-	lua_pushinteger(L, index_rv->def->iid);
+	lua_pushinteger(L, index->def->iid);
 	lua_setfield(L, -2, "id");
-	lua_pushstring(L, index_rv->def->name);
+	lua_pushstring(L, index->def->name);
 	lua_setfield(L, -2, "name");
 
 	/* Allocate a userdata object for the new index read view. */
 	struct lbox_index_read_view *u = lua_newuserdata(L, sizeof(*rv));
-	u->obj = index_rv;
+	u->space = space;
+	u->index_id = index->def->iid;
 	u->read_view = rv;
 	u->read_view_ref = LUA_NOREF;
 	luaL_getmetatable(L, lbox_index_read_view_typename);
@@ -211,9 +219,9 @@ lbox_read_view_push_index(struct lua_State *L, int rv_idx,
 
 	lua_setfield(L, -2, "_impl");
 
-	*(struct index_read_view **)luaL_pushcdata(
-		L, CTID_STRUCT_INDEX_READ_VIEW_PTR) = u->obj;
-	lua_setfield(L, -2, "_cdata");
+	*(struct space_read_view_handle **)luaL_pushcdata(
+		L, CTID_STRUCT_SPACE_READ_VIEW_HANDLE) = space;
+	lua_setfield(L, -2, "_cspace");
 
 	/*
 	 * Disable FFI if the space upgrade is in progress because in this case
@@ -221,7 +229,7 @@ lbox_read_view_push_index(struct lua_State *L, int rv_idx,
 	 * function via Lua C API, which is unsafe to do over FFI.
 	 */
 	bool ffi = box_read_view_ffi;
-	if (index_rv->space->upgrade != NULL)
+	if (space->upgrade != NULL)
 		ffi = false;
 	lua_pushboolean(L, ffi);
 	lua_setfield(L, -2, "_ffi");
@@ -236,23 +244,23 @@ lbox_read_view_push_index(struct lua_State *L, int rv_idx,
 static void
 lbox_read_view_push_space(struct lua_State *L, int rv_idx,
 			  struct lbox_read_view *rv,
-			  struct space_read_view *space_rv)
+			  struct space_read_view_handle *space)
 {
 	lua_newtable(L);
-	lua_pushinteger(L, space_rv->id);
+	lua_pushinteger(L, space->ptr->id);
 	lua_setfield(L, -2, "id");
-	lua_pushstring(L, space_rv->name);
+	lua_pushstring(L, space->ptr->name);
 	lua_setfield(L, -2, "name");
 	lua_newtable(L);
-	for (uint32_t i = 0; i <= space_rv->index_id_max; i++) {
-		struct index_read_view *index_rv = space_read_view_index(
-								space_rv, i);
-		if (index_rv == NULL)
+	for (uint32_t i = 0; i <= space->ptr->index_id_max; i++) {
+		struct index_read_view *index =
+			space_read_view_index(space->ptr, i);
+		if (index == NULL)
 			continue;
-		lbox_read_view_push_index(L, rv_idx, rv, index_rv);
+		lbox_read_view_push_index(L, rv_idx, rv, index, space);
 		lua_pushvalue(L, -1);
 		lua_rawseti(L, -3, i);
-		lua_setfield(L, -2, index_rv->def->name);
+		lua_setfield(L, -2, index->def->name);
 	}
 	lua_setfield(L, -2, "index");
 }
@@ -286,8 +294,8 @@ lbox_read_view_push_space(struct lua_State *L, int rv_idx,
  *                     -- Represented by struct lbox_index_read_view.
  *                     _impl = <userdata:box.read_view.index>,
  *
- *                     -- lbox_index_read_view->obj exported for FFI.
- *                     _cdata = <cdata:struct index_read_view *>,
+ *                     -- lbox_index_read_view->space exported for FFI.
+ *                     _cspace = <cdata:struct space_read_view_handle *>,
  *
  *                     -- Set if FFI should be used for this index.
  *                     _ffi = <bool>,
@@ -327,7 +335,8 @@ lbox_read_view_open(struct lua_State *L)
 	opts.enable_data_temporary_spaces = true;
 	if (read_view_open(&rv->obj, &opts) != 0)
 		return luaT_error_at(L, 2);
-	if (read_view_activate(&rv->obj) != 0) {
+	rv->handle = read_view_handle_new(&rv->obj);
+	if (rv->handle == NULL) {
 		read_view_close(&rv->obj);
 		return luaT_error_at(L, 2);
 	}
@@ -335,12 +344,12 @@ lbox_read_view_open(struct lua_State *L)
 
 	/* Create a space table. */
 	lua_newtable(L);
-	struct space_read_view *space_rv;
-	read_view_foreach_space(space_rv, &rv->obj) {
-		lbox_read_view_push_space(L, rv_idx, rv, space_rv);
+	struct space_read_view_handle *space;
+	read_view_foreach_space(space, rv->handle) {
+		lbox_read_view_push_space(L, rv_idx, rv, space);
 		lua_pushvalue(L, -1);
-		lua_rawseti(L, -3, space_rv->id);
-		lua_setfield(L, -2, space_rv->name);
+		lua_rawseti(L, -3, space->ptr->id);
+		lua_setfield(L, -2, space->ptr->name);
 	}
 
 	/* Push the read view table and set rv._impl and rv.space. */
@@ -403,7 +412,7 @@ lbox_read_view_gc(struct lua_State *L)
 	if (!rv->is_closed) {
 		say_warn("read view %llu ('%s') was not properly closed",
 			 (unsigned long long)rv->obj.id, rv->obj.name);
-		read_view_deactivate(&rv->obj);
+		read_view_handle_delete(rv->handle);
 		read_view_close(&rv->obj);
 	}
 	TRASH(rv);
@@ -418,7 +427,7 @@ lbox_read_view_close(struct lua_State *L)
 {
 	struct lbox_read_view *rv = lbox_check_read_view(L, 1);
 	if (!rv->is_closed) {
-		read_view_deactivate(&rv->obj);
+		read_view_handle_delete(rv->handle);
 		read_view_close(&rv->obj);
 		rv->is_closed = true;
 	}
@@ -452,7 +461,8 @@ lbox_index_read_view_get(struct lua_State *L)
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 2, &key_len);
 	struct tuple *tuple;
-	int rc = box_index_read_view_get(rv->obj, key, key + key_len, &tuple);
+	int rc = box_index_read_view_get(rv->space, rv->index_id,
+					 key, key + key_len, &tuple);
 	region_truncate(region, region_svp);
 	if (rc != 0)
 		return luaT_error(L);
@@ -472,8 +482,8 @@ lbox_index_read_view_count(struct lua_State *L)
 	size_t region_svp = region_used(region);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-	ssize_t count = box_index_read_view_count(rv->obj, iterator,
-						  key, key + key_len);
+	ssize_t count = box_index_read_view_count(rv->space, rv->index_id,
+						  iterator, key, key + key_len);
 	region_truncate(region, region_svp);
 	if (count < 0)
 		return luaT_error(L);
@@ -484,11 +494,13 @@ lbox_index_read_view_count(struct lua_State *L)
 /** Specialization of lbox_normalize_position for read views. */
 static int
 lbox_read_view_normalize_position(lua_State *L, int idx,
-				  struct index_read_view *rv,
+				  struct lbox_index_read_view *rv,
 				  const char **packed_pos,
 				  const char **packed_pos_end)
 {
-	return lbox_normalize_position(L, idx, rv->def->cmp_def, packed_pos,
+	struct index_read_view *index = space_read_view_index(rv->space->ptr,
+							      rv->index_id);
+	return lbox_normalize_position(L, idx, index->def->cmp_def, packed_pos,
 				       packed_pos_end);
 }
 
@@ -511,13 +523,14 @@ lbox_index_read_view_select(struct lua_State *L)
 	const char *key = lbox_encode_tuple_on_gc(L, 5, &key_len);
 	const char *packed_pos, *packed_pos_end;
 	bool fetch_pos = lua_toboolean(L, 7);
-	if (lbox_read_view_normalize_position(L, 6, rv->obj, &packed_pos,
+	if (lbox_read_view_normalize_position(L, 6, rv, &packed_pos,
 					      &packed_pos_end) != 0)
 		goto fail;
 	struct port port;
-	int rc = box_index_read_view_select(rv->obj, iterator, offset, limit,
-					    key, key + key_len, &packed_pos,
-					    &packed_pos_end, fetch_pos, &port);
+	int rc = box_index_read_view_select(rv->space, rv->index_id, iterator,
+					    offset, limit, key, key + key_len,
+					    &packed_pos, &packed_pos_end,
+					    fetch_pos, &port);
 	if (rc != 0)
 		goto fail;
 	port_dump_lua(&port, L, PORT_DUMP_LUA_MODE_TABLE);
@@ -561,7 +574,7 @@ lbox_index_read_view_iterator_next(struct lua_State *L)
 	struct lbox_index_read_view_iterator *it =
 		lbox_check_open_index_read_view_iterator(L, 1);
 	struct tuple *tuple;
-	if (box_index_read_view_iterator_next(&it->obj, &tuple) != 0)
+	if (box_index_read_view_iterator_next(&it->obj, it->space, &tuple) != 0)
 		return luaT_error(L);
 	if (tuple == NULL)
 		return 0;
@@ -593,7 +606,7 @@ lbox_index_read_view_iterator(struct lua_State *L)
 	lua_pushlstring(L, key, key_len);
 	key = lua_tostring(L, -1);
 	const char *packed_pos, *packed_pos_end;
-	if (lbox_read_view_normalize_position(L, 4, rv->obj, &packed_pos,
+	if (lbox_read_view_normalize_position(L, 4, rv, &packed_pos,
 					      &packed_pos_end) != 0)
 		goto error;
 	uint32_t offset = luaL_checkinteger(L, 5);
@@ -610,9 +623,10 @@ lbox_index_read_view_iterator(struct lua_State *L)
 
 	/* Initialize the userdata object. */
 	if (box_index_read_view_create_iterator_with_offset(
-			rv->obj, iterator, key, key + key_len,
+			rv->space, rv->index_id, iterator, key, key + key_len,
 			packed_pos, packed_pos_end, offset, &it->obj) != 0)
 		goto error;
+	it->space = rv->space;
 	it->read_view = rv->read_view;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, rv->read_view_ref);
 	it->read_view_ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -664,10 +678,10 @@ box_lua_read_view_init(struct lua_State *L)
 	luaL_register_type(L, lbox_index_read_view_iterator_typename,
 			   index_read_view_iterator_methods);
 
-	int rc = luaL_cdef(L, "struct index_read_view;");
+	int rc = luaL_cdef(L, "struct space_read_view_handle;");
 	assert(rc == 0);
 	(void)rc;
-	CTID_STRUCT_INDEX_READ_VIEW_PTR = luaL_ctypeid(
-		L, "struct index_read_view *");
-	assert(CTID_STRUCT_INDEX_READ_VIEW_PTR != 0);
+	CTID_STRUCT_SPACE_READ_VIEW_HANDLE = luaL_ctypeid(
+		L, "struct space_read_view_handle *");
+	assert(CTID_STRUCT_SPACE_READ_VIEW_HANDLE != 0);
 }

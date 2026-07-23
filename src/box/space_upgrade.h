@@ -25,6 +25,7 @@ struct space;
 struct space_upgrade;
 struct space_upgrade_def;
 struct space_upgrade_read_view;
+struct space_upgrade_read_view_handle;
 struct tuple;
 struct tuple_format;
 
@@ -86,9 +87,7 @@ space_upgrade_run(struct space *space);
  * This function never fails (never returns NULL).
  *
  * The original space upgrade function may be dropped after calling this
- * function - the read view function doesn't depend on it. The read view
- * function may be used from any thread, but it must be activated with
- * space_upgrade_read_view_activate() in that thread first.
+ * function - the read view function doesn't depend on it.
  */
 static inline struct space_upgrade_read_view *
 space_upgrade_read_view_new(struct space_upgrade *upgrade)
@@ -101,7 +100,7 @@ space_upgrade_read_view_new(struct space_upgrade *upgrade)
 /**
  * Frees a space upgrade read view function.
  *
- * The function must be deactivated, see space_upgrade_read_view_deactivate().
+ * All handles pointing to the function must be destroyed first.
  */
 static inline void
 space_upgrade_read_view_delete(struct space_upgrade_read_view *rv)
@@ -111,35 +110,31 @@ space_upgrade_read_view_delete(struct space_upgrade_read_view *rv)
 }
 
 /**
- * Activates a space upgrade read view function.
+ * Allocates a read view handle for a space upgrade function for exclusive
+ * use in the current thread. See the comment to read_view_handle for details.
  * Takes the format to use for allocating upgraded tuples as an argument.
- * The format must not be freed until the read view is deactivated.
- * Returns 0 on success, -1 on error.
- *
- * A space upgrade read view function may not be used unless it's activated.
- * Once activated, it may only be used in the thread it was activated in.
+ * The format must not be freed until the handle is destroyed.
+ * On error, returns NULL and sets diag.
  */
-static inline int
-space_upgrade_read_view_activate(struct space_upgrade_read_view *rv,
-				 struct tuple_format *format)
+static inline struct space_upgrade_read_view_handle *
+space_upgrade_read_view_handle_new(struct space_upgrade_read_view *rv,
+				   struct tuple_format *format)
 {
 	(void)rv;
 	(void)format;
 	unreachable();
-	return 0;
+	return NULL;
 }
 
 /**
- * Deactivates a space upgrade read view function.
+ * Frees a read view handle for a space upgrade function.
  *
- * This function must be called in the same thread where it was activated.
- * It's okay to call this function on an inactive read view - it's a no-op
- * then.
+ * A handle may only be destroyed in the thread where it was created.
  */
 static inline void
-space_upgrade_read_view_deactivate(struct space_upgrade_read_view *rv)
+space_upgrade_read_view_handle_delete(struct space_upgrade_read_view_handle *h)
 {
-	(void)rv;
+	(void)h;
 	unreachable();
 }
 
@@ -148,14 +143,14 @@ space_upgrade_read_view_deactivate(struct space_upgrade_read_view *rv)
  * Returns the new tuple on success, NULL on error.
  * The new tuple is referenced with tuple_bless.
  *
- * The space upgrade read view function must be activated in the current
- * thread, see space_upgrade_read_view_activate().
+ * The function may only be used in the thread where the read view handle
+ * was created.
  */
 static inline struct tuple *
-space_upgrade_read_view_apply(struct space_upgrade_read_view *rv,
+space_upgrade_read_view_apply(struct space_upgrade_read_view_handle *h,
 			      const struct read_view_tuple *rv_tuple)
 {
-	(void)rv;
+	(void)h;
 	(void)rv_tuple;
 	unreachable();
 	return NULL;

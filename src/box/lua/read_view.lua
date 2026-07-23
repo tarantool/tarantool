@@ -22,31 +22,34 @@ local ffi = require('ffi')
 ffi.cdef([[
     struct index_read_view_iterator { char pad[80]; };
     int box_index_read_view_tuple_position(
-            struct index_read_view *rv,
+            struct space_read_view_handle *space, uint32_t index_id,
             const char *tuple, const char *tuple_end,
             const char **packed_pos, const char **packed_pos_end);
-    int box_index_read_view_get(struct index_read_view *rv, const char *key,
-                                const char *key_end, struct tuple **result);
-    int box_index_read_view_count(struct index_read_view *rv, int iterator,
-                                  const char *key, const char *key_end);
+    int box_index_read_view_get(
+            struct space_read_view_handle *space, uint32_t index_id,
+            const char *key, const char *key_end, struct tuple **result);
+    int box_index_read_view_count(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, const char *key, const char *key_end);
     int box_index_read_view_quantile(
-        struct index_read_view *rv, double level, const char *begin_key,
-            const char *begin_key_end, const char *end_key,
-            const char *end_key_end, const char **quantile_key,
-            const char **quantile_key_end);
-    int box_index_read_view_select(struct index_read_view *rv, int iterator,
-                                   uint32_t offset, uint32_t limit,
-                                   const char *key, const char *key_end,
-                                   const char **packed_pos,
-                                   const char **packed_pos_end,
-                                   bool update_pos, struct port *port);
-    int box_index_read_view_create_iterator_with_offset(
-            struct index_read_view *rv, int iterator,
+            struct space_read_view_handle *space, uint32_t index_id,
+            double level, const char *begin_key, const char *begin_key_end,
+            const char *end_key, const char *end_key_end,
+            const char **quantile_key, const char **quantile_key_end);
+    int box_index_read_view_select(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, uint32_t offset, uint32_t limit,
             const char *key, const char *key_end,
+            const char **packed_pos, const char **packed_pos_end,
+            bool update_pos, struct port *port);
+    int box_index_read_view_create_iterator_with_offset(
+            struct space_read_view_handle *space, uint32_t index_id,
+            int iterator, const char *key, const char *key_end,
             const char *packed_pos, const char *packed_pos_end,
             uint32_t offset, struct index_read_view_iterator *it);
-    int box_index_read_view_iterator_next(
-            struct index_read_view_iterator *it, struct tuple **result);
+    int box_index_read_view_iterator_next(struct index_read_view_iterator *it,
+                                          struct space_read_view_handle *space,
+                                          struct tuple **result);
     void box_index_read_view_iterator_destroy(
             struct index_read_view_iterator *it);
 ]])
@@ -276,7 +279,7 @@ function read_view_methods:close()
             -- Reset cdata because it's going to be invalidated by 'close'.
             -- From now on, FFI methods will assume that the read view is
             -- closed.
-            index._cdata = nil
+            index._cspace = nil
         end
     end
     self._impl:close()
@@ -304,7 +307,7 @@ end
 -- (The Lua C API has this check implemented in C.)
 --
 local function check_index_read_view_is_open_ffi(index)
-    if index._cdata == nil then
+    if index._cspace == nil then
         box.error(box.error.READ_VIEW_CLOSED, 3)
     end
 end
@@ -333,7 +336,7 @@ local function iterator_pos_set(index, pos, ibuf)
         ibuf.rpos = ibuf.wpos
         local tuple, tuple_end = tuple_encode(ibuf, pos)
         return builtin.box_index_read_view_tuple_position(
-                index._cdata, tuple, tuple_end,
+                index._cspace, index.id, tuple, tuple_end,
                 iterator_pos, iterator_pos_end) == 0
     end
 end
@@ -355,7 +358,7 @@ function read_view_index_methods_ffi:get(key)
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
     local ok = builtin.box_index_read_view_get(
-            self._cdata, raw_key, raw_key_end, ptuple) == 0
+            self._cspace, self.id, raw_key, raw_key_end, ptuple) == 0
     cord_ibuf_put(ibuf)
     if not ok then
         box.error(box.error.last(), 2)
@@ -387,8 +390,8 @@ function read_view_index_methods_ffi:count(key, opts)
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
     local key_is_nil = raw_key + 1 >= raw_key_end
     local itype = check_iterator_type(opts, key_is_nil, 2)
-    local count = builtin.box_index_read_view_count(self._cdata, itype,
-                                                    raw_key, raw_key_end)
+    local count = builtin.box_index_read_view_count(self._cspace, self.id,
+                                                    itype, raw_key, raw_key_end)
     cord_ibuf_put(ibuf)
     if count < 0 then
         box.error(box.error.last(), 2)
@@ -428,8 +431,9 @@ function read_view_index_methods_ffi:select(key, opts)
     local ok = iterator_pos_set(self, after, ibuf)
     if ok then
         ok = builtin.box_index_read_view_select(
-                self._cdata, iterator, offset, limit, raw_key, raw_key_end,
-                iterator_pos, iterator_pos_end, fetch_pos, port) == 0
+                self._cspace, self.id, iterator, offset, limit,
+                raw_key, raw_key_end, iterator_pos, iterator_pos_end,
+                fetch_pos, port) == 0
     end
     local pos
     if ok and fetch_pos and iterator_pos[0] ~= nil then
@@ -465,7 +469,8 @@ end
 
 local function iterator_next_ffi(it, count)
     check_index_read_view_is_open_ffi(it.index)
-    if builtin.box_index_read_view_iterator_next(it.cdata, ptuple) ~= 0 then
+    if builtin.box_index_read_view_iterator_next(
+            it.cdata, it.index._cspace, ptuple) ~= 0 then
         box.error(box.error.last(), 2)
     elseif ptuple[0] ~= nil then
         return count + 1, tuple_bless(ptuple[0])
@@ -491,7 +496,7 @@ function read_view_index_methods_ffi:pairs(key, opts)
         raw_key_end = raw_key + #key_buf
         cdata = ffi.new('struct index_read_view_iterator')
         ok = builtin.box_index_read_view_create_iterator_with_offset(
-                self._cdata, iterator, raw_key, raw_key_end,
+                self._cspace, self.id, iterator, raw_key, raw_key_end,
                 iterator_pos[0], iterator_pos_end[0], offset, cdata) == 0
     end
     cord_ibuf_put(ibuf)
@@ -531,8 +536,8 @@ function read_view_index_methods_common:quantile(level, begin_key, end_key)
     local quantile_key_end = ffi.new('const char *[1]')
     local region_svp = builtin.box_region_used()
     local ok = builtin.box_index_read_view_quantile(
-            self._cdata, level, begin_key, begin_key_end, end_key, end_key_end,
-            quantile_key, quantile_key_end) == 0
+            self._cspace, self.id, level, begin_key, begin_key_end,
+            end_key, end_key_end, quantile_key, quantile_key_end) == 0
     cord_ibuf_put(ibuf)
     if not ok then
         box.error(box.error.last(), 2)
@@ -557,7 +562,8 @@ function read_view_index_methods_common:tuple_pos(tuple)
     local ibuf = cord_ibuf_take()
     local data, data_end = tuple_encode(ibuf, tuple)
     local ok = builtin.box_index_read_view_tuple_position(
-            self._cdata, data, data_end, iterator_pos, iterator_pos_end) == 0
+            self._cspace, self.id, data, data_end,
+            iterator_pos, iterator_pos_end) == 0
     cord_ibuf_put(ibuf)
     if not ok then
         box.error(box.error.last(), 2)

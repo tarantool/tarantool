@@ -83,7 +83,6 @@ read_view_opts_create(struct read_view_opts *opts)
 static void
 space_read_view_delete(struct space_read_view *space_rv)
 {
-	assert(space_rv->format == NULL);
 	if (space_rv->field_count > 0)
 		field_def_array_delete(space_rv->fields, space_rv->field_count);
 	free(space_rv->format_data);
@@ -137,7 +136,6 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		space_rv->format_data = NULL;
 		space_rv->format_data_len = 0;
 	}
-	space_rv->format = NULL;
 	if (opts->enable_space_upgrade && space->upgrade != NULL) {
 		space_rv->upgrade = space_upgrade_read_view_new(space->upgrade);
 		assert(space_rv->upgrade != NULL);
@@ -231,7 +229,6 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 	rv->disable_decompression = opts->disable_decompression;
 	rv->timestamp = ev_monotonic_now(loop());
 	vclock_copy(&rv->vclock, box_vclock);
-	rv->owner = NULL;
 	rlist_create(&rv->engines);
 	rlist_create(&rv->spaces);
 	read_view_register(rv);
@@ -260,7 +257,6 @@ fail:
 void
 read_view_close(struct read_view *rv)
 {
-	assert(rv->owner == NULL);
 	read_view_unregister(rv);
 	struct space_read_view *space_rv, *next_space_rv;
 	rlist_foreach_entry_safe(space_rv, &rv->spaces, link,
@@ -304,55 +300,66 @@ read_view_foreach(read_view_foreach_f cb, void *arg)
 	return true;
 }
 
-int
-read_view_activate(struct read_view *rv)
+struct read_view_handle *
+read_view_handle_new(struct read_view *rv)
 {
-	assert(rv->owner == NULL);
-	rv->owner = cord();
+	struct read_view_handle *h = xmalloc(sizeof(*h));
+	h->ptr = rv;
+	h->owner = cord();
+	rlist_create(&h->spaces);
 	struct space_read_view *space_rv;
 	rlist_foreach_entry(space_rv, &rv->spaces, link) {
-		assert(space_rv->format == NULL);
+		struct space_read_view_handle *space_rvh =
+				xmalloc(sizeof(*space_rvh));
+		space_rvh->ptr = space_rv;
+		space_rvh->owner = cord();
+		space_rvh->format = NULL;
+		space_rvh->upgrade = NULL;
+		rlist_add_tail_entry(&h->spaces, space_rvh, link);
 		if (space_rv->format_data != NULL) {
-			space_rv->format =
+			space_rvh->format =
 				runtime_tuple_format_new(
 					space_rv->format_data,
 					space_rv->format_data_len,
 					/*names_only=*/true);
-			if (space_rv->format == NULL)
+			if (space_rvh->format == NULL)
 				goto fail;
 		} else {
-			space_rv->format = tuple_format_runtime;
+			space_rvh->format = tuple_format_runtime;
 		}
-		tuple_format_ref(space_rv->format);
+		tuple_format_ref(space_rvh->format);
 		if (space_rv->upgrade != NULL) {
-			if (space_upgrade_read_view_activate(
-					space_rv->upgrade,
-					space_rv->format) != 0) {
-				read_view_deactivate(rv);
+			space_rvh->upgrade =
+				space_upgrade_read_view_handle_new(
+					space_rv->upgrade, space_rvh->format);
+			if (space_rvh->upgrade == NULL)
 				goto fail;
-			}
 		}
 	}
-	return 0;
+	return h;
 fail:
-	read_view_deactivate(rv);
-	return -1;
+	read_view_handle_delete(h);
+	return NULL;
 }
 
 void
-read_view_deactivate(struct read_view *rv)
+read_view_handle_delete(struct read_view_handle *h)
 {
-	assert(rv->owner == cord());
-	rv->owner = NULL;
-	struct space_read_view *space_rv;
-	rlist_foreach_entry(space_rv, &rv->spaces, link) {
-		if (space_rv->format != NULL) {
-			tuple_format_unref(space_rv->format);
-			space_rv->format = NULL;
-		}
-		if (space_rv->upgrade != NULL)
-			space_upgrade_read_view_deactivate(space_rv->upgrade);
+	assert(h->owner == cord());
+	while (!rlist_empty(&h->spaces)) {
+		struct space_read_view_handle *space_rvh = rlist_shift_entry(
+					&h->spaces, typeof(*space_rvh), link);
+		assert(space_rvh->owner == cord());
+		if (space_rvh->format != NULL)
+			tuple_format_unref(space_rvh->format);
+		if (space_rvh->upgrade != NULL)
+			space_upgrade_read_view_handle_delete(
+				space_rvh->upgrade);
+		TRASH(space_rvh);
+		free(space_rvh);
 	}
+	TRASH(h);
+	free(h);
 }
 
 /**
@@ -362,21 +369,21 @@ read_view_deactivate(struct read_view *rv)
  *
  * This function applies the space upgrade function if the read view was open
  * while the space upgrade was in progress. It may only be called in the thread
- * that activated the read view, see read_view_activate().
+ * where the read view handle was created.
  */
 static struct tuple *
-read_view_process_result(struct space_read_view *space_rv,
+read_view_process_result(struct space_read_view_handle *space,
 			 const struct read_view_tuple *rv_tuple)
 {
 	assert(rv_tuple->data != NULL);
 	assert(rv_tuple->size != 0);
-	assert(space_rv->rv->owner == cord());
-	if (space_rv->upgrade != NULL) {
-		return space_upgrade_read_view_apply(space_rv->upgrade,
+	assert(space->owner == cord());
+	if (space->upgrade != NULL) {
+		return space_upgrade_read_view_apply(space->upgrade,
 						     rv_tuple);
 	} else {
 		struct tuple *tuple = tuple_new(
-				space_rv->format, rv_tuple->data,
+				space->format, rv_tuple->data,
 				rv_tuple->data + rv_tuple->size);
 		if (tuple == NULL)
 			return NULL;
@@ -389,18 +396,21 @@ read_view_process_result(struct space_read_view *space_rv,
  * the runtime arena.
  */
 static int
-index_read_view_get(struct index_read_view *rv, const char *key,
-		    uint32_t part_count, struct tuple **result)
+index_read_view_get(struct index_read_view *index,
+		    struct space_read_view_handle *space,
+		    const char *key, uint32_t part_count,
+		    struct tuple **result)
 {
-	assert(rv->space->rv->owner == cord());
+	assert(space->owner == cord());
+	assert(index == space->ptr->index_map[index->def->iid]);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct read_view_tuple result_raw;
-	int rc = index_read_view_get_raw(rv, key, part_count, &result_raw);
+	int rc = index_read_view_get_raw(index, key, part_count, &result_raw);
 	if (rc != 0)
 		goto out;
 	if (result_raw.data != NULL) {
-		*result = read_view_process_result(rv->space, &result_raw);
+		*result = read_view_process_result(space, &result_raw);
 		if (*result == NULL)
 			rc = -1;
 	} else {
@@ -417,10 +427,12 @@ out:
  */
 static int
 index_read_view_iterator_next(struct index_read_view_iterator *it,
+			      struct space_read_view_handle *space,
 			      struct tuple **result)
 {
-	struct index_read_view *rv = it->base.index;
-	assert(rv->space->rv->owner == cord());
+	assert(space->owner == cord());
+	assert(it->base.index ==
+	       space->ptr->index_map[it->base.index->def->iid]);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	struct read_view_tuple result_raw;
@@ -428,7 +440,7 @@ index_read_view_iterator_next(struct index_read_view_iterator *it,
 	if (rc != 0)
 		goto out;
 	if (result_raw.data != NULL) {
-		*result = read_view_process_result(rv->space, &result_raw);
+		*result = read_view_process_result(space, &result_raw);
 		if (*result == NULL)
 			rc = -1;
 	} else {
@@ -440,76 +452,86 @@ out:
 }
 
 int
-box_index_read_view_tuple_position(struct index_read_view *rv,
-				   const char *tuple, const char *tuple_end,
-				   const char **packed_pos,
-				   const char **packed_pos_end)
+box_index_read_view_tuple_position(
+	struct space_read_view_handle *space, uint32_t index_id,
+	const char *tuple, const char *tuple_end,
+	const char **packed_pos, const char **packed_pos_end)
 {
+	assert(space->owner == cord());
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	return box_iterator_position_from_tuple(tuple, tuple_end,
-						rv->def->cmp_def, packed_pos,
-						packed_pos_end);
+						index->def->cmp_def,
+						packed_pos, packed_pos_end);
 }
 
 int
-box_index_read_view_get(struct index_read_view *rv, const char *key,
-			const char *key_end, struct tuple **result)
+box_index_read_view_get(
+	struct space_read_view_handle *space, uint32_t index_id,
+	const char *key, const char *key_end, struct tuple **result)
 {
-	assert(rv->space->rv->owner == cord());
+	assert(space->owner == cord());
 	assert(key != NULL);
 	assert(key_end != NULL);
 	assert(result != NULL);
 	mp_tuple_assert(key, key_end);
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	if (box_check_slice() != 0)
 		return -1;
-	if (!rv->def->opts.is_unique) {
+	if (!index->def->opts.is_unique) {
 		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		return -1;
 	}
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(rv->def, key, part_count) != 0)
+	if (exact_key_validate(index->def, key, part_count) != 0)
 		return -1;
-	if (index_read_view_get(rv, key, part_count, result) != 0)
+	if (index_read_view_get(index, space, key, part_count, result) != 0)
 		return -1;
 	return 0;
 }
 
 ssize_t
-box_index_read_view_count(struct index_read_view *rv, int iterator,
-			  const char *key, const char *key_end)
+box_index_read_view_count(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end)
 {
+	assert(space->owner == cord());
 	assert(key != NULL);
 	assert(key_end != NULL);
 	mp_tuple_assert(key, key_end);
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	if (iterator < 0 || iterator >= iterator_type_MAX) {
 		diag_set(IllegalParams, "Invalid iterator type");
 		return -1;
 	}
 	enum iterator_type type = iterator;
 	uint32_t part_count = mp_decode_array(&key);
-	if (iterator_validate(rv->def, type, key, part_count) != 0)
+	if (iterator_validate(index->def, type, key, part_count) != 0)
 		return -1;
-	return index_read_view_count(rv, type, key, part_count);
+	return index_read_view_count(index, type, key, part_count);
 }
 
 int
 box_index_read_view_quantile(
-	struct index_read_view *rv, double level, const char *begin_key,
-	const char *begin_key_end, const char *end_key, const char *end_key_end,
+	struct space_read_view_handle *space, uint32_t index_id,
+	double level, const char *begin_key, const char *begin_key_end,
+	const char *end_key, const char *end_key_end,
 	const char **quantile_key, const char **quantile_key_end)
 {
+	assert(space->owner == cord());
 	mp_tuple_assert(begin_key, begin_key_end);
 	mp_tuple_assert(end_key, end_key_end);
 	assert(quantile_key != NULL);
 	assert(quantile_key_end != NULL);
 
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	uint32_t begin_part_count = mp_decode_array(&begin_key);
 	uint32_t end_part_count = mp_decode_array(&end_key);
-	if (quantile_validate(rv->def, level, begin_key, begin_part_count,
+	if (quantile_validate(index->def, level, begin_key, begin_part_count,
 			      end_key, end_part_count) != 0)
 		return -1;
 
 	uint32_t quantile_key_size;
-	if (index_read_view_quantile(rv, level, begin_key, begin_part_count,
+	if (index_read_view_quantile(index, level, begin_key, begin_part_count,
 				     end_key, end_part_count, quantile_key,
 				     &quantile_key_size) != 0)
 		return -1;
@@ -520,34 +542,36 @@ box_index_read_view_quantile(
 }
 
 int
-box_index_read_view_select(struct index_read_view *rv, int iterator,
-			   uint32_t offset, uint32_t limit, const char *key,
-			   const char *key_end, const char **packed_pos,
-			   const char **packed_pos_end, bool update_pos,
-			   struct port *port)
+box_index_read_view_select(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, uint32_t offset, uint32_t limit,
+	const char *key, const char *key_end,
+	const char **packed_pos, const char **packed_pos_end,
+	bool update_pos, struct port *port)
 {
-	assert(rv->space->rv->owner == cord());
+	assert(space->owner == cord());
 	assert(key != NULL);
 	assert(key_end != NULL);
 	assert(port != NULL);
 	assert(!update_pos || (packed_pos != NULL && packed_pos_end != NULL));
 	assert(packed_pos == NULL || packed_pos_end != NULL);
 	mp_tuple_assert(key, key_end);
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	if (iterator < 0 || iterator >= iterator_type_MAX) {
 		diag_set(IllegalParams, "Invalid iterator type");
 		return -1;
 	}
 	enum iterator_type type = iterator;
 	uint32_t part_count = mp_decode_array(&key);
-	if (iterator_validate(rv->def, type, key, part_count) != 0)
+	if (iterator_validate(index->def, type, key, part_count) != 0)
 		return -1;
 	const char *pos, *pos_end;
 	if (box_iterator_position_unpack(*packed_pos, *packed_pos_end,
-					 rv->def, key, part_count,
+					 index->def, key, part_count,
 					 type, &pos, &pos_end) != 0)
 		return -1;
 	struct index_read_view_iterator it;
-	if (index_read_view_create_iterator_with_offset(rv, type, key,
+	if (index_read_view_create_iterator_with_offset(index, type, key,
 							part_count, pos,
 							offset, &it) != 0)
 		return -1;
@@ -559,7 +583,7 @@ box_index_read_view_select(struct index_read_view *rv, int iterator,
 		if (rc != 0)
 			break;
 		struct tuple *tuple;
-		rc = index_read_view_iterator_next(&it, &tuple);
+		rc = index_read_view_iterator_next(&it, space, &tuple);
 		if (rc != 0 || tuple == NULL)
 			break;
 		port_c_add_tuple(port, tuple);
@@ -591,20 +615,23 @@ fail:
 
 int
 box_index_read_view_create_iterator_with_offset(
-	struct index_read_view *rv, int iterator, const char *key,
-	const char *key_end, const char *packed_pos, const char *packed_pos_end,
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end,
+	const char *packed_pos, const char *packed_pos_end,
 	uint32_t offset, struct index_read_view_iterator *it)
 {
+	assert(space->owner == cord());
 	assert(key != NULL);
 	assert(key_end != NULL);
 	mp_tuple_assert(key, key_end);
+	struct index_read_view *index = space->ptr->index_map[index_id];
 	if (iterator < 0 || iterator >= iterator_type_MAX) {
 		diag_set(IllegalParams, "Invalid iterator type");
 		return -1;
 	}
 	enum iterator_type type = iterator;
 	uint32_t part_count = mp_decode_array(&key);
-	if (iterator_validate(rv->def, type, key, part_count) != 0)
+	if (iterator_validate(index->def, type, key, part_count) != 0)
 		return -1;
 	const char *pos, *pos_end;
 	uint32_t region_svp = region_used(&fiber()->gc);
@@ -614,10 +641,10 @@ box_index_read_view_create_iterator_with_offset(
 	 * will happen before the region will be truncated.
 	 */
 	if (box_iterator_position_unpack(packed_pos, packed_pos_end,
-					 rv->def, key, part_count,
+					 index->def, key, part_count,
 					 type, &pos, &pos_end) != 0)
 		goto error;
-	if (index_read_view_create_iterator_with_offset(rv, type, key,
+	if (index_read_view_create_iterator_with_offset(index, type, key,
 							part_count, pos,
 							offset, it) != 0)
 		goto error;
@@ -629,23 +656,27 @@ error:
 }
 
 int
-box_index_read_view_create_iterator(struct index_read_view *rv, int iterator,
-				    const char *key, const char *key_end,
-				    const char *packed_pos,
-				    const char *packed_pos_end,
-				    struct index_read_view_iterator *it)
+box_index_read_view_create_iterator(
+	struct space_read_view_handle *space, uint32_t index_id,
+	int iterator, const char *key, const char *key_end,
+	const char *packed_pos, const char *packed_pos_end,
+	struct index_read_view_iterator *it)
 {
+	assert(space->owner == cord());
 	return box_index_read_view_create_iterator_with_offset(
-		rv, iterator, key, key_end, packed_pos, packed_pos_end, 0, it);
+		space, index_id, iterator, key, key_end,
+		packed_pos, packed_pos_end, 0, it);
 }
 
 int
 box_index_read_view_iterator_next(struct index_read_view_iterator *it,
+				  struct space_read_view_handle *space,
 				  struct tuple **result)
 {
+	assert(space->owner == cord());
 	if (box_check_slice() != 0)
 		return -1;
-	return index_read_view_iterator_next(it, result);
+	return index_read_view_iterator_next(it, space, result);
 }
 
 void
