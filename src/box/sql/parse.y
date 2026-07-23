@@ -230,12 +230,11 @@ columnlist ::= column_def create_column_end.
 column_def ::= column_name_and_type carglist.
 
 column_name_and_type ::= nm(A) typedef(Y). {
-  create_column_def_init(&pParse->create_column_def, NULL, &A, Y);
-  sql_create_column_start(pParse);
+  sql_create_column_start(pParse, NULL, &A, Y);
 }
 
 create_column_end ::= autoinc(I). {
-  uint32_t fieldno = pParse->create_column_def.space->def->field_count - 1;
+  uint32_t fieldno = pParse->space->def->field_count - 1;
   if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
     return;
   if (pParse->create_table_def.new_space == NULL)
@@ -1517,11 +1516,9 @@ cmd ::= alter_column_def carglist create_column_end.
 
 alter_column_def ::= ALTER TABLE nm(T) ADD column_name(N) typedef(Y). {
   pParse->initiateTTrans = true;
-  struct SrcList *table = sql_src_list_append(NULL, &T);
-  create_column_def_init(&pParse->create_column_def, table, &N, Y);
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
-  sql_create_column_start(pParse);
+  sql_create_column_start(pParse, &T, &N, Y);
 }
 
 cmd ::= ALTER TABLE nm(X) ADD CONSTRAINT nm(N) FOREIGN KEY
