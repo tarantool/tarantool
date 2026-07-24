@@ -784,3 +784,29 @@ ast_column_new(struct region *region)
 	memset(res, 0, sizeof(*res));
 	return res;
 }
+
+struct ast_table_properties *
+ast_table_properties_new(struct region *region)
+{
+	struct ast_table_properties *res =
+		xregion_alloc_object(region, typeof(*res));
+	stailq_create(&res->columns);
+	stailq_create(&res->constraints);
+	return res;
+}
+
+struct ast_table_properties *
+ast_table_properties_append_column(struct ast_table_properties *properties,
+				   struct ast_column *column)
+{
+	stailq_add_tail(&properties->columns, &column->link);
+	return properties;
+}
+
+struct ast_table_properties *
+ast_table_properties_append_constraint(struct ast_table_properties *properties,
+				       struct ast_property *constraint)
+{
+	stailq_add_tail(&properties->constraints, &constraint->link);
+	return properties;
+}

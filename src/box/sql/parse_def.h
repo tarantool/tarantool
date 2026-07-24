@@ -168,19 +168,6 @@ struct create_fk_constraint_parse_def {
 };
 
 static inline void
-create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
-{
-	rlist_create(&def->checks);
-}
-
-static inline void
-create_fk_constraint_parse_def_init(struct create_fk_constraint_parse_def *def)
-{
-	rlist_create(&def->fkeys);
-	def->is_used = true;
-}
-
-static inline void
 create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 {
 	if (!d->is_used)

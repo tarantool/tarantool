@@ -540,6 +540,13 @@ sql_code_ast_property(struct Parse *parser, struct Token *table,
 		}
 		struct ExprList *columns =
 			expr_list_from_ast(parser, property->columns);
+		if (parser->is_aborted)
+			break;
+		if (table->n == 0) {
+			sqlAddPrimaryKey(parser, &property->name, columns,
+					 property->order);
+			break;
+		}
 		sql_create_index(parser, table, &property->name, columns,
 				 SQL_INDEX_TYPE_CONSTRAINT_PK,
 				 SORT_ORDER_ASC, false);
@@ -589,6 +596,51 @@ sql_code_ast_column(struct Parse *parser, struct Token *table,
 	sql_add_autoincrement(parser, parser->space->def->field_count - 1);
 }
 
+/** Code AST for CREATE TABLE. */
+static void
+sql_code_create_table(struct Parse *parser, struct ast_create_table *stmt)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	rlist_create(&parser->create_ck_constraint_parse_def.checks);
+	rlist_create(&parser->create_fk_constraint_parse_def.fkeys);
+	parser->create_fk_constraint_parse_def.is_used = true;
+	parser->new_space = sqlStartTable(parser, &stmt->name);
+	parser->initiateTTrans = true;
+	if (parser->is_aborted)
+		return;
+
+	struct Token tmp = Token_nil;
+	struct ast_column *column;
+	stailq_foreach_entry(column, &stmt->properties->columns, link) {
+		sql_code_ast_column(parser, &tmp, column);
+		if (parser->is_aborted)
+			return;
+	}
+
+	struct ast_property *constraint;
+	stailq_foreach_entry(constraint, &stmt->properties->constraints, link) {
+		sql_code_ast_property(parser, &tmp, constraint, false);
+		if (parser->is_aborted)
+			return;
+	}
+
+	if (stmt->engine.n > 0) {
+		if (stmt->engine.n > ENGINE_NAME_MAX) {
+			diag_set(ClientError, ER_CREATE_SPACE,
+				 parser->new_space->def->name,
+				 "space engine name is too long");
+			parser->is_aborted = true;
+			return;
+		}
+		char *engine = sql_name_from_token(&stmt->engine);
+		memcpy(parser->new_space->def->engine_name, engine,
+		       strlen(engine) + 1);
+		sql_xfree(engine);
+	}
+	vdbe_emit_create_table(parser, stmt->if_not_exists);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast)
@@ -616,6 +668,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		break;
 	case SQL_AST_SELECT:
 		sql_code_select(parse, ast->select);
+		break;
+	case SQL_AST_CREATE_TABLE:
+		sql_code_create_table(parse, &ast->create_table);
 		break;
 	case SQL_AST_DROP_VIEW:
 	case SQL_AST_DROP_TABLE:

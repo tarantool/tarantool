@@ -97,5 +97,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[ALTER TABLE t ADD COLUMN i INT 9;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '9'")
+
+        _, err = box.execute([[CREATE TABLE t(i INT) 0;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '0'")
     end)
 end
