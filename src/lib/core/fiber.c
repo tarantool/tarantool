@@ -1060,6 +1060,7 @@ fiber_recycle(struct fiber *fiber)
 	memset(&fiber->storage, 0, sizeof(fiber->storage));
 	fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 	fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
+	fiber->cnt_ref = FIBER_LUA_NOREF;
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->gc_initial_size = 0;
@@ -1556,6 +1557,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 		memset(fiber, 0, sizeof(struct fiber));
 		fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 		fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
+		fiber->cnt_ref = FIBER_LUA_NOREF;
 
 		fiber_stack_create(fiber, fiber_attr, &cord()->slabc);
 		coro_create(&fiber->ctx, fiber_loop, NULL,
@@ -1574,6 +1576,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	fiber->f = f;
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
+	fiber->cnt_ref = FIBER_LUA_NOREF;
 	register_fid(fiber);
 	fiber->max_slice = zero_slice;
 	fiber->csw = 0;
