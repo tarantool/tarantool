@@ -16,3 +16,6 @@
   variables in the definition of a view, function, or trigger (gh-5485).
 * The error for using `COLLATE` in `LIMIT` or `OFFSET` is now a semantic error
   rather than a syntactic one (gh-5485).
+* Indexes for column PRIMARY KEY and UNIQUE constraints are now created before
+  indexes for table PRIMARY KEY and UNIQUE constraints, which changes
+  the order of automatically generated index names (gh-5485).

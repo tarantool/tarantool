@@ -179,47 +179,42 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
-cmd ::= createkw TABLE ifnotexists(E) create_table create_table_args
-        with_opts. {
-  vdbe_emit_create_table(pParse, E);
+cmd ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP. {
+  pParse->ast.type = SQL_AST_CREATE_TABLE;
+  pParse->ast.create_table.name = Y;
+  pParse->ast.create_table.properties = P;
+  pParse->ast.create_table.if_not_exists = E;
 }
-create_table ::= nm(Y). {
-  create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
-  create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
-  pParse->new_space = sqlStartTable(pParse, &Y);
-  pParse->initiateTTrans = true;
+cmd ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP
+        WITH ENGINE EQ STRING(A). {
+  pParse->ast.type = SQL_AST_CREATE_TABLE;
+  pParse->ast.create_table.name = Y;
+  pParse->ast.create_table.engine = A;
+  pParse->ast.create_table.properties = P;
+  pParse->ast.create_table.if_not_exists = E;
 }
+
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
 %type ifnotexists {int}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
-create_table_args ::= LP columnlist RP.
-
-with_opts ::= WITH engine_opts.
-with_opts ::= .
-
-engine_opts ::= ENGINE EQ STRING(A). {
-  /* Note that specifying engine clause overwrites default engine. */
-  if (A.n > ENGINE_NAME_MAX) {
-    diag_set(ClientError, ER_CREATE_SPACE, pParse->new_space->def->name,
-             "space engine name is too long");
-    pParse->is_aborted = true;
-    return;
-  }
-  /* Need to dequote name. */
-  char *normalized_name = sql_name_from_token(&A);
-  memcpy(pParse->new_space->def->engine_name, normalized_name,
-         strlen(normalized_name) + 1);
-  sql_xfree(normalized_name);
+%type table_properties {struct ast_table_properties *}
+table_properties(A) ::= table_properties(A) COMMA column_def(C). {
+  A = ast_table_properties_append_column(A, C);
 }
-
-columnlist ::= columnlist COMMA tcons.
-columnlist ::= columnlist COMMA column_def_old create_column_end.
-columnlist ::= column_def_old create_column_end.
-
-column_def_old ::= column_name_and_type carglist.
+table_properties(A) ::= table_properties(A) COMMA table_constraint(C). {
+  A = ast_table_properties_append_constraint(A, C);
+}
+table_properties(A) ::= column_def(C). {
+  A = ast_table_properties_new(&pParse->region);
+  A = ast_table_properties_append_column(A, C);
+}
+table_properties(A) ::= table_constraint(C). {
+  A = ast_table_properties_new(&pParse->region);
+  A = ast_table_properties_append_constraint(A, C);
+}
 
 %type column_def {struct ast_column *}
 column_def(A) ::= nm(N) typedef(Y) column_property_list(L) autoinc(I). {
@@ -229,17 +224,6 @@ column_def(A) ::= nm(N) typedef(Y) column_property_list(L) autoinc(I). {
   A->properties = L;
   A->is_autoinc = I != 0;
 }
-
-column_name_and_type ::= nm(A) typedef(Y). {
-  sql_create_column_start(pParse, NULL, &A, Y);
-}
-
-create_column_end ::= autoinc(I). {
-  uint32_t fieldno = pParse->space->def->field_count - 1;
-  if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
-    return;
-}
-columnlist ::= tcons.
 
 // An IDENTIFIER can be a generic identifier, or one of several
 // keywords.  Any non-standard keyword can also be an identifier.
@@ -344,79 +328,40 @@ column_property(A) ::= COLLATE id(C). {
   A->collate = C;
 }
 
-/**
- * "carglist" is a list of additional constraints and clauses that
- * come after the column name and column type in a <CREATE TABLE>
- * or <ALTER TABLE ADD COLUMN> statement.
- */
-carglist ::= carglist ccons.
-carglist ::= .
 %type cconsname { struct Token }
 cconsname(N) ::= CONSTRAINT nm(X). { N = X; }
 cconsname(N) ::= . { N = Token_nil; }
-
-/**
- * Rule precedence [COLLATE] forces the parser to reduce this rule rather
- * than shift a follow-up NOT or COLLATE token into the expression: the
- * token NOT come earlier in the precedence table than COLLATE,
- * and COLLATE itself is %left - so both shift-reduce conflicts
- * with `expr NOT ...` / `expr COLLATE ...` resolve as reduce, and the
- * tokens go to the next ccons instead.
- */
-ccons ::= DEFAULT expr(X). [COLLATE] {
-  sql_column_add_default(pParse, expr_from_ast(pParse, X), X->str, X->len);
-}
-
-// In addition to the type name, we also care about the primary key and
-// UNIQUE constraints.
-//
-ccons ::= NULL.        {
-    sql_column_add_nullable_action(pParse, ON_CONFLICT_ACTION_NONE);
-}
-ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
-ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {
-  sqlAddPrimaryKey(pParse, &N, NULL, Z);
-}
-ccons ::= cconsname(N) UNIQUE. {
-  sql_create_index(pParse, &Token_nil, &N, NULL,
-                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC, false);
-}
-
-ccons ::= cconsname(N) CHECK LP expr_old(X) RP. {
-  sql_expr_delete(X.pExpr);
-  sql_create_check_constraint(pParse, NULL, &N, X.zStart, X.zEnd - X.zStart,
-                              true);
-}
-
-ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA). {
-  sql_create_foreign_key(pParse, NULL, &N, NULL, &T, TA);
-}
-ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
 // The optional AUTOINCREMENT keyword
 %type autoinc {int}
 autoinc(X) ::= .          {X = 0;}
 autoinc(X) ::= AUTOINCR.  {X = 1;}
 
-// The next group of rules parses the arguments to a REFERENCES clause.
-tcons ::= cconsname(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
-  struct ExprList *columns = expr_list_from_ast(pParse, X);
-  if (!pParse->is_aborted)
-    sqlAddPrimaryKey(pParse, &N, columns, SORT_ORDER_ASC);
+%type table_constraint {struct ast_property *}
+table_constraint(A) ::= FOREIGN KEY LP idlist(FA) RP REFERENCES nm(T)
+                        idlist_opt(TA). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_FOREIGN_KEY;
+  A->foreign_key.columns = FA;
+  A->foreign_key.foreign_table = T;
+  A->foreign_key.foreign_columns = TA;
 }
-tcons ::= cconsname(N) UNIQUE LP sortlist_old(X) RP. {
-  sql_create_index(pParse, &Token_nil, &N, X, SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-                   SORT_ORDER_ASC, false);
+table_constraint(A) ::= CHECK LP expr(X) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_CHECK;
+  A->expr = X;
 }
-tcons ::= cconsname(N) CHECK LP expr_old(X) RP. {
-  sql_expr_delete(X.pExpr);
-  sql_create_check_constraint(pParse, NULL, &N, X.zStart, X.zEnd - X.zStart,
-                              false);
+table_constraint(A) ::= UNIQUE LP sortlist(L) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_UNIQUE;
+  A->columns = L;
 }
-tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
-          REFERENCES nm(T) eidlist_opt(TA). {
-  sql_create_foreign_key(pParse, NULL, &N, FA, &T, TA);
+table_constraint(A) ::= PRIMARY KEY LP sortlist_autoinc(L) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_PRIMARY_KEY;
+  A->columns = L;
 }
+table_constraint(A) ::= table_constraint_named(A).
 
 %type table_constraint_named {struct ast_property *}
 table_constraint_named(A) ::= CONSTRAINT nm(N) FOREIGN KEY LP idlist(FA) RP
