@@ -1882,6 +1882,10 @@ return schema.new('instance_config', schema.record({
             key = schema.scalar({type = 'string'}),
             value = schema.scalar({type = 'string'}),
         }),
+        export = schema.map({
+            key = schema.scalar({type = 'string'}),
+            value = schema.scalar({type = 'any'}),
+        }),
     }),
     sharding = vshard_since('0.1.25', schema.record({
         -- Instance vshard options.
