@@ -43,6 +43,8 @@ enum sql_ast_type {
 
 	/** ALTER TABLE RENAME statement. */
 	SQL_AST_ALTER_RENAME,
+	/** ALTER TABLE ADD CONSTRAINT statement. */
+	SQL_AST_ALTER_ADD_CONSTRAINT,
 	/** ALTER TABLE DROP CONSTRAINT statement. */
 	SQL_AST_ALTER_DROP_CONSTRAINT,
 };
@@ -211,6 +213,32 @@ struct ast_expr_list_entry {
 	bool autoinc;
 };
 
+/** Description of FOREIGN KEY constraint. */
+struct ast_foreign_key {
+	/** Foreign table of FOREIGN KEY constraint. */
+	struct Token foreign_table;
+	/** Foreign columns of FOREIGN KEY constraint. */
+	struct ast_id_list *foreign_columns;
+	/** Local columns of FOREIGN KEY constraint. */
+	struct ast_id_list *columns;
+};
+
+/** Description of table and column properties. */
+struct ast_property {
+	/** Property name. */
+	struct Token name;
+	union {
+		/** Expression for CHECK constraint. */
+		struct ast_expr *expr;
+		/** Column list for PRIMARY KEY and UNIQUE table constraint. */
+		struct ast_expr_list *columns;
+		/** Description of FOREIGN KEY constraint. */
+		struct ast_foreign_key foreign_key;
+	};
+	/** Property type. */
+	enum ast_property_type type;
+};
+
 /** Description of DROP TABLE and DROP VIEW statements. */
 struct ast_drop_table {
 	/** Table or view name. */
@@ -257,6 +285,14 @@ struct ast_alter_drop_constraint {
 	enum ast_property_type type;
 };
 
+/** Description of ALTER TABLE ADD CONSTRAINT statement. */
+struct ast_alter_add_constraint {
+	/** Name of table where constraint is created. */
+	struct Token table;
+	/** Description of the constraint. */
+	struct ast_property *con;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -275,6 +311,8 @@ struct sql_ast {
 		struct ast_drop_index drop_index;
 		/** ALTER TABLE RENAME statement. */
 		struct ast_alter_rename alter_rename;
+		/** ALTER TABLE ADD CONSTRAINT statement. */
+		struct ast_alter_add_constraint alter_add_constraint;
 		/** ALTER TABLE DROP CONSTRAINT statement. */
 		struct ast_alter_drop_constraint alter_drop_constraint;
 	};
@@ -371,3 +409,15 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr);
  */
 struct ExprList *
 expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list);
+
+/**
+ * Convert `struct ast_id_list` to `struct ExprList` of column names.
+ *
+ * Return NULL on error or if `list == NULL`.
+ */
+struct ExprList *
+expr_list_from_ids(struct Parse *parser, struct ast_id_list *list);
+
+/** Create new empty structure of table or column property. */
+struct ast_property *
+ast_property_new(struct region *region);
