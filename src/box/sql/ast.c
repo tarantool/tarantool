@@ -762,3 +762,25 @@ ast_property_new(struct region *region)
 	memset(res, 0, sizeof(*res));
 	return res;
 }
+
+struct ast_property_list *
+ast_property_list_append(struct region *region, struct ast_property_list *list,
+			 struct ast_property *property)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	stailq_add_tail(&list->head, &property->link);
+	list->len++;
+	return list;
+}
+
+struct ast_column *
+ast_column_new(struct region *region)
+{
+	struct ast_column *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
