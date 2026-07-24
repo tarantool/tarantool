@@ -1154,7 +1154,15 @@ fiber_loop(MAYBE_UNUSED void *data)
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		if (fiber->flags & FIBER_IS_CANCELLED) {
+			/*
+			 * Fiber can be cancelled right at creation if shutdown
+			 * is in progress.
+			 */
+			fiber->f_ret = 0;
+		} else {
+			fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		}
 		fiber_check_gc();
 		if (fiber->f_ret != 0) {
 			struct error *e = diag_last_error(&fiber->diag);
@@ -1549,11 +1557,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
 
-	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM)) {
-		diag_set(FiberIsCancelled);
-		return NULL;
-	}
-
 	if (fiber_is_reusable(fiber_attr->flags) && !rlist_empty(&cord->dead)) {
 		fiber = rlist_first_entry(&cord->dead, struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
@@ -1601,6 +1604,9 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
+
+	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM))
+		fiber->flags |= FIBER_IS_CANCELLED;
 
 	return fiber;
 

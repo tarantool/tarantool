@@ -711,16 +711,16 @@ new_fiber_on_shudown_f(va_list ap)
 	while (!fiber_is_cancelled())
 		fiber_yield();
 	struct fiber *fiber = fiber_new("fiber_on_shutdown", wait_cancel_f);
-	fail_unless(fiber == NULL);
-	fail_unless(!diag_is_empty(diag_get()));
-	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
-			   "fiber is cancelled") == 0);
+	fail_unless(fiber != NULL);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_join(fiber);
 	struct fiber *system_fiber =
 			fiber_new_system("system_fiber_on_shutdown", noop_f);
 	fail_unless(system_fiber != NULL);
 	fiber_set_joinable(system_fiber, true);
 	fiber_start(system_fiber);
-	fiber_join(system_fiber);
+	fail_unless(fiber_join(system_fiber) == 0);
 	return 0;
 }
 
@@ -732,17 +732,23 @@ fiber_test_shutdown(void)
 	struct fiber *fiber1 = fiber_new("fiber1", wait_cancel_f);
 	fail_unless(fiber1 != NULL);
 	fiber_set_joinable(fiber1, true);
+	fiber_wakeup(fiber1);
 	struct fiber *fiber2 = fiber_new_system("fiber2", wait_cancel_f);
 	fail_unless(fiber2 != NULL);
+	fiber_wakeup(fiber2);
 	struct fiber *fiber3 = fiber_new("fiber3", hang_on_cancel_f);
 	fail_unless(fiber3 != NULL);
+	fiber_wakeup(fiber3);
 	struct fiber *fiber4 = fiber_new("fiber4", new_fiber_on_shudown_f);
 	fail_unless(fiber4 != NULL);
 	fiber_set_joinable(fiber4, true);
+	fiber_wakeup(fiber4);
 	struct fiber *fiber6 = fiber_new_system("fiber6", wait_cancel_f);
 	fail_unless(fiber6 != NULL);
 	fiber_set_managed_shutdown(fiber6);
 	fiber_set_joinable(fiber6, true);
+	fiber_wakeup(fiber6);
+	fiber_sleep(0);
 
 	int rc = fiber_shutdown(1000.0);
 	fail_unless(rc == 0);
@@ -762,10 +768,10 @@ fiber_test_shutdown(void)
 	fiber_join(fiber2);
 
 	struct fiber *fiber5 = fiber_new("fiber5", wait_cancel_f);
-	fail_unless(fiber5 == NULL);
-	fail_unless(!diag_is_empty(diag_get()));
-	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
-			   "fiber is cancelled") == 0);
+	fail_unless(fiber5 != NULL);
+	fiber_set_joinable(fiber5, true);
+	fiber_start(fiber5);
+	fail_unless(fiber_join(fiber5) == 0);
 
 	header();
 }
