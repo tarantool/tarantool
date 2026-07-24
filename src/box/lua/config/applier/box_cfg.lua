@@ -976,7 +976,7 @@ local function switch_isolated_mode_after_box_cfg(config)
         end
 
         local start_time = clock.monotonic()
-        local ok, err = pcall(box.iproto.internal.drop_connections, timeout)
+        local ok, err = pcall(box.iproto.drop_connections, timeout)
 
         -- An unique key is set here to don't duplicate the alert
         -- if the box_cfg.apply function is called twice within
