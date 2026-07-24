@@ -56,6 +56,7 @@
 #include "wal.h"
 #include "raft.h"
 #include "box.h"
+#include "arrow_ipc.h"
 
 /**
  * Cbus message to send status updates from relay to tx thread.
@@ -1410,6 +1411,41 @@ relay_save_row(struct relay *relay, struct xrow_header *packet)
 	rlist_add_tail_entry(&relay->current_tx, tx_row, in_tx);
 }
 
+static bool
+relay_needs_arrow_boolean_downgrade(struct relay *relay,
+					    const struct xrow_header *packet)
+{
+	return packet->type == IPROTO_INSERT_ARROW &&
+	       relay->version_id < version_id(3, 9, 0);
+}
+
+static void
+relay_send_arrow_compat(struct relay *relay, struct xrow_header *packet)
+{
+	if (!relay_needs_arrow_boolean_downgrade(relay, packet))
+		return relay_send(relay, packet);
+
+	struct region *gc = &fiber()->gc;
+	size_t gc_svp = region_used(gc);
+	auto guard = make_scoped_guard([=] { region_truncate(gc, gc_svp); });
+	struct request request;
+	if (xrow_decode_dml(packet, &request, dml_request_key_map(packet->type)) != 0)
+		diag_raise();
+	const char *arrow_ipc;
+	const char *arrow_ipc_end;
+	if (arrow_ipc_downgrade_boolean(request.arrow_ipc,
+					      request.arrow_ipc_end, gc,
+					      &arrow_ipc, &arrow_ipc_end) != 0)
+		diag_raise();
+	if (arrow_ipc == request.arrow_ipc)
+		return relay_send(relay, packet);
+	request.arrow_ipc = arrow_ipc;
+	request.arrow_ipc_end = arrow_ipc_end;
+	struct xrow_header downgraded = *packet;
+	xrow_encode_dml(&request, gc, downgraded.body, &downgraded.bodycnt);
+	relay_send(relay, &downgraded);
+}
+
 /** Send a full transaction to the replica. */
 static void
 relay_send_tx(struct relay *relay)
@@ -1427,7 +1463,7 @@ relay_send_tx(struct relay *relay)
 			say_warn("injected broken lsn: %lld",
 				 (long long) packet->lsn);
 		}
-		relay_send(relay, packet);
+		relay_send_arrow_compat(relay, packet);
 	}
 	if (relay_check_flush(relay) < 0)
 		diag_raise();
