@@ -197,25 +197,16 @@ fiber_madvise(void *addr, size_t len, int advice)
 	return 0;
 }
 
-static inline int
+static int
 fiber_mprotect(void *addr, size_t len, int prot)
 {
-	(void)addr;
-	(void)len;
-	(void)prot;
 	struct errinj *inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
 	if (inj != NULL && inj->iparam == prot) {
 		errno = ENOMEM;
 		goto error;
 	}
-/*
- * If we panic then fiber stacks remain protected which cause leak sanitizer
- * failures. Disable memory protection under ASAN.
- */
-#ifndef ENABLE_ASAN
 	if (mprotect(addr, len, prot) != 0)
 		goto error;
-#endif
 	return 0;
 error:
 	diag_set(SystemError, "fiber mprotect failed");
@@ -1154,7 +1145,15 @@ fiber_loop(MAYBE_UNUSED void *data)
 		struct fiber *fiber = fiber();
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		if (fiber->flags & FIBER_IS_CANCELLED) {
+			/*
+			 * Fiber can be cancelled right at creation if shutdown
+			 * is in progress.
+			 */
+			fiber->f_ret = 0;
+		} else {
+			fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		}
 		fiber_check_gc();
 		if (fiber->f_ret != 0) {
 			struct error *e = diag_last_error(&fiber->diag);
@@ -1429,7 +1428,8 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 		else
 			guard = page_align_up(fiber->stack + fiber->stack_size);
 
-		if (fiber_mprotect(guard, page_size, mprotect_flags) != 0) {
+		if (fiber->has_guard &&
+		    fiber_mprotect(guard, page_size, mprotect_flags) != 0) {
 			/*
 			 * FIXME: We need some intelligent handling:
 			 * say put this slab into a queue and retry
@@ -1463,18 +1463,12 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 	}
 }
 
-static int
+static void
 fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 		   struct slab_cache *slabc)
 {
 	size_t stack_size = fiber_attr->stack_size - slab_sizeof();
-	fiber->stack_slab = slab_get(slabc, stack_size);
-
-	if (fiber->stack_slab == NULL) {
-		diag_set(OutOfMemory, stack_size,
-			 "runtime arena", "fiber stack");
-		return -1;
-	}
+	fiber->stack_slab = xslab_get(slabc, stack_size);
 	void *guard;
 	/* Adjust begin and size for stack memory chunk. */
 	if (stack_direction < 0) {
@@ -1504,18 +1498,19 @@ fiber_stack_create(struct fiber *fiber, const struct fiber_attr *fiber_attr,
 						  (char *)fiber->stack +
 						  fiber->stack_size);
 
-	if (fiber_mprotect(guard, page_size, PROT_NONE)) {
-		/*
-		 * Write an error into the log since a guard
-		 * page is critical for functionality.
-		 */
-		diag_log();
-		fiber_stack_destroy(fiber, slabc);
-		return -1;
-	}
+#ifndef ENABLE_ASAN
+	fiber->has_guard = fiber_mprotect(guard, page_size, PROT_NONE) == 0;
+	if (!fiber->has_guard)
+		say_syserror("can't create guard page");
+#else
+	/*
+	 * If we panic then fiber stacks remain protected which cause leak
+	 * sanitizer failures. Disable memory protection under ASAN.
+	 */
+	fiber->has_guard = false;
+#endif
 
 	fiber_stack_watermark_create(fiber, fiber_attr);
-	return 0;
 }
 
 static void
@@ -1549,31 +1544,17 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
 
-	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM)) {
-		diag_set(FiberIsCancelled);
-		return NULL;
-	}
-
 	if (fiber_is_reusable(fiber_attr->flags) && !rlist_empty(&cord->dead)) {
 		fiber = rlist_first_entry(&cord->dead, struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
 		assert(fiber_is_dead(fiber));
 	} else {
-		fiber = (struct fiber *)
-			mempool_alloc(&cord->fiber_mempool);
-		if (fiber == NULL) {
-			diag_set(OutOfMemory, sizeof(struct fiber),
-				 "fiber pool", "fiber");
-			return NULL;
-		}
+		fiber = xmempool_alloc(&cord->fiber_mempool);
 		memset(fiber, 0, sizeof(struct fiber));
 		fiber->storage.lua.storage_ref = FIBER_LUA_NOREF;
 		fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
 
-		if (fiber_stack_create(fiber, fiber_attr, &cord()->slabc)) {
-			mempool_free(&cord->fiber_mempool, fiber);
-			return NULL;
-		}
+		fiber_stack_create(fiber, fiber_attr, &cord()->slabc);
 		coro_create(&fiber->ctx, fiber_loop, NULL,
 			    fiber->stack, fiber->stack_size);
 
@@ -1602,34 +1583,19 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
 
+	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM))
+		fiber->flags |= FIBER_IS_CANCELLED;
+
 	return fiber;
 
 }
 
-/**
- * Create a new fiber.
- *
- * Takes a fiber from fiber cache, if it's not empty.
- * Can fail only if there is not enough memory for
- * the fiber structure or fiber stack.
- *
- * The created fiber automatically returns itself
- * to the fiber cache when its "main" function
- * completes.
- */
 struct fiber *
 fiber_new(const char *name, fiber_func f)
 {
 	return fiber_new_ex(name, &fiber_attr_default, f);
 }
 
-/**
- * Create a new system fiber.
- *
- * Works the same way as fiber_new(), but uses fiber_attr_default
- * supplemented by the FIBER_IS_SYSTEM flag in order to create a
- * fiber.
- */
 struct fiber *
 fiber_new_system(const char *name, fiber_func f)
 {
@@ -2193,8 +2159,6 @@ cord_costart_thread_func(void *arg)
 	free(arg);
 
 	struct fiber *f = fiber_new("main", ctx.run);
-	if (f == NULL)
-		return NULL;
 	cord()->main_fiber = f;
 
 	TRIGGER(break_ev_loop, break_ev_loop_f);

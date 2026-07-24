@@ -47,7 +47,6 @@ latch_order_test(bool wakeup_before_unlock)
 	struct fiber *fibers[num_fibers];
 	for (size_t i = 0; i < num_fibers; i++) {
 		fibers[i] = fiber_new("ordered", order_f);
-		fail_if(fibers[i] == NULL);
 		fiber_set_joinable(fibers[i], true);
 		fiber_start(fibers[i], &i, &check, &latch);
 	}
@@ -75,7 +74,6 @@ latch_timeout_test(void)
 	latch_create(&latch);
 
 	struct fiber *fiber = fiber_new("sleeping", sleep_f);
-	fail_if(fiber == NULL);
 	fiber_set_joinable(fiber, true);
 	fiber_start(fiber, &latch);
 

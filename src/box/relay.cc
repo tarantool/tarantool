@@ -1093,7 +1093,7 @@ relay_subscribe_f(va_list ap)
 	/* Start fiber for receiving replica acks. */
 	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
-	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
+	struct fiber *reader = fiber_new(name, relay_reader_f);
 	fiber_set_joinable(reader, true);
 	fiber_start(reader, relay, fiber());
 
