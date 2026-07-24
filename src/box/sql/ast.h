@@ -43,6 +43,8 @@ enum sql_ast_type {
 
 	/** ALTER TABLE RENAME statement. */
 	SQL_AST_ALTER_RENAME,
+	/** ALTER TABLE ADD COLUMN statement. */
+	SQL_AST_ALTER_ADD_COLUMN,
 	/** ALTER TABLE ADD CONSTRAINT statement. */
 	SQL_AST_ALTER_ADD_CONSTRAINT,
 	/** ALTER TABLE DROP CONSTRAINT statement. */
@@ -61,6 +63,14 @@ enum ast_property_type {
 	SQL_AST_PROPERTY_PRIMARY_KEY,
 	/** Property is FOREIGN KEY constraint. */
 	SQL_AST_PROPERTY_FOREIGN_KEY,
+	/** Property is column collation. */
+	SQL_AST_PROPERTY_COLLATE,
+	/** Property is column default value or function. */
+	SQL_AST_PROPERTY_DEFAULT,
+	/** Property is column NOT NULL constraint. */
+	SQL_AST_PROPERTY_NOT_NULL,
+	/** Property is column nullability flag. */
+	SQL_AST_PROPERTY_NULL,
 };
 
 /** List of IDs received from parser. */
@@ -213,6 +223,14 @@ struct ast_expr_list_entry {
 	bool autoinc;
 };
 
+/** List of table or columns properties received from parser. */
+struct ast_property_list {
+	/** Head of the list. */
+	struct stailq head;
+	/** Length of the list. */
+	uint32_t len;
+};
+
 /** Description of FOREIGN KEY constraint. */
 struct ast_foreign_key {
 	/** Foreign table of FOREIGN KEY constraint. */
@@ -225,18 +243,38 @@ struct ast_foreign_key {
 
 /** Description of table and column properties. */
 struct ast_property {
+	/** Link to the next element of the list. */
+	struct stailq_entry link;
 	/** Property name. */
 	struct Token name;
 	union {
-		/** Expression for CHECK constraint. */
+		/** Expression for DEFAULT property and CHECK constraint. */
 		struct ast_expr *expr;
 		/** Column list for PRIMARY KEY and UNIQUE table constraint. */
 		struct ast_expr_list *columns;
 		/** Description of FOREIGN KEY constraint. */
 		struct ast_foreign_key foreign_key;
+		/** Name of column collate for COLLATE property. */
+		struct Token collate;
+		/** Column order for column PRIMARY KEY property. */
+		enum sort_order order;
+		/** Action for NULL property and NOT NULL constraint. */
+		enum on_conflict_action action;
 	};
 	/** Property type. */
 	enum ast_property_type type;
+};
+
+/** Description of a column. */
+struct ast_column {
+	/** Column name. */
+	struct Token name;
+	/** Column properties. */
+	struct ast_property_list *properties;
+	/** Column field type. */
+	enum field_type type;
+	/** Flag that shows if column is autoincremented. */
+	bool is_autoinc;
 };
 
 /** Description of DROP TABLE and DROP VIEW statements. */
@@ -293,6 +331,14 @@ struct ast_alter_add_constraint {
 	struct ast_property *con;
 };
 
+/** Description of ALTER TABLE ADD COLUMN statement. */
+struct ast_alter_add_column {
+	/** Name of table where column is created. */
+	struct Token table;
+	/** Description of the column. */
+	struct ast_column *col;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -311,6 +357,8 @@ struct sql_ast {
 		struct ast_drop_index drop_index;
 		/** ALTER TABLE RENAME statement. */
 		struct ast_alter_rename alter_rename;
+		/** ALTER TABLE ADD COLUMN statement. */
+		struct ast_alter_add_column alter_add_column;
 		/** ALTER TABLE ADD CONSTRAINT statement. */
 		struct ast_alter_add_constraint alter_add_constraint;
 		/** ALTER TABLE DROP CONSTRAINT statement. */
@@ -421,3 +469,12 @@ expr_list_from_ids(struct Parse *parser, struct ast_id_list *list);
 /** Create new empty structure of table or column property. */
 struct ast_property *
 ast_property_new(struct region *region);
+
+/** Append a property to property list. */
+struct ast_property_list *
+ast_property_list_append(struct region *region, struct ast_property_list *list,
+			 struct ast_property *property);
+
+/** Create new empty structure of column. */
+struct ast_column *
+ast_column_new(struct region *region);
