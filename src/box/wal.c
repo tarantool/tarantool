@@ -466,12 +466,14 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	writer->wal_max_size = wal_max_size;
 
 	if (wal_mode == WAL_NONE) {
-		journal_create(&writer->base, wal_write_none_async,
-			       wal_sync_none, wal_begin_checkpoint_none,
-			       wal_commit_checkpoint_none);
+		journal_set_callbacks(&writer->base, wal_write_none_async,
+				      wal_sync_none, wal_begin_checkpoint_none,
+				      wal_commit_checkpoint_none);
 	} else {
-		journal_create(&writer->base, wal_write_async, wal_sync,
-			       wal_begin_checkpoint, wal_commit_checkpoint);
+		journal_set_callbacks(&writer->base,
+				      wal_write_async, wal_sync,
+				      wal_begin_checkpoint,
+				      wal_commit_checkpoint);
 	}
 
 	struct xlog_opts opts = xlog_opts_default;
@@ -661,20 +663,36 @@ wal_enable(void)
 }
 
 void
+wal_shutdown(void)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE)
+		return;
+	assert(writer->base.sync == wal_sync);
+	/*
+	 * Do not handle new journal requests.
+	 *
+	 * The callbacks are called in the TX thread, so it's safe to
+	 * override them here (this function is called from TX too).
+	 */
+	journal_set_callbacks(&writer->base, wal_write_none_async,
+			      wal_sync_none, wal_begin_checkpoint_none,
+			      wal_commit_checkpoint_none);
+	/* Handle the requests remained.  */
+	VERIFY(wal_sync(&writer->base, NULL) == 0);
+}
+
+void
 wal_free(void)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
-
 	cbus_stop_loop(&writer->wal_pipe);
 	cpipe_destroy(&writer->wal_pipe);
-
 	if (cord_join(&writer->cord)) {
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}
-
 	trigger_destroy(&wal_on_write);
-
 	wal_writer_destroy(writer);
 }
 

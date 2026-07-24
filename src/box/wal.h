@@ -118,7 +118,13 @@ int
 wal_enable(void);
 
 /**
- * Stop WAL thread and free WAL writer resources.
+ * Stop the WAL thread.
+ */
+void
+wal_shutdown(void);
+
+/**
+ * Free the WAL writer resources.
  */
 void
 wal_free(void);

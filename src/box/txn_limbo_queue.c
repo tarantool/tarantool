@@ -926,12 +926,16 @@ void
 txn_limbo_queue_destroy(struct txn_limbo_queue *queue)
 {
 	fiber_cond_destroy(&queue->cond);
-	struct txn_limbo_entry *entry;
-	while (!rlist_empty(&queue->entries)) {
-		entry = rlist_shift_entry(&queue->entries,
-					  typeof(*entry), in_queue);
-		entry->txn->limbo_entry = NULL;
-		txn_free(entry->txn);
-	}
+	/* Should be emptied during shutdown. */
+	assert(rlist_empty(&queue->entries));
 	TRASH(queue);
+}
+
+void
+txn_limbo_queue_shutdown(struct txn_limbo_queue *queue)
+{
+	while (!txn_limbo_queue_is_empty(queue)) {
+		struct txn_limbo_entry *e = txn_limbo_queue_last_entry(queue);
+		txn_limbo_queue_complete_fail(queue, e, TXN_SIGNATURE_ROLLBACK);
+	}
 }

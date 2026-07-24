@@ -756,7 +756,8 @@ static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write, NULL, NULL, NULL);
+	journal_set_callbacks(&journal.base, recovery_journal_write,
+			      NULL, NULL, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
@@ -4011,6 +4012,25 @@ box_insert_arrow(uint32_t space_id, struct ArrowArray *array,
 	return rc;
 }
 
+API_EXPORT int
+box_delete_range(uint32_t space_id, uint32_t index_id,
+		 const char *begin_key, const char *begin_key_end,
+		 const char *end_key, const char *end_key_end)
+{
+	mp_tuple_assert(begin_key, begin_key_end);
+	mp_tuple_assert(end_key, end_key_end);
+	struct request request;
+	memset(&request, 0, sizeof(request));
+	request.type = IPROTO_DELETE_RANGE;
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.begin_key = begin_key;
+	request.begin_key_end = begin_key_end;
+	request.end_key = end_key;
+	request.end_key_end = end_key_end;
+	return box_process1(&request, NULL);
+}
+
 /**
  * Trigger space truncation by bumping a counter
  * in _truncate space.
@@ -5799,8 +5819,8 @@ box_cfg_xc(void)
 	}
 
 	struct journal bootstrap_journal;
-	journal_create(&bootstrap_journal, bootstrap_journal_write, NULL, NULL,
-		       NULL);
+	journal_set_callbacks(&bootstrap_journal, bootstrap_journal_write,
+			      NULL, NULL, NULL);
 	journal_set(&bootstrap_journal);
 	auto bootstrap_journal_guard = make_scoped_guard([] {
 		journal_set(NULL);
@@ -6603,15 +6623,6 @@ box_storage_free(void)
 	wal_free();
 	iproto_free();
 	txn_limbo_free();
-
-	/*
-	 * We free the transactions from the limbo queue above.
-	 * Free the remained transactions here.
-	 */
-	struct txn *txn, *tmp;
-	rlist_foreach_entry_safe(txn, &txns, in_txns, tmp)
-		txn_free(txn);
-
 	replication_free();
 	gc_free();
 	engine_free();
@@ -6683,10 +6694,19 @@ box_storage_shutdown()
 		diag_log();
 		panic("cannot gracefully shutdown iproto");
 	}
+	/*
+	 * Shutdown GC before WAL so no checkpoint commit
+	 * request comes to the WAL after it shut down.
+	 */
+	gc_shutdown();
+	/*
+	 * Shutdown WAL before the limbo so there's no transaction
+	 * in limbo being in a way to WAL when we roll them back.
+	 */
+	wal_shutdown();
 	replication_shutdown();
 	box_raft_shutdown();
 	txn_limbo_shutdown();
-	gc_shutdown();
 	engine_shutdown();
 	fiber_pool_shutdown(&tx_fiber_pool);
 	app_threads_stop();

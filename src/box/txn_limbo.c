@@ -1128,4 +1128,5 @@ void
 txn_limbo_shutdown(void)
 {
 	txn_limbo_stop(&txn_limbo);
+	txn_limbo_queue_shutdown(&txn_limbo.queue);
 }

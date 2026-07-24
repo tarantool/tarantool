@@ -289,16 +289,7 @@ enum txn_status {
 	TXN_ABORTED,
 };
 
-
-/**
- * Structure which contains pointers to the tuples,
- * that are used in rollback. Currently used only in
- * memxt engine.
- */
-struct txn_stmt_rollback_info {
-	struct tuple *old_tuple;
-	struct tuple *new_tuple;
-};
+struct memtx_del_story_link;
 
 /**
  * A single statement of a multi-statement
@@ -320,8 +311,6 @@ struct txn_stmt {
 	const char *min_key;
 	/** The last Arrow inserted key (MP_ARRAY, allocated on txn). */
 	const char *max_key;
-	/** Structure, which contains tuples for rollback. */
-	struct txn_stmt_rollback_info rollback_info;
 	/**
 	 * If new_tuple != NULL and this transaction was not prepared,
 	 * this member holds added story of the new_tuple.
@@ -330,19 +319,16 @@ struct txn_stmt {
 	/**
 	 * If new_tuple == NULL and this transaction was not prepared,
 	 * this member holds added story of the old_tuple.
+	 *
+	 * If the statement is IPROTO_DELETE_RANGE, it holds all deleted
+	 * tuple stories (next != NULL if deleted more than one).
+	 *
+	 * Only one prepared TX can delete a tuple and a story. But when
+	 * there are several in-progress transactions and they delete the
+	 * same tuple we have to remember several delete statements for
+	 * one story. This is done in this list.
 	 */
-	struct memtx_story *del_story;
-	/**
-	 * Link in memtx_story::del_stmt linked list.
-	 * Only one prepared TX can delete a tuple and a story. But
-	 * when there are several in-progress transactions and they delete
-	 * the same tuple we have to store several delete statements in one
-	 * story. It's implemented in that way: story has a pointer to the first
-	 * deleting statement, that statement has a pointer to the next etc,
-	 * with NULL in the end.
-	 * That member is that the pointer to next deleting statement.
-	 */
-	struct txn_stmt *next_in_del_list;
+	struct memtx_del_story_link *del_stories;
 	/** Engine savepoint for the start of this statement. */
 	void *engine_savepoint;
 	/** Redo info: the binary log row */
@@ -851,14 +837,6 @@ txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
 	txn_stmt_init_triggers(stmt);
 	trigger_add(&stmt->on_rollback, trigger);
 }
-
-/**
- * Save and ref @a old_tuple and @a new_tuple in special structure
- * inside @a stmt. Later this tuples will be used in case of rollback.
- */
-void
-txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
-			       struct tuple *new_tuple);
 
 /**
  * Save @a old_tuple and @a new_tuple of replace in @a stmt.

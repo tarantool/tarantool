@@ -194,6 +194,17 @@ tarantool_exit(int code)
 	 * After on_shutdown fiber completes, we will never wake up again.
 	 */
 	fiber_set_system(fiber(), true);
+	/*
+	 * This is the end for the fiber effectively, it's never going to
+	 * die nor to return to the os.exit() caller. Let's call on_stop
+	 * triggers of the fiber here. This can do the following:
+	 *
+	 * 1. If there's an active transaction, it's rolled back and freed.
+	 * 2. Puts a cord buffer if it has been taken and not freed yet.
+	 * 3. Destroy a session created on demand.
+	 * 4. Drops a reference to a fiber storage if created in the caller.
+	 */
+	fiber_on_stop(fiber());
 	while (true)
 		fiber_sleep(TIMEOUT_INFINITY);
 }

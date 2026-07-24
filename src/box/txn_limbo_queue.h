@@ -294,6 +294,10 @@ txn_limbo_queue_create(struct txn_limbo_queue *queue);
 void
 txn_limbo_queue_destroy(struct txn_limbo_queue *queue);
 
+/** Rollback all transactions in the queue. */
+void
+txn_limbo_queue_shutdown(struct txn_limbo_queue *queue);
+
 #if defined(__cplusplus)
 }
 #endif /* defined(__cplusplus) */
