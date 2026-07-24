@@ -1,6 +1,7 @@
 local ffi = require('ffi')
 local wireformat = require('internal.protobuf.wireformat')
 local protocol_mt
+local ctx_mt
 -- These constants are used to define the boundaries of valid field ids.
 -- Described in more detail here:
 -- https://protobuf.dev/programming-guides/proto3/#assigning
@@ -32,14 +33,17 @@ local MAX_SINT32_LL = 2LL^31 - 1
 local MAX_SINT32_ULL = 2ULL^31 - 1
 local MAX_SINT64_ULL = 2ULL^63 - 1
 
-
 local int64_t = ffi.typeof('int64_t')
 local uint64_t = ffi.typeof('uint64_t')
 
 -- Forward declarations
 local encode
+local decode
+local decode_message
 local encode_field
+local decode_field
 local validate_scalar
+local validate_field_id
 
 local scalars = {}
 
@@ -52,7 +56,9 @@ scalars.float = {
     limits = {
         number = {-MAX_FLOAT, MAX_FLOAT},
     },
+    wire_type = wireformat.I32,
     encode = wireformat.encode_float,
+    decode = wireformat.decode_float,
 }
 
 scalars.fixed32 = {
@@ -64,7 +70,9 @@ scalars.fixed32 = {
         int64 = {0LL, MAX_UINT32_LL},
         uint64 = {nil, MAX_UINT32_ULL},
     },
+    wire_type = wireformat.I32,
     encode = wireformat.encode_fixed32,
+    decode = wireformat.decode_fixed32,
 }
 
 scalars.sfixed32 = {
@@ -76,14 +84,18 @@ scalars.sfixed32 = {
         int64 = {MIN_SINT32_LL, MAX_SINT32_LL},
         uint64 = {nil, MAX_SINT32_ULL},
     },
+    wire_type = wireformat.I32,
     encode = wireformat.encode_fixed32,
+    decode = wireformat.decode_sfixed32,
 }
 
 scalars.double = {
     accept_type = 'number',
     encode_as_packed = true,
     integral_only = false,
+    wire_type = wireformat.I64,
     encode = wireformat.encode_double,
+    decode = wireformat.decode_double,
 }
 
 scalars.fixed64 = {
@@ -94,7 +106,9 @@ scalars.fixed64 = {
         number = {0, MAX_UINT64},
         int64 = {0LL, nil},
     },
+    wire_type = wireformat.I64,
     encode = wireformat.encode_fixed64,
+    decode = wireformat.decode_fixed64,
 }
 
 scalars.sfixed64 = {
@@ -105,13 +119,17 @@ scalars.sfixed64 = {
         number = {MIN_INT64, MAX_INT64},
         uint64 = {nil, MAX_SINT64_ULL},
     },
+    wire_type = wireformat.I64,
     encode = wireformat.encode_fixed64,
+    decode = wireformat.decode_sfixed64,
 }
 
 scalars.string = {
     accept_type = 'string',
     encode_as_packed = false,
+    wire_type = wireformat.LEN,
     encode = wireformat.encode_len,
+    decode = wireformat.decode_len,
 }
 
 scalars.bytes = scalars.string
@@ -125,7 +143,9 @@ scalars.int32 = {
         int64 = {MIN_SINT32_LL, MAX_SINT32_LL},
         uint64 = {nil, MAX_SINT32_ULL},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_int,
 }
 
 scalars.sint32 = {
@@ -137,7 +157,9 @@ scalars.sint32 = {
         int64 = {MIN_SINT32_LL, MAX_SINT32_LL},
         uint64 = {nil, MAX_SINT32_ULL},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_sint,
+    decode = wireformat.decode_sint,
 }
 
 scalars.uint32 = {
@@ -149,7 +171,9 @@ scalars.uint32 = {
         int64 = {0LL, MAX_UINT32_LL},
         uint64 = {nil, MAX_UINT32_ULL},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_uint,
 }
 
 scalars.int64 = {
@@ -160,7 +184,9 @@ scalars.int64 = {
         number = {MIN_INT64, MAX_INT64},
         uint64 = {nil, MAX_SINT64_ULL},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_int,
 }
 
 scalars.sint64 = {
@@ -171,7 +197,9 @@ scalars.sint64 = {
         number = {MIN_INT64, MAX_INT64},
         uint64 = {nil, MAX_SINT64_ULL},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_sint,
+    decode = wireformat.decode_sint,
 }
 
 scalars.uint64 = {
@@ -182,13 +210,17 @@ scalars.uint64 = {
         number = {0, MAX_UINT64},
         int64 = {0LL, nil},
     },
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_uint,
 }
 
 scalars.bool = {
     accept_type = 'boolean',
     encode_as_packed = true,
+    wire_type = wireformat.VARINT,
     encode = wireformat.encode_int,
+    decode = wireformat.decode_bool,
 }
 
 -- }}} Scalar type definitions
@@ -217,16 +249,7 @@ local function message(message_name, message_def)
             error(('Id %d in field %q was already used'):format(field_id,
                 field_name))
         end
-        if field_id < MIN_FIELD_ID or field_id > MAX_FIELD_ID then
-            error(('Id %d in field %q is out of range [%d; %d]'):format(
-                field_id, field_name, MIN_FIELD_ID, MAX_FIELD_ID))
-        end
-        if field_id >= RESERVED_FIELD_ID_MIN and
-           field_id <= RESERVED_FIELD_ID_MAX then
-           error(('Id %d in field %q is in reserved ' ..
-               'id range [%d, %d]'):format(field_id, field_name,
-               RESERVED_FIELD_ID_MIN, RESERVED_FIELD_ID_MAX))
-        end
+        validate_field_id(field_id, field_name)
         local field_def = {
             type = field_type,
             name = field_name,
@@ -387,6 +410,22 @@ local function is_inf(value)
     return not is_nan(value) and is_nan(value - value)
 end
 
+local function add_path(ctx, next_step)
+    ctx.path = ctx.path .. '.' .. next_step
+end
+
+local function restore_path(ctx)
+    ctx.path = ctx.path:match("^(.-)%.[^%.]+$")
+end
+
+local function append(table1, table2)
+    table1 = table1 or {}
+    for _, value in ipairs(table2) do
+        table.insert(table1, value)
+    end
+    return table1
+end
+
 -- Checks input value assumed to be integer.
 --
 -- Checks 'number' type value to be integral and 'cdata' type value to be
@@ -410,6 +449,17 @@ local function remove_tag(value)
     until msb == 0
     return string.sub(value, tag_length + 1)
 end
+
+-- Function for handling errors on decode.
+--
+-- As input parameters function gets err_msg string which describes an error
+-- and format_args table which contains parameters for error message to format.
+-- local function handle_error(ctx, err_msg, ...)
+--    err_msg = err_msg:format(...)
+--    local pos_info = ('[%s] decoding error on byte %d: %s')
+--        :format(ctx.path, ctx.pos, err_msg)
+--    error(pos_info)
+--end
 
 -- }}} Global helpers
 
@@ -500,6 +550,19 @@ local function validate_type(field_def, value, exp_type)
     return
 end
 
+validate_field_id = function(field_id, field_name)
+    if field_id < MIN_FIELD_ID or field_id > MAX_FIELD_ID then
+        error(('Id %d in %q field is out of range [%d; %d]'):format(
+            field_id, field_name, MIN_FIELD_ID, MAX_FIELD_ID))
+    end
+    if field_id >= RESERVED_FIELD_ID_MIN and
+        field_id <= RESERVED_FIELD_ID_MAX then
+        error(('Id %d in %q field is in reserved ' ..
+            'id range [%d, %d]'):format(field_id, field_name,
+            RESERVED_FIELD_ID_MIN, RESERVED_FIELD_ID_MAX))
+    end
+end
+
 local function validate_range(field_def, value, range)
     local min = range ~= nil and range[1] or nil
     local max = range ~= nil and range[2] or nil
@@ -542,6 +605,29 @@ validate_scalar = function(field_def, value)
                 or 'uint64'
         end
         validate_range(field_def, value, scalar_def.limits[value_type])
+    end
+end
+
+local function validate_decoded_type(protocol, field_def, ctx, wire_type)
+    if wireformat.types[wire_type] == nil then
+        ctx:error('Decoding data contains incorrect protobuf type: %d',
+            wire_type)
+    end
+    local exp_wire_type
+    if scalars[field_def.type] ~= nil then
+        exp_wire_type = scalars[field_def.type]['wire_type']
+    elseif is_message(protocol, field_def) then
+        exp_wire_type = wireformat.LEN
+    else
+        exp_wire_type = wireformat.VARINT
+    end
+    if field_def.repeated and wire_type == wireformat.LEN.id then
+        return
+    end
+    if wire_type ~= exp_wire_type.id then
+        ctx:error('Value for field was encoded as %q and ' ..
+            'can`t be decoded as %q', wireformat.types[wire_type].name,
+             wireformat.types[exp_wire_type.id].name)
     end
 end
 
@@ -657,9 +743,180 @@ end
 
 -- }}} Encoders
 
+-- {{{ Decoders
+
+local function read_unknown_field(ctx, type, bound)
+    local res = string.sub(ctx.val, ctx.pos - 1, ctx.pos - 1)
+    local begin = ctx.pos
+    if type == wireformat.LEN.id then
+        local len = wireformat.decode_int(ctx, bound)
+        ctx.pos = ctx.pos + len
+    elseif type == wireformat.I32.id then
+        ctx.pos = ctx.pos + 4
+    elseif type == wireformat.I64.id then
+        ctx.pos = ctx.pos + 8
+    else
+        local _ = wireformat.decode_int(ctx, bound)
+    end
+    res = res .. string.sub(ctx.val, begin, ctx.pos - 1)
+    return res
+end
+
+local function decode_repeated(protocol, field_def, ctx, bound)
+    local res = {}
+    if ctx.packed then
+        local len = wireformat.decode_int(ctx, bound)
+        local start_pos = ctx.pos
+        local value
+        while ctx.pos < start_pos + len do
+            value = decode_field(protocol, field_def, ctx, bound, true)
+            table.insert(res, value)
+        end
+    else
+        repeat
+            local value = decode_field(protocol, field_def, ctx, bound, true)
+            table.insert(res, value)
+            if ctx.pos > bound then
+                return res
+            end
+            local _, field_id = wireformat.decode_tag(ctx, bound)
+        until field_id ~= field_def.id
+        ctx.pos = ctx.pos - 1
+    end
+    return res
+end
+
+local function new_decode_context(data, message_name, decode_opts)
+    local decode_opts = decode_opts or {}
+    assert(type(decode_opts) == 'table')
+    local ctx = {
+        -- The source data to decode.
+        val = data,
+        -- The next position in the data to read.
+        pos = 1,
+        -- Options for decode.
+        opts = decode_opts,
+        -- Known decoding path.
+        path = message_name,
+    }
+    return setmetatable(ctx, ctx_mt)
+end
+
+decode_field = function(protocol, field_def, ctx, bound, ignore_repeated)
+    local res
+    if field_def.repeated and not ignore_repeated then
+        res = decode_repeated(protocol, field_def, ctx, bound)
+    elseif is_scalar(field_def) then
+        local scalar_def = scalars[field_def.type]
+        res = scalar_def.decode(ctx, bound)
+        validate_scalar(field_def, res)
+    elseif is_enum(protocol, field_def) then
+        local id = wireformat.decode_int(ctx, bound)
+        local curr_enum = protocol[field_def.type]
+        if curr_enum.value_by_id[id] then
+            res = curr_enum.value_by_id[id]
+        else
+            res = id
+        end
+    elseif is_message(protocol, field_def) then
+        local new_bound = ctx.pos + 1 + wireformat.decode_int(ctx, bound)
+        res = decode_message(protocol, field_def.type, ctx, new_bound)
+    end
+    return res
+end
+
+decode = function(protocol, message_name, data, opts)
+    local ctx = new_decode_context(data, message_name, opts)
+    local message_def = protocol[message_name]
+    if message_def == nil then
+        error(('There is no message or enum named %q in the given protocol')
+            :format(message_name))
+    end
+    if message_def.type ~= 'message' then
+        assert(message_def.type == 'enum')
+        error(('Attempt to decode enum %q as a top level message'):format(
+            message_name))
+    end
+    return decode_message(protocol, message_name, ctx, string.len(data))
+end
+
+decode_message = function(protocol, message_name, ctx, bound)
+    local res = {}
+    local message_def = protocol[message_name]
+    if message_def == nil then
+    error(('There is no message or enum named %q in the given protocol')
+            :format(message_name))
+    end
+    local field_by_id = message_def.field_by_id
+    while ctx.pos < bound do
+        -- Read tag from input get type and field_id
+        local type, field_id = wireformat.decode_tag(ctx, bound)
+        local field_def = field_by_id[field_id]
+        validate_field_id(field_id, ctx.path .. '.<field>')
+        if field_def == nil then
+            ctx:add_path('unknown_field')
+            local unknown_field = read_unknown_field(ctx, type, bound)
+            if res['_unknown_fields'] == nil then
+                res['_unknown_fields'] = {}
+            end
+            table.insert(res['_unknown_fields'], unknown_field)
+        else
+            ctx:add_path(field_def.name)
+            validate_decoded_type(protocol, field_def, ctx, type)
+            local decode_from_packed = false
+            if field_def.repeated and is_scalar(field_def) then
+                if type == wireformat.LEN.id and field_def.type ~= 'string'
+                    and field_def.type ~= 'bytes' then
+                        decode_from_packed = true
+                end
+            end
+            ctx.packed = decode_from_packed
+            local decoded = decode_field(protocol, field_def, ctx,
+                bound, false)
+            if field_def.repeated and not decode_from_packed then
+                decoded = append(res[field_def.name], decoded)
+            end
+            res[field_def.name] = decoded
+        end
+        ctx:restore_path()
+    end
+    if ctx.opts.set_default then
+        for field_id, _ in pairs(field_by_id) do
+            local field_def = field_by_id[field_id]
+            if res[field_def.name] == nil then
+                if is_scalar(field_def) then
+                    res[field_def.name] = wireformat.get_default(field_def.type)
+                elseif is_enum(protocol, field_def) then
+                    local curr_enum = protocol[field_def.type]
+                    res[field_def.name] = curr_enum.value_by_id[0]
+                elseif field_def.repeated then
+                    res[field_def.name] = {}
+                end
+            end
+        end
+    end
+    return res
+end
+
+-- }}} Decoders
+
 protocol_mt = {
     __index = {
         encode = encode,
+        decode = decode,
+    }
+}
+
+ctx_mt = {
+    __index = {
+        add_path = add_path,
+        restore_path = restore_path,
+        error = function(ctx, err_msg, ...)
+            err_msg = err_msg:format(...)
+            local pos_info = ('[%s] decoding error on position %d: %s')
+                :format(ctx.path, ctx.pos, err_msg)
+            error(pos_info)
+        end,
     }
 }
 
