@@ -5953,18 +5953,12 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		int rc = box_raft_try_promote();
-		if (raft->leader != instance_id && raft->leader != 0) {
-			/*
-			 * It was promoted and is a single registered node -
-			 * there can't be another leader or a new term bump.
-			 */
-			panic("Bootstrap master couldn't elect self as a "
-			      "leader. Leader is %u, term is %llu",
-			      raft->leader, (long long)raft->volatile_term);
+		int rc = box_promote();
+		if (rc != 0) {
+			diag_log();
+			panic("Bootstrap master couldn't claim the synchronous "
+			      "transaction queue");
 		}
-		assert(rc == 0);
-		(void)rc;
 	}
 
 	/* box.cfg.read_only is not read yet. */
