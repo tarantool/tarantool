@@ -236,19 +236,6 @@ struct create_fk_constraint_parse_def {
 	bool is_used;
 };
 
-struct create_view_def {
-	struct create_entity_def base;
-	/**
-	 * Starting position of CREATE VIEW ... statement.
-	 * It is used to fetch whole statement, which is
-	 * saved as raw string to space options.
-	 */
-	struct Token *create_start;
-	/** List of column aliases (SELECT x AS y ...). */
-	struct ExprList *aliases;
-	struct Select *select;
-};
-
 struct create_trigger_def {
 	struct create_entity_def base;
 	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
@@ -308,18 +295,6 @@ create_fk_constraint_parse_def_init(struct create_fk_constraint_parse_def *def)
 {
 	rlist_create(&def->fkeys);
 	def->is_used = true;
-}
-
-static inline void
-create_view_def_init(struct create_view_def *view_def, struct Token *name,
-		     struct Token *create, struct ExprList *aliases,
-		     struct Select *select, bool if_not_exists)
-{
-	create_entity_def_init(&view_def->base, ENTITY_TYPE_VIEW, NULL, name,
-			       if_not_exists);
-	view_def->create_start = create;
-	view_def->select = select;
-	view_def->aliases = aliases;
 }
 
 static inline void

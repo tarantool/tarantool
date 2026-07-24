@@ -8,3 +8,5 @@
   "JOIN cannot be both OUTER and INNER"; an unrecognized `JOIN` keyword is
   now a syntax error instead of the 'unknown or unsupported join type'
   error (gh-5485).
+* The SQL query used to create a view is now in the corresponding space
+  definition in `_space` as it was provided, without any changes (gh-5485).
