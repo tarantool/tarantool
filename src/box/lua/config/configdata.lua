@@ -1072,7 +1072,7 @@ local function new(iconfig, cconfig, instance_name)
         group_name = found.group_name,
     }
     iconfig = instance_config:normalize(
-        instance_config:apply_vars(iconfig, vars))
+        instance_config:apply_vars(iconfig, vars, {warn = true}))
     iconfig_def = instance_config:normalize(
         instance_config:apply_vars(iconfig_def, vars))
 
