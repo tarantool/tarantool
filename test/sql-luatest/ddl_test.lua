@@ -406,3 +406,17 @@ g.test_12968_primary_key_constraint_parsing = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure that the CREATE VIEW statement is saved exactly as it was provided.
+--
+g.test_create_view_string_representation = function(cg)
+    cg.server:exec(function()
+        local sql = [[   CREATE VIEW IF NOT EXISTS v AS SELECT id
+                      FROM _space   ; -- note  ]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+        t.assert_equals(box.space._space:get{box.space.v.id}.flags.sql, sql)
+        box.execute([[DROP VIEW v;]]);
+    end)
+end

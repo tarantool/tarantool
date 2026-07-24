@@ -1522,29 +1522,23 @@ vdbe_emit_create_table(struct Parse *pParse, bool if_not_exists)
 }
 
 void
-sql_create_view(struct Parse *parse_context)
+sql_create_view(struct Parse *parse_context, const char *sql,
+		struct Token *name, struct ExprList *aliases,
+		struct Select *view_select, bool if_not_exists)
 {
-	struct create_view_def *view_def = &parse_context->create_view_def;
-	struct create_entity_def *create_entity_def = &view_def->base;
-	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_VIEW);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	(void) alter_entity_def;
 	if (parse_context->nVar > 0) {
-		char *name = sql_name_from_token(&create_entity_def->name);
-		diag_set(ClientError, ER_CREATE_SPACE, name,
+		diag_set(ClientError, ER_CREATE_SPACE,
+			 sql_tt_name_from_token(name),
 			 "parameters are not allowed in views");
-		sql_xfree(name);
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
-	struct space *space = sqlStartTable(parse_context,
-					    &create_entity_def->name);
+	struct space *space = sqlStartTable(parse_context, name);
 	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
 
 	/* Find result of SELECT. */
-	struct Select *select = view_def->select;
+	struct Select *select = view_select;
 	uint32_t saved_flags = parse_context->sql_flags;
 	parse_context->sql_flags = 0;
 	sqlSelectPrep(parse_context, select, 0);
@@ -1554,7 +1548,7 @@ sql_create_view(struct Parse *parse_context)
 		select = select->pPrior;
 	parse_context->sql_flags = saved_flags;
 
-	struct ExprList *columns = view_def->aliases;
+	struct ExprList *columns = aliases;
 	if (columns != NULL) {
 		if (select->pEList->nExpr != columns->nExpr) {
 			diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
@@ -1563,7 +1557,7 @@ sql_create_view(struct Parse *parse_context)
 			parse_context->is_aborted = true;
 			goto create_view_fail;
 		}
-		select = view_def->select;
+		select = view_select;
 	} else {
 		columns = select->pEList;
 	}
@@ -1571,40 +1565,22 @@ sql_create_view(struct Parse *parse_context)
 	sqlSelectAddColumnTypeAndCollation(parse_context, space->def, select);
 
 	space->def->opts.is_view = true;
-	/*
-	 * Locate the end of the CREATE VIEW statement.
-	 * Make sEnd point to the end.
-	 */
-	struct Token end = parse_context->sLastToken;
-	assert(end.z[0] != 0);
-	if (end.z[0] != ';')
-		end.z += end.n;
-	end.n = 0;
-	struct Token *begin = view_def->create_start;
-	int n = end.z - begin->z;
-	assert(n > 0);
-	const char *z = begin->z;
-	while (sqlIsspace(z[n - 1]))
-		n--;
-	end.z = &z[n - 1];
-	end.n = 1;
-	space->def->opts.sql = xstrndup(begin->z, n);
-	const char *space_name = sql_name_from_token(&create_entity_def->name);
+	space->def->opts.sql = xstrdup(sql);
+	const char *space_name = sql_name_from_token(name);
 	int name_reg = ++parse_context->nMem;
 	sqlVdbeAddOp4(parse_context->pVdbe, OP_String8, 0, name_reg, 0,
 		      space_name, P4_DYNAMIC);
-	bool no_err = create_entity_def->if_not_exist;
 	vdbe_emit_halt_with_presence_test(parse_context, BOX_SPACE_ID, 2,
 					  name_reg, 1, ER_SPACE_EXISTS,
-					  space_name, (no_err != 0),
+					  space_name, if_not_exists,
 					  OP_NoConflict);
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
 			       name_reg, space);
 	free(space->def->opts.sql);
 
  create_view_fail:
-	sql_expr_list_delete(view_def->aliases);
-	sql_select_delete(view_def->select);
+	sql_expr_list_delete(aliases);
+	sql_select_delete(view_select);
 	return;
 }
 

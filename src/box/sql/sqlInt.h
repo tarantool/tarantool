@@ -1994,7 +1994,6 @@ struct Parse {
 	 */
 	union {
 		struct create_trigger_def create_trigger_def;
-		struct create_view_def create_view_def;
 	};
 	/**
 	 * Description of the new table created in the CREATE TABLE statement.
@@ -2754,9 +2753,16 @@ vdbe_emit_open_cursor(struct Parse *parse, int cursor, uint32_t index_id,
  * The parser calls this routine in order to create a new VIEW.
  *
  * @param parse_context Current parsing context.
+ * @param sql The SQL statement that creates the view.
+ * @param name name of the view.
+ * @param aliases names of columns of the view.
+ * @param view_select SELECT statement of the view.
+ * @param if_not_exists If TRUE do not raise an error when the view exists.
  */
 void
-sql_create_view(struct Parse *parse_context);
+sql_create_view(struct Parse *parse_context, const char *sql,
+		struct Token *name, struct ExprList *aliases,
+		struct Select *view_select, bool if_not_exists);
 
 /**
  * Compile view, i.e. create struct Select from
