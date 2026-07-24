@@ -350,6 +350,36 @@ tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
   sql_create_foreign_key(pParse, NULL, &N, FA, &T, TA);
 }
 
+%type table_constraint_named {struct ast_property *}
+table_constraint_named(A) ::= CONSTRAINT nm(N) FOREIGN KEY LP idlist(FA) RP
+                              REFERENCES nm(T) idlist_opt(TA). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_FOREIGN_KEY;
+  A->name = N;
+  A->foreign_key.columns = FA;
+  A->foreign_key.foreign_table = T;
+  A->foreign_key.foreign_columns = TA;
+}
+table_constraint_named(A) ::= CONSTRAINT nm(N) CHECK LP expr(X) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_CHECK;
+  A->name = N;
+  A->expr = X;
+}
+table_constraint_named(A) ::= CONSTRAINT nm(N) UNIQUE LP sortlist(L) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_UNIQUE;
+  A->name = N;
+  A->columns = L;
+}
+table_constraint_named(A) ::= CONSTRAINT nm(N) PRIMARY KEY
+                              LP sortlist_autoinc(L) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_PRIMARY_KEY;
+  A->name = N;
+  A->columns = L;
+}
+
 // The following is a non-standard extension that allows us to declare the
 // default behavior when there is a constraint conflict.
 //
@@ -1492,31 +1522,10 @@ alter_column_def ::= ALTER TABLE nm(T) ADD column_name(N) typedef(Y). {
   sql_create_column_start(pParse, &T, &N, Y);
 }
 
-cmd ::= ALTER TABLE nm(X) ADD CONSTRAINT nm(N) FOREIGN KEY
-        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA). {
-  pParse->initiateTTrans = true;
-  sql_create_foreign_key(pParse, &X, &N, FA, &T, TA);
-}
-
-cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) CHECK LP expr_old(X) RP. {
-  sql_expr_delete(X.pExpr);
-  pParse->initiateTTrans = true;
-  sql_create_check_constraint(pParse, &T, &N, X.zStart, X.zEnd - X.zStart,
-                              false);
-}
-
-cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) UNIQUE LP sortlist_old(X) RP. {
-  pParse->initiateTTrans = true;
-  sql_create_index(pParse, &T, &N, X, SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-                   SORT_ORDER_ASC, false);
-}
-
-cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
-        LP sortlist_autoinc(X) RP. {
-  pParse->initiateTTrans = true;
-  struct ExprList *columns = expr_list_from_ast(pParse, X);
-  sql_create_index(pParse, &T, &N, columns, SQL_INDEX_TYPE_CONSTRAINT_PK,
-                   SORT_ORDER_ASC, false);
+cmd ::= ALTER TABLE nm(X) ADD table_constraint_named(C). {
+  pParse->ast.type = SQL_AST_ALTER_ADD_CONSTRAINT;
+  pParse->ast.alter_add_constraint.table = X;
+  pParse->ast.alter_add_constraint.con = C;
 }
 
 cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {

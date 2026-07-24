@@ -79,5 +79,20 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.c CHECK 4;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '4'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c UNIQUE (i) 5;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               PRIMARY KEY (i) 6;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '6'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               FOREIGN KEY (i) REFERENCES t1(i) 7;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '7'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               CHECK (i > 10) 8;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '8'")
     end)
 end
