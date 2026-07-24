@@ -1584,6 +1584,8 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r)
 
 	r->group_id = row->group_id;
 	const char *pos = row->body[0].iov_base;
+	if (mp_typeof(*pos) != MP_MAP)
+		goto bad_msgpack;
 	uint32_t map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; ++i)
 	{
