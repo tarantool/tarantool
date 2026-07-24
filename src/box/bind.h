@@ -131,6 +131,13 @@ int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos);
 
 /**
+ * Put names and lens of names of bind_variables in vdbe.
+ */
+void
+set_bind_variables_in_vdbe(struct Vdbe *stmt, const char **bind_names,
+			   uint32_t *bind_names_len, uint32_t bind_count);
+
+/**
  * Bind parameter values to the prepared statement.
  * @param stmt Prepared statement.
  * @param bind Parameters to bind.
@@ -144,10 +151,18 @@ sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
 {
 	assert(stmt != NULL);
 	uint32_t pos = 1;
+	const char **bind_names = (const char **) xmalloc(sizeof(char *) *
+							  bind_count);
+	uint32_t *bind_names_len = (uint32_t *) xmalloc(sizeof(uint32_t) *
+							  bind_count);
 	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
+		bind_names[i] = bind[i].name;
+		bind_names_len[i] = bind[i].name_len;
 		if (sql_bind_column(stmt, &bind[i], pos) != 0)
 			return -1;
 	}
+	set_bind_variables_in_vdbe(stmt, bind_names,
+				   bind_names_len, bind_count);
 	return 0;
 }
 

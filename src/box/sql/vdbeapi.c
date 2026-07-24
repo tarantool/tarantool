@@ -394,6 +394,15 @@ sql_reset_autoinc_id_list(struct Vdbe *v)
 	stailq_create(&v->autoinc_id_list);
 }
 
+void
+sql_set_bind_variables_in_vdbe(struct Vdbe *stmt, const char **bind_names,
+			       uint32_t *bind_names_len, uint32_t bind_count)
+{
+	stmt->bind_names = bind_names;
+	stmt->bind_names_len = bind_names_len;
+	stmt->count_bind_names = bind_count;
+}
+
 int
 sql_bind_double(struct Vdbe *p, int i, double rValue)
 {

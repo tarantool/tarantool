@@ -29,6 +29,14 @@ g.test_bind_2 = function()
     t.assert_equals(err.message, res)
 end
 
+g.test_bind_4 = function()
+    g.server:exec(function()
+        local sql = [[SELECT :a, :a, ?, :b;]]
+        local res = box.execute(sql, {{[':a'] = 1}, {[':b'] = 2}})
+        t.assert_equals(res.rows, {{1, 1, 2, 2}})
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)
@@ -170,6 +178,7 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         parameters[1][100] = 200
         local ok = pcall(_G.execute, 'SELECT ?', parameters)
         t.assert_equals(ok, false)
+
         parameters = {}
         parameters[1] = {}
         parameters[1][':value'] = {kek = 300}
