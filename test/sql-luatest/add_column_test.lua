@@ -264,3 +264,15 @@ g.test_3075_add_column = function(cg)
         box.execute("DROP TABLE t2;")
     end)
 end
+
+--
+-- Make sure that adding a column to a non-existent space produces
+-- an appropriate error message.
+--
+g.test_add_column_to_non_existing_space = function(cg)
+    cg.server:exec(function()
+        local sql = [[ALTER TABLE no_space ADD COLUMN a INT NOT NULL;]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, "Space 'no_space' does not exist")
+    end)
+end
