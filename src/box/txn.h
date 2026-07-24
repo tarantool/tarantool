@@ -1093,11 +1093,17 @@ tx_region_acquire(struct txn *txn);
 void
 tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type);
 
-/*
+/**
  * Free txn memory and return it to a cache.
  */
 void
 txn_free(struct txn *txn);
+
+/**
+ * Stop and cancel all the started transactions.
+ */
+void
+txn_shutdown(void);
 
 /**
  * FFI bindings: do not throw exceptions, do not accept extra
