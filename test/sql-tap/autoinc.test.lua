@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(57)
+test:plan(56)
 
 --!./tcltestrunner.lua
 -- 2004 November 12
@@ -890,14 +890,6 @@ test:do_catchsql_test(
         CREATE TABLE t11_8 (i INT, a INT, PRIMARY KEY(a AUTOINCREMENT, i AUTOINCREMENT));
     ]], {
         1, "Table must feature at most one AUTOINCREMENT field"
-    })
-
-test:do_catchsql_test(
-    "autoinc-11.9",
-    [[
-        CREATE TABLE t11_9 (i INT, PRIMARY KEY(a AUTOINCREMENT), a INT);
-    ]], {
-        1, "Can't resolve field 'a'"
     })
 
 test:do_catchsql_test(

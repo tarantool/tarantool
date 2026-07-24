@@ -32,6 +32,9 @@ enum sql_ast_type {
 	/** SELECT statement. */
 	SQL_AST_SELECT,
 
+	/** CREATE TABLE statement. */
+	SQL_AST_CREATE_TABLE,
+
 	/** DROP TABLE statement. */
 	SQL_AST_DROP_TABLE,
 	/** DROP VIEW statement. */
@@ -267,6 +270,8 @@ struct ast_property {
 
 /** Description of a column. */
 struct ast_column {
+	/** Link to the next element of the list. */
+	struct stailq_entry link;
 	/** Column name. */
 	struct Token name;
 	/** Column properties. */
@@ -275,6 +280,26 @@ struct ast_column {
 	enum field_type type;
 	/** Flag that shows if column is autoincremented. */
 	bool is_autoinc;
+};
+
+/** Description of table properties. */
+struct ast_table_properties {
+	/** Head of the list of columns. */
+	struct stailq columns;
+	/** Head of the list of constraints. */
+	struct stailq constraints;
+};
+
+/** Description of CREATE TABLE statement. */
+struct ast_create_table {
+	/** Name of new table. */
+	struct Token name;
+	/** Engine of new table. */
+	struct Token engine;
+	/** Columns and constraints of new table. */
+	struct ast_table_properties *properties;
+	/** Flag to throw an error if table exists. */
+	bool if_not_exists;
 };
 
 /** Description of DROP TABLE and DROP VIEW statements. */
@@ -349,6 +374,8 @@ struct sql_ast {
 		struct Token savepoint;
 		/** SELECT statement. */
 		struct ast_select *select;
+		/** CREATE TABLE statement. */
+		struct ast_create_table create_table;
 		/** DROP TABLE and DROP VIEW statements. */
 		struct ast_drop_table drop_table;
 		/** DROP TRIGGER statement. */
@@ -478,3 +505,17 @@ ast_property_list_append(struct region *region, struct ast_property_list *list,
 /** Create new empty structure of column. */
 struct ast_column *
 ast_column_new(struct region *region);
+
+/** Create new empty structure of table properties. */
+struct ast_table_properties *
+ast_table_properties_new(struct region *region);
+
+/** Append a column to table properties. */
+struct ast_table_properties *
+ast_table_properties_append_column(struct ast_table_properties *properties,
+				   struct ast_column *column);
+
+/** Append a constraint to table properties. */
+struct ast_table_properties *
+ast_table_properties_append_constraint(struct ast_table_properties *properties,
+				       struct ast_property *constraint);

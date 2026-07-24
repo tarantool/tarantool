@@ -16,3 +16,6 @@
   variables in the definition of a view, function, or trigger (gh-5485).
 * Errors that were marked as syntactic errors but were not produced by
   the parser are now treated as semantic errors (gh-5485).
+* Indexes for column PRIMARY KEY and UNIQUE constraints are now created before
+  indexes for table PRIMARY KEY and UNIQUE constraints, which changes
+  the order of automatically generated index names (gh-5485).
