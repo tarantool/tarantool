@@ -197,12 +197,7 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 	return list;
 }
 
-/**
- * Convert `struct ast_id_list` to `struct ExprList` of column names.
- *
- * Return NULL on error or if `list == NULL`.
- */
-static struct ExprList *
+struct ExprList *
 expr_list_from_ids(struct Parse *parser, struct ast_id_list *list)
 {
 	if (list == NULL)
@@ -757,5 +752,13 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		sql_expr_delete(res);
 		return NULL;
 	}
+	return res;
+}
+
+struct ast_property *
+ast_property_new(struct region *region)
+{
+	struct ast_property *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
 	return res;
 }

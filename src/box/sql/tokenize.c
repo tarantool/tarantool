@@ -497,6 +497,54 @@ sql_code_ast_drop_constraint(struct Parse *parser, struct Token *name,
 	}
 }
 
+/** Code AST for table or column property. */
+static void
+sql_code_ast_property(struct Parse *parser, struct Token *table,
+		      struct ast_property *property)
+{
+	switch (property->type) {
+	case SQL_AST_PROPERTY_CHECK:
+		sql_create_check_constraint(parser, table, &property->name,
+					    property->expr->str,
+					    property->expr->len, false);
+		break;
+	case SQL_AST_PROPERTY_FOREIGN_KEY: {
+		struct ast_foreign_key *fk = &property->foreign_key;
+		struct ExprList *columns =
+			expr_list_from_ids(parser, fk->columns);
+		if (parser->is_aborted)
+			break;
+		struct ExprList *foreign_columns =
+			expr_list_from_ids(parser, fk->foreign_columns);
+		if (parser->is_aborted) {
+			sql_expr_list_delete(columns);
+			break;
+		}
+		sql_create_foreign_key(parser, table, &property->name, columns,
+				       &fk->foreign_table, foreign_columns);
+		break;
+	}
+	case SQL_AST_PROPERTY_UNIQUE: {
+		struct ExprList *columns =
+			expr_list_from_ast(parser, property->columns);
+		sql_create_index(parser, table, &property->name, columns,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+				 SORT_ORDER_ASC, false);
+		break;
+	}
+	case SQL_AST_PROPERTY_PRIMARY_KEY: {
+		struct ExprList *columns =
+			expr_list_from_ast(parser, property->columns);
+		sql_create_index(parser, table, &property->name, columns,
+				 SQL_INDEX_TYPE_CONSTRAINT_PK,
+				 SORT_ORDER_ASC, false);
+		break;
+	}
+	case SQL_AST_PROPERTY_ANY:
+		assert(false);
+	}
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast)
@@ -554,6 +602,11 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 					     &ast->alter_drop_constraint.column,
 					     &ast->alter_drop_constraint.table,
 					     ast->alter_drop_constraint.type);
+		break;
+	case SQL_AST_ALTER_ADD_CONSTRAINT:
+		parse->initiateTTrans = true;
+		sql_code_ast_property(parse, &ast->alter_add_constraint.table,
+				      ast->alter_add_constraint.con);
 		break;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
