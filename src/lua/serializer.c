@@ -409,6 +409,105 @@ lua_gettable_wrapper(lua_State *L)
 }
 
 static int
+luaL_decoder_metatable_newindex(struct lua_State *L)
+{
+	return luaL_error(L, "can't modify protected decoder metatable");
+}
+
+/**
+ * Protect a decoder metatable from changes from Lua.
+ *
+ * The metatable itself is shared by all decoded arrays or maps of
+ * the same kind. It should expose __serialize to Lua code, but
+ * shouldn't allow updating it.
+ */
+static void
+luaL_protect_decoder_metatable(struct lua_State *L, int idx,
+			       const char *serialize)
+{
+	if (idx < 0)
+		idx = lua_gettop(L) + idx + 1;
+	assert(lua_type(L, idx) == LUA_TTABLE);
+
+	lua_createtable(L, 0, 3);
+
+	lua_createtable(L, 0, 1);
+	lua_pushstring(L, serialize);
+	lua_setfield(L, -2, LUAL_SERIALIZE);
+	lua_setfield(L, -2, "__index");
+
+	lua_pushcfunction(L, luaL_decoder_metatable_newindex);
+	lua_setfield(L, -2, "__newindex");
+
+	lua_pushliteral(L, "protected decoder metatable");
+	lua_setfield(L, -2, "__metatable");
+
+	lua_setmetatable(L, idx);
+}
+
+/**
+ * Apply a valid __serialize hint to a serializer field.
+ */
+static void
+lua_field_set_serialize_hint(struct lua_State *L, struct luaL_serializer *cfg,
+			     int idx, struct luaL_field *field,
+			     const char *type)
+{
+	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
+	    strcmp(type, "sequence") == 0) {
+		field->type = MP_ARRAY; /* Override type */
+		field->size = luaL_arrlen(L, idx);
+		/* YAML: use flow mode if __serialize == 'seq' */
+		if (cfg->has_compact && type[3] == '\0')
+			field->compact = true;
+	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
+		field->type = MP_MAP;   /* Override type */
+		field->size = luaL_maplen(L, idx);
+		/* YAML: use flow mode if __serialize == 'map' */
+		if (cfg->has_compact && type[3] == '\0')
+			field->compact = true;
+	} else {
+		unreachable();
+	}
+}
+
+/**
+ * Try to serialize a table with an internal decoder metatable.
+ *
+ * Unlike user metatables, decoder metatables don't have a raw
+ * __serialize field, so compare them by registry references.
+ *
+ * Return values are the same as for lua_field_try_serialize().
+ */
+static int
+lua_field_try_decoder_metatable(struct lua_State *L,
+				struct luaL_serializer *cfg, int idx,
+				struct luaL_field *field)
+{
+	if (idx < 0)
+		idx = lua_gettop(L) + idx + 1;
+	if (lua_getmetatable(L, idx) == 0)
+		return 1;
+
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_array_metatable_ref);
+	if (lua_rawequal(L, -1, -2)) {
+		lua_pop(L, 2);
+		lua_field_set_serialize_hint(L, cfg, idx, field, "seq");
+		return 0;
+	}
+	lua_pop(L, 1);
+
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_map_metatable_ref);
+	if (lua_rawequal(L, -1, -2)) {
+		lua_pop(L, 2);
+		lua_field_set_serialize_hint(L, cfg, idx, field, "map");
+		return 0;
+	}
+	lua_pop(L, 2);
+	return 1;
+}
+
+static int
 lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
@@ -475,6 +574,9 @@ static int
 lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
+	int res = lua_field_try_decoder_metatable(L, cfg, idx, field);
+	if (res != 1)
+		return res;
 	if (luaL_getmetafield(L, idx, LUAL_SERIALIZE) == 0)
 		return 1;
 	if (lua_isfunction(L, -1)) {
@@ -494,23 +596,13 @@ lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 		return -1;
 	}
 	const char *type = lua_tostring(L, -1);
-	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
-	    strcmp(type, "sequence") == 0) {
-		field->type = MP_ARRAY; /* Override type */
-		field->size = luaL_arrlen(L, idx);
-		/* YAML: use flow mode if __serialize == 'seq' */
-		if (cfg->has_compact && type[3] == '\0')
-			field->compact = true;
-	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
-		field->type = MP_MAP;   /* Override type */
-		field->size = luaL_maplen(L, idx);
-		/* YAML: use flow mode if __serialize == 'map' */
-		if (cfg->has_compact && type[3] == '\0')
-			field->compact = true;
-	} else {
+	if (strcmp(type, "array") != 0 && strcmp(type, "seq") != 0 &&
+	    strcmp(type, "sequence") != 0 && strcmp(type, "map") != 0 &&
+	    strcmp(type, "mapping") != 0) {
 		diag_set(LuajitError, "invalid " LUAL_SERIALIZE " value");
 		return -1;
 	}
+	lua_field_set_serialize_hint(L, cfg, idx, field, type);
 	/* Remove value set by luaL_getmetafield. */
 	lua_pop(L, 1);
 	return 0;
@@ -1119,19 +1211,17 @@ tarantool_lua_serializer_init(struct lua_State *L)
 	luaL_register_type(L, LUAL_SERIALIZER, serializermeta);
 
 	lua_createtable(L, 0, 1);
-	lua_pushliteral(L, "map"); /* YAML will use flow mode */
-	lua_setfield(L, -2, LUAL_SERIALIZE);
 	/* automatically reset hints on table change */
 	luaL_loadstring(L, "setmetatable((...), nil); return rawset(...)");
 	lua_setfield(L, -2, "__newindex");
+	luaL_protect_decoder_metatable(L, -1, "map");
 	luaL_map_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	lua_createtable(L, 0, 1);
-	lua_pushliteral(L, "seq"); /* YAML will use flow mode */
-	lua_setfield(L, -2, LUAL_SERIALIZE);
 	/* automatically reset hints on table change */
 	luaL_loadstring(L, "setmetatable((...), nil); return rawset(...)");
 	lua_setfield(L, -2, "__newindex");
+	luaL_protect_decoder_metatable(L, -1, "seq");
 	luaL_array_metatable_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	return 0;
