@@ -216,10 +216,19 @@ engine_opts ::= ENGINE EQ STRING(A). {
 }
 
 columnlist ::= columnlist COMMA tcons.
-columnlist ::= columnlist COMMA column_def create_column_end.
-columnlist ::= column_def create_column_end.
+columnlist ::= columnlist COMMA column_def_old create_column_end.
+columnlist ::= column_def_old create_column_end.
 
-column_def ::= column_name_and_type carglist.
+column_def_old ::= column_name_and_type carglist.
+
+%type column_def {struct ast_column *}
+column_def(A) ::= nm(N) typedef(Y) column_property_list(L) autoinc(I). {
+  A = ast_column_new(&pParse->region);
+  A->name = N;
+  A->type = Y;
+  A->properties = L;
+  A->is_autoinc = I != 0;
+}
 
 column_name_and_type ::= nm(A) typedef(Y). {
   sql_create_column_start(pParse, NULL, &A, Y);
@@ -229,8 +238,6 @@ create_column_end ::= autoinc(I). {
   uint32_t fieldno = pParse->space->def->field_count - 1;
   if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
     return;
-  if (pParse->new_space == NULL)
-    sql_create_column_end(pParse);
 }
 columnlist ::= tcons.
 
@@ -274,6 +281,67 @@ nm(A) ::= id(A). {
              pParse->line_pos, token, token);
     pParse->is_aborted = true;
   }
+}
+
+%type column_property_list {struct ast_property_list *}
+column_property_list(A) ::= column_property_list(A) column_property(X). {
+  A = ast_property_list_append(&pParse->region, A, X);
+}
+column_property_list(A) ::= . {
+  A = NULL;
+}
+
+%type column_property {struct ast_property *}
+/**
+ * Rule precedence [COLLATE] forces the parser to reduce this rule rather
+ * than shift a follow-up NOT or COLLATE token into the expression: the
+ * token NOT come earlier in the precedence table than COLLATE,
+ * and COLLATE itself is %left - so both shift-reduce conflicts
+ * with `expr NOT ...` / `expr COLLATE ...` resolve as reduce, and the
+ * tokens go to the next column property instead.
+ */
+column_property(A) ::= DEFAULT expr(X). [COLLATE] {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_DEFAULT;
+  A->expr = X;
+}
+column_property(A) ::= NULL. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_NULL;
+}
+column_property(A) ::= NOT NULL onconf(R). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_NOT_NULL;
+  A->action = R;
+}
+column_property(A) ::= cconsname(N) PRIMARY KEY sortorder(Z). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_PRIMARY_KEY;
+  A->name = N;
+  A->order = Z;
+}
+column_property(A) ::= cconsname(N) UNIQUE. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_UNIQUE;
+  A->name = N;
+}
+column_property(A) ::= cconsname(N) CHECK LP expr(X) RP. {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_CHECK;
+  A->name = N;
+  A->expr = X;
+}
+column_property(A) ::= cconsname(N) REFERENCES nm(T) idlist_opt(TA). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_FOREIGN_KEY;
+  A->name = N;
+  A->foreign_key.foreign_table = T;
+  A->foreign_key.foreign_columns = TA;
+}
+column_property(A) ::= COLLATE id(C). {
+  A = ast_property_new(&pParse->region);
+  A->type = SQL_AST_PROPERTY_COLLATE;
+  A->collate = C;
 }
 
 /**
@@ -1510,16 +1578,15 @@ cmd ::= DROP TRIGGER ifexists(E) nm(X). {
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
-column_name(N) ::= COLUMN nm(A). { N = A; }
-column_name(N) ::= nm(A). { N = A; }
-
-cmd ::= alter_column_def carglist create_column_end.
-
-alter_column_def ::= ALTER TABLE nm(T) ADD column_name(N) typedef(Y). {
-  pParse->initiateTTrans = true;
-  create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
-  create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
-  sql_create_column_start(pParse, &T, &N, Y);
+cmd ::= ALTER TABLE nm(T) ADD column_def(C). {
+  pParse->ast.type = SQL_AST_ALTER_ADD_COLUMN;
+  pParse->ast.alter_add_column.table = T;
+  pParse->ast.alter_add_column.col = C;
+}
+cmd ::= ALTER TABLE nm(T) ADD COLUMN column_def(C). {
+  pParse->ast.type = SQL_AST_ALTER_ADD_COLUMN;
+  pParse->ast.alter_add_column.table = T;
+  pParse->ast.alter_add_column.col = C;
 }
 
 cmd ::= ALTER TABLE nm(X) ADD table_constraint_named(C). {

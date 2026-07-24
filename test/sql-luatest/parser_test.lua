@@ -94,5 +94,8 @@ g.test_syntax_errors = function(cg)
         _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
                                CHECK (i > 10) 8;]])
         t.assert_equals(err.message, "Syntax error at line 2 near '8'")
+
+        _, err = box.execute([[ALTER TABLE t ADD COLUMN i INT 9;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '9'")
     end)
 end
