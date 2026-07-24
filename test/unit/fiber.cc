@@ -734,17 +734,17 @@ new_fiber_on_shudown_f(va_list ap)
 {
 	while (!fiber_is_cancelled())
 		fiber_yield();
+	/*
+	 * New client fiber spawned during fiber shutdown is cancelled
+	 * immediately.
+	 */
 	struct fiber *fiber = fiber_new("fiber_on_shutdown", wait_cancel_f);
-	fail_unless(fiber == NULL);
-	fail_unless(!diag_is_empty(diag_get()));
-	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
-			   "fiber is cancelled") == 0);
-	struct fiber *system_fiber =
-			fiber_new_system("system_fiber_on_shutdown", noop_f);
-	fail_unless(system_fiber != NULL);
-	fiber_set_joinable(system_fiber, true);
-	fiber_start(system_fiber);
-	fiber_join(system_fiber);
+	fail_unless(fiber != NULL);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_sleep(0);
+	fail_unless((fiber->flags & FIBER_IS_DEAD) != 0);
+	fiber_join(fiber);
 	return 0;
 }
 
@@ -756,17 +756,22 @@ fiber_test_shutdown(void)
 	struct fiber *fiber1 = fiber_new("fiber1", wait_cancel_f);
 	fail_unless(fiber1 != NULL);
 	fiber_set_joinable(fiber1, true);
+	fiber_start(fiber1);
 	struct fiber *fiber2 = fiber_new_system("fiber2", wait_cancel_f);
 	fail_unless(fiber2 != NULL);
+	fiber_start(fiber2);
 	struct fiber *fiber3 = fiber_new("fiber3", hang_on_cancel_f);
 	fail_unless(fiber3 != NULL);
+	fiber_start(fiber3);
 	struct fiber *fiber4 = fiber_new("fiber4", new_fiber_on_shudown_f);
 	fail_unless(fiber4 != NULL);
 	fiber_set_joinable(fiber4, true);
+	fiber_start(fiber4);
 	struct fiber *fiber6 = fiber_new_system("fiber6", wait_cancel_f);
 	fail_unless(fiber6 != NULL);
 	fiber_set_managed_shutdown(fiber6);
 	fiber_set_joinable(fiber6, true);
+	fiber_start(fiber6);
 
 	int rc = fiber_shutdown(1000.0);
 	fail_unless(rc == 0);
@@ -785,11 +790,48 @@ fiber_test_shutdown(void)
 	fiber_cancel(fiber2);
 	fiber_join(fiber2);
 
+	/*
+	 * New client fiber spawned after fiber shutdown is cancelled
+	 * immediately.
+	 */
 	struct fiber *fiber5 = fiber_new("fiber5", wait_cancel_f);
-	fail_unless(fiber5 == NULL);
-	fail_unless(!diag_is_empty(diag_get()));
-	fail_unless(strcmp(diag_last_error(diag_get())->errmsg,
-			   "fiber is cancelled") == 0);
+	fail_unless(fiber5 != NULL);
+	fiber_set_joinable(fiber5, true);
+	fiber_start(fiber5);
+	fiber_sleep(0);
+	fail_unless((fiber5->flags & FIBER_IS_DEAD) != 0);
+	fail_unless(fiber_join(fiber5) == 0);
+
+	/* New system fiber spawned after fiber shutdown is NOT cancelled. */
+	struct fiber *fiber7 = fiber_new_system("fiber7", wait_cancel_f);
+	fail_unless(fiber7 != NULL);
+	fiber_set_joinable(fiber7, true);
+	fiber_start(fiber7);
+	fiber_sleep(0);
+	fail_unless((fiber7->flags & FIBER_IS_DEAD) == 0);
+	fiber_cancel(fiber7);
+	fail_unless(fiber_join(fiber7) == 0);
+
+	/*
+	 * New system fiber with managed shutdown spawned after fiber shutdown
+	 * is cancelled immediately.
+	 */
+	struct fiber *fiber8 = fiber_new_system("fiber8", wait_cancel_f);
+	fail_unless(fiber8 != NULL);
+	fiber_set_joinable(fiber8, true);
+	fiber_set_managed_shutdown(fiber8);
+	fiber_start(fiber8);
+	fiber_sleep(0);
+	fail_unless((fiber8->flags & FIBER_IS_DEAD) != 0);
+	fail_unless(fiber_join(fiber8) == 0);
+
+	/**
+	 * Test that we don't try to cancel dead non-joinable fiber (this
+	 * will lead to panic.
+	 */
+	struct fiber *fiber9 = fiber_new("fiber9", noop_f);
+	fail_unless(fiber9 != NULL);
+	fiber_start(fiber9);
 
 	header();
 }

@@ -851,6 +851,12 @@ fiber_yield_impl(MAYBE_UNUSED bool will_switch_back)
 	assert((callee->flags & FIBER_IS_RUNNING) == 0);
 
 	caller->flags &= ~FIBER_IS_RUNNING;
+	if (unlikely(cord->is_shutdown) &&
+	    !(caller->flags & (FIBER_IS_CANCELLED |
+			       FIBER_IS_DEAD)) &&
+	    (!(caller->flags & FIBER_IS_SYSTEM) ||
+	     (caller->flags & FIBER_MANAGED_SHUTDOWN)))
+		fiber_cancel(caller);
 	cord->fiber = callee;
 	callee->flags = (callee->flags & ~FIBER_IS_READY) | FIBER_IS_RUNNING;
 
@@ -1553,11 +1559,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	struct fiber *fiber = NULL;
 	assert(fiber_attr != NULL);
 	cord_collect_garbage(cord);
-
-	if (cord->is_shutdown && !(fiber_attr->flags & FIBER_IS_SYSTEM)) {
-		diag_set(FiberIsCancelled);
-		return NULL;
-	}
 
 	if (fiber_is_reusable(fiber_attr->flags) && !rlist_empty(&cord->dead)) {
 		fiber = rlist_first_entry(&cord->dead, struct fiber, link);
