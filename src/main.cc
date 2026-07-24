@@ -1042,9 +1042,6 @@ main(int argc, char **argv)
 		 */
 		on_shutdown_fiber = fiber_new_system("on_shutdown",
 						     on_shutdown_f);
-		if (on_shutdown_fiber == NULL)
-			diag_raise();
-
 		/*
 		 * The call to tarantool_free() below, thanks to
 		 * on_shutdown triggers, works all the time

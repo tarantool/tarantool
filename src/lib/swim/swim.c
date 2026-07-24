@@ -1901,11 +1901,7 @@ swim_event_handler_f(va_list va)
 struct swim *
 swim_new(uint64_t generation)
 {
-	struct swim *swim = (struct swim *) calloc(1, sizeof(*swim));
-	if (swim == NULL) {
-		diag_set(OutOfMemory, sizeof(*swim), "calloc", "swim");
-		return NULL;
-	}
+	struct swim *swim = xcalloc(1, sizeof(*swim));
 	swim->initial_generation = generation;
 	swim->members = mh_swim_table_new();
 	rlist_create(&swim->round_queue);
@@ -1929,10 +1925,6 @@ swim_new(uint64_t generation)
 	stailq_create(&swim->event_queue);
 	swim->event_handler = fiber_new_system("SWIM event handler",
 					       swim_event_handler_f);
-	if (swim->event_handler == NULL) {
-		swim_delete(swim);
-		return NULL;
-	}
 	fiber_set_joinable(swim->event_handler, true);
 	fiber_set_managed_shutdown(swim->event_handler);
 	fiber_start(swim->event_handler, swim);

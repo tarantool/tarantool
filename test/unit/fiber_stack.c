@@ -37,7 +37,7 @@ main_f(va_list ap)
 #ifdef NDEBUG
 	plan(1);
 #else
-	plan(11);
+	plan(10);
 #endif
 
 	/*
@@ -83,8 +83,10 @@ main_f(va_list ap)
 	fiber = fiber_new_ex("test_mprotect", fiber_attr, noop_f);
 	inj->iparam = -1;
 
-	ok(fiber == NULL, "mprotect: failed to setup fiber guard page");
-	ok(diag_get() != NULL, "mprotect: diag is armed after error");
+	ok(fiber != NULL, "mprotect: fiber guard page setup failure ignored");
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_join(fiber);
 
 	/*
 	 * Check madvise error on fiber creation.
@@ -131,7 +133,11 @@ main_f(va_list ap)
 	inj->iparam = -1;
 
 	used_after = slab_cache_used(slabc);
+#ifndef ENABLE_ASAN
 	ok(used_after > used_before, "expected leak detected");
+#else
+	ok(used_after == used_before, "no leak under ASAN");
+#endif
 
 	cord_collect_garbage(cord());
 	ok(fiber_count_total() == fiber_count, "fiber is deleted");

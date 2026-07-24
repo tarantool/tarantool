@@ -177,6 +177,8 @@ alloc_failure(const char *filename, int line, size_t size)
 			alloc_failure(__FILE__, __LINE__, (size));		\
 	})
 
+#define xslab_get(p, size)	xalloc_impl((size), slab_get, (p), (size))
+
 /** \cond public */
 
 /**

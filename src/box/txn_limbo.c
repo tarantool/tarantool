@@ -292,8 +292,6 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 	limbo->term = 1;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
 					 txn_limbo_worker_f);
-	if (limbo->worker == NULL)
-		panic("failed to allocate synchronous queue worker fiber");
 	limbo->worker->f_arg = limbo;
 	fiber_set_joinable(limbo->worker, true);
 	trigger_create(&limbo->on_ack, txn_limbo_on_ack_f, limbo, NULL);

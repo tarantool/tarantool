@@ -243,8 +243,7 @@ fiber_self(void);
  * Create a new fiber.
  *
  * Takes a fiber from fiber cache, if it's not empty.
- * Can fail only if there is not enough memory for
- * the fiber structure or fiber stack.
+ * Never fails (never returns NULL).
  *
  * The created fiber automatically returns itself
  * to the fiber cache when its "main" function
@@ -261,8 +260,7 @@ fiber_new(const char *name, fiber_func f);
 /**
  * Create a new fiber with defined attributes.
  *
- * Can fail only if there is not enough memory for
- * the fiber structure or fiber stack.
+ * Never fails (never returns NULL).
  *
  * The created fiber automatically returns itself
  * to the fiber cache if has default stack size
@@ -628,6 +626,12 @@ struct fiber {
 	struct slab *stack_slab;
 	/** Coro stack addr. */
 	void *stack;
+	/**
+	 * Whether fiber stack guard page is protected with mprotect().
+	 * Can be false in case of mprotect() failure or under ASAN
+	 * when we turn this feature off.
+	 */
+	bool has_guard;
 #ifdef HAVE_MADV_DONTNEED
 	/**
 	 * We want to keep total stack memory usage low while still
@@ -1013,7 +1017,7 @@ cord_slab_cache(void)
  * @details
  * Works the same way as fiber_new(), but uses fiber_attr_default
  * supplemented by the FIBER_IS_SYSTEM flag in order to create a
- * fiber.
+ * fiber. Never fails (never returns NULL).
  *
  * @param name       string with fiber name
  * @param f          func for run inside fiber
@@ -1301,31 +1305,6 @@ fiber_testcancel(void)
 	 */
 	if (fiber_is_cancelled())
 		tnt_raise(FiberIsCancelled);
-}
-
-static inline struct fiber *
-fiber_new_xc(const char *name, fiber_func func)
-{
-	struct fiber *f = fiber_new(name, func);
-	if (f == NULL) {
-		diag_raise();
-		unreachable();
-	}
-	return f;
-}
-
-/**
- * The same as fiber_new_system(), but throws an exception
- */
-static inline struct fiber *
-fiber_new_system_xc(const char *name, fiber_func func)
-{
-	struct fiber *f = fiber_new_system(name, func);
-	if (f == NULL) {
-		diag_raise();
-		unreachable();
-	}
-	return f;
 }
 
 static inline int

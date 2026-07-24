@@ -141,10 +141,6 @@ watchable_wakeup_worker(struct watchable *watchable)
 	if (watchable->worker == NULL) {
 		watchable->worker = fiber_new_system("box.watchable",
 						     watchable_worker_f);
-		if (watchable->worker == NULL) {
-			diag_log();
-			panic("failed to start box.watchable worker fiber");
-		}
 		fiber_set_joinable(watchable->worker, true);
 		watchable->worker->f_arg = watchable;
 	}
@@ -320,11 +316,8 @@ watcher_run(struct watcher *watcher)
 	if ((watcher->flags & WATCHER_RUN_ASYNC) != 0) {
 		struct fiber *fiber = fiber_new("box.watcher",
 						watcher_run_async_f);
-		if (fiber != NULL) {
-			fiber_start(fiber, watcher);
-			return;
-		}
-		diag_log();
+		fiber_start(fiber, watcher);
+		return;
 	}
 	watcher_do_run(watcher);
 }

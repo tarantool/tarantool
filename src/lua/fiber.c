@@ -475,10 +475,6 @@ fiber_create(struct lua_State *L)
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	struct fiber *f = fiber_new("lua", lua_fiber_run_f);
-	if (f == NULL) {
-		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
-		luaT_error(L);
-	}
 #ifdef ENABLE_BACKTRACE
 	if (fiber_parent_backtrace_is_enabled()) {
 		struct fiber *parent = fiber();

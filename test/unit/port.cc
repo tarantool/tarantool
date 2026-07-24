@@ -1219,7 +1219,7 @@ main(void)
 			L, "mp = require('msgpack')") == 0);
 
 	/* XXX: session cleanup tied to fiber stop (session_new_on_demand). */
-	struct fiber *main = fiber_new_system_xc("main", main_f);
+	struct fiber *main = fiber_new_system("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);
 

@@ -4526,14 +4526,10 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		    recovery_state == FINISHED_RECOVERY) {
 			fiber = fiber_new_system("synchro_filter_enabler",
 						 start_synchro_filtering);
-			if (fiber == NULL)
-				return -1;
 		} else if (version <= version_id(2, 10, 1) &&
-			   recovery_state == FINISHED_RECOVERY) {
+			 recovery_state == FINISHED_RECOVERY) {
 			fiber = fiber_new_system("synchro_filter_disabler",
 						 stop_synchro_filtering);
-			if (fiber == NULL)
-				return -1;
 		}
 		data->fiber = fiber;
 		/*
