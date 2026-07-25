@@ -1447,9 +1447,9 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	if (!is_new_tuple) {
 		/* Make the change in index. */
 		struct index *index = old_link->in_index;
-		struct tuple *removed, *unused;
+		struct tuple *removed;
 		if (memtx_index_replace(index, old_top->tuple, new_top->tuple,
-					DUP_REPLACE, &removed, &unused) != 0) {
+					DUP_REPLACE, &removed, NULL) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rebind story in index");
@@ -1635,11 +1635,10 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 			assert(link->older_story == NULL);
 			if (story->del_psn > 0 && link->in_index != NULL) {
 				struct index *index = link->in_index;
-				struct tuple *removed, *unused;
+				struct tuple *removed;
 				if (memtx_index_replace(index, story->tuple,
 							NULL, DUP_INSERT,
-							&removed,
-							&unused) != 0) {
+							&removed, NULL) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
@@ -2602,12 +2601,10 @@ rollback:
 	 * Rollback index changes.
 	 */
 	for (; i > 0; i--) {
-		struct tuple *delete;
-		struct tuple *successor;
 		struct index *index = space->index[i - 1];
 		if (memtx_index_replace(index, new_tuple,
 					directly_replaced[i - 1], DUP_INSERT,
-					&delete, &successor) != 0) {
+					NULL, NULL) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
@@ -2944,7 +2941,6 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 		return;
 	struct tuple *old_tuple;
 	for (size_t i = 0; i < stmt->space->index_count; i++) {
-		struct tuple *unused;
 		/*
 		 * It's either <= 1 in old_tuples or no new new_tuple
 		 * (see a comment in the memtx_engine_rollback_statement).
@@ -2952,8 +2948,8 @@ memtx_tx_history_rollback_empty_stmt(struct txn_stmt *stmt)
 		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
 			if (memtx_index_replace(stmt->space->index[i],
 						new_tuple, old_tuple,
-						DUP_REPLACE_OR_INSERT,
-						&unused, &unused) != 0) {
+						DUP_REPLACE_OR_INSERT, NULL,
+						NULL) != 0) {
 				panic("failed to rebind story in index on "
 				      "rollback of statement without story");
 			}
@@ -3654,10 +3650,8 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 			if (new_tuple == story->tuple)
 				continue;
 
-			struct tuple *unused;
 			if (memtx_index_replace(index, story->tuple, new_tuple,
-						DUP_REPLACE, &unused,
-						&unused) != 0) {
+						DUP_REPLACE, NULL, NULL) != 0) {
 				diag_log();
 				unreachable();
 				panic("failed to rebind story in index on "
