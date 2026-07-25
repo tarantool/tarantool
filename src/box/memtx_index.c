@@ -446,6 +446,12 @@ memtx_index_replace(struct index *index, struct tuple *old_tuple,
 		    struct tuple *new_tuple, enum dup_replace_mode mode,
 		    struct tuple **result, struct tuple **successor)
 {
+	struct tuple *unused_result;
+	struct tuple *unused_successor;
+	if (result == NULL)
+		result = &unused_result;
+	if (successor == NULL)
+		successor = &unused_successor;
 	/* Disabled functional indexes have no function or physical entries. */
 	if (index->def->key_def->for_func_index &&
 	    index->def->key_def->func_index_func == NULL) {
@@ -499,7 +505,6 @@ generic_memtx_index_reserve(struct index *index, uint32_t size_hint)
 int
 generic_memtx_index_build_next(struct index *index, struct tuple *tuple)
 {
-	struct tuple *unused;
 	/*
 	 * Note this is not no-op call in case of rtee index:
 	 * reserving 0 bytes is required during rtree recovery.
@@ -507,8 +512,7 @@ generic_memtx_index_build_next(struct index *index, struct tuple *tuple)
 	 */
 	if (memtx_index_reserve(index, 0) != 0)
 		return -1;
-	return memtx_index_replace(index, NULL, tuple, DUP_INSERT, &unused,
-				   &unused);
+	return memtx_index_replace(index, NULL, tuple, DUP_INSERT, NULL, NULL);
 }
 
 void
