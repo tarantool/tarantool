@@ -514,7 +514,7 @@ test:do_catchsql_test(
 		INSERT INTO not_exist VALUES(1) a;
 	]], {
 		-- <sql-errors-1.46>
-        1, "Space 'not_exist' does not exist"
+        1, "Syntax error at line 1 near 'a'"
 		-- </sql-errors-1.46>
 	})
 
