@@ -429,13 +429,16 @@ ifexists(A) ::= .            {A = 0;}
 
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
-cmd ::= createkw VIEW ifnotexists(E) nm(Y) eidlist_opt(C) AS select_old(S). {
-  pParse->initiateTTrans = true;
-  sql_create_view(pParse, pParse->zTail, &Y, C, S, E);
+cmd ::= CREATE VIEW ifnotexists(E) nm(N) idlist_opt(C) AS select(S). {
+  pParse->ast.type = SQL_AST_CREATE_VIEW;
+  pParse->ast.create_view.name = N;
+  pParse->ast.create_view.select = S;
+  pParse->ast.create_view.columns = C;
+  pParse->ast.create_view.if_not_exists = E;
 }
-cmd ::= VIEW_ENTRY createkw VIEW ifnotexists nm eidlist_opt AS select_old(S). {
-  pParse->parsed_ast_type = AST_TYPE_SELECT;
-  pParse->parsed_ast.select = S;
+cmd ::= VIEW_ENTRY CREATE VIEW ifnotexists nm idlist_opt AS select(S). {
+  pParse->ast.type = SQL_AST_VIEW;
+  pParse->ast.select = S;
 }
 
 //////////////////////// The SELECT statement /////////////////////////////////
@@ -1310,47 +1313,6 @@ cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
 %type uniqueflag {int}
 uniqueflag(A) ::= UNIQUE.  {A = SQL_INDEX_TYPE_UNIQUE;}
 uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
-
-
-// The eidlist non-terminal (Expression Id List) generates an ExprList
-// from a list of identifiers.  The identifier names are in ExprList.a[].zName.
-// This list is stored in an ExprList rather than an IdList so that it
-// can be easily sent to sqlColumnsExprList().
-//
-// eidlist is grouped with CREATE INDEX because it used to be the non-terminal
-// used for the arguments to an index.  That is just an historical accident.
-//
-%type eidlist {ExprList*}
-%destructor eidlist {sql_expr_list_delete($$);}
-%type eidlist_opt {ExprList*}
-%destructor eidlist_opt {sql_expr_list_delete($$);}
-
-%include {
-  /* Add a single new term to an ExprList that is used to store a
-  ** list of identifiers.  Report an error if the ID list contains
-  ** a COLLATE clause or an ASC or DESC keyword, except ignore the
-  ** error while parsing a legacy schema.
-  */
-  static ExprList *parserAddExprIdListTerm(
-    Parse *pParse,
-    ExprList *pPrior,
-    Token *pIdToken
-  ){
-    ExprList *p = sql_expr_list_append(pPrior, NULL);
-    sqlExprListSetName(pParse, p, pIdToken, 1);
-    return p;
-  }
-} // end %include
-
-eidlist_opt(A) ::= .                         {A = 0;}
-eidlist_opt(A) ::= LP eidlist(X) RP.         {A = X;}
-eidlist(A) ::= eidlist(A) COMMA nm(Y).  {
-  A = parserAddExprIdListTerm(pParse, A, &Y);
-}
-eidlist(A) ::= nm(Y). {
-  A = parserAddExprIdListTerm(pParse, 0, &Y); /*A-overwrites-Y*/
-}
-
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //

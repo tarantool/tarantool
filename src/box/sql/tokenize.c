@@ -641,9 +641,28 @@ sql_code_create_table(struct Parse *parser, struct ast_create_table *stmt)
 	vdbe_emit_create_table(parser, stmt->if_not_exists);
 }
 
+/** Code AST for CREATE VIEW. */
+static void
+sql_code_create_view(struct Parse *parser, struct ast_create_view *stmt,
+		     const char *sql)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	parser->initiateTTrans = true;
+	struct Select *select = select_from_ast(parser, stmt->select);
+	struct ExprList *cols = expr_list_from_ids(parser, stmt->columns);
+	if (parser->is_aborted) {
+		sql_expr_list_delete(cols);
+		sql_select_delete(select);
+		return;
+	}
+	sql_create_view(parser, sql, &stmt->name, cols, select,
+			stmt->if_not_exists);
+}
+
 /** Code given AST. */
 static void
-sql_code_ast(struct Parse *parse, struct sql_ast *ast)
+sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 {
 	if (parse->is_aborted)
 		return;
@@ -671,6 +690,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		break;
 	case SQL_AST_CREATE_TABLE:
 		sql_code_create_table(parse, &ast->create_table);
+		break;
+	case SQL_AST_CREATE_VIEW:
+		sql_code_create_view(parse, &ast->create_view, sql);
 		break;
 	case SQL_AST_DROP_VIEW:
 	case SQL_AST_DROP_TABLE:
@@ -718,6 +740,8 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		sql_code_ast_property(parse, &ast->alter_add_constraint.table,
 				      ast->alter_add_constraint.con, false);
 		break;
+	case SQL_AST_VIEW:
+		return;
 	default:
 		assert(parse->ast.type == SQL_AST_UNKNOWN);
 	}
@@ -805,7 +829,7 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 		}
 		pParse->line_pos += last.n;
 	}
-	sql_code_ast(pParse, &pParse->ast);
+	sql_code_ast(pParse, &pParse->ast, pParse->zTail);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
 	return pParse->is_aborted ? -1 : 0;
@@ -840,10 +864,10 @@ sql_parse_view(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_VIEW_ENTRY) != 0)
 		return NULL;
-	assert(parser->parsed_ast_type == AST_TYPE_SELECT);
-	struct Select *res = parser->parsed_ast.select;
-	parser->parsed_ast.select = NULL;
-	if (parser->nVar > 0) {
+	struct sql_ast *ast = &parser->ast;
+	assert(ast->type == SQL_AST_VIEW);
+	struct Select *res = select_from_ast(parser, ast->select);
+	if (res != NULL && parser->nVar > 0) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 			 "Parameters are not allowed in views");
 		parser->is_aborted = true;

@@ -100,5 +100,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[CREATE TABLE t(i INT) 0;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '0'")
+
+        _, err = box.execute([[CREATE VIEW v AS SELECT * FROM t 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
