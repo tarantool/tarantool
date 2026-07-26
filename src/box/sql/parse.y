@@ -735,14 +735,6 @@ using_opt(U) ::= USING LP idlist(L) RP.  {U = L;}
 using_opt(U) ::= .                        {U = 0;}
 
 %type orderby_opt {struct ast_expr_list *}
-
-// the sortlist non-terminal stores a list of expression where each
-// expression is optionally followed by ASC or DESC to indicate the
-// sort order.
-//
-%type sortlist_old {ExprList*}
-%destructor sortlist_old {sql_expr_list_delete($$);}
-
 orderby_opt(A) ::= .                          {A = 0;}
 orderby_opt(A) ::= ORDER BY sortlist(X).      {A = X;}
 
@@ -767,16 +759,6 @@ sortlist_autoinc(A) ::= expr(Y) sortorder(Z) autoinc(I). {
   A = ast_expr_list_append(&pParse->region, NULL, Y);
   ast_expr_list_set_order(A, Z);
   ast_expr_list_set_autoinc(A, I != 0);
-}
-
-sortlist_old(A) ::= sortlist_old(A) COMMA expr_old(Y) sortorder(Z). {
-  A = sql_expr_list_append(A, Y.pExpr);
-  sqlExprListSetSortOrder(A,Z);
-}
-sortlist_old(A) ::= expr_old(Y) sortorder(Z). {
-  /* A-overwrites-Y. */
-  A = sql_expr_list_append(NULL, Y.pExpr);
-  sqlExprListSetSortOrder(A,Z);
 }
 
 %type sortorder {int}
@@ -1304,15 +1286,21 @@ nexprlist(A) ::= expr(Y). {
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
-        ON nm(Y) LP sortlist_old(Z) RP. {
-  pParse->initiateTTrans = true;
-  sql_create_index(pParse, &Y, &X, Z, U, SORT_ORDER_ASC, NE);
+cmd ::= CREATE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
+  pParse->ast.type = SQL_AST_CREATE_INDEX;
+  pParse->ast.create_index.name = X;
+  pParse->ast.create_index.table = Y;
+  pParse->ast.create_index.columns = Z;
+  pParse->ast.create_index.if_not_exists = E;
 }
-
-%type uniqueflag {int}
-uniqueflag(A) ::= UNIQUE.  {A = SQL_INDEX_TYPE_UNIQUE;}
-uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
+cmd ::= CREATE UNIQUE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
+  pParse->ast.type = SQL_AST_CREATE_INDEX;
+  pParse->ast.create_index.name = X;
+  pParse->ast.create_index.table = Y;
+  pParse->ast.create_index.columns = Z;
+  pParse->ast.create_index.if_not_exists = E;
+  pParse->ast.create_index.is_unique = true;
+}
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
