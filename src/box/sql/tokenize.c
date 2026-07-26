@@ -660,6 +660,22 @@ sql_code_create_view(struct Parse *parser, struct ast_create_view *stmt,
 			stmt->if_not_exists);
 }
 
+/** Code AST for CREATE INDEX. */
+static void
+sql_code_create_index(struct Parse *parser, struct ast_create_index *stmt)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	parser->initiateTTrans = true;
+	struct ExprList *columns = expr_list_from_ast(parser, stmt->columns);
+	if (parser->is_aborted)
+		return;
+	int type = stmt->is_unique ? SQL_INDEX_TYPE_UNIQUE :
+				     SQL_INDEX_TYPE_NON_UNIQUE;
+	sql_create_index(parser, &stmt->table, &stmt->name, columns, type,
+			 SORT_ORDER_ASC, stmt->if_not_exists);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
@@ -693,6 +709,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		break;
 	case SQL_AST_CREATE_VIEW:
 		sql_code_create_view(parse, &ast->create_view, sql);
+		break;
+	case SQL_AST_CREATE_INDEX:
+		sql_code_create_index(parse, &ast->create_index);
 		break;
 	case SQL_AST_DROP_VIEW:
 	case SQL_AST_DROP_TABLE:

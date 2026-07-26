@@ -36,6 +36,8 @@ enum sql_ast_type {
 	SQL_AST_CREATE_TABLE,
 	/** CREATE VIEW statement. */
 	SQL_AST_CREATE_VIEW,
+	/** CREATE INDEX statement. */
+	SQL_AST_CREATE_INDEX,
 
 	/** DROP TABLE statement. */
 	SQL_AST_DROP_TABLE,
@@ -319,6 +321,20 @@ struct ast_create_view {
 	bool if_not_exists;
 };
 
+/** Description of CREATE INDEX statement. */
+struct ast_create_index {
+	/** New index name. */
+	struct Token name;
+	/** Name of table where index is created. */
+	struct Token table;
+	/** Columns that are parts of the index. */
+	struct ast_expr_list *columns;
+	/** Flag to throw an error if index exists. */
+	bool if_not_exists;
+	/** Flag to show if index is unique. */
+	bool is_unique;
+};
+
 /** Description of DROP TABLE and DROP VIEW statements. */
 struct ast_drop_table {
 	/** Table or view name. */
@@ -395,6 +411,8 @@ struct sql_ast {
 		struct ast_create_table create_table;
 		/** CREATE VIEW statement. */
 		struct ast_create_view create_view;
+		/** CREATE INDEX statement. */
+		struct ast_create_index create_index;
 		/** DROP TABLE and DROP VIEW statements. */
 		struct ast_drop_table drop_table;
 		/** DROP TRIGGER statement. */
