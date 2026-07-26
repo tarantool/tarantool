@@ -694,6 +694,43 @@ sql_code_insert(struct Parse *parser, struct ast_insert *insert)
 	sqlInsert(parser, src, select, columns, insert->action);
 }
 
+/** Code AST for UPDATE statement. */
+static void
+sql_code_update(struct Parse *parser, struct ast_update *update)
+{
+	assert(update->set_list != NULL);
+	struct With *with = with_from_ast(parser, update->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+
+	struct ExprList *set_list =
+		expr_list_from_set_list(parser, update->set_list);
+	if (parser->is_aborted)
+		return;
+
+	if (set_list->nExpr > SQL_MAX_COLUMN) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+			 "The number of columns in set list",
+			 update->set_list->len, SQL_MAX_COLUMN);
+		parser->is_aborted = true;
+		sql_expr_list_delete(set_list);
+		return;
+	}
+
+	struct Expr *where = expr_from_ast(parser, update->where);
+	if (parser->is_aborted) {
+		sql_expr_list_delete(set_list);
+		return;
+	}
+
+	struct SrcList *src = sql_src_list_append(NULL, &update->table);
+	sqlSrcListIndexedBy(src, &update->indexed_by);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	sqlUpdate(parser, src, set_list, where, update->action);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
@@ -724,6 +761,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		break;
 	case SQL_AST_INSERT:
 		sql_code_insert(parse, ast->insert);
+		break;
+	case SQL_AST_UPDATE:
+		sql_code_update(parse, ast->update);
 		break;
 	case SQL_AST_CREATE_TABLE:
 		sql_code_create_table(parse, &ast->create_table);

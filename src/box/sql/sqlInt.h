@@ -2536,12 +2536,12 @@ void sqlExprAssignVarNumber(Parse *, Expr *, u32);
  *
  * @param pParse Parsing context.
  * @param pList List to which to append. Might be NULL.
- * @param columns List of names of LHS of the assignment.
+ * @param pColumns List of names of LHS of the assignment.
  * @param pExpr Vector expression to be appended. Might be NULL.
  */
 struct ExprList *
 sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
-			struct ast_id_list *columns, struct Expr *pExpr);
+			struct IdList *pColumns, struct Expr *pExpr);
 
 /** Return TRUE if expression is term, FALSE otherwise. */
 static inline bool

@@ -86,5 +86,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[INSERT INTO t VALUES (1) 3;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[UPDATE t SET i = 1 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
     end)
 end

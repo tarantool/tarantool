@@ -822,37 +822,35 @@ where_opt(A) ::= WHERE expr(X). {
 
 ////////////////////////// The UPDATE command ////////////////////////////////
 //
-cmd ::= with_old(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
-        where_opt_old(W).  {
-  sqlWithPush(pParse, C, 1);
-  sqlSrcListIndexedBy(X, &I);
-  if (Y != NULL && Y->nExpr > SQL_MAX_COLUMN) {
-    diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of columns in set "\
-             "list", Y->nExpr, SQL_MAX_COLUMN);
-    pParse->is_aborted = true;
-  }
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sqlUpdate(pParse,X,Y,W,R);
+cmd ::= with(W) update(U). {
+  U->with = W;
+  pParse->ast.type = SQL_AST_UPDATE;
+  pParse->ast.update = U;
 }
 
-%type setlist {ExprList*}
-%destructor setlist {sql_expr_list_delete($$);}
+%type update {struct ast_update *}
+update(A) ::= UPDATE orconf(R) nm(X) indexed_opt(I) SET setlist(Y)
+              where_opt(W). {
+  A = ast_update_new(&pParse->region);
+  A->table = X;
+  A->indexed_by = I;
+  A->set_list = Y;
+  A->where = W;
+  A->action = R;
+}
 
-setlist(A) ::= setlist(A) COMMA nm(X) EQ expr_old(Y). {
-  A = sql_expr_list_append(A, Y.pExpr);
-  sqlExprListSetName(pParse, A, &X, 1);
+%type setlist {struct ast_set_list *}
+setlist(A) ::= setlist(A) COMMA nm(X) EQ expr(Y). {
+  A = ast_set_list_append_expr(&pParse->region, A, &X, Y);
 }
-setlist(A) ::= setlist(A) COMMA LP idlist(X) RP EQ expr_old(Y). {
-  A = sqlExprListAppendVector(pParse, A, X, Y.pExpr);
+setlist(A) ::= setlist(A) COMMA LP idlist(X) RP EQ expr(Y). {
+  A = ast_set_list_append_vector(&pParse->region, A, X, Y);
 }
-setlist(A) ::= nm(X) EQ expr_old(Y). {
-  A = sql_expr_list_append(NULL, Y.pExpr);
-  sqlExprListSetName(pParse, A, &X, 1);
+setlist(A) ::= nm(X) EQ expr(Y). {
+  A = ast_set_list_append_expr(&pParse->region, NULL, &X, Y);
 }
-setlist(A) ::= LP idlist(X) RP EQ expr_old(Y). {
-  A = sqlExprListAppendVector(pParse, 0, X, Y.pExpr);
+setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
+  A = ast_set_list_append_vector(&pParse->region, NULL, X, Y);
 }
 
 ////////////////////////// The INSERT command /////////////////////////////////
@@ -1431,7 +1429,7 @@ tridxby ::= NOT INDEXED. {
 // UPDATE 
 trigger_cmd(A) ::=
    UPDATE orconf(R) nm(X) tridxby SET setlist(Y) where_opt_old(Z). {
-     A = sql_trigger_update_step(&X, Y, Z, R);
+     A = sql_trigger_update_step(&X, expr_list_from_set_list(pParse, Y), Z, R);
      if (A == NULL) {
         pParse->is_aborted = true;
         return;
