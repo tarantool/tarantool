@@ -763,6 +763,77 @@ ast_insert_new(struct region *region)
 	return res;
 }
 
+struct ast_set_list *
+ast_set_list_append_expr(struct region *region, struct ast_set_list *list,
+			 struct Token *name, struct ast_expr *expr)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	struct ast_set_list_entry *entry =
+		xregion_alloc_object(region, typeof(*entry));
+	memset(entry, 0, sizeof(*entry));
+	entry->name = *name;
+	entry->expr = expr;
+	stailq_add_tail(&list->head, &entry->link);
+	list->len++;
+	return list;
+}
+
+struct ast_set_list *
+ast_set_list_append_vector(struct region *region, struct ast_set_list *list,
+			   struct ast_id_list *ids, struct ast_expr *expr)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	struct ast_set_list_entry *entry =
+		xregion_alloc_object(region, typeof(*entry));
+	memset(entry, 0, sizeof(*entry));
+	entry->ids = ids;
+	entry->expr = expr;
+	stailq_add_tail(&list->head, &entry->link);
+	list->len++;
+	return list;
+}
+
+struct ExprList *
+expr_list_from_set_list(struct Parse *parser, struct ast_set_list *list)
+{
+	assert(list != NULL);
+	struct ExprList *res = NULL;
+	struct ast_set_list_entry *entry;
+	stailq_foreach_entry(entry, &list->head, link) {
+		struct Expr *expr = expr_from_ast(parser, entry->expr);
+		if (expr == NULL)
+			break;
+		if (entry->ids != NULL) {
+			struct IdList *ids = id_list_from_ast(entry->ids);
+			res = sqlExprListAppendVector(parser, res, ids, expr);
+		} else {
+			res = sql_expr_list_append(res, expr);
+			sqlExprListSetName(parser, res, &entry->name, 1);
+		}
+	}
+	if (parser->is_aborted) {
+		sql_expr_list_delete(res);
+		return NULL;
+	}
+	return res;
+}
+
+struct ast_update *
+ast_update_new(struct region *region)
+{
+	struct ast_update *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
 struct ast_property *
 ast_property_new(struct region *region)
 {
