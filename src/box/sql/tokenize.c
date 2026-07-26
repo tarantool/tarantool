@@ -676,6 +676,24 @@ sql_code_create_index(struct Parse *parser, struct ast_create_index *stmt)
 			 SORT_ORDER_ASC, stmt->if_not_exists);
 }
 
+/** Code AST for INSERT statement. */
+static void
+sql_code_insert(struct Parse *parser, struct ast_insert *insert)
+{
+	struct With *with = with_from_ast(parser, insert->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+	struct Select *select = select_from_ast(parser, insert->select);
+	if (parser->is_aborted)
+		return;
+	struct SrcList *src = sql_src_list_append(NULL, &insert->table);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	struct IdList *columns = id_list_from_ast(insert->columns);
+	sqlInsert(parser, src, select, columns, insert->action);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
@@ -703,6 +721,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		break;
 	case SQL_AST_SELECT:
 		sql_code_select(parse, ast->select);
+		break;
+	case SQL_AST_INSERT:
+		sql_code_insert(parse, ast->insert);
 		break;
 	case SQL_AST_CREATE_TABLE:
 		sql_code_create_table(parse, &ast->create_table);

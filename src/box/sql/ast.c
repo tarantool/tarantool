@@ -755,6 +755,14 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 	return res;
 }
 
+struct ast_insert *
+ast_insert_new(struct region *region)
+{
+	struct ast_insert *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
 struct ast_property *
 ast_property_new(struct region *region)
 {
