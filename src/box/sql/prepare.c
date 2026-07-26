@@ -236,9 +236,6 @@ sql_parser_destroy(Parse *parser)
 	sql_get()->lookaside.bDisable -= parser->disableLookaside;
 	parser->disableLookaside = 0;
 	switch (parser->parsed_ast_type) {
-	case AST_TYPE_SELECT:
-		sql_select_delete(parser->parsed_ast.select);
-		break;
 	case AST_TYPE_EXPR:
 		sql_expr_delete(parser->parsed_ast.expr);
 		break;
