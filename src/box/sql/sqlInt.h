@@ -1870,7 +1870,6 @@ struct TriggerPrg {
 
 enum ast_type {
 	AST_TYPE_UNDEFINED = 0,
-	AST_TYPE_SELECT,
 	AST_TYPE_EXPR,
 	AST_TYPE_TRIGGER,
 	ast_type_MAX
@@ -2000,7 +1999,6 @@ struct Parse {
 	/** Objects used for functions, views, and triggers creation. */
 	union {
 		struct Expr *expr;
-		struct Select *select;
 		struct sql_trigger *trigger;
 	} parsed_ast;
 };
