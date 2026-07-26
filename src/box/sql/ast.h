@@ -33,6 +33,8 @@ enum sql_ast_type {
 	SQL_AST_SELECT,
 	/** INSERT statement. */
 	SQL_AST_INSERT,
+	/** UPDATE statement. */
+	SQL_AST_UPDATE,
 
 	/** CREATE TABLE statement. */
 	SQL_AST_CREATE_TABLE,
@@ -249,6 +251,42 @@ struct ast_insert {
 	struct ast_with_list *with;
 };
 
+/** The list of names and expressions from SET clause of UPDATE statement. */
+struct ast_set_list {
+	/** Head of the list. */
+	struct stailq head;
+	/** Length of the list. */
+	uint32_t len;
+};
+
+/** UPDATE SET clause single entry. */
+struct ast_set_list_entry {
+	/** Link to the next element of the list. */
+	struct stailq_entry link;
+	/** Column name. */
+	struct Token name;
+	/** List of names. */
+	struct ast_id_list *ids;
+	/** New value expression. */
+	struct ast_expr *expr;
+};
+
+/** Structure that describes UPDATE. */
+struct ast_update {
+	/** Name of updated table. */
+	struct Token table;
+	/** Name of index in INDEXED BY clause. */
+	struct Token indexed_by;
+	/** UPDATE SET clause. */
+	struct ast_set_list *set_list;
+	/** WHERE clause. */
+	struct ast_expr *where;
+	/** Action on conflict. */
+	enum on_conflict_action action;
+	/** WITH clause of the UPDATE. */
+	struct ast_with_list *with;
+};
+
 /** List of table or columns properties received from parser. */
 struct ast_property_list {
 	/** Head of the list. */
@@ -425,6 +463,8 @@ struct sql_ast {
 		struct ast_select *select;
 		/** INSERT statement. */
 		struct ast_insert *insert;
+		/** UPDATE statement. */
+		struct ast_update *update;
 		/** CREATE TABLE statement. */
 		struct ast_create_table create_table;
 		/** CREATE VIEW statement. */
@@ -548,9 +588,36 @@ expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list);
 struct ExprList *
 expr_list_from_ids(struct Parse *parser, struct ast_id_list *list);
 
+/**
+ * Convert `struct ast_set_list` to `struct ExprList`.
+ *
+ * Return NULL on error.
+ */
+struct ExprList *
+expr_list_from_set_list(struct Parse *parser, struct ast_set_list *list);
+
 /** Create new empty INSERT structure. */
 struct ast_insert *
 ast_insert_new(struct region *region);
+
+/**
+ * Append a SET expression to the SET expressions list, creating it if needed.
+ */
+struct ast_set_list *
+ast_set_list_append_expr(struct region *region, struct ast_set_list *list,
+			 struct Token *name, struct ast_expr *expr);
+
+/**
+ * Append a SET vector expression to the SET expressions list,
+ * creating it if needed.
+ */
+struct ast_set_list *
+ast_set_list_append_vector(struct region *region, struct ast_set_list *list,
+			   struct ast_id_list *ids, struct ast_expr *expr);
+
+/** Create new empty UPDATE structure. */
+struct ast_update *
+ast_update_new(struct region *region);
 
 /** Create new empty structure of table or column property. */
 struct ast_property *

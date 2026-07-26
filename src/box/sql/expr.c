@@ -1727,12 +1727,11 @@ sql_expr_list_append(struct ExprList *expr_list, struct Expr *expr)
 
 struct ExprList *
 sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
-			struct ast_id_list *columns, struct Expr *pExpr)
+			struct IdList *pColumns, struct Expr *pExpr)
 {
 	int n;
 	int i;
 	int iFirst = pList ? pList->nExpr : 0;
-	struct IdList *pColumns = id_list_from_ast(columns);
 	if (pExpr == 0)
 		goto vector_append_error;
 
