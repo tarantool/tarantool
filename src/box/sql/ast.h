@@ -31,6 +31,8 @@ enum sql_ast_type {
 
 	/** SELECT statement. */
 	SQL_AST_SELECT,
+	/** INSERT statement. */
+	SQL_AST_INSERT,
 
 	/** CREATE TABLE statement. */
 	SQL_AST_CREATE_TABLE,
@@ -233,6 +235,20 @@ struct ast_expr_list_entry {
 	bool autoinc;
 };
 
+/** Structure that describes INSERT. */
+struct ast_insert {
+	/** Name of table in INSERT statement. */
+	struct Token table;
+	/** SELECT that describes data that are inserted. */
+	struct ast_select *select;
+	/** Column to where data is inserted. */
+	struct ast_id_list *columns;
+	/** Action on conflict. */
+	enum on_conflict_action action;
+	/** WITH clause of the INSERT. */
+	struct ast_with_list *with;
+};
+
 /** List of table or columns properties received from parser. */
 struct ast_property_list {
 	/** Head of the list. */
@@ -407,6 +423,8 @@ struct sql_ast {
 		struct Token savepoint;
 		/** SELECT statement or SELECT of VIEW. */
 		struct ast_select *select;
+		/** INSERT statement. */
+		struct ast_insert *insert;
 		/** CREATE TABLE statement. */
 		struct ast_create_table create_table;
 		/** CREATE VIEW statement. */
@@ -529,6 +547,10 @@ expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list);
  */
 struct ExprList *
 expr_list_from_ids(struct Parse *parser, struct ast_id_list *list);
+
+/** Create new empty INSERT structure. */
+struct ast_insert *
+ast_insert_new(struct region *region);
 
 /** Create new empty structure of table or column property. */
 struct ast_property *

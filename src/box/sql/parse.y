@@ -863,21 +863,38 @@ setlist(A) ::= LP idlist(X) RP EQ expr_old(Y). {
 
 ////////////////////////// The INSERT command /////////////////////////////////
 //
-cmd ::= with_old(W) insert_cmd(R) INTO fullname(X) idlist_opt(F)
-        select_old(S). {
-  sqlWithPush(pParse, W, 1);
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sqlInsert(pParse, X, S, id_list_from_ast(F), R);
+cmd ::= with(W) insert(I). {
+  I->with = W;
+  pParse->ast.type = SQL_AST_INSERT;
+  pParse->ast.insert = I;
 }
-cmd ::= with_old(W) insert_cmd(R) INTO fullname(X) idlist_opt(F) DEFAULT VALUES.
-{
-  sqlWithPush(pParse, W, 1);
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sqlInsert(pParse, X, 0, id_list_from_ast(F), R);
+
+%type insert {struct ast_insert *}
+insert(A) ::= INSERT orconf(R) INTO nm(X) idlist_opt(F) select(S). {
+  A = ast_insert_new(&pParse->region);
+  A->table = X;
+  A->select = S;
+  A->columns = F;
+  A->action = R;
+}
+insert(A) ::= REPLACE INTO nm(X) idlist_opt(F) select(S). {
+  A = ast_insert_new(&pParse->region);
+  A->table = X;
+  A->select = S;
+  A->columns = F;
+  A->action = ON_CONFLICT_ACTION_REPLACE;
+}
+insert(A) ::= INSERT orconf(R) INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
+  A = ast_insert_new(&pParse->region);
+  A->table = X;
+  A->columns = F;
+  A->action = R;
+}
+insert(A) ::= REPLACE INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
+  A = ast_insert_new(&pParse->region);
+  A->table = X;
+  A->columns = F;
+  A->action = ON_CONFLICT_ACTION_REPLACE;
 }
 
 %type insert_cmd {int}
