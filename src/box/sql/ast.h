@@ -34,6 +34,8 @@ enum sql_ast_type {
 
 	/** CREATE TABLE statement. */
 	SQL_AST_CREATE_TABLE,
+	/** CREATE VIEW statement. */
+	SQL_AST_CREATE_VIEW,
 
 	/** DROP TABLE statement. */
 	SQL_AST_DROP_TABLE,
@@ -52,6 +54,9 @@ enum sql_ast_type {
 	SQL_AST_ALTER_ADD_CONSTRAINT,
 	/** ALTER TABLE DROP CONSTRAINT statement. */
 	SQL_AST_ALTER_DROP_CONSTRAINT,
+
+	/** VIEW object definition. */
+	SQL_AST_VIEW,
 };
 
 /** Columns and table properties. */
@@ -302,6 +307,18 @@ struct ast_create_table {
 	bool if_not_exists;
 };
 
+/** Description of CREATE VIEW statement. */
+struct ast_create_view {
+	/** Name of new view. */
+	struct Token name;
+	/** Column names of the view. */
+	struct ast_id_list *columns;
+	/** SELECT that view represents. */
+	struct ast_select *select;
+	/** Flag to throw an error if view exists. */
+	bool if_not_exists;
+};
+
 /** Description of DROP TABLE and DROP VIEW statements. */
 struct ast_drop_table {
 	/** Table or view name. */
@@ -372,10 +389,12 @@ struct sql_ast {
 	union {
 		/** Name of the savepoint. */
 		struct Token savepoint;
-		/** SELECT statement. */
+		/** SELECT statement or SELECT of VIEW. */
 		struct ast_select *select;
 		/** CREATE TABLE statement. */
 		struct ast_create_table create_table;
+		/** CREATE VIEW statement. */
+		struct ast_create_view create_view;
 		/** DROP TABLE and DROP VIEW statements. */
 		struct ast_drop_table drop_table;
 		/** DROP TRIGGER statement. */
