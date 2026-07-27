@@ -8,7 +8,7 @@ test:do_catchsql_test(
 	[[
 		PRAGMA kek = 'ON';
 	]], {
-        1, "Pragma 'kek' does not exist"
+        1, "Syntax error at line 1 near '='"
 	})
 
 ---
@@ -19,7 +19,7 @@ test:do_catchsql_test(
 	[[
 		pragma sql_default_engine='creepy';
 	]], {
-    1, "Pragma 'sql_default_engine' does not exist"
+    1, "Syntax error at line 1 near '='"
 })
 
 --

@@ -1335,13 +1335,19 @@ cmd ::= SET SESSION nm(X) EQ term(Y).  {
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
 cmd ::= PRAGMA nm(X).                        {
-    sqlPragma(pParse,&X,0,0);
+  pParse->ast.type = SQL_AST_PRAGMA;
+  pParse->ast.pragma.name = X;
 }
 cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
-    sqlPragma(pParse,&X,&Y,0);
+  pParse->ast.type = SQL_AST_PRAGMA;
+  pParse->ast.pragma.name = X;
+  pParse->ast.pragma.table_name = Y;
 }
 cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
-    sqlPragma(pParse,&X,&Y,&Z);
+  pParse->ast.type = SQL_AST_PRAGMA;
+  pParse->ast.pragma.name = X;
+  pParse->ast.pragma.table_name = Y;
+  pParse->ast.pragma.index_name = Z;
 }
 cmd ::= FUNCTION_ENTRY expr_old(E). {
   pParse->parsed_ast_type = AST_TYPE_EXPR;
