@@ -802,8 +802,8 @@ delete(A) ::= DELETE FROM nm(X) indexed_opt(I) where_opt(W). {
 /////////////////////////// The TRUNCATE statement /////////////////////////////
 //
 cmd ::= TRUNCATE TABLE nm(X). {
-  pParse->initiateTTrans = true;
-  sql_table_truncate(pParse, &X);
+  pParse->ast.type = SQL_AST_TRUNCATE;
+  pParse->ast.truncate.table = X;
 }
 
 %type where_opt_old {Expr*}
