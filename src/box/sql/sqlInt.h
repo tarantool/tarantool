@@ -2077,14 +2077,8 @@ struct Parse {
 	 */
 	struct create_fk_constraint_parse_def create_fk_constraint_parse_def;
 	struct create_ck_constraint_parse_def create_ck_constraint_parse_def;
-	/*
-	 * True, if column in a <CREATE TABLE> or an
-	 * <ALTER TABLE ADD COLUMN> statement to be created has
-	 * <AUTOINCREMENT>.
-	 */
-	bool has_autoinc;
 	/* Id of field with <AUTOINCREMENT>. */
-	uint32_t autoinc_fieldno;
+	int *autoinc_fieldno;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
@@ -4514,24 +4508,6 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
  */
 int
 sql_add_autoincrement(struct Parse *parse_context, uint32_t fieldno);
-
-/**
- * Get fieldno by field name. At the moment of forming space format
- * there's no tuple dictionary, so we can't use hash, in contrast to
- * tuple_fieldno_by_name(). However, AUTOINCREMENT can occur at most
- * once in table's definition, so it's not a big deal if we use O(n)
- * search.
- *
- * @param parse_context Parsing context.
- * @param field_name Expr that contains field name.
- * @param fieldno[out] Field number in new space format.
- *
- * @retval 0 on success.
- * @retval -1 on error.
- */
-int
-sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
-		    uint32_t *fieldno);
 
 /**
  * Create VDBE instructions to set the new value of the session setting.
