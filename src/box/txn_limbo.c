@@ -92,8 +92,8 @@ synchro_request_str(const struct synchro_request *req)
 	return TOSTR(synchro_request_snprint, req);
 }
 
-/** Write the request into the journal. */
-static int
+/** Write the request into the journal and get its LSN. */
+static int64_t
 synchro_request_write(const struct synchro_request *req)
 {
 	/*
@@ -103,15 +103,18 @@ synchro_request_write(const struct synchro_request *req)
 	char body[XROW_BODY_LEN_MAX];
 	struct xrow_header row;
 	xrow_encode_synchro(&row, body, req);
-	return journal_write_row(&row);
+	if (journal_write_row(&row) != 0)
+		return -1;
+	return row.lsn;
 }
 
-/** Write the request into the journal. */
-static void
+/** Write the request into the journal and get its LSN. */
+static int64_t
 synchro_request_write_or_panic(const struct synchro_request *req)
 {
-	if (synchro_request_write(req) == 0)
-		return;
+	int64_t lsn = synchro_request_write(req);
+	if (lsn >= 0)
+		return lsn;
 	diag_log();
 	/*
 	 * XXX: the stub is supposed to be removed once it is defined what to do
@@ -122,6 +125,7 @@ synchro_request_write_or_panic(const struct synchro_request *req)
 	 */
 	panic("Could not write a synchro request to WAL: %s",
 	      synchro_request_str(req));
+	return -1;
 }
 
 static void
@@ -208,7 +212,7 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 			.lsn = lsn
 		},
 	};
-	return synchro_request_write(&req);
+	return synchro_request_write(&req) < 0 ? -1 : 0;
 }
 
 /**
