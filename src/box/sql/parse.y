@@ -790,9 +790,9 @@ cmd ::= with_old(C) DELETE FROM fullname(X) indexed_opt(I) where_opt_old(W). {
 
 /////////////////////////// The TRUNCATE statement /////////////////////////////
 //
-cmd ::= TRUNCATE TABLE fullname(X). {
+cmd ::= TRUNCATE TABLE nm(X). {
   pParse->initiateTTrans = true;
-  sql_table_truncate(pParse, X);
+  sql_table_truncate(pParse, &X);
 }
 
 %type where_opt_old {Expr*}
