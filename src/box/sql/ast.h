@@ -65,6 +65,9 @@ enum sql_ast_type {
 	/** ALTER TABLE DROP CONSTRAINT statement. */
 	SQL_AST_ALTER_DROP_CONSTRAINT,
 
+	/** SET SESSION statement. */
+	SQL_AST_SET_SESSION,
+
 	/** VIEW object definition. */
 	SQL_AST_VIEW,
 };
@@ -473,6 +476,14 @@ struct ast_alter_add_column {
 	struct ast_column *col;
 };
 
+/** Description of SET SESSION statement. */
+struct ast_set_session {
+	/** Name of session option. */
+	struct Token name;
+	/** Value of session option. */
+	struct ast_expr *value;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -511,6 +522,8 @@ struct sql_ast {
 		struct ast_alter_add_constraint alter_add_constraint;
 		/** ALTER TABLE DROP CONSTRAINT statement. */
 		struct ast_alter_drop_constraint alter_drop_constraint;
+		/** SET SESSION statement. */
+		struct ast_set_session set_session;
 	};
 };
 
