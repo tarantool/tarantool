@@ -37,6 +37,8 @@ enum sql_ast_type {
 	SQL_AST_UPDATE,
 	/** DELETE statement. */
 	SQL_AST_DELETE,
+	/** TRUNCATE statement. */
+	SQL_AST_TRUNCATE,
 
 	/** CREATE TABLE statement. */
 	SQL_AST_CREATE_TABLE,
@@ -301,6 +303,12 @@ struct ast_delete {
 	struct ast_with_list *with;
 };
 
+/** Structure that describes TRUNCATE. */
+struct ast_truncate {
+	/** Name of table to truncate. */
+	struct Token table;
+};
+
 /** List of table or columns properties received from parser. */
 struct ast_property_list {
 	/** Head of the list. */
@@ -481,6 +489,8 @@ struct sql_ast {
 		struct ast_update *update;
 		/** DELETE statement. */
 		struct ast_delete *del;
+		/** TRUNCATE statement. */
+		struct ast_truncate truncate;
 		/** CREATE TABLE statement. */
 		struct ast_create_table create_table;
 		/** CREATE VIEW statement. */
