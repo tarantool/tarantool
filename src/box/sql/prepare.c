@@ -124,9 +124,9 @@ sql_expr_compile(const char *sql)
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	struct Expr *expr = sql_parse_function(&parser, sql);
+	struct Expr *res = sql_parse_function(&parser, sql);
 	sql_parser_destroy(&parser);
-	return expr;
+	return res;
 }
 
 struct Select *
@@ -248,9 +248,6 @@ sql_parser_destroy(Parse *parser)
 	sql_get()->lookaside.bDisable -= parser->disableLookaside;
 	parser->disableLookaside = 0;
 	switch (parser->parsed_ast_type) {
-	case AST_TYPE_EXPR:
-		sql_expr_delete(parser->parsed_ast.expr);
-		break;
 	case AST_TYPE_TRIGGER:
 		sql_trigger_delete(parser->parsed_ast.trigger);
 		break;

@@ -1875,7 +1875,6 @@ struct TriggerPrg {
 
 enum ast_type {
 	AST_TYPE_UNDEFINED = 0,
-	AST_TYPE_EXPR,
 	AST_TYPE_TRIGGER,
 	ast_type_MAX
 };

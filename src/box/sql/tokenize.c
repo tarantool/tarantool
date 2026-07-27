@@ -866,6 +866,7 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		sqlPragma(parse, &ast->pragma.name, &ast->pragma.table_name,
 			  &ast->pragma.index_name);
 		break;
+	case SQL_AST_FUNCTION:
 	case SQL_AST_VIEW:
 		return;
 	default:
@@ -972,10 +973,10 @@ sql_parse_function(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_FUNCTION_ENTRY) != 0)
 		return NULL;
-	assert(parser->parsed_ast_type == AST_TYPE_EXPR);
-	struct Expr *res = parser->parsed_ast.expr;
-	parser->parsed_ast.expr = NULL;
-	if (parser->nVar > 0) {
+	struct sql_ast *ast = &parser->ast;
+	assert(ast->type == SQL_AST_FUNCTION);
+	struct Expr *res = expr_from_ast(parser, ast->expr);
+	if (res != NULL && parser->nVar > 0) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 			 "Parameters are not allowed in functions");
 		parser->is_aborted = true;

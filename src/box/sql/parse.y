@@ -1349,9 +1349,12 @@ cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
   pParse->ast.pragma.table_name = Y;
   pParse->ast.pragma.index_name = Z;
 }
-cmd ::= FUNCTION_ENTRY expr_old(E). {
-  pParse->parsed_ast_type = AST_TYPE_EXPR;
-  pParse->parsed_ast.expr = E.pExpr;
+
+///////////////////////////// The SQL expression function ////////////////////
+//
+cmd ::= FUNCTION_ENTRY expr(X). {
+  pParse->ast.type = SQL_AST_FUNCTION;
+  pParse->ast.expr = X;
 }
 
 //////////////////////////// The SHOW CREATE TABLE command /////////////////////
