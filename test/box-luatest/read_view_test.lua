@@ -597,8 +597,8 @@ g.test_index_ref = function(cg)
     cg.server:exec(function()
         local weak = setmetatable({}, {__mode = 'v'})
         local rv = box.read_view.open()
-        local idx = rv.space._space.index.primary._impl -- luacheck: ignore
-        weak.rv = rv._impl
+        local idx = rv.space._space.index.primary -- luacheck: ignore
+        weak.rv = rv
         rv = nil -- luacheck: ignore
         for _ = 1, 5 do collectgarbage('collect') end
         t.assert_is_not(weak.rv, nil)
@@ -615,7 +615,7 @@ g.test_iterator_ref = function(cg)
         local rv = box.read_view.open()
         local idx = rv.space._space.index.primary
         local gen, param, state = idx:pairs() -- luacheck: ignore
-        weak.rv = rv._impl
+        weak.rv = rv
         rv = nil -- luacheck: ignore
         idx = nil -- luacheck: ignore
         for _ = 1, 5 do collectgarbage('collect') end

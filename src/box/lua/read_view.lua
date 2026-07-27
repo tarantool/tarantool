@@ -227,6 +227,9 @@ function box.read_view.open(opts)
                     else
                         setmetatable(index, read_view_index_mt_luac)
                     end
+                    -- Keep a reference to the read view to make sure
+                    -- it won't go away while the index is in use.
+                    index._rv = rv
                 end
             end
         end
@@ -303,10 +306,9 @@ local function keify(key)
 end
 
 --
--- Checks if the given index read view is open. Used by the FFI API.
--- (The Lua C API has this check implemented in C.)
+-- Checks if the given index read view is open.
 --
-local function check_index_read_view_is_open_ffi(index)
+local function check_index_read_view_is_open(index)
     if index._cspace == nil then
         box.error(box.error.READ_VIEW_CLOSED, 3)
     end
@@ -348,13 +350,14 @@ end
 --
 function read_view_index_methods_luac:get(key)
     check_index_arg(self, 'get', 2)
+    check_index_read_view_is_open(self)
     key = keify(key)
-    return self._impl:get(key)
+    return internal.index_get(self._cspace, self.id, key)
 end
 
 function read_view_index_methods_ffi:get(key)
     check_index_arg(self, 'get', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
     local ok = builtin.box_index_read_view_get(
@@ -378,14 +381,15 @@ end
 --
 function read_view_index_methods_luac:count(key, opts)
     check_index_arg(self, 'count', 2)
+    check_index_read_view_is_open(self)
     key = keify(key)
     local itype = check_iterator_type(opts, #key == 0, 2)
-    return self._impl:count(itype, key)
+    return internal.index_count(self._cspace, self.id, itype, key)
 end
 
 function read_view_index_methods_ffi:count(key, opts)
     check_index_arg(self, 'count', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
     local key_is_nil = raw_key + 1 >= raw_key_end
@@ -412,16 +416,18 @@ end
 --
 function read_view_index_methods_luac:select(key, opts)
     check_index_arg(self, 'select', 2)
+    check_index_read_view_is_open(self)
     key = keify(key)
     local key_is_nil = #key == 0
     local iterator, offset, limit, after, fetch_pos =
         check_select_opts(opts, key_is_nil, 2)
-    return self._impl:select(iterator, offset, limit, key, after, fetch_pos)
+    return internal.index_select(self._cspace, self.id, iterator,
+                                 offset, limit, key, after, fetch_pos)
 end
 
 function read_view_index_methods_ffi:select(key, opts)
     check_index_arg(self, 'select', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
@@ -454,21 +460,34 @@ function read_view_index_methods_ffi:select(key, opts)
     return ret, pos
 end
 
+local function iterator_next_luac(it)
+    check_index_read_view_is_open(it.index)
+    return it.impl:next()
+end
+
 --
 -- Creates an iterator over an index read view, given key and iterator type.
 -- Returns a 'gen, param, state' triplet, suitable for a 'for' loop.
 --
 function read_view_index_methods_luac:pairs(key, opts)
     check_index_arg(self, 'pairs', 2)
+    check_index_read_view_is_open(self)
     key = keify(key)
     local key_is_nil = #key == 0
     local iterator, after, offset = check_pairs_opts(opts, key_is_nil, 2)
-    local it = self._impl:iterator(iterator, key, after, offset)
-    return it.next, it
+    local it = internal.index_iterator(self._cspace, self.id, iterator,
+                                       key, after, offset)
+    return iterator_next_luac, {
+        -- Keep references to the index and the search key to make sure
+        -- they won't go away while the iterator is in use.
+        index = self,
+        key = key,
+        impl = it,
+    }
 end
 
 local function iterator_next_ffi(it, count)
-    check_index_read_view_is_open_ffi(it.index)
+    check_index_read_view_is_open(it.index)
     if builtin.box_index_read_view_iterator_next(
             it.cdata, it.index._cspace, ptuple) ~= 0 then
         box.error(box.error.last(), 2)
@@ -479,7 +498,7 @@ end
 
 function read_view_index_methods_ffi:pairs(key, opts)
     check_index_arg(self, 'pairs', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
     local raw_key, raw_key_end = tuple_encode(ibuf, key)
@@ -514,7 +533,7 @@ end
 
 function read_view_index_methods_common:quantile(level, begin_key, end_key)
     check_index_arg(self, 'quantile', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     if level == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   'Usage: index:quantile(level[, begin_key, end_key])', 2)
@@ -557,7 +576,7 @@ end
 
 function read_view_index_methods_common:tuple_pos(tuple)
     check_index_arg(self, 'tuple_pos', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
     local data, data_end = tuple_encode(ibuf, tuple)
@@ -576,7 +595,7 @@ end
 
 function read_view_index_methods_common:offset_of(key, opts)
     check_index_arg(self, 'offset_of', 2)
-    check_index_read_view_is_open_ffi(self)
+    check_index_read_view_is_open(self)
     key = keify(key)
     local itype = check_iterator_type(opts, #key == 0, 2)
     if itype == box.index.EQ then
