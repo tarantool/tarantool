@@ -204,6 +204,10 @@ function box.read_view.list()
     return list
 end
 
+local function read_view_gc(crv)
+    internal.close(crv, true)
+end
+
 --
 -- Opens a new read view.
 --
@@ -234,6 +238,7 @@ function box.read_view.open(opts)
             end
         end
     end
+    ffi.gc(rv._crv, read_view_gc)
     return register_read_view(rv)
 end
 
@@ -273,7 +278,7 @@ function read_view_methods:close()
     if self.status == 'closed' then
         box.error(box.error.READ_VIEW_CLOSED, 2)
     end
-    if self._impl == nil then
+    if self._crv == nil then
         -- System read view. Can't be closed.
         box.error(box.error.READ_VIEW_BUSY, 2)
     end
@@ -285,7 +290,9 @@ function read_view_methods:close()
             index._cspace = nil
         end
     end
-    self._impl:close()
+    internal.close(self._crv)
+    ffi.gc(self._crv, nil)
+    self._crv = nil
 end
 
 --
