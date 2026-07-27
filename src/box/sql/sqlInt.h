@@ -2991,10 +2991,10 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
  * Generate a code for TRUNCATE TABLE statement.
  *
  * @param parse Parsing context.
- * @param tab_list List of single table to truncate.
+ * @param table Name of table to truncate.
  */
 void
-sql_table_truncate(struct Parse *parse, struct SrcList *tab_list);
+sql_table_truncate(struct Parse *parse, struct Token *table);
 
 /** Free a WhereInfo structure. */
 void
