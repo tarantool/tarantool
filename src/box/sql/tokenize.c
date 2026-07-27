@@ -862,6 +862,10 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		sql_code_set_session(parse, &ast->set_session.name,
 				     ast->set_session.value);
 		break;
+	case SQL_AST_PRAGMA:
+		sqlPragma(parse, &ast->pragma.name, &ast->pragma.table_name,
+			  &ast->pragma.index_name);
+		break;
 	case SQL_AST_VIEW:
 		return;
 	default:
