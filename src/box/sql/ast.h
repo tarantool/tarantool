@@ -69,6 +69,8 @@ enum sql_ast_type {
 	SQL_AST_SET_SESSION,
 	/** PRAGMA statement. */
 	SQL_AST_PRAGMA,
+	/** SHOW CREATE TABLE statement. */
+	SQL_AST_SHOW_CREATE_TABLE,
 
 	/** VIEW object definition. */
 	SQL_AST_VIEW,
@@ -540,6 +542,8 @@ struct sql_ast {
 		struct ast_set_session set_session;
 		/** PRAGMA statement. */
 		struct ast_pragma pragma;
+		/** SHOW CREATE TABLE statement. */
+		struct Token show_create_table;
 		/** Expression for SQL expression function body. */
 		struct ast_expr *expr;
 	};

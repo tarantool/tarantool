@@ -866,6 +866,13 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		sqlPragma(parse, &ast->pragma.name, &ast->pragma.table_name,
 			  &ast->pragma.index_name);
 		break;
+	case SQL_AST_SHOW_CREATE_TABLE:
+		if (ast->show_create_table.n == 0) {
+			sql_emit_show_create_table_all(parse);
+			break;
+		}
+		sql_emit_show_create_table_one(parse, &ast->show_create_table);
+		break;
 	case SQL_AST_FUNCTION:
 	case SQL_AST_VIEW:
 		return;
