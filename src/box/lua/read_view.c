@@ -34,6 +34,20 @@
 static bool box_read_view_ffi = true;
 TWEAK_BOOL(box_read_view_ffi);
 
+/** Lua ctype ID of struct read_view_handle pointer. */
+static uint32_t CTID_STRUCT_READ_VIEW_HANDLE;
+
+/** Get a read view handle from Lua stack. */
+static inline struct read_view_handle *
+lbox_check_read_view_handle(struct lua_State *L, int idx)
+{
+	assert(CTID_STRUCT_READ_VIEW_HANDLE != 0);
+	uint32_t ctypeid;
+	void *cdata = luaL_checkcdata(L, idx, &ctypeid);
+	assert(ctypeid == CTID_STRUCT_READ_VIEW_HANDLE);
+	return *(struct read_view_handle **)cdata;
+}
+
 /** Lua ctype ID of struct space_read_view_handle pointer. */
 static uint32_t CTID_STRUCT_SPACE_READ_VIEW_HANDLE;
 
@@ -46,31 +60,6 @@ lbox_check_space_read_view_handle(struct lua_State *L, int idx)
 	void *cdata = luaL_checkcdata(L, idx, &ctypeid);
 	assert(ctypeid == CTID_STRUCT_SPACE_READ_VIEW_HANDLE);
 	return *(struct space_read_view_handle **)cdata;
-}
-
-/**
- * Wrapper around a database read view object pushed to Lua as user data.
- */
-struct lbox_read_view {
-	/** Wrapped database read view object. */
-	struct read_view *ptr;
-	/** Read view handle. */
-	struct read_view_handle *handle;
-	/**
-	 * Set to true if the read view was closed.
-	 * If set, the wrapped object is invalid and must not be used.
-	 */
-	bool is_closed;
-};
-
-/** Type name of lbox_read_view Lua user data. */
-static const char lbox_read_view_typename[] = "box.read_view";
-
-/** Get a database read view from Lua stack. */
-static struct lbox_read_view *
-lbox_check_read_view(struct lua_State *L, int idx)
-{
-	return luaL_checkudata(L, idx, lbox_read_view_typename);
 }
 
 /**
@@ -182,9 +171,8 @@ lbox_read_view_push_space(struct lua_State *L,
  * Takes the new read view name (string).
  * On success, returns a table that has the following structure:
  * {
- *     -- Read view implementation.
- *     -- Represented by struct lbox_read_view.
- *     _impl = <userdata:box.read_view>,
+ *     -- Read view handle (cdata).
+ *     _crv = <cdata:struct read_view_handle *>,
  *
  *     id = <number>,                            -- read view id
  *     name = <string>,                          -- read view name
@@ -225,14 +213,6 @@ lbox_read_view_open(struct lua_State *L)
 {
 	const char *name = luaL_checkstring(L, 1);
 
-	/* Allocate a userdata object for the new read view. */
-	struct lbox_read_view *rv = lua_newuserdata(L, sizeof(*rv));
-	rv->ptr = NULL;
-	rv->handle = NULL;
-	rv->is_closed = true;
-	luaL_getmetatable(L, lbox_read_view_typename);
-	lua_setmetatable(L, -2);
-
 	/* Open a read view. */
 	struct read_view_opts opts;
 	read_view_opts_create(&opts);
@@ -242,31 +222,32 @@ lbox_read_view_open(struct lua_State *L)
 	opts.enable_field_names = true;
 	opts.enable_space_upgrade = true;
 	opts.enable_data_temporary_spaces = true;
-	rv->ptr = read_view_new(&opts);
-	if (rv->ptr == NULL)
+	struct read_view *rv = read_view_new(&opts);
+	if (rv == NULL)
 		return luaT_error_at(L, 2);
-	rv->handle = read_view_handle_new(rv->ptr);
-	if (rv->handle == NULL) {
-		read_view_delete(rv->ptr);
+	struct read_view_handle *rvh = read_view_handle_new(rv);
+	if (rvh == NULL) {
+		read_view_delete(rv);
 		return luaT_error_at(L, 2);
 	}
-	rv->is_closed = false;
 
 	/* Create a space table. */
 	lua_newtable(L);
 	struct space_read_view_handle *space;
-	read_view_foreach_space(space, rv->handle) {
+	read_view_foreach_space(space, rvh) {
 		lbox_read_view_push_space(L, space);
 		lua_pushvalue(L, -1);
 		lua_rawseti(L, -3, space->ptr->id);
 		lua_setfield(L, -2, space->ptr->name);
 	}
 
-	/* Push the read view table and set rv._impl and rv.space. */
-	lbox_push_read_view(L, rv->ptr);
+	/* Push the read view table and set rv._crv and rv.space. */
+	lbox_push_read_view(L, rv);
 	lua_replace(L, 1);
 	lua_setfield(L, 1, "space");
-	lua_setfield(L, 1, "_impl");
+	*(struct read_view_handle **)luaL_pushcdata(
+		L, CTID_STRUCT_READ_VIEW_HANDLE) = rvh;
+	lua_setfield(L, 1, "_crv");
 	lua_settop(L, 1);
 	return 1;
 }
@@ -312,35 +293,21 @@ lbox_read_view_status(struct lua_State *L)
 }
 
 /**
- * Frees a database read view.
- * If the read view is still open, closes it and logs a warning.
- */
-static int
-lbox_read_view_gc(struct lua_State *L)
-{
-	struct lbox_read_view *rv = lbox_check_read_view(L, 1);
-	if (!rv->is_closed) {
-		say_warn("read view %llu ('%s') was not properly closed",
-			 (unsigned long long)rv->ptr->id, rv->ptr->name);
-		read_view_handle_delete(rv->handle);
-		read_view_delete(rv->ptr);
-	}
-	TRASH(rv);
-	return 0;
-}
-
-/**
- * Closes a database read view unless it's already closed.
+ * Closes a database read view by the given handle cdata.
+ * Logs a warning if the second argument is true.
  */
 static int
 lbox_read_view_close(struct lua_State *L)
 {
-	struct lbox_read_view *rv = lbox_check_read_view(L, 1);
-	if (!rv->is_closed) {
-		read_view_handle_delete(rv->handle);
-		read_view_delete(rv->ptr);
-		rv->is_closed = true;
+	struct read_view_handle *rvh = lbox_check_read_view_handle(L, 1);
+	struct read_view *rv = rvh->ptr;
+	bool warn = lua_toboolean(L, 2);
+	if (warn) {
+		say_warn("read view %llu ('%s') was not properly closed",
+			 (unsigned long long)rv->id, rv->name);
 	}
+	read_view_handle_delete(rvh);
+	read_view_delete(rv);
 	return 0;
 }
 
@@ -543,10 +510,12 @@ error:
 void
 box_lua_read_view_init(struct lua_State *L)
 {
+	int rc;
 	const struct luaL_Reg module_methods[] = {
-		{"open", lbox_read_view_open },
+		{"open", lbox_read_view_open},
 		{"list", lbox_read_view_list},
 		{"status", lbox_read_view_status},
+		{"close", lbox_read_view_close},
 		{"index_get", lbox_index_read_view_get},
 		{"index_count", lbox_index_read_view_count},
 		{"index_select", lbox_index_read_view_select},
@@ -557,13 +526,6 @@ box_lua_read_view_init(struct lua_State *L)
 	luaL_setfuncs(L, module_methods, 0);
 	lua_pop(L, 1);
 
-	const struct luaL_Reg read_view_methods[] = {
-		{"__gc", lbox_read_view_gc },
-		{"close", lbox_read_view_close },
-		{ NULL, NULL }
-	};
-	luaL_register_type(L, lbox_read_view_typename, read_view_methods);
-
 	const struct luaL_Reg index_read_view_iterator_methods[] = {
 		{"__gc", lbox_index_read_view_iterator_gc },
 		{"next", lbox_index_read_view_iterator_next },
@@ -572,7 +534,14 @@ box_lua_read_view_init(struct lua_State *L)
 	luaL_register_type(L, lbox_index_read_view_iterator_typename,
 			   index_read_view_iterator_methods);
 
-	int rc = luaL_cdef(L, "struct space_read_view_handle;");
+	rc = luaL_cdef(L, "struct read_view_handle;");
+	assert(rc == 0);
+	(void)rc;
+	CTID_STRUCT_READ_VIEW_HANDLE = luaL_ctypeid(
+		L, "struct read_view_handle *");
+	assert(CTID_STRUCT_READ_VIEW_HANDLE != 0);
+
+	rc = luaL_cdef(L, "struct space_read_view_handle;");
 	assert(rc == 0);
 	(void)rc;
 	CTID_STRUCT_SPACE_READ_VIEW_HANDLE = luaL_ctypeid(
