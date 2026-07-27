@@ -1327,8 +1327,9 @@ cmd ::= DROP INDEX ifexists(E) nm(X) ON nm(Y). {
 ///////////////////////////// The SET SESSION command ////////////////////////
 //
 cmd ::= SET SESSION nm(X) EQ term(Y).  {
-    struct Expr *e = expr_from_ast(pParse, Y);
-    sql_setting_set(pParse, &X, e);
+  pParse->ast.type = SQL_AST_SET_SESSION;
+  pParse->ast.set_session.name = X;
+  pParse->ast.set_session.value = Y;
 }
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
