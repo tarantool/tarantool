@@ -157,6 +157,8 @@ struct ast_expr_list_entry {
 	struct ast_expr *expr;
 	/** Sort order of the entry, used for ORDER BY lists. */
 	enum sort_order order;
+	/** AUTOINCREMENT feature indicator for primary key columns. */
+	bool autoinc;
 };
 
 /** Append an ID to ID list. */
@@ -217,6 +219,10 @@ ast_expr_list_set_name(struct ast_expr_list *list, struct Token *name);
 /** Set the sort order of the last expression appended to the list. */
 void
 ast_expr_list_set_order(struct ast_expr_list *list, enum sort_order order);
+
+/** Set the `autoinc` flag of the last expression appended to the list. */
+void
+ast_expr_list_set_autoinc(struct ast_expr_list *list, bool autoinc);
 
 /** Convert `struct ast_expr` to `struct Expr`. */
 struct Expr *

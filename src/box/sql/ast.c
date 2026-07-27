@@ -226,6 +226,7 @@ ast_expr_list_append(struct Parse *parser, struct ast_expr_list *list,
 	entry->name = Token_nil;
 	entry->expr = expr;
 	entry->order = SORT_ORDER_ASC;
+	entry->autoinc = false;
 	if (list == NULL) {
 		list = xregion_alloc_object(&parser->region, typeof(*list));
 		stailq_create(&list->head);
@@ -253,6 +254,14 @@ ast_expr_list_set_order(struct ast_expr_list *list, enum sort_order order)
 	entry->order = order;
 }
 
+void
+ast_expr_list_set_autoinc(struct ast_expr_list *list, bool autoinc)
+{
+	struct ast_expr_list_entry *entry =
+		stailq_last_entry(&list->head, typeof(*entry), link);
+	entry->autoinc = autoinc;
+}
+
 struct ExprList *
 expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list)
 {
@@ -272,6 +281,23 @@ expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list)
 			sqlExprListSetSpan(res, ast_expr->str, ast_expr->len);
 		if (entry->order != SORT_ORDER_ASC)
 			sqlExprListSetSortOrder(res, entry->order);
+		if (entry->autoinc) {
+			if (parser->autoinc_fieldno != NULL) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "Table must feature at most one "
+					 "AUTOINCREMENT field");
+				parser->is_aborted = true;
+				break;
+			}
+			if (expr != sqlExprSkipCollate(expr)) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "AUTOINCREMENT cannot be used with "
+					 "a non-integer column");
+				parser->is_aborted = true;
+				break;
+			}
+			parser->autoinc_fieldno = &expr->iColumn;
+		}
 	}
 	if (parser->is_aborted) {
 		sql_expr_list_delete(res);
