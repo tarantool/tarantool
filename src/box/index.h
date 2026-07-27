@@ -752,7 +752,7 @@ struct index_read_view_vtab {
 	 * If the key isn't found, the data is set to NULL.
 	 *
 	 * Note, unless the read_view_opts::disable_decompression flag was set
-	 * at read_view_open, the returned data may be allocated on the fiber
+	 * at read_view_new, the returned data may be allocated on the fiber
 	 * region, and the user is supposed to call region_truncate after using
 	 * the data.
 	 *
@@ -820,7 +820,7 @@ struct index_read_view_iterator_base {
 	 * On EOF the data is set to NULL.
 	 *
 	 * Note, unless the read_view_opts::disable_decompression flag was set
-	 * at read_view_open, the returned data may be allocated on the fiber
+	 * at read_view_new, the returned data may be allocated on the fiber
 	 * region, and the user is supposed to call region_truncate after using
 	 * the data.
 	 *

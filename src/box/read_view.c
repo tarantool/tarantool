@@ -219,9 +219,10 @@ read_view_unregister(struct read_view *rv)
 	}
 }
 
-int
-read_view_open(struct read_view *rv, const struct read_view_opts *opts)
+struct read_view *
+read_view_new(const struct read_view_opts *opts)
 {
+	struct read_view *rv = xmalloc(sizeof(*rv));
 	rv->id = next_read_view_id++;
 	assert(opts->name != NULL);
 	rv->name = xstrdup(opts->name);
@@ -231,6 +232,7 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 	vclock_copy(&rv->vclock, box_vclock);
 	rlist_create(&rv->engines);
 	rlist_create(&rv->spaces);
+	rv->ctx = NULL;
 	read_view_register(rv);
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -248,14 +250,14 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 	};
 	if (space_foreach(read_view_add_space_cb, &add_space_cb_arg) != 0)
 		goto fail;
-	return 0;
+	return rv;
 fail:
-	read_view_close(rv);
-	return -1;
+	read_view_delete(rv);
+	return NULL;
 }
 
 void
-read_view_close(struct read_view *rv)
+read_view_delete(struct read_view *rv)
 {
 	read_view_unregister(rv);
 	struct space_read_view *space_rv, *next_space_rv;
@@ -271,6 +273,7 @@ read_view_close(struct read_view *rv)
 	}
 	free(rv->name);
 	TRASH(rv);
+	free(rv);
 }
 
 struct read_view *

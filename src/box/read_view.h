@@ -140,6 +140,11 @@ struct read_view {
 	struct rlist engines;
 	/** List of space read views, linked by space_read_view::link. */
 	struct rlist spaces;
+	/**
+	 * Extra context attached to the read view.
+	 * Used by the raw read view API in Tarantol EE.
+	 */
+	void *ctx;
 };
 
 /**
@@ -242,16 +247,16 @@ read_view_opts_create(struct read_view_opts *opts);
  *
  * Engines that don't support read view creation are silently skipped.
  *
- * Returns 0 on success. On error, returns -1 and sets diag.
+ * On error, returns NULL and sets diag.
  */
-int
-read_view_open(struct read_view *rv, const struct read_view_opts *opts);
+struct read_view *
+read_view_new(const struct read_view_opts *opts);
 
 /**
  * Closes a database read view.
  */
 void
-read_view_close(struct read_view *rv);
+read_view_delete(struct read_view *rv);
 
 /**
  * Looks up an open read view by id.

@@ -53,7 +53,7 @@ lbox_check_space_read_view_handle(struct lua_State *L, int idx)
  */
 struct lbox_read_view {
 	/** Wrapped database read view object. */
-	struct read_view obj;
+	struct read_view *ptr;
 	/** Read view handle. */
 	struct read_view_handle *handle;
 	/**
@@ -227,6 +227,8 @@ lbox_read_view_open(struct lua_State *L)
 
 	/* Allocate a userdata object for the new read view. */
 	struct lbox_read_view *rv = lua_newuserdata(L, sizeof(*rv));
+	rv->ptr = NULL;
+	rv->handle = NULL;
 	rv->is_closed = true;
 	luaL_getmetatable(L, lbox_read_view_typename);
 	lua_setmetatable(L, -2);
@@ -240,11 +242,12 @@ lbox_read_view_open(struct lua_State *L)
 	opts.enable_field_names = true;
 	opts.enable_space_upgrade = true;
 	opts.enable_data_temporary_spaces = true;
-	if (read_view_open(&rv->obj, &opts) != 0)
+	rv->ptr = read_view_new(&opts);
+	if (rv->ptr == NULL)
 		return luaT_error_at(L, 2);
-	rv->handle = read_view_handle_new(&rv->obj);
+	rv->handle = read_view_handle_new(rv->ptr);
 	if (rv->handle == NULL) {
-		read_view_close(&rv->obj);
+		read_view_delete(rv->ptr);
 		return luaT_error_at(L, 2);
 	}
 	rv->is_closed = false;
@@ -260,7 +263,7 @@ lbox_read_view_open(struct lua_State *L)
 	}
 
 	/* Push the read view table and set rv._impl and rv.space. */
-	lbox_push_read_view(L, &rv->obj);
+	lbox_push_read_view(L, rv->ptr);
 	lua_replace(L, 1);
 	lua_setfield(L, 1, "space");
 	lua_setfield(L, 1, "_impl");
@@ -318,9 +321,9 @@ lbox_read_view_gc(struct lua_State *L)
 	struct lbox_read_view *rv = lbox_check_read_view(L, 1);
 	if (!rv->is_closed) {
 		say_warn("read view %llu ('%s') was not properly closed",
-			 (unsigned long long)rv->obj.id, rv->obj.name);
+			 (unsigned long long)rv->ptr->id, rv->ptr->name);
 		read_view_handle_delete(rv->handle);
-		read_view_close(&rv->obj);
+		read_view_delete(rv->ptr);
 	}
 	TRASH(rv);
 	return 0;
@@ -335,7 +338,7 @@ lbox_read_view_close(struct lua_State *L)
 	struct lbox_read_view *rv = lbox_check_read_view(L, 1);
 	if (!rv->is_closed) {
 		read_view_handle_delete(rv->handle);
-		read_view_close(&rv->obj);
+		read_view_delete(rv->ptr);
 		rv->is_closed = true;
 	}
 	return 0;
