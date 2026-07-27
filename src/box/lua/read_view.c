@@ -37,6 +37,17 @@ TWEAK_BOOL(box_read_view_ffi);
 /** Lua ctype ID of struct space_read_view_handle pointer. */
 static uint32_t CTID_STRUCT_SPACE_READ_VIEW_HANDLE;
 
+/** Get a space read view handle from Lua stack. */
+static inline struct space_read_view_handle *
+lbox_check_space_read_view_handle(struct lua_State *L, int idx)
+{
+	assert(CTID_STRUCT_SPACE_READ_VIEW_HANDLE != 0);
+	uint32_t ctypeid;
+	void *cdata = luaL_checkcdata(L, idx, &ctypeid);
+	assert(ctypeid == CTID_STRUCT_SPACE_READ_VIEW_HANDLE);
+	return *(struct space_read_view_handle **)cdata;
+}
+
 /**
  * Wrapper around a database read view object pushed to Lua as user data.
  */
@@ -63,54 +74,6 @@ lbox_check_read_view(struct lua_State *L, int idx)
 }
 
 /**
- * Wrapper around an index read view object pushed to Lua as user data.
- */
-struct lbox_index_read_view {
-	/** Space which this index belongs to. */
-	struct space_read_view_handle *space;
-	/* Ordinal number of this index in the space. */
-	uint32_t index_id;
-	/**
-	 * Pointer to the read view that owns this index.
-	 * The wrapped object is valid if and only if it hasn't been closed.
-	 */
-	struct lbox_read_view *read_view;
-	/**
-	 * Reference to the read view that owns this index.
-	 * It protects the Lua read view object from garbage collection.
-	 */
-	int read_view_ref;
-};
-
-/** Type name of lbox_index_read_view Lua user data. */
-static const char lbox_index_read_view_typename[] = "box.read_view.index";
-
-/** Get an index read view from Lua stack. */
-static inline struct lbox_index_read_view *
-lbox_check_index_read_view(struct lua_State *L, int idx)
-{
-	return luaL_checkudata(L, idx, lbox_index_read_view_typename);
-}
-
-/** Get an index read view from Lua stack. Raise if it's closed. */
-static struct lbox_index_read_view *
-lbox_check_open_index_read_view_at(struct lua_State *L, int idx, int level)
-{
-	struct lbox_index_read_view *rv = lbox_check_index_read_view(L, idx);
-	if (rv->read_view->is_closed) {
-		diag_set(ClientError, ER_READ_VIEW_CLOSED);
-		luaT_error_at(L, level);
-	}
-	return rv;
-}
-
-static inline struct lbox_index_read_view *
-lbox_check_open_index_read_view(struct lua_State *L, int idx)
-{
-	return lbox_check_open_index_read_view_at(L, idx, 1);
-}
-
-/**
  * Wrapper around an index read view iterator object pushed to Lua as user
  * data.
  */
@@ -119,22 +82,6 @@ struct lbox_index_read_view_iterator {
 	struct index_read_view_iterator obj;
 	/** Space which the iterated index belongs to. */
 	struct space_read_view_handle *space;
-	/**
-	 * Pointer to the read view that owns this iterator.
-	 * The wrapped object is valid if and only if it hasn't been closed.
-	 */
-	struct lbox_read_view *read_view;
-	/**
-	 * Reference to the read view that owns this iterator.
-	 * It protects the Lua read view object from garbage collection.
-	 */
-	int read_view_ref;
-	/**
-	 * Reference to the iterator key.
-	 * An iterator assumes that the key stays valid throughout its lifetime
-	 * so we copy the encoded key to Lua memory.
-	 */
-	int key_ref;
 	/** Number of tuples returned so far. */
 	uint64_t count;
 };
@@ -148,19 +95,6 @@ static inline struct lbox_index_read_view_iterator *
 lbox_check_index_read_view_iterator(struct lua_State *L, int idx)
 {
 	return luaL_checkudata(L, idx, lbox_index_read_view_iterator_typename);
-}
-
-/** Get an index read view iterator from Lua stack. Raise if it's closed. */
-static struct lbox_index_read_view_iterator *
-lbox_check_open_index_read_view_iterator(struct lua_State *L, int idx)
-{
-	struct lbox_index_read_view_iterator *it =
-		lbox_check_index_read_view_iterator(L, idx);
-	if (it->read_view->is_closed) {
-		diag_set(ClientError, ER_READ_VIEW_CLOSED);
-		luaT_error(L);
-	}
-	return it;
 }
 
 /**
@@ -188,36 +122,17 @@ lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
 /**
  * Helper function for lbox_read_view_open() that pushes a table for the given
  * index read view to the Lua stack.
- *
- * 'rv_idx' is the index of 'rv' in the Lua stack.
  */
 static void
-lbox_read_view_push_index(struct lua_State *L, int rv_idx,
-			  struct lbox_read_view *rv,
+lbox_read_view_push_index(struct lua_State *L,
 			  struct index_read_view *index,
 			  struct space_read_view_handle *space)
 {
-	assert(rv_idx >= 0);
 	lua_newtable(L);
 	lua_pushinteger(L, index->def->iid);
 	lua_setfield(L, -2, "id");
 	lua_pushstring(L, index->def->name);
 	lua_setfield(L, -2, "name");
-
-	/* Allocate a userdata object for the new index read view. */
-	struct lbox_index_read_view *u = lua_newuserdata(L, sizeof(*rv));
-	u->space = space;
-	u->index_id = index->def->iid;
-	u->read_view = rv;
-	u->read_view_ref = LUA_NOREF;
-	luaL_getmetatable(L, lbox_index_read_view_typename);
-	lua_setmetatable(L, -2);
-
-	/* Take a reference to the read view object. */
-	lua_pushvalue(L, rv_idx);
-	u->read_view_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-
-	lua_setfield(L, -2, "_impl");
 
 	*(struct space_read_view_handle **)luaL_pushcdata(
 		L, CTID_STRUCT_SPACE_READ_VIEW_HANDLE) = space;
@@ -238,12 +153,9 @@ lbox_read_view_push_index(struct lua_State *L, int rv_idx,
 /**
  * Helper function for lbox_read_view_open() that pushes a table for the given
  * space read view to the Lua stack.
- *
- * 'rv_idx' is the index of 'rv' in the Lua stack.
  */
 static void
-lbox_read_view_push_space(struct lua_State *L, int rv_idx,
-			  struct lbox_read_view *rv,
+lbox_read_view_push_space(struct lua_State *L,
 			  struct space_read_view_handle *space)
 {
 	lua_newtable(L);
@@ -257,7 +169,7 @@ lbox_read_view_push_space(struct lua_State *L, int rv_idx,
 			space_read_view_index(space->ptr, i);
 		if (index == NULL)
 			continue;
-		lbox_read_view_push_index(L, rv_idx, rv, index, space);
+		lbox_read_view_push_index(L, index, space);
 		lua_pushvalue(L, -1);
 		lua_rawseti(L, -3, i);
 		lua_setfield(L, -2, index->def->name);
@@ -290,11 +202,7 @@ lbox_read_view_push_space(struct lua_State *L, int rv_idx,
  *             -- Table of space indexes, keyed by space id and name.
  *             index = {
  *                 [id] = {
- *                     -- Index read view implementation.
- *                     -- Represented by struct lbox_index_read_view.
- *                     _impl = <userdata:box.read_view.index>,
- *
- *                     -- lbox_index_read_view->space exported for FFI.
+ *                     -- Space read view handle (cdata).
  *                     _cspace = <cdata:struct space_read_view_handle *>,
  *
  *                     -- Set if FFI should be used for this index.
@@ -322,7 +230,6 @@ lbox_read_view_open(struct lua_State *L)
 	rv->is_closed = true;
 	luaL_getmetatable(L, lbox_read_view_typename);
 	lua_setmetatable(L, -2);
-	int rv_idx = lua_gettop(L);
 
 	/* Open a read view. */
 	struct read_view_opts opts;
@@ -346,7 +253,7 @@ lbox_read_view_open(struct lua_State *L)
 	lua_newtable(L);
 	struct space_read_view_handle *space;
 	read_view_foreach_space(space, rv->handle) {
-		lbox_read_view_push_space(L, rv_idx, rv, space);
+		lbox_read_view_push_space(L, space);
 		lua_pushvalue(L, -1);
 		lua_rawseti(L, -3, space->ptr->id);
 		lua_setfield(L, -2, space->ptr->name);
@@ -435,33 +342,22 @@ lbox_read_view_close(struct lua_State *L)
 }
 
 /**
- * Frees an index read view.
- * Drops a reference to the database read view.
- */
-static int
-lbox_index_read_view_gc(struct lua_State *L)
-{
-	struct lbox_index_read_view *rv = lbox_check_index_read_view(L, 1);
-	luaL_unref(L, LUA_REGISTRYINDEX, rv->read_view_ref);
-	TRASH(rv);
-	return 0;
-}
-
-/**
  * Gets a tuple by key from an index read view.
- * Expects the key (tuple or Lua array) as the second argument.
+ * Takes space read view handle, index id, and key (tuple or Lua array).
  * Returns a tuple or nil on success. On error, raises a Lua exception.
  */
 static int
 lbox_index_read_view_get(struct lua_State *L)
 {
-	struct lbox_index_read_view *rv = lbox_check_open_index_read_view(L, 1);
+	struct space_read_view_handle *space =
+		lbox_check_space_read_view_handle(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 2, &key_len);
+	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 	struct tuple *tuple;
-	int rc = box_index_read_view_get(rv->space, rv->index_id,
+	int rc = box_index_read_view_get(space, index_id,
 					 key, key + key_len, &tuple);
 	region_truncate(region, region_svp);
 	if (rc != 0)
@@ -470,19 +366,22 @@ lbox_index_read_view_get(struct lua_State *L)
 }
 
 /**
- * Count tuples in an index read view. Takes iterator type and key.
+ * Counts tuples in an index read view.
+ * Takes space read view handle, index id, iterator type, and key.
  * Returns a number. On error, raises a Lua exception.
  */
 static int
 lbox_index_read_view_count(struct lua_State *L)
 {
-	struct lbox_index_read_view *rv = lbox_check_open_index_read_view(L, 1);
-	int iterator = luaL_checkinteger(L, 2);
+	struct space_read_view_handle *space =
+		lbox_check_space_read_view_handle(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	int iterator = luaL_checkinteger(L, 3);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
-	ssize_t count = box_index_read_view_count(rv->space, rv->index_id,
+	const char *key = lbox_encode_tuple_on_gc(L, 4, &key_len);
+	ssize_t count = box_index_read_view_count(space, index_id,
 						  iterator, key, key + key_len);
 	region_truncate(region, region_svp);
 	if (count < 0)
@@ -494,40 +393,45 @@ lbox_index_read_view_count(struct lua_State *L)
 /** Specialization of lbox_normalize_position for read views. */
 static int
 lbox_read_view_normalize_position(lua_State *L, int idx,
-				  struct lbox_index_read_view *rv,
+				  struct space_read_view_handle *space,
+				  uint32_t index_id,
 				  const char **packed_pos,
 				  const char **packed_pos_end)
 {
-	struct index_read_view *index = space_read_view_index(rv->space->ptr,
-							      rv->index_id);
+	struct index_read_view *index = space_read_view_index(space->ptr,
+							      index_id);
 	return lbox_normalize_position(L, idx, index->def->cmp_def, packed_pos,
 				       packed_pos_end);
 }
 
 /**
  * Selects tuples from an index read view.
- * Takes iterator type, offset, limit, key, position and fetch_pos.
+ * Takes space read view handle, index id, iterator type, offset, limit,
+ * key, position, and fetch_pos.
  * Returns an array of tuples and string with packed position if fetch_pos is
  * true on success. On error, raises a Lua exception.
  */
 static int
 lbox_index_read_view_select(struct lua_State *L)
 {
-	struct lbox_index_read_view *rv = lbox_check_open_index_read_view(L, 1);
-	int iterator = luaL_checkinteger(L, 2);
-	uint32_t offset = luaL_checkinteger(L, 3);
-	uint32_t limit = luaL_checkinteger(L, 4);
+	struct space_read_view_handle *space =
+		lbox_check_space_read_view_handle(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	int iterator = luaL_checkinteger(L, 3);
+	uint32_t offset = luaL_checkinteger(L, 4);
+	uint32_t limit = luaL_checkinteger(L, 5);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 5, &key_len);
+	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
 	const char *packed_pos, *packed_pos_end;
-	bool fetch_pos = lua_toboolean(L, 7);
-	if (lbox_read_view_normalize_position(L, 6, rv, &packed_pos,
+	bool fetch_pos = lua_toboolean(L, 8);
+	if (lbox_read_view_normalize_position(L, 7, space, index_id,
+					      &packed_pos,
 					      &packed_pos_end) != 0)
 		goto fail;
 	struct port port;
-	int rc = box_index_read_view_select(rv->space, rv->index_id, iterator,
+	int rc = box_index_read_view_select(space, index_id, iterator,
 					    offset, limit, key, key + key_len,
 					    &packed_pos, &packed_pos_end,
 					    fetch_pos, &port);
@@ -556,10 +460,8 @@ lbox_index_read_view_iterator_gc(struct lua_State *L)
 {
 	struct lbox_index_read_view_iterator *it =
 		lbox_check_index_read_view_iterator(L, 1);
-	if (it->read_view != NULL)
+	if (it->space != NULL)
 		box_index_read_view_iterator_destroy(&it->obj);
-	luaL_unref(L, LUA_REGISTRYINDEX, it->read_view_ref);
-	luaL_unref(L, LUA_REGISTRYINDEX, it->key_ref);
 	return 0;
 }
 
@@ -572,7 +474,7 @@ static int
 lbox_index_read_view_iterator_next(struct lua_State *L)
 {
 	struct lbox_index_read_view_iterator *it =
-		lbox_check_open_index_read_view_iterator(L, 1);
+		lbox_check_index_read_view_iterator(L, 1);
 	struct tuple *tuple;
 	if (box_index_read_view_iterator_next(&it->obj, it->space, &tuple) != 0)
 		return luaT_error(L);
@@ -585,15 +487,17 @@ lbox_index_read_view_iterator_next(struct lua_State *L)
 
 /**
  * Creates an iterator over an index read view.
- * Takes iterator type, key and position.
+ * Takes space read view handle, index id, iterator type, key, position,
+ * and offset.
  * Returns an iterator object on success. On error, raises a Lua exception.
  */
 static int
 lbox_index_read_view_iterator(struct lua_State *L)
 {
-	struct lbox_index_read_view *rv =
-		lbox_check_open_index_read_view_at(L, 1, 2);
-	int iterator = luaL_checkinteger(L, 2);
+	struct space_read_view_handle *space =
+		lbox_check_space_read_view_handle(L, 1);
+	uint32_t index_id = luaL_checkinteger(L, 2);
+	int iterator = luaL_checkinteger(L, 3);
 
 	/*
 	 * Store the key on Lua memory, because the iterator implementation
@@ -602,36 +506,30 @@ lbox_index_read_view_iterator(struct lua_State *L)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	size_t key_len;
-	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
+	const char *key = lbox_encode_tuple_on_gc(L, 4, &key_len);
 	lua_pushlstring(L, key, key_len);
 	key = lua_tostring(L, -1);
 	const char *packed_pos, *packed_pos_end;
-	if (lbox_read_view_normalize_position(L, 4, rv, &packed_pos,
+	if (lbox_read_view_normalize_position(L, 5, space, index_id,
+					      &packed_pos,
 					      &packed_pos_end) != 0)
 		goto error;
-	uint32_t offset = luaL_checkinteger(L, 5);
+	uint32_t offset = luaL_checkinteger(L, 6);
 
 	/* Allocate a userdata object for the new iterator. */
 	struct lbox_index_read_view_iterator *it =
 			lua_newuserdata(L, sizeof(*it));
-	it->read_view = NULL;
-	it->read_view_ref = LUA_NOREF;
-	it->key_ref = LUA_NOREF;
+	it->space = NULL;
 	it->count = 0;
 	luaL_getmetatable(L, lbox_index_read_view_iterator_typename);
 	lua_setmetatable(L, -2);
 
 	/* Initialize the userdata object. */
 	if (box_index_read_view_create_iterator_with_offset(
-			rv->space, rv->index_id, iterator, key, key + key_len,
+			space, index_id, iterator, key, key + key_len,
 			packed_pos, packed_pos_end, offset, &it->obj) != 0)
 		goto error;
-	it->space = rv->space;
-	it->read_view = rv->read_view;
-	lua_rawgeti(L, LUA_REGISTRYINDEX, rv->read_view_ref);
-	it->read_view_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushvalue(L, -2);
-	it->key_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	it->space = space;
 	region_truncate(region, region_svp);
 	return 1;
 error:
@@ -646,7 +544,11 @@ box_lua_read_view_init(struct lua_State *L)
 		{"open", lbox_read_view_open },
 		{"list", lbox_read_view_list},
 		{"status", lbox_read_view_status},
-		{ NULL, NULL }
+		{"index_get", lbox_index_read_view_get},
+		{"index_count", lbox_index_read_view_count},
+		{"index_select", lbox_index_read_view_select},
+		{"index_iterator", lbox_index_read_view_iterator},
+		{ NULL, NULL}
 	};
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.read_view", 0);
 	luaL_setfuncs(L, module_methods, 0);
@@ -658,17 +560,6 @@ box_lua_read_view_init(struct lua_State *L)
 		{ NULL, NULL }
 	};
 	luaL_register_type(L, lbox_read_view_typename, read_view_methods);
-
-	const struct luaL_Reg index_read_view_methods[] = {
-		{"__gc", lbox_index_read_view_gc },
-		{"get", lbox_index_read_view_get },
-		{"count", lbox_index_read_view_count },
-		{"select", lbox_index_read_view_select },
-		{"iterator", lbox_index_read_view_iterator },
-		{ NULL, NULL }
-	};
-	luaL_register_type(L, lbox_index_read_view_typename,
-			   index_read_view_methods);
 
 	const struct luaL_Reg index_read_view_iterator_methods[] = {
 		{"__gc", lbox_index_read_view_iterator_gc },
