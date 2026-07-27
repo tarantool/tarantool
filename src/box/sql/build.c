@@ -1101,7 +1101,7 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 static int
 emitNewSysSpaceSequenceRecord(Parse *pParse, int reg_space_id, int reg_seq_id)
 {
-	uint32_t fieldno = pParse->autoinc_fieldno;
+	uint32_t fieldno = *pParse->autoinc_fieldno;
 
 	Vdbe *v = sqlGetVdbe(pParse);
 	int first_col = pParse->nMem + 1;
@@ -1375,7 +1375,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	 * Check to see if we need to create an _sequence table
 	 * for keeping track of autoincrement keys.
 	 */
-	if (parse->has_autoinc) {
+	if (parse->autoinc_fieldno != NULL) {
 		/* Do an insertion into _sequence. */
 		int reg_seq_id = ++parse->nMem;
 		struct Vdbe *v = sqlGetVdbe(parse);
@@ -2594,6 +2594,11 @@ index_fill_def(struct Parse *parse, struct index *index,
 		assert(column_expr->op == TK_COLUMN_REF);
 
 		uint32_t fieldno = column_expr->iColumn;
+		if (parse->autoinc_fieldno == &expr->iColumn) {
+			parse->autoinc_fieldno =
+				xregion_alloc_object(&parse->region, int);
+			*parse->autoinc_fieldno = fieldno;
+		}
 		uint32_t coll_id;
 		if (expr->op == TK_COLLATE) {
 			coll_id = sql_coll_id_by_expr(expr);
@@ -2973,10 +2978,26 @@ sql_create_index(struct Parse *parse) {
 		sqlVdbeAddOp0(vdbe, OP_Expire);
 	}
 
-	if (!is_create_table_or_add_col)
+	if (is_create_table_or_add_col) {
+		sql_space_add_index(parse, space, index);
+		index = NULL;
 		goto exit_create_index;
-	sql_space_add_index(parse, space, index);
-	index = NULL;
+	}
+
+	if (parse->autoinc_fieldno != NULL) {
+		struct Vdbe *v = sqlGetVdbe(parse);
+		assert(v != NULL);
+		int reg_space_id = ++parse->nMem;
+		sqlVdbeAddOp2(v, OP_Integer, def->id, reg_space_id);
+		int reg_seq_id = ++parse->nMem;
+		sqlVdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
+		int reg_seq_rec = emitNewSysSequenceRecord(parse, reg_seq_id,
+							   def->name);
+		sqlVdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID, reg_seq_rec);
+		int reg = emitNewSysSpaceSequenceRecord(parse, reg_space_id,
+							reg_seq_id);
+		sqlVdbeAddOp2(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID, reg);
+	}
 
 	/* Clean up before exiting. */
  exit_create_index:
@@ -3477,36 +3498,15 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 int
 sql_add_autoincrement(struct Parse *parse_context, uint32_t fieldno)
 {
-	if (parse_context->has_autoinc) {
-		diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS,
-			 parse_context->line_count, parse_context->line_pos,
-			 "table must feature at most one AUTOINCREMENT field");
+	if (parse_context->autoinc_fieldno != NULL) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Table must feature at most one AUTOINCREMENT field");
 		parse_context->is_aborted = true;
 		return -1;
 	}
-	parse_context->has_autoinc = true;
-	parse_context->autoinc_fieldno = fieldno;
-	return 0;
-}
-
-int
-sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
-		    uint32_t *fieldno)
-{
-	const struct space *space = parse_context->create_table_def.new_space;
-	struct Expr *name = sqlExprSkipCollate(field_name);
-	if (name->op != TK_ID) {
-		diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED, "Expressions");
-		parse_context->is_aborted = true;
-		return -1;
-	}
-	uint32_t id = sql_fieldno_by_expr(space, name);
-	if (id == UINT32_MAX) {
-		diag_set(ClientError, ER_SQL_CANT_RESOLVE_FIELD, name->u.zToken);
-		parse_context->is_aborted = true;
-		return -1;
-	}
-	*fieldno = id;
+	parse_context->autoinc_fieldno =
+		xregion_alloc_object(&parse_context->region, int);
+	*parse_context->autoinc_fieldno = fieldno;
 	return 0;
 }
 
