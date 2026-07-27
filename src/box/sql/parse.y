@@ -1353,10 +1353,11 @@ cmd ::= FUNCTION_ENTRY expr(X). {
 
 //////////////////////////// The SHOW CREATE TABLE command /////////////////////
 cmd ::= SHOW CREATE TABLE nm(X). {
-  sql_emit_show_create_table_one(pParse, &X);
+  pParse->ast.type = SQL_AST_SHOW_CREATE_TABLE;
+  pParse->ast.show_create_table = X;
 }
 cmd ::= SHOW CREATE TABLE. {
-  sql_emit_show_create_table_all(pParse);
+  pParse->ast.type = SQL_AST_SHOW_CREATE_TABLE;
 }
 
 //////////////////////////// The CREATE TRIGGER command /////////////////////
