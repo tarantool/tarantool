@@ -67,6 +67,8 @@ enum sql_ast_type {
 
 	/** SET SESSION statement. */
 	SQL_AST_SET_SESSION,
+	/** PRAGMA statement. */
+	SQL_AST_PRAGMA,
 
 	/** VIEW object definition. */
 	SQL_AST_VIEW,
@@ -484,6 +486,16 @@ struct ast_set_session {
 	struct ast_expr *value;
 };
 
+/** Description of PRAGMA statement. */
+struct ast_pragma {
+	/** Name of pragma. */
+	struct Token name;
+	/** First argument of pragma. */
+	struct Token table_name;
+	/** Second argument of pragma. */
+	struct Token index_name;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -524,6 +536,8 @@ struct sql_ast {
 		struct ast_alter_drop_constraint alter_drop_constraint;
 		/** SET SESSION statement. */
 		struct ast_set_session set_session;
+		/** PRAGMA statement. */
+		struct ast_pragma pragma;
 	};
 };
 
