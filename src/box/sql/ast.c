@@ -834,6 +834,14 @@ ast_update_new(struct region *region)
 	return res;
 }
 
+struct ast_delete *
+ast_delete_new(struct region *region)
+{
+	struct ast_delete *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
 struct ast_property *
 ast_property_new(struct region *region)
 {

@@ -662,13 +662,6 @@ source(A) ::= LP select(S) RP as(Z). {
   A->select = S;
 }
 
-%type fullname {SrcList*}
-%destructor fullname {sqlSrcListDelete($$);}
-fullname(A) ::= nm(X). {
-  /* A-overwrites-X. */
-  A = sql_src_list_append(NULL ,&X);
-}
-
 %type joinop {int}
 joinop(A) ::= COMMA|JOIN. {
   A = JT_INNER;
@@ -792,13 +785,18 @@ limit_opt(A) ::= LIMIT expr(X) COMMA expr(Y). {
 
 /////////////////////////// The DELETE statement /////////////////////////////
 //
-cmd ::= with_old(C) DELETE FROM fullname(X) indexed_opt(I) where_opt_old(W). {
-  sqlWithPush(pParse, C, 1);
-  sqlSrcListIndexedBy(X, &I);
-  sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
-  /* Instruct SQL to initate Tarantool's transaction.  */
-  pParse->initiateTTrans = true;
-  sql_table_delete_from(pParse,X,W);
+cmd ::= with(W) delete(D). {
+  D->with = W;
+  pParse->ast.type = SQL_AST_DELETE;
+  pParse->ast.del = D;
+}
+
+%type delete {struct ast_delete *}
+delete(A) ::= DELETE FROM nm(X) indexed_opt(I) where_opt(W). {
+  A = ast_delete_new(&pParse->region);
+  A->table = X;
+  A->indexed_by = I;
+  A->where = W;
 }
 
 /////////////////////////// The TRUNCATE statement /////////////////////////////
@@ -1563,12 +1561,6 @@ cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////
-%type with_old {With*}
-%destructor with_old {sqlWithDelete($$);}
-with_old(A) ::= with(X). {
-  A = with_from_ast(pParse, X);
-}
-
 %type with {struct ast_with_list *}
 with(A) ::= . {A = 0;}
 with(A) ::= WITH wqlist(W).              { A = W; }

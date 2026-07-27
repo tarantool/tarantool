@@ -731,6 +731,26 @@ sql_code_update(struct Parse *parser, struct ast_update *update)
 	sqlUpdate(parser, src, set_list, where, update->action);
 }
 
+/** Code AST for DELETE statement. */
+static void
+sql_code_delete(struct Parse *parser, struct ast_delete *del)
+{
+	struct With *with = with_from_ast(parser, del->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+
+	struct Expr *where = expr_from_ast(parser, del->where);
+	if (parser->is_aborted)
+		return;
+
+	struct SrcList *src = sql_src_list_append(NULL, &del->table);
+	sqlSrcListIndexedBy(src, &del->indexed_by);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	sql_table_delete_from(parser, src, where);
+}
+
 /** Code given AST. */
 static void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
@@ -764,6 +784,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		break;
 	case SQL_AST_UPDATE:
 		sql_code_update(parse, ast->update);
+		break;
+	case SQL_AST_DELETE:
+		sql_code_delete(parse, ast->del);
 		break;
 	case SQL_AST_CREATE_TABLE:
 		sql_code_create_table(parse, &ast->create_table);

@@ -35,6 +35,8 @@ enum sql_ast_type {
 	SQL_AST_INSERT,
 	/** UPDATE statement. */
 	SQL_AST_UPDATE,
+	/** DELETE statement. */
+	SQL_AST_DELETE,
 
 	/** CREATE TABLE statement. */
 	SQL_AST_CREATE_TABLE,
@@ -287,6 +289,18 @@ struct ast_update {
 	struct ast_with_list *with;
 };
 
+/** Structure that describes DELETE. */
+struct ast_delete {
+	/** Name of the table from which data is being deleted. */
+	struct Token table;
+	/** Name of index in INDEXED BY clause. */
+	struct Token indexed_by;
+	/** WHERE clause. */
+	struct ast_expr *where;
+	/** WITH clause of the DELETE. */
+	struct ast_with_list *with;
+};
+
 /** List of table or columns properties received from parser. */
 struct ast_property_list {
 	/** Head of the list. */
@@ -465,6 +479,8 @@ struct sql_ast {
 		struct ast_insert *insert;
 		/** UPDATE statement. */
 		struct ast_update *update;
+		/** DELETE statement. */
+		struct ast_delete *del;
 		/** CREATE TABLE statement. */
 		struct ast_create_table create_table;
 		/** CREATE VIEW statement. */
@@ -618,6 +634,10 @@ ast_set_list_append_vector(struct region *region, struct ast_set_list *list,
 /** Create new empty UPDATE structure. */
 struct ast_update *
 ast_update_new(struct region *region);
+
+/** Create new empty DELETE structure. */
+struct ast_delete *
+ast_delete_new(struct region *region);
 
 /** Create new empty structure of table or column property. */
 struct ast_property *
