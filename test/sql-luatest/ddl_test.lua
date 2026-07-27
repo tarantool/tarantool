@@ -348,3 +348,61 @@ g.test_4086_ddl = function(cg)
         monster_ddl_clear()
     end)
 end
+
+--
+-- Check that PRIMARY KEY table constraint with both sort order and
+-- AUTOINCREMENT works as expected.
+--
+g.test_12968_primary_key_constraint_parsing = function(cg)
+    cg.server:exec(function()
+        -- Check PRIMARY KEY table constraint in CREATE TABLE.
+        local _, err = box.execute([[CREATE TABLE t (i INT, a INT, b INT, c INT,
+                                     PRIMARY KEY(a ASC, b DESC AUTOINCREMENT,
+                                     c DESC));]])
+        t.assert_equals(err, nil)
+        local seq = box.space._space_sequence:select()[1]
+        t.assert_equals(seq.id, box.space.t.id)
+        t.assert_equals(seq.field, 2)
+        box.execute([[DROP TABLE t;]])
+        t.assert_equals(box.space._space_sequence:count(), 0)
+
+        -- Check column with collate.
+        _, err = box.execute([[CREATE TABLE t (a INT, b SCALAR,
+                               PRIMARY KEY(a ASC, b COLLATE "unicode" DESC
+                               AUTOINCREMENT));]])
+        local exp_err = "AUTOINCREMENT cannot be used with a non-integer column"
+        t.assert_str_contains(err.message, exp_err)
+        t.assert_equals(box.space._space_sequence:count(), 0)
+
+        -- Check PRIMARY KEY table constraint in ALTER TABLE ADD CONSTRAINT.
+        local format = {
+            {'i', 'integer'},
+            {'a', 'integer'},
+            {'b', 'integer'},
+            {'c', 'integer'},
+        }
+        box.schema.space.create('t', {format = format})
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT pk
+                               PRIMARY KEY(a ASC, b DESC AUTOINCREMENT,
+                               c DESC)]])
+        t.assert_equals(err, nil)
+        seq = box.space._space_sequence:select()[1]
+        t.assert_equals(seq.id, box.space.t.id)
+        t.assert_equals(seq.field, 2)
+        box.execute([[DROP TABLE t;]])
+        t.assert_equals(box.space._space_sequence:count(), 0)
+
+        -- Check duplicate AUTOINCREMENT in ALTER TABLE ADD CONSTRAINT.
+        format = {
+            {'a', 'integer'},
+            {'b', 'integer'},
+        }
+        box.schema.space.create('t', {format = format})
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT pk
+                               PRIMARY KEY(a AUTOINCREMENT, b AUTOINCREMENT)]])
+        exp_err = "Table must feature at most one AUTOINCREMENT field"
+        t.assert_str_contains(err.message, exp_err)
+        t.assert_equals(box.space._space_sequence:count(), 0)
+        box.space.t:drop()
+    end)
+end

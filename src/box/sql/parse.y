@@ -349,8 +349,9 @@ autoinc(X) ::= .          {X = 0;}
 autoinc(X) ::= AUTOINCR.  {X = 1;}
 
 // The next group of rules parses the arguments to a REFERENCES clause.
-tcons ::= cconsname(N) PRIMARY KEY LP col_list_with_autoinc(X) RP. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
+tcons ::= cconsname(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
+  struct ExprList *columns = expr_list_from_ast(pParse, X);
+  create_index_def_init(&pParse->create_index_def, NULL, &N, columns,
                         SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
   sqlAddPrimaryKey(pParse);
 }
@@ -715,6 +716,19 @@ sortlist(A) ::= expr(Y) sortorder(Z). {
   ast_expr_list_set_order(A, Z);
 }
 
+%type sortlist_autoinc {struct ast_expr_list *}
+sortlist_autoinc(A) ::= sortlist_autoinc(A) COMMA expr(Y) sortorder(Z)
+                        autoinc(I). {
+  A = ast_expr_list_append(pParse, A, Y);
+  ast_expr_list_set_order(A, Z);
+  ast_expr_list_set_autoinc(A, I != 0);
+}
+sortlist_autoinc(A) ::= expr(Y) sortorder(Z) autoinc(I). {
+  A = ast_expr_list_append(pParse, NULL, Y);
+  ast_expr_list_set_order(A, Z);
+  ast_expr_list_set_autoinc(A, I != 0);
+}
+
 sortlist_old(A) ::= sortlist_old(A) COMMA expr_old(Y) sortorder(Z). {
   A = sql_expr_list_append(A, Y.pExpr);
   sqlExprListSetSortOrder(A,Z);
@@ -723,37 +737,6 @@ sortlist_old(A) ::= expr_old(Y) sortorder(Z). {
   /* A-overwrites-Y. */
   A = sql_expr_list_append(NULL, Y.pExpr);
   sqlExprListSetSortOrder(A,Z);
-}
-
-/**
- * Non-terminal rule to store a list of columns within PRIMARY KEY
- * declaration.
- */
-%type col_list_with_autoinc {ExprList*}
-%destructor col_list_with_autoinc {sql_expr_list_delete($$);}
-
-col_list_with_autoinc(A) ::= col_list_with_autoinc(A) COMMA expr_old(Y)
-                             autoinc(I). {
-  uint32_t fieldno;
-  if (I == 1) {
-    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
-      return;
-    if (sql_add_autoincrement(pParse, fieldno) != 0)
-      return;
-  }
-  A = sql_expr_list_append(A, Y.pExpr);
-}
-
-col_list_with_autoinc(A) ::= expr_old(Y) autoinc(I). {
-  if (I == 1) {
-    uint32_t fieldno = 0;
-    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
-      return;
-    if (sql_add_autoincrement(pParse, fieldno) != 0)
-      return;
-  }
-  /* A-overwrites-Y. */
-  A = sql_expr_list_append(NULL, Y.pExpr);
 }
 
 %type sortorder {int}
@@ -1568,15 +1551,20 @@ cmd ::= alter_add_constraint(N) CHECK LP expr_old(X) RP. {
     sql_create_check_contraint(pParse, false);
 }
 
-cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist_old(X) RP. {
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X, U,
+cmd ::= alter_add_constraint(N) UNIQUE LP sortlist_old(X) RP. {
+  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
                         SORT_ORDER_ASC, false);
   sql_create_index(pParse);
 }
 
-%type unique_spec {int}
-unique_spec(U) ::= UNIQUE.      { U = SQL_INDEX_TYPE_CONSTRAINT_UNIQUE; }
-unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
+cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
+  struct ExprList *columns = expr_list_from_ast(pParse, X);
+  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name,
+                        columns, SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC,
+                        false);
+  sql_create_index(pParse);
+}
 
 cmd ::= alter_table_start(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);
