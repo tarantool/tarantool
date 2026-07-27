@@ -189,7 +189,7 @@ txn_limbo_has_quorum_for(struct txn_limbo *limbo, int64_t lsn)
 }
 
 static void
-txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
+txn_limbo_ack_queue(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
 	if (txn_limbo_queue_ack(&limbo->queue, replica_id, lsn))
 		fiber_wakeup(limbo->worker);
@@ -297,7 +297,7 @@ txn_limbo_on_ack_f(struct trigger *t, void *event)
 	 */
 	int64_t lsn = vclock_get(ack->vclock, limbo->queue.owner_id);
 	assert(limbo->queue.owner_id != REPLICA_ID_NIL || lsn == 0);
-	txn_limbo_ack(limbo, ack->source, lsn);
+	txn_limbo_ack_queue(limbo, ack->source, lsn);
 	return 0;
 }
 
@@ -517,7 +517,7 @@ txn_limbo_assign_lsn(struct txn_limbo *limbo, uint32_t origin_id,
 		     struct txn_limbo_entry *entry, int64_t lsn)
 {
 	txn_limbo_queue_assign_lsn(&limbo->queue, entry, lsn);
-	txn_limbo_ack(limbo, origin_id, lsn);
+	txn_limbo_ack_queue(limbo, origin_id, lsn);
 }
 
 enum txn_limbo_wait_entry_result
