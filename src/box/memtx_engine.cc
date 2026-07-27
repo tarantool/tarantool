@@ -1027,7 +1027,7 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id, uint32_t group_id,
 
 struct checkpoint {
 	/** Database read view written to the snapshot file. */
-	struct read_view rv;
+	struct read_view *rv;
 	/** Snapshot writer thread. */
 	struct cord cord;
 	/** The vclock of the snapshot file. */
@@ -1154,19 +1154,15 @@ checkpoint_dump_sort_data(
 static struct checkpoint *
 checkpoint_new(struct memtx_engine *memtx, const struct box_checkpoint *box)
 {
-	struct checkpoint *ckpt = (struct checkpoint *)malloc(sizeof(*ckpt));
-	if (ckpt == NULL) {
-		diag_set(OutOfMemory, sizeof(*ckpt), "malloc",
-			 "struct checkpoint");
-		return NULL;
-	}
+	struct checkpoint *ckpt = (struct checkpoint *)xmalloc(sizeof(*ckpt));
 	struct read_view_opts rv_opts;
 	read_view_opts_create(&rv_opts);
 	rv_opts.name = "checkpoint";
 	rv_opts.is_system = true;
 	rv_opts.filter_space = checkpoint_space_filter;
 	rv_opts.filter_index = checkpoint_index_filter;
-	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
+	ckpt->rv = read_view_new(&rv_opts);
+	if (ckpt->rv == NULL) {
 		free(ckpt);
 		return NULL;
 	}
@@ -1190,7 +1186,7 @@ checkpoint_delete(struct checkpoint *ckpt)
 {
 	if (ckpt->sort_data_writer != NULL)
 		memtx_sort_data_writer_delete(ckpt->sort_data_writer);
-	read_view_close(&ckpt->rv);
+	read_view_delete(ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
 }
@@ -1339,7 +1335,7 @@ checkpoint_f(va_list ap)
 	if (ckpt->sort_data_writer != NULL &&
 	    memtx_sort_data_writer_create_file(ckpt->sort_data_writer,
 					       snap->filename, &ckpt->vclock,
-					       &INSTANCE_UUID, &ckpt->rv) != 0)
+					       &INSTANCE_UUID, ckpt->rv) != 0)
 		return -1;
 
 	struct mh_i32_t *temp_space_ids = mh_i32_new();
@@ -1355,7 +1351,7 @@ checkpoint_f(va_list ap)
 	});
 	ERROR_INJECT(ERRINJ_SNAP_SKIP_ALL_ROWS, goto done);
 	struct space_read_view *space_rv;
-	read_view_foreach_space(space_rv, &ckpt->rv) {
+	read_view_foreach_space(space_rv, ckpt->rv) {
 		FiberGCChecker gc_check;
 		bool skip = false;
 		ERROR_INJECT(ERRINJ_SNAP_SKIP_DDL_ROWS, {
@@ -1648,7 +1644,7 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 
 struct memtx_join_ctx {
 	/** Database read view sent to the replica. */
-	struct read_view rv;
+	struct read_view *rv;
 	struct xstream *stream;
 };
 
@@ -1685,21 +1681,16 @@ memtx_engine_prepare_join(struct engine *engine, struct engine_join_ctx *arg)
 {
 	if (arg->cursor != NULL)
 		return 0;
-
 	struct memtx_join_ctx *ctx =
-		(struct memtx_join_ctx *)malloc(sizeof(*ctx));
-	if (ctx == NULL) {
-		diag_set(OutOfMemory, sizeof(*ctx),
-			 "malloc", "struct memtx_join_ctx");
-		return -1;
-	}
+		(struct memtx_join_ctx *)xmalloc(sizeof(*ctx));
 	struct read_view_opts rv_opts;
 	read_view_opts_create(&rv_opts);
 	rv_opts.name = "join";
 	rv_opts.is_system = true;
 	rv_opts.filter_space = memtx_join_space_filter;
 	rv_opts.filter_index = primary_index_filter;
-	if (read_view_open(&ctx->rv, &rv_opts) != 0) {
+	ctx->rv = read_view_new(&rv_opts);
+	if (ctx->rv == NULL) {
 		free(ctx);
 		return -1;
 	}
@@ -1734,7 +1725,7 @@ memtx_join_f(va_list ap)
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
 	struct mh_i32_t *temp_space_ids = mh_i32_new();
 	struct space_read_view *space_rv;
-	read_view_foreach_space(space_rv, &ctx->rv) {
+	read_view_foreach_space(space_rv, ctx->rv) {
 		FiberGCChecker gc_check;
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
@@ -1799,7 +1790,7 @@ memtx_engine_complete_join(struct engine *engine, struct engine_join_ctx *arg)
 
 	struct memtx_join_ctx *ctx =
 		(struct memtx_join_ctx *)arg->data[engine->id];
-	read_view_close(&ctx->rv);
+	read_view_delete(ctx->rv);
 	free(ctx);
 }
 

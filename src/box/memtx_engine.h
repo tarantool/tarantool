@@ -308,7 +308,7 @@ memtx_prepare_result_tuple(struct space *space, struct tuple **result);
  * This function performs two tasks:
  *
  *  1. Eliminates dirty tuples using the provided snapshot cleaner created
- *     at read_view_open. If the given tuple should be skipped, the data is
+ *     at read_view_new. If the given tuple should be skipped, the data is
  *     set to NULL.
  *
  *  2. Decompresses tuples if required, unless the disable_decompression flag
