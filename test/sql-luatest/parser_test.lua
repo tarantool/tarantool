@@ -115,5 +115,8 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[DELETE FROM t 5;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[TRUNCATE TABLE t 6;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '6'")
     end)
 end

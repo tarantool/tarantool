@@ -788,6 +788,10 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 	case SQL_AST_DELETE:
 		sql_code_delete(parse, ast->del);
 		break;
+	case SQL_AST_TRUNCATE:
+		parse->initiateTTrans = true;
+		sql_table_truncate(parse, &ast->truncate.table);
+		break;
 	case SQL_AST_CREATE_TABLE:
 		sql_code_create_table(parse, &ast->create_table);
 		break;
