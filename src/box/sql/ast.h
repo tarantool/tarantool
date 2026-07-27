@@ -72,6 +72,8 @@ enum sql_ast_type {
 
 	/** VIEW object definition. */
 	SQL_AST_VIEW,
+	/** Expression for SQL expression function body. */
+	SQL_AST_FUNCTION,
 };
 
 /** Columns and table properties. */
@@ -538,6 +540,8 @@ struct sql_ast {
 		struct ast_set_session set_session;
 		/** PRAGMA statement. */
 		struct ast_pragma pragma;
+		/** Expression for SQL expression function body. */
+		struct ast_expr *expr;
 	};
 };
 
