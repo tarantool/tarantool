@@ -2000,7 +2000,6 @@ struct Parse {
 		struct create_view_def create_view_def;
 		struct rename_entity_def rename_entity_def;
 		struct drop_index_def drop_index_def;
-		struct drop_trigger_def drop_trigger_def;
 	};
 	/**
 	 * Table def or column def is not part of union since
@@ -3468,9 +3467,11 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
  * VDBE code.
  *
  * @param parser Parser context.
+ * @param name Trigger name.
+ * @param if_exists If TRUE do not raise an error when the trigger is missing.
  */
 void
-sql_drop_trigger(struct Parse *parser);
+sql_drop_trigger(struct Parse *parser, struct Token *name, bool if_exists);
 
 /**
  * Drop a trigger given a pointer to that trigger.

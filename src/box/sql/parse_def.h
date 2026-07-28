@@ -280,10 +280,6 @@ struct drop_entity_def {
  * structures be consistent. Arguments for drop procedures are
  * the same.
  */
-struct drop_trigger_def {
-	struct drop_entity_def base;
-};
-
 struct drop_index_def {
 	struct drop_entity_def base;
 };
@@ -375,15 +371,6 @@ drop_entity_def_init(struct drop_entity_def *drop_def,
 			      ALTER_ACTION_DROP);
 	drop_def->name = *name;
 	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
-		      struct SrcList *parent_name, struct Token *name,
-		      bool if_exist)
-{
-	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
-			     if_exist, ENTITY_TYPE_TRIGGER);
 }
 
 static inline void
