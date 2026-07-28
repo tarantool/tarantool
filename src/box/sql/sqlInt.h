@@ -1999,7 +1999,6 @@ struct Parse {
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 		struct rename_entity_def rename_entity_def;
-		struct drop_index_def drop_index_def;
 	};
 	/**
 	 * Table def or column def is not part of union since
@@ -2901,9 +2900,13 @@ sql_create_index(struct Parse *parse);
  * implements the DROP INDEX statement.
  *
  * @param parse_context Current parsing context.
+ * @param name Index name.
+ * @param table Name of index table.
+ * @param if_exists If TRUE do not raise an error when the index is missing.
  */
 void
-sql_drop_index(struct Parse *parse_context);
+sql_drop_index(struct Parse *parse_context, struct Token *name,
+	       struct Token *table, bool if_exists);
 
 int sqlSelect(Parse *, Select *, SelectDest *);
 Select *sqlSelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
