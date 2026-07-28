@@ -879,33 +879,31 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 }
 
 /**
- * Update the state of synchronous replication for system spaces.
+ * Update the state of synchronous replication for system spaces to match the
+ * limbo state: they are synchronous while the queue has an owner.
+ *
+ * The request, when not NULL, is an in-progress PROMOTE/DEMOTE whose outcome
+ * is applied optimistically, before its WAL write: a PROMOTE is about to
+ * claim the ownership, a DEMOTE is about to drop it. A WAL failure restores
+ * the actual state via the rollback.
  */
 static void
 txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
-					     const struct synchro_request *req,
-					     bool is_rollback)
+					     const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	/* Do not enable synchronous replication during bootstrap. */
-	if (req->origin_id == REPLICA_ID_NIL)
-		return;
-	uint16_t req_type = req->type;
-	assert(req_type == IPROTO_RAFT_PROMOTE ||
-	       req_type == IPROTO_RAFT_DEMOTE);
-	bool is_promote = req_type == IPROTO_RAFT_PROMOTE;
-	/* Synchronous replication is already enabled. */
-	if (is_promote && limbo->queue.owner_id != REPLICA_ID_NIL)
-		return;
-	/* Synchronous replication is already disabled. */
-	if (!is_promote && limbo->queue.owner_id == REPLICA_ID_NIL) {
-		assert(!is_rollback);
-		return;
+	bool is_sync;
+	if (req != NULL) {
+		assert(req->type == IPROTO_RAFT_PROMOTE ||
+		       req->type == IPROTO_RAFT_DEMOTE);
+		/* Bootstrap entries do not enable synchronous replication. */
+		if (req->origin_id == REPLICA_ID_NIL)
+			return;
+		is_sync = req->type == IPROTO_RAFT_PROMOTE;
+	} else {
+		is_sync = limbo->queue.owner_id != REPLICA_ID_NIL;
 	}
-	/* Flip operation types for a rollback. */
-	if (is_rollback)
-		is_promote = !is_promote;
-	system_spaces_update_is_sync_state(is_promote);
+	system_spaces_update_is_sync_state(is_sync);
 }
 
 int
@@ -934,8 +932,7 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		 * thread, or could be not.
 		 */
 		txn_limbo_fence(limbo);
-		txn_limbo_update_system_spaces_is_sync_state(
-			limbo, req, /*is_rollback=*/false);
+		txn_limbo_update_system_spaces_is_sync_state(limbo, req);
 		txn_limbo_update_state(limbo);
 		break;
 	}
@@ -957,8 +954,7 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 	case IPROTO_RAFT_DEMOTE: {
 		assert(limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = false;
-		txn_limbo_update_system_spaces_is_sync_state(
-			limbo, req, /*is_rollback=*/true);
+		txn_limbo_update_system_spaces_is_sync_state(limbo, NULL);
 		txn_limbo_unfence(limbo);
 		txn_limbo_update_state(limbo);
 		break;
