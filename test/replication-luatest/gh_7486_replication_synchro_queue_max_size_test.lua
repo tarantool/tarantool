@@ -133,9 +133,9 @@ g.test_recovery_with_small_max_size = function(cg)
     server_wait_synchro_queue_len_is_equal(cg.master, 1000)
     cg.master:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        box.cfg{replication_synchro_timeout = 100000}
         box.ctl.promote()
         t.assert_equals(box.space.test:len(), 1000)
-        box.cfg{replication_synchro_timeout = 100000}
         -- wait = 'complete' by default, so after truncate completes,
         -- the synchronous queue is guaranteed to be empty
         box.space.test:truncate()
