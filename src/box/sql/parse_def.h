@@ -221,11 +221,6 @@ struct create_entity_def {
 	bool if_not_exist;
 };
 
-struct create_table_def {
-	struct create_entity_def base;
-	struct space *new_space;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -300,14 +295,6 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 	trigger_def->op = op;
 	trigger_def->cols = cols;
 	trigger_def->when = when;
-}
-
-static inline void
-create_table_def_init(struct create_table_def *table_def, struct Token *name,
-		      bool if_not_exists)
-{
-	create_entity_def_init(&table_def->base, ENTITY_TYPE_TABLE, NULL, name,
-			       if_not_exists);
 }
 
 static inline void

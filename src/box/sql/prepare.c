@@ -231,7 +231,7 @@ parser_space_delete(struct Parse *parser)
 	/*
 	 * If parser->new_space is NULL, the query is ALTER TABLE ADD COLUMNS.
 	 */
-	if (parser->create_table_def.new_space == NULL) {
+	if (parser->new_space == NULL) {
 		/*
 		 * Don't delete already existing defs and start from new
 		 * ones.

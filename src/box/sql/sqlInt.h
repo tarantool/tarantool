@@ -1997,12 +1997,9 @@ struct Parse {
 		struct create_view_def create_view_def;
 	};
 	/**
-	 * Table def is not part of union since
-	 * information being held must survive till the end of
-	 * parsing of whole <CREATE TABLE> statement (to pass it to
-	 * sqlEndTable() function).
+	 * Description of the new table created in the CREATE TABLE statement.
 	 */
-	struct create_table_def create_table_def;
+	struct space *new_space;
 	/**
 	 * The space into which the column is added in the CREATE TABLE and
 	 * ALTER TABLE ADD COLUMN statements. Note that in the CREATE TABLE
@@ -2726,8 +2723,17 @@ void sqlAddCollateType(Parse *, Token *);
 struct coll *
 sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id);
 
+/*
+ * This routine is called to report the termination of a CREATE TABLE statement.
+ *
+ * During this routine byte code for creation of new Tarantool
+ * space and all necessary Tarantool indexes is emitted.
+ *
+ * @param parse Parse context.
+ * @param if_not_exists If TRUE do not raise an error when the table exists.
+ */
 void
-sqlEndTable(struct Parse *parse);
+vdbe_emit_create_table(struct Parse *parse, bool if_not_exists);
 
 /**
  * Create cursor which will be positioned to the space/index.
