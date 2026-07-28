@@ -3039,37 +3039,31 @@ sql_create_index(struct Parse *parse) {
 }
 
 void
-sql_drop_index(struct Parse *parse_context)
+sql_drop_index(struct Parse *parse_context, struct Token *name,
+	       struct Token *table, bool if_exists)
 {
-	struct drop_entity_def *drop_def = &parse_context->drop_index_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_INDEX);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	/* Never called with prior errors. */
 	assert(!parse_context->is_aborted);
-	struct SrcList *table_list = drop_def->base.entity_name;
-	assert(table_list->nSrc == 1);
 	sqlVdbeCountChanges(v);
-	const struct space *space = sql_space_by_src(&table_list->a[0]);
-	bool if_exists = drop_def->if_exist;
+	const struct space *space = sql_space_by_token(table);
 	if (space == NULL) {
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 table_list->a[0].zName);
+				 sql_tt_name_from_token(table));
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_index;
+		return;
 	}
-	uint32_t index_id = sql_index_id_by_token(space, &drop_def->name);
+	uint32_t index_id = sql_index_id_by_token(space, name);
 	if (index_id == UINT32_MAX) {
 		if (if_exists)
-			goto exit_drop_index;
-		const char *name_str = sql_tt_name_from_token(&drop_def->name);
-		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME, name_str,
-			 space->def->name);
+			return;
+		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
+			 sql_tt_name_from_token(name), space->def->name);
 		parse_context->is_aborted = true;
-		goto exit_drop_index;
+		return;
 	}
 
 	int regs = sqlGetTempRange(parse_context, 3);
@@ -3080,9 +3074,6 @@ sql_drop_index(struct Parse *parse_context)
 	sqlVdbeAddOp3(v, OP_SDelete, BOX_INDEX_ID, regs + 2, 0);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlReleaseTempRange(parse_context, regs, 3);
-
- exit_drop_index:
-	sqlSrcListDelete(table_list);
 }
 
 void *

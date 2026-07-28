@@ -267,23 +267,6 @@ struct create_view_def {
 	struct Select *select;
 };
 
-struct drop_entity_def {
-	struct alter_entity_def base;
-	/** Name of index/trigger/constraint to be dropped. */
-	struct Token name;
-	/** Statement comes with IF EXISTS clause. */
-	bool if_exist;
-};
-
-/**
- * Identical wrappers around drop_entity_def to make hierarchy of
- * structures be consistent. Arguments for drop procedures are
- * the same.
- */
-struct drop_index_def {
-	struct drop_entity_def base;
-};
-
 struct create_trigger_def {
 	struct create_entity_def base;
 	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
@@ -360,26 +343,6 @@ create_constraint_def_init(struct create_constraint_def *constr_def,
 {
 	create_entity_def_init(&constr_def->base, entity_type,
 			       parent_name, name, if_not_exists);
-}
-
-static inline void
-drop_entity_def_init(struct drop_entity_def *drop_def,
-		     struct SrcList *parent_name, struct Token *name,
-		     bool if_exist, enum entity_type entity_type)
-{
-	alter_entity_def_init(&drop_def->base, parent_name, entity_type,
-			      ALTER_ACTION_DROP);
-	drop_def->name = *name;
-	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_index_def_init(struct drop_index_def *drop_index_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_index_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_INDEX);
 }
 
 static inline void
