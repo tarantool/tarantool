@@ -223,7 +223,7 @@ parser_space_delete(struct Parse *parser)
 	assert(space->def->opts.is_ephemeral);
 	uint32_t i = 0;
 	/* If new_space is NULL, the query is ALTER TABLE ADD COLUMNS. */
-	if (parser->create_table_def.new_space == NULL) {
+	if (parser->new_space == NULL) {
 		/*
 		 * Don't delete already existing defs and start from new
 		 * ones.

@@ -497,7 +497,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->create_table_def.new_space == NULL);
+	assert(pParse->new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
