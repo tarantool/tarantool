@@ -176,12 +176,14 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
-cmd ::= create_table create_table_args with_opts create_table_end.
-create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
-  create_table_def_init(&pParse->create_table_def, &Y, E);
+cmd ::= createkw TABLE ifnotexists(E) create_table create_table_args
+        with_opts. {
+  vdbe_emit_create_table(pParse, E);
+}
+create_table ::= nm(Y). {
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
-  pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
+  pParse->new_space = sqlStartTable(pParse, &Y);
   pParse->initiateTTrans = true;
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
@@ -198,30 +200,17 @@ with_opts ::= .
 engine_opts ::= ENGINE EQ STRING(A). {
   /* Note that specifying engine clause overwrites default engine. */
   if (A.n > ENGINE_NAME_MAX) {
-    diag_set(ClientError, ER_CREATE_SPACE,
-             pParse->create_table_def.new_space->def->name,
+    diag_set(ClientError, ER_CREATE_SPACE, pParse->new_space->def->name,
              "space engine name is too long");
     pParse->is_aborted = true;
     return;
   }
   /* Need to dequote name. */
   char *normalized_name = sql_name_from_token(&A);
-  memcpy(pParse->create_table_def.new_space->def->engine_name, normalized_name,
+  memcpy(pParse->new_space->def->engine_name, normalized_name,
          strlen(normalized_name) + 1);
   sql_xfree(normalized_name);
 }
-
-create_table_end ::= . { sqlEndTable(pParse); }
-
-/*
- * CREATE TABLE AS SELECT is broken. To be re-implemented
- * in gh-3223.
- *
- * create_table_args ::= AS select(S). {
- *   sqlEndTable(pParse);
- *   sql_select_delete(S);
- * }
- */
 
 columnlist ::= columnlist COMMA tcons.
 columnlist ::= columnlist COMMA column_def create_column_end.
@@ -237,7 +226,7 @@ create_column_end ::= autoinc(I). {
   uint32_t fieldno = pParse->space->def->field_count - 1;
   if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
     return;
-  if (pParse->create_table_def.new_space == NULL)
+  if (pParse->new_space == NULL)
     sql_create_column_end(pParse);
 }
 columnlist ::= tcons.

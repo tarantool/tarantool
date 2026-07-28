@@ -192,7 +192,7 @@ sql_space_primary_key(const struct space *space)
  * when the "TEMP" or "TEMPORARY" keyword occurs in between
  * CREATE and TABLE.
  *
- * The new table record is initialized and put in pParse->create_table_def.
+ * The new table record is initialized and put in pParse->new_space.
  * As more of the CREATE TABLE statement is parsed, additional action
  * routines will be called to add more information to this record.
  * At the end of the CREATE TABLE statement, the sqlEndTable() routine
@@ -301,7 +301,7 @@ void
 sql_create_column_start(struct Parse *parse, struct Token *table,
 			struct Token *name, enum field_type type)
 {
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	bool is_alter = space == NULL;
 	if (is_alter) {
 		const struct space *origin = sql_space_by_token(table);
@@ -648,7 +648,7 @@ void
 sqlAddPrimaryKey(struct Parse *pParse, struct Token *name,
 		 struct ExprList *col_list, enum sort_order sort_order)
 {
-	struct space *space = pParse->create_table_def.new_space;
+	struct space *space = pParse->new_space;
 	if (space == NULL)
 		space = pParse->space;
 	assert(space != NULL);
@@ -725,7 +725,7 @@ sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
 {
 	struct space *space = parse->space;
 	if (space == NULL)
-		space = parse->create_table_def.new_space;
+		space = parse->new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct ck_constraint_parse *ck;
@@ -784,7 +784,7 @@ sql_create_check_constraint(struct Parse *parser, struct Token *table,
 {
 	struct space *space = parser->space;
 	if (space == NULL)
-		space = parser->create_table_def.new_space;
+		space = parser->new_space;
 	bool is_alter_add_constr = space == NULL;
 
 	/* Prepare payload for ck constraint definition. */
@@ -985,7 +985,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	memcpy(raw, index_parts, index_parts_sz);
 	index_parts = raw;
 
-	if (parse->create_table_def.new_space != NULL || parse->space != NULL) {
+	if (parse->new_space != NULL || parse->space != NULL) {
 		sqlVdbeAddOp2(v, OP_SCopy, space_id_reg, entry_reg);
 		sqlVdbeAddOp2(v, OP_Integer, idx_def->iid, entry_reg + 1);
 	} else {
@@ -1318,9 +1318,8 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	 * vdbe_emit_create_constraints()), but we know register
 	 * where it will be stored.
 	 */
-	bool is_alter_add_constr =
-		parse_context->create_table_def.new_space == NULL &&
-		parse_context->space == NULL;
+	bool is_alter_add_constr = parse_context->new_space == NULL &&
+				   parse_context->space == NULL;
 	if (!is_alter_add_constr)
 		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->child_id, regs);
 	else
@@ -1377,7 +1376,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	return;
 #endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 	assert(reg_space_id != 0);
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	bool is_alter = space == NULL;
 	uint32_t i = 0;
 	/*
@@ -1476,17 +1475,10 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	}
 }
 
-/*
- * This routine is called to report the final ")" that terminates
- * a CREATE TABLE statement.
- *
- * During this routine byte code for creation of new Tarantool
- * space and all necessary Tarantool indexes is emitted.
- */
 void
-sqlEndTable(struct Parse *pParse)
+vdbe_emit_create_table(struct Parse *pParse, bool if_not_exists)
 {
-	struct space *new_space = pParse->create_table_def.new_space;
+	struct space *new_space = pParse->new_space;
 	if (new_space == NULL)
 		return;
 	assert(!new_space->def->opts.is_view);
@@ -1520,10 +1512,9 @@ sqlEndTable(struct Parse *pParse)
 	int name_reg = ++pParse->nMem;
 	sqlVdbeAddOp4(pParse->pVdbe, OP_String8, 0, name_reg, 0,
 		      sql_xstrdup(new_space->def->name), P4_DYNAMIC);
-	bool no_err = pParse->create_table_def.base.if_not_exist;
 	vdbe_emit_halt_with_presence_test(pParse, BOX_SPACE_ID, 2, name_reg, 1,
 					  ER_SPACE_EXISTS, new_space->def->name,
-					  (no_err != 0), OP_NoConflict);
+					  if_not_exists, OP_NoConflict);
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
 	vdbe_emit_create_constraints(pParse, reg_space_id);
@@ -1849,7 +1840,7 @@ sql_fk_unique_name_new(struct Parse *parse, struct ExprList *child_cols)
 {
 	struct space *space = parse->space;
 	if (space == NULL)
-		space = parse->create_table_def.new_space;
+		space = parse->new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct fk_constraint_parse *fk;
@@ -1908,9 +1899,8 @@ sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 	char *constraint_name = NULL;
 	bool is_self_referenced = false;
 	struct space *space = parse_context->space;
-	struct create_table_def *table_def = &parse_context->create_table_def;
 	if (space == NULL)
-		space = table_def->new_space;
+		space = parse_context->new_space;
 	/*
 	 * Space under construction during <CREATE TABLE>
 	 * processing or shallow copy of space during <ALTER TABLE
@@ -1950,7 +1940,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 		 * Child space already exists if it is
 		 * <ALTER TABLE ADD COLUMN>.
 		 */
-		if (table_def->new_space == NULL)
+		if (parse_context->new_space == NULL)
 			child_space = space;
 		struct rlist *fkeys =
 			&parse_context->create_fk_constraint_parse_def.fkeys;
@@ -2681,7 +2671,7 @@ sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
 	 * Find the table that is to be indexed.
 	 * Return early if not found.
 	 */
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	if (space == NULL)
 		space = parse->space;
 	bool is_create_table_or_add_col = space != NULL;
