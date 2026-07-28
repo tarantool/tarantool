@@ -759,3 +759,50 @@ end
         box.execute([[DROP TABLE t2;]])
     end)
 end
+
+--
+-- Check that INSERT DEFAULT VALUES works as expected in trigger.
+--
+g.test_12969_insert_defaults_in_trigger = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t1(i INT PRIMARY KEY);]])
+        box.execute([[CREATE TABLE t2(i INT PRIMARY KEY AUTOINCREMENT,
+                      a STRING DEFAULT 'default string',
+                      b INT DEFAULT 123);]])
+        box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1
+                      FOR EACH ROW BEGIN INSERT INTO t2 DEFAULT VALUES; END;]])
+        box.execute([[INSERT INTO t1 VALUES(11), (22), (33), (44), (55);]])
+        local exp = {
+            {1, 'default string', 123},
+            {2, 'default string', 123},
+            {3, 'default string', 123},
+            {4, 'default string', 123},
+            {5, 'default string', 123},
+        }
+        local res = box.execute([[SELECT * FROM t2;]])
+        t.assert_equals(res.rows, exp)
+        box.execute([[DROP TRIGGER t1t;]])
+
+        box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1
+                      FOR EACH ROW BEGIN INSERT INTO t2(b) VALUES(1); END;]])
+        box.execute([[INSERT INTO t1 VALUES(66), (77), (88), (99), (100);]])
+        exp = {
+            {1, 'default string', 123},
+            {2, 'default string', 123},
+            {3, 'default string', 123},
+            {4, 'default string', 123},
+            {5, 'default string', 123},
+            {6, 'default string', 1},
+            {7, 'default string', 1},
+            {8, 'default string', 1},
+            {9, 'default string', 1},
+            {10, 'default string', 1},
+        }
+        res = box.execute([[SELECT * FROM t2;]])
+        t.assert_equals(res.rows, exp)
+        box.execute([[DROP TRIGGER t2t;]])
+
+        box.execute([[DROP TABLE t2;]])
+        box.execute([[DROP TABLE t1;]])
+    end)
+end

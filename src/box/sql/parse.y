@@ -1478,6 +1478,10 @@ trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select_old(S). {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, S, R);
 }
+trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) DEFAULT VALUES. {
+  /*A-overwrites-R. */
+  A = sql_trigger_insert_step(&X, F, NULL, R);
+}
 
 // DELETE
 trigger_cmd(A) ::= DELETE FROM trnm(X) tridxby where_opt_old(Y). {

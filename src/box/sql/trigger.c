@@ -248,7 +248,6 @@ struct TriggerStep *
 sql_trigger_insert_step(struct Token *table_name, struct ast_id_list *columns,
 			struct Select *select, enum on_conflict_action orconf)
 {
-	assert(select != NULL);
 	struct TriggerStep *trigger_step =
 		sql_trigger_step_new(TK_INSERT, table_name);
 	trigger_step->pSelect = sqlSelectDup(select, EXPRDUP_REDUCE);
