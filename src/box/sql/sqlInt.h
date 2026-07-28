@@ -1998,7 +1998,6 @@ struct Parse {
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
-		struct rename_entity_def rename_entity_def;
 	};
 	/**
 	 * Table def or column def is not part of union since
@@ -4033,9 +4032,12 @@ extern int sqlPendingByte;
  * command.
  *
  * @param parse Current parsing context.
+ * @param old_name Name of table to rename.
+ * @param new_name New name of the table.
  */
 void
-sql_alter_table_rename(struct Parse *parse);
+sql_alter_table_rename(struct Parse *parse, struct Token *old_name,
+		       struct Token *new_name);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].
