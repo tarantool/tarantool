@@ -2000,9 +2000,7 @@ struct Parse {
 		struct create_view_def create_view_def;
 		struct rename_entity_def rename_entity_def;
 		struct drop_index_def drop_index_def;
-		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
-		struct drop_view_def drop_view_def;
 	};
 	/**
 	 * Table def or column def is not part of union since
@@ -2751,8 +2749,19 @@ sql_create_view(struct Parse *parse_context);
 int
 sql_view_assign_cursors(struct Parse *parse, const char *view_stmt);
 
+/**
+ * This routine is called to do the work of a DROP TABLE and
+ * DROP VIEW statements.
+ *
+ * @param parse_context Current parsing context.
+ * @param table Name of the table.
+ * @param if_exists If TRUE do not raise an error when the table is missing.
+ * @param is_view Flag that shows if space is table or view.
+ */
 void
-sql_drop_table(struct Parse *);
+sql_drop_table(struct Parse *parse_context, struct Token *table, bool if_exists,
+	       bool is_view);
+
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
 	       enum on_conflict_action);
 
