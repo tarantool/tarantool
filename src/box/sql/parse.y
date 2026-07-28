@@ -389,18 +389,14 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
 
-cmd ::= DROP TABLE ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_table_def_init(&pParse->drop_table_def, X, &t, E);
+cmd ::= DROP TABLE ifexists(E) nm(X) . {
   pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+  sql_drop_table(pParse, &X, E, false);
 }
 
-cmd ::= DROP VIEW ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_view_def_init(&pParse->drop_view_def, X, &t, E);
+cmd ::= DROP VIEW ifexists(E) nm(X) . {
   pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+  sql_drop_table(pParse, &X, E, true);
 }
 
 %type ifexists {int}
