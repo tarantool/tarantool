@@ -1515,11 +1515,9 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
-cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
-  struct Token t = Token_nil;
-  drop_trigger_def_init(&pParse->drop_trigger_def, X, &t, NOERR);
+cmd ::= DROP TRIGGER ifexists(E) nm(X). {
   pParse->initiateTTrans = true;
-  sql_drop_trigger(pParse);
+  sql_drop_trigger(pParse, &X, E);
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
