@@ -1568,10 +1568,9 @@ cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
   sql_create_index(pParse);
 }
 
-cmd ::= ALTER TABLE fullname(A) RENAME TO nm(N). {
-    rename_entity_def_init(&pParse->rename_entity_def, A, &N);
+cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {
     pParse->initiateTTrans = true;
-    sql_alter_table_rename(pParse);
+    sql_alter_table_rename(pParse, &T, &N);
 }
 
 cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {

@@ -214,11 +214,6 @@ struct alter_entity_def {
 	struct SrcList *entity_name;
 };
 
-struct rename_entity_def {
-	struct alter_entity_def base;
-	struct Token new_name;
-};
-
 struct create_entity_def {
 	struct alter_entity_def base;
 	struct Token name;
@@ -314,15 +309,6 @@ alter_entity_def_init(struct alter_entity_def *alter_def,
 	alter_def->entity_name = entity_name;
 	alter_def->entity_type = type;
 	alter_def->alter_action = action;
-}
-
-static inline void
-rename_entity_def_init(struct rename_entity_def *rename_def,
-		       struct SrcList *table_name, struct Token *new_name)
-{
-	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
-			      ALTER_ACTION_RENAME);
-	rename_def->new_name = *new_name;
 }
 
 static inline void
