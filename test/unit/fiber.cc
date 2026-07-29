@@ -694,6 +694,30 @@ fiber_test_set_system(void)
 	footer();
 }
 
+static void
+fiber_test_set_managed_shutdown(void)
+{
+	header();
+
+	struct fiber *fiber1 = fiber_new_system("fiber1", wait_cancel_f);
+	fail_unless(fiber1 != NULL);
+	int count = cord()->managed_shutdown_fiber_count;
+
+	fiber_set_managed_shutdown(fiber1);
+	fail_unless(++count == cord()->managed_shutdown_fiber_count);
+	fail_unless((fiber1->flags & FIBER_MANAGED_SHUTDOWN) != 0);
+
+	fiber_set_managed_shutdown(fiber1);
+	fail_unless(count == cord()->managed_shutdown_fiber_count);
+	fail_unless((fiber1->flags & FIBER_MANAGED_SHUTDOWN) != 0);
+
+	fiber_set_joinable(fiber1, true);
+	fiber_cancel(fiber1);
+	fiber_join(fiber1);
+
+	footer();
+}
+
 static int
 hang_on_cancel_f(va_list ap)
 {
@@ -819,6 +843,7 @@ main_f(va_list ap)
 	fiber_test_leak_modes();
 	fiber_test_client_fiber_count();
 	fiber_test_set_system();
+	fiber_test_set_managed_shutdown();
 	fiber_test_shutdown();
 	cord_no_user_thread_rename();
 	ev_break(loop(), EVBREAK_ALL);

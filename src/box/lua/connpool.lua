@@ -94,6 +94,7 @@ function pool_methods._failed_connection_watchdog_step(self)
             if until_reconnect <= 0 then
                 table.insert(instance_names_to_reconnect, name)
             elseif until_reconnect < until_next_reconnect then
+
                 until_next_reconnect = until_reconnect
             end
         end

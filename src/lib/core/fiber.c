@@ -1187,10 +1187,15 @@ fiber_loop(MAYBE_UNUSED void *data)
 		if (!(fiber->flags & FIBER_IS_SYSTEM)) {
 			assert(cord()->client_fiber_count > 0);
 			cord()->client_fiber_count--;
-			if (cord()->shutdown_fiber != NULL &&
-			    cord()->client_fiber_count == 0)
-				fiber_wakeup(cord()->shutdown_fiber);
 		}
+		if (fiber->flags & FIBER_MANAGED_SHUTDOWN) {
+			assert(cord()->managed_shutdown_fiber_count > 0);
+			cord()->managed_shutdown_fiber_count--;
+		}
+		if (unlikely(cord()->shutdown_fiber != NULL) &&
+		    cord()->client_fiber_count == 0 &&
+		    cord()->managed_shutdown_fiber_count == 0)
+			fiber_wakeup(cord()->shutdown_fiber);
 		fiber_on_stop(fiber);
 		/* reset pending wakeups */
 		rlist_del(&fiber->state);
@@ -1906,6 +1911,7 @@ cord_create(struct cord *cord, const char *name)
 	signal_stack_init();
 	cord->shutdown_fiber = NULL;
 	cord->client_fiber_count = 0;
+	cord->managed_shutdown_fiber_count = 0;
 	cord->is_shutdown = false;
 }
 
@@ -2345,7 +2351,8 @@ fiber_set_system(struct fiber *f, bool yesno)
 			assert(cord()->client_fiber_count > 0);
 			cord()->client_fiber_count--;
 			if (cord()->shutdown_fiber != NULL &&
-			    cord()->client_fiber_count == 0)
+			    cord()->client_fiber_count == 0 &&
+			    cord()->managed_shutdown_fiber_count == 0)
 				fiber_wakeup(cord()->shutdown_fiber);
 		}
 	} else {
@@ -2359,7 +2366,10 @@ fiber_set_system(struct fiber *f, bool yesno)
 void
 fiber_set_managed_shutdown(struct fiber *f)
 {
-	f->flags |= FIBER_MANAGED_SHUTDOWN;
+	if (!(f->flags & FIBER_MANAGED_SHUTDOWN)) {
+		f->flags |= FIBER_MANAGED_SHUTDOWN;
+		cord()->managed_shutdown_fiber_count++;
+	}
 }
 
 int
@@ -2369,19 +2379,22 @@ fiber_shutdown(double timeout)
 	cord()->is_shutdown = true;
 	struct fiber *fiber;
 	rlist_foreach_entry(fiber, &cord()->alive, link) {
-		if (fiber->flags & FIBER_MANAGED_SHUTDOWN)
-			fiber_set_system(fiber, false);
-		if (!(fiber->flags & FIBER_IS_SYSTEM))
+		if (!(fiber->flags & FIBER_IS_SYSTEM) ||
+		    (fiber->flags & FIBER_MANAGED_SHUTDOWN))
 			fiber_cancel(fiber);
 	}
 	cord()->shutdown_fiber = fiber();
 	double deadline = ev_monotonic_now(loop()) + timeout;
-	while (cord()->client_fiber_count != 0) {
+	while (cord()->client_fiber_count != 0 ||
+	       cord()->managed_shutdown_fiber_count != 0) {
 		if (fiber_yield_deadline(deadline)) {
 			diag_set(TimedOut);
 			break;
 		}
 	}
 	cord()->shutdown_fiber = NULL;
-	return cord()->client_fiber_count == 0 ? 0 : -1;
+	if (cord()->client_fiber_count != 0 ||
+	    cord()->managed_shutdown_fiber_count != 0)
+		return -1;
+	return 0;
 }

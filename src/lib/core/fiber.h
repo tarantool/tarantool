@@ -176,8 +176,10 @@ enum {
 	 */
 	FIBER_JOIN_BEEN_INVOKED = 1 << 9,
 	/**
-	 * Makes sense only for system fibers. If flag is set then fiber
-	 * will be finished on fiber_shutdown().
+	 * If the flag is set, then the fiber will be cancelled and awaited to
+	 * finish on fiber_shutdown(), just like non-system fibers. Note that
+	 * this flag can be set for non-system fibers too, although one doesn't
+	 * need to.
 	 */
 	FIBER_MANAGED_SHUTDOWN = 1 << 10,
 	FIBER_DEFAULT_FLAGS	= 0
@@ -866,6 +868,8 @@ struct cord {
 	ev_async cancel_event;
 	/** Number of alive client (non system) fibers. */
 	int client_fiber_count;
+	/** Number of alive fibers with managed shutdown. */
+	int managed_shutdown_fiber_count;
 	/** Fiber calling fiber_shutdown. NULL if there is no such. */
 	struct fiber *shutdown_fiber;
 	/** Whether shutdown is started. */
@@ -1261,11 +1265,7 @@ fiber_lua_state(struct fiber *f);
 void
 fiber_set_system(struct fiber *f, bool yesno);
 
-/**
- * Turn managed shutdown on for system fiber. See FIBER_MANAGED_SHUTDOWN.
- * It is should be used after fiber creation. Using it during shutdown does not
- * work.
- */
+/** Turn managed shutdown on. See FIBER_MANAGED_SHUTDOWN. */
 void
 fiber_set_managed_shutdown(struct fiber *f);
 
