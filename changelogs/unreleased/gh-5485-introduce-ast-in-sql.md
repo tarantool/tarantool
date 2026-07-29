@@ -10,3 +10,5 @@
   error (gh-5485).
 * The SQL query used to create a view is now in the corresponding space
   definition in `_space` as it was provided, without any changes (gh-5485).
+* The SQL query used to create a trigger is now in the corresponding SQL trigger
+  definition in `_trigger` as it was provided, without any changes (gh-5485).
