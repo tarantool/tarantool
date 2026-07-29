@@ -707,6 +707,39 @@ sql_code_create_index(struct Parse *parser, struct ast_create_index *stmt)
 			 SORT_ORDER_ASC, stmt->if_not_exists);
 }
 
+/** Code AST for CREATE TRIGGER. */
+static void
+sql_code_create_trigger(struct Parse *parser, struct ast_create_trigger *stmt,
+			const char *sql)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	parser->initiateTTrans = true;
+
+	if (!stmt->is_for_each_row) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool SQL",
+			 "FOR EACH STATEMENT triggers, please supply "
+			 "FOR EACH ROW clause");
+		parser->is_aborted = true;
+		return;
+	}
+
+	struct ast_trigger_action *act;
+	stailq_foreach_entry(act, &stmt->actions->head, link) {
+		if ((act->op == TK_UPDATE && act->update->indexed_by.n > 0) ||
+		    (act->op == TK_DELETE && act->del->indexed_by.n > 0)) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 "The INDEXED BY clause is not allowed on "
+				 "UPDATE or DELETE statements within triggers");
+			parser->is_aborted = true;
+			return;
+		}
+	}
+
+	vdbe_emit_create_trigger(parser, sql, &stmt->name, &stmt->table,
+				 stmt->if_not_exists);
+}
+
 /** Code AST for INSERT statement. */
 static void
 sql_code_insert(struct Parse *parser, struct ast_insert *insert)
@@ -843,6 +876,9 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 	case SQL_AST_CREATE_INDEX:
 		sql_code_create_index(parse, &ast->create_index);
 		break;
+	case SQL_AST_CREATE_TRIGGER:
+		sql_code_create_trigger(parse, &ast->create_trigger, sql);
+		break;
 	case SQL_AST_DROP_VIEW:
 	case SQL_AST_DROP_TABLE:
 		parse->initiateTTrans = true;
@@ -904,18 +940,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		}
 		sql_emit_show_create_table_one(parse, &ast->show_create_table);
 		break;
+	case SQL_AST_TRIGGER:
 	case SQL_AST_FUNCTION:
 	case SQL_AST_VIEW:
 		return;
 	default:
-		assert(parse->ast.type == SQL_AST_UNKNOWN);
+		unreachable();
 	}
-	/*
-	 * The `AST_TYPE_UNDEFINED` value as the `parse->parsed_ast_type`
-	 * value means that we parsed a general statement, not a function, view,
-	 * or trigger definition.
-	 */
-	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
+	if (!parse->is_aborted)
 		sql_finish_coding(parse);
 }
 
@@ -934,7 +966,6 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
 	assert(pParse->new_space == NULL);
-	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
 	struct Token last;
@@ -1044,10 +1075,10 @@ sql_parse_trigger(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
 		return NULL;
-	assert(parser->parsed_ast_type == AST_TYPE_TRIGGER);
-	struct sql_trigger *res = parser->parsed_ast.trigger;
-	parser->parsed_ast.trigger = NULL;
-	if (parser->nVar > 0) {
+	struct sql_ast *ast = &parser->ast;
+	assert(ast->type == SQL_AST_TRIGGER);
+	struct sql_trigger *res = sql_trigger_from_ast(parser, &ast->trigger);
+	if (res != NULL && parser->nVar > 0) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 			 "Parameters are not allowed in triggers");
 		parser->is_aborted = true;

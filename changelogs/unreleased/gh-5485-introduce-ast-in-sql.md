@@ -19,3 +19,5 @@
 * Indexes for column-level PRIMARY KEY and UNIQUE constraints are now created
   before indexes for table-level PRIMARY KEY and UNIQUE constraints, which
   changes the order of automatically generated index names (gh-5485).
+* Errors `SQL_PARSER_GENERIC_WITH_POS` and `SQL_SYNTAX_WITH_POS` are no longer
+  used and have been removed (gh-5485).
