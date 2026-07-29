@@ -1873,12 +1873,6 @@ struct TriggerPrg {
 	uint64_t column_mask[2];
 };
 
-enum ast_type {
-	AST_TYPE_UNDEFINED = 0,
-	AST_TYPE_TRIGGER,
-	ast_type_MAX
-};
-
 /** Information about the expressions that will be used as default values. */
 struct sql_default_func {
 	/** Fieldno of the field to which default value will be added. */
@@ -2003,15 +1997,8 @@ struct Parse {
 	/* Id of field with <AUTOINCREMENT>. */
 	int *autoinc_fieldno;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
-	/** Type of parsed_ast member. */
-	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
 	uint32_t sql_flags;
-	/** Objects used for functions, views, and triggers creation. */
-	union {
-		struct Expr *expr;
-		struct sql_trigger *trigger;
-	} parsed_ast;
 };
 
 /*

@@ -121,5 +121,9 @@ g.test_syntax_errors = function(cg)
 
         _, err = box.execute([[PRAGMA unknown_pragma(one.two) 7;]])
         t.assert_equals(err.message, "Syntax error at line 1 near '7'")
+
+        _, err = box.execute([[CREATE TRIGGER tt AFTER INSERT ON tA
+                               BEGIN SELECT 1 END; 8;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '8'")
     end)
 end

@@ -282,11 +282,15 @@ end)
         --
         box.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT);]])
 
-        exp_err = "At line 1 at or near position 39: FOR EACH STATEMENT "..
-                  "triggers are not implemented, please "..
-                  "supply FOR EACH ROW clause"
+        exp_err = "Syntax error at line 1 near ';'"
         sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN; END;"
         local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Tarantool SQL does not support FOR EACH STATEMENT " ..
+                  "triggers, please supply FOR EACH ROW clause"
+        sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN SELECT 1; END;"
+        _, err = box.execute(sql)
         t.assert_equals(tostring(err), exp_err)
 
         box.execute("DROP TABLE t1;")

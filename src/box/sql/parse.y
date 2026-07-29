@@ -87,29 +87,6 @@ struct LimitVal {
   struct ast_expr *offset;
 };
 
-/*
-** An instance of the following structure describes the event of a
-** TRIGGER.  "a" is the event type, one of TK_UPDATE, TK_INSERT,
-** TK_DELETE, or TK_INSTEAD.  If the event is of the form
-**
-**      UPDATE ON (a,b,c)
-**
-** Then the "b" records the list "a,b,c".
-*/
-struct TrigEvent {
-  int a;
-  struct ast_id_list *b;
-};
-
-/*
-** Disable lookaside memory allocation for objects that might be
-** shared across database connections.
-*/
-static void disableLookaside(Parse *pParse){
-  pParse->disableLookaside++;
-  sql_get()->lookaside.bDisable++;
-}
-
 } // end %include
 
 // Input is a single SQL command
@@ -193,8 +170,6 @@ cmd ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP
   pParse->ast.create_table.properties = P;
   pParse->ast.create_table.if_not_exists = E;
 }
-
-createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
 %type ifnotexists {int}
 ifnotexists(A) ::= .              {A = 0;}
@@ -446,15 +421,6 @@ cmd ::= VIEW_ENTRY CREATE VIEW ifnotexists nm idlist_opt AS select(S). {
 cmd ::= select(X). {
   pParse->ast.type = SQL_AST_SELECT;
   pParse->ast.select = X;
-}
-
-/**
- * A temporary rule that converts `struct ast_select` values to `struct Select`.
- */
-%type select_old {Select*}
-%destructor select_old {sql_select_delete($$);}
-select_old(A) ::= select(X). {
-  A = select_from_ast(pParse, X);
 }
 
 %type select {struct ast_select *}
@@ -812,12 +778,6 @@ cmd ::= TRUNCATE TABLE nm(X). {
   pParse->ast.truncate.table = X;
 }
 
-%type where_opt_old {Expr*}
-%destructor where_opt_old {sql_expr_delete($$);}
-where_opt_old(A) ::= where_opt(X). {
-  A = expr_from_ast(pParse, X);
-}
-
 %type where_opt {struct ast_expr *}
 where_opt(A) ::= .                    {A = 0;}
 where_opt(A) ::= WHERE expr(X). {
@@ -893,10 +853,6 @@ insert(A) ::= REPLACE INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
   A->action = ON_CONFLICT_ACTION_REPLACE;
 }
 
-%type insert_cmd {int}
-insert_cmd(A) ::= INSERT orconf(R).   {A = R;}
-insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
-
 %type idlist_opt {struct ast_id_list *}
 %type idlist {struct ast_id_list *}
 
@@ -911,16 +867,6 @@ idlist(A) ::= nm(Y). {
 
 /////////////////////////// Expression Processing /////////////////////////////
 //
-
-%type expr_old {ExprSpan}
-%destructor expr_old {sql_expr_delete($$.pExpr);}
-expr_old(A) ::= expr(X). {
-  struct Expr *e = expr_from_ast(pParse, X);
-  A.pExpr = e;
-  A.zStart = X->str;
-  A.zEnd = &X->str[X->len];
-}
-
 %type expr {struct ast_expr *}
 %type term {struct ast_expr *}
 expr(A) ::= term(A).
@@ -1367,18 +1313,56 @@ cmd ::= SHOW CREATE TABLE. {
 }
 
 //////////////////////////// The CREATE TRIGGER command /////////////////////
-
-cmd ::= createkw TRIGGER ifnotexists(E) nm(N) trigger_time trigger_event
-        ON nm(T) foreach_clause when_clause BEGIN trigger_cmd_list END. {
-  pParse->initiateTTrans = true;
-  vdbe_emit_create_trigger(pParse, pParse->zTail, &N, &T, E);
+cmd ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time trigger_event ON nm(T)
+        trigger_for_each(F) trigger_when BEGIN trigger_action_list END. {
+  pParse->ast.type = SQL_AST_CREATE_TRIGGER;
+  pParse->ast.create_trigger.name = N;
+  pParse->ast.create_trigger.table = T;
+  pParse->ast.create_trigger.is_for_each_row = F;
+  pParse->ast.create_trigger.if_not_exists = E;
 }
-cmd ::= TRIGGER_ENTRY createkw TRIGGER ifnotexists nm(N) trigger_time(C)
-        trigger_event(D) ON nm(T) foreach_clause when_clause(G)
-        BEGIN trigger_cmd_list(S) END. {
-  pParse->parsed_ast_type = AST_TYPE_TRIGGER;
-  pParse->parsed_ast.trigger = sql_trigger_new(pParse, &N, &T, C, D.a,
-                                               id_list_from_ast(D.b), G, S);
+cmd ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time UPDATE OF idlist
+        ON nm(T) trigger_for_each(F) trigger_when
+        BEGIN trigger_action_list END. {
+  pParse->ast.type = SQL_AST_CREATE_TRIGGER;
+  pParse->ast.create_trigger.name = N;
+  pParse->ast.create_trigger.table = T;
+  pParse->ast.create_trigger.is_for_each_row = F;
+  pParse->ast.create_trigger.if_not_exists = E;
+}
+
+cmd ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
+        trigger_event(D) ON nm(T) trigger_for_each(F) trigger_when(W)
+        BEGIN trigger_action_list(L) END. {
+  pParse->ast.type = SQL_AST_TRIGGER;
+  pParse->ast.trigger.name = N;
+  pParse->ast.trigger.time = C;
+  pParse->ast.trigger.event = D;
+  pParse->ast.trigger.table = T;
+  pParse->ast.trigger.is_for_each_row = F;
+  pParse->ast.trigger.when = W;
+  pParse->ast.trigger.actions = L;
+}
+cmd ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
+        UPDATE OF idlist(X) ON nm(T) trigger_for_each(F) trigger_when(W)
+        BEGIN trigger_action_list(L) END. {
+  pParse->ast.type = SQL_AST_TRIGGER;
+  pParse->ast.trigger.name = N;
+  pParse->ast.trigger.time = C;
+  pParse->ast.trigger.event = TK_UPDATE;
+  pParse->ast.trigger.table = T;
+  pParse->ast.trigger.is_for_each_row = F;
+  pParse->ast.trigger.when = W;
+  pParse->ast.trigger.columns = X;
+  pParse->ast.trigger.actions = L;
+}
+
+%type trigger_event {uint8_t}
+trigger_event(A) ::= DELETE|INSERT(E). {
+  A = @E;
+}
+trigger_event(A) ::= UPDATE(E). {
+  A = @E;
 }
 
 %type trigger_time {int}
@@ -1387,89 +1371,50 @@ trigger_time(A) ::= AFTER.       { A = TK_AFTER;  }
 trigger_time(A) ::= INSTEAD OF.  { A = TK_INSTEAD;}
 trigger_time(A) ::= .            { A = TK_BEFORE; }
 
-%type trigger_event {struct TrigEvent}
-trigger_event(A) ::= DELETE|INSERT(X).   {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
-trigger_event(A) ::= UPDATE(X).          {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
-trigger_event(A) ::= UPDATE OF idlist(X).{A.a = TK_UPDATE; A.b = X;}
-
-foreach_clause ::= . {
-  diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS, pParse->line_count,
-           pParse->line_pos, "FOR EACH STATEMENT triggers are not implemented, "
-           "please supply FOR EACH ROW clause");
-  pParse->is_aborted = true;
+%type trigger_for_each {bool}
+trigger_for_each(A) ::= FOR EACH ROW. {
+  A = true;
 }
-foreach_clause ::= FOR EACH ROW.
-
-%type when_clause {Expr*}
-%destructor when_clause {sql_expr_delete($$);}
-when_clause(A) ::= .             { A = 0; }
-when_clause(A) ::= WHEN expr_old(X). {
-  A = X.pExpr;
+trigger_for_each(A) ::= . {
+  A = false;
 }
 
-%type trigger_cmd_list {TriggerStep*}
-%destructor trigger_cmd_list {sqlDeleteTriggerStep($$);}
-trigger_cmd_list(A) ::= trigger_cmd_list(A) trigger_cmd(X) SEMI. {
-  assert( A!=0 );
-  A->pLast->pNext = X;
-  A->pLast = X;
+%type trigger_when {struct ast_expr *}
+trigger_when(A) ::= . {
+  A = NULL;
 }
-trigger_cmd_list(A) ::= trigger_cmd(A) SEMI. { 
-  assert( A!=0 );
-  A->pLast = A;
+trigger_when(A) ::= WHEN expr(X). {
+  A = X;
 }
 
-// Disallow the INDEX BY and NOT INDEXED clauses on UPDATE and DELETE
-// statements within triggers.  We make a specific error message for this
-// since it is an exception to the default grammar rules.
-//
-tridxby ::= .
-tridxby ::= INDEXED BY nm. {
-  diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS, pParse->line_count,
-           pParse->line_pos, "the INDEXED BY clause is not allowed on UPDATE "\
-           "or DELETE statements within triggers");
-  pParse->is_aborted = true;
+%type trigger_action_list {struct ast_trigger_action_list *}
+trigger_action_list(A) ::= trigger_action(X). {
+  A = ast_trigger_action_list_append(&pParse->region, NULL, X);
 }
-tridxby ::= NOT INDEXED. {
-  diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS, pParse->line_count,
-           pParse->line_pos, "the NOT INDEXED BY clause is not allowed on "\
-           "UPDATE or DELETE statements within triggers");
-  pParse->is_aborted = true;
+trigger_action_list(A) ::= trigger_action_list(A) trigger_action(X). {
+  A = ast_trigger_action_list_append(&pParse->region, A, X);
 }
 
-
-
-%type trigger_cmd {TriggerStep*}
-%destructor trigger_cmd {sqlDeleteTriggerStep($$);}
-// UPDATE 
-trigger_cmd(A) ::=
-   UPDATE orconf(R) nm(X) tridxby SET setlist(Y) where_opt_old(Z). {
-     A = sql_trigger_update_step(&X, expr_list_from_set_list(pParse, Y), Z, R);
-     if (A == NULL) {
-        pParse->is_aborted = true;
-        return;
-     }
-   }
-
-// INSERT
-trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) select_old(S). {
-  /*A-overwrites-R. */
-  A = sql_trigger_insert_step(&X, F, S, R);
+%type trigger_action {struct ast_trigger_action *}
+trigger_action(A) ::= update(X) SEMI. {
+  A = ast_trigger_action_new(&pParse->region);
+  A->op = TK_UPDATE;
+  A->update = X;
 }
-trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
-  /*A-overwrites-R. */
-  A = sql_trigger_insert_step(&X, F, NULL, R);
+trigger_action(A) ::= insert(X) SEMI. {
+  A = ast_trigger_action_new(&pParse->region);
+  A->op = TK_INSERT;
+  A->insert = X;
 }
-
-// DELETE
-trigger_cmd(A) ::= DELETE FROM nm(X) tridxby where_opt_old(Y). {
-  A = sql_trigger_delete_step(&X, Y);
+trigger_action(A) ::= delete(X) SEMI. {
+  A = ast_trigger_action_new(&pParse->region);
+  A->op = TK_DELETE;
+  A->del = X;
 }
-
-// SELECT
-trigger_cmd(A) ::= select_old(X). {
-  /* A-overwrites-X. */
-  A = sql_trigger_select_step(X);
+trigger_action(A) ::= select(X) SEMI. {
+  A = ast_trigger_action_new(&pParse->region);
+  A->op = TK_SELECT;
+  A->select = X;
 }
 
 // The special RAISE expression that may occur in trigger programs
