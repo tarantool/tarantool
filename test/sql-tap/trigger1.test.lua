@@ -821,7 +821,8 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.4>
-        1, "Syntax error at line 2 at or near position 34: the NOT INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "The INDEXED BY clause is not allowed on UPDATE or " ..
+        "DELETE statements within triggers"
         -- </trigger1-16.4>
     })
 
@@ -833,7 +834,8 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.5>
-        1, "Syntax error at line 2 at or near position 38: the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "The INDEXED BY clause is not allowed on UPDATE or " ..
+        "DELETE statements within triggers"
         -- </trigger1-16.5>
     })
 
@@ -845,7 +847,8 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.6>
-        1, "Syntax error at line 2 at or near position 39: the NOT INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "The INDEXED BY clause is not allowed on UPDATE or " ..
+        "DELETE statements within triggers"
         -- </trigger1-16.6>
     })
 
@@ -857,7 +860,8 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.7>
-        1, "Syntax error at line 2 at or near position 43: the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "The INDEXED BY clause is not allowed on UPDATE or " ..
+        "DELETE statements within triggers"
         -- </trigger1-16.7>
     })
 

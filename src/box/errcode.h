@@ -319,7 +319,7 @@ struct errcode_record {
 	_(ER_SQL_CANT_RESOLVE_FIELD, 176,	"Can't resolve field '%s'", "field", STRING) \
 	_(ER_INDEX_EXISTS_IN_SPACE, 177,	"Index '%s' already exists in space '%s'", "index", STRING, "space", STRING) \
 	_(ER_INCONSISTENT_TYPES, 178,		"Inconsistent types: expected %s got %s", "expected", STRING, "actual", STRING) \
-	_(ER_SQL_SYNTAX_WITH_POS, 179,		"Syntax error at line %d at or near position %d: %s", "line", INT, "position", INT, "details", STRING) \
+	/* ER_SQL_SYNTAX_WITH_POS, 179, Unused */ \
 	_(ER_SQL_STACK_OVERFLOW, 180,		"Failed to parse SQL statement: parser stack limit reached") \
 	_(ER_SQL_SELECT_WILDCARD, 181,		"Failed to expand '*' in SELECT statement without FROM clause") \
 	_(ER_SQL_STATEMENT_EMPTY, 182,		"Failed to execute an empty SQL statement") \
@@ -346,7 +346,7 @@ struct errcode_record {
 	_(ER_BOOTSTRAP_READONLY, 203,		"Trying to bootstrap a local read-only instance as master") \
 	_(ER_SQL_FUNC_WRONG_RET_COUNT, 204,	"SQL expects exactly one argument returned from %s, got %d", "func", STRING, "actual", INT)\
 	_(ER_FUNC_INVALID_RETURN_TYPE, 205,	"Function '%s' returned value of invalid type: expected %s got %s", "func", STRING, "expected", STRING, "actual", STRING) \
-	_(ER_SQL_PARSER_GENERIC_WITH_POS, 206,	"At line %d at or near position %d: %s", "line", INT, "position", INT, "details", STRING) \
+	/* ER_SQL_PARSER_GENERIC_WITH_POS, 206, Unused */ \
 	_(ER_REPLICA_NOT_ANON, 207,		"Replica '%s' is not anonymous and cannot register.", "replica", STRING) \
 	_(ER_CANNOT_REGISTER, 208,		"Couldn't find an instance to register this replica on.") \
 	_(ER_SESSION_SETTING_INVALID_VALUE, 209, "Session setting %s expected a value of type %s", "setting", STRING, "expected", STRING) \
