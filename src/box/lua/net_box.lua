@@ -1377,13 +1377,8 @@ function this_module.timeout(timeout, ...)
     }, {__index = this_module})
 end
 
-ffi.cdef[[
-    bool
-    cord_is_main(void);
-]]
-
 -- net.box.self is available in the main thread only
-if ffi.C.cord_is_main() then
+if fiber._internal.cord_is_main then
 
 local function rollback()
     if rawget(box, 'rollback') ~= nil then

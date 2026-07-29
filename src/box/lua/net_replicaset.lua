@@ -1,12 +1,6 @@
-local ffi = require('ffi')
 local fiber = require('fiber')
 local net_box = require('net.box')
 local uri_lib = require('uri')
-
-ffi.cdef[[
-    bool
-    cord_is_main(void);
-]]
 
 -- The constant is copy-paste from tarantool/src/lua/socket.lua.
 local TIMEOUT_INFINITY = 500 * 365 * 86400
@@ -381,7 +375,7 @@ local function get_connect_cfg(replicaset_name, opts)
     opts = opts or {}
     check_options(opts, connect_opts_template, 'opts')
 
-    if not ffi.C.cord_is_main() then
+    if not fiber._internal.cord_is_main then
         error('config is available only in main thread', 0)
     end
 

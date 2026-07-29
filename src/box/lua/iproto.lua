@@ -1,10 +1,5 @@
-local ffi = require('ffi')
+local fiber = require('fiber')
 local utils = require('internal.utils')
-
-ffi.cdef[[
-    bool
-    cord_is_main(void);
-]]
 
 local may_register_funcs = true
 
@@ -21,7 +16,7 @@ box.iproto.export = function(func_name, func)
     end
 end
 
-if ffi.C.cord_is_main() then
+if fiber._internal.cord_is_main then
 
 --
 -- box.iproto.export() may be called in the main thread before the IPROTO
