@@ -103,7 +103,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 
-	struct fiber *main = fiber_new_xc("main", main_f);
+	struct fiber *main = fiber_new("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);
 

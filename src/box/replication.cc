@@ -440,8 +440,6 @@ replication_anon_gc_init(void)
 	replication_anon_gc_fiber =
 		fiber_new_system("replication_anon_gc",
 				 replication_anon_gc_fiber_f);
-	if (replication_anon_gc_fiber == NULL)
-		panic("Cannot init replication submodule");
 	fiber_set_joinable(replication_anon_gc_fiber, true);
 	fiber_start(replication_anon_gc_fiber);
 }

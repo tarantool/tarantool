@@ -139,20 +139,14 @@ gc_init(on_garbage_collection_f on_garbage_collection)
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0, 0);
 
 	gc.cleanup_fiber = fiber_new_system("gc", gc_cleanup_fiber_f);
-	if (gc.cleanup_fiber == NULL)
-		panic("failed to start garbage collection fiber");
 	fiber_set_joinable(gc.cleanup_fiber, true);
 
 	gc.checkpoint_fiber = fiber_new_system("checkpoint_daemon",
 					       gc_checkpoint_fiber_f);
-	if (gc.checkpoint_fiber == NULL)
-		panic("failed to start checkpoint daemon fiber");
 	fiber_set_joinable(gc.checkpoint_fiber, true);
 
 	gc.sync_fiber = fiber_new_system("gc_sync",
 					 gc_sync_fiber_f);
-	if (gc.sync_fiber == NULL)
-		panic("failed to start gc sync fiber");
 	fiber_set_joinable(gc.sync_fiber, true);
 
 	gc.on_garbage_collection = on_garbage_collection;

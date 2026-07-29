@@ -365,7 +365,6 @@ main(void)
 	fiber_init(fiber_c_invoke);
 	cbus_init();
 	struct fiber *main_fiber = fiber_new("main", tnt_thread_test_suite_f);
-	assert(main_fiber != NULL);
 	fiber_wakeup(main_fiber);
 	ev_run(loop(), 0);
 	cbus_free();

@@ -213,16 +213,11 @@ on_shutdown_run_triggers(void)
 		trigger = rlist_shift_entry(&triggers, struct trigger, link);
 		snprintf(name, FIBER_NAME_INLINE,
 			 "trigger_fiber%d", current_fiber);
-		fibers[current_fiber] =
+		struct fiber *fiber =
 			fiber_new(name, on_shutdown_trigger_fiber_f);
-		if (fibers[current_fiber] != NULL) {
-			fiber_set_joinable(fibers[current_fiber], true);
-			fiber_start(fibers[current_fiber], trigger);
-			current_fiber++;
-		} else {
-			rc = -1;
-			goto out;
-		}
+		fiber_set_joinable(fiber, true);
+		fiber_start(fiber, trigger);
+		fibers[current_fiber++] = fiber;
 	}
 
 	/*
@@ -243,16 +238,11 @@ on_shutdown_run_triggers(void)
 	       current_fiber < trigger_count) {
 		snprintf(name, FIBER_NAME_INLINE,
 			 "trigger_fiber_%s", trigger_name);
-		fibers[current_fiber] =
+		struct fiber *fiber =
 			fiber_new(name, on_shutdown_event_trigger_fiber_f);
-		if (fibers[current_fiber] != NULL) {
-			fiber_set_joinable(fibers[current_fiber], true);
-			fiber_start(fibers[current_fiber], func);
-			current_fiber++;
-		} else {
-			rc = -1;
-			goto out;
-		}
+		fiber_set_joinable(fiber, true);
+		fiber_start(fiber, func);
+		fibers[current_fiber++] = fiber;
 	}
 	event_trigger_iterator_destroy(&it);
 

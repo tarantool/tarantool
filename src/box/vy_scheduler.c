@@ -464,8 +464,6 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 
 	scheduler->scheduler_fiber = fiber_new_system("vinyl.scheduler",
 						      vy_scheduler_f);
-	if (scheduler->scheduler_fiber == NULL)
-		panic("failed to allocate vinyl scheduler fiber");
 	fiber_set_joinable(scheduler->scheduler_fiber, true);
 
 	fiber_cond_create(&scheduler->scheduler_cond);
@@ -1862,15 +1860,8 @@ vy_task_execute_f(struct cmsg *cmsg)
 	assert(&worker->cord == cord());
 
 	task->fiber = fiber_new("task", vy_task_f);
-	if (task->fiber == NULL) {
-		task->is_failed = true;
-		diag_move(diag_get(), &task->diag);
-		cmsg_init(&task->cmsg, vy_task_complete_route);
-		cpipe_push(&worker->tx_pipe, &task->cmsg);
-	} else {
-		worker->task = task;
-		fiber_start(task->fiber, task);
-	}
+	worker->task = task;
+	fiber_start(task->fiber, task);
 }
 
 /**

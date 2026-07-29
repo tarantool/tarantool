@@ -119,8 +119,6 @@ lua_swim_new(struct lua_State *L)
 {
 	uint64_t generation = luaL_checkuint64(L, 1);
 	struct swim *s = swim_new(generation);
-	if (s == NULL)
-		return luaT_push_nil_and_error(L);
 	*(struct swim **) luaL_pushcdata(L, ctid_swim_ptr) = s;
 	return 1;
 }

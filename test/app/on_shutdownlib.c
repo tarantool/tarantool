@@ -107,7 +107,6 @@ cfg(lua_State *L)
 				    on_shutdown_module_stop_func,
 				    on_shutdown_module_bad_func) == 0);
 	module.fiber = fiber_new("fiber", module_fiber_f);
-	fail_unless(module.fiber != NULL);
 	fiber_set_joinable(module.fiber, true);
 	fiber_start(module.fiber);
 	return 0;

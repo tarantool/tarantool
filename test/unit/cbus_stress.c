@@ -139,7 +139,6 @@ thread_start_test_cb(struct cmsg *cmsg)
 {
 	struct thread *t = container_of(cmsg, struct thread, cmsg);
 	struct fiber *test_fiber = fiber_new("test", test_func);
-	assert(test_fiber != NULL);
 	fiber_start(test_fiber, t);
 }
 
@@ -375,7 +374,6 @@ main()
 	header();
 
 	struct fiber *main_fiber = fiber_new("main", main_func);
-	assert(main_fiber != NULL);
 	fiber_wakeup(main_fiber);
 	ev_run(loop(), 0);
 

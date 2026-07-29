@@ -144,10 +144,6 @@ fiber_pool_cb(ev_loop *loop, struct ev_watcher *watcher, int events)
 			 * it's execution.
 			 */
 			f = fiber_new_system("pool", fiber_pool_f);
-			if (f == NULL) {
-				diag_log();
-				break;
-			}
 			fiber_start(f, pool);
 		} else {
 			/**

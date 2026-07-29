@@ -176,21 +176,6 @@ box_raft_schedule_async(struct raft *raft)
 	if (box_raft_worker == NULL) {
 		box_raft_worker = fiber_new_system("raft_worker",
 						   box_raft_worker_f);
-		if (box_raft_worker == NULL) {
-			/*
-			 * XXX: should be handled properly, no need to panic.
-			 * The issue though is that most of the Raft state
-			 * machine functions are not supposed to fail, and also
-			 * they usually wakeup the fiber when their work is
-			 * finished. So it is too late to fail. On the other
-			 * hand it looks not so good to create the fiber when
-			 * Raft is initialized. Because then it will occupy
-			 * memory even if Raft is not used.
-			 */
-			diag_log();
-			panic("Could't create Raft worker fiber");
-			return;
-		}
 		box_raft_worker->f_arg = raft;
 		fiber_set_joinable(box_raft_worker, true);
 	}

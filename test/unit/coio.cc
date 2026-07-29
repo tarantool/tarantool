@@ -32,7 +32,7 @@ stat_notify_test(FILE *f, const char *filename)
 {
 	header();
 
-	struct fiber *touch = fiber_new_xc("touch", touch_f);
+	struct fiber *touch = fiber_new("touch", touch_f);
 	fiber_start(touch, f);
 	ev_stat stat;
 	note("filename: %s", filename);
@@ -260,7 +260,7 @@ read_write_test(void)
 			/* Make the fd non-writable. */
 			fill_pipe(fds[1]);
 		}
-		struct fiber *f = fiber_new_xc("rw_test", test_funcs[i]);
+		struct fiber *f = fiber_new("rw_test", test_funcs[i]);
 		fiber_set_joinable(f, true);
 		fiber_start(f, &io);
 		fiber_wakeup(f);
@@ -294,7 +294,7 @@ main_f(va_list ap)
 
 	coio_init();
 	coio_enable();
-	struct fiber *call_fiber = fiber_new_xc("coio_call wakeup", test_call_f);
+	struct fiber *call_fiber = fiber_new("coio_call wakeup", test_call_f);
 	fiber_set_joinable(call_fiber, true);
 	fiber_start(call_fiber);
 	fiber_wakeup(call_fiber);
@@ -314,7 +314,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
-	struct fiber *test = fiber_new_xc("coio_stat", main_f);
+	struct fiber *test = fiber_new("coio_stat", main_f);
 	fiber_wakeup(test);
 	ev_run(loop(), 0);
 	fiber_free();

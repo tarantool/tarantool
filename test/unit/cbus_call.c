@@ -122,7 +122,6 @@ static void
 test_cbus_call_cancel(void)
 {
 	struct fiber *canceler_fiber = fiber_new("canceler", canceler_fn);
-	fail_if(canceler_fiber == NULL);
 	fiber_wakeup(canceler_fiber);
 
 	struct cbus_call_msg msg;
@@ -194,7 +193,6 @@ main(void)
 	callee_start(&callee_cord);
 
 	caller_fiber = fiber_new("caller", caller_fn);
-	fail_if(caller_fiber == NULL);
 	fiber_wakeup(caller_fiber);
 
 	ev_run(loop(), 0);

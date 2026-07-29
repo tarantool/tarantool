@@ -151,7 +151,6 @@ fiber_channel_close_reader(enum fiber_channel_close_mode mode)
 
 	struct fiber_channel *channel = fiber_channel_new(0);
 	struct fiber *reader = fiber_new("reader", reader_f);
-	fail_if(reader == NULL);
 	fiber_set_ctx(reader, channel);
 	fiber_set_joinable(reader, true);
 	fiber_wakeup(reader);
@@ -197,7 +196,6 @@ fiber_channel_close_writer(enum fiber_channel_close_mode mode)
 
 	struct fiber_channel *channel = fiber_channel_new(0);
 	struct fiber *writer = fiber_new("writer", writer_f);
-	fail_if(writer == NULL);
 	fiber_set_ctx(writer, channel);
 	fiber_set_joinable(writer, true);
 	fiber_wakeup(writer);
@@ -246,7 +244,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	struct fiber *main= fiber_new_xc("main", main_f);
+	struct fiber *main = fiber_new("main", main_f);
 	fiber_wakeup(main);
 	ev_run(loop(), 0);
 	fiber_free();

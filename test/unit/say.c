@@ -241,10 +241,6 @@ int main()
 	coio_enable();
 
 	struct fiber *test = fiber_new("loggers", main_f);
-	if (test == NULL) {
-		diag_log();
-		return check_plan();
-	}
 	fiber_wakeup(test);
 	ev_run(loop(), 0);
 

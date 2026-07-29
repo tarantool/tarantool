@@ -1003,9 +1003,6 @@ local function swim_new(cfg)
         generation = fiber.time64()
     end
     local ptr = internal.swim_new(generation)
-    if ptr == nil then
-        return nil, box.error.last()
-    end
     ffi.gc(ptr, internal.swim_gc)
     local s = setmetatable({
         ptr = ptr,
