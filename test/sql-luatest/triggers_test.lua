@@ -806,3 +806,22 @@ g.test_12969_insert_defaults_in_trigger = function(cg)
         box.execute([[DROP TABLE t1;]])
     end)
 end
+
+--
+-- Make sure that the CREATE TRIGGER statement is saved exactly as it was
+-- provided.
+--
+g.test_trigger_str = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t1(i INT PRIMARY KEY);]])
+        box.execute([[CREATE TABLE t2(i INT PRIMARY KEY);]])
+        local sql = [[    CREATE TRIGGER IF NOT EXISTS t1t AFTER INSERT ON t1
+                      FOR EACH ROW BEGIN INSERT INTO t2 DEFAULT VALUES; END;
+                       -- note   ]]
+        box.execute(sql)
+        t.assert_equals(box.space._trigger:get('t1t').opts.sql, sql)
+        box.execute([[DROP TRIGGER t1t;]])
+        box.execute([[DROP TABLE t2;]])
+        box.execute([[DROP TABLE t1;]])
+    end)
+end

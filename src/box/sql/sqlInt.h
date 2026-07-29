@@ -1988,14 +1988,6 @@ struct Parse {
 	/** Space triggers are being coded for. */
 	struct space *triggered_space;
 	/**
-	 * One of parse_def structures which are used to
-	 * assemble and carry arguments of DDL routines
-	 * from parse.y
-	 */
-	union {
-		struct create_trigger_def create_trigger_def;
-	};
-	/**
 	 * Description of the new table created in the CREATE TABLE statement.
 	 */
 	struct space *new_space;
@@ -3478,30 +3470,25 @@ void
 sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 		     int cursor);
 
-/**
- * This is called by the parser when it sees a CREATE TRIGGER
- * statement up to the point of the BEGIN before the trigger
- * actions.  A sql_trigger structure is generated based on the
- * information available and stored in parse->parsed_ast.trigger.
- * After the trigger actions have been parsed, the
- * sql_trigger_finish() function is called to complete the trigger
- * construction process.
- */
-void
-sql_trigger_begin(struct Parse *parse);
+/** Create a new `struct sql_trigger` object. */
+struct sql_trigger *
+sql_trigger_new(struct Parse *parser, struct Token *name, struct Token *table,
+		uint8_t time, uint8_t event, struct IdList *columns,
+		struct Expr *when, struct TriggerStep *step_list);
 
 /**
- * This routine is called after all of the trigger actions have
- * been parsed in order to complete the process of building the
- * trigger.
+ * Emit code to write SQL trigger definition to `_trigger`.
  *
- * @param parse Parser context.
- * @param step_list The triggered program.
- * @param token Token that describes the complete CREATE TRIGGER.
+ * @param parser Parsing context.
+ * @param sql The SQL statement that creates the trigger.
+ * @param name Name of the trigger.
+ * @param table Name of table where trigger is created.
+ * @param if_not_exists If TRUE do not raise an error when the trigger exists.
  */
 void
-sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
-		   struct Token *token);
+vdbe_emit_create_trigger(struct Parse *parser, const char *sql,
+			 struct Token *name, struct Token *table,
+			 bool if_not_exists);
 
 /**
  * This function is called from parser to generate drop trigger
