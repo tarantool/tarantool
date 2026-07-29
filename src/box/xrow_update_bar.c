@@ -55,11 +55,11 @@ xrow_update_bar_finish(struct xrow_update_field *field)
  * @param field Field to locate in.
  * @param[out] key_len_or_index One parameter for two values,
  *        depending on where the target point is located: in an
- *        array or a map. In case of map it is size of a key
- *        before the found point. It is used to find range of the
- *        both key and value in '#' operation to drop the pair.
- *        In case of array it is index of the array element to be
- *        able to check how many fields are left for deletion.
+ *        array or a map. In case of map it is length of the key
+ *        as it is written in the JSON path, which is not the size
+ *        of its MsgPack encoding. In case of array it is index of
+ *        the array element to be able to check how many fields are
+ *        left for deletion.
  *
  * @retval 0 Success.
  * @retval -1 Not found or invalid JSON.
@@ -272,7 +272,7 @@ xrow_update_op_do_nop_delete(struct xrow_update_op *op,
 	if (mp_typeof(*field->bar.parent) == MP_ARRAY) {
 		const char *tmp = field->bar.parent;
 		uint32_t size = mp_decode_array(&tmp);
-		if (key_len_or_index + op->arg.del.count > size)
+		if ((uint64_t) key_len_or_index + op->arg.del.count > size)
 			op->arg.del.count = size - key_len_or_index;
 		const char *end = field->bar.point + field->bar.point_size;
 		for (uint32_t i = 1; i < op->arg.del.count; ++i)
@@ -281,10 +281,26 @@ xrow_update_op_do_nop_delete(struct xrow_update_op *op,
 	} else {
 		if (op->arg.del.count != 1)
 			return xrow_update_err_delete1(op);
-		/* Take key size into account to delete it too. */
-		key_len_or_index = mp_sizeof_str(key_len_or_index);
-		field->bar.point -= key_len_or_index;
-		field->bar.point_size += key_len_or_index;
+		/*
+		 * Take key size into account to delete it too. The key
+		 * length can't be taken from the path token: a numeric
+		 * token matches an integer key, and a string key may use
+		 * any of the MsgPack string encodings. Walk the map up to
+		 * the found value instead.
+		 */
+		const char *tmp = field->bar.parent;
+		uint32_t size = mp_decode_map(&tmp);
+		const char *key = tmp;
+		for (uint32_t i = 0; i < size; ++i) {
+			key = tmp;
+			mp_next(&tmp);
+			if (tmp == field->bar.point)
+				break;
+			mp_next(&tmp);
+		}
+		assert(tmp == field->bar.point);
+		field->bar.point_size += field->bar.point - key;
+		field->bar.point = key;
 	}
 	return xrow_update_bar_finish(field);
 }
