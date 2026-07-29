@@ -424,7 +424,7 @@ test:do_catchsql_test(
 		CREATE TRIGGER r0 AFTER INSERT ON t0 FOR EACH ROW BEGIN INSERT INTO t0.i VALUES (2); END;
 	]], {
 		-- <sql-errors-1.37>
-		1,"At line 1 at or near position 76: qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+        1, "Syntax error at line 1 near '.'"
 		-- </sql-errors-1.37>
 	})
 
