@@ -520,6 +520,19 @@ lbox_memtx_tx_gc(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Returns whether this instance has bootstrapped the replicaset on the
+ * current startup. Allows to distinguish a real bootstrap leader from
+ * an instance that recovered from a local checkpoint or joined an
+ * already bootstrapped replicaset.
+ */
+static int
+lbox_is_bootstrap_leader(struct lua_State *L)
+{
+	lua_pushboolean(L, box_is_bootstrap_leader());
+	return 1;
+}
+
 void
 box_lua_misc_init(struct lua_State *L)
 {
@@ -530,6 +543,7 @@ box_lua_misc_init(struct lua_State *L)
 		{"generate_space_id", lbox_generate_space_id},
 		{"generate_func_id", lbox_generate_func_id},
 		{"memtx_tx_gc", lbox_memtx_tx_gc},
+		{"is_bootstrap_leader", lbox_is_bootstrap_leader},
 		{NULL, NULL}
 	};
 
