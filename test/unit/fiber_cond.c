@@ -34,12 +34,10 @@ fiber_cond_basic()
 	int check = 0;
 
 	struct fiber *f1 = fiber_new("f1", fiber_cond_basic_f);
-	assert(f1 != NULL);
 	fiber_start(f1, cond, &check);
 	fiber_set_joinable(f1, true);
 
 	struct fiber *f2 = fiber_new("f2", fiber_cond_basic_f);
-	assert(f2 != NULL);
 	fiber_start(f2, cond, &check);
 	fiber_set_joinable(f2, true);
 

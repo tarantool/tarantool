@@ -3676,8 +3676,6 @@ vy_squash_schedule(struct vy_lsm *lsm, struct vy_entry entry, void *arg)
 	if (sq->fiber == NULL) {
 		sq->fiber = fiber_new_system("vinyl.squash_queue",
 					     vy_squash_queue_f);
-		if (sq->fiber == NULL)
-			goto fail;
 		fiber_set_joinable(sq->fiber, true);
 		fiber_start(sq->fiber, sq);
 	}

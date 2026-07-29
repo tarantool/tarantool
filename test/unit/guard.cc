@@ -64,7 +64,7 @@ int main()
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
 	fiber_attr_create(&default_attr);
-	struct fiber *fmain = fiber_new_xc("main", main_f);
+	struct fiber *fmain = fiber_new("main", main_f);
 	fiber_wakeup(fmain);
 	ev_run(loop(), 0);
 	fiber_free();

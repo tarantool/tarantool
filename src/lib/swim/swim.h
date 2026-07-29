@@ -65,7 +65,7 @@ enum swim_gc_mode {
 /**
  * Create a new SWIM instance. Do not bind to a port or set any
  * parameters. Allocation and initialization only. The function
- * yields.
+ * yields. Never fails (never returns NULL).
  */
 struct swim *
 swim_new(uint64_t generation);

@@ -1237,8 +1237,6 @@ tarantool_lua_run_script(char *path, struct instance_state *instance,
 	 */
 
 	script_fiber = fiber_new(title, run_script_f);
-	if (script_fiber == NULL)
-		panic("%s", diag_last_error(diag_get())->errmsg);
 	script_fiber->storage.lua.stack = tarantool_L;
 	/*
 	 * Create a new diag on the stack. Don't pass fiber's diag, because it

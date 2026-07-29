@@ -3203,13 +3203,6 @@ luaT_netbox_transport_start(struct lua_State *L)
 		name = tt_sprintf("fd=%d (net.box)", transport->opts.fd);
 	}
 	transport->worker = fiber_new_system(name, netbox_worker_f);
-	if (transport->worker == NULL) {
-		luaL_unref(L, LUA_REGISTRYINDEX, transport->coro_ref);
-		transport->coro_ref = LUA_NOREF;
-		luaL_unref(L, LUA_REGISTRYINDEX, transport->self_ref);
-		transport->self_ref = LUA_NOREF;
-		return luaT_error(L);
-	}
 	fiber_set_managed_shutdown(transport->worker);
 	transport->worker->f_arg = transport;
 	/*
