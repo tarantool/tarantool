@@ -1618,22 +1618,21 @@ typedef(A) ::= ARRAY . { A = FIELD_TYPE_ARRAY; }
 typedef(A) ::= MAP . { A = FIELD_TYPE_MAP; }
 typedef(A) ::= DATETIME . { A = FIELD_TYPE_DATETIME; }
 typedef(A) ::= INTERVAL . { A = FIELD_TYPE_INTERVAL; }
-
-char_len(A) ::= LP INTEGER(B) RP . {
-  (void) A;
-  (void) B;
-}
-
-%type char_len {int}
-typedef(A) ::= VARCHAR char_len(B) . {
+typedef(A) ::= VARCHAR LP INTEGER RP . {
   A = FIELD_TYPE_STRING;
-  (void) B;
 }
-
-%type number_typedef {enum field_type}
-typedef(A) ::= number_typedef(A) .
-number_typedef(A) ::= NUMBER . { A = FIELD_TYPE_NUMBER; }
-number_typedef(A) ::= DOUBLE . { A = FIELD_TYPE_DOUBLE; }
-number_typedef(A) ::= INT|INTEGER_KW . { A = FIELD_TYPE_INTEGER; }
-number_typedef(A) ::= UNSIGNED . { A = FIELD_TYPE_UNSIGNED; }
-number_typedef(A) ::= DECIMAL . { A = FIELD_TYPE_DECIMAL; }
+typedef(A) ::= NUMBER . {
+  A = FIELD_TYPE_NUMBER;
+}
+typedef(A) ::= DOUBLE . {
+  A = FIELD_TYPE_DOUBLE;
+}
+typedef(A) ::= INT|INTEGER_KW . {
+  A = FIELD_TYPE_INTEGER;
+}
+typedef(A) ::= UNSIGNED . {
+  A = FIELD_TYPE_UNSIGNED;
+}
+typedef(A) ::= DECIMAL . {
+  A = FIELD_TYPE_DECIMAL;
+}
