@@ -384,6 +384,7 @@ static void yy_destructor(
 /********* End destructor definitions *****************************************/
     default:  break;   /* If no destructor action specified: do nothing */
   }
+  (void)yypminor;
 }
 
 /*
