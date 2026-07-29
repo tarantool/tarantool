@@ -130,6 +130,25 @@ txn_limbo_assert_locked(struct txn_limbo *limbo)
 	VERIFY(latch_is_locked(&limbo->state_latch));
 }
 
+/**
+ * Validate correctness of the limbo state. The function helps to catch
+ * state-breaking changes early, instead of continuing execution and either
+ * leaving the broken state unnoticed or crashing later in some distantly
+ * related place which usually complicates debug a lot.
+ */
+static void
+txn_limbo_assert_consistent(struct txn_limbo *limbo)
+{
+#ifndef NDEBUG
+	struct txn_limbo_queue *queue = &limbo->queue;
+	VERIFY(queue->confirmed_lsn ==
+	       vclock_get(&queue->confirmed_vclock, queue->owner_id));
+	VERIFY(queue->volatile_confirmed_lsn >= queue->confirmed_lsn);
+#else
+	(void)limbo;
+#endif
+}
+
 static int64_t
 txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 				uint32_t replica_id)
@@ -1063,8 +1082,10 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
+	txn_limbo_assert_consistent(limbo);
 	/* The replication_synchro_quorum value may have changed. */
 	txn_limbo_queue_bump_volatile_confirm(&limbo->queue);
+	txn_limbo_assert_consistent(limbo);
 	fiber_wakeup(limbo->worker);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
