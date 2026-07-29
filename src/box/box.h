@@ -230,6 +230,15 @@ box_is_waiting_for_own_rows(void);
 bool
 box_is_anon(void);
 
+/**
+ * Check if this instance has bootstrapped the replicaset on the current
+ * startup. Returns false if the instance recovered from a local
+ * checkpoint or joined an already bootstrapped replicaset (including a
+ * rebootstrap into an existing registration).
+ */
+bool
+box_is_bootstrap_leader(void);
+
 /** \cond public */
 
 /**
