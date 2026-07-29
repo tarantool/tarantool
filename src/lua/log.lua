@@ -1,5 +1,6 @@
 -- log.lua
 --
+local fiber = require('fiber')
 local ffi = require('ffi')
 ffi.cdef[[
     typedef void (*sayfunc_t)(int level, const char *filename, int line,
@@ -72,9 +73,6 @@ ffi.cdef[[
     extern void
     log_write_flightrec_from_lua(int level, const char *filename, int line,
                                  ...);
-
-    bool
-    cord_is_main(void);
 ]]
 
 local S_WARN = ffi.C.S_WARN
@@ -482,7 +480,7 @@ log_main = {
     new = log_new,
 }
 
-if ffi.C.cord_is_main() then
+if fiber._internal.cord_is_main then
     log_main.rotate = log_rotate
     log_main.pid = log_pid
     log_main.level = set_log_level

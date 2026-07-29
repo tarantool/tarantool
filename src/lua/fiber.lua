@@ -11,6 +11,8 @@ double
 fiber_clock(void);
 int64_t
 fiber_clock64(void);
+bool
+cord_is_main(void);
 ]]
 local C = ffi.C
 
@@ -94,6 +96,7 @@ fiber._internal = fiber._internal or {}
 fiber._internal.schedule_task = worker_schedule_task
 fiber._internal.set_system = fiber_set_system
 fiber._internal.set_managed_shutdown = fiber_set_managed_shutdown
+fiber._internal.cord_is_main = ffi.C.cord_is_main()
 
 setmetatable(fiber, {__serialize = function(self)
     local res = table.copy(self)
