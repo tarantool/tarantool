@@ -268,6 +268,13 @@ static const char *box_recovery_state_strs[box_recovery_state_MAX] = {
 /** Whether the triggers for "synced" recovery stage have already run. */
 static bool recovery_state_synced_is_reached;
 
+/**
+ * Whether this instance has bootstrapped the replicaset on the current
+ * startup (created the initial snapshot itself rather than recovered
+ * from a local checkpoint or joined an existing replicaset).
+ */
+static bool is_bootstrap_leader;
+
 /** PATH_MAX is too big and 2K is recommended limit for web address. */
 #define BOX_FEEDBACK_HOST_MAX 2048
 
@@ -629,6 +636,12 @@ bool
 box_is_anon(void)
 {
 	return instance_id == REPLICA_ID_NIL;
+}
+
+bool
+box_is_bootstrap_leader(void)
+{
+	return is_bootstrap_leader;
 }
 
 API_EXPORT int
@@ -5802,7 +5815,6 @@ box_cfg_xc(void)
 		journal_set(NULL);
 	});
 
-	bool is_bootstrap_leader = false;
 	if (box_recovery_triggers_disabled) {
 		space_events_enable(false);
 		txn_events_enable(false);
