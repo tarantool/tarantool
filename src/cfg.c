@@ -77,6 +77,15 @@ cfg_isnumber(const char *param)
 }
 
 bool
+cfg_isboolean(const char *param)
+{
+	cfg_get(param);
+	bool ret = !!lua_isboolean(tarantool_L, -1);
+	lua_pop(tarantool_L, 1);
+	return ret;
+}
+
+bool
 cfg_getb(const char *param)
 {
 	cfg_get(param);
