@@ -1410,20 +1410,6 @@ trigger_cmd_list(A) ::= trigger_cmd(A) SEMI. {
   A->pLast = A;
 }
 
-// Disallow qualified table names on INSERT, UPDATE, and DELETE statements
-// within a trigger.  The table to INSERT, UPDATE, or DELETE is always in 
-// the same database as the table that the trigger fires on.
-//
-%type trnm {Token}
-trnm(A) ::= nm(A).
-trnm(A) ::= nm DOT nm(X). {
-  A = X;
-  diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS, pParse->line_count,
-           pParse->line_pos, "qualified table names are not allowed on INSERT, "
-           "UPDATE, and DELETE statements within triggers");
-  pParse->is_aborted = true;
-}
-
 // Disallow the INDEX BY and NOT INDEXED clauses on UPDATE and DELETE
 // statements within triggers.  We make a specific error message for this
 // since it is an exception to the default grammar rules.
@@ -1448,7 +1434,7 @@ tridxby ::= NOT INDEXED. {
 %destructor trigger_cmd {sqlDeleteTriggerStep($$);}
 // UPDATE 
 trigger_cmd(A) ::=
-   UPDATE orconf(R) trnm(X) tridxby SET setlist(Y) where_opt_old(Z). {
+   UPDATE orconf(R) nm(X) tridxby SET setlist(Y) where_opt_old(Z). {
      A = sql_trigger_update_step(&X, Y, Z, R);
      if (A == NULL) {
         pParse->is_aborted = true;
@@ -1457,17 +1443,17 @@ trigger_cmd(A) ::=
    }
 
 // INSERT
-trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select_old(S). {
+trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) select_old(S). {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, S, R);
 }
-trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) DEFAULT VALUES. {
+trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, NULL, R);
 }
 
 // DELETE
-trigger_cmd(A) ::= DELETE FROM trnm(X) tridxby where_opt_old(Y). {
+trigger_cmd(A) ::= DELETE FROM nm(X) tridxby where_opt_old(Y). {
   A = sql_trigger_delete_step(&X, Y);
 }
 
