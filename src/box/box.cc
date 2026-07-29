@@ -179,6 +179,8 @@ static bool is_storage_initialized = false;
 /** Set if storage shutdown is started. */
 static bool is_storage_shutdown = false;
 static bool is_ro = true;
+/** Whether the read_only option has been applied at least once. */
+static bool is_ro_cfg_applied;
 static fiber_cond ro_cond;
 
 /**
@@ -611,6 +613,7 @@ void
 box_set_ro(void)
 {
 	is_ro = box_check_ro();
+	is_ro_cfg_applied = true;
 	box_update_ro_summary();
 }
 
@@ -1701,29 +1704,100 @@ box_check_uuid(struct tt_uuid *uuid, const char *name, bool set_diag)
 	return 0;
 }
 
+/**
+ * The box.cfg.read_only setting: a boolean or the string
+ * 'unless_bootstrap'.
+ */
+enum ro_cfg {
+	RO_CFG_FALSE,
+	RO_CFG_TRUE,
+	/**
+	 * Go RW only if this instance has bootstrapped the replicaset
+	 * on the current startup, go RO otherwise (local recovery or
+	 * join to an already bootstrapped replicaset).
+	 */
+	RO_CFG_UNLESS_BOOTSTRAP,
+};
+
+/**
+ * Parse the box.cfg.read_only value. Returns -1 and sets diag if the
+ * value is a string other than 'unless_bootstrap'.
+ */
+static int
+box_check_ro_cfg(enum ro_cfg *out)
+{
+	if (cfg_isboolean("read_only")) {
+		*out = cfg_getb("read_only") ? RO_CFG_TRUE : RO_CFG_FALSE;
+		return 0;
+	}
+	const char *value = cfg_gets("read_only");
+	if (value != NULL && strcmp(value, "unless_bootstrap") == 0) {
+		*out = RO_CFG_UNLESS_BOOTSTRAP;
+		return 0;
+	}
+	diag_set(ClientError, ER_CFG, "read_only",
+		 "the value must be a boolean or the string "
+		 "'unless_bootstrap'");
+	return -1;
+}
+
 static bool
 box_check_ro(void)
 {
-	bool ro = cfg_geti("read_only") != 0;
+	enum ro_cfg mode;
+	if (box_check_ro_cfg(&mode) != 0)
+		diag_raise();
+	/*
+	 * The 'unless_bootstrap' value makes sense only on startup.
+	 * Setting it dynamically is banned: with a leader already
+	 * chosen elsewhere the outcome would be unpredictable, and
+	 * after a whole cluster restart there is no bootstrap leader
+	 * at all, so everyone would go read-only. Note that the value
+	 * left in the configuration does not fail the next startup:
+	 * the initial application is always allowed and resolves to RO
+	 * on a recovery.
+	 */
+	if (mode == RO_CFG_UNLESS_BOOTSTRAP && is_ro_cfg_applied) {
+		tnt_raise(ClientError, ER_CFG, "read_only",
+			  "the 'unless_bootstrap' value may be set only "
+			  "during the initial box.cfg() call");
+	}
 	bool anon = cfg_geti("replication_anon") != 0;
-	if (anon && !ro) {
+	if (anon && mode == RO_CFG_FALSE) {
 		tnt_raise(ClientError, ER_CFG, "read_only",
 			  "the value may be set to false only when "
 			  "replication_anon is false");
 	}
-	return ro;
+	if (anon && mode == RO_CFG_UNLESS_BOOTSTRAP) {
+		tnt_raise(ClientError, ER_CFG, "read_only",
+			  "the value may be set to 'unless_bootstrap' only "
+			  "when replication_anon is false");
+	}
+	/*
+	 * The bootstrap outcome the 'unless_bootstrap' mode resolves
+	 * from is known once the initial box.cfg() call returns and
+	 * the option is applied after that, so the very first RO/RW
+	 * state transition happens with the final resolved value: a
+	 * joined or recovered instance never goes through a transient
+	 * RW state.
+	 */
+	if (mode == RO_CFG_UNLESS_BOOTSTRAP)
+		return !box_is_bootstrap_leader();
+	return mode == RO_CFG_TRUE;
 }
 
 static bool
 box_check_replication_anon(void)
 {
 	bool anon = cfg_geti("replication_anon") != 0;
-	bool ro = cfg_geti("read_only") != 0;
+	enum ro_cfg ro_mode;
+	if (box_check_ro_cfg(&ro_mode) != 0)
+		diag_raise();
 	const char *mode_name = cfg_gets("election_mode");
 	enum election_mode mode = election_mode_by_name(mode_name);
 	if (mode == ELECTION_MODE_INVALID)
 		diag_raise();
-	if (anon && !ro) {
+	if (anon && ro_mode != RO_CFG_TRUE) {
 		tnt_raise(ClientError, ER_CFG, "replication_anon",
 			  "the value may be set to true only when "
 			  "the instance is read-only");
@@ -2209,6 +2283,9 @@ box_check_config(void)
 	if (box_check_replicaset_uuid(&uuid) != 0)
 		diag_raise();
 	if (box_check_election_mode(&election_mode) != 0)
+		diag_raise();
+	enum ro_cfg ro_mode;
+	if (box_check_ro_cfg(&ro_mode) != 0)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
@@ -4995,7 +5072,19 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 void
 box_process_vote(struct ballot *ballot)
 {
-	ballot->is_ro_cfg = cfg_geti("read_only") != 0;
+	/*
+	 * is_ro_cfg reports whether the configuration unconditionally
+	 * enforces RO, that is whether the value is exactly true. This
+	 * way an 'unless_bootstrap' instance is a valid bootstrap
+	 * leader candidate and does not lose the bootstrap master
+	 * scoring (see replicaset_find_join_master()). The mode cannot
+	 * be resolved via box_is_bootstrap_leader() here: ballots are
+	 * exchanged before the bootstrap leader is elected, when the
+	 * flag is not known yet.
+	 */
+	enum ro_cfg ro_mode = RO_CFG_TRUE;
+	VERIFY(box_check_ro_cfg(&ro_mode) == 0);
+	ballot->is_ro_cfg = ro_mode == RO_CFG_TRUE;
 	const char *mode_name = cfg_gets("election_mode");
 	enum election_mode mode = election_mode_by_name(mode_name);
 	assert(mode != ELECTION_MODE_INVALID);
@@ -5228,6 +5317,9 @@ bootstrap_master(void)
 {
 	/*
 	 * Do not allow to bootstrap a readonly instance as master.
+	 * The 'unless_bootstrap' read_only mode explicitly allows the
+	 * bootstrap: it resolves to RW exactly when the instance
+	 * becomes the bootstrap leader.
 	 *
 	 * Allow an exception for the supervised bootstrap
 	 * strategy, because the command to bootstrap may be
@@ -5235,8 +5327,10 @@ bootstrap_master(void)
 	 * there is no way to change box.cfg.read_only at this
 	 * time.
 	 */
+	enum ro_cfg ro_mode = RO_CFG_TRUE;
+	VERIFY(box_check_ro_cfg(&ro_mode) == 0);
 	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED &&
-	    cfg_geti("read_only") == 1) {
+	    ro_mode == RO_CFG_TRUE) {
 		tnt_raise(ClientError, ER_BOOTSTRAP_READONLY);
 	}
 	/*
@@ -6123,11 +6217,20 @@ box_broadcast_status(void)
 {
 	char buf[1024];
 	char *w = buf;
+	/*
+	 * As in the ballot, is_ro_cfg reports whether the
+	 * configuration unconditionally enforces RO, that is whether
+	 * the value is exactly true (see box_process_vote()). The
+	 * effective state is reported in is_ro.
+	 */
+	enum ro_cfg ro_mode = RO_CFG_TRUE;
+	VERIFY(box_check_ro_cfg(&ro_mode) == 0);
+	bool is_ro_cfg = ro_mode == RO_CFG_TRUE;
 	w = mp_encode_map(w, 4);
 	w = mp_encode_str0(w, "is_ro");
 	w = mp_encode_bool(w, box_is_ro());
 	w = mp_encode_str0(w, "is_ro_cfg");
-	w = mp_encode_bool(w, cfg_geti("read_only"));
+	w = mp_encode_bool(w, is_ro_cfg);
 	w = mp_encode_str0(w, "status");
 	w = mp_encode_str0(w, box_status());
 	w = mp_encode_str0(w, "dd_version");
