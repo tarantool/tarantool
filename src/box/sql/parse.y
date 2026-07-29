@@ -1364,21 +1364,18 @@ cmd ::= SHOW CREATE TABLE. {
 
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
-cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
-  Token all;
-  all.z = A.z;
-  all.n = (int)(Z.z - A.z) + Z.n;
-  pParse->initiateTTrans = true;
-  sql_trigger_finish(pParse, S, &all);
-}
-
-trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
-                    trigger_time(C) trigger_event(D)
-                    ON fullname(E) foreach_clause when_clause(G). {
-  create_trigger_def_init(&pParse->create_trigger_def, E, &B, C, D.a,
-                          id_list_from_ast(D.b), G, NOERR);
-  sql_trigger_begin(pParse);
-  A = B; /*A-overwrites-T*/
+cmd ::= createkw TRIGGER ifnotexists(E) nm(N) trigger_time(C) trigger_event(D)
+        ON nm(T) foreach_clause when_clause(G) BEGIN trigger_cmd_list(S) END. {
+  if (pParse->parse_only) {
+    pParse->parsed_ast_type = AST_TYPE_TRIGGER;
+    pParse->parsed_ast.trigger = sql_trigger_new(pParse, &N, &T, C, D.a,
+                                                 id_list_from_ast(D.b), G, S);
+  } else {
+    sql_expr_delete(G);
+    sqlDeleteTriggerStep(S);
+    pParse->initiateTTrans = true;
+    vdbe_emit_create_trigger(pParse, pParse->zTail, &N, &T, E);
+  }
 }
 
 %type trigger_time {int}

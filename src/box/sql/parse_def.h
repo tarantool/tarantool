@@ -184,43 +184,6 @@ enum sql_index_type {
 	sql_index_type_MAX
 };
 
-enum entity_type {
-	ENTITY_TYPE_TABLE = 0,
-	ENTITY_TYPE_COLUMN,
-	ENTITY_TYPE_VIEW,
-	ENTITY_TYPE_INDEX,
-	ENTITY_TYPE_TRIGGER,
-	ENTITY_TYPE_CK,
-	ENTITY_TYPE_FK,
-	/**
-	 * For assertion checks that constraint definition is
-	 * created before initialization of a term constraint.
-	 */
-	ENTITY_TYPE_CONSTRAINT,
-};
-
-enum alter_action {
-	ALTER_ACTION_CREATE = 0,
-	ALTER_ACTION_DROP,
-	ALTER_ACTION_RENAME,
-};
-
-struct alter_entity_def {
-	/** Type of topmost entity. */
-	enum entity_type entity_type;
-	/** Action to be performed using current entity. */
-	enum alter_action alter_action;
-	/** As a rule it is a name of table to be altered. */
-	struct SrcList *entity_name;
-};
-
-struct create_entity_def {
-	struct alter_entity_def base;
-	struct Token name;
-	/** Statement comes with IF NOT EXISTS clause. */
-	bool if_not_exist;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -235,54 +198,6 @@ struct create_fk_constraint_parse_def {
 	 */
 	bool is_used;
 };
-
-struct create_trigger_def {
-	struct create_entity_def base;
-	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
-	int tr_tm;
-	/** One of TK_INSERT, TK_UPDATE, TK_DELETE. */
-	int op;
-	/** Column list if this is an UPDATE trigger. */
-	struct IdList *cols;
-	/** When clause. */
-	struct Expr *when;
-};
-
-/** Basic initialisers of parse structures.*/
-static inline void
-alter_entity_def_init(struct alter_entity_def *alter_def,
-		      struct SrcList *entity_name, enum entity_type type,
-		      enum alter_action action)
-{
-	alter_def->entity_name = entity_name;
-	alter_def->entity_type = type;
-	alter_def->alter_action = action;
-}
-
-static inline void
-create_entity_def_init(struct create_entity_def *create_def,
-		       enum entity_type type, struct SrcList *parent_name,
-		       struct Token *name, bool if_not_exist)
-{
-	alter_entity_def_init(&create_def->base, parent_name, type,
-			      ALTER_ACTION_CREATE);
-	create_def->name = *name;
-	create_def->if_not_exist = if_not_exist;
-}
-
-static inline void
-create_trigger_def_init(struct create_trigger_def *trigger_def,
-			struct SrcList *table_name, struct Token *name,
-			int tr_tm, int op, struct IdList *cols,
-			struct Expr *when, bool if_not_exists)
-{
-	create_entity_def_init(&trigger_def->base, ENTITY_TYPE_TRIGGER,
-			       table_name, name, if_not_exists);
-	trigger_def->tr_tm = tr_tm;
-	trigger_def->op = op;
-	trigger_def->cols = cols;
-	trigger_def->when = when;
-}
 
 static inline void
 create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
