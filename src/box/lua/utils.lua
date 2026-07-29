@@ -1,4 +1,73 @@
+local ffi = require('ffi')
 local msgpack = require('msgpack')
+
+ffi.cdef([[
+    size_t
+    box_region_used(void);
+    void
+    box_region_truncate(size_t size);
+
+    struct port {
+        const struct port_vtab *vtab;
+        char pad[74];
+    };
+
+    enum port_c_entry_type {
+        PORT_C_ENTRY_UNKNOWN,
+        PORT_C_ENTRY_NULL,
+        PORT_C_ENTRY_DOUBLE,
+        PORT_C_ENTRY_TUPLE,
+        PORT_C_ENTRY_STR,
+        PORT_C_ENTRY_BOOL,
+        PORT_C_ENTRY_MP,
+        PORT_C_ENTRY_MP_OBJECT,
+        PORT_C_ENTRY_MP_ITERABLE,
+    };
+
+    struct port_c_iterator;
+
+    typedef void
+    (*port_c_iterator_create_f)(void *data, struct port_c_iterator *it);
+
+    struct port_c_iterable {
+        port_c_iterator_create_f iterator_create;
+        void *data;
+    };
+
+    struct port_c_entry {
+        struct port_c_entry *next;
+        enum port_c_entry_type type;
+        union {
+            double number;
+            struct tuple *tuple;
+            bool boolean;
+            struct {
+                const char *data;
+                uint32_t size;
+            } str;
+            struct {
+                const char *data;
+                uint32_t size;
+                union {
+                    struct tuple_format *mp_format;
+                    struct mp_ctx *mp_ctx;
+                };
+            } mp;
+            struct port_c_iterable iterable;
+        };
+    };
+
+    struct port_c {
+        const struct port_vtab *vtab;
+        struct port_c_entry *first;
+        struct port_c_entry *last;
+        struct port_c_entry first_entry;
+        int size;
+    };
+
+    void
+    port_destroy(struct port *port);
+]])
 
 -- performance fixup for hot functions
 local is_tuple = box.tuple.is
