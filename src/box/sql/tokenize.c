@@ -812,6 +812,19 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 	case SQL_AST_CREATE_INDEX:
 		sql_code_create_index(parse, &ast->create_index);
 		break;
+	case SQL_AST_CREATE_TRIGGER:
+		if (!ast->create_trigger.is_for_each_row) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool SQL",
+				 "FOR EACH STATEMENT triggers, please supply "
+				 "FOR EACH ROW clause");
+			parse->is_aborted = true;
+			break;
+		}
+		parse->initiateTTrans = true;
+		vdbe_emit_create_trigger(parse, sql, &ast->create_trigger.name,
+					 &ast->create_trigger.table,
+					 ast->create_trigger.if_not_exists);
+		break;
 	case SQL_AST_DROP_VIEW:
 	case SQL_AST_DROP_TABLE:
 		parse->initiateTTrans = true;
@@ -873,13 +886,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		}
 		sql_emit_show_create_table_one(parse, &ast->show_create_table);
 		break;
+	case SQL_AST_TRIGGER:
 	case SQL_AST_FUNCTION:
 	case SQL_AST_VIEW:
 		return;
 	default:
-		assert(parse->ast.type == SQL_AST_UNKNOWN);
+		unreachable();
 	}
-	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
+	if (!parse->is_aborted)
 		sql_finish_coding(parse);
 }
 
@@ -898,7 +912,6 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
 	assert(pParse->new_space == NULL);
-	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
 	struct Token last;
@@ -1008,10 +1021,10 @@ sql_parse_trigger(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
 		return NULL;
-	assert(parser->parsed_ast_type == AST_TYPE_TRIGGER);
-	struct sql_trigger *res = parser->parsed_ast.trigger;
-	parser->parsed_ast.trigger = NULL;
-	if (parser->nVar > 0) {
+	struct sql_ast *ast = &parser->ast;
+	assert(ast->type == SQL_AST_TRIGGER);
+	struct sql_trigger *res = sql_trigger_from_ast(parser, &ast->trigger);
+	if (res != NULL && parser->nVar > 0) {
 		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 			 "Parameters are not allowed in triggers");
 		parser->is_aborted = true;

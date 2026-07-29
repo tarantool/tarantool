@@ -46,6 +46,8 @@ enum sql_ast_type {
 	SQL_AST_CREATE_VIEW,
 	/** CREATE INDEX statement. */
 	SQL_AST_CREATE_INDEX,
+	/** CREATE TRIGGER statement. */
+	SQL_AST_CREATE_TRIGGER,
 
 	/** DROP TABLE statement. */
 	SQL_AST_DROP_TABLE,
@@ -76,6 +78,8 @@ enum sql_ast_type {
 	SQL_AST_VIEW,
 	/** Expression for SQL expression function body. */
 	SQL_AST_FUNCTION,
+	/** TRIGGER object definition. */
+	SQL_AST_TRIGGER,
 };
 
 /** Columns and table properties. */
@@ -318,6 +322,32 @@ struct ast_truncate {
 	struct Token table;
 };
 
+/** List of actions of trigger. */
+struct ast_trigger_action_list {
+	/** Head of the list. */
+	struct stailq head;
+	/** Length of the list. */
+	uint32_t len;
+};
+
+/** Trigger action. */
+struct ast_trigger_action {
+	/** Link to the next element of the list. */
+	struct stailq_entry link;
+	union {
+		/** UPDATE action of the trigger. */
+		struct ast_update *update;
+		/** INSERT action of the trigger. */
+		struct ast_insert *insert;
+		/** DELETE action of the trigger. */
+		struct ast_delete *del;
+		/** SELECT action of the trigger. */
+		struct ast_select *select;
+	};
+	/** Type of action. */
+	uint8_t op;
+};
+
 /** List of table or columns properties received from parser. */
 struct ast_property_list {
 	/** Head of the list. */
@@ -382,6 +412,26 @@ struct ast_table_properties {
 	struct stailq constraints;
 };
 
+/** Description of a trigger. */
+struct ast_trigger {
+	/** New trigger name. */
+	struct Token name;
+	/** Name of table where trigger is created. */
+	struct Token table;
+	/** WHEN clause of trigger. */
+	struct ast_expr *when;
+	/** Columns for UPDATE OF event. */
+	struct ast_id_list *columns;
+	/** Actions list of the trigger. */
+	struct ast_trigger_action_list *actions;
+	/** Reaction time of the trigger. */
+	uint8_t time;
+	/** Reaction event of the trigger. */
+	uint8_t event;
+	/** Flag to distinguish between FOR EACH ROW and FOR EACH STATEMENT. */
+	bool is_for_each_row;
+};
+
 /** Description of CREATE TABLE statement. */
 struct ast_create_table {
 	/** Name of new table. */
@@ -418,6 +468,18 @@ struct ast_create_index {
 	bool if_not_exists;
 	/** Flag to show if index is unique. */
 	bool is_unique;
+};
+
+/** Description of CREATE TRIGGER statement. */
+struct ast_create_trigger {
+	/** New trigger name. */
+	struct Token name;
+	/** Name of table where trigger is created. */
+	struct Token table;
+	/** Flag to throw an error if trigger exists. */
+	bool if_not_exists;
+	/** Flag to distinguish between FOR EACH ROW and FOR EACH STATEMENT. */
+	bool is_for_each_row;
 };
 
 /** Description of DROP TABLE and DROP VIEW statements. */
@@ -524,6 +586,8 @@ struct sql_ast {
 		struct ast_create_view create_view;
 		/** CREATE INDEX statement. */
 		struct ast_create_index create_index;
+		/** CREATE TRIGGER statement. */
+		struct ast_create_trigger create_trigger;
 		/** DROP TABLE and DROP VIEW statements. */
 		struct ast_drop_table drop_table;
 		/** DROP TRIGGER statement. */
@@ -546,6 +610,8 @@ struct sql_ast {
 		struct Token show_create_table;
 		/** Expression for SQL expression function body. */
 		struct ast_expr *expr;
+		/** Definition of a trigger. */
+		struct ast_trigger trigger;
 	};
 };
 
@@ -684,6 +750,16 @@ ast_update_new(struct region *region);
 struct ast_delete *
 ast_delete_new(struct region *region);
 
+/** Append a trigger action to trigger action list. */
+struct ast_trigger_action_list *
+ast_trigger_action_list_append(struct region *region,
+			       struct ast_trigger_action_list *list,
+			       struct ast_trigger_action *action);
+
+/** Create new empty TRIGGER ACTION structure. */
+struct ast_trigger_action *
+ast_trigger_action_new(struct region *region);
+
 /** Create new empty structure of table or column property. */
 struct ast_property *
 ast_property_new(struct region *region);
@@ -710,3 +786,11 @@ ast_table_properties_append_column(struct ast_table_properties *properties,
 struct ast_table_properties *
 ast_table_properties_append_constraint(struct ast_table_properties *properties,
 				       struct ast_property *constraint);
+
+/**
+ * Convert `struct ast_create_trigger` to `struct sql_trigger`.
+ *
+ * Return NULL on error.
+ */
+struct sql_trigger *
+sql_trigger_from_ast(struct Parse *parser, struct ast_trigger *def);
