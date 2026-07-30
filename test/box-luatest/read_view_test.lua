@@ -75,6 +75,12 @@ g.test_invalid_opts = function(cg)
         t.assert_error_msg_equals(
             "options parameter 'name' should be of type string",
             box.read_view.open, {name = 42})
+        t.assert_error_msg_equals(
+            "options parameter 'id' should be of type number",
+            box.read_view.open, {id = 'foo'})
+        t.assert_error_msg_equals(
+            "options parameter 'name' should not be used with 'id'",
+            box.read_view.open, {name = 'foo', id = 42})
     end)
 end
 
@@ -2655,3 +2661,334 @@ g_mvcc.test_count_cleaner = function(cg)
         rv:close()
     end, {cg.params.func_index})
 end
+
+local g_threads = t.group('read_view.threads')
+
+g_threads.before_all(function(cg)
+    cg.server = server:new({
+        box_cfg = {app_threads = 4},
+        net_box_credentials = {user = 'admin'}
+    })
+    cg.server:start()
+end)
+
+g_threads.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g_threads.after_each(function(cg)
+    -- If there's a stray read view left from a failing test, make sure it's
+    -- gone. To do that, first collect garbage in all application threads,
+    -- then collect garbage in the main thread and check the read view list.
+    -- Note, we might need to retry the last step because read views are
+    -- unpinned by application threads asynchronously.
+    for i = 1, cg.server.box_cfg.app_threads do
+        cg.server:exec(function()
+        for _ = 1, 5 do collectgarbage('collect') end
+        end, {}, {_thread_id = i})
+    end
+    cg.server:exec(function()
+        t.helpers.retrying({}, function()
+            collectgarbage('collect')
+            t.assert_equals(box.read_view.list(), {})
+        end)
+    end)
+end)
+
+g_threads.test_unsupported = function(cg)
+    cg.server:exec(function()
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'UNSUPPORTED',
+            message = 'Application thread does not support ' ..
+                      'listing read views',
+        }, box.read_view.list)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'UNSUPPORTED',
+            message = 'Application thread does not support ' ..
+                      'creating a new read view',
+        }, box.read_view.open)
+    end, {}, {_thread_id = 1})
+end
+
+g_threads.test_reuse_in_main_thread = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local rv = box.read_view.open()
+        local id = rv.id
+
+        -- Reopening a read view with the same id doesn't create a new handle.
+        t.assert_equals(box.read_view.open({id = id}), rv)
+
+        -- Try to reuse a closed read view that's still in the registry.
+        rv:close()
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, box.read_view.open, {id = id})
+
+        -- Try to reuse a read view that has been garbage-collected.
+        rv = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_equals(box.read_view.list(), {})
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, box.read_view.open, {id = id})
+
+        -- Try to reuse a system read view.
+        t.assert_equals(box.read_view.list(), {})
+        box.space._schema:delete('dummy')
+        local f = fiber.new(box.snapshot)
+        f:set_joinable(true)
+        fiber.yield()
+        rv = box.read_view.list()[1]
+        t.assert_covers(rv, {is_system = true, name = 'checkpoint'})
+        id = rv.id
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'READ_VIEW_BUSY',
+        }, box.read_view.open, {id = id})
+
+        -- Try to reuse a system read view whose handle was removed from
+        -- the registry by the garbage collector.
+        rv = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'READ_VIEW_BUSY',
+        }, box.read_view.open, {id = id})
+        t.assert_equals({f:join()}, {true, 'ok'})
+    end)
+end
+
+g_threads.test_reuse_in_app_thread = function(cg)
+    local id = cg.server:exec(function()
+        local rv = box.read_view.open()
+        rawset(_G, 'test_rv', rv)
+        return rv.id
+    end)
+    cg.server:exec(function(id)
+        local rv = box.read_view.open({id = id})
+        t.assert_equals(rv.id, id)
+        t.assert_equals(rv.status, 'open')
+
+        -- Reopening a read view with the same id shouldn't create
+        -- a new handle.
+        t.assert_equals(box.read_view.open({id = id}), rv)
+
+        -- It should be possible to reuse the original id again after
+        -- the old handle was closed.
+        rv:close()
+        t.assert_equals(rv.status, 'closed')
+        local rv2 = box.read_view.open({id = id})
+        t.assert_not_equals(rv2, rv)
+        t.assert_equals(rv2.id, id)
+        t.assert_equals(rv2.status, 'open')
+        rv2:close()
+        t.assert_equals(rv2.status, 'closed')
+    end, {id}, {_thread_id = 1})
+    cg.server:exec(function()
+        local rv = rawget(_G, 'test_rv')
+        rv:close()
+    end)
+
+    -- Try to reuse a closed read view that's still in the registry.
+    cg.server:exec(function(id)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, box.read_view.open, {id = id})
+    end, {id}, {_thread_id = 1})
+
+    -- Try to reuse a read view that has been garbage-collected.
+    cg.server:exec(function()
+        rawset(_G, 'test_rv', nil)
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_equals(box.read_view.list(), {})
+    end)
+    cg.server:exec(function(id)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, box.read_view.open, {id = id})
+    end, {id}, {_thread_id = 1})
+end
+
+g_threads.after_test('test_reuse_in_app_thread', function(cg)
+    cg.server:exec(function()
+        rawset(_G, 'test_rv', nil)
+    end)
+end)
+
+g_threads.test_reuse_error_after_acquire = function(cg)
+    -- Check that if an application thread fails to create a read view handle,
+    -- the read view is released in the main thread.
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        local rv = box.read_view.open()
+        t.assert_equals(rv.status, 'open')
+        box.error.injection.set('ERRINJ_READ_VIEW_HANDLE_NEW', true)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'INJECTION',
+            details = 'read view handle new',
+        }, threads.eval, 'app', [[box.read_view.open({id = ...})]], {rv.id})
+        rv:close()
+        t.assert_equals(rv.status, 'closed')
+    end)
+end
+
+g_threads.after_test('test_reuse_error_after_acquire', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_READ_VIEW_HANDLE_NEW', false)
+    end)
+end)
+
+g_threads.test_close_pending = function(cg)
+    -- Check that a read view isn't deleted until every thread using it
+    -- closes it.
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        local rv = box.read_view.open()
+        threads.eval('app', [[
+            rawset(_G, 'test_rv', box.read_view.open({id = ...}))
+        ]], {rv.id}, {target = 'all'})
+        rv:close()
+        t.assert_equals(rv.status, 'close_pending')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'READ_VIEW_CLOSED',
+        }, rv.close, rv)
+
+        -- The read view is still usable in application threads.
+        t.assert_equals(threads.eval('app', [[
+            local rv = rawget(_G, 'test_rv')
+            return rv.id, rv.status
+        ]], {}, {target = 'any'}), {{rv.id, 'open'}})
+
+        -- However, if an application thread closes the read view,
+        -- it won't be able to reopen it.
+        threads.eval('app', [[
+            local rv = rawget(_G, 'test_rv')
+            rawset(_G, 'test_rv', nil)
+            rv:close()
+        ]], {}, {target = 1})
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, threads.eval, 'app', [[
+            box.read_view.open({id = ...})
+        ]], {rv.id}, {target = 1})
+
+        -- The read view status doesn't change after it's removed from
+        -- the local registry by the garbage collector.
+        rv = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        rv = box.read_view.list()[1]
+        t.assert_equals(rv.status, 'close_pending')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'READ_VIEW_CLOSED',
+        }, rv.close, rv)
+        t.assert_error_covers({
+            type = 'ClientError',
+            name = 'NO_SUCH_READ_VIEW',
+        }, threads.eval, 'app', [[
+            box.read_view.open({id = ...})
+        ]], {rv.id}, {target = 1})
+
+        -- The read view is deleted as soon as all threads close it.
+        for i = 2, box.cfg.app_threads do
+            threads.eval('app', [[
+                local rv = rawget(_G, 'test_rv')
+                rawset(_G, 'test_rv', nil)
+                rv:close()
+            ]], {}, {target = i})
+        end
+        t.helpers.retrying({}, function()
+            t.assert_equals(rv.status, 'closed')
+        end)
+        rv = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_equals(box.read_view.list(), {})
+    end)
+end
+
+g_threads.after_test('test_close_pending', function(cg)
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        threads.eval('app', [[rawset(_G, 'test_rv', nil)]], {},
+                     {target = 'all'})
+    end)
+end)
+
+g_threads.test_gc = function(cg)
+    -- Check that read view handles closed by the garbage collector release
+    -- the backing read view in the main thread.
+    local rv_id, rv_name = cg.server:exec(function()
+        local threads = require('experimental.threads')
+        local rv = box.read_view.open({name = 'test_gc_in_threads'})
+        threads.eval('app', [[box.read_view.open({id = ...})]], {rv.id})
+        rv:close()
+        t.assert_equals(rv.status, 'close_pending')
+        threads.eval('app', [[for i = 1, 5 do collectgarbage('collect') end]])
+        t.helpers.retrying({}, function()
+            t.assert_equals(rv.status, 'closed')
+        end)
+        return rv.id, rv.name
+    end)
+    for thread_id = 1, cg.server.box_cfg.app_threads do
+        local fmt = "app%d/.*W> read view %d .'%s'. was not properly closed"
+        local pattern = string.format(fmt, thread_id, rv_id, rv_name)
+        t.assert(cg.server:grep_log(pattern))
+    end
+end
+
+g_threads.test_data_access = function(cg)
+    cg.server:exec(function()
+        local threads = require('experimental.threads')
+        local s = box.schema.space.create('test', {
+            format = {{'a', 'unsigned'}, {'b', 'string'}},
+        })
+        s:create_index('primary')
+        s:create_index('secondary', {parts = {'b'}})
+        s:insert({1, 'a'})
+        s:insert({2, 'b'})
+        s:insert({3, 'c'})
+        local rv = box.read_view.open()
+        s:replace({2, 'abc'})
+        s:insert({4, 'd'})
+        local function eval(expr)
+            return unpack(unpack(threads.eval('app', [[
+                local rv = box.read_view.open({id = ...})
+            ]] .. expr, {rv.id}, {target = 'any'})))
+        end
+        local ret
+        ret = eval([[return rv.space.test:count()]])
+        t.assert_equals(ret, 3)
+        ret = eval([[return rv.space.test:select({2}, {iterator = 'ge'})]])
+        t.assert_equals(ret, {{2, 'b'}, {3, 'c'}})
+        t.assert_equals(ret[1]:tomap({names_only = true}), {a = 2, b = 'b'})
+        ret = eval([[return rv.space.test.index.secondary:get('a')]])
+        t.assert_equals(ret, {1, 'a'})
+        t.assert_equals(ret:tomap({names_only = true}), {a = 1, b = 'a'})
+        ret = eval([[
+            local fun = require('fun')
+            return fun.totable(rv.space.test:pairs())
+        ]])
+        t.assert_equals(ret, {{1, 'a'}, {2, 'b'}, {3, 'c'}})
+        t.assert_equals(ret[3]:tomap({names_only = true}), {a = 3, b = 'c'})
+        eval([[rv:close()]])
+    end)
+end
+
+g_threads.after_test('test_data_access', function(cg)
+    cg.server:exec(function()
+        if box.space.test ~= nil then
+            box.space.test:drop()
+        end
+    end)
+end)

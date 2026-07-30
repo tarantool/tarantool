@@ -238,6 +238,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
 	"box/app_threads", "experimental.threads", app_threads_lua,
 	"box/recovery_point_manager", NULL, recovery_point_manager_lua,
+	"box/read_view", NULL, read_view_lua,
 	/*
 	 * To support tarantool-only types with checks, the module
 	 * must be loaded after decimal and datetime lua modules
@@ -342,7 +343,6 @@ static const char * const lua_sources_minimal[] = {
 static const char * const lua_sources_main[] = {
 	"box/session", NULL, session_lua,
 	"box/schema", NULL, schema_lua,
-	"box/read_view", NULL, read_view_lua,
 	"box/healthcheck", "internal.healthcheck", healthcheck_lua,
 	"box/healthcheck_defaults", "internal.healthcheck.defaults",
 	healthcheck_defaults_lua,
@@ -1097,6 +1097,7 @@ box_lua_init_minimal(struct lua_State *L)
 	box_lua_call_init(L);
 	box_lua_iproto_init(L);
 	box_lua_trigger_init(L);
+	box_lua_read_view_init(L);
 
 	luaopen_key_def(L);
 	lua_pop(L, 1);
@@ -1145,7 +1146,6 @@ box_lua_init(struct lua_State *L)
 	box_lua_index_init(L);
 	box_lua_space_init(L);
 	box_lua_sequence_init(L);
-	box_lua_read_view_init(L);
 	box_lua_misc_init(L);
 	box_lua_info_init(L);
 	box_lua_stat_init(L);

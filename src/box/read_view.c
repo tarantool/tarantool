@@ -17,6 +17,7 @@
 #include "engine.h"
 #include "error.h"
 #include "errcode.h"
+#include "errinj.h"
 #include "fiber.h"
 #include "field_def.h"
 #include "index.h"
@@ -222,10 +223,13 @@ read_view_unregister(struct read_view *rv)
 struct read_view *
 read_view_new(const struct read_view_opts *opts)
 {
+	assert(cord_is_main());
 	struct read_view *rv = xmalloc(sizeof(*rv));
 	rv->id = next_read_view_id++;
 	assert(opts->name != NULL);
 	rv->name = xstrdup(opts->name);
+	rv->pin_count = 0;
+	rv->is_close_pending = false;
 	rv->is_system = opts->is_system;
 	rv->disable_decompression = opts->disable_decompression;
 	rv->timestamp = ev_monotonic_now(loop());
@@ -259,6 +263,8 @@ fail:
 void
 read_view_delete(struct read_view *rv)
 {
+	assert(cord_is_main());
+	assert(rv->pin_count == 0);
 	read_view_unregister(rv);
 	struct space_read_view *space_rv, *next_space_rv;
 	rlist_foreach_entry_safe(space_rv, &rv->spaces, link,
@@ -279,6 +285,7 @@ read_view_delete(struct read_view *rv)
 struct read_view *
 read_view_by_id(uint64_t id)
 {
+	assert(cord_is_main());
 	struct mh_i64ptr_t *h = read_views;
 	if (h == NULL)
 		return NULL;
@@ -291,6 +298,7 @@ read_view_by_id(uint64_t id)
 bool
 read_view_foreach(read_view_foreach_f cb, void *arg)
 {
+	assert(cord_is_main());
 	struct mh_i64ptr_t *h = read_views;
 	if (h == NULL)
 		return true;
@@ -306,6 +314,10 @@ read_view_foreach(read_view_foreach_f cb, void *arg)
 struct read_view_handle *
 read_view_handle_new(struct read_view *rv)
 {
+	ERROR_INJECT(ERRINJ_READ_VIEW_HANDLE_NEW, {
+		diag_set(ClientError, ER_INJECTION, "read view handle new");
+		return NULL;
+	});
 	struct read_view_handle *h = xmalloc(sizeof(*h));
 	h->ptr = rv;
 	h->owner = cord();

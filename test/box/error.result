@@ -513,6 +513,7 @@ t;
  |   302: box.error.NO_SUCH_THREAD_GROUP
  |   303: box.error.XLOG_NOT_FOUND
  |   304: box.error.RECOVERY_POINT_TXN_LAST_ROW
+ |   305: box.error.NO_SUCH_READ_VIEW
  | ...
 
 test_run:cmd("setopt delimiter ''");
