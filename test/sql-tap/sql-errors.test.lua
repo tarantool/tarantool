@@ -134,7 +134,7 @@ test:do_catchsql_test(
 		CREATE INDEX i12 ON v0(i);
 	]], {
 		-- <sql-errors-1.12>
-        1,"Can't create or modify index 'i12' in space 'v0': views can not be indexed"
+        1,"Views can not be indexed"
 		-- </sql-errors-1.12>
 	})
 
