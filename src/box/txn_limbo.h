@@ -40,12 +40,39 @@ extern "C" {
 struct raft;
 struct synchro_request;
 
+/**
+ * The applied form of a PROMOTE/DEMOTE request: the term claimed by the new
+ * queue owner, the old owner being replaced with the confirm boundary in
+ * their LSNs, and the confirmed vclock the queue inherits on apply.
+ */
+struct txn_limbo_promote_entry {
+	/**
+	 * Raft term claimed by this PROMOTE. Zero means the slot holds no
+	 * entry - a valid one always has a non-zero term.
+	 */
+	uint64_t raft_term;
+	/**
+	 * The previous limbo owner. Their pending transactions will be
+	 * confirmed up to confirm_lsn when this PROMOTE is applied.
+	 */
+	uint32_t queue_owner_id;
+	/** Up to which queue_owner_id's transactions this PROMOTE confirms. */
+	int64_t confirm_lsn;
+	/**
+	 * Confirmed vclock the limbo will inherit when this PROMOTE is
+	 * applied.
+	 */
+	struct vclock confirmed_vclock;
+};
+
 /** Per-instance limbo state, indexed by replica id. */
 struct txn_limbo_node {
 	/**
 	 * Biggest PROMOTE/DEMOTE term ever applied from this instance.
 	 */
 	uint64_t latest_term;
+	/** PROMOTE from this instance being applied right now, if any. */
+	struct txn_limbo_promote_entry pending;
 };
 
 /** Limbo state. */

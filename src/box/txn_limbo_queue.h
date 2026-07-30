@@ -252,11 +252,14 @@ txn_limbo_queue_apply_rollback(struct txn_limbo_queue *queue, int64_t lsn,
 /**
  * Transfer ownership of the queue to a new owner with the given ID. The
  * transactions already stored in the queue are all confirmed for LSNs <= the
- * given border LSN, and the newer ones are rolled back.
+ * given border LSN, and the newer ones are rolled back. The border is in the
+ * old owner's LSN space. The queue then inherits the given confirmed vclock,
+ * and the confirmed LSN becomes its component of the new owner.
  */
 void
 txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
-				   uint32_t new_owner_id, int64_t border_lsn);
+				   uint32_t new_owner_id, int64_t border_lsn,
+				   const struct vclock *confirmed_vclock);
 
 /**
  * Ack all transactions up to the given LSN on behalf of the replica with the
