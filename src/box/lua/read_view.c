@@ -12,8 +12,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
+#include "diag.h"
+#include "error.h"
 #include "fiber.h"
 #include "port.h"
 #include "box/index.h"
@@ -35,7 +38,7 @@ static bool box_read_view_ffi = true;
 TWEAK_BOOL(box_read_view_ffi);
 
 /** Lua ctype ID of struct read_view_handle pointer. */
-static uint32_t CTID_STRUCT_READ_VIEW_HANDLE;
+static __thread uint32_t CTID_STRUCT_READ_VIEW_HANDLE;
 
 /** Get a read view handle from Lua stack. */
 static inline struct read_view_handle *
@@ -49,7 +52,7 @@ lbox_check_read_view_handle(struct lua_State *L, int idx)
 }
 
 /** Lua ctype ID of struct space_read_view_handle pointer. */
-static uint32_t CTID_STRUCT_SPACE_READ_VIEW_HANDLE;
+static __thread uint32_t CTID_STRUCT_SPACE_READ_VIEW_HANDLE;
 
 /** Get a space read view handle from Lua stack. */
 static inline struct space_read_view_handle *
@@ -91,7 +94,7 @@ lbox_check_index_read_view_iterator(struct lua_State *L, int idx)
  * the Lua stack.
  */
 static void
-lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
+lbox_push_read_view_info(struct lua_State *L, const struct read_view *rv)
 {
 	lua_newtable(L);
 	luaL_pushuint64(L, rv->id);
@@ -109,11 +112,11 @@ lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
 }
 
 /**
- * Helper function for lbox_read_view_open() that pushes a table for the given
+ * Helper function for lbox_new_read_view() that pushes a table for the given
  * index read view to the Lua stack.
  */
 static void
-lbox_read_view_push_index(struct lua_State *L,
+lbox_push_index_read_view(struct lua_State *L,
 			  struct index_read_view *index,
 			  struct space_read_view_handle *space)
 {
@@ -140,11 +143,11 @@ lbox_read_view_push_index(struct lua_State *L,
 }
 
 /**
- * Helper function for lbox_read_view_open() that pushes a table for the given
+ * Helper function for lbox_new_read_view() that pushes a table for the given
  * space read view to the Lua stack.
  */
 static void
-lbox_read_view_push_space(struct lua_State *L,
+lbox_push_space_read_view(struct lua_State *L,
 			  struct space_read_view_handle *space)
 {
 	lua_newtable(L);
@@ -158,7 +161,7 @@ lbox_read_view_push_space(struct lua_State *L,
 			space_read_view_index(space->ptr, i);
 		if (index == NULL)
 			continue;
-		lbox_read_view_push_index(L, index, space);
+		lbox_push_index_read_view(L, index, space);
 		lua_pushvalue(L, -1);
 		lua_rawseti(L, -3, i);
 		lua_setfield(L, -2, index->def->name);
@@ -167,9 +170,9 @@ lbox_read_view_push_space(struct lua_State *L,
 }
 
 /**
- * Opens a database read view.
- * Takes the new read view name (string).
- * On success, returns a table that has the following structure:
+ * Creates a read view handle and pushes a table with the following structure
+ * to the Lua stack:
+ *
  * {
  *     -- Read view handle (cdata).
  *     _crv = <cdata:struct read_view_handle *>,
@@ -206,14 +209,46 @@ lbox_read_view_push_space(struct lua_State *L,
  *     }
  * }
  *
+ * Returns 0 on success. On failure, sets diag and returns -1.
+ */
+static int
+lbox_new_read_view(struct lua_State *L, struct read_view *rv)
+{
+	struct read_view_handle *rvh = read_view_handle_new(rv);
+	if (rvh == NULL)
+		return -1;
+
+	/* Create a read view table. */
+	lbox_push_read_view_info(L, rv);
+
+	*(struct read_view_handle **)luaL_pushcdata(
+		L, CTID_STRUCT_READ_VIEW_HANDLE) = rvh;
+	lua_setfield(L, -2, "_crv");
+
+	/* Create a space table. */
+	lua_newtable(L);
+	struct space_read_view_handle *space;
+	read_view_foreach_space(space, rvh) {
+		lbox_push_space_read_view(L, space);
+		lua_pushvalue(L, -1);
+		lua_rawseti(L, -3, space->ptr->id);
+		lua_setfield(L, -2, space->ptr->name);
+	}
+	lua_setfield(L, -2, "space");
+
+	return 0;
+}
+
+/**
+ * Opens a database read view.
+ * Takes the new read view name (string).
  * On error, raises a Lua exception.
  */
 static int
 lbox_read_view_open(struct lua_State *L)
 {
+	assert(cord_is_main());
 	const char *name = luaL_checkstring(L, 1);
-
-	/* Open a read view. */
 	struct read_view_opts opts;
 	read_view_opts_create(&opts);
 	opts.name = name;
@@ -225,30 +260,87 @@ lbox_read_view_open(struct lua_State *L)
 	struct read_view *rv = read_view_new(&opts);
 	if (rv == NULL)
 		return luaT_error_at(L, 2);
-	struct read_view_handle *rvh = read_view_handle_new(rv);
-	if (rvh == NULL) {
+	if (lbox_new_read_view(L, rv) != 0) {
 		read_view_delete(rv);
 		return luaT_error_at(L, 2);
 	}
+	return 1;
+}
 
-	/* Create a space table. */
-	lua_newtable(L);
-	struct space_read_view_handle *space;
-	read_view_foreach_space(space, rvh) {
-		lbox_read_view_push_space(L, space);
-		lua_pushvalue(L, -1);
-		lua_rawseti(L, -3, space->ptr->id);
-		lua_setfield(L, -2, space->ptr->name);
+/**
+ * Pushes a pointer to the given read view encoded as a %p-formatted string
+ * to the Lua stack. See also lbox_check_read_view_ptr_str.
+ */
+static void
+lbox_push_read_view_ptr_str(struct lua_State *L, struct read_view *rv)
+{
+	lua_pushfstring(L, "%p", rv);
+}
+
+/**
+ * Returns a pointer to a read view encoded as a %p-formatted string at
+ * the given index in the Lua stack. See also lbox_push_read_view_ptr_str.
+ */
+static struct read_view *
+lbox_check_read_view_ptr_str(struct lua_State *L, int idx)
+{
+	struct read_view *rv = NULL;
+	VERIFY(sscanf(luaL_checkstring(L, idx), "%p", &rv) == 1);
+	return rv;
+}
+
+/**
+ * Increments the usage counter of a read view.
+ * Takes a read view id.
+ * Returns a pointer to the read view encoded as a %p-formatted string.
+ * On error, raises a Lua exception.
+ */
+static int
+lbox_read_view_acquire(struct lua_State *L)
+{
+	assert(cord_is_main());
+	uint64_t id = luaL_checkuint64(L, 1);
+	struct read_view *rv = read_view_by_id(id);
+	if (rv == NULL || rv->is_close_pending) {
+		diag_set(ClientError, ER_NO_SUCH_READ_VIEW);
+		return luaT_error(L);
 	}
+	if (rv->is_system) {
+		diag_set(ClientError, ER_READ_VIEW_BUSY);
+		return luaT_error(L);
+	}
+	read_view_pin(rv);
+	lbox_push_read_view_ptr_str(L, rv);
+	return 1;
+}
 
-	/* Push the read view table and set rv._crv and rv.space. */
-	lbox_push_read_view(L, rv);
-	lua_replace(L, 1);
-	lua_setfield(L, 1, "space");
-	*(struct read_view_handle **)luaL_pushcdata(
-		L, CTID_STRUCT_READ_VIEW_HANDLE) = rvh;
-	lua_setfield(L, 1, "_crv");
-	lua_settop(L, 1);
+/**
+ * Decrements the usage counter of a read view and deletes the read view
+ * if it was closed and has no more users.
+ * Takes a pointer to a read view encoded as a %p-formatted string.
+ */
+static int
+lbox_read_view_release(struct lua_State *L)
+{
+	assert(cord_is_main());
+	struct read_view *rv = lbox_check_read_view_ptr_str(L, 1);
+	read_view_unpin(rv);
+	if (rv->pin_count == 0 && rv->is_close_pending)
+		read_view_delete(rv);
+	return 0;
+}
+
+/**
+ * Reuses an existing database read view.
+ * Takes a pointer to a read view encoded as a %p-formatted string.
+ * On error, raises a Lua exception.
+ */
+static int
+lbox_read_view_reuse(struct lua_State *L)
+{
+	struct read_view *rv = lbox_check_read_view_ptr_str(L, 1);
+	if (lbox_new_read_view(L, rv) != 0)
+		return luaT_error_at(L, 2);
 	return 1;
 }
 
@@ -258,7 +350,7 @@ lbox_read_view_list_cb(struct read_view *rv, void *arg)
 	struct lua_State *L = (struct lua_State *)arg;
 	assert(lua_gettop(L) >= 1);
 	assert(lua_type(L, -1) == LUA_TTABLE);
-	lbox_push_read_view(L, rv);
+	lbox_push_read_view_info(L, rv);
 	lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
 	return true;
 }
@@ -270,6 +362,7 @@ lbox_read_view_list_cb(struct read_view *rv, void *arg)
 static int
 lbox_read_view_list(struct lua_State *L)
 {
+	assert(cord_is_main());
 	lua_newtable(L);
 	read_view_foreach(lbox_read_view_list_cb, L);
 	return 1;
@@ -277,24 +370,37 @@ lbox_read_view_list(struct lua_State *L)
 
 /**
  * Given a read view object (a table that has the 'id' field), pushes
- * the read view status string ('open' or 'closed') to the Lua stack.
+ * the read view status string ('open', 'closed', 'close_pending') to
+ * the Lua stack.
  */
 static int
 lbox_read_view_status(struct lua_State *L)
 {
+	assert(cord_is_main());
 	lua_getfield(L, 1, "id");
 	uint64_t id = luaL_checkuint64(L, -1);
 	struct read_view *rv = read_view_by_id(id);
-	if (rv == NULL)
+	if (rv == NULL) {
 		lua_pushliteral(L, "closed");
-	else
+	} else if (rv->is_close_pending) {
+		lua_pushliteral(L, "close_pending");
+	} else {
 		lua_pushliteral(L, "open");
+	}
 	return 1;
 }
 
 /**
  * Closes a database read view by the given handle cdata.
  * Logs a warning if the second argument is true.
+ *
+ * The behavior of this function differs between the main thread and
+ * application threads:
+ *  - The main thread closes the core read view if it has no users,
+ *    otherwise it marks the read view as "close pending" to be closed
+ *    as soon as the last user is gone.
+ *  - An application thread returns a pointer to the core read view
+ *    to be passed to the main thread for release.
  */
 static int
 lbox_read_view_close(struct lua_State *L)
@@ -307,8 +413,18 @@ lbox_read_view_close(struct lua_State *L)
 			 (unsigned long long)rv->id, rv->name);
 	}
 	read_view_handle_delete(rvh);
-	read_view_delete(rv);
-	return 0;
+	if (cord_is_main()) {
+		assert(!rv->is_close_pending);
+		if (rv->pin_count == 0) {
+			read_view_delete(rv);
+		} else {
+			rv->is_close_pending = true;
+		}
+		return 0;
+	} else {
+		lbox_push_read_view_ptr_str(L, rv);
+		return 1;
+	}
 }
 
 /**
@@ -513,6 +629,9 @@ box_lua_read_view_init(struct lua_State *L)
 	int rc;
 	const struct luaL_Reg module_methods[] = {
 		{"open", lbox_read_view_open},
+		{"acquire", lbox_read_view_acquire},
+		{"release", lbox_read_view_release},
+		{"reuse", lbox_read_view_reuse},
 		{"list", lbox_read_view_list},
 		{"status", lbox_read_view_status},
 		{"close", lbox_read_view_close},

@@ -1,6 +1,9 @@
 local fun = require('fun')
 local utils = require('internal.utils')
 
+local fiber = require('fiber')
+local threads = require('experimental.threads')
+
 local check_index_arg = box.internal.check_index_arg
 local check_param_table = utils.check_param_table
 local check_primary_index = box.internal.check_primary_index
@@ -64,9 +67,15 @@ local iterator_pos_end = ffi.new('const char *[1]')
 
 local internal = box.internal.read_view
 
+if fiber._internal.cord_is_main then
+    threads.export('box.internal.read_view.acquire', internal.acquire)
+    threads.export('box.internal.read_view.release', internal.release)
+end
+
 -- box.read_view.open() options template.
 local READ_VIEW_OPTIONS_TEMPLATE = {
     name = 'string',
+    id = 'number',
 }
 
 local function check_read_view_arg(rv, method, level)
@@ -173,7 +182,6 @@ local read_view_registry = setmetatable({}, {__mode = 'v'})
 --
 local function register_read_view(rv)
     assert(rv.id ~= nil)
-    assert(read_view_registry[rv.id] == nil)
     assert(getmetatable(rv) == nil)
     setmetatable(rv, read_view_mt)
     read_view_registry[rv.id] = rv
@@ -189,6 +197,10 @@ box.read_view = {}
 -- the most recent read view will always be last.
 --
 function box.read_view.list()
+    if not fiber._internal.cord_is_main then
+        box.error(box.error.UNSUPPORTED, 'Application thread',
+                  'listing read views', 2)
+    end
     local list = {}
     for _, rv in ipairs(internal.list()) do
         local registered_rv = read_view_registry[rv.id]
@@ -204,22 +216,82 @@ function box.read_view.list()
     return list
 end
 
+--
+-- Wrapper around internal.close() that, if called in an application thread,
+-- sends a request to release the read view to the main thread.
+--
+local function read_view_close(crv, warn)
+    local ptr = internal.close(crv, warn)
+    if ptr ~= nil then
+        assert(not fiber._internal.cord_is_main)
+        -- threads.call() yields while we can't yield in this function
+        -- because it may be called by the garbage collector.
+        fiber.new(threads.call, 'tx', 'box.internal.read_view.release', {ptr})
+    end
+end
+
 local function read_view_gc(crv)
-    internal.close(crv, true)
+    read_view_close(crv, true)
 end
 
 --
--- Opens a new read view.
+-- Opens a new or reuses an existing read view.
 --
 -- Takes an optional argument that contains a table of read view options.
 -- Returns a read view object on success. On error, raises an exception.
 --
 -- Available options:
---  - 'name' - read view name. If omitted 'unknown' is used.
+--  - 'name' - new read view name
+--  - 'id' - id of the read view to reuse
+--
+-- Notes:
+--  - 'name' and 'id' can't be used together.
+--  - 'name' may be omitted, in which case it defaults to 'unknown'.
+--  - A new read view may be created only in the main thread.
+--  - Reusing a read view may cause a fiber yield.
 --
 function box.read_view.open(opts)
+    opts = opts or {}
     check_param_table(opts, READ_VIEW_OPTIONS_TEMPLATE, 2)
-    local rv = internal.open(opts and opts.name or 'unknown')
+    if opts.id ~= nil and opts.name ~= nil then
+        box.error(box.error.ILLEGAL_PARAMS, "options parameter 'name' " ..
+                  "should not be used with 'id'", 2)
+    end
+    local rv
+    if opts.id ~= nil then
+        -- If the read view is already in the thread-local registry and
+        -- it has an active handle, there's no need to create a new one.
+        rv = read_view_registry[opts.id]
+        if rv ~= nil and rv._crv ~= nil then
+            return rv
+        end
+        -- Ask the main thread to pin the read view with the given id
+        -- and create a local handle for it.
+        local ret = utils.call_at(2, threads.call, 'tx',
+                                  'box.internal.read_view.acquire', {opts.id})
+        -- We should never get here when called from the main thread because
+        -- the read view registry maintained by the main thread is supposed to
+        -- store all usable read views.
+        assert(not fiber._internal.cord_is_main)
+        local ptr = ret[1][1]
+        local ok
+        ok, ret = pcall(internal.reuse, ptr)
+        if not ok then
+            -- Don't forget to unpin the read view on error.
+            threads.call('tx', 'box.internal.read_view.release', {ptr})
+            box.error(ret, 2)
+        end
+        rv = ret
+        -- Reset the status field because application threads can't call
+        -- internal.status.
+        rv.status = 'open'
+    else
+        if not fiber._internal.cord_is_main then
+            box.error(box.error.UNSUPPORTED, 'Application thread',
+                      'creating a new read view', 2)
+        end
+        rv = internal.open(opts.name or 'unknown')
+    end
     setmetatable(rv.space, read_view_space_list_mt)
     for space_id, space in pairs(rv.space) do
         if type(space_id) == 'number' then
@@ -250,7 +322,7 @@ end
 --  - 'timestamp' - fiber.clock() at the time of read view open.
 --  - 'vclock' - box.info.vclock at the time of read view open.
 --  - 'signature' - box.info.signature at the time of read view open.
---  - 'status' - 'open' or 'closed'.
+--  - 'status' - 'open', 'closed', or 'close_pending'.
 --
 function read_view_methods:info()
     check_read_view_arg(self, 'info', 2)
@@ -275,7 +347,7 @@ read_view_mt.__serialize = read_view_methods.info
 --
 function read_view_methods:close()
     check_read_view_arg(self, 'close', 2)
-    if self.status == 'closed' then
+    if self.status ~= 'open' then
         box.error(box.error.READ_VIEW_CLOSED, 2)
     end
     if self._crv == nil then
@@ -290,9 +362,14 @@ function read_view_methods:close()
             index._cspace = nil
         end
     end
-    internal.close(self._crv)
+    read_view_close(self._crv)
     ffi.gc(self._crv, nil)
     self._crv = nil
+    if not fiber._internal.cord_is_main then
+        -- Reset the status field because application threads can't call
+        -- internal.status.
+        self.status = 'closed'
+    end
 end
 
 --
