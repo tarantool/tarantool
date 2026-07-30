@@ -27,8 +27,7 @@ g.test_view = function(cg)
 
         -- View can't have any indexes.
         local _, err = box.execute("CREATE INDEX i1 ON v1(a);")
-        local exp_err = "Can't create or modify index 'i1' "..
-                        "in space 'v1': views can not be indexed"
+        local exp_err = "Views can not be indexed"
         t.assert_equals(err.message, exp_err)
         local v1 = box.space.v1
         local opts = {parts = {1, 'string'}}
@@ -435,5 +434,24 @@ g.test_duplicate_column_error = function(cg)
         sql = [[CREATE VIEW v AS SELECT 1 AS a, 1 AS a;]]
         _, err = box.execute(sql)
         t.assert_equals(tostring(err), exp_err)
+    end)
+end
+
+--
+-- gh-13009: Make sure that adding a column unique to the view
+-- does not trigger an assertion.
+--
+g.test_13009_adding_column_unique = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE VIEW v AS SELECT id FROM _space;]])
+        local exp_err = "Views can not be indexed"
+        local sql = [[ALTER TABLE v ADD COLUMN a INT UNIQUE;]]
+        local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        sql = [[ALTER TABLE v ADD COLUMN a INT PRIMARY KEY;]]
+        _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+        box.execute([[DROP VIEW v;]])
     end)
 end

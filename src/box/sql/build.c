@@ -2770,10 +2770,8 @@ sql_create_index(struct Parse *parse) {
 	struct space_def *def = space->def;
 
 	if (def->opts.is_view) {
-		char *name = sql_name_from_token(&token);
-		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
-			 "views can not be indexed");
-		sql_xfree(name);
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Views can not be indexed");
 		parse->is_aborted = true;
 		goto exit_create_index;
 	}

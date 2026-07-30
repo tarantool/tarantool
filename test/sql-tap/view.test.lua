@@ -370,7 +370,7 @@ test:do_catchsql_test(
         CREATE INDEX i1v1 ON v1(xyz);
     ]], {
         -- <view-4.5>
-        1, "Can't create or modify index 'i1v1' in space 'v1': views can not be indexed"
+        1, "Views can not be indexed"
         -- </view-4.5>
     })
 
