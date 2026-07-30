@@ -40,10 +40,6 @@
 
 struct txn_limbo txn_limbo;
 
-/*******************************************************************************
- * Private API
- ******************************************************************************/
-
 /**
  * Stringify the synchro request into the given buffer. Same semantics as
  * snprintf().
@@ -223,6 +219,34 @@ txn_limbo_unfence(struct txn_limbo *limbo)
 	txn_limbo_assert_locked(limbo);
 	if (txn_limbo_queue_unfence(&limbo->queue))
 		fiber_wakeup(limbo->worker);
+}
+
+/**
+ * Update the state of synchronous replication for system spaces to match the
+ * limbo state: they are synchronous while the queue has an owner.
+ *
+ * The request, when not NULL, is an in-progress PROMOTE/DEMOTE whose outcome
+ * is applied optimistically, before its WAL write: a PROMOTE is about to
+ * claim the ownership, a DEMOTE is about to drop it. A WAL failure restores
+ * the actual state via the rollback.
+ */
+static void
+txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
+					     const struct synchro_request *req)
+{
+	txn_limbo_assert_locked(limbo);
+	bool is_sync;
+	if (req != NULL) {
+		assert(req->type == IPROTO_RAFT_PROMOTE ||
+		       req->type == IPROTO_RAFT_DEMOTE);
+		/* Bootstrap entries do not enable synchronous replication. */
+		if (req->origin_id == REPLICA_ID_NIL)
+			return;
+		is_sync = req->type == IPROTO_RAFT_PROMOTE;
+	} else {
+		is_sync = limbo->queue.owner_id != REPLICA_ID_NIL;
+	}
+	system_spaces_update_is_sync_state(is_sync);
 }
 
 static int
@@ -429,10 +453,6 @@ txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	txn_limbo_req_commit(limbo, &req);
 	return 0;
 }
-
-/*******************************************************************************
- * Public API
- ******************************************************************************/
 
 void
 txn_limbo_set_max_size(struct txn_limbo *limbo, int64_t size)
@@ -896,34 +916,6 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	default:
 		unreachable();
 	}
-}
-
-/**
- * Update the state of synchronous replication for system spaces to match the
- * limbo state: they are synchronous while the queue has an owner.
- *
- * The request, when not NULL, is an in-progress PROMOTE/DEMOTE whose outcome
- * is applied optimistically, before its WAL write: a PROMOTE is about to
- * claim the ownership, a DEMOTE is about to drop it. A WAL failure restores
- * the actual state via the rollback.
- */
-static void
-txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
-					     const struct synchro_request *req)
-{
-	txn_limbo_assert_locked(limbo);
-	bool is_sync;
-	if (req != NULL) {
-		assert(req->type == IPROTO_RAFT_PROMOTE ||
-		       req->type == IPROTO_RAFT_DEMOTE);
-		/* Bootstrap entries do not enable synchronous replication. */
-		if (req->origin_id == REPLICA_ID_NIL)
-			return;
-		is_sync = req->type == IPROTO_RAFT_PROMOTE;
-	} else {
-		is_sync = limbo->queue.owner_id != REPLICA_ID_NIL;
-	}
-	system_spaces_update_is_sync_state(is_sync);
 }
 
 int
