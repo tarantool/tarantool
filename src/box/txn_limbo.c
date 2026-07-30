@@ -73,7 +73,7 @@ synchro_request_snprint(char *buf, int size, const struct synchro_request *req)
 		req->type == IPROTO_RAFT_PROMOTE ? "PROMOTE" : "DEMOTE",
 		req->queue_owner_id, req->origin_id,
 		(long long)req->promote.lsn, (long long)req->promote.term);
-	if (vclock_is_set(&req->promote.confirmed_vclock)) {
+	if (vclock_calc_sum(&req->promote.confirmed_vclock) > 0) {
 		SNPRINT(total, snprintf, buf, size, ", vclock: ");
 		SNPRINT(total, vclock_snprint, buf, size,
 			&req->promote.confirmed_vclock);
