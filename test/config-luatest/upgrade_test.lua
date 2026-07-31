@@ -60,7 +60,11 @@ g.before_all(function(g)
                 replicasets = {
                     ['replicaset-001'] = {
                         instances = {
-                            ['instance-001'] = {},
+                            ['instance-001'] = {
+                                config = {
+                                    checks = 'off',
+                                },
+                            },
                         },
                     },
                 },

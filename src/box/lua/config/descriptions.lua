@@ -153,6 +153,29 @@ I['app.module'] = 'A Lua module to load an application from.'
 
 -- }}} app configuration
 
+-- {{{ checks configuration
+
+I['config.checks'] = format_text([[
+    The `checks` section controls which system checks are enabled.
+    When a check is enabled and detects an issue, a warning alert
+    appears in `box.info.config.alerts`.
+
+    Set `config.checks` to `'off'` to disable all system checks at once.
+
+    The checks run on every config apply/reload and also periodically
+    via a background fiber, so that runtime changes are detected automatically.
+]])
+
+I['config.checks.mixed_sync_async_spaces'] = format_text([[
+    Whether to check for spaces with different `is_sync` flags.
+
+    When enabled, the check generates a warning alert if both
+    synchronous and asynchronous spaces exist in the same
+    replicaset.
+]])
+
+-- }}} checks configuration
+
 -- {{{ audit_log configuration
 
 I['audit_log'] = format_text([[
