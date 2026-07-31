@@ -73,3 +73,17 @@ g.test_3613_idx_alter_update_2 = function(cg)
         box.execute('DROP TABLE j3;')
     end)
 end
+
+--
+-- Check the foreign field ID for a field foreign key
+-- not lost after executing an `ALTER TABLE ADD COLUMN` statement.
+--
+g.test_13010_repeat_adding_constraint_column = function(cg)
+    cg.server:exec(function()
+        box.execute("CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t(i));")
+        local exp = {fk_unnamed_t_a_1 = {space = box.space.t.id, field = 1}}
+        t.assert_equals(box.space.t:format()[2]['foreign_key'], exp)
+        box.execute("ALTER TABLE t ADD COLUMN b;")
+        t.assert_equals(box.space.t:format()[2]['foreign_key'], exp)
+    end)
+end
