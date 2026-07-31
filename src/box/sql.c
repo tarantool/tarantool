@@ -972,8 +972,10 @@ sql_mpstream_encode_constraints(struct mpstream *stream,
 				mpstream_encode_map(stream, 1);
 			}
 			mpstream_encode_str(stream, "field");
-			assert(fkey->field.name_len != 0);
-			mpstream_encode_str(stream, fkey->field.name);
+			if (fkey->field.name_len > 0)
+				mpstream_encode_str(stream, fkey->field.name);
+			else
+				mpstream_encode_uint(stream, fkey->field.id);
 		}
 	}
 	if (ck_count > 0) {
