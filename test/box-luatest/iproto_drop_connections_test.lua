@@ -43,7 +43,7 @@ g.test_basic = function(g)
 
     -- Drop connections.
     local timeout = 60
-    g.it:roundtrip(('box.iproto.internal.drop_connections(%d)'):format(timeout))
+    g.it:roundtrip(('box.iproto.drop_connections(%d)'):format(timeout))
 
     -- Verify that our connection was dropped.
     t.assert_not(g.conn:ping())
@@ -55,7 +55,7 @@ g.test_basic = function(g)
 
     -- Verify error reporting.
     t.assert_error_msg_equals('timed out', function()
-        g.it:roundtrip('box.iproto.internal.drop_connections(0)')
+        g.it:roundtrip('box.iproto.drop_connections(0)')
     end)
 
     -- Verify that connections are dropped in background anyway
