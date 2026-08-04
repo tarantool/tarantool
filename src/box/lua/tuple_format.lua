@@ -239,6 +239,18 @@ local function normalize_default_func(func_name, error_prefix, level)
 end
 
 local function normalize_format(space_id, space_name, format, level)
+    -- A format with one field definition may omit the outer braces, e.g.
+    -- {name = 'a', type = 'unsigned'} or {'a', type = 'unsigned'}.
+    -- A string key identifies this form unless the first array entry is a
+    -- table, which identifies a format list.
+    if type(format[1]) ~= 'table' then
+        for k in pairs(format) do
+            if type(k) == 'string' then
+                format = {format}
+                break
+            end
+        end
+    end
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
