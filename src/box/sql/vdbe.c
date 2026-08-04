@@ -358,6 +358,7 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
  */
 int sqlVdbeExec(Vdbe *p)
 {
+	ynVar last = 0;
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
 #if defined(SQL_DEBUG)
@@ -862,9 +863,25 @@ case OP_Blob: {                /* out2 */
 case OP_Variable: {            /* out2 */
 	Mem *pVar;       /* Value being transferred */
 
+	if (pOp->p4.z != NULL) {
+		if (pOp->p4.z[0] == ':' || pOp->p4.z[0] == '@' ||
+		    pOp->p4.z[0] == '#') {
+			for (uint32_t i = 0; i < (uint32_t)p->nVar; i++) {
+				if (p->aVar[i].name != NULL) {
+					if (strncmp(p->aVar[i].name, pOp->p4.z,
+						    p->aVar[i].name_len) == 0) {
+						pOp->p1 = i + 1;
+						break;
+					}
+				}
+			}
+		}
+	} else {
+		pOp->p1 = ++last;
+	}
+	last = pOp->p1;
 	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
-	pVar = &p->aVar[pOp->p1 - 1];
+	pVar = p->aVar[pOp->p1 - 1].value;
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;
 	}

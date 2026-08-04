@@ -41,11 +41,12 @@
 
 int
 sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
-		 struct Vdbe **ppStmt, const char **pzTail)
+		 struct Vdbe **ppStmt, const char **pzTail, uint32_t bind_count)
 {
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
+	sParse.bind_count = bind_count;
 	sParse.pReprepare = pReprepare;
 	*ppStmt = NULL;
 
@@ -174,7 +175,7 @@ sqlReprepare(Vdbe * p)
 
 	zSql = sql_sql(p);
 	assert(zSql != 0);
-	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
+	if (sql_stmt_compile(zSql, -1, p, &pNew, 0, 0) != 0) {
 		assert(pNew == 0);
 		return -1;
 	}

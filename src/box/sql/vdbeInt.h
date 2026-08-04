@@ -216,6 +216,16 @@ struct sql_column_metadata {
 };
 
 /*
+ * A structure used to create the `aVar` array of variables
+ * within the `Vdbe` struct; it holds the variable's value and its name.
+ */
+struct Var {
+	Mem *value; /* Value of Variable. */
+	const char *name; /* Name of value. */
+	uint32_t name_len; /* Len of name of value. */
+};
+
+/*
  * An instance of the virtual machine.  This structure contains the complete
  * state of the virtual machine.
  *
@@ -265,7 +275,7 @@ struct Vdbe {
 	struct sql_column_metadata *metadata;
 	Mem *pResultSet;	/* Pointer to an array of results */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
-	Mem *aVar;		/* Values for the OP_Variable opcode. */
+	struct Var *aVar;		/* Values for the OP_Variable opcode. */
 	/**
 	 * Array which contains positions of variables to be
 	 * bound in resulting set of SELECT.

@@ -1404,7 +1404,10 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	assert(pParse != 0);
 	assert(p->magic == VDBE_MAGIC_INIT);
 	assert(pParse == p->pParse);
-	nVar = pParse->nVar;
+	if (pParse->bind_count == 0)
+		nVar = pParse->nVar;
+	else
+		nVar = pParse->bind_count;
 	nMem = pParse->nMem;
 	nCursor = pParse->nTab;
 
@@ -1447,7 +1450,7 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	do {
 		x.nNeeded = 0;
 		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(Mem));
-		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(Mem));
+		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(struct Var));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)
@@ -1462,8 +1465,10 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	p->explain = pParse->explain;
 	p->nCursor = nCursor;
 	p->nVar = nVar;
-	for (int i = 0; i < nVar; ++i)
-		mem_create(&p->aVar[i]);
+	for (int i = 0; i < nVar; ++i) {
+		p->aVar[i].value = sql_xmalloc(sizeof(Mem));
+		mem_create(p->aVar[i].value);
+	}
 	p->nMem = nMem;
 	for (int i = 0; i < nMem; ++i) {
 		mem_create(&p->aMem[i]);
@@ -1987,7 +1992,7 @@ sqlVdbeClearObject(struct Vdbe *p)
 		sql_xfree(pSub);
 	}
 	if (p->magic != VDBE_MAGIC_INIT) {
-		releaseMemArray(p->aVar, p->nVar);
+		releaseVarArray(p->aVar, p->nVar);
 		sql_xfree(p->pVList);
 		sql_xfree(p->pFree);
 	}
@@ -2073,7 +2078,7 @@ vdbe_get_bound_value(struct Vdbe *vdbe, int id)
 {
 	if (vdbe == NULL || id < 0 || id >= vdbe->nVar)
 		return NULL;
-	return &vdbe->aVar[id];
+	return vdbe->aVar[id].value;
 }
 
 void

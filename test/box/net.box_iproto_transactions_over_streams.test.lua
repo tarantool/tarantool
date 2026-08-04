@@ -798,18 +798,18 @@ space:replace{1, 2, '3'}
 space:select()
 -- select is empty, because transaction was not commited
 conn.space.TEST:select()
-stream_pr = stream:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
-conn_pr = conn:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
+stream_pr = stream:prepare("SELECT * FROM TEST WHERE ID = :id AND A = :a;")
+conn_pr = conn:prepare("SELECT * FROM TEST WHERE ID = :id AND A = :a;")
 assert(stream_pr.stmt_id == conn_pr.stmt_id)
 -- [ 1, 2, '3' ]
-stream:execute(stream_pr.stmt_id, {1, 2})
+stream:execute(stream_pr.stmt_id, {{[':id'] = 1}, {[':a'] = 2}})
 -- empty select, transaction was not commited
-conn:execute(conn_pr.stmt_id, {1, 2})
+conn:execute(conn_pr.stmt_id, {{[':id'] = 1}, {[':a'] = 2}})
 stream:execute('COMMIT')
 -- [ 1, 2, '3' ]
-stream:execute(stream_pr.stmt_id, {1, 2})
+stream:execute(stream_pr.stmt_id, {{[':id'] = 1}, {[':a'] = 2}})
 -- [ 1, 2, '3' ]
-conn:execute(conn_pr.stmt_id, {1, 2})
+conn:execute(conn_pr.stmt_id, {{[':id'] = 1}, {[':a'] = 2}})
 stream:unprepare(stream_pr.stmt_id)
 conn:close()
 test_run:switch('test')

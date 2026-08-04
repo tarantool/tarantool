@@ -138,7 +138,7 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 			zRawSql += nToken;
 			nextIndex = idx + 1;
 			assert(idx > 0 && idx <= p->nVar);
-			const char *value = mem_str(&p->aVar[idx - 1]);
+			const char *value = mem_str(p->aVar[idx - 1].value);
 			sqlStrAccumAppend(&out, value, strlen(value));
 		}
 	}
