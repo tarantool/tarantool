@@ -43,13 +43,28 @@ main(void)
 {
 	plan(1);
 
+	/* Create threads. */
 	int rc;
+	main_thread = pthread_self();
+	pthread_t child_threads[THREADS_NUM];
+	pthread_attr_t attr;
+	rc = pthread_attr_init(&attr);
+	fail_if(rc != 0);
+	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	fail_if(rc != 0);
+	for (int i = 0; i < THREADS_NUM; ++i) {
+		rc = pthread_create(&child_threads[i], &attr, &thread_f, NULL);
+		fail_if(rc != 0);
+	}
+
+	/* Set a signal handler. */
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = handler_f;
 	rc = tt_sigaction(SIGALRM, &sa, NULL);
 	fail_if(rc != 0);
 
+	/* Start the timer. */
 	struct itimerval timer;
 	struct timeval resolution = {
 		.tv_sec = 0,
@@ -60,25 +75,13 @@ main(void)
 	rc = setitimer(ITIMER_REAL, &timer, NULL);
 	fail_if(rc != 0);
 
-	main_thread = pthread_self();
-	pthread_t child_threads[THREADS_NUM];
-	pthread_attr_t attr;
-	rc = pthread_attr_init(&attr);
-	fail_if(rc != 0);
-
-	rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	fail_if(rc != 0);
-
-	for (int i = 0; i < THREADS_NUM; ++i) {
-		rc = pthread_create(&child_threads[i], &attr, &thread_f, NULL);
-		fail_if(rc != 0);
-	}
-
+	/* Wait for the threads to finish. */
 	for (int i = 0; i < THREADS_NUM; ++i) {
 		rc = pthread_join(child_threads[i], NULL);
 		fail_if(rc != 0);
 	}
 
+	/* Check no user handler called in a non-main thread. */
 	uint32_t false_handles = pm_atomic_load_explicit(
 		&false_handle_cnt, pm_memory_order_relaxed);
 	ok(false_handles == 0,
