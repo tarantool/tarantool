@@ -294,6 +294,45 @@ g.test_aboard_set_get_drop_if_clean_return_values = function(g)
     })
 end
 
+-- Ensure that the `log_f` option of aboard.new() redefines how the
+-- alerts are reported to the log.
+g.test_aboard_log_f = function(g)
+    local verify = function()
+        local aboard = require('internal.config.utils.aboard')
+
+        local logged = {}
+        local board = aboard.new({
+            log_f = function(alert)
+                table.insert(logged, {
+                    type = alert.type,
+                    message = alert.message,
+                })
+            end,
+        })
+
+        board:set({type = 'warn', message = 'msg1'}, {key = 'key1'})
+        board:set({type = 'error', message = 'msg2'})
+        t.assert_equals(logged, {
+            {type = 'warn', message = 'msg1'},
+            {type = 'error', message = 'msg2'},
+        })
+
+        -- A repeated alert is not set and, so, is not logged.
+        board:set({type = 'warn', message = 'msg1'}, {key = 'key1'})
+        t.assert_equals(#logged, 2)
+
+        -- Without the option the built-in logger is used: verify
+        -- that :set() still works.
+        local default_board = aboard.new()
+        t.assert_is(default_board:set({type = 'warn', message = 'msg'}), true)
+        t.assert_equals(#default_board:alerts(), 1)
+    end
+
+    helpers.success_case(g, {
+        verify = verify,
+    })
+end
+
 -- Ensure that namespace:get() returns a copy.
 g.test_alert_get_returns_copy = function(g)
     local verify = function()
