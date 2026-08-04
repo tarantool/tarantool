@@ -3,6 +3,26 @@
 local datetime = require('datetime')
 local log = require('internal.config.utils.log')
 
+-- Report the given alert to the log.
+--
+-- The `log_f` function given to the aboard.new() call is used if it
+-- is provided, otherwise the alert is written using the logger of
+-- this module.
+--
+-- The alert has no timestamp at this point: it is set by the
+-- caller after the logging.
+local function aboard_log(self, alert)
+    if self._log_f ~= nil then
+        return self._log_f(alert)
+    end
+
+    if alert.type == 'error' then
+        log.error(alert.message)
+    else
+        log.warn(alert.message)
+    end
+end
+
 -- Set an alert.
 --
 -- Optional `opts.key` declares an unique identifier of the alert.
@@ -47,11 +67,7 @@ local function aboard_set(self, alert, opts)
         end
     end
 
-    if alert.type == 'error' then
-        log.error(alert.message)
-    else
-        log.warn(alert.message)
-    end
+    aboard_log(self, alert)
     alert.timestamp = datetime.now()
 
     self._alerts[key] = alert
@@ -298,10 +314,25 @@ local mt = {
 -- | local function on_drop_cb(aboard, key)
 -- |     <...>
 -- | end
+--
+-- The `log_f` option redefines how an alert is reported to the log.
+-- It is called instead of the logger of this module on the :set()
+-- method call and it has the following prototype.
+--
+-- | local function log_f(alert)
+-- |     <...>
+-- | end
+--
+-- It is needed for the users that have their own logging format,
+-- for example, the failover coordinator writes JSON lines. It is a
+-- temporary solution: the option should be dropped in favor of a
+-- logger configured per module (ghe-924).
 local function new(opts)
     local on_drop
+    local log_f
     if opts ~= nil then
         on_drop = opts.on_drop
+        log_f = opts.log_f
     end
 
     return setmetatable({
@@ -324,6 +355,7 @@ local function new(opts)
         _alerts = {},
         _next_key = 1,
         _on_drop = on_drop,
+        _log_f = log_f,
     }, mt)
 end
 
