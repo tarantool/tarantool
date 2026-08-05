@@ -947,7 +947,6 @@ struct sql {
 	struct sqlInitInfo {	/* Information used during initialization */
 		uint32_t space_id;
 		uint32_t index_id;
-		u8 busy;	/* TRUE if currently initializing */
 		u8 orphanTrigger;	/* Last statement is orphaned TEMP trigger */
 		u8 imposterTable;	/* Building an imposter table */
 	} init;
@@ -3261,7 +3260,18 @@ void sqlSavepoint(Parse *, int, Token *);
 void sqlCloseSavepoints(Vdbe *);
 int sqlExprIsConstant(Expr *);
 int sqlExprIsConstantNotJoin(Expr *);
-int sqlExprIsConstantOrFunction(Expr *, u8);
+
+/**
+ * Return non-zero if the expression is constant or a function call with
+ * constant arguments. Return 0 if there are any variables.
+ *
+ * For the purposes of this function, a double-quoted string (ex: "abc")
+ * is considered a variable but a single-quoted string (ex: 'abc') is
+ * a constant.
+ */
+int
+sqlExprIsConstantOrFunction(struct Expr *expr);
+
 int sqlExprIsTableConstant(Expr *, int);
 int sqlExprIsInteger(Expr *, int *);
 int sqlExprCanBeNull(const Expr *);
