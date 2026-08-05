@@ -2488,6 +2488,8 @@ func_sql_expr_new(const struct func_def *def)
 
 	bool is_error = parser.is_aborted;
 	sql_finish_coding(&parser);
+	/* Take VDBE out of parser. */
+	parser.pVdbe = NULL;
 	sql_parser_destroy(&parser);
 	sql_expr_delete(expr);
 
