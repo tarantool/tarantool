@@ -1268,7 +1268,7 @@ sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
 	uint32_t fieldno = def->field_count - 1;
 	const char *field_name = def->fields[fieldno].name;
 
-	if (!sqlExprIsConstantOrFunction(span->pExpr, sql_get()->init.busy)) {
+	if (!sqlExprIsConstantOrFunction(span->pExpr)) {
 		diag_set(ClientError, ER_CREATE_SPACE, def->name,
 			 tt_sprintf("default value of column '%s' is not "
 				    "constant", field_name));
@@ -1516,7 +1516,6 @@ sqlEndTable(struct Parse *pParse)
 	struct space *new_space = pParse->create_table_def.new_space;
 	if (new_space == NULL)
 		return;
-	assert(!sql_get()->init.busy);
 	assert(!new_space->def->opts.is_view);
 
 	if (sql_space_primary_key(new_space) == NULL) {
@@ -1946,13 +1945,6 @@ sql_create_foreign_key(struct Parse *parse_context)
 	struct alter_entity_def *alter_def = &create_def->base;
 	assert(alter_def->entity_type == ENTITY_TYPE_FK);
 	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
-	/*
-	 * When this function is called second time during
-	 * <CREATE TABLE ...> statement (i.e. at VDBE runtime),
-	 * don't even try to do something.
-	 */
-	if (sql_get()->init.busy)
-		return;
 	/*
 	 * Beforehand initialization for correct clean-up
 	 * while emergency exiting in case of error.
@@ -2720,7 +2712,6 @@ sql_create_index(struct Parse *parse) {
 	struct index *index = NULL;
 	/* Name of the index. */
 	char *name = NULL;
-	assert(!sql_get()->init.busy);
 	struct create_index_def *create_idx_def = &parse->create_index_def;
 	struct create_entity_def *create_entity_def = &create_idx_def->base.base;
 	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
