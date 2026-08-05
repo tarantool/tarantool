@@ -308,14 +308,11 @@ sql_vsnprintf(int, char *, const char *, va_list);
  * a statement handle (struct Vdbe).
  *
  * @param sql UTF-8 encoded SQL statement.
- * @param sql_len Length of @sql in bytes.
  * @param re_prepared VM being re-compiled. Can be NULL.
- * @param[out] stmt A pointer to the compiled statement.
- * @param[out] sql_tail End of parsed string.
+ * @retval stmt A pointer to the compiled statement.
  */
-int
-sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
-		 struct Vdbe **stmt, const char **sql_tail);
+struct Vdbe *
+sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
 
 /** This is the top-level implementation of sqlStep(). */
 int
