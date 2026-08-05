@@ -84,16 +84,13 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 	return 0;
 }
 
-/*
- * Remember the SQL string for a prepared statement.
- */
 void
-sqlVdbeSetSql(Vdbe * p, const char *z, int n)
+sqlVdbeSetSql(struct Vdbe *p, const char *z)
 {
 	if (p == 0)
 		return;
 	assert(p->zSql == 0);
-	p->zSql = sql_xstrndup(z, n);
+	p->zSql = sql_xstrdup(z);
 }
 
 /*
