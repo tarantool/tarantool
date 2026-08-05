@@ -163,6 +163,74 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	return rc;
 }
 
+struct Expr *
+sql_expr_compile(const char *expr, int expr_len)
+{
+	const char *outer = "FUNCTION ";
+	int len = strlen(outer) + expr_len;
+
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	/*
+	 * Since SELECT token is added to the original expression,
+	 * to make error message display correct position we should
+	 * account its length.
+	 */
+	parser.line_pos -= strlen(outer);
+	parser.parse_only = true;
+	parser.is_expr = true;
+
+	struct Expr *expression = NULL;
+	char *stmt = xregion_alloc(&parser.region, len + 1);
+	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
+
+	if (sqlRunParser(&parser, stmt) == 0) {
+		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
+		expression = parser.parsed_ast.expr;
+		parser.parsed_ast.expr = NULL;
+	}
+	sql_parser_destroy(&parser);
+	return expression;
+}
+
+struct Select *
+sql_view_compile(const char *view_stmt)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	parser.parse_only = true;
+
+	struct Select *select = NULL;
+
+	if (sqlRunParser(&parser, view_stmt) != 0 ||
+	    parser.parsed_ast_type != AST_TYPE_SELECT) {
+		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
+	} else {
+		select = parser.parsed_ast.select;
+		parser.parsed_ast.select = NULL;
+	}
+
+	sql_parser_destroy(&parser);
+	return select;
+}
+
+struct sql_trigger *
+sql_trigger_compile(const char *sql)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	parser.parse_only = true;
+	struct sql_trigger *trigger = NULL;
+	if (sqlRunParser(&parser, sql) == 0 &&
+	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
+		trigger = parser.parsed_ast.trigger;
+		parser.parsed_ast.trigger = NULL;
+	}
+
+	sql_parser_destroy(&parser);
+	return trigger;
+}
+
 /*
  * Rerun the compilation of a statement after a schema change.
  */
