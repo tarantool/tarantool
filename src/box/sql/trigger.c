@@ -696,7 +696,6 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	pProgram->token = (void *)trigger;
 	pPrg->column_mask[0] = pSubParse->oldmask;
 	pPrg->column_mask[1] = pSubParse->newmask;
-	sqlVdbeDelete(v);
 
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
 	sql_parser_destroy(pSubParse);
