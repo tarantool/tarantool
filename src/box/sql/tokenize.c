@@ -501,14 +501,15 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
+	struct Token last;
+	memset(&last, 0, sizeof(last));
 	while (1) {
 		assert(i >= 0);
 		if (zSql[i] != 0) {
-			pParse->sLastToken.z = &zSql[i];
-			pParse->sLastToken.n =
-			    sql_token(&zSql[i], &tokenType,
-				      &pParse->sLastToken.isReserved);
-			i += pParse->sLastToken.n;
+			last.z = &zSql[i];
+			last.n = sql_token(&zSql[i], &tokenType,
+					   &last.isReserved);
+			i += last.n;
 			if (i > SQL_MAX_SQL_LENGTH) {
 				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 					 "SQL command length", i,
@@ -534,8 +535,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
 					 pParse->line_count, pParse->line_pos,
-					 tt_cstr(pParse->sLastToken.z,
-						 pParse->sLastToken.n));
+					 tt_cstr(last.z, last.n));
 				pParse->is_aborted = true;
 				break;
 			}
@@ -544,13 +544,12 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			pParse->line_pos = 1;
 			continue;
 		} else {
-			sqlParser(pEngine, tokenType, pParse->sLastToken,
-				      pParse);
+			sqlParser(pEngine, tokenType, last, pParse);
 			lastTokenParsed = tokenType;
 			if (pParse->is_aborted)
 				break;
 		}
-		pParse->line_pos += pParse->sLastToken.n;
+		pParse->line_pos += last.n;
 	}
 	sql_code_ast(pParse, &pParse->ast);
 	pParse->zTail = &zSql[i];
