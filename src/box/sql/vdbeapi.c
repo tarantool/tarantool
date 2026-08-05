@@ -51,7 +51,6 @@ invokeProfileCallback(struct Vdbe *p)
 	sql_int64 iElapse;
 	assert(p->startTime > 0);
 	assert(db->xProfile != 0 || (db->mTrace & SQL_TRACE_PROFILE) != 0);
-	assert(db->init.busy == 0);
 	assert(p->zSql != 0);
 	sqlOsCurrentTimeInt64(db->pVfs, &iNow);
 	iElapse = (iNow - p->startTime) * 1000000;
@@ -116,8 +115,8 @@ sqlStep(Vdbe * p)
 		return -1;
 	}
 	if (p->pc < 0) {
-		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0)
-		    && !db->init.busy && p->zSql) {
+		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0) &&
+		    p->zSql) {
 			sqlOsCurrentTimeInt64(db->pVfs, &p->startTime);
 		} else {
 			assert(p->startTime == 0);
