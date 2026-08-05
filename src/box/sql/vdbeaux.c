@@ -1997,7 +1997,7 @@ sqlVdbeClearObject(struct Vdbe *p)
 void
 sqlVdbeDelete(Vdbe * p)
 {
-	if (NEVER(p == 0))
+	if (p == NULL)
 		return;
 	sqlVdbeClearObject(p);
 	if (p->pPrev) {
