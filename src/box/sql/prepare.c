@@ -38,6 +38,7 @@
 #include "tarantoolInt.h"
 #include "box/space.h"
 #include "box/session.h"
+#include "box/schema.h"
 
 int
 sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
@@ -147,13 +148,7 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	} else {
 		*ppStmt = sParse.pVdbe;
 	}
-
-	/* Delete any TriggerPrg structures allocated while parsing this statement. */
-	while (sParse.pTriggerPrg) {
-		TriggerPrg *pT = sParse.pTriggerPrg;
-		sParse.pTriggerPrg = pT->pNext;
-		sql_xfree(pT);
-	}
+	sParse.pVdbe = NULL;
 
  end_prepare:
 
@@ -262,11 +257,54 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	region_create(&parser->region, &cord()->slabc);
 }
 
+/**
+ * This function is called to release parsing artifacts
+ * during table creation or column addition. The only objects
+ * allocated using malloc are index defs.
+ * Note that this functions can't be called on ordinary
+ * space object. It's purpose is to clean-up parser->new_space.
+ *
+ * @param parser Parser context.
+ */
+static void
+parser_space_delete(struct Parse *parser)
+{
+	struct space *space = parser->create_column_def.space;
+	if (space == NULL)
+		return;
+	assert(space->def->opts.is_ephemeral);
+	uint32_t i = 0;
+	/*
+	 * If parser->new_space is NULL, the query is ALTER TABLE ADD COLUMNS.
+	 */
+	if (parser->create_table_def.new_space == NULL) {
+		/*
+		 * Don't delete already existing defs and start from new
+		 * ones.
+		 */
+		struct space *altered_space = space_by_name0(space->def->name);
+		if (altered_space != NULL)
+			i = altered_space->index_count;
+	}
+	for (; i < space->index_count; ++i)
+		index_def_delete(space->index[i]->def);
+}
+
 void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
 	assert(!parser->parse_only || parser->pVdbe == NULL);
+	sqlVdbeDelete(parser->pVdbe);
+	parser_space_delete(parser);
+	while (parser->pTriggerPrg != NULL) {
+		TriggerPrg *pT = parser->pTriggerPrg;
+		parser->pTriggerPrg = pT->pNext;
+		sql_xfree(pT);
+	}
+	if (parser->pWithToFree)
+		sqlWithDelete(parser->pWithToFree);
+	sql_xfree(parser->pVList);
 	sql_xfree(parser->default_funcs);
 	sql_xfree(parser->aLabel);
 	sql_expr_list_delete(parser->pConstExpr);

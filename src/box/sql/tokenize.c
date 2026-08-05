@@ -39,11 +39,8 @@
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 
-#include "box/session.h"
-#include "box/schema.h"
 #include "say.h"
 #include "sqlInt.h"
-#include "tarantoolInt.h"
 
 /* Character classes for tokenizing
  *
@@ -441,40 +438,6 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	return i;
 }
 
-/**
- * This function is called to release parsing artifacts
- * during table creation or column addition. The only objects
- * allocated using malloc are index defs.
- * Note that this functions can't be called on ordinary
- * space object. It's purpose is to clean-up parser->new_space.
- *
- * @param parser Parser context.
- */
-static void
-parser_space_delete(struct Parse *parser)
-{
-	struct space *space = parser->create_column_def.space;
-	if (space == NULL)
-		return;
-	assert(space->def->opts.is_ephemeral);
-	uint32_t i = 0;
-	/*
-	 * If create_table_def.new_space is NULL,
-	 * the query is ALTER TABLE ADD COLUMNS.
-	 */
-	if (parser->create_table_def.new_space == NULL) {
-		/*
-		 * Don't delete already existing defs and start from new
-		 * ones.
-		 */
-		struct space *altered_space = space_by_name0(space->def->name);
-		if (altered_space != NULL)
-			i = altered_space->index_count;
-	}
-	for (; i < space->index_count; ++i)
-		index_def_delete(space->index[i]->def);
-}
-
 static void *
 new_xmalloc(size_t n)
 {
@@ -592,14 +555,5 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	sql_code_ast(pParse, &pParse->ast);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
-	if (pParse->pVdbe != NULL && pParse->is_aborted) {
-		sqlVdbeDelete(pParse->pVdbe);
-		pParse->pVdbe = 0;
-	}
-	parser_space_delete(pParse);
-
-	if (pParse->pWithToFree)
-		sqlWithDelete(pParse->pWithToFree);
-	sql_xfree(pParse->pVList);
 	return pParse->is_aborted ? -1 : 0;
 }
