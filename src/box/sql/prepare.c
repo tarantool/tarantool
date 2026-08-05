@@ -40,61 +40,27 @@
 #include "box/session.h"
 #include "box/schema.h"
 
-int
-sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
-		 struct Vdbe **ppStmt, const char **pzTail)
+struct Vdbe *
+sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 {
-	int rc = 0;	/* Result code */
+	if (strlen(zSql) > SQL_MAX_SQL_LENGTH) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "SQL command length",
+			 (int)strlen(zSql), SQL_MAX_SQL_LENGTH);
+		return NULL;
+	}
+
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
-	*ppStmt = NULL;
 
-	/* Check to verify that it is possible to get a read lock on all
-	 * database schemas.  The inability to get a read lock indicates that
-	 * some other database connection is holding a write-lock, which in
-	 * turn means that the other connection has made uncommitted changes
-	 * to the schema.
-	 *
-	 * Were we to proceed and prepare the statement against the uncommitted
-	 * schema changes and if those schema changes are subsequently rolled
-	 * back and different changes are made in their place, then when this
-	 * prepared statement goes to run the schema cookie would fail to detect
-	 * the schema change.  Disaster would follow.
-	 *
-	 * Note that setting READ_UNCOMMITTED overrides most lock detection,
-	 * but it does *not* override schema lock detection, so this all still
-	 * works even if READ_UNCOMMITTED is set.
-	 */
-	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
-		char *zSqlCopy;
-		int mxLen = SQL_MAX_SQL_LENGTH;
-		if (nBytes > mxLen) {
-			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
-				 "SQL command length", nBytes, mxLen);
-			rc = -1;
-			goto end_prepare;
-		}
-		zSqlCopy = sql_xstrndup(zSql, nBytes);
-		if (zSqlCopy) {
-			sqlRunParser(&sParse, zSqlCopy);
-			sParse.zTail = &zSql[sParse.zTail - zSqlCopy];
-			sql_xfree(zSqlCopy);
-		} else {
-			sParse.zTail = &zSql[nBytes];
-		}
-	} else {
-		sqlRunParser(&sParse, zSql);
+	sqlRunParser(&sParse, zSql);
+	if (sParse.is_aborted) {
+		sql_parser_destroy(&sParse);
+		return NULL;
 	}
-	assert(0 == sParse.nQueryLoop || sParse.is_aborted);
+	assert(sParse.nQueryLoop == 0);
 
-	if (pzTail) {
-		*pzTail = sParse.zTail;
-	}
-	if (sParse.is_aborted)
-		rc = -1;
-
-	if (rc == 0 && sParse.pVdbe != NULL && sParse.explain) {
+	if (sParse.explain != 0) {
 		static const char *const azColName[] = {
 			/*  0 */ "addr",
 			/*  1 */ "integer",
@@ -140,20 +106,11 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		}
 	}
 
-	Vdbe *pVdbe = sParse.pVdbe;
-	sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
-	if (sParse.pVdbe != NULL && rc != 0) {
-		sqlVdbeFinalize(sParse.pVdbe);
-		assert(!(*ppStmt));
-	} else {
-		*ppStmt = sParse.pVdbe;
-	}
+	struct Vdbe *res = sParse.pVdbe;
 	sParse.pVdbe = NULL;
-
- end_prepare:
-
+	sqlVdbeSetSql(res, zSql);
 	sql_parser_destroy(&sParse);
-	return rc;
+	return res;
 }
 
 struct Expr *
@@ -230,16 +187,13 @@ sql_trigger_compile(const char *sql)
 int
 sqlReprepare(Vdbe * p)
 {
-	struct Vdbe *pNew;
 	const char *zSql;
 
 	zSql = sql_sql(p);
 	assert(zSql != 0);
-	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
-		assert(pNew == 0);
+	struct Vdbe *pNew = sql_stmt_compile(zSql, p);
+	if (pNew == NULL)
 		return -1;
-	}
-	assert(pNew != 0);
 	sqlVdbeSwap(pNew, p);
 	sqlTransferBindings(pNew, p);
 	sqlVdbeResetStepResult(pNew);
