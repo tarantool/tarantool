@@ -1957,14 +1957,6 @@ struct Parse {
 	} aColCache[SQL_N_COLCACHE];	/* One for each column cache entry */
 	int aTempReg[8];	/* Holding area for temporary registers */
 
-  /************************************************************************
-  * Above is constant between recursions.  Below is reset before and after
-  * each recursion.  The boundary between these two regions is determined
-  * using offsetof(Parse,sLastToken) so the sLastToken field must be the
-  * first field in the recursive region.
-  ***********************************************************************/
-
-	Token sLastToken;	/* The last token parsed */
 	/** The line counter. */
 	uint32_t line_count;
 	/**
