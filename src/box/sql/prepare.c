@@ -139,10 +139,8 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		}
 	}
 
-	if (sql_get()->init.busy == 0) {
-		Vdbe *pVdbe = sParse.pVdbe;
-		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
-	}
+	Vdbe *pVdbe = sParse.pVdbe;
+	sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
 	if (sParse.pVdbe != NULL && rc != 0) {
 		sqlVdbeFinalize(sParse.pVdbe);
 		assert(!(*ppStmt));

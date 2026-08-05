@@ -2011,20 +2011,10 @@ sqlExprIsTableConstant(Expr * p, int iCur)
 	return exprIsConst(p, 3, iCur);
 }
 
-/*
- * Walk an expression tree.  Return non-zero if the expression is constant
- * or a function call with constant arguments.  Return and 0 if there
- * are any variables.
- *
- * For the purposes of this function, a double-quoted string (ex: "abc")
- * is considered a variable but a single-quoted string (ex: 'abc') is
- * a constant.
- */
 int
-sqlExprIsConstantOrFunction(Expr * p, u8 isInit)
+sqlExprIsConstantOrFunction(struct Expr *p)
 {
-	assert(isInit == 0 || isInit == 1);
-	return exprIsConst(p, 4 + isInit, 0);
+	return exprIsConst(p, 4, 0);
 }
 
 /*
