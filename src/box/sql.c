@@ -1794,10 +1794,10 @@ sql_field_ck_by_token(const struct space *space, uint32_t fieldno,
 
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 int
-sql_fuzz(const char *sql, int bytes_count)
+sql_fuzz(const char *sql)
 {
-	struct Vdbe *stmt;
-	if (sql_stmt_compile(sql, bytes_count, NULL, &stmt, NULL) != 0)
+	struct Vdbe *stmt = sql_stmt_compile(sql, NULL);
+	if (stmt == NULL)
 		return -1;
 	return sqlVdbeFinalize(stmt);
 }

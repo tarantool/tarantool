@@ -50,5 +50,5 @@ DEFINE_PROTO_FUZZER(const sql_query::SQLQuery &query) {
 	if (query_str.length() == 0)
 		return;
 
-	sql_fuzz(query_str.data(), query_str.size());
+	sql_fuzz(query_str.data());
 }
