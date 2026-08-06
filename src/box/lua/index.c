@@ -408,6 +408,25 @@ lbox_truncate(struct lua_State *L)
 
 /* {{{ Introspection */
 
+/** Index information (`index:info()`). */
+static int
+lbox_index_info(lua_State *L)
+{
+	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		diag_set(IllegalParams,
+			 "Usage: box.internal.info(space_id, index_id)");
+		return luaT_error(L);
+	}
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+
+	struct info_handler info;
+	luaT_info_handler_create(&info, L);
+	if (box_index_info(space_id, index_id, &info) != 0)
+		return luaT_error(L);
+	return 1;
+}
+
 /** Index statistics (`index:stat()`). */
 static int
 lbox_index_stat(lua_State *L)
@@ -493,6 +512,7 @@ box_lua_index_init(struct lua_State *L)
 		{"iterator", lbox_index_iterator},
 		{"iterator_next", lbox_iterator_next},
 		{"truncate", lbox_truncate},
+		{"info", lbox_index_info},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
 		{"insert_arrow", lbox_insert_arrow},

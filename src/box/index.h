@@ -322,6 +322,18 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 			 const char **packed_pos, const char **packed_pos_end);
 
 /**
+ * Index information (`index:info()`).
+ *
+ * \param space_id space identifier
+ * \param index_id index identifier
+ * \param info info handler
+ * \retval -1 on error (check `box_error_last()`)
+ * \retval 0 on success
+ */
+int
+box_index_info(uint32_t space_id, uint32_t index_id, struct info_handler *info);
+
+/**
  * Index statistics (index:stat())
  *
  * \param space_id space identifier
@@ -685,6 +697,8 @@ struct index_vtab {
 				   struct ArrowArrayStream *stream);
 	/** Create an index read view. */
 	struct index_read_view *(*create_read_view)(struct index *index);
+	/** Index information (`index:info()`). */
+	void (*info)(struct index *index, struct info_handler *handler);
 	/** Index statistics (`index:stat()`). */
 	void (*stat)(struct index *index, struct info_handler *handler);
 	/**
@@ -1075,6 +1089,12 @@ index_create_read_view(struct index *index)
 }
 
 static inline void
+index_info(struct index *index, struct info_handler *handler)
+{
+	index->vtab->info(index, handler);
+}
+
+static inline void
 index_stat(struct index *index, struct info_handler *handler)
 {
 	index->vtab->stat(index, handler);
@@ -1248,6 +1268,7 @@ generic_index_read_view_count(struct index_read_view *rv,
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 struct index_read_view *
 generic_index_create_read_view(struct index *index);
+void generic_index_info(struct index *, struct info_handler *);
 void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);
