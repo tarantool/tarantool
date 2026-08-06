@@ -51,6 +51,7 @@ test/*/*/Makefile
 test/*/*-workdir-*
 proofs/tla/test/Makefile
 Doxyfile.API
+/lapi-doc/
 RPM
 *.src.rpm
 *.i386.rpm

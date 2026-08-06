@@ -838,6 +838,8 @@ endif ()
 # require bundled libbenchmark library defined in the perf
 # subdirectory.
 add_subdirectory(src)
+# Needs the `emmylua-stubs` target defined in the src subdirectory.
+include(cmake/lapi-doc.cmake)
 add_subdirectory(doc)
 
 option(WITH_NOTIFY_SOCKET "Enable notifications on NOTIFY_SOCKET" ON)
