@@ -703,6 +703,41 @@ replica_has_connections(const struct replica *replica)
 	return replica->has_incoming_connection || replica->applier != NULL;
 }
 
+bool
+replica_try_rebootstrap(struct replica *replica,
+			const struct tt_uuid *new_uuid)
+{
+	assert(!tt_uuid_is_nil(new_uuid));
+	assert(!tt_uuid_is_equal(&replica->uuid, new_uuid));
+	if (replica->has_incoming_connection || replica->applier == NULL)
+		return false;
+
+	struct applier *applier = replica->applier;
+	if (!tt_uuid_is_nil(&applier->expected_rebootstrap_uuid)) {
+		bool is_expected =
+			tt_uuid_is_equal(&applier->expected_rebootstrap_uuid,
+					 new_uuid);
+		if (applier->state != APPLIER_STOPPED &&
+		    applier->state != APPLIER_OFF)
+			return is_expected;
+		/*
+		 * Don't let a failed check reserve the replica name
+		 * indefinitely.
+		 */
+		applier->expected_rebootstrap_uuid = uuid_nil;
+		if (is_expected)
+			return false;
+	}
+	if (applier->state != APPLIER_STOPPED)
+		return false;
+
+	assert(replica->applier_sync_state == APPLIER_STOPPED);
+	applier->expected_rebootstrap_uuid = *new_uuid;
+	replica->applier_sync_state = APPLIER_DISCONNECTED;
+	applier_restart_stopped(applier);
+	return true;
+}
+
 /** A helper to track applier health on its state change. */
 static void
 replica_update_applier_health(struct replica *replica)
@@ -855,6 +890,7 @@ replica_on_applier_reconnect(struct replica *replica)
 
 	replica->applier_sync_state = APPLIER_CONNECTED;
 	replicaset.applier.connected++;
+	applier->expected_rebootstrap_uuid = uuid_nil;
 }
 
 static void

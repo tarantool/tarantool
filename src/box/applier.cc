@@ -688,6 +688,13 @@ applier_connect(struct applier *applier)
 
 	/* Don't display previous error messages in box.info.replication */
 	diag_clear(&applier->diag);
+	if (!tt_uuid_is_nil(&applier->expected_rebootstrap_uuid) &&
+	    !tt_uuid_is_equal(&applier->uuid,
+			      &applier->expected_rebootstrap_uuid)) {
+		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+			  tt_uuid_str(&applier->expected_rebootstrap_uuid),
+			  tt_uuid_str(&applier->uuid));
+	}
 
 	/*
 	 * Send an IPROTO_ID request if it's supported by the master.
@@ -2789,6 +2796,17 @@ applier_start(struct applier *applier)
 	assert(applier->fiber == NULL);
 	applier->fiber = applier_fiber_new(applier, "applier", applier_f, true);
 	fiber_start(applier->fiber, applier);
+}
+
+void
+applier_restart_stopped(struct applier *applier)
+{
+	assert(applier->state == APPLIER_STOPPED);
+	assert(applier->fiber != NULL);
+	assert(fiber_is_dead(applier->fiber));
+	fiber_join(applier->fiber);
+	applier->fiber = NULL;
+	applier_start(applier);
 }
 
 void
