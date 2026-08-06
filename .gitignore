@@ -72,6 +72,7 @@ config.guess
 config.sub
 doc/doxygen
 doc/capi-site
+doc/lapi-site
 doc/www/content/doc/dev_guide.html
 doc/www/content/doc/tnt.css
 doc/www/content/doc/user_guide.html
