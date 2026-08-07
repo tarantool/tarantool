@@ -1,5 +1,7 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
+---@type table tz # Maps timezone names and abbreviations to their index
+---    and vice-versa
 local tz = require('timezones')
 local tweaks = require('internal.tweaks')
 
@@ -105,6 +107,120 @@ enum {
 
 ]]
 
+---@alias datetime.units {
+---    nsec?: integer,
+---    usec?: integer,
+---    msec?: integer,
+---    sec?: integer,
+---    min?: integer,
+---    hour?: integer,
+---    day?: integer,
+---    month?: integer,
+---    year?: integer,
+---    timestamp?: number,
+---    tzoffset?: integer,
+---    tz?: string,
+---}
+
+---@alias datetime.interval.adjust 'none' | 'last' | 'excess'
+
+---@alias datetime.interval.units {
+---    nsec?: integer,
+---    sec?: integer,
+---    min?: integer,
+---    hour?: integer,
+---    day?: integer,
+---    week?: integer,
+---    month?: integer,
+---    year?: integer,
+---    adjust?: datetime.interval.adjust,
+---}
+
+---@class datetime: ffi.cdata*
+---@field nsec integer (Default: 0) (usec, msec) Fractional part of the last
+---    second. You can specify either nanoseconds (nsec), or microseconds
+---    (usec), or milliseconds (msec). Specifying two of these units
+---    simultaneously or all three ones lead to an error.
+---@field sec integer (Default: 0) Seconds. Value range: 0 - 60.
+---@field min integer (Default: 0) Minutes. Value range: 0 - 59.
+---@field hour integer (Default: 0) Hours. Value range: 0 - 23.
+---@field day integer (Default: 1) Day number. Value range: 1 - 31. The
+---    special value -1 generates the last day of a particular month.
+---@field month integer (Default: 1) Month number. Value range: 1 - 12.
+---@field year integer (Default: 1970) Year.
+---@field timestamp number (Default: 0) Timestamp, in seconds. Similar to the
+---    Unix timestamp, but can have a fractional part which is converted in
+---    nanoseconds in the resulting datetime object. If the fractional part
+---    for the last second is set via the nsec, usec, or msec units, the
+---    timestamp value should be integer otherwise an error occurs. Timestamp
+---    is not allowed if you already set time and/or date via specific units,
+---    namely, sec, min, hour, day, month, and year.
+---@field tzoffset integer (Default: 0) Time zone offset from UTC, in
+---    minutes. If both tzoffset and tz are specified, tz has the preference
+---    and the tzoffset value is ignored.
+---@field tz string Time zone name according to the tz database.
+---@field wday integer Days since the beginning of the week.
+---@field yday integer Days since the beginning of the year.
+---@field isdst boolean Is the DST (Daylight saving time) applicable for the
+---    date.
+---@field usec integer Read-only. Nanoseconds / 1e3.
+---@field msec integer Read-only. Nanoseconds / 1e6.
+---@field format fun(self: datetime, fmt?: string): string
+---@field totable fun(self: datetime): datetime.totable
+---@field set fun(self: datetime, units: datetime.units): datetime
+---@field add fun(self: datetime,
+---    input: datetime.interval.units | datetime.interval): datetime
+---@field sub fun(self: datetime,
+---    input: datetime.interval.units | datetime.interval): datetime
+---@operator add(datetime.interval): datetime
+---@operator sub(datetime.interval): datetime
+
+---@class datetime.totable
+---@field nsec integer Nanoseconds.
+---@field sec integer Seconds.
+---@field min integer Minutes.
+---@field hour integer Hours.
+---@field day integer Day number.
+---@field month integer Month number.
+---@field year integer Year.
+---@field wday integer Days since the beginning of the week.
+---@field yday integer Days since the beginning of the year.
+---@field timestamp number Timestamp, in seconds.
+---@field isdst boolean Whether DST is applicable for the date.
+---@field tzoffset integer Time zone offset from UTC, in minutes.
+---@field tz string Time zone name or abbreviation.
+
+---@class datetime.interval: ffi.cdata*
+---@field nsec integer (Default: 0) (usec, msec) Fractional part of the last
+---    second. You can specify either nanoseconds (nsec), or microseconds
+---    (usec), or milliseconds (msec). Specifying two of these units
+---    simultaneously or all three ones lead to an error.
+---@field sec integer (Default: 0) Seconds.
+---@field min integer (Default: 0) Minutes.
+---@field hour integer (Default: 0) Hours.
+---@field day integer (Default: 0) Day number.
+---@field week integer (Default: 0) Week number.
+---@field month integer (Default: 0) Month number.
+---@field year integer (Default: 0) Year.
+---@field adjust datetime.interval.adjust (Default: 'none') Defines how to
+---    round days in a month after an arithmetic operation.
+---@field usec integer Read-only. Nanoseconds / 1e3.
+---@field msec integer Read-only. Nanoseconds / 1e6.
+---@field totable fun(self: datetime.interval): datetime.interval.totable
+---@operator add(datetime.interval): datetime.interval
+---@operator sub(datetime.interval): datetime.interval
+
+---@class datetime.interval.totable
+---@field nsec integer
+---@field sec integer
+---@field min integer
+---@field hour integer
+---@field day integer
+---@field week integer
+---@field month integer
+---@field year integer
+---@field adjust datetime.interval.adjust|nil
+
 local builtin = ffi.C
 local math_modf = math.modf
 local math_floor = math.floor
@@ -185,10 +301,22 @@ local date_int16_stash_put = date_int16_stash.put
 local datetime_t = ffi.typeof('struct datetime')
 local interval_t = ffi.typeof('struct interval')
 
+---Check whether the specified value is an `interval` object.
+---
+---*Since 3.2.0*
+---
+---@param o any the value to check.
+---@return boolean result true if the specified value is an `interval` object,
+---    otherwise false.
 local function is_interval(o)
     return ffi.istype(interval_t, o)
 end
 
+---Check whether the specified value is a `datetime` object.
+---
+---@param o any the value to check.
+---@return boolean result true if the specified value is a `datetime` object,
+---    otherwise false.
 local function is_datetime(o)
     return ffi.istype(datetime_t, o)
 end
@@ -383,6 +511,22 @@ local function interval_decode_args(obj)
                          adjust)
 end
 
+---Create an object of the `interval` type from a table of time units.
+---
+---**Default values:**
+---
+---* `nsec: 0`
+---* `sec: 0`
+---* `min: 0`
+---* `hour: 0`
+---* `day: 0`
+---* `week: 0`
+---* `month: 0`
+---* `year: 0`
+---* `adjust: 'none'`
+---
+---@param obj? datetime.interval.units table with time units and parameters.
+---@return datetime.interval interval_obj the created interval object.
 local function interval_new(obj)
     if obj == nil then
         return interval_init(0, 0, 0, 0, 0, 0, 0, 0, DEF_DT_ADJUST)
@@ -670,6 +814,26 @@ local function check_and_update_epoch(epoch, offset)
 end
 
 -- Create datetime given attribute values from obj.
+---Create an object of the `datetime` type from a table of time units.
+---
+---**Default values:**
+---
+---* `nsec: 0`
+---* `sec: 0`
+---* `min: 0`
+---* `hour: 0`
+---* `day: 1`
+---* `year: 1970`
+---* `timestamp: 0`
+---* `tzoffset: 0`
+---* `tz: nil`
+---
+---If an empty table or no arguments are passed, the `datetime` object with
+---the default values corresponding to Unix Epoch is created:
+---`1970-01-01T00:00:00Z`.
+---
+---@param obj? datetime.units table of time units.
+---@return datetime datetime_obj the created datetime object.
 local function datetime_new(obj)
     if obj == nil then
         return datetime_new_raw(0, 0, 0, 0)
@@ -918,6 +1082,18 @@ end
     Returns pair of constructed datetime object, and length of string
     which has been accepted by parser.
 ]]
+---Parse a partial ISO-8601 date string.
+---
+---Accepted formats are:
+---
+---* Calendar date (ISO 8601): `2012-12-24`.
+---* Ordinal date (ISO 8601): `2012-359`.
+---* Week date (ISO 8601): `2012-W52-1`.
+---* Quarter date: `2012-Q4-85`.
+---
+---@param str string Input string with the date information.
+---@return datetime date the parsed datetime object.
+---@return number? len the number of parsed characters.
 local function datetime_parse_date(str)
     check_str(str, 'datetime.parse_date()')
     local dt = date_dt_stash_take()
@@ -965,6 +1141,100 @@ local function datetime_parse_format(str, fmt)
     return date, tonumber(len)
 end
 
+---Convert an input string with the date and time information into a
+---`datetime` object.
+---
+---The input string should be formatted according to one of the following
+---standards:
+---
+---* ISO 8601.
+---* RFC 3339.
+---* Extended `strftime` -- see description of the `format()` for details.
+---
+---By default fields that are not specified are equal to appropriate values
+---in a Unix time.
+---
+---Leap second is supported, see a section leap second.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> datetime.parse('1970-01-01T00:00:00Z')
+--- ---
+--- - 1970-01-01T00:00:00Z
+--- - 20
+--- ...
+---
+--- tarantool> t = datetime.parse('1970-01-01T00:00:00',
+---         >     {format = 'iso8601', tzoffset = 180})
+---
+--- tarantool> t
+--- ---
+--- - 1970-01-01T00:00:00+0300
+--- ...
+---
+--- tarantool> t = datetime.parse('2017-12-27T18:45:32.999999-05:00',
+---         >     {format = 'rfc3339'})
+---
+--- tarantool> t
+--- ---
+--- - 2017-12-27T18:45:32.999999-0500
+--- ...
+---
+--- tarantool> T = datetime.parse('Thu Jan  1 03:00:00 1970', {format = '%c'})
+---
+--- tarantool> T
+--- ---
+--- - 1970-01-01T03:00:00Z
+--- ...
+---
+--- tarantool> T = datetime.parse('12/31/2020', {format = '%m/%d/%y'})
+---
+--- tarantool> T
+--- ---
+--- - 2020-12-31T00:00:00Z
+--- ...
+---
+--- tarantool> T = datetime.parse('1970-01-01T03:00:00.125000000+0300',
+---         >     {format = '%FT%T.%f%z'})
+---
+--- tarantool> T
+--- ---
+--- - 1970-01-01T03:00:00.125+0300
+--- ...
+---
+--- tarantool> dt = datetime.parse('01:01:01 MSK', {format ='%H:%M:%S %Z'})
+---
+--- ---
+--- ...
+---
+--- tarantool> dt.year
+--- ---
+--- - 1970
+--- ...
+---
+--- tarantool> dt.month
+--- ---
+--- - 1
+--- ...
+---
+--- tarantool> dt.wday
+--- ---
+--- - 5
+--- ...
+---
+--- tarantool> dt.tz
+--- ---
+--- - MSK
+--- ...
+--- ```
+---
+---@param str string Input string with the date and time information.
+---@param obj? { format?: string, tzoffset?: integer, tz?: string } parsing
+---    options. `format` may be 'iso8601', 'rfc3339', or a `strptime`-like
+---    format string.
+---@return datetime date the parsed datetime object.
+---@return number? len the number of parsed characters.
 local function datetime_parse_from(str, obj)
     check_str(str, 'datetime.parse()')
     local fmt = ''
@@ -1019,6 +1289,9 @@ end
     Create datetime object representing current time using microseconds
     platform timer and local timezone information.
 ]]
+---Create an object of the `datetime` type with the current date and time.
+---
+---@return datetime now the current datetime object.
 local function datetime_now()
     local d = datetime_new_raw(0, 0, 0, 0)
     builtin.tnt_datetime_now(d)
@@ -1047,6 +1320,43 @@ end
     Return table in os.date('*t') format, but with timezone
     and nanoseconds
 ]]
+---Convert the information from a `datetime` object into the table format.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> dt = datetime.new {
+---   sec = 20,
+---   min = 25,
+---   hour = 18,
+---
+---   day = 20,
+---   month = 8,
+---   year = 2021,
+---   tz = 'MAGT',
+---   }
+--- ---
+--- ...
+---
+--- tarantool> dt:totable()
+--- ---
+--- - tz: 'MAGT'
+---   sec: 20
+---   min: 25
+---   yday: 232
+---   day: 20
+---   nsec: 0
+---   isdst: false
+---   wday: 6
+---   tzoffset: 600
+---   month: 8
+---   year: 2021
+---   hour: 18
+--- ...
+--- ```
+---
+---@param self datetime
+---@return datetime.totable result table with the date and time parameters.
 local function datetime_totable(self)
     check_date(self, 'datetime.totable()')
     local dt = local_dt(self)
@@ -1086,6 +1396,39 @@ local function datetime_update_epoch_hms(epoch, h, m, s)
     return secs_day + h * 3600 + m * 60 + s
 end
 
+---Update the field values in the existing `datetime` object.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> dt = datetime.new {
+---   nsec = 123456789,
+---
+---   sec = 20,
+---   min = 25,
+---   hour = 18,
+---
+---   day = 20,
+---   month = 8,
+---   year = 2021,
+---
+---   tzoffset  = 180
+--- }
+---
+--- tarantool> dt:set {msec = 567}
+--- ---
+--- - 2021-08-20T18:25:20.567+0300
+--- ...
+---
+--- tarantool> dt:set {tzoffset = 60}
+--- ---
+--- - 2021-08-20T18:25:20.567+0100
+--- ...
+--- ```
+---
+---@param self datetime
+---@param obj datetime.units table of time units.
+---@return datetime self the updated datetime object.
 function datetime_set(self, obj)
     check_date(self, 'datetime.set()')
     check_table(obj, "datetime.set()")
@@ -1177,6 +1520,56 @@ local function datetime_strftime(self, fmt)
     return ffi.string(buff)
 end
 
+---Convert the standard `datetime` object presentation into a formatted
+---string.
+---
+---The conversion specifications are the same as in the `strftime` function.
+---Additional specification for nanoseconds is `%f` which also allows a
+---modifier to control the output precision of fractional part: `%5f` (see
+---the example below).
+---
+---If no arguments are set for the method, the default conversions are used:
+---`'%FT%T.%f%z'` (see the example below).
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> dt = datetime.new {
+--- nsec = 123456789,
+---
+--- sec = 20,
+--- min = 25,
+--- hour = 18,
+---
+--- day = 20,
+--- month = 8,
+--- year = 2021,
+---
+--- tzoffset  = 180
+--- }
+--- ---
+--- ...
+---
+--- tarantool> dt:format('%d.%m.%y %H:%M:%S.%5f')
+--- ---
+--- - 20.08.21 18:25:20.12345
+--- ...
+---
+--- tarantool> dt:format()
+--- ---
+--- - 2021-08-20T18:25:20.123456789+0300
+--- ...
+---
+--- tarantool> dt:format('%FT%T.%f%z')
+--- ---
+--- - 2021-08-20T18:25:20.123456789+0300
+--- ...
+--- ```
+---
+---@param self datetime
+---@param fmt? string Format string consisting of zero or more conversion
+---    specifications and ordinary characters.
+---@return string result string with the formatted date and time information.
 local function datetime_format(self, fmt)
     check_date(self, 'datetime.format()')
     if fmt ~= nil then
@@ -1211,7 +1604,136 @@ local datetime_index_functions = {
     format = datetime_format,
     totable = datetime_totable,
     set = datetime_set,
+    ---Modify an existing datetime object by adding values of the input
+    ---argument.
+    ---
+    ---The addition is performed taking `tzdata` into account, when `tzoffset`
+    ---or `tz` fields are set.
+    ---
+    ---**Example #1:**
+    ---
+    --- ```tarantoolsession
+    --- tarantool> dt = datetime.new {
+    --- day = 26,
+    --- month = 8,
+    --- year = 2021,
+    --- tzoffset  = 180
+    --- }
+    --- ---
+    --- ...
+    ---
+    --- tarantool> iv = datetime.interval.new {day = 7}
+    --- ---
+    --- ...
+    ---
+    --- tarantool> dt, iv
+    --- ---
+    --- - 2021-08-26T00:00:00+0300
+    --- - +7 days
+    --- ...
+    ---
+    --- tarantool> dt:add(iv)
+    --- ---
+    --- - 2021-09-02T00:00:00+0300
+    --- ...
+    ---
+    --- tarantool> dt:add{ day = 7 }
+    --- ---
+    --- - 2021-09-09T00:00:00+0300
+    --- ...
+    --- ```
+    ---
+    ---**Example #2:**
+    ---
+    --- ```tarantoolsession
+    --- tarantool> dt = datetime.new {
+    --- day = 29,
+    --- month = 2,
+    --- year = 2020
+    --- }
+    --- ---
+    --- ...
+    ---
+    --- tarantool> dt:add{month = 1, adjust = 'none'}
+    --- ---
+    --- - 2020-03-29T00:00:00Z
+    --- ...
+    ---
+    --- tarantool> dt = datetime.new {
+    --- day = 29,
+    --- month = 2,
+    --- year = 2020
+    --- }
+    --- ---
+    --- ...
+    ---
+    --- tarantool> dt:add{month = 1, adjust = 'last'}
+    --- ---
+    --- - 2020-03-31T00:00:00Z
+    --- ...
+    ---
+    --- tarantool> dt = datetime.new {
+    --- day = 31,
+    --- month = 1,
+    --- year = 2020
+    --- }
+    --- ---
+    --- ...
+    ---
+    --- tarantool> dt:add{month = 1, adjust = 'excess'}
+    --- ---
+    --- - 2020-03-02T00:00:00Z
+    --- ...
+    --- ```
+    ---
+    ---@param self datetime
+    ---@param obj datetime.interval.units | datetime.interval the input
+    ---    interval object or an equivalent table.
+    ---@return datetime self the modified datetime object.
     add = function(self, obj) return datetime_shift(self, obj, 1) end,
+    ---Modify an existing datetime object by subtracting values of the input
+    ---argument.
+    ---
+    ---The subtraction is performed taking `tzdata` into account, when
+    ---`tzoffset` or `tz` fields are set.
+    ---
+    ---**Example:**
+    ---
+    --- ```tarantoolsession
+    --- tarantool> dt = datetime.new {
+    --- day = 26,
+    --- month = 8,
+    --- year = 2021,
+    --- tzoffset  = 180
+    --- }
+    --- ---
+    --- ...
+    ---
+    --- tarantool> iv = datetime.interval.new {day = 5}
+    --- ---
+    --- ...
+    ---
+    --- tarantool> dt, iv
+    --- ---
+    --- - 2021-08-26T00:00:00+0300
+    --- - +5 days
+    --- ...
+    ---
+    --- tarantool> dt:sub(iv)
+    --- ---
+    --- - 2021-08-21T00:00:00+0300
+    --- ...
+    ---
+    --- tarantool> dt:sub{ day = 1 }
+    --- ---
+    --- - 2021-08-20T00:00:00+0300
+    --- ...
+    --- ```
+    ---
+    ---@param self datetime
+    ---@param obj datetime.interval.units | datetime.interval the input
+    ---    interval object or an equivalent table.
+    ---@return datetime self the modified datetime object.
     sub = function(self, obj) return datetime_shift(self, obj, -1) end,
 }
 
@@ -1233,6 +1755,31 @@ ffi.metatype(datetime_t, {
     __index = datetime_index,
 })
 
+---Convert the information from an `interval` object into the table format.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> iv = datetime.interval.new{month = 1, adjust = 'last'}
+--- ---
+--- ...
+--- tarantool> iv:totable()
+--- ---
+--- - adjust: last
+--- sec: 0
+--- nsec: 0
+--- day: 0
+--- week: 0
+--- hour: 0
+--- month: 1
+--- year: 0
+--- min: 0
+--- ...
+--- ```
+---
+---@param self datetime.interval
+---@return datetime.interval.totable? result table with the date and time
+---    parameters.
 local function interval_totable(self)
     if not is_interval(self) then
         return error(("interval.totable(): expected interval, but received "..
@@ -1316,14 +1863,139 @@ local interval_mt = {
     is_interval = is_interval,
 }
 
-return setmetatable(
-    {
-        new         = datetime_new,
-        interval    = setmetatable(interval_mt, interval_mt),
-        now         = datetime_now,
-        parse       = datetime_parse_from,
-        parse_date  = datetime_parse_date,
-        is_datetime = is_datetime,
-        TZ          = tz,
-    }, {}
-)
+---@class datetime.interval.module
+---@field new fun(obj?: datetime.interval.units): datetime.interval
+---@field is_interval fun(o: any): boolean
+local interval = setmetatable(interval_mt, interval_mt)
+
+---@class datetime.tz
+---@field [integer|string] string|integer
+local TZ = tz
+
+---# Builtin `datetime` module
+---
+---The `datetime` module provides support for the `datetime` and `interval`
+---data types. It allows creating the date and time values either via the
+---object interface or via parsing string values conforming to the ISO-8601
+---standard.
+---
+---**Datetime and interval arithmetic**
+---
+---The `datetime` module enables creating objects of two types:
+---`datetime` and `interval`.
+---
+---To shift datetime values, use `datetime_object:add()` or
+---`datetime_object:sub()`, or the overloaded `+` and `-` operators. The
+---methods modify the current object, while the operators return a new
+---object.
+---
+---In an interval operation each component is calculated from the largest
+---(`year`) to the smallest (`nsec`): `year`, `month`, `week`, `day`,
+---`hour`, `min`, `sec`, `nsec`.
+---
+---* `interval + interval` returns an interval.
+---* `interval - interval` returns an interval.
+---* `datetime + interval` returns a datetime.
+---* `datetime - datetime` returns an interval.
+---* `datetime + datetime` is unsupported.
+---* `interval + datetime` returns a datetime.
+---
+---An untyped table can be used instead of a typed interval or datetime
+---operand if the left operand is a typed object.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> datetime.new({tz = 'MSK'}) - datetime.new({tz = 'UTC'})
+---    ---
+---    - -180 minutes
+---    ...
+---```
+---
+---**Datetime and interval comparison**
+---
+---Use the standard Lua relational operators (`==`, `~=`, `>`, `<`, `>=`,
+---`<=`). They use the `__eq`, `__lt` and `__le` metamethods.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> dt1 = datetime.new({year = 2010})
+---tarantool> dt2 = datetime.new({year = 2024})
+---tarantool> dt1 == dt2
+---    ---
+---    - false
+---    ...
+---tarantool> dt1 < dt2
+---    ---
+---    - true
+---    ...
+---```
+---
+---**Leap second**
+---
+---Leap seconds are supported at the most basic level:
+---
+---* `datetime.parse()` parses an input string with 60 seconds.
+---* `datetime.new()` and `datetime_object:set()` accept a table with
+---  `sec = 60`.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> datetime.parse('23:12:60', {format = '%H:%M:%S'})
+---    ---
+---    - 1970-01-01T23:13:00Z
+---    - 8
+---    ...
+---tarantool> datetime.new({sec = 60})
+---    ---
+---    - 1970-01-01T00:01:00Z
+---    ...
+---```
+---
+---Parsing a leap second with the `rfc3339` or `iso8601` format is not
+---supported and produces an error.
+---
+---**Time zones**
+---
+---Tarantool uses the IANA Time Zone Database for timezone support.
+---Each datetime object has `tz`, `tzoffset` and `isdst` fields:
+---
+---* `tz` is a timezone name or abbreviation, available via `datetime.TZ`.
+---* `tzoffset` is calculated automatically from the Olson rule when `tz`
+---  is set, or can be set manually.
+---* `isdst` shows whether daylight saving time is applicable.
+---
+---The fields `tz` and `tzoffset` can be set in `datetime.new()`,
+---`datetime.parse()` and `datetime_object:set()`.
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> require('datetime').parse('2004-06-01T00:00 Europe/Moscow').isdst
+---    ---
+---    - true
+---    ...
+---tarantool> datetime.TZ['Europe/Moscow']
+---    ---
+---    - 947
+---    ...
+---```
+---
+---**Limitations**
+---
+---* The supported date range is from `-5879610-06-22` to
+---  `+5879611-07-11`.
+---* Some ancient timezones had offsets with seconds; the module uses
+---  minutes, so precision may be lost for such timestamps.
+local datetime_module = {
+    new         = datetime_new,
+    interval    = interval,
+    now         = datetime_now,
+    parse       = datetime_parse_from,
+    parse_date  = datetime_parse_date,
+    is_datetime = is_datetime,
+    TZ          = TZ,
+}
+return datetime_module

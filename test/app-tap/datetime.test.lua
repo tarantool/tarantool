@@ -148,11 +148,14 @@ test:test("Datetime API checks", function(test)
     test:is(local_set(ts, {sec = 1}), date_expected, "correct :set")
 
     -- check results of wrong arguments passed
+    -- The calls below intentionally pass wrong arguments, including
+    -- missing ones, to check the error handling.
     assert_raises(test, exp_datetime("datetime.format()", 123),
                   function() return local_format(123) end)
     assert_raises(test, exp_datetime("datetime.format()", "1970-01-01"),
                   function() return local_format("1970-01-01") end)
     assert_raises(test, exp_datetime("datetime.format()"),
+                  ---@diagnostic disable-next-line: missing-parameter
                   function() return local_format() end)
 
     assert_raises(test, exp_datetime("datetime.totable()", 123),
@@ -160,13 +163,17 @@ test:test("Datetime API checks", function(test)
     assert_raises(test, exp_datetime("datetime.totable()", "1970-01-01"),
                   function() return local_totable("1970-01-01") end)
     assert_raises(test, exp_datetime("datetime.totable()"),
+                  ---@diagnostic disable-next-line: missing-parameter
                   function() return local_totable() end)
 
     assert_raises(test, exp_datetime("datetime.set()", 123),
+                  ---@diagnostic disable-next-line: missing-parameter
                   function() return local_set(123) end)
     assert_raises(test, exp_datetime("datetime.set()", "1970-01-01"),
+                  ---@diagnostic disable-next-line: missing-parameter
                   function() return local_set("1970-01-01") end)
     assert_raises(test, exp_datetime("datetime.set()"),
+                  ---@diagnostic disable-next-line: missing-parameter
                   function() return local_set() end)
 end)
 
