@@ -682,6 +682,26 @@ I['config.reload'] = format_text([[
       reload the configuration in the application code using `config:reload()`.
 ]])
 
+I['config.reload_jitter'] = format_text([[
+    Spread fetches of a new configuration from the remote configuration
+    storage over the given number of seconds. When an instance detects a new
+    configuration, it fetches the configuration at a random moment within
+    this interval and applies it when the interval ends. This avoids a burst
+    of simultaneous fetches in large clusters, while instances still apply
+    the configuration at about the same time. A value of `0` (the default)
+    fetches and applies the configuration immediately.
+
+    New configurations detected during the interval are handled in the next
+    interval, which starts after the current one ends. If the fetched
+    configuration is newer than the detected one, the instance does not
+    apply it, issues a warning, and applies the newest configuration at the
+    end of the next interval.
+
+    This option affects only automatic reloads from the remote configuration
+    storage events. Manual reloads using `config:reload()` are not delayed
+    and end the current interval.
+]])
+
 -- {{{ config.storage configuration
 
 I['config.storage'] = format_text([[
