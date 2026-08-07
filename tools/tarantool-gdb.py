@@ -3,7 +3,6 @@ GDB extension for Tarantool post-mortem analysis.
 To use, just put 'source <path-to-this-file>' in gdb.
 """
 
-import gdb
 import argparse
 import base64
 import logging
@@ -11,6 +10,9 @@ import struct
 import itertools
 import re
 import sys
+
+import gdb
+import gdb.printing
 
 if sys.version_info[0] == 2:
     map = itertools.imap
