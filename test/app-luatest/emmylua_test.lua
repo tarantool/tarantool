@@ -227,6 +227,43 @@ local modules = {
             },
         },
     },
+    {
+        name = 'compat',
+        source = 'src/lua/compat.lua',
+        fixtures = 'test/app-luatest/emmylua/compat',
+        type_name = 'compat_module',
+        fields = {
+            help = 'Show help for the',
+            dump = 'Return a Lua command',
+            add_option = 'Add a new option',
+        },
+        objects = {
+            {
+                fixture = 'option.lua',
+                type_name = 'compat.option',
+                fields = {
+                    brief = 'a brief description of the option',
+                    default = 'the default value of the option',
+                    obsolete = 'a string with the obsolete version',
+                    current = 'the current effective value',
+                    is_new = 'whether the effective value of the option is',
+                    is_old = 'whether the effective value of the option is',
+                },
+            },
+            {
+                fixture = 'option_def.lua',
+                type_name = 'compat.option_def',
+                fields = {
+                    name = 'the option name',
+                    default = 'the default value of the option',
+                    brief = 'a brief description of the option',
+                    obsolete = 'a string with the obsolete version',
+                    action = 'the action to run when the option is',
+                    run_action_now = 'whether to run the action immediately',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
