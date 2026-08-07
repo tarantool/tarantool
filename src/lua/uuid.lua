@@ -1,5 +1,42 @@
 -- uuid.lua (internal file)
 
+---@alias uuid.byte_order
+---| "l" # little-endian
+---| "b" # big-endian
+---| "h" # host (endianness depends on host)
+---| "n" # network (endianness depends on network)
+---| "host" # host (endianness depends on host)
+---| "network" # network (endianness depends on network)
+
+---A UUID object. The `__tostring` metamethod converts it to a 36-byte
+---hexadecimal string, so `tostring(u)` works; `u:str()` returns the
+---same string.
+---@class uuid: ffi.cdata*
+---@field bin fun(self: uuid, byte_order?: uuid.byte_order): string Return
+---    the UUID as a 16-byte binary string.
+---@field str fun(self: uuid): string Return the UUID as a 36-byte
+---    hexadecimal string.
+---@field isnil fun(self: uuid): boolean Check if the UUID is an all-zero
+---    value.
+---@operator eq(uuid|string): boolean
+---@operator lt(uuid|string): boolean
+---@operator le(uuid|string): boolean
+
+---@class uuid_module
+---@operator call: uuid
+---@field NULL uuid A nil UUID object (all zero bytes).
+---@field new fun(): uuid Create a UUID.
+---@field fromstr fun(str: string): uuid? Create a UUID from a 36-byte
+---    hexadecimal string.
+---@field frombin fun(bin: string, byte_order?: uuid.byte_order): uuid Create
+---    a UUID from a 16-byte binary string.
+---@field bin fun(byte_order?: uuid.byte_order): string Create a UUID and
+---    return its 16-byte binary form.
+---@field str fun(): string Create a UUID and return its 36-byte
+---    hexadecimal form.
+---@field is_uuid fun(value: any): boolean Check if the specified value
+---    has the UUID type.
+
 local ffi = require("ffi")
 local buffer = require('buffer')
 local builtin = ffi.C
@@ -34,13 +71,70 @@ local uuid_str_stash =
 local uuid_str_stash_take = uuid_str_stash.take
 local uuid_str_stash_put = uuid_str_stash.put
 
-local is_uuid = function(value)
+---# Builtin `uuid` module
+---
+---A "UUID" is a [Universally unique identifier](https://en.wikipedia.org/wiki/Universally_unique_identifier).
+---
+---If an application requires that a value be unique only within a single
+---computer or on a single database, then a simple counter is better than a
+---UUID, because getting a UUID is time-consuming (it requires a
+---[syscall](https://en.wikipedia.org/wiki/Syscall)). For clusters of
+---computers, or widely distributed applications, UUIDs are better.
+---
+---Tarantool generates UUIDs following the rules for RFC 4122
+---[version 4 variant 1](https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)).
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> uuid = require('uuid')
+---    ---
+---    ...
+---
+---tarantool> uuid(), uuid.bin(), uuid.str()
+---    ---
+---    - 16ffedc8-cbae-4f93-a05e-349f3ab70baa
+---    - !!binary FvG+Vy1MfUC6kIyeM81DYw==
+---    - 67c999d2-5dce-4e58-be16-ac1bcb93160f
+---    ...
+---```
+---
+---**Example:**
+---
+---```tarantoolsession
+---tarantool> uu = uuid()
+---    ---
+---    ...
+---
+---tarantool> #uu:bin(), #uu:str(), type(uu), uu:isnil()
+---    ---
+---    - 16
+---    - 36
+---    - cdata
+---    - false
+---    ...
+---```
+local uuid = {}
+---@cast uuid uuid_module
+
+---Check if the specified value has the UUID type.
+---
+---*Since 2.6.1*
+---
+---@param value any a value to check.
+---@return boolean is_uuid true if the specified value is a uuid, and false
+---    otherwise.
+function uuid.is_uuid(value)
     return ffi.istype(uuid_t, value)
 end
 
+---Convert UUID to a 36-byte hexadecimal string.
+---
+---@param uu uuid
+---@return string uuid 36-byte hexadecimal string
 local uuid_tostring = function(uu)
-    if not is_uuid(uu) then
-        return error('Usage: uuid:str()')
+    if not uuid.is_uuid(uu) then
+        error('Usage: uuid:str()', 0)
     end
     local strbuf = uuid_str_stash_take()
     builtin.tt_uuid_to_string(uu, strbuf)
@@ -49,7 +143,11 @@ local uuid_tostring = function(uu)
     return uu
 end
 
-local uuid_fromstr = function(str)
+---Convert a hexadecimal 36-byte string to a UUID object.
+---
+---@param str string UUID in 36-byte hexadecimal string.
+---@return uuid? uu converted UUID, or nil if the string is invalid.
+function uuid.fromstr(str)
     if type(str) ~= 'string' then
         error("fromstr(str)")
     end
@@ -71,9 +169,14 @@ local need_bswap = function(order)
     end
 end
 
+---Convert UUID to a 16-byte string.
+---
+---@param uu uuid
+---@param byteorder? uuid.byte_order byte order of the resulting UUID.
+---@return string uuid 16-byte string
 local uuid_tobin = function(uu, byteorder)
-    if not is_uuid(uu) then
-        return error('Usage: uuid:bin([byteorder])')
+    if not uuid.is_uuid(uu) then
+        error('Usage: uuid:bin([byteorder])', 0)
     end
     if need_bswap(byteorder) then
         local uuidbuf = uuid_stash_take()
@@ -86,7 +189,12 @@ local uuid_tobin = function(uu, byteorder)
     return ffi.string(ffi.cast('char *', uu), UUID_LEN)
 end
 
-local uuid_frombin = function(bin, byteorder)
+---Convert a binary 16-byte string to a UUID object.
+---
+---@param bin string UUID in 16-byte binary string.
+---@param byteorder? uuid.byte_order byte order of the given string.
+---@return uuid uu converted UUID.
+function uuid.frombin(bin, byteorder)
     if type(bin) ~= 'string' or #bin ~= UUID_LEN then
         error("frombin(bin, [byteorder])")
     end
@@ -98,9 +206,30 @@ local uuid_frombin = function(bin, byteorder)
     return uu
 end
 
+---Check if the UUID is an all-zero value.
+---
+---The all-zero UUID value can be expressed as `uuid.NULL`, or as
+---`uuid.fromstr('00000000-0000-0000-0000-000000000000')`. The comparison
+---with an all-zero value can also be expressed as
+---`uuid_with_type_cdata == uuid.NULL`.
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> uu = uuid()
+--- ---
+--- ...
+--- tarantool> uu:isnil()
+--- ---
+--- - false
+--- ...
+--- ```
+---
+---@param uu uuid
+---@return boolean is_nil true if the value is all zero, otherwise false.
 local uuid_isnil = function(uu)
-    if not is_uuid(uu) then
-        return error('Usage: uuid:isnil()')
+    if not uuid.is_uuid(uu) then
+        error('Usage: uuid:isnil()', 0)
     end
     return builtin.tt_uuid_is_nil(uu)
 end
@@ -111,9 +240,9 @@ local function error_convert_arg(arg_index)
 end
 
 local uuid_eq = function(lhs, rhs)
-    if not is_uuid(lhs) then
+    if not uuid.is_uuid(lhs) then
         lhs, rhs = rhs, lhs
-    elseif is_uuid(rhs) then
+    elseif uuid.is_uuid(rhs) then
         return builtin.tt_uuid_is_equal(lhs, rhs)
     end
     if type(rhs) ~= 'string' then
@@ -130,20 +259,48 @@ local uuid_eq = function(lhs, rhs)
     return rc
 end
 
-local uuid_new = function()
+---Create a UUID.
+---
+---You can use it in an index over a UUID field.
+---
+---*Since 2.4.1*
+---
+---**Example:**
+---
+--- ```tarantoolsession
+--- tarantool> box.space.test:create_index("pk",
+---          >   {parts={{field = 1, type = 'uuid'}}})
+--- ---
+--- ...
+--- tarantool> box.space.test:insert{uuid.new()}
+--- ---
+--- - [e631fdcc-0e8a-4d2f-83fd-b0ce6762b13f]
+--- ...
+--- ```
+---
+---@return uuid uu a UUID.
+function uuid.new()
     local uu = ffi.new(uuid_t)
     builtin.tt_uuid_create(uu)
     return uu
 end
 
-local uuid_new_bin = function(byteorder)
+---Get UUID as a 16-byte string. An optimized shortcut for `new():bin()`.
+---
+---@param byteorder? uuid.byte_order byte order of the resulting UUID.
+---@return string uuid 16-byte string
+function uuid.bin(byteorder)
     local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
     local res = uuid_tobin(uuidbuf, byteorder)
     uuid_stash_put(uuidbuf)
     return res
 end
-local uuid_new_str = function()
+---Get UUID as a 36-byte hexadecimal string. An optimized shortcut for
+---`new():str()`.
+---
+---@return string uuid 36-byte hexadecimal string
+function uuid.str()
     local uuidbuf = uuid_stash_take()
     builtin.tt_uuid_create(uuidbuf)
     local res = uuid_tostring(uuidbuf)
@@ -153,8 +310,8 @@ end
 
 local uuid_cmp = function(lhs, rhs)
     local buf
-    if is_uuid(lhs) then
-        if is_uuid(rhs) then
+    if uuid.is_uuid(lhs) then
+        if uuid.is_uuid(rhs) then
             -- Fast path.
            return builtin.tt_uuid_compare(lhs, rhs)
         end
@@ -203,14 +360,12 @@ local uuid_mt = {
 
 ffi.metatype(uuid_t, uuid_mt)
 
-return setmetatable({
-    NULL        = builtin.uuid_nil;
-    new         = uuid_new;
-    fromstr     = uuid_fromstr;
-    frombin     = uuid_frombin;
-    bin         = uuid_new_bin;   -- optimized shortcut for new():bin()
-    str         = uuid_new_str;   -- optimized shortcut for new():str()
-    is_uuid     = is_uuid;
-}, {
-    __call = uuid_new; -- shortcut for new()
+---A nil UUID object (all zero bytes).
+---@type uuid
+uuid.NULL = builtin.uuid_nil
+
+setmetatable(uuid, {
+    __call = uuid.new, -- shortcut for new()
 })
+
+return uuid
