@@ -222,24 +222,6 @@ sqlCloseSavepoints(Vdbe * pVdbe)
 }
 
 /*
- * Rollback all database files.  If tripCode is not 0, then
- * any write cursors are invalidated ("tripped" - as in "tripping a circuit
- * breaker") and made to return tripCode if there are any further
- * attempts to use that cursor.  Read cursors remain open and valid
- * but are "saved" in case the table pages are moved around.
- */
-void
-sqlRollbackAll(Vdbe * pVdbe)
-{
-	struct sql *db = sql_get();
-
-	/* If one has been configured, invoke the rollback-hook callback */
-	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {
-		db->xRollbackCallback(db->pRollbackArg);
-	}
-}
-
-/*
  * This array defines hard upper bounds on limit values.  The
  * initializer must be kept in sync with the SQL_LIMIT_*
  * #defines in sql.h.
