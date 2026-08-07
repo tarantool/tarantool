@@ -69,6 +69,24 @@ local modules = {
             },
         },
     },
+    {
+        name = 'console',
+        source = 'src/box/lua/console.lua',
+        fixtures = 'test/app-luatest/emmylua/console',
+        fields = {
+            set_default_output = 'Set default output format',
+            get_default_output = 'Get default output format',
+            eos = 'end-of-output string',
+            delimiter = 'Set a custom end-of-request marker',
+            initial_env = 'initial console environment',
+            set_initial_env = 'Set initial console environment',
+            eval = 'Evaluate a line of Lua code',
+            ac = 'Set the auto-completion flag',
+            connect = 'Connect to the instance',
+            listen = 'Listen for incoming requests',
+        },
+        objects = {},
+    },
 }
 
 local function normalize(value)
