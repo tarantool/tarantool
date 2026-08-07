@@ -130,6 +130,12 @@ M['config.context.*'] = function(var, w)
     end
 end
 
+M['config.reload_jitter'] = function(data, w)
+    if data < 0 then
+        w.error('The reload jitter must be a non-negative integer')
+    end
+end
+
 M['config.etcd'] = function(data, w)
     -- No config.etcd section at all -- OK.
     if data == nil or next(data) == nil then
