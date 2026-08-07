@@ -94,11 +94,13 @@ jobs:
       - name: Build
         run: make -f .test.mk build
 
+      # Install check-jsonschema 0.30.0 because this version
+      # is available in Ubuntu 20.04.
       - name: Install jq, check-jsonschema
         run: |
           apt-get update
           apt-get install jq python3-pip -y
-          pip3 install check-jsonschema
+          pip3 install check-jsonschema==0.30.0
       - name: Generate config schema
         run: |
           ./src/tarantool -l json -l config -e "print(json.encode(config:jsonschema()))" > config-schema.json
