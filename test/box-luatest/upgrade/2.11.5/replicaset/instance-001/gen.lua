@@ -10,7 +10,7 @@ box.schema.user.grant('guest', 'super')
 while not box.info.replication[2] or
       not box.info.replication[2].downstream or
       box.info.replication[2].downstream.status ~= 'follow' do
-    require('fiber').yield(0.1)
+    require('fiber').sleep(0.1)
 end
 box.snapshot()
 os.exit(0)
