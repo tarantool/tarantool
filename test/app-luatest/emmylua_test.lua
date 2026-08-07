@@ -182,6 +182,51 @@ local modules = {
         },
         objects = {},
     },
+    {
+        name = 'crypto',
+        source = 'src/lua/crypto.lua',
+        fixtures = 'test/app-luatest/emmylua/crypto',
+        type_name = 'crypto_module',
+        fields = {
+            digest = 'Digest algorithms',
+            hmac = 'HMAC algorithms',
+            cipher = 'Cipher algorithms',
+            cipher_algo = 'Cipher algorithm identifiers',
+            cipher_mode = 'Cipher mode identifiers',
+        },
+        objects = {
+            {
+                fixture = 'digest.lua',
+                type_name = 'crypto.digest',
+                fields = {
+                    init = 'Initialize the digest context',
+                    update = 'Feed data',
+                    result = 'Return the digest value',
+                    free = 'Free the digest context',
+                },
+            },
+            {
+                fixture = 'hmac.lua',
+                type_name = 'crypto.hmac',
+                fields = {
+                    init = 'Initialize the HMAC',
+                    update = 'Feed data',
+                    result = 'Return the HMAC value',
+                    free = 'Free the HMAC context',
+                },
+            },
+            {
+                fixture = 'cipher.lua',
+                type_name = 'crypto.cipher',
+                fields = {
+                    init = 'Initialize',
+                    update = 'Process data',
+                    result = 'Return final chunk',
+                    free = 'Free the cipher context',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
