@@ -32,6 +32,7 @@ lua_source(lua_sources lua/recovery_point_manager.lua recovery_point_manager_lua
 lua_source(lua_sources lua/healthcheck.lua healthcheck_lua)
 lua_source(lua_sources lua/healthcheck_defaults.lua healthcheck_defaults_lua)
 
+lua_stub(console FILES lua/console.lua RETURN M)
 lua_stub(xlog FILES lua/xlog.lua RETURN xlog)
 
 # {{{ config
