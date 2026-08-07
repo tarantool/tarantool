@@ -174,6 +174,162 @@ local function collect_arguments(lines, index, rest)
     end
 end
 
+local function class_field(line)
+    local name, typ = line:match('^%-%-%-@field%s+([%w_]+)%s+(.+)$')
+    if name == nil then
+        return nil
+    end
+    return name, strip(typ)
+end
+
+local function split_top_level(text)
+    local parts = {}
+    local depth = 0
+    local start = 1
+    for i = 1, #text do
+        local char = text:sub(i, i)
+        if char == '<' or char == '{' or char == '(' or char == '[' then
+            depth = depth + 1
+        elseif char == '>' or char == '}' or char == ')' or char == ']' then
+            depth = depth - 1
+        elseif char == ',' and depth == 0 then
+            table.insert(parts, strip(text:sub(start, i - 1)))
+            start = i + 1
+        end
+    end
+    table.insert(parts, strip(text:sub(start)))
+    return parts
+end
+
+local function parse_argument(arg)
+    if arg:match('^%.%.%.') then
+        return '...', arg:match('^%.%.%.%s*:%s*(.+)$') or 'any', false
+    end
+    local name, optional, typ =
+        arg:match('^([%w_]+)(%??)%s*:%s*(.+)$')
+    if name == nil then
+        name, optional = arg:match('^([%w_]+)(%??)$')
+        typ = 'any'
+    end
+    if name == nil then
+        name = arg
+        optional = ''
+        typ = 'any'
+    end
+    return name, typ, optional == '?'
+end
+
+-- Return the change of the bracket nesting depth for a type expression.
+local function type_balance(text)
+    local depth = 0
+    for char in text:gmatch('[%(%)%[%]{}]') do
+        if char == '(' or char == '[' or char == '{' then
+            depth = depth + 1
+        else
+            depth = depth - 1
+        end
+    end
+    return depth
+end
+
+-- Split a function type into its parameter list and the return type.
+-- The parameter list is delimited by the matching closing parenthesis,
+-- so nested function types are handled correctly.
+local function split_fun_type(typ)
+    local open = typ:find('(', 1, true)
+    if open == nil then
+        return nil
+    end
+    local depth = 0
+    local close = nil
+    for i = open, #typ do
+        local char = typ:sub(i, i)
+        if char == '(' then
+            depth = depth + 1
+        elseif char == ')' then
+            depth = depth - 1
+            if depth == 0 then
+                close = i
+                break
+            end
+        end
+    end
+    if close == nil then
+        return nil
+    end
+    local args = strip(typ:sub(open + 1, close - 1))
+    local ret = typ:sub(close + 1):match('^%s*:%s*(.*)$')
+    if ret == nil then
+        return nil
+    end
+    return args, strip(ret)
+end
+
+-- Emit function fields of the module class as module functions. The
+-- class itself stays for the type page, while the module page gets
+-- all the functions.
+local function emit_class_functions(lines, module_name, names, body)
+    local function emit_field(field)
+        if field == nil then
+            return
+        end
+        local full_name = module_name .. '.' .. field.name
+        if names[full_name] ~= nil then
+            return
+        end
+        for _, doc in ipairs(field.docs) do
+            table.insert(body, doc)
+        end
+        local args, ret = split_fun_type(field.typ)
+        if args ~= nil then
+            local arguments = {}
+            for _, arg in ipairs(split_top_level(args)) do
+                if arg ~= '' then
+                    local arg_name, arg_type, optional = parse_argument(arg)
+                    table.insert(arguments, arg_name)
+                    table.insert(body, '---@param ' .. arg_name ..
+                                 (optional and '?' or '') .. ' ' .. arg_type)
+                end
+            end
+            for _, result in ipairs(split_top_level(ret)) do
+                if result ~= '' then
+                    table.insert(body, '---@return ' .. result)
+                end
+            end
+            table.insert(body, 'function ' .. full_name .. '(' ..
+                         table.concat(arguments, ', ') .. ') end')
+        end
+        table.insert(body, '')
+        names[full_name] = true
+    end
+
+    local current = nil
+    local i = 1
+    while i <= #lines do
+        local line = lines[i]
+        local name, typ = class_field(line)
+        if name ~= nil then
+            if typ:sub(1, 3) == 'fun' and type_balance(typ) > 0 then
+                local depth = type_balance(typ)
+                while depth > 0 and i < #lines do
+                    i = i + 1
+                    local continuation =
+                        strip(lines[i]:gsub('^%-%-%-%s*', ''))
+                    typ = typ .. ' ' .. continuation
+                    depth = depth + type_balance(continuation)
+                end
+            end
+            emit_field(current)
+            current = {name = name, typ = typ, docs = {}}
+        elseif current ~= nil and line:sub(1, 3) == '---' and
+                not line:match('^%-%-%-@class%s') then
+            table.insert(current.docs, line)
+        end
+        i = i + 1
+    end
+    emit_field(current)
+end
+
 local function emit_type(statement, declared, body)
     local name = statement:match('^local%s+([%a_][%w_]*)%s*=')
     if name ~= nil and not declared[name] then
@@ -334,6 +490,8 @@ local function generate(out_file, files, return_name)
     local roots = {}
     local order = {}
     local return_emitted = false
+    local module_class_lines = nil
+    local module_docs = nil
 
     for _, path in ipairs(files) do
         local lines = split_lines(read_file(path))
@@ -379,6 +537,32 @@ local function generate(out_file, files, return_name)
 
                 local statement, statement_index = find_statement(lines, j)
                 if has_dir and not code_only then
+                    local class_name = nil
+                    for k = i, j - 1 do
+                        class_name = lines[k]:match(
+                            '^%-%-%-@class%s+([%w_%.]+)')
+                        if class_name ~= nil then
+                            local class_docs = {}
+                            for m = i, k - 1 do
+                                table.insert(class_docs, lines[m])
+                            end
+                            if class_name ~= nil and
+                                    class_name == return_name then
+                                module_class_lines = {}
+                                for m = i, j - 1 do
+                                    table.insert(module_class_lines, lines[m])
+                                end
+                                module_docs = class_docs
+                                if not declared[return_name] and
+                                        not roots[return_name] then
+                                    roots[return_name] = true
+                                    table.insert(order, return_name)
+                                    declared[return_name] = true
+                                end
+                            end
+                            break
+                        end
+                    end
                     for k = i, j - 1 do
                         table.insert(body, lines[k])
                     end
@@ -386,6 +570,15 @@ local function generate(out_file, files, return_name)
                     if visible and statement ~= nil then
                         if has_type then
                             emit_type(statement, declared, body)
+                            local is_module_value =
+                                class_name ~= nil and
+                                class_name == return_name and
+                                statement:match('^local%s+' .. return_name ..
+                                                '%s*=%s*{') ~= nil
+                            if is_module_value then
+                                emit_class_functions(module_class_lines,
+                                                     return_name, names, body)
+                            end
                         elseif has_function then
                             emit_function(lines, statement_index, statement,
                                           declared, names, roots, order, body)
@@ -429,6 +622,11 @@ local function generate(out_file, files, return_name)
     if #order > 0 then
         table.insert(out, '')
         for _, root in ipairs(order) do
+            if root == return_name and module_docs ~= nil then
+                for _, line in ipairs(module_docs) do
+                    table.insert(out, line)
+                end
+            end
             table.insert(out, 'local ' .. root .. ' = {}')
         end
     end

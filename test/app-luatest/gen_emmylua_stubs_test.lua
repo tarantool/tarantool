@@ -152,3 +152,133 @@ return mod
 
     fio.rmtree(dir)
 end
+
+g.test_class_field_docs_stay_with_their_function = function()
+    local dir = fio.tempdir()
+    local source = fio.pathjoin(dir, 'module.lua')
+    local output = fio.pathjoin(dir, 'module-stub.lua')
+    local fh = assert(io.open(source, 'w'))
+    fh:write([[
+---@class mod
+---@field first fun(): number
+---
+---    Description of first.
+---@field second fun(): number
+---
+---    Description of second.
+
+---@type mod
+local mod = {}
+
+return mod
+]])
+    fh:close()
+
+    local ph = assert(popen.new({
+        arg[-1], TOOL,
+        '--out', output,
+        '--return', 'mod',
+        source,
+    }, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.DEVNULL,
+    }))
+    local out = read_all(ph)
+    local st = ph:wait()
+    ph:close()
+    t.assert_equals(st.exit_code, 0, out)
+
+    local stub = assert(io.open(output, 'r'))
+    local text = stub:read('*a')
+    stub:close()
+    t.assert_str_contains(text,
+        '---    Description of first.\n' ..
+        '---@return number\nfunction mod.first() end')
+    t.assert_str_contains(text,
+        '---    Description of second.\n' ..
+        '---@return number\nfunction mod.second() end')
+
+    fio.rmtree(dir)
+end
+
+g.test_class_field_nested_and_multiline_signatures = function()
+    local dir = fio.tempdir()
+    local source = fio.pathjoin(dir, 'module.lua')
+    local output = fio.pathjoin(dir, 'module-stub.lua')
+    local fh = assert(io.open(source, 'w'))
+    fh:write([[
+---@class mod
+---@field call fun(cb: fun(): number): number
+---@field bench fun<T>(
+---    func: fun(...: any): T,
+---    ...: any
+---): { number, T } Measure CPU time.
+
+---@type mod
+local mod = {}
+
+return mod
+]])
+    fh:close()
+
+    local ph = assert(popen.new({
+        arg[-1], TOOL,
+        '--out', output,
+        '--return', 'mod',
+        source,
+    }, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.DEVNULL,
+    }))
+    local out = read_all(ph)
+    local st = ph:wait()
+    ph:close()
+    t.assert_equals(st.exit_code, 0, out)
+
+    local stub = assert(io.open(output, 'r'))
+    local text = stub:read('*a')
+    stub:close()
+    t.assert_str_contains(text,
+        '---@param cb fun(): number\n' ..
+        '---@return number\nfunction mod.call(cb) end')
+    t.assert_str_contains(text,
+        '---@param func fun(...: any): T\n' ..
+        '---@param ... any\n' ..
+        '---@return { number, T } Measure CPU time.\n' ..
+        'function mod.bench(func, ...) end')
+
+    fio.rmtree(dir)
+end
+
+g.test_enum_without_return_name = function()
+    local dir = fio.tempdir()
+    local source = fio.pathjoin(dir, 'module.lua')
+    local output = fio.pathjoin(dir, 'module-stub.lua')
+    local fh = assert(io.open(source, 'w'))
+    fh:write([[
+---@enum Status
+local status = {OK = 0}
+]])
+    fh:close()
+
+    local ph = assert(popen.new({
+        arg[-1], TOOL,
+        '--out', output,
+        source,
+    }, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.DEVNULL,
+    }))
+    local out = read_all(ph)
+    local st = ph:wait()
+    ph:close()
+    t.assert_equals(st.exit_code, 0, out)
+
+    local stub = assert(io.open(output, 'r'))
+    local text = stub:read('*a')
+    stub:close()
+    t.assert_str_contains(text, '---@enum Status')
+    t.assert_str_contains(text, 'local status = {}')
+
+    fio.rmtree(dir)
+end
