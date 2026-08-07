@@ -86,6 +86,7 @@ endif()
 lua_stub(decimal FILES lua/decimal_stub.lua RETURN decimal)
 lua_stub(pickle FILES lua/pickle_stub.lua RETURN pickle)
 lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
+lua_stub(crypto FILES lua/crypto.lua RETURN crypto)
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
