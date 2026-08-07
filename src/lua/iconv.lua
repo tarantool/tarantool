@@ -25,6 +25,74 @@ local BUF_SIZE = 64
 
 local conv_rv_error = ffi.cast('void *', -1)
 
+---The `iconv` module provides a way to convert a string with one encoding
+---to a string with another encoding, for example from ASCII to UTF-8. It is
+---based on the POSIX iconv routines.
+---
+---An exact list of the available encodings may depend on environment.
+---Typically the list includes ASCII, BIG5, KOI8R, LATIN8, MS-GREEK, SJIS,
+---and about 100 others. For a complete list, type `iconv --list` on a
+---terminal.
+---
+---@class iconv
+---@field new fun(
+---    to: string,
+---    from: string
+---): iconv.converter Construct a new iconv instance.
+---
+---    If either parameter is not a valid name, there will be an error
+---    message.
+---
+---    **Example:**
+---
+---    ```tarantoolsession
+---    tarantool> converter = require('iconv').new('UTF8', 'ASCII')
+---    ---
+---    ...
+---    ```
+---@field converter fun(
+---    input_string: string
+---): string Convert a string from one encoding to another.
+---
+---    If anything in `input_string` cannot be converted, there will be an
+---    error message and the result string will be unchanged.
+---
+---    **Example:**
+---
+---    The Unicode code point U+0414 (CYRILLIC CAPITAL LETTER DE) is
+---    encoded in UTF-8 as the bytes D0 94. Tarantool uses UTF-8, so use
+---    `string.hex(string.char(208, 148))` to show the UTF-8 source bytes,
+---    then convert the character to UTF-16BE and check the result. The
+---    result 0414 shows that iconv conversion works. (Different iconv
+---    implementations might use different names, for example UTF-16BE
+---    instead of UTF16BE.)
+---
+---    ```tarantoolsession
+---    tarantool> string.hex(string.char(208, 148))
+---    ---
+---    - d094
+---    ...
+---
+---    tarantool> converter = require('iconv').new('UTF16BE', 'UTF8')
+---    ---
+---    ...
+---
+---    tarantool> utf16_string = converter(string.char(208, 148))
+---    ---
+---    ...
+---
+---    tarantool> string.hex(utf16_string)
+---    ---
+---    - '0414'
+---    ...
+---    ```
+
+---@class iconv.converter: ffi.cdata*
+---@operator call fun(self: iconv.converter, input_string: string): string
+
+---@param data string the string to be converted (the "from" string)
+---@return string res_string the string that results from the conversion
+---    (the "to" string)
 local function iconv_convert(iconv, data)
     if not ffi.istype(iconv_t, iconv) then
         error("Usage: iconv:convert(data: string)")
@@ -75,6 +143,10 @@ local iconv_mt = {
 
 ffi.metatype(iconv_t, iconv_mt)
 
+---@param to string the name of the encoding that we will convert to.
+---@param from string the name of the encoding that we will convert from.
+---@return iconv.converter iconv a new iconv instance -- in effect,
+---    a callable function
 local function iconv_new(to, from)
     if type(to) ~= 'string' or type(from) ~= 'string' then
         error('Usage: iconv.new("CP1251", "KOI8-R")')
