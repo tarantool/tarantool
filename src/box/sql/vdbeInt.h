@@ -280,12 +280,10 @@ struct Vdbe {
 	 */
 	uint32_t res_var_count;
 	VList *pVList;		/* Name of variables */
-	i64 startTime;		/* Time when query started - used for profiling */
 	int nOp;		/* Number of instructions in the program */
 	u16 nResColumn;		/* Number of columns in one row of the result set */
 	u8 errorAction;		/* Recovery action to do in case of an error */
 	bft expired:1;		/* True if the VM needs to be recompiled */
-	bft doingRerun:1;	/* True if rerunning after an auto-reprepare */
 	bft explain:2;		/* True if EXPLAIN present on SQL command */
 	bft changeCntOn:1;	/* True to update the change-counter */
 	bft runOnlyOnce:1;	/* Automatically expire on reset */
