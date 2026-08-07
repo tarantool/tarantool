@@ -1,0 +1,5 @@
+local digest = require('digest')
+digest.crc32('x')
+digest.murmur('x')
+digest.xxhash32('x')
+digest.xxhash64('x')

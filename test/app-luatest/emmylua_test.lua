@@ -248,6 +248,67 @@ local modules = {
             },
         },
     },
+    {
+        name = 'digest',
+        source = 'src/lua/digest.lua',
+        fixtures = 'test/app-luatest/emmylua/digest',
+        fields = {
+            md4 = 'digest made with MD4',
+            sha256 = 'digest made with SHA-2',
+            base64_encode = 'Encode a string to Base64',
+            crc32 = '32-bit checksum',
+            guava = 'consistent hash',
+            murmur = 'MurmurHash',
+            xxhash32 = 'xxHash32',
+            xxhash64 = 'xxHash64',
+        },
+        diagnostics = {
+            fixture = 'calls.lua',
+            forbidden = {'call-non-callable'},
+        },
+        objects = {
+            {
+                fixture = 'crc32.lua',
+                type_name = 'digest.crc32ctx',
+                fields = {
+                    update = 'Feed data',
+                    result = 'Return the checksum',
+                    clear = 'Reset the state',
+                    copy = 'Copy the state',
+                },
+            },
+            {
+                fixture = 'murmur.lua',
+                type_name = 'digest.murmurctx',
+                fields = {
+                    update = 'Feed data',
+                    result = 'Return the hash',
+                    clear = 'Reset the state',
+                    copy = 'Copy the state',
+                },
+            },
+            {
+                fixture = 'xxhash32.lua',
+                type_name = 'digest.xxhash32ctx',
+                fields = {
+                    update = 'Feed data',
+                    result = 'Return the hash',
+                    clear = 'Reset the state',
+                    copy = 'Copy the state',
+                },
+            },
+            {
+                fixture = 'xxhash64.lua',
+                type_name = 'digest.xxhash64ctx',
+                fields = {
+                    update = 'Feed data',
+                    result = 'Return the hash',
+                    clear = 'Reset the state',
+                    copy = 'Copy the state',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
@@ -340,6 +401,22 @@ local function assert_fields(client, items, fields, context)
     end
 end
 
+local function assert_diagnostics(client, spec, workspace)
+    local path = open_fixture(client, workspace, spec.diagnostics.fixture)
+    local uri = emmylua.file_uri(path)
+    local diagnostics = client:wait_diagnostics(uri, 10)
+    for _, diagnostic in ipairs(diagnostics) do
+        local code = tostring(diagnostic.code or '')
+        local message = normalize(diagnostic.message or '')
+        for _, forbidden in ipairs(spec.diagnostics.forbidden) do
+            t.assert(not code:find(forbidden, 1, true) and
+                     not message:find(forbidden, 1, true),
+                ('%s: unexpected %s diagnostic: %s'):format(
+                    spec.name, forbidden, message))
+        end
+    end
+end
+
 local function run_module_test(spec)
     local binary = os.getenv('EMMYLUA_LS')
     t.skip_if(binary == nil or binary == '',
@@ -360,6 +437,10 @@ local function run_module_test(spec)
             resources = resources,
         })
         client:initialize()
+
+        if spec.diagnostics ~= nil then
+            assert_diagnostics(client, spec, workspace)
+        end
 
         local module_path, module_text =
             open_fixture(client, workspace, 'module.lua')

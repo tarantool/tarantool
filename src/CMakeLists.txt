@@ -87,6 +87,7 @@ endif()
 lua_stub(buffer FILES lua/buffer.lua RETURN buffer)
 lua_stub(crypto FILES lua/crypto.lua RETURN crypto)
 lua_stub(decimal FILES lua/decimal_stub.lua RETURN decimal)
+lua_stub(digest FILES lua/digest.lua RETURN m)
 lua_stub(pickle FILES lua/pickle_stub.lua RETURN pickle)
 lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
 
