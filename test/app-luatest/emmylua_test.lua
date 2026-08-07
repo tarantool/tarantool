@@ -20,6 +20,24 @@ local modules = {
         objects = {},
     },
     {
+        name = 'iconv',
+        source = 'src/lua/iconv.lua',
+        fixtures = 'test/app-luatest/emmylua/iconv',
+        type_name = 'iconv',
+        fields = {
+            new = 'Construct a new',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'iconv.converter',
+                fields = {
+                    __tostring = 'Returns a string representation',
+                },
+            },
+        },
+    },
+    {
         name = 'varbinary',
         source = 'src/lua/varbinary.lua',
         fixtures = 'test/app-luatest/emmylua/varbinary',
