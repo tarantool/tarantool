@@ -122,6 +122,8 @@ end
 local function read_file(...)
     local path = fio.pathjoin(...)
     local fh, err = fio.open(path, {'O_RDONLY'})
+    -- emmylua_check: false positive for a table message.
+    ---@diagnostic disable-next-line: missing-parameter
     assert(fh ~= nil, {'unable to read file %s: %s', path, err})
     local data = fh:read()
     fh:close()
@@ -131,6 +133,8 @@ end
 local function write_file(data, ...)
     local path = fio.pathjoin(...)
     local fh, err = fio.open(path, {'O_WRONLY', 'O_CREAT', 'O_TRUNC'})
+    -- emmylua_check: false positive for a table message.
+    ---@diagnostic disable-next-line: missing-parameter
     assert(fh ~= nil, {'unable to write file %s: %s', path, err})
     fh:write(data)
     fh:close()
