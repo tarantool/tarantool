@@ -227,6 +227,59 @@ local modules = {
             },
         },
     },
+    {
+        name = 'swim',
+        source = 'src/lua/swim.lua',
+        fixtures = 'test/app-luatest/emmylua/swim',
+        fields = {
+            new = 'Create a new SWIM instance',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'swim.object',
+                fields = {
+                    delete = 'Delete a SWIM instance immediately',
+                    size = 'Return the size of the member table',
+                    self = 'Return the member object of this SWIM instance',
+                },
+            },
+            {
+                fixture = 'member.lua',
+                type_name = 'swim.member',
+                fields = {
+                    status = 'Return the member status',
+                    uri = 'Return the member URI',
+                    incarnation = 'Return the member incarnation',
+                },
+            },
+            {
+                fixture = 'event.lua',
+                type_name = 'swim.event',
+                fields = {
+                    is_new = 'Return true if the member is new',
+                    is_drop = 'Return true if the member is dropped',
+                    is_update = 'Return true if the member is updated',
+                },
+            },
+            {
+                fixture = 'incarnation.lua',
+                type_name = 'swim.incarnation',
+                fields = {
+                    generation = 'the persistent part of the incarnation',
+                    version = 'the volatile part of the incarnation',
+                },
+            },
+            {
+                fixture = 'cfg.lua',
+                type_name = 'swim.cfg',
+                fields = {
+                    heartbeat_rate = 'rate of sending round messages',
+                    gc_mode = 'dead member collection mode',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
