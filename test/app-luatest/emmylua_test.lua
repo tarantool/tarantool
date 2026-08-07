@@ -9,6 +9,44 @@ local root = emmylua.source_root()
 -- add a spec and a fixture directory with module.lua and object.lua.
 local modules = {
     {
+        name = 'tap',
+        source = 'src/lua/tap.lua',
+        fixtures = 'test/app-luatest/emmylua/tap',
+        type_name = 'tap',
+        fields = {
+            test = 'Initialize a test',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'taptest',
+                fields = {
+                    strict = 'Flag, true if comparisons',
+                    test = 'Create a subtest',
+                    plan = 'Indicate how many tests',
+                    check = 'Checks the number of tests',
+                    diag = 'Display a diagnostic message',
+                    ok = 'This is a basic function',
+                    fail = 'is equivalent to',
+                    skip = 'is equivalent to',
+                    is = 'Check whether the first argument equals',
+                    isnt = 'This is the negation of',
+                    is_deeply = 'Recursive version of',
+                    like = 'Verify a string against a pattern',
+                    unlike = 'This is the negation of',
+                    isnil = 'Test whether a value is nil',
+                    isnumber = 'Test whether a value is a number',
+                    isstring = 'Test whether a value is a string',
+                    istable = 'Test whether a value is a table',
+                    isboolean = 'Test whether a value is a boolean',
+                    isfunction = 'Test whether a value is a function',
+                    isudata = 'Test whether a value is a userdata',
+                    iscdata = 'Test whether a value is a cdata',
+                },
+            },
+        },
+    },
+    {
         name = 'varbinary',
         source = 'src/lua/varbinary.lua',
         fixtures = 'test/app-luatest/emmylua/varbinary',
