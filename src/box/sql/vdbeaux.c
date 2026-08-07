@@ -1826,13 +1826,11 @@ sqlVdbeHalt(Vdbe * p)
 				if (rc != 0) {
 					p->is_aborted = true;
 					box_txn_rollback();
-					sqlRollbackAll(p);
 					p->nChange = 0;
 				}
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				p->nChange = 0;
 			}
 			p->anonymous_savepoint = NULL;
@@ -1845,7 +1843,6 @@ sqlVdbeHalt(Vdbe * p)
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);
 				p->nChange = 0;
 			}
@@ -1863,7 +1860,6 @@ sqlVdbeHalt(Vdbe * p)
 				box_txn_rollback();
 				p->is_aborted = true;
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);
 				p->nChange = 0;
 			}

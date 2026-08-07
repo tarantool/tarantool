@@ -986,10 +986,6 @@ case OP_ResultRow: {
 	}
 #endif
 
-	if (db->mTrace & SQL_TRACE_ROW) {
-		db->xTrace(SQL_TRACE_ROW, db->pTraceArg, p, 0);
-	}
-
 	/* Return SQL_ROW
 	 */
 	p->pc = (int)(pOp - aOp) + 1;
@@ -4313,7 +4309,6 @@ case OP_Expire: {
  * first time they are evaluated for this run.
  */
 case OP_Init: {          /* jump */
-	char *zTrace;
 	int i;
 
 	/* If the P4 argument is not NULL, then it must be an SQL comment string.
@@ -4341,18 +4336,12 @@ case OP_Init: {          /* jump */
 		break;
 	}
 
-	if ((db->mTrace & SQL_TRACE_STMT)!=0
-	    && !p->doingRerun
-	    && (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql))!=0
-		) {
-		{
-			(void)db->xTrace(SQL_TRACE_STMT, db->pTraceArg, p, zTrace);
-		}
-	}
 #ifdef SQL_DEBUG
 	if ((p->sql_flags & SQL_SqlTrace) != 0 &&
-	    (zTrace = (pOp->p4.z ? pOp->p4.z : p->zSql)) != 0)
+	    (pOp->p4.z != NULL || p->zSql != NULL)) {
+		char *zTrace = pOp->p4.z != NULL ? pOp->p4.z : p->zSql;
 		sqlDebugPrintf("SQL-trace: %s\n", zTrace);
+	}
 #endif /* SQL_DEBUG */
 	assert(pOp->p2>0);
 	if (pOp->p1>=sqlGlobalConfig.iOnceResetThreshold) {
