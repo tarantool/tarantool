@@ -84,10 +84,11 @@ if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
 endif()
 
+lua_stub(crypto FILES lua/crypto.lua RETURN crypto)
 lua_stub(decimal FILES lua/decimal_stub.lua RETURN decimal)
+lua_stub(fio FILES lua/fio.lua RETURN fio)
 lua_stub(pickle FILES lua/pickle_stub.lua RETURN pickle)
 lua_stub(varbinary FILES lua/varbinary.lua RETURN varbinary)
-lua_stub(crypto FILES lua/crypto.lua RETURN crypto)
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
