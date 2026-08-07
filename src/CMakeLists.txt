@@ -81,6 +81,8 @@ if(ENABLE_LUA_EXTRAS)
     lua_multi_source(lua_sources ${EXTRA_LUA_SOURCES})
 endif()
 
+lua_stub(clock FILES lua/clock.lua)
+
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
 lua_source(lua_sources ../third_party/lua/luadebug.lua luadebug_lua)
