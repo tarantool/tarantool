@@ -149,6 +149,7 @@ g.test_config_enterprise = function()
     local iconfig = {
         config = {
             reload = 'auto',
+            reload_jitter = 0.5,
             context = {},
             etcd = {
                 prefix = '/one',
@@ -202,6 +203,7 @@ g.test_config_enterprise = function()
 
     local exp = {
         reload = 'auto',
+        reload_jitter = 0,
         storage = {
             timeout = 3,
             reconnect_after = 3,
@@ -209,6 +211,20 @@ g.test_config_enterprise = function()
     }
     local res = instance_config:apply_default({}).config
     t.assert_equals(res, exp)
+end
+
+g.test_config_reload_jitter_negative = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {
+        config = {
+            reload_jitter = -1,
+        },
+    }
+    local err = '[instance_config] config.reload_jitter: Unexpected data ' ..
+        'for scalar "number": Expected a non-negative duration, got -1'
+    t.assert_error_msg_equals(err, function()
+        instance_config:validate(iconfig)
+    end)
 end
 
 -- A non-empty `config.etcd` table should contain the `prefix`

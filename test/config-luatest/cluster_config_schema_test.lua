@@ -360,6 +360,7 @@ g.test_defaults = function()
         },
         config = {
             reload = 'auto',
+            reload_jitter = is_enterprise and 0 or nil,
             storage = {
                 timeout = 3,
                 reconnect_after = 3,
