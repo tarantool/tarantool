@@ -69,6 +69,32 @@ local modules = {
             },
         },
     },
+    {
+        name = 'uri',
+        source = 'src/lua/uri.lua',
+        fixtures = 'test/app-luatest/emmylua/uri',
+        fields = {
+            parse = 'Parse a URI string',
+            parse_many = 'Parse a string containing many URIs',
+            format = 'Construct a URI from the specified components',
+            escape = 'Encode a string using the specified encoding options',
+            unescape = 'Decode a string using the specified encoding options',
+            unreserved = 'Build a table of unreserved symbols',
+            values = 'Allow specifying multivalue keys',
+        },
+        objects = {
+            {
+                fixture = 'components.lua',
+                type_name = 'uri',
+                fields = {
+                    scheme = 'a URI scheme',
+                    host = 'a host subcomponent',
+                    path = 'a path component',
+                    fragment = 'a fragment component',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
