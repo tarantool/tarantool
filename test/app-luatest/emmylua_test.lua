@@ -17,10 +17,44 @@ local modules = {
             is = 'Check that the given object',
             new = 'Create a new',
         },
-        object = {
-            type_name = 'varbinary_object',
-            fields = {
-                __tostring = 'Returns the binary data',
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'varbinary_object',
+                fields = {
+                    __tostring = 'Returns the binary data',
+                },
+            },
+        },
+    },
+    {
+        name = 'xlog',
+        source = 'src/box/lua/xlog.lua',
+        fixtures = 'test/app-luatest/emmylua/xlog',
+        type_name = 'xlog',
+        fields = {
+            pairs = 'Open a file, and allow iterating',
+            meta = 'Open an xlog file',
+        },
+        objects = {
+            {
+                fixture = 'object.lua',
+                type_name = 'xlog.meta',
+                fields = {
+                    filetype = 'The file type',
+                    instance_uuid = 'The instance UUID',
+                    prev_vclock = 'The previous vclock',
+                },
+            },
+            {
+                fixture = 'entry_header.lua',
+                type_name = 'xlog.entry_header',
+                fields = {
+                    type = 'The request type',
+                    lsn = 'The log sequence number',
+                    replica_id = 'The identifier of the replica',
+                    timestamp = 'The request timestamp',
+                },
             },
         },
     },
@@ -168,37 +202,41 @@ local function run_module_test(spec)
             end, 30)
         assert_fields(client, module_items, spec.fields, spec.name .. ' module')
 
-        local object_path, object_text =
-            open_fixture(client, workspace, 'object.lua')
-        local object_uri = emmylua.file_uri(object_path)
+        for _, object in ipairs(spec.objects) do
+            local object_path, object_text =
+                open_fixture(client, workspace, object.fixture)
+            local object_uri = emmylua.file_uri(object_path)
 
-        local object_hover = client:request_until('textDocument/hover', {
-            textDocument = {uri = object_uri},
-            position = emmylua.marker_position(object_text, 'object', -1),
-        }, function(result)
-            local value = hover_text(result)
-            if value == '' or value == 'any' then
-                return false
-            end
-            return has_type_or_fields(
-                value, spec.object.type_name, spec.object.fields)
-        end, 30)
-        local object_type = normalize(hover_text(object_hover))
-        t.assert(has_type_or_fields(
-            object_type, spec.object.type_name, spec.object.fields),
-            ('%s: object type is not inferred: %s'):format(
-                spec.name, object_type))
+            local object_hover = client:request_until(
+                'textDocument/hover', {
+                    textDocument = {uri = object_uri},
+                    position = emmylua.marker_position(
+                        object_text, 'object', -1),
+                }, function(result)
+                    local value = hover_text(result)
+                    if value == '' or value == 'any' then
+                        return false
+                    end
+                    return has_type_or_fields(
+                        value, object.type_name, object.fields)
+                end, 30)
+            local object_type = normalize(hover_text(object_hover))
+            t.assert(has_type_or_fields(
+                object_type, object.type_name, object.fields),
+                ('%s: object type is not inferred: %s'):format(
+                    object.type_name, object_type))
 
-        local object_items = client:request_until(
-            'textDocument/completion', {
-                textDocument = {uri = object_uri},
-                position = emmylua.marker_position(
-                    object_text, 'object_fields'),
-            }, function(result)
-                return has_any_label(result, spec.object.fields)
-            end, 30)
-        assert_fields(client, object_items, spec.object.fields,
-            spec.name .. ' object')
+            local object_items = client:request_until(
+                'textDocument/completion', {
+                    textDocument = {uri = object_uri},
+                    position = emmylua.marker_position(
+                        object_text, 'object_fields'),
+                }, function(result)
+                    return has_any_label(result, object.fields)
+                end, 30)
+            assert_fields(client, object_items, object.fields,
+                object.type_name)
+        end
     end, debug.traceback)
 
     if client ~= nil then
