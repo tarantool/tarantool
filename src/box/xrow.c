@@ -1733,6 +1733,24 @@ error:
 			request->tuple_formats = value;
 			request->tuple_formats_end = data;
 			break;
+		case IPROTO_REQUEST_CNT:
+			uint32_t typ = mp_typeof(*value);
+			if (typ == MP_INT) {
+				request->request_cnt = mp_decode_int(&value);
+			}
+			else if (typ == MP_UINT) {
+				request->request_cnt = mp_decode_uint(&value);
+			}
+			else
+				goto error;
+			break;
+		case IPROTO_REQUEST_CNT_LEN:
+			if (mp_typeof(*value) == MP_UINT) {
+				request->request_cnt_len = mp_decode_uint(&value);
+			}
+			else
+				goto error;
+			break;
 		default:
 			continue; /* unknown key */
 		}

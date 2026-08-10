@@ -100,7 +100,7 @@ static const char *fiberlib_name = "fiber";
  * which can create the storage. Trigger guarantees, that even for non-Lua
  * fibers the Lua storage is destroyed.
  */
-static int
+int
 lbox_fiber_on_stop(struct trigger *trigger, void *event)
 {
 	struct fiber *f = event;
@@ -112,6 +112,7 @@ lbox_fiber_on_stop(struct trigger *trigger, void *event)
 	if (f->cnt_ref != FIBER_LUA_NOREF) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->cnt_ref);
 		f->cnt_ref = FIBER_LUA_NOREF;
+		f->cnt_len = 0;
 	}
 	trigger_clear(trigger);
 	free(trigger);
@@ -519,6 +520,7 @@ fiber_create(struct lua_State *L)
 		f->cnt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	} else {
 		f->cnt_ref = FIBER_LUA_NOREF;
+		f->cnt_len = 0;
 	}
 #ifdef ENABLE_BACKTRACE
 	if (fiber_parent_backtrace_is_enabled()) {

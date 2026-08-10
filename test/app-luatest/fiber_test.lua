@@ -151,3 +151,65 @@ g.test_check_distribution_meta_data_in_fiber = function()
     f_new:cancel()
     f_create:cancel()
 end
+
+g = t.group("fiber2")
+local server = require('luatest.server')
+
+g.before_all(function()
+    g.server = server:new({alias = 'master'})
+    g.server:start()
+end)
+
+g.after_all(function()
+    g.server:drop()
+end)
+
+g.test_check_distribution_meta_data_in_fiber_call = function()
+    g.server:exec(function()
+        local netbox = require('net.box')
+        local fiber = require('fiber')
+        box.schema.user.create('test_user', {password = 'test'})
+        box.schema.user.grant('test_user', 'read, write, execute', 'universe')
+        box.schema.user.grant('test_user', 'create', 'space')
+        local cn = netbox.connect(box.cfg.listen,{user = 'test_user', password = 'test'})
+
+        box.schema.func.create('f_nil', {
+            body = [[
+                function()
+                    return require('fiber').self():get_cnt()
+                end
+            ]],
+            language = 'Lua'
+        })
+
+        box.schema.func.create('f_set', {
+            body = [[
+                function()
+                    require('fiber').self():set_cnt({a = 0, b = 1})
+                    return require('fiber').self():get_cnt()
+                end
+            ]],
+            language = 'Lua'
+        })
+
+        local f = fiber.self()
+        local res = cn:call('f_nil', {})
+        t.assert_equals(res, nil)
+
+        res = cn:call('f_set', {})
+        t.assert_equals(res, {a = 0, b = 1})
+        t.assert_equals(f:get_cnt(), nil)
+
+        f:set_cnt({c = 'abd'})
+
+        res = cn:call('f_nil', {})
+        t.assert_equals(res, {c = 'abd'})
+
+        res = cn:call('f_set', {})
+        t.assert_equals(res, {a = 0, b = 1})
+        t.assert_equals(f:get_cnt(), {c = 'abd'})
+
+        cn:close()
+        box.schema.user.drop('test_user')
+    end)
+end
