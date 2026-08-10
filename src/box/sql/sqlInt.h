@@ -213,6 +213,15 @@
 #include <assert.h>
 #include <stddef.h>
 
+/**
+ * When the value is `true` we do search in sql looks only for an exact
+ * name match.
+ * When the value is `false` we additionally do search in sql first looks for
+ * an exact match; if that fails, we do searc using the name
+ * converted to uppercase.
+ */
+extern bool sql_legacy_name_normalization;
+
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
