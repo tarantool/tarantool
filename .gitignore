@@ -192,3 +192,7 @@ states/
 
 # Per-developer local setup notes (agent-generated, machine-specific)
 doc/agents/local_setup.md
+
+# Local findings files of the agent-driven reviews (see
+# doc/agents/review.md)
+/reviews/
