@@ -34,7 +34,6 @@
  */
 /*
  * AI review test block A, line 1.
- * AI review test block A, line 2, will be deleted in a later commit.
  * AI review test block A, line 3.
  * AI review test block A, line 4, edited in a later commit.
  */
@@ -124,7 +123,6 @@ static char status[64] = "unconfigured";
 /**
  * Storage for WAL vclock. Not in-memory but specifically for what is the
  * vclock of the end of WAL.
- *
  * It is encapsulated inside this file to protect it from any illegal changes
  * by outside code.
  */
