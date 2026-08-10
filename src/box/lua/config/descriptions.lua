@@ -502,6 +502,14 @@ I['compat.datetime_setfn_timestamp_type_check'] = format_text([[
     - `old` (3.x default): don't check
 ]])
 
+I['compat.sql_uppercase_id'] = format_text([[
+    In SQL if the name is not found via an exact match,
+    it also searches for the uppercase version:
+
+    - `new` (3.x default): false
+    - `old` (2.x default): true
+]])
+
 -- }}} compat configuration
 
 -- {{{ config configuration

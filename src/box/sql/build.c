@@ -1865,6 +1865,20 @@ fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
 	return *links_offset + link_count * sizeof(struct field_link);
 }
 
+bool
+sql_find_foregin_key_name(const Token *parent, const char *space_name)
+{
+	const char *parent_name = sql_name_from_token(parent);
+	bool is_self_referenced = strcmp(parent_name, space_name) == 0;
+	if (!is_self_referenced && parent->z[0] != '"' &&
+	    sql_uppercase_id) {
+		char *old_name = sql_legacy_name_new(parent->z,
+						     parent->n);
+		is_self_referenced = strcmp(old_name, space_name) == 0;
+		sql_xfree(old_name);
+	}
+	return is_self_referenced;
+}
 void
 sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 		       struct Token *name, struct ExprList *child_cols,
@@ -1927,22 +1941,20 @@ sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 	}
 	assert(parent != NULL);
 	parent_name = sql_name_from_token(parent);
-	/*
-	 * Within ALTER TABLE ADD CONSTRAINT FK also can be
-	 * self-referenced, but in this case parent (which is
-	 * also child) table will definitely exist.
-	 */
-	if (!is_alter_add_constr) {
-		const char *space_name = space->def->name;
-		is_self_referenced = strcmp(parent_name, space_name) == 0;
-		if (!is_self_referenced && parent->z[0] != '"') {
-			char *old_name = sql_legacy_name_new(parent->z,
-							     parent->n);
-			is_self_referenced = strcmp(old_name, space_name) == 0;
-			sql_xfree(old_name);
+	const struct space *parent_space = sql_space_by_token(parent);
+	if ((parent_space == NULL) ||
+	    ((space != NULL) && (space->def->id == parent_space->def->id))) {
+		/*
+		 * Within ALTER TABLE ADD CONSTRAINT FK also can be
+		 * self-referenced, but in this case parent (which is
+		 * also child) table will definitely exist.
+		 */
+		if (!is_alter_add_constr) {
+			const char *space_name = space->def->name;
+			is_self_referenced =
+			sql_find_foregin_key_name(parent, space_name);
 		}
 	}
-	const struct space *parent_space = sql_space_by_token(parent);
 	if (parent_space == NULL && !is_self_referenced) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);
 		goto tnt_error;
@@ -3014,6 +3026,16 @@ sqlArrayAllocate(void *pArray, size_t szEntry, int *pnEntry, int *pIdx)
 	return pArray;
 }
 
+void
+sql_add_name_token_in_IdItem(struct IdList_item *item, const Token *name_token)
+{
+	item->zName = sql_name_from_token(name_token);
+	if (name_token->z[0] != '"' && sql_uppercase_id) {
+		item->legacy_name = sql_legacy_name_new(name_token->z,
+							name_token->n);
+	}
+}
+
 struct IdList *
 sql_id_list_append(struct IdList *list, struct Token *name_token)
 {
@@ -3023,11 +3045,8 @@ sql_id_list_append(struct IdList *list, struct Token *name_token)
 	assert(list->nId >= 0);
 	list->a = sqlArrayAllocate(list->a, sizeof(list->a[0]), &list->nId, &i);
 	assert(i >= 0);
-	list->a[i].zName = sql_name_from_token(name_token);
-	if (name_token->z[0] != '"') {
-		list->a[i].legacy_name = sql_legacy_name_new(name_token->z,
-							     name_token->n);
-	}
+	struct IdList_item *item = &list->a[i];
+	sql_add_name_token_in_IdItem(item, name_token);
 	return list;
 }
 
@@ -3107,6 +3126,16 @@ sql_src_list_new(void)
 	return src_list;
 }
 
+void
+sql_add_name_token_in_SrcItem(struct SrcList_item *item, const Token *name_token)
+{
+	item->zName = sql_name_from_token(name_token);
+	if (name_token->z[0] != '"' && sql_uppercase_id) {
+		item->legacy_name = sql_legacy_name_new(name_token->z,
+							name_token->n);
+	}
+}
+
 struct SrcList *
 sql_src_list_append(struct SrcList *list, struct Token *name_token)
 {
@@ -3119,11 +3148,7 @@ sql_src_list_append(struct SrcList *list, struct Token *name_token)
 	}
 	struct SrcList_item *item = &list->a[list->nSrc - 1];
 	if (name_token != NULL) {
-		item->zName = sql_name_from_token(name_token);
-		if (name_token->z[0] != '"') {
-			item->legacy_name = sql_legacy_name_new(name_token->z,
-								name_token->n);
-		}
+		sql_add_name_token_in_SrcItem(item, name_token);
 	}
 	return list;
 }
@@ -3223,7 +3248,7 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 		} else if (pIndexedBy->z != NULL) {
 			pItem->u1.zIndexedBy = sql_name_from_token(pIndexedBy);
 			pItem->fg.isIndexedBy = true;
-			if (pIndexedBy->z[0] != '"') {
+			if (pIndexedBy->z[0] != '"' && sql_uppercase_id) {
 				pItem->legacy_index_name =
 					sql_legacy_name_new(pIndexedBy->z,
 							    pIndexedBy->n);
@@ -3295,7 +3320,8 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 	 */
 	int old_name_reg = 0;
 	assert(pName->n > 0);
-	if (op != SAVEPOINT_BEGIN && pName->z[0] != '"') {
+	if (op != SAVEPOINT_BEGIN && pName->z[0] != '"' &&
+	    sql_uppercase_id) {
 		old_name_reg = ++pParse->nMem;
 		char *old_name = sql_legacy_name_new(pName->z, pName->n);
 		sqlVdbeAddOp4(v, OP_String8, 0, old_name_reg, 0, old_name,
