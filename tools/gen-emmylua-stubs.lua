@@ -176,7 +176,7 @@ end
 
 local function emit_type(statement, declared, body)
     local name = statement:match('^local%s+([%a_][%w_]*)%s*=')
-    if name ~= nil then
+    if name ~= nil and not declared[name] then
         table.insert(body, 'local ' .. name .. ' = {}')
         declared[name] = true
     end

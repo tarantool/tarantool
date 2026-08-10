@@ -40,10 +40,13 @@ looks like this:
         is = 'Check that the given object',
         new = 'Create a new',
     },
-    object = {
-        type_name = 'varbinary_object',
-        fields = {
-            __tostring = 'Returns the binary data',
+    objects = {
+        {
+            fixture = 'object.lua',
+            type_name = 'varbinary_object',
+            fields = {
+                __tostring = 'Returns the binary data',
+            },
         },
     },
 }
@@ -60,11 +63,12 @@ For each specification the test:
    every field from `fields` is present.
 5. Resolves every completion item and checks that its
    documentation contains the expected phrase.
-6. Repeats the field and documentation checks for the type
-   returned by the object expression, using `object.lua`.
+6. Repeats the field and documentation checks for every object
+   fixture of the module.
 
-The `object.lua` fixture obtains the object type with the module's
-constructor, for example `varbinary.new('data')`.
+An object fixture obtains the object type either with the module's
+constructor, for example `varbinary.new('data')`, or from a value
+returned by a module function, for example `xlog.pairs()`.
 
 Only `---@field` annotations are checked. Metamethods declared with
 `---@operator` are not class members, so they do not show up in
