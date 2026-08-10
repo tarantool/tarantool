@@ -28,6 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * AI review test block A, line 1.
+ * AI review test block A, line 2, will be deleted in a later commit.
+ * AI review test block A, line 3.
+ * AI review test block A, line 4.
+ */
 #include "box/box.h"
 
 #include "trivia/config.h"
