@@ -1934,7 +1934,8 @@ sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 	if (!is_alter_add_constr) {
 		const char *space_name = space->def->name;
 		is_self_referenced = strcmp(parent_name, space_name) == 0;
-		if (!is_self_referenced && parent->z[0] != '"') {
+		if (!is_self_referenced && parent->z[0] != '"' &&
+		    sql_legacy_name_normalization) {
 			char *old_name = sql_legacy_name_new(parent->z,
 							     parent->n);
 			is_self_referenced = strcmp(old_name, space_name) == 0;
@@ -3023,7 +3024,7 @@ sql_id_list_append(struct IdList *list, struct Token *name_token)
 	list->a = sqlArrayAllocate(list->a, sizeof(list->a[0]), &list->nId, &i);
 	assert(i >= 0);
 	list->a[i].zName = sql_name_from_token(name_token);
-	if (name_token->z[0] != '"') {
+	if (name_token->z[0] != '"' && sql_legacy_name_normalization) {
 		list->a[i].legacy_name = sql_legacy_name_new(name_token->z,
 							     name_token->n);
 	}
@@ -3119,7 +3120,7 @@ sql_src_list_append(struct SrcList *list, struct Token *name_token)
 	struct SrcList_item *item = &list->a[list->nSrc - 1];
 	if (name_token != NULL) {
 		item->zName = sql_name_from_token(name_token);
-		if (name_token->z[0] != '"') {
+		if (name_token->z[0] != '"' && sql_legacy_name_normalization) {
 			item->legacy_name = sql_legacy_name_new(name_token->z,
 								name_token->n);
 		}
@@ -3222,7 +3223,8 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 		} else if (pIndexedBy->z != NULL) {
 			pItem->u1.zIndexedBy = sql_name_from_token(pIndexedBy);
 			pItem->fg.isIndexedBy = true;
-			if (pIndexedBy->z[0] != '"') {
+			if (pIndexedBy->z[0] != '"' &&
+			    sql_legacy_name_normalization) {
 				pItem->legacy_index_name =
 					sql_legacy_name_new(pIndexedBy->z,
 							    pIndexedBy->n);
@@ -3294,7 +3296,8 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 	 */
 	int old_name_reg = 0;
 	assert(pName->n > 0);
-	if (op != SAVEPOINT_BEGIN && pName->z[0] != '"') {
+	if (op != SAVEPOINT_BEGIN && pName->z[0] != '"' &&
+	    sql_legacy_name_normalization) {
 		old_name_reg = ++pParse->nMem;
 		char *old_name = sql_legacy_name_new(pName->z, pName->n);
 		sqlVdbeAddOp4(v, OP_String8, 0, old_name_reg, 0, old_name,

@@ -213,6 +213,14 @@
 #include <assert.h>
 #include <stddef.h>
 
+/**
+ * This flag controls how the SQL search matches names.
+ * `true`  - exact name match only.
+ * `false` - first tries an exact match; if none is found, retries with the
+ *           name converted to uppercase.
+ */
+extern bool sql_legacy_name_normalization;
+
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
