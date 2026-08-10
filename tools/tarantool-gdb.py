@@ -21,6 +21,21 @@ if sys.version_info[0] == 2:
 elif sys.version_info[0] == 3:
     unicode = str
 
+
+enumauto = itertools.count().__next__
+arch_id_x86_64 = enumauto()
+arch_id_aarch64 = enumauto()
+
+
+def map_to_arch_id(arch: gdb.Architecture):
+    arch_name = arch.name().lower()
+    if "x86-64" in arch_name:
+        return arch_id_x86_64
+    elif "aarch64" in arch_name:
+        return arch_id_aarch64
+    return None
+
+
 logger = logging.getLogger('gdb.tarantool')
 logger.setLevel(logging.WARNING)
 
@@ -45,13 +60,13 @@ def int_from_address(address):
 def find_type(type):
     try:
         return gdb.lookup_type(type)
-    except Exception as exc:
+    except Exception:
         return None
 
 def find_value(sym):
     try:
         return gdb.parse_and_eval(sym)
-    except Exception as exc:
+    except Exception:
         return None
 
 def find(predicate, iterable, default=None):
@@ -69,6 +84,9 @@ def enumval_name(type, val, default):
 def cast_ptr(dest_type, ptr, offset):
     dest_ptr = ptr.cast(gdb.lookup_type('char').pointer()) + offset
     return dest_ptr.cast(dest_type.pointer())
+
+def offset_ptr(ptr, offset):
+    return cast_ptr(ptr.type.target(), ptr, offset)
 
 def container_of(ptr, container_type, field):
     return cast_ptr(container_type, ptr, -(container_type[field].bitpos // 8)).dereference()
@@ -266,14 +284,14 @@ class MsgPack(object):
 
     @staticmethod
     def decode_array(data): # mp_decode_array
-        c = data.read_u8();
+        c = data.read_u8()
         if not (c & 0x40):
             return c & 0xf
         return MsgPack.decode_array_slowpath(c, data)
 
     @staticmethod
     def decode_map(data): # mp_decode_map
-        c = data.read_u8();
+        c = data.read_u8()
         if c == 0xde:
             return data.read_u16()
         elif c == 0xdf:
@@ -376,7 +394,7 @@ class MsgPack(object):
         k = 1
         while k > 0:
             c = data.read_u8()
-            l = cls.mp_parser_hint[c];
+            l = cls.mp_parser_hint[c]
             if l >= 0:
                 data.seek(l)
                 k -= 1
@@ -881,7 +899,7 @@ if find_type('struct decNumber') is not None:
             if digits == 0: return dn
 
             while True:
-                nib = (bcd[last] & 0xf0) >> 4;
+                nib = (bcd[last] & 0xf0) >> 4
                 if nib > 9: return None, "unexpected digit in high nibble: bcd[{}]={:02x}".format(last, bcd[last])
 
                 if cut == 0: dn.val['lsu'][up] = nib
@@ -1178,10 +1196,10 @@ if find_type('struct datetime') is not None:
 
             else:
                 if offset < 0:
-                    sign = '-';
-                    offset = -offset;
+                    sign = '-'
+                    offset = -offset
                 else:
-                    sign = '+';
+                    sign = '+'
                 s += '{}{:02d}{:02d}'.format(sign, offset // 60, offset % 60)
 
             return s
@@ -2587,16 +2605,319 @@ Examples (repeat the command until the list is exhausted):
 TtListWalk()
 
 
-def cord():
-    return gdb.parse_and_eval('cord_ptr')
+def log(msg):
+    gdb.write(msg + "\n")
+    pass
 
-def fiber():
-    return cord()['fiber']
+
+class SearchMemory(gdb.Function):
+    """
+Return address of thread-local variable for the current thread.
+
+GDB needs additional thread-specific debugging information so user is able to handle
+thread-local variables (the ones that are declared with 'thread_local' or similar specifiers)
+in the same way as regular ones. This debugging information is provided with libthread_db and
+might be unavailable for some reason. If so this function might be helpful.
+
+This function uses the fact that thread-local variable is stored at the same offset
+in every thread local storage (TLS), so if the offset for the certain variable is
+discovered somehow one might use this function to get variable address.
+
+Usage: $tl_var_address(TLS_OFFSET)
+
+Arguments:
+    TLS_OFFSET: offset the variable is stored at in TLS
+
+Returns:
+    Address of the variable for the current thread
+
+Example:
+    # Display some thread-local string (assume it's TLS-offset is 0x100)
+    print (char*)$tl_var_address(0x100)
+    # Display errno (which is thread-local) of every thread (assume it's TLS-offset is 123)
+    thread apply all print *(int*)$tl_var_address(120)
+
+See also:
+    help function find_tl_var_like
+    help show max_tls_offset
+    """
+
+    def __init__(self):
+        super(SearchMemory, self).__init__("find")
+
+    def invoke(self, start_address, length, val):
+        # Turn gdb.Value into search pattern.
+        val_as_array = val.cast(gdb.lookup_type("uint8_t").array(val.type.sizeof-1))
+        search_pattern = bytes([val_as_array[i] for i in range(val.type.sizeof)])
+        return gdb.selected_inferior().search_memory(start_address, length, search_pattern)
+
+
+SearchMemory()
+
+
+class TlVarSearchRangeParam(gdb.Parameter):
+    param_name = "tl-var-search-range"
+
+    __title = "range for searching thread-local variables"
+    __doc_footer = """
+        It is used by $tl_var_find_offset and $tl_var_like functions if
+        "SEARCH_RANGE argument is omitted."""
+
+    def __init__(self):
+        self.set_doc = "Set {}.\n{}".format(self.__title, self.__doc_footer)
+        self.show_doc = "Show {}.\n{}".format(self.__title, self.__doc_footer)
+        super(TlVarSearchRangeParam, self).__init__(self.__class__.param_name,
+            gdb.COMMAND_DATA, gdb.PARAM_UINTEGER)
+        self.value = 0x10000
+
+    def get_show_string(self, svalue):
+        return "{} is {}".format(self.__title.capitalize(), svalue)
+
+    def get_set_string(self, svalue):
+        return "{} is set to {}".format(self.__title.capitalize(), svalue)
+
+
+TlVarSearchRangeParam()
+
+
+def tls_base():
+    arch = gdb.selected_frame().architecture()
+    tls_base_expr = {
+        arch_id_x86_64: "$fs_base",
+        arch_id_aarch64: "$tpidr_el0",
+    }.get(map_to_arch_id(arch))
+
+    if tls_base_expr is None:
+        raise gdb.GdbError("tls_base: architecture '{}' is not supported".format(arch.name()))
+
+    return gdb.parse_and_eval(tls_base_expr)
+
+
+class TlVarAddr(gdb.Function):
+    """Return address of the thread-local variable at the given offset for the current thread.
+
+To be able to handle thread-local variables (the ones declared with
+'thread_local' or similar specifiers) GDB needs additional thread-specific
+debugging information that is provided usually with libthread_db and might
+be unavailable for some reason. If so this function might be helpful.
+
+It uses the fact that certain thread-local variable is stored at the same
+offset relative to the base memory address of thread-local storage (TLS) so
+if somehow value of certain thread-local variable is known for some thread
+this function could be used to find it for the current thread.
+
+Usage:
+    $tl_var_addr(TLS_OFFSET)
+
+Arguments:
+    TLS_OFFSET:
+
+Returns:
+    Value of the variable for the current thread
+
+Example:
+    # print thread-local cord_ptr (it is known that in some thread its value is equal to &main_cord)
+    print (cord*)$tl_var_addr(-112)
+
+See also:
+    help tl_var_like
+    help tl_var_find_offset
+    help show tl-var-search-range
+    """
+
+    def __init__(self):
+        super(TlVarAddr, self).__init__("tl_var_addr")
+
+    def invoke(self, tls_offset):
+        return offset_ptr(tls_base(), tls_offset)
+
+
+TlVarAddr()
+
+
+def log(msg):
+    gdb.write(msg + "\n")
+    pass
+
+
+# Generally it is expected that if 'find_tls_offset' function is needed it works fine.
+# This function is mostly introduced to allow for a quick check if something goes wrong.
+class TlVarFindOffset(gdb.Function):
+    """
+Find TLS-offset of thread local variable by known reference value.
+
+To be able to handle thread-local variables (the ones declared with the
+'thread_local' or similar specifier) in the same way as the other ones GDB
+needs additional thread-specific debugging information that is provided usually
+with libthread_db, but it might be unavailable (or mismatched) for some reason.
+If so this function might be helpful.
+
+It iterates over all threads and search every thread-local
+storage (TLS) for the 'ref_val'. If found the offset from the base address of
+the corresponding TLS is returned, otherwise it returns 'None'.
+Thread-local variables are stored in a region preceding base of TLS, that is
+when found the returned offset is always negative.
+
+It uses the fact that certain thread-local variable is stored with the same
+offset relative to the base memory address of thread-local storage (TLS) so
+if somehow value of the desired thread-local variable is known for some thread
+(it's not necessary to know for which one) this function could be used to find
+its offset from TLS, and it could be
+
+It uses the fact that certain thread-local variable is stored with the same
+offset relative to the base memory address of thread-local storage (TLS) so
+if somehow value of the desired thread-local variable is known for some thread
+this function could be used to find its  for the current thread.
+
+Usage: $tl_var_find_offset(REF_VAL[, SEARCH_RANGE])
+
+Arguments:
+    REF_VAL: known value of the thread-local variable
+    SEARCH_RANGE: size of searched area in TLS (optional, get default from 'tl-var-search-range')
+
+Returns:
+    Offset from the base address of TLS.
+
+Example:
+    # if not able to get thread local variable in a usual way
+    print cord_ptr
+    Cannot find thread-local variables on this target
+    # but we know that 'cord_ptr' in some thread points to &main_cord
+    print (cord*)($fs_base-$find_tls_offset(&main_cord))
+    print ()
+
+See also:
+    help function find_tl_var_like
+    help show tl-var-search-range
+    """
+
+    def __init__(self):
+        super(TlVarFindOffset, self).__init__("tl_var_find_offset")
+        self.__cached_offsets = {}
+
+    def invoke(self, ref_val, search_range=None):
+        if search_range is None:
+            search_range = gdb.parameter(TlVarSearchRangeParam.param_name)
+
+        if search_range < 0:
+            raise gdb.GdbError("Invalid range {}. It must be greater than zero.".format(search_range))
+
+        if search_range < ref_val.type.sizeof:
+            raise gdb.GdbError("Range of size {} is not able to contain variable of size {}.".format(
+                search_range,
+                ref_val.type.sizeof,
+            ))
+
+        # Turn gdb.Value into search pattern.
+        log("TlVarFindOffset.invoke: 1 search_range={}".format(search_range))
+        ref_val_as_array = ref_val.cast(gdb.lookup_type("uint8_t").array(ref_val.type.sizeof-1))
+        log("TlVarFindOffset.invoke: 2")
+        search_pattern = bytes((ref_val_as_array[i] for i in range(ref_val.type.sizeof)))
+        log("TlVarFindOffset.invoke: 3")
+
+        offset = self.__cached_offsets.get(search_pattern)
+        log("TlVarFindOffset.invoke: 4 offset={}".format(offset))
+        if offset is None or search_range < -offset:
+            log("TlVarFindOffset.invoke: 5 offset={}".format(offset))
+            offset = self.__find_offset(search_pattern, search_range)
+            log("TlVarFindOffset.invoke: 6 offset={}".format(offset))
+            if offset is None:
+                raise gdb.GdbError("Failed to find the given value in any TLS.")
+            self.__cached_offsets[search_pattern] = offset
+
+        return offset
+
+    @staticmethod
+    def __find_offset(search_pattern, search_range):
+        # Save currently selected thread to restore it after iteration over threads.
+        orig_thread = gdb.selected_thread()
+
+        inferior = gdb.selected_inferior()
+        offset = None
+        for thread in inferior.threads():
+            thread.switch()
+
+            log("TlVarFindOffset.__find_offset: 0")
+            base = tls_base()
+            log("TlVarFindOffset.__find_offset: 1 tls_base={}".format(base))
+            log("TlVarFindOffset.__find_offset: 1 tls_base.type.code={}".format(base.type.code))
+            log("TlVarFindOffset.__find_offset: 1 tls_base.type.sizeof={}".format(base.type.sizeof))
+            base = int(tls_base())
+            log("TlVarFindOffset.__find_offset: 2 base={}".format(base))
+
+            # Thread-local variables resides in a region preceding base address of TLS.
+            addr = inferior.search_memory(base - search_range, search_range, search_pattern)
+            if addr is None:
+                continue
+
+            offset = addr - base
+
+            # Make search range for next searching less than the last found offset to make sure
+            # the next found (if any) will be closer to its TLS base.
+            search_range = -offset - 1
+
+        # Switch back to initially selected thread.
+        orig_thread.switch()
+
+        return offset
+
+
+class TlVarLike(gdb.Function):
+    """Find thread-local variable with the given known value for some thread.
+
+Generally thread-local variables (the ones declared with the 'thread_local' or
+similar specifier) are handled in the same way as the general ones, so this
+function is no needed. But when thread-specific debugging information is not
+available (or mismatched) for some reason this function might be helpful.
+
+It uses the fact that certain thread-local variable in all threads is stored
+at the same offset relative to the base memory address of thread-local storage
+(TLS) so if somehow value of the given thread-local variable is known for some
+thread (it's not necessary to know for which one) this function could be used
+to find its value for the current thread.
+
+Usage:
+    $tl_var_like(REF_VAL, [SEARCH_RANGE])
+
+Arguments:
+    REF_VAL: known value of the variable for some thread
+    SEARCH_RANGE: search range in TLS (optional, default is 'tl-var-search-range')
+
+Returns:
+    Value of the variable for the current thread
+
+Example:
+    # print thread-local cord_ptr (it is known that in some thread its value is equal to &main_cord)
+    print $tl_var_like(&main_cord)
+
+See also:
+    help tl_var_addr
+    help tl_var_find_offset
+    help show tl-var-search-range
+    """
+
+    def __init__(self, find_offset_func):
+        super(TlVarLike, self).__init__("tl_var_like")
+        self.__find_offset_func = find_offset_func
+
+    def invoke(self, ref_val, search_range=None):
+        offset = self.__find_offset_func.invoke(ref_val, search_range)
+        return cast_ptr(ref_val.type, tls_base(), offset).dereference()
+
+
+TlVarLike(TlVarFindOffset())
+
+
+def cord():
+    return find_value("cord_ptr") or gdb.parse_and_eval("$tl_var_like(&main_cord)")
 
 
 class Cord(object):
     def __init__(self):
         self.__cord_ptr = cord()
+
+    def fiber(self):
+        return self.__cord_ptr["fiber"]
 
     def fibers(self):
         fibers = self.__cord_ptr['alive']
@@ -2605,7 +2926,7 @@ class Cord(object):
         fibers = map(lambda x: list_entry_info.container_from_field(x), fibers)
         return itertools.chain(fibers, [self.__cord_ptr['sched'].address])
 
-    def fiber(self, fid):
+    def find_fiber(self, fid):
         return next((f for f in self.fibers() if f['fid'] == fid), None)
 
 
@@ -2613,9 +2934,9 @@ try:
     import gdb.unwinder
     support_unwinders = True
 
-except ImportError as e:
+except ImportError:
     support_unwinders = False
-    msg_cant_explore_fiber_stack = "Exploring stack of non-current fiber is not supported with this version of GDB."
+    msg_cant_explore_fiber_stack = "Exploring stack of non-running fiber is not supported with this version of GDB (requires GDB 8+)"
     gdb.write("WARNING: " + msg_cant_explore_fiber_stack + '\n')
 
 
@@ -2648,17 +2969,58 @@ if support_unwinders:
         def instance(cls):
             if cls.__instance is None:
                 cls.__instance = cls()
+                gdb.unwinder.register_unwinder(gdb.current_progspace(), cls.__instance, True)
             return cls.__instance
 
         def __init__(self):
             super(FiberUnwinder, self).__init__('TtFiberUnwinder')
-            self.reset_fiber()
-            self.__frame_filter = None
+            self.__frame_filter = FiberUnwinderFrameFilter()
+            self.__unwind_mode = True
+            self.__arch = None
+            self.__set_fiber_internal(None)
 
-            # Initialize architecture specific parameters of coro context
-            arch = gdb.newest_frame().architecture().name().lower()
+        def fiber(self):
+            return self.__fiber
+
+        def set_fiber(self, f):
+            self.__set_fiber_internal(f)
+            self.__arch = self.get_arch()
+            gdb.invalidate_cached_frames()
+
+        def __set_fiber_internal(self, f):
+            self.__fiber = f
+            self.__is_running_fiber_frame_unwound = False
+            self.__cord = cord()
+
+        def get_arch(self):
+            if hasattr(gdb.selected_inferior(), "architecture"):
+                return gdb.selected_inferior().architecture()
+            self.__unwind_mode = False
+            arch = gdb.selected_frame().architecture()
+            self.__unwind_mode = True
+            return arch
+
+        def __call__(self, pending_frame):
+            if not self.__unwind_mode:
+                return None
+
+            # Reset fiber if the unwinder is called due to thread (and hence cord) switching
+            if self.__cord != cord():
+                self.__set_fiber_internal(None)
+
+            # For the currently running fiber use the default unwinder and don't filter frames
+            if self.__fiber is None:
+                self.__frame_filter.skip_frame_sp = None
+                return None
+
+            # Once running fiber frame is unwinded proceed with the default unwinder.
+            if self.__is_running_fiber_frame_unwound:
+                return None
+
+            # Architecture specific parameters of coro context
+            arch = self.__arch.name().lower()
             if arch.find('x86-64') != -1:
-                self.__coro_ctx_regs = [
+                coro_ctx_regs = [
                     'r15',
                     'r14',
                     'r13',
@@ -2667,12 +3029,12 @@ if support_unwinders:
                     'rbp',
                     'rip',
                 ]
-                self.__ctx_offs_lr = self.__coro_ctx_regs.index('rip')
-                self.__reg_pc = 'rip'
-                self.__reg_sp = 'rsp'
+                ctx_offs_lr = coro_ctx_regs.index('rip')
+                reg_pc = 'rip'
+                reg_sp = 'rsp'
 
             elif arch.find('aarch64') != -1:
-                self.__coro_ctx_regs = [
+                coro_ctx_regs = [
                     'x19', 'x20',
                     'x21', 'x22',
                     'x23', 'x24',
@@ -2684,55 +3046,22 @@ if support_unwinders:
                     'd12', 'd13',
                     'd14', 'd15',
                 ]
-                self.__ctx_offs_lr = self.__coro_ctx_regs.index('x30')
-                self.__reg_pc = 'pc'
-                self.__reg_sp = 'sp'
+                ctx_offs_lr = coro_ctx_regs.index('x30')
+                reg_pc = 'pc'
+                reg_sp = 'sp'
 
             else:
-                raise gdb.GdbError("FiberUnwinder: architecture '{}' is not supported".format(arch))
+                raise gdb.GdbError("FiberUnwinder: architecture '{}' is not supported".format(arch.name()))
 
-            if support_unwinders:
-                gdb.unwinder.register_unwinder(gdb.current_progspace(), self, True)
-
-        def fiber(self):
-            return self.__fiber if self.__cord == cord() else fiber()
-
-        def set_fiber(self, f):
-            self.__fiber = f
-            self.__cord = cord()
-
-        def reset_fiber(self):
-            self.set_fiber(fiber())
-
-        def __call__(self, pending_frame):
-            # Reset fiber if the unwinder is called due to thread (and hence cord) switching
-            if self.__cord != cord():
-                self.reset_fiber()
-
-            # Make sure unwinder frame filter is initialized
-            if self.__frame_filter is None:
-                self.__frame_filter = FiberUnwinderFrameFilter()
-
-            # For the currently running fiber use the default unwinder and don't filter frames
-            if self.fiber() == fiber():
-                self.__frame_filter.skip_frame_sp = None
-                return None
-
-            orig_sp = pending_frame.read_register(self.__reg_sp)
-            orig_pc = pending_frame.read_register(self.__reg_pc)
-
-            # Register 'sp' is used to identify that the outermost frame of the fiber has been
-            # injected already. After that proceed with the default unwinder.
-            reg_sp_exp = '${}'.format(self.__reg_sp)
-            if orig_sp != gdb.parse_and_eval(reg_sp_exp):
-                return None
+            orig_sp = pending_frame.read_register(reg_sp)
+            orig_pc = pending_frame.read_register(reg_pc)
 
             # Frame matching actual stack pointer should be skipped as it refers to
             # the running fiber
-            self.__frame_filter.skip_frame_sp = (self.__reg_sp, orig_sp)
+            self.__frame_filter.skip_frame_sp = (reg_sp, orig_sp)
 
             # Get fiber stack
-            sp = self.fiber()['ctx']['sp']
+            sp = self.__fiber['ctx']['sp']
 
             # Create UnwindInfo. Usually the frame is identified by the stack
             # pointer and the program counter.
@@ -2740,12 +3069,14 @@ if support_unwinders:
 
             # Find the values of the registers in the caller's frame and
             # save them in the result:
-            pc = (sp + self.__ctx_offs_lr).dereference()
-            for reg in self.__coro_ctx_regs:
+            pc = (sp + ctx_offs_lr).dereference()
+            for reg in coro_ctx_regs:
                 unwind_info.add_saved_register(reg, sp.dereference())
                 sp += 1
-            unwind_info.add_saved_register(self.__reg_pc, pc)
-            unwind_info.add_saved_register(self.__reg_sp, sp)
+            unwind_info.add_saved_register(reg_pc, pc)
+            unwind_info.add_saved_register(reg_sp, sp)
+
+            self.__is_running_fiber_frame_unwound = True
 
             # Return the result:
             return unwind_info
@@ -2761,15 +3092,19 @@ Otherwise, all fibers of the current cord are displayed."""
         super(FibersInfo, self).__init__("info tt-fibers", gdb.COMMAND_STATUS)
 
     def invoke(self, arg, from_tty):
+        cord = Cord()
+
         # Prepare sequence of fibers
-        fibers = Cord().fibers()
+        fibers = cord.fibers()
         ids = arg.split()
         if len(ids) > 0:
             ids = set(map(lambda x: int(x), ids))
             fibers = filter(lambda f: int(f['fid']) in ids, fibers)
 
-        fiber_cur = fiber()
-        fiber_to_unwind = FiberUnwinder.instance().fiber() if support_unwinders else fiber_cur
+        fiber_cur = fiber_to_unwind = cord.fiber()
+        if support_unwinders and FiberUnwinder.instance().fiber():
+            fiber_to_unwind = FiberUnwinder.instance().fiber()
+
         gdb.write('{marker_cur} {id:6} {target:8} {name:32} {marker_unwind} {stack:18} {func}\n'.format(
             marker_cur=' ',
             marker_unwind=' ',
@@ -2814,8 +3149,10 @@ it just selects stack to explore w/o changing any register/data."""
         if not support_unwinders:
             raise gdb.GdbError(msg_cant_explore_fiber_stack)
 
+        cord = Cord()
+
         if not arg:
-            f = FiberUnwinder.instance().fiber()
+            f = FiberUnwinder.instance().fiber() or cord.fiber()
             gdb.write('Current fiber is {id} "{name}" {func}\n'.format(
                 id=f['fid'],
                 name=f['name'].string(),
@@ -2826,18 +3163,22 @@ it just selects stack to explore w/o changing any register/data."""
         argv = gdb.string_to_argv(arg)
         try:
             fid = int(argv[0])
+
         except Exception as e:
-            gdb.write('Invalid fiber ID: {}\n'.format(argv[0]))
-            return
+            raise gdb.GdbError("Invalid fiber ID: {}".format(argv[0]))
 
-        f = Cord().fiber(fid)
+        f = cord.find_fiber(fid)
         if f is None:
-            gdb.write("Unknown fiber {}.\n".format(argv[0]))
-            return
+            raise gdb.GdbError("Unknown fiber {}.".format(argv[0]))
 
-        FiberUnwinder.instance().set_fiber(f)
-        gdb.invalidate_cached_frames()
+        fiber_to_unwind, frame_to_select = (None, 0) if f == cord.fiber() else (f, 1)
+        FiberUnwinder.instance().set_fiber(fiber_to_unwind)
+        gdb.write("Switching stack unwinder to fiber {} ({:#x} ({}))\n".format(
+            f["fid"],
+            int_from_address(f),
+            f["name"].string(),
+        ))
 
-        gdb.execute('frame {}'.format(0 if f == fiber() else 1))
+        gdb.execute("frame {}".format(frame_to_select), False, True)
 
 Fiber()
