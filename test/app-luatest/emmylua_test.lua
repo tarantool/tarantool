@@ -9,6 +9,17 @@ local root = emmylua.source_root()
 -- add a spec and a fixture directory with module.lua and object.lua.
 local modules = {
     {
+        name = 'strict',
+        source = 'src/lua/strict.lua',
+        fixtures = 'test/app-luatest/emmylua/strict',
+        type_name = 'strict',
+        fields = {
+            on = 'Enable strict mode',
+            off = 'Disable strict mode',
+        },
+        objects = {},
+    },
+    {
         name = 'varbinary',
         source = 'src/lua/varbinary.lua',
         fixtures = 'test/app-luatest/emmylua/varbinary',
