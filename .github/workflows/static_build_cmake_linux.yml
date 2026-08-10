@@ -97,6 +97,8 @@ jobs:
           apt -y remove cmake
           pip3 install cmake==3.17.3
       - name: test
+        env:
+          ENABLE_COREDUMP_TESTS: 1
         run: make -f .test.mk test-static-cmake
       - name: Send VK Teams message on failure
         if: failure()
