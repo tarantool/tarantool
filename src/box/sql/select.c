@@ -3738,6 +3738,27 @@ substSelect(Parse * pParse,	/* Report errors here */
 	} while (doPrior && (p = p->pPrior) != 0);
 }
 
+/**
+ * Create zName if it absent.
+ */
+static void
+sql_generate_new_names(ExprList *pList)
+{
+	for (int i = 0; i < pList->nExpr; i++) {
+		if (pList->a[i].zName == 0) {
+			const char *str = pList->a[i].zSpan;
+			size_t len = strlen(str);
+			char *name = sql_name_new(str, len);
+			pList->a[i].zName = name;
+			if (pList->a[i].zSpan[0] != '"' &&
+			    sql_uppercase_id) {
+				pList->a[i].legacy_name =
+				sql_legacy_name_new(str, len);
+			}
+		}
+	}
+}
+
 /*
  * This routine attempts to flatten subqueries as a performance optimization.
  * This routine returns 1 if it makes changes and 0 if no flattening occurs.
@@ -4196,18 +4217,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		 * "a" we substitute "x*3" and every place we see "b" we substitute "y+10".
 		 */
 		pList = pParent->pEList;
-		for (i = 0; i < pList->nExpr; i++) {
-			if (pList->a[i].zName == 0) {
-				const char *str = pList->a[i].zSpan;
-				size_t len = strlen(str);
-				char *name = sql_name_new(str, len);
-				pList->a[i].zName = name;
-				if (pList->a[i].zSpan[0] != '"') {
-					pList->a[i].legacy_name =
-						sql_legacy_name_new(str, len);
-				}
-			}
-		}
+		sql_generate_new_names(pList);
 		if (pSub->pOrderBy) {
 			/* At this point, any non-zero iOrderByCol values indicate that the
 			 * ORDER BY column expression is identical to the iOrderByCol'th
