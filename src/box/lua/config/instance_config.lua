@@ -69,11 +69,10 @@ end
 local function vshard_since_apply_default_if(_data, w)
     -- Apply the default only when the installed vshard accepts the option.
     --
-    -- Note: the vshard module availability must not be checked here or on
-    -- the validation stage. Both happen before box.cfg(), while the module
-    -- may become available only later: for example, when it is installed
-    -- into process.work_dir, the module can be resolved only after box.cfg()
-    -- chdir()s there. The availability is verified by the sharding applier.
+    -- Note: it is not the place to verify the module availability: the
+    -- defaults are evaluated on every instance, while the module is needed
+    -- only on instances with a sharding role. The availability is verified
+    -- by the sharding applier.
     local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
     if not ok then
         return false
