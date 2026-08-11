@@ -1,4 +1,5 @@
 local fun = require('fun')
+local fio = require('fio')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
@@ -981,9 +982,11 @@ g.test_vshard_too_old = function(g)
 end
 
 --
--- The vshard module installed into the configured process.work_dir can be
--- resolved only after box.cfg() chdir()s there. Make sure the configuration
--- is not rejected due to the unavailable vshard before that.
+-- The vshard module installed into the configured process.work_dir is
+-- resolvable even before box.cfg() chdir()s there: the module search root
+-- is pointed to the working directory. Make sure the configuration is not
+-- rejected due to the unavailable vshard when tarantool is started from a
+-- different directory.
 --
 g.test_vshard_in_work_dir = function()
     local dir = treegen.prepare_directory({}, {})
@@ -1032,6 +1035,40 @@ g.test_vshard_in_work_dir = function()
         {nojson = true, stderr = true, setsearchroot = false})
     t.assert_equals(res.exit_code, 0, res.stderr)
     t.assert_str_contains(res.stdout, 'vshard version: 0.1.25')
+end
+
+--
+-- A configured sharding role without an available vshard module is an
+-- error. Make sure it is raised before box.cfg(), so a misconfigured
+-- instance fails fast, without a potentially long database recovery.
+--
+g.test_vshard_missing_error_before_box_cfg = function()
+    local dir = treegen.prepare_directory({}, {})
+    local config = [[
+    sharding:
+      roles: [router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]
+    treegen.write_file(dir, 'config.yaml', config)
+
+    -- LUA_PATH is emptied to not resolve the real vshard from the testing
+    -- environment.
+    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 1)
+    t.assert_str_contains(res.stderr,
+                          'The vshard-ee/vshard module is not available')
+    -- The error is raised before box.cfg(): the database is not
+    -- initialized.
+    local snaps = fio.glob(fio.pathjoin(dir, 'var/lib/instance-001/*.snap'))
+    t.assert_equals(snaps, {})
 end
 
 --

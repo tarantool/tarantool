@@ -30,19 +30,25 @@ local function register_vshard_router_health_check()
     end
 end
 
-local function apply(config)
+-- Make sure vshard is available and its version is not too old.
+--
+-- The check is performed before box.cfg() and so before a
+-- potentially long database recovery: a misconfiguration is
+-- reported as fast as possible.
+--
+-- It can't be done even earlier, on the configuration validation
+-- stage, for two reasons. First, the validation is performed
+-- before the module search root is pointed to process.work_dir
+-- (the work_dir is not known yet), so a module installed into the
+-- working directory is not resolvable at that point. Second, the
+-- same schema validates cluster configurations as a whole, while
+-- the module is only needed on instances that have a sharding
+-- role.
+local function check_vshard(config)
     local configdata = config._configdata
-    local roles = configdata:get('sharding.roles')
-    if roles == nil then
-        unregister_vshard_health_checks()
+    if configdata:get('sharding.roles') == nil then
         return
     end
-    -- Make sure vshard is available and its version is not too old.
-    --
-    -- It can't be done earlier, on the configuration validation stage: it
-    -- occurs before box.cfg() and if the module is installed into the
-    -- configured process.work_dir, it can be resolved only after box.cfg()
-    -- chdir()s there.
     local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
     if not ok then
         error('The vshard-ee/vshard module is not available', 0)
@@ -51,8 +57,18 @@ local function apply(config)
         error('The vshard module is too old: the minimum supported version ' ..
               'is 0.1.25.', 0)
     end
+end
 
-    _G.vshard = vshard
+local function apply(config)
+    local configdata = config._configdata
+    local roles = configdata:get('sharding.roles')
+    if roles == nil then
+        unregister_vshard_health_checks()
+        return
+    end
+    -- The availability and the minimum version are verified by
+    -- the sharding.stage_1 applier.
+    _G.vshard = loaders.require_first('vshard-ee', 'vshard')
     local is_storage = false
     local is_router = false
     for _, role in pairs(roles) do
@@ -97,6 +113,12 @@ local function apply(config)
 end
 
 return {
-    name = 'sharding',
-    apply = apply,
+    stage_1 = {
+        name = 'sharding.stage_1',
+        apply = check_vshard,
+    },
+    stage_2 = {
+        name = 'sharding.stage_2',
+        apply = apply,
+    },
 }

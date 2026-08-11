@@ -4,5 +4,4 @@
   configuration validation error on startup when the vshard module is
   installed into the configured `process.work_dir` and the process is started
   from a different directory. The vshard availability and its minimum version
-  are checked when the sharding configuration is applied, after `box.cfg()`,
-  when the configured working directory is already entered.
+  are now checked only on instances with a configured sharding role.
