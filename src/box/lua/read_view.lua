@@ -191,26 +191,31 @@ end
 box.read_view = {}
 
 --
--- Returns an array of all open read views sorted by id, ascending.
+-- Returns an array of all read views opened in the current thread,
+-- sorted by id, ascending.
 --
 -- Since read view ids grow incrementally and never wrap around,
 -- the most recent read view will always be last.
 --
 function box.read_view.list()
-    if not fiber._internal.cord_is_main then
-        box.error(box.error.UNSUPPORTED, 'Application thread',
-                  'listing read views', 2)
-    end
     local list = {}
-    for _, rv in ipairs(internal.list()) do
-        local registered_rv = read_view_registry[rv.id]
-        if registered_rv == nil then
-            -- This is a new read view object that hasn't been used from Lua
-            -- yet. Add it to the registry for the next listing to return the
-            -- same object.
-            registered_rv = register_read_view(rv)
+    if fiber._internal.cord_is_main then
+        -- Use internal.list in the main thread to include system read views
+        -- into the listing.
+        for _, rv in ipairs(internal.list()) do
+            local registered_rv = read_view_registry[rv.id]
+            if registered_rv == nil then
+                -- This is a new read view object that hasn't been used from
+                -- Lua yet. Add it to the registry for the next listing to
+                -- return the same object.
+                registered_rv = register_read_view(rv)
+            end
+            table.insert(list, registered_rv)
         end
-        table.insert(list, registered_rv)
+    else
+        for _, rv in pairs(read_view_registry) do
+            table.insert(list, rv)
+        end
     end
     table.sort(list, function(rv1, rv2) return rv1.id < rv2.id end)
     return list

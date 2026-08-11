@@ -2715,12 +2715,6 @@ g_threads.test_unsupported = function(cg)
             type = 'ClientError',
             name = 'UNSUPPORTED',
             message = 'Application thread does not support ' ..
-                      'listing read views',
-        }, box.read_view.list)
-        t.assert_error_covers({
-            type = 'ClientError',
-            name = 'UNSUPPORTED',
-            message = 'Application thread does not support ' ..
                       'creating a new read view',
         }, box.read_view.open)
     end, {}, {_thread_id = 1})
@@ -3004,5 +2998,48 @@ g_threads.after_test('test_data_access', function(cg)
         if box.space.test ~= nil then
             box.space.test:drop()
         end
+    end)
+end)
+
+g_threads.test_list = function(cg)
+    local rv_ids = cg.server:exec(function()
+        local rvs = {}
+        rawset(_G, 'test_rvs', rvs)
+        local rv_ids = {}
+        for i = 1, 3 do
+            rvs[i] = box.read_view.open({name = 'test' .. i})
+            table.insert(rv_ids, rvs[i].id)
+        end
+        return rv_ids
+    end)
+    cg.server:exec(function(rv_ids)
+        t.assert_equals(box.read_view.list(), {})
+        local rv1 = box.read_view.open({id = rv_ids[1]})
+        local rv2 = box.read_view.open({id = rv_ids[2]})
+        t.assert_equals(box.read_view.list(), {rv1, rv2})
+        rv2:close()
+        rv2 = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_equals(box.read_view.list(), {rv1})
+    end, {rv_ids}, {_thread_id = 1})
+    cg.server:exec(function(rv_ids)
+        t.assert_equals(box.read_view.list(), {})
+        local rv1 = box.read_view.open({id = rv_ids[1]})
+        local rv2 = box.read_view.open({id = rv_ids[2]})
+        local rv3 = box.read_view.open({id = rv_ids[3]})
+        t.assert_equals(box.read_view.list(), {rv1, rv2, rv3})
+        rv3:close()
+        rv3 = nil -- luacheck: ignore
+        for _ = 1, 5 do collectgarbage('collect') end
+        t.assert_equals(box.read_view.list(), {rv1, rv2})
+    end, {rv_ids}, {_thread_id = 2})
+    cg.server:exec(function()
+        t.assert_equals(box.read_view.list(), rawget(_G, 'test_rvs'))
+    end)
+end
+
+g_threads.after_test('test_list', function(cg)
+    cg.server:exec(function()
+        rawset(_G, 'test_rvs', nil)
     end)
 end)
