@@ -163,7 +163,7 @@ struct ast_expr_list_entry {
 
 /** Append an ID to ID list. */
 struct ast_id_list *
-ast_id_list_append(struct Parse *parser, struct ast_id_list *list,
+ast_id_list_append(struct region *region, struct ast_id_list *list,
 		   const struct Token *id);
 
 /** Convert `struct ast_id_list` to `struct IdList`. */
@@ -172,11 +172,11 @@ id_list_from_ast(struct ast_id_list *list);
 
 /** Allocate a new, zero-initialized source. */
 struct ast_source *
-ast_source_new(struct Parse *parser);
+ast_source_new(struct region *region);
 
 /** Append a source to the sources list, creating the list if needed. */
 struct ast_source_list *
-ast_source_list_append(struct Parse *parser, struct ast_source_list *list,
+ast_source_list_append(struct region *region, struct ast_source_list *list,
 		       struct ast_source *src);
 
 /** Convert `struct ast_source_list` to `struct SrcList`. */
@@ -185,7 +185,7 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list);
 
 /** Create new empty SELECT structure. */
 struct ast_select *
-ast_select_new(struct Parse *parser);
+ast_select_new(struct region *region);
 
 /** Build `struct Select` object from `struct ast_select` object. */
 struct Select *
@@ -195,7 +195,7 @@ select_from_ast(struct Parse *parser, struct ast_select *select);
  * Append a WITH clause to the WITH clause list, creating the list if needed.
  */
 struct ast_with_list *
-ast_with_list_append(struct Parse *parser, struct ast_with_list *list,
+ast_with_list_append(struct region *region, struct ast_with_list *list,
 		     const struct Token *name, struct ast_id_list *columns,
 		     struct ast_select *select);
 
@@ -205,11 +205,12 @@ with_from_ast(struct Parse *parser, struct ast_with_list *list);
 
 /** Allocate a new expression node from a token's text. */
 struct ast_expr *
-ast_expr_new(struct Parse *parser, const char *start, uint32_t len, uint8_t op);
+ast_expr_new(struct region *region, const char *start, uint32_t len,
+	     uint8_t op);
 
 /** Append an expression to the expressions list, creating it if needed. */
 struct ast_expr_list *
-ast_expr_list_append(struct Parse *parser, struct ast_expr_list *list,
+ast_expr_list_append(struct region *region, struct ast_expr_list *list,
 		     struct ast_expr *expr);
 
 /** Set the name of the last expression appended to the list. */
