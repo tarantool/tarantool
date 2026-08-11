@@ -1,4 +1,5 @@
 local alloc = require('internal.alloc')
+local fio = require('fio')
 local log = require('internal.config.utils.log')
 
 -- After limiting the memory to some value we want to be sure
@@ -12,7 +13,37 @@ local log = require('internal.config.utils.log')
 -- as 1/16 of the minimum Lua memory limit.
 local REQUIRED_UNUSED_MEMORY_AFTER_APPLICATION = 16 * 1024 * 1024
 
-local function apply(config)
+-- Point the module search root to process.work_dir.
+--
+-- The first box.cfg() call changes the current working directory
+-- to process.work_dir and modules installed into it (for
+-- example, into the .rocks subdirectory) become resolvable,
+-- because the module search is relative to the current directory
+-- by default.
+--
+-- However, some code runs before box.cfg(): roles and an
+-- application marked with the early_load tag and their metadata
+-- scan. Set the search root to make modules installed into the
+-- working directory resolvable before the chdir occurs.
+local function set_searchroot(config)
+    if type(box.cfg) ~= 'function' then
+        -- box.cfg() is already called, the current working
+        -- directory is process.work_dir. Nothing to do.
+        return
+    end
+    local configdata = config._configdata
+    local work_dir = configdata:get('process.work_dir', {use_default = true})
+    if work_dir == nil then
+        return
+    end
+    -- A relative process.work_dir is interpreted against the
+    -- startup working directory, which is not changed yet.
+    work_dir = fio.abspath(work_dir)
+    package.setsearchroot(work_dir)
+    log.verbose('lua.apply: set the module search root to %q', work_dir)
+end
+
+local function set_memory_limit(config)
     local configdata = config._configdata
     local memory_limit = configdata:get('lua.memory', {use_default = true})
     local old_memory_limit = alloc.getlimit()
@@ -43,6 +74,11 @@ local function apply(config)
     alloc.setlimit(memory_limit)
 
     log.verbose(('lua.apply: set memory limit to %d'):format(memory_limit))
+end
+
+local function apply(config)
+    set_searchroot(config)
+    set_memory_limit(config)
 end
 
 return {

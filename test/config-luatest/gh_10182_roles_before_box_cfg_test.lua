@@ -1,5 +1,7 @@
 local t = require('luatest')
 local fio = require('fio')
+local treegen = require('luatest.treegen')
+local justrun = require('luatest.justrun')
 local helpers = require('test.config-luatest.helpers')
 
 ---@class luatest.group
@@ -286,4 +288,49 @@ tg.test_app_with_early_load_tag_added = function(g)
         'App "main" with the "early_load" tag was added to the config, ' ..
         'it cannot be loaded before the first box.cfg call',
         1024, {filename = g.server.chdir .. '/tarantool.log'}))
+end
+
+--
+-- A role installed into the configured process.work_dir becomes
+-- resolvable before box.cfg(): the config module points the
+-- module search root to the working directory before the early
+-- load occurs. Verify that a role with the early_load tag is
+-- loaded before box.cfg() in this scenario.
+--
+tg.test_role_with_early_load_tag_in_work_dir = function()
+    local dir = treegen.prepare_directory({}, {})
+    treegen.write_file(dir, 'wd/.rocks/share/tarantool/myrole.lua',
+                       early_load_role)
+    treegen.write_file(dir, 'wd/main.lua', [[
+        print(('on_load_status: %s'):format(_G.on_load_status))
+        print(('on_apply_status: %s'):format(_G.on_apply_status))
+        os.exit(0)
+    ]])
+    local config = ([[
+    process:
+      work_dir: wd
+
+    app:
+      file: %s/wd/main.lua
+
+    roles: [myrole]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]):format(dir)
+    treegen.write_file(dir, 'config.yaml', config)
+
+    -- Start tarantool in a directory from which the role module
+    -- is not resolvable. LUA_PATH is emptied to not resolve
+    -- anything from the testing environment.
+    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    t.assert_str_contains(res.stdout, 'on_load_status: unconfigured')
+    t.assert_str_contains(res.stdout, 'on_apply_status: running')
 end
