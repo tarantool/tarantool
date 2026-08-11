@@ -103,6 +103,8 @@ ast_select_new(struct Parse *parser)
 static struct Select *
 select_from_ast_single(struct Parse *parser, struct ast_select *select)
 {
+	if (select->op != TK_SELECT && select->op != TK_ALL)
+		parser->hasCompound = 1;
 	struct SrcList *list = src_list_from_ast(parser, select->sources);
 	struct Expr *where = expr_from_ast(parser, select->where);
 	struct Expr *having = expr_from_ast(parser, select->having);
