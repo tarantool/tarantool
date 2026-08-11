@@ -218,7 +218,7 @@ local function simple_table_values(lines)
             line = line:gsub('}%s*$', '')
         end
         line = strip(line)
-        if line ~= '' then
+        if line ~= '' and line:sub(1, 2) ~= '--' then
             local value =
                 line:match('^[%a_][%w_]*%s*=%s*([%a_][%w_]*)%s*,?$')
             if value == nil then

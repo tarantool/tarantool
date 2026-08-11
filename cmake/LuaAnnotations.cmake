@@ -1,6 +1,6 @@
 # lua_stub() exports EmmyLua annotations from Lua sources into a stub file.
 #
-# lua_stub(<module> FILES <file>... [RETURN <name>])
+# lua_stub(<module> FILES <file>... [RETURN <name>] [OUTPUT <path>])
 #
 # Gathers EmmyLua annotation comments (---@...) from the given files
 # together with bodyless declarations they annotate and writes the result
@@ -14,12 +14,17 @@
 # A `---@type` block followed by a table literal also creates the declaration
 # for <name>.
 #
+# The output file is named `<module>.lua` by default. When OUTPUT is
+# specified, it is used as a path relative to the `emmylua` directory, so
+# that dotted module names (for example, `net/box.lua` for `net.box`) can
+# be installed in the expected location.
+#
 # The file is generated at build time by the `emmylua-stubs` target. When
 # ENABLE_DIST is set, the target is a part of the default build, so that
 # the stubs are ready for installation. The extraction itself runs in a
 # Lua helper (tools/gen-emmylua-stubs.lua) executed by the bundled LuaJIT.
 function(lua_stub name)
-    cmake_parse_arguments(ARG "" "RETURN" "FILES" ${ARGN})
+    cmake_parse_arguments(ARG "" "RETURN;OUTPUT" "FILES" ${ARGN})
     if(NOT ARG_FILES)
         message(FATAL_ERROR "lua_stub(${name}): FILES is not specified")
     endif()
@@ -27,7 +32,11 @@ function(lua_stub name)
         message(FATAL_ERROR "lua_stub(${name}): MODULE_LUADIR is not set")
     endif()
 
-    set(_out_file "${PROJECT_BINARY_DIR}/emmylua/${name}.lua")
+    if(ARG_OUTPUT)
+        set(_out_file "${PROJECT_BINARY_DIR}/emmylua/${ARG_OUTPUT}")
+    else()
+        set(_out_file "${PROJECT_BINARY_DIR}/emmylua/${name}.lua")
+    endif()
     get_filename_component(_out_dir "${_out_file}" DIRECTORY)
     get_filename_component(_extractor
         "${PROJECT_SOURCE_DIR}/tools/gen-emmylua-stubs.lua"
@@ -62,7 +71,17 @@ function(lua_stub name)
     endif()
     add_dependencies(emmylua-stubs ${name}-stub)
     set_property(GLOBAL APPEND PROPERTY LAPI_STUB_FILES "${_out_file}")
-    install(FILES "${_out_file}" DESTINATION "${MODULE_LUADIR}/emmylua")
+    if(ARG_OUTPUT)
+        get_filename_component(_out_rel_dir "${ARG_OUTPUT}" DIRECTORY)
+    else()
+        set(_out_rel_dir "")
+    endif()
+    if(_out_rel_dir)
+        install(FILES "${_out_file}"
+                DESTINATION "${MODULE_LUADIR}/emmylua/${_out_rel_dir}")
+    else()
+        install(FILES "${_out_file}" DESTINATION "${MODULE_LUADIR}/emmylua")
+    endif()
 endfunction()
 
 # Generate HTML documentation from the generated EmmyLua stubs.

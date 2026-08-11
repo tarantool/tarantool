@@ -69,6 +69,131 @@ local modules = {
             },
         },
     },
+    {
+        name = 'net_box',
+        source = 'src/box/lua/net_box.lua',
+        fixtures = 'test/app-luatest/emmylua/net_box',
+        type_name = 'net.box',
+        fields = {
+            connect = 'Create a connection to a remote instance',
+            new = 'Create a connection (compatibility alias)',
+            from_fd = 'Create a connection from a file descriptor',
+            timeout = 'a default connection timeout',
+            self = 'the connection object for the local Tarantool server',
+        },
+        objects = {
+            {
+                fixture = 'conn.lua',
+                type_name = 'net.box.conn',
+                fields = {
+                    host = 'the remote host',
+                    port = 'the remote port',
+                    state = 'the current connection state',
+                    error = 'the error message',
+                    protocol = 'the IPROTO protocol version',
+                    schema_version = 'the remote schema version',
+                    peer_uuid = "the peer's UUID",
+                },
+            },
+            {
+                fixture = 'space.lua',
+                type_name = 'net.box.space',
+                fields = {
+                    id = 'the space id',
+                    name = 'the space name',
+                    engine = 'the storage engine of the space',
+                    field_count = 'the number of fields in the space',
+                    enabled = 'whether the space is enabled',
+                    temporary = 'whether the space is temporary',
+                    is_sync = 'whether the space is synchronous',
+                    index = 'the space indexes',
+                    connection = 'the connection the space belongs to',
+                },
+            },
+            {
+                fixture = 'index.lua',
+                type_name = 'net.box.index',
+                fields = {
+                    space = 'the space the index belongs to',
+                    id = 'the index id',
+                    name = 'the index name',
+                    type = 'the index type',
+                    parts = 'the index parts',
+                    unique = 'whether the index is unique',
+                },
+            },
+            {
+                fixture = 'stream.lua',
+                type_name = 'net.box.stream',
+                fields = {
+                    space = 'the stream spaces',
+                },
+            },
+            {
+                fixture = 'watcher.lua',
+                type_name = 'net.box.watcher',
+                fields = {
+                    unregister = 'unregister the watcher',
+                },
+            },
+            {
+                fixture = 'future.lua',
+                type_name = 'net.box.future',
+                fields = {
+                    is_ready = 'is_ready',
+                    result = 'result',
+                    wait_result = 'wait_result',
+                    discard = 'discard',
+                    pairs = 'pairs',
+                },
+            },
+            {
+                fixture = 'self.lua',
+                type_name = 'net.box.self',
+                fields = {
+                    ping = 'ping',
+                    reload_schema = 'reload_schema',
+                    close = 'close',
+                    timeout = 'timeout',
+                    wait_connected = 'wait_connected',
+                    is_connected = 'is_connected',
+                    call = 'call',
+                    eval = 'eval',
+                },
+            },
+            {
+                fixture = 'connect_options.lua',
+                type_name = 'net.box.connect_options',
+                fields = {
+                    user = 'a username used to connect',
+                    password = "a user's password",
+                    wait_connected = 'a connection timeout',
+                    reconnect_after = 'a number of seconds to wait',
+                    connect_timeout = 'a number of seconds to wait',
+                    fetch_schema = 'whether to fetch schema changes',
+                },
+            },
+            {
+                fixture = 'request_options.lua',
+                type_name = 'net.box.request_options',
+                fields = {
+                    is_async = 'whether the request is asynchronous',
+                    iterator = 'iterator',
+                    limit = 'limit',
+                    offset = 'offset',
+                    on_push = 'callback for each inbound message',
+                },
+            },
+            {
+                fixture = 'call_options.lua',
+                type_name = 'net.box.call_options',
+                fields = {
+                    is_async = 'whether the request is asynchronous',
+                    on_push = 'callback for each inbound message',
+                },
+            },
+        },
+    },
 }
 
 local function normalize(value)
