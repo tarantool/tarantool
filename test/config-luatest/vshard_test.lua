@@ -1034,6 +1034,59 @@ g.test_vshard_in_work_dir = function()
     t.assert_str_contains(res.stdout, 'vshard version: 0.1.25')
 end
 
+-- The defaults of the options accepted only by a newer vshard (see the
+-- vshard_since schema annotation) depend on the installed vshard version.
+-- Make sure they are applied on the first startup when the module is
+-- installed into process.work_dir, the same way as on a reload.
+g.test_vshard_since_default_in_work_dir = function()
+    local dir = treegen.prepare_directory({}, {})
+    -- The working directory is set using a template to verify that the
+    -- variables are substituted before the module search root is set.
+    local wd = 'wd-instance-001'
+    treegen.write_file(dir, wd .. '/.rocks/share/tarantool/vshard/init.lua', [[
+        return {
+            consts = {VERSION = '0.1.41'},
+            storage = {cfg = function() end, internal = {}},
+            router = {
+                cfg = function() end,
+                info = function() return {bucket = {unknown = 0}} end,
+            },
+        }
+    ]])
+    treegen.write_file(dir, wd .. '/main.lua', [[
+        local config = require('config')
+        print(('rebalancer_bucket_send_timeout: %s'):format(
+            config:get('sharding.rebalancer_bucket_send_timeout')))
+        os.exit(0)
+    ]])
+    local config = ([[
+    process:
+      work_dir: wd-{{ instance_name }}
+
+    app:
+      file: %s/wd-instance-001/main.lua
+
+    sharding:
+      roles: [router]
+
+    groups:
+      group-001:
+        replicasets:
+          replicaset-001:
+            instances:
+              instance-001: {}
+    ]]):format(dir)
+    treegen.write_file(dir, 'config.yaml', config)
+
+    local res = justrun.tarantool(dir, {LUA_PATH = ''},
+        {'--name', 'instance-001', '--config', 'config.yaml'},
+        {nojson = true, stderr = true, setsearchroot = false})
+    t.assert_equals(res.exit_code, 0, res.stderr)
+    -- TIMEOUT_INFINITY, the option's default.
+    t.assert_str_contains(res.stdout,
+                          'rebalancer_bucket_send_timeout: 15768000000')
+end
+
 -- gh-12928: sharding options set on the global level (like
 -- sharding.bucket_count) are inherited by all the instances of
 -- the cluster.
