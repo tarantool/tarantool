@@ -341,13 +341,14 @@ function methods._initialize(self)
     self:_register_applier(require('internal.config.applier.console'))
     self:_register_applier(require('internal.config.applier.runtime_priv'))
     self:_register_applier(require('internal.config.applier.session_settings'))
+    self:_register_applier(require('internal.config.applier.sharding').stage_1)
     self:_register_applier(require('internal.config.applier.roles').stage_1)
     self:_register_applier(require('internal.config.applier.app').stage_1)
     self:_register_applier(require('internal.config.applier.box_cfg'))
     self:_register_applier(require('internal.config.applier.box_status'))
     self:_register_applier(require('internal.config.applier.credentials'))
     self:_register_applier(require('internal.config.applier.fiber'))
-    self:_register_applier(require('internal.config.applier.sharding'))
+    self:_register_applier(require('internal.config.applier.sharding').stage_2)
     self:_register_applier(require('internal.config.applier.autoexpel'))
     self:_register_applier(require('internal.config.applier.connpool'))
     self:_register_applier(require('internal.config.applier.roles').stage_2)
@@ -548,6 +549,7 @@ function methods._apply_on_startup(self, opts)
         mkdir = true,
         console = true,
         runtime_priv = true,
+        ['sharding.stage_1'] = true,
         ['roles.stage_1'] = true,
         ['app.stage_1'] = true,
         box_cfg = true,
