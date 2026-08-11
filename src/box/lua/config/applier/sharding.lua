@@ -30,38 +30,74 @@ local function register_vshard_router_health_check()
     end
 end
 
-local function apply(config)
-    local configdata = config._configdata
-    local roles = configdata:get('sharding.roles')
-    if roles == nil then
-        unregister_vshard_health_checks()
-        return
-    end
-    -- Make sure vshard is available and its version is not too old.
-    --
-    -- It can't be done earlier, on the configuration validation stage: it
-    -- occurs before box.cfg() and if the module is installed into the
-    -- configured process.work_dir, it can be resolved only after box.cfg()
-    -- chdir()s there.
-    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
-    if not ok then
-        error('The vshard-ee/vshard module is not available', 0)
-    end
-    if expression.eval('v < 0.1.25', {v = vshard.consts.VERSION}) then
-        error('The vshard module is too old: the minimum supported version ' ..
-              'is 0.1.25.', 0)
-    end
-
-    _G.vshard = vshard
+-- Whether the storage and the router vshard roles are configured
+-- on the instance.
+local function get_vshard_roles(configdata)
     local is_storage = false
     local is_router = false
-    for _, role in pairs(roles) do
+    for _, role in pairs(configdata:get('sharding.roles') or {}) do
         if role == 'storage' then
             is_storage = true
         elseif role == 'router' then
             is_router = true
         end
     end
+    return is_storage, is_router
+end
+
+-- Make sure vshard is available and its version is not too old.
+--
+-- The check is performed before box.cfg() and so before a
+-- potentially long database recovery: a misconfiguration is
+-- reported as fast as possible.
+--
+-- It can't be done even earlier, on the configuration validation
+-- stage, for two reasons. First, the validation is performed
+-- before the module search root is pointed to process.work_dir
+-- (the work_dir is not known yet), so a module installed into the
+-- working directory is not resolvable at that point. Second, the
+-- same schema validates cluster configurations as a whole, while
+-- the module is only needed on instances that have a sharding
+-- role.
+local function check_vshard(config)
+    local configdata = config._configdata
+    local is_storage, is_router = get_vshard_roles(configdata)
+    if not is_storage and not is_router then
+        return
+    end
+    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    if not ok then
+        error('The vshard-ee/vshard module is not available', 0)
+    end
+    local version = vshard.consts.VERSION
+    -- The minimum vshard version accepted by the sharding section
+    -- and by particular sharding options is declared in the schema,
+    -- see the vshard_since annotation. Verify the configured ones.
+    configdata:filter(function(w)
+        return w.schema.vshard_since ~= nil
+    end):each(function(w)
+        if w.data == nil then
+            return
+        end
+        local since = w.schema.vshard_since
+        if expression.eval('v < ' .. since, {v = version}) then
+            error(('%s: The vshard module is too old: the minimum ' ..
+                   'supported version is %s'):format(
+                   table.concat(w.path, '.'), since), 0)
+        end
+    end)
+end
+
+local function apply(config)
+    local configdata = config._configdata
+    local is_storage, is_router = get_vshard_roles(configdata)
+    if not is_storage and not is_router then
+        unregister_vshard_health_checks()
+        return
+    end
+    -- The availability and the minimum version are verified by
+    -- the sharding.stage_1 applier.
+    _G.vshard = loaders.require_first('vshard-ee', 'vshard')
     local cfg = configdata:sharding()
     if is_storage then
         -- Start a watcher which will create all the necessary functions.
@@ -97,6 +133,12 @@ local function apply(config)
 end
 
 return {
-    name = 'sharding',
-    apply = apply,
+    stage_1 = {
+        name = 'sharding.stage_1',
+        apply = check_vshard,
+    },
+    stage_2 = {
+        name = 'sharding.stage_2',
+        apply = apply,
+    },
 }
