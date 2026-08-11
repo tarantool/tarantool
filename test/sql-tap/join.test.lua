@@ -598,7 +598,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 INNER OUTER JOIN t2;
     ]], {
         -- <join-3.7>
-        1, "unknown or unsupported join type: INNER OUTER"
+        1, "JOIN cannot be both OUTER and INNER"
         -- </join-3.7>
     })
 
@@ -608,7 +608,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 INNER OUTER CROSS JOIN t2;
     ]], {
         -- <join-3.8>
-        1, "unknown or unsupported join type: INNER OUTER CROSS"
+        1, "JOIN cannot be both OUTER and INNER"
         -- </join-3.8>
     })
 
@@ -618,7 +618,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 OUTER NATURAL INNER JOIN t2;
     ]], {
         -- <join-3.9>
-        1, "unknown or unsupported join type: OUTER NATURAL INNER"
+        1, "JOIN cannot be both OUTER and INNER"
         -- </join-3.9>
     })
 
@@ -628,7 +628,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LEFT BOGUS JOIN t2;
     ]], {
         -- <join-3.10>
-        1, "unknown or unsupported join type: LEFT BOGUS"
+        1, "Syntax error at line 1 near 'BOGUS'"
         -- </join-3.10>
     })
 
@@ -638,7 +638,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 INNER BOGUS CROSS JOIN t2;
     ]], {
         -- <join-3.11>
-        1, "unknown or unsupported join type: INNER BOGUS CROSS"
+        1, "Syntax error at line 1 near 'BOGUS'"
         -- </join-3.11>
     })
 
@@ -648,7 +648,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 NATURAL AWK SED JOIN t2;
     ]], {
         -- <join-3.12>
-        1, "unknown or unsupported join type: NATURAL AWK SED"
+        1, "Syntax error at line 1 near 'AWK'"
         -- </join-3.12>
     })
 

@@ -3700,8 +3700,6 @@ sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 #define sqlParseToplevel(p) ((p)->pToplevel ? (p)->pToplevel : (p))
 #define sqlIsToplevel(p) ((p)->pToplevel==0)
 
-int sqlJoinType(Parse *, Token *, Token *, Token *);
-
 /**
  * Function called from parser to handle
  * <ALTER TABLE child ADD CONSTRAINT constraint

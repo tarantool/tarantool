@@ -656,16 +656,38 @@ fullname(A) ::= nm(X). {
 }
 
 %type joinop {int}
-join_nm(A) ::= id(A).
-join_nm(A) ::= JOIN_KW(A).
+joinop(A) ::= COMMA|JOIN. {
+  A = JT_INNER;
+}
+joinop(X) ::= join_type(A) JOIN. {
+  X = A;
+}
+joinop(X) ::= join_type(A) join_type(B) JOIN. {
+  X = A | B;
+}
+joinop(X) ::= join_type(A) join_type(B) join_type(C) JOIN. {
+  X = A | B | C;
+}
 
-joinop(X) ::= COMMA|JOIN.              { X = JT_INNER; }
-joinop(X) ::= JOIN_KW(A) JOIN.
-                  {X = sqlJoinType(pParse,&A,0,0);  /*X-overwrites-A*/}
-joinop(X) ::= JOIN_KW(A) join_nm(B) JOIN.
-                  {X = sqlJoinType(pParse,&A,&B,0); /*X-overwrites-A*/}
-joinop(X) ::= JOIN_KW(A) join_nm(B) join_nm(C) JOIN.
-                  {X = sqlJoinType(pParse,&A,&B,&C);/*X-overwrites-A*/}
+%type join_type {int}
+join_type(A) ::= CROSS. {
+  A = JT_INNER | JT_CROSS;
+}
+join_type(A) ::= INNER. {
+  A = JT_INNER;
+}
+join_type(A) ::= LEFT. {
+  A = JT_LEFT | JT_OUTER;
+}
+join_type(A) ::= NATURAL. {
+  A = JT_NATURAL;
+}
+join_type(A) ::= OUTER. {
+  A = JT_OUTER;
+}
+join_type(A) ::= RIGHT. {
+  A = JT_RIGHT | JT_OUTER;
+}
 
 %type on_opt {struct ast_expr *}
 on_opt(N) ::= ON expr(E). {
@@ -897,7 +919,7 @@ expr(A) ::= LP(B) expr(X) RP(E). {
 expr(A) ::= id(X). {
   A = ast_expr_new(pParse, X.z, X.n, TK_ID);
 }
-expr(A) ::= JOIN_KW(X). {
+expr(A) ::= CROSS|INNER|LEFT|NATURAL|OUTER|RIGHT(X). {
   A = ast_expr_new(pParse, X.z, X.n, TK_ID);
 }
 expr(A) ::= nm(X) DOT nm(Y). {
