@@ -80,6 +80,20 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 			sqlSrcListFuncArgs(res, func_args);
 		}
 		res->a[res->nSrc - 1].fg.jointype = src->join_type;
+		if ((src->join_type & JT_INNER) != 0 &&
+		    (src->join_type & JT_OUTER) != 0) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 "JOIN cannot be both OUTER and INNER");
+			parser->is_aborted = true;
+			break;
+		}
+		if ((src->join_type & JT_OUTER) != 0 &&
+		    (src->join_type & (JT_LEFT | JT_RIGHT)) != JT_LEFT) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+				 "RIGHT and FULL OUTER JOINs");
+			parser->is_aborted = true;
+			break;
+		}
 	}
 	if (parser->is_aborted) {
 		sqlSrcListDelete(res);
