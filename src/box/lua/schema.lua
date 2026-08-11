@@ -2260,6 +2260,7 @@ base_index_mt.delete_range = function(index, begin_key, end_key)
 end
 
 base_index_mt.stat = function(index)
+    check_index_arg(index, 'stat', 2)
     return internal.stat(index.space_id, index.id);
 end
 
