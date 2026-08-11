@@ -29,6 +29,7 @@ function(lua_stub name)
 
     set(_out_file "${PROJECT_BINARY_DIR}/emmylua/${name}.lua")
     get_filename_component(_out_dir "${_out_file}" DIRECTORY)
+    string(REPLACE "/" "_" _target_name "${name}")
     get_filename_component(_extractor
         "${PROJECT_SOURCE_DIR}/tools/gen-emmylua-stubs.lua"
         ABSOLUTE)
@@ -52,7 +53,7 @@ function(lua_stub name)
         VERBATIM
         COMMENT "Generating EmmyLua stub ${name}")
 
-    add_custom_target(${name}-stub DEPENDS "${_out_file}")
+    add_custom_target(${_target_name}-stub DEPENDS "${_out_file}")
     if(NOT TARGET emmylua-stubs)
         if(ENABLE_DIST)
             add_custom_target(emmylua-stubs ALL)
@@ -60,9 +61,15 @@ function(lua_stub name)
             add_custom_target(emmylua-stubs)
         endif()
     endif()
-    add_dependencies(emmylua-stubs ${name}-stub)
+    add_dependencies(emmylua-stubs ${_target_name}-stub)
     set_property(GLOBAL APPEND PROPERTY LAPI_STUB_FILES "${_out_file}")
-    install(FILES "${_out_file}" DESTINATION "${MODULE_LUADIR}/emmylua")
+    get_filename_component(_name_dir "${name}" DIRECTORY)
+    if(_name_dir)
+        set(_install_dir "${MODULE_LUADIR}/emmylua/${_name_dir}")
+    else()
+        set(_install_dir "${MODULE_LUADIR}/emmylua")
+    endif()
+    install(FILES "${_out_file}" DESTINATION "${_install_dir}")
 endfunction()
 
 # Generate HTML documentation from the generated EmmyLua stubs.
