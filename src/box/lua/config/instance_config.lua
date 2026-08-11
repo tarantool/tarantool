@@ -21,7 +21,9 @@ local enterprise_edition = schema._enterprise_edition
 --
 --   The minimum vshard version that accepts this sharding option.
 --   The option's default value is applied only when the installed
---   vshard accepts the option.
+--   vshard accepts the option. An explicitly set option (or the
+--   sharding section as a whole) is verified against the installed
+--   vshard version by the sharding applier before box.cfg().
 --
 -- * default (any)
 --
