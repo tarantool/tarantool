@@ -470,8 +470,6 @@ selectnowith(A) ::= selectnowith(X) multiselect_op(Y) oneselect(Z).  {
   X->flags |= SF_Compound;
   X->flags &= ~SF_MultiValue;
   rlist_add(&X->link, &A->link);
-  if(Y != TK_ALL)
-    pParse->hasCompound = 1;
 }
 %type multiselect_op {uint8_t}
 multiselect_op(A) ::= UNION(OP).             {A = @OP; /*A-overwrites-OP*/}
