@@ -459,10 +459,10 @@ selectnowith(A) ::= oneselect(A).
 selectnowith(A) ::= selectnowith(X) multiselect_op(Y) oneselect(Z).  {
   A = Z;
   if (!rlist_empty(&Z->link)) {
-    struct ast_source *new = ast_source_new(pParse);
+    struct ast_source *new = ast_source_new(&pParse->region);
     new->select = Z;
-    A = ast_select_new(pParse);
-    A->sources = ast_source_list_append(pParse, NULL, new);
+    A = ast_select_new(&pParse->region);
+    A->sources = ast_source_list_append(&pParse->region, NULL, new);
   }
   A->op = Y;
   A->flags |= SF_Compound;
@@ -478,7 +478,7 @@ multiselect_op(A) ::= EXCEPT|INTERSECT(OP).  {A = @OP; /*A-overwrites-OP*/}
 
 oneselect(A) ::= SELECT distinct(D) select_list(W) from(X) where_opt(Y)
                  groupby_opt(P) having_opt(Q) orderby_opt(Z) limit_opt(L). {
-  A = ast_select_new(pParse);
+  A = ast_select_new(&pParse->region);
   A->columns = W;
   A->sources = X;
   A->where = Y;
@@ -493,14 +493,14 @@ oneselect(A) ::= values(A).
 
 %type values {struct ast_select *}
 values(A) ::= VALUES LP nexprlist(X) RP. {
-  A = ast_select_new(pParse);
+  A = ast_select_new(&pParse->region);
   A->columns = X;
   A->flags = SF_Values;
 }
 values(A) ::= values(X) COMMA LP exprlist(Y) RP. {
   X->flags |= SF_Compound;
   X->flags &= ~SF_MultiValue;
-  A = ast_select_new(pParse);
+  A = ast_select_new(&pParse->region);
   A->columns = Y;
   A->flags = SF_Values|SF_MultiValue|SF_Compound;
   A->op = TK_ALL;
@@ -517,35 +517,37 @@ distinct(A) ::= .           {A = 0;}
 
 %type select_list {struct ast_expr_list *}
 select_list(A) ::= expr(X) as(Y). {
-  A = ast_expr_list_append(pParse, NULL, X);
+  A = ast_expr_list_append(&pParse->region, NULL, X);
   ast_expr_list_set_name(A, &Y);
   A->is_select_list = true;
 }
 select_list(A) ::= STAR(X). {
-  struct ast_expr *expr = ast_expr_new(pParse, X.z, X.n, TK_ASTERISK);
-  A = ast_expr_list_append(pParse, NULL, expr);
+  struct ast_expr *expr = ast_expr_new(&pParse->region, X.z, X.n, TK_ASTERISK);
+  A = ast_expr_list_append(&pParse->region, NULL, expr);
   A->is_select_list = true;
 }
 select_list(A) ::= nm(X) DOT STAR(Y). {
-  struct ast_expr *dot = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_DOT);
-  dot->left = ast_expr_new(pParse, X.z, X.n, TK_ID);
-  dot->right = ast_expr_new(pParse, Y.z, Y.n, TK_ASTERISK);
-  A = ast_expr_list_append(pParse, NULL, dot);
+  struct ast_expr *dot = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n,
+                                      TK_DOT);
+  dot->left = ast_expr_new(&pParse->region, X.z, X.n, TK_ID);
+  dot->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_ASTERISK);
+  A = ast_expr_list_append(&pParse->region, NULL, dot);
   A->is_select_list = true;
 }
 select_list(A) ::= select_list(A) COMMA expr(X) as(Y). {
-  A = ast_expr_list_append(pParse, A, X);
+  A = ast_expr_list_append(&pParse->region, A, X);
   ast_expr_list_set_name(A, &Y);
 }
 select_list(A) ::= select_list(A) COMMA STAR(X). {
-  struct ast_expr *expr = ast_expr_new(pParse, X.z, X.n, TK_ASTERISK);
-  A = ast_expr_list_append(pParse, A, expr);
+  struct ast_expr *expr = ast_expr_new(&pParse->region, X.z, X.n, TK_ASTERISK);
+  A = ast_expr_list_append(&pParse->region, A, expr);
 }
 select_list(A) ::= select_list(A) COMMA nm(X) DOT STAR(Y). {
-  struct ast_expr *dot = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_DOT);
-  dot->left = ast_expr_new(pParse, X.z, X.n, TK_ID);
-  dot->right = ast_expr_new(pParse, Y.z, Y.n, TK_ASTERISK);
-  A = ast_expr_list_append(pParse, A, dot);
+  struct ast_expr *dot = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n,
+                                      TK_DOT);
+  dot->left = ast_expr_new(&pParse->region, X.z, X.n, TK_ID);
+  dot->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_ASTERISK);
+  A = ast_expr_list_append(&pParse->region, A, dot);
 }
 
 // An option "AS <id>" phrase that can follow one of the expressions that
@@ -570,7 +572,7 @@ from(A) ::= FROM source_list(X). {
 
 %type source_list {struct ast_source_list *}
 source_list(A) ::= source(X). {
-  A = ast_source_list_append(pParse, NULL, X);
+  A = ast_source_list_append(&pParse->region, NULL, X);
 }
 source_list(A) ::= LP source_list(F) RP as(Z). {
   if (Z.n == 0) {
@@ -578,64 +580,64 @@ source_list(A) ::= LP source_list(F) RP as(Z). {
   } else if (F->len == 1) {
     struct ast_source *old = stailq_first_entry(&F->head, struct ast_source,
                                                 link);
-    struct ast_source *new = ast_source_new(pParse);
+    struct ast_source *new = ast_source_new(&pParse->region);
     new->name = old->name;
     new->alias = Z;
     new->select = old->select;
-    A = ast_source_list_append(pParse, NULL, new);
+    A = ast_source_list_append(&pParse->region, NULL, new);
   } else {
-    struct ast_select *subquery = ast_select_new(pParse);
+    struct ast_select *subquery = ast_select_new(&pParse->region);
     subquery->sources = F;
     subquery->flags = SF_NestedFrom;
-    struct ast_source *src = ast_source_new(pParse);
+    struct ast_source *src = ast_source_new(&pParse->region);
     src->alias = Z;
     src->select = subquery;
-    A = ast_source_list_append(pParse, NULL, src);
+    A = ast_source_list_append(&pParse->region, NULL, src);
   }
 }
 source_list(A) ::= source_list(A) joinop(Y) source(X) on_opt(N) using_opt(U). {
   X->join_type = Y;
   X->join_on = N;
   X->join_using = U;
-  A = ast_source_list_append(pParse, A, X);
+  A = ast_source_list_append(&pParse->region, A, X);
 }
 source_list(A) ::= source_list(X) joinop(Y) LP source_list(F) RP as(Z) on_opt(N)
                    using_opt(U). {
   if (F->len == 1) {
     struct ast_source *old = stailq_first_entry(&F->head, struct ast_source,
                                                 link);
-    struct ast_source *new = ast_source_new(pParse);
+    struct ast_source *new = ast_source_new(&pParse->region);
     new->name = old->name;
     new->alias = Z;
     new->select = old->select;
     new->join_type = Y;
     new->join_on = N;
     new->join_using = U;
-    A = ast_source_list_append(pParse, X, new);
+    A = ast_source_list_append(&pParse->region, X, new);
   } else {
-    struct ast_select *subquery = ast_select_new(pParse);
+    struct ast_select *subquery = ast_select_new(&pParse->region);
     subquery->sources = F;
     subquery->flags = SF_NestedFrom;
-    struct ast_source *src = ast_source_new(pParse);
+    struct ast_source *src = ast_source_new(&pParse->region);
     src->alias = Z;
     src->select = subquery;
     src->join_type = Y;
     src->join_on = N;
     src->join_using = U;
-    A = ast_source_list_append(pParse, X, src);
+    A = ast_source_list_append(&pParse->region, X, src);
   }
 }
 
 %type source {struct ast_source *}
 source(A) ::= seqscan(X) nm(Y) as(Z) indexed_opt(I). {
-  A = ast_source_new(pParse);
+  A = ast_source_new(&pParse->region);
   A->name = Y;
   A->alias = Z;
   A->indexed_by = I;
   A->disallow_scan = X;
 }
 source(A) ::= seqscan(X) nm(Y) LP exprlist(E) RP as(Z). {
-  A = ast_source_new(pParse);
+  A = ast_source_new(&pParse->region);
   A->name = Y;
   A->alias = Z;
   A->func_args = E;
@@ -643,7 +645,7 @@ source(A) ::= seqscan(X) nm(Y) LP exprlist(E) RP as(Z). {
   A->disallow_scan = X;
 }
 source(A) ::= LP select(S) RP as(Z). {
-  A = ast_source_new(pParse);
+  A = ast_source_new(&pParse->region);
   A->alias = Z;
   A->select = S;
 }
@@ -734,23 +736,23 @@ orderby_opt(A) ::= ORDER BY sortlist(X).      {A = X;}
 
 %type sortlist {struct ast_expr_list *}
 sortlist(A) ::= sortlist(A) COMMA expr(Y) sortorder(Z). {
-  A = ast_expr_list_append(pParse, A, Y);
+  A = ast_expr_list_append(&pParse->region, A, Y);
   ast_expr_list_set_order(A, Z);
 }
 sortlist(A) ::= expr(Y) sortorder(Z). {
-  A = ast_expr_list_append(pParse, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
   ast_expr_list_set_order(A, Z);
 }
 
 %type sortlist_autoinc {struct ast_expr_list *}
 sortlist_autoinc(A) ::= sortlist_autoinc(A) COMMA expr(Y) sortorder(Z)
                         autoinc(I). {
-  A = ast_expr_list_append(pParse, A, Y);
+  A = ast_expr_list_append(&pParse->region, A, Y);
   ast_expr_list_set_order(A, Z);
   ast_expr_list_set_autoinc(A, I != 0);
 }
 sortlist_autoinc(A) ::= expr(Y) sortorder(Z) autoinc(I). {
-  A = ast_expr_list_append(pParse, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
   ast_expr_list_set_order(A, Z);
   ast_expr_list_set_autoinc(A, I != 0);
 }
@@ -894,10 +896,10 @@ insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
 idlist_opt(A) ::= .                       {A = 0;}
 idlist_opt(A) ::= LP idlist(X) RP.    {A = X;}
 idlist(A) ::= idlist(A) COMMA nm(Y). {
-  A = ast_id_list_append(pParse, A, &Y);
+  A = ast_id_list_append(&pParse->region, A, &Y);
 }
 idlist(A) ::= nm(Y). {
-  A = ast_id_list_append(pParse, NULL, &Y);
+  A = ast_id_list_append(&pParse->region, NULL, &Y);
 }
 
 /////////////////////////// Expression Processing /////////////////////////////
@@ -916,64 +918,64 @@ expr_old(A) ::= expr(X). {
 %type term {struct ast_expr *}
 expr(A) ::= term(A).
 term(A) ::= NULL|BLOB|STRING|FALSE|TRUE|UNKNOWN|FLOAT|DECIMAL|INTEGER(X). {
-  A = ast_expr_new(pParse, X.z, X.n, @X);
+  A = ast_expr_new(&pParse->region, X.z, X.n, @X);
 }
 expr(A) ::= LP(B) expr(X) RP(E). {
-  A = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_PARENTHESES);
+  A = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_PARENTHESES);
   A->left = X;
 }
 expr(A) ::= id(X). {
-  A = ast_expr_new(pParse, X.z, X.n, TK_ID);
+  A = ast_expr_new(&pParse->region, X.z, X.n, TK_ID);
 }
 expr(A) ::= CROSS|INNER|LEFT|NATURAL|OUTER|RIGHT(X). {
-  A = ast_expr_new(pParse, X.z, X.n, TK_ID);
+  A = ast_expr_new(&pParse->region, X.z, X.n, TK_ID);
 }
 expr(A) ::= nm(X) DOT nm(Y). {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_DOT);
-  A->left = ast_expr_new(pParse, X.z, X.n, TK_ID);
-  A->right = ast_expr_new(pParse, Y.z, Y.n, TK_ID);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_DOT);
+  A->left = ast_expr_new(&pParse->region, X.z, X.n, TK_ID);
+  A->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_ID);
 }
 expr(A) ::= VARNUM(X). {
-  A = ast_expr_new(pParse, X.z, X.n, TK_VARIABLE);
+  A = ast_expr_new(&pParse->region, X.z, X.n, TK_VARIABLE);
 }
 expr(A) ::= COLON|VARIABLE(X) id(Y).     {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
-  A->left = ast_expr_new(pParse, Y.z, Y.n, TK_STRING);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
+  A->left = ast_expr_new(&pParse->region, Y.z, Y.n, TK_STRING);
 }
 expr(A) ::= COLON|VARIABLE(X) INTEGER(Y).     {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
-  A->left = ast_expr_new(pParse, Y.z, Y.n, TK_INTEGER);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_VARIABLE);
+  A->left = ast_expr_new(&pParse->region, Y.z, Y.n, TK_INTEGER);
 }
 expr(A) ::= expr(X) COLLATE id(C). {
-  A = ast_expr_new(pParse, X->str, (C.z - X->str) + C.n, TK_COLLATE);
+  A = ast_expr_new(&pParse->region, X->str, (C.z - X->str) + C.n, TK_COLLATE);
   A->left = X;
-  A->right = ast_expr_new(pParse, C.z, C.n, TK_ID);
+  A->right = ast_expr_new(&pParse->region, C.z, C.n, TK_ID);
 }
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_CAST);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_CAST);
   A->type = T;
   A->left = E;
 }
 expr(A) ::= expr(X) LB getlist(Y) RB(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_GETITEM);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_GETITEM);
   A->left = X;
   A->list = Y;
 }
 
 %type getlist {struct ast_expr_list *}
 getlist(A) ::= getlist(A) RB LB expr(X). {
-  A = ast_expr_list_append(pParse, A, X);
+  A = ast_expr_list_append(&pParse->region, A, X);
 }
 getlist(A) ::= expr(X). {
-  A = ast_expr_list_append(pParse, NULL, X);
+  A = ast_expr_list_append(&pParse->region, NULL, X);
 }
 
 expr(A) ::= LB(X) exprlist(Y) RB(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_ARRAY);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_ARRAY);
   A->list = Y;
 }
 expr(A) ::= LCB(X) maplist(Y) RCB(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_MAP);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_MAP);
   A->list = Y;
 }
 
@@ -984,284 +986,294 @@ maplist(A) ::= . {
   A = NULL;
 }
 nmaplist(A) ::= nmaplist(A) COMMA expr(X) COLON expr(Y). {
-  A = ast_expr_list_append(pParse, A, X);
-  A = ast_expr_list_append(pParse, A, Y);
+  A = ast_expr_list_append(&pParse->region, A, X);
+  A = ast_expr_list_append(&pParse->region, A, Y);
 }
 nmaplist(A) ::= expr(X) COLON expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, X);
-  A = ast_expr_list_append(pParse, A, Y);
+  A = ast_expr_list_append(&pParse->region, NULL, X);
+  A = ast_expr_list_append(&pParse->region, A, Y);
 }
 
 expr(A) ::= TRIM(X) LP(B) trim_operands(Y) RP(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, X.z, X.n, TK_STRING);
-  A->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_VECTOR);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, X.z, X.n, TK_STRING);
+  A->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_VECTOR);
   A->right->list = Y;
 }
 
 %type trim_operands {struct ast_expr_list *}
 trim_operands(A) ::= LEADING|TRAILING|BOTH(N) expr(Z) FROM expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, Y);
-  A = ast_expr_list_append(pParse, A, ast_expr_new(pParse, N.z, N.n, @N));
-  A = ast_expr_list_append(pParse, A, Z);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, A, ast_expr_new(&pParse->region,
+                           N.z, N.n, @N));
+  A = ast_expr_list_append(&pParse->region, A, Z);
 }
 trim_operands(A) ::= LEADING|TRAILING|BOTH(N) FROM expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, Y);
-  A = ast_expr_list_append(pParse, A, ast_expr_new(pParse, N.z, N.n, @N));
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, A, ast_expr_new(&pParse->region,
+                           N.z, N.n, @N));
 }
 trim_operands(A) ::= expr(Z) FROM expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, Y);
-  A = ast_expr_list_append(pParse, A, Z);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, A, Z);
 }
 trim_operands(A) ::= expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
 }
 
 expr(A) ::= id(X) LP(B) distinct(D) exprlist(Y) RP(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, X.z, X.n, TK_STRING);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, X.z, X.n, TK_STRING);
   uint8_t op = D == SF_Distinct ? TK_DISTINCT : TK_VECTOR;
-  A->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, op);
+  A->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, op);
   A->right->list = Y;
 }
 expr(A) ::= CHAR(X) LP(B) distinct(D) exprlist(Y) RP(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, X.z, X.n, TK_STRING);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, X.z, X.n, TK_STRING);
   uint8_t op = D == SF_Distinct ? TK_DISTINCT : TK_VECTOR;
-  A->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, op);
+  A->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, op);
   A->right->list = Y;
 }
 expr(A) ::= id(X) LP STAR RP(E). {
-  A = ast_expr_new(pParse, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, X.z, X.n, TK_STRING);
+  A = ast_expr_new(&pParse->region, X.z, (E.z - X.z) + E.n, TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, X.z, X.n, TK_STRING);
 }
 expr(A) ::= LP(L) nexprlist(X) COMMA expr(Y) RP(R). {
-  A = ast_expr_new(pParse, L.z, (R.z - L.z) + R.n, TK_VECTOR);
-  A->list = ast_expr_list_append(pParse, X, Y);
+  A = ast_expr_new(&pParse->region, L.z, (R.z - L.z) + R.n, TK_VECTOR);
+  A->list = ast_expr_list_append(&pParse->region, X, Y);
 }
 expr(A) ::= expr(X) AND(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) OR(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) LT|GT|GE|LE(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) EQ|NE(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) BITAND|BITOR|LSHIFT|RSHIFT(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) PLUS|MINUS(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) STAR|SLASH|REM(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) CONCAT(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, @OP);
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, @OP);
   A->left = X;
   A->right = Y;
 }
 expr(A) ::= expr(X) LIKE_KW|MATCH(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, OP.z, OP.n, TK_STRING);
-  A->right = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len,
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len,
+                   TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, OP.z, OP.n, TK_STRING);
+  A->right = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len,
                           TK_VECTOR);
-  A->right->list = ast_expr_list_append(pParse, NULL, Y);
-  A->right->list = ast_expr_list_append(pParse, A->right->list, X);
+  A->right->list = ast_expr_list_append(&pParse->region, NULL, Y);
+  A->right->list = ast_expr_list_append(&pParse->region, A->right->list, X);
 }
 expr(A) ::= expr(X) NOT LIKE_KW|MATCH(OP) expr(Y). {
-  A = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len,
+  A = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (Y->str - X->str) + Y->len,
                          TK_FUNCTION);
-  A->left->left = ast_expr_new(pParse, OP.z, OP.n, TK_STRING);
-  A->left->right = ast_expr_new(pParse, X->str, (Y->str - X->str) + Y->len,
-                                TK_VECTOR);
-  A->left->right->list = ast_expr_list_append(pParse, NULL, Y);
-  A->left->right->list = ast_expr_list_append(pParse, A->left->right->list, X);
+  A->left->left = ast_expr_new(&pParse->region, OP.z, OP.n, TK_STRING);
+  A->left->right = ast_expr_new(&pParse->region, X->str,
+                                (Y->str - X->str) + Y->len, TK_VECTOR);
+  A->left->right->list = ast_expr_list_append(&pParse->region, NULL, Y);
+  A->left->right->list = ast_expr_list_append(&pParse->region,
+                                              A->left->right->list, X);
 }
 expr(A) ::= expr(X) LIKE_KW|MATCH(OP) expr(Y) ESCAPE expr(E). {
-  A = ast_expr_new(pParse, X->str, (E->str - X->str) + E->len, TK_FUNCTION);
-  A->left = ast_expr_new(pParse, OP.z, OP.n, TK_STRING);
-  A->right = ast_expr_new(pParse, X->str, (E->str - X->str) + E->len,
+  A = ast_expr_new(&pParse->region, X->str, (E->str - X->str) + E->len,
+                   TK_FUNCTION);
+  A->left = ast_expr_new(&pParse->region, OP.z, OP.n, TK_STRING);
+  A->right = ast_expr_new(&pParse->region, X->str, (E->str - X->str) + E->len,
                           TK_VECTOR);
-  A->right->list = ast_expr_list_append(pParse, NULL, Y);
-  A->right->list = ast_expr_list_append(pParse, A->right->list, X);
-  A->right->list = ast_expr_list_append(pParse, A->right->list, E);
+  A->right->list = ast_expr_list_append(&pParse->region, NULL, Y);
+  A->right->list = ast_expr_list_append(&pParse->region, A->right->list, X);
+  A->right->list = ast_expr_list_append(&pParse->region, A->right->list, E);
 }
 expr(A) ::= expr(X) NOT LIKE_KW|MATCH(OP) expr(Y) ESCAPE expr(E). {
-  A = ast_expr_new(pParse, X->str, (E->str - X->str) + E->len, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (E->str - X->str) + E->len,
+  A = ast_expr_new(&pParse->region, X->str, (E->str - X->str) + E->len, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (E->str - X->str) + E->len,
                          TK_FUNCTION);
-  A->left->left = ast_expr_new(pParse, OP.z, OP.n, TK_STRING);
-  A->left->right = ast_expr_new(pParse, X->str, (E->str - X->str) + E->len,
-                                TK_VECTOR);
-  A->left->right->list = ast_expr_list_append(pParse, NULL, Y);
-  A->left->right->list = ast_expr_list_append(pParse, A->left->right->list, X);
-  A->left->right->list = ast_expr_list_append(pParse, A->left->right->list, E);
+  A->left->left = ast_expr_new(&pParse->region, OP.z, OP.n, TK_STRING);
+  A->left->right = ast_expr_new(&pParse->region, X->str,
+                                (E->str - X->str) + E->len, TK_VECTOR);
+  A->left->right->list = ast_expr_list_append(&pParse->region, NULL, Y);
+  A->left->right->list = ast_expr_list_append(&pParse->region,
+                                              A->left->right->list, X);
+  A->left->right->list = ast_expr_list_append(&pParse->region,
+                                              A->left->right->list, E);
 }
 expr(A) ::= expr(X) IS NULL(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_ISNULL);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_ISNULL);
   A->left = X;
 }
 expr(A) ::= expr(X) IS NOT NULL(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_NOTNULL);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_NOTNULL);
   A->left = X;
 }
 expr(A) ::= NOT(B) expr(X). {
-  A = ast_expr_new(pParse, B.z, (X->str - B.z) + X->len, @B);
+  A = ast_expr_new(&pParse->region, B.z, (X->str - B.z) + X->len, @B);
   A->left = X;
 }
 expr(A) ::= BITNOT(B) expr(X). {
-  A = ast_expr_new(pParse, B.z, (X->str - B.z) + X->len, @B);
+  A = ast_expr_new(&pParse->region, B.z, (X->str - B.z) + X->len, @B);
   A->left = X;
 }
 expr(A) ::= MINUS(B) expr(X). [BITNOT] {
-  A = ast_expr_new(pParse, B.z, (X->str - B.z) + X->len, TK_UMINUS);
+  A = ast_expr_new(&pParse->region, B.z, (X->str - B.z) + X->len, TK_UMINUS);
   A->left = X;
 }
 expr(A) ::= PLUS(B) expr(X). [BITNOT] {
-  A = ast_expr_new(pParse, B.z, (X->str - B.z) + X->len, TK_UPLUS);
+  A = ast_expr_new(&pParse->region, B.z, (X->str - B.z) + X->len, TK_UPLUS);
   A->left = X;
 }
 expr(A) ::= expr(Z) BETWEEN(N) expr(X) AND expr(Y). {
-  A = ast_expr_new(pParse, Z->str, (Y->str - Z->str) + Y->len, @N);
+  A = ast_expr_new(&pParse->region, Z->str, (Y->str - Z->str) + Y->len, @N);
   A->left = Z;
-  A->list = ast_expr_list_append(pParse, NULL, X);
-  A->list = ast_expr_list_append(pParse, A->list, Y);
+  A->list = ast_expr_list_append(&pParse->region, NULL, X);
+  A->list = ast_expr_list_append(&pParse->region, A->list, Y);
 }
 expr(A) ::= expr(Z) NOT BETWEEN(N) expr(X) AND expr(Y). {
-  A = ast_expr_new(pParse, Z->str, (Y->str - Z->str) + Y->len, TK_NOT);
-  A->left = ast_expr_new(pParse, Z->str, (Y->str - Z->str) + Y->len, @N);
+  A = ast_expr_new(&pParse->region, Z->str, (Y->str - Z->str) + Y->len, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, Z->str, (Y->str - Z->str) + Y->len,
+                         @N);
   A->left->left = Z;
-  A->left->list = ast_expr_list_append(pParse, NULL, X);
-  A->left->list = ast_expr_list_append(pParse, A->left->list, Y);
+  A->left->list = ast_expr_list_append(&pParse->region, NULL, X);
+  A->left->list = ast_expr_list_append(&pParse->region, A->left->list, Y);
 }
 expr(A) ::= expr(X) IN LP(B) exprlist(Y) RP(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_IN);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_IN);
   A->left = X;
-  A->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_VECTOR);
+  A->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_VECTOR);
   A->right->list = Y;
 }
 expr(A) ::= expr(X) NOT IN LP(B) exprlist(Y) RP(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_IN);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_IN);
   A->left->left = X;
-  A->left->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_VECTOR);
+  A->left->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n,
+                                TK_VECTOR);
   A->left->right->list = Y;
 }
 expr(A) ::= expr(X) IN LP(B) select(Y) RP(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_IN);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_IN);
   A->left = X;
-  A->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_SELECT);
+  A->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_SELECT);
   A->right->select = Y;
 }
 expr(A) ::= expr(X) NOT IN LP(B) select(Y) RP(E). {
-  A = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (E.z - X->str) + E.n, TK_IN);
+  A = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (E.z - X->str) + E.n, TK_IN);
   A->left->left = X;
-  A->left->right = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_SELECT);
+  A->left->right = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n,
+                                TK_SELECT);
   A->left->right->select = Y;
 }
 expr(A) ::= expr(X) IN nm(Y). {
-  struct ast_source *src = ast_source_new(pParse);
+  struct ast_source *src = ast_source_new(&pParse->region);
   src->name = Y;
-  struct ast_select *select = ast_select_new(pParse);
-  select->sources = ast_source_list_append(pParse, NULL, src);
-  A = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_IN);
+  struct ast_select *select = ast_select_new(&pParse->region);
+  select->sources = ast_source_list_append(&pParse->region, NULL, src);
+  A = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
   A->left = X;
-  A->right = ast_expr_new(pParse, Y.z, Y.n, TK_SELECT);
+  A->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_SELECT);
   A->right->select = select;
 }
 expr(A) ::= expr(X) IN nm(Y) LP exprlist(E) RP. {
-  struct ast_source *src = ast_source_new(pParse);
+  struct ast_source *src = ast_source_new(&pParse->region);
   src->name = Y;
   if (E != NULL) {
     src->func_args = E;
     src->is_tab_func = true;
   }
-  struct ast_select *select = ast_select_new(pParse);
-  select->sources = ast_source_list_append(pParse, NULL, src);
-  A = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_IN);
+  struct ast_select *select = ast_select_new(&pParse->region);
+  select->sources = ast_source_list_append(&pParse->region, NULL, src);
+  A = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
   A->left = X;
-  A->right = ast_expr_new(pParse, Y.z, Y.n, TK_SELECT);
+  A->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_SELECT);
   A->right->select = select;
 }
 expr(A) ::= expr(X) NOT IN nm(Y). {
-  struct ast_source *src = ast_source_new(pParse);
+  struct ast_source *src = ast_source_new(&pParse->region);
   src->name = Y;
-  struct ast_select *select = ast_select_new(pParse);
-  select->sources = ast_source_list_append(pParse, NULL, src);
-  A = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_IN);
+  struct ast_select *select = ast_select_new(&pParse->region);
+  select->sources = ast_source_list_append(&pParse->region, NULL, src);
+  A = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
   A->left->left = X;
-  A->left->right = ast_expr_new(pParse, Y.z, Y.n, TK_SELECT);
+  A->left->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_SELECT);
   A->left->right->select = select;
 }
 expr(A) ::= expr(X) NOT IN nm(Y) LP exprlist(E) RP. {
-  struct ast_source *src = ast_source_new(pParse);
+  struct ast_source *src = ast_source_new(&pParse->region);
   src->name = Y;
   if (E != NULL) {
     src->func_args = E;
     src->is_tab_func = true;
   }
-  struct ast_select *select = ast_select_new(pParse);
-  select->sources = ast_source_list_append(pParse, NULL, src);
-  A = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_NOT);
-  A->left = ast_expr_new(pParse, X->str, (Y.z - X->str) + Y.n, TK_IN);
+  struct ast_select *select = ast_select_new(&pParse->region);
+  select->sources = ast_source_list_append(&pParse->region, NULL, src);
+  A = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_NOT);
+  A->left = ast_expr_new(&pParse->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
   A->left->left = X;
-  A->left->right = ast_expr_new(pParse, Y.z, Y.n, TK_SELECT);
+  A->left->right = ast_expr_new(&pParse->region, Y.z, Y.n, TK_SELECT);
   A->left->right->select = select;
 }
 expr(A) ::= LP(B) select(X) RP(E). {
-  A = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_SELECT);
+  A = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_SELECT);
   A->select = X;
 }
 expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
-  A = ast_expr_new(pParse, B.z, (E.z - B.z) + E.n, TK_EXISTS);
+  A = ast_expr_new(&pParse->region, B.z, (E.z - B.z) + E.n, TK_EXISTS);
   A->select = Y;
 }
 expr(A) ::= CASE(C) case_exprlist(Y) END(E). {
-  A = ast_expr_new(pParse, C.z, (E.z - C.z) + E.n, TK_CASE);
+  A = ast_expr_new(&pParse->region, C.z, (E.z - C.z) + E.n, TK_CASE);
   A->list = Y;
 }
 expr(A) ::= CASE(C) expr(X) case_exprlist(Y) END(E). {
-  A = ast_expr_new(pParse, C.z, (E.z - C.z) + E.n, TK_CASE);
+  A = ast_expr_new(&pParse->region, C.z, (E.z - C.z) + E.n, TK_CASE);
   A->left = X;
   A->list = Y;
 }
 
 %type case_exprlist_when {struct ast_expr_list *}
 case_exprlist_when(A) ::= case_exprlist_when(A) WHEN expr(Y) THEN expr(Z). {
-  A = ast_expr_list_append(pParse, A, Y);
-  A = ast_expr_list_append(pParse, A, Z);
+  A = ast_expr_list_append(&pParse->region, A, Y);
+  A = ast_expr_list_append(&pParse->region, A, Z);
 }
 case_exprlist_when(A) ::= WHEN expr(Y) THEN expr(Z). {
-  A = ast_expr_list_append(pParse, NULL, Y);
-  A = ast_expr_list_append(pParse, A, Z);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, A, Z);
 }
 
 %type case_exprlist {struct ast_expr_list *}
 case_exprlist(A) ::= case_exprlist_when(A).
 case_exprlist(A) ::= case_exprlist_when(A) ELSE expr(X). {
-  A = ast_expr_list_append(pParse, A, X);
+  A = ast_expr_list_append(&pParse->region, A, X);
 }
 
 %type exprlist {struct ast_expr_list *}
@@ -1272,10 +1284,10 @@ exprlist(A) ::= . {
   A = NULL;
 }
 nexprlist(A) ::= nexprlist(A) COMMA expr(Y). {
-  A = ast_expr_list_append(pParse, A, Y);
+  A = ast_expr_list_append(&pParse->region, A, Y);
 }
 nexprlist(A) ::= expr(Y). {
-  A = ast_expr_list_append(pParse, NULL, Y);
+  A = ast_expr_list_append(&pParse->region, NULL, Y);
 }
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
@@ -1491,12 +1503,12 @@ trigger_cmd(A) ::= select_old(X). {
 
 // The special RAISE expression that may occur in trigger programs
 expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_RAISE);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_RAISE);
   A->on_conflict_action = ON_CONFLICT_ACTION_IGNORE;
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
-  A = ast_expr_new(pParse, X.z, (Y.z - X.z) + Y.n, TK_RAISE);
-  A->left = ast_expr_new(pParse, Z.z, Z.n, @Z);
+  A = ast_expr_new(&pParse->region, X.z, (Y.z - X.z) + Y.n, TK_RAISE);
+  A->left = ast_expr_new(&pParse->region, Z.z, Z.n, @Z);
   A->on_conflict_action = T;
 }
 
@@ -1623,10 +1635,10 @@ with(A) ::= WITH RECURSIVE wqlist(W).    { A = W; }
 
 %type wqlist {struct ast_with_list *}
 wqlist(A) ::= nm(X) idlist_opt(Y) AS LP select(Z) RP. {
-  A = ast_with_list_append(pParse, NULL, &X, Y, Z);
+  A = ast_with_list_append(&pParse->region, NULL, &X, Y, Z);
 }
 wqlist(A) ::= wqlist(A) COMMA nm(X) idlist_opt(Y) AS LP select(Z) RP. {
-  A = ast_with_list_append(pParse, A, &X, Y, Z);
+  A = ast_with_list_append(&pParse->region, A, &X, Y, Z);
 }
 
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
