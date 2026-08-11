@@ -408,15 +408,15 @@ lbox_truncate(struct lua_State *L)
 
 /* {{{ Introspection */
 
+/** Index statistics (`index:stat()`). */
 static int
 lbox_index_stat(lua_State *L)
 {
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
 		diag_set(IllegalParams,
-			 "Usage: index.info(space_id, index_id)");
+			 "Usage: box.internal.stat(space_id, index_id)");
 		return luaT_error(L);
 	}
-
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 
@@ -426,6 +426,8 @@ lbox_index_stat(lua_State *L)
 		return luaT_error(L);
 	return 1;
 }
+
+/* }}} */
 
 static int
 lbox_index_compact(lua_State *L)
@@ -465,8 +467,6 @@ lbox_insert_arrow(lua_State *L)
 		return luaT_error(L);
 	return 0;
 }
-
-/* }}} */
 
 void
 box_lua_index_init(struct lua_State *L)

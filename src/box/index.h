@@ -685,8 +685,8 @@ struct index_vtab {
 				   struct ArrowArrayStream *stream);
 	/** Create an index read view. */
 	struct index_read_view *(*create_read_view)(struct index *index);
-	/** Introspection (index:stat()) */
-	void (*stat)(struct index *, struct info_handler *);
+	/** Index statistics (`index:stat()`). */
+	void (*stat)(struct index *index, struct info_handler *handler);
 	/**
 	 * Trigger asynchronous index compaction. What exactly
 	 * is implied under 'compaction' depends on the engine.
