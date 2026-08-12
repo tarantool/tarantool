@@ -393,7 +393,7 @@ local template_cfg = {
     checkpoint_wal_threshold = 'number',
     wal_queue_max_size  = 'number',
     checkpoint_count    = 'number',
-    read_only           = 'boolean',
+    read_only           = 'boolean, string',
     hot_standby         = 'boolean',
     memtx_use_mvcc_engine = 'boolean',
     txn_isolation = 'string, number',
@@ -1345,11 +1345,15 @@ local function get_option_from_env(option)
     end
 
     if param_type:find('boolean') then
-        assert(param_type == 'boolean')
         if raw_value:lower() == 'false' then
             return false
         elseif raw_value:lower() == 'true' then
             return true
+        end
+        -- A mixed 'boolean, string' option (e.g. read_only): any
+        -- value other than 'true'/'false' is passed as a string.
+        if param_type:find('string') then
+            return raw_value
         end
         error(err_msg_fmt:format(env_var_name, option, '"true" or "false"'))
     end

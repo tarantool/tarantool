@@ -178,27 +178,28 @@ end
 
 -- {{{ Set RO/RW
 
-local function wait_if_not_bootstrap_leader()
-    -- Wait until the instance learns its id in the replicaset to
-    -- distinguish a bootstrap leader from a regular replica.
-    --
-    -- Default value for `replication.connect_timeout` is 30 seconds.
-    local TIMEOUT = 30
-    local deadline = fiber.time() + TIMEOUT
-    while box.info.id == 0 do
-        if fiber.time() > deadline then
-            error(string.format(
-                'failed to learn instance id in the replicaset within %d ' ..
-                'seconds; cannot distinguish bootstrap leader from a ' ..
-                'regular replica.', TIMEOUT), 0)
-        end
-        fiber.sleep(0.01)
-    end
-
-    if box.info.id ~= 1 then
-        -- Not really a bootstrap leader, just a replica. Go to RO.
-        box.cfg({read_only = true})
-    end
+-- Replace the 'unless_bootstrap' read_only value with the
+-- equivalent boolean.
+--
+-- The supervised failover coordinator manages the RO/RW mode via
+-- box.cfg({read_only = <boolean>}) and treats the *configured*
+-- box.cfg.read_only value as the source of truth (e.g. the RW
+-- deadline failsafe does nothing if the value is truthy). Leaving
+-- the 'unless_bootstrap' string there would confuse it, so
+-- normalize the value to the boolean it has resolved to.
+--
+-- There is no mode transition here: the assigned boolean is
+-- identical to the already effective RO/RW state.
+--
+-- Note that box.cfg becomes a table before the initial
+-- configuration is finished, so external observers may see the
+-- 'unless_bootstrap' string in box.cfg.read_only while the startup is in
+-- progress. It is fine for the coordinator: the instance is
+-- effectively RO during the whole startup, so there is nothing to
+-- demote, and a truthy value correctly reports that the
+-- configuration does not ask for RW unconditionally.
+local function normalize_read_only()
+    box.cfg({read_only = not box.internal.is_bootstrap_leader()})
 end
 
 local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
@@ -340,18 +341,24 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         -- * Look over the peer names of the replicaset and choose
         --   the minimal name across all non-anonymous instances
         --   (compare them lexicographically).
-        -- * The instance with the minimal name starts in the RW
-        --   mode to be able to bootstrap the replicaset if there
-        --   is no local snapshot. Otherwise, it starts as usual,
-        --   in RO.
+        -- * The instance with the minimal name and no local
+        --   snapshot starts with read_only = 'unless_bootstrap': it goes RW
+        --   only if it actually bootstraps the replicaset and
+        --   stays RO if the replicaset is already bootstrapped
+        --   (e.g. a new instance with the minimal name is added
+        --   to the configuration, or an existing instance is
+        --   rebootstrapped: its data directory is wiped to rejoin
+        --   it from scratch). The 'unless_bootstrap' mode is resolved by the
+        --   box.cfg() machinery with no transient RW state, so
+        --   such an instance can't become a second master along
+        --   with a leader appointed by the failover coordinator
+        --   (gh-12970).
         -- * All the other instances are started in RO.
-        -- * The instance that is started in RW re-checks, whether
-        --   it was a bootstrap leader (box.info.id == 1) and, if
-        --   not, goes to RO.
         --
         -- The algorithm leans on the replicaset bootstrap process
-        -- that chooses an RW instance as the bootstrap leader.
-        -- bootstrap_strategy 'auto' fits this criteria.
+        -- that chooses the bootstrap leader among the instances
+        -- whose configuration does not enforce RO. The 'unless_bootstrap'
+        -- mode fits this criteria (see box_process_vote()).
         --
         -- As result, all the instances are in RO or one is in RW.
         -- The supervisor (failover agent) manages the RO/RW mode
@@ -369,33 +376,16 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
             am_i_bootstrap_leader =
                 snapshot.get_path(configdata._iconfig_def) == nil and
                 instance_name == configdata:bootstrap_leader_name()
-            box_cfg.read_only = not am_i_bootstrap_leader
+            box_cfg.read_only =
+                am_i_bootstrap_leader and 'unless_bootstrap' or true
         end
 
-        -- It is possible that an instance with the minimal
-        -- name (configdata:bootstrap_leader_name()) is added to
-        -- the configuration, when the replicaset is already
-        -- bootstrapped.
-        --
-        -- Ideally, we shouldn't make this instance RW. However,
-        -- we can't differentiate this situation from one, when
-        -- the replicaset bootstrap is needed, before a first
-        -- box.cfg().
-        --
-        -- After box.cfg() returns, we can determine whether the
-        -- instance really became the bootstrap leader using the
-        -- box.info.id == 1 condition.
-        --
-        -- Note that box.ctl.wait_rw() is not sufficient here:
-        -- box_cfg.read_only is set above before the instance
-        -- learns its id, so RW status does not guarantee that
-        -- box.info.id has already been assigned.
-        --
-        -- If box.info.id != 1, then the replicaset was already
-        -- bootstrapped and the instance should go to RO.
+        -- Replace 'unless_bootstrap' with the resolved boolean once box.cfg()
+        -- returns: the failover coordinator expects a boolean in
+        -- box.cfg.read_only (see normalize_read_only()).
         if am_i_bootstrap_leader then
             assert(post_box_cfg_hooks ~= nil)
-            post_box_cfg_hooks:add(wait_if_not_bootstrap_leader)
+            post_box_cfg_hooks:add(normalize_read_only)
         end
     else
         assert(false)
