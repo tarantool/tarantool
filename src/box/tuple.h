@@ -926,12 +926,14 @@ tuple_field_go_to_index(const char **field, uint64_t index);
  * @param[in][out] field Field to propagate.
  * @param key Key to propagate to.
  * @param len Length of @a key.
+ * @param field_key Pointer to key in @a field.
  *
  * @retval  0 Success, the index was found.
  * @retval -1 Not found.
  */
 int
-tuple_field_go_to_key(const char **field, const char *key, int len);
+tuple_field_go_to_key(const char **field, const char *key, int len,
+		      const char **field_key);
 
 /**
  * Get tuple field by field index, relative JSON path and

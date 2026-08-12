@@ -213,7 +213,8 @@ xrow_update_route_branch(struct xrow_update_field *field,
 			break;
 		case JSON_TOKEN_STR:
 			rc = tuple_field_go_to_key(&next_pos, new_token.str,
-						   new_token.len);
+						   new_token.len,
+						   /*field_key=*/NULL);
 			break;
 		default:
 			unreachable();

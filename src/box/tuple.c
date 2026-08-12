@@ -509,7 +509,8 @@ tuple_field_go_to_index(const char **field, uint64_t index)
 }
 
 int
-tuple_field_go_to_key(const char **field, const char *key, int len)
+tuple_field_go_to_key(const char **field, const char *key, int len,
+		      const char **field_key)
 {
 	enum mp_type type = mp_typeof(**field);
 	if (type != MP_MAP)
@@ -519,6 +520,8 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 		type = mp_typeof(**field);
 		if (type == MP_STR) {
 			uint32_t value_len;
+			if (field_key != NULL)
+				*field_key = *field;
 			const char *value = mp_decode_str(field, &value_len);
 			if (value_len == (uint)len &&
 			    memcmp(value, key, len) == 0)
@@ -552,7 +555,8 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
 			rc = tuple_field_go_to_index(data, token.num);
 			break;
 		case JSON_TOKEN_STR:
-			rc = tuple_field_go_to_key(data, token.str, token.len);
+			rc = tuple_field_go_to_key(data, token.str, token.len,
+						   /*field_key=*/NULL);
 			break;
 		default:
 			assert(token.type == JSON_TOKEN_END);
