@@ -53,21 +53,19 @@ xrow_update_bar_finish(struct xrow_update_field *field)
  *
  * @param op Update operation.
  * @param field Field to locate in.
- * @param[out] key_len_or_index One parameter for two values,
- *        depending on where the target point is located: in an
- *        array or a map. In case of map it is size of a key
- *        before the found point. It is used to find range of the
- *        both key and value in '#' operation to drop the pair.
- *        In case of array it is index of the array element to be
- *        able to check how many fields are left for deletion.
+ * @param[out] index The parameter is set to index in array in case target point
+ *        is located in a array. Otherwise is undefined.
+ * @param[out] field_key The parameter is set to pointer to key in map in case
+ *        target point is located in a map. Otherwise is undefined. NULL is
+ *        valid to ignore this output parameter.
  *
  * @retval 0 Success.
  * @retval -1 Not found or invalid JSON.
  */
 static inline int
 xrow_update_bar_locate(struct xrow_update_op *op,
-		       struct xrow_update_field *field,
-		       int *key_len_or_index)
+		       struct xrow_update_field *field, int *index,
+		       const char **field_key)
 {
 	/*
 	 * Bar update is not flat by definition. It always has a
@@ -88,17 +86,16 @@ xrow_update_bar_locate(struct xrow_update_op *op,
 	struct json_token token;
 	while ((rc = json_lexer_next_token(&op->lexer, &token)) == 0 &&
 	       token.type != JSON_TOKEN_END) {
-
 		switch (token.type) {
 		case JSON_TOKEN_NUM:
 			field->bar.parent = pos;
-			*key_len_or_index = token.num;
+			*index = token.num;
 			rc = tuple_field_go_to_index(&pos, token.num);
 			break;
 		case JSON_TOKEN_STR:
 			field->bar.parent = pos;
-			*key_len_or_index = token.len;
-			rc = tuple_field_go_to_key(&pos, token.str, token.len);
+			rc = tuple_field_go_to_key(&pos, token.str, token.len,
+						   field_key);
 			break;
 		default:
 			assert(token.type == JSON_TOKEN_ANY);
@@ -162,7 +159,8 @@ xrow_update_bar_locate_opt(struct xrow_update_op *op,
 			break;
 		case JSON_TOKEN_STR:
 			field->bar.parent = pos;
-			rc = tuple_field_go_to_key(&pos, token.str, token.len);
+			rc = tuple_field_go_to_key(&pos, token.str, token.len,
+						   /*field_key=*/NULL);
 			break;
 		default:
 			assert(token.type == JSON_TOKEN_ANY);
@@ -266,14 +264,15 @@ xrow_update_op_do_nop_delete(struct xrow_update_op *op,
 {
 	assert(op->opcode == '#');
 	assert(field->type == XUPDATE_NOP);
-	int key_len_or_index = 0;
-	if (xrow_update_bar_locate(op, field, &key_len_or_index) != 0)
+	int index = 0;
+	const char *field_key = NULL;
+	if (xrow_update_bar_locate(op, field, &index, &field_key) != 0)
 		return -1;
 	if (mp_typeof(*field->bar.parent) == MP_ARRAY) {
 		const char *tmp = field->bar.parent;
 		uint32_t size = mp_decode_array(&tmp);
-		if (key_len_or_index + op->arg.del.count > size)
-			op->arg.del.count = size - key_len_or_index;
+		if (index + op->arg.del.count > size)
+			op->arg.del.count = size - index;
 		const char *end = field->bar.point + field->bar.point_size;
 		for (uint32_t i = 1; i < op->arg.del.count; ++i)
 			mp_next(&end);
@@ -281,10 +280,10 @@ xrow_update_op_do_nop_delete(struct xrow_update_op *op,
 	} else {
 		if (op->arg.del.count != 1)
 			return xrow_update_err_delete1(op);
-		/* Take key size into account to delete it too. */
-		key_len_or_index = mp_sizeof_str(key_len_or_index);
-		field->bar.point -= key_len_or_index;
-		field->bar.point_size += key_len_or_index;
+		const char *field_key_end = field_key;
+		mp_next(&field_key_end);
+		field->bar.point = field_key;
+		field->bar.point_size += field_key_end - field_key;
 	}
 	return xrow_update_bar_finish(field);
 }
@@ -295,8 +294,8 @@ xrow_update_op_do_nop_##op_type(struct xrow_update_op *op,			\
 				struct xrow_update_field *field)		\
 {										\
 	assert(field->type == XUPDATE_NOP);					\
-	int key_len_or_index;							\
-	if (xrow_update_bar_locate(op, field, &key_len_or_index) != 0)		\
+	int index;								\
+	if (xrow_update_bar_locate(op, field, &index, /*field_key=*/NULL) != 0)	\
 		return -1;							\
 	const char *data = field->bar.point;					\
 	xrow_update_mp_read_scalar(&data, &field->bar.scalar);			\
