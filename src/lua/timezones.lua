@@ -1260,4 +1260,10 @@ return {
     ["Pacific/Wake"] = 1010,
     [1011] = "Pacific/Wallis",
     ["Pacific/Wallis"] = 1011,
+    [1012] = "America/Ciudad_Juarez",
+    ["America/Ciudad_Juarez"] = 1012,
+    [1013] = "Europe/Kyiv",
+    ["Europe/Kyiv"] = 1013,
+    [1014] = "America/Coyhaique",
+    ["America/Coyhaique"] = 1014,
 }
