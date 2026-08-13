@@ -338,7 +338,7 @@ static void
 evio_service_add_entry(struct evio_service *dst,
 		       struct evio_service_entry *entry)
 {
-	rlist_add_entry(&dst->entries, entry, link);
+	rlist_add_tail_entry(&dst->entries, entry, link);
 	++dst->entry_count;
 }
 
