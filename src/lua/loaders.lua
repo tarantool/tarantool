@@ -14,24 +14,6 @@ local ROCKS_LUA_TEMPLATES = {
     ROCKS_LUA_PATH .. '/?/init.lua',
 }
 
-local package_searchroot
-
-local function searchroot()
-    return package_searchroot or minifio.cwd()
-end
-
-local function setsearchroot(path)
-    if not path then
-        -- Here we need to get this function caller's sourcedir.
-        path = debug.sourcedir(3)
-    elseif path == box.NULL then
-        path = nil
-    else
-        assert(type(path) == 'string', 'Search root must be a string')
-    end
-    package_searchroot = path and minifio.abspath(path)
-end
-
 local function mksymname(name)
     local mark = string.find(name, "-")
     if mark then name = string.sub(name, mark + 1) end
@@ -92,16 +74,16 @@ end
 local path = {
     package = function() return package.path end,
     cwd = {
-        dot = gen_path_builder(searchroot, LUA_TEMPLATES),
-        rocks = gen_path_builder(searchroot, ROCKS_LUA_TEMPLATES, true),
+        dot = gen_path_builder(package.searchroot, LUA_TEMPLATES),
+        rocks = gen_path_builder(package.searchroot, ROCKS_LUA_TEMPLATES, true),
     }
 }
 
 local cpath = {
     package = function() return package.cpath end,
     cwd = {
-        dot = gen_path_builder(searchroot, LIB_TEMPLATES),
-        rocks = gen_path_builder(searchroot, ROCKS_LIB_TEMPLATES, true),
+        dot = gen_path_builder(package.searchroot, LIB_TEMPLATES),
+        rocks = gen_path_builder(package.searchroot, ROCKS_LIB_TEMPLATES, true),
     }
 }
 
@@ -497,8 +479,6 @@ for index, _ in ipairs(searchers) do
 end
 
 rawset(package, "search", search)
-rawset(package, "searchroot", searchroot)
-rawset(package, "setsearchroot", setsearchroot)
 
 local no_package_loaded = {}
 local raw_require = require
