@@ -2670,20 +2670,6 @@ g_threads.before_all(function(cg)
         net_box_credentials = {user = 'admin'}
     })
     cg.server:start()
-    --
-    -- FIXME(gh-12546): For server.exec to be able to find the luatest module,
-    -- searchroot must be set in the test server. For the main thread, this is
-    -- done automatically by luatest itself, but due to the bug in Tarantool,
-    -- searchroot isn't propagated to application threads so we have to set it
-    -- manually. Remove this when the bug is fixed.
-    --
-    local searchroot = cg.server:exec(function()
-        return package.searchroot()
-    end)
-    for i = 1, cg.server.box_cfg.app_threads do
-        cg.server:eval('package.setsearchroot(...)', {searchroot},
-                       {_thread_id = i})
-    end
 end)
 
 g_threads.after_all(function(cg)

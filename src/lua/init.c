@@ -31,9 +31,7 @@
 #include "lua/init.h"
 #include "lua/utils.h"
 #include "main.h"
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__) || defined(__OpenBSD__)
 #include <libgen.h>
-#endif
 
 #include <assert.h>
 #include <lua.h>
@@ -76,6 +74,7 @@
 #include "digest.h"
 #include "errinj.h"
 #include "trivia/config.h"
+#include "tt_pthread.h"
 
 #ifdef ENABLE_BACKTRACE
 #include "core/backtrace.h"
@@ -114,6 +113,19 @@ luaopen_zip(lua_State *L);
  * The single Lua state of the transaction processor (tx) thread.
  */
 __thread struct lua_State *tarantool_L;
+
+/**
+ * Path to the search root directory.
+ *
+ * The search root directory is used as the root directory for loading Lua
+ * dependencies from. It affects all application threads.
+ */
+static char *package_searchroot;
+
+/**
+ * Mutex protecting package_searchroot.
+ */
+static pthread_mutex_t package_searchroot_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * The fiber running the startup Lua script
@@ -393,6 +405,68 @@ ret_nil:
 }
 
 /**
+ * package.searchroot() - returns the path to the search root directory.
+ *
+ * If the search root directory is unset, the path to the current working
+ * directory is returned.
+ */
+static int
+lbox_tarantool_package_searchroot(struct lua_State *L)
+{
+	bool is_set = false;
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	if (package_searchroot != NULL) {
+		lua_pushstring(L, package_searchroot);
+		is_set = true;
+	}
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	if (is_set)
+		return 1;
+	char buf[PATH_MAX];
+	char *cwd = getcwd(buf, sizeof(buf));
+	if (cwd == NULL) {
+		diag_set(SystemError, "getcwd");
+		return luaT_push_nil_and_error(L);
+	}
+	lua_pushstring(L, cwd);
+	return 1;
+}
+
+/**
+ * package.setsearchroot() - sets the path to the search root directory.
+ *
+ * If no path is specified, the search root directory is set to the directory
+ * where the calling function's source file is located.
+ *
+ * If box.NULL is passed, the search root directory is unset.
+ */
+static int
+lbox_tarantool_package_setsearchroot(struct lua_State *L)
+{
+	char *new_root;
+	if (luaL_isnull(L, 1)) {
+		new_root = NULL;
+	} else if (lua_isnoneornil(L, 1)) {
+		struct lua_Debug info;
+		VERIFY(lua_getstack(L, 1, &info) == 1);
+		VERIFY(lua_getinfo(L, "S", &info) == 1);
+		char *path = xstrdup(info.source[0] == '@' ?
+				     info.source + 1 : info.source);
+		new_root = abspath(dirname(path));
+		free(path);
+	} else if (lua_type(L, 1) == LUA_TSTRING) {
+		new_root = abspath(lua_tostring(L, 1));
+	} else {
+		return luaL_error(L, "Search root must be a string");
+	}
+	tt_pthread_mutex_lock(&package_searchroot_mutex);
+	free(package_searchroot);
+	package_searchroot = new_root;
+	tt_pthread_mutex_unlock(&package_searchroot_mutex);
+	return 0;
+}
+
+/**
  * Convert lua number or string to lua cdata 64bit number.
  */
 static int
@@ -602,6 +676,11 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_concat(L, lua_gettop(L) - top);
 	tarantool_lua_pushpath_env(L, "LUA_CPATH");
 	lua_setfield(L, top, "cpath");
+
+	lua_pushcfunction(L, lbox_tarantool_package_searchroot);
+	lua_setfield(L, top, "searchroot");
+	lua_pushcfunction(L, lbox_tarantool_package_setsearchroot);
+	lua_setfield(L, top, "setsearchroot");
 
 	assert(lua_gettop(L) == top);
 	lua_pop(L, 1); /* package */
