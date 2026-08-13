@@ -16,23 +16,6 @@ local SERVER_OPTS = {
     net_box_credentials = {user = 'admin', password = 'secret'},
 }
 
---
--- FIXME(gh-12546): For server.exec to be able to find the luatest module,
--- searchroot must be set in the test server. For the main thread, this is
--- done automatically by luatest itself, but due to the bug in Tarantool,
--- searchroot isn't propagated to application threads so we have to set it
--- manually. Remove this when the bug is fixed.
---
-local function setsearchroot(server)
-    local searchroot, app_threads = server:exec(function()
-        return package.searchroot(), box.cfg.app_threads
-    end)
-    for i = 1, app_threads do
-        server:eval('package.setsearchroot(...)', {searchroot},
-                    {_thread_id = i})
-    end
-end
-
 g.test_threads_config_propagation = function()
     --
     -- Check that the threads configuration is propagated to box.cfg
@@ -106,7 +89,6 @@ g.test_threads_config_propagation = function()
     --
     -- Check configuration in other threads.
     --
-    setsearchroot(cluster.server)
     for i = 1, 10 do
         local group_name, thread_id
         if i < 2 then
@@ -412,7 +394,6 @@ g.test_threads_call = function()
     --
     -- Usage in other a non-tx thread.
     --
-    setsearchroot(cluster.server)
     cluster.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_covers(threads.info(), {
@@ -594,7 +575,6 @@ g.test_threads_eval = function()
     --
     -- Usage in other a non-tx thread.
     --
-    setsearchroot(cluster.server)
     cluster.server:exec(function()
         local threads = require('experimental.threads')
         t.assert_covers(threads.info(), {
