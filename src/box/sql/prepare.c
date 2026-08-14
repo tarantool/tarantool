@@ -164,6 +164,8 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	memset(parser, 0, sizeof(struct Parse));
 	parser->sql_flags = sql_flags;
 	region_create(&parser->region, &cord()->slabc);
+	parser->var.offset = 1;
+	parser->var.pos = 0;
 }
 
 /**
