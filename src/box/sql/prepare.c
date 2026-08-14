@@ -46,6 +46,8 @@ sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
+	sParse.var.name = NULL;
+	sParse.var.offset = 0;
 
 	struct sql_ast *ast = sql_parse_statement(&sParse, zSql);
 	if (ast == NULL) {
