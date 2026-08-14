@@ -254,9 +254,12 @@ sc_space_new(uint32_t id, const char *name,
 	space_cache_replace(NULL, space);
 	if (replace_trigger)
 		trigger_add(&space->on_replace, replace_trigger);
-	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
-	trigger_create(t, on_replace_dd_system_space, NULL, (trigger_f0) free);
-	trigger_add(&space->on_replace, t);
+	if (id != BOX_SEQUENCE_DATA_ID) {
+		struct trigger *t = (struct trigger *)xmalloc(sizeof(*t));
+		trigger_create(t, on_replace_dd_system_space,
+			       NULL, (trigger_f0)free);
+		trigger_add(&space->on_replace, t);
+	}
 	/*
 	 * Data dictionary spaces are fully built since:
 	 * - they contain data right from the start
