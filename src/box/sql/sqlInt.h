@@ -213,6 +213,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+struct sql_bind;
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
@@ -309,7 +310,7 @@ sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
 
 /** This is the top-level implementation of sqlStep(). */
 int
-sql_step(struct Vdbe *v);
+sql_step(struct Vdbe *v, const struct sql_bind *bind, uint32_t bind_count);
 
 /** Encode the result of an SQL statement in msgpack. */
 char *
@@ -3893,6 +3894,14 @@ const char *sqlVListNumToName(VList *, int);
 int sqlVListNameToNum(VList *, const char *, int);
 
 /*
+ * Return a pointer to the name of a variable in the given VList that
+ * coincides with name.  Or return a NULL if there is no such variable in
+ * the list
+ */
+const char *
+sql_find_var_by_name(VList *pIn, const char *name);
+
+/*
  * Routines to read and write variable-length integers.  These used to
  * be defined locally, but now we use the varint routines in the util.c
  * file.
@@ -4547,3 +4556,10 @@ sql_generate_column_name(uint32_t number)
 }
 
 #endif				/* sqlINT_H */
+
+/**
+ * Create a pVar in execution for numeric bind variables.
+ */
+struct Mem *
+sql_create_pVar_for_numeric_variable(const struct sql_bind *bind,
+				     uint32_t p1, uint32_t bind_count);
