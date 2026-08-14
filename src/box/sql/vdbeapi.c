@@ -38,6 +38,7 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "box/session.h"
+#include "box/bind.h"
 
 int
 sql_stmt_finalize(struct Vdbe *v)
@@ -345,6 +346,14 @@ sql_unbind(struct Vdbe *v)
 		 */
 		sql_bind_type(v, i, "boolean");
 	}
+}
+
+void
+sql_set_bind_vdbe(struct Vdbe *v, uint32_t bind_count,
+		  const struct sql_bind *bind)
+{
+	v->bind_count = bind_count;
+	v->bind = bind;
 }
 
 void

@@ -277,6 +277,7 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					       DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, false);
+	sql_set_bind_vdbe(stmt, bind_count, bind);
 	if (sql_execute(stmt, port, region) != 0) {
 		port_destroy(port);
 		sql_stmt_reset(stmt);
@@ -300,6 +301,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					   DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, true);
+	sql_set_bind_vdbe(stmt, bind_count, bind);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
 	    sql_execute(stmt, port, region) == 0)
 		return 0;

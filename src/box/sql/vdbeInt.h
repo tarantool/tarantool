@@ -306,6 +306,9 @@ struct Vdbe {
 	uint32_t id;
 	/* Field for storing a function variable. */
 	struct vdbe_field_ref *func_arg;
+	uint32_t bind_count; /** Count of bind variables. */
+	/** Name and value of an SQL prepared statement parameter. */
+	const struct sql_bind *bind;
 };
 
 /*
@@ -331,6 +334,7 @@ void sqlVdbePrintOp(FILE *, int, Op *);
 #endif
 
 int sqlVdbeExec(Vdbe *);
+
 int sqlVdbeList(Vdbe *);
 
 int sqlVdbeHalt(Vdbe *);

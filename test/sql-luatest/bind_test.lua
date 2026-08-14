@@ -124,6 +124,132 @@ g.test_bind_3 = function()
     end)
 end
 
+-- Check work of numeric bind variables
+g.test_12733_bind_variables = function()
+    g.server:exec(function()
+        local sql = [[SELECT $3, $1, $2, $10;]]
+        local res = box.execute(sql, {'a', 'b', 'c'})
+        t.assert_equals(res.rows, {{'c', 'a', 'b', nil}})
+
+        res = box.execute([[select :a, $1;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select $1, :a;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select :a, $1;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 321}})
+
+        res = box.execute([[select $1, :a;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{321, 123}})
+
+        local parameters = {111, {['#a'] = 222}, {[':a'] = 333}}
+        res = box.execute([[select #a, ?, :a;]], parameters)
+        t.assert_equals(res.rows, {{222, 333, 333}})
+
+        res = box.execute([[SELECT ?, ?;]], {1, 2})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT $1, ?;]], {1, 2})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT :a, $1, ?;]], {1, 2, {[':a'] = 3}})
+        t.assert_equals(res.rows, {{3, 1, 2}})
+
+        res = box.execute([[SELECT $1, $2;]], {1, {['$1'] = 2}})
+        t.assert_equals(res.rows, {{1, 2}})
+
+        res = box.execute([[SELECT :a, $2, ?;]], {1})
+        t.assert_equals(res.rows, {{nil, nil, nil}})
+
+        res = box.execute([[SELECT @a, ?, @a, ?;]], {{['@a'] = 1}, 2})
+        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+
+        local s = box.prepare([[SELECT @a, ?, @a, ?;]])
+        local exp = {
+            {
+                name = "@a",
+                type = "ANY",
+            },
+            {
+                name = "?",
+                type = "ANY",
+            },
+        }
+        t.assert_equals(s.params, exp)
+        res = box.execute(s.stmt_id, {{['@a'] = 1}, 2})
+        t.assert_equals(res.rows, {{1, 2, 1, 2}})
+
+        local s = box.prepare([[SELECT $1, ?, :a, $5;]])
+        local exp = {
+            {
+                name = "$1",
+                type = "ANY",
+            },
+            {
+                name = "?",
+                type = "ANY",
+            },
+            {
+                name = ":a",
+                type = "ANY",
+            },
+            {
+                name = "?",
+                type = "ANY",
+            },
+            {
+                name = "$5",
+                type = "ANY",
+            },
+        }
+        t.assert_equals(s.params, exp)
+        res = box.execute(s.stmt_id, {1, 2})
+        t.assert_equals(res.rows, {{1, 2, nil, nil}})
+
+        local s = box.prepare([[SELECT $1, :a;]])
+        local exp = {
+            {
+                name = "$1",
+                type = "ANY",
+            },
+            {
+                name = ":a",
+                type = "ANY",
+            },
+        }
+        t.assert_equals(s.params, exp)
+        res = box.execute(s.stmt_id, {{[':a'] = 1}})
+        t.assert_equals(res.rows, {{1, 1}})
+
+        local s = box.prepare([[SELECT :a, $1;]])
+        local exp = {
+            {
+                name = ":a",
+                type = "ANY",
+            },
+        }
+        t.assert_equals(s.params, exp)
+        res = box.execute(s.stmt_id, {{[':a'] = 1}})
+        t.assert_equals(res.rows, {{1, 1}})
+
+        box.execute([[CREATE TABLE t (id INT PRIMARY KEY, x INT);]])
+        box.space.t:insert({1, 10})
+        box.space.t:insert({2, 20})
+
+        res = box.execute('SELECT id FROM SEQSCAN t WHERE x = ? AND id = :a',
+                          {20, {[':a'] = 2}})
+        t.assert_equals(res.rows, {{2}})
+
+        parameters = {100, {[':b'] = 2}, 200}
+        res = box.execute([[SELECT id + ?, :b, id + ? FROM SEQSCAN t;]],
+                          parameters)
+        t.assert_equals(res.rows, {{101, 2, 201}, {102, 2, 202}})
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)

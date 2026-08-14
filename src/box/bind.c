@@ -230,3 +230,16 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 	}
 	return 0;
 }
+
+uint32_t
+sql_bind_lookup(const struct sql_bind *bind, uint32_t bind_count,
+		const char *name)
+{
+	for (uint32_t i = 0; i < bind_count; i++) {
+		uint32_t len = bind[i].name_len;
+		if (bind[i].name != NULL &&
+		    strncmp(name, bind[i].name, len) == 0 && name[len] == 0)
+			return i + 1;
+	}
+	return 0;
+}
