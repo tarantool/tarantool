@@ -1,8 +1,11 @@
 local errno = require('errno')
+local fiber = require('fiber')
 local ffi = require('ffi')
 local net = require('net.box')
 local socket = require('socket')
+local tarantool = require('tarantool')
 local utils = require('internal.utils')
+local uuid = require('uuid')
 
 ffi.cdef([[
     void
@@ -260,6 +263,51 @@ function thread_group_methods:eval(expr, args, opts)
     return self:_dispatch(thread_eval_cb, {expr, args}, opts)
 end
 
+local function box_info_init()
+    local box_info = {
+        package = tarantool.package,
+        version = tarantool.version,
+        id = box.NULL,
+        uuid = uuid.NULL,
+        name = box.NULL,
+        replicaset = {
+            uuid = uuid.NULL,
+            name = box.NULL,
+        },
+        cluster = {
+            name = box.NULL,
+        },
+    }
+    local box_info_call = function()
+        return box_info
+    end
+    box.info = setmetatable({
+        package = tarantool.package,
+        version = tarantool.version,
+    }, {
+        __index = box_info,
+        __call = box_info_call,
+        __serialize = box_info_call,
+    })
+    local on_box_info_update = fiber.cond()
+    threads_conn:watch('box.id', function(_k, v)
+        box_info.id = v.id
+        box_info.uuid = v.instance_uuid
+        box_info.name = v.instance_name
+        box_info.replicaset.uuid = v.replicaset_uuid
+        box_info.replicaset.name = v.replicaset_name
+        box_info.cluster.name = v.cluster_name
+        on_box_info_update:broadcast()
+    end)
+    -- Wait until box.info is initialized so that code executed in application
+    -- threads can read it right after box.cfg() is done. Note, we have to keep
+    -- the watcher since instance, replicaset, and cluster names can be set
+    -- after recovery.
+    while box_info.id == box.NULL do
+        on_box_info_update:wait()
+    end
+end
+
 --
 -- Initializes the subsystem in the current thread.
 --
@@ -268,7 +316,8 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
     threads_cfg = cfg
     this_group_name = group_name
     this_thread_id_in_group = id_in_group
-    if group_name ~= 'tx' then
+    local is_main = (group_name == 'tx')
+    if not is_main then
         ffi.C.cord_set_name(string.format('%s%d', group_name, id_in_group))
     end
     threads_conn = net.from_fd(conn_fd, {
@@ -281,6 +330,9 @@ function box.internal.threads.init(cfg, group_name, id_in_group, conn_fd)
         _disable_graceful_shutdown = true,
     })
     init_thread_groups(cfg)
+    if not is_main then
+        box_info_init()
+    end
 end
 
 --

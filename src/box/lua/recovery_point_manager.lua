@@ -156,12 +156,11 @@ end
 -- The default label for a recovery point: <instance>.<manager>.<uuid>, with a
 -- fresh uuid on each call. The instance segment is the instance name, its uuid
 -- when the name is unset, or is omitted entirely when the instance is
--- unconfigured (box.info is also absent in an application thread).
+-- unconfigured.
 --
 local function manager_default_label(manager)
-    local info = box.info
-    local instance = info ~= nil and (info.name ~= box.NULL and info.name
-        or info.uuid ~= uuid.NULL and info.uuid)
+    local instance = (box.info.name ~= box.NULL and box.info.name or
+                      box.info.uuid ~= uuid.NULL and box.info.uuid)
     if instance then
         return string.format('%s.%s.%s', instance, manager.name, uuid.str())
     end
