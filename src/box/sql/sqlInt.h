@@ -195,6 +195,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+struct sql_bind;
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
@@ -1254,6 +1255,13 @@ struct Expr {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
 		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
+	/**
+	 * For anonymous variable it is a position in PVList of last name before
+	 * this variable (?). If it takes the value 0 then there is no named
+	 * variable before or then the last variable was numeric ($N).
+	 * For named variable it is its own position in PVList.
+	 */
+	int var_base;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
 	 * space is allocated for the fields below this point. An attempt to
@@ -1886,12 +1894,24 @@ struct Parse {
 		int lru;	/* Least recently used entry has the smallest value */
 	} aColCache[SQL_N_COLCACHE];	/* One for each column cache entry */
 	int aTempReg[8];	/* Holding area for temporary registers */
-	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
+	/** Number of parameters reported in the statement's bind metadata. */
+	ynVar nVar;
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
+	/** Information about last named variable before anonymous variables. */
+	struct {
+		/**
+		 * Relative position of the next anonymous variable (?):
+		 * an offset from the named variable when it is set,
+		 * otherwise an absolute position.
+		 */
+		int offset;
+		/** Position of last named variable. */
+		int pos;
+	} var;
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
