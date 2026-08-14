@@ -49,6 +49,7 @@
 #include "mp_decimal.h"
 #include "mp_uuid.h"
 #include "mp_util.h"
+#include "box/bind.h"
 
 #define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
 
@@ -307,6 +308,61 @@ mem_delete(struct Mem *v)
 }
 
 void
+mem_set_bind(struct Mem *mem, const struct sql_bind *bind)
+{
+	switch (bind->type) {
+	case MP_INT:
+		mem_set_int(mem, bind->i64);
+		break;
+	case MP_UINT:
+		mem_set_uint(mem, bind->u64);
+		break;
+	case MP_BOOL:
+		mem_set_bool(mem, bind->b);
+		break;
+	case MP_DOUBLE:
+	case MP_FLOAT:
+		mem_set_double(mem, bind->d);
+		break;
+	case MP_STR:
+		mem_set_str_static(mem, bind->s, bind->bytes);
+		break;
+	case MP_NIL:
+		break;
+	case MP_BIN:
+		mem_set_bin_static(mem, bind->s, bind->bytes);
+		break;
+	case MP_ARRAY:
+		mem_set_array_static(mem, (char *)bind->s, bind->bytes);
+		break;
+	case MP_MAP:
+		mem_set_map_static(mem, (char *)bind->s, bind->bytes);
+		break;
+	case MP_EXT:
+		switch (bind->ext_type) {
+		case MP_UUID:
+			mem_set_uuid(mem, &bind->uuid);
+			break;
+		case MP_DECIMAL:
+			mem_set_dec(mem, &bind->dec);
+			break;
+		case MP_DATETIME:
+			mem_set_datetime(mem, &bind->dt);
+			break;
+		case MP_INTERVAL:
+			mem_set_interval(mem, &bind->itv);
+			break;
+		default:
+			unreachable();
+			break;
+		}
+		break;
+	default:
+		unreachable();
+	}
+}
+
+void
 mem_set_null(struct Mem *mem)
 {
 	mem_clear(mem);
@@ -396,12 +452,15 @@ mem_set_interval(struct Mem *mem, const struct interval *itv)
 	assert(mem->flags == 0);
 }
 
+/**
+ * Set const string value in cell mem.
+ */
 static inline void
-set_str_const(struct Mem *mem, char *value, size_t len, int alloc_type)
+set_str_const(struct Mem *mem, const char *value, size_t len, int alloc_type)
 {
 	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
-	mem->z = value;
+	mem->z = (char *)value;
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
 	mem->flags = alloc_type;
@@ -428,7 +487,7 @@ mem_set_str_ephemeral(struct Mem *mem, char *value, size_t len)
 }
 
 void
-mem_set_str_static(struct Mem *mem, char *value, size_t len)
+mem_set_str_static(struct Mem *mem, const char *value, size_t len)
 {
 	set_str_const(mem, value, len, MEM_Static);
 }
@@ -491,12 +550,15 @@ mem_copy_str0(struct Mem *mem, const char *value)
 	mem->n = len;
 }
 
+/**
+ * Set const bin value in cell mem.
+ */
 static inline void
-set_bin_const(struct Mem *mem, char *value, size_t size, int alloc_type)
+set_bin_const(struct Mem *mem, const char *value, size_t size, int alloc_type)
 {
 	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
-	mem->z = value;
+	mem->z = (char *)value;
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
 	mem->flags = alloc_type;
@@ -522,7 +584,7 @@ mem_set_bin_ephemeral(struct Mem *mem, char *value, size_t size)
 }
 
 void
-mem_set_bin_static(struct Mem *mem, char *value, size_t size)
+mem_set_bin_static(struct Mem *mem, const char *value, size_t size)
 {
 	set_bin_const(mem, value, size, MEM_Static);
 }

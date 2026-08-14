@@ -38,6 +38,7 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "box/session.h"
+#include "box/bind.h"
 
 int
 sql_stmt_finalize(struct Vdbe *v)
@@ -51,6 +52,8 @@ int
 sql_stmt_reset(struct Vdbe *v)
 {
 	assert(v != NULL);
+	v->bind_count = 0;
+	v->bind = NULL;
 	int rc = sqlVdbeReset(v);
 	sqlVdbeRewind(v);
 	return rc;

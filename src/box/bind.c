@@ -34,10 +34,25 @@
 #include "sql/sqlInt.h"
 #include "sql/sqlLimit.h"
 #include "sql/vdbe.h"
+#include "sql/vdbeInt.h"
 #include "mp_interval.h"
 #include "mp_datetime.h"
 #include "mp_decimal.h"
 #include "mp_uuid.h"
+
+int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
+{
+	assert(stmt != NULL);
+	uint32_t pos = 1;
+	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
+		if (sql_bind_column(stmt, &bind[i], pos) != 0)
+			return -1;
+	}
+	stmt->bind_count = bind_count;
+	stmt->bind = bind;
+	return 0;
+}
 
 const char *
 sql_bind_name(const struct sql_bind *bind)
@@ -227,6 +242,19 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 		}
 	default:
 		unreachable();
+	}
+	return 0;
+}
+
+uint32_t
+sql_bind_lookup(const struct sql_bind *bind, uint32_t bind_count,
+		const char *name)
+{
+	for (uint32_t i = 0; i < bind_count; i++) {
+		uint32_t len = bind[i].name_len;
+		if (bind[i].name != NULL &&
+		    strncmp(name, bind[i].name, len) == 0 && name[len] == 0)
+			return i + 1;
 	}
 	return 0;
 }
