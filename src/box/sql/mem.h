@@ -36,6 +36,7 @@
 
 struct sql;
 struct Vdbe;
+struct Var;
 struct region;
 struct mpstream;
 struct VdbeFrame;

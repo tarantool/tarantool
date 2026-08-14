@@ -3685,13 +3685,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 					  target);
 			assert(pExpr->u.zToken[1] != 0);
-			const char *z = sqlVListNumToName(pParse->pVList,
-							  pExpr->iColumn);
-			assert(pExpr->u.zToken[0] == '$' ||
-			       strcmp(pExpr->u.zToken, z) == 0);
 			/* Indicate VList may no longer be enlarged */
 			pParse->pVList[0] = 0;
-			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+			sqlVdbeAppendP4(v, pExpr->u.zToken, P4_STATIC);
 			return target;
 		}
 	case TK_VAR_ANON: {

@@ -2553,7 +2553,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	if (sql_bind_ptr(stmt, 1, ref) != 0)
 		goto error;
 
-	if (sql_step(stmt) != SQL_ROW)
+	if (sql_step(stmt, NULL, 0) != SQL_ROW)
 		goto error;
 
 	uint32_t res_size;
@@ -2562,7 +2562,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 		goto error;
 	port_c_add_mp(ret, pos, pos + res_size);
 
-	if (sql_step(stmt) != SQL_DONE)
+	if (sql_step(stmt, NULL, 0) != SQL_DONE)
 		goto error;
 
 	sql_stmt_reset(stmt);
