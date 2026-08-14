@@ -74,12 +74,13 @@ g.test_prepared = function(cg)
         space:replace{1, 2, '3'}
         space:replace{4, 5, '6'}
         space:replace{7, 8.5, '9'}
-        local s, err = _G.prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
+        local sql = "SELECT * FROM test WHERE id = $1 AND a = $2;"
+        local s, err = _G.prepare(sql)
         t.assert_equals(err, nil)
-        t.assert_equals(s.stmt_id, 3603193623)
+        t.assert_equals(s.stmt_id, 3434833435)
 
         exp = {
-            stmt_id = 3603193623,
+            stmt_id = 3434833435,
             metadata = {
                 {
                     name = "id",
@@ -96,11 +97,11 @@ g.test_prepared = function(cg)
             },
             params = {
                 {
-                    name = "?",
+                    name = "$1",
                     type = "ANY",
                 },
                 {
-                    name = "?",
+                    name = "$2",
                     type = "ANY",
                 },
             },
@@ -150,8 +151,8 @@ g.test_prepared = function(cg)
         check_prepared_ddl_fails("ALTER TABLE test RENAME TO test1;")
 
         box.execute("CREATE TABLE test2 (id INT PRIMARY KEY);")
-        local sql =  [[ALTER TABLE test2 ADD CONSTRAINT fk1
-                       FOREIGN KEY (id) REFERENCES test2;]]
+        sql =  [[ALTER TABLE test2 ADD CONSTRAINT fk1
+                 FOREIGN KEY (id) REFERENCES test2;]]
         check_prepared_ddl_fails(sql)
         box.space.test2:drop()
         t.assert_equals(box.space.test2, nil)
