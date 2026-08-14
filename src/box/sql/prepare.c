@@ -169,6 +169,8 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	parser->line_count = 1;
 	parser->line_pos = 1;
 	region_create(&parser->region, &cord()->slabc);
+	parser->var.offset = 1;
+	parser->var.pos = 0;
 }
 
 void

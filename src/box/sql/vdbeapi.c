@@ -38,6 +38,7 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "box/session.h"
+#include "box/bind.h"
 
 /*
  * Invoke the profile callback.  This routine is only called if we already
@@ -81,6 +82,8 @@ sql_stmt_reset(struct Vdbe *v)
 	assert(v != NULL);
 	if (v->startTime > 0)
 		invokeProfileCallback(v);
+	v->bind_count = 0;
+	v->bind = NULL;
 	int rc = sqlVdbeReset(v);
 	sqlVdbeRewind(v);
 	return rc;
