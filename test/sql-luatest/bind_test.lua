@@ -124,6 +124,27 @@ g.test_bind_3 = function()
     end)
 end
 
+-- Check work of numeric bind variables
+g.test_12733_numeric_bind_variables = function()
+    g.server:exec(function()
+        local sql = [[SELECT $3, $1, $2, $10;]]
+        local res = box.execute(sql, {'a', 'b', 'c'})
+        t.assert_equals(res.rows, {{'c', 'a', 'b', nil}})
+
+        res = box.execute([[select :a, $1;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select $1, :a;]], {{[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 123}})
+
+        res = box.execute([[select :a, $1;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{123, 321}})
+
+        res = box.execute([[select $1, :a;]], {321, {[':a'] = 123}})
+        t.assert_equals(res.rows, {{321, 123}})
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)
