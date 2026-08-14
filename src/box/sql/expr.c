@@ -1197,7 +1197,17 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	if (z[1] == 0) {
 		/* Wildcard of the form "?".  Assign the next variable number */
 		assert(z[0] == '?');
-		x = (ynVar) (++pParse->nVar);
+		x = pParse->var.offset;
+		int nVar = x;
+		if (pParse->var.name != NULL) {
+			nVar += pParse->var.pos;
+			pExpr->var_base = pParse->var.pos;
+		} else {
+			pExpr->var_base = 0;
+		}
+		if (nVar > pParse->nVar)
+			pParse->nVar = nVar;
+		pParse->var.offset++;
 	} else {
 		int doAdd = 0;
 		assert(z[0] != '?');
@@ -1224,26 +1234,29 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 				pParse->is_aborted = true;
 				return;
 			}
-			if (x > pParse->nVar) {
-				pParse->nVar = (int)x;
-				doAdd = 1;
-			} else if (sqlVListNumToName(pParse->pVList, x) ==
-				   0) {
-				doAdd = 1;
-			}
+			pParse->var.name = NULL;
+			pParse->var.offset = x + 1;
+			if (x > pParse->nVar)
+				pParse->nVar = x;
 		} else {
 			/* Wildcards like ":aaa", or "@aaa".  Reuse the same variable
 			 * number as the prior appearance of the same name, or if the name
 			 * has never appeared before, reuse the same variable number
 			 */
-			x = (ynVar) sqlVListNameToNum(pParse->pVList, z, n);
-			if (x == 0) {
-				x = (ynVar) (++pParse->nVar);
+			ynVar num = sqlVListNameToNum(pParse->pVList, z, n);
+			if (num == 0) {
+				pParse->nVar++;
+				num = pParse->nVar;
 				doAdd = 1;
 			}
-		}
-		if (doAdd) {
-			pParse->pVList = sqlVListAdd(pParse->pVList, z, n, x);
+			x = (ynVar)0;
+			pParse->var.name = z;
+			pParse->var.offset = 1;
+			pParse->var.pos = num;
+			if (doAdd) {
+				pParse->pVList = sqlVListAdd(pParse->pVList,
+							     z, n, num);
+			}
 		}
 	}
 	pExpr->iColumn = x;
@@ -3656,26 +3669,40 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			return target;
 		}
 	case TK_VAR_NUM:
-	case TK_VAR_NAME: {
+			assert(!ExprHasProperty(pExpr, EP_IntValue));
+			assert(pExpr->u.zToken != 0);
+			assert(pExpr->u.zToken[0] != 0);
+			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn, target);
+			assert(pExpr->u.zToken[1] != 0);
+			return target;
+	case TK_VAR_NAME:
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 					  target);
 			assert(pExpr->u.zToken[1] != 0);
-			const char *z = sqlVListNumToName(pParse->pVList,
-							  pExpr->iColumn);
-			assert(pExpr->u.zToken[0] == '$' ||
-			       strcmp(pExpr->u.zToken, z) == 0);
+			const char *z =
+				sql_find_var_by_name(pParse->pVList,
+						     pExpr->u.zToken);
+			assert(z != NULL);
 			/* Indicate VList may no longer be enlarged */
 			pParse->pVList[0] = 0;
 			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
 			return target;
-		}
 	case TK_VAR_ANON: {
 			assert(pExpr->u.zToken[0] == '?');
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 				      target);
+			if (pExpr->var_base != 0) {
+				const char *z =
+					sqlVListNumToName(pParse->pVList,
+							  pExpr->var_base);
+				assert(z != NULL);
+				/* Indicate VList may no longer be enlarged */
+				pParse->pVList[0] = 0;
+				sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+			}
 			return target;
 		}
 	case TK_REGISTER:{

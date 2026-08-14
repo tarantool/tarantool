@@ -1123,6 +1123,20 @@ sqlVListNumToName(VList * pIn, int iVal)
 	return 0;
 }
 
+const char *
+sql_find_var_by_name(VList *pIn, const char *name)
+{
+	int i, mx;
+	if (pIn == 0)
+		return 0;
+	mx = pIn[1];
+	for (i = 2; i < mx; i += pIn[i + 1]) {
+		if (strcmp((char *)&pIn[i + 2], name) == 0)
+			return (char *)&pIn[i + 2];
+	}
+	return 0;
+}
+
 /*
  * Return the number of the variable named zName, if it is in VList.
  * or return 0 if there is no such variable.

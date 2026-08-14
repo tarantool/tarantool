@@ -195,6 +195,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+struct sql_bind;
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
@@ -291,7 +292,7 @@ sql_stmt_compile(const char *sql);
 
 /** This is the top-level implementation of sqlStep(). */
 int
-sql_step(struct Vdbe *v);
+sql_step(struct Vdbe *v, const struct sql_bind *bind, uint32_t bind_count);
 
 /** Encode the result of an SQL statement in msgpack. */
 char *
@@ -1258,6 +1259,12 @@ struct Expr {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
 		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
+	/**
+	 * Position in PVList of last name before anonymous variables (?).
+	 * If it takes the value 0 then there is no named variable before or
+	 * then the last variable was numeric ($N).
+	 */
+	int var_base;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
 	 * space is allocated for the fields below this point. An attempt to
@@ -1896,6 +1903,23 @@ struct Parse {
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
+	/** Information about last name before anonymous variables (?). */
+	struct {
+		/**
+		 * Last name before anonymous variables (?).
+		 * If NULL, then there is no named variable before or
+		 * then the last variable was numeric ($N).
+		 */
+		const char *name;
+		/**
+		 * Relative position of the next anonymous variable (?):
+		 * an offset from the variable `name` when it is set,
+		 * otherwise an absolute position.
+		 */
+		int offset;
+		/** Position of last named variable. */
+		int pos;
+	} var;
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
@@ -3802,6 +3826,14 @@ sqlVListAdd(int *pIn, const char *zName, int nName, int iVal);
 
 const char *sqlVListNumToName(VList *, int);
 int sqlVListNameToNum(VList *, const char *, int);
+
+/*
+ * Return a pointer to the name of a variable in the given VList that
+ * coincides with name.  Or return a NULL if there is no such variable in
+ * the list
+ */
+const char *
+sql_find_var_by_name(VList *pIn, const char *name);
 
 /*
  * Routines to read and write variable-length integers.  These used to

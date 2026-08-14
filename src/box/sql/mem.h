@@ -111,6 +111,10 @@ struct Mem {
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
 
+/** Initialize Mem element which corresponds to bind element. */
+void
+mem_set_bind(struct Mem *mem, const struct sql_bind *bind);
+
 static inline bool
 mem_is_null(const struct Mem *mem)
 {
