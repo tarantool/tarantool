@@ -93,16 +93,16 @@ g.test_call_eval = function(cg)
     local conn = net.connect(cg.server.net_box_uri,
                              cg.server.net_box_credentials)
     -- Call a box function in the main thread.
-    t.assert_covers(conn:call('box.info', {}, {_thread_id = 0}),
-                    {status = 'running'})
+    t.assert_equals(conn:call('box.ctl.is_recovery_finished',
+                              {}, {_thread_id = 0}), true)
     -- Check that the box function is unavailable in an application thread.
     local err = {
         type = 'ClientError',
         name = 'NO_SUCH_PROC',
-        func = 'box.info',
+        func = 'box.ctl.is_recovery_finished',
     }
-    t.assert_error_covers(err, conn.call, conn, 'box.info', {},
-                          {_thread_id = 1})
+    t.assert_error_covers(err, conn.call, conn, 'box.ctl.is_recovery_finished',
+                          {}, {_thread_id = 1})
     -- Register a function in an application thread.
     conn:eval([[rawset(_G, 'test_func', function() return 42 end)]], {},
               {_thread_id = 1})
@@ -818,8 +818,7 @@ g.test_recovery_point_manager = function(cg)
     cg.server:exec(function()
         local rp = box.backup.recovery_point
         t.assert_type(rp.manager_create, 'function')
-        -- Neither box.info nor config is available in an application thread.
-        t.assert_equals(box.info, nil)
+        -- config is unavailable in an application thread.
         t.assert_equals(pcall(require, 'config'), false)
 
         local created = {}
@@ -838,13 +837,14 @@ g.test_recovery_point_manager = function(cg)
         -- No config -> no alerts namespace, but the manager still runs.
         t.assert_equals(m.alert_namespace, nil)
 
-        -- The loop creates points. With no box.info the label carries no
-        -- instance segment: <manager>.<uuid>.
+        -- The loop creates points.
         t.helpers.retrying({timeout = 10}, function()
             t.assert_ge(#created, 2)
         end)
         for _, label in ipairs(created) do
-            t.assert_str_matches(label, 'thr%.[^.]+')
+            local uuid = '%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-' ..
+                         '%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x'
+            t.assert_str_matches(label, uuid .. '%.thr%.' .. uuid)
         end
 
         m:drop()
