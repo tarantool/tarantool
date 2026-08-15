@@ -56,7 +56,6 @@ sql_alter_table_rename(struct Parse *parse)
 		diag_set(ClientError, ER_NO_SUCH_SPACE, src_tab->a[0].zName);
 		goto tnt_error;
 	}
-	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
 	struct Vdbe *v = sqlGetVdbe(parse);
 	sqlVdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,

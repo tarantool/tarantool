@@ -310,7 +310,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	/* Allocate a VDBE. */
 	v = sqlGetVdbe(pParse);
 	sqlVdbeCountChanges(v);
-	sql_set_multi_write(pParse, pSelect != NULL || trigger != NULL);
 
 	/* If the statement is of the form
 	 *
@@ -885,7 +884,6 @@ process_index:  ;
 			sqlVdbeAddOp4Int(v, OP_NoConflict, cursor,
 					     skip_index, idx_key_reg,
 					     part_count);
-			sql_set_multi_write(parse_context, true);
 			struct sql_trigger *trigger =
 				sql_triggers_exist(space->def, TK_DELETE, NULL,
 						   parse_context->sql_flags,
