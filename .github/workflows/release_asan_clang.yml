@@ -71,6 +71,18 @@ jobs:
       # of the .github/actions/environment action.
       options: '--init --privileged'
 
+    strategy:
+      matrix:
+        ALLOCATOR: [sysmalloc, dlmalloc]
+        include:
+          - ALLOCATOR: sysmalloc
+            MAKE_CMD: test-release-asan-sysmalloc
+          - ALLOCATOR: dlmalloc
+            MAKE_CMD: test-release-asan-dlmalloc
+
+    name: >
+      release_asan_clang_${{ matrix.ALLOCATOR }}
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -89,11 +101,18 @@ jobs:
         with:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
+      - name: Switch luajit submodule branch
+        # This step is a temporary solution needed to test the ASAN
+        # instrumentation of LuaJIT allocator.
+        if: ${{ matrix.ALLOCATOR == 'dlmalloc' }}
+        run: |
+          git -C third_party/luajit fetch origin mandesero/lj-10231-ASAN-and-LJ-allocator && \
+          git -C third_party/luajit checkout mandesero/lj-10231-ASAN-and-LJ-allocator
       - name: test
         env:
           CC: clang-19
           CXX: clang++-19
-        run: make -f .test.mk test-release-asan
+        run: make -f .test.mk ${{ matrix.MAKE_CMD }}
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
