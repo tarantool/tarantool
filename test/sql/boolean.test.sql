@@ -102,7 +102,7 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
 
 -- Check BOOLEAN as binding parameter.
 \set language lua
-box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
+box.execute('SELECT :a, :b, return_type($1), TYPEOF($2);', {{[':a'] = true}, {[':b'] = false}})
 
 parameters = {}
 parameters[1] = {}

@@ -36,6 +36,7 @@
 
 struct sql;
 struct Vdbe;
+struct Var;
 struct region;
 struct mpstream;
 struct VdbeFrame;
@@ -778,6 +779,12 @@ int sqlVdbeCheckMemInvariants(struct Mem *);
  */
 void
 sqlVdbeMemClearAndResize(struct Mem *pMem, size_t n);
+
+/*
+ * Release an array of N Var elements
+ */
+void
+releaseVarArray(struct Var *p, int N);
 
 /*
  * Release an array of N Mem elements

@@ -2876,6 +2876,18 @@ sqlVdbeMemClearAndResize(struct Mem *pMem, size_t szNew)
 }
 
 void
+releaseVarArray(struct Var *p, int N)
+{
+	if (p && N) {
+		for (int i = 0; i < N; i++) {
+			assert(sqlVdbeCheckMemInvariants(p[i].value));
+			mem_destroy(p[i].value);
+			sql_xfree(p[i].value);
+		}
+	}
+}
+
+void
 releaseMemArray(Mem * p, int N)
 {
 	if (p && N) {

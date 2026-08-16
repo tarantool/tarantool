@@ -2547,7 +2547,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	else
 		vdbe_field_ref_prepare_array(ref, 1, data, mp_size);
 	ref->format = format;
-	if (sql_bind_ptr(stmt, 1, ref) != 0)
+	if (sql_bind_ptr(stmt, 1, ref, NULL, 0) != 0)
 		goto error;
 
 	if (sql_step(stmt) != SQL_ROW)

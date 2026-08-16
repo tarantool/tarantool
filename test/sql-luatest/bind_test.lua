@@ -29,6 +29,19 @@ g.test_bind_2 = function()
     t.assert_equals(err.message, res)
 end
 
+-- Check work of numeric bind variables
+g.test_12733_numeric_bind_variables = function()
+    g.server:exec(function()
+        local sql = [[SELECT $3, $1, $2;]]
+        local res = box.execute(sql, {'a', 'b', 'c'})
+        t.assert_equals(res.rows, {{'c', 'a', 'b'}})
+
+        sql = [[select #a, ?, :a;]]
+        res = box.execute(sql, {{['#a'] = 222}, {[':a'] = 333}})
+        t.assert_equals(res.rows, {{222, 333, 333}})
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)
@@ -108,9 +121,9 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         parameters[5] = 5
         parameters[6] = {}
         parameters[6]['@value2'] = 6
-        sql = 'SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3;'
+        sql = 'SELECT :value3, ?, :value1, ?, ?, @value2, :value3;'
         res = _G.execute(sql, parameters)
-        t.assert_equals(res.rows, {{1, 2, 3, 4, 5, 6, nil, 1}})
+        t.assert_equals(res.rows, {{1, 2, 3, 4, 5, 6, 1}})
 
         -- Try not-integer types.
         local msgpack = require('msgpack')
@@ -178,13 +191,11 @@ g.test_3401_box_execute_parameter_binding = function(cg)
 
         box.execute('DROP TABLE test;')
 
-        exp_err = "Failed to execute SQL statement: "..
-                  "The number of parameters is too large"
-        local _, err = box.execute('SELECT ?;', {1, 2})
-        t.assert_equals(tostring(err), exp_err)
+        res = box.execute('SELECT ?;', {1, 2})
+        t.assert_equals(res.rows, {{1}})
 
-        _, err = box.execute('SELECT $2;', {1, 2, 3})
-        t.assert_equals(tostring(err), exp_err)
+        res = box.execute('SELECT $2;', {1, 2, 3})
+        t.assert_equals(res.rows, {{2}})
     end)
 end
 

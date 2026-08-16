@@ -74,12 +74,13 @@ g.test_prepared = function(cg)
         space:replace{1, 2, '3'}
         space:replace{4, 5, '6'}
         space:replace{7, 8.5, '9'}
-        local s, err = _G.prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
+        local sql = "SELECT * FROM test WHERE id = :id AND a = :a;"
+        local s, err = _G.prepare(sql)
         t.assert_equals(err, nil)
-        t.assert_equals(s.stmt_id, 3603193623)
+        t.assert_equals(s.stmt_id, 4051716978)
 
         exp = {
-            stmt_id = 3603193623,
+            stmt_id = 4051716978,
             metadata = {
                 {
                     name = "id",
@@ -96,11 +97,11 @@ g.test_prepared = function(cg)
             },
             params = {
                 {
-                    name = "?",
+                    name = ":id",
                     type = "ANY",
                 },
                 {
-                    name = "?",
+                    name = ":a",
                     type = "ANY",
                 },
             },
@@ -108,16 +109,18 @@ g.test_prepared = function(cg)
         }
         t.assert_covers(s, exp)
 
-        t.assert_equals(_G.execute(s.stmt_id, {1, 2}).rows, {{1, 2, '3'}})
-        t.assert_equals(_G.execute(s.stmt_id, {1, 3}).rows, {})
+        t.assert_equals(_G.execute(s.stmt_id, {{[':id'] = 1},
+                                   {[':a'] = 2}}).rows, {{1, 2, '3'}})
+        t.assert_equals(_G.execute(s.stmt_id, {{[':id'] = 1},
+                                   {[':a'] = 3}}).rows, {})
 
         t.assert_not_equals(box.info.sql().cache.stmt_count, 0)
         t.assert_not_equals(box.info.sql().cache.size, 0)
 
         if not remote then
-            res = s:execute({1, 2})
+            res = s:execute({{[':id'] = 1}, {[':a'] = 2}})
             t.assert_not_equals(res, nil)
-            res = s:execute({1, 3})
+            res = s:execute({{[':id'] = 1}, {[':a'] = 3}})
             t.assert_not_equals(res, nil)
         end
 
@@ -150,7 +153,7 @@ g.test_prepared = function(cg)
         check_prepared_ddl_fails("ALTER TABLE test RENAME TO test1;")
 
         box.execute("CREATE TABLE test2 (id INT PRIMARY KEY);")
-        local sql =  [[ALTER TABLE test2 ADD CONSTRAINT fk1
+        sql =  [[ALTER TABLE test2 ADD CONSTRAINT fk1
                        FOREIGN KEY (id) REFERENCES test2;]]
         check_prepared_ddl_fails(sql)
         box.space.test2:drop()

@@ -325,7 +325,7 @@ vdbeUnbind(struct Vdbe *p, int i)
 		return -1;
 	}
 	i--;
-	pVar = &p->aVar[i];
+	pVar = p->aVar[i].value;
 	mem_destroy(pVar);
 	return 0;
 }
@@ -394,49 +394,68 @@ sql_reset_autoinc_id_list(struct Vdbe *v)
 	stailq_create(&v->autoinc_id_list);
 }
 
+/*
+ * Set name and length of name in strcut `Var`.
+ */
+void
+var_set_name(struct Var *variable, const char *name, uint32_t name_len)
+{
+	variable->name = name;
+	variable->name_len = name_len;
+}
+
 int
-sql_bind_double(struct Vdbe *p, int i, double rValue)
+sql_bind_double(struct Vdbe *p, int i, double rValue,
+		const char *name, uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "numeric");
-	mem_set_double(&p->aVar[i - 1], rValue);
+	mem_set_double(p->aVar[i - 1].value, rValue);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return rc;
 }
 
 int
-sql_bind_boolean(struct Vdbe *p, int i, bool value)
+sql_bind_boolean(struct Vdbe *p, int i, bool value,
+		 const char *name, uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "boolean");
-	mem_set_bool(&p->aVar[i - 1], value);
+	mem_set_bool(p->aVar[i - 1].value, value);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return rc;
 }
 
 int
-sql_bind_int(struct Vdbe *p, int i, int iValue)
+sql_bind_int(struct Vdbe *p, int i, int iValue, const char *name,
+	     uint32_t name_len)
 {
-	return sql_bind_int64(p, i, (i64) iValue);
+	return sql_bind_int64(p, i, (i64) iValue, name, name_len);
 }
 
 int
-sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
+sql_bind_int64(struct Vdbe *p, int i, int64_t iValue, const char *name,
+	       uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
-	mem_set_int(&p->aVar[i - 1], iValue);
+	mem_set_int(p->aVar[i - 1].value, iValue);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return rc;
 }
 
 int
-sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
+sql_bind_uint64(struct Vdbe *p, int i, uint64_t value, const char *name,
+		uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
-	mem_set_uint(&p->aVar[i - 1], value);
+	mem_set_uint(p->aVar[i - 1].value, value);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return rc;
 }
 
@@ -449,77 +468,95 @@ sql_bind_null(struct Vdbe *p, int i)
 }
 
 int
-sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
+sql_bind_ptr(struct Vdbe *p, int i, void *ptr, const char *name,
+	     uint32_t name_len)
 {
 	int rc = vdbeUnbind(p, i);
 	if (rc == 0) {
 		rc = sql_bind_type(p, i, "varbinary");
-		mem_set_ptr(&p->aVar[i - 1], ptr);
+		mem_set_ptr(p->aVar[i - 1].value, ptr);
+		var_set_name(&p->aVar[i - 1], name, name_len);
 	}
 	return rc;
 }
 
 int
-sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
+sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len,
+		    const char *name, uint32_t name_len)
 {
-	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
+	mem_set_str_static(vdbe->aVar[i - 1].value, (char *)str, len);
+	var_set_name(&vdbe->aVar[i - 1], name, name_len);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size,
+		    const char *name, uint32_t name_len)
 {
-	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_bin_static(vdbe->aVar[i - 1].value, (char *)str, size);
+	var_set_name(&vdbe->aVar[i - 1], name, name_len);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size,
+		      const char *name, uint32_t name_len)
 {
-	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_array_static(vdbe->aVar[i - 1].value, (char *)str, size);
+	var_set_name(&vdbe->aVar[i - 1], name, name_len);
 	return sql_bind_type(vdbe, i, "array");
 }
 
 int
-sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size,
+		    const char *name, uint32_t name_len)
 {
-	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_map_static(vdbe->aVar[i - 1].value, (char *)str, size);
+	var_set_name(&vdbe->aVar[i - 1], name, name_len);
 	return sql_bind_type(vdbe, i, "map");
 }
 
 int
-sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
+sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid,
+	      const char *name, uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
 		return -1;
-	mem_set_uuid(&p->aVar[i - 1], uuid);
+	mem_set_uuid(p->aVar[i - 1].value, uuid);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return 0;
 }
 
 int
-sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
+sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec, const char *name,
+	     uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
 		return -1;
-	mem_set_dec(&p->aVar[i - 1], dec);
+	mem_set_dec(p->aVar[i - 1].value, dec);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return 0;
 }
 
 int
-sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
+sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt,
+		  const char *name, uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
 		return -1;
-	mem_set_datetime(&p->aVar[i - 1], dt);
+	mem_set_datetime(p->aVar[i - 1].value, dt);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return 0;
 }
 
 int
-sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
+sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv,
+		  const char *name, uint32_t name_len)
 {
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
 		return -1;
-	mem_set_interval(&p->aVar[i - 1], itv);
+	mem_set_interval(p->aVar[i - 1].value, itv);
+	var_set_name(&p->aVar[i - 1], name, name_len);
 	return 0;
 }
 
@@ -562,7 +599,7 @@ sqlTransferBindings(struct Vdbe *pFrom, struct Vdbe *pTo)
 	int i;
 	assert(pTo->nVar == pFrom->nVar);
 	for (i = 0; i < pFrom->nVar; i++) {
-		mem_move(&pTo->aVar[i], &pFrom->aVar[i]);
+		mem_move(pTo->aVar[i].value, pFrom->aVar[i].value);
 	}
 	return 0;
 }

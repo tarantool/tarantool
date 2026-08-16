@@ -3690,13 +3690,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 					  target);
 			if (pExpr->u.zToken[1] != 0) {
-				const char *z =
-				    sqlVListNumToName(pParse->pVList,
-							  pExpr->iColumn);
-				assert(pExpr->u.zToken[0] == '$'
-				       || strcmp(pExpr->u.zToken, z) == 0);
-				pParse->pVList[0] = 0;	/* Indicate VList may no longer be enlarged */
-				sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+				/* Indicate VList may no longer be enlarged */
+				pParse->pVList[0] = 0;
+				sqlVdbeAppendP4(v, (char *)pExpr->u.zToken,
+						P4_STATIC);
 			}
 			return target;
 		}
