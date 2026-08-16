@@ -66,6 +66,9 @@ static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 static bool sql_seq_scan_default = false;
 TWEAK_BOOL(sql_seq_scan_default);
 
+bool sql_uppercase_id = true;
+TWEAK_BOOL(sql_uppercase_id);
+
 uint32_t
 sql_default_session_flags(void)
 {
@@ -1618,7 +1621,8 @@ sql_space_by_token(const struct Token *name)
 	char *name_str = sql_name_from_token(name);
 	struct space *res = space_by_name0(name_str);
 	sql_xfree(name_str);
-	if (res != NULL || name->z[0] == '"')
+	if (res != NULL || name->z[0] == '"' ||
+	    !sql_uppercase_id)
 		return res;
 	char *old_name_str = sql_legacy_name_new(name->z, name->n);
 	res = space_by_name0(old_name_str);
@@ -1630,7 +1634,8 @@ const struct space *
 sql_space_by_src(const struct SrcList_item *src)
 {
 	struct space *res = space_by_name0(src->zName);
-	if (res != NULL || src->legacy_name == NULL)
+	if (res != NULL || src->legacy_name == NULL ||
+	    !sql_uppercase_id)
 		return res;
 	return space_by_name0(src->legacy_name);
 }
@@ -1655,7 +1660,8 @@ sql_index_id_by_token(const struct space *space, const struct Token *name)
 	char *name_str = sql_name_from_token(name);
 	uint32_t res = sql_space_index_id(space, name_str);
 	sql_xfree(name_str);
-	if (res != UINT32_MAX || name->z[0] == '"')
+	if (res != UINT32_MAX || name->z[0] == '"' ||
+	    !sql_uppercase_id)
 		return res;
 	char *old_name_str = sql_legacy_name_new(name->z, name->n);
 	res = sql_space_index_id(space, old_name_str);
@@ -1709,7 +1715,7 @@ sql_coll_id_by_token(const struct Token *name)
 	sql_xfree(name_str);
 	if (coll_id != NULL)
 		return coll_id->id;
-	if (name->z[0] == '"')
+	if (name->z[0] == '"' || !sql_uppercase_id)
 		return UINT32_MAX;
 
 	char *old_name_str = sql_legacy_name_new(name->z, name->n);
@@ -1740,7 +1746,7 @@ sql_constraint_by_token(const struct tuple_constraint_def *cdefs,
 		}
 	}
 	sql_xfree(name_str);
-	if (name->z[0] == '"')
+	if (name->z[0] == '"' || !sql_uppercase_id)
 		return NULL;
 	char *old_name_str = sql_legacy_name_new(name->z, name->n);
 	for (uint32_t i = 0; i < count; ++i) {

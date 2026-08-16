@@ -2461,6 +2461,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        sql_uppercase_id = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
