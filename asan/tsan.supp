@@ -1,0 +1,78 @@
+# File format:
+#fun:*
+#src:*
+
+# This file is for thread suppressions only.
+# [thread]
+
+race:lf_lifo_push
+race:lf_lifo_pop
+race:slab_map
+
+race:clock_lowres_tick
+race:clock_lowres_signal_init
+race:clock_lowres_monotonic
+
+race:rmean_collect
+race:rmean_roll
+
+# Error injection
+race:vy_read_view_merge
+race:vy_write_iterator_start
+
+race:*accept*
+race:*pipe*
+race:*close*
+race:*epoll_ctl*
+
+# Needs a look (came from vinyl)!
+race:quota_use
+race:vy_stmt_alloc
+
+# Replication?? (Came from vinyl)
+race:epoll_ctl
+race:close
+race:iostream_close
+race:epoll_poll
+race:xlog_create
+race:alter_space_do
+
+race:sio_accept
+race:error_unref
+
+# Replication
+race:relay_send
+race:relay_last_row_time
+
+# IPROTO
+race:obuf_alloc
+race:obuf_dup
+race:obuf_create_svp
+race:obuf_reserve_slow
+
+race:iproto_do_cfg_f
+race:net_cord_f
+
+# replication/prune.test.lua - looks suspicious
+race:replica_clear_id
+race:relay_filter_row
+
+# gh-12530
+race:relay_check_status_needs_update
+race:tx_status_update
+race:cmsg_init
+
+# gh-12531
+race:iostream_close
+race:coio_read_ahead_timeout
+
+# Is it a problem??? Seems like a problem.
+race:raft_sm_follow_leader
+race:box_raft
+race:raft_sm_schedule_new_term
+
+# unit/say
+race:main_f
+race:dummy_log
+race:log_rotate
+race:test_log_rotate
