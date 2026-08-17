@@ -207,9 +207,13 @@ test-debug-flaky: UNITTEST_PATTERN = "./unit/*.c*"
 
 test-debug-flaky: build install-test-deps
 	cd test && \
-	TESTS=$$(git diff --relative=test --name-only \
-	         ${COMMIT_RANGE} -- ${LUA_PATTERN} ${UNITTEST_PATTERN} | \
-	         sed 's/\.\(c\|cpp\|cc\)$$//' | grep . | sort -u) && \
+	TESTS="${FLAKY_TESTS}" && \
+	if [ -z "$${TESTS}" ]; then \
+		TESTS=$$(git diff --relative=test --name-only \
+		         ${COMMIT_RANGE} -- ${LUA_PATTERN} \
+		         ${UNITTEST_PATTERN} | \
+		         sed 's/\.\(c\|cpp\|cc\)$$//' | grep . | sort -u); \
+	fi && \
 	(([ -n "$${TESTS}" ] && ${TEST_RUN_ENV} \
 	  ./test-run.py --force \
 	                --vardir ${VARDIR} \
