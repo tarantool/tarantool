@@ -303,8 +303,8 @@ local random_tx_executor
 local consistency_checker
 
 local function generate_txn_repro_stmt(stmt)
-    return ('tx%d(\'%s\') -- %s\n'):format(stmt.tid, stmt.str,
-                                           json.encode(stmt.res))
+    return ('tx%d(%q) -- %s\n'):format(stmt.tid, stmt.str,
+                                      json.encode(stmt.res))
 end
 
 local function generate_txn_serial_stmt(stmt)
