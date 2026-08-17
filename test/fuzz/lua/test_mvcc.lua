@@ -166,14 +166,14 @@ local generic_idx_meta = {
         {
             type = DQL,
             subtype = SELECT,
-            key_cnt = 2,
-            fmt = 'box.space.%s.index[%d]:select({%s, %s}, ' ..
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
         {
             type = DQL,
             subtype = GET,
-            fmt = 'box.space.%s.index[%d]:get{%s, %s}',
+            fmt = 'box.space.%s.index[%d]:get{%s}',
         },
     }
 }
@@ -182,28 +182,28 @@ generic_idx_meta.ops = {
         {
             type = DML,
             subtype = UPDATE,
-            fmt = 'box.space.%s.index[%d]:update({%s, %s}, ' ..
+            fmt = 'box.space.%s.index[%d]:update({%s}, ' ..
                   '{%s, %s})',
         },
         {
             type = DML,
             subtype = DELETE,
-            fmt = 'box.space.%s.index[%d]:delete{%s, %s}',
+            fmt = 'box.space.%s.index[%d]:delete{%s}',
         },
         {
             type = DML,
             subtype = INSERT,
-            fmt = 'box.space.%s:insert{%d, %d, %s, %s}',
+            fmt = 'box.space.%s:insert{%s}',
         },
         {
             type = DML,
             subtype = REPLACE,
-            fmt = 'box.space.%s:replace{%d, %d, %s, %s}',
+            fmt = 'box.space.%s:replace{%s}',
         },
         {
             type = DML,
             subtype = UPSERT,
-            fmt = 'box.space.%s:upsert({%d, %d, %s, %s}, ' ..
+            fmt = 'box.space.%s:upsert({%s}, ' ..
                   '{{\'=\', 3, %s}, {\'=\', 4, %s}})',
         },
 }
@@ -560,6 +560,7 @@ local function gen_random_operation(ro)
     local op = ro and idx.ro_ops[math.random(#idx.ro_ops)] or
                idx.ops[math.random(#idx.ops)]
     local keys = gen_key(idx.fields)
+    local key = table.concat(keys, ', ')
     if op.type == DQL then
         if op.subtype == SELECT then
             local iter = idx.iters[math.random(#idx.iters)]
@@ -567,22 +568,21 @@ local function gen_random_operation(ro)
                 op.str = op.fmt:format(eng.space, idx_id, iter)
             elseif op.key_cnt == 1 then
                 op.str = op.fmt:format(eng.space, idx_id, keys[1], iter)
-            elseif op.key_cnt == 2 then
-                op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2],
-                                       iter)
+            elseif op.full_key then
+                op.str = op.fmt:format(eng.space, idx_id, key, iter)
             end
         elseif op.subtype == GET then
-            op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2])
+            op.str = op.fmt:format(eng.space, idx_id, key)
         end
     else
         local tuple = gen_tuple()
+        local tuple_str = table.concat(tuple, ', ')
         local update = gen_update({ SPACE_FORMAT[3], SPACE_FORMAT[4]})
         if op.subtype == DELETE or op.subtype == UPDATE then
-            op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2],
+            op.str = op.fmt:format(eng.space, idx_id, key,
                                    update[1], update[2])
         else
-            op.str = op.fmt:format(eng.space, tuple[1], tuple[2], tuple[3],
-                                   tuple[4], update[1], update[2])
+            op.str = op.fmt:format(eng.space, tuple_str, update[1], update[2])
         end
     end
     return op
