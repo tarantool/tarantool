@@ -203,8 +203,7 @@ generic_idx_meta.ops = {
         {
             type = DML,
             subtype = UPSERT,
-            fmt = 'box.space.%s:upsert({%s}, ' ..
-                  '{{\'=\', 3, %s}, {\'=\', 4, %s}})',
+            fmt = 'box.space.%s:upsert({%s}, {%s, %s})',
         },
 }
 
