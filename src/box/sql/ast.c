@@ -111,7 +111,11 @@ ast_select_new(struct region *region)
 	return res;
 }
 
-/** Build single `struct Select` object from `struct ast_select` object. */
+/**
+ * Build single `struct Select` object from `struct ast_select` object.
+ *
+ * Return NULL on error.
+ */
 static struct Select *
 select_from_ast_single(struct Parse *parser, struct ast_select *select)
 {
@@ -132,6 +136,10 @@ select_from_ast_single(struct Parse *parser, struct ast_select *select)
 					  select->flags, limit, offset);
 	res->op = select->op;
 	res->pWith = with_from_ast(parser, select->with);
+	if (parser->is_aborted) {
+		sql_select_delete(res);
+		return NULL;
+	}
 	return res;
 }
 
@@ -141,11 +149,17 @@ select_from_ast(struct Parse *parser, struct ast_select *select)
 	if (select == NULL)
 		return NULL;
 	struct Select *res = select_from_ast_single(parser, select);
+	if (parser->is_aborted)
+		return NULL;
 	struct Select *next = res;
 	struct ast_select *prev;
 	int count = 1;
 	rlist_foreach_entry_reverse(prev, &select->link, link) {
 		struct Select *prior = select_from_ast_single(parser, prev);
+		if (parser->is_aborted) {
+			sql_select_delete(res);
+			return NULL;
+		}
 		next->pPrior = prior;
 		prior->pNext = next;
 		next = prior;
@@ -183,7 +197,11 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 	return list;
 }
 
-/** Convert `struct ast_id_list` to `struct ExprList` of column names. */
+/**
+ * Convert `struct ast_id_list` to `struct ExprList` of column names.
+ *
+ * Return NULL on error or if `list == NULL`.
+ */
 static struct ExprList *
 expr_list_from_ids(struct Parse *parser, struct ast_id_list *list)
 {
@@ -194,6 +212,10 @@ expr_list_from_ids(struct Parse *parser, struct ast_id_list *list)
 	stailq_foreach_entry(entry, &list->head, link) {
 		res = sql_expr_list_append(res, NULL);
 		sqlExprListSetName(parser, res, &entry->id, 1);
+	}
+	if (parser->is_aborted) {
+		sql_expr_list_delete(res);
+		return NULL;
 	}
 	return res;
 }
@@ -348,7 +370,11 @@ expr_leaf(struct ast_expr *expr, enum field_type type)
 	return res;
 }
 
-/** Build a `struct Expr` for a bound variable. */
+/**
+ * Build a `struct Expr` for a bound variable.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_var(struct Parse *parser, struct ast_expr *expr)
 {
@@ -379,20 +405,37 @@ expr_var(struct Parse *parser, struct ast_expr *expr)
 	res->type = FIELD_TYPE_BOOLEAN;
 	res->flags |= EP_Leaf;
 	sqlExprAssignVarNumber(parser, res, expr->len);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
 	return res;
 }
 
-/** Build a `struct Expr` for a unary operator applied to `expr->left`. */
+/**
+ * Build a `struct Expr` for a unary operator applied to `expr->left`.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_unary(struct Parse *parser, struct ast_expr *expr)
 {
 	struct Expr *left = expr_from_ast(parser, expr->left);
 	if (parser->is_aborted)
 		return NULL;
-	return sqlPExpr(parser, expr->op, left, NULL);
+	struct Expr *res = sqlPExpr(parser, expr->op, left, NULL);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
+	return res;
 }
 
-/** Build a `struct Expr` for a binary operator applied to left and right. */
+/**
+ * Build a `struct Expr` for a binary operator applied to left and right.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_binary(struct Parse *parser, struct ast_expr *expr)
 {
@@ -404,25 +447,38 @@ expr_binary(struct Parse *parser, struct ast_expr *expr)
 		sql_expr_delete(left);
 		return NULL;
 	}
-	return sqlPExpr(parser, expr->op, left, right);
+	struct Expr *res = sqlPExpr(parser, expr->op, left, right);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
+	return res;
 }
 
-/** Build a `struct Expr` of the given type whose operand is expr->list. */
+/**
+ * Build a `struct Expr` of the given type whose operand is expr->list.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_list(struct Parse *parser, struct ast_expr *expr, enum field_type type)
 {
 	struct Expr *res = sql_expr_new_anon(expr->op);
 	res->x.pList = expr_list_from_ast(parser, expr->list);
+	res->type = type;
+	sqlExprSetHeightAndFlags(parser, res);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
 		return NULL;
 	}
-	res->type = type;
-	sqlExprSetHeightAndFlags(parser, res);
 	return res;
 }
 
-/** Build a `struct Expr` with a left operand and an expression list operand. */
+/**
+ * Build a `struct Expr` with a left operand and an expression list operand.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_left_and_list(struct Parse *parser, struct ast_expr *expr)
 {
@@ -431,15 +487,19 @@ expr_left_and_list(struct Parse *parser, struct ast_expr *expr)
 		return NULL;
 	struct Expr *res = sqlPExpr(parser, expr->op, left, NULL);
 	res->x.pList = expr_list_from_ast(parser, expr->list);
+	sqlExprSetHeightAndFlags(parser, res);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
 		return NULL;
 	}
-	sqlExprSetHeightAndFlags(parser, res);
 	return res;
 }
 
-/** Build a `struct Expr` for a function call expression. */
+/**
+ * Build a `struct Expr` for a function call expression.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_function(struct Parse *parser, struct ast_expr *expr)
 {
@@ -461,15 +521,19 @@ expr_function(struct Parse *parser, struct ast_expr *expr)
 		return NULL;
 	}
 	res->x.pList = expr_list_from_ast(parser, expr->right->list);
+	sqlExprSetHeightAndFlags(parser, res);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
 		return NULL;
 	}
-	sqlExprSetHeightAndFlags(parser, res);
 	return res;
 }
 
-/** Build a `struct Expr` for an IN expression (subquery or value list). */
+/**
+ * Build a `struct Expr` for an IN expression (subquery or value list).
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_in(struct Parse *parser, struct ast_expr *expr)
 {
@@ -485,6 +549,10 @@ expr_in(struct Parse *parser, struct ast_expr *expr)
 		}
 		struct Expr *res = sqlPExpr(parser, expr->op, left, NULL);
 		sqlPExprAddSelect(parser, res, select);
+		if (parser->is_aborted) {
+			sql_expr_delete(res);
+			return NULL;
+		}
 		return res;
 	}
 	assert(expr->right->op == TK_VECTOR);
@@ -505,22 +573,31 @@ expr_in(struct Parse *parser, struct ast_expr *expr)
 			sql_expr_delete(left);
 			return NULL;
 		}
-		return sqlPExpr(parser, TK_EQ, left, right);
+		struct Expr *res = sqlPExpr(parser, TK_EQ, left, right);
+		if (parser->is_aborted) {
+			sql_expr_delete(res);
+			return NULL;
+		}
+		return res;
 	}
 	struct Expr *left = expr_from_ast(parser, expr->left);
 	if (parser->is_aborted)
 		return NULL;
 	struct Expr *res = sqlPExpr(parser, expr->op, left, NULL);
 	res->x.pList = expr_list_from_ast(parser, expr->right->list);
+	sqlExprSetHeightAndFlags(parser, res);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
 		return NULL;
 	}
-	sqlExprSetHeightAndFlags(parser, res);
 	return res;
 }
 
-/** Build a `struct Expr` for a subscripting operator expression. */
+/**
+ * Build a `struct Expr` for a subscripting operator expression.
+ *
+ * Return NULL on error.
+ */
 static struct Expr *
 expr_getitem(struct Parse *parser, struct ast_expr *expr)
 {
@@ -528,12 +605,18 @@ expr_getitem(struct Parse *parser, struct ast_expr *expr)
 	if (parser->is_aborted)
 		return NULL;
 	struct Expr *left = expr_from_ast(parser, expr->left);
-	if (parser->is_aborted)
+	if (parser->is_aborted) {
+		sql_expr_list_delete(list);
 		return NULL;
+	}
 	struct Expr *res = sql_expr_new_anon(expr->op);
 	res->x.pList = sql_expr_list_append(list, left);
 	res->type = FIELD_TYPE_ANY;
 	sqlExprSetHeightAndFlags(parser, res);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
 	return res;
 }
 

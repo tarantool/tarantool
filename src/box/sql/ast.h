@@ -179,7 +179,11 @@ struct ast_source_list *
 ast_source_list_append(struct region *region, struct ast_source_list *list,
 		       struct ast_source *src);
 
-/** Convert `struct ast_source_list` to `struct SrcList`. */
+/**
+ * Convert `struct ast_source_list` to `struct SrcList`.
+ *
+ * Return NULL on error or if `list == NULL`.
+ */
 struct SrcList *
 src_list_from_ast(struct Parse *parser, struct ast_source_list *list);
 
@@ -187,7 +191,11 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list);
 struct ast_select *
 ast_select_new(struct region *region);
 
-/** Build `struct Select` object from `struct ast_select` object. */
+/**
+ * Build `struct Select` object from `struct ast_select` object.
+ *
+ * Return NULL on error or if `select == NULL`.
+ */
 struct Select *
 select_from_ast(struct Parse *parser, struct ast_select *select);
 
@@ -199,7 +207,11 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 		     const struct Token *name, struct ast_id_list *columns,
 		     struct ast_select *select);
 
-/** Convert `struct ast_with_list` to `struct With`. */
+/**
+ * Convert `struct ast_with_list` to `struct With`.
+ *
+ * Return NULL on error or if `list == NULL`.
+ */
 struct With *
 with_from_ast(struct Parse *parser, struct ast_with_list *list);
 
@@ -225,10 +237,18 @@ ast_expr_list_set_order(struct ast_expr_list *list, enum sort_order order);
 void
 ast_expr_list_set_autoinc(struct ast_expr_list *list, bool autoinc);
 
-/** Convert `struct ast_expr` to `struct Expr`. */
+/**
+ * Convert `struct ast_expr` to `struct Expr`.
+ *
+ * Return NULL on error or if `expr == NULL`.
+ */
 struct Expr *
 expr_from_ast(struct Parse *parser, struct ast_expr *expr);
 
-/** Convert `struct ast_expr_list` to `struct ExprList`. */
+/**
+ * Convert `struct ast_expr_list` to `struct ExprList`.
+ *
+ * Return NULL on error or if `list == NULL`.
+ */
 struct ExprList *
 expr_list_from_ast(struct Parse *parser, struct ast_expr_list *list);
