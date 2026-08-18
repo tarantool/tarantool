@@ -12,3 +12,5 @@
   definition in `_space` as it was provided, without any changes (gh-5485).
 * The SQL query used to create a trigger is now in the corresponding SQL trigger
   definition in `_trigger` as it was provided, without any changes (gh-5485).
+* Changed the description of the error that occurs when using bind
+  variables in the definition of a view, function, or trigger (gh-5485).
