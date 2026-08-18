@@ -1045,3 +1045,11 @@ sql_trigger_from_ast(struct Parse *parser, struct ast_trigger *def)
 	return sql_trigger_new(parser, &def->name, &def->table, def->time,
 			       def->event, columns, when, steps);
 }
+
+struct sql_ast *
+sql_ast_new(struct region *region)
+{
+	struct sql_ast *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
