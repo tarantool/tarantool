@@ -145,11 +145,6 @@ struct txn_limbo {
 	 */
 	bool saw_promote;
 	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
-	 */
-	int64_t svp_confirmed_lsn;
-	/**
 	 * Whether this instance validates incoming synchro requests. When the
 	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
 	 * limbo owner, tracks PROMOTE/DEMOTE term and owner_id consistency.
