@@ -1987,7 +1987,7 @@ struct Parse {
 	/** Length of array of default function descriptions. */
 	uint32_t default_func_count;
 	/** AST of parsed SQL statement. */
-	struct sql_ast ast;
+	struct sql_ast *ast;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.

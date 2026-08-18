@@ -104,6 +104,12 @@ enum ast_property_type {
 	SQL_AST_PROPERTY_NULL,
 };
 
+enum ast_explain_type {
+	SQL_AST_EXPLAIN_NONE = 0,
+	SQL_AST_EXPLAIN_VDBE,
+	SQL_AST_EXPLAIN_PLAN,
+};
+
 /** List of IDs received from parser. */
 struct ast_id_list {
 	/** Head of the list. */
@@ -566,6 +572,8 @@ struct ast_pragma {
 struct sql_ast {
 	/** Parsed statement type. */
 	enum sql_ast_type type;
+	/** Explain type of parsed statement. */
+	enum ast_explain_type explain;
 	/** Definition of the statement. */
 	union {
 		/** Name of the savepoint. */
@@ -794,3 +802,7 @@ ast_table_properties_append_constraint(struct ast_table_properties *properties,
  */
 struct sql_trigger *
 sql_trigger_from_ast(struct Parse *parser, struct ast_trigger *def);
+
+/** Create new empty structure of AST. */
+struct sql_ast *
+sql_ast_new(struct region *region);

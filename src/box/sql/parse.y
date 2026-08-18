@@ -90,16 +90,32 @@ struct LimitVal {
 } // end %include
 
 // Input is a single SQL command
-input ::= ecmd.
-ecmd ::= explain cmdx SEMI.
-ecmd ::= SEMI. {
+input ::= ecmd(X). {
+  pParse->ast = X;
+}
+
+%type ecmd {struct sql_ast *}
+%type cmd {struct sql_ast *}
+ecmd(A) ::= explain(E) cmd(X) SEMI. {
+  A = X;
+  A->explain = E;
+}
+ecmd(A) ::= SEMI. {
+  A = NULL;
   diag_set(ClientError, ER_SQL_STATEMENT_EMPTY);
   pParse->is_aborted = true;
 }
-explain ::= .
-explain ::= EXPLAIN.              { pParse->explain = 1; }
-explain ::= EXPLAIN QUERY PLAN.   { pParse->explain = 2; }
-cmdx ::= cmd.
+
+%type explain {enum ast_explain_type}
+explain(A) ::= . {
+  A = SQL_AST_EXPLAIN_NONE;
+}
+explain(A) ::= EXPLAIN. {
+  A = SQL_AST_EXPLAIN_VDBE;
+}
+explain(A) ::= EXPLAIN QUERY PLAN. {
+  A = SQL_AST_EXPLAIN_PLAN;
+}
 
 // Define operator precedence early so that this is the first occurrence
 // of the operator tokens in the grammer.  Keeping the operators together
@@ -129,46 +145,54 @@ cmdx ::= cmd.
 ///////////////////// Begin and end transactions. ////////////////////////////
 //
 
-cmd ::= START TRANSACTION. {
-  pParse->ast.type = SQL_AST_TX_START;
+cmd(A) ::= START TRANSACTION. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_START;
 }
-cmd ::= COMMIT. {
-  pParse->ast.type = SQL_AST_TX_COMMIT;
+cmd(A) ::= COMMIT. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_COMMIT;
 }
-cmd ::= ROLLBACK. {
-  pParse->ast.type = SQL_AST_TX_ROLLBACK;
+cmd(A) ::= ROLLBACK. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_ROLLBACK;
 }
 
 savepoint_opt ::= SAVEPOINT.
 savepoint_opt ::= .
-cmd ::= SAVEPOINT nm(X). {
-  pParse->ast.type = SQL_AST_TX_SAVEPOINT_NEW;
-  pParse->ast.savepoint = X;
+cmd(A) ::= SAVEPOINT nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_SAVEPOINT_NEW;
+  A->savepoint = X;
 }
-cmd ::= RELEASE savepoint_opt nm(X). {
-  pParse->ast.type = SQL_AST_TX_SAVEPOINT_RELEASE;
-  pParse->ast.savepoint = X;
+cmd(A) ::= RELEASE savepoint_opt nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_SAVEPOINT_RELEASE;
+  A->savepoint = X;
 }
-cmd ::= ROLLBACK TO savepoint_opt nm(X). {
-  pParse->ast.type = SQL_AST_TX_SAVEPOINT_ROLLBACK;
-  pParse->ast.savepoint = X;
+cmd(A) ::= ROLLBACK TO savepoint_opt nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TX_SAVEPOINT_ROLLBACK;
+  A->savepoint = X;
 }
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
-cmd ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP. {
-  pParse->ast.type = SQL_AST_CREATE_TABLE;
-  pParse->ast.create_table.name = Y;
-  pParse->ast.create_table.properties = P;
-  pParse->ast.create_table.if_not_exists = E;
+cmd(A) ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_TABLE;
+  A->create_table.name = Y;
+  A->create_table.properties = P;
+  A->create_table.if_not_exists = E;
 }
-cmd ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP
-        WITH ENGINE EQ STRING(A). {
-  pParse->ast.type = SQL_AST_CREATE_TABLE;
-  pParse->ast.create_table.name = Y;
-  pParse->ast.create_table.engine = A;
-  pParse->ast.create_table.properties = P;
-  pParse->ast.create_table.if_not_exists = E;
+cmd(A) ::= CREATE TABLE ifnotexists(E) nm(Y) LP table_properties(P) RP
+        WITH ENGINE EQ STRING(S). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_TABLE;
+  A->create_table.name = Y;
+  A->create_table.engine = S;
+  A->create_table.properties = P;
+  A->create_table.if_not_exists = E;
 }
 
 %type ifnotexists {int}
@@ -386,16 +410,18 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
 
-cmd ::= DROP TABLE ifexists(E) nm(X) . {
-  pParse->ast.type = SQL_AST_DROP_TABLE;
-  pParse->ast.drop_table.name = X;
-  pParse->ast.drop_table.if_exists = E;
+cmd(A) ::= DROP TABLE ifexists(E) nm(X) . {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_DROP_TABLE;
+  A->drop_table.name = X;
+  A->drop_table.if_exists = E;
 }
 
-cmd ::= DROP VIEW ifexists(E) nm(X) . {
-  pParse->ast.type = SQL_AST_DROP_VIEW;
-  pParse->ast.drop_table.name = X;
-  pParse->ast.drop_table.if_exists = E;
+cmd(A) ::= DROP VIEW ifexists(E) nm(X) . {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_DROP_VIEW;
+  A->drop_table.name = X;
+  A->drop_table.if_exists = E;
 }
 
 %type ifexists {int}
@@ -404,23 +430,26 @@ ifexists(A) ::= .            {A = 0;}
 
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
-cmd ::= CREATE VIEW ifnotexists(E) nm(N) idlist_opt(C) AS select(S). {
-  pParse->ast.type = SQL_AST_CREATE_VIEW;
-  pParse->ast.create_view.name = N;
-  pParse->ast.create_view.select = S;
-  pParse->ast.create_view.columns = C;
-  pParse->ast.create_view.if_not_exists = E;
+cmd(A) ::= CREATE VIEW ifnotexists(E) nm(N) idlist_opt(C) AS select(S). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_VIEW;
+  A->create_view.name = N;
+  A->create_view.select = S;
+  A->create_view.columns = C;
+  A->create_view.if_not_exists = E;
 }
-cmd ::= VIEW_ENTRY CREATE VIEW ifnotexists nm idlist_opt AS select(S). {
-  pParse->ast.type = SQL_AST_VIEW;
-  pParse->ast.select = S;
+cmd(A) ::= VIEW_ENTRY CREATE VIEW ifnotexists nm idlist_opt AS select(S). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_VIEW;
+  A->select = S;
 }
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
-cmd ::= select(X). {
-  pParse->ast.type = SQL_AST_SELECT;
-  pParse->ast.select = X;
+cmd(A) ::= select(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_SELECT;
+  A->select = X;
 }
 
 %type select {struct ast_select *}
@@ -757,10 +786,11 @@ limit_opt(A) ::= LIMIT expr(X) COMMA expr(Y). {
 
 /////////////////////////// The DELETE statement /////////////////////////////
 //
-cmd ::= with(W) delete(D). {
+cmd(A) ::= with(W) delete(D). {
   D->with = W;
-  pParse->ast.type = SQL_AST_DELETE;
-  pParse->ast.del = D;
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_DELETE;
+  A->del = D;
 }
 
 %type delete {struct ast_delete *}
@@ -773,9 +803,10 @@ delete(A) ::= DELETE FROM nm(X) indexed_opt(I) where_opt(W). {
 
 /////////////////////////// The TRUNCATE statement /////////////////////////////
 //
-cmd ::= TRUNCATE TABLE nm(X). {
-  pParse->ast.type = SQL_AST_TRUNCATE;
-  pParse->ast.truncate.table = X;
+cmd(A) ::= TRUNCATE TABLE nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TRUNCATE;
+  A->truncate.table = X;
 }
 
 %type where_opt {struct ast_expr *}
@@ -786,10 +817,11 @@ where_opt(A) ::= WHERE expr(X). {
 
 ////////////////////////// The UPDATE command ////////////////////////////////
 //
-cmd ::= with(W) update(U). {
+cmd(A) ::= with(W) update(U). {
   U->with = W;
-  pParse->ast.type = SQL_AST_UPDATE;
-  pParse->ast.update = U;
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_UPDATE;
+  A->update = U;
 }
 
 %type update {struct ast_update *}
@@ -819,10 +851,11 @@ setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
 
 ////////////////////////// The INSERT command /////////////////////////////////
 //
-cmd ::= with(W) insert(I). {
+cmd(A) ::= with(W) insert(I). {
   I->with = W;
-  pParse->ast.type = SQL_AST_INSERT;
-  pParse->ast.insert = I;
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_INSERT;
+  A->insert = I;
 }
 
 %type insert {struct ast_insert *}
@@ -1245,116 +1278,132 @@ nexprlist(A) ::= expr(Y). {
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= CREATE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
-  pParse->ast.type = SQL_AST_CREATE_INDEX;
-  pParse->ast.create_index.name = X;
-  pParse->ast.create_index.table = Y;
-  pParse->ast.create_index.columns = Z;
-  pParse->ast.create_index.if_not_exists = E;
+cmd(A) ::= CREATE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_INDEX;
+  A->create_index.name = X;
+  A->create_index.table = Y;
+  A->create_index.columns = Z;
+  A->create_index.if_not_exists = E;
 }
-cmd ::= CREATE UNIQUE INDEX ifnotexists(E) nm(X) ON nm(Y) LP sortlist(Z) RP. {
-  pParse->ast.type = SQL_AST_CREATE_INDEX;
-  pParse->ast.create_index.name = X;
-  pParse->ast.create_index.table = Y;
-  pParse->ast.create_index.columns = Z;
-  pParse->ast.create_index.if_not_exists = E;
-  pParse->ast.create_index.is_unique = true;
+cmd(A) ::= CREATE UNIQUE INDEX ifnotexists(E) nm(X) ON nm(Y)
+           LP sortlist(Z) RP. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_INDEX;
+  A->create_index.name = X;
+  A->create_index.table = Y;
+  A->create_index.columns = Z;
+  A->create_index.if_not_exists = E;
+  A->create_index.is_unique = true;
 }
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
-cmd ::= DROP INDEX ifexists(E) nm(X) ON nm(Y). {
-  pParse->ast.type = SQL_AST_DROP_INDEX;
-  pParse->ast.drop_index.name = X;
-  pParse->ast.drop_index.table = Y;
-  pParse->ast.drop_index.if_exists = E;
+cmd(A) ::= DROP INDEX ifexists(E) nm(X) ON nm(Y). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_DROP_INDEX;
+  A->drop_index.name = X;
+  A->drop_index.table = Y;
+  A->drop_index.if_exists = E;
 }
 
 ///////////////////////////// The SET SESSION command ////////////////////////
 //
-cmd ::= SET SESSION nm(X) EQ term(Y).  {
-  pParse->ast.type = SQL_AST_SET_SESSION;
-  pParse->ast.set_session.name = X;
-  pParse->ast.set_session.value = Y;
+cmd(A) ::= SET SESSION nm(X) EQ term(Y). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_SET_SESSION;
+  A->set_session.name = X;
+  A->set_session.value = Y;
 }
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
-cmd ::= PRAGMA nm(X).                        {
-  pParse->ast.type = SQL_AST_PRAGMA;
-  pParse->ast.pragma.name = X;
+cmd(A) ::= PRAGMA nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_PRAGMA;
+  A->pragma.name = X;
 }
-cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
-  pParse->ast.type = SQL_AST_PRAGMA;
-  pParse->ast.pragma.name = X;
-  pParse->ast.pragma.table_name = Y;
+cmd(A) ::= PRAGMA nm(X) LP nm(Y) RP. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_PRAGMA;
+  A->pragma.name = X;
+  A->pragma.table_name = Y;
 }
-cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
-  pParse->ast.type = SQL_AST_PRAGMA;
-  pParse->ast.pragma.name = X;
-  pParse->ast.pragma.table_name = Y;
-  pParse->ast.pragma.index_name = Z;
+cmd(A) ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_PRAGMA;
+  A->pragma.name = X;
+  A->pragma.table_name = Y;
+  A->pragma.index_name = Z;
 }
 
 ///////////////////////////// The SQL expression function ////////////////////
 //
-cmd ::= FUNCTION_ENTRY expr(X). {
-  pParse->ast.type = SQL_AST_FUNCTION;
-  pParse->ast.expr = X;
+cmd(A) ::= FUNCTION_ENTRY expr(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_FUNCTION;
+  A->expr = X;
 }
 
 //////////////////////////// The SHOW CREATE TABLE command /////////////////////
-cmd ::= SHOW CREATE TABLE nm(X). {
-  pParse->ast.type = SQL_AST_SHOW_CREATE_TABLE;
-  pParse->ast.show_create_table = X;
+cmd(A) ::= SHOW CREATE TABLE nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_SHOW_CREATE_TABLE;
+  A->show_create_table = X;
 }
-cmd ::= SHOW CREATE TABLE. {
-  pParse->ast.type = SQL_AST_SHOW_CREATE_TABLE;
+cmd(A) ::= SHOW CREATE TABLE. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_SHOW_CREATE_TABLE;
 }
 
 //////////////////////////// The CREATE TRIGGER command /////////////////////
-cmd ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time trigger_event ON nm(T)
-        trigger_for_each(F) trigger_when BEGIN trigger_action_list END. {
-  pParse->ast.type = SQL_AST_CREATE_TRIGGER;
-  pParse->ast.create_trigger.name = N;
-  pParse->ast.create_trigger.table = T;
-  pParse->ast.create_trigger.is_for_each_row = F;
-  pParse->ast.create_trigger.if_not_exists = E;
-}
-cmd ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time UPDATE OF idlist
+cmd(A) ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time trigger_event
         ON nm(T) trigger_for_each(F) trigger_when
         BEGIN trigger_action_list END. {
-  pParse->ast.type = SQL_AST_CREATE_TRIGGER;
-  pParse->ast.create_trigger.name = N;
-  pParse->ast.create_trigger.table = T;
-  pParse->ast.create_trigger.is_for_each_row = F;
-  pParse->ast.create_trigger.if_not_exists = E;
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_TRIGGER;
+  A->create_trigger.name = N;
+  A->create_trigger.table = T;
+  A->create_trigger.is_for_each_row = F;
+  A->create_trigger.if_not_exists = E;
+}
+cmd(A) ::= CREATE TRIGGER ifnotexists(E) nm(N) trigger_time UPDATE OF idlist
+        ON nm(T) trigger_for_each(F) trigger_when
+        BEGIN trigger_action_list END. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_CREATE_TRIGGER;
+  A->create_trigger.name = N;
+  A->create_trigger.table = T;
+  A->create_trigger.is_for_each_row = F;
+  A->create_trigger.if_not_exists = E;
 }
 
-cmd ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
-        trigger_event(D) ON nm(T) trigger_for_each(F) trigger_when(W)
-        BEGIN trigger_action_list(L) END. {
-  pParse->ast.type = SQL_AST_TRIGGER;
-  pParse->ast.trigger.name = N;
-  pParse->ast.trigger.time = C;
-  pParse->ast.trigger.event = D;
-  pParse->ast.trigger.table = T;
-  pParse->ast.trigger.is_for_each_row = F;
-  pParse->ast.trigger.when = W;
-  pParse->ast.trigger.actions = L;
+cmd(A) ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
+           trigger_event(D) ON nm(T) trigger_for_each(F) trigger_when(W)
+           BEGIN trigger_action_list(L) END. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TRIGGER;
+  A->trigger.name = N;
+  A->trigger.time = C;
+  A->trigger.event = D;
+  A->trigger.table = T;
+  A->trigger.is_for_each_row = F;
+  A->trigger.when = W;
+  A->trigger.actions = L;
 }
-cmd ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
-        UPDATE OF idlist(X) ON nm(T) trigger_for_each(F) trigger_when(W)
-        BEGIN trigger_action_list(L) END. {
-  pParse->ast.type = SQL_AST_TRIGGER;
-  pParse->ast.trigger.name = N;
-  pParse->ast.trigger.time = C;
-  pParse->ast.trigger.event = TK_UPDATE;
-  pParse->ast.trigger.table = T;
-  pParse->ast.trigger.is_for_each_row = F;
-  pParse->ast.trigger.when = W;
-  pParse->ast.trigger.columns = X;
-  pParse->ast.trigger.actions = L;
+cmd(A) ::= TRIGGER_ENTRY CREATE TRIGGER ifnotexists nm(N) trigger_time(C)
+           UPDATE OF idlist(X) ON nm(T) trigger_for_each(F) trigger_when(W)
+           BEGIN trigger_action_list(L) END. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_TRIGGER;
+  A->trigger.name = N;
+  A->trigger.time = C;
+  A->trigger.event = TK_UPDATE;
+  A->trigger.table = T;
+  A->trigger.is_for_each_row = F;
+  A->trigger.when = W;
+  A->trigger.columns = X;
+  A->trigger.actions = L;
 }
 
 %type trigger_event {uint8_t}
@@ -1435,91 +1484,104 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
-cmd ::= DROP TRIGGER ifexists(E) nm(X). {
-  pParse->ast.type = SQL_AST_DROP_TRIGGER;
-  pParse->ast.drop_trigger.name = X;
-  pParse->ast.drop_trigger.if_exists = E;
+cmd(A) ::= DROP TRIGGER ifexists(E) nm(X). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_DROP_TRIGGER;
+  A->drop_trigger.name = X;
+  A->drop_trigger.if_exists = E;
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
-cmd ::= ALTER TABLE nm(T) ADD column_def(C). {
-  pParse->ast.type = SQL_AST_ALTER_ADD_COLUMN;
-  pParse->ast.alter_add_column.table = T;
-  pParse->ast.alter_add_column.col = C;
+cmd(A) ::= ALTER TABLE nm(T) ADD column_def(C). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_ADD_COLUMN;
+  A->alter_add_column.table = T;
+  A->alter_add_column.col = C;
 }
-cmd ::= ALTER TABLE nm(T) ADD COLUMN column_def(C). {
-  pParse->ast.type = SQL_AST_ALTER_ADD_COLUMN;
-  pParse->ast.alter_add_column.table = T;
-  pParse->ast.alter_add_column.col = C;
-}
-
-cmd ::= ALTER TABLE nm(X) ADD table_constraint_named(C). {
-  pParse->ast.type = SQL_AST_ALTER_ADD_CONSTRAINT;
-  pParse->ast.alter_add_constraint.table = X;
-  pParse->ast.alter_add_constraint.con = C;
+cmd(A) ::= ALTER TABLE nm(T) ADD COLUMN column_def(C). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_ADD_COLUMN;
+  A->alter_add_column.table = T;
+  A->alter_add_column.col = C;
 }
 
-cmd ::= ALTER TABLE nm(T) RENAME TO nm(N). {
-  pParse->ast.type = SQL_AST_ALTER_RENAME;
-  pParse->ast.alter_rename.old_name = T;
-  pParse->ast.alter_rename.new_name = N;
+cmd(A) ::= ALTER TABLE nm(X) ADD table_constraint_named(C). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_ADD_CONSTRAINT;
+  A->alter_add_constraint.table = X;
+  A->alter_add_constraint.con = C;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.table = X;
+cmd(A) ::= ALTER TABLE nm(T) RENAME TO nm(N). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_RENAME;
+  A->alter_rename.old_name = T;
+  A->alter_rename.new_name = N;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) FOREIGN KEY. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.table = X;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) PRIMARY KEY. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_PRIMARY_KEY;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) FOREIGN KEY. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) UNIQUE. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_UNIQUE;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) PRIMARY KEY. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_PRIMARY_KEY;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) CHECK. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) UNIQUE. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_UNIQUE;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z). {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.column = F;
-  pParse->ast.alter_drop_constraint.table = X;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(Z) CHECK. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) FOREIGN KEY. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.column = F;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z). {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.column = F;
+  A->alter_drop_constraint.table = X;
 }
 
-cmd ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
-  pParse->ast.type = SQL_AST_ALTER_DROP_CONSTRAINT;
-  pParse->ast.alter_drop_constraint.name = Z;
-  pParse->ast.alter_drop_constraint.column = F;
-  pParse->ast.alter_drop_constraint.table = X;
-  pParse->ast.alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) FOREIGN KEY. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.column = F;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_FOREIGN_KEY;
+}
+
+cmd(A) ::= ALTER TABLE nm(X) DROP CONSTRAINT nm(F) DOT nm(Z) CHECK. {
+  A = sql_ast_new(&pParse->region);
+  A->type = SQL_AST_ALTER_DROP_CONSTRAINT;
+  A->alter_drop_constraint.name = Z;
+  A->alter_drop_constraint.column = F;
+  A->alter_drop_constraint.table = X;
+  A->alter_drop_constraint.type = SQL_AST_PROPERTY_CHECK;
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

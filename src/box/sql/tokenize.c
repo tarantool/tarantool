@@ -976,9 +976,12 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 		}
 		pParse->line_pos += last.n;
 	}
-	sql_code_ast(pParse, &pParse->ast, pParse->zTail);
-	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
+	if (pParse->is_aborted)
+		return -1;
+	pParse->explain = (int)pParse->ast->explain;
+	sql_code_ast(pParse, pParse->ast, pParse->zTail);
+	pParse->zTail = &zSql[i];
 	return pParse->is_aborted ? -1 : 0;
 }
 
