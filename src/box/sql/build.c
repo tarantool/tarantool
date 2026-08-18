@@ -1530,9 +1530,8 @@ sql_create_view(struct Parse *parse_context, const char *sql,
 		struct Select *view_select, bool if_not_exists)
 {
 	if (parse_context->nVar > 0) {
-		diag_set(ClientError, ER_CREATE_SPACE,
-			 sql_tt_name_from_token(name),
-			 "parameters are not allowed in views");
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}

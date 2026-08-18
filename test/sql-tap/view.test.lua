@@ -806,7 +806,7 @@ test:do_catchsql_test(
         CREATE VIEW v12 AS SELECT a FROM t1 WHERE b=?
     ]], {
         -- <view-12.1>
-        1, "Failed to create space 'v12': parameters are not allowed in views"
+        1, "Parameters are not allowed in views"
         -- </view-12.1>
     })
 
@@ -816,7 +816,7 @@ test:do_catchsql_test(
         CREATE VIEW v12(x) AS SELECT a FROM t1 WHERE b=?
     ]], {
         -- <view-12.2>
-        1, "Failed to create space 'v12': parameters are not allowed in views"
+        1, "Parameters are not allowed in views"
         -- </view-12.2>
     })
 
