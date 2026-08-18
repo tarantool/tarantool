@@ -287,7 +287,6 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 	txn_limbo_queue_create(&limbo->queue);
 	vclock_create(&limbo->promote_term_map);
 	latch_create(&limbo->state_latch);
-	limbo->svp_confirmed_lsn = -1;
 	limbo->raft = raft;
 	limbo->term = 1;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
@@ -505,18 +504,21 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(!txn_limbo_entry_is_complete(entry));
 	assert(entry->lsn >= 0);
 	txn_limbo_lock(limbo);
-	if (limbo->state != TXN_LIMBO_STATE_LEADER) {
+	/*
+	 * The latch might have been taken over from a PROMOTE/DEMOTE WAL write
+	 * covering this entry. Then the entry is already completed by now.
+	 */
+	if (txn_limbo_entry_is_complete(entry) ||
+	    limbo->state != TXN_LIMBO_STATE_LEADER) {
 		txn_limbo_unlock(limbo);
-		do {
+		while (!txn_limbo_entry_is_complete(entry))
 			fiber_yield();
-		} while (!txn_limbo_entry_is_complete(entry));
 		if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 			diag_set(ClientError, ER_SYNC_ROLLBACK);
 			return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 		}
 		return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
 	}
-	assert(!txn_limbo_entry_is_complete(entry));
 	txn_limbo_write_rollback(limbo, entry->lsn);
 	txn_limbo_queue_apply_rollback(&limbo->queue, entry->lsn,
 				       TXN_SIGNATURE_QUORUM_TIMEOUT);
@@ -926,11 +928,8 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->svp_confirmed_lsn == -1);
 		assert(!limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = true;
-		limbo->svp_confirmed_lsn = limbo->queue.volatile_confirmed_lsn;
-		limbo->queue.volatile_confirmed_lsn = req->promote.lsn;
 		txn_limbo_update_system_spaces_is_sync_state(
 			limbo, req, /*is_rollback=*/false);
 		txn_limbo_update_state(limbo);
@@ -953,11 +952,8 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
 		assert(limbo->is_in_rollback);
-		assert(limbo->svp_confirmed_lsn >= 0);
 		assert(limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = false;
-		limbo->queue.volatile_confirmed_lsn = limbo->svp_confirmed_lsn;
-		limbo->svp_confirmed_lsn = -1;
 		txn_limbo_update_system_spaces_is_sync_state(
 			limbo, req, /*is_rollback=*/true);
 		limbo->is_in_rollback = false;
@@ -1011,11 +1007,9 @@ txn_limbo_req_commit_promote_demote(struct txn_limbo *limbo,
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_PROMOTE ||
 	       req->type == IPROTO_RAFT_DEMOTE);
-	assert(limbo->svp_confirmed_lsn >= 0);
 	assert(limbo->is_in_rollback);
 	assert(limbo->is_transition_in_progress);
 	limbo->is_transition_in_progress = false;
-	limbo->svp_confirmed_lsn = -1;
 	limbo->is_in_rollback = false;
 
 	uint64_t term = req->promote.term;
