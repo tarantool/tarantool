@@ -1022,9 +1022,12 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 		}
 		pParse->line_pos += last.n;
 	}
-	sql_code_ast(pParse, &pParse->ast, pParse->zTail);
-	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
+	if (pParse->is_aborted)
+		return -1;
+	pParse->explain = (int)pParse->ast->explain;
+	sql_code_ast(pParse, pParse->ast, pParse->zTail);
+	pParse->zTail = &zSql[i];
 	return pParse->is_aborted ? -1 : 0;
 }
 
@@ -1039,7 +1042,7 @@ sql_parse_function(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_FUNCTION_ENTRY) != 0)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
+	struct sql_ast *ast = parser->ast;
 	assert(ast->type == SQL_AST_FUNCTION);
 	struct Expr *res = expr_from_ast(parser, ast->expr);
 	if (res != NULL && parser->nVar > 0) {
@@ -1057,7 +1060,7 @@ sql_parse_view(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_VIEW_ENTRY) != 0)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
+	struct sql_ast *ast = parser->ast;
 	assert(ast->type == SQL_AST_VIEW);
 	struct Select *res = select_from_ast(parser, ast->select);
 	if (res != NULL && parser->nVar > 0) {
@@ -1075,7 +1078,7 @@ sql_parse_trigger(struct Parse *parser, const char *sql)
 {
 	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
+	struct sql_ast *ast = parser->ast;
 	assert(ast->type == SQL_AST_TRIGGER);
 	struct sql_trigger *res = sql_trigger_from_ast(parser, &ast->trigger);
 	if (res != NULL && parser->nVar > 0) {
