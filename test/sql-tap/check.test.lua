@@ -452,7 +452,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "At line 1 at or near position 9: bindings are not allowed in DDL"
+        1, "Parameters are not allowed in functions"
         -- </check-5.1>
     })
 
@@ -464,7 +464,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "At line 1 at or near position 6: bindings are not allowed in DDL"
+        1, "Parameters are not allowed in functions"
         -- </check-5.2>
     })
 
