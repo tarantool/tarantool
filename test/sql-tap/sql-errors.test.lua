@@ -124,7 +124,7 @@ test:do_catchsql_test(
 		CREATE VIEW v11 AS SELECT * FROM t0 WHERE i = ?;
 	]], {
 		-- <sql-errors-1.11>
-        1,"Failed to create space 'v11': parameters are not allowed in views"
+        1,"Parameters are not allowed in views"
 		-- </sql-errors-1.11>
 	})
 

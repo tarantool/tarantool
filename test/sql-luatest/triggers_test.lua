@@ -354,18 +354,16 @@ end
         local sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 "..
                     "FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;"
         local _, err = box.execute(sql)
-        local exp_err = "At line 1 at or near position 67: "..
-                    "bindings are not allowed in DDL"
+        local exp_err = "Parameters are not allowed in triggers"
         t.assert_equals(tostring(err), exp_err)
 
         sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 "..
               "FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;"
         local tuple = {"TR1", space_id, {sql = sql}}
         exp_err = {
-            details = "bindings are not allowed in DDL",
-            message = "At line 1 at or near position 67: "..
-                      "bindings are not allowed in DDL",
-            name = "SQL_PARSER_GENERIC_WITH_POS",
+            details = exp_err,
+            message = exp_err,
+            name = "SQL_PARSER_GENERIC",
         }
         t.assert_error_covers(exp_err, _trigger.insert, _trigger, tuple)
 
