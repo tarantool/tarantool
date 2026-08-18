@@ -382,13 +382,6 @@ expr_var(struct Parse *parser, struct ast_expr *expr)
 	t.z = expr->str;
 	t.n = expr->len;
 	t.isReserved = false;
-	if (parser->parse_only) {
-		diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS,
-			 parser->line_count, parser->line_pos,
-			 "bindings are not allowed in DDL");
-		parser->is_aborted = true;
-		return NULL;
-	}
 	if (expr->len > 1) {
 		assert(expr->str[0] != '?');
 		if (!IdChar(expr->str[1])) {
