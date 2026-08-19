@@ -825,3 +825,30 @@ g.test_trigger_str = function(cg)
         box.execute([[DROP TABLE t1;]])
     end)
 end
+
+--
+-- Make sure that no assertion when inserting an invalid trigger definition
+-- into _trigger.
+--
+g.test_wrong_trigger_def = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
+        local _trigger = box.space._trigger
+        local def = {'asd', box.space.t.id, {sql = ''}}
+        local exp_err = {
+            details = "Trigger definition cannot be empty",
+            message = "Trigger definition cannot be empty",
+            name = "SQL_PARSER_GENERIC",
+        }
+        t.assert_error_covers(exp_err, _trigger.insert, _trigger, def)
+
+        def = {'asd', box.space.t.id, {sql = 'INSERT INTO t VALUES (1);'}}
+        exp_err = {
+            message = "Syntax error at line 1 near 'INSERT'",
+            name = "SQL_SYNTAX_NEAR_TOKEN",
+            token = "INSERT",
+        }
+        t.assert_error_covers(exp_err, _trigger.insert, _trigger, def)
+        box.execute([[DROP TABLE t;]])
+    end)
+end
