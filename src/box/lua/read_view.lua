@@ -67,11 +67,6 @@ local iterator_pos_end = ffi.new('const char *[1]')
 
 local internal = box.internal.read_view
 
-if fiber._internal.cord_is_main then
-    threads.export('box.internal.read_view.acquire', internal.acquire)
-    threads.export('box.internal.read_view.release', internal.release)
-end
-
 -- box.read_view.open() options template.
 local READ_VIEW_OPTIONS_TEMPLATE = {
     name = 'string',
@@ -145,7 +140,15 @@ local read_view_methods = {}
 local read_view_properties = {
     -- System read views are closed asynchronously so we have to query
     -- the status.
-    status = internal.status,
+    status = function(self)
+        if self._status ~= nil then
+            return self._status
+        elseif internal.exists(self.id) then
+            return 'open'
+        else
+            return 'closed'
+        end
+    end
 }
 
 local read_view_mt = {
@@ -226,12 +229,12 @@ end
 -- sends a request to release the read view to the main thread.
 --
 local function read_view_close(crv, warn)
-    local ptr = internal.close(crv, warn)
-    if ptr ~= nil then
+    local id = internal.close(crv, warn)
+    if id ~= nil then
         assert(not fiber._internal.cord_is_main)
         -- threads.call() yields while we can't yield in this function
         -- because it may be called by the garbage collector.
-        fiber.new(threads.call, 'tx', 'box.internal.read_view.release', {ptr})
+        fiber.new(threads.call, 'tx', 'box.internal.read_view.release', {id})
     end
 end
 
@@ -267,7 +270,7 @@ function box.read_view.open(opts)
         -- If the read view is already in the thread-local registry and
         -- it has an active handle, there's no need to create a new one.
         rv = read_view_registry[opts.id]
-        if rv ~= nil and rv._crv ~= nil then
+        if rv ~= nil and rv.status == 'open' and rv._crv ~= nil then
             return rv
         end
         -- Ask the main thread to pin the read view with the given id
@@ -283,13 +286,10 @@ function box.read_view.open(opts)
         ok, ret = pcall(internal.reuse, ptr)
         if not ok then
             -- Don't forget to unpin the read view on error.
-            threads.call('tx', 'box.internal.read_view.release', {ptr})
+            threads.call('tx', 'box.internal.read_view.release', {opts.id})
             box.error(ret, 2)
         end
         rv = ret
-        -- Reset the status field because application threads can't call
-        -- internal.status.
-        rv.status = 'open'
     else
         if not fiber._internal.cord_is_main then
             box.error(box.error.UNSUPPORTED, 'Application thread',
@@ -315,6 +315,8 @@ function box.read_view.open(opts)
             end
         end
     end
+    rv._refs = 0
+    rv._status = 'open'
     ffi.gc(rv._crv, read_view_gc)
     return register_read_view(rv)
 end
@@ -359,6 +361,16 @@ function read_view_methods:close()
         -- System read view. Can't be closed.
         box.error(box.error.READ_VIEW_BUSY, 2)
     end
+    if self._refs == 0 then
+        self:_do_close()
+    else
+        self._status = 'close_pending'
+    end
+end
+
+function read_view_methods:_do_close()
+    assert(self.status ~= 'closed')
+    assert(self._crv ~= nil)
     for _, space in pairs(self.space) do
         for _, index in pairs(space.index) do
             -- Reset cdata because it's going to be invalidated by 'close'.
@@ -370,11 +382,78 @@ function read_view_methods:close()
     read_view_close(self._crv)
     ffi.gc(self._crv, nil)
     self._crv = nil
-    if not fiber._internal.cord_is_main then
-        -- Reset the status field because application threads can't call
-        -- internal.status.
-        self.status = 'closed'
+    self._status = 'closed'
+end
+
+--
+-- Map: id -> referenced read view.
+--
+-- Used to prevent the garbage collector from deleting read views referenced
+-- in other threads.
+--
+local referenced_read_views = {}
+
+--
+-- Acquires a reference to this read view.
+--
+-- A referenced read view isn't closed immediately. Instead, its status is
+-- changed to 'close_pending' and remains so until the last reference to it
+-- is gone, after which it's closed for real.
+--
+function read_view_methods:_acquire()
+    assert(self.status == 'open')
+    assert(self._crv ~= nil)
+    assert(self._refs >= 0)
+    if self._refs == 0 then
+        referenced_read_views[self.id] = self
+    else
+        assert(referenced_read_views[self.id] == self)
     end
+    self._refs = self._refs + 1
+end
+
+--
+-- Releases a reference to this read view.
+--
+-- If the read view was closed (its status is 'close_pending'), it will be
+-- deleted as soon as the last reference to it is gone.
+--
+function read_view_methods:_release()
+    assert(self.status ~= 'closed')
+    assert(self._crv ~= nil)
+    assert(self._refs > 0)
+    self._refs = self._refs - 1
+    if self._refs == 0 then
+        referenced_read_views[self.id] = nil
+        if self.status == 'close_pending' then
+            self:_do_close()
+        end
+    end
+end
+
+if fiber._internal.cord_is_main then
+    -- Acquires a reference to a read view in the main thread.
+    -- Returns a pointer to the referenced read view.
+    threads.export('box.internal.read_view.acquire', function(id)
+        local rv = read_view_registry[id]
+        -- System read views are added to the Lua registry on demand so
+        -- to raise a proper error on an attempt to acquire a reference
+        -- to a system read view, we also check the C registry.
+        if internal.exists(id) and (rv == nil or rv._crv == nil) then
+            box.error(box.error.READ_VIEW_BUSY)
+        end
+        if rv == nil or rv.status ~= 'open' then
+            box.error(box.error.NO_SUCH_READ_VIEW)
+        end
+        rv:_acquire()
+        return rv._ptr
+    end)
+    -- Releases a reference to a read view in the main thread.
+    threads.export('box.internal.read_view.release', function(id)
+        local rv = read_view_registry[id]
+        assert(rv ~= nil)
+        rv:_release()
+    end)
 end
 
 --

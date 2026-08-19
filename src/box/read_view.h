@@ -124,16 +124,6 @@ struct read_view {
 	/** Read view name. Used for introspection. */
 	char *name;
 	/**
-	 * Number of users referring to this read view.
-	 * A read view must not be deleted until it's 0.
-	 */
-	int pin_count;
-	/**
-	 * Set if the read view should be closed as soon as the last user stops
-	 * using it (pin_count hits 0).
-	 */
-	bool is_close_pending;
-	/**
 	 * Set if this read view is needed for system purposes (for example, to
 	 * make a checkpoint). Initialized with read_view_opts::is_system.
 	 */
@@ -268,19 +258,6 @@ read_view_new(const struct read_view_opts *opts);
  */
 void
 read_view_delete(struct read_view *rv);
-
-static inline void
-read_view_pin(struct read_view *rv)
-{
-	rv->pin_count++;
-}
-
-static inline void
-read_view_unpin(struct read_view *rv)
-{
-	assert(rv->pin_count > 0);
-	rv->pin_count--;
-}
 
 /**
  * Looks up an open read view by id.
