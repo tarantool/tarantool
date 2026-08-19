@@ -124,7 +124,6 @@ sql_expr_compile(const char *sql)
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
 	struct Expr *expr = sql_parse_function(&parser, sql);
 	sql_parser_destroy(&parser);
 	return expr;
@@ -141,7 +140,6 @@ sql_view_compile(const char *sql)
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
 	struct Select *res = sql_parse_view(&parser, sql);
 	sql_parser_destroy(&parser);
 	return res;
@@ -158,7 +156,6 @@ sql_trigger_compile(const char *sql)
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
 	struct sql_trigger *res = sql_parse_trigger(&parser, sql);
 	sql_parser_destroy(&parser);
 	return res;
@@ -231,7 +228,6 @@ void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
-	assert(!parser->parse_only || parser->pVdbe == NULL);
 	sqlVdbeDelete(parser->pVdbe);
 	parser_space_delete(parser);
 	while (parser->pTriggerPrg != NULL) {
