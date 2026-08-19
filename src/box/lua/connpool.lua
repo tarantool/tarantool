@@ -165,6 +165,62 @@ function pool_methods.get_connection(self, instance_name)
     return self._connections[instance_name]
 end
 
+-- config:instance_uri() raises an error on an instance unknown to
+-- the current configuration (removed from the topology), so
+-- resolve such instances to nil instead.
+local function instance_uri_or_nil(instance_name)
+    local ok, uri = pcall(config.instance_uri, config, 'peer',
+                          {instance = instance_name})
+    if not ok then
+        return nil
+    end
+    return uri
+end
+
+--- Close and reconnect cached connections whose instance URI has
+--- been changed by a configuration reload. Connections to
+--- instances removed from the configuration are closed and
+--- evicted.
+function pool_methods.reload_uris(self)
+    -- Collect the instances first: instance_uri_or_nil() does not
+    -- yield, so the collected names are consistent with the cache.
+    local to_evict = {}
+    local to_reconnect = {}
+    for name, conn in pairs(self._connections) do
+        local uri = instance_uri_or_nil(name)
+        if uri == nil then
+            table.insert(to_evict, name)
+        elseif not table.equals(uri, conn._uri) then
+            table.insert(to_reconnect, name)
+        end
+    end
+
+    for _, name in ipairs(to_evict) do
+        local conn = self._connections[name]
+        self._connections[name] = nil
+        conn:close()
+    end
+
+    for _, name in ipairs(to_reconnect) do
+        -- The loop yields, so re-fetch the connection and re-check
+        -- the URI: the cache may have been changed by the
+        -- watchdogs or a concurrent connect().
+        local conn = self._connections[name]
+        local uri = instance_uri_or_nil(name)
+        if conn ~= nil and uri ~= nil and
+           not table.equals(uri, conn._uri) then
+            -- The closed connection is kept in the cache, so
+            -- connect() inherits its deadline and reconnect mark.
+            conn:close()
+            self:connect(name, {
+                ttl = 0,
+                wait_connected = false,
+                fetch_schema = conn.opts.fetch_schema,
+            })
+        end
+    end
+end
+
 --- Connect to an instance or receive a cached connection by
 --- name.
 ---
@@ -200,6 +256,8 @@ function pool_methods.connect(self, instance_name, opts)
             return nil, msg:format(instance_name, res.message)
         end
         conn = res
+        -- Used by reload_uris() to detect configuration changes.
+        conn._uri = table.deepcopy(uri)
         self._connections[instance_name] = conn
         local function mode(conn)
             if conn.state == 'active' then
@@ -375,6 +433,10 @@ local pool = create_pool()
 
 local function set_idle_timeout(idle_timeout)
     pool:set_idle_timeout(idle_timeout)
+end
+
+local function reload_uris()
+    pool:reload_uris()
 end
 
 local function connect(instance_name, opts)
@@ -765,4 +827,7 @@ return {
     call = call,
 
     set_idle_timeout = set_idle_timeout,
+
+    -- Internal API for the config applier, not for public use.
+    _reload_uris = reload_uris,
 }
