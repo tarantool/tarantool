@@ -2007,8 +2007,6 @@ struct Parse {
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
-	/** If true, then parsed_ast_type should be EXPR after parsing. */
-	bool is_expr;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
@@ -2421,7 +2419,46 @@ char *
 sql_escaped_name_new(const char *name);
 
 int sqlKeywordCode(const unsigned char *, int);
-int sqlRunParser(Parse *, const char *);
+
+/**
+ * Run the parser on the given SQL string.
+ *
+ * @param pParse Parser context.
+ * @param sql SQL string.
+ * @retval 0 on success, -1 otherwise.
+ */
+int
+sql_parse_statement(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given functions definition.
+ *
+ * @param pParse Parser context.
+ * @param sql SQL string.
+ * @retval Expression that describes the function on success, NULL otherwise.
+ */
+struct Expr *
+sql_parse_function(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given view definition.
+ *
+ * @param pParse Parser context.
+ * @param sql SQL string.
+ * @retval SELECT that describes the VIEW on success, NULL otherwise.
+ */
+struct Select *
+sql_parse_view(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given trigger definition.
+ *
+ * @param pParse Parser context.
+ * @param sql SQL string.
+ * @retval SQL trigger on success, NULL otherwise.
+ */
+struct sql_trigger *
+sql_parse_trigger(struct Parse *parser, const char *sql);
 
 /**
  * This routine is called after a single SQL statement has been
