@@ -52,7 +52,6 @@
 Vdbe *
 sqlVdbeCreate(Parse * pParse)
 {
-	assert(!pParse->parse_only);
 	sql *db = sql_get();
 	Vdbe *p;
 	p = sql_xmalloc(sizeof(Vdbe));

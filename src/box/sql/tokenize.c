@@ -472,7 +472,7 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}
-	if (!parse->is_aborted && !parse->parse_only)
+	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
 		sql_finish_coding(parse);
 }
 
