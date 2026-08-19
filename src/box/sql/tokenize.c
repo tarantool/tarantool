@@ -481,11 +481,12 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
  *
  * @param pParse Parser context.
  * @param zSql SQL string.
+ * @param seed_token Token type to feed before `zSql`, or 0.
  * @retval 0 on success.
  * @retval -1 on error.
  */
-int
-sqlRunParser(Parse * pParse, const char *zSql)
+static int
+sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 {
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
@@ -503,6 +504,10 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	assert(pParse->pVList == 0);
 	struct Token last;
 	memset(&last, 0, sizeof(last));
+	if (seed_token != 0) {
+		last.z = zSql;
+		sqlParser(pEngine, seed_token, last, pParse);
+	}
 	while (1) {
 		assert(i >= 0);
 		if (zSql[i] != 0) {
@@ -555,4 +560,43 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
 	return pParse->is_aborted ? -1 : 0;
+}
+
+int
+sql_parse_statement(struct Parse *parser, const char *sql)
+{
+	return sql_run_parser(parser, sql, 0);
+}
+
+struct Expr *
+sql_parse_function(struct Parse *parser, const char *sql)
+{
+	if (sql_run_parser(parser, sql, TK_FUNCTION_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_EXPR);
+	struct Expr *res = parser->parsed_ast.expr;
+	parser->parsed_ast.expr = NULL;
+	return res;
+}
+
+struct Select *
+sql_parse_view(struct Parse *parser, const char *sql)
+{
+	if (sql_run_parser(parser, sql, TK_VIEW_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_SELECT);
+	struct Select *res = parser->parsed_ast.select;
+	parser->parsed_ast.select = NULL;
+	return res;
+}
+
+struct sql_trigger *
+sql_parse_trigger(struct Parse *parser, const char *sql)
+{
+	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_TRIGGER);
+	struct sql_trigger *res = parser->parsed_ast.trigger;
+	parser->parsed_ast.trigger = NULL;
+	return res;
 }

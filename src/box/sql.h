@@ -80,10 +80,10 @@ struct func;
  * stuct Select and return it.
  *
  * @param expr Expression to parse.
- * @param expr_len Length of @an expr.
+ * @retval Expression on success, NULL otherwise.
  */
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len);
+sql_expr_compile(const char *expr);
 
 /**
  * This routine executes parser on 'CREATE VIEW ...' statement

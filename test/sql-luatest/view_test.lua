@@ -81,7 +81,7 @@ g.test_view = function(cg)
         box.space.test:drop()
         -- This case must fail since parser converts it to expr AST.
         raw_sp[6].sql = 'SELECT 1;'
-        exp_err = "Failed to execute SQL statement: SELECT 1;"
+        exp_err = "Syntax error at line 1 near 'SELECT'"
         t.assert_error_msg_equals(exp_err, _space.replace, _space, raw_sp)
 
         box.execute("DROP VIEW v1;")
@@ -453,5 +453,26 @@ g.test_13009_adding_column_unique = function(cg)
         _, err = box.execute(sql)
         t.assert_equals(tostring(err), exp_err)
         box.execute([[DROP VIEW v;]])
+    end)
+end
+
+--
+-- Make sure that no assertion when inserting an invalid view definition
+-- into _space.
+--
+g.test_wrong_view_def = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
+        local _space = box.space._space
+        local format = {{type = 'integer', name = 'i'}}
+        local flags = {sql = 'INSERT INTO t VALUES (1);', view = true}
+        local def = {1000, 1, 'view', 'memtx', 1, flags, format}
+        local exp_err = {
+            message = "Syntax error at line 1 near 'INSERT'",
+            name = "SQL_SYNTAX_NEAR_TOKEN",
+            token = "INSERT",
+        }
+        t.assert_error_covers(exp_err, _space.insert, _space, def)
+        box.execute([[DROP TABLE t;]])
     end)
 end
