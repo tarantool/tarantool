@@ -2467,9 +2467,7 @@ struct func_sql_expr {
 struct func *
 func_sql_expr_new(const struct func_def *def)
 {
-	const char *body = def->body;
-	uint32_t body_len = body == NULL ? 0 : strlen(body);
-	struct Expr *expr = sql_expr_compile(body, body_len);
+	struct Expr *expr = sql_expr_compile(def->body);
 	if (expr == NULL)
 		return NULL;
 	struct Parse parser;

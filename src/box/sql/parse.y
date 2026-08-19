@@ -382,26 +382,18 @@ ifexists(A) ::= .            {A = 0;}
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
 cmd ::= createkw VIEW ifnotexists(E) nm(Y) eidlist_opt(C) AS select_old(S). {
-  if (!pParse->parse_only) {
-    pParse->initiateTTrans = true;
-    sql_create_view(pParse, pParse->zTail, &Y, C, S, E);
-  } else {
-    sql_expr_list_delete(C);
-    pParse->parsed_ast_type = AST_TYPE_SELECT;
-    pParse->parsed_ast.select = S;
-  }
+  pParse->initiateTTrans = true;
+  sql_create_view(pParse, pParse->zTail, &Y, C, S, E);
+}
+cmd ::= VIEW_ENTRY createkw VIEW ifnotexists nm eidlist_opt AS select_old(S). {
+  pParse->parsed_ast_type = AST_TYPE_SELECT;
+  pParse->parsed_ast.select = S;
 }
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
 cmd ::= select_old(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
-  if(pParse->parse_only) {
-    diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-             "Failed to parse SQL expression");
-    pParse->is_aborted = true;
-    return;
-  }
   sqlSelect(pParse, X, &dest);
   sql_select_delete(X);
 }
@@ -1320,13 +1312,7 @@ cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
 cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
     sqlPragma(pParse,&X,&Y,&Z);
 }
-cmd ::= FUNCTION_KW(T) expr_old(E). {
-  if (!pParse->is_expr) {
-    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count,
-             tt_cstr(T.z, T.n));
-    pParse->is_aborted = true;
-    return;
-  }
+cmd ::= FUNCTION_ENTRY expr_old(E). {
   pParse->parsed_ast_type = AST_TYPE_EXPR;
   pParse->parsed_ast.expr = E.pExpr;
 }
@@ -1341,18 +1327,17 @@ cmd ::= SHOW CREATE TABLE. {
 
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
-cmd ::= createkw TRIGGER ifnotexists(E) nm(N) trigger_time(C) trigger_event(D)
-        ON nm(T) foreach_clause when_clause(G) BEGIN trigger_cmd_list(S) END. {
-  if (pParse->parse_only) {
-    pParse->parsed_ast_type = AST_TYPE_TRIGGER;
-    pParse->parsed_ast.trigger = sql_trigger_new(pParse, &N, &T, C, D.a,
-                                                 id_list_from_ast(D.b), G, S);
-  } else {
-    sql_expr_delete(G);
-    sqlDeleteTriggerStep(S);
-    pParse->initiateTTrans = true;
-    vdbe_emit_create_trigger(pParse, pParse->zTail, &N, &T, E);
-  }
+cmd ::= createkw TRIGGER ifnotexists(E) nm(N) trigger_time trigger_event
+        ON nm(T) foreach_clause when_clause BEGIN trigger_cmd_list END. {
+  pParse->initiateTTrans = true;
+  vdbe_emit_create_trigger(pParse, pParse->zTail, &N, &T, E);
+}
+cmd ::= TRIGGER_ENTRY createkw TRIGGER ifnotexists nm(N) trigger_time(C)
+        trigger_event(D) ON nm(T) foreach_clause when_clause(G)
+        BEGIN trigger_cmd_list(S) END. {
+  pParse->parsed_ast_type = AST_TYPE_TRIGGER;
+  pParse->parsed_ast.trigger = sql_trigger_new(pParse, &N, &T, C, D.a,
+                                               id_list_from_ast(D.b), G, S);
 }
 
 %type trigger_time {int}
