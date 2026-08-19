@@ -303,14 +303,7 @@ sql_vsnprintf(int, char *, const char *, va_list);
 #define MATCH_ONE_WILDCARD '_'
 #define MATCH_ALL_WILDCARD '%'
 
-/**
- * Compile the UTF-8 encoded SQL statement into
- * a statement handle (struct Vdbe).
- *
- * @param sql UTF-8 encoded SQL statement.
- * @param re_prepared VM being re-compiled. Can be NULL.
- * @retval stmt A pointer to the compiled statement.
- */
+/** Compile the UTF-8 encoded SQL statement into a statement handle. */
 struct Vdbe *
 sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
 
@@ -2000,8 +1993,6 @@ struct Parse {
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
-	/** If true, then parsed_ast_type should be EXPR after parsing. */
-	bool is_expr;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
@@ -2414,7 +2405,34 @@ char *
 sql_escaped_name_new(const char *name);
 
 int sqlKeywordCode(const unsigned char *, int);
-int sqlRunParser(Parse *, const char *);
+
+/**
+ * Run the parser on the given SQL string.
+ * Return 0 on success, -1 otherwise.
+ */
+int
+sql_parse_statement(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given function definition.
+ * Return the parsed expression on success, or NULL on error.
+ */
+struct Expr *
+sql_parse_function(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given view definition.
+ * Return the parsed SELECT on success, or NULL on error.
+ */
+struct Select *
+sql_parse_view(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given trigger definition.
+ * Return the parsed SQL TRIGGER on success, or NULL on error.
+ */
+struct sql_trigger *
+sql_parse_trigger(struct Parse *parser, const char *sql);
 
 /**
  * This routine is called after a single SQL statement has been
