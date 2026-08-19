@@ -228,8 +228,6 @@ read_view_new(const struct read_view_opts *opts)
 	rv->id = next_read_view_id++;
 	assert(opts->name != NULL);
 	rv->name = xstrdup(opts->name);
-	rv->pin_count = 0;
-	rv->is_close_pending = false;
 	rv->is_system = opts->is_system;
 	rv->disable_decompression = opts->disable_decompression;
 	rv->timestamp = ev_monotonic_now(loop());
@@ -264,7 +262,6 @@ void
 read_view_delete(struct read_view *rv)
 {
 	assert(cord_is_main());
-	assert(rv->pin_count == 0);
 	read_view_unregister(rv);
 	struct space_read_view *space_rv, *next_space_rv;
 	rlist_foreach_entry_safe(space_rv, &rv->spaces, link,

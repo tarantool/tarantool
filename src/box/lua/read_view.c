@@ -177,6 +177,9 @@ lbox_push_space_read_view(struct lua_State *L,
  *     -- Read view handle (cdata).
  *     _crv = <cdata:struct read_view_handle *>,
  *
+ *     -- Pointer to the read view object serialized as a %p-formatted string.
+ *     _ptr = <string>
+ *
  *     id = <number>,                            -- read view id
  *     name = <string>,                          -- read view name
  *     is_system = <bool>,                       -- system?
@@ -225,6 +228,9 @@ lbox_new_read_view(struct lua_State *L, struct read_view *rv)
 		L, CTID_STRUCT_READ_VIEW_HANDLE) = rvh;
 	lua_setfield(L, -2, "_crv");
 
+	lua_pushfstring(L, "%p", rv);
+	lua_setfield(L, -2, "_ptr");
+
 	/* Create a space table. */
 	lua_newtable(L);
 	struct space_read_view_handle *space;
@@ -268,69 +274,6 @@ lbox_read_view_open(struct lua_State *L)
 }
 
 /**
- * Pushes a pointer to the given read view encoded as a %p-formatted string
- * to the Lua stack. See also lbox_check_read_view_ptr_str.
- */
-static void
-lbox_push_read_view_ptr_str(struct lua_State *L, struct read_view *rv)
-{
-	lua_pushfstring(L, "%p", rv);
-}
-
-/**
- * Returns a pointer to a read view encoded as a %p-formatted string at
- * the given index in the Lua stack. See also lbox_push_read_view_ptr_str.
- */
-static struct read_view *
-lbox_check_read_view_ptr_str(struct lua_State *L, int idx)
-{
-	struct read_view *rv = NULL;
-	VERIFY(sscanf(luaL_checkstring(L, idx), "%p", &rv) == 1);
-	return rv;
-}
-
-/**
- * Increments the usage counter of a read view.
- * Takes a read view id.
- * Returns a pointer to the read view encoded as a %p-formatted string.
- * On error, raises a Lua exception.
- */
-static int
-lbox_read_view_acquire(struct lua_State *L)
-{
-	assert(cord_is_main());
-	uint64_t id = luaL_checkuint64(L, 1);
-	struct read_view *rv = read_view_by_id(id);
-	if (rv == NULL || rv->is_close_pending) {
-		diag_set(ClientError, ER_NO_SUCH_READ_VIEW);
-		return luaT_error(L);
-	}
-	if (rv->is_system) {
-		diag_set(ClientError, ER_READ_VIEW_BUSY);
-		return luaT_error(L);
-	}
-	read_view_pin(rv);
-	lbox_push_read_view_ptr_str(L, rv);
-	return 1;
-}
-
-/**
- * Decrements the usage counter of a read view and deletes the read view
- * if it was closed and has no more users.
- * Takes a pointer to a read view encoded as a %p-formatted string.
- */
-static int
-lbox_read_view_release(struct lua_State *L)
-{
-	assert(cord_is_main());
-	struct read_view *rv = lbox_check_read_view_ptr_str(L, 1);
-	read_view_unpin(rv);
-	if (rv->pin_count == 0 && rv->is_close_pending)
-		read_view_delete(rv);
-	return 0;
-}
-
-/**
  * Reuses an existing database read view.
  * Takes a pointer to a read view encoded as a %p-formatted string.
  * On error, raises a Lua exception.
@@ -338,7 +281,8 @@ lbox_read_view_release(struct lua_State *L)
 static int
 lbox_read_view_reuse(struct lua_State *L)
 {
-	struct read_view *rv = lbox_check_read_view_ptr_str(L, 1);
+	struct read_view *rv;
+	VERIFY(sscanf(luaL_checkstring(L, 1), "%p", &rv) == 1);
 	if (lbox_new_read_view(L, rv) != 0)
 		return luaT_error_at(L, 2);
 	return 1;
@@ -369,24 +313,14 @@ lbox_read_view_list(struct lua_State *L)
 }
 
 /**
- * Given a read view object (a table that has the 'id' field), pushes
- * the read view status string ('open', 'closed', 'close_pending') to
- * the Lua stack.
+ * Returns true if the read view with the given id exists.
  */
 static int
-lbox_read_view_status(struct lua_State *L)
+lbox_read_view_exists(struct lua_State *L)
 {
 	assert(cord_is_main());
-	lua_getfield(L, 1, "id");
-	uint64_t id = luaL_checkuint64(L, -1);
-	struct read_view *rv = read_view_by_id(id);
-	if (rv == NULL) {
-		lua_pushliteral(L, "closed");
-	} else if (rv->is_close_pending) {
-		lua_pushliteral(L, "close_pending");
-	} else {
-		lua_pushliteral(L, "open");
-	}
+	uint64_t id = luaL_checkuint64(L, 1);
+	lua_pushboolean(L, read_view_by_id(id) != NULL);
 	return 1;
 }
 
@@ -396,11 +330,9 @@ lbox_read_view_status(struct lua_State *L)
  *
  * The behavior of this function differs between the main thread and
  * application threads:
- *  - The main thread closes the core read view if it has no users,
- *    otherwise it marks the read view as "close pending" to be closed
- *    as soon as the last user is gone.
- *  - An application thread returns a pointer to the core read view
- *    to be passed to the main thread for release.
+ *  - The main thread deletes the core read view object immediately.
+ *  - An application thread returns the read view id to be passed to
+ *    the main thread for release.
  */
 static int
 lbox_read_view_close(struct lua_State *L)
@@ -414,15 +346,10 @@ lbox_read_view_close(struct lua_State *L)
 	}
 	read_view_handle_delete(rvh);
 	if (cord_is_main()) {
-		assert(!rv->is_close_pending);
-		if (rv->pin_count == 0) {
-			read_view_delete(rv);
-		} else {
-			rv->is_close_pending = true;
-		}
+		read_view_delete(rv);
 		return 0;
 	} else {
-		lbox_push_read_view_ptr_str(L, rv);
+		luaL_pushuint64(L, rv->id);
 		return 1;
 	}
 }
@@ -629,11 +556,9 @@ box_lua_read_view_init(struct lua_State *L)
 	int rc;
 	const struct luaL_Reg module_methods[] = {
 		{"open", lbox_read_view_open},
-		{"acquire", lbox_read_view_acquire},
-		{"release", lbox_read_view_release},
 		{"reuse", lbox_read_view_reuse},
 		{"list", lbox_read_view_list},
-		{"status", lbox_read_view_status},
+		{"exists", lbox_read_view_exists},
 		{"close", lbox_read_view_close},
 		{"index_get", lbox_index_read_view_get},
 		{"index_count", lbox_index_read_view_count},
