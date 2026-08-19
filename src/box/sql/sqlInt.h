@@ -2083,8 +2083,6 @@ struct Parse {
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
-	/** If true, then parsed_ast_type should be EXPR after parsing. */
-	bool is_expr;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
@@ -2497,7 +2495,10 @@ char *
 sql_escaped_name_new(const char *name);
 
 int sqlKeywordCode(const unsigned char *, int);
-int sqlRunParser(Parse *, const char *);
+
+/** Run the parser on the given SQL string. */
+int
+sqlRunParser(struct Parse *pParse, const char *zSql, int seed_token);
 
 /**
  * This routine is called after a single SQL statement has been

@@ -403,27 +403,19 @@ ifexists(A) ::= .            {A = 0;}
 //
 cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
-  if (!pParse->parse_only) {
-    create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
-    pParse->initiateTTrans = true;
-    sql_create_view(pParse);
-  } else {
-    sql_expr_list_delete(C);
-    pParse->parsed_ast_type = AST_TYPE_SELECT;
-    pParse->parsed_ast.select = S;
-  }
+  create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
+  pParse->initiateTTrans = true;
+  sql_create_view(pParse);
+}
+cmd ::= VIEW_ENTRY createkw VIEW ifnotexists nm eidlist_opt AS select(S). {
+  pParse->parsed_ast_type = AST_TYPE_SELECT;
+  pParse->parsed_ast.select = S;
 }
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
 cmd ::= select(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
-  if(pParse->parse_only) {
-    diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-             "Failed to parse SQL expression");
-    pParse->is_aborted = true;
-    return;
-  }
   sqlSelect(pParse, X, &dest);
   sql_select_delete(X);
 }
@@ -1509,13 +1501,7 @@ cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
 cmd ::= PRAGMA nm(X) LP nm(Y) DOT nm(Z) RP.  {
     sqlPragma(pParse,&X,&Y,&Z);
 }
-cmd ::= FUNCTION_KW(T) expr(E). {
-  if (!pParse->is_expr) {
-    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count,
-             tt_cstr(T.z, T.n));
-    pParse->is_aborted = true;
-    return;
-  }
+cmd ::= FUNCTION_ENTRY expr(E). {
   pParse->parsed_ast_type = AST_TYPE_EXPR;
   pParse->parsed_ast.expr = E.pExpr;
 }
@@ -1531,6 +1517,14 @@ cmd ::= SHOW CREATE TABLE. {
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
 cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
+  Token all;
+  all.z = A.z;
+  all.n = (int)(Z.z - A.z) + Z.n;
+  pParse->initiateTTrans = true;
+  sql_trigger_finish(pParse, S, &all);
+}
+cmd ::= TRIGGER_ENTRY createkw trigger_decl(A) BEGIN trigger_cmd_list(S)
+        END(Z). {
   Token all;
   all.z = A.z;
   all.n = (int)(Z.z - A.z) + Z.n;
