@@ -58,7 +58,7 @@ findNextHostParameter(const char *zSql, int *pnToken)
 	while (zSql[0]) {
 		n = sql_token(zSql, &tokenType, &unused);
 		assert(n > 0 && tokenType != TK_ILLEGAL);
-		if (tokenType == TK_VARIABLE) {
+		if (sql_expr_is_variable(tokenType)) {
 			*pnToken = n;
 			break;
 		}

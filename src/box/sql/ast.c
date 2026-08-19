@@ -335,7 +335,7 @@ expr_leaf(struct ast_expr *expr, enum field_type type)
 	return res;
 }
 
-/** Build a `struct Expr` for a bound variable (`?`, `:name`, etc). */
+/** Build a `struct Expr` for a bound variable. */
 static struct Expr *
 expr_var(struct Parse *parser, struct ast_expr *expr)
 {
@@ -350,22 +350,17 @@ expr_var(struct Parse *parser, struct ast_expr *expr)
 		parser->is_aborted = true;
 		return NULL;
 	}
-	if (expr->len > 1) {
-		assert(expr->str[0] != '?');
-		if (!IdChar(expr->str[1])) {
-			diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-				 parser->line_count,
-				 expr->str - parser->zTail + 1,
-				 tt_cstr(expr->str, 1));
-			parser->is_aborted = true;
-			return NULL;
-		}
-		if (expr->str[0] == '#' && sqlIsdigit(expr->str[1])) {
-			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 parser->line_count, tt_cstr(expr->str, 1));
-			parser->is_aborted = true;
-			return NULL;
-		}
+	/*
+	 * The check exists only for the `:` case,
+	 * because the other variants (`@`, `#`, `?`, `$`)
+	 * are checked during tokenization.
+	 */
+	if (expr->str[0] == ':' && (IdChar(expr->str[1]) == 0)) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 tt_sprintf("Wrong bind variable name '%.*s'",
+				    expr->len, expr->str));
+		parser->is_aborted = true;
+		return NULL;
 	}
 	struct Expr *res = sql_expr_new_dequoted(expr->op, &t);
 	res->type = FIELD_TYPE_BOOLEAN;
@@ -556,7 +551,9 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 	case TK_UNKNOWN:
 		res = expr_leaf(expr, FIELD_TYPE_BOOLEAN);
 		break;
-	case TK_VARIABLE:
+	case TK_VAR_ANON:
+	case TK_VAR_NUM:
+	case TK_VAR_NAME:
 		res = expr_var(parser, expr);
 		break;
 	case TK_AND:
