@@ -76,14 +76,14 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		}
 		zSqlCopy = sql_xstrndup(zSql, nBytes);
 		if (zSqlCopy) {
-			sqlRunParser(&sParse, zSqlCopy);
+			sqlRunParser(&sParse, zSqlCopy, 0);
 			sParse.zTail = &zSql[sParse.zTail - zSqlCopy];
 			sql_xfree(zSqlCopy);
 		} else {
 			sParse.zTail = &zSql[nBytes];
 		}
 	} else {
-		sqlRunParser(&sParse, zSql);
+		sqlRunParser(&sParse, zSql, 0);
 	}
 	assert(0 == sParse.nQueryLoop || sParse.is_aborted);
 
