@@ -513,16 +513,8 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 		sql_finish_coding(parse);
 }
 
-/**
- * Run the parser on the given SQL string.
- *
- * @param pParse Parser context.
- * @param zSql SQL string.
- * @retval 0 on success.
- * @retval -1 on error.
- */
 int
-sqlRunParser(Parse * pParse, const char *zSql)
+sqlRunParser(struct Parse *pParse, const char *zSql, int seed_token)
 {
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
@@ -538,6 +530,10 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
+	if (seed_token != 0) {
+		pParse->sLastToken.z = zSql;
+		sqlParser(pEngine, seed_token, pParse->sLastToken, pParse);
+	}
 	while (1) {
 		assert(i >= 0);
 		if (zSql[i] != 0) {
@@ -605,27 +601,21 @@ sqlRunParser(Parse * pParse, const char *zSql)
 }
 
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len)
+sql_expr_compile(const char *expr)
 {
-	const char *outer = "FUNCTION ";
-	int len = strlen(outer) + expr_len;
+	if (expr == NULL || expr[0] == '\0') {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Function definition cannot be empty");
+		return NULL;
+	}
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	/*
-	 * Since SELECT token is added to the original expression,
-	 * to make error message display correct position we should
-	 * account its length.
-	 */
-	parser.line_pos -= strlen(outer);
 	parser.parse_only = true;
-	parser.is_expr = true;
 
 	struct Expr *expression = NULL;
-	char *stmt = xregion_alloc(&parser.region, len + 1);
-	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
 
-	if (sqlRunParser(&parser, stmt) == 0) {
+	if (sqlRunParser(&parser, expr, TK_FUNCTION_ENTRY) == 0) {
 		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
 		expression = parser.parsed_ast.expr;
 		parser.parsed_ast.expr = NULL;
@@ -637,16 +627,16 @@ sql_expr_compile(const char *expr, int expr_len)
 struct Select *
 sql_view_compile(const char *view_stmt)
 {
+	assert(view_stmt != NULL && view_stmt[0] != '\0');
+
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
 	parser.parse_only = true;
 
 	struct Select *select = NULL;
 
-	if (sqlRunParser(&parser, view_stmt) != 0 ||
-	    parser.parsed_ast_type != AST_TYPE_SELECT) {
-		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
-	} else {
+	if (sqlRunParser(&parser, view_stmt, TK_VIEW_ENTRY) == 0) {
+		assert(parser.parsed_ast_type == AST_TYPE_SELECT);
 		select = parser.parsed_ast.select;
 		parser.parsed_ast.select = NULL;
 	}
@@ -658,11 +648,17 @@ sql_view_compile(const char *view_stmt)
 struct sql_trigger *
 sql_trigger_compile(const char *sql)
 {
+	if (sql == NULL || sql[0] == '\0') {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Trigger definition cannot be empty");
+		return NULL;
+	}
+
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
 	parser.parse_only = true;
 	struct sql_trigger *trigger = NULL;
-	if (sqlRunParser(&parser, sql) == 0 &&
+	if (sqlRunParser(&parser, sql, TK_TRIGGER_ENTRY) == 0 &&
 	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
 		trigger = parser.parsed_ast.trigger;
 		parser.parsed_ast.trigger = NULL;
