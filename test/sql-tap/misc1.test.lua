@@ -1052,7 +1052,7 @@ test:do_catchsql_test(
         select''like''like''like#0;
     ]], {
         -- <misc1-21.1>
-        1, [[Syntax error at line 1 near '#']]
+        1, [[Wrong bind variable name '#0']]
         -- </misc1-21.1>
     })
 

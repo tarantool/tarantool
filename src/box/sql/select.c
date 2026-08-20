@@ -2111,8 +2111,8 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		if((p->pLimit->flags & EP_Collate) != 0 ||
 		   (p->pOffset != NULL &&
 		   (p->pOffset->flags & EP_Collate) != 0)) {
-			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 pParse->line_count, "COLLATE");
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 "COLLATE cannot be used in LIMIT and OFFSET");
 			pParse->is_aborted = true;
 			return;
 		}
