@@ -655,12 +655,14 @@ local function extract_obj_tzoffset_tzindex(obj, base_epoch)
     return tzoffset, tzindex
 end
 
--- Timestamp is erroneously considered as "local", not UTC (gh10363).
--- Handle this historical case here.
+-- Historically the timestamp is erroneously considered as
+-- "local", not UTC, so it is adjusted by the timezone offset.
+-- The new compat behavior treats the timestamp as UTC and
+-- preserves it as is (gh-10363).
 local function check_and_update_epoch(epoch, offset)
-    -- Convert "local" timestamp to UTC timestamp.
-    -- Removing this adjustment will fix gh10363.
-    epoch = utc_secs(epoch, offset)
+    if not tweaks.datetime_apply_timezone_preserves_timestamp then
+        epoch = utc_secs(epoch, offset)
+    end
     check_range(epoch, MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE, 'timestamp',
         nil, 1)
     return epoch
@@ -678,6 +680,7 @@ local function datetime_new(obj)
     local nsec = extract_obj_nsec(obj)
     local epoch
     epoch, nsec = extract_obj_epoch_and_update_nsec(obj, ymd, hms, nsec)
+    local has_nsec = nsec ~= nil
     nsec = nsec or 0
 
     -- Timestamp case.
@@ -699,6 +702,14 @@ local function datetime_new(obj)
     local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj,
         epoch_from_dt(dt))
     tzoffset, tzindex = tzoffset or 0, tzindex or 0
+
+    -- Only the timezone is provided. The new compat behavior
+    -- preserves the zero timestamp, so `new{tz = x}` remains
+    -- equivalent to `new{}:set{tz = x}` (gh-10363).
+    if not ymd and not hms and not has_nsec and
+       tweaks.datetime_apply_timezone_preserves_timestamp then
+        return datetime_new_raw(0, 0, tzoffset, tzindex)
+    end
 
     -- .hour, .minute, .second
     local secs = 0
@@ -991,6 +1002,13 @@ local function datetime_parse_from(str, obj)
     -- string.
     if date.tz == '' and date.tzoffset == 0 then
         datetime_set(date, { tzoffset = tzoffset, tz = tzname })
+
+        -- If working in a "preserve timestamp" mode the set
+        -- call changes the represented time of day and it should
+        -- be adjusted (gh-10363).
+        if tweaks.datetime_apply_timezone_preserves_timestamp then
+            date.epoch = utc_secs(date.epoch, date.tzoffset)
+        end
     end
 
     return date, len
@@ -1085,6 +1103,18 @@ function datetime_set(self, obj)
         self.epoch = epoch
         self.nsec = nsec
         self.tzoffset = effective_tzoffset
+        self.tzindex = tzindex or self.tzindex
+        return self
+    end
+
+    -- Only the timezone is changed. The new compat behavior
+    -- preserves the timestamp, so the epoch is not recalculated
+    -- (gh-10363). Time units provided together with a timezone
+    -- are still applied to the wall clock time below.
+    if not ymd and not hms and nsec == nil and
+       tweaks.datetime_apply_timezone_preserves_timestamp then
+        local tzoffset, tzindex = extract_obj_tzoffset_tzindex(obj, self.epoch)
+        self.tzoffset = tzoffset or self.tzoffset
         self.tzindex = tzindex or self.tzindex
         return self
     end
