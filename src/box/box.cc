@@ -182,6 +182,11 @@ static bool is_storage_shutdown = false;
 static bool is_ro = true;
 /** Whether the read_only option has been applied at least once. */
 static bool is_ro_cfg_applied;
+/**
+ * Custom read-only reason set via box.cfg.ro_reason. NULL when no custom reason
+ * is configured. Owns its memory, since cfg_gets() returns a transient buffer.
+ */
+static char *box_ro_reason_cfg;
 static fiber_cond ro_cond;
 
 /**
@@ -419,10 +424,21 @@ box_ro_state_msg_snprint(char *buf, int size)
 				" and is frozen until promotion");
 		}
 	} else {
-		if (is_ro)
+		if (is_ro) {
 			SNPRINT(total, snprintf, buf, size,
 				"box.cfg.read_only is true");
-		else if (is_waiting_for_own_rows)
+			if (box_ro_reason_cfg != NULL) {
+				/*
+				 * The reason is arbitrary user text. Escape it
+				 * so that newlines and other control characters
+				 * don't break the single-line log/error record.
+				 * box.cfg.ro_reason keeps the original value.
+				 */
+				SNPRINT(total, snprintf, buf, size, " - ");
+				SNPRINT(total, json_escape, buf, size,
+					box_ro_reason_cfg);
+			}
+		} else if (is_waiting_for_own_rows)
 			SNPRINT(total, snprintf, buf, size,
 				"it has lost some of its own transactions "
 				"and is waiting to receive them back from "
@@ -480,7 +496,7 @@ box_ro_reason(void)
 	if (is_box_configured && box_raft_is_ro())
 		return "synchro";
 	if (is_ro)
-		return "config";
+		return box_ro_reason_cfg != NULL ? box_ro_reason_cfg : "config";
 	if (is_waiting_for_own_rows)
 		return "waiting to receive its own transactions "
 			"back from the replicaset";
@@ -613,11 +629,16 @@ error:
 static bool
 box_check_ro(void);
 
+/** Update box_ro_reason_cfg from box.cfg.ro_reason. */
+static void
+box_update_ro_reason_cfg(void);
+
 void
 box_set_ro(void)
 {
 	is_ro = box_check_ro();
 	is_ro_cfg_applied = true;
+	box_update_ro_reason_cfg();
 	box_update_ro_summary();
 }
 
@@ -1788,6 +1809,20 @@ box_check_ro(void)
 	if (mode == RO_CFG_UNLESS_BOOTSTRAP)
 		return !box_is_bootstrap_leader();
 	return mode == RO_CFG_TRUE;
+}
+
+static void
+box_update_ro_reason_cfg(void)
+{
+	free(box_ro_reason_cfg);
+	box_ro_reason_cfg = NULL;
+	if (!is_ro)
+		return;
+	if (!is_box_configured)
+		return;
+	const char *reason = cfg_gets("ro_reason");
+	if (reason != NULL)
+		box_ro_reason_cfg = (char *)xstrdup(reason);
 }
 
 static bool
@@ -6884,6 +6919,8 @@ box_free(void)
 	coll_id_cache_destroy();
 	port_free();
 	box_lua_call_runtime_priv_reset();
+	free(box_ro_reason_cfg);
+	box_ro_reason_cfg = NULL;
 	/* schema_module_free(); */
 	/* session_free(); */
 }
