@@ -167,6 +167,20 @@ struct create_fk_constraint_parse_def {
 	bool is_used;
 };
 
+/** Parsing context. */
+struct sql_parser_context {
+	/** The resulting AST. */
+	struct sql_ast *ast;
+	/** Region for memory allocation. */
+	struct region *region;
+	/** Currently parsed line. */
+	uint32_t line;
+	/** Currently parsed position in line. */
+	uint32_t pos;
+	/** Flag to show if a syntax error happened. */
+	bool is_aborted;
+};
+
 static inline void
 create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 {
@@ -176,5 +190,15 @@ create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 	rlist_foreach_entry(fk, &d->fkeys, link)
 		sql_expr_list_delete(fk->selfref_cols);
 }
+
+/** Create parsing context. */
+void
+sql_parser_context_create(struct sql_parser_context *ctx,
+			  struct region *region);
+
+/** Run parser. */
+void
+sqlParser(void *engine, int token_type, struct Token token,
+	  struct sql_parser_context *ctx);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

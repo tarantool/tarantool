@@ -19,3 +19,6 @@
 * Indexes for column PRIMARY KEY and UNIQUE constraints are now created before
   indexes for table PRIMARY KEY and UNIQUE constraints, which changes
   the order of automatically generated index names (gh-5485).
+* SQL now builds an internal AST for SQL queries before building the VDBE.
+  This affects the order of error detection - syntactic errors are now
+  always detected before semantic errors (gh-5485).

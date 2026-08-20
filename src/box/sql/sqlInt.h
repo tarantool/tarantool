@@ -1934,14 +1934,6 @@ struct Parse {
 		int lru;	/* Least recently used entry has the smallest value */
 	} aColCache[SQL_N_COLCACHE];	/* One for each column cache entry */
 	int aTempReg[8];	/* Holding area for temporary registers */
-
-	/** The line counter. */
-	uint32_t line_count;
-	/**
-	 * The position in a line. Line and position are used
-	 * for detailed error diagnostics.
-	 */
-	int line_pos;
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
@@ -1949,7 +1941,6 @@ struct Parse {
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
 	Vdbe *pReprepare;	/* VM being reprepared (sqlReprepare()) */
-	const char *zTail;	/* All SQL text past the last semicolon parsed */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
@@ -2387,9 +2378,9 @@ int sqlKeywordCode(const unsigned char *, int);
 
 /**
  * Run the parser on the given SQL string.
- * Return 0 on success, -1 otherwise.
+ * Return AST of given SQL statement on success, NULL otherwise.
  */
-int
+struct sql_ast *
 sql_parse_statement(struct Parse *parser, const char *sql);
 
 /**
@@ -2412,6 +2403,10 @@ sql_parse_view(struct Parse *parser, const char *sql);
  */
 struct sql_trigger *
 sql_parse_trigger(struct Parse *parser, const char *sql);
+
+/** Code given AST. */
+void
+sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql);
 
 /**
  * This routine is called after a single SQL statement has been
@@ -4288,7 +4283,6 @@ void *
 sqlParserAlloc(void *(*)(size_t));
 
 void sqlParserFree(void *, void (*)(void *));
-void sqlParser(void *, int, Token, Parse *);
 #ifdef YYTRACKMAXSTACKDEPTH
 int sqlParserStackPeak(void *);
 #endif
