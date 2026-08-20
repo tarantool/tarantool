@@ -25,7 +25,7 @@ test:plan(1)
 
 test:test("json", function(test)
     local serializer = require('json')
-    test:plan(82)
+    test:plan(83)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -313,6 +313,15 @@ test:test("json", function(test)
     test:is(err_msg,
             "Expected value but found invalid token on line 1 at character 1 here ' >> a'",
             'mem-leak test for .decode error with options')
+    --
+    -- gh-12726: Check that we used an original key while
+    -- iterating, not its serialized form.
+    --
+    local meta_obj = setmetatable({}, {__serialize = function()
+        return 'serialized'
+    end})
+    test:is(j.encode({[meta_obj] = 'value'}), '{"serialized":"value"}',
+            'encoding with serialized object as the key')
 end)
 
 os.exit(test:check() and 0 or 1)

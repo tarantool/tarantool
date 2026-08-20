@@ -319,7 +319,11 @@ static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
             comma = 1;
 
         struct luaL_field field;
-        luaL_checkfield(l, cfg, -2, &field);
+        /* Push a copy of the key on top of the stack. */
+        lua_pushvalue(l, -2);
+        /* const table, (table ?), key_idx, key, value, key */
+        luaL_checkfield(l, cfg, -3, &field);
+        /* const table, (table ?), key_idx, key_ser, value, key */
         switch (field.type) {
         case MP_UINT:
             strbuf_append_char(json, '"');
@@ -340,6 +344,8 @@ static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
             break;
         }
 
+        /* Replace the serialized key with the original form. */
+        lua_replace(l, -3);
         /* const table, (table ?), key_idx, key, value */
         json_append_data(l, cfg, current_depth, json);
         lua_pop(l, 1);
