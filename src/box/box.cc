@@ -4549,6 +4549,17 @@ private:
 	struct replica *replica_;
 };
 
+/** Check privileges and WAL mode before accepting a replica connection. */
+static void
+box_check_replica_connection_xc(void)
+{
+	access_check_universe_xc(PRIV_R);
+	if (wal_mode() == WAL_NONE) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
+			  "wal_mode = 'none'");
+	}
+}
+
 /**
  * A helper for replication endpoints to handle a connecting replica.
  * 1. Checks if the replica can be connected - replica has read permission
@@ -4564,14 +4575,7 @@ NODISCARD static ReplicaConnectionGuard
 box_connect_replica(const struct tt_uuid *uuid, const struct vclock *gc_vclock,
 		    struct replica **out)
 {
-	/* Check permissions */
-	access_check_universe_xc(PRIV_R);
-
-	/* Forbid replication with disabled WAL */
-	if (wal_mode() == WAL_NONE) {
-		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
-			  "wal_mode = 'none'");
-	}
+	box_check_replica_connection_xc();
 
 	/* No replica object with nil UUID. */
 	if (tt_uuid_is_nil(uuid)) {
@@ -4870,6 +4874,11 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 		struct replica *other = replica_by_name(req.instance_name);
 		if (other != NULL && other != replica &&
 		    replica_has_connections(other)) {
+			box_check_replica_connection_xc();
+			if (replica_try_rebootstrap(other,
+						    &req.instance_uuid)) {
+				tnt_raise(ClientError, ER_LOADING);
+			}
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));

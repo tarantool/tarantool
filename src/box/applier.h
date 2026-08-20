@@ -155,6 +155,11 @@ struct applier {
 	uint32_t instance_id;
 	/** Remote instance UUID */
 	struct tt_uuid uuid;
+	/**
+	 * Expected remote UUID of a pending replica rebootstrap check. Nil when
+	 * there is no pending check.
+	 */
+	struct tt_uuid expected_rebootstrap_uuid;
 	/** Remote URI (parsed) */
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
@@ -299,6 +304,13 @@ applier_free(void);
  */
 void
 applier_start(struct applier *applier);
+
+/**
+ * Restart an applier stopped by an unrecoverable error.
+ * The applier must be in APPLIER_STOPPED and its fiber must be dead.
+ */
+void
+applier_restart_stopped(struct applier *applier);
 
 /**
  * Stop a client.

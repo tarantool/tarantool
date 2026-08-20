@@ -577,6 +577,16 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Start checking that a stopped applier's URI belongs to a replica with the
+ * given new UUID, or report that the same check is still in progress. Return
+ * true if JOIN should be retried later and false if replica replacement must
+ * be rejected.
+ */
+bool
+replica_try_rebootstrap(struct replica *replica,
+			const struct tt_uuid *new_uuid);
+
+/**
  * Collects garbage of a replica that is gone for a while: removes associated
  * WAL GC state including persistent one and if the replica is anonymous, it
  * is deleted. If the replica is connected or does not exist, an error is
