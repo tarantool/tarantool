@@ -207,6 +207,10 @@ create_unit_test(PREFIX interval
                  SOURCES interval.c core_test_utils.c
                  LIBRARIES core unit
 )
+create_unit_test(PREFIX escape_inplace
+                 SOURCES escape_inplace.c core_test_utils.c
+                 LIBRARIES core unit
+)
 create_unit_test(PREFIX bps_tree
                  SOURCES bps_tree.cc
                  LIBRARIES unit small misc
