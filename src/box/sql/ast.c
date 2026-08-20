@@ -384,17 +384,11 @@ expr_var(struct Parse *parser, struct ast_expr *expr)
 	t.isReserved = false;
 	if (expr->len > 1) {
 		assert(expr->str[0] != '?');
-		if (!IdChar(expr->str[1])) {
-			diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-				 parser->line_count,
-				 expr->str - parser->zTail + 1,
-				 tt_cstr(expr->str, 1));
-			parser->is_aborted = true;
-			return NULL;
-		}
-		if (expr->str[0] == '#' && sqlIsdigit(expr->str[1])) {
-			diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN,
-				 parser->line_count, tt_cstr(expr->str, 1));
+		if (!IdChar(expr->str[1]) ||
+		    (expr->str[0] == '#' && sqlIsdigit(expr->str[1]))) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 tt_sprintf("Wrong bind variable name '%.*s'",
+					    expr->len, expr->str));
 			parser->is_aborted = true;
 			return NULL;
 		}
