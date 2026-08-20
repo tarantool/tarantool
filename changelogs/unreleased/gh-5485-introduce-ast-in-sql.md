@@ -14,3 +14,5 @@
   definition in `_trigger` as it was provided, without any changes (gh-5485).
 * Changed the description of the error that occurs when using bind
   variables in the definition of a view, function, or trigger (gh-5485).
+* The error for using `COLLATE` in `LIMIT` or `OFFSET` is now a semantic error
+  rather than a syntactic one (gh-5485).

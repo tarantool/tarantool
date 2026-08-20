@@ -88,9 +88,10 @@ end
 --
 g.test_3010_collate_after_limit = function(cg)
     cg.server:exec(function()
-        -- All of these tests should throw error "near "COLLATE": syntax error"
+        -- All of these tests should throw the "COLLATE cannot be used in LIMIT
+        -- and OFFSET" error.
         local _, err = box.execute("SELECT 1 LIMIT 1 COLLATE BINARY;")
-        local exp_err = "Syntax error at line 1 near 'COLLATE'"
+        local exp_err = "COLLATE cannot be used in LIMIT and OFFSET"
         t.assert_equals(err.message, exp_err)
         _, err = box.execute("SELECT 1 LIMIT 1 COLLATE BINARY OFFSET 1;")
         t.assert_equals(err.message, exp_err)
@@ -99,6 +100,17 @@ g.test_3010_collate_after_limit = function(cg)
         _, err = box.execute("SELECT 1 LIMIT 1, 1 COLLATE BINARY;")
         t.assert_equals(err.message, exp_err)
         _, err = box.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
+        t.assert_equals(err.message, exp_err)
+
+        _, err = box.execute("SELECT 1 LIMIT '1' COLLATE BINARY;")
+        t.assert_equals(err.message, exp_err)
+        _, err = box.execute("SELECT 1 LIMIT '1' COLLATE BINARY OFFSET 1;")
+        t.assert_equals(err.message, exp_err)
+        _, err = box.execute("SELECT 1 LIMIT '1' COLLATE BINARY, 1;")
+        t.assert_equals(err.message, exp_err)
+        _, err = box.execute("SELECT 1 LIMIT 1 OFFSET '1' COLLATE BINARY;")
+        t.assert_equals(err.message, exp_err)
+        _, err = box.execute("SELECT 1 LIMIT 1, '1' COLLATE BINARY;")
         t.assert_equals(err.message, exp_err)
 
         local cn = require('net.box').connect(box.cfg.listen)
