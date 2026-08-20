@@ -45,3 +45,12 @@ sqlTokenInit(struct Token *p, char *z)
 	p->z = z;
 	p->n = z == NULL ? 0 : strlen(z);
 }
+
+void
+sql_parser_context_create(struct sql_parser_context *ctx, struct region *region)
+{
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->region = region;
+	ctx->line = 1;
+	ctx->pos = 1;
+}

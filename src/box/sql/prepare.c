@@ -53,11 +53,19 @@ sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
 
-	sql_parse_statement(&sParse, zSql);
+	struct sql_ast *ast = sql_parse_statement(&sParse, zSql);
+	if (ast == NULL) {
+		sql_parser_destroy(&sParse);
+		return NULL;
+	}
+
+	sParse.explain = (int)ast->explain;
+	sql_code_ast(&sParse, ast, zSql);
 	if (sParse.is_aborted) {
 		sql_parser_destroy(&sParse);
 		return NULL;
 	}
+
 	assert(sParse.nQueryLoop == 0);
 
 	if (sParse.explain != 0) {
@@ -186,8 +194,6 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 {
 	memset(parser, 0, sizeof(struct Parse));
 	parser->sql_flags = sql_flags;
-	parser->line_count = 1;
-	parser->line_pos = 1;
 	region_create(&parser->region, &cord()->slabc);
 }
 

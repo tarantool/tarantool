@@ -762,8 +762,7 @@ sql_code_set_session(struct Parse *parser, struct Token *name,
 	sql_setting_set(parser, name, expr);
 }
 
-/** Code given AST. */
-static void
+void
 sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 {
 	if (parse->is_aborted)
@@ -886,10 +885,6 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 		}
 		sql_emit_show_create_table_one(parse, &ast->show_create_table);
 		break;
-	case SQL_AST_TRIGGER:
-	case SQL_AST_FUNCTION:
-	case SQL_AST_VIEW:
-		return;
 	default:
 		unreachable();
 	}
@@ -900,33 +895,31 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 /**
  * Run the parser on the given SQL string.
  *
- * @param pParse Parser context.
+ * @param region Region for memory allocation.
  * @param zSql SQL string.
  * @param seed_token Token type to feed before `zSql`, or 0.
  * @retval 0 on success.
  * @retval -1 on error.
  */
-static int
-sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
+struct sql_ast *
+sql_run_parser(struct region *region, const char *zSql, int seed_token)
 {
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
 	int tokenType;		/* type of the next token */
 	int lastTokenParsed = -1;	/* type of the previous token */
+	struct sql_parser_context ctx;
+	sql_parser_context_create(&ctx, region);
 
 	assert(zSql != 0);
-	pParse->zTail = zSql;
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->new_space == NULL);
-	assert(pParse->nVar == 0);
-	assert(pParse->pVList == 0);
 	struct Token last;
 	memset(&last, 0, sizeof(last));
 	if (seed_token != 0) {
 		last.z = zSql;
-		sqlParser(pEngine, seed_token, last, pParse);
+		sqlParser(pEngine, seed_token, last, &ctx);
 	}
 	while (1) {
 		assert(i >= 0);
@@ -939,7 +932,7 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 					 "SQL command length", i,
 					 SQL_MAX_SQL_LENGTH);
-				pParse->is_aborted = true;
+				ctx.is_aborted = true;
 				break;
 			}
 		} else {
@@ -959,44 +952,42 @@ sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 			       || tokenType == TK_ILLEGAL);
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-					 pParse->line_count, pParse->line_pos,
+					 ctx.line, ctx.pos,
 					 tt_cstr(last.z, last.n));
-				pParse->is_aborted = true;
+				ctx.is_aborted = true;
 				break;
 			}
 		} else if (tokenType == TK_LINEFEED) {
-			pParse->line_count++;
-			pParse->line_pos = 1;
+			ctx.line++;
+			ctx.pos = 1;
 			continue;
 		} else {
-			sqlParser(pEngine, tokenType, last, pParse);
+			sqlParser(pEngine, tokenType, last, &ctx);
 			lastTokenParsed = tokenType;
-			if (pParse->is_aborted)
+			if (ctx.is_aborted)
 				break;
 		}
-		pParse->line_pos += last.n;
+		ctx.pos += last.n;
 	}
 	sqlParserFree(pEngine, free);
-	if (pParse->is_aborted)
-		return -1;
-	pParse->explain = (int)pParse->ast->explain;
-	sql_code_ast(pParse, pParse->ast, pParse->zTail);
-	pParse->zTail = &zSql[i];
-	return pParse->is_aborted ? -1 : 0;
+	if (ctx.is_aborted)
+		return NULL;
+	return ctx.ast;
 }
 
-int
+struct sql_ast *
 sql_parse_statement(struct Parse *parser, const char *sql)
 {
-	return sql_run_parser(parser, sql, 0);
+	return sql_run_parser(&parser->region, sql, 0);
 }
 
 struct Expr *
 sql_parse_function(struct Parse *parser, const char *sql)
 {
-	if (sql_run_parser(parser, sql, TK_FUNCTION_ENTRY) != 0)
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_FUNCTION_ENTRY);
+	if (ast == NULL)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
 	assert(ast->type == SQL_AST_FUNCTION);
 	struct Expr *res = expr_from_ast(parser, ast->expr);
 	if (res != NULL && parser->nVar > 0) {
@@ -1012,9 +1003,10 @@ sql_parse_function(struct Parse *parser, const char *sql)
 struct Select *
 sql_parse_view(struct Parse *parser, const char *sql)
 {
-	if (sql_run_parser(parser, sql, TK_VIEW_ENTRY) != 0)
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_VIEW_ENTRY);
+	if (ast == NULL)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
 	assert(ast->type == SQL_AST_VIEW);
 	struct Select *res = select_from_ast(parser, ast->select);
 	if (res != NULL && parser->nVar > 0) {
@@ -1030,9 +1022,10 @@ sql_parse_view(struct Parse *parser, const char *sql)
 struct sql_trigger *
 sql_parse_trigger(struct Parse *parser, const char *sql)
 {
-	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_TRIGGER_ENTRY);
+	if (ast == NULL)
 		return NULL;
-	struct sql_ast *ast = &parser->ast;
 	assert(ast->type == SQL_AST_TRIGGER);
 	struct sql_trigger *res = sql_trigger_from_ast(parser, &ast->trigger);
 	if (res != NULL && parser->nVar > 0) {
