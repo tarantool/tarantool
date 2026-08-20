@@ -21,3 +21,6 @@
   the order of automatically generated index names (gh-5485).
 * Errors `SQL_PARSER_GENERIC_WITH_POS` and `SQL_SYNTAX_WITH_POS` are no longer
   used and were removed (gh-5485).
+* SQL now builds an internal AST for SQL queries before building the VDBE.
+  This affects the order of error detection - syntactic errors are now
+  always detected before semantic errors (gh-5485).
