@@ -80,10 +80,10 @@ struct func;
  * stuct Select and return it.
  *
  * @param expr Expression to parse.
- * @param expr_len Length of @an expr.
+ * @retval Expression on success, NULL otherwise.
  */
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len);
+sql_expr_compile(const char *expr);
 
 /**
  * This routine executes parser on 'CREATE VIEW ...' statement
@@ -420,10 +420,9 @@ sql_default_session_flags(void);
  * Entrypoint for fuzzing SQL engine.
  *
  * @param sql UTF-8 encoded SQL statement.
- * @param sql_len Length of @sql in bytes.
  */
 int
-sql_fuzz(const char *sql, int bytes_count);
+sql_fuzz(const char *sql);
 #endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 
 #if defined(__cplusplus)

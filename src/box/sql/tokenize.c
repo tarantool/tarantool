@@ -39,11 +39,8 @@
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 
-#include "box/session.h"
-#include "box/schema.h"
 #include "say.h"
 #include "sqlInt.h"
-#include "tarantoolInt.h"
 
 /* Character classes for tokenizing
  *
@@ -441,40 +438,6 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	return i;
 }
 
-/**
- * This function is called to release parsing artifacts
- * during table creation or column addition. The only objects
- * allocated using malloc are index defs.
- * Note that this functions can't be called on ordinary
- * space object. It's purpose is to clean-up parser->new_space.
- *
- * @param parser Parser context.
- */
-static void
-parser_space_delete(struct Parse *parser)
-{
-	struct space *space = parser->create_column_def.space;
-	if (space == NULL)
-		return;
-	assert(space->def->opts.is_ephemeral);
-	uint32_t i = 0;
-	/*
-	 * If create_table_def.new_space is NULL,
-	 * the query is ALTER TABLE ADD COLUMNS.
-	 */
-	if (parser->create_table_def.new_space == NULL) {
-		/*
-		 * Don't delete already existing defs and start from new
-		 * ones.
-		 */
-		struct space *altered_space = space_by_name0(space->def->name);
-		if (altered_space != NULL)
-			i = altered_space->index_count;
-	}
-	for (; i < space->index_count; ++i)
-		index_def_delete(space->index[i]->def);
-}
-
 static void *
 new_xmalloc(size_t n)
 {
@@ -509,7 +472,7 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}
-	if (!parse->is_aborted && !parse->parse_only)
+	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
 		sql_finish_coding(parse);
 }
 
@@ -518,11 +481,12 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
  *
  * @param pParse Parser context.
  * @param zSql SQL string.
+ * @param seed_token Token type to feed before `zSql`, or 0.
  * @retval 0 on success.
  * @retval -1 on error.
  */
-int
-sqlRunParser(Parse * pParse, const char *zSql)
+static int
+sql_run_parser(struct Parse *pParse, const char *zSql, int seed_token)
 {
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
@@ -534,18 +498,23 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->create_table_def.new_space == NULL);
+	assert(pParse->new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
+	struct Token last;
+	memset(&last, 0, sizeof(last));
+	if (seed_token != 0) {
+		last.z = zSql;
+		sqlParser(pEngine, seed_token, last, pParse);
+	}
 	while (1) {
 		assert(i >= 0);
 		if (zSql[i] != 0) {
-			pParse->sLastToken.z = &zSql[i];
-			pParse->sLastToken.n =
-			    sql_token(&zSql[i], &tokenType,
-				      &pParse->sLastToken.isReserved);
-			i += pParse->sLastToken.n;
+			last.z = &zSql[i];
+			last.n = sql_token(&zSql[i], &tokenType,
+					   &last.isReserved);
+			i += last.n;
 			if (i > SQL_MAX_SQL_LENGTH) {
 				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 					 "SQL command length", i,
@@ -571,8 +540,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
 					 pParse->line_count, pParse->line_pos,
-					 tt_cstr(pParse->sLastToken.z,
-						 pParse->sLastToken.n));
+					 tt_cstr(last.z, last.n));
 				pParse->is_aborted = true;
 				break;
 			}
@@ -581,93 +549,75 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			pParse->line_pos = 1;
 			continue;
 		} else {
-			sqlParser(pEngine, tokenType, pParse->sLastToken,
-				      pParse);
+			sqlParser(pEngine, tokenType, last, pParse);
 			lastTokenParsed = tokenType;
 			if (pParse->is_aborted)
 				break;
 		}
-		pParse->line_pos += pParse->sLastToken.n;
+		pParse->line_pos += last.n;
 	}
 	sql_code_ast(pParse, &pParse->ast);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
-	if (pParse->pVdbe != NULL && pParse->is_aborted) {
-		sqlVdbeDelete(pParse->pVdbe);
-		pParse->pVdbe = 0;
-	}
-	parser_space_delete(pParse);
-
-	if (pParse->pWithToFree)
-		sqlWithDelete(pParse->pWithToFree);
-	sql_xfree(pParse->pVList);
 	return pParse->is_aborted ? -1 : 0;
 }
 
-struct Expr *
-sql_expr_compile(const char *expr, int expr_len)
+int
+sql_parse_statement(struct Parse *parser, const char *sql)
 {
-	const char *outer = "FUNCTION ";
-	int len = strlen(outer) + expr_len;
+	return sql_run_parser(parser, sql, 0);
+}
 
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	/*
-	 * Since SELECT token is added to the original expression,
-	 * to make error message display correct position we should
-	 * account its length.
-	 */
-	parser.line_pos -= strlen(outer);
-	parser.parse_only = true;
-	parser.is_expr = true;
-
-	struct Expr *expression = NULL;
-	char *stmt = xregion_alloc(&parser.region, len + 1);
-	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
-
-	if (sqlRunParser(&parser, stmt) == 0) {
-		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
-		expression = parser.parsed_ast.expr;
-		parser.parsed_ast.expr = NULL;
+struct Expr *
+sql_parse_function(struct Parse *parser, const char *sql)
+{
+	if (sql_run_parser(parser, sql, TK_FUNCTION_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_EXPR);
+	struct Expr *res = parser->parsed_ast.expr;
+	parser->parsed_ast.expr = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in functions");
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
 	}
-	sql_parser_destroy(&parser);
-	return expression;
+	return res;
 }
 
 struct Select *
-sql_view_compile(const char *view_stmt)
+sql_parse_view(struct Parse *parser, const char *sql)
 {
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-
-	struct Select *select = NULL;
-
-	if (sqlRunParser(&parser, view_stmt) != 0 ||
-	    parser.parsed_ast_type != AST_TYPE_SELECT) {
-		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
-	} else {
-		select = parser.parsed_ast.select;
-		parser.parsed_ast.select = NULL;
+	if (sql_run_parser(parser, sql, TK_VIEW_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_SELECT);
+	struct Select *res = parser->parsed_ast.select;
+	parser->parsed_ast.select = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
+		parser->is_aborted = true;
+		sql_select_delete(res);
+		return NULL;
 	}
-
-	sql_parser_destroy(&parser);
-	return select;
+	return res;
 }
 
 struct sql_trigger *
-sql_trigger_compile(const char *sql)
+sql_parse_trigger(struct Parse *parser, const char *sql)
 {
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-	struct sql_trigger *trigger = NULL;
-	if (sqlRunParser(&parser, sql) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
-		trigger = parser.parsed_ast.trigger;
-		parser.parsed_ast.trigger = NULL;
+	if (sql_run_parser(parser, sql, TK_TRIGGER_ENTRY) != 0)
+		return NULL;
+	assert(parser->parsed_ast_type == AST_TYPE_TRIGGER);
+	struct sql_trigger *res = parser->parsed_ast.trigger;
+	parser->parsed_ast.trigger = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in triggers");
+		parser->is_aborted = true;
+		sql_trigger_delete(res);
+		return NULL;
 	}
-
-	sql_parser_destroy(&parser);
-	return trigger;
+	return res;
 }

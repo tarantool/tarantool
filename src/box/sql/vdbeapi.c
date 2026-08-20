@@ -39,39 +39,11 @@
 #include "vdbeInt.h"
 #include "box/session.h"
 
-/*
- * Invoke the profile callback.  This routine is only called if we already
- * know that the profile callback is defined and needs to be invoked.
- */
-static SQL_NOINLINE void
-invokeProfileCallback(struct Vdbe *p)
-{
-	struct sql *db = sql_get();
-	sql_int64 iNow;
-	sql_int64 iElapse;
-	assert(p->startTime > 0);
-	assert(db->xProfile != 0 || (db->mTrace & SQL_TRACE_PROFILE) != 0);
-	assert(db->init.busy == 0);
-	assert(p->zSql != 0);
-	sqlOsCurrentTimeInt64(db->pVfs, &iNow);
-	iElapse = (iNow - p->startTime) * 1000000;
-	if (db->xProfile) {
-		db->xProfile(db->pProfileArg, p->zSql, iElapse);
-	}
-	if (db->mTrace & SQL_TRACE_PROFILE) {
-		db->xTrace(SQL_TRACE_PROFILE, db->pTraceArg, p,
-			   (void *)&iElapse);
-	}
-	p->startTime = 0;
-}
-
 int
 sql_stmt_finalize(struct Vdbe *v)
 {
 	if (v == NULL)
 		return 0;
-	if (v->startTime > 0)
-		invokeProfileCallback(v);
 	return sqlVdbeFinalize(v);
 }
 
@@ -79,8 +51,6 @@ int
 sql_stmt_reset(struct Vdbe *v)
 {
 	assert(v != NULL);
-	if (v->startTime > 0)
-		invokeProfileCallback(v);
 	int rc = sqlVdbeReset(v);
 	sqlVdbeRewind(v);
 	return rc;
@@ -116,13 +86,6 @@ sqlStep(Vdbe * p)
 		return -1;
 	}
 	if (p->pc < 0) {
-		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0)
-		    && !db->init.busy && p->zSql) {
-			sqlOsCurrentTimeInt64(db->pVfs, &p->startTime);
-		} else {
-			assert(p->startTime == 0);
-		}
-
 		db->nVdbeActive++;
 		p->pc = 0;
 	}
@@ -133,10 +96,6 @@ sqlStep(Vdbe * p)
 		rc = sqlVdbeExec(p);
 		db->nVdbeExec--;
 	}
-
-	/* If the statement completed successfully, invoke the profile callback */
-	if (rc != SQL_ROW && p->startTime > 0)
-		invokeProfileCallback(p);
 
 	if (rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare(), and an

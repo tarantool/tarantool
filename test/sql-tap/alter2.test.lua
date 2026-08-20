@@ -188,7 +188,7 @@ test:do_catchsql_test(
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY REFERENCES child(id);
     ]], {
         -- <alter2-4.1>
-        1, "At line 1 at or near position 57: keyword 'REFERENCES' is reserved. Please use double quotes if 'REFERENCES' is an identifier."
+        1, "Syntax error at line 1 near 'REFERENCES'"
         -- </alter2-4.1>
     })
 

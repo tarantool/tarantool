@@ -272,7 +272,11 @@ const struct Mem *
 vdbe_get_bound_value(struct Vdbe *vdbe, int id);
 
 void sqlVdbeCountChanges(Vdbe *);
-void sqlVdbeSetSql(Vdbe *, const char *z, int n);
+
+/** Remember the SQL string for a prepared statement. */
+void
+sqlVdbeSetSql(struct Vdbe *vdbe, const char *z);
+
 void sqlVdbeSwap(Vdbe *, Vdbe *);
 
 struct VdbeOp *

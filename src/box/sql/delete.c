@@ -82,31 +82,25 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 }
 
 void
-sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
+sql_table_truncate(struct Parse *parse, struct Token *table)
 {
-	assert(tab_list->nSrc == 1);
-
 	struct Vdbe *v = sqlGetVdbe(parse);
-	const struct space *space = sql_space_by_src(&tab_list->a[0]);
+	const struct space *space = sql_space_by_token(table);
 	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_list->a[0].zName);
-		goto tarantool_error;
+		diag_set(ClientError, ER_NO_SUCH_SPACE,
+			 sql_tt_name_from_token(table));
+		parse->is_aborted = true;
+		return;
 	}
 	if (space->def->opts.is_view) {
 		const char *err_msg =
 			tt_sprintf("can not truncate space '%s' because space "\
 				   "is a view", space->def->name);
 		diag_set(ClientError, ER_SQL_EXECUTE, err_msg);
-		goto tarantool_error;
+		parse->is_aborted = true;
+		return;
 	}
 	sqlVdbeAddOp2(v, OP_Clear, space->def->id, true);
-	sqlSrcListDelete(tab_list);
-	return;
-
-tarantool_error:
-	parse->is_aborted = true;
-	sqlSrcListDelete(tab_list);
-	return;
 }
 
 void

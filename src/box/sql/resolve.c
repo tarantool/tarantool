@@ -1238,7 +1238,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			if (sqlResolveExprNames(&sNC, item->pExpr) != 0)
 				return WRC_Abort;
 			if ((sNC.ncFlags & NC_HasAgg) == 0 &&
-			    !sqlExprIsConstantOrFunction(item->pExpr, 0)) {
+			    !sqlExprIsConstantOrFunction(item->pExpr)) {
 				is_all_select_agg = false;
 				sNC.ncFlags |= has_agg_flag;
 				break;
@@ -1574,9 +1574,9 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 		return;
 	}
 
-	/* Fake SrcList for parser->create_table_def */
+	/* Fake SrcList for parser->new_space */
 	SrcList sSrc;
-	/* Name context for parser->create_table_def  */
+	/* Name context for parser->new_space  */
 	NameContext sNC;
 
 	memset(&sNC, 0, sizeof(sNC));

@@ -59,154 +59,127 @@ sqlDeleteTriggerStep(struct TriggerStep *pTriggerStep)
 	}
 }
 
-void
-sql_trigger_begin(struct Parse *parse)
+/**
+ * Return the space ID by name.
+ *
+ * Note that this function uses the exported API rather than getting
+ * the space ID directly from BOX.
+ */
+static uint32_t
+sql_space_id_by_token(struct Token *table)
+{
+	char *name = sql_name_from_token(table);
+	uint32_t space_id = box_space_id_by_name(name, strlen(name));
+	sql_xfree(name);
+	if (space_id != BOX_ID_NIL || table->z[0] == '"')
+		return space_id;
+	char *old_name = sql_legacy_name_new(table->z, table->n);
+	space_id = box_space_id_by_name(old_name, strlen(old_name));
+	sql_xfree(old_name);
+	return space_id;
+}
+
+struct sql_trigger *
+sql_trigger_new(struct Parse *parser, struct Token *name, struct Token *table,
+		uint8_t time, uint8_t event, struct IdList *columns,
+		struct Expr *when, struct TriggerStep *step_list)
 {
 	/* The new trigger. */
 	struct sql_trigger *trigger = NULL;
-	struct create_trigger_def *trigger_def = &parse->create_trigger_def;
-	struct create_entity_def *create_def = &trigger_def->base;
-	struct alter_entity_def *alter_def = &create_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
-	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
 
 	char *trigger_name = NULL;
-	if (alter_def->entity_name == NULL)
-		goto trigger_cleanup;
-	assert(alter_def->entity_name->nSrc == 1);
-	assert(create_def->name.n > 0);
-	trigger_name = sql_name_from_token(&create_def->name);
-	if (sqlCheckIdentifierName(parse, trigger_name) != 0)
-		goto trigger_cleanup;
+	assert(name->n > 0);
+	trigger_name = sql_name_from_token(name);
+	if (sqlCheckIdentifierName(parser, trigger_name) != 0)
+		goto error;
 
-	const char *table_name = alter_def->entity_name->a[0].zName;
-	uint32_t space_id = box_space_id_by_name(table_name,
-						 strlen(table_name));
-	if (space_id == BOX_ID_NIL &&
-	    alter_def->entity_name->a[0].legacy_name != NULL) {
-		char *old_name = alter_def->entity_name->a[0].legacy_name;
-		space_id = box_space_id_by_name(old_name, strlen(old_name));
-	}
+	uint32_t space_id = sql_space_id_by_token(table);
 	if (space_id == BOX_ID_NIL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
-		goto set_tarantool_error_and_cleanup;
-	}
-
-	if (!parse->parse_only) {
-		struct Vdbe *v = sqlGetVdbe(parse);
-		sqlVdbeCountChanges(v);
-		int name_reg = ++parse->nMem;
-		sqlVdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
-			      sql_xstrdup(trigger_name), P4_DYNAMIC);
-		bool no_err = create_def->if_not_exist;
-		vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
-						  name_reg, 1,
-						  ER_TRIGGER_EXISTS,
-						  trigger_name, (no_err != 0),
-						  OP_NoConflict);
+		diag_set(ClientError, ER_NO_SUCH_SPACE,
+			 sql_tt_name_from_token(table));
+		parser->is_aborted = true;
+		goto error;
 	}
 
 	/* Build the Trigger object. */
 	trigger = sql_xmalloc0(sizeof(struct sql_trigger));
 	trigger->space_id = space_id;
 	trigger->zName = trigger_name;
-	trigger_name = NULL;
-	assert(trigger_def->op == TK_INSERT || trigger_def->op == TK_UPDATE ||
-	       trigger_def->op== TK_DELETE);
-	trigger->op = (u8) trigger_def->op;
-	trigger->tr_tm = trigger_def->tr_tm;
-	trigger->pWhen = sqlExprDup(trigger_def->when, EXPRDUP_REDUCE);
-	trigger->pColumns = sqlIdListDup(trigger_def->cols);
-	if ((trigger->pWhen != NULL && trigger->pWhen == NULL) ||
-	    (trigger->pColumns != NULL && trigger->pColumns == NULL))
-		goto trigger_cleanup;
-	assert(parse->parsed_ast.trigger == NULL);
-	parse->parsed_ast.trigger = trigger;
-	parse->parsed_ast_type = AST_TYPE_TRIGGER;
+	assert(event == TK_INSERT || event == TK_UPDATE || event == TK_DELETE);
+	trigger->op = event;
+	trigger->tr_tm = time;
+	trigger->pWhen = sqlExprDup(when, EXPRDUP_REDUCE);
+	trigger->pColumns = sqlIdListDup(columns);
+	trigger->step_list = step_list;
+	sqlIdListDelete(columns);
+	sql_expr_delete(when);
+	return trigger;
 
- trigger_cleanup:
+error:
+	sqlDeleteTriggerStep(step_list);
 	sql_xfree(trigger_name);
-	sqlSrcListDelete(alter_def->entity_name);
-	sqlIdListDelete(trigger_def->cols);
-	sql_expr_delete(trigger_def->when);
-	if (parse->parsed_ast.trigger == NULL)
-		sql_trigger_delete(trigger);
-	else
-		assert(parse->parsed_ast.trigger == trigger);
-
-	return;
-
-set_tarantool_error_and_cleanup:
-	parse->is_aborted = true;
-	goto trigger_cleanup;
+	sqlIdListDelete(columns);
+	sql_expr_delete(when);
+	return NULL;
 }
 
 void
-sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
-		   struct Token *token)
+vdbe_emit_create_trigger(struct Parse *parser, const char *sql,
+			 struct Token *name, struct Token *table,
+			 bool if_not_exists)
 {
-	/* Trigger being finished. */
-	struct sql_trigger *trigger = parse->parsed_ast.trigger;
-
-	parse->parsed_ast.trigger = NULL;
-	if (NEVER(parse->is_aborted) || trigger == NULL)
-		goto cleanup;
-	char *trigger_name = trigger->zName;
-	trigger->step_list = step_list;
-	while (step_list != NULL) {
-		step_list = step_list->pNext;
+	uint32_t space_id = sql_space_id_by_token(table);
+	if (space_id == BOX_ID_NIL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE,
+			 sql_tt_name_from_token(table));
+		parser->is_aborted = true;
+		return;
 	}
-
-	/* Trigger name for error reporting. */
-	struct Token trigger_name_token;
-	sqlTokenInit(&trigger_name_token, trigger->zName);
 
 	/*
-	 * Generate byte code to insert a new trigger into
-	 * Tarantool for non-parsing mode or export trigger.
+	 * Generate byte code to insert a new trigger into Tarantool
+	 * for non-parsing mode or export trigger.
 	 */
-	if (!parse->parse_only) {
-		/* Make an entry in the _trigger space. */
-		struct Vdbe *v = sqlGetVdbe(parse);
-
-		char *sql_str = sqlMPrintf("CREATE TRIGGER %s", token->z);
-
-		int first_col = parse->nMem + 1;
-		parse->nMem += 3;
-		int record = ++parse->nMem;
-		int sql_str_len = strlen(sql_str);
-		int sql_len = strlen("sql");
-
-		uint32_t opts_buff_sz = mp_sizeof_map(1) +
-					mp_sizeof_str(sql_len) +
-					mp_sizeof_str(sql_str_len);
-		char *opts_buff = sql_xmalloc(opts_buff_sz);
-		char *data = mp_encode_map(opts_buff, 1);
-		data = mp_encode_str(data, "sql", sql_len);
-		data = mp_encode_str(data, sql_str, sql_str_len);
-		sql_xfree(sql_str);
-
-		sqlVdbeAddOp4(v, OP_String8, 0, first_col, 0,
-			      sql_xstrdup(trigger_name), P4_DYNAMIC);
-		sqlVdbeAddOp2(v, OP_Integer, trigger->space_id,
-				  first_col + 1);
-		sqlVdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
-				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
-		sqlVdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
-		int reg = ++parse->nMem;
-		sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_TRIGGER_ID);
-		sqlVdbeAddOp2(v, OP_IdxInsert, record, reg);
-		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
-	} else {
-		parse->parsed_ast.trigger = trigger;
-		parse->parsed_ast_type = AST_TYPE_TRIGGER;
-		trigger = NULL;
+	struct Vdbe *v = sqlGetVdbe(parser);
+	char *trigger_name = sql_name_from_token(name);
+	if (sqlCheckIdentifierName(parser, trigger_name) != 0) {
+		sql_xfree(trigger_name);
+		return;
 	}
 
-cleanup:
-	sql_trigger_delete(trigger);
-	assert(parse->parsed_ast.trigger == NULL || parse->parse_only);
-	sqlDeleteTriggerStep(step_list);
+	/* Check that there is no trigger with the same name. */
+	sqlVdbeCountChanges(v);
+	int name_reg = ++parser->nMem;
+	sqlVdbeAddOp4(parser->pVdbe, OP_String8, 0, name_reg, 0, trigger_name,
+		      P4_DYNAMIC);
+	vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0, name_reg,
+					  1, ER_TRIGGER_EXISTS, trigger_name,
+					  if_not_exists, OP_NoConflict);
+
+	int first_col = parser->nMem + 1;
+	parser->nMem += 3;
+	int record = ++parser->nMem;
+	int sql_str_len = strlen(sql);
+	int sql_len = strlen("sql");
+
+	uint32_t opts_buff_sz = mp_sizeof_map(1) +
+				mp_sizeof_str(sql_len) +
+				mp_sizeof_str(sql_str_len);
+	char *opts_buff = sql_xmalloc(opts_buff_sz);
+	char *data = mp_encode_map(opts_buff, 1);
+	data = mp_encode_str(data, "sql", sql_len);
+	data = mp_encode_str(data, sql, sql_str_len);
+
+	sqlVdbeAddOp4(v, OP_String8, 0, first_col, 0, sql_xstrdup(trigger_name),
+		      P4_DYNAMIC);
+	sqlVdbeAddOp2(v, OP_Integer, space_id, first_col + 1);
+	sqlVdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
+		      SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
+	sqlVdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
+	int reg = ++parser->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_TRIGGER_ID);
+	sqlVdbeAddOp2(v, OP_IdxInsert, record, reg);
+	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }
 
 struct TriggerStep *
@@ -326,28 +299,18 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 }
 
 void
-sql_drop_trigger(struct Parse *parser)
+sql_drop_trigger(struct Parse *parser, struct Token *name, bool if_exists)
 {
-	struct drop_entity_def *drop_def = &parser->drop_trigger_def.base;
-	struct alter_entity_def *alter_def = &drop_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
-	assert(alter_def->alter_action == ALTER_ACTION_DROP);
-	struct SrcList *name = alter_def->entity_name;
-	bool no_err = drop_def->if_exist;
-
 	struct Vdbe *v = sqlGetVdbe(parser);
 	sqlVdbeCountChanges(v);
 
-	assert(name->nSrc == 1);
-	const char *trigger_name = name->a[0].zName;
+	const char *trigger_name = sql_name_from_token(name);
 	int name_reg = ++parser->nMem;
-	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, sql_xstrdup(trigger_name),
-		      P4_DYNAMIC);
+	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, trigger_name, P4_DYNAMIC);
 	vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0, name_reg,
 					  1, ER_NO_SUCH_TRIGGER, trigger_name,
-					  no_err, OP_Found);
+					  if_exists, OP_Found);
 	vdbe_code_drop_trigger(parser, trigger_name, true);
-	sqlSrcListDelete(name);
 }
 
 int
@@ -696,7 +659,6 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	pProgram->token = (void *)trigger;
 	pPrg->column_mask[0] = pSubParse->oldmask;
 	pPrg->column_mask[1] = pSubParse->newmask;
-	sqlVdbeDelete(v);
 
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
 	sql_parser_destroy(pSubParse);
