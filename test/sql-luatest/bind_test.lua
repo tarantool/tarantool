@@ -219,3 +219,19 @@ g.test_4566_bind_variable_LIKE_argument_resulted_to_crash = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure the "invalid bind variable name" error is not reported as
+-- a syntax error.
+--
+g.test_bind_varbinary_wrong_name_error = function(cg)
+    cg.server:exec(function()
+        local _, err = box.execute([[SELECT : a;]])
+        local exp_err = "Wrong bind variable name ': a'"
+        t.assert_equals(err.message, exp_err)
+
+        _, err = box.execute([[SELECT #1;]])
+        exp_err = "Wrong bind variable name '#1'"
+        t.assert_equals(err.message, exp_err)
+    end)
+end
