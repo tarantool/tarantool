@@ -80,6 +80,20 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 			sqlSrcListFuncArgs(res, func_args);
 		}
 		res->a[res->nSrc - 1].fg.jointype = src->join_type;
+		if ((src->join_type & JT_INNER) != 0 &&
+		    (src->join_type & JT_OUTER) != 0) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 "JOIN cannot be both OUTER and INNER");
+			parser->is_aborted = true;
+			break;
+		}
+		if ((src->join_type & JT_OUTER) != 0 &&
+		    (src->join_type & (JT_LEFT | JT_RIGHT)) != JT_LEFT) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+				 "RIGHT and FULL OUTER JOINs");
+			parser->is_aborted = true;
+			break;
+		}
 	}
 	if (parser->is_aborted) {
 		sqlSrcListDelete(res);
@@ -103,6 +117,8 @@ ast_select_new(struct Parse *parser)
 static struct Select *
 select_from_ast_single(struct Parse *parser, struct ast_select *select)
 {
+	if (select->op != TK_SELECT && select->op != TK_ALL)
+		parser->hasCompound = 1;
 	struct SrcList *list = src_list_from_ast(parser, select->sources);
 	struct Expr *where = expr_from_ast(parser, select->where);
 	struct Expr *having = expr_from_ast(parser, select->having);

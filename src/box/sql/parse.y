@@ -470,8 +470,6 @@ selectnowith(A) ::= selectnowith(X) multiselect_op(Y) oneselect(Z).  {
   X->flags |= SF_Compound;
   X->flags &= ~SF_MultiValue;
   rlist_add(&X->link, &A->link);
-  if(Y != TK_ALL)
-    pParse->hasCompound = 1;
 }
 %type multiselect_op {uint8_t}
 multiselect_op(A) ::= UNION(OP).             {A = @OP; /*A-overwrites-OP*/}
@@ -658,16 +656,38 @@ fullname(A) ::= nm(X). {
 }
 
 %type joinop {int}
-join_nm(A) ::= id(A).
-join_nm(A) ::= JOIN_KW(A).
+joinop(A) ::= COMMA|JOIN. {
+  A = JT_INNER;
+}
+joinop(X) ::= join_type(A) JOIN. {
+  X = A;
+}
+joinop(X) ::= join_type(A) join_type(B) JOIN. {
+  X = A | B;
+}
+joinop(X) ::= join_type(A) join_type(B) join_type(C) JOIN. {
+  X = A | B | C;
+}
 
-joinop(X) ::= COMMA|JOIN.              { X = JT_INNER; }
-joinop(X) ::= JOIN_KW(A) JOIN.
-                  {X = sqlJoinType(pParse,&A,0,0);  /*X-overwrites-A*/}
-joinop(X) ::= JOIN_KW(A) join_nm(B) JOIN.
-                  {X = sqlJoinType(pParse,&A,&B,0); /*X-overwrites-A*/}
-joinop(X) ::= JOIN_KW(A) join_nm(B) join_nm(C) JOIN.
-                  {X = sqlJoinType(pParse,&A,&B,&C);/*X-overwrites-A*/}
+%type join_type {int}
+join_type(A) ::= CROSS. {
+  A = JT_INNER | JT_CROSS;
+}
+join_type(A) ::= INNER. {
+  A = JT_INNER;
+}
+join_type(A) ::= LEFT. {
+  A = JT_LEFT | JT_OUTER;
+}
+join_type(A) ::= NATURAL. {
+  A = JT_NATURAL;
+}
+join_type(A) ::= OUTER. {
+  A = JT_OUTER;
+}
+join_type(A) ::= RIGHT. {
+  A = JT_RIGHT | JT_OUTER;
+}
 
 %type on_opt {struct ast_expr *}
 on_opt(N) ::= ON expr(E). {
@@ -899,7 +919,7 @@ expr(A) ::= LP(B) expr(X) RP(E). {
 expr(A) ::= id(X). {
   A = ast_expr_new(pParse, X.z, X.n, TK_ID);
 }
-expr(A) ::= JOIN_KW(X). {
+expr(A) ::= CROSS|INNER|LEFT|NATURAL|OUTER|RIGHT(X). {
   A = ast_expr_new(pParse, X.z, X.n, TK_ID);
 }
 expr(A) ::= nm(X) DOT nm(Y). {
@@ -1410,20 +1430,6 @@ trigger_cmd_list(A) ::= trigger_cmd(A) SEMI. {
   A->pLast = A;
 }
 
-// Disallow qualified table names on INSERT, UPDATE, and DELETE statements
-// within a trigger.  The table to INSERT, UPDATE, or DELETE is always in 
-// the same database as the table that the trigger fires on.
-//
-%type trnm {Token}
-trnm(A) ::= nm(A).
-trnm(A) ::= nm DOT nm(X). {
-  A = X;
-  diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS, pParse->line_count,
-           pParse->line_pos, "qualified table names are not allowed on INSERT, "
-           "UPDATE, and DELETE statements within triggers");
-  pParse->is_aborted = true;
-}
-
 // Disallow the INDEX BY and NOT INDEXED clauses on UPDATE and DELETE
 // statements within triggers.  We make a specific error message for this
 // since it is an exception to the default grammar rules.
@@ -1448,7 +1454,7 @@ tridxby ::= NOT INDEXED. {
 %destructor trigger_cmd {sqlDeleteTriggerStep($$);}
 // UPDATE 
 trigger_cmd(A) ::=
-   UPDATE orconf(R) trnm(X) tridxby SET setlist(Y) where_opt_old(Z). {
+   UPDATE orconf(R) nm(X) tridxby SET setlist(Y) where_opt_old(Z). {
      A = sql_trigger_update_step(&X, Y, Z, R);
      if (A == NULL) {
         pParse->is_aborted = true;
@@ -1457,17 +1463,17 @@ trigger_cmd(A) ::=
    }
 
 // INSERT
-trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select_old(S). {
+trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) select_old(S). {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, S, R);
 }
-trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) DEFAULT VALUES. {
+trigger_cmd(A) ::= insert_cmd(R) INTO nm(X) idlist_opt(F) DEFAULT VALUES. {
   /*A-overwrites-R. */
   A = sql_trigger_insert_step(&X, F, NULL, R);
 }
 
 // DELETE
-trigger_cmd(A) ::= DELETE FROM trnm(X) tridxby where_opt_old(Y). {
+trigger_cmd(A) ::= DELETE FROM nm(X) tridxby where_opt_old(Y). {
   A = sql_trigger_delete_step(&X, Y);
 }
 
@@ -1503,70 +1509,55 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
-%include {
-  struct alter_args {
-    struct SrcList *table_name;
-    /** Name of constraint OR new name of table in case of RENAME. */
-    struct Token name;
-  };
-}
-
-%type alter_table_start {struct SrcList *}
-alter_table_start(A) ::= ALTER TABLE fullname(T) . { A = T; }
-
-%type alter_add_constraint {struct alter_args}
-alter_add_constraint(A) ::= alter_table_start(T) ADD CONSTRAINT nm(N). {
-   A.table_name = T;
-   A.name = N;
-   pParse->initiateTTrans = true;
- }
-
-%type alter_add_column {struct alter_args}
-alter_add_column(A) ::= alter_table_start(T) ADD column_name(N). {
-  A.table_name = T;
-  A.name = N;
-  pParse->initiateTTrans = true;
-}
-
 column_name(N) ::= COLUMN nm(A). { N = A; }
 column_name(N) ::= nm(A). { N = A; }
 
 cmd ::= alter_column_def carglist create_column_end.
 
-alter_column_def ::= alter_add_column(N) typedef(Y). {
-  create_column_def_init(&pParse->create_column_def, N.table_name, &N.name, Y);
+alter_column_def ::= ALTER TABLE nm(T) ADD column_name(N) typedef(Y). {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_column_def_init(&pParse->create_column_def, table, &N, Y);
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
   sql_create_column_start(pParse);
 }
 
-cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
-        nm(T) eidlist_opt(TA). {
-  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA);
+cmd ::= ALTER TABLE nm(X) ADD CONSTRAINT nm(N) FOREIGN KEY
+        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA). {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &X);
+  create_fk_def_init(&pParse->create_fk_def, table, &N, FA, &T, TA);
   sql_create_foreign_key(pParse);
 }
 
-cmd ::= alter_add_constraint(N) CHECK LP expr_old(X) RP. {
-    create_ck_def_init(&pParse->create_ck_def, N.table_name, &N.name, &X);
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) CHECK LP expr_old(X) RP. {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_ck_def_init(&pParse->create_ck_def, table, &N, &X);
     sql_create_check_contraint(pParse, false);
 }
 
-cmd ::= alter_add_constraint(N) UNIQUE LP sortlist_old(X) RP. {
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-                        SORT_ORDER_ASC, false);
-  sql_create_index(pParse);
-}
-
-cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist_autoinc(X) RP. {
-  struct ExprList *columns = expr_list_from_ast(pParse, X);
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name,
-                        columns, SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC,
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) UNIQUE LP sortlist_old(X) RP. {
+  pParse->initiateTTrans = true;
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_index_def_init(&pParse->create_index_def, table, &N, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
                         false);
   sql_create_index(pParse);
 }
 
-cmd ::= alter_table_start(A) RENAME TO nm(N). {
+cmd ::= ALTER TABLE nm(T) ADD CONSTRAINT nm(N) PRIMARY KEY
+        LP sortlist_autoinc(X) RP. {
+  pParse->initiateTTrans = true;
+  struct ExprList *columns = expr_list_from_ast(pParse, X);
+  struct SrcList *table = sql_src_list_append(NULL, &T);
+  create_index_def_init(&pParse->create_index_def, table, &N, columns,
+                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
+  sql_create_index(pParse);
+}
+
+cmd ::= ALTER TABLE fullname(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);
     pParse->initiateTTrans = true;
     sql_alter_table_rename(pParse);
@@ -1647,22 +1638,21 @@ typedef(A) ::= ARRAY . { A = FIELD_TYPE_ARRAY; }
 typedef(A) ::= MAP . { A = FIELD_TYPE_MAP; }
 typedef(A) ::= DATETIME . { A = FIELD_TYPE_DATETIME; }
 typedef(A) ::= INTERVAL . { A = FIELD_TYPE_INTERVAL; }
-
-char_len(A) ::= LP INTEGER(B) RP . {
-  (void) A;
-  (void) B;
-}
-
-%type char_len {int}
-typedef(A) ::= VARCHAR char_len(B) . {
+typedef(A) ::= VARCHAR LP INTEGER RP . {
   A = FIELD_TYPE_STRING;
-  (void) B;
 }
-
-%type number_typedef {enum field_type}
-typedef(A) ::= number_typedef(A) .
-number_typedef(A) ::= NUMBER . { A = FIELD_TYPE_NUMBER; }
-number_typedef(A) ::= DOUBLE . { A = FIELD_TYPE_DOUBLE; }
-number_typedef(A) ::= INT|INTEGER_KW . { A = FIELD_TYPE_INTEGER; }
-number_typedef(A) ::= UNSIGNED . { A = FIELD_TYPE_UNSIGNED; }
-number_typedef(A) ::= DECIMAL . { A = FIELD_TYPE_DECIMAL; }
+typedef(A) ::= NUMBER . {
+  A = FIELD_TYPE_NUMBER;
+}
+typedef(A) ::= DOUBLE . {
+  A = FIELD_TYPE_DOUBLE;
+}
+typedef(A) ::= INT|INTEGER_KW . {
+  A = FIELD_TYPE_INTEGER;
+}
+typedef(A) ::= UNSIGNED . {
+  A = FIELD_TYPE_UNSIGNED;
+}
+typedef(A) ::= DECIMAL . {
+  A = FIELD_TYPE_DECIMAL;
+}
