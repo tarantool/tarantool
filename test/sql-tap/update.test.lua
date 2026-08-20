@@ -969,7 +969,9 @@ test:do_catchsql_test("update-10.9", [[
   SELECT a,b,c,d,e,f FROM t1;
 ]], {
   -- <update-10.9>
-  1, "Duplicate key exists in unique index \"unique_unnamed_t1_3\" in space \"t1\" with old tuple - [1, 2, 3, 4, 13, 6, 1] and new tuple - [2, 3, 3, 4, 14, 7, 2]"
+  1, 'Duplicate key exists in unique index "unique_unnamed_t1_4" ' ..
+  'in space "t1" with old tuple - [1, 2, 3, 4, 13, 6, 1] and ' ..
+  'new tuple - [2, 3, 3, 4, 14, 7, 2]'
   -- </update-10.9>
 })
 

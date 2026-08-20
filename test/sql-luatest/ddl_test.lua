@@ -406,3 +406,43 @@ g.test_12968_primary_key_constraint_parsing = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure that the CREATE VIEW statement is saved exactly as it was provided.
+--
+g.test_create_view_string_representation = function(cg)
+    cg.server:exec(function()
+        local sql = [[   CREATE VIEW IF NOT EXISTS v AS SELECT id
+                      FROM _space   ; -- note  ]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+        t.assert_equals(box.space._space:get{box.space.v.id}.flags.sql, sql)
+        box.execute([[DROP VIEW v;]]);
+    end)
+end
+
+-- Make sure that columns mentioned before they are defined in
+-- the CREATE TABLE command are resolved correctly.
+--
+g.test_resolve_columns_in_create_table = function(cg)
+    cg.server:exec(function()
+        local sql = [[CREATE TABLE t (
+                      CONSTRAINT pk PRIMARY KEY(b, c),
+                      CONSTRAINT ck CHECK(a > 10),
+                      CONSTRAINT u UNIQUE(i),
+                      CONSTRAINT fk FOREIGN KEY (a) REFERENCES t(i),
+                      i INT, a INT, b INT, c INT);]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err, nil)
+        local s = box.space.t
+        t.assert_equals(#s.index.pk.parts, 2)
+        t.assert_equals(s.index.pk.parts[1].fieldno, 3)
+        t.assert_equals(s.index.pk.parts[2].fieldno, 4)
+        t.assert_equals(#s.index.u.parts, 1)
+        t.assert_equals(s.index.u.parts[1].fieldno, 1)
+        t.assert_equals(box.space._func:get{s.constraint.ck}.body, 'a > 10')
+        t.assert_equals(s.foreign_key, {fk = {field = {[2] = 1}, space = s.id}})
+        s:drop()
+        box.func.check_t_ck:drop()
+    end)
+end

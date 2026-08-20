@@ -1727,12 +1727,11 @@ sql_expr_list_append(struct ExprList *expr_list, struct Expr *expr)
 
 struct ExprList *
 sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
-			struct ast_id_list *columns, struct Expr *pExpr)
+			struct IdList *pColumns, struct Expr *pExpr)
 {
 	int n;
 	int i;
 	int iFirst = pList ? pList->nExpr : 0;
-	struct IdList *pColumns = id_list_from_ast(columns);
 	if (pExpr == 0)
 		goto vector_append_error;
 
@@ -2011,20 +2010,10 @@ sqlExprIsTableConstant(Expr * p, int iCur)
 	return exprIsConst(p, 3, iCur);
 }
 
-/*
- * Walk an expression tree.  Return non-zero if the expression is constant
- * or a function call with constant arguments.  Return and 0 if there
- * are any variables.
- *
- * For the purposes of this function, a double-quoted string (ex: "abc")
- * is considered a variable but a single-quoted string (ex: 'abc') is
- * a constant.
- */
 int
-sqlExprIsConstantOrFunction(Expr * p, u8 isInit)
+sqlExprIsConstantOrFunction(struct Expr *p)
 {
-	assert(isInit == 0 || isInit == 1);
-	return exprIsConst(p, 4 + isInit, 0);
+	return exprIsConst(p, 4, 0);
 }
 
 /*

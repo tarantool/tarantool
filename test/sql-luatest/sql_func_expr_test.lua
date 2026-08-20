@@ -64,17 +64,14 @@ end
 -- Make sure SQL_EXPRESSION function parsed properly.
 g.test_sql_func_expr_2 = function()
     g.server:exec(function()
+        local func_create = box.schema.func.create
         local def = {language = 'SQL_EXPR', is_deterministic = true, body = ''}
-        t.assert_error_msg_content_equals(
-            "Syntax error at line 1 near ' '",
-            function() box.schema.func.create('a1', def) end
-        )
+        local exp_err = "Function definition cannot be empty"
+        t.assert_error_msg_content_equals(exp_err, func_create, 'a1', def)
 
         def.body = ' '
-        t.assert_error_msg_content_equals(
-            "Syntax error at line 1 near '  '",
-            function() box.schema.func.create('a1', def) end
-        )
+        exp_err = "Syntax error at line 1 near ' '"
+        t.assert_error_msg_content_equals(exp_err, func_create, 'a1', def)
 
         def.body = '1, 1 '
         t.assert_error_msg_content_equals(
@@ -173,5 +170,21 @@ g.test_sql_func_expr_5 = function()
         t.assert_equals(s:insert{4, 5}, {4, 5})
         box.space.test:drop()
         box.schema.func.drop('abc')
+    end)
+end
+
+--
+-- Make sure that the body of a SQL expression function cannot be
+-- parsed outside the function.
+--
+g.test_sql_expr_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[FUNCTION a * b > 10]])
+        local exp_err = "Syntax error at line 1 near 'FUNCTION'"
+        t.assert_equals(err.message, exp_err)
+
+        _, err = box.execute([[a * b > 10]])
+        exp_err = "Syntax error at line 1 near 'a'"
+        t.assert_equals(err.message, exp_err)
     end)
 end

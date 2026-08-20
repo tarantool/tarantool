@@ -39,11 +39,8 @@
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 
-#include "box/session.h"
-#include "box/schema.h"
 #include "say.h"
 #include "sqlInt.h"
-#include "tarantoolInt.h"
 
 /* Character classes for tokenizing
  *
@@ -441,116 +438,501 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	return i;
 }
 
-/**
- * This function is called to release parsing artifacts
- * during table creation or column addition. The only objects
- * allocated using malloc are index defs.
- * Note that this functions can't be called on ordinary
- * space object. It's purpose is to clean-up parser->new_space.
- *
- * @param parser Parser context.
- */
-static void
-parser_space_delete(struct Parse *parser)
-{
-	struct space *space = parser->create_column_def.space;
-	if (space == NULL)
-		return;
-	assert(space->def->opts.is_ephemeral);
-	uint32_t i = 0;
-	/*
-	 * If create_table_def.new_space is NULL,
-	 * the query is ALTER TABLE ADD COLUMNS.
-	 */
-	if (parser->create_table_def.new_space == NULL) {
-		/*
-		 * Don't delete already existing defs and start from new
-		 * ones.
-		 */
-		struct space *altered_space = space_by_name0(space->def->name);
-		if (altered_space != NULL)
-			i = altered_space->index_count;
-	}
-	for (; i < space->index_count; ++i)
-		index_def_delete(space->index[i]->def);
-}
-
 static void *
 new_xmalloc(size_t n)
 {
 	return xmalloc(n);
 }
 
-/** Code given AST. */
+/** Code AST for SELECT statement. */
 static void
-sql_code_ast(struct Parse *parse, struct sql_ast *ast)
+sql_code_select(struct Parse *parser, struct ast_select *select)
+{
+	struct Select *res = select_from_ast(parser, select);
+	if (parser->is_aborted)
+		return;
+	struct SelectDest dest = {SRT_Output, NULL, 0, 0, 0, 0, NULL};
+	sqlSelect(parser, res, &dest);
+	sql_select_delete(res);
+}
+
+/** Code AST for DROP CONSTRAINT statements. */
+static void
+sql_code_ast_drop_constraint(struct Parse *parser, struct Token *name,
+			     struct Token *column, struct Token *table,
+			     enum ast_property_type type)
+{
+	parser->initiateTTrans = true;
+	if (column->n == 0) {
+		/* Table constraint. */
+		switch (type) {
+		case SQL_AST_PROPERTY_CHECK:
+			sql_drop_tuple_check(parser, table, name);
+			break;
+		case SQL_AST_PROPERTY_UNIQUE:
+			sql_drop_unique(parser, table, name);
+			break;
+		case SQL_AST_PROPERTY_PRIMARY_KEY:
+			sql_drop_primary_key(parser, table, name);
+			break;
+		case SQL_AST_PROPERTY_FOREIGN_KEY:
+			sql_drop_tuple_foreign_key(parser, table, name);
+			break;
+		default:
+			assert(type == SQL_AST_PROPERTY_ANY);
+			sql_drop_table_constraint(parser, table, name);
+		}
+		return;
+	}
+	switch (type) {
+	case SQL_AST_PROPERTY_CHECK:
+		sql_drop_field_check(parser, table, column, name);
+		break;
+	case SQL_AST_PROPERTY_FOREIGN_KEY:
+		sql_drop_field_foreign_key(parser, table, column, name);
+		break;
+	default:
+		assert(type == SQL_AST_PROPERTY_ANY);
+		sql_drop_field_constraint(parser, table, column, name);
+	}
+}
+
+/** Code AST for table or column property. */
+static void
+sql_code_ast_property(struct Parse *parser, struct Token *table,
+		      struct ast_property *property, bool is_column)
+{
+	switch (property->type) {
+	case SQL_AST_PROPERTY_CHECK:
+		sql_create_check_constraint(parser, table, &property->name,
+					    property->expr->str,
+					    property->expr->len, is_column);
+		break;
+	case SQL_AST_PROPERTY_FOREIGN_KEY: {
+		struct ast_foreign_key *fk = &property->foreign_key;
+		struct ExprList *columns =
+			expr_list_from_ids(parser, fk->columns);
+		if (parser->is_aborted)
+			break;
+		struct ExprList *foreign_columns =
+			expr_list_from_ids(parser, fk->foreign_columns);
+		if (parser->is_aborted) {
+			sql_expr_list_delete(columns);
+			break;
+		}
+		sql_create_foreign_key(parser, table, &property->name, columns,
+				       &fk->foreign_table, foreign_columns);
+		break;
+	}
+	case SQL_AST_PROPERTY_UNIQUE: {
+		struct ExprList *columns =
+			expr_list_from_ast(parser, property->columns);
+		sql_create_index(parser, table, &property->name, columns,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+				 SORT_ORDER_ASC, false);
+		break;
+	}
+	case SQL_AST_PROPERTY_PRIMARY_KEY: {
+		if (is_column) {
+			sqlAddPrimaryKey(parser, &property->name, NULL,
+					 property->order);
+			break;
+		}
+		struct ExprList *columns =
+			expr_list_from_ast(parser, property->columns);
+		if (parser->is_aborted)
+			break;
+		if (table->n == 0) {
+			sqlAddPrimaryKey(parser, &property->name, columns,
+					 property->order);
+			break;
+		}
+		sql_create_index(parser, table, &property->name, columns,
+				 SQL_INDEX_TYPE_CONSTRAINT_PK,
+				 SORT_ORDER_ASC, false);
+		break;
+	}
+	case SQL_AST_PROPERTY_DEFAULT: {
+		assert(is_column);
+		struct Expr *expr = expr_from_ast(parser, property->expr);
+		if (parser->is_aborted)
+			break;
+		sql_column_add_default(parser, expr, property->expr->str,
+				       property->expr->len);
+		break;
+	}
+	case SQL_AST_PROPERTY_COLLATE:
+		sqlAddCollateType(parser, &property->collate);
+		break;
+	case SQL_AST_PROPERTY_NOT_NULL:
+		sql_column_add_nullable_action(parser, property->action);
+		break;
+	case SQL_AST_PROPERTY_NULL:
+		sql_column_add_nullable_action(parser, ON_CONFLICT_ACTION_NONE);
+		break;
+	case SQL_AST_PROPERTY_ANY:
+		assert(false);
+	}
+}
+
+/** Code AST for column. */
+static void
+sql_code_ast_column(struct Parse *parser, struct Token *table,
+		    struct ast_column *col)
+{
+	sql_create_column_start(parser, table, &col->name, col->type);
+	if (parser->is_aborted)
+		return;
+	if (col->properties != NULL) {
+		struct ast_property *property;
+		stailq_foreach_entry(property, &col->properties->head, link) {
+			sql_code_ast_property(parser, table, property, true);
+			if (parser->is_aborted)
+				return;
+		}
+	}
+	if (!col->is_autoinc)
+		return;
+	sql_add_autoincrement(parser, parser->space->def->field_count - 1);
+}
+
+/** Code AST for CREATE TABLE. */
+static void
+sql_code_create_table(struct Parse *parser, struct ast_create_table *stmt)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	rlist_create(&parser->create_ck_constraint_parse_def.checks);
+	rlist_create(&parser->create_fk_constraint_parse_def.fkeys);
+	parser->create_fk_constraint_parse_def.is_used = true;
+	parser->new_space = sqlStartTable(parser, &stmt->name);
+	parser->initiateTTrans = true;
+	if (parser->is_aborted)
+		return;
+
+	struct Token tmp = Token_nil;
+	struct ast_column *column;
+	stailq_foreach_entry(column, &stmt->properties->columns, link) {
+		sql_code_ast_column(parser, &tmp, column);
+		if (parser->is_aborted)
+			return;
+	}
+
+	struct ast_property *constraint;
+	stailq_foreach_entry(constraint, &stmt->properties->constraints, link) {
+		sql_code_ast_property(parser, &tmp, constraint, false);
+		if (parser->is_aborted)
+			return;
+	}
+
+	if (stmt->engine.n > 0) {
+		if (stmt->engine.n > ENGINE_NAME_MAX) {
+			diag_set(ClientError, ER_CREATE_SPACE,
+				 parser->new_space->def->name,
+				 "space engine name is too long");
+			parser->is_aborted = true;
+			return;
+		}
+		char *engine = sql_name_from_token(&stmt->engine);
+		memcpy(parser->new_space->def->engine_name, engine,
+		       strlen(engine) + 1);
+		sql_xfree(engine);
+	}
+	vdbe_emit_create_table(parser, stmt->if_not_exists);
+}
+
+/** Code AST for CREATE VIEW. */
+static void
+sql_code_create_view(struct Parse *parser, struct ast_create_view *stmt,
+		     const char *sql)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	parser->initiateTTrans = true;
+	struct Select *select = select_from_ast(parser, stmt->select);
+	struct ExprList *cols = expr_list_from_ids(parser, stmt->columns);
+	if (parser->is_aborted) {
+		sql_expr_list_delete(cols);
+		sql_select_delete(select);
+		return;
+	}
+	sql_create_view(parser, sql, &stmt->name, cols, select,
+			stmt->if_not_exists);
+}
+
+/** Code AST for CREATE INDEX. */
+static void
+sql_code_create_index(struct Parse *parser, struct ast_create_index *stmt)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	parser->initiateTTrans = true;
+	struct ExprList *columns = expr_list_from_ast(parser, stmt->columns);
+	if (parser->is_aborted)
+		return;
+	int type = stmt->is_unique ? SQL_INDEX_TYPE_UNIQUE :
+				     SQL_INDEX_TYPE_NON_UNIQUE;
+	sql_create_index(parser, &stmt->table, &stmt->name, columns, type,
+			 SORT_ORDER_ASC, stmt->if_not_exists);
+}
+
+/** Code AST for INSERT statement. */
+static void
+sql_code_insert(struct Parse *parser, struct ast_insert *insert)
+{
+	struct With *with = with_from_ast(parser, insert->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+	struct Select *select = select_from_ast(parser, insert->select);
+	if (parser->is_aborted)
+		return;
+	struct SrcList *src = sql_src_list_append(NULL, &insert->table);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	struct IdList *columns = id_list_from_ast(insert->columns);
+	sqlInsert(parser, src, select, columns, insert->action);
+}
+
+/** Code AST for UPDATE statement. */
+static void
+sql_code_update(struct Parse *parser, struct ast_update *update)
+{
+	assert(update->set_list != NULL);
+	struct With *with = with_from_ast(parser, update->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+
+	struct ExprList *set_list =
+		expr_list_from_set_list(parser, update->set_list);
+	if (parser->is_aborted)
+		return;
+
+	if (set_list->nExpr > SQL_MAX_COLUMN) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+			 "The number of columns in set list",
+			 update->set_list->len, SQL_MAX_COLUMN);
+		parser->is_aborted = true;
+		sql_expr_list_delete(set_list);
+		return;
+	}
+
+	struct Expr *where = expr_from_ast(parser, update->where);
+	if (parser->is_aborted) {
+		sql_expr_list_delete(set_list);
+		return;
+	}
+
+	struct SrcList *src = sql_src_list_append(NULL, &update->table);
+	sqlSrcListIndexedBy(src, &update->indexed_by);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	sqlUpdate(parser, src, set_list, where, update->action);
+}
+
+/** Code AST for DELETE statement. */
+static void
+sql_code_delete(struct Parse *parser, struct ast_delete *del)
+{
+	struct With *with = with_from_ast(parser, del->with);
+	if (parser->is_aborted)
+		return;
+	sqlWithPush(parser, with, 1);
+
+	struct Expr *where = expr_from_ast(parser, del->where);
+	if (parser->is_aborted)
+		return;
+
+	struct SrcList *src = sql_src_list_append(NULL, &del->table);
+	sqlSrcListIndexedBy(src, &del->indexed_by);
+	sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
+	parser->initiateTTrans = true;
+	sql_table_delete_from(parser, src, where);
+}
+
+/** Code AST for SET SESSION statement. */
+static void
+sql_code_set_session(struct Parse *parser, struct Token *name,
+		     struct ast_expr *value)
+{
+	struct Expr *expr = expr_from_ast(parser, value);
+	if (parser->is_aborted)
+		return;
+	sql_setting_set(parser, name, expr);
+}
+
+void
+sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql)
 {
 	if (parse->is_aborted)
 		return;
 	switch (ast->type) {
-	case SQL_AST_TYPE_START_TRANSACTION:
+	case SQL_AST_TX_START:
 		sql_transaction_begin(parse);
 		break;
-	case SQL_AST_TYPE_COMMIT:
+	case SQL_AST_TX_COMMIT:
 		sql_transaction_commit(parse);
 		break;
-	case SQL_AST_TYPE_ROLLBACK:
+	case SQL_AST_TX_ROLLBACK:
 		sql_transaction_rollback(parse);
 		break;
-	case SQL_AST_TYPE_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_BEGIN, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_NEW:
+		sqlSavepoint(parse, SAVEPOINT_BEGIN, &ast->savepoint);
 		break;
-	case SQL_AST_TYPE_RELEASE_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_RELEASE, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_RELEASE:
+		sqlSavepoint(parse, SAVEPOINT_RELEASE, &ast->savepoint);
 		break;
-	case SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT:
-		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint.name);
+	case SQL_AST_TX_SAVEPOINT_ROLLBACK:
+		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint);
+		break;
+	case SQL_AST_SELECT:
+		sql_code_select(parse, ast->select);
+		break;
+	case SQL_AST_INSERT:
+		sql_code_insert(parse, ast->insert);
+		break;
+	case SQL_AST_UPDATE:
+		sql_code_update(parse, ast->update);
+		break;
+	case SQL_AST_DELETE:
+		sql_code_delete(parse, ast->del);
+		break;
+	case SQL_AST_TRUNCATE:
+		parse->initiateTTrans = true;
+		sql_table_truncate(parse, &ast->truncate.table);
+		break;
+	case SQL_AST_CREATE_TABLE:
+		sql_code_create_table(parse, &ast->create_table);
+		break;
+	case SQL_AST_CREATE_VIEW:
+		sql_code_create_view(parse, &ast->create_view, sql);
+		break;
+	case SQL_AST_CREATE_INDEX:
+		sql_code_create_index(parse, &ast->create_index);
+		break;
+	case SQL_AST_CREATE_TRIGGER:
+		if (!ast->create_trigger.is_for_each_row) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool SQL",
+				 "FOR EACH STATEMENT triggers, please supply "
+				 "FOR EACH ROW clause");
+			parse->is_aborted = true;
+			break;
+		}
+		parse->initiateTTrans = true;
+		vdbe_emit_create_trigger(parse, sql, &ast->create_trigger.name,
+					 &ast->create_trigger.table,
+					 ast->create_trigger.if_not_exists);
+		break;
+	case SQL_AST_DROP_VIEW:
+	case SQL_AST_DROP_TABLE:
+		parse->initiateTTrans = true;
+		sql_drop_table(parse, &ast->drop_table.name,
+			       ast->drop_table.if_exists,
+			       ast->type == SQL_AST_DROP_VIEW);
+		break;
+	case SQL_AST_DROP_TRIGGER:
+		parse->initiateTTrans = true;
+		sql_drop_trigger(parse, &ast->drop_trigger.name,
+				 ast->drop_trigger.if_exists);
+		break;
+	case SQL_AST_DROP_INDEX:
+		parse->initiateTTrans = true;
+		sql_drop_index(parse, &ast->drop_index.name,
+			       &ast->drop_index.table,
+			       ast->drop_index.if_exists);
+		break;
+	case SQL_AST_ALTER_RENAME:
+		parse->initiateTTrans = true;
+		sql_alter_table_rename(parse, &ast->alter_rename.old_name,
+				       &ast->alter_rename.new_name);
+		break;
+	case SQL_AST_ALTER_ADD_COLUMN:
+		parse->initiateTTrans = true;
+		rlist_create(&parse->create_ck_constraint_parse_def.checks);
+		rlist_create(&parse->create_fk_constraint_parse_def.fkeys);
+		parse->create_fk_constraint_parse_def.is_used = true;
+		sql_code_ast_column(parse, &ast->alter_add_column.table,
+				    ast->alter_add_column.col);
+		if (parse->is_aborted)
+			break;
+		sql_create_column_end(parse);
+		break;
+	case SQL_AST_ALTER_DROP_CONSTRAINT:
+		sql_code_ast_drop_constraint(parse,
+					     &ast->alter_drop_constraint.name,
+					     &ast->alter_drop_constraint.column,
+					     &ast->alter_drop_constraint.table,
+					     ast->alter_drop_constraint.type);
+		break;
+	case SQL_AST_ALTER_ADD_CONSTRAINT:
+		parse->initiateTTrans = true;
+		sql_code_ast_property(parse, &ast->alter_add_constraint.table,
+				      ast->alter_add_constraint.con, false);
+		break;
+	case SQL_AST_SET_SESSION:
+		sql_code_set_session(parse, &ast->set_session.name,
+				     ast->set_session.value);
+		break;
+	case SQL_AST_PRAGMA:
+		sqlPragma(parse, &ast->pragma.name, &ast->pragma.table_name,
+			  &ast->pragma.index_name);
+		break;
+	case SQL_AST_SHOW_CREATE_TABLE:
+		if (ast->show_create_table.n == 0) {
+			sql_emit_show_create_table_all(parse);
+			break;
+		}
+		sql_emit_show_create_table_one(parse, &ast->show_create_table);
 		break;
 	default:
-		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+		unreachable();
 	}
-	if (!parse->is_aborted && !parse->parse_only)
+	if (!parse->is_aborted)
 		sql_finish_coding(parse);
 }
 
 /**
  * Run the parser on the given SQL string.
  *
- * @param pParse Parser context.
+ * @param region Region for memory allocation.
  * @param zSql SQL string.
+ * @param seed_token Token type to feed before `zSql`, or 0.
  * @retval 0 on success.
  * @retval -1 on error.
  */
-int
-sqlRunParser(Parse * pParse, const char *zSql)
+struct sql_ast *
+sql_run_parser(struct region *region, const char *zSql, int seed_token)
 {
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
 	int tokenType;		/* type of the next token */
 	int lastTokenParsed = -1;	/* type of the previous token */
+	struct sql_parser_context ctx;
+	sql_parser_context_create(&ctx, region);
 
 	assert(zSql != 0);
-	pParse->zTail = zSql;
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->create_table_def.new_space == NULL);
-	assert(pParse->parsed_ast.trigger == NULL);
-	assert(pParse->nVar == 0);
-	assert(pParse->pVList == 0);
+	struct Token last;
+	memset(&last, 0, sizeof(last));
+	if (seed_token != 0) {
+		last.z = zSql;
+		sqlParser(pEngine, seed_token, last, &ctx);
+	}
 	while (1) {
 		assert(i >= 0);
 		if (zSql[i] != 0) {
-			pParse->sLastToken.z = &zSql[i];
-			pParse->sLastToken.n =
-			    sql_token(&zSql[i], &tokenType,
-				      &pParse->sLastToken.isReserved);
-			i += pParse->sLastToken.n;
+			last.z = &zSql[i];
+			last.n = sql_token(&zSql[i], &tokenType,
+					   &last.isReserved);
+			i += last.n;
 			if (i > SQL_MAX_SQL_LENGTH) {
 				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 					 "SQL command length", i,
 					 SQL_MAX_SQL_LENGTH);
-				pParse->is_aborted = true;
+				ctx.is_aborted = true;
 				break;
 			}
 		} else {
@@ -570,104 +952,88 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			       || tokenType == TK_ILLEGAL);
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
-					 pParse->line_count, pParse->line_pos,
-					 tt_cstr(pParse->sLastToken.z,
-						 pParse->sLastToken.n));
-				pParse->is_aborted = true;
+					 ctx.line, ctx.pos,
+					 tt_cstr(last.z, last.n));
+				ctx.is_aborted = true;
 				break;
 			}
 		} else if (tokenType == TK_LINEFEED) {
-			pParse->line_count++;
-			pParse->line_pos = 1;
+			ctx.line++;
+			ctx.pos = 1;
 			continue;
 		} else {
-			sqlParser(pEngine, tokenType, pParse->sLastToken,
-				      pParse);
+			sqlParser(pEngine, tokenType, last, &ctx);
 			lastTokenParsed = tokenType;
-			if (pParse->is_aborted)
+			if (ctx.is_aborted)
 				break;
 		}
-		pParse->line_pos += pParse->sLastToken.n;
+		ctx.pos += last.n;
 	}
-	sql_code_ast(pParse, &pParse->ast);
-	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
-	if (pParse->pVdbe != NULL && pParse->is_aborted) {
-		sqlVdbeDelete(pParse->pVdbe);
-		pParse->pVdbe = 0;
-	}
-	parser_space_delete(pParse);
+	if (ctx.is_aborted)
+		return NULL;
+	return ctx.ast;
+}
 
-	if (pParse->pWithToFree)
-		sqlWithDelete(pParse->pWithToFree);
-	sql_xfree(pParse->pVList);
-	return pParse->is_aborted ? -1 : 0;
+struct sql_ast *
+sql_parse_statement(struct Parse *parser, const char *sql)
+{
+	return sql_run_parser(&parser->region, sql, 0);
 }
 
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len)
+sql_parse_function(struct Parse *parser, const char *sql)
 {
-	const char *outer = "FUNCTION ";
-	int len = strlen(outer) + expr_len;
-
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	/*
-	 * Since SELECT token is added to the original expression,
-	 * to make error message display correct position we should
-	 * account its length.
-	 */
-	parser.line_pos -= strlen(outer);
-	parser.parse_only = true;
-	parser.is_expr = true;
-
-	struct Expr *expression = NULL;
-	char *stmt = xregion_alloc(&parser.region, len + 1);
-	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
-
-	if (sqlRunParser(&parser, stmt) == 0) {
-		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
-		expression = parser.parsed_ast.expr;
-		parser.parsed_ast.expr = NULL;
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_FUNCTION_ENTRY);
+	if (ast == NULL)
+		return NULL;
+	assert(ast->type == SQL_AST_FUNCTION);
+	struct Expr *res = expr_from_ast(parser, ast->expr);
+	if (res != NULL && parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in functions");
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
 	}
-	sql_parser_destroy(&parser);
-	return expression;
+	return res;
 }
 
 struct Select *
-sql_view_compile(const char *view_stmt)
+sql_parse_view(struct Parse *parser, const char *sql)
 {
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-
-	struct Select *select = NULL;
-
-	if (sqlRunParser(&parser, view_stmt) != 0 ||
-	    parser.parsed_ast_type != AST_TYPE_SELECT) {
-		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
-	} else {
-		select = parser.parsed_ast.select;
-		parser.parsed_ast.select = NULL;
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_VIEW_ENTRY);
+	if (ast == NULL)
+		return NULL;
+	assert(ast->type == SQL_AST_VIEW);
+	struct Select *res = select_from_ast(parser, ast->select);
+	if (res != NULL && parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
+		parser->is_aborted = true;
+		sql_select_delete(res);
+		return NULL;
 	}
-
-	sql_parser_destroy(&parser);
-	return select;
+	return res;
 }
 
 struct sql_trigger *
-sql_trigger_compile(const char *sql)
+sql_parse_trigger(struct Parse *parser, const char *sql)
 {
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-	struct sql_trigger *trigger = NULL;
-	if (sqlRunParser(&parser, sql) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
-		trigger = parser.parsed_ast.trigger;
-		parser.parsed_ast.trigger = NULL;
+	struct sql_ast *ast = sql_run_parser(&parser->region, sql,
+					     TK_TRIGGER_ENTRY);
+	if (ast == NULL)
+		return NULL;
+	assert(ast->type == SQL_AST_TRIGGER);
+	struct sql_trigger *res = sql_trigger_from_ast(parser, &ast->trigger);
+	if (res != NULL && parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in triggers");
+		parser->is_aborted = true;
+		sql_trigger_delete(res);
+		return NULL;
 	}
-
-	sql_parser_destroy(&parser);
-	return trigger;
+	return res;
 }

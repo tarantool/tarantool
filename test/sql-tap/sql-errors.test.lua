@@ -124,7 +124,7 @@ test:do_catchsql_test(
 		CREATE VIEW v11 AS SELECT * FROM t0 WHERE i = ?;
 	]], {
 		-- <sql-errors-1.11>
-        1,"Failed to create space 'v11': parameters are not allowed in views"
+        1,"Parameters are not allowed in views"
 		-- </sql-errors-1.11>
 	})
 
@@ -424,7 +424,7 @@ test:do_catchsql_test(
 		CREATE TRIGGER r0 AFTER INSERT ON t0 FOR EACH ROW BEGIN INSERT INTO t0.i VALUES (2); END;
 	]], {
 		-- <sql-errors-1.37>
-		1,"At line 1 at or near position 76: qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+        1, "Syntax error at line 1 near '.'"
 		-- </sql-errors-1.37>
 	})
 
@@ -514,7 +514,7 @@ test:do_catchsql_test(
 		INSERT INTO not_exist VALUES(1) a;
 	]], {
 		-- <sql-errors-1.46>
-        1, "Space 'not_exist' does not exist"
+        1, "Syntax error at line 1 near 'a'"
 		-- </sql-errors-1.46>
 	})
 

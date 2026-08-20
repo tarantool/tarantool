@@ -192,7 +192,7 @@ sql_space_primary_key(const struct space *space)
  * when the "TEMP" or "TEMPORARY" keyword occurs in between
  * CREATE and TABLE.
  *
- * The new table record is initialized and put in pParse->create_table_def.
+ * The new table record is initialized and put in pParse->new_space.
  * As more of the CREATE TABLE statement is parsed, additional action
  * routines will be called to add more information to this record.
  * At the end of the CREATE TABLE statement, the sqlEndTable() routine
@@ -298,26 +298,22 @@ sql_shallow_space_copy(struct Parse *parse, const struct space *space)
 }
 
 void
-sql_create_column_start(struct Parse *parse)
+sql_create_column_start(struct Parse *parse, struct Token *table,
+			struct Token *name, enum field_type type)
 {
-	struct create_column_def *create_column_def = &parse->create_column_def;
-	struct alter_entity_def *alter_entity_def =
-		&create_column_def->base.base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_COLUMN);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	bool is_alter = space == NULL;
 	if (is_alter) {
-		const struct space *origin =
-			sql_space_by_src(&alter_entity_def->entity_name->a[0]);
+		const struct space *origin = sql_space_by_token(table);
 		if (origin == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 alter_entity_def->entity_name->a[0].zName);
-			goto tnt_error;
+				 sql_tt_name_from_token(table));
+			parse->is_aborted = true;
+			return;
 		}
 		space = sql_shallow_space_copy(parse, origin);
 	}
-	create_column_def->space = space;
+	parse->space = space;
 	struct space_def *def = space->def;
 	assert(def->opts.is_ephemeral);
 
@@ -325,11 +321,11 @@ sql_create_column_start(struct Parse *parse)
 	if ((int)def->field_count + 1 > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_COLUMN_COUNT_MAX, def->name,
 			 def->field_count + 1, SQL_MAX_COLUMN);
-		goto tnt_error;
+		parse->is_aborted = true;
+		return;
 	}
 #endif
 
-	struct Token *name = &create_column_def->base.name;
 	char *column_name = sql_name_temp(parse, name->z, name->n);
 
 	/*
@@ -350,14 +346,8 @@ sql_create_column_start(struct Parse *parse)
 	 */
 	column_def->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	column_def->is_nullable = true;
-	column_def->type = create_column_def->type;
+	column_def->type = type;
 	def->field_count++;
-
-	sqlSrcListDelete(alter_entity_def->entity_name);
-	return;
-tnt_error:
-	parse->is_aborted = true;
-	sqlSrcListDelete(alter_entity_def->entity_name);
 }
 
 static void
@@ -378,7 +368,7 @@ vdbe_emit_create_defaults(struct Parse *parser, int reg_space_id)
 void
 sql_create_column_end(struct Parse *parse)
 {
-	struct space *space = parse->create_column_def.space;
+	struct space *space = parse->space;
 	assert(space != NULL);
 	struct space_def *def = space->def;
 	struct field_def *field = &def->fields[def->field_count - 1];
@@ -440,8 +430,8 @@ void
 sql_column_add_nullable_action(struct Parse *parser,
 			       enum on_conflict_action nullable_action)
 {
-	assert(parser->create_column_def.space != NULL);
-	struct space_def *def = parser->create_column_def.space->def;
+	assert(parser->space != NULL);
+	struct space_def *def = parser->space->def;
 	assert(def->field_count > 0);
 	struct field_def *field = &def->fields[def->field_count - 1];
 	if (field->nullable_action != ON_CONFLICT_ACTION_DEFAULT &&
@@ -494,14 +484,14 @@ sql_expr_uint(const struct Expr *expr, uint64_t *res)
 	return errno == 0 ? 0 : -1;
 }
 
+/** This function adds literal default value for a column. */
 static void
-sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
+sql_add_term_default(struct Parse *parser, struct Expr *expr)
 {
-	assert(parser->create_column_def.space != NULL);
+	assert(parser->space != NULL);
 	char *buf = NULL;
 	uint32_t size = 0;
 	struct region *region = &parser->region;
-	struct Expr *expr = expr_span->pExpr;
 	switch (sql_expr_type(expr)) {
 	case FIELD_TYPE_BOOLEAN: {
 		assert(expr->op == TK_TRUE || expr->op == TK_FALSE);
@@ -603,20 +593,21 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 			parser->is_aborted = true;
 			break;
 		}
+		const struct Expr *int_expr = expr;
 		if (expr->op == TK_UPLUS) {
 			assert(expr->pLeft != NULL &&
 			       expr->pLeft->op == TK_INTEGER);
-			expr = expr->pLeft;
+			int_expr = expr->pLeft;
 		}
 		uint64_t val;
-		if (sql_expr_uint(expr, &val) == 0) {
+		if (sql_expr_uint(int_expr, &val) == 0) {
 			size = mp_sizeof_uint(val);
 			buf = xregion_alloc(region, size);
 			mp_encode_uint(buf, val);
 			break;
 		}
 		int errcode = ER_INT_LITERAL_MAX;
-		const char *str = expr->u.zToken;
+		const char *str = int_expr->u.zToken;
 		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
 			errcode = ER_HEX_LITERAL_MAX;
 		diag_set(ClientError, errcode, str);
@@ -629,10 +620,10 @@ sql_add_term_default(struct Parse *parser, struct ExprSpan *expr_span)
 		assert(buf == NULL);
 		assert(size == 0);
 	}
-	sql_expr_delete(expr_span->pExpr);
+	sql_expr_delete(expr);
 	if (parser->is_aborted)
 		return;
-	struct space_def *def = parser->create_column_def.space->def;
+	struct space_def *def = parser->space->def;
 	struct field_def *field = &def->fields[def->field_count - 1];
 	field->default_value = buf;
 	field->default_value_size = size;
@@ -654,30 +645,23 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 	return 0;
 }
 
-/*
- * Designate the PRIMARY KEY for the table.  pList is a list of names
- * of columns that form the primary key.  If pList is NULL, then the
- * most recently added column of the table is the primary key.
- *
- * A table can have at most one primary key.  If the table already has
- * a primary key (and this is the second primary key) then create an
- * error.
- */
 void
-sqlAddPrimaryKey(struct Parse *pParse)
+sqlAddPrimaryKey(struct Parse *pParse, struct Token *name,
+		 struct ExprList *col_list, enum sort_order sort_order)
 {
-	struct space *space = pParse->create_table_def.new_space;
+	struct space *space = pParse->new_space;
 	if (space == NULL)
-		space = pParse->create_column_def.space;
+		space = pParse->space;
 	assert(space != NULL);
 	if (sql_space_primary_key(space) != NULL) {
 		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 			 "primary key has been already declared");
 		pParse->is_aborted = true;
-		sql_expr_list_delete(pParse->create_index_def.cols);
+		sql_expr_list_delete(col_list);
 		return;
 	}
-	sql_create_index(pParse);
+	sql_create_index(pParse, &Token_nil, name, col_list,
+			 SQL_INDEX_TYPE_CONSTRAINT_PK, sort_order, false);
 	if (pParse->is_aborted)
 		return;
 
@@ -740,9 +724,9 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 static char *
 sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
 {
-	struct space *space = parse->create_column_def.space;
+	struct space *space = parse->space;
 	if (space == NULL)
-		space = parse->create_table_def.new_space;
+		space = parse->new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct ck_constraint_parse *ck;
@@ -795,22 +779,16 @@ ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
 }
 
 void
-sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
+sql_create_check_constraint(struct Parse *parser, struct Token *table,
+			    struct Token *name_token, const char *expr_str,
+			    uint32_t expr_str_len, bool is_field_ck)
 {
-	struct create_ck_def *create_ck_def = &parser->create_ck_def;
-	struct ExprSpan *expr_span = create_ck_def->expr;
-	sql_expr_delete(expr_span->pExpr);
-
-	struct alter_entity_def *alter_def =
-		(struct alter_entity_def *) create_ck_def;
-	assert(alter_def->entity_type == ENTITY_TYPE_CK);
-	struct space *space = parser->create_column_def.space;
+	struct space *space = parser->space;
 	if (space == NULL)
-		space = parser->create_table_def.new_space;
+		space = parser->new_space;
 	bool is_alter_add_constr = space == NULL;
 
 	/* Prepare payload for ck constraint definition. */
-	struct Token *name_token = &create_ck_def->base.base.name;
 	char *name;
 	if (name_token->n != 0)
 		name = sql_name_from_token(name_token);
@@ -818,9 +796,6 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 		name = sql_ck_unique_name_new(parser, is_field_ck);
 	assert(name != NULL);
 	size_t name_len = strlen(name);
-
-	uint32_t expr_str_len = (uint32_t)(expr_span->zEnd - expr_span->zStart);
-	const char *expr_str = expr_span->zStart;
 
 	/*
 	 * Allocate memory for ck constraint parse structure and
@@ -861,11 +836,11 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	sql_xfree(name);
 	ck_def->name[name_len] = '\0';
 	if (is_alter_add_constr) {
-		const struct space *space =
-			sql_space_by_src(&alter_def->entity_name->a[0]);
+		assert(table != NULL);
+		const struct space *space = sql_space_by_token(table);
 		if (space == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 alter_def->entity_name->a[0].zName);
+				 sql_tt_name_from_token(table));
 			parser->is_aborted = true;
 			return;
 		}
@@ -896,7 +871,7 @@ sqlAddCollateType(Parse * pParse, Token * pToken)
 		return;
 	}
 
-	struct space *space = pParse->create_column_def.space;
+	struct space *space = pParse->space;
 	assert(space != NULL);
 	uint32_t fieldno = space->def->field_count - 1;
 	space->def->fields[fieldno].coll_id = coll_id;
@@ -1011,8 +986,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	memcpy(raw, index_parts, index_parts_sz);
 	index_parts = raw;
 
-	if (parse->create_table_def.new_space != NULL ||
-	    parse->create_column_def.space != NULL) {
+	if (parse->new_space != NULL || parse->space != NULL) {
 		sqlVdbeAddOp2(v, OP_SCopy, space_id_reg, entry_reg);
 		sqlVdbeAddOp2(v, OP_Integer, idx_def->iid, entry_reg + 1);
 	} else {
@@ -1260,26 +1234,28 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 	sqlVdbeCountChanges(v);
 }
 
+/** This function adds function to calculate default value for a column. */
 static void
-sql_add_func_default(struct Parse *parser, struct ExprSpan *span)
+sql_add_func_default(struct Parse *parser, struct Expr *expr, const char *str,
+		     uint32_t len)
 {
-	assert(parser->create_column_def.space != NULL);
-	struct space_def *def = parser->create_column_def.space->def;
+	assert(parser->space != NULL);
+	struct space_def *def = parser->space->def;
 	uint32_t fieldno = def->field_count - 1;
 	const char *field_name = def->fields[fieldno].name;
 
-	if (!sqlExprIsConstantOrFunction(span->pExpr, sql_get()->init.busy)) {
+	if (!sqlExprIsConstantOrFunction(expr)) {
 		diag_set(ClientError, ER_CREATE_SPACE, def->name,
 			 tt_sprintf("default value of column '%s' is not "
 				    "constant", field_name));
 		parser->is_aborted = true;
-		sql_expr_delete(span->pExpr);
+		sql_expr_delete(expr);
 		return;
 	}
-	sql_expr_delete(span->pExpr);
+	sql_expr_delete(expr);
 
 	char *name = sqlMPrintf("default_%s_%s", def->name, field_name);
-	char *body = sql_xstrndup(span->zStart, span->zEnd - span->zStart);
+	char *body = sql_xstrndup(str, len);
 	int reg_id = ++parser->nMem;
 	vdbe_emit_create_function(parser, reg_id, name, body);
 	sql_xfree(name);
@@ -1300,17 +1276,17 @@ sql_expr_is_number_term(const struct Expr *expr)
 }
 
 void
-sql_column_add_default(struct Parse *parser, struct ExprSpan *expr_span)
+sql_column_add_default(struct Parse *parser, struct Expr *expr, const char *str,
+		       uint32_t len)
 {
-	struct Expr *expr = expr_span->pExpr;
 	if (sql_expr_is_term(expr))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else if (expr->op == TK_UPLUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else if (expr->op == TK_UMINUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr_span);
+		sql_add_term_default(parser, expr);
 	else
-		sql_add_func_default(parser, expr_span);
+		sql_add_func_default(parser, expr, str, len);
 }
 
 /**
@@ -1345,9 +1321,8 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	 * vdbe_emit_create_constraints()), but we know register
 	 * where it will be stored.
 	 */
-	bool is_alter_add_constr =
-		parse_context->create_table_def.new_space == NULL &&
-		parse_context->create_column_def.space == NULL;
+	bool is_alter_add_constr = parse_context->new_space == NULL &&
+				   parse_context->space == NULL;
 	if (!is_alter_add_constr)
 		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->child_id, regs);
 	else
@@ -1404,7 +1379,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	return;
 #endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 	assert(reg_space_id != 0);
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	bool is_alter = space == NULL;
 	uint32_t i = 0;
 	/*
@@ -1415,7 +1390,7 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	 * (inside ephemeral space).
 	 */
 	if (is_alter) {
-		space = parse->create_column_def.space;
+		space = parse->space;
 		assert(space->def->id != 0);
 		i = space_by_id(space->def->id)->index_count;
 	}
@@ -1503,20 +1478,12 @@ vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 	}
 }
 
-/*
- * This routine is called to report the final ")" that terminates
- * a CREATE TABLE statement.
- *
- * During this routine byte code for creation of new Tarantool
- * space and all necessary Tarantool indexes is emitted.
- */
 void
-sqlEndTable(struct Parse *pParse)
+vdbe_emit_create_table(struct Parse *pParse, bool if_not_exists)
 {
-	struct space *new_space = pParse->create_table_def.new_space;
+	struct space *new_space = pParse->new_space;
 	if (new_space == NULL)
 		return;
-	assert(!sql_get()->init.busy);
 	assert(!new_space->def->opts.is_view);
 
 	if (sql_space_primary_key(new_space) == NULL) {
@@ -1548,10 +1515,9 @@ sqlEndTable(struct Parse *pParse)
 	int name_reg = ++pParse->nMem;
 	sqlVdbeAddOp4(pParse->pVdbe, OP_String8, 0, name_reg, 0,
 		      sql_xstrdup(new_space->def->name), P4_DYNAMIC);
-	bool no_err = pParse->create_table_def.base.if_not_exist;
 	vdbe_emit_halt_with_presence_test(pParse, BOX_SPACE_ID, 2, name_reg, 1,
 					  ER_SPACE_EXISTS, new_space->def->name,
-					  (no_err != 0), OP_NoConflict);
+					  if_not_exists, OP_NoConflict);
 	int reg_space_id = getNewSpaceId(pParse);
 	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
 	vdbe_emit_create_constraints(pParse, reg_space_id);
@@ -1559,29 +1525,22 @@ sqlEndTable(struct Parse *pParse)
 }
 
 void
-sql_create_view(struct Parse *parse_context)
+sql_create_view(struct Parse *parse_context, const char *sql,
+		struct Token *name, struct ExprList *aliases,
+		struct Select *view_select, bool if_not_exists)
 {
-	struct create_view_def *view_def = &parse_context->create_view_def;
-	struct create_entity_def *create_entity_def = &view_def->base;
-	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_VIEW);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	(void) alter_entity_def;
 	if (parse_context->nVar > 0) {
-		char *name = sql_name_from_token(&create_entity_def->name);
-		diag_set(ClientError, ER_CREATE_SPACE, name,
-			 "parameters are not allowed in views");
-		sql_xfree(name);
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
-	struct space *space = sqlStartTable(parse_context,
-					    &create_entity_def->name);
+	struct space *space = sqlStartTable(parse_context, name);
 	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
 
 	/* Find result of SELECT. */
-	struct Select *select = view_def->select;
+	struct Select *select = view_select;
 	uint32_t saved_flags = parse_context->sql_flags;
 	parse_context->sql_flags = 0;
 	sqlSelectPrep(parse_context, select, 0);
@@ -1591,7 +1550,7 @@ sql_create_view(struct Parse *parse_context)
 		select = select->pPrior;
 	parse_context->sql_flags = saved_flags;
 
-	struct ExprList *columns = view_def->aliases;
+	struct ExprList *columns = aliases;
 	if (columns != NULL) {
 		if (select->pEList->nExpr != columns->nExpr) {
 			diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
@@ -1600,7 +1559,7 @@ sql_create_view(struct Parse *parse_context)
 			parse_context->is_aborted = true;
 			goto create_view_fail;
 		}
-		select = view_def->select;
+		select = view_select;
 	} else {
 		columns = select->pEList;
 	}
@@ -1608,40 +1567,22 @@ sql_create_view(struct Parse *parse_context)
 	sqlSelectAddColumnTypeAndCollation(parse_context, space->def, select);
 
 	space->def->opts.is_view = true;
-	/*
-	 * Locate the end of the CREATE VIEW statement.
-	 * Make sEnd point to the end.
-	 */
-	struct Token end = parse_context->sLastToken;
-	assert(end.z[0] != 0);
-	if (end.z[0] != ';')
-		end.z += end.n;
-	end.n = 0;
-	struct Token *begin = view_def->create_start;
-	int n = end.z - begin->z;
-	assert(n > 0);
-	const char *z = begin->z;
-	while (sqlIsspace(z[n - 1]))
-		n--;
-	end.z = &z[n - 1];
-	end.n = 1;
-	space->def->opts.sql = xstrndup(begin->z, n);
-	const char *space_name = sql_name_from_token(&create_entity_def->name);
+	space->def->opts.sql = xstrdup(sql);
+	const char *space_name = sql_name_from_token(name);
 	int name_reg = ++parse_context->nMem;
 	sqlVdbeAddOp4(parse_context->pVdbe, OP_String8, 0, name_reg, 0,
 		      space_name, P4_DYNAMIC);
-	bool no_err = create_entity_def->if_not_exist;
 	vdbe_emit_halt_with_presence_test(parse_context, BOX_SPACE_ID, 2,
 					  name_reg, 1, ER_SPACE_EXISTS,
-					  space_name, (no_err != 0),
+					  space_name, if_not_exists,
 					  OP_NoConflict);
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
 			       name_reg, space);
 	free(space->def->opts.sql);
 
  create_view_fail:
-	sql_expr_list_delete(view_def->aliases);
-	sql_select_delete(view_def->select);
+	sql_expr_list_delete(aliases);
+	sql_select_delete(view_select);
 	return;
 }
 
@@ -1814,53 +1755,39 @@ sql_code_drop_table(struct Parse *parse_context, const struct space *space,
 	VdbeComment((v, "Delete entry from _space"));
 }
 
-/**
- * This routine is called to do the work of a DROP TABLE and
- * DROP VIEW statements.
- *
- * @param parse_context Current parsing context.
- */
 void
-sql_drop_table(struct Parse *parse_context)
+sql_drop_table(struct Parse *parse_context, struct Token *table, bool if_exists,
+	       bool is_view)
 {
-	struct drop_entity_def drop_def = parse_context->drop_table_def.base;
-	assert(drop_def.base.alter_action == ALTER_ACTION_DROP);
-	struct SrcList *table_name_list = drop_def.base.entity_name;
 	struct Vdbe *v = sqlGetVdbe(parse_context);
-	bool is_view = drop_def.base.entity_type == ENTITY_TYPE_VIEW;
-	assert(is_view || drop_def.base.entity_type == ENTITY_TYPE_TABLE);
 	sqlVdbeCountChanges(v);
 	assert(!parse_context->is_aborted);
-	assert(table_name_list->nSrc == 1);
-	const char *space_name = table_name_list->a[0].zName;
-	const struct space *space = sql_space_by_src(&table_name_list->a[0]);
+	const struct space *space = sql_space_by_token(table);
 	if (space == NULL) {
-		if (!drop_def.if_exist) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 sql_tt_name_from_token(table));
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_table;
+		return;
 	}
 	/*
 	 * Ensure DROP TABLE is not used on a view,
 	 * and DROP VIEW is not used on a table.
 	 */
 	if (is_view && !space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
-			 "use DROP TABLE");
+		diag_set(ClientError, ER_DROP_SPACE,
+			 sql_tt_name_from_token(table), "use DROP TABLE");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
 	if (!is_view && space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
-			 "use DROP VIEW");
+		diag_set(ClientError, ER_DROP_SPACE,
+			 sql_tt_name_from_token(table), "use DROP VIEW");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
 	sql_code_drop_table(parse_context, space, is_view);
-
- exit_drop_table:
-	sqlSrcListDelete(table_name_list);
 }
 
 /**
@@ -1887,17 +1814,17 @@ columnno_by_name(struct Parse *parse_context, const struct space *space,
 
 /** Generate unique name for foreign key constraint. */
 static char *
-sql_fk_unique_name_new(struct Parse *parse)
+sql_fk_unique_name_new(struct Parse *parse, struct ExprList *child_cols)
 {
-	struct space *space = parse->create_column_def.space;
+	struct space *space = parse->space;
 	if (space == NULL)
-		space = parse->create_table_def.new_space;
+		space = parse->new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct fk_constraint_parse *fk;
 	struct rlist *fkeys = &parse->create_fk_constraint_parse_def.fkeys;
 	uint32_t n = 1;
-	if (parse->create_fk_def.child_cols != NULL) {
+	if (child_cols != NULL) {
 		rlist_foreach_entry(fk, fkeys, link) {
 			if (!fk->fk_def->is_field_fk)
 				++n;
@@ -1938,21 +1865,10 @@ fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
 }
 
 void
-sql_create_foreign_key(struct Parse *parse_context)
+sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
+		       struct Token *name, struct ExprList *child_cols,
+		       struct Token *parent, struct ExprList *parent_cols)
 {
-	struct create_fk_def *create_fk_def = &parse_context->create_fk_def;
-	struct create_constraint_def *create_constr_def = &create_fk_def->base;
-	struct create_entity_def *create_def = &create_constr_def->base;
-	struct alter_entity_def *alter_def = &create_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_FK);
-	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
-	/*
-	 * When this function is called second time during
-	 * <CREATE TABLE ...> statement (i.e. at VDBE runtime),
-	 * don't even try to do something.
-	 */
-	if (sql_get()->init.busy)
-		return;
 	/*
 	 * Beforehand initialization for correct clean-up
 	 * while emergency exiting in case of error.
@@ -1960,10 +1876,9 @@ sql_create_foreign_key(struct Parse *parse_context)
 	char *parent_name = NULL;
 	char *constraint_name = NULL;
 	bool is_self_referenced = false;
-	struct space *space = parse_context->create_column_def.space;
-	struct create_table_def *table_def = &parse_context->create_table_def;
+	struct space *space = parse_context->space;
 	if (space == NULL)
-		space = table_def->new_space;
+		space = parse_context->new_space;
 	/*
 	 * Space under construction during <CREATE TABLE>
 	 * processing or shallow copy of space during <ALTER TABLE
@@ -1972,26 +1887,25 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 */
 	bool is_alter_add_constr = space == NULL;
 	uint32_t child_cols_count;
-	struct ExprList *child_cols = create_fk_def->child_cols;
 	if (child_cols == NULL) {
 		assert(!is_alter_add_constr);
 		child_cols_count = 1;
 	} else {
 		child_cols_count = child_cols->nExpr;
 	}
-	struct ExprList *parent_cols = create_fk_def->parent_cols;
 	struct space *child_space = NULL;
-	if (create_def->name.n != 0)
-		constraint_name = sql_name_from_token(&create_def->name);
-	else
-		constraint_name = sql_fk_unique_name_new(parse_context);
+	if (name->n != 0) {
+		constraint_name = sql_name_from_token(name);
+	} else {
+		constraint_name = sql_fk_unique_name_new(parse_context,
+							 child_cols);
+	}
 	assert(constraint_name != NULL);
 	if (is_alter_add_constr) {
-		const struct space *origin =
-			sql_space_by_src(&alter_def->entity_name->a[0]);
+		const struct space *origin = sql_space_by_token(table);
 		if (origin == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 alter_def->entity_name->a[0].zName);
+				 sql_tt_name_from_token(table));
 			goto tnt_error;
 		}
 		child_space = space_by_id(origin->def->id);
@@ -2004,13 +1918,12 @@ sql_create_foreign_key(struct Parse *parse_context)
 		 * Child space already exists if it is
 		 * <ALTER TABLE ADD COLUMN>.
 		 */
-		if (table_def->new_space == NULL)
+		if (parse_context->new_space == NULL)
 			child_space = space;
 		struct rlist *fkeys =
 			&parse_context->create_fk_constraint_parse_def.fkeys;
 		rlist_add_entry(fkeys, fk_parse, link);
 	}
-	struct Token *parent = create_fk_def->parent_name;
 	assert(parent != NULL);
 	parent_name = sql_name_from_token(parent);
 	/*
@@ -2715,28 +2628,17 @@ constraint_is_named(const char *name)
 }
 
 void
-sql_create_index(struct Parse *parse) {
+sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
+		 struct ExprList *col_list, enum sql_index_type idx_type,
+		 enum sort_order sort_order, bool if_not_exists)
+{
 	/* The index to be created. */
 	struct index *index = NULL;
 	/* Name of the index. */
-	char *name = NULL;
-	assert(!sql_get()->init.busy);
-	struct create_index_def *create_idx_def = &parse->create_index_def;
-	struct create_entity_def *create_entity_def = &create_idx_def->base.base;
-	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_INDEX);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	/*
-	 * Get list of columns to be indexed. It will be NULL if
-	 * this is a primary key or unique-constraint on the most
-	 * recent column added to the table under construction.
-	 */
-	struct ExprList *col_list = create_idx_def->cols;
-	struct SrcList *tbl_name = alter_entity_def->entity_name;
+	char *index_name = NULL;
 
 	if (parse->is_aborted)
 		goto exit_create_index;
-	enum sql_index_type idx_type = create_idx_def->idx_type;
 	if (idx_type == SQL_INDEX_TYPE_UNIQUE ||
 	    idx_type == SQL_INDEX_TYPE_NON_UNIQUE) {
 		Vdbe *v = sqlGetVdbe(parse);
@@ -2747,25 +2649,22 @@ sql_create_index(struct Parse *parse) {
 	 * Find the table that is to be indexed.
 	 * Return early if not found.
 	 */
-	struct space *space = parse->create_table_def.new_space;
+	struct space *space = parse->new_space;
 	if (space == NULL)
-		space = parse->create_column_def.space;
+		space = parse->space;
 	bool is_create_table_or_add_col = space != NULL;
-	struct Token token = create_entity_def->name;
-	if (tbl_name != NULL) {
-		assert(token.n > 0 && token.z != NULL);
-		const struct space *origin = sql_space_by_src(&tbl_name->a[0]);
+	if (!is_create_table_or_add_col) {
+		assert(table != NULL && table->n > 0);
+		const struct space *origin = sql_space_by_token(table);
 		if (origin == NULL) {
-			if (! create_entity_def->if_not_exist) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE,
-					 tbl_name->a[0].zName);
+					 sql_tt_name_from_token(table));
 				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
 		space = space_by_id(origin->def->id);
-	} else if (!is_create_table_or_add_col) {
-		goto exit_create_index;
 	}
 	struct space_def *def = space->def;
 
@@ -2800,22 +2699,20 @@ sql_create_index(struct Parse *parse) {
 	 *    auto-index name will be generated.
 	 */
 	if (!is_create_table_or_add_col) {
-		assert(token.z != NULL);
-		name = sql_name_from_token(&token);
-		if (space_index_by_name0(space, name) != NULL) {
-			if (! create_entity_def->if_not_exist) {
+		assert(name->z != NULL);
+		index_name = sql_name_from_token(name);
+		if (space_index_by_name0(space, index_name) != NULL) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
-					 name, def->name);
+					 index_name, def->name);
 				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
 	} else {
 		char *constraint_name = NULL;
-		if (create_entity_def->name.n > 0) {
-			constraint_name =
-				sql_name_from_token(&create_entity_def->name);
-		}
+		if (name->n > 0)
+			constraint_name = sql_name_from_token(name);
 
 	       /*
 		* This naming is temporary. Now it's not
@@ -2830,24 +2727,26 @@ sql_create_index(struct Parse *parse) {
 		uint32_t idx_count = space->index_count;
 		if (constraint_name == NULL) {
 			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) {
-				name = sqlMPrintf("unique_unnamed_%s_%d",
-						  def->name, idx_count + 1);
+				index_name = sqlMPrintf("unique_unnamed_%s_%d",
+							def->name,
+							idx_count + 1);
 			} else {
-				name = sqlMPrintf("pk_unnamed_%s_%d",
-						  def->name, idx_count + 1);
+				index_name = sqlMPrintf("pk_unnamed_%s_%d",
+							def->name,
+							idx_count + 1);
 			}
 		} else {
-			name = sql_xstrdup(constraint_name);
+			index_name = sql_xstrdup(constraint_name);
 		}
 		sql_xfree(constraint_name);
 	}
 
-	assert(name != NULL);
-	if (sqlCheckIdentifierName(parse, name) != 0)
+	assert(index_name != NULL);
+	if (sqlCheckIdentifierName(parse, index_name) != 0)
 		goto exit_create_index;
 
-	if (tbl_name != NULL && space_is_system(space)) {
-		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
+	if (!is_create_table_or_add_col && space_is_system(space)) {
+		diag_set(ClientError, ER_MODIFY_INDEX, index_name, def->name,
 			 "can't create index on system space");
 		parse->is_aborted = true;
 		goto exit_create_index;
@@ -2866,7 +2765,7 @@ sql_create_index(struct Parse *parse) {
 		struct Expr *expr = sql_expr_new(TK_ID, &prev_col);
 		col_list = sql_expr_list_append(NULL, expr);
 		assert(col_list->nExpr == 1);
-		sqlExprListSetSortOrder(col_list, create_idx_def->sort_order);
+		sqlExprListSetSortOrder(col_list, sort_order);
 	} else {
 		if (col_list->nExpr > SQL_MAX_COLUMN) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
@@ -2889,8 +2788,8 @@ sql_create_index(struct Parse *parse) {
 		iid = space->index_id_max + 1;
 	else
 		iid = 0;
-	if (index_fill_def(parse, index, def, iid, name, strlen(name),
-			   col_list, idx_type) != 0)
+	if (index_fill_def(parse, index, def, iid, index_name,
+			   strlen(index_name), col_list, idx_type) != 0)
 		goto exit_create_index;
 	/*
 	 * Remove all redundant columns from the PRIMARY KEY.
@@ -2985,7 +2884,6 @@ sql_create_index(struct Parse *parse) {
 			    !constraint_is_named(index->def->name))
 				goto exit_create_index;
 		}
-	}
 
 	/*
 	 * If this is the initial CREATE INDEX statement (or
@@ -2995,13 +2893,13 @@ sql_create_index(struct Parse *parse) {
 	 * we are simply parsing the schema, or if this index is
 	 * the PRIMARY KEY index.
 	 *
-	 * If tbl_name == NULL it means this index is generated as
+	 * If table == Token_nil it means this index is generated as
 	 * an implied PRIMARY KEY or UNIQUE index in a CREATE
 	 * TABLE statement.  Since the table has just been
 	 * created, it contains no data and the index
 	 * initialization step can be skipped.
 	 */
-	else if (tbl_name != NULL) {
+	} else {
 		Vdbe *vdbe;
 		int cursor = parse->nTab++;
 
@@ -3057,42 +2955,35 @@ sql_create_index(struct Parse *parse) {
 	if (index != NULL && index->def != NULL)
 		index_def_delete(index->def);
 	sql_expr_list_delete(col_list);
-	sqlSrcListDelete(tbl_name);
-	sql_xfree(name);
+	sql_xfree(index_name);
 }
 
 void
-sql_drop_index(struct Parse *parse_context)
+sql_drop_index(struct Parse *parse_context, struct Token *name,
+	       struct Token *table, bool if_exists)
 {
-	struct drop_entity_def *drop_def = &parse_context->drop_index_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_INDEX);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	/* Never called with prior errors. */
 	assert(!parse_context->is_aborted);
-	struct SrcList *table_list = drop_def->base.entity_name;
-	assert(table_list->nSrc == 1);
 	sqlVdbeCountChanges(v);
-	const struct space *space = sql_space_by_src(&table_list->a[0]);
-	bool if_exists = drop_def->if_exist;
+	const struct space *space = sql_space_by_token(table);
 	if (space == NULL) {
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE,
-				 table_list->a[0].zName);
+				 sql_tt_name_from_token(table));
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_index;
+		return;
 	}
-	uint32_t index_id = sql_index_id_by_token(space, &drop_def->name);
+	uint32_t index_id = sql_index_id_by_token(space, name);
 	if (index_id == UINT32_MAX) {
 		if (if_exists)
-			goto exit_drop_index;
-		const char *name_str = sql_tt_name_from_token(&drop_def->name);
-		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME, name_str,
-			 space->def->name);
+			return;
+		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
+			 sql_tt_name_from_token(name), space->def->name);
 		parse_context->is_aborted = true;
-		goto exit_drop_index;
+		return;
 	}
 
 	int regs = sqlGetTempRange(parse_context, 3);
@@ -3103,9 +2994,6 @@ sql_drop_index(struct Parse *parse_context)
 	sqlVdbeAddOp3(v, OP_SDelete, BOX_INDEX_ID, regs + 2, 0);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlReleaseTempRange(parse_context, regs, 3);
-
- exit_drop_index:
-	sqlSrcListDelete(table_list);
 }
 
 void *

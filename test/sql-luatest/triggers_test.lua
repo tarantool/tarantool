@@ -282,11 +282,15 @@ end)
         --
         box.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT);]])
 
-        exp_err = "At line 1 at or near position 39: FOR EACH STATEMENT "..
-                  "triggers are not implemented, please "..
-                  "supply FOR EACH ROW clause"
+        exp_err = "Syntax error at line 1 near ';'"
         sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN; END;"
         local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Tarantool SQL does not support FOR EACH STATEMENT " ..
+                  "triggers, please supply FOR EACH ROW clause"
+        sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN SELECT 1; END;"
+        _, err = box.execute(sql)
         t.assert_equals(tostring(err), exp_err)
 
         box.execute("DROP TABLE t1;")
@@ -354,18 +358,16 @@ end
         local sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 "..
                     "FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;"
         local _, err = box.execute(sql)
-        local exp_err = "At line 1 at or near position 67: "..
-                    "bindings are not allowed in DDL"
+        local exp_err = "Parameters are not allowed in triggers"
         t.assert_equals(tostring(err), exp_err)
 
         sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 "..
               "FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;"
         local tuple = {"TR1", space_id, {sql = sql}}
         exp_err = {
-            details = "bindings are not allowed in DDL",
-            message = "At line 1 at or near position 67: "..
-                      "bindings are not allowed in DDL",
-            name = "SQL_PARSER_GENERIC_WITH_POS",
+            details = exp_err,
+            message = exp_err,
+            name = "SQL_PARSER_GENERIC",
         }
         t.assert_error_covers(exp_err, _trigger.insert, _trigger, tuple)
 
@@ -804,5 +806,51 @@ g.test_12969_insert_defaults_in_trigger = function(cg)
 
         box.execute([[DROP TABLE t2;]])
         box.execute([[DROP TABLE t1;]])
+    end)
+end
+
+--
+-- Make sure that the CREATE TRIGGER statement is saved exactly as it was
+-- provided.
+--
+g.test_trigger_str = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t1(i INT PRIMARY KEY);]])
+        box.execute([[CREATE TABLE t2(i INT PRIMARY KEY);]])
+        local sql = [[    CREATE TRIGGER IF NOT EXISTS t1t AFTER INSERT ON t1
+                      FOR EACH ROW BEGIN INSERT INTO t2 DEFAULT VALUES; END;
+                       -- note   ]]
+        box.execute(sql)
+        t.assert_equals(box.space._trigger:get('t1t').opts.sql, sql)
+        box.execute([[DROP TRIGGER t1t;]])
+        box.execute([[DROP TABLE t2;]])
+        box.execute([[DROP TABLE t1;]])
+    end)
+end
+
+--
+-- Make sure that no assertion when inserting an invalid trigger definition
+-- into _trigger.
+--
+g.test_wrong_trigger_def = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
+        local _trigger = box.space._trigger
+        local def = {'asd', box.space.t.id, {sql = ''}}
+        local exp_err = {
+            details = "Trigger definition cannot be empty",
+            message = "Trigger definition cannot be empty",
+            name = "SQL_PARSER_GENERIC",
+        }
+        t.assert_error_covers(exp_err, _trigger.insert, _trigger, def)
+
+        def = {'asd', box.space.t.id, {sql = 'INSERT INTO t VALUES (1);'}}
+        exp_err = {
+            message = "Syntax error at line 1 near 'INSERT'",
+            name = "SQL_SYNTAX_NEAR_TOKEN",
+            token = "INSERT",
+        }
+        t.assert_error_covers(exp_err, _trigger.insert, _trigger, def)
+        box.execute([[DROP TABLE t;]])
     end)
 end
