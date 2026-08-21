@@ -28,7 +28,6 @@ local normalize_txn_isolation_level = box.internal.normalize_txn_isolation_level
 local normalize_constraint = box.internal.tuple_format.normalize_constraint
 local normalize_foreign_key = box.internal.tuple_format.normalize_foreign_key
 local normalize_format = box.internal.tuple_format.normalize_format
-local denormalize_format = box.internal.tuple_format.denormalize_format
 
 local DEFAULT_ORIGIN = ''
 -- We use the field ID instead of the field name so we don't need to upgrade
@@ -505,7 +504,7 @@ function box.schema.space.format(id, format)
     end
 
     if format == nil then
-        return denormalize_format(tuple.format)
+        return box.space[id].format_object:totable()
     else
         check_param(format, 'format', 'table', 2)
         format = normalize_format(id, tuple.name, format, 2)
