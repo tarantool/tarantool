@@ -137,6 +137,14 @@ descriptions here.
   replication-specific code. MUST use when editing/adding tests under
   `test/replication/` or `test/replication-luatest/`.
 
+- `doc/agents/review.md` - Enables code reviewing: validation of commits and
+  code for correctness and against the project standards. MUST use when the user
+  asks to review a patch, a branch, a pull request.
+
+- `doc/agents/review-gh.md` - Enables code reviewing on GitHub. This extends the
+  regular review skill. MUST use when the user asks for a review to be posted on
+  GitHub.
+
 - `doc/agents/setup-dev.md` - Enables access to user-specific development setup:
   sources fetch, configure, build, tests, static analysis. MUST use when
   `doc/agents/local_setup.md` is missing or seems outdated, and you need to do
