@@ -308,14 +308,11 @@ sql_vsnprintf(int, char *, const char *, va_list);
  * a statement handle (struct Vdbe).
  *
  * @param sql UTF-8 encoded SQL statement.
- * @param sql_len Length of @sql in bytes.
  * @param re_prepared VM being re-compiled. Can be NULL.
- * @param[out] stmt A pointer to the compiled statement.
- * @param[out] sql_tail End of parsed string.
+ * @retval stmt A pointer to the compiled statement.
  */
-int
-sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
-		 struct Vdbe **stmt, const char **sql_tail);
+struct Vdbe *
+sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
 
 /** This is the top-level implementation of sqlStep(). */
 int
@@ -412,11 +409,6 @@ sql_stmt_schema_version(const struct Vdbe *stmt);
 
 int
 sql_initialize(void);
-
-#define SQL_TRACE_STMT       0x01
-#define SQL_TRACE_PROFILE    0x02
-#define SQL_TRACE_ROW        0x04
-#define SQL_TRACE_CLOSE      0x08
 
 #define SQL_OPEN_READONLY         0x00000001	/* Ok for sql_open_v2() */
 #define SQL_OPEN_READWRITE        0x00000002	/* Ok for sql_open_v2() */
@@ -933,37 +925,15 @@ struct LookasideSlot {
 struct sql {
 	sql_vfs *pVfs;	/* OS Interface */
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
-	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	i64 szMmap;		/* Default mmap_size setting */
 	u16 dbOptFlags;		/* Flags to enable/disable optimizations */
-	u8 enc;			/* Text encoding */
-	u8 dfltLockMode;	/* Default locking-mode for attached dbs */
-	u8 mTrace;		/* zero or more sql_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
 	/** Value returned by ROW_COUNT(). */
 	int nChange;
 	int aLimit[SQL_N_LIMIT];	/* Limits */
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */
-	struct sqlInitInfo {	/* Information used during initialization */
-		uint32_t space_id;
-		uint32_t index_id;
-		u8 busy;	/* TRUE if currently initializing */
-		u8 orphanTrigger;	/* Last statement is orphaned TEMP trigger */
-		u8 imposterTable;	/* Building an imposter table */
-	} init;
 	int nVdbeActive;	/* Number of VDBEs currently running */
 	int nVdbeExec;		/* Number of nested calls to VdbeExec() */
-	int (*xTrace) (u32, void *, void *, void *);	/* Trace function */
-	void *pTraceArg;	/* Argument to the trace function */
-	void (*xProfile) (void *, const char *, u64);	/* Profiling function */
-	void *pProfileArg;	/* Argument to profile function */
-	void *pCommitArg;	/* Argument to xCommitCallback() */
-	int (*xCommitCallback) (void *);	/* Invoked at every commit. */
-	void *pRollbackArg;	/* Argument to xRollbackCallback() */
-	void (*xRollbackCallback) (void *);	/* Invoked at every commit. */
-	void *pUpdateArg;
-	void (*xUpdateCallback) (void *, int, const char *, const char *,
-				 sql_int64);
 	Lookaside lookaside;	/* Lookaside malloc configuration */
 };
 
@@ -3228,8 +3198,6 @@ int sqlFunctionUsesThisSrc(Expr *, SrcList *);
 struct Vdbe *
 sqlGetVdbe(struct Parse *pParse);
 
-void sqlRollbackAll(Vdbe *);
-
 /**
  * Generate opcodes which start new Tarantool transaction.
  * Used from parser to process BEGIN statement.
@@ -3261,7 +3229,19 @@ void sqlSavepoint(Parse *, int, Token *);
 void sqlCloseSavepoints(Vdbe *);
 int sqlExprIsConstant(Expr *);
 int sqlExprIsConstantNotJoin(Expr *);
-int sqlExprIsConstantOrFunction(Expr *, u8);
+
+/*
+ * Walk an expression tree.  Return non-zero if the expression is constant
+ * or a function call with constant arguments.  Return and 0 if there
+ * are any variables.
+ *
+ * For the purposes of this function, a double-quoted string (ex: "abc")
+ * is considered a variable but a single-quoted string (ex: 'abc') is
+ * a constant.
+ */
+int
+sqlExprIsConstantOrFunction(struct Expr *expr);
+
 int sqlExprIsTableConstant(Expr *, int);
 int sqlExprIsInteger(Expr *, int *);
 int sqlExprCanBeNull(const Expr *);

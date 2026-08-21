@@ -38,62 +38,29 @@
 #include "tarantoolInt.h"
 #include "box/space.h"
 #include "box/session.h"
+#include "box/schema.h"
 
-int
-sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
-		 struct Vdbe **ppStmt, const char **pzTail)
+struct Vdbe *
+sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 {
-	int rc = 0;	/* Result code */
+	if (strlen(zSql) > SQL_MAX_SQL_LENGTH) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "SQL command length",
+			 (int)strlen(zSql), SQL_MAX_SQL_LENGTH);
+		return NULL;
+	}
+
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
-	*ppStmt = NULL;
 
-	/* Check to verify that it is possible to get a read lock on all
-	 * database schemas.  The inability to get a read lock indicates that
-	 * some other database connection is holding a write-lock, which in
-	 * turn means that the other connection has made uncommitted changes
-	 * to the schema.
-	 *
-	 * Were we to proceed and prepare the statement against the uncommitted
-	 * schema changes and if those schema changes are subsequently rolled
-	 * back and different changes are made in their place, then when this
-	 * prepared statement goes to run the schema cookie would fail to detect
-	 * the schema change.  Disaster would follow.
-	 *
-	 * Note that setting READ_UNCOMMITTED overrides most lock detection,
-	 * but it does *not* override schema lock detection, so this all still
-	 * works even if READ_UNCOMMITTED is set.
-	 */
-	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
-		char *zSqlCopy;
-		int mxLen = SQL_MAX_SQL_LENGTH;
-		if (nBytes > mxLen) {
-			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
-				 "SQL command length", nBytes, mxLen);
-			rc = -1;
-			goto end_prepare;
-		}
-		zSqlCopy = sql_xstrndup(zSql, nBytes);
-		if (zSqlCopy) {
-			sqlRunParser(&sParse, zSqlCopy);
-			sParse.zTail = &zSql[sParse.zTail - zSqlCopy];
-			sql_xfree(zSqlCopy);
-		} else {
-			sParse.zTail = &zSql[nBytes];
-		}
-	} else {
-		sqlRunParser(&sParse, zSql);
+	sqlRunParser(&sParse, zSql);
+	if (sParse.is_aborted) {
+		sql_parser_destroy(&sParse);
+		return NULL;
 	}
-	assert(0 == sParse.nQueryLoop || sParse.is_aborted);
+	assert(sParse.nQueryLoop == 0);
 
-	if (pzTail) {
-		*pzTail = sParse.zTail;
-	}
-	if (sParse.is_aborted)
-		rc = -1;
-
-	if (rc == 0 && sParse.pVdbe != NULL && sParse.explain) {
+	if (sParse.explain != 0) {
 		static const char *const azColName[] = {
 			/*  0 */ "addr",
 			/*  1 */ "integer",
@@ -139,28 +106,79 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		}
 	}
 
-	if (sql_get()->init.busy == 0) {
-		Vdbe *pVdbe = sParse.pVdbe;
-		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
-	}
-	if (sParse.pVdbe != NULL && rc != 0) {
-		sqlVdbeFinalize(sParse.pVdbe);
-		assert(!(*ppStmt));
-	} else {
-		*ppStmt = sParse.pVdbe;
-	}
-
-	/* Delete any TriggerPrg structures allocated while parsing this statement. */
-	while (sParse.pTriggerPrg) {
-		TriggerPrg *pT = sParse.pTriggerPrg;
-		sParse.pTriggerPrg = pT->pNext;
-		sql_xfree(pT);
-	}
-
- end_prepare:
-
+	struct Vdbe *res = sParse.pVdbe;
+	sParse.pVdbe = NULL;
+	sqlVdbeSetSql(res, zSql);
 	sql_parser_destroy(&sParse);
-	return rc;
+	return res;
+}
+
+struct Expr *
+sql_expr_compile(const char *expr, int expr_len)
+{
+	const char *outer = "FUNCTION ";
+	int len = strlen(outer) + expr_len;
+
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	/*
+	 * Since SELECT token is added to the original expression,
+	 * to make error message display correct position we should
+	 * account its length.
+	 */
+	parser.line_pos -= strlen(outer);
+	parser.parse_only = true;
+	parser.is_expr = true;
+
+	struct Expr *expression = NULL;
+	char *stmt = xregion_alloc(&parser.region, len + 1);
+	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
+
+	if (sqlRunParser(&parser, stmt) == 0) {
+		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
+		expression = parser.parsed_ast.expr;
+		parser.parsed_ast.expr = NULL;
+	}
+	sql_parser_destroy(&parser);
+	return expression;
+}
+
+struct Select *
+sql_view_compile(const char *view_stmt)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	parser.parse_only = true;
+
+	struct Select *select = NULL;
+
+	if (sqlRunParser(&parser, view_stmt) != 0 ||
+	    parser.parsed_ast_type != AST_TYPE_SELECT) {
+		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
+	} else {
+		select = parser.parsed_ast.select;
+		parser.parsed_ast.select = NULL;
+	}
+
+	sql_parser_destroy(&parser);
+	return select;
+}
+
+struct sql_trigger *
+sql_trigger_compile(const char *sql)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	parser.parse_only = true;
+	struct sql_trigger *trigger = NULL;
+	if (sqlRunParser(&parser, sql) == 0 &&
+	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
+		trigger = parser.parsed_ast.trigger;
+		parser.parsed_ast.trigger = NULL;
+	}
+
+	sql_parser_destroy(&parser);
+	return trigger;
 }
 
 /*
@@ -169,16 +187,13 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 int
 sqlReprepare(Vdbe * p)
 {
-	struct Vdbe *pNew;
 	const char *zSql;
 
 	zSql = sql_sql(p);
 	assert(zSql != 0);
-	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
-		assert(pNew == 0);
+	struct Vdbe *pNew = sql_stmt_compile(zSql, p);
+	if (pNew == NULL)
 		return -1;
-	}
-	assert(pNew != 0);
 	sqlVdbeSwap(pNew, p);
 	sqlTransferBindings(pNew, p);
 	sqlVdbeResetStepResult(pNew);
@@ -196,11 +211,54 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 	region_create(&parser->region, &cord()->slabc);
 }
 
+/**
+ * This function is called to release parsing artifacts
+ * during table creation or column addition. The only objects
+ * allocated using malloc are index defs.
+ * Note that this functions can't be called on ordinary
+ * space object. It's purpose is to clean-up parser->new_space.
+ *
+ * @param parser Parser context.
+ */
+static void
+parser_space_delete(struct Parse *parser)
+{
+	struct space *space = parser->create_column_def.space;
+	if (space == NULL)
+		return;
+	assert(space->def->opts.is_ephemeral);
+	uint32_t i = 0;
+	/*
+	 * If parser->new_space is NULL, the query is ALTER TABLE ADD COLUMNS.
+	 */
+	if (parser->create_table_def.new_space == NULL) {
+		/*
+		 * Don't delete already existing defs and start from new
+		 * ones.
+		 */
+		struct space *altered_space = space_by_name0(space->def->name);
+		if (altered_space != NULL)
+			i = altered_space->index_count;
+	}
+	for (; i < space->index_count; ++i)
+		index_def_delete(space->index[i]->def);
+}
+
 void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
 	assert(!parser->parse_only || parser->pVdbe == NULL);
+	sqlVdbeDelete(parser->pVdbe);
+	parser_space_delete(parser);
+	while (parser->pTriggerPrg != NULL) {
+		TriggerPrg *pT = parser->pTriggerPrg;
+		parser->pTriggerPrg = pT->pNext;
+		sql_xfree(pT);
+	}
+	if (parser->pWithToFree)
+		sqlWithDelete(parser->pWithToFree);
+	sql_xfree(parser->pVList);
 	sql_xfree(parser->default_funcs);
 	sql_xfree(parser->aLabel);
 	sql_expr_list_delete(parser->pConstExpr);

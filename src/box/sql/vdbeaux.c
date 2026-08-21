@@ -84,16 +84,13 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 	return 0;
 }
 
-/*
- * Remember the SQL string for a prepared statement.
- */
 void
-sqlVdbeSetSql(Vdbe * p, const char *z, int n)
+sqlVdbeSetSql(struct Vdbe *p, const char *z)
 {
 	if (p == 0)
 		return;
 	assert(p->zSql == 0);
-	p->zSql = sql_xstrndup(z, n);
+	p->zSql = sql_xstrdup(z);
 }
 
 /*
@@ -1826,13 +1823,11 @@ sqlVdbeHalt(Vdbe * p)
 				if (rc != 0) {
 					p->is_aborted = true;
 					box_txn_rollback();
-					sqlRollbackAll(p);
 					p->nChange = 0;
 				}
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				p->nChange = 0;
 			}
 			p->anonymous_savepoint = NULL;
@@ -1845,7 +1840,6 @@ sqlVdbeHalt(Vdbe * p)
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);
 				p->nChange = 0;
 			}
@@ -1863,7 +1857,6 @@ sqlVdbeHalt(Vdbe * p)
 				box_txn_rollback();
 				p->is_aborted = true;
 				closeCursorsAndFree(p);
-				sqlRollbackAll(p);
 				sqlCloseSavepoints(p);
 				p->nChange = 0;
 			}
@@ -2001,7 +1994,7 @@ sqlVdbeClearObject(struct Vdbe *p)
 void
 sqlVdbeDelete(Vdbe * p)
 {
-	if (NEVER(p == 0))
+	if (p == NULL)
 		return;
 	sqlVdbeClearObject(p);
 	if (p->pPrev) {
