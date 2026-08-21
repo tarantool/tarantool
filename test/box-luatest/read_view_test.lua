@@ -95,6 +95,9 @@ g.test_invalid_usage = function(cg)
             "Use read_view:info(...) instead of read_view.info(...)",
             rv.info)
         t.assert_error_msg_contains(
+            "Use read_view:with(...) instead of read_view.with(...)",
+            rv.with)
+        t.assert_error_msg_contains(
             "Use index:get(...) instead of index.get(...)",
             rv.space._space.index.primary.get)
         t.assert_error_msg_contains(
@@ -192,11 +195,13 @@ g.test_autocomplete = function(cg)
             'test_rv.status',
             'test_rv.space',
             'test_rv.info(',
+            'test_rv.with(',
             'test_rv.close(',
         })
         t.assert_items_equals(complete('test_rv:'), {
             'test_rv:',
             'test_rv:info(',
+            'test_rv:with(',
             'test_rv:close(',
         })
         rv:close()
@@ -2393,6 +2398,100 @@ g.test_read_view_get_after_space_drop = function(cg)
     end)
 end
 
+g.test_with = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.schema.space.create('test')
+        s:create_index('primary')
+        s:insert({1})
+        s:insert({2})
+        s:insert({3})
+        local rv = box.read_view.open()
+        t.assert_error_covers({
+            type = 'IllegalParams',
+            message = 'function object should be a function',
+        }, rv.with, rv)
+        rv:with(function(rv_inner)
+            t.assert_is(rv_inner, rv)
+        end)
+        -- Returning a value.
+        t.assert_equals(rv:with(function(rv_inner)
+            return rv_inner.space.test:select()
+        end), {{1}, {2}, {3}})
+        -- Multi-return.
+        t.assert_equals({rv:with(function(rv_inner)
+            return rv_inner.space.test:get(1),
+                   rv_inner.space.test:get(2),
+                   rv_inner.space.test:get(3)
+        end)}, {{1}, {2}, {3}})
+        -- Passing arguments.
+        rv:with(function(rv_inner, a, b, c)
+            t.assert_equals(rv_inner.space.test:get(1), a)
+            t.assert_equals(rv_inner.space.test:get(2), b)
+            t.assert_equals(rv_inner.space.test:get(3), c)
+        end, {1}, {2}, {3})
+        -- Raising an error.
+        t.assert_equals({pcall(rv.with, rv, function()
+            error('foobar', 0)
+        end)}, {false, 'foobar'})
+        -- Calling with() on a closed read view.
+        rv:close()
+        t.assert_equals(rv.status, 'closed')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name ='READ_VIEW_CLOSED'
+        }, rv.with, rv, function() end)
+        -- Postponing close() using with().
+        rv = box.read_view.open()
+        local f1 = fiber.new(function()
+            return rv:with(function(rv_inner)
+                fiber.sleep(1000)
+                return rv_inner.space.test:select()
+            end)
+        end)
+        f1:set_joinable(true)
+        local f2 = fiber.new(function()
+            return rv:with(function(rv_inner_1)
+                return rv_inner_1:with(function(rv_inner_2)
+                    fiber.sleep(1000)
+                    return rv_inner_2.space.test:select()
+                end)
+            end)
+        end)
+        f2:set_joinable(true)
+        fiber.yield()
+        t.assert_equals(rv.status, 'open')
+        rv:close()
+        t.assert_equals(rv.status, 'close_pending')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name ='READ_VIEW_CLOSED'
+        }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {
+            {type = 'fiber', fid = f1:id()},
+            {type = 'fiber', fid = f2:id()},
+        })
+        f1:wakeup()
+        t.assert_equals({f1:join(10)}, {true, s:select()})
+        t.assert_equals(rv.status, 'close_pending')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name ='READ_VIEW_CLOSED'
+        }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {
+            {type = 'fiber', fid = f2:id()},
+        })
+        f2:wakeup()
+        t.assert_equals({f2:join(10)}, {true, s:select()})
+        t.assert_equals(rv.status, 'closed')
+        t.assert_error_covers({
+            type = 'ClientError',
+            name ='READ_VIEW_CLOSED'
+        }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {})
+    end)
+end
+
 local g_mvcc = t.group('read_view.mvcc', t.helpers.matrix{
     func_index = {true, false},
 })
@@ -2845,6 +2944,7 @@ g_threads.test_close_pending = function(cg)
     -- Check that a read view isn't deleted until every thread using it
     -- closes it.
     cg.server:exec(function()
+        local fun = require('fun')
         local threads = require('experimental.threads')
         local rv = box.read_view.open()
         threads.eval('app', [[
@@ -2856,6 +2956,11 @@ g_threads.test_close_pending = function(cg)
             type = 'ClientError',
             name = 'READ_VIEW_CLOSED',
         }, rv.close, rv)
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(1, 4)):totable())
 
         -- The read view is still usable in application threads.
         t.assert_equals(threads.eval('app', [[
@@ -2876,6 +2981,11 @@ g_threads.test_close_pending = function(cg)
         }, threads.eval, 'app', [[
             box.read_view.open({id = ...})
         ]], {rv.id}, {target = 1})
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(2, 4)):totable())
 
         -- The read view status doesn't change after it's removed from
         -- the local registry by the garbage collector.
@@ -2893,6 +3003,11 @@ g_threads.test_close_pending = function(cg)
         }, threads.eval, 'app', [[
             box.read_view.open({id = ...})
         ]], {rv.id}, {target = 1})
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(2, 4)):totable())
 
         -- The read view is deleted as soon as all threads close it.
         for i = 2, box.cfg.app_threads do
@@ -2905,6 +3020,7 @@ g_threads.test_close_pending = function(cg)
         t.helpers.retrying({}, function()
             t.assert_equals(rv.status, 'closed')
         end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {})
         rv = nil -- luacheck: ignore
         for _ = 1, 5 do collectgarbage('collect') end
         t.assert_equals(box.read_view.list(), {})
