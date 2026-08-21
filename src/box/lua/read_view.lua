@@ -5,6 +5,7 @@ local fiber = require('fiber')
 local threads = require('experimental.threads')
 
 local check_index_arg = box.internal.check_index_arg
+local check_param = utils.check_param
 local check_param_table = utils.check_param_table
 local check_primary_index = box.internal.check_primary_index
 local check_iterator_type = box.internal.check_iterator_type
@@ -345,6 +346,30 @@ function read_view_methods:info()
 end
 
 read_view_mt.__serialize = read_view_methods.info
+
+function read_view_methods:_with_tail(status, ...)
+    self:_release()
+    if not status then
+        local err = ...
+        error(err, 0)
+    end
+    return ...
+end
+
+--
+-- Calls a function ensuring that the read view isn't closed until the function
+-- returns. The function is passed the read view object followed by the passed
+-- arguments.
+--
+function read_view_methods:with(func, ...)
+    check_read_view_arg(self, 'with', 2)
+    check_param(func, 'function object', 'function', 2)
+    if self.status ~= 'open' then
+        box.error(box.error.READ_VIEW_CLOSED, 2)
+    end
+    self:_acquire()
+    return self:_with_tail(pcall(func, self, ...))
+end
 
 --
 -- If the given read view was created with box.read_view.open(), the function
