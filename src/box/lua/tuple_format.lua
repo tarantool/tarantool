@@ -239,6 +239,19 @@ local function normalize_default_func(func_name, error_prefix, level)
 end
 
 local function normalize_format(space_id, space_name, format, level)
+    -- A field def can be passed without the enclosing braces, e.g.
+    -- {name = 'a', type = 'unsigned'} or {'a', type = 'unsigned'}.
+    -- Any string key is meaningless directly on the format list, so
+    -- its presence means the table is one field, unless format[1] is
+    -- already a table (a real list entry), which takes priority.
+    if type(format[1]) ~= 'table' then
+        for k in pairs(format) do
+            if type(k) == 'string' then
+                format = {format}
+                break
+            end
+        end
+    end
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
