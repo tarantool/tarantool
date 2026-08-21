@@ -94,11 +94,13 @@ g_object.test_autocomplete = function(cg)
             'test_rv.signature',
             'test_rv.status',
             'test_rv.info(',
+            'test_rv.with(',
             'test_rv.close(',
         })
         t.assert_items_equals(complete('test_rv:'), {
             'test_rv:',
             'test_rv:info(',
+            'test_rv:with(',
             'test_rv:close(',
         })
     end)
@@ -148,8 +150,8 @@ g_status.test_status = function(cg)
     end)
 end
 
--- Checks read_view:close() method.
-g_status.test_close = function(cg)
+-- Checks that a system read view can't be used or closed.
+g_status.test_busy = function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
         box.space.test:replace({1, 'close'})
@@ -160,10 +162,14 @@ g_status.test_close = function(cg)
         local l = box.read_view.list()
         t.assert_equals(#l, 1)
         local rv = l[1]
-        t.assert_error_msg_equals('The read view is busy', rv.close, rv)
+        local err = {type = 'ClientError', name = 'READ_VIEW_BUSY'}
+        t.assert_error_covers(err, rv.with, rv, function() end)
+        t.assert_error_covers(err, rv.close, rv)
         box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
         t.assert(f:join())
-        t.assert_error_msg_equals('The read view is closed', rv.close, rv)
+        err = {type = 'ClientError', name = 'READ_VIEW_CLOSED'}
+        t.assert_error_covers(err, rv.with, rv, function() end)
+        t.assert_error_covers(err, rv.close, rv)
     end)
 end
 

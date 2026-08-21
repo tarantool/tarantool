@@ -74,6 +74,11 @@ local READ_VIEW_OPTIONS_TEMPLATE = {
     id = 'number',
 }
 
+-- box.read_view.info() options template.
+local READ_VIEW_INFO_TEMPLATE = {
+    refs = 'boolean',
+}
+
 local function check_read_view_arg(rv, method, level)
     if type(rv) ~= 'table' then
         local fmt = 'Use read_view:%s(...) instead of read_view.%s(...)'
@@ -226,6 +231,21 @@ function box.read_view.list()
 end
 
 --
+-- Returns a path used to acquire a reference to a read view in a thread.
+--
+local function thread_ref_path()
+    local info = threads.info()
+    return {'thread', info.group_name, info.thread_id}
+end
+
+--
+-- Returns a path used to acquire a reference to a read view in a fiber.
+--
+local function fiber_ref_path()
+    return {'fiber', fiber.id()}
+end
+
+--
 -- Wrapper around internal.close() that, if called in an application thread,
 -- sends a request to release the read view to the main thread.
 --
@@ -235,7 +255,8 @@ local function read_view_close(crv, warn)
         assert(not fiber._internal.cord_is_main)
         -- threads.call() yields while we can't yield in this function
         -- because it may be called by the garbage collector.
-        fiber.new(threads.call, 'tx', 'box.internal.read_view.release', {id})
+        fiber.new(threads.call, 'tx', 'box.internal.read_view.release',
+                  {id, thread_ref_path()})
     end
 end
 
@@ -277,7 +298,8 @@ function box.read_view.open(opts)
         -- Ask the main thread to pin the read view with the given id
         -- and create a local handle for it.
         local ret = utils.call_at(2, threads.call, 'tx',
-                                  'box.internal.read_view.acquire', {opts.id})
+                                  'box.internal.read_view.acquire',
+                                  {opts.id, thread_ref_path()})
         -- We should never get here when called from the main thread because
         -- the read view registry maintained by the main thread is supposed to
         -- store all usable read views.
@@ -287,7 +309,8 @@ function box.read_view.open(opts)
         ok, ret = pcall(internal.reuse, ptr)
         if not ok then
             -- Don't forget to unpin the read view on error.
-            threads.call('tx', 'box.internal.read_view.release', {opts.id})
+            threads.call('tx', 'box.internal.read_view.release',
+                         {opts.id, thread_ref_path()})
             box.error(ret, 2)
         end
         rv = ret
@@ -316,7 +339,11 @@ function box.read_view.open(opts)
             end
         end
     end
-    rv._refs = 0
+    -- Each read view reference is identified by path {key1, key2, ...} in
+    -- the _refs table. At the leaf sub-table of each path a reference counter
+    -- is stored under the key _count so that the same reference path may be
+    -- taken multiple times.
+    rv._refs = {}
     rv._status = 'open'
     ffi.gc(rv._crv, read_view_gc)
     return register_read_view(rv)
@@ -332,9 +359,14 @@ end
 --  - 'signature' - box.info.signature at the time of read view open.
 --  - 'status' - 'open', 'closed', or 'close_pending'.
 --
-function read_view_methods:info()
+-- If opts.refs is true, adds 'refs' key to the info table that stores
+-- a list of references taken for this read view.
+--
+function read_view_methods:info(opts)
     check_read_view_arg(self, 'info', 2)
-    return {
+    opts = opts or {}
+    check_param_table(opts, READ_VIEW_INFO_TEMPLATE, 2)
+    local info = {
         id = self.id,
         name = self.name,
         is_system = self.is_system,
@@ -343,12 +375,16 @@ function read_view_methods:info()
         signature = self.signature,
         status = self.status,
     }
+    if opts.refs then
+        info.refs = self:_refs_info()
+    end
+    return info
 end
 
 read_view_mt.__serialize = read_view_methods.info
 
 function read_view_methods:_with_tail(status, ...)
-    self:_release()
+    self:_release(fiber_ref_path())
     if not status then
         local err = ...
         error(err, 0)
@@ -367,7 +403,11 @@ function read_view_methods:with(func, ...)
     if self.status ~= 'open' then
         box.error(box.error.READ_VIEW_CLOSED, 2)
     end
-    self:_acquire()
+    if self._crv == nil then
+        -- System read view. Can't be used.
+        box.error(box.error.READ_VIEW_BUSY, 2)
+    end
+    self:_acquire(fiber_ref_path())
     return self:_with_tail(pcall(func, self, ...))
 end
 
@@ -386,7 +426,7 @@ function read_view_methods:close()
         -- System read view. Can't be closed.
         box.error(box.error.READ_VIEW_BUSY, 2)
     end
-    if self._refs == 0 then
+    if next(self._refs) == nil then
         self:_do_close()
     else
         self._status = 'close_pending'
@@ -425,16 +465,26 @@ local referenced_read_views = {}
 -- changed to 'close_pending' and remains so until the last reference to it
 -- is gone, after which it's closed for real.
 --
-function read_view_methods:_acquire()
+function read_view_methods:_acquire(path)
     assert(self.status == 'open')
     assert(self._crv ~= nil)
-    assert(self._refs >= 0)
-    if self._refs == 0 then
+    if next(self._refs) == nil then
         referenced_read_views[self.id] = self
     else
         assert(referenced_read_views[self.id] == self)
     end
-    self._refs = self._refs + 1
+    local ref = self._refs
+    for _, key in ipairs(path) do
+        if ref[key] == nil then
+            ref[key] = {}
+        end
+        ref = ref[key]
+    end
+    if ref._count ~= nil then
+        ref._count = ref._count + 1
+    else
+        ref._count = 1
+    end
 end
 
 --
@@ -443,12 +493,29 @@ end
 -- If the read view was closed (its status is 'close_pending'), it will be
 -- deleted as soon as the last reference to it is gone.
 --
-function read_view_methods:_release()
+function read_view_methods:_release(path)
     assert(self.status ~= 'closed')
     assert(self._crv ~= nil)
-    assert(self._refs > 0)
-    self._refs = self._refs - 1
-    if self._refs == 0 then
+    local ref_path = {}
+    local ref = self._refs
+    for _, key in ipairs(path) do
+        table.insert(ref_path, ref)
+        assert(ref[key] ~= nil)
+        ref = ref[key]
+    end
+    assert(ref._count > 0)
+    ref._count = ref._count - 1
+    if ref._count == 0 then
+        ref._count = nil
+    end
+    for i = #path, 1, -1 do
+        local key = path[i]
+        if next(ref_path[i][key]) ~= nil then
+            break
+        end
+        ref_path[i][key] = nil
+    end
+    if next(self._refs) == nil then
         referenced_read_views[self.id] = nil
         if self.status == 'close_pending' then
             self:_do_close()
@@ -456,10 +523,35 @@ function read_view_methods:_release()
     end
 end
 
+--
+-- Returns a list of references taken for this read view.
+--
+-- Assumes there are two types of references: fiber and thread.
+--
+function read_view_methods:_refs_info()
+    local info = {}
+    for group_name, group_refs in pairs(self._refs.thread or {}) do
+        for thread_id in pairs(group_refs) do
+            table.insert(info, {
+                type = 'thread',
+                group_name = group_name,
+                thread_id = thread_id
+            })
+        end
+    end
+    for fid in pairs(self._refs.fiber or {}) do
+        table.insert(info, {
+            type = 'fiber',
+            fid = fid,
+        })
+    end
+    return info
+end
+
 if fiber._internal.cord_is_main then
     -- Acquires a reference to a read view in the main thread.
     -- Returns a pointer to the referenced read view.
-    threads.export('box.internal.read_view.acquire', function(id)
+    threads.export('box.internal.read_view.acquire', function(id, path)
         local rv = read_view_registry[id]
         -- System read views are added to the Lua registry on demand so
         -- to raise a proper error on an attempt to acquire a reference
@@ -470,14 +562,14 @@ if fiber._internal.cord_is_main then
         if rv == nil or rv.status ~= 'open' then
             box.error(box.error.NO_SUCH_READ_VIEW)
         end
-        rv:_acquire()
+        rv:_acquire(path)
         return rv._ptr
     end)
     -- Releases a reference to a read view in the main thread.
-    threads.export('box.internal.read_view.release', function(id)
+    threads.export('box.internal.read_view.release', function(id, path)
         local rv = read_view_registry[id]
         assert(rv ~= nil)
-        rv:_release()
+        rv:_release(path)
     end)
 end
 
