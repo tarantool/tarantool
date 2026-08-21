@@ -3083,31 +3083,46 @@ box_check_promote(void) {
 }
 
 /**
- * Wait until this instance becomes writable, as long as it remains the Raft
- * leader.
+ * Wait until this instance claims the limbo. Usually it means the node
+ * becomes writable, but not necessarily. It might, for example, have
+ * box.cfg.read_only = true and still claim the limbo successfully.
  */
 static int
-box_wait_for_rw_while_leader(struct raft *raft)
+box_wait_for_limbo_claim(struct raft *raft)
 {
 	assert(is_box_configured);
 	double deadline = ev_monotonic_now(loop()) +
 		replication_synchro_timeout;
-	while (box_is_ro()) {
+	bool is_timed_out = false;
+	while (txn_limbo.state != TXN_LIMBO_STATE_LEADER) {
 		if (raft->state != RAFT_STATE_LEADER) {
 			diag_set(ClientError, ER_INTERFERING_ELECTIONS);
 			return -1;
 		}
-		struct trigger on_update;
-		trigger_create(&on_update, fiber_wakeup_trigger_cb,
-			       fiber(), NULL);
-		raft_on_update(raft, &on_update);
-		int rc = fiber_cond_wait_deadline(&ro_cond, deadline);
-		trigger_clear(&on_update);
-		if (rc != 0)
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
 			return -1;
+		}
+		if (is_timed_out) {
+			diag_set(TimedOut);
+			return -1;
+		}
+		/*
+		 * Raft updates are covered by the limbo updates. Enough to
+		 * subscribe to the latter to get notified about the former too.
+		 */
+		struct trigger on_state_update;
+		trigger_create(&on_state_update, fiber_wakeup_trigger_cb,
+			       fiber(), NULL);
+		trigger_add(&txn_limbo.on_state_update, &on_state_update);
+		/*
+		 * Even if timed out, firstly check the limbo and raft states -
+		 * perhaps they are right already.
+		 */
+		is_timed_out = fiber_yield_deadline(deadline);
+		trigger_clear(&on_state_update);
 	}
 	assert(raft->state == RAFT_STATE_LEADER);
-	assert(!box_is_ro());
 	return 0;
 }
 
@@ -3134,7 +3149,7 @@ box_promote(void)
 	if (box_raft_try_promote() != 0)
 		return -1;
 	assert(raft->state == RAFT_STATE_LEADER);
-	return box_wait_for_rw_while_leader(raft);
+	return box_wait_for_limbo_claim(raft);
 }
 
 int
@@ -6067,18 +6082,12 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		int rc = box_raft_try_promote();
-		if (raft->leader != instance_id && raft->leader != 0) {
-			/*
-			 * It was promoted and is a single registered node -
-			 * there can't be another leader or a new term bump.
-			 */
-			panic("Bootstrap master couldn't elect self as a "
-			      "leader. Leader is %u, term is %llu",
-			      raft->leader, (long long)raft->volatile_term);
+		int rc = box_promote();
+		if (rc != 0) {
+			diag_log();
+			panic("Bootstrap master couldn't claim the synchronous "
+			      "transaction queue");
 		}
-		assert(rc == 0);
-		(void)rc;
 	}
 
 	/* box.cfg.read_only is not read yet. */

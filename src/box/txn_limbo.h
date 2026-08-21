@@ -81,6 +81,11 @@ enum txn_limbo_state {
 struct txn_limbo {
 	/** Limbo state. */
 	enum txn_limbo_state state;
+	/**
+	 * Triggers run on every event which might update the limbo state. Even
+	 * when the state didn't actually change.
+	 */
+	struct rlist on_state_update;
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
@@ -144,11 +149,6 @@ struct txn_limbo {
 	 * since its restart.
 	 */
 	bool saw_promote;
-	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
-	 */
-	int64_t svp_confirmed_lsn;
 	/**
 	 * Whether this instance validates incoming synchro requests. When the
 	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
