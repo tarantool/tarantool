@@ -2467,6 +2467,10 @@ g.test_with = function(cg)
             type = 'ClientError',
             name ='READ_VIEW_CLOSED'
         }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {
+            {type = 'fiber', fid = f1:id()},
+            {type = 'fiber', fid = f2:id()},
+        })
         f1:wakeup()
         t.assert_equals({f1:join(10)}, {true, s:select()})
         t.assert_equals(rv.status, 'close_pending')
@@ -2474,6 +2478,9 @@ g.test_with = function(cg)
             type = 'ClientError',
             name ='READ_VIEW_CLOSED'
         }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {
+            {type = 'fiber', fid = f2:id()},
+        })
         f2:wakeup()
         t.assert_equals({f2:join(10)}, {true, s:select()})
         t.assert_equals(rv.status, 'closed')
@@ -2481,6 +2488,7 @@ g.test_with = function(cg)
             type = 'ClientError',
             name ='READ_VIEW_CLOSED'
         }, rv.with, rv, function() end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {})
     end)
 end
 
@@ -2936,6 +2944,7 @@ g_threads.test_close_pending = function(cg)
     -- Check that a read view isn't deleted until every thread using it
     -- closes it.
     cg.server:exec(function()
+        local fun = require('fun')
         local threads = require('experimental.threads')
         local rv = box.read_view.open()
         threads.eval('app', [[
@@ -2947,6 +2956,11 @@ g_threads.test_close_pending = function(cg)
             type = 'ClientError',
             name = 'READ_VIEW_CLOSED',
         }, rv.close, rv)
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(1, 4)):totable())
 
         -- The read view is still usable in application threads.
         t.assert_equals(threads.eval('app', [[
@@ -2967,6 +2981,11 @@ g_threads.test_close_pending = function(cg)
         }, threads.eval, 'app', [[
             box.read_view.open({id = ...})
         ]], {rv.id}, {target = 1})
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(2, 4)):totable())
 
         -- The read view status doesn't change after it's removed from
         -- the local registry by the garbage collector.
@@ -2984,6 +3003,11 @@ g_threads.test_close_pending = function(cg)
         }, threads.eval, 'app', [[
             box.read_view.open({id = ...})
         ]], {rv.id}, {target = 1})
+        t.assert_items_equals(
+            rv:info({refs = true}).refs,
+            fun.map(function(i)
+                return {type = 'thread', group_name = 'app', thread_id = i}
+            end, fun.range(2, 4)):totable())
 
         -- The read view is deleted as soon as all threads close it.
         for i = 2, box.cfg.app_threads do
@@ -2996,6 +3020,7 @@ g_threads.test_close_pending = function(cg)
         t.helpers.retrying({}, function()
             t.assert_equals(rv.status, 'closed')
         end)
+        t.assert_items_equals(rv:info({refs = true}).refs, {})
         rv = nil -- luacheck: ignore
         for _ = 1, 5 do collectgarbage('collect') end
         t.assert_equals(box.read_view.list(), {})
