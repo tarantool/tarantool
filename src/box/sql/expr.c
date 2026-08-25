@@ -1371,6 +1371,8 @@ dupedExprNodeSize(Expr * p, int flags)
 	if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken) {
 		nByte += sqlStrlen30(p->u.zToken) + 1;
 	}
+	if (p->op == TK_DECIMAL)
+		nByte += sizeof(decimal_t);
 	return ROUND8(nByte);
 }
 
@@ -1456,6 +1458,15 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 	if (nToken != 0) {
 		pNew->u.zToken = &zAlloc[nNewSize];
 		memcpy(pNew->u.zToken, p->u.zToken, nToken);
+	}
+
+	/*
+	 * The decimal value is stored in the trailing space of the node,
+	 * right after the token, so rebase and copy it like the token.
+	 */
+	if (pNew->op == TK_DECIMAL) {
+		pNew->v.d = (decimal_t *)&zAlloc[nNewSize + nToken];
+		*pNew->v.d = *p->v.d;
 	}
 
 	if (((p->flags | pNew->flags) & (EP_TokenOnly | EP_Leaf)) == 0) {
@@ -3040,29 +3051,6 @@ codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
 	}
 }
 
-static void
-expr_code_dec(struct Parse *parser, struct Expr *expr, bool is_neg, int reg)
-{
-	const char *str = expr->u.zToken;
-	assert(str != NULL);
-	decimal_t *value = sql_xmalloc(sizeof(*value));
-	if (is_neg) {
-		decimal_t dec;
-		if (decimal_from_string(&dec, str) == NULL)
-			goto error;
-		decimal_minus(value, &dec);
-	} else if (decimal_from_string(value, str) == NULL) {
-		goto error;
-	}
-	sqlVdbeAddOp4(parser->pVdbe, OP_Decimal, 0, reg, 0, (char *)value,
-		      P4_DEC);
-	return;
-error:
-	sql_xfree(value);
-	diag_set(ClientError, ER_INVALID_DEC, str);
-	parser->is_aborted = true;
-}
-
 /**
  * Generate an instruction that will put the integer describe by
  * text z[0..n-1] into register iMem.
@@ -3609,10 +3597,12 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_FALSE:
 		sqlVdbeAddOp2(v, OP_Bool, pExpr->v.b, target);
 		return target;
-	case TK_DECIMAL:{
-			expr_code_dec(pParse, pExpr, false, target);
-			return target;
-		}
+	case TK_DECIMAL: {
+		decimal_t *dec = sql_xmalloc(sizeof(*dec));
+		*dec = *pExpr->v.d;
+		sqlVdbeAddOp4(v, OP_Decimal, 0, target, 0, (char *)dec, P4_DEC);
+		return target;
+	}
 	case TK_FLOAT:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
@@ -3751,33 +3741,25 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp3(v, op, r2, r1, target);
 			break;
 		}
-	case TK_UMINUS:{
-			Expr *pLeft = pExpr->pLeft;
-			assert(pLeft);
-			if (pLeft->op == TK_INTEGER) {
-				expr_code_int(pParse, pLeft, true, target);
-				return target;
-			} else if (pLeft->op == TK_FLOAT) {
-				assert(!ExprHasProperty(pExpr, EP_IntValue));
-				codeReal(v, pLeft->u.zToken, 1, target);
-				return target;
-			} else if (pLeft->op == TK_DECIMAL) {
-				expr_code_dec(pParse, pLeft, true, target);
-				return target;
-			} else {
-				tempX.op = TK_INTEGER;
-				tempX.type = FIELD_TYPE_INTEGER;
-				tempX.flags = EP_IntValue | EP_TokenOnly;
-				tempX.u.iValue = 0;
-				r1 = sqlExprCodeTemp(pParse, &tempX,
-							 &regFree1);
-				r2 = sqlExprCodeTemp(pParse, pExpr->pLeft,
-							 &regFree2);
-				sqlVdbeAddOp3(v, OP_Subtract, r2, r1,
-						  target);
-			}
-			break;
+	case TK_UMINUS:
+		assert(pExpr->pLeft != NULL);
+		if (pExpr->pLeft->op == TK_INTEGER) {
+			expr_code_int(pParse, pExpr->pLeft, true, target);
+			return target;
 		}
+		if (pExpr->pLeft->op == TK_FLOAT) {
+			assert(!ExprHasProperty(pExpr, EP_IntValue));
+			codeReal(v, pExpr->pLeft->u.zToken, 1, target);
+			return target;
+		}
+		tempX.op = TK_INTEGER;
+		tempX.type = FIELD_TYPE_INTEGER;
+		tempX.flags = EP_IntValue | EP_TokenOnly;
+		tempX.u.iValue = 0;
+		r1 = sqlExprCodeTemp(pParse, &tempX, &regFree1);
+		r2 = sqlExprCodeTemp(pParse, pExpr->pLeft, &regFree2);
+		sqlVdbeAddOp3(v, OP_Subtract, r2, r1, target);
+		break;
 	case TK_BITNOT:
 	case TK_NOT:{
 			assert(TK_BITNOT == OP_BitNot);
@@ -4846,6 +4828,16 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 	case TK_TRUE:
 	case TK_FALSE:
 		return 0;
+	case TK_DECIMAL:
+		/*
+		 * Two decimal literals are only interchangeable when they have
+		 * the same representation. Values that are numerically equal
+		 * but differ in scale (e.g. 1.0 and 1.00) are distinct, since
+		 * the scale is preserved in the result.
+		 */
+		return decimal_compare(pA->v.d, pB->v.d) == 0 &&
+		       decimal_scale(pA->v.d) == decimal_scale(pB->v.d) ?
+		       0 : 2;
 	default:
 		break;
 	}

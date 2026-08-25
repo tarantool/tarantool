@@ -1193,3 +1193,13 @@ sql_legacy_name_new(const char *name, int len)
 	(void)new_len;
 	return res;
 }
+
+int
+sql_dec_from_str(decimal_t *dec, const char *str)
+{
+	if (decimal_from_string(dec, str) == NULL) {
+		diag_set(ClientError, ER_INVALID_DEC, str);
+		return -1;
+	}
+	return 0;
+}

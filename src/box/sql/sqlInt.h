@@ -1263,6 +1263,8 @@ struct Expr {
 	union {
 		/** Value for TK_TRUE and TK_FALSE. */
 		bool b;
+		/** Value for TK_DECIMAL. */
+		decimal_t *d;
 	} v;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -2321,6 +2323,14 @@ sql_legacy_name_new0(const char *name)
  */
 char *
 sql_escaped_name_new(const char *name);
+
+/**
+ * Parse DECIMAL value from string representation.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_dec_from_str(decimal_t *dec, const char *str);
 
 int sqlKeywordCode(const unsigned char *, int);
 

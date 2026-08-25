@@ -541,31 +541,12 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 		mp_encode_double(buf, val);
 		break;
 	}
-	case FIELD_TYPE_DECIMAL: {
-		const char *str;
-		if (expr->op == TK_UMINUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_DECIMAL);
-			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
-		} else if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_DECIMAL);
-			str = expr->pLeft->u.zToken;
-		} else {
-			assert(expr->op == TK_DECIMAL);
-			str = expr->u.zToken;
-		}
-		decimal_t val;
-		if (decimal_from_string(&val, str) == NULL) {
-			diag_set(ClientError, ER_INVALID_DEC, str);
-			parser->is_aborted = true;
-			break;
-		}
-		size = mp_sizeof_decimal(&val);
+	case FIELD_TYPE_DECIMAL:
+		assert(expr->op == TK_DECIMAL);
+		size = mp_sizeof_decimal(expr->v.d);
 		buf = xregion_alloc(region, size);
-		mp_encode_decimal(buf, &val);
+		mp_encode_decimal(buf, expr->v.d);
 		break;
-	}
 	case FIELD_TYPE_INTEGER: {
 		if (expr->op == TK_UMINUS) {
 			int64_t val;
