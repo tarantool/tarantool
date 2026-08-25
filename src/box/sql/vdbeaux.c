@@ -238,15 +238,6 @@ sqlVdbeGoto(Vdbe * p, int iDest)
 	return sqlVdbeAddOp3(p, OP_Goto, 0, iDest, 0);
 }
 
-/* Generate code to cause the string zStr to be loaded into
- * register iDest
- */
-int
-sqlVdbeLoadString(Vdbe * p, int iDest, const char *zStr)
-{
-	return sqlVdbeAddOp4(p, OP_String8, 0, iDest, 0, zStr, 0);
-}
-
 /*
  * Generate code that initializes multiple registers to string or integer
  * constants.  The registers begin with iDest and increase consecutively.
@@ -265,8 +256,12 @@ sqlVdbeMultiLoad(Vdbe * p, int iDest, const char *zTypes, ...)
 	for (i = 0; (c = zTypes[i]) != 0; i++) {
 		if (c == 's') {
 			const char *z = va_arg(ap, const char *);
-			sqlVdbeAddOp4(p, z == 0 ? OP_Null : OP_String8, 0,
-					  iDest++, 0, z, 0);
+			if (z != NULL) {
+				sqlVdbeAddOp4(p, OP_String8, 0, iDest++, 0,
+					      sql_xstrdup(z), P4_DYNAMIC);
+			} else {
+				sqlVdbeAddOp2(p, OP_Null, 0, iDest++);
+			}
 		} else {
 			assert(c == 'i');
 			sqlVdbeAddOp2(p, OP_Integer, va_arg(ap, int),
@@ -648,42 +643,11 @@ sqlVdbeDeletePriorOpcode(Vdbe * p, u8 op)
 	}
 }
 
-/*
- * Change the value of the P4 operand for a specific instruction.
- *
- * If n>=0 then the P4 operand is dynamic, meaning that a copy of
- * the string is made into memory obtained from malloc().
- * A value of n==0 means copy bytes of zP4 up to and including the
- * first null byte.  If n>0 then copy n+1 bytes of zP4.
- *
- * Other values of n (P4_STATIC, P4_COLLSEQ etc.) indicate that zP4 points
- * to a string or structure that is guaranteed to exist for the lifetime of
- * the Vdbe. In these cases we can just copy the pointer.
- *
- * If addr<0 then change P4 on the most recently inserted instruction.
- */
-static void SQL_NOINLINE
-vdbeChangeP4Full(Vdbe * p, Op * pOp, const char *zP4, int n)
-{
-	if (pOp->p4type) {
-		freeP4(pOp->p4type, pOp->p4.p);
-		pOp->p4type = 0;
-		pOp->p4.p = 0;
-	}
-	if (n < 0) {
-		sqlVdbeChangeP4(p, (int)(pOp - p->aOp), zP4, n);
-	} else {
-		if (n == 0)
-			n = sqlStrlen30(zP4);
-		pOp->p4.z = sql_xstrndup(zP4, n);
-		pOp->p4type = P4_DYNAMIC;
-	}
-}
-
 void
-sqlVdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
+sqlVdbeChangeP4(struct Vdbe *p, int addr, const char *zP4, int type)
 {
 	Op *pOp;
+	assert(type < 0);
 	assert(p != 0);
 	assert(p->magic == VDBE_MAGIC_INIT);
 	assert(p->aOp != 0);
@@ -693,17 +657,17 @@ sqlVdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 		addr = p->nOp - 1;
 	}
 	pOp = &p->aOp[addr];
-	if (n >= 0 || pOp->p4type) {
-		vdbeChangeP4Full(p, pOp, zP4, n);
-		return;
+	if (pOp->p4type != P4_NOTUSED) {
+		freeP4(pOp->p4type, pOp->p4.p);
+		pOp->p4type = P4_NOTUSED;
+		pOp->p4.p = NULL;
 	}
-	if (n == P4_BOOL) {
+	if (type == P4_BOOL) {
 		pOp->p4.b = *(bool*)zP4;
 		pOp->p4type = P4_BOOL;
 	} else {
-		assert(n < 0);
 		pOp->p4.p = (void *)zP4;
-		pOp->p4type = (signed char)n;
+		pOp->p4type = (signed char)type;
 	}
 }
 
