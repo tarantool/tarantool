@@ -1187,8 +1187,10 @@ sql_legacy_name_new(const char *name, int len)
 		return res;
 	size = new_len + 1;
 	res = sql_xrealloc(res, size);
+	status = U_ZERO_ERROR;
 	new_len = ucasemap_utf8ToUpper(icu_ucase_default_map, res, size,
 				       name, len, &status);
+	assert(U_SUCCESS(status));
 	assert((size_t)new_len < size);
 	(void)new_len;
 	return res;
