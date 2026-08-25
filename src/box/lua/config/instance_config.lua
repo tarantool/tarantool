@@ -75,7 +75,7 @@ local function vshard_since_apply_default_if(_data, w)
     -- defaults are evaluated on every instance, while the module is needed
     -- only on instances with a sharding role. The availability is verified
     -- by the sharding applier.
-    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    local ok, vshard = pcall(loaders.require_first, 'vshard', 'vshard-ee')
     if not ok then
         return false
     end
