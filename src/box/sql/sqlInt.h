@@ -1268,6 +1268,8 @@ struct Expr {
 		double f;
 		/** Value for TK_DECIMAL. */
 		decimal_t *d;
+		/** Value for TK_STRING. */
+		char *s;
 	} v;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -1329,7 +1331,8 @@ struct Expr {
 #define EP_Reduced   0x002000	/* Expr struct EXPR_REDUCEDSIZE bytes only */
 #define EP_TokenOnly 0x004000	/* Expr struct EXPR_TOKENONLYSIZE bytes only */
 #define EP_Static    0x008000	/* Held in memory not obtained from malloc() */
-#define EP_MemToken  0x010000	/* Need to sql_xfree() Expr.zToken */
+/** Need to free Expr.u.zToken or Expr.v.s. */
+#define EP_MemToken  0x010000
 #define EP_NoReduce  0x020000	/* Cannot EXPRDUP_REDUCE this Expr */
 #define EP_Unlikely  0x040000	/* unlikely() or likelihood() function */
 #define EP_ConstFunc 0x080000	/* A sql_FUNC_CONSTANT or _SLOCHNG function */
@@ -2294,7 +2297,27 @@ void sqlTreeViewSelect(TreeView *, const Select *, u8);
 void sqlTreeViewWith(TreeView *, const With *);
 #endif
 
-void sqlDequote(char *);
+/*
+ * Convert an SQL-style quoted string into a normal string by removing the quote
+ * characters. The conversion is done in-place. If the input does not begin with
+ * a quote character, then this routine is a no-op.
+ *
+ * The string is defined by a pointer and its size, so it does not have
+ * to be zero-terminated, and the resulting dequoted string is not
+ * zero-terminated either.
+ *
+ * The return value is the length of the dequoted string, or size if no
+ * dequoting occurs.
+ */
+uint32_t
+sql_dequote(char *str, uint32_t size);
+
+/*
+ * Same as sql_dequote(), but the string is zero-terminated and the
+ * resulting dequoted string remains zero-terminated.
+ */
+void
+sqlDequote(char *z);
 
 /** Duplicate the string and remove the double quotes if necessary. */
 char *
@@ -2423,6 +2446,13 @@ sql_expr_new(int op, const struct Token *token);
 /** Allocate a new empty expression object with reserved extra memory. */
 struct Expr *
 sql_expr_new_empty(int op, int extra_size);
+
+/**
+ * Create a TK_STRING expression holding a copy of `n` bytes of the `str`.
+ * The resulting string is NULL-terminated.
+ */
+struct Expr *
+sql_expr_new_string(const char *str, uint32_t n);
 
 /**
  * The same as @sa sql_expr_new, but normalizes name, stored in

@@ -748,7 +748,8 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 	struct Expr *res = NULL;
 	switch (expr->op) {
 	case TK_STRING:
-		res = expr_leaf(expr, FIELD_TYPE_STRING);
+		res = sql_expr_new_string(expr->str, expr->len);
+		res->v.s[sql_dequote(res->v.s, expr->len)] = '\0';
 		break;
 	case TK_BLOB:
 		res = expr_leaf(expr, FIELD_TYPE_VARBINARY);

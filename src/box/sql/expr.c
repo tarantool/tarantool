@@ -965,6 +965,18 @@ sql_expr_new_empty(int op, int extra_size)
 	return e;
 }
 
+struct Expr *
+sql_expr_new_string(const char *str, uint32_t n)
+{
+	struct Expr *e = sql_expr_new_empty(TK_STRING, n + 1);
+	e->type = FIELD_TYPE_STRING;
+	e->flags |= EP_Leaf;
+	e->v.s = (char *)&e[1];
+	memcpy(e->v.s, str, n);
+	e->v.s[n] = '\0';
+	return e;
+}
+
 /** Create an expression of a constant integer. */
 static inline struct Expr *
 sql_expr_new_int(int value)
@@ -1242,8 +1254,12 @@ sqlExprDeleteNN(struct Expr *p)
 			sql_expr_list_delete(p->x.pList);
 		}
 	}
-	if (ExprHasProperty(p, EP_MemToken))
-		sql_xfree(p->u.zToken);
+	if (ExprHasProperty(p, EP_MemToken)) {
+		if (p->op == TK_STRING)
+			sql_xfree(p->v.s);
+		else
+			sql_xfree(p->u.zToken);
+	}
 	if (!ExprHasProperty(p, EP_Static)) {
 		sql_xfree(p);
 	}
@@ -1332,7 +1348,7 @@ dupedExprStructSize(Expr * p, int flags)
 /*
  * This function returns the space in bytes required to store the copy
  * of the Expr structure and a copy of the Expr.u.zToken string (if that
- * string is defined.)
+ * string is defined) or the Expr.v.s string (if the node is TK_STRING).
  */
 static int
 dupedExprNodeSize(Expr * p, int flags)
@@ -1343,6 +1359,8 @@ dupedExprNodeSize(Expr * p, int flags)
 	}
 	if (p->op == TK_DECIMAL)
 		nByte += sizeof(decimal_t);
+	else if (p->op == TK_STRING)
+		nByte += sqlStrlen30(p->v.s) + 1;
 	return ROUND8(nByte);
 }
 
@@ -1407,6 +1425,7 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 		nToken = sqlStrlen30(p->u.zToken) + 1;
 	else
 		nToken = 0;
+	int nStr = p->op == TK_STRING ? sqlStrlen30(p->v.s) + 1 : 0;
 	if (flags != 0) {
 		assert(ExprHasProperty(p, EP_Reduced) == 0);
 		memcpy(zAlloc, p, nNewSize);
@@ -1437,6 +1456,12 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 	if (pNew->op == TK_DECIMAL) {
 		pNew->v.d = (decimal_t *)&zAlloc[nNewSize + nToken];
 		*pNew->v.d = *p->v.d;
+	}
+
+	/* Copy the p->v.s string, if the node is TK_STRING. */
+	if (nStr != 0) {
+		pNew->v.s = &zAlloc[nNewSize + nToken];
+		memcpy(pNew->v.s, p->v.s, nStr);
 	}
 
 	if (((p->flags | pNew->flags) & (EP_TokenOnly | EP_Leaf)) == 0) {
@@ -3472,11 +3497,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_FLOAT:
 		sql_vdbe_add_op4_real(v, 0, target, 0, pExpr->v.f);
 		return target;
-	case TK_STRING:{
-			sqlVdbeAddOp4(v, OP_String8, 0, target, 0,
-				      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
-			return target;
-		}
+	case TK_STRING:
+		sqlVdbeAddOp4(v, OP_String8, 0, target, 0,
+			      sql_xstrdup(pExpr->v.s), P4_DYNAMIC);
+		return target;
 	case TK_NULL:{
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			return target;
@@ -4671,6 +4695,8 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 	case TK_TRUE:
 	case TK_FALSE:
 		return 0;
+	case TK_STRING:
+		return strcmp(pA->v.s, pB->v.s) == 0 ? 0 : 2;
 	case TK_INTEGER:
 		return pA->v.u == pB->v.u &&
 		       (pA->flags & EP_Negative) == (pB->flags & EP_Negative) ?

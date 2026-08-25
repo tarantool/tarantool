@@ -126,6 +126,9 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
 		pExpr->u.zToken = sql_xstrdup(pExpr->u.zToken);
 		pExpr->flags |= EP_MemToken;
+	} else if (pExpr->op == TK_STRING) {
+		pExpr->v.s = sql_xstrdup(pExpr->v.s);
+		pExpr->flags |= EP_MemToken;
 	}
 	sql_xfree(pDup);
 }

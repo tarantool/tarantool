@@ -74,47 +74,37 @@ sqlStrlen30(const char *z)
 	return 0x3fffffff & (unsigned)strlen(z);
 }
 
-/*
- * Convert an SQL-style quoted string into a normal string by removing
- * the quote characters.  The conversion is done in-place.  If the
- * input does not begin with a quote character, then this routine
- * is a no-op.
- *
- * The input string must be zero-terminated. The resulting dequoted
- * string will also be zero-terminated.
- *
- * The return value is -1 if no dequoting occurs or the length of the
- * dequoted string, exclusive of the zero terminator, if dequoting does
- * occur.
- *
- * 2002-Feb-14: This routine is extended to remove MS-Access style
- * brackets from around identifiers.  For example:  "[a-b-c]" becomes
- * "a-b-c".
- */
-void
-sqlDequote(char *z)
+uint32_t
+sql_dequote(char *str, uint32_t size)
 {
-	char quote;
-	int i, j;
-	if (z == 0)
-		return;
-	quote = z[0];
-	if (!sqlIsquote(quote))
-		return;
-	for (i = 1, j = 0;; i++) {
-		if (z[i] == quote) {
-			if (z[i + 1] == quote) {
-				z[j++] = quote;
+	if (size == 0)
+		return 0;
+
+	char quote = str[0];
+	if (sqlIsquote(quote) == 0)
+		return size;
+
+	uint32_t len = 0;
+	for (uint32_t i = 1; i < size; i++) {
+		if (str[i] == quote) {
+			if (i + 1 < size && str[i + 1] == quote) {
+				str[len++] = quote;
 				i++;
 			}
-		} else if (z[i] == 0) {
-			z[j] = 0;
-			return;
 		} else {
-			z[j++] = z[i];
+			str[len++] = str[i];
 		}
-		assert(z[i] != 0);
 	}
+	return len;
+}
+
+void
+sqlDequote(char *str)
+{
+	if (str == NULL)
+		return;
+	uint32_t len = sql_dequote(str, strlen(str));
+	str[len] = '\0';
 }
 
 char *
