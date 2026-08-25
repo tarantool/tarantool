@@ -3631,7 +3631,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_STRING:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
-			sqlVdbeLoadString(v, target, pExpr->u.zToken);
+			sqlVdbeAddOp4(v, OP_String8, 0, target, 0,
+				      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
 			return target;
 		}
 	case TK_NULL:{
