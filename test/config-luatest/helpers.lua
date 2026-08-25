@@ -13,9 +13,9 @@ local server = require('luatest.server')
 -- sharding options annotated with the vshard_since version, nil otherwise.
 --
 local function has_vshard_since(version)
-    local ok, vshard = pcall(require, 'vshard-ee')
+    local ok, vshard = pcall(require, 'vshard')
     if not ok then
-        ok, vshard = pcall(require, 'vshard')
+        ok, vshard = pcall(require, 'vshard-ee')
     end
     if not ok then
         return nil

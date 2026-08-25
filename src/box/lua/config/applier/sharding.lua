@@ -65,7 +65,7 @@ local function check_vshard(config)
     if not is_storage and not is_router then
         return
     end
-    local ok, vshard = pcall(loaders.require_first, 'vshard-ee', 'vshard')
+    local ok, vshard = pcall(loaders.require_first, 'vshard', 'vshard-ee')
     if not ok then
         error('The vshard-ee/vshard module is not available', 0)
     end
@@ -97,14 +97,14 @@ local function apply(config)
     end
     -- The availability and the minimum version are verified by
     -- the sharding.stage_1 applier.
-    _G.vshard = loaders.require_first('vshard-ee', 'vshard')
+    _G.vshard = loaders.require_first('vshard', 'vshard-ee')
     local cfg = configdata:sharding()
     if is_storage then
         -- Start a watcher which will create all the necessary functions.
         if watcher == nil then
             local function deploy_funcs()
                 local vexports = loaders.require_first(
-                    'vshard-ee.storage.exports', 'vshard.storage.exports')
+                    'vshard.storage.exports', 'vshard-ee.storage.exports')
                 local exports = vexports.compile(vexports.log[#vexports.log])
                 vexports.deploy_funcs(exports)
             end
