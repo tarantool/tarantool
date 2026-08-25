@@ -615,9 +615,9 @@ g.test_sharding_credentials_role = function(g)
         local role = box.space._user.index.name:get('sharding')
         local repl_id = box.space._user.index.name:get('replication').id
         t.assert(role ~= nil)
-        local ok, vexports = pcall(require, 'vshard-ee.storage.exports')
+        local ok, vexports = pcall(require, 'vshard.storage.exports')
         if not ok then
-            vexports = require('vshard.storage.exports')
+            vexports = require('vshard-ee.storage.exports')
         end
         local exports = vexports.compile(vexports.log[#vexports.log])
 
@@ -967,7 +967,7 @@ g.test_vshard_too_old = function(g)
     g.server:exec(function()
         local loaders = require('internal.loaders')
         local config = require('config')
-        local vshard = loaders.require_first('vshard-ee', 'vshard')
+        local vshard = loaders.require_first('vshard', 'vshard-ee')
 
         local saved = vshard.consts.VERSION
         vshard.consts.VERSION = '0.1.20'

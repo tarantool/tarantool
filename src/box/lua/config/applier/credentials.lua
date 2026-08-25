@@ -329,8 +329,8 @@ local function sharding_role(configdata)
     -- VShard availability and its minimum version are ensured by the
     -- sharding.stage_1 applier, which runs before this one.
     local funcs = {}
-    local vexports = loaders.require_first('vshard-ee.storage.exports',
-        'vshard.storage.exports')
+    local vexports = loaders.require_first('vshard.storage.exports',
+        'vshard-ee.storage.exports')
     local exports = vexports.compile(vexports.log[#vexports.log])
     for name in pairs(exports.funcs) do
         table.insert(funcs, name)
