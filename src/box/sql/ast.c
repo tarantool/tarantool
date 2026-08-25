@@ -638,9 +638,17 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_leaf(expr, FIELD_TYPE_DECIMAL);
 		break;
 	case TK_TRUE:
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_BOOLEAN;
+		res->flags |= EP_Leaf;
+		res->v.b = true;
+		break;
 	case TK_FALSE:
 	case TK_UNKNOWN:
-		res = expr_leaf(expr, FIELD_TYPE_BOOLEAN);
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_BOOLEAN;
+		res->flags |= EP_Leaf;
+		assert(!res->v.b);
 		break;
 	case TK_VAR_ANON:
 	case TK_VAR_NUM:

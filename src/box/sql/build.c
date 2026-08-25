@@ -493,10 +493,9 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 	switch (sql_expr_type(expr)) {
 	case FIELD_TYPE_BOOLEAN: {
 		assert(expr->op == TK_TRUE || expr->op == TK_FALSE);
-		bool val = expr->op == TK_TRUE;
-		size = mp_sizeof_bool(val);
+		size = mp_sizeof_bool(expr->v.b);
 		buf = xregion_alloc(region, size);
-		mp_encode_bool(buf, val);
+		mp_encode_bool(buf, expr->v.b);
 		break;
 	}
 	case FIELD_TYPE_VARBINARY: {

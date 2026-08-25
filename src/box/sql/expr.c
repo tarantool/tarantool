@@ -955,17 +955,7 @@ sqlSelectExprHeight(Select * p)
 	return nHeight;
 }
 
-/**
- * Allocate a new empty expression object with reserved extra
- * memory.
- *
- * @param op Expression value type.
- * @param extra_size Extra size, needed to be allocated together
- *        with the expression.
- * @retval Not NULL Success. An empty expression.
- * @retval NULL Error. A diag message is set.
- */
-static struct Expr *
+struct Expr *
 sql_expr_new_empty(int op, int extra_size)
 {
 	struct Expr *e = sql_xmalloc(sizeof(*e) + extra_size);
@@ -3616,10 +3606,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			return target;
 		}
 	case TK_TRUE:
-	case TK_FALSE: {
-			sqlVdbeAddOp2(v, OP_Bool, op == TK_TRUE, target);
-			return target;
-		}
+	case TK_FALSE:
+		sqlVdbeAddOp2(v, OP_Bool, pExpr->v.b, target);
+		return target;
 	case TK_DECIMAL:{
 			expr_code_dec(pParse, pExpr, false, target);
 			return target;
@@ -4852,6 +4841,13 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 			return 1;
 		}
 		return 2;
+	}
+	switch (pA->op) {
+	case TK_TRUE:
+	case TK_FALSE:
+		return 0;
+	default:
+		break;
 	}
 	if (pA->op != TK_COLUMN_REF && pA->op != TK_AGG_COLUMN &&
 	    pA->u.zToken) {
