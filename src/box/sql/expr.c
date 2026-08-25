@@ -90,7 +90,6 @@ sql_expr_type(struct Expr *pExpr)
 		el = pExpr->x.pSelect->pEList;
 		return sql_expr_type(el->a[0].pExpr);
 	case TK_CAST:
-		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		return pExpr->type;
 	case TK_AGG_COLUMN:
 	case TK_COLUMN_REF:
@@ -966,31 +965,14 @@ sql_expr_new_empty(int op, int extra_size)
 	return e;
 }
 
-/**
- * Try to convert a token of a specified type to integer.
- * @param op Token type.
- * @param token Token itself.
- * @param[out] res Result integer.
- * @retval 0 Success. @A res stores a result.
- * @retval -1 Error. Can not be converted. No diag.
- */
-static inline int
-sql_expr_token_to_int(int op, const struct Token *token, int *res)
-{
-	if (op == TK_INTEGER && token->z != NULL &&
-	    sqlGetInt32(token->z, res) > 0)
-		return 0;
-	return -1;
-}
-
 /** Create an expression of a constant integer. */
 static inline struct Expr *
 sql_expr_new_int(int value)
 {
+	assert(value >= 0);
 	struct Expr *e = sql_expr_new_empty(TK_INTEGER, 0);
 	e->type = FIELD_TYPE_INTEGER;
-	e->flags |= EP_IntValue;
-	e->u.iValue = value;
+	e->v.u = value;
 	return e;
 }
 
@@ -998,12 +980,8 @@ struct Expr *
 sql_expr_new(int op, const struct Token *token)
 {
 	int extra_sz = 0;
-	if (token != NULL) {
-		int val;
-		if (sql_expr_token_to_int(op, token, &val) == 0)
-			return sql_expr_new_int(val);
+	if (token != NULL)
 		extra_sz = token->n + 1;
-	}
 	struct Expr *e = sql_expr_new_empty(op, extra_sz);
 	if (token == NULL)
 		return e;
@@ -1018,13 +996,8 @@ struct Expr *
 sql_expr_new_dequoted(int op, const struct Token *token)
 {
 	int extra_size = 0;
-	if (token != NULL) {
-		int val;
-		assert(token->z != NULL || token->n == 0);
-		if (sql_expr_token_to_int(op, token, &val) == 0)
-			return sql_expr_new_int(val);
+	if (token != NULL)
 		extra_size = token->n + 1;
-	}
 	struct Expr *e = sql_expr_new_empty(op, extra_size);
 	if (token == NULL || token->n == 0)
 		return e;
@@ -1178,8 +1151,7 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 
 	if (pExpr == 0)
 		return;
-	assert(!ExprHasProperty
-	       (pExpr, EP_IntValue | EP_Reduced | EP_TokenOnly));
+	assert(!ExprHasProperty(pExpr, EP_Reduced | EP_TokenOnly));
 	z = pExpr->u.zToken;
 	assert(z != 0);
 	assert(z[0] != 0);
@@ -1251,8 +1223,6 @@ static SQL_NOINLINE void
 sqlExprDeleteNN(struct Expr *p)
 {
 	assert(p != 0);
-	/* Sanity check: Assert that the IntValue is non-negative if it exists */
-	assert(!ExprHasProperty(p, EP_IntValue) || p->u.iValue >= 0);
 #ifdef SQL_DEBUG
 	if (ExprHasProperty(p, EP_Leaf) && !ExprHasProperty(p, EP_TokenOnly)) {
 		assert(p->pLeft == 0);
@@ -1368,7 +1338,7 @@ static int
 dupedExprNodeSize(Expr * p, int flags)
 {
 	int nByte = dupedExprStructSize(p, flags) & 0xfff;
-	if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken) {
+	if (p->u.zToken != NULL) {
 		nByte += sqlStrlen30(p->u.zToken) + 1;
 	}
 	if (p->op == TK_DECIMAL)
@@ -1433,7 +1403,7 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 	const unsigned nStructSize = dupedExprStructSize(p, flags);
 	const int nNewSize = nStructSize & 0xfff;
 	int nToken;
-	if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken)
+	if (p->u.zToken != NULL)
 		nToken = sqlStrlen30(p->u.zToken) + 1;
 	else
 		nToken = 0;
@@ -1997,45 +1967,22 @@ sqlExprIsConstantOrFunction(struct Expr *p)
 	return exprIsConst(p, 4, 0);
 }
 
-/*
- * If the expression p codes a constant integer that is small enough
- * to fit in a 32-bit integer, return 1 and put the value of the integer
- * in *pValue.  If the expression is not an integer or if it is too big
- * to fit in a signed 32-bit integer, return 0 and leave *pValue unchanged.
- */
 int
 sqlExprIsInteger(Expr * p, int *pValue)
 {
-	int rc = 0;
-
-	/* If an expression is an integer literal that fits in a signed 32-bit
-	 * integer, then the EP_IntValue flag will have already been set
-	 */
-	assert(p->op != TK_INTEGER || (p->flags & EP_IntValue) != 0
-	       || sqlGetInt32(p->u.zToken, &rc) == 0);
-
-	if (p->flags & EP_IntValue) {
-		*pValue = p->u.iValue;
+	if (p->op != TK_INTEGER)
+		return 0;
+	if ((p->flags & EP_Negative) != 0) {
+		int64_t value = (int64_t)p->v.u;
+		if (value < INT32_MIN)
+			return 0;
+		*pValue = (int)value;
 		return 1;
 	}
-	switch (p->op) {
-	case TK_UPLUS:{
-			rc = sqlExprIsInteger(p->pLeft, pValue);
-			break;
-		}
-	case TK_UMINUS:{
-			int v;
-			if (sqlExprIsInteger(p->pLeft, &v)) {
-				assert(v != (-2147483647 - 1));
-				*pValue = -v;
-				rc = 1;
-			}
-			break;
-		}
-	default:
-		break;
-	}
-	return rc;
+	if (p->v.u > INT32_MAX)
+		return 0;
+	*pValue = (int)p->v.u;
+	return 1;
 }
 
 /*
@@ -3030,70 +2977,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	sql_xfree(zAff);
 }
 
-/**
- * Generate an instruction that will put the integer describe by
- * text z[0..n-1] into register iMem.
- *
- * @param parse Parsing context.
- * @param expr Expression being parsed. Expr.u.zToken is always
- *             UTF8 and zero-terminated.
- * @param neg_flag True if value is negative.
- * @param mem Register to store parsed integer
- */
-static void
-expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
-	      int mem)
-{
-	struct Vdbe *v = parse->pVdbe;
-	if (expr->flags & EP_IntValue) {
-		int i = expr->u.iValue;
-		assert(i >= 0);
-		if (is_neg)
-			i = -i;
-		sqlVdbeAddOp2(v, OP_Integer, i, mem);
-		return;
-	}
-	int64_t value;
-	const char *z = expr->u.zToken;
-	assert(z != NULL);
-	const char *sign = is_neg ? "-" : "";
-	if (z[0] == '0' && (z[1] == 'x' || z[1] == 'X')) {
-		errno = 0;
-		if (is_neg)
-			value = strtoll(z, NULL, 16);
-		else
-			value = strtoull(z, NULL, 16);
-		if (errno != 0) {
-			diag_set(ClientError, ER_HEX_LITERAL_MAX,
-				 tt_sprintf("%s%s", sign, z),
-				 strlen(z) - 2, 16);
-			parse->is_aborted = true;
-			return;
-		}
-	} else {
-		size_t len = strlen(z);
-		bool unused;
-		if (sql_atoi64(z, &value, &unused, len) != 0 ||
-		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1)) {
-			diag_set(ClientError, ER_INT_LITERAL_MAX,
-				 tt_sprintf("%s%s", sign, z));
-			parse->is_aborted = true;
-			return;
-		}
-	}
-
-	/*
-	 * We don't need to negate INT64_MIN value because it's negation is
-	 * equal to it.
-	 */
-	if (is_neg && value != INT64_MIN)
-		value = -value;
-	if (is_neg)
-		sql_vdbe_add_op4_int64(v, 0, mem, 0, value);
-	else
-		sql_vdbe_add_op4_uint64(v, 0, mem, 0, value);
-}
-
 static void
 expr_code_array(struct Parse *parser, struct Expr *expr, int reg)
 {
@@ -3568,10 +3451,14 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 "reference to spaces");
 		pParse->is_aborted = true;
 		return target;
-	case TK_INTEGER:{
-			expr_code_int(pParse, pExpr, false, target);
-			return target;
+	case TK_INTEGER:
+		if ((pExpr->flags & EP_Negative) != 0) {
+			sql_vdbe_add_op4_int64(v, 0, target, 0,
+					       (int64_t)pExpr->v.u);
+		} else {
+			sql_vdbe_add_op4_uint64(v, 0, target, 0, pExpr->v.u);
 		}
+		return target;
 	case TK_TRUE:
 	case TK_FALSE:
 		sqlVdbeAddOp2(v, OP_Bool, pExpr->v.b, target);
@@ -3586,7 +3473,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		sql_vdbe_add_op4_real(v, 0, target, 0, pExpr->v.f);
 		return target;
 	case TK_STRING:{
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlVdbeAddOp4(v, OP_String8, 0, target, 0,
 				      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
 			return target;
@@ -3599,7 +3485,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			int n;
 			const char *z;
 			char *zBlob;
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken[0] == 'x'
 			       || pExpr->u.zToken[0] == 'X');
 			assert(pExpr->u.zToken[1] == '\'');
@@ -3613,7 +3498,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_VAR_NUM:
 	case TK_VAR_NAME: {
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
@@ -3720,14 +3604,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_UMINUS:
 		assert(pExpr->pLeft != NULL);
-		if (pExpr->pLeft->op == TK_INTEGER) {
-			expr_code_int(pParse, pExpr->pLeft, true, target);
-			return target;
-		}
 		tempX.op = TK_INTEGER;
 		tempX.type = FIELD_TYPE_INTEGER;
-		tempX.flags = EP_IntValue | EP_TokenOnly;
-		tempX.u.iValue = 0;
+		tempX.flags = EP_TokenOnly;
+		tempX.u.zToken = NULL;
+		tempX.v.u = 0;
 		r1 = sqlExprCodeTemp(pParse, &tempX, &regFree1);
 		r2 = sqlExprCodeTemp(pParse, pExpr->pLeft, &regFree2);
 		sqlVdbeAddOp3(v, OP_Subtract, r2, r1, target);
@@ -3757,7 +3638,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_AGG_FUNCTION:{
 			AggInfo *pInfo = pExpr->pAggInfo;
 			if (pInfo == 0) {
-				assert(!ExprHasProperty(pExpr, EP_IntValue));
 				const char *err = "misuse of aggregate: %s()";
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 					 tt_sprintf(err, pExpr->u.zToken));
@@ -3781,7 +3661,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				pFarg = pExpr->x.pList;
 			}
 			nFarg = pFarg ? pFarg->nExpr : 0;
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			struct func *func = sql_func_find(pExpr);
 			if (func == NULL) {
 				pParse->is_aborted = true;
@@ -4184,7 +4063,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			pParse->is_aborted = true;
 			return 0;
 		}
-		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
 			sqlVdbeAddOp2(v, OP_Halt, 0, ON_CONFLICT_ACTION_IGNORE);
 		} else {
@@ -4778,13 +4656,6 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 		return pB == pA ? 0 : 2;
 	}
 	combinedFlags = pA->flags | pB->flags;
-	if (combinedFlags & EP_IntValue) {
-		if ((pA->flags & pB->flags & EP_IntValue) != 0
-		    && pA->u.iValue == pB->u.iValue) {
-			return 0;
-		}
-		return 2;
-	}
 	if (pA->op != pB->op) {
 		if (pA->op == TK_COLLATE
 		    && sqlExprCompare(pA->pLeft, pB, iTab) < 2) {
@@ -4800,6 +4671,10 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 	case TK_TRUE:
 	case TK_FALSE:
 		return 0;
+	case TK_INTEGER:
+		return pA->v.u == pB->v.u &&
+		       (pA->flags & EP_Negative) == (pB->flags & EP_Negative) ?
+		       0 : 2;
 	case TK_FLOAT:
 		return pA->v.f == pB->v.f ? 0 : 2;
 	case TK_DECIMAL:
@@ -5178,8 +5053,6 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						 */
 						pParse->nMem += n;
 						pItem->iMem = ++pParse->nMem;
-						assert(!ExprHasProperty
-						       (pExpr, EP_IntValue));
 						pItem->func =
 							sql_func_find(pExpr);
 						if (pItem->func == NULL) {

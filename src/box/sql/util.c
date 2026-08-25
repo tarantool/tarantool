@@ -1203,3 +1203,38 @@ sql_dec_from_str(decimal_t *dec, const char *str)
 	}
 	return 0;
 }
+
+int
+sql_uint_from_str(uint64_t *res, const char *str)
+{
+	assert(strlen(str) > 0);
+	errno = 0;
+	int base = 10;
+	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+		base = 16;
+	*res = strtoull(str, NULL, base);
+	if (errno == 0)
+		return 0;
+	if (base == 16) {
+		diag_set(ClientError, ER_HEX_LITERAL_MAX, str, strlen(str) - 2,
+			 16);
+	} else {
+		diag_set(ClientError, ER_INT_LITERAL_MAX, str);
+	}
+	return -1;
+}
+
+int
+sql_neg_uint(int64_t *res, uint64_t val)
+{
+	if (val < (uint64_t)INT64_MIN) {
+		*res = -(int64_t)val;
+		return 0;
+	} else if (val == (uint64_t)INT64_MIN) {
+		*res = INT64_MIN;
+		return 0;
+	}
+	diag_set(ClientError, ER_INT_LITERAL_MAX,
+		 tt_sprintf("-%llu", (unsigned long long)val));
+	return -1;
+}

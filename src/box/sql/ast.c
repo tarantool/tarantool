@@ -447,6 +447,25 @@ expr_uminus(struct Parse *parser, struct ast_expr *expr)
 		left->v.f = -left->v.f;
 		return left;
 	}
+	if (left->op == TK_INTEGER) {
+		if ((left->flags & EP_Negative) != 0) {
+			/* Compute -u in unsigned to avoid signed overflow. */
+			left->v.u = ~left->v.u + 1;
+			left->flags &= ~EP_Negative;
+			return left;
+		}
+		if (left->v.u == 0)
+			return left;
+		int64_t value;
+		if (sql_neg_uint(&value, left->v.u) != 0) {
+			parser->is_aborted = true;
+			sql_expr_delete(left);
+			return NULL;
+		}
+		left->v.u = (uint64_t)value;
+		left->flags |= EP_Negative;
+		return left;
+	}
 	struct Expr *res = sqlPExpr(parser, TK_UMINUS, left, NULL);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
@@ -468,6 +487,8 @@ expr_uplus(struct Parse *parser, struct ast_expr *expr)
 	if (parser->is_aborted)
 		return NULL;
 	if (left->op == TK_DECIMAL || left->op == TK_FLOAT)
+		return left;
+	if (left->op == TK_INTEGER)
 		return left;
 	struct Expr *res = sqlPExpr(parser, TK_UPLUS, left, NULL);
 	if (parser->is_aborted) {
@@ -667,6 +688,32 @@ expr_getitem(struct Parse *parser, struct ast_expr *expr)
 }
 
 /**
+ * Build a `struct Expr` for an INTEGER value.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_integer(struct Parse *parser, struct ast_expr *expr)
+{
+	uint32_t used = region_used(&parser->region);
+	char *str = xregion_alloc(&parser->region, expr->len + 1);
+	memcpy(str, expr->str, expr->len);
+	str[expr->len] = '\0';
+
+	struct Expr *res = sql_expr_new_empty(expr->op, 0);
+	res->type = FIELD_TYPE_INTEGER;
+	res->flags |= EP_Leaf;
+	if (sql_uint_from_str(&res->v.u, str) != 0) {
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
+	}
+
+	region_truncate(&parser->region, used);
+	return res;
+}
+
+/**
  * Build a `struct Expr` for a DECIMAL value.
  *
  * Return NULL on error.
@@ -707,7 +754,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_leaf(expr, FIELD_TYPE_VARBINARY);
 		break;
 	case TK_INTEGER:
-		res = expr_leaf(expr, FIELD_TYPE_INTEGER);
+		res = expr_integer(parser, expr);
 		break;
 	case TK_FLOAT:
 		res = sql_expr_new_empty(expr->op, 0);

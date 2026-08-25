@@ -1256,13 +1256,14 @@ struct Expr {
 	u32 flags;		/* Various flags.  EP_* See below */
 	union {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
-		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
 
 	/** Resolved value of the expression. */
 	union {
 		/** Value for TK_TRUE and TK_FALSE. */
 		bool b;
+		/** Value for TK_INTEGER. */
+		uint64_t u;
 		/** Value for TK_FLOAT. */
 		double f;
 		/** Value for TK_DECIMAL. */
@@ -1321,7 +1322,8 @@ struct Expr {
 /** Second lookup could be performed for the ID. */
 #define EP_Lookup2   0x000040
 #define EP_Collate   0x000100	/* Tree contains a TK_COLLATE operator */
-#define EP_IntValue  0x000400	/* Integer value contained in u.iValue */
+/** TK_INTEGER literal holds a negative value */
+#define EP_Negative  0x000400
 #define EP_xIsSelect 0x000800	/* x.pSelect is valid (otherwise x.pList is) */
 #define EP_Skip      0x001000	/* COLLATE, AS, or UNLIKELY */
 #define EP_Reduced   0x002000	/* Expr struct EXPR_REDUCEDSIZE bytes only */
@@ -2334,6 +2336,22 @@ sql_escaped_name_new(const char *name);
 int
 sql_dec_from_str(decimal_t *dec, const char *str);
 
+/**
+ * Parse INTEGER value from string representation.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_uint_from_str(uint64_t *res, const char *str);
+
+/**
+ * Negate an unsigned value.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_neg_uint(int64_t *res, uint64_t val);
+
 int sqlKeywordCode(const unsigned char *, int);
 
 /**
@@ -2394,12 +2412,6 @@ void sqlClearTempRegCache(Parse *);
  * token argument is a single allocation obtained from
  * sql_xmalloc(). The calling function is responsible for making
  * sure the node eventually gets freed.
- *
- * Special case: If op==TK_INTEGER and token points to a string
- * that can be translated into a 32-bit integer, then the token is
- * not stored in u.zToken. Instead, the integer values is written
- * into u.iValue and the EP_IntValue flag is set. No extra storage
- * is allocated to hold the integer text.
  *
  * @param op Expression opcode (TK_*).
  * @param token Source token. Might be NULL.
@@ -3997,7 +4009,6 @@ sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 extern const unsigned char sqlOpcodeProperty[];
 extern const unsigned char sqlUpperToLower[];
 extern const unsigned char sqlCtypeMap[];
-extern const Token sqlIntTokens[];
 extern SQL_WSD struct sqlConfig sqlConfig;
 extern int sqlPendingByte;
 

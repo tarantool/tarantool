@@ -448,40 +448,6 @@ sql_column_add_nullable_action(struct Parse *parser,
 	field->is_nullable = action_is_nullable(nullable_action);
 }
 
-/** Fetch negative integer value from the expr. */
-static int
-sql_expr_nint(const struct Expr *expr, int64_t *res)
-{
-	assert(expr->op == TK_INTEGER);
-	if ((expr->flags & EP_IntValue) != 0) {
-		*res = -expr->u.iValue;
-		return 0;
-	}
-	assert(strlen(expr->u.zToken) > 2);
-	const char *str = tt_sprintf("-%s", expr->u.zToken);
-	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
-	errno = 0;
-	*res = strtoll(str, NULL, base);
-	return errno == 0 ? 0 : -1;
-}
-
-/** Fetch non-negative integer value from the expr. */
-static int
-sql_expr_uint(const struct Expr *expr, uint64_t *res)
-{
-	assert(expr->op == TK_INTEGER);
-	if ((expr->flags & EP_IntValue) != 0) {
-		*res = expr->u.iValue;
-		return 0;
-	}
-	assert(strlen(expr->u.zToken) > 2);
-	const char *str = expr->u.zToken;
-	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
-	errno = 0;
-	*res = strtoull(str, NULL, base);
-	return errno == 0 ? 0 : -1;
-}
-
 /** This function adds literal default value for a column. */
 static void
 sql_add_term_default(struct Parse *parser, struct Expr *expr)
@@ -532,48 +498,20 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 		mp_encode_decimal(buf, expr->v.d);
 		break;
 	case FIELD_TYPE_INTEGER: {
-		if (expr->op == TK_UMINUS) {
-			int64_t val;
-			if (sql_expr_nint(expr->pLeft, &val) == 0) {
-				if (val == 0) {
-					size = mp_sizeof_uint(val);
-					buf = xregion_alloc(region, size);
-					mp_encode_uint(buf, val);
-					break;
-				}
-				size = mp_sizeof_int(val);
-				buf = xregion_alloc(region, size);
-				mp_encode_int(buf, val);
-				break;
-			}
-			int errcode = ER_INT_LITERAL_MAX;
-			const char *str = expr->pLeft->u.zToken;
-			if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-				errcode = ER_HEX_LITERAL_MAX;
-			diag_set(ClientError, errcode,
-				 tt_sprintf("%s%s", "-", str));
-			parser->is_aborted = true;
-			break;
-		}
-		const struct Expr *int_expr = expr;
-		if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_INTEGER);
-			int_expr = expr->pLeft;
-		}
-		uint64_t val;
-		if (sql_expr_uint(int_expr, &val) == 0) {
-			size = mp_sizeof_uint(val);
+		assert(expr->op == TK_INTEGER);
+		if ((expr->flags & EP_Negative) != 0) {
+			int64_t val = (int64_t)expr->v.u;
+			assert(val < 0);
+			size = mp_sizeof_int(val);
 			buf = xregion_alloc(region, size);
-			mp_encode_uint(buf, val);
+			mp_encode_int(buf, val);
 			break;
 		}
-		int errcode = ER_INT_LITERAL_MAX;
-		const char *str = int_expr->u.zToken;
-		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-			errcode = ER_HEX_LITERAL_MAX;
-		diag_set(ClientError, errcode, str);
-		parser->is_aborted = true;
+
+		uint64_t val = expr->v.u;
+		size = mp_sizeof_uint(val);
+		buf = xregion_alloc(region, size);
+		mp_encode_uint(buf, val);
 		break;
 	}
 	default:
@@ -1230,22 +1168,11 @@ sql_add_func_default(struct Parse *parser, struct Expr *expr, const char *str,
 	parser->default_funcs[id].reg_func_id = reg_id;
 }
 
-static bool
-sql_expr_is_number_term(const struct Expr *expr)
-{
-	return expr->op == TK_INTEGER || expr->op == TK_FLOAT ||
-	       expr->op == TK_DECIMAL;
-}
-
 void
 sql_column_add_default(struct Parse *parser, struct Expr *expr, const char *str,
 		       uint32_t len)
 {
 	if (sql_expr_is_term(expr))
-		sql_add_term_default(parser, expr);
-	else if (expr->op == TK_UPLUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr);
-	else if (expr->op == TK_UMINUS && sql_expr_is_number_term(expr->pLeft))
 		sql_add_term_default(parser, expr);
 	else
 		sql_add_func_default(parser, expr, str, len);

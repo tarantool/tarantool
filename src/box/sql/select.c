@@ -1995,7 +1995,6 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 				space_def = pColExpr->space_def;
 				name = space_def->fields[iCol].name;
 			} else if (pColExpr->op == TK_ID) {
-				assert(!ExprHasProperty(pColExpr, EP_IntValue));
 				name = pColExpr->u.zToken;
 			}
 		}
@@ -3300,8 +3299,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			if (j == nOrderBy) {
 				struct Expr *pNew =
 					sql_expr_new_anon(TK_INTEGER);
-				pNew->flags |= EP_IntValue;
-				pNew->u.iValue = i;
+				pNew->v.u = i;
 				pNew->type = FIELD_TYPE_INTEGER;
 				pOrderBy = sql_expr_list_append(pOrderBy, pNew);
 				pOrderBy->a[nOrderBy++].u.x.iOrderByCol = i;
@@ -4847,7 +4845,6 @@ selectExpander(Walker * pWalker, Select * p)
 		char *zTName = NULL;
 		if (pE->op == TK_DOT) {
 			assert(pE->pLeft != NULL);
-			assert(!ExprHasProperty(pE->pLeft, EP_IntValue));
 			zTName = pE->pLeft->u.zToken;
 		}
 		for (i = 0, pFrom = pTabList->a;
