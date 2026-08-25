@@ -3030,27 +3030,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	sql_xfree(zAff);
 }
 
-/*
- * Generate an instruction that will put the floating point
- * value described by z[0..n-1] into register iMem.
- *
- * The z[] string will probably not be zero-terminated.  But the
- * z[n] character is guaranteed to be something that does not look
- * like the continuation of the number.
- */
-static void
-codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
-{
-	if (ALWAYS(z != 0)) {
-		double value;
-		sqlAtoF(z, &value, sqlStrlen30(z));
-		assert(!sqlIsNaN(value));	/* The new AtoF never returns NaN */
-		if (negateFlag)
-			value = -value;
-		sql_vdbe_add_op4_real(v, 0, iMem, 0, value);
-	}
-}
-
 /**
  * Generate an instruction that will put the integer describe by
  * text z[0..n-1] into register iMem.
@@ -3603,11 +3582,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		sqlVdbeAddOp4(v, OP_Decimal, 0, target, 0, (char *)dec, P4_DEC);
 		return target;
 	}
-	case TK_FLOAT:{
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
-			codeReal(v, pExpr->u.zToken, 0, target);
-			return target;
-		}
+	case TK_FLOAT:
+		sql_vdbe_add_op4_real(v, 0, target, 0, pExpr->v.f);
+		return target;
 	case TK_STRING:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlVdbeAddOp4(v, OP_String8, 0, target, 0,
@@ -3745,11 +3722,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		assert(pExpr->pLeft != NULL);
 		if (pExpr->pLeft->op == TK_INTEGER) {
 			expr_code_int(pParse, pExpr->pLeft, true, target);
-			return target;
-		}
-		if (pExpr->pLeft->op == TK_FLOAT) {
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
-			codeReal(v, pExpr->pLeft->u.zToken, 1, target);
 			return target;
 		}
 		tempX.op = TK_INTEGER;
@@ -4828,6 +4800,8 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 	case TK_TRUE:
 	case TK_FALSE:
 		return 0;
+	case TK_FLOAT:
+		return pA->v.f == pB->v.f ? 0 : 2;
 	case TK_DECIMAL:
 		/*
 		 * Two decimal literals are only interchangeable when they have

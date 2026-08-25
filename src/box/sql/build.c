@@ -519,28 +519,12 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 		mp_encode_str(buf, val, len);
 		break;
 	}
-	case FIELD_TYPE_DOUBLE: {
-		const char *str;
-		if (expr->op == TK_UMINUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_FLOAT);
-			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
-		} else if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_FLOAT);
-			str = expr->pLeft->u.zToken;
-		} else {
-			assert(expr->op == TK_FLOAT);
-			str = expr->u.zToken;
-		}
-		double val;
-		sqlAtoF(str, &val, strlen(str));
-		assert(!sqlIsNaN(val));
-		size = mp_sizeof_double(val);
+	case FIELD_TYPE_DOUBLE:
+		assert(expr->op == TK_FLOAT && !sqlIsNaN(expr->v.f));
+		size = mp_sizeof_double(expr->v.f);
 		buf = xregion_alloc(region, size);
-		mp_encode_double(buf, val);
+		mp_encode_double(buf, expr->v.f);
 		break;
-	}
 	case FIELD_TYPE_DECIMAL:
 		assert(expr->op == TK_DECIMAL);
 		size = mp_sizeof_decimal(expr->v.d);

@@ -341,7 +341,7 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			break;
 		}
 	case TK_FLOAT:{
-			sqlTreeViewLine(pView, "%s", pExpr->u.zToken);
+			sqlTreeViewLine(pView, "%!.15g", pExpr->v.f);
 			break;
 		}
 	case TK_STRING:{

@@ -443,6 +443,10 @@ expr_uminus(struct Parse *parser, struct ast_expr *expr)
 		decimal_minus(left->v.d, left->v.d);
 		return left;
 	}
+	if (left->op == TK_FLOAT) {
+		left->v.f = -left->v.f;
+		return left;
+	}
 	struct Expr *res = sqlPExpr(parser, TK_UMINUS, left, NULL);
 	if (parser->is_aborted) {
 		sql_expr_delete(res);
@@ -463,7 +467,7 @@ expr_uplus(struct Parse *parser, struct ast_expr *expr)
 	struct Expr *left = expr_from_ast(parser, expr->left);
 	if (parser->is_aborted)
 		return NULL;
-	if (left->op == TK_DECIMAL)
+	if (left->op == TK_DECIMAL || left->op == TK_FLOAT)
 		return left;
 	struct Expr *res = sqlPExpr(parser, TK_UPLUS, left, NULL);
 	if (parser->is_aborted) {
@@ -706,7 +710,10 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_leaf(expr, FIELD_TYPE_INTEGER);
 		break;
 	case TK_FLOAT:
-		res = expr_leaf(expr, FIELD_TYPE_DOUBLE);
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_DOUBLE;
+		res->flags |= EP_Leaf;
+		sqlAtoF(expr->str, &res->v.f, expr->len);
 		break;
 	case TK_DECIMAL:
 		res = expr_decimal(parser, expr);
