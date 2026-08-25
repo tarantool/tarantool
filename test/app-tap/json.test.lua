@@ -25,7 +25,7 @@ test:plan(1)
 
 test:test("json", function(test)
     local serializer = require('json')
-    test:plan(82)
+    test:plan(85)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -97,6 +97,16 @@ test:test("json", function(test)
             'error: too many nested data structures')
     test:is(serializer.cfg.decode_max_depth, orig_decode_max_depth,
             'global option remains unchanged')
+
+    -- gh-6115: Raise an error for integers outside the supported range.
+    local ok, err = pcall(serializer.decode, '18446744073709551616')
+    test:ok(not ok and err:find('INT64_MIN, UINT64_MAX', 1, true) ~= nil,
+            'error on unsigned integer overflow')
+    ok, err = pcall(serializer.decode, '-9223372036854775809')
+    test:ok(not ok and err:find('INT64_MIN, UINT64_MAX', 1, true) ~= nil,
+            'error on signed integer underflow')
+    test:is(serializer.decode('18446744073709551616.0'), 2^64,
+            'decode floating-point value above integer range')
 
     --
     -- gh-3514: fix parsing integers with exponent in json
