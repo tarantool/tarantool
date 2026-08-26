@@ -155,6 +155,11 @@ struct txn_limbo_queue {
 	 */
 	int ack_count;
 	/**
+	 * Whether the queue is fenced off from new confirmations and
+	 * transactions.
+	 */
+	bool is_fenced;
+	/**
 	 * The time that the latest successfully confirmed entry waited for
 	 * quorum.
 	 */
@@ -266,6 +271,14 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 /** Try to bump the volatile confirmed LSN. */
 bool
 txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue);
+
+/** Fence the queue off from new confirmations and transactions. */
+void
+txn_limbo_queue_fence(struct txn_limbo_queue *queue);
+
+/** Lift the fence. */
+void
+txn_limbo_queue_unfence(struct txn_limbo_queue *queue);
 
 /**
  * Wait until the last transaction in the queue is finished and get its result.

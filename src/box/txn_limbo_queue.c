@@ -250,6 +250,18 @@ txn_limbo_queue_submit(struct txn_limbo_queue *queue, uint32_t origin_id,
 	 */
 	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	assert(txn->status == TXN_PREPARED);
+	if (queue->is_fenced) {
+		/*
+		 * Cascading rollback. It is impossible to commit the
+		 * transaction, because if there is an existing rollback in
+		 * progress, it should rollback this one too for the sake of
+		 * 'reversed rollback order' rule. On the other hand the
+		 * rollback can't be postponed until after WAL write as well -
+		 * it should be done right now. See in the queue comments why.
+		 */
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
+		return -1;
+	}
 	if (queue->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
 		return -1;
@@ -721,6 +733,8 @@ void
 txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
 				   uint32_t new_owner_id, int64_t border_lsn)
 {
+	/* New transactions can't be coming during the ownership switch. */
+	assert(queue->is_fenced);
 	txn_limbo_queue_apply_confirm(queue, border_lsn);
 	txn_limbo_queue_apply_rollback(queue, border_lsn + 1,
 				       TXN_SIGNATURE_SYNC_ROLLBACK);
@@ -814,6 +828,20 @@ txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 	assert(max_assigned_lsn >= queue->volatile_confirmed_lsn);
 	queue->volatile_confirmed_lsn = max_assigned_lsn;
 	return true;
+}
+
+void
+txn_limbo_queue_fence(struct txn_limbo_queue *queue)
+{
+	assert(!queue->is_fenced);
+	queue->is_fenced = true;
+}
+
+void
+txn_limbo_queue_unfence(struct txn_limbo_queue *queue)
+{
+	assert(queue->is_fenced);
+	queue->is_fenced = false;
 }
 
 int
