@@ -183,7 +183,8 @@ static void
 txn_limbo_unfence(struct txn_limbo *limbo)
 {
 	txn_limbo_assert_locked(limbo);
-	txn_limbo_queue_unfence(&limbo->queue);
+	if (txn_limbo_queue_unfence(&limbo->queue))
+		fiber_wakeup(limbo->worker);
 }
 
 /**
@@ -1059,8 +1060,7 @@ void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
 	/* The replication_synchro_quorum value may have changed. */
-	if (!limbo->queue.is_fenced &&
-	    txn_limbo_is_owned_by_current_instance(limbo) &&
+	if (txn_limbo_is_owned_by_current_instance(limbo) &&
 	    txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
 		fiber_wakeup(limbo->worker);
 	/*

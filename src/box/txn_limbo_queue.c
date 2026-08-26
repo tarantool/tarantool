@@ -788,6 +788,16 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 bool
 txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 {
+	if (queue->is_fenced) {
+		/*
+		 * Bumping the volatile LSN during fencing can mistakenly bump
+		 * it to an LSN which is actually rolled back, while the
+		 * rollback isn't finished yet (is being written to WAL, for
+		 * example). This might lead to the same LSN being confirmed and
+		 * rolled back at the same time.
+		 */
+		return false;
+	}
 	if (queue->entry_to_confirm == NULL ||
 	    queue->entry_to_confirm->lsn == -1)
 		return false;
@@ -837,11 +847,12 @@ txn_limbo_queue_fence(struct txn_limbo_queue *queue)
 	queue->is_fenced = true;
 }
 
-void
+bool
 txn_limbo_queue_unfence(struct txn_limbo_queue *queue)
 {
 	assert(queue->is_fenced);
 	queue->is_fenced = false;
+	return txn_limbo_queue_bump_volatile_confirm(queue);
 }
 
 int

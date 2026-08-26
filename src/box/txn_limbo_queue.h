@@ -276,8 +276,11 @@ txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue);
 void
 txn_limbo_queue_fence(struct txn_limbo_queue *queue);
 
-/** Lift the fence. */
-void
+/**
+ * Lift the fence and check if there is any work unblocked for processing, like
+ * a volatile confirmed LSN bump.
+ */
+bool
 txn_limbo_queue_unfence(struct txn_limbo_queue *queue);
 
 /**
