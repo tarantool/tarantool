@@ -1282,6 +1282,8 @@ struct Expr {
 			/** Length of the varbinary string. */
 			uint32_t n;
 		};
+		/** ID for TK_COLLATE. */
+		uint32_t id;
 	} v;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -2471,6 +2473,13 @@ struct Expr *
 sql_expr_new_string(const char *str, uint32_t n);
 
 /**
+ * Create a TK_COLLATE expression that contains the ID of a collation and
+ * the specified expression to which the collation applies.
+ */
+struct Expr *
+sql_expr_new_collate(struct Expr *expr, uint32_t coll_id);
+
+/**
  * The same as @sa sql_expr_new, but normalizes name, stored in
  * @a token. Quotes are removed if they are presented.
  */
@@ -3168,22 +3177,10 @@ uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
 
 /**
- * Return the ID of the collation with the name defined by the token. A second
- * lookup will be performed if the collation is not found on the first try and
- * token is not start with double quote. Return UINT32_MAX if the field was not
- * found.
+ * Find collation by name. If no collation is found, return -1 and set the diag.
  */
-uint32_t
-sql_coll_id_by_token(const struct Token *name);
-
-/**
- * Return the ID of the collation with the name defined by the expression. A
- * second lookup will be performed if the collation is not found on the first
- * try and EP_Lookup2 flag is set. Return UINT32_MAX if the collation was not
- * found.
- */
-uint32_t
-sql_coll_id_by_expr(const struct Expr *expr);
+int
+sql_coll_id(uint32_t *id, const char *name, uint32_t len);
 
 /**
  * Return the tuple foreign key constraint with the name defined by the token.
@@ -3986,22 +3983,6 @@ u8 sqlHexToInt(int h);
 int
 sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 	      struct coll **coll);
-
-/**
- * Set the collating sequence for expression pExpr to be the collating sequence
- * named by pCollName. Return a pointer to a new Expr node that implements the
- * COLLATE operator.
- */
-struct Expr *
-sqlExprAddCollateToken(struct Expr *pExpr, const Token *pCollName, int dequote);
-
-/**
- * Set the collating sequence for expression pExpr to be the collating sequence
- * named by zC. Return a pointer to a new Expr node that implements the COLLATE
- * operator.
- */
-struct Expr *
-sqlExprAddCollateString(struct Expr *pExpr, const char *zC);
 
 Expr *sqlExprSkipCollate(Expr *);
 int sqlCheckIdentifierName(Parse *, char *);

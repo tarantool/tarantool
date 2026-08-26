@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "box/schema.h"
+#include "box/coll_id_cache.h"
 
 /*
  * Walk the expression tree pExpr and increase the aggregate function
@@ -110,7 +111,7 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 	if (zType[0] != 'G')
 		incrAggFunctionDepth(pDup, nSubquery);
 	if (pExpr->op == TK_COLLATE)
-		pDup = sqlExprAddCollateString(pDup, pExpr->u.zToken);
+		pDup = sql_expr_new_collate(pDup, pExpr->v.id);
 
 	/* Before calling sql_expr_delete(), set the EP_Static flag. This
 	 * prevents ExprDelete() from deleting the Expr structure itself,
@@ -1578,4 +1579,29 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 	sNC.pSrcList = &sSrc;
 	sNC.ncFlags = NC_IdxExpr;
 	sqlResolveExprNames(&sNC, expr);
+}
+
+int
+sql_coll_id(uint32_t *id, const char *name, uint32_t len)
+{
+	char *name_str = sql_name_new(name, len);
+	struct coll_id *coll_id = coll_by_name(name_str, strlen(name_str));
+	sql_xfree(name_str);
+	if (coll_id != NULL) {
+		*id = coll_id->id;
+		return 0;
+	}
+	if (name[0] != '"') {
+		name_str = sql_legacy_name_new(name, len);
+		coll_id = coll_by_name(name_str, strlen(name_str));
+		sql_xfree(name_str);
+		if (coll_id != NULL) {
+			*id = coll_id->id;
+			return 0;
+		}
+	}
+	name_str = sql_name_new(name, len);
+	diag_set(ClientError, ER_NO_SUCH_COLLATION, name_str);
+	sql_xfree(name_str);
+	return -1;
 }

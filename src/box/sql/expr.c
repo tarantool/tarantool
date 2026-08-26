@@ -205,30 +205,6 @@ field_type_sequence_dup(enum field_type *types, uint32_t len)
 	return ret_types;
 }
 
-struct Expr *
-sqlExprAddCollateToken(struct Expr *pExpr, const Token *pCollName, int dequote)
-{
-	if (pCollName->n == 0)
-		return pExpr;
-	struct Expr *new_expr;
-	if (dequote)
-		new_expr = sql_expr_new_dequoted(TK_COLLATE, pCollName);
-	else
-		new_expr = sql_expr_new(TK_COLLATE, pCollName);
-	new_expr->pLeft = pExpr;
-	new_expr->flags |= EP_Collate | EP_Skip;
-	return new_expr;
-}
-
-struct Expr *
-sqlExprAddCollateString(struct Expr *pExpr, const char *zC)
-{
-	Token s;
-	assert(zC != 0);
-	sqlTokenInit(&s, (char *)zC);
-	return sqlExprAddCollateToken(pExpr, &s, 0);
-}
-
 /*
  * Skip over any TK_COLLATE operators and any unlikely()
  * or likelihood() function at the root of an expression.
@@ -294,15 +270,8 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		}
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			uint32_t id = sql_coll_id_by_expr(p);
-			if (id == UINT32_MAX) {
-				diag_set(ClientError, ER_NO_SUCH_COLLATION,
-					 p->u.zToken);
-				parse->is_aborted = true;
-				return -1;
-			}
-			*coll_id = id;
-			*coll = coll_by_id(id)->coll;
+			*coll_id = p->v.id;
+			*coll = coll_by_id(p->v.id)->coll;
 			*is_explicit_coll = true;
 			break;
 		}
@@ -1006,6 +975,17 @@ sql_expr_new(int op, const struct Token *token)
 }
 
 struct Expr *
+sql_expr_new_collate(struct Expr *expr, uint32_t coll_id)
+{
+	struct Expr *res = sql_expr_new_empty(TK_COLLATE, 0);
+	res->type = FIELD_TYPE_SCALAR;
+	res->flags |= EP_Collate | EP_Skip;
+	res->pLeft = expr;
+	res->v.id = coll_id;
+	return res;
+}
+
+struct Expr *
 sql_expr_new_dequoted(int op, const struct Token *token)
 {
 	int extra_size = 0;
@@ -1018,7 +998,7 @@ sql_expr_new_dequoted(int op, const struct Token *token)
 	memcpy(e->u.zToken, token->z, token->n);
 	e->u.zToken[token->n] = '\0';
 	sqlDequote(e->u.zToken);
-	if (op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION)
+	if (op == TK_ID || op == TK_FUNCTION)
 		e->flags |= token->z[0] != '"' ? EP_Lookup2 : 0;
 	return e;
 }
@@ -4722,6 +4702,10 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 		return decimal_compare(pA->v.d, pB->v.d) == 0 &&
 		       decimal_scale(pA->v.d) == decimal_scale(pB->v.d) ?
 		       0 : 2;
+	case TK_COLLATE:
+		if (pA->v.id != pB->v.id)
+			return 1;
+		break;
 	default:
 		break;
 	}
@@ -4731,7 +4715,7 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 			if (sqlStrICmp(pA->u.zToken, pB->u.zToken) != 0)
 				return 2;
 		} else if (strcmp(pA->u.zToken, pB->u.zToken) != 0) {
-			return pA->op == TK_COLLATE ? 1 : 2;
+			return 2;
 		}
 	}
 	if ((pA->flags & EP_Distinct) != (pB->flags & EP_Distinct))
@@ -5272,23 +5256,4 @@ sql_fieldno_by_item(const struct space *space, const struct ExprList_item *item)
 	if (res != UINT32_MAX || item->legacy_name == NULL)
 		return res;
 	return sql_space_fieldno(space, item->legacy_name);
-}
-
-uint32_t
-sql_coll_id_by_expr(const struct Expr *expr)
-{
-	assert(expr->op == TK_COLLATE);
-	const char *name = expr->u.zToken;
-	struct coll_id *coll_id = coll_by_name(name, strlen(name));
-	if (coll_id != NULL)
-		return coll_id->id;
-	if ((expr->flags & EP_Lookup2) == 0)
-		return UINT32_MAX;
-
-	char *old_name_str = sql_legacy_name_new0(expr->u.zToken);
-	coll_id = coll_by_name(old_name_str, strlen(old_name_str));
-	sql_xfree(old_name_str);
-	if (coll_id != NULL)
-		return coll_id->id;
-	return UINT32_MAX;
 }

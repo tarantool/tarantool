@@ -757,10 +757,8 @@ sql_create_check_constraint(struct Parse *parser, struct Token *table,
 void
 sqlAddCollateType(Parse * pParse, Token * pToken)
 {
-	uint32_t coll_id = sql_coll_id_by_token(pToken);
-	if (coll_id == UINT32_MAX) {
-		diag_set(ClientError, ER_NO_SUCH_COLLATION,
-			 sql_tt_name_from_token(pToken));
+	uint32_t coll_id;
+	if (sql_coll_id(&coll_id, pToken->z, pToken->n) != 0) {
 		pParse->is_aborted = true;
 		return;
 	}
@@ -2451,16 +2449,10 @@ index_fill_def(struct Parse *parse, struct index *index,
 			*parse->autoinc_fieldno = fieldno;
 		}
 		uint32_t coll_id;
-		if (expr->op == TK_COLLATE) {
-			coll_id = sql_coll_id_by_expr(expr);
-			if (coll_id == UINT32_MAX) {
-				diag_set(ClientError, ER_NO_SUCH_COLLATION,
-					 expr->u.zToken);
-				goto tnt_error;
-			}
-		} else {
+		if (expr->op == TK_COLLATE)
+			coll_id = expr->v.id;
+		else
 			sql_column_collation(space_def, fieldno, &coll_id);
-		}
 		/*
 		 * Tarantool: DESC indexes are not supported so
 		 * far.

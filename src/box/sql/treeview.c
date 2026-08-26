@@ -39,6 +39,7 @@
  * with SQL_DEBUG.
  */
 #include "sqlInt.h"
+#include "box/coll_id_cache.h"
 #ifdef SQL_DEBUG
 
 /*
@@ -464,12 +465,12 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			break;
 		}
 
-	case TK_COLLATE:{
-			sqlTreeViewLine(pView, "COLLATE %Q",
-					    pExpr->u.zToken);
-			sqlTreeViewExpr(pView, pExpr->pLeft, 0);
-			break;
-		}
+	case TK_COLLATE: {
+		sqlTreeViewLine(pView, "COLLATE %Q",
+				coll_by_id(pExpr->v.id)->name);
+		sqlTreeViewExpr(pView, pExpr->pLeft, 0);
+		break;
+	}
 
 	case TK_AGG_FUNCTION:
 	case TK_FUNCTION:{

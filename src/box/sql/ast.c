@@ -766,6 +766,25 @@ expr_decimal(struct Parse *parser, struct ast_expr *expr)
 	return res;
 }
 
+/**
+ * Build a `struct Expr` for a COLLATE.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_collate(struct Parse *parser, struct ast_expr *expr)
+{
+	uint32_t id;
+	if (sql_coll_id(&id, expr->right->str, expr->right->len) != 0) {
+		parser->is_aborted = true;
+		return NULL;
+	}
+	struct Expr *left = expr_from_ast(parser, expr->left);
+	if (parser->is_aborted)
+		return NULL;
+	return sql_expr_new_collate(left, id);
+}
+
 struct Expr *
 expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 {
@@ -838,11 +857,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_from_ast(parser, expr);
 		break;
 	case TK_COLLATE:
-		res = expr_id(expr->right);
-		assert(res != NULL);
-		res->op = TK_COLLATE;
-		res->flags |= EP_Collate | EP_Skip;
-		res->pLeft = expr_from_ast(parser, expr->left);
+		res = expr_collate(parser, expr);
 		break;
 	case TK_CAST:
 		res = expr_unary(parser, expr);

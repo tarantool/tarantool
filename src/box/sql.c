@@ -1703,25 +1703,6 @@ sql_fieldno_by_id(const struct space *space, const struct IdList_item *id)
 	return sql_space_fieldno(space, id->legacy_name);
 }
 
-uint32_t
-sql_coll_id_by_token(const struct Token *name)
-{
-	char *name_str = sql_name_from_token(name);
-	struct coll_id *coll_id = coll_by_name(name_str, strlen(name_str));
-	sql_xfree(name_str);
-	if (coll_id != NULL)
-		return coll_id->id;
-	if (name->z[0] == '"')
-		return UINT32_MAX;
-
-	char *old_name_str = sql_legacy_name_new(name->z, name->n);
-	coll_id = coll_by_name(old_name_str, strlen(old_name_str));
-	sql_xfree(old_name_str);
-	if (coll_id != NULL)
-		return coll_id->id;
-	return UINT32_MAX;
-}
-
 /**
  * Return a constraint with the name specified by the token and the
  * specified type. A second lookup will be performed if the constraint is not

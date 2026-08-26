@@ -184,9 +184,8 @@ sql_space_info_new_from_order_by(struct Parse *parser, struct Select *select,
 		info->coll_ids[i] = multi_select_coll_seq(parser, select,
 							  fieldno);
 		if (info->coll_ids[i] != COLL_NONE) {
-			const char *name = coll_by_id(info->coll_ids[i])->name;
-			order_by->a[i].pExpr =
-				sqlExprAddCollateString(expr, name);
+			uint32_t id = info->coll_ids[i];
+			order_by->a[i].pExpr = sql_expr_new_collate(expr, id);
 		}
 	}
 	info->types[order_by->nExpr] = FIELD_TYPE_INTEGER;
@@ -2295,9 +2294,8 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 			id = multi_select_coll_seq(parse, s,
 						   item->u.x.iOrderByCol - 1);
 			if (id != COLL_NONE) {
-				const char *name = coll_by_id(id)->name;
 				order_by->a[i].pExpr =
-					sqlExprAddCollateString(term, name);
+					sql_expr_new_collate(term, id);
 			}
 		}
 		part->coll_id = id;
