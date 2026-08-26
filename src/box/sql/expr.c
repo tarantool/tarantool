@@ -1257,6 +1257,8 @@ sqlExprDeleteNN(struct Expr *p)
 	if (ExprHasProperty(p, EP_MemToken)) {
 		if (p->op == TK_STRING)
 			sql_xfree(p->v.s);
+		else if (p->op == TK_BLOB)
+			sql_xfree(p->v.z);
 		else
 			sql_xfree(p->u.zToken);
 	}
@@ -1348,7 +1350,8 @@ dupedExprStructSize(Expr * p, int flags)
 /*
  * This function returns the space in bytes required to store the copy
  * of the Expr structure and a copy of the Expr.u.zToken string (if that
- * string is defined) or the Expr.v.s string (if the node is TK_STRING).
+ * string is defined) or the Expr.v.s string (if the node is TK_STRING) or
+ * the Expr.v.z blob (if the node is TK_BLOB).
  */
 static int
 dupedExprNodeSize(Expr * p, int flags)
@@ -1361,6 +1364,8 @@ dupedExprNodeSize(Expr * p, int flags)
 		nByte += sizeof(decimal_t);
 	else if (p->op == TK_STRING)
 		nByte += sqlStrlen30(p->v.s) + 1;
+	else if (p->op == TK_BLOB)
+		nByte += p->v.n;
 	return ROUND8(nByte);
 }
 
@@ -1426,6 +1431,7 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 	else
 		nToken = 0;
 	int nStr = p->op == TK_STRING ? sqlStrlen30(p->v.s) + 1 : 0;
+	int nBlob = p->op == TK_BLOB ? p->v.n : 0;
 	if (flags != 0) {
 		assert(ExprHasProperty(p, EP_Reduced) == 0);
 		memcpy(zAlloc, p, nNewSize);
@@ -1462,6 +1468,12 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 	if (nStr != 0) {
 		pNew->v.s = &zAlloc[nNewSize + nToken];
 		memcpy(pNew->v.s, p->v.s, nStr);
+	}
+
+	/* Copy the p->v.z blob, if the node is TK_BLOB. */
+	if (nBlob != 0) {
+		pNew->v.z = &zAlloc[nNewSize + nToken];
+		memcpy(pNew->v.z, p->v.z, nBlob);
 	}
 
 	if (((p->flags | pNew->flags) & (EP_TokenOnly | EP_Leaf)) == 0) {
@@ -3505,21 +3517,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			return target;
 		}
-	case TK_BLOB:{
-			int n;
-			const char *z;
-			char *zBlob;
-			assert(pExpr->u.zToken[0] == 'x'
-			       || pExpr->u.zToken[0] == 'X');
-			assert(pExpr->u.zToken[1] == '\'');
-			z = &pExpr->u.zToken[2];
-			n = sqlStrlen30(z) - 1;
-			assert(z[n] == '\'');
-			zBlob = sqlHexToBlob(z, n);
-			sqlVdbeAddOp4(v, OP_Blob, n / 2, target, 0, zBlob,
-					  P4_DYNAMIC);
-			return target;
-		}
+	case TK_BLOB:
+		sqlVdbeAddOp4(v, OP_Blob, pExpr->v.n, target, 0,
+			      sql_xstrndup(pExpr->v.z, pExpr->v.n), P4_DYNAMIC);
+		return target;
 	case TK_VAR_NUM:
 	case TK_VAR_NAME: {
 			assert(pExpr->u.zToken != 0);
@@ -4695,6 +4696,9 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 	case TK_TRUE:
 	case TK_FALSE:
 		return 0;
+	case TK_BLOB:
+		return pA->v.n == pB->v.n &&
+		       memcmp(pA->v.z, pB->v.z, pA->v.n) == 0 ? 0 : 2;
 	case TK_STRING:
 		return strcmp(pA->v.s, pB->v.s) == 0 ? 0 : 2;
 	case TK_INTEGER:

@@ -688,6 +688,32 @@ expr_getitem(struct Parse *parser, struct ast_expr *expr)
 }
 
 /**
+ * Build a `struct Expr` for a VARBINARY value.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_varbinary(struct ast_expr *expr)
+{
+	assert(expr->op == TK_BLOB);
+	assert(expr->str[0] == 'x' || expr->str[0] == 'X');
+	assert(expr->str[1] == '\'' && expr->str[expr->len - 1] == '\'');
+	assert(expr->len > 2 && expr->len % 2 == 1);
+
+	uint32_t len = (expr->len - 3) / 2;
+	struct Expr *res = sql_expr_new_empty(expr->op, len);
+	res->type = FIELD_TYPE_VARBINARY;
+	res->flags |= EP_Leaf;
+	res->v.n = len;
+	res->v.z = (char *)&res[1];
+	for (uint32_t i = 0; i < len; ++i) {
+		res->v.z[i] = (sqlHexToInt(expr->str[2 + i * 2]) << 4 |
+			       sqlHexToInt(expr->str[3 + i * 2]));
+	}
+	return res;
+}
+
+/**
  * Build a `struct Expr` for an INTEGER value.
  *
  * Return NULL on error.
@@ -752,7 +778,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res->v.s[sql_dequote(res->v.s, expr->len)] = '\0';
 		break;
 	case TK_BLOB:
-		res = expr_leaf(expr, FIELD_TYPE_VARBINARY);
+		res = expr_varbinary(expr);
 		break;
 	case TK_INTEGER:
 		res = expr_integer(parser, expr);

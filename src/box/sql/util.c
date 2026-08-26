@@ -766,20 +766,6 @@ sqlHexToInt(int h)
 	return (u8) (h & 0xf);
 }
 
-void *
-sqlHexToBlob(const char *z, int n)
-{
-	char *zBlob;
-	int i;
-
-	zBlob = sql_xmalloc(n / 2 + 1);
-	n--;
-	for (i = 0; i < n; i += 2)
-		zBlob[i / 2] = (sqlHexToInt(z[i]) << 4) | sqlHexToInt(z[i + 1]);
-	zBlob[i / 2] = 0;
-	return zBlob;
-}
-
 #if ENABLE_UB_SANITIZER
 /* See https://github.com/tarantool/tarantool/issues/10703. */
 int
@@ -1227,4 +1213,21 @@ sql_neg_uint(int64_t *res, uint64_t val)
 	diag_set(ClientError, ER_INT_LITERAL_MAX,
 		 tt_sprintf("-%llu", (unsigned long long)val));
 	return -1;
+}
+
+char *
+sql_str_to_hex(const char *str, uint32_t len)
+{
+	static const char hexdigits[] = {
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+	};
+	uint32_t size = 2 * len;
+	char *res = sql_xmalloc(size);
+	for (size_t i = 0; i < len; ++i) {
+		char c = str[i];
+		res[2 * i] = hexdigits[(c >> 4) & 0xf];
+		res[2 * i + 1] = hexdigits[c & 0xf];
+	}
+	return res;
 }

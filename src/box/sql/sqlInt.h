@@ -1270,6 +1270,13 @@ struct Expr {
 		decimal_t *d;
 		/** Value for TK_STRING. */
 		char *s;
+		/** Value for TK_BLOB. */
+		struct {
+			/** Varbinary string in hexadecimal format. */
+			char *z;
+			/** Length of the varbinary string. */
+			uint32_t n;
+		};
 	} v;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -2374,6 +2381,10 @@ sql_uint_from_str(uint64_t *res, const char *str);
  */
 int
 sql_neg_uint(int64_t *res, uint64_t val);
+
+/** Convert the string to hex and store the result in the allocated memory. */
+char *
+sql_str_to_hex(const char *str, uint32_t len);
 
 int sqlKeywordCode(const unsigned char *, int);
 
@@ -3945,15 +3956,6 @@ field_type_sequence_dup(enum field_type *types, uint32_t len);
  */
 int
 sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length);
-
-/**
- * Convert a BLOB literal of the form "x'hhhhhh'" into its binary
- * value.  Return a pointer to its binary value.  Space to hold the
- * binary value has been obtained from malloc and must be freed by
- * the calling routine.
- */
-void *
-sqlHexToBlob(const char *z, int n);
 
 u8 sqlHexToInt(int h);
 

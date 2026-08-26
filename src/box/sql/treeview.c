@@ -349,10 +349,13 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			sqlTreeViewLine(pView, "NULL");
 			break;
 		}
-	case TK_BLOB:{
-			sqlTreeViewLine(pView, "%s", pExpr->u.zToken);
-			break;
-		}
+	case TK_BLOB: {
+		uint32_t len = pExpr->v.n * 2;
+		char *hex = sql_str_to_hex(pExpr->v.z, pExpr->v.n);
+		sqlTreeViewLine(pView, "X'%.*s'", len, hex);
+		sql_xfree(hex);
+		break;
+	}
 	case TK_VAR_NUM:
 	case TK_VAR_ANON:
 	case TK_VAR_NAME: {

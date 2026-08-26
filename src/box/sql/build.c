@@ -465,16 +465,10 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 		break;
 	}
 	case FIELD_TYPE_VARBINARY: {
-		assert(expr->u.zToken[0] == 'x' || expr->u.zToken[0] == 'X');
-		assert(expr->u.zToken[1] == '\'');
-		const char *val_hex = &expr->u.zToken[2];
-		uint32_t len = strlen(val_hex) - 1;
-		assert(val_hex[len] == '\'');
-		size = mp_sizeof_bin(len / 2);
+		assert(expr->op == TK_BLOB);
+		size = mp_sizeof_bin(expr->v.n);
 		buf = xregion_alloc(region, size);
-		char *val = sqlHexToBlob(val_hex, len);
-		mp_encode_bin(buf, val, len / 2);
-		sql_xfree(val);
+		mp_encode_bin(buf, expr->v.z, expr->v.n);
 		break;
 	}
 	case FIELD_TYPE_STRING: {

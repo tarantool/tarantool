@@ -129,6 +129,9 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 	} else if (pExpr->op == TK_STRING) {
 		pExpr->v.s = sql_xstrdup(pExpr->v.s);
 		pExpr->flags |= EP_MemToken;
+	} else if (pExpr->op == TK_BLOB) {
+		pExpr->v.z = sql_xstrndup(pExpr->v.z, pExpr->v.n);
+		pExpr->flags |= EP_MemToken;
 	}
 	sql_xfree(pDup);
 }

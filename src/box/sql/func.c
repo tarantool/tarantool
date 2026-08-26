@@ -886,16 +886,6 @@ func_greatest_least(struct sql_context *ctx, int argc, const struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
-/**
- * Implementation of the HEX() function.
- *
- * The HEX() function returns the hexadecimal representation of the argument.
- */
-static const char hexdigits[] = {
-	'0', '1', '2', '3', '4', '5', '6', '7',
-	'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-};
-
 static void
 func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
@@ -910,13 +900,7 @@ func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_set_str0_static(ctx->pOut, "");
 
 	uint32_t size = 2 * arg->n;
-	char *str = sql_xmalloc(size);
-	for (size_t i = 0; i < arg->n; ++i) {
-		char c = arg->z[i];
-		str[2 * i] = hexdigits[(c >> 4) & 0xf];
-		str[2 * i + 1] = hexdigits[c & 0xf];
-	}
-	mem_set_str_allocated(ctx->pOut, str, size);
+	mem_set_str_allocated(ctx->pOut, sql_str_to_hex(arg->z, arg->n), size);
 }
 
 /** Implementation of the OCTET_LENGTH() function. */
@@ -1602,10 +1586,9 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		size_t nBlob = argv[0].n;
 		uint32_t size = 2 * nBlob + 3;
 		char *zText = sql_xmalloc(size);
-		for (size_t i = 0; i < nBlob; i++) {
-			zText[(i * 2) + 2] = hexdigits[(zBlob[i] >> 4) & 0x0F];
-			zText[(i * 2) + 3] = hexdigits[(zBlob[i]) & 0x0F];
-		}
+		char *hex = sql_str_to_hex(zBlob, nBlob);
+		memcpy(&zText[2], hex, nBlob * 2);
+		sql_xfree(hex);
 		zText[(nBlob * 2) + 2] = '\'';
 		zText[0] = 'X';
 		zText[1] = '\'';
