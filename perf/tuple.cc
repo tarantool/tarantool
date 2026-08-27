@@ -60,7 +60,27 @@ enum data_format {
 	FORMAT_SPARSE,
 };
 
-/** Class that creates and destroys memtx engine. */
+/** Name passed to memtx_set_tuple_format_vtab() for a given allocator. */
+template<class ALLOC>
+static const char *
+memtx_allocator_name();
+
+template<>
+const char *
+memtx_allocator_name<SmallAlloc>()
+{
+	return "small";
+}
+
+template<>
+const char *
+memtx_allocator_name<SysAlloc>()
+{
+	return "system";
+}
+
+/** Class that creates and destroys memtx engine using the given allocator. */
+template<class ALLOC>
 class MemtxEngine {
 public:
 	static MemtxEngine &instance()
@@ -69,14 +89,22 @@ public:
 		return instance;
 	}
 	struct memtx_engine *engine() { return &memtx; }
+
+	/*
+	 * memtx_tuple_format_vtab is a global struct shared by all allocators;
+	 * its content is only copied into a tuple format at the moment the
+	 * format is created (see `tuple_format_new()'). So this must be called
+	 * to select this engine's allocator right before creating a tuple
+	 * format that is supposed to use it.
+	 */
+	static void activate()
+	{
+		instance();
+		memtx_set_tuple_format_vtab(memtx_allocator_name<ALLOC>());
+	}
 private:
 	MemtxEngine()
 	{
-		memory_init();
-		fiber_init(fiber_c_invoke);
-		region_alloc(&fiber()->gc, 4);
-		tuple_init();
-
 		memset(&memtx, 0, sizeof(memtx));
 
 		quota_init(&memtx.quota, QUOTA_MAX);
@@ -95,34 +123,33 @@ private:
 		allocator_settings_init(&alloc_settings, &memtx.slab_cache,
 					16, 8, 1.1, &actual_alloc_factor,
 					&memtx.quota);
-		SmallAlloc::create(&alloc_settings);
-		memtx_set_tuple_format_vtab("small");
+		ALLOC::create(&alloc_settings);
+		memtx_set_tuple_format_vtab(memtx_allocator_name<ALLOC>());
 
 		memtx.max_tuple_size = 1024 * 1024;
 	}
 	~MemtxEngine()
 	{
-		tuple_free();
-		SmallAlloc::destroy();
+		ALLOC::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
 		tuple_arena_destroy(&memtx.arena);
-		fiber_free();
-		memory_free();
 	}
 
 	struct memtx_engine memtx;
 };
 
 /** Class that creates and destroys tuple format. */
-template<data_format F>
+template<class ALLOC, data_format F>
 class TupleFormat;
 
-template<>
-class TupleFormat<FORMAT_BASIC> {
+template<class ALLOC>
+class TupleFormat<ALLOC, FORMAT_BASIC> {
 public:
 	static struct tuple_format *make(struct key_def *kd)
 	{
-		struct memtx_engine *memtx = MemtxEngine::instance().engine();
+		MemtxEngine<ALLOC>::activate();
+		struct memtx_engine *memtx =
+			MemtxEngine<ALLOC>::instance().engine();
 		struct tuple_format *fmt = simple_tuple_format_new(
 			&memtx_tuple_format_vtab, memtx, &kd, 1);
 		if (fmt == NULL)
@@ -132,13 +159,14 @@ public:
 	}
 };
 
-template<>
-class TupleFormat<FORMAT_SPARSE> {
+template<class ALLOC>
+class TupleFormat<ALLOC, FORMAT_SPARSE> {
 public:
 	static struct tuple_format *make(struct key_def *kd)
 	{
-		struct memtx_engine *memtx = MemtxEngine::instance().engine();
-
+		MemtxEngine<ALLOC>::activate();
+		struct memtx_engine *memtx =
+			MemtxEngine<ALLOC>::instance().engine();
 		constexpr size_t max_name_size = sizeof("f999");
 		std::vector<std::array<char, max_name_size>> names(FIELD_COUNT);
 		std::vector<struct field_def> fields(FIELD_COUNT);
@@ -214,7 +242,8 @@ public:
 	const char *end() const { return data_end; }
 	MpData()
 	{
-		size_t field_count = TupleFormat<FORMAT_SPARSE>::FIELD_COUNT;
+		size_t field_count =
+			TupleFormat<SmallAlloc, FORMAT_SPARSE>::FIELD_COUNT;
 		std::vector<bool> is_non_null(field_count);
 		for (size_t i = 0; i < FIELD_COUNT_NON_NULL; i++)
 			is_non_null[rand() % field_count] = true;
@@ -284,7 +313,7 @@ struct BenchDataSimple {
 			kdp.type = FIELD_TYPE_UNSIGNED;
 			return key_def_new(&kdp, 1, 0);
 		} ())
-		, format(TupleFormat<F>::make(kd))
+		, format(TupleFormat<SmallAlloc, F>::make(kd))
 		, tuples(format)
 	{
 	}
@@ -301,7 +330,7 @@ struct BenchDataSimple {
 };
 
 // box_tuple_new benchmark.
-template<data_format F>
+template<class ALLOC, data_format F>
 static void
 bench_tuple_new(benchmark::State& state)
 {
@@ -313,7 +342,7 @@ bench_tuple_new(benchmark::State& state)
 	struct key_def *kd = key_def_new(&kdp, 1, 0);
 	size_t total_count = 0;
 
-	struct tuple_format *format = TupleFormat<F>::make(kd);
+	struct tuple_format *format = TupleFormat<ALLOC, F>::make(kd);
 	MpDataSet<F> dataset;
 	struct tuple *tuples[NUM_TEST_TUPLES];
 	size_t i = 0;
@@ -342,11 +371,13 @@ bench_tuple_new(benchmark::State& state)
 	key_def_delete(kd);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_BASIC);
-BENCHMARK_TEMPLATE(bench_tuple_new, FORMAT_SPARSE);
+BENCHMARK_TEMPLATE(bench_tuple_new, SmallAlloc, FORMAT_BASIC);
+BENCHMARK_TEMPLATE(bench_tuple_new, SysAlloc, FORMAT_BASIC);
+BENCHMARK_TEMPLATE(bench_tuple_new, SmallAlloc, FORMAT_SPARSE);
+BENCHMARK_TEMPLATE(bench_tuple_new, SysAlloc, FORMAT_SPARSE);
 
 // memtx_tuple_delete benchmark.
-template<data_format F>
+template<class ALLOC, data_format F>
 static void
 bench_tuple_delete(benchmark::State& state)
 {
@@ -356,7 +387,7 @@ bench_tuple_delete(benchmark::State& state)
 	struct key_def *kd = key_def_new(&kdp, 1, 0);
 	size_t total_count = 0;
 
-	struct tuple_format *format = TupleFormat<F>::make(kd);
+	struct tuple_format *format = TupleFormat<ALLOC, F>::make(kd);
 	MpDataSet<F> dataset;
 	struct tuple *tuples[NUM_TEST_TUPLES];
 
@@ -385,7 +416,8 @@ bench_tuple_delete(benchmark::State& state)
 	key_def_delete(kd);
 }
 
-BENCHMARK_TEMPLATE(bench_tuple_delete, FORMAT_BASIC);
+BENCHMARK_TEMPLATE(bench_tuple_delete, SmallAlloc, FORMAT_BASIC);
+BENCHMARK_TEMPLATE(bench_tuple_delete, SysAlloc, FORMAT_BASIC);
 
 template<data_format F>
 static void
@@ -581,7 +613,8 @@ BENCHMARK_TEMPLATE(tuple_tuple_compare, FORMAT_BASIC);
 static void
 tuple_tuple_hash_impl(benchmark::State &state, struct key_def *kd)
 {
-	struct tuple_format *format = TupleFormat<FORMAT_BASIC>::make(kd);
+	struct tuple_format *format =
+		TupleFormat<SmallAlloc, FORMAT_BASIC>::make(kd);
 	TestTuples<FORMAT_BASIC> tuples(format);
 	size_t i = 0;
 	size_t total_count = 0;
@@ -686,9 +719,22 @@ BENCHMARK_TEMPLATE(tuple_tuple_compare_hint, FORMAT_BASIC);
 int
 main(int argc, char **argv)
 {
-	MemtxEngine::instance();
+	memory_init();
+	fiber_init(fiber_c_invoke);
+	/*
+	 * Trigger the one-time slab fetch at startup, avoiding a timing spike
+	 * on the first key_def_new() / tuple_format_new() in the benchmark.
+	 */
+	region_alloc(&fiber()->gc, 4);
+	tuple_init();
+
+	MemtxEngine<SmallAlloc>::instance();
+	MemtxEngine<SysAlloc>::instance();
 	::benchmark::Initialize(&argc, argv);
 	::benchmark::RunSpecifiedBenchmarks();
+	tuple_free();
+	fiber_free();
+	memory_free();
 }
 
 #include "debug_warning.h"
