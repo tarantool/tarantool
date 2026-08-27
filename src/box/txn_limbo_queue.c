@@ -318,6 +318,22 @@ txn_limbo_queue_submit(struct txn_limbo_queue *queue, uint32_t origin_id,
 		/* Could be a spurious wakeup. */
 		if (txn_limbo_queue_is_full(queue))
 			continue;
+		/*
+		 * While the fence is up, transactions can't proceed to WAL.
+		 * The fencing ending might result in these txns being rolled
+		 * back, and that would be too late if they were already
+		 * written into WAL.
+		 *
+		 * Note that fencing doesn't necessarily mean the transaction
+		 * will be rolled back. For example, the fence might be raised
+		 * for the time of a PROMOTE WAL write, which then might fail,
+		 * and the fence would be lifted without rolling anything back.
+		 *
+		 * This is why the transaction needs to continue waiting. Can't
+		 * act until the situation is clear.
+		 */
+		if (queue->is_fenced)
+			continue;
 		if (txn_limbo_queue_first_entry(queue) == e)
 			break;
 		struct txn_limbo_entry *prev = rlist_prev_entry(e, in_queue);
@@ -852,6 +868,12 @@ txn_limbo_queue_unfence(struct txn_limbo_queue *queue)
 {
 	assert(queue->is_fenced);
 	queue->is_fenced = false;
+	/*
+	 * The parked transactions, if any survived the synchro request, need to
+	 * re-evaluate their situation. Nothing else might wake them up if the
+	 * request didn't touch them.
+	 */
+	fiber_cond_broadcast(&queue->cond);
 	return txn_limbo_queue_bump_volatile_confirm(queue);
 }
 
