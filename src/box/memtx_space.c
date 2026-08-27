@@ -1513,8 +1513,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	 */
 	bool can_yield = pk->def->type != HASH;
 
-	inj = errinj(ERRINJ_BUILD_INDEX_DISABLE_YIELD, ERRINJ_BOOL);
-	if (inj != NULL && inj->bparam == true)
+	if (ERROR_INJECTED(ERRINJ_BUILD_INDEX_DISABLE_YIELD))
 		can_yield = false;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
