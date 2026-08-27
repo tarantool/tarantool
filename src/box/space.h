@@ -79,7 +79,8 @@ struct space_vtab {
 	 */
 	int (*execute_insert_arrow)(struct space *space, struct txn *txn,
 				    struct ArrowArray *array,
-				    struct ArrowSchema *schema);
+				    struct ArrowSchema *schema,
+				    bool must_allow_intersecting);
 	/** Executes a range delete request. */
 	int (*execute_delete_range)(struct space *space, struct txn *txn,
 				    struct request *request);
@@ -798,7 +799,8 @@ space_events_are_enabled(void);
 size_t generic_space_bsize(struct space *);
 int generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				       struct ArrowArray *array,
-				       struct ArrowSchema *schema);
+				       struct ArrowSchema *schema,
+				       bool must_allow_intersecting);
 int generic_space_execute_delete_range(struct space *space, struct txn *txn,
 				       struct request *request);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
