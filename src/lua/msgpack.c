@@ -721,9 +721,9 @@ static int
 lua_decode_array_header(lua_State *L)
 {
 	const char *func_name = "msgpack.decode_array_header";
-	const char *data;
-	uint32_t cdata_type;
-	ptrdiff_t size;
+	const char *data = NULL;
+	uint32_t cdata_type = 0;
+	ptrdiff_t size = 0;
 	verify_decode_header_args(L, func_name, &data, &cdata_type, &size);
 
 	if (mp_typeof(*data) != MP_ARRAY)
@@ -747,9 +747,9 @@ static int
 lua_decode_map_header(lua_State *L)
 {
 	const char *func_name = "msgpack.decode_map_header";
-	const char *data;
-	uint32_t cdata_type;
-	ptrdiff_t size;
+	const char *data = NULL;
+	uint32_t cdata_type = 0;
+	ptrdiff_t size = 0;
 	verify_decode_header_args(L, func_name, &data, &cdata_type, &size);
 
 	if (mp_typeof(*data) != MP_MAP)
