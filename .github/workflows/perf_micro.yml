@@ -4,84 +4,30 @@ on:
   push:
     branches:
       - 'master'
-      - 'release/**'
     tags:
       - '**'
-    paths:
-      - '.github/workflows/perf_micro.yml'
-      - 'CMakeLists.txt'
-      - 'cmake/**'
-      - 'patches/**'
-      - 'perf/**'
-      - 'src/**'
-      - 'third_party/**'
   pull_request:
-  pull_request_target:
-    types: [labeled]
-  workflow_dispatch:
-  workflow_call:
-    inputs:
-      submodule:
-        description: Name of submodule to bump.
-        required: true
-        type: string
-      revision:
-        description: Git revision from submodule repository
-        required: true
-        type: string
-      tarantool_revision:
-        description: Git revision for the Tarantool repository
-        required: false
-        default: 'master'
-        type: string
+    types: [opened, reopened, synchronize, labeled]
   schedule:
     - cron: '0 0 * * *'  # Once a day at midnight.
 
 concurrency:
-  # Update of a developer branch cancels the previously scheduled workflow
-  # run for this branch. However, the 'master' branch, release branch, and
-  # tag workflow runs are never canceled.
-  #
-  # We use a trick here: define the concurrency group as 'workflow run ID' +
-  # 'workflow run attempt' because it is a unique combination for any run.
-  # So it effectively discards grouping.
-  #
-  # Important: we cannot use `github.sha` as a unique identifier because
-  # pushing a tag may cancel a run that works on a branch push event.
-  group: ${{ (
-    github.ref == 'refs/heads/master' ||
-    startsWith(github.ref, 'refs/heads/release/') ||
-    startsWith(github.ref, 'refs/tags/')) &&
-    format('{0}-{1}', github.run_id, github.run_attempt) ||
-    format('{0}-{1}-perf-micro', github.workflow, github.ref) }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}
 
 jobs:
   perf_micro:
-    # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'notest' label is not set
-    # or on pull request in the main repository if the
-    # 'performance' label is set.
     if: github.repository_owner == 'tarantool' &&
-        ( ( github.event_name != 'pull_request' &&
-            github.event_name != 'pull_request_target' ) ||
-          ( github.event_name == 'pull_request' &&
-            !contains(github.event.pull_request.labels.*.name, 'notest') ) ||
-          ( github.event.pull_request.head.repo.full_name == github.repository &&
-            github.event_name == 'pull_request_target' &&
-            contains(github.event.pull_request.labels.*.name, 'performance') ) )
+        (github.event_name == 'schedule' ||
+         (github.event.pull_request.head.repo.full_name == github.repository &&
+         contains(github.event.pull_request.labels.*.name, 'performance')))
 
     # 'performance' label _must_ be set only for the single runner
     # to guarantee that results are not dependent on the machine.
-    # For runs whose statistics are not collected, it is OK to use
-    # any runner.
     runs-on:
       - self-hosted
       - Linux
       - x86_64
-      - ${{ (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
-          'performance' || 'regular' }}
+      - performance
 
     timeout-minutes: 60
 
@@ -108,11 +54,6 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: setup environment
-        # Run on push to the 'master' and release branches or on
-        # non-fork pull requests. The script will fail on regular
-        # runners.
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         run: sh ./perf/tools/setup_env.sh
       - name: test
         run: make -f .test.mk test-perf
@@ -131,11 +72,6 @@ jobs:
       - name: Aggregate benchmark results
         run: make -f .test.mk test-perf-aggregate
       - name: Send statistics to InfluxDB
-        # Run on push to the 'master' and release branches or on
-        # non-fork pull requests (secrets are unavailable in fork
-        # pull requests).
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         # TODO: For now, use the debug bucket for this PoC.
         # --silent -o /dev/null: Prevent dumping any reply part
         # in the output in case of an error.
@@ -155,11 +91,6 @@ jobs:
           --header "Authorization: Token ${{ secrets.INFLUXDB_TOKEN_DEBUG }}"
           --data-binary @./perf/output/summary.txt
       - name: Prepare data with performance results for analysis
-        # Run on push to the 'master' and release branches or on
-        # non-fork pull requests (secrets are unavailable in fork
-        # pull requests).
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         run: |
           apt install -y python3-venv
           python3 -m venv venv_influx
@@ -181,11 +112,6 @@ jobs:
         with:
           python-version: '3.10'
       - name: Run performance results analysis
-        # Run on push to the 'master' and release branches or on
-        # non-fork pull requests (secrets are unavailable in fork
-        # pull requests).
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         run: |
           python3 -m venv venv_otava
           source venv_otava/bin/activate
