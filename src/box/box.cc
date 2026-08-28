@@ -6643,7 +6643,7 @@ box_generate_unique_id(uint32_t space_id, uint32_t index_id,
 	assert(new_id != NULL);
 
 	*new_id = id_range_end;
-	char key_buf[16];
+	char key_buf[16] = {};
 	char *key_end = key_buf;
 	key_end = mp_encode_array(key_end, 1);
 	key_end = mp_encode_uint(key_end, id_range_end);
