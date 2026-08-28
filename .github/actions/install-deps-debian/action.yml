@@ -29,6 +29,14 @@ runs:
         && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
         && rm cmake-3.26.0-linux-$(uname -i).tar.gz
 
-        luarocks install luacheck 0.26.1
+        # (Re)install luacheck only if it is not installed (or if another
+        # version is installed).
+        #
+        # This reduces amount of failures when connectivity to luarocks.org is
+        # unreliable. See the following issues for details:
+        #
+        # https://github.com/tarantool/tarantool/issues/12600
+        # https://github.com/tarantool/tarantool/issues/12783
+        luarocks show luacheck 0.26.1 || luarocks install luacheck 0.26.1
         gem install coveralls-lcov
       shell: bash
