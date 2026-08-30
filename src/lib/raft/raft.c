@@ -501,6 +501,10 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 		diag_set(RaftError, "Invalid term or state");
 		return -1;
 	}
+	if (req->vote >= VCLOCK_MAX) {
+		diag_set(RaftError, "Invalid vote");
+		return -1;
+	}
 	if (req->state == RAFT_STATE_CANDIDATE &&
 	    (req->vote != source || req->vclock == NULL)) {
 		diag_set(RaftError, "Candidate should always vote for self and "
