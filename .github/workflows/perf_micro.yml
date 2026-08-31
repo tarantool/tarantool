@@ -183,8 +183,6 @@ jobs:
         # Run on push to the 'master' and release branches or on
         # non-fork pull requests (secrets are unavailable in fork
         # pull requests).
-        if: github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository
         run: |
           python3 -m venv venv_otava
           source venv_otava/bin/activate
