@@ -2,7 +2,7 @@
 # 1. https://github.com/tarantool/tarantool/wiki/Dependency-Management
 dependencies:
   - name: c-ares
-    version: 1.88.1
+    version: 1.18.1
   - name: c-dt
     version: 5bd1b4e651b597c106976f08d4c05b9ccb3efabd
   - name: decNumber
