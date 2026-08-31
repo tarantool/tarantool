@@ -70,6 +70,7 @@ create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME luafun)
 create_perf_lua_test(NAME tuple_field_by_name)
 create_perf_lua_test(NAME uri_escape_unescape)
+create_perf_lua_test(NAME column_update)
 
 create_perf_lua_test(NAME recovery)
 file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/recovery_script.lua
