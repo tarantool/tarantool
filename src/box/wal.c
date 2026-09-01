@@ -44,6 +44,7 @@
 #include "replication.h"
 #include "iproto_constants.h"
 #include "watcher.h"
+#include "memtx_memory_check.h"
 
 enum {
 	/**
@@ -959,7 +960,7 @@ wal_opt_rotate(struct wal_writer *writer)
 
 	if (xdir_create_xlog_memtx(&writer->wal_dir, &writer->current_wal,
 				   &writer->vclock,
-				   /*memtx_used=*/0) != 0)
+				   memtx_memory_get_used()) != 0)
 		return -1;
 	/*
 	 * Keep track of the new WAL vclock. Required for garbage
@@ -1327,7 +1328,7 @@ wal_writer_f(va_list ap)
 		struct xlog l;
 		if (xdir_create_xlog_memtx(&writer->wal_dir, &l,
 					   &writer->vclock,
-					   /*memtx_used=*/0) == 0)
+					   memtx_memory_get_used()) == 0)
 			xlog_close(&l, false);
 		else
 			diag_log();
