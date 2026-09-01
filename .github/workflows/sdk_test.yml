@@ -1,0 +1,238 @@
+name: sdk_test
+
+on:
+  pull_request:
+    types:
+      # events that trigger integration testing
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      # events that trigger cleanup after testing
+      - unlabeled
+      - closed
+
+concurrency:
+  # Update of a developer branch cancels the previously scheduled workflow
+  # run for this branch. However, the 'master' branch and tag workflow runs
+  # are never canceled.
+  #
+  # We use a trick here: define the concurrency group as 'workflow run ID' +
+  # 'workflow run attempt' because it is a unique combination for any run.
+  # So it effectively discards grouping.
+  #
+  # Important: we cannot use `github.sha` as a unique identifier because
+  # pushing a tag may cancel a run that works on a branch push event.
+  group: ${{ (
+    github.ref == 'refs/heads/master' ||
+    startsWith(github.ref, 'refs/heads/2.') ||
+    startsWith(github.ref, 'refs/tags/')) &&
+    format('{0}-{1}', github.run_id, github.run_attempt) ||
+    format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: true
+
+env:
+  # variables, shared by all jobs in this workflow
+  # comment title is also used to find the bot's commit
+  COMMENT_TITLE: '# Integration testing'
+  BRANCH_TEMPLATE: 'TEST_BRANCH=TarantoolBot/test-ce-${GITHUB_HEAD_REF##*/}'
+
+jobs:
+  sdk-test-intro:
+    # Make an introduction to integration testing.
+    # Run on pull requests, eligible for integration testing:
+    # opened from branches in tarantool/tarantool-ee, not in forks,
+    # but not having the `sdk-test` branch.
+    if: >
+      github.repository == 'tarantool/tarantool' &&
+      !contains(github.event.pull_request.labels.*.name, 'sdk-test') &&
+      contains(
+        'opened, reopened',
+        github.event.action
+      )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    steps:
+      - name: Check if the comment with test branches exists
+        uses: peter-evans/find-comment@v2
+        id: check-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: ${{ env.COMMENT_TITLE }}
+
+      - name: Post or update the comment with SDK test branches
+        uses: peter-evans/create-or-update-comment@v2
+        id: add-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.check-comment.outputs.comment-id }}
+          edit-mode: replace
+          body: >
+            ${{ env.COMMENT_TITLE }}
+
+            To run integration testing with SDK in this pull request,
+            add the
+            https://github.com/tarantool/tarantool/labels/sdk-test
+            label.
+
+            [Read more](
+            https://github.com/tarantool/tarantool/blob/master/.github/workflows/sdk_test.md
+            ) about the integration testing workflow.
+
+  sdk-test:
+    # Run on pull request only if the 'sdk-test' label is set,
+    # and only on branches in tarantool/tarantool-ee, but not in forks.
+    # Action secrets, required by this workflow, are unavailable in forks.
+    if: >
+      github.repository == 'tarantool/tarantool' &&
+      contains(github.event.pull_request.labels.*.name, 'sdk-test') &&
+      contains(
+        'opened, reopened, synchronize, labeled',
+        github.event.action
+      )
+
+    runs-on: ubuntu-20.04-self-hosted
+
+    env:
+      SDK_SUBMODULE: 'tarantool-${{ github.base_ref}}'
+      COMMIT_MESSAGE_EE: |
+        integration-test: tarantool@${{ github.head_ref }}
+
+        bump submodule tarantool/${{ github.base_ref }} to commit
+        * tarantool/tarantool@${{ github.event.pull_request.merge_commit_sha }},
+        | \ which is a merge commit between
+        | * tarantool/tarantool@${{ github.event.pull_request.head.sha }} (${{ github.event.pull_request.head.ref }})
+        |   and
+        * tarantool/tarantool@${{ github.event.pull_request.base.sha }} (${{ github.event.pull_request.base.ref }}).
+
+      COMMIT_MESSAGE_SDK: |
+        integration-test: tarantool@${{ github.head_ref }}
+
+        bump submodule tarantool/${{ github.base_ref }} to commit
+        * tarantool/tarantool@${{ github.event.pull_request.merge_commit_sha }},
+        | \ which is a merge commit between
+        | * tarantool/tarantool@${{ github.event.pull_request.head.sha }} (${{ github.event.pull_request.head.ref }})
+        |   and
+        * tarantool/tarantool@${{ github.event.pull_request.base.sha }} (${{ github.event.pull_request.base.ref }}).
+
+
+    steps:
+      - name: Set extra environment variables
+        run: |
+          # Make a specific unique name for the test branch
+          # in the TEST_BRANCH variable
+          # username/feature-branch-name => TarantoolBot/test-ce-feature-branch-name
+          echo "${{ env.BRANCH_TEMPLATE }}" >> $GITHUB_ENV
+
+
+      - name: Update tarantool/tarantool in tarantool/tarantool-ee@${{ env.TEST_BRANCH }}
+        uses: tarantool/actions/update-submodule@nickvolynkin/sdk-test-improvements
+        id: create-branch-ee
+        with:
+          repository: 'tarantool/tarantool-ee'
+          github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
+          # checkout_branch: 'master'
+          # temporary branch which doesn't consume CI time
+          # but emulates running builds:
+          checkout_branch: 'master'
+          feature_branch: '${{ env.TEST_BRANCH }}'
+          submodule: 'tarantool'
+          update_to: ${{ github.event.pull_request.merge_commit_sha }}
+          commit_message: ${{ env.COMMIT_MESSAGE_EE }}
+          create_pr: 'false'
+
+      - name: Update tarantool/tarantool-ee in tarantool/sdk@${{ env.TEST_BRANCH }}
+        uses: tarantool/actions/update-submodule@nickvolynkin/sdk-test-improvements
+        id: create-branch-sdk
+        with:
+          repository: 'tarantool/sdk'
+          github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
+          # checkout_branch: 'master'
+          # temporary branch which doesn't consume CI time
+          # but emulates running builds:
+          checkout_branch: 'master'
+          feature_branch: '${{ env.TEST_BRANCH }}'
+          submodule: ${{ env.SDK_SUBMODULE }}
+          update_to: ${{ steps.create-branch-ee.outputs.sha }}
+          commit_message: ${{ env.COMMIT_MESSAGE_SDK }}
+          create_pr: 'false'
+
+      - name: Check if the comment with test branches exists
+        uses: peter-evans/find-comment@v2
+        id: check-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: ${{ env.COMMENT_TITLE }}
+
+      - name: Post or update the comment with SDK test branches
+        uses: peter-evans/create-or-update-comment@v2
+        id: add-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.check-comment.outputs.comment-id }}
+          edit-mode: replace
+          body: |
+            ${{ env.COMMENT_TITLE }}
+
+            ## tarantool-ee
+
+            Source commit: tarantool/tarantool@${{ github.event.pull_request.head.sha }}
+            (merged to commit: tarantool/tarantool@${{ github.event.pull_request.merge_commit_sha }})
+            EE test branch: https://github.com/tarantool/tarantool-ee/tree/${{ env.TEST_BRANCH }}
+            Commit: tarantool/tarantool-ee@${{ steps.create-branch-ee.outputs.sha7 }}
+
+
+            ## sdk
+            Source commit: tarantool/tarantool-ee@${{ steps.create-branch-ee.outputs.sha }}
+            SDK submodule: `${{ env.SDK_SUBMODULE }}`
+            SDK test branch: https://github.com/tarantool/sdk/tree/${{ env.TEST_BRANCH }}
+            Commit: tarantool/sdk@${{ steps.create-branch-sdk.outputs.sha7 }}
+
+            Workflows in tarantool/sdk:
+
+            * [![Linux SDK](
+              https://github.com/tarantool/sdk/actions/workflows/ci-linux.yml/badge.svg?branch=${{
+              env.TEST_BRANCH }}&cachebust=${{ github.sha }}
+              )](https://github.com/tarantool/sdk/actions/workflows/ci-linux.yml?query=branch:${{ env.TEST_BRANCH }})
+            * [![macOS SDK](
+              https://github.com/tarantool/sdk/actions/workflows/ci-macos.yml/badge.svg?branch=${{
+              env.TEST_BRANCH }}&cachebust=${{ github.sha }}
+              )](https://github.com/tarantool/sdk/actions/workflows/ci-macos.yml?query=branch:${{ env.TEST_BRANCH }})
+
+            Triggered by PR #${{ github.event.pull_request.number }} being ${{ github.event.action }}.
+
+  sdk-test-cleanup:
+    # Make a cleanup after the sdk_test workflow:
+    # Remove test branches, update the commit
+    # Action secrets, required by this workflow, are unavailable in forks.
+    if: >
+      github.repository == 'tarantool/tarantool-ee' &&
+      (
+        (
+          github.event.action == 'unlabeled' &&
+          github.event.label.name == 'sdk-test'
+        )
+        ||
+        github.event.action == 'closed'
+      )
+
+    runs-on: [ self-hosted, flavor-1-2 ]
+
+    steps:
+      - name: Set extra environment variables
+        run: |
+          # Make a specific unique name for the test branch
+          # in the TEST_BRANCH variable
+          # username/feature-branch-name => TarantoolBot/test-ee-feature-branch-name
+          echo "${{ env.BRANCH_TEMPLATE }}" >> $GITHUB_ENV
+
+      - name: Remove tarantool/sdk@${{ env.TEST_BRANCH }}
+        uses: tarantool/actions/remove-git-ref@nickvolynkin/sdk-test-improvements
+        with:
+          owner: tarantool
+          repo: sdk
+          ref: ${{ env.TEST_BRANCH }}
+          token: ${{ secrets.SDK_UPDATE_SUBMODULE_TOKEN }}
