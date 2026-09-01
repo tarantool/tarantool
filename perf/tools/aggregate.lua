@@ -65,16 +65,25 @@ local REPORTED_FIELDS = {
 
 local time = os.time()
 
-local function influx_kv(tab)
+-- Tag keys, tag values, and field keys must escape spaces, commas and equal
+-- signs with a backslash, see [1].
+local function escape_string(s)
+    return (tostring(s):gsub('[ ,=]', '\\%1'))
+end
+
+local function influx_kv(tab, is_tag_set)
     local kv_string = {}
     for k, v in pairs(tab) do
+        if is_tag_set then
+            v = escape_string(v)
+        end
         table.insert(kv_string, ('%s=%s'):format(k, v))
     end
     return table.concat(kv_string, ',')
 end
 
 local function influx_line(measurement, tags, fields)
-    return ('%s,%s %s %d\n'):format(measurement, influx_kv(tags),
+    return ('%s,%s %s %d\n'):format(measurement, influx_kv(tags, true),
             influx_kv(fields), time)
 end
 
