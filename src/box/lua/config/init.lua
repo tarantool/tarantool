@@ -86,6 +86,23 @@ local function set_searchroot(iconfig, vars)
     if work_dir == nil then
         return
     end
+    -- `package.setsearchroot()` is a public API and the root can
+    -- be pinned manually (e.g. luatest pins it for the test
+    -- servers it spawns). An unset root falls back to the
+    -- current directory. Respect non-default values and don't
+    -- override.
+    --
+    -- A root explicitly pinned to the current directory is
+    -- indistinguishable from an unset one and is overridden here.
+    -- It is going to be resolved when a chdir to process.work_dir
+    -- is performed at this point instead of the search root
+    -- change, see gh-13086.
+    local searchroot = package.searchroot()
+    if searchroot ~= fio.cwd() then
+        log.verbose('the module search root is not set: it is already ' ..
+                    'pinned to %q', searchroot)
+        return
+    end
     -- The variables are substituted later, when the configdata
     -- object is constructed. Substitute the name variables here
     -- in the same way. The other ones (config.context.*) can't be
