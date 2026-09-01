@@ -677,6 +677,10 @@ struct fiber {
 	int csw;
 	/** Fiber id. */
 	uint64_t fid;
+	/** Reference on fiber metadata. */
+	int cnt_ref;
+	/** Len on fiber metadata. */
+	size_t cnt_len;
 	/** Fiber flags */
 	uint32_t flags;
 	struct clock_stat clock_stat;
