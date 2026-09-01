@@ -73,6 +73,11 @@ ffi.cdef[[
 
     void
     crypto_stream_delete(struct crypto_stream *s);
+
+    int
+    crypto_RSA_PSS_verify(const unsigned char *text, size_t text_len,
+                          const unsigned char *pub_key, size_t key_len,
+                          const unsigned char *sig, size_t sig_len);
 ]]
 
 local function openssl_err_str()
@@ -435,10 +440,17 @@ for algo_name, algo_value in pairs(crypto_algos) do
     end
 end
 
+local function rsa_pss_verify(text, public_key, signature)
+    return ffi.C.crypto_RSA_PSS_verify(text, text:len(),
+                                       public_key, public_key:len(),
+                                       signature, signature:len())
+end
+
 local public_methods = {
     digest = digest_api,
     hmac   = hmac_api,
     cipher = crypto_api,
+    rsa_pss_verify = rsa_pss_verify,
 }
 
 local module_mt = {
