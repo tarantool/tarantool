@@ -167,13 +167,13 @@ memtx_allocators_init(struct allocator_settings *settings)
 	foreach_allocator<allocator_create,
 		struct allocator_settings *&>(settings);
 
-	foreach_memtx_allocator<allocator_create>();
+	foreach_memtx_allocator<MemtxAllocatorTag, allocator_create>();
 }
 
 void
 memtx_allocators_destroy()
 {
-	foreach_memtx_allocator<allocator_destroy>();
+	foreach_memtx_allocator<MemtxAllocatorTag, allocator_destroy>();
 	foreach_allocator<allocator_destroy>();
 }
 
@@ -192,7 +192,8 @@ memtx_allocators_read_view
 memtx_allocators_open_read_view(const struct read_view_opts *opts)
 {
 	memtx_allocators_read_view rv;
-	foreach_memtx_allocator<memtx_allocator_open_read_view,
+	foreach_memtx_allocator<MemtxAllocatorTag,
+				memtx_allocator_open_read_view,
 				memtx_allocators_read_view &,
 				const struct read_view_opts &>(rv, *opts);
 	return rv;
@@ -213,22 +214,13 @@ struct memtx_allocator_close_read_view {
 void
 memtx_allocators_close_read_view(memtx_allocators_read_view rv)
 {
-	foreach_memtx_allocator<memtx_allocator_close_read_view,
+	foreach_memtx_allocator<MemtxAllocatorTag,
+				memtx_allocator_close_read_view,
 				memtx_allocators_read_view &>(rv);
 }
-
-/** Sums allocator statistics. */
-struct memtx_allocator_add_stats {
-	template<typename Allocator>
-	void invoke(struct memtx_allocator_stats &stats)
-	{
-		memtx_allocator_stats_add(&stats, &Allocator::stats);
-	}
-};
 
 void
 memtx_allocators_stats(struct memtx_allocator_stats *stats)
 {
-	memtx_allocator_stats_create(stats);
-	foreach_memtx_allocator<memtx_allocator_add_stats>(*stats);
+	memtx_allocators_stats_tagged<MemtxAllocatorTag>(stats);
 }
