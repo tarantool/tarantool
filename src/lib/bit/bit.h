@@ -327,6 +327,13 @@ bit_copy_range_reverse(uint8_t *restrict dst, size_t dst_i,
 		       const uint8_t *restrict src, size_t src_i, size_t count);
 
 /**
+ * Whether two bitmasks of `count` bits overlap - have at least one position
+ * where bit is set in both masks.
+ */
+bool
+bit_overlap(const void *a, const void *b, size_t count);
+
+/**
  * @cond false
  * @brief Naive implementation of ctz.
  */
