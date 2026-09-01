@@ -28,6 +28,7 @@ cookies for auth.
 """
 
 import argparse
+import io
 import json
 import os
 import re
@@ -79,8 +80,8 @@ def fail(msg):
 def git(args):
     """Run git and return the exit code, stdout, and stderr. Whether a
     failure is fatal is up to the caller."""
-    res = subprocess.run(['git'] + args, capture_output=True,
-                         encoding='utf-8')
+    res = subprocess.run(['git'] + args, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, encoding='utf-8')
     return res.returncode, res.stdout, res.stderr
 
 
@@ -546,8 +547,8 @@ def find_gh_token():
     """The token of the user's `gh` login - the fallback for when there
     is no GH_TOKEN in the environment, so the tool keeps working
     without any setup for the default profile."""
-    res = subprocess.run(['gh', 'auth', 'token'], capture_output=True,
-                         encoding='utf-8')
+    res = subprocess.run(['gh', 'auth', 'token'], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, encoding='utf-8')
     if res.returncode != 0:
         fail('no GH_TOKEN in the environment and no `gh` login to take '
              'the token from')
@@ -557,12 +558,20 @@ def find_gh_token():
 def main():
     # The comments and the GitHub data are UTF-8 regardless of the local
     # environment, so make the output independent from the locale too.
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    # Not via reconfigure() - it needs Python 3.7, while some supported
+    # systems have only 3.6. The detach() keeps the replaced wrappers
+    # from closing the underlying files when garbage collected.
+    sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding='utf-8',
+                                  errors='replace', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding='utf-8',
+                                  errors='replace', line_buffering=True)
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    subs = parser.add_subparsers(dest='command', required=True)
+    subs = parser.add_subparsers(dest='command')
+    # Not via the 'required' argument of add_subparsers() - it needs
+    # Python 3.7.
+    subs.required = True
 
     sub = subs.add_parser(
         'comment', help='add a comment to the pending review, creating '
