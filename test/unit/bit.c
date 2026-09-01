@@ -345,6 +345,31 @@ test_bit_copy_range(bool reverse, bool src_val)
 }
 
 static void
+test_bit_overlap(void)
+{
+	header();
+
+	for (size_t i = 0; i < lengthof(vals); i++) {
+		for (size_t j = 0; j < lengthof(vals); j++) {
+			bool expected = (vals[i] & vals[j]) != 0;
+			bool actual = bit_overlap(
+				&vals[i], &vals[j], sizeof(vals[0]) * CHAR_BIT);
+			fail_unless(actual == expected);
+		}
+	}
+
+	/* Cover unaligned tail. */
+	uint8_t a[2] = {0x00, 0b10100};
+	uint8_t b[2] = {0x00, 0b10001};
+	for (int i = 0; i < 12; i++)
+		fail_if(bit_overlap(a, b, i));
+	for (int i = 13; i < 16; i++)
+		fail_unless(bit_overlap(a, b, i));
+
+	footer();
+}
+
+static void
 random_bytes(size_t n, unsigned char *out)
 {
 	for (size_t i = 0; i < n; i++) {
@@ -432,5 +457,6 @@ main(void)
 	test_bit_copy_range(/*reverse=*/false, /*src_val=*/false);
 	test_bit_copy_range(/*reverse=*/true, /*src_val=*/true);
 	test_bit_copy_range(/*reverse=*/true, /*src_val=*/false);
+	test_bit_overlap();
 	test_bit_count();
 }
