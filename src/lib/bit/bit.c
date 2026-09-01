@@ -689,3 +689,17 @@ bit_copy_range_reverse(uint8_t *restrict dst, size_t dst_i,
 		}
 	}
 }
+
+bool
+bit_overlap(const void *a, const void *b, size_t count)
+{
+	const uint8_t *a_bytes = (const uint8_t *)a;
+	const uint8_t *b_bytes = (const uint8_t *)b;
+	size_t size = count / CHAR_BIT;
+	for (size_t i = 0; i < size; i++) {
+		if ((a_bytes[i] & b_bytes[i]) != 0)
+			return true;
+	}
+	uint8_t mask = (1 << (count % CHAR_BIT)) - 1;
+	return mask != 0 && (a_bytes[size] & b_bytes[size] & mask) != 0;
+}

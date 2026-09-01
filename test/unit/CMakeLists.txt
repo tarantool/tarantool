@@ -157,7 +157,7 @@ create_unit_test(PREFIX int96
 )
 create_unit_test(PREFIX bit
                  SOURCES bit.c
-                 LIBRARIES bit
+                 LIBRARIES bit unit
 )
 create_unit_test(PREFIX bitset_basic
                  SOURCES bitset_basic.c
