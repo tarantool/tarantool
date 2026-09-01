@@ -30,7 +30,7 @@ dependencies:
   - name: openssl
     version: 3.2.1
   - name: tz
-    version: 2022a
+    version: 2026c
   - name: xxHash
     version: 0.8.0
   - name: zlib
