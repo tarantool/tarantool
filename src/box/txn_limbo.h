@@ -81,6 +81,11 @@ enum txn_limbo_state {
 struct txn_limbo {
 	/** Limbo state. */
 	enum txn_limbo_state state;
+	/**
+	 * Triggers run on every event which might update the limbo state. Even
+	 * when the state didn't actually change.
+	 */
+	struct rlist on_state_update;
 	/** Synchronous transactions and other ones depending on them. */
 	struct txn_limbo_queue queue;
 	/**
@@ -111,23 +116,6 @@ struct txn_limbo {
 	/** To linearize any sort of state changes. */
 	struct latch state_latch;
 	/**
-	 * Whether the limbo is in rollback mode. The meaning is exactly the
-	 * same as for the similar WAL flag. In theory this should be deleted
-	 * if the limbo will be ever moved to WAL thread. It would reuse the WAL
-	 * flag.
-	 * It is a sign to immediately rollback all new limbo entries, if there
-	 * is an existing rollback in progress. This technique is called
-	 * 'cascading rollback'. Cascading rollback does not allow to write to
-	 * WAL anything new so as not to violate the 'reversed rollback order'
-	 * rule.
-	 * Without cascading rollback it could happen, that the limbo would
-	 * start writing ROLLBACK to WAL, then a new transaction would be added
-	 * to limbo and sent to WAL too. In the result the new transaction would
-	 * be stored in WAL after ROLLBACK, and yet it should be rolled back too
-	 * by the 'reversed rollback order' rule - contradiction.
-	 */
-	bool is_in_rollback;
-	/**
 	 * If there is an ongoing PROMOTE being applied. It is not immediate at
 	 * least because it needs to be written into the journal.
 	 */
@@ -144,11 +132,6 @@ struct txn_limbo {
 	 * since its restart.
 	 */
 	bool saw_promote;
-	/**
-	 * Savepoint of confirmed LSN. To rollback to in case the current
-	 * synchro command (promote/demote/...) fails.
-	 */
-	int64_t svp_confirmed_lsn;
 	/**
 	 * Whether this instance validates incoming synchro requests. When the
 	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the

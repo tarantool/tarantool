@@ -130,6 +130,25 @@ txn_limbo_assert_locked(struct txn_limbo *limbo)
 	VERIFY(latch_is_locked(&limbo->state_latch));
 }
 
+/**
+ * Validate correctness of the limbo state. The function helps to catch
+ * state-breaking changes early, instead of continuing execution and either
+ * leaving the broken state unnoticed or crashing later in some distantly
+ * related place which usually complicates debug a lot.
+ */
+static void
+txn_limbo_assert_consistent(struct txn_limbo *limbo)
+{
+#ifndef NDEBUG
+	struct txn_limbo_queue *queue = &limbo->queue;
+	VERIFY(queue->confirmed_lsn ==
+	       vclock_get(&queue->confirmed_vclock, queue->owner_id));
+	VERIFY(queue->volatile_confirmed_lsn >= queue->confirmed_lsn);
+#else
+	(void)limbo;
+#endif
+}
+
 static int64_t
 txn_limbo_replica_confirmed_lsn(const struct txn_limbo *limbo,
 				uint32_t replica_id)
@@ -172,6 +191,21 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		fiber_wakeup(limbo->worker);
 }
 
+static void
+txn_limbo_fence(struct txn_limbo *limbo)
+{
+	txn_limbo_assert_locked(limbo);
+	txn_limbo_queue_fence(&limbo->queue);
+}
+
+static void
+txn_limbo_unfence(struct txn_limbo *limbo)
+{
+	txn_limbo_assert_locked(limbo);
+	if (txn_limbo_queue_unfence(&limbo->queue))
+		fiber_wakeup(limbo->worker);
+}
+
 /**
  * Write a confirmation entry to the WAL. After it's written all the
  * transactions waiting for confirmation may be finished.
@@ -181,7 +215,7 @@ txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
 {
 	txn_limbo_assert_locked(limbo);
 	assert(lsn > limbo->queue.confirmed_lsn);
-	assert(!limbo->is_in_rollback);
+	assert(!limbo->queue.is_fenced);
 	struct synchro_request req = {
 		.type = IPROTO_RAFT_CONFIRM,
 		.queue_owner_id = limbo->queue.owner_id,
@@ -201,8 +235,7 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 {
 	txn_limbo_assert_locked(limbo);
 	assert(lsn > limbo->queue.confirmed_lsn);
-	assert(!limbo->is_in_rollback);
-	limbo->is_in_rollback = true;
+	assert(limbo->queue.is_fenced);
 	struct synchro_request req = {
 		.type = IPROTO_RAFT_ROLLBACK,
 		.queue_owner_id = limbo->queue.owner_id,
@@ -211,7 +244,6 @@ txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
 		},
 	};
 	synchro_request_write_or_panic(&req);
-	limbo->is_in_rollback = false;
 }
 
 static int
@@ -222,7 +254,7 @@ txn_limbo_worker_bump_confirmed_lsn(struct txn_limbo *limbo)
 	assert(queue->volatile_confirmed_lsn >= queue->confirmed_lsn);
 	while (limbo->state == TXN_LIMBO_STATE_LEADER &&
 	       queue->volatile_confirmed_lsn > queue->confirmed_lsn) {
-		if (limbo->is_in_rollback)
+		if (queue->is_fenced)
 			return -1;
 		/* It can get bumped again while we are writing. */
 		int64_t lsn = queue->volatile_confirmed_lsn;
@@ -283,11 +315,11 @@ txn_limbo_create(struct txn_limbo *limbo, struct raft *raft)
 {
 	memset(limbo, 0, sizeof(*limbo));
 	limbo->state = TXN_LIMBO_STATE_INACTIVE;
+	rlist_create(&limbo->on_state_update);
 	limbo->is_in_recovery = true;
 	txn_limbo_queue_create(&limbo->queue);
 	vclock_create(&limbo->promote_term_map);
 	latch_create(&limbo->state_latch);
-	limbo->svp_confirmed_lsn = -1;
 	limbo->raft = raft;
 	limbo->term = 1;
 	limbo->worker = fiber_new_system("txn_limbo_worker",
@@ -333,6 +365,12 @@ make_leader:
 make_inactive:
 	limbo->state = TXN_LIMBO_STATE_INACTIVE;
 end:
+	/*
+	 * Run before the ro summary update. A trigger might need to finish
+	 * setting things up before the new state's effects, such as the box
+	 * becoming writable, can be observed.
+	 */
+	trigger_run(&limbo->on_state_update, limbo);
 	box_update_ro_summary();
 }
 
@@ -419,6 +457,7 @@ static inline void
 txn_limbo_destroy(struct txn_limbo *limbo)
 {
 	trigger_clear(&limbo->on_ack);
+	trigger_destroy(&limbo->on_state_update);
 	txn_limbo_queue_destroy(&limbo->queue);
 	TRASH(limbo);
 }
@@ -452,18 +491,6 @@ int
 txn_limbo_submit(struct txn_limbo *limbo, uint32_t id, struct txn *txn,
 		 size_t approx_len)
 {
-	if (limbo->is_in_rollback) {
-		/*
-		 * Cascading rollback. It is impossible to commit the
-		 * transaction, because if there is an existing rollback in
-		 * progress, it should rollback this one too for the sake of
-		 * 'reversed rollback order' rule. On the other hand the
-		 * rollback can't be postponed until after WAL write as well -
-		 * it should be done right now. See in the limbo comments why.
-		 */
-		diag_set(ClientError, ER_SYNC_ROLLBACK);
-		return -1;
-	}
 	return txn_limbo_queue_submit(&limbo->queue, id == 0 ? instance_id : id,
 				      txn, approx_len);
 }
@@ -505,23 +532,28 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	assert(!txn_limbo_entry_is_complete(entry));
 	assert(entry->lsn >= 0);
 	txn_limbo_lock(limbo);
-	if (limbo->state != TXN_LIMBO_STATE_LEADER) {
+	/*
+	 * The latch might have been taken over from a PROMOTE/DEMOTE WAL write
+	 * covering this entry. Then the entry is already completed by now.
+	 */
+	if (txn_limbo_entry_is_complete(entry) ||
+	    limbo->state != TXN_LIMBO_STATE_LEADER) {
 		txn_limbo_unlock(limbo);
-		do {
+		while (!txn_limbo_entry_is_complete(entry))
 			fiber_yield();
-		} while (!txn_limbo_entry_is_complete(entry));
 		if (entry->state == TXN_LIMBO_ENTRY_ROLLBACK) {
 			diag_set(ClientError, ER_SYNC_ROLLBACK);
 			return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
 		}
 		return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
 	}
-	assert(!txn_limbo_entry_is_complete(entry));
+	txn_limbo_fence(limbo);
 	txn_limbo_write_rollback(limbo, entry->lsn);
 	txn_limbo_queue_apply_rollback(&limbo->queue, entry->lsn,
 				       TXN_SIGNATURE_QUORUM_TIMEOUT);
 	assert(txn_limbo_entry_is_complete(entry));
 	assert(entry->state == TXN_LIMBO_ENTRY_ROLLBACK);
+	txn_limbo_unfence(limbo);
 	txn_limbo_unlock(limbo);
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return TXN_LIMBO_WAIT_ENTRY_FAIL_COMPLETE;
@@ -866,33 +898,31 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 }
 
 /**
- * Update the state of synchronous replication for system spaces.
+ * Update the state of synchronous replication for system spaces to match the
+ * limbo state: they are synchronous while the queue has an owner.
+ *
+ * The request, when not NULL, is an in-progress PROMOTE/DEMOTE whose outcome
+ * is applied optimistically, before its WAL write: a PROMOTE is about to
+ * claim the ownership, a DEMOTE is about to drop it. A WAL failure restores
+ * the actual state via the rollback.
  */
 static void
 txn_limbo_update_system_spaces_is_sync_state(struct txn_limbo *limbo,
-					     const struct synchro_request *req,
-					     bool is_rollback)
+					     const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	/* Do not enable synchronous replication during bootstrap. */
-	if (req->origin_id == REPLICA_ID_NIL)
-		return;
-	uint16_t req_type = req->type;
-	assert(req_type == IPROTO_RAFT_PROMOTE ||
-	       req_type == IPROTO_RAFT_DEMOTE);
-	bool is_promote = req_type == IPROTO_RAFT_PROMOTE;
-	/* Synchronous replication is already enabled. */
-	if (is_promote && limbo->queue.owner_id != REPLICA_ID_NIL)
-		return;
-	/* Synchronous replication is already disabled. */
-	if (!is_promote && limbo->queue.owner_id == REPLICA_ID_NIL) {
-		assert(!is_rollback);
-		return;
+	bool is_sync;
+	if (req != NULL) {
+		assert(req->type == IPROTO_RAFT_PROMOTE ||
+		       req->type == IPROTO_RAFT_DEMOTE);
+		/* Bootstrap entries do not enable synchronous replication. */
+		if (req->origin_id == REPLICA_ID_NIL)
+			return;
+		is_sync = req->type == IPROTO_RAFT_PROMOTE;
+	} else {
+		is_sync = limbo->queue.owner_id != REPLICA_ID_NIL;
 	}
-	/* Flip operation types for a rollback. */
-	if (is_rollback)
-		is_promote = !is_promote;
-	system_spaces_update_is_sync_state(is_promote);
+	system_spaces_update_is_sync_state(is_sync);
 }
 
 int
@@ -900,39 +930,28 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	/*
-	 * Guard against new transactions appearing during WAL write. It is
-	 * necessary because otherwise when PROMOTE/DEMOTE would be done and it
-	 * would see a txn without LSN in the limbo, it couldn't tell whether
-	 * the transaction should be confirmed or rolled back. It could be
-	 * delivered to the PROMOTE/DEMOTE initiator even before than to the
-	 * local TX thread, or could be not.
-	 *
-	 * CONFIRM and ROLLBACK need this guard only during  the filter stage.
-	 * Because the filter needs to see all the transactions LSNs to work
-	 * correctly.
-	 */
-	assert(!limbo->is_in_rollback);
-	limbo->is_in_rollback = true;
-	if (txn_limbo_filter_request(limbo, req) < 0) {
-		limbo->is_in_rollback = false;
+	if (txn_limbo_filter_request(limbo, req) < 0)
 		return -1;
-	}
 	/* Prepare for request execution and fine-grained filtering. */
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 	case IPROTO_RAFT_ROLLBACK:
-		limbo->is_in_rollback = false;
 		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->svp_confirmed_lsn == -1);
 		assert(!limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = true;
-		limbo->svp_confirmed_lsn = limbo->queue.volatile_confirmed_lsn;
-		limbo->queue.volatile_confirmed_lsn = req->promote.lsn;
-		txn_limbo_update_system_spaces_is_sync_state(
-			limbo, req, /*is_rollback=*/false);
+		/*
+		 * Guard against new transactions appearing during the WAL
+		 * write. It is necessary because otherwise when PROMOTE/DEMOTE
+		 * would be done and it would see a txn without LSN in the
+		 * limbo, it couldn't tell whether the transaction should be
+		 * confirmed or rolled back. It could be delivered to the
+		 * PROMOTE/DEMOTE initiator even before than to the local TX
+		 * thread, or could be not.
+		 */
+		txn_limbo_fence(limbo);
+		txn_limbo_update_system_spaces_is_sync_state(limbo, req);
 		txn_limbo_update_state(limbo);
 		break;
 	}
@@ -952,15 +971,10 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 	switch (req->type) {
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
-		assert(limbo->is_in_rollback);
-		assert(limbo->svp_confirmed_lsn >= 0);
 		assert(limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = false;
-		limbo->queue.volatile_confirmed_lsn = limbo->svp_confirmed_lsn;
-		limbo->svp_confirmed_lsn = -1;
-		txn_limbo_update_system_spaces_is_sync_state(
-			limbo, req, /*is_rollback=*/true);
-		limbo->is_in_rollback = false;
+		txn_limbo_update_system_spaces_is_sync_state(limbo, NULL);
+		txn_limbo_unfence(limbo);
 		txn_limbo_update_state(limbo);
 		break;
 	}
@@ -1011,12 +1025,8 @@ txn_limbo_req_commit_promote_demote(struct txn_limbo *limbo,
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_PROMOTE ||
 	       req->type == IPROTO_RAFT_DEMOTE);
-	assert(limbo->svp_confirmed_lsn >= 0);
-	assert(limbo->is_in_rollback);
 	assert(limbo->is_transition_in_progress);
 	limbo->is_transition_in_progress = false;
-	limbo->svp_confirmed_lsn = -1;
-	limbo->is_in_rollback = false;
 
 	uint64_t term = req->promote.term;
 	uint32_t origin = req->origin_id;
@@ -1037,6 +1047,7 @@ txn_limbo_req_commit_promote_demote(struct txn_limbo *limbo,
 		new_owner = req->origin_id;
 	}
 	txn_limbo_queue_transfer_ownership(&limbo->queue, new_owner, lsn);
+	txn_limbo_unfence(limbo);
 	txn_limbo_update_state(limbo);
 }
 
@@ -1071,11 +1082,11 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
+	txn_limbo_assert_consistent(limbo);
 	/* The replication_synchro_quorum value may have changed. */
-	if (!limbo->is_in_rollback &&
-	    txn_limbo_is_owned_by_current_instance(limbo) &&
-	     txn_limbo_queue_bump_volatile_confirm(&limbo->queue))
-		fiber_wakeup(limbo->worker);
+	txn_limbo_queue_bump_volatile_confirm(&limbo->queue);
+	txn_limbo_assert_consistent(limbo);
+	fiber_wakeup(limbo->worker);
 	/*
 	 * Wakeup all the others - timed out will rollback. Also
 	 * there can be non-transactional waiters, such as CONFIRM

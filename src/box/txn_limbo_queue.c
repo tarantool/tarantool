@@ -250,6 +250,18 @@ txn_limbo_queue_submit(struct txn_limbo_queue *queue, uint32_t origin_id,
 	 */
 	assert(txn->signature == TXN_SIGNATURE_UNKNOWN);
 	assert(txn->status == TXN_PREPARED);
+	if (queue->is_fenced) {
+		/*
+		 * Cascading rollback. It is impossible to commit the
+		 * transaction, because if there is an existing rollback in
+		 * progress, it should rollback this one too for the sake of
+		 * 'reversed rollback order' rule. On the other hand the
+		 * rollback can't be postponed until after WAL write as well -
+		 * it should be done right now. See in the queue comments why.
+		 */
+		diag_set(ClientError, ER_SYNC_ROLLBACK);
+		return -1;
+	}
 	if (queue->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
 		return -1;
@@ -305,6 +317,22 @@ txn_limbo_queue_submit(struct txn_limbo_queue *queue, uint32_t origin_id,
 		}
 		/* Could be a spurious wakeup. */
 		if (txn_limbo_queue_is_full(queue))
+			continue;
+		/*
+		 * While the fence is up, transactions can't proceed to WAL.
+		 * The fencing ending might result in these txns being rolled
+		 * back, and that would be too late if they were already
+		 * written into WAL.
+		 *
+		 * Note that fencing doesn't necessarily mean the transaction
+		 * will be rolled back. For example, the fence might be raised
+		 * for the time of a PROMOTE WAL write, which then might fail,
+		 * and the fence would be lifted without rolling anything back.
+		 *
+		 * This is why the transaction needs to continue waiting. Can't
+		 * act until the situation is clear.
+		 */
+		if (queue->is_fenced)
 			continue;
 		if (txn_limbo_queue_first_entry(queue) == e)
 			break;
@@ -581,6 +609,27 @@ txn_limbo_queue_get_lsn_range(struct txn_limbo_queue *queue, int64_t *first_lsn,
 	*last_lsn = last->lsn;
 }
 
+/**
+ * Bump the confirmed LSN of the queue to the given one, if it is bigger. The
+ * volatile confirmed LSN is bumped along when it gets behind. That can happen
+ * when the CONFIRM was made with a smaller quorum than known locally - then
+ * the volatile LSN is collecting acks by a bigger quorum. Or when the acks
+ * simply didn't arrive yet - they always reach the queue owner first, and the
+ * other nodes see them later, sometimes never, like the leaf replicas having
+ * no subscribers of their own. The volatile LSN must be bumped forward to
+ * keep it being the present or the future of the confirmed LSN.
+ */
+static void
+txn_limbo_queue_bump_confirmed_lsn(struct txn_limbo_queue *queue, int64_t lsn)
+{
+	if (queue->confirmed_lsn >= lsn)
+		return;
+	queue->confirmed_lsn = lsn;
+	vclock_follow(&queue->confirmed_vclock, queue->owner_id, lsn);
+	if (queue->volatile_confirmed_lsn < lsn)
+		queue->volatile_confirmed_lsn = lsn;
+}
+
 void
 txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 {
@@ -616,13 +665,10 @@ txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 				 * matching this txn exactly. Making an illusion
 				 * like each txn has its own confirmation.
 				 */
-				if (queue->confirmed_lsn < e->lsn) {
-					queue->confirmed_lsn = e->lsn;
-					vclock_follow(&queue->confirmed_vclock,
-						      queue->owner_id, e->lsn);
-				} else {
-					assert(queue->confirmed_lsn == lsn);
-				}
+				assert(queue->confirmed_lsn < e->lsn ||
+				       queue->confirmed_lsn == lsn);
+				txn_limbo_queue_bump_confirmed_lsn(queue,
+								   e->lsn);
 			}
 		} else if (e->txn->signature == TXN_SIGNATURE_UNKNOWN) {
 			/*
@@ -667,21 +713,7 @@ txn_limbo_queue_apply_confirm(struct txn_limbo_queue *queue, int64_t lsn)
 		}
 		txn_limbo_queue_complete_success(queue, e);
 	}
-	if (queue->confirmed_lsn < lsn) {
-		queue->confirmed_lsn = lsn;
-		vclock_follow(&queue->confirmed_vclock, queue->owner_id, lsn);
-	}
-	if (queue->confirmed_lsn > queue->volatile_confirmed_lsn) {
-		/*
-		 * This can happen when CONFIRM was made with a smaller quorum
-		 * than known right now. Then the volatile LSN is collecting
-		 * acks by a bigger quorum and can actually be smaller. Bump it
-		 * forward when this happens to keep the invariant of the
-		 * volatile LSN being the present or the future of the confirmed
-		 * LSN.
-		 */
-		queue->volatile_confirmed_lsn = queue->confirmed_lsn;
-	}
+	txn_limbo_queue_bump_confirmed_lsn(queue, lsn);
 	if (queue_was_full && !txn_limbo_queue_is_full(queue))
 		fiber_cond_broadcast(&queue->cond);
 }
@@ -721,6 +753,8 @@ void
 txn_limbo_queue_transfer_ownership(struct txn_limbo_queue *queue,
 				   uint32_t new_owner_id, int64_t border_lsn)
 {
+	/* New transactions can't be coming during the ownership switch. */
+	assert(queue->is_fenced);
 	txn_limbo_queue_apply_confirm(queue, border_lsn);
 	txn_limbo_queue_apply_rollback(queue, border_lsn + 1,
 				       TXN_SIGNATURE_SYNC_ROLLBACK);
@@ -774,6 +808,16 @@ txn_limbo_queue_ack(struct txn_limbo_queue *queue, uint32_t replica_id,
 bool
 txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 {
+	if (queue->is_fenced) {
+		/*
+		 * Bumping the volatile LSN during fencing can mistakenly bump
+		 * it to an LSN which is actually rolled back, while the
+		 * rollback isn't finished yet (is being written to WAL, for
+		 * example). This might lead to the same LSN being confirmed and
+		 * rolled back at the same time.
+		 */
+		return false;
+	}
 	if (queue->entry_to_confirm == NULL ||
 	    queue->entry_to_confirm->lsn == -1)
 		return false;
@@ -814,6 +858,27 @@ txn_limbo_queue_bump_volatile_confirm(struct txn_limbo_queue *queue)
 	assert(max_assigned_lsn >= queue->volatile_confirmed_lsn);
 	queue->volatile_confirmed_lsn = max_assigned_lsn;
 	return true;
+}
+
+void
+txn_limbo_queue_fence(struct txn_limbo_queue *queue)
+{
+	assert(!queue->is_fenced);
+	queue->is_fenced = true;
+}
+
+bool
+txn_limbo_queue_unfence(struct txn_limbo_queue *queue)
+{
+	assert(queue->is_fenced);
+	queue->is_fenced = false;
+	/*
+	 * The parked transactions, if any survived the synchro request, need to
+	 * re-evaluate their situation. Nothing else might wake them up if the
+	 * request didn't touch them.
+	 */
+	fiber_cond_broadcast(&queue->cond);
+	return txn_limbo_queue_bump_volatile_confirm(queue);
 }
 
 int
