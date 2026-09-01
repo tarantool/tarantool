@@ -990,7 +990,7 @@ checkpoint_f(va_list ap)
 	}
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock, 0) != 0)
 		return -1;
 
 	bool is_synchro_written = false;

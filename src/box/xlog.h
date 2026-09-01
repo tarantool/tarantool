@@ -355,19 +355,27 @@ struct xlog_meta {
 	 * directory for missing WALs.
 	 */
 	struct vclock prev_vclock;
+	/**
+	 * Text file header: amount of used memtx memory at the
+	 * time the file is created (the MemtxUsed key). Zero
+	 * means the key is absent from the header.
+	 */
+	uint64_t memtx_used;
 };
 
 /**
  * Initialize xlog meta struct.
  *
  * @vclock and @prev_vclock are optional: if the value is NULL,
- * the key won't be written to the xlog header.
+ * the key won't be written to the xlog header. @memtx_used is
+ * written iff it is not zero.
  */
 void
 xlog_meta_create(struct xlog_meta *meta, const char *filetype,
 		 const struct tt_uuid *instance_uuid,
 		 const struct vclock *vclock,
-		 const struct vclock *prev_vclock);
+		 const struct vclock *prev_vclock,
+		 uint64_t memtx_used);
 
 /* }}} */
 
@@ -459,16 +467,18 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock);
  *
  * @param xdir xdir
  * @param[out] xlog xlog structure
- * @param instance uuid   the instance which created the file
  * @param vclock        the global state of replication (vector
  *			clock) at the moment the file is created.
+ * @param memtx_used    the amount of used memtx memory, written
+ *			to the header as the MemtxUsed key iff it
+ *			is not zero.
  *
  * @retval 0 if OK
  * @retval -1 if error
  */
 int
 xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
-		 const struct vclock *vclock);
+		 const struct vclock *vclock, uint64_t memtx_used);
 
 /**
  * Create new xlog writer based on fd.
