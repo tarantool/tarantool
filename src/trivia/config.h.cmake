@@ -287,6 +287,7 @@
 #cmakedefine ENABLE_FEEDBACK_DAEMON 1
 #cmakedefine ENABLE_WAL_EXT 1
 #cmakedefine ENABLE_RETENTION_PERIOD 1
+#cmakedefine ENABLE_MEMTX_MEMORY_CHECK 1
 #cmakedefine ENABLE_READ_VIEW 1
 #cmakedefine ENABLE_SECURITY 1
 #cmakedefine ENABLE_COMPRESS_MODULE 1

@@ -45,6 +45,7 @@ local _enterprise_keys = {
     password_history_length = true,
     wal_ext = true,
     experimental_wal_retention_period = true,
+    memtx_memory_recovery_check = true,
 }
 
 function cfg_filter(data)
