@@ -55,6 +55,7 @@
 #include "txn_limbo.h"
 #include "memtx_allocator.h"
 #include "index.h"
+#include "memtx_memory_check.h"
 #include "read_view.h"
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
@@ -990,7 +991,8 @@ checkpoint_f(va_list ap)
 	}
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock, 0) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock,
+			     memtx_memory_check_get_memtx_used()) != 0)
 		return -1;
 
 	bool is_synchro_written = false;

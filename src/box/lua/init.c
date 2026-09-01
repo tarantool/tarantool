@@ -70,6 +70,7 @@
 #include "box/lua/watcher.h"
 #include "box/lua/iproto.h"
 #include "box/lua/wal_retention_period.h"
+#include "box/lua/memtx_memory_check.h"
 
 #include "mpstream/mpstream.h"
 
@@ -709,6 +710,9 @@ box_lua_init(struct lua_State *L)
 #endif
 #ifdef ENABLE_RETENTION_PERIOD
 	box_lua_wal_retention_period_init(L);
+#endif
+#ifdef ENABLE_MEMTX_MEMORY_CHECK
+	box_lua_memtx_memory_check_init(L);
 #endif
 #ifdef ENABLE_WAL_EXT
 	box_lua_wal_ext_init(L);

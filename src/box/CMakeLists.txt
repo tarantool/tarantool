@@ -272,6 +272,10 @@ if(ENABLE_WAL_EXT)
     list(APPEND box_sources ${WAL_EXT_SOURCES})
 endif()
 
+if(ENABLE_MEMTX_MEMORY_CHECK)
+    list(APPEND box_sources ${MEMTX_MEMORY_CHECK_SOURCES})
+endif()
+
 if(ENABLE_READ_VIEW)
     list(APPEND box_sources ${READ_VIEW_SOURCES})
 endif()

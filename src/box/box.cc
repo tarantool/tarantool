@@ -94,6 +94,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "memtx_memory_check.h"
 #include "mp_util.h"
 #include "small/static.h"
 #include "memory.h"
@@ -1615,6 +1616,32 @@ box_check_memory_quota(const char *quota_name)
 	return -1;
 }
 
+enum memtx_memory_check_mode memtx_memory_check_mode =
+	MEMTX_MEMORY_CHECK_OFF;
+
+/**
+ * Read and validate box.cfg.memtx_memory_recovery_check. An unset
+ * option (community edition) means 'off'.
+ */
+static int
+box_check_memtx_memory_recovery_check(enum memtx_memory_check_mode *mode)
+{
+	const char *str = cfg_gets("memtx_memory_recovery_check");
+	if (str == NULL || strcmp(str, "off") == 0) {
+		*mode = MEMTX_MEMORY_CHECK_OFF;
+	} else if (strcmp(str, "warn") == 0) {
+		*mode = MEMTX_MEMORY_CHECK_WARN;
+	} else if (strcmp(str, "panic") == 0) {
+		*mode = MEMTX_MEMORY_CHECK_PANIC;
+	} else {
+		diag_set(ClientError, ER_CFG, "memtx_memory_recovery_check",
+			 "the value must be one of the following strings: "
+			 "'off', 'warn', 'panic'");
+		return -1;
+	}
+	return 0;
+}
+
 static void
 box_check_vinyl_options(void)
 {
@@ -1795,6 +1822,7 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	enum election_mode election_mode;
+	enum memtx_memory_check_mode memtx_memory_check;
 	box_check_say();
 	box_check_audit();
 	if (box_check_flightrec() != 0)
@@ -1837,6 +1865,8 @@ box_check_config(void)
 	if (box_check_wal_retention_period() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
+		diag_raise();
+	if (box_check_memtx_memory_recovery_check(&memtx_memory_check) != 0)
 		diag_raise();
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	if (box_check_allocator() != 0)
@@ -2885,6 +2915,16 @@ box_set_memtx_memory(void)
 	if (size < 0)
 		diag_raise();
 	memtx_engine_set_memory_xc(memtx, size);
+}
+
+int
+box_set_memtx_memory_recovery_check(void)
+{
+	enum memtx_memory_check_mode mode;
+	if (box_check_memtx_memory_recovery_check(&mode) != 0)
+		return -1;
+	memtx_memory_check_mode = mode;
+	return 0;
 }
 
 void
@@ -4923,6 +4963,13 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		}
 	}
 
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+
+	if (memtx_memory_check_on_recovery(memtx, recovery) != 0)
+		diag_raise();
+
 	/*
 	 * recovery->vclock is needed by Vinyl to filter
 	 * WAL rows that were dumped before restart.
@@ -4933,10 +4980,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * and explicitly pass the statement LSN to it.
 	 */
 	engine_begin_initial_recovery_xc(&recovery->vclock);
-
-	struct memtx_engine *memtx;
-	memtx = (struct memtx_engine *)engine_by_name("memtx");
-	assert(memtx != NULL);
 
 	/*
 	 * We explicitly request memtx to recover its
@@ -5116,6 +5159,8 @@ box_cfg_xc(void)
 {
 	box_set_force_recovery();
 	box_storage_init();
+	if (box_set_memtx_memory_recovery_check() != 0)
+		diag_raise();
 	title("loading");
 
 	struct tt_uuid instance_uuid, replicaset_uuid;
