@@ -37,6 +37,13 @@ local function find_variant(schema, schema_type)
     return nil
 end
 
+M['config.checks'] = function(data, w)
+    if type(data) == 'string' then
+        return find_variant(w.schema, 'string')
+    end
+    return find_variant(w.schema, 'record')
+end
+
 M['audit_log.spaces'] = function(data, w)
     if type(data) ~= 'table' then
         return nil
