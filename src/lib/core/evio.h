@@ -34,6 +34,7 @@
  * Asynchronous IO in libev event loop.
  * Requires a running libev loop.
  */
+#include <assert.h>
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
@@ -55,12 +56,46 @@ extern "C" {
  * a fiber and use coio.h (cooperative multi-tasking I/O)) API.
  *
  * How to use a service:
+ *
  * struct evio_service service;
  * evio_service_create(loop(), &service, ..., on_accept_cb, ...);
- * evio_service_bind(&service);
- * evio_service_listen(&service);
+ * evio_service_start(&service, ...);
  * ...
  * evio_service_stop(&service);
+ *
+ * Note: evio_service_create() doesn't allocate resources, so
+ * there is no opposite evio_service_destroy().
+ *
+ * If on_accept_cb is NULL, the service performs bind+listen on
+ * evio_service_start(), but doesn't perform accept. It is useful
+ * to listen from one thread, but do accepts from other ones.
+ *
+ * evio_service_attach() serves exactly this purpose: it keeps
+ * the event loop and the accept callback, but uses the
+ * listening socket from the source service.
+ *
+ * // thread 1
+ * struct evio_service listen_service;
+ * evio_service_create(loop(), &listen_service, ..., NULL, ...);
+ * evio_service_start(&listen_service, ...);
+ * ...
+ * evio_service_stop(&listen_service);
+ *
+ * // thread 2
+ * struct evio_service accept_service;
+ * evio_service_create(loop(), &accept_service, ..., on_accept_cb, ...);
+ * evio_service_attach(&accept_service, &listen_service);
+ * ...
+ * evio_service_detach(&accept_service);
+ *
+ * The attached service only uses the socket and doesn't own it.
+ * evio_service_stop() on an attached service would close the
+ * listening socket for the parent service and all the other
+ * attaches services, it is incorrect. Use evio_service_detach()
+ * to stop accepting incoming connections.
+ *
+ * Also, detach all the child services before calling
+ * evio_service_stop() on the parent one.
  */
 struct evio_service_entry;
 struct evio_service;
@@ -80,17 +115,21 @@ struct evio_service {
 	char name[SERVICE_NAME_MAXLEN];
 	/**
 	 * A callback invoked on every accepted client socket.
-	 * If a callback returned != 0, the accepted socket is
-	 * closed and the error is logged.
 	 *
-	 * On success the callback must move the IO stream object
-	 * it was passed.
+	 * The callback must move the IO stream object it was
+	 * passed or close it.
 	 */
 	evio_accept_f on_accept;
-	/**  The iproto_thread used in the callback above */
+	/** The parameter passed to on_accept on every call. */
 	void *on_accept_param;
 	/** Event loop */
 	ev_loop *loop;
+#ifndef NDEBUG
+	/** A service the given one attached to (if any). */
+	struct evio_service *src;
+	/** Count of attached services. */
+	size_t refs;
+#endif
 };
 
 /**

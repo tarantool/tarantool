@@ -556,12 +556,21 @@ evio_service_create(struct ev_loop *loop, struct evio_service *service,
 	service->on_accept_param = on_accept_param;
 	service->entry_count = 0;
 	rlist_create(&service->entries);
+#ifndef NDEBUG
+	service->src = NULL;
+	service->refs = 0;
+#endif
 }
 
 void
 evio_service_attach(struct evio_service *dst, const struct evio_service *src)
 {
 	assert(dst->entry_count == 0);
+#ifndef NDEBUG
+	assert(dst->src == NULL);
+	dst->src = (struct evio_service *)src;
+	++dst->src->refs;
+#endif
 	struct evio_service_entry *src_entry;
 	rlist_foreach_entry(src_entry, &src->entries, link) {
 		struct evio_service_entry *dst_entry =
@@ -575,6 +584,11 @@ evio_service_attach(struct evio_service *dst, const struct evio_service *src)
 void
 evio_service_detach(struct evio_service *service)
 {
+#ifndef NDEBUG
+	if (service->src != NULL)
+		--service->src->refs;
+	service->src = NULL;
+#endif
 	if (service->entry_count == 0)
 		return;
 	struct evio_service_entry *entry, *tmp;
@@ -600,6 +614,17 @@ evio_service_listen(struct evio_service *service)
 void
 evio_service_stop(struct evio_service *service)
 {
+	/*
+	 * Invariant: stop is not called on an attached
+	 * service.
+	 */
+	assert(service->src == NULL);
+	/*
+	 * Invariant: all the previously attached services are
+	 * detached before stopping the service.
+	 */
+	assert(service->refs == 0);
+
 	if (service->entry_count == 0)
 		return;
 	say_info("%s: stopped", evio_service_name(service));
