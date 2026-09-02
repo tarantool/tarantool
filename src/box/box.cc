@@ -5608,9 +5608,15 @@ box_storage_free(void)
 	iproto_free();
 	replication_free();
 	gc_free();
+	/*
+	 * The WAL thread reads the memtx quota when it creates an
+	 * xlog file, including the empty one made right before the
+	 * thread exits, so it must be stopped while the engines
+	 * are still alive.
+	 */
+	wal_free();
 	engine_shutdown();
 	/* schema_free(); */
-	wal_free();
 	flightrec_free();
 	audit_log_free();
 	sql_built_in_functions_cache_free();
