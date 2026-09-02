@@ -4568,3 +4568,13 @@ sql_generate_column_name(uint32_t number)
 struct Mem *
 sql_create_pVar_for_numeric_variable(const struct sql_bind *bind,
 				     uint32_t p1, uint32_t bind_count);
+
+/** Set the type of a bound variable that occurs in the result set. */
+int
+sql_bind_type(struct Vdbe *v, uint32_t position, const char *type);
+
+/**
+ * This function set types in metadata in result columns in vdbe.
+ */
+void
+sql_set_types(struct Vdbe *v, const struct sql_bind *bind, uint32_t bind_count);

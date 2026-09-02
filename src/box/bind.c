@@ -174,6 +174,19 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 }
 
 int
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
+{
+	assert(stmt != NULL);
+	uint32_t pos = 1;
+	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
+		if (sql_bind_column(stmt, &bind[i], pos) != 0)
+			return -1;
+	}
+	sql_set_types(stmt, bind, bind_count);
+	return 0;
+}
+
+int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
 	if (p->name != NULL) {

@@ -145,6 +145,29 @@ g.test_12733_numeric_bind_variables = function()
     end)
 end
 
+-- Check types of bind variables
+g.test_6551_metadata_types_for_bind_variable = function()
+    g.server:exec(function()
+        local sql = [[SELECT :a, :a, :b;]]
+        local res = box.execute(sql, {{[':a'] = 1}, {[':b'] = "aSd"}})
+        local exp = {
+            {
+                type = "integer",
+                name =  "COLUMN_1",
+            },
+            {
+                type = "integer",
+                name = "COLUMN_2",
+            },
+            {
+                type = "text",
+                name = "COLUMN_3",
+            },
+        }
+        t.assert_equals(res.metadata, exp)
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)

@@ -311,7 +311,7 @@ vdbeUnbind(struct Vdbe *p, int i)
  * @param type String literal representing type of binding param.
  * @retval 0 on success.
  */
-static int
+int
 sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 {
 	if (v->res_var_count < position)
@@ -359,9 +359,8 @@ sql_bind_double(struct Vdbe *p, int i, double rValue)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "numeric");
 	mem_set_double(&p->aVar[i - 1], rValue);
-	return rc;
+	return 0;
 }
 
 int
@@ -369,9 +368,8 @@ sql_bind_boolean(struct Vdbe *p, int i, bool value)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "boolean");
 	mem_set_bool(&p->aVar[i - 1], value);
-	return rc;
+	return 0;
 }
 
 int
@@ -385,9 +383,8 @@ sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "integer");
 	mem_set_int(&p->aVar[i - 1], iValue);
-	return rc;
+	return 0;
 }
 
 int
@@ -395,9 +392,8 @@ sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	int rc = sql_bind_type(p, i, "integer");
 	mem_set_uint(&p->aVar[i - 1], value);
-	return rc;
+	return 0;
 }
 
 int
@@ -405,7 +401,7 @@ sql_bind_null(struct Vdbe *p, int i)
 {
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
-	return sql_bind_type(p, i, "boolean");
+	return 0;
 }
 
 int
@@ -413,7 +409,6 @@ sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 {
 	int rc = vdbeUnbind(p, i);
 	if (rc == 0) {
-		rc = sql_bind_type(p, i, "varbinary");
 		mem_set_ptr(&p->aVar[i - 1], ptr);
 	}
 	return rc;
@@ -423,34 +418,34 @@ int
 sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
 {
 	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
-	return sql_bind_type(vdbe, i, "text");
+	return 0;
 }
 
 int
 sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
 	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "text");
+	return 0;
 }
 
 int
 sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
 	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "array");
+	return 0;
 }
 
 int
 sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
 	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "map");
+	return 0;
 }
 
 int
 sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
+	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	mem_set_uuid(&p->aVar[i - 1], uuid);
 	return 0;
@@ -459,7 +454,7 @@ sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
 int
 sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
+	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	mem_set_dec(&p->aVar[i - 1], dec);
 	return 0;
@@ -468,7 +463,7 @@ sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
 int
 sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
+	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	mem_set_datetime(&p->aVar[i - 1], dt);
 	return 0;
@@ -477,7 +472,7 @@ sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
 int
 sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
 {
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
+	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	mem_set_interval(&p->aVar[i - 1], itv);
 	return 0;
@@ -538,4 +533,132 @@ const char *
 sql_sql(struct Vdbe *p)
 {
 	return p ? p->zSql : 0;
+}
+
+/**
+ * This function find number of bind variable whose name matches
+ * the result column name in vdbe.
+ */
+static uint32_t
+sql_find_name_in_bind(const struct sql_bind *bind, uint32_t bind_count,
+		      const char *name)
+{
+	uint32_t pos = 0;
+	for (uint32_t i = 0; i < bind_count; i++) {
+		pos = i + 1;
+		if (strncmp(bind[i].name, name, bind[i].name_len) == 0) {
+			return pos;
+		}
+	}
+	return 0;
+}
+
+/**
+ * This function is auxiliary. It set type in one result column in vdbe.
+ */
+static void
+sql_set_type(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t i, uint32_t pos)
+{
+	const struct sql_bind *p = &bind[pos - 1];
+	switch (p->type) {
+	case MP_INT:
+		sql_bind_type(stmt, i, "integer");
+		break;
+	case MP_UINT:
+		sql_bind_type(stmt, i, "integer");
+		break;
+	case MP_BOOL:
+		sql_bind_type(stmt, i, "boolean");
+		break;
+	case MP_DOUBLE:
+	case MP_FLOAT:
+		sql_bind_type(stmt, i, "numeric");
+		break;
+	case MP_STR:
+		/*
+		 * Parameters are allocated within message pack,
+		 * received from the iproto thread. IProto thread
+		 * now is waiting for the response and it will not
+		 * free the packet until sql_stmt_finalize. So
+		 * there is no need to copy the packet and we can
+		 * use SQL_STATIC.
+		 */
+		sql_bind_type(stmt, i, "text");
+		break;
+	case MP_NIL:
+		sql_bind_type(stmt, i, "boolean");
+		break;
+	case MP_BIN:
+		sql_bind_type(stmt, i, "text");
+		break;
+	case MP_ARRAY:
+		sql_bind_type(stmt, i, "array");
+		break;
+	case MP_MAP:
+		sql_bind_type(stmt, i, "map");
+		break;
+	case MP_EXT:
+		switch (p->ext_type) {
+		case MP_UUID:
+			sql_bind_type(stmt, i, "uuid");
+			break;
+		case MP_DECIMAL:
+			sql_bind_type(stmt, i, "decimal");
+			break;
+		case MP_DATETIME:
+			sql_bind_type(stmt, i, "datetime");
+			break;
+		case MP_INTERVAL:
+			sql_bind_type(stmt, i, "interval");
+			break;
+		default:
+			unreachable();
+		}
+		break;
+	default:
+		unreachable();
+	}
+}
+
+void
+sql_set_types(struct Vdbe *p, const struct sql_bind *bind, uint32_t bind_count)
+{
+	Op *aOp = p->aOp;
+	Op *pOp;
+	uint32_t i = 0;
+	uint32_t last = 0;
+	for (pOp = p->aOp; pOp < &aOp[p->nOp]; pOp++) {
+		if (pOp->opcode == OP_Variable) {
+			if (pOp->p4.z != NULL) {
+				if (pOp->p4.z[0] != '$') {
+					uint32_t pos =
+					sql_find_name_in_bind(bind, bind_count,
+							      pOp->p4.z);
+					if (pos == 0)
+						sql_bind_type(p, i + 1,
+							      "boolean");
+					else
+						sql_set_type(p, bind, i + 1,
+							     pos);
+					last = pos;
+
+				} else {
+					if ((uint32_t)pOp->p1 <= bind_count)
+						sql_set_type(p, bind, i + 1,
+							     pOp->p1);
+					else
+						sql_bind_type(p, i + 1,
+							      "boolean");
+					last = pOp->p1;
+				}
+			} else {
+				last += 1;
+				if (last <= bind_count)
+					sql_set_type(p, bind, i + 1, last);
+				else
+					sql_bind_type(p, i + 1, "boolean");
+			}
+		i++;
+		}
+	}
 }
