@@ -79,6 +79,9 @@ local function popen_test_json_log()
         stdout = popen.opts.PIPE,
         stderr = popen.opts.PIPE,
         stdin = popen.opts.PIPE,
+        -- Unset XDG_STATE_HOME and HOME environment variables to skip readline
+        -- history file write. Otherwise it clogs user's own history.
+        env = {},
     })
     t.assert(ph, 'process is not up')
 
