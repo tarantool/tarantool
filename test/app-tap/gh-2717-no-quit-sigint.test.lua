@@ -18,8 +18,17 @@ local prompt = 'tarantool> '
 local TARANTOOL_PATH = arg[-1]
 local test = tap.test('gh-2717-no-quit-sigint')
 
+-- Unset XDG_STATE_HOME and HOME environment variables to skip readline
+-- history file write. Otherwise it clogs user's own history.
+--
+-- Also, reset readline configuration using the INPUTRC environment
+-- variable.
+local interactive_tarantool_env = {
+    ['INPUTRC'] = 'non_existent_file',
+}
+
 test:plan(8)
-local cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = TARANTOOL_PATH .. ' -i 2>&1'
 local ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -27,6 +36,7 @@ local ph = popen.new({cmd}, {
     stdout = popen.opts.PIPE,
     stderr = popen.opts.DEVNULL,
     stdin = popen.opts.PIPE,
+    env = interactive_tarantool_env,
 })
 assert(ph, 'process is not up')
 
@@ -64,7 +74,7 @@ ph:close()
 --
 -- gh-7109: Ctrl+C does not break multiline input.
 --
-local cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -72,6 +82,7 @@ ph = popen.new({cmd}, {
     stdout = popen.opts.PIPE,
     stderr = popen.opts.DEVNULL,
     stdin = popen.opts.PIPE,
+    env = interactive_tarantool_env,
 })
 assert(ph, 'process is not up')
 
@@ -158,7 +169,7 @@ local ph_server = popen.shell('INPUTRC=non_existent_file ' .. TARANTOOL_PATH
 local f = process_timeout.open_with_timeout(log_file, file_open_timeout)
 assert(f, 'error while opening ' .. log_file)
 
-cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = TARANTOOL_PATH .. ' -i 2>&1'
 local ph_client = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -166,6 +177,7 @@ local ph_client = popen.new({cmd}, {
     stdout = popen.opts.PIPE,
     stderr = popen.opts.DEVNULL,
     stdin = popen.opts.PIPE,
+    env = interactive_tarantool_env,
 })
 assert(ph_client, 'the nested console is not up')
 
@@ -222,7 +234,7 @@ os.remove(snap_file)
 --
 -- Testing case when the client and instance are called in the same console.
 --
-cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -230,6 +242,7 @@ ph = popen.new({cmd}, {
     stdout = popen.opts.PIPE,
     stderr = popen.opts.DEVNULL,
     stdin = popen.opts.PIPE,
+    env = interactive_tarantool_env,
 })
 assert(ph, 'process is not up')
 

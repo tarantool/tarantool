@@ -38,7 +38,13 @@ g.test_using_backslash_on_local_console = function()
                               [[bbb\n]] ..
                               [=[]])]=]
 
-    local cmd = "printf '%s' | INPUTRC=/dev/null %s -i 2>/dev/null"
+    -- Unset XDG_STATE_HOME and HOME environment variables to skip readline
+    -- history file write. Otherwise it clogs user's own history.
+    --
+    -- Also, reset readline configuration using the INPUTRC environment
+    -- variable.
+    local cmd = "unset XDG_STATE_HOME; unset HOME; " ..
+        "printf '%s' | INPUTRC=/dev/null %s -i 2>/dev/null"
     cmd = (cmd):format(tarantool_command, TARANTOOL_PATH)
     local fh = io.popen(cmd, 'r')
 

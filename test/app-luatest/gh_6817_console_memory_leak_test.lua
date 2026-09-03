@@ -24,6 +24,13 @@ g.before_test('test_console_mem_leak', function()
     g.console_write = function(command)
         ffi.C.write(g.console_write_fd, command, string.len(command))
     end
+
+    -- Unset XDG_STATE_HOME and HOME environment variables to skip readline
+    -- history file write. Otherwise it clogs user's own history.
+    g.XDG_STATE_HOME = os.getenv('XDG_STATE_HOME')
+    g.HOME = os.getenv('HOME')
+    os.setenv('XDG_STATE_HOME', nil)
+    os.setenv('HOME', nil)
 end)
 
 g.after_test('test_console_mem_leak', function()
@@ -31,6 +38,9 @@ g.after_test('test_console_mem_leak', function()
     t.assert_equals(ffi.C.close(0), 0)
     g.console_write = nil
     g.console_write_fd = nil
+
+    os.setenv('XDG_STATE_HOME', g.XDG_STATE_HOME)
+    os.setenv('HOME', g.HOME)
 end)
 
 -- Checks that ASAN doesn't detect any memory leaks when console is used.
