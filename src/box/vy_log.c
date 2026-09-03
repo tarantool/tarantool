@@ -901,7 +901,7 @@ vy_log_open(struct xlog *xlog)
 	}
 
 	if (xdir_create_xlog(&vy_log.dir, xlog,
-			     &vy_log.last_checkpoint) < 0)
+			     &vy_log.last_checkpoint, 0) < 0)
 		goto fail;
 
 	struct xrow_header row;
@@ -2546,7 +2546,7 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
 		/* Create the log file on the first write. */
 		if (!xlog_is_open(&xlog) &&
-		    xdir_create_xlog(&vy_log.dir, &xlog, vclock) != 0)
+		    xdir_create_xlog(&vy_log.dir, &xlog, vclock, 0) != 0)
 			goto err_create_xlog;
 
 		if (vy_log_append_lsm(&xlog, lsm) != 0)

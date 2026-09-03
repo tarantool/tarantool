@@ -369,6 +369,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 int box_set_wal_retention_period(void);
+int box_set_memtx_memory_recovery_check(void);
 
 typedef struct tuple box_tuple_t;
 

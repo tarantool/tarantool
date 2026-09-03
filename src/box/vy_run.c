@@ -2086,7 +2086,7 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	struct xlog index_xlog;
 	struct xlog_meta meta;
 	xlog_meta_create(&meta, XLOG_META_TYPE_INDEX, &INSTANCE_UUID,
-			 NULL, NULL);
+			 NULL, NULL, 0);
 	struct xlog_opts opts = xlog_opts_default;
 	opts.rate_limit = run->env->snap_io_rate_limit;
 	opts.sync_interval = VY_RUN_SYNC_INTERVAL;
@@ -2184,7 +2184,7 @@ vy_run_writer_create_xlog(struct vy_run_writer *writer)
 	say_info("writing `%s'", path);
 	struct xlog_meta meta;
 	xlog_meta_create(&meta, XLOG_META_TYPE_RUN, &INSTANCE_UUID,
-			 NULL, NULL);
+			 NULL, NULL, 0);
 	struct xlog_opts opts = xlog_opts_default;
 	opts.rate_limit = writer->run->env->snap_io_rate_limit;
 	opts.sync_interval = VY_RUN_SYNC_INTERVAL;

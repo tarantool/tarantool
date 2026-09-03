@@ -87,10 +87,17 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+local function ifdef_memtx_memory_check(value)
+    if private.cfg_set_memtx_memory_recovery_check ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
     memtx_memory        = 256 * 1024 *1024,
+    memtx_memory_recovery_check = ifdef_memtx_memory_check('off'),
     strip_core          = true,
     memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 1024 * 1024,
@@ -283,6 +290,7 @@ end
 local template_cfg = {
     listen              = 'string, number, table',
     memtx_memory        = 'number',
+    memtx_memory_recovery_check = ifdef_memtx_memory_check('string'),
     strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',
     memtx_max_tuple_size  = 'number',
@@ -479,6 +487,7 @@ local dynamic_cfg = {
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
     memtx_memory            = private.cfg_set_memtx_memory,
+    memtx_memory_recovery_check = private.cfg_set_memtx_memory_recovery_check,
     memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
     vinyl_memory            = private.cfg_set_vinyl_memory,
     vinyl_max_tuple_size    = private.cfg_set_vinyl_max_tuple_size,
@@ -681,6 +690,7 @@ local dynamic_cfg_skip_at_load = {
     disable_guest           = ifdef_security(true),
     password_lifetime_days  = ifdef_security(true),
     experimental_wal_retention_period = ifdef_wal_retention_period(true),
+    memtx_memory_recovery_check = ifdef_memtx_memory_check(true),
 }
 
 -- Options that are not part of dynamic_cfg_modules and applied individually
