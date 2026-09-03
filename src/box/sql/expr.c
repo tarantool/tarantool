@@ -1627,16 +1627,12 @@ sqlSrcListDup(struct SrcList *p, int flags)
 		pNewItem->addrFillSub = pOldItem->addrFillSub;
 		pNewItem->regReturn = pOldItem->regReturn;
 		if (pNewItem->fg.isIndexedBy) {
-			pNewItem->u1.zIndexedBy =
-				sql_xstrdup(pOldItem->u1.zIndexedBy);
+			pNewItem->indexed_by =
+				sql_xstrdup(pOldItem->indexed_by);
 			pNewItem->legacy_index_name =
 				sql_xstrdup(pOldItem->legacy_index_name);
 		}
 		pNewItem->pIBIndex = pOldItem->pIBIndex;
-		if (pNewItem->fg.isTabFunc) {
-			pNewItem->u1.pFuncArg =
-				sql_expr_list_dup(pOldItem->u1.pFuncArg, flags);
-		}
 		pNewItem->space = pOldItem->space;
 		pNewItem->pSelect = sqlSelectDup(pOldItem->pSelect, flags);
 		pNewItem->pOn = sqlExprDup(pOldItem->pOn, flags);

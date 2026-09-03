@@ -467,7 +467,6 @@ void sqlWhereSplit(WhereClause *, Expr *, u8);
 Bitmask sqlWhereExprUsage(WhereMaskSet *, Expr *);
 Bitmask sqlWhereExprListUsage(WhereMaskSet *, ExprList *);
 void sqlWhereExprAnalyze(SrcList *, WhereClause *);
-void sqlWhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
 
 /*
  * Bitmasks for the operators on WhereTerm objects.  These are all
