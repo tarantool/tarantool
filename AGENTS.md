@@ -69,7 +69,9 @@ Lua is used for public non-perf-critical API, and uses LuaJIT under the hood.
 C++ remains in some places, is not growing, but can still be used without STL.
 
 - `src/` is all the sources.
-- `test/` is all the tests.
+- `test/` is all the functional tests.
+- `perf/` are performance tests: C++ micro-benchmarks written with Google
+  Benchmark (`perf/*.cc`) and Lua benchmarks (`perf/lua/*.lua`).
 - `src/box/` is storage-aware code which is Tarantool-specific.
 - `src/lib/` are storage-agnostic self-sufficient libraries.
 - `src/lua/` are storage-agnostic Lua modules.
@@ -79,8 +81,9 @@ the process management.
 
 ### Testing
 
-Tests are entirely located in `test/`. There are several ways of testing,
-depending on what is being tested. The most widely used ones are listed below.
+The functional tests are entirely located in `test/` and `perf/`. There are
+several ways of testing, depending on what is being tested. The most widely used
+ones are listed below.
 
 - C/C++ unit tests. They are handy for covering C APIs which don't require the
   full storage being configured. Such tests use TAP library, and are located in
@@ -106,6 +109,40 @@ depending on what is being tested. The most widely used ones are listed below.
   what they are testing - application server, fibers, replication, SQL, a
   specific engine, etc. These are the default way of testing unless it is
   possible to write a C/C++ unit test.
+
+- Fuzzing tests. Fuzzing is done with libFuzzer and its Lua binding `luzer`
+  (a coverage-guided engine). Fuzz targets and seed corpora/dictionaries live in
+  `test/fuzz/` and `test/static/`. Build with Clang and `-DENABLE_FUZZER=ON`
+  (GCC is unsupported; `-DOSS_FUZZ=ON` is used by OSS-Fuzz), then run with
+  `ctest -L fuzzing`; the number of runs is overridden by the `RUNS` environment
+  variable. Two flavors exist:
+
+  - C/C++ targets in `test/fuzz/*_fuzzer.c|cc`. Each defines
+    `LLVMFuzzerTestOneInput()`, e.g. for network protocol decoders
+    (`xrow_*`, `swim_*`) or parsers (`uri`, `csv`, `datetime`). Some are
+    grammar-based and generate inputs via protobuf (`test/fuzz/sql_fuzzer`,
+    `test/fuzz/luaL_loadbuffer`).
+  - Lua targets in `test/fuzz/lua/*_test.lua`. Each requires `luzer`, gets
+    arbitrary bytes in `TestOneInput(buf)` and asserts invariants of the tested
+    API. `test_engine.lua` and `test_mvcc.lua` randomly generate DDL/DML over
+    `memtx`/`vinyl` and support greybox mode when `luzer` is available. Related
+    LuaJIT C/Lua API fuzz tests are fetched from the `ligurio/lunapark` repo.
+
+  These tests are effectively property-based tests: for fuzzer-generated input
+  they check properties the API claims, e.g. round-trips (`encode`/`decode`,
+  `parse`/`format`), inverse operations, invariants, and cross-checks against a
+  reference. When a failure is found, only report it if it is reproducible,
+  exercises realistic input, and contradicts behavior the code actually claims.
+
+- Performance tests. Micro-benchmarks in `perf/` are wired into CTest with the
+  label `performance`: C++ benchmarks use Google Benchmark (`perf/*.cc`),
+  Lua ones are plain scripts run by `tarantool` (`perf/lua/*.lua`). Run them
+  via `ctest -L performance` or `cmake --build build --target test-perf`
+  (targets `test-c-perf`, `test-lua-perf`, `test-perf-aggregate`). Both kinds
+  write results as JSON, which can be compared with
+  `perf/tools/compare/compare.py benchmarks <old>.json <new>.json`. Heavier
+  end-to-end workloads (sysbench, TPC-C/H, YCSB, nosqlbench) are run in CI only,
+  see `.github/actions/perf/` and `.github/workflows/perf_*.yml`.
 
 Testing usually tries to cover 100% of new code. When some cases are very tricky
 to cover, sometimes the tests use error injections - a debug-build option added
