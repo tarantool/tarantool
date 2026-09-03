@@ -133,3 +133,17 @@ g.test_4157_transitive_transaction = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure that the AUTOINCEMENT property is correctly checked when
+-- adding it as both a column property and a table property.
+--
+g.test_column_and_table_properties = function(cg)
+    cg.server:exec(function()
+        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT,
+                      PRIMARY KEY(a AUTOINCREMENT, a AUTOINCREMENT));]]
+        local exp_err = "Table must feature at most one AUTOINCREMENT field"
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, exp_err)
+    end)
+end

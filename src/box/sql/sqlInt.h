@@ -303,14 +303,7 @@ sql_vsnprintf(int, char *, const char *, va_list);
 #define MATCH_ONE_WILDCARD '_'
 #define MATCH_ALL_WILDCARD '%'
 
-/**
- * Compile the UTF-8 encoded SQL statement into
- * a statement handle (struct Vdbe).
- *
- * @param sql UTF-8 encoded SQL statement.
- * @param re_prepared VM being re-compiled. Can be NULL.
- * @retval stmt A pointer to the compiled statement.
- */
+/** Compile the UTF-8 encoded SQL statement into a statement handle. */
 struct Vdbe *
 sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
 
@@ -1873,14 +1866,6 @@ struct TriggerPrg {
 	uint64_t column_mask[2];
 };
 
-enum ast_type {
-	AST_TYPE_UNDEFINED = 0,
-	AST_TYPE_SELECT,
-	AST_TYPE_EXPR,
-	AST_TYPE_TRIGGER,
-	ast_type_MAX
-};
-
 /** Information about the expressions that will be used as default values. */
 struct sql_default_func {
 	/** Fieldno of the field to which default value will be added. */
@@ -1949,14 +1934,6 @@ struct Parse {
 		int lru;	/* Least recently used entry has the smallest value */
 	} aColCache[SQL_N_COLCACHE];	/* One for each column cache entry */
 	int aTempReg[8];	/* Holding area for temporary registers */
-
-	/** The line counter. */
-	uint32_t line_count;
-	/**
-	 * The position in a line. Line and position are used
-	 * for detailed error diagnostics.
-	 */
-	int line_pos;
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
@@ -1964,7 +1941,6 @@ struct Parse {
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
 	Vdbe *pReprepare;	/* VM being reprepared (sqlReprepare()) */
-	const char *zTail;	/* All SQL text past the last semicolon parsed */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
@@ -1988,7 +1964,7 @@ struct Parse {
 	/** Length of array of default function descriptions. */
 	uint32_t default_func_count;
 	/** AST of parsed SQL statement. */
-	struct sql_ast ast;
+	struct sql_ast *ast;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.
@@ -1998,23 +1974,8 @@ struct Parse {
 	/* Id of field with <AUTOINCREMENT>. */
 	int *autoinc_fieldno;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
-	/** If set - do not emit byte code at all, just parse.  */
-	bool parse_only;
-	/** If true, then parsed_ast_type should be EXPR after parsing. */
-	bool is_expr;
-	/** Type of parsed_ast member. */
-	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
 	uint32_t sql_flags;
-	/**
-	 * Members of this union are valid only
-	 * if parse_only is set to true.
-	 */
-	union {
-		struct Expr *expr;
-		struct Select *select;
-		struct sql_trigger *trigger;
-	} parsed_ast;
 };
 
 /*
@@ -2414,7 +2375,38 @@ char *
 sql_escaped_name_new(const char *name);
 
 int sqlKeywordCode(const unsigned char *, int);
-int sqlRunParser(Parse *, const char *);
+
+/**
+ * Run the parser on the given SQL string.
+ * Return AST of given SQL statement on success, NULL otherwise.
+ */
+struct sql_ast *
+sql_parse_statement(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given function definition.
+ * Return the parsed expression on success, or NULL on error.
+ */
+struct Expr *
+sql_parse_function(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given view definition.
+ * Return the parsed SELECT on success, or NULL on error.
+ */
+struct Select *
+sql_parse_view(struct Parse *parser, const char *sql);
+
+/**
+ * Run the parser on the given trigger definition.
+ * Return the parsed SQL TRIGGER on success, or NULL on error.
+ */
+struct sql_trigger *
+sql_parse_trigger(struct Parse *parser, const char *sql);
+
+/** Code given AST. */
+void
+sql_code_ast(struct Parse *parse, struct sql_ast *ast, const char *sql);
 
 /**
  * This routine is called after a single SQL statement has been
@@ -2525,12 +2517,12 @@ void sqlExprAssignVarNumber(Parse *, Expr *, u32);
  *
  * @param pParse Parsing context.
  * @param pList List to which to append. Might be NULL.
- * @param columns List of names of LHS of the assignment.
+ * @param pColumns List of names of LHS of the assignment.
  * @param pExpr Vector expression to be appended. Might be NULL.
  */
 struct ExprList *
 sqlExprListAppendVector(struct Parse *pParse, struct ExprList *pList,
-			struct ast_id_list *columns, struct Expr *pExpr);
+			struct IdList *pColumns, struct Expr *pExpr);
 
 /** Return TRUE if expression is term, FALSE otherwise. */
 static inline bool
@@ -4291,7 +4283,6 @@ void *
 sqlParserAlloc(void *(*)(size_t));
 
 void sqlParserFree(void *, void (*)(void *));
-void sqlParser(void *, int, Token, Parse *);
 #ifdef YYTRACKMAXSTACKDEPTH
 int sqlParserStackPeak(void *);
 #endif

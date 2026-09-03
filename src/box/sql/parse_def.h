@@ -74,24 +74,6 @@
  * parsing context (struct Parse).
  */
 
-/** Type of parsed statement. */
-enum sql_ast_type {
-	/** Type of the statement is unknown. */
-	SQL_AST_TYPE_UNKNOWN = 0,
-	/** START TRANSACTION statement. */
-	SQL_AST_TYPE_START_TRANSACTION,
-	/** COMMIT statement. */
-	SQL_AST_TYPE_COMMIT,
-	/** ROLLBACK statement. */
-	SQL_AST_TYPE_ROLLBACK,
-	/** SAVEPOINT statement. */
-	SQL_AST_TYPE_SAVEPOINT,
-	/** RELEASE SAVEPOINT statement. */
-	SQL_AST_TYPE_RELEASE_SAVEPOINT,
-	/** ROLLBACK TO SAVEPOINT statement. */
-	SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT,
-};
-
 /**
  * Each token coming out of the lexer is an instance of
  * this structure. Tokens are also used as part of an expression.
@@ -102,20 +84,6 @@ struct Token {
 	/** Number of characters in this token. */
 	unsigned int n;
 	bool isReserved;
-};
-
-/** Description of a SAVEPOINT. */
-struct sql_ast_savepoint {
-	/** Name of the SAVEPOINT. */
-	struct Token name;
-};
-
-/** A structure describing the AST of the parsed SQL statement. */
-struct sql_ast {
-	/** Parsed statement type. */
-	enum sql_ast_type type;
-	/** Savepoint description for savepoint-related statements. */
-	struct sql_ast_savepoint savepoint;
 };
 
 /** Constant tokens for integer values. */
@@ -199,18 +167,19 @@ struct create_fk_constraint_parse_def {
 	bool is_used;
 };
 
-static inline void
-create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
-{
-	rlist_create(&def->checks);
-}
-
-static inline void
-create_fk_constraint_parse_def_init(struct create_fk_constraint_parse_def *def)
-{
-	rlist_create(&def->fkeys);
-	def->is_used = true;
-}
+/** Parsing context. */
+struct sql_parser_context {
+	/** The resulting AST. */
+	struct sql_ast *ast;
+	/** Region for memory allocation. */
+	struct region *region;
+	/** Currently parsed line. */
+	uint32_t line;
+	/** Currently parsed position in line. */
+	uint32_t pos;
+	/** Flag to show if a syntax error happened. */
+	bool is_aborted;
+};
 
 static inline void
 create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
@@ -222,29 +191,14 @@ create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 		sql_expr_list_delete(fk->selfref_cols);
 }
 
-/** Save parsed START TRANSACTION statement. */
+/** Create parsing context. */
 void
-sql_ast_init_start_transaction(struct Parse *parse);
+sql_parser_context_create(struct sql_parser_context *ctx,
+			  struct region *region);
 
-/** Save parsed COMMIT statement. */
+/** Run parser. */
 void
-sql_ast_init_commit(struct Parse *parse);
-
-/** Save parsed ROLLBACK statement. */
-void
-sql_ast_init_rollback(struct Parse *parse);
-
-/** Save parsed SAVEPOINT statement. */
-void
-sql_ast_init_savepoint(struct Parse *parse, const struct Token *name);
-
-/** Save parsed RELEASE SAVEPOINT statement. */
-void
-sql_ast_init_release_savepoint(struct Parse *parse, const struct Token *name);
-
-/** Save parsed ROLLBACK TO SAVEPOINT statement. */
-void
-sql_ast_init_rollback_to_savepoint(struct Parse *parse,
-				   const struct Token *name);
+sqlParser(void *engine, int token_type, struct Token token,
+	  struct sql_parser_context *ctx);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

@@ -74,34 +74,22 @@ struct space_def;
 struct func;
 
 /**
- * Perform parsing of provided expression. This is done by
- * surrounding the expression w/ 'SELECT ' prefix and perform
- * convetional parsing. Then extract result expression value from
- * stuct Select and return it.
- *
- * @param expr Expression to parse.
- * @param expr_len Length of @an expr.
+ * Perform parsing of provided function definition.
+ * Return the parsed expression on success, or NULL on error.
  */
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len);
+sql_expr_compile(const char *expr);
 
 /**
- * This routine executes parser on 'CREATE VIEW ...' statement
- * and loads content of SELECT into internal structs as result.
- *
- * @param view_stmt String containing 'CREATE VIEW' statement.
- * @retval AST of SELECT statement on success, NULL otherwise.
+ * Perform parsing of provided view definition.
+ * Return the parsed SELECT on success, or NULL on error.
  */
 struct Select *
 sql_view_compile(const char *view_stmt);
 
 /**
- * Perform parsing of provided SQL request and construct trigger AST.
- * @param db SQL context handle.
- * @param sql request to parse.
- *
- * @retval NULL on error
- * @retval not NULL sql_trigger AST pointer on success.
+ * Perform parsing of provided trigger definition.
+ * Return the parsed SQL TRIGGER on success, or NULL on error.
  */
 struct sql_trigger *
 sql_trigger_compile(const char *sql);

@@ -1530,9 +1530,8 @@ sql_create_view(struct Parse *parse_context, const char *sql,
 		struct Select *view_select, bool if_not_exists)
 {
 	if (parse_context->nVar > 0) {
-		diag_set(ClientError, ER_CREATE_SPACE,
-			 sql_tt_name_from_token(name),
-			 "parameters are not allowed in views");
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
@@ -2746,7 +2745,7 @@ sql_create_index(struct Parse *parse, struct Token *table, struct Token *name,
 	if (sqlCheckIdentifierName(parse, index_name) != 0)
 		goto exit_create_index;
 
-	if (table->n > 0 && space_is_system(space)) {
+	if (!is_create_table_or_add_col && space_is_system(space)) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_name, def->name,
 			 "can't create index on system space");
 		parse->is_aborted = true;

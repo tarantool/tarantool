@@ -265,6 +265,7 @@ void
 sqlPragma(struct Parse *pParse, struct Token *pragma, struct Token *table_name,
 	  struct Token *index_name)
 {
+	assert(pragma != NULL && table_name != NULL && index_name != NULL);
 	const struct space *space = NULL;
 	const struct index *index = NULL;
 	struct Vdbe *v = sqlGetVdbe(pParse);
@@ -273,9 +274,9 @@ sqlPragma(struct Parse *pParse, struct Token *pragma, struct Token *table_name,
 	pParse->nMem = 2;
 
 	char *pragma_name = sql_name_from_token(pragma);
-	if (table_name != NULL)
+	if (table_name->n > 0)
 		space = sql_space_by_token(table_name);
-	if (space != NULL && index_name != NULL) {
+	if (space != NULL && index_name->n > 0) {
 		uint32_t index_id = sql_index_id_by_token(space, index_name);
 		if (index_id <= space->index_id_max)
 			index = space->index_map[index_id];

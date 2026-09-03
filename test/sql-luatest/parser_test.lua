@@ -1,0 +1,106 @@
+local server = require('luatest.server')
+local t = require('luatest')
+
+local g = t.group('parser')
+
+g.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Make sure that syntax errors occur before semantic errors.
+g.test_syntax_errors = function(cg)
+    cg.server:exec(function()
+        local _, err = box.execute([[SELECT i FROM t 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+
+        _, err = box.execute([[DROP TABLE t 2;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '2'")
+
+        _, err = box.execute([[DROP VIEW v 3;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[DROP TRIGGER t 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
+
+        _, err = box.execute([[DROP INDEX I ON t 5;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[ALTER TABLE t RENAME TO t1 6;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '6'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c 7;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '7'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c FOREIGN KEY 8;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '8'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c PRIMARY KEY 9;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '9'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c UNIQUE 0;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '0'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT c CHECK 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.c 2;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '2'")
+
+        _, err = box.execute("ALTER TABLE t DROP CONSTRAINT a.c FOREIGN KEY 3;")
+        t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT a.c CHECK 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c UNIQUE (i) 5;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               PRIMARY KEY (i) 6;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '6'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               FOREIGN KEY (i) REFERENCES t1(i) 7;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '7'")
+
+        _, err = box.execute([[ALTER TABLE t ADD CONSTRAINT c
+                               CHECK (i > 10) 8;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '8'")
+
+        _, err = box.execute([[ALTER TABLE t ADD COLUMN i INT 9;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '9'")
+
+        _, err = box.execute([[CREATE TABLE t(i INT) 0;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '0'")
+
+        _, err = box.execute([[CREATE VIEW v AS SELECT * FROM t 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+
+        _, err = box.execute([[CREATE INDEX i ON t(i) 2;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '2'")
+
+        _, err = box.execute([[INSERT INTO t VALUES (1) 3;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '3'")
+
+        _, err = box.execute([[UPDATE t SET i = 1 4;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '4'")
+
+        _, err = box.execute([[DELETE FROM t 5;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '5'")
+
+        _, err = box.execute([[TRUNCATE TABLE t 6;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '6'")
+
+        _, err = box.execute([[PRAGMA unknown_pragma(one.two) 7;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '7'")
+
+        _, err = box.execute([[CREATE TRIGGER tt AFTER INSERT ON tA
+                               BEGIN SELECT 1 END; 8;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '8'")
+    end)
+end

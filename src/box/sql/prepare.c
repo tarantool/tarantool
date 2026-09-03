@@ -47,11 +47,19 @@ sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
 
-	sqlRunParser(&sParse, zSql);
+	struct sql_ast *ast = sql_parse_statement(&sParse, zSql);
+	if (ast == NULL) {
+		sql_parser_destroy(&sParse);
+		return NULL;
+	}
+
+	sParse.explain = (int)ast->explain;
+	sql_code_ast(&sParse, ast, zSql);
 	if (sParse.is_aborted) {
 		sql_parser_destroy(&sParse);
 		return NULL;
 	}
+
 	assert(sParse.nQueryLoop == 0);
 
 	if (sParse.explain != 0) {
@@ -108,71 +116,47 @@ sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
 }
 
 struct Expr *
-sql_expr_compile(const char *expr, int expr_len)
+sql_expr_compile(const char *sql)
 {
-	const char *outer = "FUNCTION ";
-	int len = strlen(outer) + expr_len;
+	if (sql == NULL || strlen(sql) == 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Function definition cannot be empty");
+		return NULL;
+	}
 
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	/*
-	 * Since SELECT token is added to the original expression,
-	 * to make error message display correct position we should
-	 * account its length.
-	 */
-	parser.line_pos -= strlen(outer);
-	parser.parse_only = true;
-	parser.is_expr = true;
-
-	struct Expr *expression = NULL;
-	char *stmt = xregion_alloc(&parser.region, len + 1);
-	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
-
-	if (sqlRunParser(&parser, stmt) == 0) {
-		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
-		expression = parser.parsed_ast.expr;
-		parser.parsed_ast.expr = NULL;
-	}
+	struct Expr *res = sql_parse_function(&parser, sql);
 	sql_parser_destroy(&parser);
-	return expression;
+	return res;
 }
 
 struct Select *
-sql_view_compile(const char *view_stmt)
+sql_view_compile(const char *sql)
 {
+	assert(sql != NULL && strlen(sql) > 0);
+
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-
-	struct Select *select = NULL;
-
-	if (sqlRunParser(&parser, view_stmt) != 0 ||
-	    parser.parsed_ast_type != AST_TYPE_SELECT) {
-		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
-	} else {
-		select = parser.parsed_ast.select;
-		parser.parsed_ast.select = NULL;
-	}
-
+	struct Select *res = sql_parse_view(&parser, sql);
 	sql_parser_destroy(&parser);
-	return select;
+	return res;
 }
 
 struct sql_trigger *
 sql_trigger_compile(const char *sql)
 {
-	struct Parse parser;
-	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
-	parser.parse_only = true;
-	struct sql_trigger *trigger = NULL;
-	if (sqlRunParser(&parser, sql) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_TRIGGER) {
-		trigger = parser.parsed_ast.trigger;
-		parser.parsed_ast.trigger = NULL;
+	if (sql == NULL || strlen(sql) == 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Trigger definition cannot be empty");
+		return NULL;
 	}
 
+	struct Parse parser;
+	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
+	struct sql_trigger *res = sql_parse_trigger(&parser, sql);
 	sql_parser_destroy(&parser);
-	return trigger;
+	return res;
 }
 
 /*
@@ -200,8 +184,6 @@ sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 {
 	memset(parser, 0, sizeof(struct Parse));
 	parser->sql_flags = sql_flags;
-	parser->line_count = 1;
-	parser->line_pos = 1;
 	region_create(&parser->region, &cord()->slabc);
 }
 
@@ -240,7 +222,6 @@ void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
-	assert(!parser->parse_only || parser->pVdbe == NULL);
 	sqlVdbeDelete(parser->pVdbe);
 	parser_space_delete(parser);
 	while (parser->pTriggerPrg != NULL) {
@@ -260,18 +241,5 @@ sql_parser_destroy(Parse *parser)
 	assert(sql_get()->lookaside.bDisable >= parser->disableLookaside);
 	sql_get()->lookaside.bDisable -= parser->disableLookaside;
 	parser->disableLookaside = 0;
-	switch (parser->parsed_ast_type) {
-	case AST_TYPE_SELECT:
-		sql_select_delete(parser->parsed_ast.select);
-		break;
-	case AST_TYPE_EXPR:
-		sql_expr_delete(parser->parsed_ast.expr);
-		break;
-	case AST_TYPE_TRIGGER:
-		sql_trigger_delete(parser->parsed_ast.trigger);
-		break;
-	default:
-		assert(parser->parsed_ast_type == AST_TYPE_UNDEFINED);
-	}
 	region_destroy(&parser->region);
 }
