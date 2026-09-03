@@ -73,11 +73,6 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 					       src->disallow_scan);
 		if (src->indexed_by.n != 0)
 			sqlSrcListIndexedBy(res, &src->indexed_by);
-		if (src->is_tab_func) {
-			struct ExprList *func_args =
-				expr_list_from_ast(parser, src->func_args);
-			sqlSrcListFuncArgs(res, func_args);
-		}
 		res->a[res->nSrc - 1].fg.jointype = src->join_type;
 		if ((src->join_type & JT_INNER) != 0 &&
 		    (src->join_type & JT_OUTER) != 0) {

@@ -78,3 +78,20 @@ g.test_12337_throw_duplicate_from_select = function(cg)
         t.assert_equals(res.rows, {{1, 2, 3}})
     end)
 end
+
+--
+-- Make sure that table-valued functions are no longer supported by the parser.
+--
+g.test_13133_no_table_value_functions = function(cg)
+    cg.server:exec(function()
+        local exp_err = "Syntax error at line 1 near '('"
+
+        local _, err = box.execute([[SELECT * FROM t();]])
+        t.assert_equals(err.message, exp_err)
+
+        _, err = box.execute([[SELECT 1 IN t();]])
+        t.assert_equals(err.message, exp_err)
+        _, err = box.execute([[SELECT 1 NOT IN t();]])
+        t.assert_equals(err.message, exp_err)
+    end)
+end

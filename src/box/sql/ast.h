@@ -150,12 +150,8 @@ struct ast_source {
 	struct ast_expr *join_on;
 	/** Column names of a join's USING clause. */
 	struct ast_id_list *join_using;
-	/** Arguments of a table-valued function. */
-	struct ast_expr_list *func_args;
 	/** Type of join between this source and the previous one. */
 	int join_type;
-	/** True if the source is a table-valued function. */
-	bool is_tab_func;
 	/** True if scanning is not allowed for this source. */
 	bool disallow_scan;
 };

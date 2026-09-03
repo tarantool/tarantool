@@ -1531,7 +1531,6 @@ struct SrcList {
 			u8 jointype;	/* Type of join between this table and the previous */
 			unsigned notIndexed:1;	/* True if there is a NOT INDEXED clause */
 			unsigned isIndexedBy:1;	/* True if there is an INDEXED BY clause */
-			unsigned isTabFunc:1;	/* True if table-valued-function syntax */
 			unsigned isCorrelated:1;	/* True if sub-query is correlated */
 			unsigned viaCoroutine:1;	/* Implemented as a co-routine */
 			unsigned isRecursive:1;	/* True for recursive reference in WITH */
@@ -1548,10 +1547,8 @@ struct SrcList {
 		Expr *pOn;	/* The ON clause of a join */
 		IdList *pUsing;	/* The USING clause of a join */
 		Bitmask colUsed;	/* Bit N (1<<N) set if column N of space is used */
-		union {
-			char *zIndexedBy;	/* Identifier from "INDEXED BY <zIndex>" clause */
-			ExprList *pFuncArg;	/* Arguments to table-valued-function */
-		} u1;
+		/** Identifier from "INDEXED BY <index>" clause. */
+		char *indexed_by;
 		/** Normalized index name for the second lookup. */
 		char *legacy_index_name;
 		struct index_def *pIBIndex;
@@ -2862,13 +2859,6 @@ sqlSrcListAppendFromTerm(struct SrcList *p, struct Token *pTable,
  */
 void
 sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy);
-
-/**
- * Add the list of function arguments to the SrcList entry for a
- * table-valued-function.
- */
-void
-sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList);
 
 int sqlIndexedByLookup(Parse *, struct SrcList_item *);
 void sqlSrcListAssignCursors(Parse *, SrcList *);

@@ -3638,13 +3638,8 @@ substSelect(Parse * pParse,	/* Report errors here */
 		p->pWhere = substExpr(pParse, p->pWhere, iTable, pEList);
 		pSrc = p->pSrc;
 		assert(pSrc != 0);
-		for (i = pSrc->nSrc, pItem = pSrc->a; i > 0; i--, pItem++) {
+		for (i = pSrc->nSrc, pItem = pSrc->a; i > 0; i--, pItem++)
 			substSelect(pParse, pItem->pSelect, iTable, pEList, 1);
-			if (pItem->fg.isTabFunc) {
-				substExprList(pParse, pItem->u1.pFuncArg,
-					      iTable, pEList);
-			}
-		}
 	} while (doPrior && (p = p->pPrior) != 0);
 }
 
@@ -4087,7 +4082,6 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		 */
 		for (i = 0; i < nSubSrc; i++) {
 			sqlIdListDelete(pSrc->a[i + iFrom].pUsing);
-			assert(pSrc->a[i + iFrom].fg.isTabFunc == 0);
 			pSrc->a[i + iFrom] = pSubSrc->a[i];
 			memset(&pSubSrc->a[i], 0, sizeof(pSubSrc->a[i]));
 		}
@@ -4360,7 +4354,7 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 	uint32_t index_id = sql_index_id_by_src(pFrom);
 	if (index_id == UINT32_MAX) {
 		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
-			 pFrom->u1.zIndexedBy, pFrom->space->def->name);
+			 pFrom->indexed_by, pFrom->space->def->name);
 		pParse->is_aborted = true;
 		return -1;
 	}
@@ -4538,13 +4532,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		if (pCte->zCteErr) {
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 				 tt_sprintf(pCte->zCteErr, pCte->zName));
-			pParse->is_aborted = true;
-			return -1;
-		}
-		if (pFrom->fg.isTabFunc) {
-			const char *err = "'%s' is not a function";
-			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-				 tt_sprintf(err, pFrom->zName));
 			pParse->is_aborted = true;
 			return -1;
 		}
@@ -4764,15 +4751,6 @@ selectExpander(Walker * pWalker, Select * p)
 			struct space *space = sql_lookup_space(pParse, pFrom);
 			if (space == NULL)
 				return WRC_Abort;
-			if (pFrom->fg.isTabFunc) {
-				const char *err =
-					tt_sprintf("'%s' is not a function",
-						   pFrom->zName);
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 err);
-				pParse->is_aborted = true;
-				return WRC_Abort;
-			}
 			if (space->def->opts.is_view) {
 				struct Select *select =
 					sql_view_compile(space->def->opts.sql);

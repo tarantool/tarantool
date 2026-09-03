@@ -3660,10 +3660,8 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	 * equal to pTabList->nSrc but might be shortened to 1 if the
 	 * WHERE_OR_SUBCLAUSE flag is set.
 	 */
-	for (ii = 0; ii < pTabList->nSrc; ii++) {
+	for (ii = 0; ii < pTabList->nSrc; ii++)
 		createMask(pMaskSet, pTabList->a[ii].iCursor);
-		sqlWhereTabFuncArgs(pParse, &pTabList->a[ii], &pWInfo->sWC);
-	}
 #ifdef SQL_DEBUG
 	for (ii = 0; ii < pTabList->nSrc; ii++) {
 		Bitmask m =
