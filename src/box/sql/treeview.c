@@ -238,12 +238,6 @@ sqlTreeViewSelect(TreeView * pView, const Select * p, u8 moreToFollow)
 							      pItem->pSelect,
 							      0);
 				}
-				if (pItem->fg.isTabFunc) {
-					sqlTreeViewExprList(pView,
-								pItem->u1.
-								pFuncArg, 0,
-								"func-args:");
-				}
 				sqlTreeViewPop(pView);
 			}
 			sqlTreeViewPop(pView);

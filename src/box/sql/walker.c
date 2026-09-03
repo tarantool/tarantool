@@ -148,11 +148,6 @@ sqlWalkSelectFrom(Walker * pWalker, Select * p)
 			if (sqlWalkSelect(pWalker, pItem->pSelect)) {
 				return WRC_Abort;
 			}
-			if (pItem->fg.isTabFunc
-			    && sqlWalkExprList(pWalker, pItem->u1.pFuncArg)
-			    ) {
-				return WRC_Abort;
-			}
 		}
 	}
 	return WRC_Continue;

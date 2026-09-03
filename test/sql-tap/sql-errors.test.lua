@@ -459,7 +459,7 @@ test:do_catchsql_test(
 		SELECT * FROM t0();
 	]], {
 		-- <sql-errors-1.39>
-        1,"'t0' is not a function"
+        1, "Syntax error at line 1 near '('"
 		-- </sql-errors-1.39>
 	})
 

@@ -643,14 +643,6 @@ source(A) ::= seqscan(X) nm(Y) as(Z) indexed_opt(I). {
   A->indexed_by = I;
   A->disallow_scan = X;
 }
-source(A) ::= seqscan(X) nm(Y) LP exprlist(E) RP as(Z). {
-  A = ast_source_new(ctx->region);
-  A->name = Y;
-  A->alias = Z;
-  A->func_args = E;
-  A->is_tab_func = true;
-  A->disallow_scan = X;
-}
 source(A) ::= LP select(S) RP as(Z). {
   A = ast_source_new(ctx->region);
   A->alias = Z;
@@ -1177,38 +1169,9 @@ expr(A) ::= expr(X) IN nm(Y). {
   A->right = ast_expr_new(ctx->region, Y.z, Y.n, TK_SELECT);
   A->right->select = select;
 }
-expr(A) ::= expr(X) IN nm(Y) LP exprlist(E) RP. {
-  struct ast_source *src = ast_source_new(ctx->region);
-  src->name = Y;
-  if (E != NULL) {
-    src->func_args = E;
-    src->is_tab_func = true;
-  }
-  struct ast_select *select = ast_select_new(ctx->region);
-  select->sources = ast_source_list_append(ctx->region, NULL, src);
-  A = ast_expr_new(ctx->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
-  A->left = X;
-  A->right = ast_expr_new(ctx->region, Y.z, Y.n, TK_SELECT);
-  A->right->select = select;
-}
 expr(A) ::= expr(X) NOT IN nm(Y). {
   struct ast_source *src = ast_source_new(ctx->region);
   src->name = Y;
-  struct ast_select *select = ast_select_new(ctx->region);
-  select->sources = ast_source_list_append(ctx->region, NULL, src);
-  A = ast_expr_new(ctx->region, X->str, (Y.z - X->str) + Y.n, TK_NOT);
-  A->left = ast_expr_new(ctx->region, X->str, (Y.z - X->str) + Y.n, TK_IN);
-  A->left->left = X;
-  A->left->right = ast_expr_new(ctx->region, Y.z, Y.n, TK_SELECT);
-  A->left->right->select = select;
-}
-expr(A) ::= expr(X) NOT IN nm(Y) LP exprlist(E) RP. {
-  struct ast_source *src = ast_source_new(ctx->region);
-  src->name = Y;
-  if (E != NULL) {
-    src->func_args = E;
-    src->is_tab_func = true;
-  }
   struct ast_select *select = ast_select_new(ctx->region);
   select->sources = ast_source_list_append(ctx->region, NULL, src);
   A = ast_expr_new(ctx->region, X->str, (Y.z - X->str) + Y.n, TK_NOT);

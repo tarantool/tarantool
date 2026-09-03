@@ -1319,17 +1319,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		if (sqlResolveExprNames(&sNC, p->pWhere))
 			return WRC_Abort;
 
-		/* Resolve names in table-valued-function arguments */
-		for (i = 0; i < p->pSrc->nSrc; i++) {
-			struct SrcList_item *pItem = &p->pSrc->a[i];
-			if (pItem->fg.isTabFunc
-			    && sqlResolveExprListNames(&sNC,
-							   pItem->u1.pFuncArg)
-			    ) {
-				return WRC_Abort;
-			}
-		}
-
 		/* The ORDER BY and GROUP BY clauses may not refer to terms in
 		 * outer queries
 		 */
