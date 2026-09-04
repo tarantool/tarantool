@@ -217,14 +217,21 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				enum dup_replace_mode mode,
 				struct tuple **result)
 {
-	struct tuple *successor;
+	size_t region_svp = region_used(&fiber()->gc);
+	struct rlist results;
 	if (memtx_index_replace(space->index[0], old_tuple, new_tuple, mode,
-				&old_tuple, &successor) != 0)
+				&results) != 0)
 		return -1;
+	struct memtx_index_replace_result *replace_result =
+		rlist_first_entry(&results, struct memtx_index_replace_result,
+				  link);
+	old_tuple = replace_result->replaced.tuple;
 	memtx_space_update_tuple_stat(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
+	memtx_index_replace_results_cleanup(space->index[0], &results);
+	region_truncate(&fiber()->gc, region_svp);
 	return 0;
 }
 
@@ -1032,23 +1039,6 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 			 "'aggregates' option");
 		return -1;
 	}
-
-	/* Checks for memtx MVCC unsupported features. */
-	if (memtx_tx_manager_use_mvcc_engine) {
-		if (key_def->is_multikey) {
-			diag_set(ClientError, ER_UNSUPPORTED,
-				 "Memtx MVCC engine", "multikey indexes");
-			return -1;
-		}
-		/*
-		 * Also, functional multikey indexes are not supported,
-		 * corresponding check can be found in a routine checking
-		 * functions for functional indexes - we can't do the check
-		 * here, see descriptions of `key_def::is_multikey` and
-		 * `key_def::func_index_func` for details.
-		 */
-	}
-
 	return 0;
 }
 
@@ -1325,9 +1315,6 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 	rlist_del_entry(trigger, in_state);
 	assert(stmt != NULL);
 
-	struct tuple *delete = NULL;
-	struct tuple *successor = NULL;
-
 	struct memtx_stmt_rollback_info *undo =
 		(typeof(undo))stmt->engine_savepoint;
 	struct tuple *old_tuple;
@@ -1354,8 +1341,7 @@ memtx_build_on_replace_rollback(struct trigger *base, void *event)
 		 */
 		state->rc = memtx_index_replace(state->index,
 						undo->new_tuple, old_tuple,
-						DUP_REPLACE_OR_INSERT,
-						&delete, &successor);
+						DUP_REPLACE_OR_INSERT, NULL);
 		if (state->rc != 0) {
 			diag_move(diag_get(), &state->diag);
 			return 0;
@@ -1420,13 +1406,10 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 			return 0;
 		}
 
-		struct tuple *delete = NULL;
 		enum dup_replace_mode mode = state->index->def->opts.is_unique ?
 					     DUP_INSERT : DUP_REPLACE_OR_INSERT;
-		struct tuple *successor;
 		state->rc = memtx_index_replace(state->index, old_tuple,
-						undo->new_tuple, mode,
-						&delete, &successor);
+						undo->new_tuple, mode, NULL);
 		if (state->rc != 0) {
 			diag_move(diag_get(), &state->diag);
 			return 0;
@@ -1575,14 +1558,10 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		/*
 		 * @todo: better message if there is a duplicate.
 		 */
-		struct tuple *old_tuple;
-		struct tuple *successor;
 		rc = memtx_index_replace(new_index, NULL, tuple, DUP_INSERT,
-					 &old_tuple, &successor);
+					 NULL);
 		if (rc != 0)
 			break;
-		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
-		(void) old_tuple;
 		ERROR_INJECT_DOUBLE(ERRINJ_BUILD_INDEX_TIMEOUT, inj->dparam > 0,
 				    thread_sleep(inj->dparam));
 		/*
