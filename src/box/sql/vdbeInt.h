@@ -328,7 +328,12 @@ int sqlVdbeCursorRestore(VdbeCursor *);
 void sqlVdbePrintOp(FILE *, int, Op *);
 #endif
 
-int sqlVdbeExec(Vdbe *);
+/*
+ * Execute as much of a VDBE program as we can.
+ * This is the core of sql_step().
+ */
+int
+sqlVdbeExec(Vdbe *, const struct sql_bind *, uint32_t);
 int sqlVdbeList(Vdbe *);
 
 int sqlVdbeHalt(Vdbe *);

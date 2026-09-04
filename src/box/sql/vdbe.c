@@ -56,6 +56,7 @@
 #include "box/space.h"
 #include "box/sequence.h"
 #include "box/session_settings.h"
+#include "box/bind.h"
 
 #ifdef SQL_DEBUG
 
@@ -356,7 +357,8 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
  * Execute as much of a VDBE program as we can.
  * This is the core of sql_step().
  */
-int sqlVdbeExec(Vdbe *p)
+int
+sqlVdbeExec(Vdbe *p, const struct sql_bind *bind, uint32_t bind_count)
 {
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
@@ -861,16 +863,92 @@ case OP_Blob: {                /* out2 */
  */
 case OP_Variable: {            /* out2 */
 	Mem *pVar;       /* Value being transferred */
-
 	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
-	pVar = &p->aVar[pOp->p1 - 1];
+	bool flag = false;
+	if ((pOp->p4.z != NULL) && (pOp->p4.z[0] == '$')) {
+		flag = true;
+		if ((uint32_t)pOp->p1 <= bind_count) {
+			pVar = sql_xmalloc(sizeof(Mem));
+			mem_create(pVar);
+			uint32_t pos = pOp->p1 - 1;
+			switch (bind[pos].type) {
+			case MP_INT:
+				mem_set_int(pVar, bind[pos].i64);
+				break;
+			case MP_UINT:
+				mem_set_uint(pVar, bind[pos].i64);
+				break;
+			case MP_BOOL:
+				mem_set_bool(pVar, bind[pos].b);
+				break;
+			case MP_DOUBLE:
+			case MP_FLOAT:
+				mem_set_double(pVar, bind[pos].d);
+				break;
+			case MP_STR:
+				/*
+				 * Parameters are allocated within message pack,
+				 * received from the iproto thread.
+				 * IProto thread now is waiting for the response
+				 * and it will not free the packet
+				 * until sql_stmt_finalize. So there is no need
+				 * to copy the packet and we can use SQL_STATIC.
+				 */
+				mem_set_str_static(pVar, (char *)bind[pos].s,
+						   bind[pos].bytes);
+				break;
+			case MP_NIL:
+				break;
+			case MP_BIN:
+				mem_set_bin_static(pVar, (char *)bind[pos].s,
+						   bind[pos].bytes);
+				break;
+			case MP_ARRAY:
+				mem_set_array_static(pVar, (char *)bind[pos].s,
+						     bind[pos].bytes);
+				break;
+			case MP_MAP:
+				mem_set_map_static(pVar, (char *)bind[pos].s,
+						   bind[pos].bytes);
+				break;
+			case MP_EXT:
+				switch (bind[pos].ext_type) {
+				case MP_UUID:
+					mem_set_uuid(pVar, &bind[pos].uuid);
+					break;
+				case MP_DECIMAL:
+					mem_set_dec(pVar, &bind[pos].dec);
+					break;
+				case MP_DATETIME:
+					mem_set_datetime(pVar, &bind[pos].dt);
+					break;
+				case MP_INTERVAL:
+					mem_set_interval(pVar, &bind[pos].itv);
+					break;
+				default:
+					unreachable();
+					break;
+				}
+				break;
+			default:
+				unreachable();
+			}
+		} else {
+			pVar = sql_xmalloc(sizeof(Mem));
+			mem_create(pVar);
+		}
+	} else {
+		pVar = &p->aVar[pOp->p1 - 1];
+	}
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;
 	}
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	mem_copy_as_ephemeral(pOut, pVar);
 	UPDATE_MAX_BLOBSIZE(pOut);
+	if (flag) {
+		sql_xfree(pVar);
+	}
 	break;
 }
 

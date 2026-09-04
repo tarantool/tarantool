@@ -2202,7 +2202,8 @@ is_upcast(int op, enum field_type a, enum field_type b)
 static inline bool
 is_castable(int op, enum field_type a, enum field_type b)
 {
-	return is_upcast(op, a, b) || op == TK_VARIABLE || op == TK_ID ||
+	return is_upcast(op, a, b) || sql_token_is_variable(op) ||
+	       op == TK_ID ||
 	       (sql_type_is_numeric(a) && sql_type_is_numeric(b)) ||
 	       b == FIELD_TYPE_ANY;
 }
@@ -2550,7 +2551,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	if (sql_bind_ptr(stmt, 1, ref) != 0)
 		goto error;
 
-	if (sql_step(stmt) != SQL_ROW)
+	if (sql_step(stmt, NULL, 0) != SQL_ROW)
 		goto error;
 
 	uint32_t res_size;
@@ -2559,7 +2560,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 		goto error;
 	port_c_add_mp(ret, pos, pos + res_size);
 
-	if (sql_step(stmt) != SQL_DONE)
+	if (sql_step(stmt, NULL, 0) != SQL_DONE)
 		goto error;
 
 	sql_stmt_reset(stmt);
