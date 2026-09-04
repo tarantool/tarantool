@@ -1991,16 +1991,11 @@ struct Parse {
 	/* Id of field with <AUTOINCREMENT>. */
 	int *autoinc_fieldno;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
-	/** If set - do not emit byte code at all, just parse.  */
-	bool parse_only;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
 	uint32_t sql_flags;
-	/**
-	 * Members of this union are valid only
-	 * if parse_only is set to true.
-	 */
+	/** Objects used for functions, views, and triggers creation. */
 	union {
 		struct Expr *expr;
 		struct Select *select;

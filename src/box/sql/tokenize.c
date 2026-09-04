@@ -472,7 +472,7 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}
-	if (!parse->is_aborted && !parse->parse_only)
+	if (!parse->is_aborted && parse->parsed_ast_type == AST_TYPE_UNDEFINED)
 		sql_finish_coding(parse);
 }
 
@@ -568,6 +568,13 @@ sql_parse_function(struct Parse *parser, const char *sql)
 	assert(parser->parsed_ast_type == AST_TYPE_EXPR);
 	struct Expr *res = parser->parsed_ast.expr;
 	parser->parsed_ast.expr = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in functions");
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
+	}
 	return res;
 }
 
@@ -579,6 +586,13 @@ sql_parse_view(struct Parse *parser, const char *sql)
 	assert(parser->parsed_ast_type == AST_TYPE_SELECT);
 	struct Select *res = parser->parsed_ast.select;
 	parser->parsed_ast.select = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in views");
+		parser->is_aborted = true;
+		sql_select_delete(res);
+		return NULL;
+	}
 	return res;
 }
 
@@ -590,5 +604,12 @@ sql_parse_trigger(struct Parse *parser, const char *sql)
 	assert(parser->parsed_ast_type == AST_TYPE_TRIGGER);
 	struct sql_trigger *res = parser->parsed_ast.trigger;
 	parser->parsed_ast.trigger = NULL;
+	if (parser->nVar > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "Parameters are not allowed in triggers");
+		parser->is_aborted = true;
+		sql_trigger_delete(res);
+		return NULL;
+	}
 	return res;
 }
