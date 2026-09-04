@@ -1144,9 +1144,9 @@ local function load_cfg(cfg)
         cfg = {}
     elseif type(cfg) ~= 'table' then
         error("Error: cfg should be a table")
+    else
+        cfg = table.copy(cfg)
     end
-
-    cfg = upgrade_cfg(cfg, translate_cfg)
 
     -- Forced recovery can be envoked by CLI options. Set the appropriate
     -- box_cfg option in this case.
@@ -1156,6 +1156,8 @@ local function load_cfg(cfg)
 
     -- Set options passed through environment variables.
     apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
+
+    cfg = upgrade_cfg(cfg, translate_cfg)
 
     cfg = prepare_cfg(cfg, pre_load_cfg, default_cfg, template_cfg, modify_cfg)
 
