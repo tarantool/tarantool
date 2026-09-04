@@ -244,9 +244,11 @@ local options = {
         brief = FIBER_SLICE_DEFAULT_BRIEF,
         action = function(is_new)
             local slice = TIMEOUT_INFINITY
-            -- ASAN build is slow. Turn slice check off to suppress noisy
-            -- failures on exceeding slice limit in this case.
-            if is_new and not tarantool.build.asan then
+            -- ASAN and TSAN builds are slow. Turn slice check off to
+            -- suppress noisy failures on exceeding slice limit in this
+            -- case.
+            if is_new and not tarantool.build.asan and
+               not tarantool.build.tsan then
                 slice = {warn = 0.5, err = 1.0}
             end
             require('fiber').set_max_slice(slice)

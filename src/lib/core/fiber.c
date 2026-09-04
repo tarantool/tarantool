@@ -52,10 +52,10 @@ extern void cord_on_yield(void);
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
 
 /**
- * ASAN build is slow. Turn slice check off to suppress noisy failures
- * on exceeding slice limit in this case.
+ * ASAN and TSAN builds are slow. Turn slice check off to suppress noisy
+ * failures on exceeding slice limit in this case.
  */
-#if ENABLE_ASAN
+#if ENABLE_ASAN || ENABLE_TSAN
 static struct fiber_slice default_slice = {
 	.warn = TIMEOUT_INFINITY,
 	.err = TIMEOUT_INFINITY,
