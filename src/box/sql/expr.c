@@ -1061,7 +1061,9 @@ sql_expr_new_dequoted(int op, const struct Token *token)
 	e->u.zToken[token->n] = '\0';
 	sqlDequote(e->u.zToken);
 	if (op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION)
-		e->flags |= token->z[0] != '"' ? EP_Lookup2 : 0;
+		e->flags |= (token->z[0] != '"' &&
+			     sql_uppercase_id) ?
+			    EP_Lookup2 : 0;
 	return e;
 }
 

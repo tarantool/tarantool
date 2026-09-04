@@ -213,6 +213,13 @@
 #include <assert.h>
 #include <stddef.h>
 
+/**
+ * Then value true: if exact match search for ID failed,
+ * the ID is searched for using its uppercase version.
+ * Then value false: ID is searched for using only exact match.
+ */
+extern bool sql_uppercase_id;
+
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;

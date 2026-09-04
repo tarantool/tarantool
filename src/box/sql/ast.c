@@ -332,7 +332,7 @@ expr_id(struct ast_expr *expr)
 	t.isReserved = false;
 	struct Expr *res = sql_expr_new_dequoted(expr->op, &t);
 	res->type = FIELD_TYPE_SCALAR;
-	if (expr->str[0] != '"')
+	if (expr->str[0] != '"' && sql_uppercase_id)
 		res->flags |= EP_Lookup2;
 	return res;
 }

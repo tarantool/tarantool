@@ -459,6 +459,7 @@ g.test_defaults = function()
             box_space_max = 'new',
             box_error_unpack_type_and_code = 'old',
             console_session_scope_vars = 'old',
+            sql_uppercase_id = "old",
             wal_cleanup_delay_deprecation = 'old',
             box_recovery_triggers_deprecation = 'old',
             skip_replication_names = 'new',
