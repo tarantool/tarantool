@@ -297,6 +297,26 @@ local function stop_roles(roles_to_skip)
         health.remove_health_check(('role.%s'):format(role_name), {
             if_exists = true,
         })
+        -- A yielding on_event callback may retain references to these tables.
+        local last_loaded = table.copy(roles_state.last_loaded)
+        local last_roles_ordered = table.copy(roles_state.last_roles_ordered)
+        local last_roles_cfg = roles_state.last_roles_cfg
+        if last_roles_cfg ~= nil then
+            last_roles_cfg = table.copy(last_roles_cfg)
+        end
+        last_loaded[role_name] = nil
+        if last_roles_cfg ~= nil then
+            last_roles_cfg[role_name] = nil
+        end
+        for id = #last_roles_ordered, 1, -1 do
+            if last_roles_ordered[id] == role_name then
+                table.remove(last_roles_ordered, id)
+                break
+            end
+        end
+        roles_state.last_loaded = last_loaded
+        roles_state.last_roles_ordered = last_roles_ordered
+        roles_state.last_roles_cfg = last_roles_cfg
     end
 end
 
