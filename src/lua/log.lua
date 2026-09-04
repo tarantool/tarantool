@@ -408,6 +408,11 @@ end
 
 local function log_configure(self, cfg, box_api)
     if not box_api then
+        if cfg == nil then
+            cfg = {}
+        elseif type(cfg) ~= 'table' then
+            error("Error: cfg should be a table")
+        end
         if not log_initialized then
             local env_cfg = box.internal.env_cfg(box2log_keys)
             box.internal.apply_env_cfg(cfg, box_to_log_cfg(env_cfg))
