@@ -1255,6 +1255,27 @@ local function normalize_covers(covers, format, what, level)
     return result
 end
 
+-- Recursively normalize field identifiers inside a predicate expression.
+-- Leaves: {op, field_identifier, value} -> field_identifier is converted to
+-- 0-based index via normalize_field().
+-- Conjunctions: {'&&', child, ...} -> recurse into each child.
+-- expr is mutated in place (caller has already deep-copied the aggregate).
+local function normalize_predicate(expr, format, what, i, level)
+    local field_ref = what .. '[' .. i .. ']: '
+    if type(expr) ~= 'table' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  field_ref .. 'predicate must be an array', level + 1)
+    end
+    if expr[1] == '&&' then
+        for j = 2, #expr do
+            normalize_predicate(expr[j], format, what, i, level)
+        end
+    else
+        -- Leaf: {op, field_identifier, value}
+        expr[2] = normalize_field(expr[2], format, what, i, level + 1)
+    end
+end
+
 -- Normalize array of aggregates `aggregates`: all fields are normalized.
 local function normalize_aggregates(aggregates, format, what, level)
     -- Do not much care if opts.aggregates is something strange like
@@ -1265,6 +1286,10 @@ local function normalize_aggregates(aggregates, format, what, level)
         if type(aggregate) == 'table' and aggregate.field ~= nil then
             result[i].field = normalize_field(aggregate.field, format, what, i,
                                               level + 1)
+        end
+        if type(aggregate) == 'table' and aggregate.type == 'predicate' and
+                aggregate.predicate ~= nil then
+            normalize_predicate(result[i].predicate, format, what, i, level + 1)
         end
     end
     return result
