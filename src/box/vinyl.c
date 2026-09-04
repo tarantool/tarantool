@@ -2085,20 +2085,24 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 	return rc;
 }
 
+/** Normalize update operations before storing them in a Vinyl statement. */
 static int
-request_normalize_ops(struct request *request)
+request_normalize_ops(struct request *request, struct tuple_format *format)
 {
 	assert(request->type == IPROTO_UPSERT ||
 	       request->type == IPROTO_UPDATE);
-	assert(request->index_base != 0);
-	char *ops;
 	ssize_t ops_len = request->ops_end - request->ops;
-	ops = (char *)region_alloc(&fiber()->gc, ops_len);
+	const char *pos = request->ops;
+	int op_cnt = mp_decode_array(&pos);
+	/*
+	 * A field name is replaced with a field number, which may require up to
+	 * four extra bytes per operation.
+	 */
+	size_t max_ops_len = ops_len + op_cnt * sizeof(uint32_t);
+	char *ops = region_alloc(&fiber()->gc, max_ops_len);
 	if (ops == NULL)
 		return -1;
 	char *ops_end = ops;
-	const char *pos = request->ops;
-	int op_cnt = mp_decode_array(&pos);
 	ops_end = mp_encode_array(ops_end, op_cnt);
 	int op_no = 0;
 	for (op_no = 0; op_no < op_cnt; ++op_no) {
@@ -2111,6 +2115,7 @@ request_normalize_ops(struct request *request)
 
 		int field_no;
 		const char *field_name;
+		uint32_t field_name_len, field_id, hash;
 		switch (mp_typeof(*pos)) {
 		case MP_INT:
 			field_no = mp_decode_int(&pos);
@@ -2127,10 +2132,16 @@ request_normalize_ops(struct request *request)
 			ops_end = mp_encode_uint(ops_end, field_no);
 			break;
 		case MP_STR:
-			field_name = pos;
-			mp_next(&pos);
-			memcpy(ops_end, field_name, pos - field_name);
-			ops_end += pos - field_name;
+			field_name = mp_decode_str(&pos, &field_name_len);
+			hash = field_name_hash(field_name, field_name_len);
+			if (tuple_fieldno_by_name(format->dict, field_name,
+						  field_name_len, hash,
+						  &field_id) == 0) {
+				ops_end = mp_encode_uint(ops_end, field_id);
+			} else {
+				ops_end = mp_encode_str(ops_end, field_name,
+							field_name_len);
+			}
 			break;
 		default:
 			unreachable();
@@ -2206,10 +2217,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		error_set_space(diag_last_error(diag_get()), space->def);
 		return -1;
 	}
-	if (request->index_base != 0) {
-		if (request_normalize_ops(request))
-			return -1;
-	}
+	if (request_normalize_ops(request, pk->format))
+		return -1;
 	assert(request->index_base == 0);
 	const char *tuple = request->tuple;
 	const char *tuple_end = request->tuple_end;
