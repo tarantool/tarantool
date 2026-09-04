@@ -152,6 +152,39 @@ test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
                                     --server-start-timeout 610
 test-debug-asan: build run-luajit-test run-test
 
+# *_TSAN variables are common part of respective variables for all TSAN builds.
+CMAKE_PARAMS_TSAN = -DENABLE_WERROR=ON \
+                    -DENABLE_TSAN=ON \
+                    -DENABLE_UB_SANITIZER=ON \
+                    -DTEST_BUILD=ON
+
+# The crash handler intentionally performs async-signal-unsafe operations
+# while collecting and symbolizing a backtrace. TSAN otherwise floods stderr
+# with thousands of reports and may deadlock tests waiting for a crashing
+# child process because its stderr pipe fills up. The signal-safety check is
+# disabled, but data race detection remains enabled. Limit TSAN's memory usage
+# to keep memory-heavy tests from invoking the OOM killer on CI runners.
+TEST_RUN_ENV_TSAN = TSAN_OPTIONS="suppressions=${PWD}/asan/tsan.supp report_signal_unsafe=0 memory_limit_mb=4000"
+
+# Debug TSAN build
+
+.PHONY: test-debug-tsan
+test-debug-tsan: CMAKE_PARAMS = ${CMAKE_PARAMS_TSAN} \
+                                -DCMAKE_BUILD_TYPE=Debug
+test-debug-tsan: TEST_RUN_ENV = ${TEST_RUN_ENV_TSAN}
+test-debug-tsan: LUAJIT_TEST_ENV = ${TEST_RUN_ENV_TSAN}
+# Increase timeouts as some tests in TSAN debug build take quite a lot
+# of time to finish.
+test-debug-tsan: TEST_RUN_PARAMS += --test-timeout 620 \
+                                    --no-output-timeout 630 \
+                                    --server-start-timeout 610
+# TSAN's shadow memory multiplies each test's RSS several times, so the
+# default parallelism (2 * cpu_count) makes concurrent tests exhaust the
+# CI runner's RAM and get the whole job OOM-killed (exit code 137). Cap the
+# number of parallel workers to keep the total memory usage bounded.
+test-debug-tsan: TEST_RUN_PARAMS += --jobs 3
+test-debug-tsan: build run-test
+
 # Debug build
 
 .PHONY: test-debug
