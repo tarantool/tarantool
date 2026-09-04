@@ -1154,6 +1154,9 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
 end
 
 local function reload_cfg(oldcfg, cfg)
+    if cfg ~= nil and type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
     cfg = upgrade_cfg(cfg, translate_cfg, oldcfg)
     local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
                                modify_cfg)
@@ -1254,6 +1257,8 @@ local function load_cfg(cfg)
 
     if cfg == nil then
         cfg = {}
+    elseif type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
     end
 
     -- Forced recovery can be envoked by CLI options. Set the appropriate
