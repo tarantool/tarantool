@@ -1290,9 +1290,10 @@ typedef int ynVar;
  *
  * If the expression is an SQL literal (TK_INTEGER, TK_FLOAT, TK_BLOB,
  * or TK_STRING), then Expr.token contains the text of the SQL literal. If
- * the expression is a variable (TK_VARIABLE), then Expr.token contains the
- * variable name. Finally, if the expression is an SQL function (TK_FUNCTION),
- * then Expr.token contains the name of the function.
+ * the expression is a variable (TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON),
+ * then Expr.token contains the variable name. Finally, if the expression
+ * is an SQL function (TK_FUNCTION), then Expr.token contains the name of
+ * the function.
  *
  * Expr.pRight and Expr.pLeft are the left and right subexpressions of a
  * binary operator. Either or both may be NULL.
@@ -1382,7 +1383,8 @@ struct Expr {
 				 * TK_SELECT: 1st register of result vector
 				 */
 	ynVar iColumn;		/* TK_COLUMN_REF: column index.
-				 * TK_VARIABLE: variable number (always >= 1).
+				 * TK_VAR_NAME or TK_VAR_NUM or TK_VAR_ANON:
+				 * variable number (always >= 1).
 				 * TK_SELECT_COLUMN: column of the result vector
 				 */
 	i16 iAgg;		/* Which entry in pAggInfo->aCol[] or ->aFunc[] */
@@ -2595,16 +2597,33 @@ Expr *sqlExprFunction(Parse *, ExprList *, Token *);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 
+/** Check if the token type denotes a bind variable. */
+static inline bool
+sql_token_is_variable(int op)
+{
+	return op == TK_VAR_NAME || op == TK_VAR_NUM || op == TK_VAR_ANON;
+}
+
 /**
- * Parse tokens as a name or a position of bound variable.
+ * pColumns and pExpr form a vector assignment which is part of the SET
+ * clause of an UPDATE statement.  Like this:
  *
  * @param parse Parse context.
  * @param spec Special symbol for bound variable.
  * @param id Name or position number of bound variable.
  */
+/** Create new named variable. */
 struct Expr *
-expr_new_variable(struct Parse *parse, const struct Token *spec,
+expr_new_var_name(struct Parse *parse, const struct Token *spec,
 		  const struct Token *id);
+
+/** Create new numeric variable. */
+struct Expr *
+expr_new_var_num(struct Parse *parse, const struct Token *spec);
+
+/** Create new anonymous variable. */
+struct Expr *
+expr_new_var_anon(struct Parse *parse, const struct Token *id);
 
 /** Return TRUE if expression is term, FALSE otherwise. */
 static inline bool
