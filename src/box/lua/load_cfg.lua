@@ -901,7 +901,12 @@ end
 -- not 1-to-1, then a function can be used. It takes 2 parameters:
 -- value of the old option, value of the new if present. It
 -- returns two values - value to replace the old option and to
--- replace the new one.
+-- replace the new one. The optional third element is a function
+-- which takes the value of the old option and the effective value
+-- of the new one (from the same box.cfg call or from the already
+-- applied config), and tells whether the deprecation warning
+-- should be logged. When it is omitted, the warning is always
+-- logged.
 local translate_cfg = {
     snapshot_count = {'checkpoint_count'},
     snapshot_period = {'checkpoint_interval'},
@@ -935,11 +940,13 @@ local translate_cfg = {
         elseif old ~= nil then
             return old, 'legacy'
         end
+    end, function(_, new)
+        return new ~= 'legacy'
     end},
 }
 
--- Upgrade old config
-local function upgrade_cfg(cfg, translate_cfg)
+-- Upgrade old config. The oldcfg is the already applied config, if any.
+local function upgrade_cfg(cfg, translate_cfg, oldcfg)
     if cfg == nil then
         return {}
     end
@@ -949,8 +956,16 @@ local function upgrade_cfg(cfg, translate_cfg)
         if translation ~= nil then
             local new_key = translation[1]
             local transform = translation[2]
-            log.warn('Deprecated option %s, please use %s instead', k, new_key)
+            local warn = translation[3]
             local new_val_orig = cfg[new_key]
+            local new_val_eff = new_val_orig
+            if new_val_eff == nil and oldcfg ~= nil then
+                new_val_eff = oldcfg[new_key]
+            end
+            if warn == nil or warn(v, new_val_eff) then
+                local msg = 'Deprecated option %s, please use %s instead'
+                log.warn(msg, k, new_key)
+            end
             local old_val, new_val
             if transform == nil then
                 new_val = v
@@ -1139,7 +1154,7 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
 end
 
 local function reload_cfg(oldcfg, cfg)
-    cfg = upgrade_cfg(cfg, translate_cfg)
+    cfg = upgrade_cfg(cfg, translate_cfg, oldcfg)
     local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
                                modify_cfg)
     local module_keys = {}
