@@ -751,9 +751,6 @@ local translate_cfg = {
 
 -- Upgrade old config
 local function upgrade_cfg(cfg, translate_cfg)
-    if cfg == nil then
-        return {}
-    end
     local result_cfg = {}
     for k, v in pairs(cfg) do
         local translation = translate_cfg[k]
@@ -801,11 +798,6 @@ local function check_cfg_option_type(template, name, value)
 end
 
 local function prepare_cfg(cfg, old_cfg, default_cfg, template_cfg, modify_cfg)
-    if cfg == nil then
-        cfg = {}
-    elseif type(cfg) ~= 'table' then
-        error("Error: cfg should be a table")
-    end
     local new_cfg = {}
     for k, v in pairs(cfg) do
         if template_cfg[k] == nil then
@@ -933,6 +925,11 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
 end
 
 local function reload_cfg(oldcfg, cfg)
+    if cfg == nil then
+        cfg = {}
+    elseif type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
     cfg = upgrade_cfg(cfg, translate_cfg)
     local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
                                modify_cfg)
@@ -1024,6 +1021,12 @@ local function load_cfg(cfg)
     if box_is_configured then
         reload_cfg(raw_cfg, cfg)
         return
+    end
+
+    if cfg == nil then
+        cfg = {}
+    elseif type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
     end
 
     cfg = upgrade_cfg(cfg, translate_cfg)
