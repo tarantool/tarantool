@@ -120,7 +120,7 @@ parameters[1] = 11
 parameters[2] = 22
 parameters[3] = 33
 cn:execute('select $2, $1, $3', parameters)
-cn:execute('select * from test where id = :1', {1})
+cn:execute('select * from test where id = $1', {1})
 
 -- gh-2602 obuf_alloc breaks the tuple in different slabs
 _ = space:replace{1, 1, string.rep('a', 4 * 1024 * 1024)}
