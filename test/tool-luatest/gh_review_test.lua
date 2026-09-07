@@ -181,7 +181,8 @@ spec.loader.exec_module(m)
 print(json.dumps(%s))
 ]]):format(json.encode(TOOL), expr)
     local ph = popen.new({PYTHON, '-c', script},
-                         {env = {PATH = os.getenv('PATH')},
+                         {env = {PATH = os.getenv('PATH'),
+                                 PYTHONDONTWRITEBYTECODE = '1'},
                           stdout = popen.opts.PIPE,
                           stderr = popen.opts.PIPE})
     t.assert(ph)
