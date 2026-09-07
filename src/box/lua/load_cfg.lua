@@ -901,7 +901,8 @@ end
 -- not 1-to-1, then a function can be used. It takes 2 parameters:
 -- value of the old option, value of the new if present. It
 -- returns two values - value to replace the old option and to
--- replace the new one.
+-- replace the new one. The optional third returned value tells
+-- whether the deprecation warning should be suppressed.
 local translate_cfg = {
     snapshot_count = {'checkpoint_count'},
     snapshot_period = {'checkpoint_interval'},
@@ -931,7 +932,8 @@ local translate_cfg = {
     end},
     replication_connect_quorum = {'bootstrap_strategy', function(old, new)
         if new ~= nil then
-            return old, new
+            -- Do not log the warning, if strategy is 'legacy' in that box.cfg.
+            return old, new, new == 'legacy'
         elseif old ~= nil then
             return old, 'legacy'
         end
@@ -946,13 +948,16 @@ local function upgrade_cfg(cfg, translate_cfg)
         if translation ~= nil then
             local new_key = translation[1]
             local transform = translation[2]
-            log.warn('Deprecated option %s, please use %s instead', k, new_key)
             local new_val_orig = cfg[new_key]
-            local old_val, new_val
+            local old_val, new_val, no_warning
             if transform == nil then
                 new_val = v
             else
-                old_val, new_val = transform(v, new_val_orig)
+                old_val, new_val, no_warning = transform(v, new_val_orig)
+            end
+            if not no_warning then
+                log.warn('Deprecated option %s, please use %s instead',
+                         k, new_key)
             end
             if new_val_orig ~= nil and
                new_val_orig ~= new_val then
