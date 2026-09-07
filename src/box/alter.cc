@@ -64,6 +64,7 @@
 #include "relay.h"
 #include "gc.h"
 #include "memtx_tx.h"
+#include "memcs_engine.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -4311,6 +4312,13 @@ on_commit_dd_version(struct trigger *trigger, void * /* event */)
 	struct fiber *fiber = data->fiber;
 	if (fiber != NULL)
 		fiber_wakeup(fiber);
+
+	if (recovery_state == FINISHED_RECOVERY) {
+		bool memcs_use_columnar_snapshot =
+			dd_version_id >= version_id(3, 9, 0);
+		memcs_engine_set_columnar_snapshot(memcs_use_columnar_snapshot);
+	}
+
 	box_broadcast_status();
 	return 0;
 }

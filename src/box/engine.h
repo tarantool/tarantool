@@ -221,6 +221,12 @@ struct engine_vtab {
 	int (*begin_initial_recovery)(struct engine *engine,
 			const struct vclock *recovery_vclock);
 	/**
+	 * Recover the engine's snapshot for the checkpoint identified by
+	 * @vclock. On remote recovery (no local snapshot) @vclock is NULL.
+	 */
+	int (*recover_snapshot)(struct engine *engine,
+			const struct vclock *vclock);
+	/**
 	 * Notify engine about a start of recovering from WALs
 	 * that could be local WALs during local recovery
 	 * of WAL catch up durin join on slave side
@@ -503,6 +509,12 @@ int
 engine_begin_initial_recovery(const struct vclock *recovery_vclock);
 
 /**
+ * Recover the snapshot of all engines for the given checkpoint.
+ */
+int
+engine_recover_snapshot(const struct vclock *vclock);
+
+/**
  * Called in the middle of JOIN stage,
  * when xlog catch-up process is started
  */
@@ -578,6 +590,7 @@ void generic_engine_abort_with_conflict(struct engine *, struct txn *);
 int generic_engine_bootstrap(struct engine *);
 int generic_engine_begin_initial_recovery(struct engine *,
 					  const struct vclock *);
+int generic_engine_recover_snapshot(struct engine *, const struct vclock *);
 int generic_engine_begin_final_recovery(struct engine *);
 int generic_engine_begin_hot_standby(struct engine *);
 int generic_engine_end_recovery(struct engine *);
@@ -608,6 +621,13 @@ static inline void
 engine_begin_initial_recovery_xc(const struct vclock *recovery_vclock)
 {
 	if (engine_begin_initial_recovery(recovery_vclock) != 0)
+		diag_raise();
+}
+
+static inline void
+engine_recover_snapshot_xc(const struct vclock *vclock)
+{
+	if (engine_recover_snapshot(vclock) != 0)
 		diag_raise();
 }
 
