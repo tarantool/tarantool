@@ -454,6 +454,16 @@ local dependencies_registry = {
             end
         end,
     },
+    {
+        type = 'submodule',
+        upstream = 'nghttp2/nghttp2',
+        path = 'third_party/nghttp2',
+        dependencies_yaml_name = 'nghttp2',
+        filter_tag = '^v%d+%.%d+%.%d+$',
+        tag_to_version = function(tag)
+            return tag:gsub('^v', ''):split('.')
+        end,
+    },
 }
 
 for _, upstream_def in ipairs(dependencies_registry) do
