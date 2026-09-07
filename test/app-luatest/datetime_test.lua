@@ -2932,3 +2932,198 @@ g_ghs_146_stack_overflow.test_many_zones_pollutes_stack = function()
 end
 
 -- }}} ghs-146 stack overflow test.
+
+-- {{{ Compat option for applying timezones test (gh-10363).
+
+-- The listed timezones must not use DST at the moment and must
+-- have whole-hour offsets: the expected hour values below are
+-- calculated by adding the offsets converted to hours.
+local TIMEZONES = {
+    {
+        tzname = 'Europe/Moscow',
+        tzoffset = 180,
+    },
+    {
+        tzname = 'Africa/Abidjan',
+        tzoffset = 0,
+    },
+    {
+        tzname = 'America/Argentina/Buenos_Aires',
+        tzoffset = -180,
+    },
+    {
+        tzname = 'Asia/Krasnoyarsk',
+        tzoffset = 420,
+    },
+    {
+        tzname = 'Pacific/Fiji',
+        tzoffset = 720,
+    }
+}
+
+local function tz_behavior_test_case(behavior, create_dt, expected)
+    return function()
+        t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
+        compat.datetime_apply_timezone_action = behavior
+
+        local dt_obj = create_dt()
+
+        t.assert_equals(dt_obj.hour, expected.hour)
+        t.assert_equals(dt_obj.timestamp, expected.timestamp)
+    end
+end
+
+-- Test new/old behavior of applying timezone to datetime objects
+-- (gh-10363).
+for _, case in ipairs(TIMEZONES) do
+    local function add_test_case(method, behavior, ...)
+        local testcase_name = ('test_tz_behavior_%s_%s_%s')
+            :format(method, case.tzname:gsub('/', '_'), behavior)
+        pg[testcase_name] = tz_behavior_test_case(behavior, ...)
+    end
+
+    local now = dt.now()
+
+    -- Ensure the hardcoded offset is still correct for the
+    -- timezone, it may change with a tzdata update.
+    assert(dt.new{timestamp = now.timestamp, tz = case.tzname}.tzoffset ==
+           case.tzoffset, ('outdated tzoffset for %s'):format(case.tzname))
+
+    -- Note the following when using old behavior.
+    --
+    -- `datetime.new{timestamp = now.timestamp,
+    --               tzoffset = now.tzoffset}`
+    -- creates a datetime object representing time of day in GMT+0
+    -- corresponding to `now` time of day within the provided
+    -- timezone instead of creating a complete `now` copy.
+    local old_expected = {
+        hour = (now.hour - now.tzoffset / 60) % 24,
+        timestamp = now.timestamp - case.tzoffset * 60,
+    }
+    local new_expected = {
+        hour = (now.hour + (case.tzoffset - now.tzoffset) / 60) % 24,
+        timestamp = now.timestamp,
+    }
+
+    local create_dt = function()
+        return dt.new{timestamp = now.timestamp, tzoffset = case.tzoffset}
+    end
+    add_test_case('create_tzoffset', 'old', create_dt, old_expected)
+    add_test_case('create_tzoffset', 'new', create_dt, new_expected)
+
+    create_dt = function()
+        return dt.new{timestamp = now.timestamp, tz = case.tzname}
+    end
+    add_test_case('create_tzname', 'old', create_dt, old_expected)
+    add_test_case('create_tzname', 'new', create_dt, new_expected)
+
+    create_dt = function()
+        return dt.new{timestamp = now.timestamp}:set{tzoffset = case.tzoffset}
+    end
+    add_test_case('set_tzoffset', 'old', create_dt, old_expected)
+    add_test_case('set_tzoffset', 'new', create_dt, new_expected)
+
+    create_dt = function()
+        return dt.new{timestamp = now.timestamp}:set{tz = case.tzname}
+    end
+    add_test_case('set_tzname', 'old', create_dt, old_expected)
+    add_test_case('set_tzname', 'new', create_dt, new_expected)
+
+    create_dt = function()
+        return dt.new{}:set{timestamp = now.timestamp,
+                            tzoffset = case.tzoffset}
+    end
+    add_test_case('set_timestamp_tzoffset', 'old', create_dt, old_expected)
+    add_test_case('set_timestamp_tzoffset', 'new', create_dt, new_expected)
+
+    create_dt = function()
+        return dt.new{}:set{timestamp = now.timestamp, tz = case.tzname}
+    end
+    add_test_case('set_timestamp_tzname', 'old', create_dt, old_expected)
+    add_test_case('set_timestamp_tzname', 'new', create_dt, new_expected)
+end
+
+-- Test new/old behavior of applying timezone when parsing
+-- datetime objects.
+-- Adapted from app-tap/datetime.test.lua (gh-10363).
+pg.test_new_tz_behavior_parse = function()
+    t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
+    compat.datetime_apply_timezone_action = 'new'
+
+    t.assert(dt.parse("1970-01-01T01:00:00Z") ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+    t.assert(dt.parse("1970-01-01T01:00:00Z", {format = 'iso8601'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+    t.assert(dt.parse("1970-01-01T01:00:00Z", {format = 'rfc3339'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0})
+    t.assert(dt.parse("2020-01-01T01:00:00+00:00", {format = 'rfc3339'}) ==
+            dt.parse("2020-01-01T01:00:00+00:00", {format = 'iso8601'}))
+    t.assert(dt.parse("1970-01-01T02:00:00+02:00") ==
+            dt.new{year=1970, mon=1, day=1, hour=2, min=0, sec=0, tzoffset=120})
+
+    t.assert(dt.parse("1970-01-01T01:00:00", {tzoffset = 120}) ==
+        dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+    t.assert(dt.parse("1970-01-01T01:00:00", {tzoffset = '+0200'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+    t.assert(dt.parse("1970-01-01T01:00:00", {tzoffset = '+02:00'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=120})
+    t.assert(dt.parse("1970-01-01T01:00:00Z", {tzoffset = '+02:00'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=0})
+    t.assert(dt.parse("1970-01-01T01:00:00+01:00", {tzoffset = '+02:00'}) ==
+            dt.new{year=1970, mon=1, day=1, hour=1, min=0, sec=0, tzoffset=60})
+    t.assert(dt.parse('1998-11-25', { format = '%Y-%m-%d', tzoffset = 180 }) ==
+            dt.new({ year = 1998, month = 11, day = 25, tzoffset = 180 }))
+    t.assert(dt.parse('1998', { format = '%Y', tzoffset = '+03:00' }) ==
+            dt.new({ year = 1998, tzoffset = 180 }))
+
+    -- Testcases with override timezone by setting tz.
+    -- Timezone is not specified in a parsed string.
+    t.assert(dt.parse("1970-01-01T01:00:00", {tz = "MSK"}) ==
+        dt.new{year = 1970, mon = 1, day = 1,
+               hour = 1, min = 0, sec = 0, tzoffset=180})
+    -- Timezone is specified in a parsed string as a military timezone.
+    t.assert(dt.parse("1970-01-01T01:00:00Z", {tz = "Europe/Moscow"}) ==
+        dt.new{year = 1970, mon = 1, day = 1,
+               hour = 1, min = 0, sec = 0, tzoffset = 0})
+    -- Timezone is specified in a parsed string as an offset.
+    t.assert(dt.parse("1970-01-01T01:00:00+01:00", {tz = "Asia/Omsk"}) ==
+        dt.new{year = 1970, mon = 1, day = 1,
+               hour = 1, min = 0, sec = 0, tzoffset = 60})
+    -- Timezone is not specified in a parsed string and format is passed.
+    t.assert(dt.parse("1998-11-25", { format = "%Y-%m-%d", tz = "MSK" }) ==
+        dt.new{year = 1998, month = 11, day = 25, tzoffset = 180})
+end
+
+-- Test the new behavior preserves the zero timestamp when only
+-- a timezone is provided to `new()`, so it stays equivalent to
+-- setting the timezone on a default datetime object (gh-10363).
+pg.test_new_tz_behavior_tz_only_new = function()
+    t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
+    compat.datetime_apply_timezone_action = 'new'
+
+    local d = dt.new{tz = 'MSK'}
+    t.assert_equals(d.timestamp, 0)
+    t.assert_equals(tostring(d), tostring(dt.new{}:set{tz = 'MSK'}))
+    t.assert_equals(tostring(d), '1970-01-01T03:00:00 MSK')
+
+    d = dt.new{tzoffset = 180}
+    t.assert_equals(d.timestamp, 0)
+    t.assert_equals(tostring(d), tostring(dt.new{}:set{tzoffset = 180}))
+    t.assert_equals(tostring(d), '1970-01-01T03:00:00+0300')
+end
+
+-- Test time units provided together with a timezone are applied
+-- to the wall clock time regardless of the compat option value
+-- (gh-10363).
+pg.test_tz_behavior_time_units_with_tz = function()
+    t.assert_equals(compat.datetime_apply_timezone_action.default, 'old')
+    for _, behavior in ipairs({'old', 'new'}) do
+        compat.datetime_apply_timezone_action = behavior
+        local d = dt.new{hour = 3, tz = 'MSK'}
+        t.assert_equals(tostring(d), '1970-01-01T03:00:00 MSK', behavior)
+        d = d:set{msec = 1, tzoffset = 6 * 60}
+        t.assert_equals(tostring(d), '1970-01-01T03:00:00.001+0600', behavior)
+    end
+end
+
+-- }}} Compat option for applying timezones test (gh-10363).
