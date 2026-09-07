@@ -214,6 +214,7 @@ local function write_file(dir, name, lines)
 end
 
 g.before_all(function(cg)
+    t.skip_if(not fio.path.exists(TOOL), 'gh-review.py is unavailable')
     -- popen.new() does not resolve the program name via PATH - find
     -- the interpreter's absolute path. Also skip when there is none.
     local ph = popen.shell('command -v ' .. PYTHON, 'r')
