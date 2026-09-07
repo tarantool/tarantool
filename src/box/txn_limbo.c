@@ -88,6 +88,30 @@ synchro_request_str(const struct synchro_request *req)
 	return TOSTR(synchro_request_snprint, req);
 }
 
+/**
+ * Log the rejection of the given synchro request with the error installed in
+ * the diag, and yield -1, so the callers could reject a request in a single
+ * 'return' statement.
+ */
+#define synchro_request_error(req) ({					\
+	say_error("RAFT: rejecting %s. %s", synchro_request_str(req),	\
+		  diag_last_error(diag_get())->errmsg);			\
+	-1;								\
+})
+
+/** Reject the given request as a split-brain with the given reason. */
+#define synchro_request_error_split_brain(req, ...) ({			\
+	diag_set(ClientError, ER_SPLIT_BRAIN, tt_sprintf(__VA_ARGS__));	\
+	synchro_request_error(req);					\
+})
+
+/** Reject the given request as an unsupported replication feature. */
+#define synchro_request_error_unsupported(req, ...) ({			\
+	diag_set(ClientError, ER_UNSUPPORTED, "Replication",		\
+		 tt_sprintf(__VA_ARGS__));				\
+	synchro_request_error(req);					\
+})
+
 /** Write the request into the journal and get its LSN. */
 static int64_t
 synchro_request_write(const struct synchro_request *req)
@@ -765,17 +789,6 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 					     timeout);
 }
 
-/**
- * Fill the reject reason with request data.
- * The function is not reenterable, use with care.
- * May crop at TT_STATIC_BUF_LEN.
- */
-static const char *
-reject_str(const struct synchro_request *req)
-{
-	return tt_sprintf("RAFT: rejecting %s", synchro_request_str(req));
-}
-
 /** Ensure request sees the correct limbo owner. */
 static int
 txn_limbo_filter_owner_match(struct txn_limbo *limbo,
@@ -790,11 +803,9 @@ txn_limbo_filter_owner_match(struct txn_limbo *limbo,
 		 * if it doesn't match it means the sender
 		 * missed limbo owner migrations and is out of date.
 		 */
-		say_error("%s. Limbo owner mismatch, owner_id %u",
-			  reject_str(req), limbo->queue.owner_id);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request from a foreign synchro queue owner");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a request from a foreign synchro queue "
+			"owner, the local owner is %u", limbo->queue.owner_id);
 	}
 	return 0;
 }
@@ -808,11 +819,8 @@ txn_limbo_filter_owner_set(struct txn_limbo *limbo,
 	if (!limbo->do_validate)
 		return 0;
 	if (req->queue_owner_id == REPLICA_ID_NIL) {
-		say_error("%s. Zero replica_id detected",
-			  reject_str(req));
-		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-			 "synchronous requests with zero replica_id");
-		return -1;
+		return synchro_request_error_unsupported(
+			req, "synchronous requests with zero queue owner ID");
 	}
 	return 0;
 }
@@ -826,10 +834,8 @@ txn_limbo_filter_non_zero_lsn(struct txn_limbo *limbo,
 	VERIFY(limbo->do_validate);
 	if (lsn > 0)
 		return 0;
-	say_error("%s. Zero lsn detected", reject_str(req));
-	diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-		 "zero LSN for CONFIRM/ROLLBACK");
-	return -1;
+	return synchro_request_error_unsupported(
+		req, "zero LSN for CONFIRM/ROLLBACK");
 }
 
 /** Validate correctness of a PROMOTE/DEMOTE entry to confirm. */
@@ -851,14 +857,11 @@ txn_limbo_filter_promote_pre_commit(struct txn_limbo *limbo,
 	int64_t to_confirm_lsn = vclock_get(&e->confirmed_vclock,
 					    queue->owner_id);
 	if (confirmed_lsn > to_confirm_lsn) {
-		say_error("RAFT: rejecting a PROMOTE in term %llu: its confirm "
-			  "lsn %lld is below the already confirmed lsn %lld",
-			  (long long)e->raft_term, (long long)e->confirm_lsn,
-			  (long long)confirmed_lsn);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request with lsn from an already "
-			 "processed range");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a PROMOTE with LSN from an already processed "
+			"range, confirming %lld while %lld is already locally "
+			"confirmed", (long long)to_confirm_lsn,
+			(long long)confirmed_lsn);
 	}
 	/*
 	 * Ahead in some components or incomparable (VCLOCK_ORDER_UNDEFINED
@@ -866,31 +869,23 @@ txn_limbo_filter_promote_pre_commit(struct txn_limbo *limbo,
 	 */
 	if (vclock_compare_ignore0(&queue->confirmed_vclock,
 				   &e->confirmed_vclock) > 0) {
-		say_error("%s. The confirmed vclock of the PROMOTE is behind "
-			  "the locally confirmed vclock", reject_str(req));
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a PROMOTE with a confirmed vclock from an "
-			 "already processed range");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a PROMOTE with a confirmed vclock from an "
+			"already processed range");
 	}
 	if (e->raft_term <= limbo->term) {
-		say_error("%s. The committing PROMOTE tries to revert "
-			  "the latest confirmed term", reject_str(req));
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "trying to commit a PROMOTE reverting the "
-			 "latest confirmed term");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "trying to commit a PROMOTE reverting the latest "
+			"confirmed term %llu", (long long)limbo->term);
 	}
 	if (confirmed_lsn == to_confirm_lsn)
 		return 0;
 	if (txn_limbo_is_empty(limbo)) {
-		say_error("RAFT: rejecting a PROMOTE in term %llu: its confirm "
-			  "lsn %lld is ahead of the confirmed lsn %lld and the "
-			  "limbo is empty", (long long)e->raft_term,
-			  (long long)to_confirm_lsn, (long long)confirmed_lsn);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request mentioning future lsn");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a PROMOTE mentioning future LSN, confirming "
+			"%lld ahead of the locally confirmed %lld with an empty"
+			" limbo", (long long)to_confirm_lsn,
+			(long long)confirmed_lsn);
 	}
 	/*
 	 * Some entries are present in the limbo, we need to make sure that
@@ -917,13 +912,11 @@ txn_limbo_filter_promote_pre_commit(struct txn_limbo *limbo,
 	int64_t first_lsn, last_lsn;
 	txn_limbo_queue_get_lsn_range(queue, &first_lsn, &last_lsn);
 	if (to_confirm_lsn < first_lsn || last_lsn < to_confirm_lsn) {
-		say_error("RAFT: rejecting a PROMOTE in term %llu: its confirm "
-			  "lsn %lld is out of the queue range [%lld; %lld]",
-			  (long long)e->raft_term, (long long)to_confirm_lsn,
-			  (long long)first_lsn, (long long)last_lsn);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a request lsn out of queue range");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a request LSN out of queue range, confirming "
+			"%lld outside of [%lld; %lld]",
+			(long long)to_confirm_lsn, (long long)first_lsn,
+			(long long)last_lsn);
 	}
 	return 0;
 }
@@ -1032,10 +1025,8 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	 * term supplied, otherwise it is a broken packet.
 	 */
 	if (req->promote.term == 0) {
-		say_error("%s. Zero term detected", reject_str(req));
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "Replication", "PROMOTE/DEMOTE with a zero term");
-		return -1;
+		return synchro_request_error_unsupported(
+			req, "PROMOTE/DEMOTE with a zero term");
 	}
 	/*
 	 * Zero origin appears only in the bootstrap and checkpoint entries,
@@ -1043,22 +1034,17 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	 * data, when the filtering is disabled.
 	 */
 	if (req->origin_id == REPLICA_ID_NIL) {
-		say_error("%s. Zero origin_id detected", reject_str(req));
-		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-			 "PROMOTE/DEMOTE with a zero origin_id");
-		return -1;
+		return synchro_request_error_unsupported(
+			req, "PROMOTE/DEMOTE with a zero origin_id");
 	}
 	/*
 	 * A PROMOTE of an unowned limbo confirms nothing - a non-zero confirm
 	 * lsn can't be attributed to any queue owner.
 	 */
 	if (req->queue_owner_id == REPLICA_ID_NIL && req->promote.lsn != 0) {
-		say_error("%s. Non-zero confirm lsn without a queue owner",
-			  reject_str(req));
-		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-			 "PROMOTE/DEMOTE with a confirm lsn but no queue "
-			 "owner");
-		return -1;
+		return synchro_request_error_unsupported(
+			req, "PROMOTE/DEMOTE with a confirm LSN but no queue "
+			"owner");
 	}
 	/*
 	 * The request must be self-consistent. A request might be missing the
@@ -1069,12 +1055,9 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	if (vclock_is_set(&req->promote.confirmed_vclock) &&
 	    vclock_get(&req->promote.confirmed_vclock, req->queue_owner_id) !=
 	    req->promote.lsn) {
-		say_error("%s. The confirm lsn doesn't match its component "
-			  "in the confirmed vclock", reject_str(req));
-		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
-			 "PROMOTE/DEMOTE confirm lsn being not equal to its "
-			 "component in the confirmed vclock");
-		return -1;
+		return synchro_request_error_unsupported(
+			req, "PROMOTE/DEMOTE confirm LSN is not equal to "
+			"its component in the confirmed vclock");
 	}
 	/*
 	 * If the term is already seen it means it comes from a node which
@@ -1082,11 +1065,9 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	 * data is no longer consistent.
 	 */
 	if (limbo->term >= req->promote.term) {
-		say_error("%s. Max term seen is %llu", reject_str(req),
-			  (long long)limbo->term);
-		diag_set(ClientError, ER_SPLIT_BRAIN,
-			 "got a PROMOTE/DEMOTE with an obsolete term");
-		return -1;
+		return synchro_request_error_split_brain(
+			req, "got a PROMOTE/DEMOTE with an obsolete term, the "
+			"max seen term is %llu", (long long)limbo->term);
 	}
 	/*
 	 * The request is applied at once. Hence must validate it right on the
