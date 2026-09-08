@@ -174,6 +174,7 @@ test-static: build run-luajit-test run-test
 test-static-cmake: SRC_DIR = ${STATIC_DIR}
 test-static-cmake: BUILD_DIR = ${STATIC_DIR}
 test-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
+test-static-cmake: ENABLE_COREDUMP_TESTS = 1
 test-static-cmake: build run-test-ctest
 
 # Coverage build
