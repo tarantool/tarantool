@@ -122,11 +122,6 @@ struct index_opts {
 	 */
 	uint32_t covered_field_count;
 	/**
-	 * Engine dependent. For engines supporting various layouts means a
-	 * string with the layout options.
-	 */
-	char *layout;
-	/**
 	 * Engine dependent. MsgPack array with aggregates, each one is
 	 * a MsgPack map.
 	 */
@@ -152,7 +147,6 @@ static inline void
 index_opts_destroy(struct index_opts *opts)
 {
 	free(opts->covered_fields);
-	free(opts->layout);
 	free(opts->aggregates);
 	TRASH(opts);
 }
@@ -186,13 +180,6 @@ index_opts_is_equal(const struct index_opts *o1, const struct index_opts *o2)
 		if (o1->covered_fields[i] != o2->covered_fields[i])
 			return false;
 	}
-	if (o1->layout != NULL && o2->layout != NULL) {
-		if (strcmp(o1->layout, o2->layout) != 0)
-			return false;
-	} else if (o1->layout != NULL || o2->layout != NULL) {
-		return false;
-	}
-
 	if (o1->aggregates != NULL && o2->aggregates != NULL) {
 		uint32_t o1_aggregates_len = mp_len(o1->aggregates);
 		uint32_t o2_aggregates_len = mp_len(o2->aggregates);

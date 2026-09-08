@@ -669,11 +669,6 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_setfield(L, -2, "covers");
 		}
 
-		if (index_def->opts.layout != NULL) {
-			lua_pushstring(L, index_def->opts.layout);
-			lua_setfield(L, -2, "layout");
-		}
-
 		if (index_def->opts.aggregates != NULL) {
 			luaT_push_aggregates(L, index_def);
 			lua_setfield(L, -2, "aggregates");

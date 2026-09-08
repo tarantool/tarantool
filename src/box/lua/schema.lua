@@ -1142,7 +1142,6 @@ local index_options = {
     func = 'number, string',
     hint = 'boolean',
     covers = 'table',
-    layout = 'string',
     aggregates = 'table',
 }
 
@@ -1341,7 +1340,6 @@ box.schema.index.create = atomic_wrapper(function(space_id, name, options)
             func = options.func,
             hint = options.hint,
             covers = options.covers,
-            layout = options.layout,
             aggregates = options.aggregates,
     }
     local field_type_aliases = {
