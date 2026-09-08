@@ -2932,3 +2932,19 @@ g_ghs_146_stack_overflow.test_many_zones_pollutes_stack = function()
 end
 
 -- }}} ghs-146 stack overflow test.
+
+-- {{{ gh-8965 unknown timezone name test.
+
+local g_gh_8965 = t.group('gh_8965')
+
+g_gh_8965.test_unknown_timezone_name = function()
+    -- An unknown timezone name must make `strptime` fail the
+    -- whole parse instead of being silently consumed (gh-8965).
+    local buf = 'FOO'
+    local fmt = '%Z'
+    t.assert_error(function()
+        dt.parse(buf, {format = fmt})
+    end)
+end
+
+-- }}} gh-8965 unknown timezone name test.
