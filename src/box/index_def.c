@@ -54,7 +54,6 @@ const struct index_opts index_opts_default = {
 	/* .hint                = */ INDEX_HINT_DEFAULT,
 	/* .covered_fields      = */ NULL,
 	/* .covered_field_count = */ 0,
-	/* .layout              = */ NULL,
 	/* .aggregates          = */ NULL,
 };
 
@@ -115,25 +114,6 @@ index_opts_parse_covered_fields(const char **data, void *opts,
 	return 0;
 }
 
-/** Parse index layout option given as MsgPack in `data' into `opts'. */
-static int
-index_opts_parse_layout(const char **data, void *opts, struct region *region)
-{
-	struct index_opts *index_opts = (struct index_opts *)opts;
-	if (mp_typeof(**data) != MP_STR) {
-		diag_set(IllegalParams, "'layout' must be string");
-		return -1;
-	}
-	uint32_t len = 0;
-	const char *str = mp_decode_str(data, &len);
-	if (len > 0) {
-		index_opts->layout = xregion_alloc(region, len + 1);
-		memcpy(index_opts->layout, str, len);
-		index_opts->layout[len] = '\0';
-	}
-	return 0;
-}
-
 /**
  * Parse index 'aggregates' option given as MsgPack in 'data' into 'opts'.
  * The MsgPack is copied to a memory allocated on 'region'.
@@ -180,7 +160,6 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF_LEGACY("sql"),
 	OPT_DEF_CUSTOM("hint", index_opts_parse_hint),
 	OPT_DEF_CUSTOM("covers", index_opts_parse_covered_fields),
-	OPT_DEF_CUSTOM("layout", index_opts_parse_layout),
 	OPT_DEF_CUSTOM("aggregates", index_opts_parse_aggregates),
 	OPT_END,
 };
@@ -232,8 +211,6 @@ index_opts_dup(const struct index_opts *opts, struct index_opts *dup)
 		       dup->covered_field_count *
 		       sizeof(*dup->covered_fields));
 	}
-	if (dup->layout != NULL)
-		dup->layout = xstrdup(dup->layout);
 	if (dup->aggregates != NULL)
 		dup->aggregates = mp_dup(dup->aggregates);
 }
