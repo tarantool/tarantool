@@ -11,6 +11,7 @@
 #include "crc32.h"
 #include "random.h"
 #include "memory.h"
+#include "say.h"
 #include "iproto_constants.h"
 
 /**
@@ -145,15 +146,75 @@ test_dynamic_sized_ibuf(void)
 	footer();
 }
 
+/** Last message emitted while parsing a test header. */
+static char log_message[256];
+
+static void
+capture_log(int level, const char *filename, int line, const char *error,
+	    const char *format, ...)
+{
+	(void)level;
+	(void)filename;
+	(void)line;
+	(void)error;
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(log_message, sizeof(log_message), format, ap);
+	va_end(ap);
+}
+
+static void
+check_meta_key(const char *filetype, const char *key, const char *expected_log)
+{
+	header();
+	plan(2);
+
+	char data[256];
+	int size = snprintf(data, sizeof(data),
+			    "%s\n0.13\n"
+			    "Instance: 1e63b356-4b16-4023-bbfa-fc4c00e8cbbf\n"
+			    "VClock: {1: 1}\n%s: 150994944\n\n", filetype, key);
+	struct xlog_cursor cursor;
+	sayfunc_t saved_say = _say;
+	_say = capture_log;
+	log_message[0] = '\0';
+	int rc = xlog_cursor_openmem(&cursor, data, size, "mem");
+	_say = saved_say;
+	is(rc, 0, "%s header with %s is parsed", filetype, key);
+	is_str(log_message, expected_log, "expected log '%s', got '%s'",
+	       expected_log, log_message);
+	if (rc == 0)
+		xlog_cursor_close(&cursor, false);
+
+	check_plan();
+	footer();
+}
+
+static void
+test_ignored_meta_keys(void)
+{
+	header();
+	plan(4);
+
+	check_meta_key("SNAP", "MemtxUsed", "");
+	check_meta_key("XLOG", "MemtxUsed", "");
+	check_meta_key("SNAP", "OtherKey", "Unknown meta item: 'OtherKey'");
+	check_meta_key("XLOG", "OtherKey", "Unknown meta item: 'OtherKey'");
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(2);
 	crc32_init();
 	memory_init();
 	random_init();
 
 	test_dynamic_sized_ibuf();
+	test_ignored_meta_keys();
 
 	random_free();
 	memory_free();
