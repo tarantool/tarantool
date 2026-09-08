@@ -124,6 +124,21 @@ synchro_request_write_or_panic(const struct synchro_request *req)
 	      synchro_request_str(req));
 }
 
+/**
+ * Prepare a request which is never supposed to fail its preparation. These are
+ * supposed to be locally made requests originating from limbo's own state.
+ */
+static void
+txn_limbo_req_prepare_or_panic(struct txn_limbo *limbo,
+			       const struct synchro_request *req)
+{
+	if (txn_limbo_req_prepare(limbo, req) == 0)
+		return;
+	diag_log();
+	panic("Could not prepare a synchro request: %s",
+	      synchro_request_str(req));
+}
+
 static void
 txn_limbo_assert_locked(struct txn_limbo *limbo)
 {
@@ -206,46 +221,6 @@ txn_limbo_unfence(struct txn_limbo *limbo)
 		fiber_wakeup(limbo->worker);
 }
 
-/**
- * Write a confirmation entry to the WAL. After it's written all the
- * transactions waiting for confirmation may be finished.
- */
-static int
-txn_limbo_write_confirm(struct txn_limbo *limbo, int64_t lsn)
-{
-	txn_limbo_assert_locked(limbo);
-	assert(lsn > limbo->queue.confirmed_lsn);
-	assert(!limbo->queue.is_fenced);
-	struct synchro_request req = {
-		.type = IPROTO_RAFT_CONFIRM,
-		.queue_owner_id = limbo->queue.owner_id,
-		.confirm = {
-			.lsn = lsn
-		},
-	};
-	return synchro_request_write(&req);
-}
-
-/**
- * Write a rollback message to WAL. After it's written all the transactions
- * following the current one and waiting for confirmation must be rolled back.
- */
-static void
-txn_limbo_write_rollback(struct txn_limbo *limbo, int64_t lsn)
-{
-	txn_limbo_assert_locked(limbo);
-	assert(lsn > limbo->queue.confirmed_lsn);
-	assert(limbo->queue.is_fenced);
-	struct synchro_request req = {
-		.type = IPROTO_RAFT_ROLLBACK,
-		.queue_owner_id = limbo->queue.owner_id,
-		.rollback = {
-			.lsn = lsn
-		},
-	};
-	synchro_request_write_or_panic(&req);
-}
-
 static int
 txn_limbo_worker_bump_confirmed_lsn(struct txn_limbo *limbo)
 {
@@ -257,13 +232,22 @@ txn_limbo_worker_bump_confirmed_lsn(struct txn_limbo *limbo)
 		if (queue->is_fenced)
 			return -1;
 		/* It can get bumped again while we are writing. */
-		int64_t lsn = queue->volatile_confirmed_lsn;
-		if (txn_limbo_write_confirm(limbo, lsn) != 0) {
+		struct synchro_request req = {
+			.type = IPROTO_RAFT_CONFIRM,
+			.origin_id = instance_id,
+			.queue_owner_id = queue->owner_id,
+			.confirm = {
+				.lsn = queue->volatile_confirmed_lsn,
+			},
+		};
+		txn_limbo_req_prepare_or_panic(limbo, &req);
+		if (synchro_request_write(&req) != 0) {
 			diag_log();
+			txn_limbo_req_rollback(limbo, &req);
 			return -1;
 		}
 		ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_WORKER_DELAY);
-		txn_limbo_queue_apply_confirm(queue, lsn);
+		txn_limbo_req_commit(limbo, &req);
 	}
 	assert(queue->volatile_confirmed_lsn >= queue->confirmed_lsn);
 	return 0;
@@ -550,9 +534,17 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		return TXN_LIMBO_WAIT_ENTRY_SUCCESS;
 	}
 	txn_limbo_fence(limbo);
-	txn_limbo_write_rollback(limbo, entry->lsn);
-	txn_limbo_queue_apply_rollback(&limbo->queue, entry->lsn,
-				       TXN_SIGNATURE_QUORUM_TIMEOUT);
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_ROLLBACK,
+		.origin_id = instance_id,
+		.queue_owner_id = limbo->queue.owner_id,
+		.rollback = {
+			.lsn = entry->lsn,
+		},
+	};
+	txn_limbo_req_prepare_or_panic(limbo, &req);
+	synchro_request_write_or_panic(&req);
+	txn_limbo_req_commit(limbo, &req);
 	assert(txn_limbo_entry_is_complete(entry));
 	assert(entry->state == TXN_LIMBO_ENTRY_ROLLBACK);
 	txn_limbo_unfence(limbo);
@@ -960,10 +952,6 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		txn_limbo_update_state(limbo);
 		break;
 	}
-	/*
-	 * XXX: ideally all requests should go through req_* methods. To unify
-	 * their work from applier and locally.
-	 */
 	}
 	return 0;
 }
@@ -983,10 +971,6 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 		txn_limbo_update_state(limbo);
 		break;
 	}
-	/*
-	 * XXX: ideally all requests should go through req_* methods. To unify
-	 * their work from applier and locally.
-	 */
 	default: {
 		break;
 	}
@@ -1018,8 +1002,14 @@ txn_limbo_req_commit_rollback(struct txn_limbo *limbo, const struct synchro_requ
 	 */
 	if (req->queue_owner_id != limbo->queue.owner_id)
 		return;
+	/*
+	 * A locally created rollback is a quorum timeout. A received one means
+	 * the same has happened on the queue owner.
+	 */
+	int64_t signature = req->origin_id == instance_id ?
+		TXN_SIGNATURE_QUORUM_TIMEOUT : TXN_SIGNATURE_SYNC_ROLLBACK;
 	txn_limbo_queue_apply_rollback(&limbo->queue, req->rollback.lsn,
-				       TXN_SIGNATURE_SYNC_ROLLBACK);
+				       signature);
 }
 
 /** Commit IPROTO_RAFT_PROMOTE/DEMOTE request. */
