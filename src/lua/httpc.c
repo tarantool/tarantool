@@ -122,10 +122,12 @@ parse_headers(lua_State *L, const char *buffer, size_t len,
 	const char *end_buf = buffer + len;
 	lua_pushstring(L, "headers");
 	lua_newtable(L);
-	while (true) {
+	while (buffer < end_buf) {
 		int rc = http_parse_header_line(&parser, &buffer, end_buf,
 						max_header_name_len);
-		if (rc == HTTP_PARSE_INVALID || rc == HTTP_PARSE_CONTINUE) {
+		if (rc == HTTP_PARSE_INVALID)
+			break;
+		if (rc == HTTP_PARSE_CONTINUE) {
 			continue;
 		}
 		if (rc == HTTP_PARSE_DONE) {
