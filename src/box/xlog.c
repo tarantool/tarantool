@@ -117,6 +117,7 @@ enum {
 #define VCLOCK_KEY "VClock"
 #define VERSION_KEY "Version"
 #define PREV_VCLOCK_KEY "PrevVClock"
+#define MEMTX_USED_KEY "MemtxUsed"
 
 static const char v13[] = "0.13";
 static const char v12[] = "0.12";
@@ -311,6 +312,11 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			 */
 			if (parse_vclock(val, val_end, &meta->prev_vclock) != 0)
 				return -1;
+		} else if (xlog_meta_key_equal(key, key_end, MEMTX_USED_KEY)) {
+			/*
+			 * Only Tarantool EE 2.11 uses this field for recovery
+			 * memory checks.
+			 */
 		} else if (xlog_meta_key_equal(key, key_end, VERSION_KEY)) {
 			/* Ignore Version: for now */
 		} else {
