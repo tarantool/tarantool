@@ -740,6 +740,18 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	assert(limbo->do_validate);
 	assert(iproto_type_is_promote_request(req->type));
 	/*
+	 * Need all LSNs to be known. They are used to determine whether the
+	 * request is safe to apply, below in the filtering logic.
+	 *
+	 * The queue is fenced off during the wait, so no new txns appearing
+	 * in parallel would prolong the waiting.
+	 */
+	txn_limbo_fence(limbo);
+	int rc = txn_limbo_queue_wait_writes_finished(&limbo->queue);
+	txn_limbo_unfence(limbo);
+	if (rc != 0)
+		return -1;
+	/*
 	 * PROMOTE might be claiming an unclaimed limbo. But DEMOTE can't be
 	 * unclaiming a nobody-owned limbo.
 	 */
@@ -852,12 +864,6 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 	txn_limbo_assert_locked(limbo);
 	if (!limbo->do_validate)
 		return 0;
-	/*
-	 * Need all LSNs to be known. They will be used to determine whether
-	 * filtered request is safe to apply.
-	 */
-	if (txn_limbo_queue_wait_writes_finished(&limbo->queue) < 0)
-		return -1;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 		return txn_limbo_filter_confirm(limbo, req);
@@ -906,33 +912,24 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	/*
-	 * Guard against new transactions appearing during WAL write. It is
-	 * necessary because otherwise when PROMOTE/DEMOTE would be done and it
-	 * would see a txn without LSN in the limbo, it couldn't tell whether
-	 * the transaction should be confirmed or rolled back. It could be
-	 * delivered to the PROMOTE/DEMOTE initiator even before than to the
-	 * local TX thread, or could be not.
-	 *
-	 * CONFIRM and ROLLBACK need this guard only during  the filter stage.
-	 * Because the filter needs to see all the transactions LSNs to work
-	 * correctly.
-	 */
-	txn_limbo_fence(limbo);
-	if (txn_limbo_filter_request(limbo, req) < 0) {
-		txn_limbo_unfence(limbo);
+	if (txn_limbo_filter_request(limbo, req) < 0)
 		return -1;
-	}
 	/* Prepare for request execution and fine-grained filtering. */
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 	case IPROTO_RAFT_ROLLBACK:
-		txn_limbo_unfence(limbo);
 		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
 		assert(!limbo->is_transition_in_progress);
 		limbo->is_transition_in_progress = true;
+		/*
+		 * Guard against new transactions appearing during the WAL
+		 * write. Otherwise a txn written right after the PROMOTE
+		 * must be rolled back by this PROMOTE, but it can't be, because
+		 * it would be written after it.
+		 */
+		txn_limbo_fence(limbo);
 		txn_limbo_update_system_spaces_is_sync_state(
 			limbo, req, /*is_rollback=*/false);
 		txn_limbo_update_state(limbo);
