@@ -577,12 +577,53 @@ txn_limbo_wait_acked(struct txn_limbo *limbo, double timeout)
 	return -1;
 }
 
-/** Execute an ownership change request (PROMOTE/DEMOTE). */
+/** Execute a DEMOTE request. */
 static int
-txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-		      uint64_t term)
+txn_limbo_req_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t raft_term,
+		     uint64_t limbo_term)
 {
 	txn_limbo_assert_locked(limbo);
+	if (txn_limbo_check_raft_term_intact(limbo, raft_term) != 0)
+		return -1;
+	if (txn_limbo_check_own_term_intact(limbo, limbo_term) != 0)
+		return -1;
+	/*
+	 * We make sure that demote is only written once everything this
+	 * instance has may be confirmed.
+	 */
+	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
+	VERIFY(e == NULL || e->lsn <= lsn);
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_DEMOTE,
+		.queue_owner_id = limbo->queue.owner_id,
+		.origin_id = instance_id,
+		.promote = {
+			.lsn = lsn,
+			.term = raft_term,
+		},
+	};
+	/*
+	 * Confirmed_vclock is only persisted in checkpoints. It doesn't
+	 * appear in WALs and replication.
+	 */
+	vclock_clear(&req.promote.confirmed_vclock);
+	if (txn_limbo_req_prepare(limbo, &req) < 0)
+		return -1;
+	synchro_request_write_or_panic(&req);
+	txn_limbo_req_commit(limbo, &req);
+	return 0;
+}
+
+/** Execute a PROMOTE request. */
+static int
+txn_limbo_req_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t raft_term,
+		      uint64_t limbo_term)
+{
+	txn_limbo_assert_locked(limbo);
+	if (txn_limbo_check_raft_term_intact(limbo, raft_term) != 0)
+		return -1;
+	if (txn_limbo_check_own_term_intact(limbo, limbo_term) != 0)
+		return -1;
 	/*
 	 * We make sure that promote is only written once everything this
 	 * instance has may be confirmed.
@@ -590,12 +631,12 @@ txn_limbo_req_promote(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
 	VERIFY(e == NULL || e->lsn <= lsn);
 	struct synchro_request req = {
-		.type = type,
+		.type = IPROTO_RAFT_PROMOTE,
 		.queue_owner_id = limbo->queue.owner_id,
 		.origin_id = instance_id,
 		.promote = {
 			.lsn = lsn,
-			.term = term,
+			.term = raft_term,
 		},
 	};
 	/*
@@ -743,7 +784,7 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 }
 
 int
-txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
+txn_limbo_promote(struct txn_limbo *limbo, double timeout)
 {
 	struct raft *raft = limbo->raft;
 	uint64_t term = raft->term;
@@ -753,7 +794,7 @@ txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
 	int64_t wait_lsn = txn_limbo_wait_acked(limbo, timeout);
 	if (wait_lsn < 0)
 		return -1;
-	if (type == IPROTO_RAFT_PROMOTE && raft->state != RAFT_STATE_LEADER) {
+	if (raft->state != RAFT_STATE_LEADER) {
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
@@ -764,14 +805,35 @@ txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout)
 	 * Fully ready to execute the promotion now.
 	 */
 	txn_limbo_begin(limbo);
-	rc = txn_limbo_check_raft_term_intact(limbo, term);
+	rc = txn_limbo_req_promote(limbo, wait_lsn, term, limbo_term);
+	if (rc == 0) {
+		txn_limbo_commit(limbo);
+		assert(txn_limbo_is_empty(limbo));
+	} else {
+		txn_limbo_rollback(limbo);
+	}
+	return rc;
+}
+
+int
+txn_limbo_demote(struct txn_limbo *limbo, double timeout)
+{
+	struct raft *raft = limbo->raft;
+	uint64_t term = raft->term;
+	uint64_t limbo_term = limbo->term;
+	if (txn_limbo_replica_term(limbo, instance_id) == term)
+		return 0;
+	int64_t wait_lsn = txn_limbo_wait_acked(limbo, timeout);
+	if (wait_lsn < 0)
+		return -1;
+	int rc = txn_limbo_check_raft_term_intact(limbo, term);
 	if (rc != 0)
-		goto tx_end;
-	rc = txn_limbo_check_own_term_intact(limbo, limbo_term);
-	if (rc != 0)
-		goto tx_end;
-	rc = txn_limbo_req_promote(limbo, type, wait_lsn, term);
-tx_end:
+		return rc;
+	/*
+	 * Fully ready to execute the demotion now.
+	 */
+	txn_limbo_begin(limbo);
+	rc = txn_limbo_req_demote(limbo, wait_lsn, term, limbo_term);
 	if (rc == 0) {
 		txn_limbo_commit(limbo);
 		assert(txn_limbo_is_empty(limbo));
