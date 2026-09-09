@@ -355,11 +355,18 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 		     struct synchro_request *req);
 
 /**
- * Execute promotion/demotion to catch up with the Raft state, in case this node
- * is a Raft leader in a new term, and the limbo is behind.
+ * Execute promotion to catch up with the Raft state, in case this node is a
+ * Raft leader in a new term, and the limbo is behind.
  */
 int
-txn_limbo_promote(struct txn_limbo *limbo, uint16_t type, double timeout);
+txn_limbo_promote(struct txn_limbo *limbo, double timeout);
+
+/**
+ * Execute demotion - exit from the synchronous replication by making the limbo
+ * unowned.
+ */
+int
+txn_limbo_demote(struct txn_limbo *limbo, double timeout);
 
 /**
  * Update qsync parameters dynamically.
