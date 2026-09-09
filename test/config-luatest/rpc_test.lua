@@ -2,6 +2,7 @@
 
 local t = require('luatest')
 local fiber = require('fiber')
+local fio = require('fio')
 local fun = require('fun')
 local treegen = require('luatest.treegen')
 local server = require('luatest.server')
@@ -1387,5 +1388,194 @@ g.test_does_not_wait_if_recently_checked = function()
 
         t.assert_equals(_G.connects, cur_connects)
         t.assert_lt(elapsed_time, CONNECT_TIMEOUT)
+    end)
+end
+
+local function build_two_instances_config()
+    return cbuilder:new()
+        :set_global_option('credentials.users.myuser',
+            {password =  'secret',
+             roles = { 'replication' },
+             privileges = {{permissions = {'execute'}, universe = true}}})
+        :set_global_option('iproto.advertise.peer.login', 'myuser')
+        :add_instance('i-001', { database = { mode = 'rw' } })
+        :add_instance('i-002', {})
+        :config()
+end
+
+-- Add a counter to count netbox.connect() calls.
+local function add_netbox_connect_counter(cluster)
+    treegen.write_file(cluster._dir, 'override/net/box.lua',
+        string.dump(function()
+            local loaders = require('internal.loaders')
+
+            rawset(_G, 'connects', 0)
+
+            local builtin_netbox = loaders.builtin['net.box']
+            local builtin_connect = builtin_netbox.connect
+            builtin_netbox.connect = function(...)
+                _G.connects = _G.connects + 1
+                return builtin_connect(...)
+            end
+
+            return builtin_netbox
+        end))
+end
+
+g.test_reconnects_on_peer_uri_change = function()
+    local config = build_two_instances_config()
+    local cluster = cluster:new(config)
+
+    add_netbox_connect_counter(cluster)
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        local conn = connpool.connect('i-002')
+        t.assert_equals(conn.state, 'active')
+        t.assert_equals(_G.connects, 1)
+        rawset(_G, 'i2_conn', conn)
+    end)
+
+    -- Advertise i-002 by an equivalent URI pointing to the same
+    -- unix socket by an absolute path.
+    local new_config = cbuilder:new(config)
+        :set_instance_option('i-002', 'iproto.advertise.peer.uri',
+                             ('unix/:%s/i-002.iproto'):format(cluster._dir))
+        :config()
+    cluster:reload(new_config)
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        -- The old connection has been closed by the reload and
+        -- replaced with a new one.
+        t.assert_equals(_G.i2_conn.state, 'closed')
+
+        local conn = connpool.connect('i-002')
+        t.assert_equals(conn.state, 'active')
+        t.assert_not_equals(conn, _G.i2_conn)
+        t.assert_equals(_G.connects, 2)
+    end)
+end
+
+g.test_no_reconnect_without_uri_change = function()
+    local config = build_two_instances_config()
+    local cluster = cluster:new(config)
+
+    add_netbox_connect_counter(cluster)
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        local conn = connpool.connect('i-002')
+        t.assert_equals(conn.state, 'active')
+        rawset(_G, 'i2_conn', conn)
+    end)
+
+    -- Reload with a change unrelated to the instance URIs.
+    local new_config = cbuilder:new(config)
+        :set_global_option('connpool.idle_timeout', 3600)
+        :config()
+    cluster:reload(new_config)
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        t.assert_equals(_G.i2_conn.state, 'active')
+        t.assert_is(connpool.connect('i-002'), _G.i2_conn)
+        t.assert_equals(_G.connects, 1)
+    end)
+end
+
+g.test_evicts_connection_to_removed_instance = function()
+    local config = cbuilder:new(build_two_instances_config())
+        :add_instance('i-003', {})
+        :config()
+    local cluster = cluster:new(config)
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        local conn = connpool.connect('i-003')
+        t.assert_equals(conn.state, 'active')
+        rawset(_G, 'i3_conn', conn)
+    end)
+
+    -- Remove i-003 from the configuration. The instance itself
+    -- keeps running, so the cached connection stays alive until
+    -- connpool evicts it.
+    local new_config = cbuilder:new(config)
+        :set_replicaset_option('instances.i-003', nil)
+        :config()
+    cluster:sync(new_config)
+
+    cluster['i-001']:exec(function()
+        local config = require('config')
+
+        config:reload()
+        t.assert_equals(_G.i3_conn.state, 'closed')
+    end)
+end
+
+g.test_reconnects_on_ssl_cert_change = function()
+    t.tarantool.skip_if_not_enterprise(
+        'The iproto.ssl option is supported only by Tarantool ' ..
+        'Enterprise Edition')
+
+    local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
+                                  'test/enterprise-luatest/ssl_cert')
+
+    local config = cbuilder:new(build_two_instances_config())
+        :set_global_option('iproto.listen', {{
+            uri = 'unix/:./{{ instance_name }}.iproto',
+            params = {transport = 'ssl'},
+        }})
+        :set_global_option('iproto.ssl', {
+            ssl_cert = fio.pathjoin(cert_dir, 'server.crt'),
+            ssl_key = fio.pathjoin(cert_dir, 'server.key'),
+        })
+        :config()
+    local cluster = cluster:new(config)
+
+    add_netbox_connect_counter(cluster)
+
+    cluster:start()
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        local conn = connpool.connect('i-002')
+        t.assert_equals(conn.state, 'active')
+        rawset(_G, 'i2_conn', conn)
+    end)
+
+    -- Rotate the SSL certificates.
+    local new_config = cbuilder:new(config)
+        :set_global_option('iproto.ssl', {
+            ssl_cert = fio.pathjoin(cert_dir, 'server_2.crt'),
+            ssl_key = fio.pathjoin(cert_dir, 'server_2.key'),
+        })
+        :config()
+    cluster:reload(new_config)
+
+    cluster['i-001']:exec(function()
+        local connpool = require('experimental.connpool')
+
+        -- The old connection has been closed by the reload and
+        -- replaced with a one using the new certificates.
+        t.assert_equals(_G.i2_conn.state, 'closed')
+
+        local conn = connpool.connect('i-002')
+        t.assert_equals(conn.state, 'active')
+        t.assert_not_equals(conn, _G.i2_conn)
+        t.assert_equals(conn:eval('return true'), true)
+        t.assert_equals(_G.connects, 2)
     end)
 end
