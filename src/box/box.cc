@@ -3063,8 +3063,7 @@ box_promote_qsync(void)
 	auto promote_guard = make_scoped_guard([&] {
 		is_in_box_promote = false;
 	});
-	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_PROMOTE,
-				 TIMEOUT_INFINITY);
+	return txn_limbo_promote(&txn_limbo, TIMEOUT_INFINITY);
 }
 
 int
@@ -3190,8 +3189,7 @@ box_demote(void)
 		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
 		return -1;
 	}
-	return txn_limbo_promote(&txn_limbo, IPROTO_RAFT_DEMOTE,
-				 replication_synchro_timeout);
+	return txn_limbo_demote(&txn_limbo, replication_synchro_timeout);
 }
 
 int
