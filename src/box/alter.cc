@@ -4799,6 +4799,12 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 	strlcpy(old_def->name, old_replica->name, NODE_NAME_SIZE_MAX);
 	old_def->uuid = old_replica->uuid;
 
+	struct applier *applier = NULL;
+	if (old_replica->applier != NULL) {
+		assert(old_replica->applier->state == APPLIER_STOPPED);
+		assert(old_replica->applier_sync_state == APPLIER_STOPPED);
+		applier = replica_take_stopped_applier(old_replica);
+	}
 	replica_clear_id(old_replica);
 	if (replica_by_uuid(&old_def->uuid) != NULL)
 		panic("Replica with old UUID wasn't deleted");
@@ -4807,6 +4813,8 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 	else
 		replica_set_id(new_replica, new_def->id);
 	replica_set_name(new_replica, old_def->name);
+	if (applier != NULL)
+		replica_set_stopped_applier(new_replica, applier);
 	on_rollback_drop_new->data = new_replica;
 	on_rollback_add_old->data = old_def;
 	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
