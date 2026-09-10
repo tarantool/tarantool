@@ -5689,18 +5689,12 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	 */
 	engine_begin_initial_recovery_xc(&recovery->vclock);
 
-	struct memtx_engine *memtx;
-	memtx = (struct memtx_engine *)engine_by_name("memtx");
-	assert(memtx != NULL);
-
 	/*
-	 * We explicitly request memtx to recover its
-	 * snapshot as a separate phase since it contains
-	 * data for system spaces, and triggers on
-	 * recovery of system spaces issue DDL events in
-	 * other engines.
+	 * It's important that MemTX will be recovered first since it contains
+	 * data for system spaces, and triggers on recovery of system spaces
+	 * issue DDL events in other engines.
 	 */
-	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
+	engine_recover_snapshot_xc(checkpoint_vclock);
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 	/*
 	 * Xlog starts after snapshot. Hence recovery vclock must point at the
