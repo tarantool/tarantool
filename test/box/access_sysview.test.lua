@@ -174,7 +174,7 @@ box.session.su('guest')
 --
 
 -- a guest user can see granted 'public' role
-box.space._vpriv.index[2]:select('role')[1][2] == session.uid()
+box.space._vpriv.index[2]:select('role')[1][2] == session.euid()
 
 -- read access to original space also allow to read a view
 box.session.su('admin')

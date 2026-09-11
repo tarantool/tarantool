@@ -439,7 +439,7 @@ box.session.su('guest')
 -- _vpriv
 --
 -- a guest user can see granted 'public' role
-box.space._vpriv.index[2]:select('role')[1][2] == session.uid()
+box.space._vpriv.index[2]:select('role')[1][2] == session.euid()
 ---
 - true
 ...

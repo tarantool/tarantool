@@ -23,7 +23,7 @@ c = remote.connect(box.cfg.listen)
 c:eval("session.su('admin')")
 ---
 ...
-c:eval("return session.user()")
+c:eval("return session.effective_user()")
 ---
 - admin
 ...

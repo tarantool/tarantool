@@ -33,8 +33,10 @@ struct credentials {
 	 * when checking global grants.
 	 */
 	user_access_t universal_access;
-	/** User id of the authenticated user. */
+	/** Effective user id. */
 	uint32_t uid;
+	/** User id of the authenticated user. */
+	uint32_t auth_uid;
 	/**
 	 * Member of credentials list of the source user. The list
 	 * is used to collect privilege updates to keep the
