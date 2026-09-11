@@ -1185,6 +1185,9 @@ lua_rl_complete(lua_State *L, const char *text, int start, int end)
 	size_t i, n, dot, items_checked;
 	int loop, savetop, is_method_ref = 0;
 
+	if (text == NULL)
+		return NULL;
+
 	if (!(text[0] == '\0' || isalpha(text[0]) || text[0] == '_'))
 		return NULL;
 
