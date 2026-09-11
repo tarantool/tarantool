@@ -6,6 +6,7 @@
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
+#include "error.h"
 #include "xlog.h"
 #include "xrow.h"
 #include "crc32.h"
@@ -25,7 +26,8 @@ enum {
  * Create a temporary directory, initialize it as xdir, and create a new xlog.
  */
 static void
-create_xlog(struct xlog *xlog, char *dirname)
+create_xlog(struct xlog *xlog, char *dirname, enum xdir_type type,
+	    uint64_t memtx_used)
 {
 	fail_if(mkdtemp(dirname) == NULL);
 
@@ -35,9 +37,9 @@ create_xlog(struct xlog *xlog, char *dirname)
 	memset(&tt_uuid, 1, sizeof(tt_uuid));
 	memset(&vclock, 0, sizeof(vclock));
 
-	xdir_create(&xdir, dirname, XLOG, &tt_uuid, &xlog_opts_default);
+	xdir_create(&xdir, dirname, type, &tt_uuid, &xlog_opts_default);
 
-	fail_if(xdir_create_xlog(&xdir, xlog, &vclock) < 0);
+	fail_if(xdir_create_xlog_memtx(&xdir, xlog, &vclock, memtx_used) < 0);
 }
 
 /**
@@ -88,7 +90,7 @@ test_dynamic_sized_ibuf(void)
 	struct xlog xlog;
 	char dirname[] = "./xlog.XXXXXX";
 	char filename[PATH_MAX];
-	create_xlog(&xlog, dirname);
+	create_xlog(&xlog, dirname, XLOG, /*memtx_used=*/0);
 	strlcpy(filename, xlog.filename, sizeof(filename));
 
 	/* Write about 20 MB of data to the xlog. */
@@ -145,15 +147,139 @@ test_dynamic_sized_ibuf(void)
 	footer();
 }
 
+/**
+ * Read the text header of the file, including the trailing empty
+ * line, into a NUL-terminated buffer.
+ */
+static void
+read_header(const char *filename, char *buf, size_t size)
+{
+	FILE *f = fopen(filename, "r");
+	fail_if(f == NULL);
+	size_t n = fread(buf, 1, size - 1, f);
+	fclose(f);
+	buf[n] = '\0';
+	char *end = strstr(buf, "\n\n");
+	fail_if(end == NULL);
+	end[2] = '\0';
+}
+
+/**
+ * Create an xlog of the given xdir type with the given MemtxUsed value, close
+ * it, and check that the header carries (or doesn't carry) the MemtxUsed key
+ * and that the value is read back both from the file and from a memory buffer.
+ */
+static void
+check_ok_memtx_used(enum xdir_type type, uint64_t memtx_used)
+{
+	header();
+	plan(4);
+
+	struct xlog xlog;
+	struct xlog_cursor cursor;
+	char dirname[] = "./xlog.XXXXXX";
+	char filename[PATH_MAX];
+	char buf[512];
+
+	create_xlog(&xlog, dirname, type, memtx_used);
+	strlcpy(filename, xlog.filename, sizeof(filename));
+	write_1k(&xlog);
+	fail_if(xlog_flush(&xlog) < 0);
+	fail_if(xlog_close(&xlog, false) < 0);
+
+	fail_if(xlog_cursor_open(&cursor, filename) < 0);
+	ok(cursor.meta.memtx_used == memtx_used,
+	   "MemtxUsed %" PRIu64 " is read back from the header", memtx_used);
+	xlog_cursor_close(&cursor, false);
+
+	read_header(filename, buf, sizeof(buf));
+	char key[64];
+	snprintf(key, sizeof(key), "MemtxUsed: %" PRIu64, memtx_used);
+	if (memtx_used != 0) {
+		ok(strstr(buf, key) != NULL,
+		   "MemtxUsed is written to the header");
+	} else {
+		ok(strstr(buf, "MemtxUsed") == NULL,
+		   "MemtxUsed is not written when the value is 0");
+	}
+
+	ok(xlog_cursor_openmem(&cursor, buf, strlen(buf), "mem") == 0,
+	   "the header is parsed from memory");
+	ok(cursor.meta.memtx_used == memtx_used,
+	   "MemtxUsed %" PRIu64 " is read back from memory", memtx_used);
+	xlog_cursor_close(&cursor, false);
+
+	unlink(filename);
+	rmdir(dirname);
+
+	check_plan();
+	footer();
+}
+
+/**
+ * Check that a header with the given malformed MemtxUsed value fails to
+ * parse.
+ */
+static void
+check_fail_memtx_used(const char *memtx_used)
+{
+	header();
+	plan(3);
+
+	const char *uuid = "1e63b356-4b16-4023-bbfa-fc4c00e8cbbf";
+	struct xlog_cursor cursor;
+	char data[256];
+	int size = snprintf(data, sizeof(data),
+			    "XLOG\n0.13\nInstance: %s\n"
+			    "MemtxUsed: %s\n\n", uuid, memtx_used);
+	diag_clear(diag_get());
+	ok(xlog_cursor_openmem(&cursor, data, size, "mem") < 0,
+	   "malformed MemtxUsed value '%s' fails the meta parsing",
+	   memtx_used);
+	struct error *error = diag_last_error(diag_get());
+	fail_if(error == NULL);
+	is(error->type, &type_XlogError, "error type is XlogError");
+	is_str(error->errmsg, "can't parse uint64", "error message is correct");
+
+	check_plan();
+	footer();
+}
+
+/**
+ * Test that the memtx_used value is written to the headers of
+ * the created files as the MemtxUsed key, is read back by the cursor, and
+ * that the key is not written at all when the value is 0.
+ */
+static void
+test_memtx_used(void)
+{
+	header();
+	plan(8);
+
+	check_ok_memtx_used(XLOG, 12345678901ULL);
+	check_ok_memtx_used(SNAP, UINT64_MAX);
+	check_ok_memtx_used(XLOG, /*memtx_used=*/0);
+
+	check_fail_memtx_used("garbage");
+	check_fail_memtx_used("-1");
+	check_fail_memtx_used("");
+	check_fail_memtx_used("18446744073709551616");
+	check_fail_memtx_used("123x");
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(2);
 	crc32_init();
 	memory_init();
 	random_init();
 
 	test_dynamic_sized_ibuf();
+	test_memtx_used();
 
 	random_free();
 	memory_free();

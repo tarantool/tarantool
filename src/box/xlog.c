@@ -115,6 +115,7 @@ enum {
 #define VCLOCK_KEY "VClock"
 #define VERSION_KEY "Version"
 #define PREV_VCLOCK_KEY "PrevVClock"
+#define MEMTX_USED_KEY "MemtxUsed"
 
 static const char v13[] = "0.13";
 static const char v12[] = "0.12";
@@ -125,6 +126,7 @@ xlog_meta_create(struct xlog_meta *meta, const char *filetype,
 		 const struct vclock *vclock,
 		 const struct vclock *prev_vclock)
 {
+	memset(meta, 0, sizeof(*meta));
 	snprintf(meta->filetype, sizeof(meta->filetype), "%s", filetype);
 	meta->instance_uuid = *instance_uuid;
 	if (vclock != NULL)
@@ -168,6 +170,10 @@ xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 		SNPRINT(total, snprintf, buf, size, PREV_VCLOCK_KEY ": %s\n",
 			vclock_to_string(&meta->prev_vclock));
 	}
+	if (meta->memtx_used != 0) {
+		SNPRINT(total, snprintf, buf, size,
+			MEMTX_USED_KEY ": %" PRIu64 "\n", meta->memtx_used);
+	}
 	SNPRINT(total, snprintf, buf, size, "\n");
 	assert(total > 0);
 	return total;
@@ -193,6 +199,36 @@ parse_vclock(const char *val, const char *val_end, struct vclock *vclock)
 			 "offset %zd", off);
 		return -1;
 	}
+	return 0;
+}
+
+/**
+ * Parse uint64 value from xlog meta.
+ */
+static int
+parse_uint64(const char *val, const char *val_end, uint64_t *out)
+{
+	/*
+	 * UINT64_MAX has 20 digits. Emptiness and the first character are
+	 * checked explicitly, since strtoull parses an empty string as 0 and
+	 * silently accepts a sign, wrapping negative values around.
+	 */
+	if (val == val_end || val_end - val > 20 ||
+	    !isdigit((unsigned char)*val)) {
+		diag_set(XlogError, "can't parse uint64");
+		return -1;
+	}
+	char str[21];
+	memcpy(str, val, val_end - val);
+	str[val_end - val] = '\0';
+	char *str_end;
+	errno = 0;
+	unsigned long long res = strtoull(str, &str_end, 10);
+	if (errno != 0 || *str_end != '\0') {
+		diag_set(XlogError, "can't parse uint64");
+		return -1;
+	}
+	*out = res;
 	return 0;
 }
 
@@ -308,6 +344,12 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			 * PrevVClock: <vclock>
 			 */
 			if (parse_vclock(val, val_end, &meta->prev_vclock) != 0)
+				return -1;
+		} else if (xlog_meta_key_equal(key, key_end, MEMTX_USED_KEY)) {
+			/*
+			 * MemtxUsed: <memtx_used>
+			 */
+			if (parse_uint64(val, val_end, &meta->memtx_used) != 0)
 				return -1;
 		} else if (xlog_meta_key_equal(key, key_end, VERSION_KEY)) {
 			/* Ignore Version: for now */
@@ -1050,9 +1092,9 @@ xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock)
  * In case of error, writes a message to the error log
  * and sets errno.
  */
-int
-xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
-		 const struct vclock *vclock)
+static int
+xdir_create_xlog_impl(struct xdir *dir, struct xlog *xlog,
+		      const struct vclock *vclock, uint64_t memtx_used)
 {
 	int64_t signature = vclock_sum(vclock);
 	assert(signature >= 0);
@@ -1069,6 +1111,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	struct xlog_meta meta;
 	xlog_meta_create(&meta, dir->filetype, dir->instance_uuid,
 			 vclock, prev_vclock);
+	meta.memtx_used = memtx_used;
 
 	const char *filename = xdir_format_filename(dir, signature, NONE);
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta,
@@ -1084,6 +1127,21 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	}
 
 	return 0;
+}
+
+int
+xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
+		 const struct vclock *vclock)
+{
+	return xdir_create_xlog_impl(dir, xlog, vclock, /*memtx_used=*/0);
+}
+
+int
+xdir_create_xlog_memtx(struct xdir *dir, struct xlog *xlog,
+		       const struct vclock *vclock, uint64_t memtx_used)
+{
+	assert(dir->type == SNAP || dir->type == XLOG);
+	return xdir_create_xlog_impl(dir, xlog, vclock, memtx_used);
 }
 
 ssize_t

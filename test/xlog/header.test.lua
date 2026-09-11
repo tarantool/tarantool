@@ -10,7 +10,9 @@ function dump_header(path)
     while true do
         local line = f:read()
         if line == "" then break end
-        table.insert(header, line)
+        if not line:match('^MemtxUsed:') then
+            table.insert(header, line)
+        end
     end
     f:close()
     return header

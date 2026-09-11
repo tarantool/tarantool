@@ -512,6 +512,10 @@ box_lua_misc_init(struct lua_State *L)
 
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
 	luaL_setfuncs(L, boxlib_internal, 0);
+#ifdef ENABLE_MEMTX_MEMORY_CHECK
+	lua_pushboolean(L, true);
+	lua_setfield(L, -2, "memtx_memory_check_supported");
+#endif
 	lua_pop(L, 1);
 
 	int rc = luaL_cdef(L, "struct tuple_format;");
