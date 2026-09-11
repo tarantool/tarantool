@@ -3,6 +3,7 @@ local json = require('json')
 local fiber = require('fiber')
 local uri = require('uri')
 local os = require('os')
+local socket = require('socket')
 local t = require('luatest')
 
 local g = t.group('http_client', {
@@ -229,6 +230,19 @@ g.test_cancel_and_errinj = function(cg)
     r = ch:get()
     t.assert_equals(r.status, 200, "No hangs in errinj")
     errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', false)
+end
+
+g.test_incomplete_response_headers = function()
+    local handler = function(s)
+        s:write('HTTP/1.1 200 OK\r\nContent-Type: text/plain')
+        fiber.sleep(1)
+    end
+    local server = socket.tcp_server('127.0.0.1', 0, handler)
+    local url = 'http://127.0.0.1:' .. server:name().port
+    local response = client.get(url, {timeout = 0.01})
+    server:close()
+
+    t.assert_equals(response.status, 408)
 end
 
 g.test_post_and_get = function(cg)

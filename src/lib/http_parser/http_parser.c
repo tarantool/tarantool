@@ -428,6 +428,9 @@ http_parse_header_line(struct http_parser *prsr, const char **bufp,
 		}
 	}
 
+	*bufp = p;
+	return HTTP_PARSE_CONTINUE;
+
 skipped_status:
 	*bufp = p + 1;
 	return HTTP_PARSE_CONTINUE;

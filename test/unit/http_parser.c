@@ -44,10 +44,33 @@ test_protocol_version(void)
 	check_plan();
 }
 
+static void
+test_incomplete_header(void)
+{
+	const char *header = "Content-Type: text/plain";
+	const char *end = header + strlen(header);
+	char buf[32];
+	struct http_parser parser;
+	int rc;
+
+	plan(2);
+	header();
+
+	http_parser_create(&parser);
+	parser.hdr_name = buf;
+	rc = http_parse_header_line(&parser, &header, end, lengthof(buf));
+	is(HTTP_PARSE_CONTINUE, rc, "incomplete header needs more data");
+	ok(header == end, "parser stops at the end of the input buffer");
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(2);
 	test_protocol_version();
+	test_incomplete_header();
 	return check_plan();
 }
