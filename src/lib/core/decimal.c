@@ -812,14 +812,19 @@ decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 	if (type == MP_UINT) {
 		if (mp_check_uint(p, end) > 0)
 			return NULL;
-		scale = mp_decode_uint(&p);
 	} else if (type == MP_INT) {
 		if (mp_check_int(p, end) > 0)
 			return NULL;
-		scale = mp_decode_int(&p);
 	} else {
 		return NULL;
 	}
+	/*
+	 * The scale is negated to get the exponent, by decPackedToNumber()
+	 * below and back by decimal_pack(), so it must fit in int32_t and
+	 * must not be INT32_MIN.
+	 */
+	if (mp_read_int32(&p, &scale) != 0 || scale == INT32_MIN)
+		return NULL;
 	len -= p - *data;
 	/* First check that there is enough space to store the digits. */
 	if (len > (DECIMAL_DIGIT_CAPACITY + 1) / 2)
