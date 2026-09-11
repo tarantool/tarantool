@@ -148,6 +148,65 @@ local err_msg_cannot_find_user = 'Cannot find user unknown ' ..
 local err_msg_no_suitable_uris = 'replication.peers construction for ' ..
     'instance "instance-001" of replicaset "replicaset-001" of group ' ..
     '"group-001": no suitable peer URIs found'
+local err_msg_no_leader_to_register = 'Startup failure.\n' ..
+    'No leader to register new instance "instance-001". All the ' ..
+    'instances in replicaset "replicaset-001" of group "group-001" are ' ..
+    'configured to the read-only mode.'
+
+g.test_no_leader_to_register_singleton_manual_failover = function()
+    local dir = treegen.prepare_directory({}, {})
+
+    local config = {
+        credentials = {
+            users = {
+                replicator = {
+                    password = 'topsecret',
+                    roles = {'replication'},
+                },
+            },
+        },
+        iproto = {
+            listen = {{
+                uri = 'unix/:./{{ instance_name }}.iproto',
+            }},
+            advertise = {
+                peer = {
+                    login = 'replicator',
+                },
+            },
+        },
+        replication = {
+            failover = 'manual',
+        },
+        groups = {
+            ['group-001'] = {
+                replicasets = {
+                    ['replicaset-001'] = {
+                        instances = {
+                            ['instance-001'] = {},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    local config_file = treegen.write_file(dir, 'config.yaml',
+        yaml.encode(config))
+    local env = {}
+    local args = {'--name', 'instance-001', '--config', config_file}
+    local opts = {nojson = true, stderr = true}
+    local res = justrun.tarantool(dir, env, args, opts)
+
+    t.assert_equals({
+        exit_code = res.exit_code,
+        stderr = last_n_lines(res.stderr,
+                              count_lines(err_msg_no_leader_to_register)),
+    }, {
+        exit_code = 1,
+        stderr = err_msg_no_leader_to_register,
+    })
+end
 
 -- Bad cases for building replicaset.
 for case_name, case in pairs({
@@ -236,10 +295,7 @@ for case_name, case in pairs({
         -- All the instances are  configured to the read-only mode
         -- (and instance-001 has no existing snapshot).
         mode = 'ro',
-        exp_err = 'Startup failure.\nNo leader to register new instance ' ..
-            '"instance-001". All the instances in replicaset ' ..
-            '"replicaset-001" of group "group-001" are configured to the ' ..
-            'read-only mode.',
+        exp_err = err_msg_no_leader_to_register,
     },
     failover_off_leader_is_set = {
         -- The leader option is set together with failover =
