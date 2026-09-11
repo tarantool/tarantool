@@ -1,0 +1,24 @@
+# OpenSSL symbols used by the built-in HTTP server through LuaJIT FFI.
+# Keep the symbols sorted by name using `LC_COLLATE="C" sort -f`.
+
+ERR_clear_error
+ERR_error_string
+ERR_peek_last_error
+SSL_CTX_free
+SSL_CTX_load_verify_locations
+SSL_CTX_new
+SSL_CTX_set_cipher_list
+SSL_CTX_set_default_passwd_cb
+SSL_CTX_set_default_passwd_cb_userdata
+SSL_CTX_set_verify
+SSL_CTX_use_certificate_file
+SSL_CTX_use_PrivateKey_file
+SSL_free
+SSL_get_error
+SSL_new
+SSL_pending
+SSL_read
+SSL_set_accept_state
+SSL_set_fd
+SSL_write
+TLS_server_method

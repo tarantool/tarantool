@@ -128,6 +128,17 @@ lua_source(lua_sources ../third_party/metrics/metrics/tarantool/vinyl.lua metric
 lua_source(lua_sources ../third_party/metrics/metrics/tarantool.lua metrics_tarantool_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/utils.lua metrics_utils_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/version.lua metrics_version_lua)
+lua_source(lua_sources ../third_party/http/http/codes.lua http_codes_lua)
+lua_source(lua_sources ../third_party/http/http/mime_types.lua
+           http_mime_types_lua)
+lua_source(lua_sources ../third_party/http/http/sslsocket.lua
+           http_sslsocket_lua)
+lua_source(lua_sources ../third_party/http/http/server.lua http_server_lua)
+lua_source(lua_sources ../third_party/http/http/version.lua http_version_lua)
+lua_source(lua_sources ../third_party/http/roles/httpd.lua httpd_role_lua)
+lua_source(lua_sources
+           ../third_party/metrics-export-role/roles/metrics-export.lua
+           metrics_export_role_lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
@@ -214,6 +225,7 @@ set (server_sources
      lua/builtin_modcache.c
      lua/tweaks.c
      lua/xml.c
+     ${PROJECT_SOURCE_DIR}/third_party/http/http/lib.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
@@ -281,6 +293,11 @@ if (NOT TARGET_OS_DEBIAN_FREEBSD)
 endif()
 
 set_source_files_compile_flags(${server_sources})
+if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
+    set_source_files_properties(
+        ${PROJECT_SOURCE_DIR}/third_party/http/http/lib.c
+        PROPERTIES COMPILE_FLAGS "-Wno-error")
+endif()
 add_library(server STATIC ${server_sources})
 add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll digest http_parser bit uri swim swim_udp
@@ -301,6 +318,11 @@ set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
      shutdown tzcode ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
      ${CURL_LIBRARIES} ${XXHASH_LIBRARIES} ${LIBCDT_LIBRARIES}
      ${EXTRA_REEXPORT_LIBRARIES})
+
+if (OPENSSL_USE_STATIC_LIBS)
+    set (reexport_libraries ${reexport_libraries}
+         ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+endif()
 
 set (common_libraries
     ${reexport_libraries}
@@ -353,6 +375,11 @@ set(TARANTOOL_CXX_FLAGS ${TARANTOOL_CXX_FLAGS} PARENT_SCOPE)
 set(exports_file_sources
     ${PROJECT_SOURCE_DIR}/extra/exports
     ${EXTRA_EXPORTS_FILE_SOURCES})
+if (OPENSSL_USE_STATIC_LIBS)
+    set(exports_file_sources ${exports_file_sources}
+        ${PROJECT_SOURCE_DIR}/extra/exports_openssl)
+endif()
+
 if (EXPORT_LIBCURL_SYMBOLS)
     set(exports_file_sources ${exports_file_sources}
         ${PROJECT_SOURCE_DIR}/extra/exports_libcurl)
