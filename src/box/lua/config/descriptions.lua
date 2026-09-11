@@ -682,6 +682,17 @@ I['config.reload'] = format_text([[
       reload the configuration in the application code using `config:reload()`.
 ]])
 
+I['config.reload_jitter'] = format_text([[
+    Add jitter to automatic configuration reloads caused by remote configuration
+    storage events. A positive value, specified in seconds, spreads reloads over
+    this interval and reduces the burst in simultaneous fetches from the remote
+    storage. This is especially useful for large clusters. A value of `0`
+    (the default) reloads the configuration immediately.
+
+    This option affects only automatic reloads from the remote configuration
+    storage events. Manual reloads using `config:reload()` are not delayed.
+]])
+
 -- {{{ config.storage configuration
 
 I['config.storage'] = format_text([[

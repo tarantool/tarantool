@@ -352,6 +352,11 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'auto',
         }),
+        reload_jitter = enterprise_edition(duration(schema.scalar({
+            type = 'integer',
+            default = 0,
+            validate = validators['config.reload_jitter'],
+        }))),
         -- Defaults can't be set there, because the `validate`
         -- annotation expects either no data or data with existing
         -- prefix field. The prefix field has no default. So,
