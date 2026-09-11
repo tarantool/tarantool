@@ -7,7 +7,7 @@ local g = t.group()
 -- Please update them, if you changed the relevant structures.
 local SIZE_OF_STMT = 136
 -- Size of story with one link (for spaces with 1 index).
-local SIZE_OF_STORY = 152
+local SIZE_OF_STORY = 280
 -- Size of a deleted story list entry.
 local SIZE_OF_DEL_STORY_LINK = 24
 -- Size of tuple with 2 number fields

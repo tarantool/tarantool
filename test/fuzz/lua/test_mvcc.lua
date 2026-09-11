@@ -151,7 +151,8 @@ local SPACE_FORMAT = {
     {'1', type = 'uint'},
     {'2', type = 'uint'},
     {'3', type = 'uint', is_nullable = true},
-    {'4', type = 'uint', is_nullable = true}
+    {'4', type = 'uint', is_nullable = true},
+    {'5', type = 'array'},
 }
 
 local generic_idx_meta = {
@@ -166,14 +167,14 @@ local generic_idx_meta = {
         {
             type = DQL,
             subtype = SELECT,
-            key_cnt = 2,
-            fmt = 'box.space.%s.index[%d]:select({%s, %s}, ' ..
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
         {
             type = DQL,
             subtype = GET,
-            fmt = 'box.space.%s.index[%d]:get{%s, %s}',
+            fmt = 'box.space.%s.index[%d]:get{%s}',
         },
     }
 }
@@ -182,29 +183,28 @@ generic_idx_meta.ops = {
         {
             type = DML,
             subtype = UPDATE,
-            fmt = 'box.space.%s.index[%d]:update({%s, %s}, ' ..
+            fmt = 'box.space.%s.index[%d]:update({%s}, ' ..
                   '{%s, %s})',
         },
         {
             type = DML,
             subtype = DELETE,
-            fmt = 'box.space.%s.index[%d]:delete{%s, %s}',
+            fmt = 'box.space.%s.index[%d]:delete{%s}',
         },
         {
             type = DML,
             subtype = INSERT,
-            fmt = 'box.space.%s:insert{%d, %d, %s, %s}',
+            fmt = 'box.space.%s:insert{%s}',
         },
         {
             type = DML,
             subtype = REPLACE,
-            fmt = 'box.space.%s:replace{%d, %d, %s, %s}',
+            fmt = 'box.space.%s:replace{%s}',
         },
         {
             type = DML,
             subtype = UPSERT,
-            fmt = 'box.space.%s:upsert({%d, %d, %s, %s}, ' ..
-                  '{{\'=\', 3, %s}, {\'=\', 4, %s}})',
+            fmt = 'box.space.%s:upsert({%s}, {%s, %s})',
         },
 }
 
@@ -262,6 +262,8 @@ local ENGINES = {
             create_idx_meta({{is_nullable = false}, {is_nullable = false}},
                             'HASH'),
             create_idx_meta({{is_nullable = false}, {is_nullable = false}}),
+            create_idx_meta({{is_nullable = false}}),
+            create_idx_meta({{is_nullable = false}}),
         }
     },
     {
@@ -274,6 +276,7 @@ local ENGINES = {
             create_idx_meta({{is_nullable = true}, {is_nullable = true}}),
             create_idx_meta({{is_nullable = true}, {is_nullable = true}}),
             create_idx_meta({{is_nullable = false}, {is_nullable = true}}),
+            create_idx_meta({{is_nullable = false}}),
         }
     },
 }
@@ -304,8 +307,8 @@ local random_tx_executor
 local consistency_checker
 
 local function generate_txn_repro_stmt(stmt)
-    return ('tx%d(\'%s\') -- %s\n'):format(stmt.tid, stmt.str,
-                                           json.encode(stmt.res))
+    return ('tx%d(%q) -- %s\n'):format(stmt.tid, stmt.str,
+                                      json.encode(stmt.res))
 end
 
 local function generate_txn_serial_stmt(stmt)
@@ -340,8 +343,24 @@ end
 -- the ENGINES tables.
 local SCHEMA_CODE = [[
 box.schema.func.create('func',
-    {body = 'function(tuple) return tuple end', is_deterministic = true,
+    {body = 'function(tuple) return {tuple[1], tuple[2]} end',
+     is_deterministic = true,
      is_sandboxed = true, if_not_exists = true})
+box.schema.func.create('multikey_func', {
+    body = [=[
+        function(tuple)
+            local keys = {}
+            for _, key in ipairs(tuple[5]) do
+                table.insert(keys, {key})
+            end
+            return keys
+        end
+    ]=],
+    is_deterministic = true,
+    is_sandboxed = true,
+    if_not_exists = true,
+    opts = {is_multikey = true},
+})
 box.schema.space.create('m', {engine = 'memtx'})
 box.space.m:create_index('p', {parts = {
     {1, 'uint'},
@@ -367,6 +386,10 @@ box.space.m:create_index('s6', {type = 'HASH', parts = {
 box.space.m:create_index('s7', {parts = {
     {1, 'uint'},
     {2, 'uint'}}, func = 'func'})
+box.space.m:create_index('s8', {
+    parts = {{field = 5, path = '[*]'}}, unique = true})
+box.space.m:create_index('s9', {
+    parts = {{1, 'unsigned'}}, func = 'multikey_func', unique = true})
 box.schema.space.create('v', {engine = 'vinyl'})
 box.space.v:create_index('p', {parts = {
     {1, 'uint'},
@@ -386,6 +409,8 @@ box.space.v:create_index('s4', {parts = {
 box.space.v:create_index('s5', {unique = false, parts = {
     {1, 'uint', is_nullable = false},
     {4, 'uint', is_nullable = true}}})
+box.space.v:create_index('s6', {
+    parts = {{field = 5, path = '[*]'}}, unique = true})
 ]]
 
 local function generate_schema_code()
@@ -525,9 +550,20 @@ local function random_number()
     return math.random(ARG_MAX_KEY)
 end
 
+local function gen_array()
+    local array = {}
+    for _ = 1, math.random(4) do
+        table.insert(array, random_number())
+    end
+    return ('{%s}'):format(table.concat(array, ', '))
+end
+
 local function gen_field(field)
     if field.is_nullable and math.random() <= ARG_P_NULL_KEY then
         return 'box.NULL'
+    end
+    if field.type == 'array' then
+        return gen_array()
     end
     return random_number()
 end
@@ -560,6 +596,7 @@ local function gen_random_operation(ro)
     local op = ro and idx.ro_ops[math.random(#idx.ro_ops)] or
                idx.ops[math.random(#idx.ops)]
     local keys = gen_key(idx.fields)
+    local key = table.concat(keys, ', ')
     if op.type == DQL then
         if op.subtype == SELECT then
             local iter = idx.iters[math.random(#idx.iters)]
@@ -567,22 +604,21 @@ local function gen_random_operation(ro)
                 op.str = op.fmt:format(eng.space, idx_id, iter)
             elseif op.key_cnt == 1 then
                 op.str = op.fmt:format(eng.space, idx_id, keys[1], iter)
-            elseif op.key_cnt == 2 then
-                op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2],
-                                       iter)
+            elseif op.full_key then
+                op.str = op.fmt:format(eng.space, idx_id, key, iter)
             end
         elseif op.subtype == GET then
-            op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2])
+            op.str = op.fmt:format(eng.space, idx_id, key)
         end
     else
         local tuple = gen_tuple()
+        local tuple_str = table.concat(tuple, ', ')
         local update = gen_update({ SPACE_FORMAT[3], SPACE_FORMAT[4]})
         if op.subtype == DELETE or op.subtype == UPDATE then
-            op.str = op.fmt:format(eng.space, idx_id, keys[1], keys[2],
+            op.str = op.fmt:format(eng.space, idx_id, key,
                                    update[1], update[2])
         else
-            op.str = op.fmt:format(eng.space, tuple[1], tuple[2], tuple[3],
-                                   tuple[4], update[1], update[2])
+            op.str = op.fmt:format(eng.space, tuple_str, update[1], update[2])
         end
     end
     return op
