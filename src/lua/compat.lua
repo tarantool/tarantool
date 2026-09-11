@@ -202,6 +202,13 @@ local BOX_BACKUP_DEFAULT_TTL_BRIEF = [[
 Default backup TTL values when it is not set explicitly in box.backup.start().
 ]]
 
+local SQL_LEGACY_NAME_NORMALIZATION_BRIEF = [[
+When the behaviour is new we do search in sql looks only for an exact
+name match. When the behaviour is old we additionally do search in sql
+first looks for an exact match; if that fails, we do searc using the name
+converted to uppercase.
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -379,6 +386,12 @@ local options = {
         brief = BOX_BACKUP_DEFAULT_TTL_BRIEF,
         action = tweak_action(
             'box_backup_default_ttl', TIMEOUT_INFINITY, 3600),
+    },
+    sql_legacy_name_normalization = {
+        default = 'old',
+        obsolete = nil,
+        brief = SQL_LEGACY_NAME_NORMALIZATION_BRIEF,
+        action = tweak_action('sql_legacy_name_normalization', true, false),
     },
 }
 
