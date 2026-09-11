@@ -1,4 +1,4 @@
-local fun = require('fun')
+local fun = require("fun")
 local fio = require('fio')
 local t = require('luatest')
 local treegen = require('luatest.treegen')
