@@ -49,6 +49,7 @@
 #include "mp_decimal.h"
 #include "mp_uuid.h"
 #include "mp_util.h"
+#include "box/bind.h"
 
 #define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
 
@@ -304,6 +305,80 @@ mem_delete(struct Mem *v)
 		return;
 	mem_destroy(v);
 	sql_xfree(v);
+}
+
+struct Mem *
+sql_mem_create_from_bind(const struct sql_bind *bind)
+{
+	struct Mem *mem;
+	if (bind != NULL) {
+		mem = sql_xmalloc(sizeof(Mem));
+		mem_create(mem);
+		switch (bind->type) {
+		case MP_INT:
+			mem_set_int(mem, bind->i64);
+			break;
+		case MP_UINT:
+			printf("%ld\n", bind->i64);
+			mem_set_uint(mem, bind->i64);
+			break;
+		case MP_BOOL:
+			mem_set_bool(mem, bind->b);
+			break;
+		case MP_DOUBLE:
+		case MP_FLOAT:
+			mem_set_double(mem, bind->d);
+			break;
+		case MP_STR:
+			/*
+			 * Parameters are allocated within message pack,
+			 * received from the iproto thread.
+			 * IProto thread now is waiting for the response
+			 * and it will not free the packet
+			 * until sql_stmt_finalize. So there is no need
+			 * to copy the packet and we can use SQL_STATIC.
+			 */
+			mem_set_str_static(mem, (char *)bind->s, bind->bytes);
+			break;
+		case MP_NIL:
+			break;
+		case MP_BIN:
+			mem_set_bin_static(mem, (char *)bind->s, bind->bytes);
+			break;
+		case MP_ARRAY:
+			mem_set_array_static(mem, (char *)bind->s,
+					     bind->bytes);
+			break;
+		case MP_MAP:
+			mem_set_map_static(mem, (char *)bind->s, bind->bytes);
+			break;
+		case MP_EXT:
+			switch (bind->ext_type) {
+			case MP_UUID:
+				mem_set_uuid(mem, &bind->uuid);
+				break;
+			case MP_DECIMAL:
+				mem_set_dec(mem, &bind->dec);
+				break;
+			case MP_DATETIME:
+				mem_set_datetime(mem, &bind->dt);
+				break;
+			case MP_INTERVAL:
+				mem_set_interval(mem, &bind->itv);
+				break;
+			default:
+				unreachable();
+				break;
+			}
+			break;
+		default:
+			unreachable();
+		}
+	} else {
+		mem = sql_xmalloc(sizeof(Mem));
+		mem_create(mem);
+	}
+	return mem;
 }
 
 void
