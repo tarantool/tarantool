@@ -775,8 +775,8 @@ s:format(format)
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'num'}, {'name': 'field3',
-    'type': 'str'}, {'name': 'field4', 'type': '*'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'unsigned'},
+  {'name': 'field3', 'type': 'string'}, {'name': 'field4', 'type': 'any'}]
 ...
 s:replace{1, 2, '3', {4, 4, 4}}
 ---
@@ -1632,7 +1632,7 @@ s:format(format)
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'any'}]
+- [{'name': 'field1', 'type': 'unsigned'}]
 ...
 format[1].type = 'unsigned'
 ---
@@ -2009,8 +2009,8 @@ sk4 = s:create_index('sk4', {parts = {{3, 'number'}}})
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'scalar'}, {
-    'name': 'field3', 'type': 'integer'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'unsigned'},
+  {'name': 'field3', 'type': 'integer'}]
 ...
 s:replace{1, '100', -20.2}
 ---
