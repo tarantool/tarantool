@@ -1796,6 +1796,18 @@ g.test_metrics = function()
             include = {'network', 'info', 'cpu', 'roles.crud-router'},
             exclude = {'info', 'roles.crud-storage.custom_metric'},
             labels = {foo = 'bar'},
+            export = {
+                http = {{
+                    listen = 3301,
+                    endpoints = {{
+                        path = '/metrics/json',
+                        format = 'json',
+                        metrics = {
+                            enabled = true,
+                        },
+                    }},
+                }},
+            },
         }
     }
 
