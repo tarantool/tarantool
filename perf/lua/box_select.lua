@@ -13,6 +13,7 @@ local USAGE = [[
                                 possible to specify more than one pattern
                                 separated by '|', for example, 'get|select'
    read_view <boolean, false> - use a read view
+   memtx_use_mvcc <boolean>   - enable memtx MVCC engine
 
  Being run without options, this benchmark measures the performance of
  various space select (get, select, pairs) operations.
@@ -21,6 +22,7 @@ local USAGE = [[
 local params = benchmark.argparse(arg, {
     {'pattern', 'string'},
     {'read_view', 'boolean'},
+    {'memtx_use_mvcc', 'boolean'},
 }, USAGE)
 
 if params.pattern then
@@ -29,7 +31,7 @@ end
 
 local bench = benchmark.new(params)
 
-box.cfg({log_level = 'error'})
+box.cfg({log_level = 'error', memtx_use_mvcc_engine = params.memtx_use_mvcc})
 box.once('perf_select_init', function()
     local s = box.schema.space.create('perf_select_space')
     s:create_index('primary')
