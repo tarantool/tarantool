@@ -117,9 +117,8 @@ LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
                                     symbolize=1:$\
                                     unmap_shadow_on_exit=1
 
-# Release ASAN build
+# Release ASAN
 
-.PHONY: test-release-asan
 # FIBER_STACK_SIZE=640Kb: The default value of fiber stack size
 # is 512Kb, but several tests in test/PUC-Rio-Lua-5.1-test suite
 # in the LuaJIT repo (e.g. some cases with deep recursion in
@@ -128,29 +127,63 @@ LUAJIT_TEST_ENV_ASAN = LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
 # while running LuaJIT tests with ASan support enabled.
 # Experiments once again confirm the notorious quote that "640 Kb
 # ought to be enough for anybody".
-test-release-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
-                                  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                                  -DFIBER_STACK_SIZE=640Kb
-test-release-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
-test-release-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
-test-release-asan: build run-luajit-test run-test
+RELEASE_ASAN_CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+                            -DFIBER_STACK_SIZE=640Kb
 
-# Debug ASAN build
+# Release ASAN build (sysmalloc)
 
-.PHONY: test-debug-asan
+.PHONY: test-release-asan-sysmalloc
+test-release-asan-sysmalloc: CMAKE_PARAMS = ${RELEASE_ASAN_CMAKE_PARAMS}
+test-release-asan-sysmalloc: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-release-asan-sysmalloc: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-release-asan-sysmalloc: build run-luajit-test run-test
+
+# Release ASAN build (LuaJIT allocator && ASAN)
+
+.PHONY: test-release-asan-dlmalloc
+
+test-release-asan-dlmalloc: CMAKE_PARAMS = ${RELEASE_ASAN_CMAKE_PARAMS} \
+                                           -DLUAJIT_USE_ASAN_HARDENING=ON \
+                                           -DLUAJIT_ENABLE_GC64=ON
+test-release-asan-dlmalloc: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-release-asan-dlmalloc: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-release-asan-dlmalloc: build run-luajit-test run-test
+
+# Debug ASAN
+
 # We need even larger fiber stacks in ASAN debug build for luajit tests
 # to pass. Value twice as big as in ASAN release is just a wild guess.
-test-debug-asan: CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
-                                -DCMAKE_BUILD_TYPE=Debug \
-                                -DFIBER_STACK_SIZE=1280Kb
-test-debug-asan: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
-test-debug-asan: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+DEBUG_ASAN_CMAKE_PARAMS = ${CMAKE_PARAMS_ASAN} \
+                          -DCMAKE_BUILD_TYPE=Debug \
+                          -DFIBER_STACK_SIZE=1280Kb
+
 # Increase timeouts as some tests in ASAN debug build take quite a lot
 # of time to finish.
-test-debug-asan: TEST_RUN_PARAMS += --test-timeout 620 \
-                                    --no-output-timeout 630 \
-                                    --server-start-timeout 610
-test-debug-asan: build run-luajit-test run-test
+DEBUG_ASAN_TEST_RUN_PARAMS = --test-timeout 620 \
+                             --no-output-timeout 630 \
+                             --server-start-timeout 610
+
+# Debug ASAN build (sysmalloc)
+
+.PHONY: test-debug-asan-sysmalloc
+test-debug-asan-sysmalloc: CMAKE_PARAMS = ${DEBUG_ASAN_CMAKE_PARAMS}
+test-debug-asan-sysmalloc: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-debug-asan-sysmalloc: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-debug-asan-sysmalloc: TEST_RUN_PARAMS += ${DEBUG_ASAN_TEST_RUN_PARAMS}
+test-debug-asan-sysmalloc: build run-luajit-test run-test
+
+# Debug ASAN build (LuaJIT allocator && ASAN)
+
+.PHONY: test-debug-asan-dlmalloc
+
+test-debug-asan-dlmalloc: CMAKE_PARAMS = ${DEBUG_ASAN_CMAKE_PARAMS} \
+                                           -DLUAJIT_USE_ASAN_HARDENING=ON \
+                                           -DLUAJIT_ENABLE_GC64=ON
+test-debug-asan-dlmalloc: TEST_RUN_ENV = ${TEST_RUN_ENV_ASAN}
+test-debug-asan-dlmalloc: LUAJIT_TEST_ENV = ${LUAJIT_TEST_ENV_ASAN}
+test-debug-asan-dlmalloc: TEST_RUN_PARAMS += ${DEBUG_ASAN_TEST_RUN_PARAMS}
+test-debug-asan-dlmalloc: build run-luajit-test run-test
 
 # Debug build
 
