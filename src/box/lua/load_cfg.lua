@@ -901,7 +901,8 @@ end
 -- not 1-to-1, then a function can be used. It takes 2 parameters:
 -- value of the old option, value of the new if present. It
 -- returns two values - value to replace the old option and to
--- replace the new one.
+-- replace the new one. The optional third returned value tells
+-- whether the deprecation warning should be suppressed.
 local translate_cfg = {
     snapshot_count = {'checkpoint_count'},
     snapshot_period = {'checkpoint_interval'},
@@ -931,7 +932,8 @@ local translate_cfg = {
     end},
     replication_connect_quorum = {'bootstrap_strategy', function(old, new)
         if new ~= nil then
-            return old, new
+            -- Do not log the warning, if strategy is 'legacy' in that box.cfg.
+            return old, new, new == 'legacy'
         elseif old ~= nil then
             return old, 'legacy'
         end
@@ -940,22 +942,22 @@ local translate_cfg = {
 
 -- Upgrade old config
 local function upgrade_cfg(cfg, translate_cfg)
-    if cfg == nil then
-        return {}
-    end
     local result_cfg = {}
     for k, v in pairs(cfg) do
         local translation = translate_cfg[k]
         if translation ~= nil then
             local new_key = translation[1]
             local transform = translation[2]
-            log.warn('Deprecated option %s, please use %s instead', k, new_key)
             local new_val_orig = cfg[new_key]
-            local old_val, new_val
+            local old_val, new_val, no_warning
             if transform == nil then
                 new_val = v
             else
-                old_val, new_val = transform(v, new_val_orig)
+                old_val, new_val, no_warning = transform(v, new_val_orig)
+            end
+            if not no_warning then
+                log.warn('Deprecated option %s, please use %s instead',
+                         k, new_key)
             end
             if new_val_orig ~= nil and
                new_val_orig ~= new_val then
@@ -998,11 +1000,6 @@ local function check_cfg_option_type(template, name, value)
 end
 
 local function prepare_cfg(cfg, old_cfg, default_cfg, template_cfg, modify_cfg)
-    if cfg == nil then
-        cfg = {}
-    elseif type(cfg) ~= 'table' then
-        error("Error: cfg should be a table")
-    end
     local new_cfg = {}
     for k, v in pairs(cfg) do
         if template_cfg[k] == nil then
@@ -1139,6 +1136,11 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
 end
 
 local function reload_cfg(oldcfg, cfg)
+    if cfg == nil then
+        cfg = {}
+    elseif type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
     cfg = upgrade_cfg(cfg, translate_cfg)
     local newcfg = prepare_cfg(cfg, {}, default_cfg, template_cfg,
                                modify_cfg)
@@ -1237,7 +1239,11 @@ local function load_cfg(cfg)
         return
     end
 
-    cfg = upgrade_cfg(cfg, translate_cfg)
+    if cfg == nil then
+        cfg = {}
+    elseif type(cfg) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
 
     -- Forced recovery can be envoked by CLI options. Set the appropriate
     -- box_cfg option in this case.
@@ -1247,6 +1253,8 @@ local function load_cfg(cfg)
 
     -- Set options passed through environment variables.
     apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
+
+    cfg = upgrade_cfg(cfg, translate_cfg)
 
     cfg = prepare_cfg(cfg, pre_load_cfg, default_cfg, template_cfg, modify_cfg)
 
