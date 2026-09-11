@@ -250,7 +250,7 @@ raft_test_recovery(void)
 static void
 raft_test_bad_msg(void)
 {
-	raft_start_test(11);
+	raft_start_test(13);
 	struct raft_msg msg;
 	struct raft_node node;
 	struct vclock vclock;
@@ -261,6 +261,15 @@ raft_test_bad_msg(void)
 		.term = 10,
 	};
 	is(raft_node_process_msg(&node, &msg, 2), -1, "state can't be 0");
+	is(node.raft.term, 1, "term from the bad message wasn't used");
+
+	msg = (struct raft_msg){
+		.state = RAFT_STATE_FOLLOWER,
+		.term = 10,
+		.vote = VCLOCK_MAX,
+	};
+	is(raft_node_process_msg(&node, &msg, 2), -1, "vote can't exceed the "
+	   "replica id limit");
 	is(node.raft.term, 1, "term from the bad message wasn't used");
 
 	raft_vclock_from_string(&vclock, "{2: 1}");
