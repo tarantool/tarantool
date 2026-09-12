@@ -2,8 +2,6 @@ find_program(CHECKPATCH checkpatch.pl
              HINTS ${PROJECT_SOURCE_DIR}/checkpatch)
 find_program(CODESPELL codespell)
 
-add_custom_target(checkpatch)
-
 set(BASE_GIT_REF "origin/master")
 if(DEFINED ENV{CHECKPATCH_GITREF})
     set(BASE_GIT_REF "$ENV{CHECKPATCH_GITREF}")
@@ -17,14 +15,14 @@ if(CODESPELL)
 endif(CODESPELL)
 
 if(CHECKPATCH)
-    add_custom_command(TARGET checkpatch
+    add_custom_target(checkpatch
         COMMENT "Running checkpatch on a current branch against ${BASE_GIT_REF}"
         COMMAND ${CHECKPATCH} ${CHECKPATCH_OPTIONS}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 else()
     set(WARN_MSG "`checkpatch.pl' is not found, so checkpatch target is dummy.")
-    add_custom_command(TARGET checkpatch
+    add_custom_target(checkpatch
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --red ${WARN_MSG}
         COMMENT ${WARN_MSG}
     )
