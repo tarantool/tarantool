@@ -290,10 +290,10 @@ file_is_in_directory(BINARY_DIR_INSIDE_SOURCE_DIR "${BINARY_REALPATH}"
 if (BINARY_DIR_INSIDE_SOURCE_DIR)
     set(EXCLUDE_FILES --exclude-files "${BINARY_REALPATH}/**/*.lua")
 endif()
-add_custom_target(luacheck DEPENDS LuaJIT-luacheck)
-add_custom_command(TARGET luacheck
+add_custom_target(luacheck
     COMMAND ${LUACHECK} --codes --config .luacheckrc . ${EXCLUDE_FILES}
     WORKING_DIRECTORY ${SOURCE_REALPATH}
+    DEPENDS LuaJIT-luacheck
     COMMENT "Perform static analysis of Lua code"
 )
 unset(BINARY_REALPATH)
@@ -315,11 +315,11 @@ if (WITH_JEPSEN)
     # Enable 'make run-jepsen' target.
     #
 
-    add_custom_target(run-jepsen DEPENDS jepsen-tests)
-    add_custom_command(TARGET run-jepsen
+    add_custom_target(run-jepsen
         COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
 				${PROJECT_SOURCE_DIR}
                                 ${PROJECT_BINARY_DIR}
+        DEPENDS jepsen-tests
         COMMENT "Running Jepsen tests"
     )
 endif()
@@ -882,14 +882,12 @@ if (WITH_NOTIFY_SOCKET)
 endif()
 
 if(NOT "${PROJECT_BINARY_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
-    add_custom_target(distclean)
-    add_custom_command(TARGET distclean
+    add_custom_target(distclean
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${PROJECT_BINARY_DIR}"
         COMMENT "Removing the build directory and its content"
     )
 elseif(IS_DIRECTORY .git AND GIT)
-    add_custom_target(distclean)
-    add_custom_command(TARGET distclean
+    add_custom_target(distclean
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         COMMAND ${GIT} submodule foreach --recursive git clean -f -X -d
         COMMAND ${GIT} clean -f -X -d
