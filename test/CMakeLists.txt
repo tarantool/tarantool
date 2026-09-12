@@ -123,7 +123,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${CMAKE_CURRENT_BINARY_DIR}/../src/lib/small/test/
         ${CMAKE_CURRENT_BINARY_DIR}/small
-        COMMENT Create the symlink for libsmall test binaries)
+    COMMENT "Create the symlink for libsmall test binaries")
 
 add_custom_target(symlink_libsmall_test_binaries ALL
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small)

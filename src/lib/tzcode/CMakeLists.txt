@@ -40,12 +40,12 @@ ExternalProject_Add(${TZCODE_PROJECT}
 
 find_program(PERL perl)
 
-add_custom_target(gen-timezones DEPENDS ${TZCODE_PROJECT})
-add_custom_command(TARGET gen-timezones
+add_custom_target(gen-timezones
     COMMAND
     ${PERL} ${TZCODE_SRC}/gen-zone-abbrevs.pl
         ${TZCODE_SRC}/zone-abbrevs.txt ${TZDATA_FULL_TARGET}
         ${TZCODE_SRC}/timezones.h ${TZLUA_SRC}/timezones.lua
+    DEPENDS ${TZCODE_PROJECT}
     COMMENT "Generating timezones.h and timezones.lua"
 )
 
