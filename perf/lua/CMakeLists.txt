@@ -11,8 +11,6 @@ function(create_perf_lua_test)
   set(singleValues NAME)
   set(multiValues DEPENDS)
 
-  # FIXME: if we update to CMake >= 3.5, can remove this line.
-  include(CMakeParseArguments)
   cmake_parse_arguments(${prefix}
                         "${noValues}"
                         "${singleValues}"
