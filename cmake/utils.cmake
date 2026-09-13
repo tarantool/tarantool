@@ -146,24 +146,6 @@ function(list_add_prefix
     set(${list_out} ${result} PARENT_SCOPE)
 endfunction()
 
-# string() has JOIN option but only since 3.12.
-function(string_join
-    glue
-    string_out
-)
-    set(result "")
-    set(is_first_item TRUE)
-    foreach(item IN LISTS ARGN)
-        if(is_first_item)
-            set(result "${item}")
-            set(is_first_item FALSE)
-        else()
-            set(result "${result}${glue}${item}")
-        endif()
-    endforeach()
-    set(${string_out} ${result} PARENT_SCOPE)
-endfunction()
-
 # ${EP_MAKE_COMMAND} is the make command for ExternalProject_Add() steps
 # of a library that has its own makefiles. Such a library is configured
 # by its own configure script, and its build and install steps are make
