@@ -18,8 +18,6 @@ include_directories(${CURL_INCLUDE_DIRS})
 
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
-include(CMakeParseArguments)
-
 function(create_unit_test)
   cmake_parse_arguments(
     UNIT

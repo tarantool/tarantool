@@ -30,8 +30,6 @@ function(create_perf_test_target)
   set(singleValues TARGET)
   set(multiValues)
 
-  # FIXME: if we update to CMake >= 3.5, can remove this line.
-  include(CMakeParseArguments)
   cmake_parse_arguments(${prefix}
                         "${noValues}"
                         "${singleValues}"
@@ -52,8 +50,6 @@ function(create_perf_test)
   set(singleValues NAME)
   set(multiValues "SOURCES;LIBRARIES")
 
-  # FIXME: if we update to CMake >= 3.5, can remove this line.
-  include(CMakeParseArguments)
   cmake_parse_arguments(${prefix}
                         "${noValues}"
                         "${singleValues}"
