@@ -29,7 +29,6 @@ _add_test_suite_target(${TEST_SUITE_NAME}
   DEPENDS ${UNIT_TEST_TARGETS}
 )
 
-include(CMakeParseArguments)
 message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 
 function(create_unit_test)
