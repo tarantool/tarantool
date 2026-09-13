@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.18)
 
 # Detect system compilers for further dependencies configuring to be
 # built with these compilers. This is used to build tarantool and
