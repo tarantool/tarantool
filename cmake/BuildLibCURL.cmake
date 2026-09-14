@@ -126,6 +126,8 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=ON")
+    # The curl tool isn't built, so no CA bundle is embedded into it.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_EMBED=")
 
     # Even though we set the external project's install dir
     # below, we still need to pass the corresponding install
