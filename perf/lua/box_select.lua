@@ -6,9 +6,11 @@
 
 local clock = require('clock')
 local fiber = require('fiber')
+local fio = require('fio')
 local benchmark = require('benchmark')
 
 local USAGE = [[
+   engine <string, 'memtx'>   - space engine to use for the test
    pattern <string>           - run only tests matching the pattern; it's
                                 possible to specify more than one pattern
                                 separated by '|', for example, 'get|select'
@@ -19,9 +21,14 @@ local USAGE = [[
 ]]
 
 local params = benchmark.argparse(arg, {
+    {'engine', 'string'},
     {'pattern', 'string'},
     {'read_view', 'boolean'},
 }, USAGE)
+
+local DEFAULT_ENGINE = 'memtx'
+
+params.engine = params.engine or DEFAULT_ENGINE
 
 if params.pattern then
     params.pattern = string.split(params.pattern, '|')
@@ -29,9 +36,18 @@ end
 
 local bench = benchmark.new(params)
 
-box.cfg({log_level = 'error'})
+local WORK_DIR = string.format('box_select,engine=%s', params.engine)
+fio.mkdir(WORK_DIR)
+
+box.cfg({
+    log_level = 'error',
+    work_dir = WORK_DIR,
+})
 box.once('perf_select_init', function()
-    local s = box.schema.space.create('perf_select_space')
+    local s = box.schema.space.create('perf_select_space', {
+        engine = params.engine, field_count = 2,
+        format = {{'id', 'unsigned'}, {'data', 'string'}},
+    })
     s:create_index('primary')
     for i = 1, 1e3 do
         s:insert({i, 'data' .. i})
@@ -91,6 +107,24 @@ local TESTS = {
         name = 'select_10',
         func = function()
             space:select({10}, {iterator = 'ge', limit = 10})
+        end,
+    },
+    {
+        name = 'select_offset_1',
+        func = function()
+            space:select({10}, {iterator = 'ge', offset = 1, limit = 1})
+        end,
+    },
+    {
+        name = 'select_offset_10',
+        func = function()
+            space:select({10}, {iterator = 'ge', offset = 10, limit = 1})
+        end,
+    },
+    {
+        name = 'select_offset_100',
+        func = function()
+            space:select({10}, {iterator = 'ge', offset = 100, limit = 1})
         end,
     },
     {
