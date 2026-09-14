@@ -109,18 +109,6 @@ g.test_validate = function()
     end, {BACKEND})
 end
 
-g.test_ssl_params_are_enterprise_only = function()
-    t.tarantool.skip_if_enterprise()
-    g.cluster.router:exec(function(backend_name)
-        local backend = require(backend_name)
-        t.assert_error_msg_contains(
-            'available only in Tarantool Enterprise Edition', function()
-                backend.config.validate({target = 'storage',
-                                         params = {ssl_key_file = '/k.pem'}})
-            end)
-    end, {BACKEND})
-end
-
 g.test_create_point = function()
     local point = g.cluster.router:exec(function(backend_name)
         local backend = require(backend_name)

@@ -44,28 +44,3 @@ g.test_net_box = function()
         'Invalid transport: foo',
         net.connect, {g.server.net_box_uri, params = {transport = 'foo'}})
 end
-
-g.test_listen_ssl = function()
-    t.tarantool.skip_if_enterprise()
-    g.server:exec(function()
-        t.assert_error_msg_equals(
-            'SSL is not available in this build',
-            box.cfg, {listen = 'localhost:0?transport=ssl'})
-    end)
-end
-
-g.test_replication_ssl = function()
-    t.tarantool.skip_if_enterprise()
-    g.server:exec(function()
-        t.assert_error_msg_equals(
-            'SSL is not available in this build',
-            box.cfg, {replication = 'localhost:0?transport=ssl'})
-    end)
-end
-
-g.test_net_box_ssl = function()
-    t.tarantool.skip_if_enterprise()
-    t.assert_error_msg_equals(
-        'SSL is not available in this build',
-        net.connect, {g.server.net_box_uri, params = {transport = 'ssl'}})
-end

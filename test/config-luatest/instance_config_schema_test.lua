@@ -466,56 +466,6 @@ local function check_validate_iproto()
 end
 
 g.test_iproto = function()
-    t.tarantool.skip_if_enterprise()
-    local iconfig = {
-        iproto = {
-            listen = {{
-                uri = 'one',
-                params = {
-                    transport = 'ssl',
-                },
-            }},
-            advertise = {
-                client = 'two',
-                peer = {
-                    uri = 'three',
-                    login = 'four',
-                    params = {
-                        transport = 'plain',
-                    },
-                    password = 'five',
-                },
-                sharding = {
-                    uri = 'six',
-                    login = 'seven',
-                    params = {
-                        transport = 'ssl',
-                    },
-                    password = 'ten',
-                },
-            },
-            threads = 1,
-            net_msg_max = 1,
-            readahead = 1,
-        },
-    }
-    instance_config:validate(iconfig)
-    validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
-    check_validate_iproto()
-    local exp = {
-        advertise = {
-            client = box.NULL,
-        },
-        threads = 1,
-        net_msg_max = 768,
-        readahead = 16320,
-    }
-    local res = instance_config:apply_default({}).iproto
-    t.assert_equals(res, exp)
-end
-
-g.test_iproto_enterprise = function()
-    t.tarantool.skip_if_not_enterprise()
     local iconfig = {
         iproto = {
             listen = {{

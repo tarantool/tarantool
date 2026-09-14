@@ -64,10 +64,6 @@ local function sensitive(schema_node)
     return schema_node
 end
 
-local function sensitive_ee(schema_node)
-    return sensitive(enterprise_edition(schema_node))
-end
-
 local function vshard_since_apply_default_if(_data, w)
     -- Apply the default only when the installed vshard accepts the option.
     --
@@ -450,22 +446,22 @@ return schema.new('instance_config', schema.record({
                             'plain',
                             'ssl',
                         }),
-                        ssl_key_file = enterprise_edition(schema.scalar({
+                        ssl_key_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_cert_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_ca_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_ciphers = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_password = sensitive(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_cert_file = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_ca_file = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_ciphers = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_password = sensitive_ee(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_password_file = sensitive_ee(schema.scalar({
+                        ssl_password_file = sensitive(schema.scalar({
                             type = 'string',
                         })),
                     }),
@@ -732,23 +728,23 @@ return schema.new('instance_config', schema.record({
                         'ssl',
                     }),
                     -- Mandatory server options for TLS.
-                    ssl_key_file = enterprise_edition(schema.scalar({
+                    ssl_key_file = schema.scalar({
                         type = 'string',
-                    })),
-                    ssl_cert_file = enterprise_edition(schema.scalar({
+                    }),
+                    ssl_cert_file = schema.scalar({
                         type = 'string',
-                    })),
+                    }),
                     -- Optional server options for TLS.
-                    ssl_ca_file = enterprise_edition(schema.scalar({
+                    ssl_ca_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_ciphers = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_password = sensitive(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_ciphers = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password = sensitive_ee(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password_file = sensitive_ee(schema.scalar({
+                    ssl_password_file = sensitive(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -837,22 +833,22 @@ return schema.new('instance_config', schema.record({
                         'plain',
                         'ssl',
                     }),
-                    ssl_ca_file = enterprise_edition(schema.scalar({
+                    ssl_ca_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_cert_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_ciphers = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_key_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_password = sensitive(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_cert_file = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_ciphers = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_key_file = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password = sensitive_ee(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password_file = sensitive_ee(schema.scalar({
+                    ssl_password_file = sensitive(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -875,22 +871,22 @@ return schema.new('instance_config', schema.record({
                         'plain',
                         'ssl',
                     }),
-                    ssl_ca_file = enterprise_edition(schema.scalar({
+                    ssl_ca_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_cert_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_ciphers = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_key_file = schema.scalar({
+                        type = 'string',
+                    }),
+                    ssl_password = sensitive(schema.scalar({
                         type = 'string',
                     })),
-                    ssl_cert_file = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_ciphers = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_key_file = enterprise_edition(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password = sensitive_ee(schema.scalar({
-                        type = 'string',
-                    })),
-                    ssl_password_file = sensitive_ee(schema.scalar({
+                    ssl_password_file = sensitive(schema.scalar({
                         type = 'string',
                     })),
                 }),
@@ -914,7 +910,7 @@ return schema.new('instance_config', schema.record({
             box_cfg = 'readahead',
             default = 16320,
         })),
-        ssl = enterprise_edition(schema.record({
+        ssl = schema.record({
             ca_file = schema.scalar({
                 type = 'string',
             }),
@@ -933,7 +929,7 @@ return schema.new('instance_config', schema.record({
             ssl_password_file = sensitive(schema.scalar({
                 type = 'string',
             })),
-        })),
+        }),
     }),
     session = schema.record({
         -- Per-user client IPROTO session options.
@@ -2227,22 +2223,22 @@ return schema.new('instance_config', schema.record({
                             'plain',
                             'ssl',
                         }),
-                        ssl_key_file = enterprise_edition(schema.scalar({
+                        ssl_key_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_cert_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_ca_file = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_ciphers = schema.scalar({
+                            type = 'string',
+                        }),
+                        ssl_password = sensitive(schema.scalar({
                             type = 'string',
                         })),
-                        ssl_cert_file = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_ca_file = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_ciphers = enterprise_edition(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_password = sensitive_ee(schema.scalar({
-                            type = 'string',
-                        })),
-                        ssl_password_file = sensitive_ee(schema.scalar({
+                        ssl_password_file = sensitive(schema.scalar({
                             type = 'string',
                         })),
                         ssl_verify_client = schema.enum({

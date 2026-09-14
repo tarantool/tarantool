@@ -40,7 +40,8 @@ set(core_sources
     mp_interval.c
     prbuf.c
     clock_lowres.c
-    ssl_init.c
+    ssl.c
+    ssl_error.cc
     tt_sigaction.c
     tt_strerror.c
     mp_util.c
@@ -64,12 +65,6 @@ if(ENABLE_TUPLE_COMPRESSION)
     list(APPEND core_sources ${TUPLE_COMPRESSION_CORE_SOURCES})
 else()
     list(APPEND core_sources  tt_compression.c)
-endif()
-
-if(ENABLE_SSL)
-    list(APPEND core_sources ${SSL_SOURCES})
-else()
-    list(APPEND core_sources ssl.c ssl_error.cc)
 endif()
 
 include_directories(${OPENSSL_INCLUDE_DIR}
