@@ -35,6 +35,10 @@ configure:
 luacheck: configure
 	${CMAKE_BUILD} --target luacheck
 
+.PHONY: option-consistency
+option-consistency: configure
+	${CMAKE_BUILD} --target option-consistency
+
 # Building
 
 .PHONY: build
