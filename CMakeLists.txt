@@ -482,6 +482,15 @@ set(EMBED_LUAZLIB ${BUILD_STATIC})
 add_custom_target(build_bundled_libs)
 
 #
+# 'make build-option-consistency' compares the options of the bundled libraries'
+# CMake projects with the options that are passed to them or excluded
+# explicitly. A bundled library adds its check to the dependency list of
+# this target. The check is for a maintainer updating a library, it is not
+# a part of the build.
+#
+add_custom_target(build-option-consistency)
+
+#
 # ZSTD
 #
 
@@ -586,6 +595,7 @@ if (ENABLE_BUNDLED_LIBCURL)
     include(BuildLibCURL)
     curl_build()
     add_dependencies(build_bundled_libs bundled-libcurl)
+    add_dependencies(build-option-consistency curl-build-option-consistency)
 else()
     set(CURL_FIND_REQUIRED ON)
     find_package(CURL)
