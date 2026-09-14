@@ -11,6 +11,7 @@ _add_test_suite_target(${TEST_SUITE_NAME}
 list(APPEND TEST_ENV
   "LUA_PATH=${LUATEST_LUA_PATH}"
   "VARDIR=${VARDIR}"
+  "${TARANTOOL_ASAN_OPTIONS}"
 )
 
 file(GLOB tests ${CMAKE_CURRENT_SOURCE_DIR} *_test.lua)
