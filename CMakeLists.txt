@@ -486,7 +486,7 @@ endif()
 #
 if(OPENSSL_USE_STATIC_LIBS)
     set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
-    if(ENABLED_BUNDLED_OPENSSL AND ENABLE_BUNDLED_ZLIB)
+    if(ENABLE_BUNDLED_OPENSSL AND ENABLE_BUNDLED_ZLIB)
         add_dependencies(bundled-openssl bundled-zlib)
     endif()
 endif()
