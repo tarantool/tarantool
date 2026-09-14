@@ -86,6 +86,10 @@ macro(curl_build)
     string(REPLACE ";" "$<SEMICOLON>" LIBCURL_FIND_ROOT_PATH_STR "${LIBCURL_FIND_ROOT_PATH}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${LIBCURL_FIND_ROOT_PATH_STR}")
 
+    # Look for c-ares and nghttp2 at the paths above, not at the ones given
+    # by pkg-config, which describes the packages installed on the host.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_PKGCONFIG=OFF")
+
     # On cmake CURL_USE_LIBSSH2 flag is enabled by default, we need to switch it
     # off to avoid of issues, like:
     #   ld: libssh2.c:(.text+0x4d8): undefined reference to `libssh2_*...
