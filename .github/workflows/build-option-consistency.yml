@@ -1,0 +1,23 @@
+name: Verify build options passed to subprojects
+
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Disable man-db triggers
+        uses: ./.github/actions/disable-man-db-triggers
+      - name: Install deps
+        run: sudo apt-get install -y libreadline-dev
+      - name: Configure
+        run: cmake .
+      - name: The check itself
+        run: cmake --build . --parallel $(nproc) --target build-option-consistency
