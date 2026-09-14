@@ -147,6 +147,13 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_RANLIB=${CMAKE_RANLIB}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_NM=${CMAKE_NM}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_STRIP=${CMAKE_STRIP}")
+    # curl-cmake-option-consistency check doesn't see untyped entries: the
+    # type is set either by the command that defines the entry (find_program()
+    # in this case) or from the command line (:FILEPATH). CMake looks for the
+    # make program only when it is not given from the command line, so we have
+    # to set the type here.
+    list(APPEND LIBCURL_CMAKE_FLAGS
+        "-DCMAKE_MAKE_PROGRAM:FILEPATH=${CMAKE_MAKE_PROGRAM}")
 
     # Need to set values explicitly everything that is default, because
     # we don't know how defaults will be changed in a future and we don't
