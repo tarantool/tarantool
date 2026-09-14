@@ -5,12 +5,6 @@
  */
 #pragma once
 
-#include "trivia/config.h"
-
-#if defined(ENABLE_SSL)
-# include "ssl_error_impl.h"
-#else /* !defined(ENABLE_SSL) */
-
 #include <stddef.h>
 
 #include "exception.h"
@@ -34,9 +28,8 @@ public:
 	SSLError(const char *file, unsigned line)
 		: Exception(&type_SSLError, file, line) {}
 	SSLError() : SSLError(NULL, 0) {}
+	SSLError(const char *file, unsigned line, const char *format, ...);
 	virtual void raise() { throw this; }
 };
 
 #endif /* defined(__cplusplus) */
-
-#endif /* !defined(ENABLE_SSL) */

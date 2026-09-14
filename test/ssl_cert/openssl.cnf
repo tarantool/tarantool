@@ -1,0 +1,16 @@
+openssl_conf = openssl_def
+
+[ req ]
+distinguished_name = req_dn
+
+[ req_dn ]
+
+[ openssl_def ]
+engines = engine_section
+
+[ engine_section ]
+gost = gost_section
+
+[ gost_section ]
+engine_id = gost
+default_algorithms = ALL

@@ -9,17 +9,11 @@ local g = t.group()
 
 local passwd = '123qwe'
 local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
-                              'test/enterprise-luatest/ssl_cert')
+                              'test/ssl_cert')
 local ca_file = fio.pathjoin(cert_dir, 'ca.crt')
 local cert_file = fio.pathjoin(cert_dir, 'client.crt')
 local key_file = fio.pathjoin(cert_dir, 'client.enc.key')
 local ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
-
-g.before_all(function()
-    t.tarantool.skip_if_not_enterprise(
-        'The iproto.ssl option is supported only by Tarantool ' ..
-        'Enterprise Edition')
-end)
 
 local function base_config(g)
     return cbuilder:new()

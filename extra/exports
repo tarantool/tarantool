@@ -331,6 +331,7 @@ say_set_modules
 space_bsize
 space_by_id
 space_run_triggers
+ssl_openssl_version_number
 string_strip_helper
 swim_add_member
 swim_broadcast

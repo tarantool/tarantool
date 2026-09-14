@@ -1768,22 +1768,6 @@ g.test_iproto_listen_to_advertise = function()
 end
 
 g.test_iproto_listen_ssl = function()
-    t.tarantool.skip_if_enterprise()
-    helpers.failure_case({
-        options = {
-            ['iproto.listen'] = {
-                {
-                    uri = 'unix/:./{{ instance_name }}.iproto',
-                    params = {transport = 'ssl'},
-                },
-            },
-        },
-        exp_err = 'SSL is not available in this build',
-    })
-end
-
-g.test_iproto_listen_ssl_enterprise = function()
-    t.tarantool.skip_if_not_enterprise()
     local dir = treegen.prepare_directory({}, {})
     local passwd = '123qwe'
     local passwd_file = fio.pathjoin(dir, 'passwd.txt')
@@ -1793,7 +1777,7 @@ g.test_iproto_listen_ssl_enterprise = function()
     file:write(passwd)
     file:close()
     local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
-                                  'test/enterprise-luatest/ssl_cert')
+                                  'test/ssl_cert')
     local ca_file = fio.pathjoin(cert_dir, 'ca.crt')
     local cert_file = fio.pathjoin(cert_dir, 'client.crt')
     local key_file = fio.pathjoin(cert_dir, 'client.enc.key')
@@ -1836,11 +1820,10 @@ g.test_iproto_listen_ssl_enterprise = function()
     })
 end
 
-g.test_replication_ssl_enterprise = function()
-    t.tarantool.skip_if_not_enterprise()
+g.test_replication_ssl = function()
     local dir = treegen.prepare_directory({}, {})
     local cert_dir = fio.pathjoin(fio.abspath(os.getenv('SOURCEDIR') or '.'),
-                                  'test/enterprise-luatest/ssl_cert')
+                                  'test/ssl_cert')
 
     local passwd_file = fio.pathjoin(dir, 'passwd.txt')
     local file = fio.open(passwd_file, {'O_WRONLY', 'O_CREAT'},
