@@ -1390,7 +1390,20 @@ space_execute_insert_arrow(struct space *space, struct txn *txn,
 	 * In case of replication the request may contain both IPC and in-memory
 	 * versions of the arrow data, which was decoded by the applier thread.
 	 */
-	rc = space->vtab->execute_insert_arrow(space, txn, array, schema);
+	/*
+	 * If the batch is not inserted contiguously but has to be split into a
+	 * number of single inserts, it's going to be processed much slower than
+	 * in a good case so the implementation might decide to throw an error
+	 * instead. But this might be required in case a woken-up master starts
+	 * sending its not replicated rows to replicas after time of inactivity
+	 * while another node was the master. So inform the implementation it
+	 * must allow this case if the request came from replication or WAL.
+	 */
+	bool must_allow_intersecting =
+		(request->header != NULL && request->header->replica_id != 0) ||
+		ERROR_INJECTED(ERRINJ_INSERT_ARROW_MUST_ALLOW_INTERSECTING);
+	rc = space->vtab->execute_insert_arrow(space, txn, array, schema,
+					       must_allow_intersecting);
 
 	if (array->release != NULL)
 		array->release(array);
@@ -1569,11 +1582,13 @@ generic_space_bsize(struct space *space)
 int
 generic_space_execute_insert_arrow(struct space *space, struct txn *txn,
 				   struct ArrowArray *array,
-				   struct ArrowSchema *schema)
+				   struct ArrowSchema *schema,
+				   bool must_allow_intersecting)
 {
 	(void)txn;
 	(void)array;
 	(void)schema;
+	(void)must_allow_intersecting;
 	diag_set(ClientError, ER_UNSUPPORTED, space->engine->name,
 		 "arrow format");
 	return -1;

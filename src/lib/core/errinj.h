@@ -227,6 +227,7 @@ struct errinj {
 	_(ERRINJ_XLOG_WRITE_INVALID_VALUE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_WRITE_UNKNOWN_KEY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_WRITE_UNKNOWN_TYPE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_INSERT_ARROW_MUST_ALLOW_INTERSECTING, ERRINJ_BOOL, {.bparam = false}) \
 	ERRINJ_EXTRAS(_)
 
 ENUM0(errinj_id, ERRINJ_LIST);
@@ -253,6 +254,7 @@ errinj_foreach(errinj_cb cb, void *cb_ctx);
 void errinj_set_with_environment_vars(void);
 
 #ifdef NDEBUG
+#  define ERROR_INJECTED(ID) (false)
 #  define ERROR_INJECT(ID, CODE)
 #  define ERROR_INJECT_COND(ID, TYPE, COND, CODE)
 #  define ERROR_INJECT_WHILE(ID, CODE)
@@ -267,6 +269,7 @@ void errinj_set_with_environment_vars(void);
 		assert(errinjs[ID].type == TYPE); \
 		&errinjs[ID]; \
 	})
+#  define ERROR_INJECTED(ID) (errinj(ID, ERRINJ_BOOL)->bparam)
 #  define ERROR_INJECT(ID, CODE) \
 	do { \
 		if (errinj(ID, ERRINJ_BOOL)->bparam) \
