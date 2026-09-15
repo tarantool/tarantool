@@ -900,13 +900,11 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 
 	struct tuple *old_tuple;
 	for (uint32_t i = 0; i < index_count; i++) {
-		struct tuple *unused;
 		struct index *index = space->index[i];
 		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
 			/* Rollback must not fail. */
-			if (memtx_index_replace(index, new_tuple,
-						old_tuple, DUP_INSERT,
-						&unused, &unused) != 0) {
+			if (memtx_index_replace(index, new_tuple, old_tuple,
+						DUP_INSERT, NULL) != 0) {
 				diag_log();
 				unreachable();
 				panic("failed to rollback change");
