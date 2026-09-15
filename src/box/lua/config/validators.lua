@@ -1,4 +1,3 @@
-local tarantool = require('tarantool')
 local urilib = require('uri')
 local uuid = require('uuid')
 local network = require('internal.config.utils.network')
@@ -403,19 +402,6 @@ M['replication.failover'] = function(_data, w)
 end
 
 -- }}} replication
-
--- {{{ security
-
-M['security.auth_type'] = function(auth_type, w)
-    if auth_type ~= 'chap-sha1' and
-            tarantool.package ~= 'Tarantool Enterprise' then
-        w.error('"chap-sha1" is the only authentication method ' ..
-                '(auth_type) available in Tarantool Community ' ..
-                'Edition (%q requested)', auth_type)
-    end
-end
-
--- }}} security
 
 -- {{{ session
 

@@ -1705,35 +1705,23 @@ end
 
 g.test_security_community = function()
     t.tarantool.skip_if_enterprise()
+
     local iconfig = {
         security = {
             auth_type = 'pap-sha256',
+            auth_delay = 5,
         }
     }
 
     local ok, err = pcall(instance_config.validate, instance_config, iconfig)
     t.assert_not(ok)
-    local exp = '[instance_config] security.auth_type: "chap-sha1" is the ' ..
-                'only authentication method (auth_type) available in ' ..
-                'Tarantool Community Edition (\"pap-sha256\" requested)'
+    local exp = '[instance_config] security.auth_delay: This configuration ' ..
+                'parameter is available only in Tarantool Enterprise Edition'
     t.assert_equals(err, exp)
 
     iconfig = {
         security = {
-            auth_type = 'chap-sha1',
-            auth_delay = 5,
-        }
-    }
-
-    ok, err = pcall(instance_config.validate, instance_config, iconfig)
-    t.assert_not(ok)
-    exp = '[instance_config] security.auth_delay: This configuration ' ..
-          'parameter is available only in Tarantool Enterprise Edition'
-    t.assert_equals(err, exp)
-
-    iconfig = {
-        security = {
-            auth_type = 'chap-sha1',
+            auth_type = 'pap-sha256',
         }
     }
 

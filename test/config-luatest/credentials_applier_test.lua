@@ -379,10 +379,6 @@ g.test_set_password = function()
     }
 
     for _, auth_type in ipairs(auth_types) do
-        if auth_type == 'pap-sha256' then
-            t.tarantool.skip_if_not_enterprise()
-        end
-
         local child = it.new()
 
         local dir = treegen.prepare_directory({}, {})
@@ -1047,8 +1043,6 @@ g.test_lua_eval_lua_call_sql = function()
 end
 
 g.test_consider_auth_type_for_passwods = function(g)
-    t.tarantool.skip_if_not_enterprise()
-
     helpers.reload_success_case(g, {
         options = {
             credentials = {
