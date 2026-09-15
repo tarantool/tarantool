@@ -75,8 +75,15 @@ engine_shutdown(void)
 void
 engine_free(void)
 {
+	/*
+	 * Free engines in the reverse of their registration order: an engine
+	 * registered later may hold a reference to (and share allocator state
+	 * with) an engine registered earlier, e.g. memcs and quiver both keep
+	 * a pointer to the memtx engine and allocate memory through memtx's
+	 * shared allocators.
+	 */
 	struct engine *engine;
-	for (int i = 0; i < engine_count; i++) {
+	for (int i = engine_count - 1; i >= 0; i--) {
 		engine = engines[i];
 		engines[i] = NULL;
 		engine->vtab->free(engine);
