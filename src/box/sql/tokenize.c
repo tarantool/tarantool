@@ -384,7 +384,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		}
 		return i;
 	case CC_VAR_ANON:
-		*type = TK_VAR_ANON;
+		*type = TK_VARIABLE;
 		i = 1;
 		if (IdChar(z[i]) != 0) {
 			*type = TK_ILLEGAL;
@@ -396,7 +396,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		*type = TK_COLON;
 		return 1;
 	case CC_VAR_NAME:
-		*type = TK_VAR_NAME;
+		*type = TK_VARIABLE;
 		if (IdChar(z[1]) == 0) {
 			*type = TK_ILLEGAL;
 			return 1;
@@ -409,7 +409,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		}
 		return i;
 	case CC_VAR_NUM:
-		*type = TK_VAR_NUM;
+		*type = TK_VARIABLE;
 		if (sqlIsdigit(z[1]) == 0)
 			*type = TK_ILLEGAL;
 		for (i = 1; sqlIsdigit(z[i]) != 0; i++) {
