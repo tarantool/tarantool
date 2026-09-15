@@ -2603,7 +2603,8 @@ ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 static inline bool
 sql_token_is_variable(int op)
 {
-	return op == TK_VAR_NAME || op == TK_VAR_NUM || op == TK_VAR_ANON;
+	return op == TK_VARIABLE || op == TK_VAR_NAME || op == TK_VAR_NUM ||
+	       op == TK_VAR_ANON;
 }
 
 /**

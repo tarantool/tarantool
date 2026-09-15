@@ -54,6 +54,9 @@ extras="            \
     SPACE           \
     ILLEGAL         \
     GETITEM         \
+    VAR_NAME        \
+    VAR_NUM         \
+    VAR_ANON        \
 "
 
 IFS=" "
