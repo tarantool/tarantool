@@ -274,7 +274,7 @@ g.test_wrong_field_constraint = function(cg)
         local func_id = box.func.field_constr1.id
         t.assert_equals(box.space.test:format(),
                         { {constraint = {field_constr1 = func_id},
-                           name = "id1", type = "any"},
+                           name = "id1", type = "unsigned"}, -- cause of pk
                           {name = "id2", type = "any"} })
     end)
 end
@@ -522,7 +522,7 @@ g.test_field_constraint_integrity = function(cg)
 
         t.assert_equals(s:select{}, {{1, 2, 300}, {100, 2, 3}})
         t.assert_equals(s:format(),
-            { {name = "id1", type = "any"},
+            { {name = "id1", type = "unsigned"},
               {constraint = {field_constr2 = box.func.field_constr2.id},
                name = "id2", type = "any"}
             })
