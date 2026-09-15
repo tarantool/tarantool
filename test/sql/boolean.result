@@ -389,7 +389,7 @@ SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---
  | - true
  | ...
-box.execute('SELECT ?, ?, return_type($1), TYPEOF($2);', {true, false})
+box.execute('SELECT $1, $2, return_type($1), TYPEOF($2);', {true, false})
  | ---
  | - metadata:
  |   - name: COLUMN_1

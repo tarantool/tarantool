@@ -798,8 +798,8 @@ space:replace{1, 2, '3'}
 space:select()
 -- select is empty, because transaction was not commited
 conn.space.TEST:select()
-stream_pr = stream:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
-conn_pr = conn:prepare("SELECT * FROM TEST WHERE ID = ? AND A = ?;")
+stream_pr = stream:prepare("SELECT * FROM TEST WHERE ID = $1 AND A = $2;")
+conn_pr = conn:prepare("SELECT * FROM TEST WHERE ID = $1 AND A = $2;")
 assert(stream_pr.stmt_id == conn_pr.stmt_id)
 -- [ 1, 2, '3' ]
 stream:execute(stream_pr.stmt_id, {1, 2})

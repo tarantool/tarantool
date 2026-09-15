@@ -151,6 +151,14 @@ sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
 	return 0;
 }
 
+/**
+ * This function finds the position among bind variables
+ * whose name matches the specified one.
+ */
+uint32_t
+sql_bind_find_name(const struct sql_bind *bind, uint32_t bind_count,
+		   const char *name);
+
 #if defined(__cplusplus)
 } /* extern "C" { */
 #endif
