@@ -1734,7 +1734,6 @@ return schema.new('instance_config', schema.record({
         }, {
             box_cfg = 'auth_type',
             default = 'chap-sha1',
-            validate = validators['security.auth_type'],
         }),
         auth_delay = enterprise_edition(duration(schema.scalar({
             type = 'number',

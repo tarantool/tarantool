@@ -267,6 +267,7 @@ set(box_sources
     user.cc
     authentication.c
     auth_chap_sha1.c
+    auth_pap_sha256.c
     replication.cc
     recovery.cc
     xstream.cc

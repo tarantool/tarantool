@@ -13,6 +13,7 @@
 
 #include "assoc.h"
 #include "auth_chap_sha1.h"
+#include "auth_pap_sha256.h"
 #include "base64.h"
 #include "diag.h"
 #include "errcode.h"
@@ -172,6 +173,7 @@ auth_init(void)
 	struct auth_method *method = auth_chap_sha1_new();
 	AUTH_METHOD_DEFAULT = method;
 	auth_method_register(method);
+	auth_method_register(auth_pap_sha256_new());
 }
 
 void
