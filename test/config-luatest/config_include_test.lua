@@ -1,4 +1,4 @@
-local t = require('luatest')
+local t = require("luatest")
 local server = require('luatest.server')
 local treegen = require('luatest.treegen')
 local yaml = require('yaml')
