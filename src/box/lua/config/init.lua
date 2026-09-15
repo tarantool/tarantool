@@ -8,6 +8,7 @@ local aboard = require('internal.config.utils.aboard')
 local tarantool = require('tarantool')
 local textutils = require('internal.config.utils.textutils')
 local log = require('internal.config.utils.log')
+local ssl_certificate = require('internal.ssl_certificate')
 
 -- Tarantool Enterprise Edition has its own additions
 -- for config module.
@@ -613,6 +614,7 @@ function methods._post_apply(self)
             applier.post_apply(self)
         end
     end
+    ssl_certificate.apply(self)
 end
 
 -- Set proper status depending on received alerts.
