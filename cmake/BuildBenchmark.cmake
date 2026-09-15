@@ -34,7 +34,6 @@ ExternalProject_Add(bundled-benchmark-project
     INSTALL_COMMAND ""
     CMAKE_GENERATOR ${CMAKE_GENERATOR}
     BUILD_BYPRODUCTS ${BENCHMARK_LIB} ${BENCHMARK_LIB_MAIN}
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_library(bundled-benchmark STATIC IMPORTED GLOBAL)
