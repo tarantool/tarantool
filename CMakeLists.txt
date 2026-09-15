@@ -21,6 +21,16 @@ include(ExternalProject)
 include(CheckPatch)
 include(MakeLuaPath)
 
+# We have to set OLD or NEW to silence warnings on CMake 3.24+.
+#
+# NEW works smoother: re-downloading archive sources (due to, say, changing
+# the project's URL) triggers rebuilding of the subproject.
+#
+# https://cmake.org/cmake/help/latest/policy/CMP0135.html
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 find_program(ECHO echo)
 find_program(CAT cat)
 find_program(BASH bash)
