@@ -4112,7 +4112,8 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 				size_t len = strlen(str);
 				char *name = sql_name_new(str, len);
 				pList->a[i].zName = name;
-				if (pList->a[i].zSpan[0] != '"') {
+				if (pList->a[i].zSpan[0] != '"' &&
+				    sql_legacy_name_normalization) {
 					pList->a[i].legacy_name =
 						sql_legacy_name_new(str, len);
 				}

@@ -2446,6 +2446,12 @@ return schema.new('instance_config', schema.record({
         }, {
             default = 'old',
         }),
+        sql_legacy_name_normalization = schema.enum({
+            'old',
+            'new',
+        }, {
+            default = 'old',
+        }),
     }),
     -- Instance labels.
     labels = schema.map({
