@@ -996,16 +996,13 @@ expr(A) ::= COLON(X) id(Y). {
   A.pExpr = expr_new_variable(pParse, &X, &Y, TK_VAR_NAME);
   spanSet(&A, &X, &Y);
 }
-expr(A) ::= VAR_NAME(X). {
-  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_NAME);
-  spanSet(&A, &X, &X);
-}
-expr(A) ::= VAR_NUM(X). {
-  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_NUM);
-  spanSet(&A, &X, &X);
-}
-expr(A) ::= VAR_ANON(X). {
-  A.pExpr = expr_new_variable(pParse, &X, NULL, TK_VAR_ANON);
+expr(A) ::= VARIABLE(X). {
+  uint8_t var_op = TK_VAR_NAME;
+  if (X.z[0] == '$')
+    var_op = TK_VAR_NUM;
+  else if (X.z[0] == '?')
+    var_op = TK_VAR_ANON;
+  A.pExpr = expr_new_variable(pParse, &X, NULL, var_op);
   spanSet(&A, &X, &X);
 }
 expr(A) ::= expr(A) COLLATE id(C). {
