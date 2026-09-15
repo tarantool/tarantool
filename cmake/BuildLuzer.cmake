@@ -39,7 +39,6 @@ ExternalProject_Add(bundled-luzer
   INSTALL_COMMAND ""
   CMAKE_GENERATOR ${CMAKE_GENERATOR}
   BUILD_BYPRODUCTS ${LUZER_LIBRARIES}
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 add_dependencies(bundled-luzer libluajit_static)
