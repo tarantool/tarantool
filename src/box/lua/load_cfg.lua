@@ -87,10 +87,17 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+local function ifdef_memtx_memory_check(value)
+    if private.memtx_memory_check_supported then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
     memtx_memory        = 256 * 1024 *1024,
+    memtx_memory_recovery_check = ifdef_memtx_memory_check('off'),
     strip_core          = true,
     memtx_min_tuple_size = 16,
     memtx_max_tuple_size = 1024 * 1024,
@@ -283,6 +290,7 @@ end
 local template_cfg = {
     listen              = 'string, number, table',
     memtx_memory        = 'number',
+    memtx_memory_recovery_check = ifdef_memtx_memory_check('string'),
     strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',
     memtx_max_tuple_size  = 'number',

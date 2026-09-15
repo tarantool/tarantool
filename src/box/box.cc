@@ -94,6 +94,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "memtx_memory_check.h"
 #include "mp_util.h"
 #include "small/static.h"
 #include "memory.h"
@@ -1837,6 +1838,8 @@ box_check_config(void)
 	if (box_check_wal_retention_period() < 0)
 		diag_raise();
 	if (box_check_memory_quota("memtx_memory") < 0)
+		diag_raise();
+	if (box_check_memtx_memory_recovery_check() != 0)
 		diag_raise();
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	if (box_check_allocator() != 0)
@@ -4923,6 +4926,13 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		}
 	}
 
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+
+	if (memtx_memory_check_recovery(memtx, recovery) != 0)
+		diag_raise();
+
 	/*
 	 * recovery->vclock is needed by Vinyl to filter
 	 * WAL rows that were dumped before restart.
@@ -4933,10 +4943,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * and explicitly pass the statement LSN to it.
 	 */
 	engine_begin_initial_recovery_xc(&recovery->vclock);
-
-	struct memtx_engine *memtx;
-	memtx = (struct memtx_engine *)engine_by_name("memtx");
-	assert(memtx != NULL);
 
 	/*
 	 * We explicitly request memtx to recover its
@@ -5116,6 +5122,8 @@ box_cfg_xc(void)
 {
 	box_set_force_recovery();
 	box_storage_init();
+	if (box_set_memtx_memory_recovery_check() != 0)
+		diag_raise();
 	title("loading");
 
 	struct tt_uuid instance_uuid, replicaset_uuid;
@@ -5608,9 +5616,15 @@ box_storage_free(void)
 	iproto_free();
 	replication_free();
 	gc_free();
+	/*
+	 * The WAL thread reads the memtx quota when it creates an
+	 * xlog file, including the empty one made right before the
+	 * thread exits, so it must be stopped while the engines
+	 * are still alive.
+	 */
+	wal_free();
 	engine_shutdown();
 	/* schema_free(); */
-	wal_free();
 	flightrec_free();
 	audit_log_free();
 	sql_built_in_functions_cache_free();
