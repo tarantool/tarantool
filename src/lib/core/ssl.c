@@ -10,10 +10,13 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 
@@ -102,6 +105,54 @@ ssl_free(void)
 #ifdef OPENSSL_cleanup
 	OPENSSL_cleanup();
 #endif
+}
+
+/** Read the first PEM certificate expiry time as a Unix timestamp. */
+int
+ssl_cert_get_not_after(const char *path, int64_t *timestamp)
+{
+	*timestamp = 0;
+	BIO *bio = BIO_new_file(path, "r");
+	if (bio == NULL) {
+		diag_set(SSLError, "Error opening SSL certificate '%s'", path);
+		return -1;
+	}
+	X509 *cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	if (cert == NULL) {
+		diag_set(SSLError, "Error loading SSL certificate '%s'", path);
+		BIO_free(bio);
+		return -1;
+	}
+	time_t now = time(NULL);
+	if (now == (time_t)-1) {
+		diag_set(SSLError, "Failed to get current time");
+		X509_free(cert);
+		BIO_free(bio);
+		return -1;
+	}
+	ASN1_TIME *asn1_now = ASN1_TIME_set(NULL, now);
+	if (asn1_now == NULL) {
+		diag_set(SSLError, "Failed to convert current time to ASN.1");
+		X509_free(cert);
+		BIO_free(bio);
+		return -1;
+	}
+	int days;
+	int seconds;
+	if (ASN1_TIME_diff(&days, &seconds, asn1_now,
+			   X509_get0_notAfter(cert)) != 1) {
+		diag_set(SSLError,
+			 "Invalid expiry time in SSL certificate '%s'", path);
+		ASN1_TIME_free(asn1_now);
+		X509_free(cert);
+		BIO_free(bio);
+		return -1;
+	}
+	*timestamp = (int64_t)now + (int64_t)days * 24 * 60 * 60 + seconds;
+	ASN1_TIME_free(asn1_now);
+	X509_free(cert);
+	BIO_free(bio);
+	return 0;
 }
 
 /**
