@@ -859,7 +859,7 @@ local function index_opts(space, is_primary)
     local n_parts = math.random(1, #possible_fields)
     local id = unique_ids(n_parts)
     local is_nullable_support = not is_primary and
-        tarantool_indices[opts.type].is_nullable_support
+        tarantool_indices[idx].is_nullable_support
     for i = 1, n_parts do
         local field_id = id()
         local field = possible_fields[field_id]
@@ -887,7 +887,7 @@ local function index_opts(space, is_primary)
             part.type = 'unsigned'
         end
         table.insert(opts.parts, part)
-        if not tarantool_indices[opts.type].is_multipart and
+        if not tarantool_indices[idx].is_multipart and
            i == 1 then
             break
         end
