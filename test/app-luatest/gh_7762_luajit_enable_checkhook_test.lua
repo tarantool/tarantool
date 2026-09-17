@@ -91,6 +91,9 @@ g.test_luajit_enable_checkhook = function()
     local sum = sumN(3)
 
     -- Remove debug hook.
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1176
+    ---@diagnostic disable-next-line: missing-parameter
     debug.sethook()
 
     -- Check all lines have been hit by the debug hook above.

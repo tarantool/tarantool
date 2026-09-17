@@ -831,6 +831,9 @@ local samples = {
     true,
     {},
     function() end,
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1249
+    ---@diagnostic disable-next-line: missing-parameter
     newproxy(),
     box.NULL,
     1LL,
