@@ -149,6 +149,7 @@ g.test_config_enterprise = function()
     local iconfig = {
         config = {
             reload = 'auto',
+            reload_jitter = 0,
             context = {},
             etcd = {
                 prefix = '/one',
@@ -202,6 +203,7 @@ g.test_config_enterprise = function()
 
     local exp = {
         reload = 'auto',
+        reload_jitter = 0,
         storage = {
             timeout = 3,
             reconnect_after = 3,
