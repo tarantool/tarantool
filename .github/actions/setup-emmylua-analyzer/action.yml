@@ -1,0 +1,24 @@
+name: Setup emmylua_check on Linux
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Cache Cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          $HOME/.cargo/registry
+          $HOME/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Setup emmylua_check
+      run: cargo install emmylua_check --version 0.25.1
+      shell: bash
