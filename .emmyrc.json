@@ -37,7 +37,6 @@
       "generic-constraint-mismatch",
       "global-in-non-module",
       "inject-field",
-      "missing-parameter",
       "need-check-nil",
       "param-type-mismatch",
       "preferred-local-alias",
