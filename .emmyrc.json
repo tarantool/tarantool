@@ -4,6 +4,10 @@
     "version": "LuaJIT"
   },
   "workspace": {
+    "library": [
+      "third_party/checks/",
+      "third_party/metrics/"
+    ],
     "ignoreGlobs": [
       "build/**/*.lua",
       "luatest/**/*.lua",
