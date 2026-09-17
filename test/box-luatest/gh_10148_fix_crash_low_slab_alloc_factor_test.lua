@@ -35,6 +35,9 @@ g.test_low_slab_alloc_factor = function(cg)
         for i=1,1000000 do
             local ok, err = pcall(test.insert, test, {i, string.rep('x', 1000)})
             if not ok then
+                -- emmylua_check: false positive, see
+                -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1248
+                ---@diagnostic disable-next-line: missing-parameter
                 t.assert_equals(err:unpack().type, 'OutOfMemory')
                 break
             end

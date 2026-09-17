@@ -1,3 +1,8 @@
+-- emmylua_check: missing-parameter is a false positive for
+-- error_object:unpack() after pcall(); see
+-- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1248
+---@diagnostic disable: missing-parameter
+
 local t = require('luatest')
 local server = require('luatest.server')
 

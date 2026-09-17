@@ -977,6 +977,9 @@ g2.test_recovery_point_limit_precise_cleanup = function(cg)
             box.error.injection.set('ERRINJ_WAL_IO_COUNTDOWN', i)
             local ok, err = pcall(box.backup.recovery_point.create)
             if not ok then
+                -- emmylua_check: false positive, see
+                -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1248
+                ---@diagnostic disable-next-line: missing-parameter
                 t.assert_covers(err:unpack(), {
                     type = 'ClientError',
                     name = 'WAL_IO',
