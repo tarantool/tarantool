@@ -1,5 +1,21 @@
 {
   "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
+  "$comment": {
+    "access-invisible": "Reports Lua 5.3+ members (for example string.pack/string.unpack) that are not accessible in LuaJIT; the analyzer resolves them and then flags their use.",
+    "assign-type-mismatch": "Mostly legacy SQL tests and dynamic Lua where the inferred type differs from the declared one; fixing them requires a large test refactoring.",
+    "call-non-callable": "The analyzer often cannot infer the type of a value obtained from the C API or metatables and treats a valid call as non-callable.",
+    "duplicate-require": "Cannot be disabled per directory, see EmmyLuaLs/emmylua-analyzer-rust#1196; it mainly triggers on require() in luatest test bodies.",
+    "global-in-non-module": "Flags intentional _G.x assignments used to share state between the test body and server:exec() callbacks.",
+    "inject-field": "Tables are extended with new fields at runtime and the analyzer cannot know the resulting type.",
+    "need-check-nil": "The analyzer does not always propagate non-nil guarantees (assert(), pcall(), C API) and reports many false positives.",
+    "param-type-mismatch": "Many false positives caused by incomplete type information for the C API and dynamic Lua code.",
+    "preferred-local-alias": "Sometimes suggests a wrong replacement, for example it turns assert(a == b) into assert(a == a).",
+    "redefined-local": "More than two thousand warnings, mostly intentional shadowing in legacy tests.",
+    "undefined-field": "Fields assigned dynamically or through metatables are not known to the analyzer, which reports them as undefined.",
+    "unnecessary-if": "Conditions are often considered constant because of incomplete type information; most hits are in legacy SQL tests.",
+    "unresolved-require": "require() paths follow Tarantool's module layout and test-run helpers that the analyzer cannot resolve.",
+    "unused": "Unused locals and arguments are mostly intentional in legacy tests and C API wrappers; prefixing them with _ would be noisy."
+  },
   "workspace": {
     "library": [
       "third_party/checks/",
