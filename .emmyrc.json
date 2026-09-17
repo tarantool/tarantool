@@ -1,6 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
   "workspace": {
+    "library": [
+      "third_party/checks/",
+      "third_party/metrics/"
+    ],
+    "workspaceRoots": [
+      "third_party/checks/",
+      "third_party/metrics/"
+    ],
     "ignoreGlobs": [
       "build/**/*.lua",
       "luatest/**/*.lua",
