@@ -128,8 +128,10 @@ g.test_lua_call_all_with_built_in_func = function()
         rawset(_G, 'foo', function() return true end)
         t.assert(con:call('foo'))
         local info1 = con:call('box.info')
+        info1.uptime = nil
         info1.election.leader_idle = nil
         local info2 = box.info()
+        info2.uptime = nil
         info2.election.leader_idle = nil
         t.assert_equals(info1, info2)
     end)
