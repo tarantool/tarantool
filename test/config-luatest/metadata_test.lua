@@ -3,7 +3,7 @@ local file = require('internal.config.utils.file')
 
 local t = require('luatest')
 
----@class luatest.group
+---@class (partial) luatest.group
 local tg = t.group()
 
 local success_cases = {
@@ -158,7 +158,7 @@ local function write_file(path, content)
     fh:close()
 end
 
----@class g luatest.group
+---@class (partial) g luatest.group
 tg.test_module_metadata = function(g)
     assert(g.tmpdir ~= nil, 'Temporary directory is not set')
 
@@ -169,7 +169,7 @@ tg.test_module_metadata = function(g)
     end
 end
 
----@class g luatest.group
+---@class (partial) g luatest.group
 tg.test_file_metadata = function(g)
     assert(g.tmpdir ~= nil, 'Temporary directory is not set')
 
@@ -180,7 +180,7 @@ tg.test_file_metadata = function(g)
     end
 end
 
----@class g luatest.group
+---@class (partial) g luatest.group
 tg.test_metadata_with_errors = function(g)
     assert(g.tmpdir ~= nil, 'Temporary directory is not set')
 

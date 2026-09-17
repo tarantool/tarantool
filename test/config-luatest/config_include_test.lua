@@ -3,7 +3,7 @@ local server = require('luatest.server')
 local treegen = require('luatest.treegen')
 local yaml = require('yaml')
 
----@class luatest.group
+---@class (partial) luatest.group
 local g = t.group()
 
 local common_config = {
