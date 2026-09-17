@@ -27,8 +27,7 @@ local common = {
 local want_to_skip = {
     test_net_box_conn = false,
     test_replication_ssl_reconfig = false,
-    -- https://github.com/tarantool/tarantool/issues/13185
-    test_replication_and_connpool_ssl_reconfig = true,
+    test_replication_and_connpool_ssl_reconfig = false,
 }
 
 -- Common per test config.
@@ -223,6 +222,8 @@ local function cluster_config_base(opts)
     c:set_replicaset_option('bootstrap_leader', main_i)
     c:set_replicaset_option('replication.failover', 'manual')
     c:set_replicaset_option('leader', main_i)
+    -- Reduced timeout is enough for tests and it make them quickly.
+    c:set_replicaset_option('replication.connect_timeout', 10)
     if opts.election then
         c:set_replicaset_option('replication.failover', 'election')
         c:set_replicaset_option('leader', nil)
