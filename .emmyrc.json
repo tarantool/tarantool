@@ -48,7 +48,6 @@
       "param-type-mismatch",
       "preferred-local-alias",
       "redefined-local",
-      "return-type-mismatch",
       "undefined-field",
       "unnecessary-if",
       "unresolved-require",
