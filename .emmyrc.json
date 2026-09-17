@@ -35,7 +35,6 @@
       "access-invisible",
       "assign-type-mismatch",
       "call-non-callable",
-      "discard-returns",
       "duplicate-require",
       "duplicate-type",
       "generic-constraint-mismatch",
