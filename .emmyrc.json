@@ -38,7 +38,6 @@
       "assign-type-mismatch",
       "call-non-callable",
       "duplicate-require",
-      "duplicate-type",
       "global-in-non-module",
       "inject-field",
       "need-check-nil",

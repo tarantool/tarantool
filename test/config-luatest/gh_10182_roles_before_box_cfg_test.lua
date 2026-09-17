@@ -4,7 +4,7 @@ local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 local helpers = require('test.config-luatest.helpers')
 
----@class luatest.group
+---@class (partial) luatest.group
 local tg = helpers.group()
 
 local simple_role = [[
