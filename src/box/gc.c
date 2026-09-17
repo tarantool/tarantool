@@ -710,10 +710,10 @@ gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
 		assert(consumer->is_orphan);
 		consumer->is_orphan = false;
 		if (!consumer->is_inactive) {
-			/* Take vclock as a component-wise minimum. */
 			gc_tree_remove(&gc.active_consumers, consumer);
-			vclock_min(&consumer->vclock, vclock);
+			vclock_copy(&consumer->vclock, vclock);
 			gc_tree_insert(&gc.active_consumers, consumer);
+			gc_schedule_cleanup();
 		}
 		return consumer;
 	}
