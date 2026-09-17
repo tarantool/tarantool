@@ -36,7 +36,6 @@
     "disable": [
       "access-invisible",
       "assign-type-mismatch",
-      "await-in-sync",
       "call-non-callable",
       "deprecated",
       "discard-returns",
