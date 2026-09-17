@@ -222,6 +222,7 @@ local function say(self, level, fmt, ...)
                 msg[1] = nil
             end
             -- always encode tables as maps
+            ---@cast msg table
             setmetatable(msg, json.map_mt)
             -- indicate that message is already encoded in JSON
             format = fmt_num2str[ffi.C.SF_JSON]
