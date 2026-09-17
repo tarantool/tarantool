@@ -126,8 +126,10 @@ g.test_grant_builtins_lua_call = function()
 
         -- Check that user `alice` can call built-in functions.
         local info1 = con:call('box.info')
+        info1.uptime = nil
         info1.election.leader_idle = nil
         local info2 = box.info()
+        info2.uptime = nil
         info2.election.leader_idle = nil
         t.assert_equals(info1, info2)
     end)
