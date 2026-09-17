@@ -124,7 +124,7 @@ local function do_test(self, label, func, expect)
 
         -- If nothing is expected: just make sure there were no error.
         if expect == nil then
-            if table.getn(result) ~= 0 and result[1] ~= 0 then
+            if #result ~= 0 and result[1] ~= 0 then
                 test:fail(self, label)
             else
                 test:ok(self, label)
