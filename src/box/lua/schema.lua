@@ -1834,7 +1834,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     local function detect_width()
         ffi.cdef('void tnt_rl_get_screen_size(int *rows, int *cols);')
         local colsp = ffi.new('int[1]')
-        ffi.C.tnt_rl_get_screen_size(nil, colsp)
+        builtin.tnt_rl_get_screen_size(nil, colsp)
         return colsp[0]
     end
     if max_width == 0 then
