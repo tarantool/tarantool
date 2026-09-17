@@ -37,7 +37,6 @@
       "call-non-callable",
       "duplicate-require",
       "duplicate-type",
-      "generic-constraint-mismatch",
       "global-in-non-module",
       "inject-field",
       "need-check-nil",
