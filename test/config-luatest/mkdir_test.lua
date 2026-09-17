@@ -1,4 +1,4 @@
-local fio = require('fio')
+local fio = require("fio")
 local t = require('luatest')
 local treegen = require('luatest.treegen')
 local helpers = require('test.config-luatest.helpers')
