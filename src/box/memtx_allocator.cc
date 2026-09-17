@@ -35,19 +35,6 @@ struct memtx_block_rv *
 memtx_block_rv_new(uint32_t version, struct rlist *list)
 {
 	assert(version > 0);
-	/* Reuse the last read view if its version matches. */
-	struct memtx_block_rv *last_rv = rlist_empty(list) ? nullptr :
-		rlist_last_entry(list, struct memtx_block_rv, link);
-	if (last_rv != nullptr) {
-		uint32_t last_version = memtx_block_rv_version(last_rv);
-		assert(last_version <= version);
-		assert(last_rv->refs > 0);
-		if (last_version == version) {
-			last_rv->refs++;
-			return last_rv;
-		}
-	}
-	/* Proceed to creation of a new read view. */
 	int count = 1;
 	struct memtx_block_rv *rv;
 	rlist_foreach_entry(rv, list, link)
@@ -75,7 +62,6 @@ memtx_block_rv_new(uint32_t version, struct rlist *list)
 	stailq_create(&l->blocks);
 	l->mem_used = 0;
 	rlist_add_tail_entry(list, new_rv, link);
-	new_rv->refs = 1;
 	return new_rv;
 }
 
@@ -84,9 +70,6 @@ memtx_block_rv_delete(struct memtx_block_rv *rv, struct rlist *list,
 		      struct stailq *blocks_to_free, size_t *mem_freed)
 {
 	*mem_freed = 0;
-	assert(rv->refs > 0);
-	if (--rv->refs > 0)
-		return;
 	struct memtx_block_rv *prev_rv = rlist_prev_entry_safe(rv, list, link);
 	uint32_t prev_version = prev_rv == nullptr ? 0 :
 				memtx_block_rv_version(prev_rv);
