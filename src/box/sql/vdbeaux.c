@@ -130,20 +130,8 @@ growOpArray(Vdbe * v, int nOp)
 	VdbeOp *pNew;
 	Parse *p = v->pParse;
 
-	/* The SQL_TEST_REALLOC_STRESS compile-time option is designed to force
-	 * more frequent reallocs and hence provide more opportunities for
-	 * simulated OOM faults.  SQL_TEST_REALLOC_STRESS is generally used
-	 * during testing only.  With SQL_TEST_REALLOC_STRESS grow the op array
-	 * by the minimum* amount required until the size reaches 512.  Normal
-	 * operation (without SQL_TEST_REALLOC_STRESS) is to double the current
-	 * size of the op array or add 1KB of space, whichever is smaller.
-	 */
-#ifdef SQL_TEST_REALLOC_STRESS
-	int nNew = (p->nOpAlloc >= 512 ? p->nOpAlloc * 2 : p->nOpAlloc + nOp);
-#else
 	int nNew = (p->nOpAlloc ? p->nOpAlloc * 2 : (int)(1024 / sizeof(Op)));
 	UNUSED_PARAMETER(nOp);
-#endif
 
 	assert((unsigned)nOp <= (1024 / sizeof(Op)));
 	assert(nNew >= (p->nOpAlloc + nOp));
