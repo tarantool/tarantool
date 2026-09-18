@@ -48,6 +48,7 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/bind.h"
 
 #include "msgpuck/msgpuck.h"
 #include "mpstream/mpstream.h"
@@ -356,8 +357,10 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
  * Execute as much of a VDBE program as we can.
  * This is the core of sql_step().
  */
-int sqlVdbeExec(Vdbe *p)
+int
+sqlVdbeExec(struct Vdbe *p, const struct sql_bind *bind, uint32_t bind_count)
 {
+	uint32_t last = 0;
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
 #if defined(SQL_DEBUG)
@@ -860,11 +863,36 @@ case OP_Blob: {                /* out2 */
  * The P4 value is used by sql_bind_parameter_name().
  */
 case OP_Variable: {            /* out2 */
-	Mem *pVar;       /* Value being transferred */
-
+	Mem *pVar;
 	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
-	pVar = &p->aVar[pOp->p1 - 1];
+	if (pOp->p4.z != NULL) {
+		if (pOp->p4.z[0] == '$') {
+			last = pOp->p1;
+			if ((uint32_t)pOp->p1 <= bind_count) {
+				int pos = pOp->p1 - 1;
+				pVar = sql_mem_create_from_bind(&bind[pos]);
+			} else {
+				pVar = sql_mem_create_from_bind(NULL);
+			}
+		} else if (pOp->p4.z[0] == '?') {
+			uint32_t pos = last + 1;
+			if (pos > bind_count)
+				pVar = sql_mem_create_from_bind(NULL);
+			else
+				pVar = sql_mem_create_from_bind(&bind[pos - 1]);
+			last++;
+		} else {
+			uint32_t pos = sql_bind_find_name(bind, bind_count,
+							  pOp->p4.z);
+			last = pos;
+			if (pos == 0)
+				pVar = sql_mem_create_from_bind(NULL);
+			else
+				pVar = sql_mem_create_from_bind(&bind[pos - 1]);
+		}
+	} else {
+		pVar = &p->aVar[pOp->p1 - 1];
+	}
 	if (sqlVdbeMemTooBig(pVar)) {
 		goto too_big;
 	}

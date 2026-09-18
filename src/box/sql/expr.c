@@ -1216,6 +1216,8 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 		/* Wildcard of the form "?".  Assign the next variable number */
 		assert(z[0] == '?');
 		x = (ynVar) (++pParse->nVar);
+		if (sql_find_var_by_name(pParse->pVList, z) == 0)
+			pParse->pVList = sqlVListAdd(pParse->pVList, z, n, x);
 	} else {
 		int doAdd = 0;
 		assert(z[0] != '?');
@@ -1245,8 +1247,8 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			if (x > pParse->nVar) {
 				pParse->nVar = (int)x;
 				doAdd = 1;
-			} else if (sqlVListNumToName(pParse->pVList, x) ==
-				   0) {
+			} else if (sql_find_var_by_name(pParse->pVList, z)
+				   == 0) {
 				doAdd = 1;
 			}
 		} else {
@@ -3685,10 +3687,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 					  target);
 			assert(pExpr->u.zToken[1] != 0);
-			const char *z = sqlVListNumToName(pParse->pVList,
-							  pExpr->iColumn);
-			assert(pExpr->u.zToken[0] == '$' ||
-			       strcmp(pExpr->u.zToken, z) == 0);
+			const char *z =
+				sql_find_var_by_name(pParse->pVList,
+						     pExpr->u.zToken);
 			/* Indicate VList may no longer be enlarged */
 			pParse->pVList[0] = 0;
 			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
@@ -3698,6 +3699,12 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(pExpr->u.zToken[0] == '?');
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
 				      target);
+			const char *z =
+				sql_find_var_by_name(pParse->pVList,
+						     pExpr->u.zToken);
+			/* Indicate VList may no longer be enlarged */
+			pParse->pVList[0] = 0;
+			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
 			return target;
 		}
 	case TK_REGISTER:{
