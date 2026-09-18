@@ -785,6 +785,15 @@ luaopen_tarantool(lua_State *L)
 #endif
 	lua_settable(L, -3);
 
+	/* build.mimalloc */
+	lua_pushstring(L, "mimalloc");
+#ifdef ENABLE_MIMALLOC
+	lua_pushboolean(L, true);
+#else
+	lua_pushboolean(L, false);
+#endif
+	lua_settable(L, -3);
+
 	lua_settable(L, -3);    /* box.info.build */
 
 	/* debug */
