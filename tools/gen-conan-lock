@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""Generate a synthetic Conan lockfile for Trivy SCA.
+
+Trivy does not see git submodules or CMake source archives. It does
+scan conan.lock. This script maps extra/dependencies.yaml onto Conan
+package names and release versions so `trivy fs conan.lock` can match
+CVEs from the GitLab Conan advisory database.
+
+Git hashes and pre-release labels are rewritten to the nearest
+upstream release. Packages with no Conan/CVE identity are skipped.
+"""
+from __future__ import print_function
+
+import argparse
+import json
+import os
+import re
+import sys
+
+
+CONAN_MAP = {
+    'c-ares': {'conan': 'c-ares'},
+    'c-dt': None,
+    'decNumber': None,
+    # tarantool/curl@461ce6c6 is libcurl 8.11.0-DEV.
+    'libcurl': {'conan': 'libcurl', 'version': '8.11.0'},
+    'libiconv': {'conan': 'libiconv'},
+    'libicu': {'conan': 'icu'},
+    # Snapshot date is not a Conan version; use the 6.3 release.
+    'libncurses': {'conan': 'ncurses', 'version': '6.3'},
+    'libreadline': {'conan': 'readline'},
+    'libunwind': {'conan': 'libunwind'},
+    # tarantool/libyaml@788563cb reports YAML 0.1.7.
+    'libyaml': {'conan': 'libyaml', 'version': '0.1.7'},
+    # cmake/BuildZZIP.cmake fetches zziplib-0.13.71.
+    'libzip': {'conan': 'zziplib'},
+    'lua-zlib': None,
+    'nghttp2': {'conan': 'nghttp2'},
+    'openssl': {'conan': 'openssl'},
+    'tz': None,
+    'xxHash': {'conan': 'xxhash'},
+    'zlib': {'conan': 'zlib'},
+    # extra/dependencies.yaml says pre-1.5.5.
+    'zstd': {'conan': 'zstd', 'version': '1.5.4'},
+}
+
+GIT_HASH_RE = re.compile(r'^[0-9a-f]{7,40}$', re.IGNORECASE)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_INPUT = os.path.join(os.path.dirname(SCRIPT_DIR),
+                             'extra', 'dependencies.yaml')
+
+
+def parse_dependencies(path):
+    """Parse name/version pairs from extra/dependencies.yaml."""
+    deps = []
+    current = None
+    with open(path) as f:
+        for raw in f:
+            line = raw.split('#', 1)[0].rstrip()
+            if not line.strip():
+                continue
+            stripped = line.strip()
+            if stripped.startswith('- name:'):
+                if current is not None:
+                    deps.append(current)
+                name = stripped.split(':', 1)[1].strip()
+                current = {'name': name}
+            elif stripped.startswith('version:') and current is not None:
+                current['version'] = stripped.split(':', 1)[1].strip()
+        if current is not None:
+            deps.append(current)
+    return deps
+
+
+def is_scannable_version(version):
+    if not version:
+        return False
+    if GIT_HASH_RE.match(version):
+        return False
+    if version.startswith('pre-'):
+        return False
+    return True
+
+
+def map_dependency(dep):
+    """Return (conan_ref, skip_reason) for one yaml entry."""
+    name = dep.get('name')
+    version = dep.get('version')
+    if not name:
+        return None, 'entry without a name'
+    mapping = CONAN_MAP.get(name, 'unknown')
+    if mapping == 'unknown':
+        return None, 'not in CONAN_MAP'
+    if mapping is None:
+        return None, 'no Conan/CVE identity'
+    conan_name = mapping['conan']
+    scan_version = mapping.get('version', version)
+    if not is_scannable_version(scan_version):
+        return None, 'version is not a release: %s' % scan_version
+    return '%s/%s' % (conan_name, scan_version), None
+
+
+def build_lockfile(deps):
+    requires = []
+    skipped = []
+    for dep in deps:
+        ref, reason = map_dependency(dep)
+        if ref is None:
+            skipped.append((dep.get('name'), dep.get('version'), reason))
+        else:
+            requires.append(ref)
+    lock = {
+        'version': '0.5',
+        'requires': requires,
+        'build_requires': [],
+        'python_requires': [],
+        'config_requires': [],
+    }
+    return lock, skipped
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        '-i', '--input', default=DEFAULT_INPUT,
+        help='path to extra/dependencies.yaml')
+    parser.add_argument(
+        '-o', '--output', default='conan.lock',
+        help='path to write conan.lock')
+    args = parser.parse_args(argv)
+
+    deps = parse_dependencies(args.input)
+    if not deps:
+        print('no dependencies parsed from %s' % args.input,
+              file=sys.stderr)
+        return 1
+
+    lock, skipped = build_lockfile(deps)
+    for name, version, reason in skipped:
+        print('skip %s %s (%s)' % (name, version, reason),
+              file=sys.stderr)
+    if not lock['requires']:
+        print('no scannable packages produced', file=sys.stderr)
+        return 1
+
+    out_dir = os.path.dirname(os.path.abspath(args.output))
+    if out_dir and not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+    with open(args.output, 'w') as f:
+        json.dump(lock, f, indent=4)
+        f.write('\n')
+
+    print('wrote %d packages to %s' % (len(lock['requires']),
+                                       args.output))
+    for ref in lock['requires']:
+        print('  %s' % ref)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
