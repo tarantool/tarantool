@@ -17,6 +17,8 @@ if(APPLE)
     set(ICU_CPPFLAGS "${ICU_CPPFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
 endif()
 
+include(utils)
+
 ExternalProject_Add(bundled-icu-project
     PREFIX ${ICU_INSTALL_DIR}
     SOURCE_DIR ${ICU_INSTALL_DIR}/src/icu
@@ -40,7 +42,7 @@ ExternalProject_Add(bundled-icu-project
         --disable-tests
         --disable-samples
     INSTALL_COMMAND
-        ${CMAKE_MAKE_PROGRAM} install &&
+        ${EP_MAKE_COMMAND} install &&
         ${CMAKE_COMMAND} -E touch <BINARY_DIR>/uconfig.h &&
         cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
         ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
