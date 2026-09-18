@@ -304,6 +304,8 @@ struct Vdbe {
 	struct txn_savepoint *anonymous_savepoint;
 	/* The statement ID in the prepared statement cache. */
 	uint32_t id;
+	/* Field for storing a function variable. */
+	struct vdbe_field_ref *func_arg;
 };
 
 /*

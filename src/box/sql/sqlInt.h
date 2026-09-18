@@ -550,18 +550,6 @@ sql_bind_parameter_count(const struct Vdbe *v);
 const char *
 sql_bind_parameter_name(const struct Vdbe *v, int i);
 
-/**
- * Perform pointer parameter binding for the prepared sql
- * statement.
- * @param v Prepared statement.
- * @param i Index of the variable to be binded.
- * @param ptr Pointer value to use.
- * @retval 0 On Success.
- * @retval Not 0 otherwise.
- */
-int
-sql_bind_ptr(struct Vdbe *v, int i, void *ptr);
-
 int
 sql_init_db(sql **db);
 

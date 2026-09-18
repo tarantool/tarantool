@@ -2475,7 +2475,7 @@ func_sql_expr_new(const struct func_def *def)
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
 	struct Vdbe *v = sqlGetVdbe(&parser);
 	int ref_reg = ++parser.nMem;
-	sqlVdbeAddOp2(v, OP_Variable, ++parser.nVar, ref_reg);
+	sqlVdbeAddOp2(v, OP_FuncArg, 0, ref_reg);
 	v->is_sandboxed = 1;
 	parser.vdbe_field_ref_reg = ref_reg;
 
@@ -2548,8 +2548,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	else
 		vdbe_field_ref_prepare_array(ref, 1, data, mp_size);
 	ref->format = format;
-	if (sql_bind_ptr(stmt, 1, ref) != 0)
-		goto error;
+	stmt->func_arg = ref;
 
 	if (sql_step(stmt) != SQL_ROW)
 		goto error;
