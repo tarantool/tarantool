@@ -25,6 +25,17 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          # BuildKit releases after v0.30.0 bundle a runc that can't mask
+          # /proc/acpi on the Ubuntu 20.04 5.4 kernel of the runners [1].
+          # Unpin once the runners run a newer kernel or the default image
+          # bundles runc 1.5.1 or 1.4.4. This prints its runc version:
+          #
+          #   docker run --rm --pull=always --entrypoint buildkit-runc \
+          #       moby/buildkit:buildx-stable-1 --version
+          #
+          # [1]: https://github.com/opencontainers/runc/issues/5348
+          driver-opts: image=moby/buildkit:v0.30.0
 
       - name: Compose image tags
         run: |
