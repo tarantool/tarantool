@@ -833,7 +833,6 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 	sqlVdbeResolveLabel(v, addrDone);
 }
 
-#if SQL_MAX_EXPR_DEPTH>0
 /*
  * Check that argument nHeight is less than or equal to the maximum
  * expression depth allowed. If it is not, leave an error message in
@@ -955,21 +954,6 @@ sqlSelectExprHeight(Select * p)
 	heightOfSelect(p, &nHeight);
 	return nHeight;
 }
-#else				/* ABOVE:  Height enforcement enabled.  BELOW: Height enforcement off */
-/*
- * Propagate all EP_Propagate flags from the Expr.x.pList into
- * Expr.flags.
- */
-void
-sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
-{
-	if (p && p->x.pList && !ExprHasProperty(p, EP_xIsSelect)) {
-		p->flags |= EP_Propagate & sqlExprListFlags(p->x.pList);
-	}
-}
-
-#define exprSetHeight(y)
-#endif				/* SQL_MAX_EXPR_DEPTH>0 */
 
 /**
  * Allocate a new empty expression object with reserved extra
@@ -988,9 +972,7 @@ sql_expr_new_empty(int op, int extra_size)
 	memset(e, 0, sizeof(*e));
 	e->op = (u8)op;
 	e->iAgg = -1;
-#if SQL_MAX_EXPR_DEPTH > 0
 	e->nHeight = 1;
-#endif
 	return e;
 }
 

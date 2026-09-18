@@ -317,14 +317,12 @@ sql_create_column_start(struct Parse *parse, struct Token *table,
 	struct space_def *def = space->def;
 	assert(def->opts.is_ephemeral);
 
-#if SQL_MAX_COLUMN
 	if ((int)def->field_count + 1 > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_COLUMN_COUNT_MAX, def->name,
 			 def->field_count + 1, SQL_MAX_COLUMN);
 		parse->is_aborted = true;
 		return;
 	}
-#endif
 
 	char *column_name = sql_name_temp(parse, name->z, name->n);
 
