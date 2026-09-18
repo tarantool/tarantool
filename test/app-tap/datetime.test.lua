@@ -2615,6 +2615,29 @@ test:test("Parse invalid string with a custom format", function(test)
         {
             buf =  "2025-321 12",
             fmt = "%G-%j %m",
+        {
+            buf = 'o1',
+            fmt = '%m',
+        },
+        {
+            buf = '0',
+            fmt = '%m',
+        },
+        {
+            buf = '13',
+            fmt = '%m',
+        },
+        {
+            buf = '-1',
+            fmt = '%j',
+        },
+        {
+            buf = '0',
+            fmt = '%j',
+        },
+        {
+            buf = '367',
+            fmt = '%j',
         },
     }
     test:plan(#formats)
