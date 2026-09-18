@@ -192,6 +192,7 @@ list(APPEND EXECUTED_WITHOUT_TEST_RUN
     config-luatest
     engine-luatest
     engine-tap
+    gdb
     metrics-luatest
     replication-luatest
     sql-luatest
@@ -241,3 +242,11 @@ foreach(test_path ${tests})
     FAIL_REGULAR_EXPRESSION "${CTEST_FAIL_REGEXP}"
   )
 endforeach()
+
+add_test(NAME gdb
+  COMMAND python -m pytest -v ${PROJECT_SOURCE_DIR}/test/gdb
+)
+set_tests_properties(gdb PROPERTIES
+  LABELS "gdb;regression;"
+  DEPENDS tarantool
+)
