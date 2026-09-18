@@ -93,6 +93,10 @@ enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
 static void
 replica_delete(struct replica *replica);
 
+/** Detach the applier from the replica. */
+static void
+replica_clear_applier(struct replica *replica);
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -548,8 +552,12 @@ replica_delete(struct replica *replica)
 {
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
-	if (replica->applier != NULL)
-		applier_delete(replica->applier);
+	if (replica->applier != NULL) {
+		struct applier *applier = replica->applier;
+		replica_clear_applier(replica);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	if (replica->gc_checkpoint_ref != NULL)
@@ -700,7 +708,9 @@ replica_has_connections(const struct replica *replica)
 	/* Relay is expected to be active only for connected replicas. */
 	assert(relay_get_state(replica->relay) != RELAY_FOLLOW ||
 	       replica->has_incoming_connection);
-	return replica->has_incoming_connection || replica->applier != NULL;
+	return replica->has_incoming_connection ||
+	       (replica->applier != NULL &&
+		replica->applier->state != APPLIER_STOPPED);
 }
 
 /** A helper to track applier health on its state change. */
@@ -741,6 +751,30 @@ replica_clear_applier(struct replica *replica)
 	replica->applier = NULL;
 	trigger_clear(&replica->on_applier_state);
 	replica_update_applier_health(replica);
+}
+
+/** Detach a stopped applier from a replica. */
+struct applier *
+replica_take_stopped_applier(struct replica *replica)
+{
+	struct applier *applier = replica->applier;
+	assert(applier != NULL);
+	assert(applier->state == APPLIER_STOPPED);
+	assert(replica->applier_sync_state == APPLIER_STOPPED);
+	replica_clear_applier(replica);
+	replica->applier_sync_state = APPLIER_DISCONNECTED;
+	return applier;
+}
+
+/** Attach a stopped applier to a replica. */
+void
+replica_set_stopped_applier(struct replica *replica, struct applier *applier)
+{
+	assert(replica->applier == NULL);
+	assert(applier->state == APPLIER_STOPPED);
+	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
+	replica->applier_sync_state = APPLIER_STOPPED;
+	replica_set_applier(replica, applier);
 }
 
 static void
