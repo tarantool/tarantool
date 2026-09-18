@@ -81,36 +81,18 @@
 #include "datetime.h"
 
 /*
- * These #defines should enable >2GB file support on POSIX if the
- * underlying operating system supports it.  If the OS lacks
- * large file support, these should be no-ops.
+ * These #defines enable >2GB file support on POSIX if the underlying
+ * operating system supports it.  If the OS lacks large file support, they
+ * should be no-ops.
  *
- * Ticket #2739:  The _LARGEFILE_SOURCE macro must appear before any
- * system #includes.  Hence, this block of code must be the very first
- * code in all source files.
- *
- * Large file support can be disabled using the -Dsql_DISABLE_LFS switch
- * on the compiler command line.  This is necessary if you are compiling
- * on a recent machine (ex: Red Hat 7.2) but you want your code to work
- * on an older machine (ex: Red Hat 6.0).  If you compile on Red Hat 7.2
- * without this option, LFS is enable.  But LFS does not exist in the kernel
- * in Red Hat 6.0, so the code won't work.  Hence, for maximum binary
- * portability you should omit LFS.
- *
- * The previous paragraph was written in 2005.  (This paragraph is written
- * on 2008-11-28.) These days, all Linux kernels support large files, so
- * you should probably leave LFS enabled.  But some embedded platforms might
- * lack LFS in which case the sql_DISABLE_LFS macro might still be useful.
- *
- * Similar is true for Mac OS X.  LFS is only supported on Mac OS X 9 and later.
+ * The _LARGEFILE_SOURCE macro must appear before any system #includes.
+ * Hence, this block of code must be the very first code in all source files.
  */
-#ifndef SQL_DISABLE_LFS
 #define _LARGE_FILE       1
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
 #define _LARGEFILE_SOURCE 1
-#endif
 
 /* What version of GCC is being used.  0 means GCC is not being used */
 #ifdef __GNUC__
@@ -573,17 +555,6 @@ sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName);
  */
 #ifndef SQL_BIG_DBL
 #define SQL_BIG_DBL (1e99)
-#endif
-
-/*
- * OMIT_TEMPDB is set to 1 if sql_OMIT_TEMPDB is defined, or 0
- * afterward. Having this macro allows us to cause the C compiler
- * to omit code used by TEMP tables without messy #ifndef statements.
- */
-#ifdef SQL_OMIT_TEMPDB
-#define OMIT_TEMPDB 1
-#else
-#define OMIT_TEMPDB 0
 #endif
 
 /*
@@ -1305,9 +1276,7 @@ struct Expr {
 	 * access them will result in a segfault or malfunction.
 	 ********************************************************************/
 
-#if SQL_MAX_EXPR_DEPTH>0
 	int nHeight;		/* Height of the tree headed by this node */
-#endif
 	int iTable;		/* TK_COLUMN_REF: cursor number of table holding column
 				 * TK_REGISTER: register number
 				 * TK_TRIGGER: 1 -> new, 0 -> old
@@ -2264,23 +2233,9 @@ sql_xrealloc(void *buf, size_t n);
 void
 sql_xfree(void *buf);
 
-/*
- * On systems with ample stack space and that support alloca(), make
- * use of alloca() to obtain space for large automatic objects.  By default,
- * obtain space from malloc().
- *
- * The alloca() routine never returns NULL.  This will cause code paths
- * that deal with sqlStackAlloc() failures to be unreachable.
- */
-#ifdef SQL_USE_ALLOCA
-#define sqlStackAllocRaw(N)   alloca(N)
-#define sqlStackAllocZero(D,N)  memset(alloca(N), 0, N)
-#define sqlStackFree(P)
-#else
 #define sqlStackAllocRaw(N)   sql_xmalloc(N)
 #define sqlStackAllocZero(N)  sql_xmalloc0(N)
 #define sqlStackFree(P)       sql_xfree(P)
-#endif
 
 int sqlIsNaN(double);
 
@@ -4355,13 +4310,8 @@ void sqlWithPush(Parse *, With *, u8);
 int sqlFindInIndex(Parse *, Expr *, u32, int *, int *, int *);
 
 void sqlExprSetHeightAndFlags(Parse * pParse, Expr * p);
-#if SQL_MAX_EXPR_DEPTH>0
 int sqlSelectExprHeight(Select *);
 int sqlExprCheckHeight(Parse *, int);
-#else
-#define sqlSelectExprHeight(x) 0
-#define sqlExprCheckHeight(x,y)
-#endif
 
 #ifdef SQL_DEBUG
 void sqlParserTrace(FILE *, char *);

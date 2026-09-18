@@ -4948,7 +4948,6 @@ selectExpander(Walker * pWalker, Select * p)
 	sql_expr_list_delete(pEList);
 	p->pEList = pNew;
 end:
-#if SQL_MAX_COLUMN
 	if (p->pEList && p->pEList->nExpr > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of "\
 			 "columns in result set", p->pEList->nExpr,
@@ -4956,7 +4955,6 @@ end:
 		pParse->is_aborted = true;
 		return WRC_Abort;
 	}
-#endif
 	return WRC_Continue;
 }
 

@@ -881,7 +881,6 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	pOrderBy = pSelect->pOrderBy;
 	if (pOrderBy == 0)
 		return 0;
-#if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 			 "The number of terms in ORDER BY clause",
@@ -889,7 +888,6 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 		pParse->is_aborted = true;
 		return 1;
 	}
-#endif
 	for (i = 0; i < pOrderBy->nExpr; i++) {
 		pOrderBy->a[i].done = 0;
 	}
@@ -997,7 +995,6 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 
 	if (pOrderBy == NULL)
 		return 0;
-#if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		const char *err = tt_sprintf("The number of terms in %s BY "\
 					     "clause", zType);
@@ -1006,7 +1003,6 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 		pParse->is_aborted = true;
 		return 1;
 	}
-#endif
 	pEList = pSelect->pEList;
 	assert(pEList != 0);	/* sqlSelectNew() guarantees this */
 	for (i = 0, pItem = pOrderBy->a; i < pOrderBy->nExpr; i++, pItem++) {
@@ -1471,7 +1467,6 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 
 	if (pExpr == 0)
 		return 0;
-#if SQL_MAX_EXPR_DEPTH>0
 	{
 		Parse *pParse = pNC->pParse;
 		if (sqlExprCheckHeight
@@ -1480,7 +1475,6 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 		}
 		pParse->nHeight += pExpr->nHeight;
 	}
-#endif
 	savedHasAgg = pNC->ncFlags & (NC_HasAgg | NC_MinMaxAgg);
 	pNC->ncFlags &= ~(NC_HasAgg | NC_MinMaxAgg);
 	w.pParse = pNC->pParse;
@@ -1491,9 +1485,7 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 	w.eCode = 0;
 	w.u.pNC = pNC;
 	sqlWalkExpr(&w, pExpr);
-#if SQL_MAX_EXPR_DEPTH>0
 	pNC->pParse->nHeight -= pExpr->nHeight;
-#endif
 	if (pNC->nErr > 0 || w.pParse->is_aborted) {
 		ExprSetProperty(pExpr, EP_Error);
 	}
