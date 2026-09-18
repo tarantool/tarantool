@@ -265,7 +265,10 @@ struct Vdbe {
 	struct sql_column_metadata *metadata;
 	Mem *pResultSet;	/* Pointer to an array of results */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
-	Mem *aVar;		/* Values for the OP_Variable opcode. */
+	/**
+	 * Values for the OP_Variable and OP_FuncVariable opcode.
+	 */
+	Mem *aVar;
 	/**
 	 * Array which contains positions of variables to be
 	 * bound in resulting set of SELECT.
@@ -304,6 +307,8 @@ struct Vdbe {
 	struct txn_savepoint *anonymous_savepoint;
 	/* The statement ID in the prepared statement cache. */
 	uint32_t id;
+	/* Field for storing a function variable. */
+	struct vdbe_field_ref *func_arg;
 };
 
 /*

@@ -874,6 +874,22 @@ case OP_Variable: {            /* out2 */
 	break;
 }
 
+/* Opcode: FuncVariable P2
+ * Synopsis: r[P2]=p->func_arg
+ *
+ * Transfer the values of function argument into register P2
+ *
+ * For func variables p4 is NULL.
+ */
+case OP_FuncArg: {            /* out2 */
+	assert(pOp->p1 > 0 && pOp->p1 <= p->nVar);
+	assert(pOp->p4.z == 0);
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	mem_set_ptr(pOut, p->func_arg);
+	UPDATE_MAX_BLOBSIZE(pOut);
+	break;
+}
+
 /* Opcode: Move P1 P2 P3 * *
  * Synopsis: r[P2@P3]=r[P1@P3]
  *
