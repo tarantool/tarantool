@@ -314,3 +314,22 @@ g.test_4566_bind_variable_LIKE_argument_resulted_to_crash = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure bind variables in a compound SELECT are numbered in the order
+-- they appear in the query, regardless of the compound part they belong to.
+--
+g.test_bind_numbering_in_compound_select = function(cg)
+    cg.server:exec(function()
+        local sql = [[SELECT ?, 1 UNION SELECT $2, 2 UNION SELECT ?, 3;]]
+        local res = _G.execute(sql, {1, 2, 3})
+        t.assert_equals(res.rows, {{1, 1}, {2, 2}, {3, 3}})
+
+        sql = [[SELECT ? UNION ALL SELECT ? UNION ALL SELECT ?;]]
+        res = _G.execute(sql, {10, 20, 30})
+        t.assert_equals(res.rows, {{10}, {20}, {30}})
+
+        res = _G.execute([[VALUES (?, 1), ($2, 2), (?, 3);]], {1, 2, 3})
+        t.assert_equals(res.rows, {{1, 1}, {2, 2}, {3, 3}})
+    end)
+end

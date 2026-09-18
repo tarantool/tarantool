@@ -148,22 +148,34 @@ select_from_ast(struct Parse *parser, struct ast_select *select)
 {
 	if (select == NULL)
 		return NULL;
-	struct Select *res = select_from_ast_single(parser, select);
-	if (parser->is_aborted)
-		return NULL;
-	struct Select *next = res;
-	struct ast_select *prev;
+	/*
+	 * Convert the compound parts from left to right, so that anonymous bind
+	 * variables ("?") are numbered in the order they appear in the query.
+	 */
+	struct Select *prior = NULL;
+	struct ast_select *part;
 	int count = 1;
-	rlist_foreach_entry_reverse(prev, &select->link, link) {
-		struct Select *prior = select_from_ast_single(parser, prev);
+	rlist_foreach_entry(part, &select->link, link) {
+		struct Select *cur = select_from_ast_single(parser, part);
 		if (parser->is_aborted) {
-			sql_select_delete(res);
+			sql_select_delete(prior);
 			return NULL;
 		}
-		next->pPrior = prior;
-		prior->pNext = next;
-		next = prior;
+		if (prior != NULL) {
+			cur->pPrior = prior;
+			prior->pNext = cur;
+		}
+		prior = cur;
 		count++;
+	}
+	struct Select *res = select_from_ast_single(parser, select);
+	if (parser->is_aborted) {
+		sql_select_delete(prior);
+		return NULL;
+	}
+	if (prior != NULL) {
+		res->pPrior = prior;
+		prior->pNext = res;
 	}
 	if ((res->selFlags & SF_MultiValue) == 0 &&
 	    count > SQL_MAX_COMPOUND_SELECT) {
