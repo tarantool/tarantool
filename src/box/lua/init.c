@@ -116,6 +116,7 @@ extern char session_lua[],
 	merger_lua[],
 	iproto_lua[],
 	app_threads_lua[],
+	ssl_certificate_lua[],
 	healthcheck_lua[],
 	healthcheck_defaults_lua[],
 	checks_version_lua[],
@@ -359,6 +360,8 @@ static const char * const lua_sources_main[] = {
 	"box/upgrade", NULL, upgrade_lua,
 	"box/console", "console", console_lua,
 	"box/backup", NULL, backup_lua,
+
+	"ssl_certificate", "internal.ssl_certificate", ssl_certificate_lua,
 
 	/* {{{ config */
 
