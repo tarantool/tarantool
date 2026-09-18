@@ -136,7 +136,6 @@ struct SubProgram {
 /** P4 is a pointer to a decimal. */
 #define P4_DEC      (-5)
 #define P4_MEM      (-7)	/* P4 is a pointer to a Mem*    structure */
-#define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
 #define P4_REAL     (-9)	/* P4 is a 64-bit floating point value */
 #define P4_INT64    (-10)	/* P4 is a 64-bit signed integer */
 #define P4_UINT64   (-8)	/* P4 is a 64-bit signed integer */
@@ -198,7 +197,6 @@ int sqlVdbeAddOp0(Vdbe *, int);
 int sqlVdbeAddOp1(Vdbe *, int, int);
 int sqlVdbeAddOp2(Vdbe *, int, int, int);
 int sqlVdbeGoto(Vdbe *, int);
-int sqlVdbeLoadString(Vdbe *, int, const char *);
 void sqlVdbeMultiLoad(Vdbe *, int, const char *, ...);
 int sqlVdbeAddOp3(Vdbe *, int, int, int, int);
 int sqlVdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
@@ -224,7 +222,11 @@ void sqlVdbeChangeP5(Vdbe *, int P5);
 void sqlVdbeJumpHere(Vdbe *, int addr);
 int sqlVdbeChangeToNoop(Vdbe *, int addr);
 int sqlVdbeDeletePriorOpcode(Vdbe *, u8 op);
-void sqlVdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
+
+/** Change P4 of VDBE opcode. */
+void
+sqlVdbeChangeP4(struct Vdbe *p, int addr, const char *zP4, int type);
+
 void sqlVdbeAppendP4(Vdbe *, void *pP4, int p4type);
 
 VdbeOp *sqlVdbeGetOp(Vdbe *, int);
