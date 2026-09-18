@@ -1,4 +1,4 @@
--- Usage:
+-- Usage for result reporting:
 --
 -- local benchmark = require('benchmark')
 -- local clock = require('clock')
@@ -30,7 +30,12 @@
 -- })
 --
 -- bench:dump_results()
+--
+-- Other utilities:
+-- - benchmark.do_or_die(func, args...) - allows to run a function and report
+--   a nice error log if a Tarantool or Lua error happens.
 
+local log = require('log')
 local json = require('json')
 local fio = require('fio')
 local argparse = require('internal.argparse')
@@ -184,6 +189,22 @@ function M.new(opts)
         add_result = add_result,
         dump_results = dump_results,
     }})
+end
+
+function M.die(fmt, ...)
+    local msg = fmt:format(...)
+    if log.cfg.log ~= nil then
+        log.error(msg)
+    end
+    io.stderr:write(msg .. '\n')
+    os.exit(1)
+end
+
+function M.do_or_die(func, ...)
+    local ok, err = pcall(func, ...)
+    if not ok then
+        M.die('%s', err)
+    end
 end
 
 return M
