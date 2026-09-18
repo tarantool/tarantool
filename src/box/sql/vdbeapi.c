@@ -408,17 +408,6 @@ sql_bind_null(struct Vdbe *p, int i)
 }
 
 int
-sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
-{
-	int rc = vdbeUnbind(p, i);
-	if (rc == 0) {
-		rc = sql_bind_type(p, i, "varbinary");
-		mem_set_ptr(&p->aVar[i - 1], ptr);
-	}
-	return rc;
-}
-
-int
 sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
 {
 	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
