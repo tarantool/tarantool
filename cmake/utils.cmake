@@ -163,3 +163,32 @@ function(string_join
     endforeach()
     set(${string_out} ${result} PARENT_SCOPE)
 endfunction()
+
+# ${EP_MAKE_COMMAND} is the make command for ExternalProject_Add() steps
+# of a library that has its own makefiles. Such a library is configured
+# by its own configure script, and its build and install steps are make
+# runs.
+#
+# The value is `make`, except with the Makefile generators, where it is
+# `$(MAKE)`. CMake writes that text into the generated rule as is, and
+# make expands it at build time. GNU make also treats a rule mentioning
+# $(MAKE) as a recursive call: the sub-make takes job slots from the job
+# server of the main build instead of running its recipes one by one, and
+# it obeys -n, -t and -q.
+#
+# The condition matches any generator whose name contains `Makefiles`:
+# `Unix Makefiles`, `NMake Makefiles`, the MinGW and MSYS variants. That
+# is deliberate: $(MAKE) belongs to the makefile language rather than to
+# GNU make (POSIX defines MAKE, NMAKE has it for recursive calls), and
+# ExternalProject uses the same test internally for its default steps.
+# Non-Makefile generators produce no makefile to expand it; ninja
+# refuses to load a build file that contains $(MAKE).
+#
+# ${CMAKE_MAKE_PROGRAM} looks like a fit, but it is the build tool of the
+# main build rather than a make: with the Ninja generator it is ninja,
+# which has nothing to do where the library's configure left makefiles.
+if(CMAKE_GENERATOR MATCHES "Makefiles")
+    set(EP_MAKE_COMMAND "$(MAKE)")
+else()
+    set(EP_MAKE_COMMAND "make")
+endif()
