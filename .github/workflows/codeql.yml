@@ -69,5 +69,18 @@ jobs:
         category: "/language:${{matrix.language}}"
 
     - name: Cleanup CodeQL files
+      # Once the cache has filled the disk, the jobs that would clean it are
+      # exactly the ones that fail before reaching this step.
+      if: always()
+      # Setting the shell to bash makes the runner call it with pipefail.
+      shell: bash
       run: |
-        ls --directory -t ${{ runner.tool_cache }}/CodeQL/* | tail -n +2 | xargs -r rm -rf
+        # runner.tool_cache is expanded on the host, and the path it yields
+        # does not exist in the job container, where the cache is
+        # bind-mounted elsewhere. RUNNER_TOOL_CACHE is the path the
+        # container sees.
+        set -u
+        cache="${RUNNER_TOOL_CACHE}/CodeQL"
+        [ -d "${cache}" ] || exit 0
+        cd "${cache}"
+        ls -1t | tail -n +2 | xargs -r rm -rf --
