@@ -282,11 +282,15 @@ end)
         --
         box.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT);]])
 
-        exp_err = "At line 1 at or near position 39: FOR EACH STATEMENT "..
-                  "triggers are not implemented, please "..
-                  "supply FOR EACH ROW clause"
+        exp_err = "Syntax error at line 1 near ';'"
         sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN; END;"
         local _, err = box.execute(sql)
+        t.assert_equals(tostring(err), exp_err)
+
+        exp_err = "Tarantool SQL does not support FOR EACH STATEMENT " ..
+                  "triggers, please supply FOR EACH ROW clause"
+        sql = "CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN SELECT 1; END;"
+        _, err = box.execute(sql)
         t.assert_equals(tostring(err), exp_err)
 
         box.execute("DROP TABLE t1;")
@@ -847,6 +851,30 @@ g.test_wrong_trigger_def = function(cg)
             token = "INSERT",
         }
         t.assert_error_covers(exp_err, _trigger.insert, _trigger, def)
+        box.execute([[DROP TABLE t;]])
+    end)
+end
+
+--
+-- Make sure that an error is returned when preparing `UPDATE` or `DELETE`
+-- steps of `CREATE TRIGGER` with `INDEXED BY`.
+--
+g.test_indexed_by_in_update_delete = function(cg)
+    cg.server:exec(function()
+        box.execute([[CREATE TABLE t (i INT PRIMARY KEY);]])
+        local exp_err = "The INDEXED BY clause is not allowed on UPDATE or " ..
+                        "DELETE statements within triggers"
+
+        local sql = [[CREATE TRIGGER tr AFTER INSERT ON t FOR EACH ROW
+                      BEGIN UPDATE t INDEXED BY pk SET i = 1; END;]]
+        local _, err = box.prepare(sql);
+        t.assert_equals(err.message, exp_err)
+
+        sql = [[CREATE TRIGGER tr AFTER INSERT ON t FOR EACH ROW
+                BEGIN DELETE FROM t INDEXED BY pk WHERE i = 1; END;]]
+        _, err = box.prepare(sql);
+        t.assert_equals(err.message, exp_err)
+
         box.execute([[DROP TABLE t;]])
     end)
 end

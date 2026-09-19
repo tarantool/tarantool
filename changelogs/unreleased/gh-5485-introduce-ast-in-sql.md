@@ -16,3 +16,11 @@
   variables in the definition of a view, function, or trigger (gh-5485).
 * The error for using `COLLATE` in `LIMIT` or `OFFSET` is now a semantic error
   rather than a syntactic one (gh-5485).
+* Indexes for column PRIMARY KEY and UNIQUE constraints are now created before
+  indexes for table PRIMARY KEY and UNIQUE constraints, which changes
+  the order of automatically generated index names (gh-5485).
+* Errors `SQL_PARSER_GENERIC_WITH_POS` and `SQL_SYNTAX_WITH_POS` are no longer
+  used and were removed (gh-5485).
+* SQL now builds an internal AST for SQL queries before building the VDBE.
+  This affects the order of error detection - syntactic errors are now
+  always detected before semantic errors (gh-5485).

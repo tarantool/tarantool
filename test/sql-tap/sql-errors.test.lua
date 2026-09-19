@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(81)
+test:plan(82)
 
 test:execsql([[
 	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
@@ -365,6 +365,21 @@ test:do_catchsql_test(
 		-- </sql-errors-1.31>
 	})
 
+update_statement = 'UPDATE t SET (a, b, c, d, e) = (1, 2, 3, 4, 5)'
+for _ = 1, 400 do
+    update_statement = update_statement .. ', (a, b, c, d, e) = (1, 2, 3, 4, 5)'
+end
+update_statement = update_statement .. ';'
+
+test:do_catchsql_test(
+    "sql-errors-1.31_2",
+    update_statement,
+    {
+        -- <sql-errors-1.31>
+        1,"The number of columns in set list 2005 exceeds the limit (2000)"
+        -- </sql-errors-1.31>
+    })
+
 select_statement = 'SELECT * FROM (SELECT 1 UNION ALL SELECT 1 ORDER BY 1'..string.rep(', 1', 2000)..')'
 
 test:do_catchsql_test(
@@ -514,7 +529,7 @@ test:do_catchsql_test(
 		INSERT INTO not_exist VALUES(1) a;
 	]], {
 		-- <sql-errors-1.46>
-        1, "Space 'not_exist' does not exist"
+        1, "Syntax error at line 1 near 'a'"
 		-- </sql-errors-1.46>
 	})
 

@@ -391,7 +391,6 @@ t;
  |   176: box.error.SQL_CANT_RESOLVE_FIELD
  |   177: box.error.INDEX_EXISTS_IN_SPACE
  |   178: box.error.INCONSISTENT_TYPES
- |   179: box.error.SQL_SYNTAX_WITH_POS
  |   180: box.error.SQL_STACK_OVERFLOW
  |   181: box.error.SQL_SELECT_WILDCARD
  |   182: box.error.SQL_STATEMENT_EMPTY
@@ -415,7 +414,6 @@ t;
  |   203: box.error.BOOTSTRAP_READONLY
  |   204: box.error.SQL_FUNC_WRONG_RET_COUNT
  |   205: box.error.FUNC_INVALID_RETURN_TYPE
- |   206: box.error.SQL_PARSER_GENERIC_WITH_POS
  |   207: box.error.REPLICA_NOT_ANON
  |   208: box.error.CANNOT_REGISTER
  |   209: box.error.SESSION_SETTING_INVALID_VALUE

@@ -197,12 +197,7 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 	return list;
 }
 
-/**
- * Convert `struct ast_id_list` to `struct ExprList` of column names.
- *
- * Return NULL on error or if `list == NULL`.
- */
-static struct ExprList *
+struct ExprList *
 expr_list_from_ids(struct Parse *parser, struct ast_id_list *list)
 {
 	if (list == NULL)
@@ -744,5 +739,304 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		sql_expr_delete(res);
 		return NULL;
 	}
+	return res;
+}
+
+struct ast_insert *
+ast_insert_new(struct region *region)
+{
+	struct ast_insert *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_set_list *
+ast_set_list_append_expr(struct region *region, struct ast_set_list *list,
+			 struct Token *name, struct ast_expr *expr)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	struct ast_set_list_entry *entry =
+		xregion_alloc_object(region, typeof(*entry));
+	memset(entry, 0, sizeof(*entry));
+	entry->name = *name;
+	entry->expr = expr;
+	stailq_add_tail(&list->head, &entry->link);
+	list->len++;
+	return list;
+}
+
+struct ast_set_list *
+ast_set_list_append_vector(struct region *region, struct ast_set_list *list,
+			   struct ast_id_list *ids, struct ast_expr *expr)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	struct ast_set_list_entry *entry =
+		xregion_alloc_object(region, typeof(*entry));
+	memset(entry, 0, sizeof(*entry));
+	entry->ids = ids;
+	entry->expr = expr;
+	stailq_add_tail(&list->head, &entry->link);
+	list->len++;
+	return list;
+}
+
+struct ExprList *
+expr_list_from_set_list(struct Parse *parser, struct ast_set_list *list)
+{
+	assert(list != NULL);
+	struct ExprList *res = NULL;
+	struct ast_set_list_entry *entry;
+	stailq_foreach_entry(entry, &list->head, link) {
+		struct Expr *expr = expr_from_ast(parser, entry->expr);
+		if (expr == NULL)
+			break;
+		if (entry->ids != NULL) {
+			struct IdList *ids = id_list_from_ast(entry->ids);
+			res = sqlExprListAppendVector(parser, res, ids, expr);
+		} else {
+			res = sql_expr_list_append(res, expr);
+			sqlExprListSetName(parser, res, &entry->name, 1);
+		}
+	}
+	if (parser->is_aborted) {
+		sql_expr_list_delete(res);
+		return NULL;
+	}
+	return res;
+}
+
+struct ast_update *
+ast_update_new(struct region *region)
+{
+	struct ast_update *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_trigger_action_list *
+ast_trigger_action_list_append(struct region *region,
+			       struct ast_trigger_action_list *list,
+			       struct ast_trigger_action *action)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	stailq_add_tail(&list->head, &action->link);
+	list->len++;
+	return list;
+}
+
+struct ast_delete *
+ast_delete_new(struct region *region)
+{
+	struct ast_delete *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_trigger_action *
+ast_trigger_action_new(struct region *region)
+{
+	struct ast_trigger_action *res =
+		xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_property *
+ast_property_new(struct region *region)
+{
+	struct ast_property *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_property_list *
+ast_property_list_append(struct region *region, struct ast_property_list *list,
+			 struct ast_property *property)
+{
+	if (list == NULL) {
+		list = xregion_alloc_object(region, typeof(*list));
+		stailq_create(&list->head);
+		list->len = 0;
+	}
+	stailq_add_tail(&list->head, &property->link);
+	list->len++;
+	return list;
+}
+
+struct ast_column *
+ast_column_new(struct region *region)
+{
+	struct ast_column *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
+	return res;
+}
+
+struct ast_table_properties *
+ast_table_properties_new(struct region *region)
+{
+	struct ast_table_properties *res =
+		xregion_alloc_object(region, typeof(*res));
+	stailq_create(&res->columns);
+	stailq_create(&res->constraints);
+	return res;
+}
+
+struct ast_table_properties *
+ast_table_properties_append_column(struct ast_table_properties *properties,
+				   struct ast_column *column)
+{
+	stailq_add_tail(&properties->columns, &column->link);
+	return properties;
+}
+
+struct ast_table_properties *
+ast_table_properties_append_constraint(struct ast_table_properties *properties,
+				       struct ast_property *constraint)
+{
+	stailq_add_tail(&properties->constraints, &constraint->link);
+	return properties;
+}
+
+/** Convert UPDATE statement to trigger UPDATE step. */
+static struct TriggerStep *
+sql_trigger_step_update(struct Parse *parser, struct ast_update *stmt)
+{
+	if (stmt->indexed_by.n > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "The INDEXED BY clause is not allowed on UPDATE or "
+			 "DELETE statements within triggers");
+		parser->is_aborted = true;
+		return NULL;
+	}
+	struct ExprList *set_list =
+		expr_list_from_set_list(parser, stmt->set_list);
+	if (parser->is_aborted)
+		return NULL;
+	struct Expr *where = expr_from_ast(parser, stmt->where);
+	if (parser->is_aborted) {
+		sql_expr_list_delete(set_list);
+		return NULL;
+	}
+	return sql_trigger_update_step(&stmt->table, set_list, where,
+				       stmt->action);
+}
+
+/** Convert INSERT statement to trigger INSERT step. */
+static struct TriggerStep *
+sql_trigger_step_insert(struct Parse *parser, struct ast_insert *stmt)
+{
+	struct Select *select = select_from_ast(parser, stmt->select);
+	if (parser->is_aborted) {
+		sql_select_delete(select);
+		return NULL;
+	}
+	return sql_trigger_insert_step(&stmt->table, stmt->columns, select,
+				       stmt->action);
+}
+
+/** Convert DELETE statement to trigger DELETE step. */
+static struct TriggerStep *
+sql_trigger_step_delete(struct Parse *parser, struct ast_delete *stmt)
+{
+	if (stmt->indexed_by.n > 0) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "The INDEXED BY clause is not allowed on UPDATE or "
+			 "DELETE statements within triggers");
+		parser->is_aborted = true;
+		return NULL;
+	}
+	struct Expr *where = expr_from_ast(parser, stmt->where);
+	if (parser->is_aborted)
+		return NULL;
+	return sql_trigger_delete_step(&stmt->table, where);
+}
+
+/** Convert SELECT statement to trigger SELECT step. */
+static struct TriggerStep *
+sql_trigger_step_select(struct Parse *parser, struct ast_select *stmt)
+{
+	struct Select *select = select_from_ast(parser, stmt);
+	if (parser->is_aborted) {
+		sql_select_delete(select);
+		return NULL;
+	}
+	return sql_trigger_select_step(select);
+}
+
+struct sql_trigger *
+sql_trigger_from_ast(struct Parse *parser, struct ast_trigger *def)
+{
+	parser->disableLookaside++;
+	sql_get()->lookaside.bDisable++;
+	if (!def->is_for_each_row) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool SQL",
+			 "FOR EACH STATEMENT triggers, please supply "
+			 "FOR EACH ROW clause");
+		parser->is_aborted = true;
+		return NULL;
+	}
+
+	struct Expr *when = expr_from_ast(parser, def->when);
+	if (parser->is_aborted)
+		return NULL;
+
+	parser->initiateTTrans = true;
+	struct TriggerStep *steps = NULL;
+	struct ast_trigger_action *action;
+	stailq_foreach_entry(action, &def->actions->head, link) {
+		struct TriggerStep *step = NULL;
+		switch (action->op) {
+		case TK_UPDATE:
+			step = sql_trigger_step_update(parser, action->update);
+			break;
+		case TK_INSERT:
+			step = sql_trigger_step_insert(parser, action->insert);
+			break;
+		case TK_DELETE:
+			step = sql_trigger_step_delete(parser, action->del);
+			break;
+		case TK_SELECT:
+			step = sql_trigger_step_select(parser, action->select);
+			break;
+		default:
+			assert(false);
+		}
+		if (parser->is_aborted)
+			break;
+		if (steps != NULL)
+			steps->pLast->pNext = step;
+		else
+			steps = step;
+		steps->pLast = step;
+	}
+
+	if (parser->is_aborted) {
+		sqlDeleteTriggerStep(steps);
+		sql_expr_delete(when);
+		return NULL;
+	}
+
+	struct IdList *columns = id_list_from_ast(def->columns);
+	return sql_trigger_new(parser, &def->name, &def->table, def->time,
+			       def->event, columns, when, steps);
+}
+
+struct sql_ast *
+sql_ast_new(struct region *region)
+{
+	struct sql_ast *res = xregion_alloc_object(region, typeof(*res));
+	memset(res, 0, sizeof(*res));
 	return res;
 }
