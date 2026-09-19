@@ -12,6 +12,7 @@ local json = require('json')
 local helpers = require('luatest.helpers')
 local uri = require('uri')
 local fun = require('fun')
+local clock = require('clock')
 
 -- {{{ Common test config.
 
@@ -27,8 +28,7 @@ local common = {
 local want_to_skip = {
     test_net_box_conn = false,
     test_replication_ssl_reconfig = false,
-    -- https://github.com/tarantool/tarantool/issues/13185
-    test_replication_and_connpool_ssl_reconfig = true,
+    test_replication_and_connpool_ssl_reconfig = false,
 }
 
 -- Common per test config.
@@ -119,10 +119,23 @@ local CA2_CLIENT1_KEY_FILE = fio.pathjoin(CERT_DIR, 'client2.key')
 local CA2_CLIENT2_CERT_FILE = fio.pathjoin(CERT_DIR, 'client2_2.crt')
 local CA2_CLIENT2_KEY_FILE = fio.pathjoin(CERT_DIR, 'client2_2.key')
 
+local CIPHERS1 = 'AES128-SHA'
+local CIPHERS2 = 'AES256-SHA'
+
 local CERTS = {}
 CERTS.NC_CA1_S1 = {
     ssl_key = CA1_SERVER1_KEY_FILE,
     ssl_cert = CA1_SERVER1_CERT_FILE,
+}
+CERTS.NC_CA1_S1_H1 = {
+    ssl_key = CA1_SERVER1_KEY_FILE,
+    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
+CERTS.NC_CA1_S1_H2 = {
+    ssl_key = CA1_SERVER1_KEY_FILE,
+    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_ciphers = CIPHERS2,
 }
 CERTS.NC_CA1_S2 = {
     ssl_key = CA1_SERVER2_KEY_FILE,
@@ -136,13 +149,43 @@ CERTS.NC_CA1_C1 = {
     ssl_key = CA1_CLIENT1_KEY_FILE,
     ssl_cert = CA1_CLIENT1_CERT_FILE,
 }
+CERTS.NC_CA1_C1_H1 = {
+    ssl_key = CA1_CLIENT1_KEY_FILE,
+    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
+CERTS.NC_CA1_C1_H2 = {
+    ssl_key = CA1_CLIENT1_KEY_FILE,
+    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_ciphers = CIPHERS2,
+}
 CERTS.NC_CA2_S1 = {
     ssl_key = CA2_SERVER1_KEY_FILE,
     ssl_cert = CA2_SERVER1_CERT_FILE,
 }
+CERTS.NC_CA2_S1_H1 = {
+    ssl_key = CA2_SERVER1_KEY_FILE,
+    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
+CERTS.NC_CA2_S1_H2 = {
+    ssl_key = CA2_SERVER1_KEY_FILE,
+    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_ciphers = CIPHERS2,
+}
 CERTS.NC_CA2_C1 = {
     ssl_key = CA2_CLIENT1_KEY_FILE,
     ssl_cert = CA2_CLIENT1_CERT_FILE,
+}
+CERTS.NC_CA2_C1_H1 = {
+    ssl_key = CA2_CLIENT1_KEY_FILE,
+    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
+CERTS.NC_CA2_C1_H2 = {
+    ssl_key = CA2_CLIENT1_KEY_FILE,
+    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_ciphers = CIPHERS2,
 }
 -- CA1.
 CERTS.CA1_S1 = {
@@ -176,20 +219,44 @@ CERTS.CA2_S1 = {
     ssl_key = CA2_SERVER1_KEY_FILE,
     ssl_cert = CA2_SERVER1_CERT_FILE,
 }
+CERTS.CA2_S1_H1 = {
+    ca_file = CA2_FILE,
+    ssl_key = CA2_SERVER1_KEY_FILE,
+    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
 CERTS.CA2_S2 = {
     ca_file = CA2_FILE,
     ssl_key = CA2_SERVER2_KEY_FILE,
     ssl_cert = CA2_SERVER2_CERT_FILE,
+}
+CERTS.CA2_S2_H1 = {
+    ca_file = CA2_FILE,
+    ssl_key = CA2_SERVER2_KEY_FILE,
+    ssl_cert = CA2_SERVER2_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_S3 = {
     ca_file = CA2_FILE,
     ssl_key = CA2_SERVER3_KEY_FILE,
     ssl_cert = CA2_SERVER3_CERT_FILE,
 }
+CERTS.CA2_S3_H1 = {
+    ca_file = CA2_FILE,
+    ssl_key = CA2_SERVER3_KEY_FILE,
+    ssl_cert = CA2_SERVER3_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
+}
 CERTS.CA2_C1 = {
     ca_file = CA2_FILE,
     ssl_key = CA2_CLIENT1_KEY_FILE,
     ssl_cert = CA2_CLIENT1_CERT_FILE,
+}
+CERTS.CA2_C1_H1 = {
+    ca_file = CA2_FILE,
+    ssl_key = CA2_CLIENT1_KEY_FILE,
+    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_C2 = {
     ca_file = CA2_FILE,
@@ -208,6 +275,18 @@ local SSL_SOCK = {
 
 -- {{{ Cluster helpers section.
 
+-- Returns done_tm() function.
+local function start_tm(msg)
+    checks('string')
+    log.info('(%s): %s', utils.get_caller_loc(1), msg)
+    local t0 = clock.monotonic64()
+    return function()
+        local t1 = clock.monotonic64()
+        log.info('(%s): Done %q in %dms', utils.get_caller_loc(1),
+            msg, tonumber(t1 - t0)/1.0E6)
+    end
+end
+
 local function cluster_config_base(opts)
     checks('?table')
     opts = opts or {}
@@ -223,6 +302,8 @@ local function cluster_config_base(opts)
     c:set_replicaset_option('bootstrap_leader', main_i)
     c:set_replicaset_option('replication.failover', 'manual')
     c:set_replicaset_option('leader', main_i)
+    -- Reduced timeout is enough for tests and it make them quickly.
+    c:set_replicaset_option('replication.connect_timeout', 10)
     if opts.election then
         c:set_replicaset_option('replication.failover', 'election')
         c:set_replicaset_option('leader', nil)
@@ -271,6 +352,7 @@ local function server_net_box_uri_with_opts(server, opts)
         ca_file = '?string',
         ssl_key = '?string',
         ssl_cert = '?string',
+        ssl_ciphers = '?string',
     })
     local uri = {}
     if type(server.net_box_uri) == 'table' then
@@ -285,12 +367,14 @@ local function server_net_box_uri_with_opts(server, opts)
 
     if opts ~= nil then
         local has_ssl_opts = opts.ca_file ~= nil or
-            opts.ssl_key ~= nil or opts.ssl_cert ~= nil
+            opts.ssl_key ~= nil or opts.ssl_cert ~= nil or
+            opts.ssl_ciphers ~= nil
         uri.params = {
             transport = opts[1] or (has_ssl_opts and 'ssl' or nil),
             ssl_ca_file = opts.ca_file,
             ssl_key_file = opts.ssl_key,
             ssl_cert_file = opts.ssl_cert,
+            ssl_ciphers = opts.ssl_ciphers,
         }
     end
 
@@ -524,8 +608,9 @@ g.test_net_box_conn = function()
     t.skip_if(want_to_skip.test_net_box_conn)
     local tc = test_cfg.test_net_box_conn
     local cn_reset_enabled = common.cfg_conn_reset_option
+    local done_tm
 
-    log.info('Start with plain transport.')
+    done_tm = start_tm('Start with plain transport.')
     -- Default cbuilder config provides client:secret user with super role.
     -- It is used by default by cluster's server net_box connection.
     -- We can eval with this user in cluster_check_net_box_conn.
@@ -536,7 +621,7 @@ g.test_net_box_conn = function()
     })
     cl:start({wait_until_ready = false})
     cluster_wait_until_ready(cl)
-    log.info('Done start with plain transport.')
+    done_tm()
 
     -- Test new conn.
     -- Non SSL: OK.
@@ -544,13 +629,13 @@ g.test_net_box_conn = function()
     -- SSL: error.
     cluster_check_net_box_conn(cl, {'ssl'}, 'assert_conn_error')
 
-    log.info('Reload with SSL certs, no CA.')
+    done_tm = start_tm('Reload with SSL certs, no CA.')
     local cfg_ssl0 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.NC_CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl0, {'ssl'})
-    log.info('Done reload with SSL certs, no CA.')
+    done_tm()
 
     -- Test old conn became invalid.
     utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
@@ -569,13 +654,13 @@ g.test_net_box_conn = function()
     -- SSL, client with CA2 certs, CA2: error, client don't trust.
     cluster_check_net_box_conn(cl, CERTS.CA2_C1, 'assert_conn_error')
 
-    log.info('Reload with SSL certs from CA1.')
+    done_tm = start_tm('Reload with SSL certs from CA1.')
     local cfg_ssl1 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA1_S1)
         :config()
     cluster_reload(cl, cfg_ssl1, CERTS.CA1_C1)
-    log.info('Done reload with SSL certs from CA1.')
+    done_tm()
 
     -- Test old conn became invalid.
     utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
@@ -594,13 +679,13 @@ g.test_net_box_conn = function()
     -- SSL, client with (other) CA1 certs, CA1: OK, client trust, server trust.
     cluster_check_net_box_conn(cl, CERTS.CA1_C2, 'assert_conn_active')
 
-    log.info('Reload with SSL certs from CA2.')
+    done_tm = start_tm('Reload with SSL certs from CA2.')
     local cfg_ssl2 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA2_S1)
         :config()
     cluster_reload(cl, cfg_ssl2, CERTS.CA2_C1)
-    log.info('Done reload with SSL certs from CA2.')
+    done_tm()
 
     -- Test old conn became invalid.
     utils.assert_conn_reset_if_enabled(cl.old_cn.i1, cn_reset_enabled)
@@ -785,8 +870,61 @@ local function cluster_check_repl_status(cl, opts)
 end
 
 local g2 = t.group('replication_ssl_reconfig', {
-    -- Certs changed, no CA.
-    {
+    {case = 'Ciphers changed (H1 -> H2), certs not changed, no CA'},
+    {case = 'Ciphers changed (H1 -> any), certs not changed, no CA'},
+    {case = 'Ciphers changed (any -> H1), certs not changed, no CA'},
+    {case = 'Certs changed, no CA'},
+    {case = 'Certs not changed, CA added'},
+    {case = 'Certs changed, CA changed'},
+})
+
+g2.cases = {
+    ['Ciphers changed (H1 -> H2), certs not changed, no CA'] = {
+        set1 = {
+            s1 = 'NC_CA1_S1_H1',
+            c1 = 'NC_CA1_C1_H1',
+            s2 = 'NC_CA2_S1_H1',
+            c2 = 'NC_CA2_C1_H1',
+        },
+        set2 = {
+            s1 = 'NC_CA1_S1_H2',
+            c1 = 'NC_CA1_C1_H2',
+            s2 = 'NC_CA2_S1_H2',
+            c2 = 'NC_CA2_C1_H2',
+        },
+        i1_peer_changed = true,
+    },
+    ['Ciphers changed (H1 -> any), certs not changed, no CA'] = {
+        set1 = {
+            s1 = 'NC_CA1_S1_H1',
+            c1 = 'NC_CA1_C1_H1',
+            s2 = 'NC_CA2_S1_H1',
+            c2 = 'NC_CA2_C1_H1',
+        },
+        set2 = {
+            s1 = 'NC_CA1_S1',
+            c1 = 'NC_CA1_C1',
+            s2 = 'NC_CA2_S1',
+            c2 = 'NC_CA2_C1',
+        },
+        i1_peer_changed = false,
+    },
+    ['Ciphers changed (any -> H1), certs not changed, no CA'] = {
+        set1 = {
+            s1 = 'NC_CA1_S1',
+            c1 = 'NC_CA1_C1',
+            s2 = 'NC_CA2_S1',
+            c2 = 'NC_CA2_C1',
+        },
+        set2 = {
+            s1 = 'NC_CA1_S1_H1',
+            c1 = 'NC_CA1_C1_H1',
+            s2 = 'NC_CA2_S1_H1',
+            c2 = 'NC_CA2_C1_H1',
+        },
+        i1_peer_changed = false,
+    },
+    ['Certs changed, no CA'] = {
         set1 = {
             s1 = 'NC_CA1_S1',
             c1 = 'NC_CA1_C1',
@@ -801,8 +939,7 @@ local g2 = t.group('replication_ssl_reconfig', {
         },
         i1_peer_changed = false,
     },
-    -- Certs not changed, CA added.
-    {
+    ['Certs not changed, CA added'] = {
         set1 = {
             s1 = 'NC_CA1_S1',
             c1 = 'NC_CA1_C1',
@@ -817,8 +954,7 @@ local g2 = t.group('replication_ssl_reconfig', {
         },
         i1_peer_changed = false,
     },
-    -- Certs changed, CA changed.
-    {
+    ['Certs changed, CA changed'] = {
         set1 = {
             s1 = 'CA1_S1',
             c1 = 'CA1_C1',
@@ -833,7 +969,7 @@ local g2 = t.group('replication_ssl_reconfig', {
         },
         i1_peer_changed = true,
     },
-})
+}
 
 -- Check leader 'i1' ssl parameters of replication.peer updated
 -- to given values after config reload. The gh-1672 cases.
@@ -842,9 +978,11 @@ g2.test_replication_ssl_reconfig = function(cg)
     t.skip_if(utils.tarantool_build_ndebug(), 'error injs are not available')
     local tc = test_cfg.test_replication_ssl_reconfig
 
-    local p = cg.params
+    local p = g2.cases[cg.params.case]
     local i1_peer_expect_changed = common.gh1672_solved and true or
         p.i1_peer_changed
+    -- i2 peer never changes, this is additional check for gh-1667 case.
+    local i2_peer_expect_changed = common.gh1667_solved
 
     local check_repl_common_opts = {
         debug_log_repl_info = tc.debug_log_repl_info,
@@ -853,8 +991,9 @@ g2.test_replication_ssl_reconfig = function(cg)
 
     local cfg_plain = cluster_config_base({instances = {'i1', 'i2'},
         election = false, log_level = 'info'})
+    local done_tm
 
-    log.info('Start with SSL certs set 1.')
+    done_tm = start_tm(cg.params.case..': Start with SSL certs set 1.')
     local cfg_ssl0 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS[p.set1.s1])
@@ -869,12 +1008,12 @@ g2.test_replication_ssl_reconfig = function(cg)
     server_set_net_box_opts(cl['i2'], CERTS[p.set1.c2])
     cluster_wait_until_ready(cl)
     cluster_wait_for_fullmesh(cl)
-    log.info('Done start with SSL certs set 1.')
+    done_tm()
 
     -- Collect repl_info of set1.
     cluster_check_repl_status(cl, check_repl_common_opts)
 
-    log.info('Reload with SSL certs set 2.')
+    done_tm = start_tm(cg.params.case..': Reload with SSL certs set 2.')
     local cfg_ssl1 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS[p.set2.s1])
@@ -886,25 +1025,40 @@ g2.test_replication_ssl_reconfig = function(cg)
     server_set_net_box_opts(cl['i2'], CERTS[p.set2.c2])
     cluster_wait_until_ready(cl)
     cluster_wait_for_fullmesh(cl)
-    log.info('Done reload with SSL certs set 2.')
+    done_tm()
 
     -- Collect repl_info of set2.
     cluster_check_repl_status(cl, check_repl_common_opts)
+
+    -- Check peer changes.
+    local function check_params(actual_uri_peer, expected_params)
+        local u = uri.parse(actual_uri_peer)
+        t.assert(u ~= nil, 'uri.parse success expected')
+        local u_p = u.params
+        t.assert(u_p ~= nil)
+        local actual = {
+            ssl_cert = u_p.ssl_cert_file[1],
+            ssl_key = u_p.ssl_key_file[1],
+            ssl_ciphers = u_p.ssl_ciphers and u_p.ssl_ciphers[1] or nil,
+            ca_file = u_p.ssl_ca_file and u_p.ssl_ca_file[1] or nil,
+        }
+        t.assert_equals(actual.ssl_cert, expected_params.ssl_cert)
+        t.assert_equals(actual.ssl_key, expected_params.ssl_key)
+        t.assert_equals(actual.ssl_ciphers, expected_params.ssl_ciphers)
+        t.assert_equals(actual.ca_file, expected_params.ca_file)
+    end
+
+    local chk_set
     -- Check i1 to i2 peer changes.
     local i1up2 = cl.old_repl_info.i1[2].upstream
     t.assert_equals(i1up2.peer_changed, i1_peer_expect_changed)
-    local u = uri.parse(i1up2.peer)
-    t.assert(u ~= nil, 'uri.parse success expected')
-    local chk_set = i1_peer_expect_changed and p.set2 or p.set1
-    local certs = CERTS[chk_set.s1]
-    local actual = {
-        ssl_cert = u.params.ssl_cert_file[1],
-        ssl_key = u.params.ssl_key_file[1],
-        ca_file = u.params.ssl_ca_file and u.params.ssl_ca_file[1] or nil,
-    }
-    t.assert_equals(actual.ssl_cert, certs.ssl_cert)
-    t.assert_equals(actual.ssl_key, certs.ssl_key)
-    t.assert_equals(actual.ca_file, certs.ca_file)
+    chk_set = i1_peer_expect_changed and p.set2 or p.set1
+    check_params(i1up2.peer, CERTS[chk_set.s1])
+    -- Check i2 to i1 peer changes.
+    local i2up1 = cl.old_repl_info.i2[1].upstream
+    t.assert_equals(i2up1.peer_changed, i2_peer_expect_changed)
+    chk_set = i2_peer_expect_changed and p.set2 or p.set1
+    check_params(i2up1.peer, CERTS[chk_set.s2])
 
     cl:drop()
 end
@@ -1035,8 +1189,9 @@ g.test_replication_and_connpool_ssl_reconfig = function()
 
     local cfg_base = cluster_config_base({instances = {'i1', 'i2', 'i3'},
         election = false})
+    local done_tm
 
-    log.info('Start with plain transport.')
+    done_tm = start_tm('Start with plain transport.')
     local cfg_plain = cbuilder:new(cfg_base)
         -- Connpool uses replication connections, so
         -- we need to grant some privileges to replication user
@@ -1060,7 +1215,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
     cluster_wait_until_ready(cl)
     cluster_add_package_path(cl, ('%s/?.lua'):format(test_suite_dir))
     cluster_wait_for_fullmesh(cl)
-    log.info('Done start with plain transport.')
+    done_tm()
 
     cluster_check_repl_status(cl, fun.chain({
         check_config = true,
@@ -1072,7 +1227,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
     }, check_repl_common_opts):tomap())
     cluster_check_connpool(cl, check_connpool_opts)
 
-    log.info('Reload with SSL certs, no CA.')
+    done_tm = start_tm('Reload with SSL certs, no CA.')
     local cfg_ssl0 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.NC_CA1_S1)
@@ -1081,7 +1236,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         :config()
     cluster_reload(cl, cfg_ssl0, {'ssl'})
     cluster_wait_for_fullmesh(cl)
-    log.info('Done reload with SSL certs, no CA.')
+    done_tm()
 
     cluster_check_repl_status(cl, fun.chain({
         check_config = true,
@@ -1091,7 +1246,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
     }, check_repl_common_opts):tomap())
     cluster_check_connpool(cl, check_connpool_opts)
 
-    log.info('Reload with SSL certs from CA1.')
+    done_tm = start_tm('Reload with same SSL certs from CA1.')
     local cfg_ssl1 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA1_S1)
@@ -1100,7 +1255,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         :config()
     cluster_reload(cl, cfg_ssl1, CERTS.CA1_C1)
     cluster_wait_for_fullmesh(cl)
-    log.info('Done reload with SSL certs from CA1.')
+    done_tm()
 
     cluster_check_repl_status(cl, fun.chain({
         check_config = true,
@@ -1110,7 +1265,7 @@ g.test_replication_and_connpool_ssl_reconfig = function()
     }, check_repl_common_opts):tomap())
     cluster_check_connpool(cl, check_connpool_opts)
 
-    log.info('Reload with SSL certs from CA2.')
+    done_tm = start_tm('Reload with other SSL certs from CA2.')
     local cfg_ssl2 = cbuilder:new(cfg_plain)
         :set_global_option('iproto.listen', {SSL_SOCK})
         :set_instance_option('i1', 'iproto.ssl', CERTS.CA2_S1)
@@ -1119,7 +1274,26 @@ g.test_replication_and_connpool_ssl_reconfig = function()
         :config()
     cluster_reload(cl, cfg_ssl2, CERTS.CA2_C1)
     cluster_wait_for_fullmesh(cl)
-    log.info('Done reload with SSL certs from CA2.')
+    done_tm()
+
+    cluster_check_repl_status(cl, fun.chain({
+        check_config = true,
+        gh1667_solved = common.gh1667_solved,
+        gh1672_solved = common.gh1672_solved,
+        gh1672_case = false,
+    }, check_repl_common_opts):tomap())
+    cluster_check_connpool(cl, check_connpool_opts)
+
+    done_tm = start_tm('Reload with same SSL certs from CA2, ciphers limited.')
+    local cfg_ssl3 = cbuilder:new(cfg_plain)
+        :set_global_option('iproto.listen', {SSL_SOCK})
+        :set_instance_option('i1', 'iproto.ssl', CERTS.CA2_S1_H1)
+        :set_instance_option('i2', 'iproto.ssl', CERTS.CA2_S2_H1)
+        :set_instance_option('i3', 'iproto.ssl', CERTS.CA2_S3_H1)
+        :config()
+    cluster_reload(cl, cfg_ssl3, CERTS.CA2_C1_H1)
+    cluster_wait_for_fullmesh(cl)
+    done_tm()
 
     cluster_check_repl_status(cl, fun.chain({
         check_config = true,
