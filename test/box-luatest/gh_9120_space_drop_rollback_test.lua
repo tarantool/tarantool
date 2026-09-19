@@ -93,7 +93,7 @@ g.test_sophisticated_transaction = function(cg)
         t.assert(s == box.space.test)
 
         -- The space format and contents still the same.
-        t.assert_equals(s:format(), {{name = 'id', type = 'any'}})
+        t.assert_equals(s:format(), {{name = 'id', type = 'unsigned'}})
         t.assert_equals(s:select(), {{1, 1}})
     end)
 end
