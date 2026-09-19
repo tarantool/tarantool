@@ -354,7 +354,7 @@ local function fetch_source_gen(param, state)
         if #data == 0 then return end
         return new_state, data[1]
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -430,9 +430,9 @@ local function prepare_data(schema, tuple_count, source_count, opts)
             msgpackffi.internal.encode_r(buf, tuples[i], 0)
         end
     elseif input_type == 'tuple' then
-        assert(false)
+        error('unreachable')
     else
-        assert(false)
+        error('unreachable')
     end
 
     return sources, exp_result

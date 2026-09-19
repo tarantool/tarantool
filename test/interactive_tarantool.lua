@@ -288,6 +288,7 @@ function mt.read_response(self, opts)
     --
     -- This is how tarantool's console serializes a raised error.
     local is_error = #reply == 1 and type(reply[1]) == 'table' and
+        ---@diagnostic disable-next-line: redundant-parameter
         next(reply[1], next(reply[1])) == nil and reply[1].error ~= nil
     if is_error then
         error(reply[1].error, 0)

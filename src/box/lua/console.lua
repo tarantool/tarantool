@@ -562,9 +562,9 @@ local function local_eval(storage, line)
     -- case try to run the original string.
     --
     create_env_on_demand(storage)
-    local fun, errmsg = loadstring("return "..line, nil, nil, storage.env)
+    local fun, errmsg = load("return "..line, nil, nil, storage.env)
     if not fun then
-        fun, errmsg = loadstring(line, nil, nil, storage.env)
+        fun, errmsg = load(line, nil, nil, storage.env)
     end
     if not fun then
         return format(false, errmsg)

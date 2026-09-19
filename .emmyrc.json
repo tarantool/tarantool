@@ -1,0 +1,177 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/refs/heads/main/crates/emmylua_code_analysis/resources/schema.json",
+  "$comment": {
+    "access-invisible": "Reports Lua 5.3+ members (for example string.pack/string.unpack) that are not accessible in LuaJIT; the analyzer resolves them and then flags their use.",
+    "assign-type-mismatch": "Mostly legacy SQL tests and dynamic Lua where the inferred type differs from the declared one; fixing them requires a large test refactoring.",
+    "call-non-callable": "The analyzer often cannot infer the type of a value obtained from the C API or metatables and treats a valid call as non-callable.",
+    "duplicate-require": "Cannot be disabled per directory, see EmmyLuaLs/emmylua-analyzer-rust#1196; it mainly triggers on require() in luatest test bodies.",
+    "global-in-non-module": "Flags intentional _G.x assignments used to share state between the test body and server:exec() callbacks.",
+    "inject-field": "Tables are extended with new fields at runtime and the analyzer cannot know the resulting type.",
+    "need-check-nil": "The analyzer does not always propagate non-nil guarantees (assert(), pcall(), C API) and reports many false positives.",
+    "param-type-mismatch": "Many false positives caused by incomplete type information for the C API and dynamic Lua code.",
+    "preferred-local-alias": "Sometimes suggests a wrong replacement, for example it turns assert(a == b) into assert(a == a).",
+    "redefined-local": "More than two thousand warnings, mostly intentional shadowing in legacy tests.",
+    "undefined-field": "Fields assigned dynamically or through metatables are not known to the analyzer, which reports them as undefined.",
+    "unnecessary-if": "Conditions are often considered constant because of incomplete type information; most hits are in legacy SQL tests.",
+    "unresolved-require": "require() paths follow Tarantool's module layout and test-run helpers that the analyzer cannot resolve.",
+    "unused": "Unused locals and arguments are mostly intentional in legacy tests and C API wrappers; prefixing them with _ would be noisy."
+  },
+  "workspace": {
+    "library": [
+      "third_party/checks/",
+      "third_party/metrics/"
+    ],
+    "workspaceRoots": [
+      "third_party/checks/",
+      "third_party/metrics/"
+    ],
+    "ignoreGlobs": [
+      "build/**/*.lua",
+      "luatest/**/*.lua",
+      "test-run/**/*.lua",
+      "test/app/*.test.lua",
+      "test/box/*.test.lua",
+      "test/engine/*.test.lua",
+      "test/engine_long/*.test.lua",
+      "test/replication/*.test.lua",
+      "test/metrics-luatest/test/*.lua",
+      "test/metrics-luatest/test/**/*.lua",
+      "test/sql/**/*.lua",
+      "test/swim/*.test.lua",
+      "test/var/**/*.lua",
+      "test/vinyl/*.test.lua",
+      "test/wal_off/*.test.lua",
+      "test/xlog/*.test.lua",
+      "test/static/corpus/luaL_loadbuffer/*.lua",
+      "third_party/**/*.lua",
+      ".rocks/**/*.lua",
+      ".git/**/*.lua"
+    ]
+  },
+  "diagnostics": {
+    "disable": [
+      "access-invisible",
+      "assign-type-mismatch",
+      "call-non-callable",
+      "duplicate-require",
+      "global-in-non-module",
+      "inject-field",
+      "need-check-nil",
+      "param-type-mismatch",
+      "preferred-local-alias",
+      "redefined-local",
+      "undefined-field",
+      "unnecessary-if",
+      "unresolved-require",
+      "unused"
+    ],
+    "severity": {
+      "redefined-local": "information",
+      "shadow-local": "information",
+      "shadow-upvalue": "information",
+      "unused-arg": "information",
+      "unused-local": "information"
+    },
+    "globals": [
+      "box",
+      "misc",
+      "package",
+      "tonumber64",
+      "utf8",
+      "_TARANTOOL"
+    ]
+  },
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "config": {
+    "override": [
+      {
+        "files": [
+          "src/lua/help.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "help",
+            "tutorial"
+          ]
+        }
+      },
+      {
+        "files": [
+          "src/lua/init.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "dostring"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box/box.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "cfg_filter",
+            "sorted",
+            "iproto_request"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box-tap/session.test.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "session",
+            "space",
+            "f1",
+            "f2"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/box-tap/extended_error.test.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "error_access_denied",
+            "error_new",
+            "error_new_stacked",
+            "error_throw",
+            "error_throw_stacked",
+            "error_throw_access_denied",
+            "forbidden_function"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/swim/box.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "listen_port",
+            "listen_uri",
+            "uuid",
+            "uri"
+          ]
+        }
+      },
+      {
+        "files": [
+          "test/replication/replica_quorum.lua"
+        ],
+        "diagnostics": {
+          "globals": [
+            "INSTANCE_URI",
+            "nonexistent_uri"
+          ]
+        }
+      }
+    ]
+  }
+}

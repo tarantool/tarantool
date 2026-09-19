@@ -545,7 +545,7 @@ g1.test_replicaset_recovery = function(cg)
         box.backup.stop()
     end)
     cg.replica_set:stop()
-    restore_replicaset(cg.replica_set, backup_dir, replica1)
+    restore_replicaset(cg.replica_set, backup_dir)
     cg.replica_set:start()
     cg.replica_set:wait_for_fullmesh()
     for _, server in ipairs(cg.replica_set.servers) do
@@ -977,6 +977,9 @@ g2.test_recovery_point_limit_precise_cleanup = function(cg)
             box.error.injection.set('ERRINJ_WAL_IO_COUNTDOWN', i)
             local ok, err = pcall(box.backup.recovery_point.create)
             if not ok then
+                -- emmylua_check: false positive, see
+                -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1248
+                ---@diagnostic disable-next-line: missing-parameter
                 t.assert_covers(err:unpack(), {
                     type = 'ClientError',
                     name = 'WAL_IO',
