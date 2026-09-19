@@ -45,7 +45,6 @@ macro(curl_build)
 
     # Let's disable testing for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_TESTING=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_TEST_BUNDLES=OFF")
 
     # Let's disable building documentation for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
@@ -87,6 +86,10 @@ macro(curl_build)
     string(REPLACE ";" "$<SEMICOLON>" LIBCURL_FIND_ROOT_PATH_STR "${LIBCURL_FIND_ROOT_PATH}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${LIBCURL_FIND_ROOT_PATH_STR}")
 
+    # Look for c-ares and nghttp2 at the paths above, not at the ones given
+    # by pkg-config, which describes the packages installed on the host.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_PKGCONFIG=OFF")
+
     # On cmake CURL_USE_LIBSSH2 flag is enabled by default, we need to switch it
     # off to avoid of issues, like:
     #   ld: libssh2.c:(.text+0x4d8): undefined reference to `libssh2_*...
@@ -127,6 +130,8 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=ON")
+    # The curl tool isn't built, so no CA bundle is embedded into it.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_EMBED=")
 
     # Even though we set the external project's install dir
     # below, we still need to pass the corresponding install
@@ -135,19 +140,32 @@ macro(curl_build)
 
     # The default values for the options below are not always
     # "./lib", "./bin"  and "./include", while curl expects them
-    # to be.
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_LIBDIR=lib")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_INCLUDEDIR=include")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_BINDIR=bin")
+    # to be. The type is passed too, because CMake 4.1+ leaves the
+    # variables untyped otherwise, and untyped cache entries aren't
+    # visible to the curl-build-option-consistency target below.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_LIBDIR:PATH=lib")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_INCLUDEDIR:PATH=include")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_INSTALL_BINDIR:PATH=bin")
 
     # Pass the same toolchain as is used to build tarantool itself,
-    # because they can be incompatible.
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_LINKER=${CMAKE_LINKER}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_AR=${CMAKE_AR}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_RANLIB=${CMAKE_RANLIB}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_NM=${CMAKE_NM}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_STRIP=${CMAKE_STRIP}")
+    # because they can be incompatible. The types are passed for the
+    # same reason as above: CMake before 3.19 leaves the compiler
+    # untyped otherwise, and a reconfiguration of libcurl leaves the
+    # other tools untyped.
+    list(APPEND LIBCURL_CMAKE_FLAGS
+        "-DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_LINKER:FILEPATH=${CMAKE_LINKER}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_AR:FILEPATH=${CMAKE_AR}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_RANLIB:FILEPATH=${CMAKE_RANLIB}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_NM:FILEPATH=${CMAKE_NM}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_STRIP:FILEPATH=${CMAKE_STRIP}")
+    # curl-build-option-consistency check doesn't see untyped entries: the
+    # type is set either by the command that defines the entry (find_program()
+    # in this case) or from the command line (:FILEPATH). CMake looks for the
+    # make program only when it is not given from the command line, so we have
+    # to set the type here.
+    list(APPEND LIBCURL_CMAKE_FLAGS
+        "-DCMAKE_MAKE_PROGRAM:FILEPATH=${CMAKE_MAKE_PROGRAM}")
 
     # Need to set values explicitly everything that is default, because
     # we don't know how defaults will be changed in a future and we don't
@@ -155,7 +173,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DPICKY_COMPILER=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_CURL_EXE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_BROTLI=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_GNUTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GNUTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_MBEDTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_WOLFSSL=OFF")
@@ -165,7 +182,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GSASL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBIDN2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGTCP2=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_QUICHE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_OPENSSL_QUIC=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HTTP=OFF")
@@ -205,7 +221,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PARSEDATE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROGRESS_METER=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROXY=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SHUFFLE_DNS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SOCKETPAIR=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_VERBOSE_STRINGS=OFF")
@@ -249,6 +264,100 @@ macro(curl_build)
     # Disables headers-api support.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HEADERS_API=OFF")
 
+    # libcurl's cache entries that we don't set: they are not used in our
+    # build or are derived from the options above (for example,
+    # OPENSSL_INCLUDE_DIR from OPENSSL_ROOT_DIR). See the
+    # curl-build-option-consistency target below.
+    set(LIBCURL_EXCLUDED_OPTIONS
+        CMAKE_ADDR2LINE
+        CMAKE_C_COMPILER_AR
+        CMAKE_C_COMPILER_RANLIB
+        CMAKE_C_FLAGS_DEBUG
+        CMAKE_C_FLAGS_MINSIZEREL
+        CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_DLLTOOL
+        CMAKE_EXE_LINKER_FLAGS
+        CMAKE_EXE_LINKER_FLAGS_DEBUG
+        CMAKE_EXE_LINKER_FLAGS_MINSIZEREL
+        CMAKE_EXE_LINKER_FLAGS_RELEASE
+        CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
+        CMAKE_EXPORT_COMPILE_COMMANDS
+        CMAKE_INSTALL_DATADIR
+        CMAKE_INSTALL_DATAROOTDIR
+        CMAKE_INSTALL_DOCDIR
+        CMAKE_INSTALL_INFODIR
+        CMAKE_INSTALL_LIBEXECDIR
+        CMAKE_INSTALL_LOCALEDIR
+        CMAKE_INSTALL_LOCALSTATEDIR
+        CMAKE_INSTALL_MANDIR
+        CMAKE_INSTALL_OLDINCLUDEDIR
+        CMAKE_INSTALL_RUNSTATEDIR
+        CMAKE_INSTALL_SBINDIR
+        CMAKE_INSTALL_SHAREDSTATEDIR
+        CMAKE_INSTALL_SYSCONFDIR
+        CMAKE_MODULE_LINKER_FLAGS
+        CMAKE_MODULE_LINKER_FLAGS_DEBUG
+        CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL
+        CMAKE_MODULE_LINKER_FLAGS_RELEASE
+        CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
+        CMAKE_OBJCOPY
+        CMAKE_OBJDUMP
+        CMAKE_READELF
+        CMAKE_SHARED_LINKER_FLAGS
+        CMAKE_SHARED_LINKER_FLAGS_DEBUG
+        CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL
+        CMAKE_SHARED_LINKER_FLAGS_RELEASE
+        CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO
+        CMAKE_SKIP_INSTALL_RPATH
+        CMAKE_SKIP_RPATH
+        CMAKE_STATIC_LINKER_FLAGS
+        CMAKE_STATIC_LINKER_FLAGS_DEBUG
+        CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL
+        CMAKE_STATIC_LINKER_FLAGS_RELEASE
+        CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO
+        CMAKE_VERBOSE_MAKEFILE
+        OPENSSL_CRYPTO_LIBRARY
+        OPENSSL_INCLUDE_DIR
+        OPENSSL_SSL_LIBRARY
+        PERL_EXECUTABLE
+        PKG_CONFIG_EXECUTABLE
+        ZLIB_INCLUDE_DIR
+        ZLIB_LIBRARY
+    )
+
+    # Regular expressions of libcurl options that the
+    # curl-build-option-consistency target doesn't compare: variables that
+    # are passed, but aren't cache options, and options whose presence
+    # depends on the environment or on our build options.
+    set(LIBCURL_IGNORED_OPTIONS
+        # Passed variables that aren't cache options.
+        CMAKE_DEBUG_POSTFIX
+        CMAKE_FIND_ROOT_PATH
+        CMAKE_MODULE_PATH
+        CMAKE_POSITION_INDEPENDENT_CODE
+        CMAKE_UNITY_BUILD
+        OPENSSL_ROOT_DIR
+        ZLIB_ROOT
+        # libcurl removes them from the cache, when they are set to "none".
+        CURL_CA_BUNDLE
+        CURL_CA_PATH
+        # Depend on the generator.
+        CMAKE_COLOR_MAKEFILE
+        CMAKE_EXPORT_BUILD_DATABASE
+        # Depend on the platform.
+        CMAKE_INSTALL_NAME_TOOL
+        "CMAKE_OSX_.*"
+        # Depend on the CMake version.
+        CMAKE_TAPI
+        PKG_CONFIG_ARGN
+        # Depend on BUNDLED_LIBCURL_USE_ARES and BUNDLED_LIBCURL_USE_NGHTTP2.
+        "CARES_.*"
+        "NGHTTP2_.*"
+        # Depend on the installed pkg-config modules.
+        "pkgcfg_lib_.*"
+    )
+
     include(ExternalProject)
     ExternalProject_Add(
         bundled-libcurl-project
@@ -287,6 +396,31 @@ macro(curl_build)
     endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
+    # Compares the options in the libcurl's CMake cache with the passed and
+    # excluded ones, for example, to find new and removed options after a
+    # libcurl update. The cache of the existing libcurl build is used, so
+    # use a clean build directory after the update.
+    set(LIBCURL_PASSED_OPTIONS "")
+    foreach(LIBCURL_FLAG IN LISTS LIBCURL_CMAKE_FLAGS)
+        if(LIBCURL_FLAG MATCHES "^-D([^:=]+)")
+            list(APPEND LIBCURL_PASSED_OPTIONS ${CMAKE_MATCH_1})
+        endif()
+    endforeach()
+    add_custom_target(curl-build-option-consistency
+        COMMAND ${CMAKE_COMMAND}
+            -DCACHE_FILE=${LIBCURL_BINARY_DIR}/curl/CMakeCache.txt
+            -DOPTIONS_FILE=${PROJECT_SOURCE_DIR}/cmake/BuildLibCURL.cmake
+            "-DPASSED_OPTIONS=${LIBCURL_PASSED_OPTIONS}"
+            "-DEXCLUDED_OPTIONS=${LIBCURL_EXCLUDED_OPTIONS}"
+            "-DIGNORED_OPTIONS=${LIBCURL_IGNORED_OPTIONS}"
+            -P ${PROJECT_SOURCE_DIR}/cmake/CheckExternalProjectOptions.cmake
+        COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --green
+            "libcurl external project options are consistent"
+        DEPENDS bundled-libcurl-project
+        COMMENT "Checking libcurl options against its CMake cache"
+        VERBATIM
+    )
+
     # Setup CURL_INCLUDE_DIRS & CURL_LIBRARIES for global use.
     set(CURL_INCLUDE_DIRS ${LIBCURL_INSTALL_DIR}/include)
     set(CURL_LIBRARIES bundled-libcurl ${ZLIB_LIBRARIES})
@@ -305,6 +439,10 @@ macro(curl_build)
 
     unset(FOUND_ZLIB_ROOT_DIR)
     unset(FOUND_OPENSSL_ROOT_DIR)
+    unset(LIBCURL_EXCLUDED_OPTIONS)
+    unset(LIBCURL_IGNORED_OPTIONS)
+    unset(LIBCURL_PASSED_OPTIONS)
+    unset(LIBCURL_FLAG)
     unset(LIBCURL_CFLAGS)
     unset(LIBCURL_INSTALL_DIR)
     unset(LIBCURL_BINARY_DIR)
