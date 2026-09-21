@@ -6,6 +6,9 @@ local g_tweaks = t.group('read_view.tweaks')
 g_tweaks.before_all(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_tweaks.after_all(function(cg)
@@ -40,6 +43,53 @@ g_tweaks.after_test('test_ffi', function(cg)
     end)
 end)
 
+-- Checks that opening a read view before the throttle interval elapsed since
+-- the previous one blocks the caller for the remainder of the interval, and
+-- that the interval can be changed or disabled.
+g_tweaks.test_throttle = function(cg)
+    cg.server:exec(function()
+        local clock = require('fiber').clock
+        local tweaks = require('internal.tweaks')
+
+        tweaks.read_view_throttle_interval = 0.5
+        box.read_view.open():close()
+        local start = clock()
+        box.read_view.open():close()
+        local throttled = clock() - start
+        t.assert_gt(throttled, 0.4)
+
+        tweaks.read_view_throttle_interval = 0
+        local start = clock()
+        box.read_view.open():close()
+        local unthrottled = clock() - start
+        t.assert_lt(unthrottled, 0.5)
+    end)
+end
+
+g_tweaks.after_test('test_throttle_cancel', function(cg)
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
+end)
+
+-- Checks that a fiber waiting out the throttle interval can be cancelled.
+g_tweaks.test_throttle_cancel = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local tweaks = require('internal.tweaks')
+
+        box.read_view.open():close()
+        tweaks.read_view_throttle_interval = 60
+        local f = fiber.new(box.read_view.open)
+        f:set_joinable(true)
+        fiber.yield()
+        f:cancel()
+        local ok, err = f:join()
+        t.assert_not(ok)
+        t.assert_equals(err.type, 'FiberIsCancelled')
+    end)
+end
+
 local g = t.group('read_view', t.helpers.matrix({ffi = {true, false}}))
 
 g.before_all(function(cg)
@@ -48,6 +98,7 @@ g.before_all(function(cg)
     cg.server:exec(function(ffi)
         local tweaks = require('internal.tweaks')
         tweaks.box_read_view_ffi = ffi
+        tweaks.read_view_throttle_interval = 0
     end, {cg.params.ffi})
 end)
 
@@ -2499,6 +2550,9 @@ local g_mvcc = t.group('read_view.mvcc', t.helpers.matrix{
 g_mvcc.before_all(function(cg)
     cg.server = server:new({box_cfg = {memtx_use_mvcc_engine = true}})
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_mvcc.after_all(function(cg)
@@ -2769,6 +2823,9 @@ g_threads.before_all(function(cg)
         net_box_credentials = {user = 'admin'}
     })
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_threads.after_all(function(cg)

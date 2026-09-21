@@ -10,6 +10,7 @@ g.before_all(function(cg)
     cg.server:exec(function(ffi)
         local tweaks = require('internal.tweaks')
         tweaks.box_read_view_ffi = ffi
+        tweaks.read_view_throttle_interval = 0
     end, {cg.params.ffi})
 end)
 
@@ -878,6 +879,7 @@ no_sup.before_all(function(cg)
     cg.server:exec(function(ffi)
         local tweaks = require('internal.tweaks')
         tweaks.box_read_view_ffi = ffi
+        tweaks.read_view_throttle_interval = 0
     end, {cg.params.ffi})
 end)
 
