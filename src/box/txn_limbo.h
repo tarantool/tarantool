@@ -167,15 +167,6 @@ struct txn_limbo {
 	 */
 	bool saw_promote;
 	/**
-	 * Whether this instance validates incoming synchro requests. When the
-	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
-	 * limbo owner, tracks PROMOTE/DEMOTE term and owner_id consistency.
-	 * The filtering is turned off during bootstrap, because it makes no
-	 * sense when applying a full copy of a remote instance's data. There
-	 * can't be any inconsistencies.
-	 */
-	bool do_validate;
-	/**
 	 * The elections state machine that controls the limbo when elections
 	 * are enabled.
 	 */
@@ -383,14 +374,6 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo);
  */
 void
 txn_limbo_rollback_all_volatile(struct txn_limbo *limbo);
-
-/** Start filtering incoming syncrho requests. */
-void
-txn_limbo_filter_enable(struct txn_limbo *limbo);
-
-/** Stop filtering incoming synchro requests. */
-void
-txn_limbo_filter_disable(struct txn_limbo *limbo);
 
 /** Tell the limbo that the recovery is finished. */
 void
