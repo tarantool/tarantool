@@ -448,6 +448,9 @@ struct errcode_record {
 	_(ER_DICT_OVERFLOW, 301,		"Dictionary has no space - too many unique values are used", "max_size", UINT) \
 	_(ER_NO_SUCH_THREAD_GROUP, 302,		"Thread group does not exist", "thread_group", STRING) \
 	_(ER_THREADS_NOT_CONFIGURED, 303,	"Threads are not configured") \
+	/* ER_RECOVERY_POINT_TXN_LAST_ROW, 304, Unused */ \
+	/* ER_NO_SUCH_READ_VIEW , 305, Unused */ \
+	_(ER_READ_VIEW_THROTTLED, 306,		"Read view creation is throttled, try again later") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
