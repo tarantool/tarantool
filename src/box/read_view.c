@@ -13,6 +13,7 @@
 
 #include "assoc.h"
 #include "box.h"
+#include "diag.h"
 #include "engine.h"
 #include "fiber.h"
 #include "field_def.h"
@@ -25,6 +26,7 @@
 #include "tarantool_ev.h"
 #include "trivia/util.h"
 #include "tuple.h"
+#include "tweaks.h"
 #include "vclock/vclock.h"
 
 /**
@@ -39,6 +41,20 @@ static struct mh_i64ptr_t *read_views;
  * Monotonically growing counter used for assigning unique ids to read views.
  */
 static uint64_t next_read_view_id = 1;
+
+/**
+ * Minimal interval between opening two non-system read views, in seconds.
+ *
+ * Each read view gets its own 32-bit version, which is never reused, so their
+ * consumption rate must be bounded to keep the underlying counter from wrapping
+ * around. The 100 ms interval keeps the counter safe for at least 13 years of
+ * continuous opening at the maximum rate. Set to 0 to disable throttling.
+ */
+static double read_view_throttle_interval = 0.1;
+TWEAK_DOUBLE(read_view_throttle_interval);
+
+/** Monotonic clock time when the last non-system read view was opened. */
+static double read_view_last_open;
 
 static bool
 default_space_filter(struct space *space, void *arg)
@@ -212,9 +228,36 @@ read_view_unregister(struct read_view *rv)
 	}
 }
 
+bool
+read_view_is_throttled(void)
+{
+	if (read_view_throttle_interval <= 0)
+		return false;
+	double elapsed = ev_monotonic_now(loop()) - read_view_last_open;
+	return elapsed < read_view_throttle_interval;
+}
+
+int
+read_view_throttle(void)
+{
+	while (read_view_is_throttled()) {
+		double elapsed = ev_monotonic_now(loop()) - read_view_last_open;
+		fiber_sleep(read_view_throttle_interval - elapsed);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 int
 read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 {
+	if (!opts->is_system) {
+		assert(!read_view_is_throttled());
+		read_view_last_open = ev_monotonic_now(loop());
+	}
 	rv->id = next_read_view_id++;
 	assert(opts->name != NULL);
 	rv->name = xstrdup(opts->name);
