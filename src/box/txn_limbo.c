@@ -416,15 +416,13 @@ txn_limbo_apply_promote(struct txn_limbo *limbo, uint16_t type, uint32_t origin)
 	 *   was stuck in its author's WAL while the new leader was getting
 	 *   elected. Then the new leader couldn't see any txns of that
 	 *   older-term owner either.
-	 * - With the filter disabled the request can carry a completely
-	 *   foreign ownership history.
 	 *
 	 * There is nothing to confirm then, and all the queued txns get rolled
 	 * back by the transfer. Which is only correct if the PROMOTE doesn't
 	 * claim to confirm anything new of the local owner, because the queue
 	 * inherits the PROMOTE's confirmed vclock.
 	 */
-	assert(!limbo->do_validate || queue->owner_id == p->queue_owner_id ||
+	assert(queue->owner_id == p->queue_owner_id ||
 	       queue->owner_id == REPLICA_ID_NIL ||
 	       vclock_get(&p->confirmed_vclock, queue->owner_id) ==
 	       queue->confirmed_lsn);
@@ -863,14 +861,35 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 					     timeout);
 }
 
+/**
+ * Whether the limbo is still in its initial state, with nothing applied to it
+ * yet: no owner, no terms, no confirmed LSNs. No transactions either - they
+ * can't get into an unowned queue.
+ */
+static bool
+txn_limbo_is_pristine(const struct txn_limbo *limbo)
+{
+	const struct txn_limbo_queue *queue = &limbo->queue;
+	/* The term is 1 since the creation. */
+	if (limbo->term != 1 || queue->owner_id != REPLICA_ID_NIL ||
+	    vclock_sum(&queue->confirmed_vclock) != 0)
+		return false;
+	for (size_t i = 0; i < lengthof(limbo->nodes); ++i) {
+		const struct txn_limbo_node *n = &limbo->nodes[i];
+		/* The limbo's term is the max of all the nodes' terms. */
+		assert(n->latest_term == 0);
+		if (n->pending.raft_term != 0)
+			return false;
+	}
+	return true;
+}
+
 /** Ensure request sees the correct limbo owner. */
 static int
 txn_limbo_filter_owner_match(struct txn_limbo *limbo,
 			     const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	if (!limbo->do_validate)
-		return 0;
 	if (req->queue_owner_id != limbo->queue.owner_id) {
 		/*
 		 * Incoming packets should esteem limbo owner,
@@ -890,8 +909,6 @@ txn_limbo_filter_owner_set(struct txn_limbo *limbo,
 			   const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	if (!limbo->do_validate)
-		return 0;
 	if (req->queue_owner_id == REPLICA_ID_NIL) {
 		return synchro_request_error_unsupported(
 			req, "synchronous requests with zero queue owner ID");
@@ -901,11 +918,8 @@ txn_limbo_filter_owner_set(struct txn_limbo *limbo,
 
 /** Ensure the request has a non-zero LSN whatever it is needed for. */
 static int
-txn_limbo_filter_non_zero_lsn(struct txn_limbo *limbo,
-			      const struct synchro_request *req,
-			      int64_t lsn)
+txn_limbo_filter_non_zero_lsn(const struct synchro_request *req, int64_t lsn)
 {
-	VERIFY(limbo->do_validate);
 	if (lsn > 0)
 		return 0;
 	return synchro_request_error_unsupported(
@@ -1002,10 +1016,9 @@ txn_limbo_filter_confirm(struct txn_limbo *limbo,
 {
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_CONFIRM);
-	assert(limbo->do_validate);
 	if (txn_limbo_filter_owner_set(limbo, req) != 0)
 		return -1;
-	if (txn_limbo_filter_non_zero_lsn(limbo, req, req->confirm.lsn) != 0)
+	if (txn_limbo_filter_non_zero_lsn(req, req->confirm.lsn) != 0)
 		return -1;
 	int64_t confirmed_lsn = txn_limbo_replica_confirmed_lsn(
 		limbo, req->queue_owner_id);
@@ -1042,10 +1055,9 @@ txn_limbo_filter_rollback(struct txn_limbo *limbo,
 {
 	txn_limbo_assert_locked(limbo);
 	assert(req->type == IPROTO_RAFT_ROLLBACK);
-	assert(limbo->do_validate);
 	if (txn_limbo_filter_owner_set(limbo, req) != 0)
 		return -1;
-	if (txn_limbo_filter_non_zero_lsn(limbo, req, req->rollback.lsn) != 0)
+	if (txn_limbo_filter_non_zero_lsn(req, req->rollback.lsn) != 0)
 		return -1;
 	int64_t confirmed_lsn = txn_limbo_replica_confirmed_lsn(
 		limbo, req->queue_owner_id);
@@ -1073,8 +1085,17 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 				const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	assert(limbo->do_validate);
 	assert(iproto_type_is_promote_request(req->type));
+	/*
+	 * The very first PROMOTE during recovery initializes the limbo's
+	 * state. It is a checkpoint from a snapshot or from a join stream. It
+	 * describes an already established state, not a transition, and can't
+	 * be validated like one. Everything after it is validated, even during
+	 * recovery.
+	 */
+	if (limbo->is_in_recovery && req->type == IPROTO_RAFT_PROMOTE &&
+	    txn_limbo_is_pristine(limbo))
+		return 0;
 	/*
 	 * Need all LSNs to be known. They are used to determine whether the
 	 * request is safe to apply, below in the filtering logic.
@@ -1104,8 +1125,8 @@ txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
 	}
 	/*
 	 * Zero origin appears only in the bootstrap and checkpoint entries,
-	 * which are never filtered - they only come from the initial snapshot
-	 * data, when the filtering is disabled.
+	 * which are never filtered - they initialize the limbo's state, see
+	 * above.
 	 */
 	if (req->origin_id == REPLICA_ID_NIL) {
 		return synchro_request_error_unsupported(
@@ -1158,8 +1179,6 @@ txn_limbo_filter_request(struct txn_limbo *limbo,
 			 const struct synchro_request *req)
 {
 	txn_limbo_assert_locked(limbo);
-	if (!limbo->do_validate)
-		return 0;
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 		return txn_limbo_filter_confirm(limbo, req);
@@ -1345,22 +1364,6 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	 * sync transactions can live on replica infinitely.
 	 */
 	fiber_cond_broadcast(&limbo->queue.cond);
-}
-
-void
-txn_limbo_filter_enable(struct txn_limbo *limbo)
-{
-	txn_limbo_lock(limbo);
-	limbo->do_validate = true;
-	txn_limbo_unlock(limbo);
-}
-
-void
-txn_limbo_filter_disable(struct txn_limbo *limbo)
-{
-	txn_limbo_lock(limbo);
-	limbo->do_validate = false;
-	txn_limbo_unlock(limbo);
 }
 
 void

@@ -6052,15 +6052,6 @@ box_cfg_xc(void)
 	if (box_set_election_mode() != 0)
 		diag_raise();
 
-	/*
-	 * Enable split brain detection once node is fully recovered or
-	 * bootstrapped. No split brain could happen during bootstrap or local
-	 * recovery. Only do so in an upgraded cluster. Unfortunately, schema
-	 * version 2.10.1 was used in 2.10.0 release, while split-brain
-	 * detection appeared in 2.10.1. So use the schema version after 2.10.1.
-	 */
-	if (dd_version_id > version_id(2, 10, 1))
-		txn_limbo_filter_enable(&txn_limbo);
 	box_raft_finish_recovery();
 	txn_limbo_finish_recovery(&txn_limbo);
 
