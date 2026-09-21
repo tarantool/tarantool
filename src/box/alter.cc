@@ -2463,8 +2463,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		}
 		if (def == NULL)
 			return -1;
-		if (access_check_ddl(def->name, def->uid, old_space->access,
-				     SC_SPACE, PRIV_A) != 0)
+		if (access_check_ddl(def->name, old_space->def->uid,
+				     old_space->access, SC_SPACE, PRIV_A) != 0)
 			return -1;
 		if (def->id != space_id(old_space)) {
 			diag_set(ClientError, ER_ALTER_SPACE,
