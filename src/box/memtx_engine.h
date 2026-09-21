@@ -338,10 +338,6 @@ memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h);
 int
 memtx_end_build_snapshot_space(struct memtx_engine *memtx, uint32_t space_id);
 
-int
-memtx_engine_recover_snapshot(struct memtx_engine *memtx,
-			      const struct vclock *vclock);
-
 void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 
@@ -487,14 +483,6 @@ static inline void
 memtx_engine_set_memory_xc(struct memtx_engine *memtx, size_t size)
 {
 	if (memtx_engine_set_memory(memtx, size) != 0)
-		diag_raise();
-}
-
-static inline void
-memtx_engine_recover_snapshot_xc(struct memtx_engine *memtx,
-				 const struct vclock *vclock)
-{
-	if (memtx_engine_recover_snapshot(memtx, vclock) != 0)
 		diag_raise();
 }
 

@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <stdbool.h>
+
 #include "trivia/config.h"
 
 #if defined(ENABLE_MEMCS_ENGINE)
@@ -17,6 +19,12 @@ extern "C" {
 
 static inline void
 memcs_engine_register(void) {}
+
+static inline void
+memcs_engine_set_columnar_snapshot(bool enabled)
+{
+	(void)enabled;
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */
