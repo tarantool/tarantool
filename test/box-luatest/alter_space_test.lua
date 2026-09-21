@@ -334,3 +334,32 @@ g.test_alter_name = function(cg)
         t.assert_equals(s.name, 'test')
     end)
 end
+
+g.after_test('test_alter_owner_permissions', function(cg)
+    cg.server:exec(function()
+        box.schema.user.drop('test', {if_exists = true})
+    end)
+end)
+
+-- ghs-173. Rights to read/write to _space should not be enough to change
+-- space owner by not owner.
+g.test_alter_owner_permissions = function(cg)
+    cg.server:exec(function()
+        local s = box.schema.create_space('test')
+        s:create_index('pk')
+
+        box.schema.user.create('test')
+        box.schema.user.grant('test','read,write', 'space', '_space')
+        box.session.su('test', function()
+            local err = {
+                type = 'AccessDeniedError',
+                object_name = 'test',
+                object_type = 'space',
+                user = 'test',
+            }
+            t.assert_error_covers(err, s.alter, s, {user = 'test'})
+            t.assert_error_covers(err, s.replace, s, {1})
+            t.assert_error_covers(err, s.select, s)
+        end)
+    end)
+end
