@@ -35,6 +35,7 @@
 #include "tuple.h"
 #include "tuple_dictionary.h"
 #include "tuple_format.h"
+#include "tweaks.h"
 #include "vclock/vclock.h"
 
 /**
@@ -49,6 +50,20 @@ static struct mh_i64ptr_t *read_views;
  * Monotonically growing counter used for assigning unique ids to read views.
  */
 static uint64_t next_read_view_id = 1;
+
+/**
+ * Minimal interval between opening two non-system read views, in seconds.
+ *
+ * Each read view gets its own 32-bit version, which is never reused, so their
+ * consumption rate must be bounded to keep the underlying counter from wrapping
+ * around. The 100 ms interval keeps the counter safe for at least 13 years of
+ * continuous opening at the maximum rate. Set to 0 to disable throttling.
+ */
+static double read_view_throttle_interval = 0.1;
+TWEAK_DOUBLE(read_view_throttle_interval);
+
+/** Monotonic clock time when the last non-system read view was opened. */
+static double read_view_last_open;
 
 static bool
 default_space_filter(struct space *space, void *arg)
@@ -79,6 +94,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->enable_space_upgrade = false;
 	opts->enable_data_temporary_spaces = false;
 	opts->disable_decompression = false;
+	opts->disable_wait = false;
 }
 
 static void
@@ -224,6 +240,21 @@ struct read_view *
 read_view_new(const struct read_view_opts *opts)
 {
 	assert(cord_is_main());
+	if (!opts->is_system && read_view_throttle_interval > 0) {
+		double now = ev_monotonic_now(loop());
+		double elapsed = now - read_view_last_open;
+		if (opts->disable_wait &&
+		    elapsed < read_view_throttle_interval) {
+			diag_set(ClientError, ER_READ_VIEW_THROTTLED);
+			return NULL;
+		}
+		while (elapsed < read_view_throttle_interval) {
+			fiber_sleep(read_view_throttle_interval - elapsed);
+			now = ev_monotonic_now(loop());
+			elapsed = now - read_view_last_open;
+		}
+		read_view_last_open = now;
+	}
 	struct read_view *rv = xmalloc(sizeof(*rv));
 	rv->id = next_read_view_id++;
 	assert(opts->name != NULL);
