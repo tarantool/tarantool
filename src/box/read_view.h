@@ -194,10 +194,34 @@ void
 read_view_opts_create(struct read_view_opts *opts);
 
 /**
+ * Returns true if a non-system read view can't be opened right now because less
+ * than read_view_throttle_interval has elapsed since the previous non-system
+ * read view was opened. See read_view_throttle_interval in `read_view.c'.
+ */
+bool
+read_view_is_throttled(void);
+
+/**
+ * Yields until the read view creation rate limit allows opening a non-system
+ * read view, i.e. until read_view_is_throttled() returns false. The caller
+ * must open the read view with read_view_open() right after this function
+ * returns, without yielding in between, otherwise another fiber may open a
+ * read view first and the limit would be exceeded.
+ *
+ * Returns 0 on success. If the fiber is cancelled while waiting, returns -1 and
+ * sets diag to FiberIsCancelled.
+ */
+int
+read_view_throttle(void);
+
+/**
  * Opens a database read view: all changes done to the database after a read
  * view was open will not be visible from the read view.
  *
  * Engines that don't support read view creation are silently skipped.
+ *
+ * Unless opts->is_system is set, the caller must make sure the read view
+ * creation rate limit allows opening a new read view (see read_view_throttle).
  *
  * Returns 0 on success. On error, returns -1 and sets diag.
  */
