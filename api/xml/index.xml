@@ -343,7 +343,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea3f3ade07101d53aeb191d9d66466594d" kind="enumvalue"><name>ER_SQL_CANT_RESOLVE_FIELD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8116ecbea1268d416f0d3cce564bf3b1" kind="enumvalue"><name>ER_INDEX_EXISTS_IN_SPACE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaec57275bca21926754b51da182d9e2ac" kind="enumvalue"><name>ER_INCONSISTENT_TYPES</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea581ea5051161d97de42c5c5e92ff96be" kind="enumvalue"><name>ER_SQL_SYNTAX_WITH_POS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf5f498039f3124061c9023208b4f7880" kind="enumvalue"><name>ER_SQL_STACK_OVERFLOW</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea579993d04e95dea402d489b1dbee248a" kind="enumvalue"><name>ER_SQL_SELECT_WILDCARD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac0a020589f6684e82ea59e02795a36db" kind="enumvalue"><name>ER_SQL_STATEMENT_EMPTY</name></member>
@@ -367,7 +366,6 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea8abeba1f393b54ccfcbdfd5ba847ec55" kind="enumvalue"><name>ER_BOOTSTRAP_READONLY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac718aad6ca5e03e6c01ac8d3e3e4b6c6" kind="enumvalue"><name>ER_SQL_FUNC_WRONG_RET_COUNT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceae793affb3fc872253f2ce9caa856fe9d" kind="enumvalue"><name>ER_FUNC_INVALID_RETURN_TYPE</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6beca8e8d99f1229f3f13a2fcb0f868a" kind="enumvalue"><name>ER_SQL_PARSER_GENERIC_WITH_POS</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea6aebf59aac47776f688f300a9ee5ac83" kind="enumvalue"><name>ER_REPLICA_NOT_ANON</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaece5c9efd6f0416c846adcc564a78c06" kind="enumvalue"><name>ER_CANNOT_REGISTER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea178c1a96f43cdf1b134824a9b83ad484" kind="enumvalue"><name>ER_SESSION_SETTING_INVALID_VALUE</name></member>
