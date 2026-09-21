@@ -33,6 +33,7 @@
 #include "allocator.h"
 #include "read_view.h"
 #include "salad/stailq.h"
+#include "say.h"
 #include "small/rlist.h"
 #include "tuple.h"
 
@@ -280,6 +281,8 @@ public:
 	 */
 	static ReadView *open_read_view(const struct read_view_opts *opts)
 	{
+		if (read_view_version == UINT32_MAX)
+			panic("read view version counter overflow");
 		read_view_version++;
 		ReadView *rv = (ReadView *)xcalloc(1, sizeof(*rv));
 		for (int type = 0; type < memtx_block_rv_type_MAX; type++) {
