@@ -5461,6 +5461,13 @@ bootstrap_from_master(struct replica *master)
 	} catch (FiberIsCancelled *e) {
 		throw e;
 	} catch (...) {
+		/*
+		 * The join metadata is applied while waiting here. It changes
+		 * the local state, so a retry is not possible after it, same
+		 * as after the snapshot data. See applier_f().
+		 */
+		if (applier->row_count > 0)
+			throw;
 		return false;
 	}
 
