@@ -13,9 +13,6 @@ LUAJIT_TEST_BUILD_DIR = ${BUILD_DIR}
 # `sysctl -n hw.ncpu`       - for FreeBSD (deprecated in OSX)
 NPROC ?= $(shell nproc || sysctl -n hw.logicalcpu || sysctl -n hw.ncpu)
 
-MAX_PROCS ?= 2048
-MAX_FILES ?= 4096
-
 N_TRIALS ?= 128
 COMMIT_RANGE ?= master..HEAD
 
@@ -227,36 +224,6 @@ test-debug-flaky: build install-test-deps
 .PHONY: prebuild-osx
 prebuild-osx:
 	sysctl vm.swapusage
-
-.PHONY: pretest-osx
-pretest-osx:
-	ulimit -u ${MAX_PROCS} || : && ulimit -u
-	ulimit -n ${MAX_FILES} || : && ulimit -n
-
-# Release build
-
-.PHONY: test-osx-release
-test-osx-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                                 -DENABLE_WERROR=ON \
-                                 -DTEST_BUILD=ON
-test-osx-release: prebuild-osx build run-luajit-test pretest-osx run-test
-
-# Debug build
-
-.PHONY: test-osx-debug
-test-osx-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
-                               -DTEST_BUILD=ON
-test-osx-debug: prebuild-osx build run-luajit-test pretest-osx run-test
-
-# Static build
-
-.PHONY: test-osx-static-cmake
-test-osx-static-cmake: SRC_DIR = ${STATIC_DIR}
-test-osx-static-cmake: BUILD_DIR = ${STATIC_DIR}
-test-osx-static-cmake: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
-test-osx-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
-test-osx-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
-test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
 
 ##############################
 # FreeBSD                    #
