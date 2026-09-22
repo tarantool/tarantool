@@ -53,6 +53,16 @@ __thread int luaL_array_metatable_ref = LUA_REFNIL;
 
 /* {{{ luaL_serializer manipulations */
 
+/** Names accepted by the JSON integer overflow option. */
+static const char *const json_decode_overflow_strs[] = {
+	[JSON_DECODE_OVERFLOW_CLAMP] = "clamp",
+	[JSON_DECODE_OVERFLOW_ERROR] = "error",
+	[JSON_DECODE_OVERFLOW_NUMBER] = "number",
+	[JSON_DECODE_OVERFLOW_DECIMAL] = "decimal",
+	[JSON_DECODE_OVERFLOW_STRING] = "string",
+	[JSON_DECODE_OVERFLOW_NIL] = "nil",
+};
+
 #define OPTION(type, name, defvalue) { #name, \
 	offsetof(struct luaL_serializer, name), type, defvalue}
 /**
@@ -65,6 +75,8 @@ static struct {
 	int type;
 	int defvalue;
 } OPTIONS[] = {
+	/* Reject invalid overflow modes before applying any other options. */
+	OPTION(LUA_TSTRING,  decode_overflow, JSON_DECODE_OVERFLOW_CLAMP),
 	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 1),
 	OPTION(LUA_TNUMBER,  encode_sparse_ratio, 2),
 	OPTION(LUA_TNUMBER,  encode_sparse_safe, 10),
@@ -90,6 +102,7 @@ luaL_serializer_create(struct luaL_serializer *cfg)
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		switch (OPTIONS[i].type) {
 		case LUA_TBOOLEAN:
+		case LUA_TSTRING:
 		case LUA_TNUMBER: {
 			int *pval = (int *)((char *)cfg + OPTIONS[i].offset);
 			*pval = OPTIONS[i].defvalue;
@@ -251,6 +264,29 @@ luaL_serializer_parse_option(struct lua_State *L, int i,
 	case LUA_TNUMBER:
 		*pval = lua_tointeger(L, -1);
 		break;
+	case LUA_TSTRING: {
+		assert(strcmp(OPTIONS[i].name, "decode_overflow") == 0);
+		size_t len;
+		const char *value = lua_tolstring(L, -1, &len);
+		int mode = json_decode_overflow_MAX;
+		if (value != NULL) {
+			for (mode = 0; mode < json_decode_overflow_MAX;
+			     mode++) {
+				const char *name =
+					json_decode_overflow_strs[mode];
+				if (strlen(name) == len &&
+				    memcmp(name, value, len) == 0)
+					break;
+			}
+		}
+		if (mode == json_decode_overflow_MAX) {
+			luaL_error(L, "Invalid decode_overflow: expected "
+				   "'clamp', 'error', 'number', 'decimal', "
+				   "'string' or 'nil'");
+		}
+		*pval = mode;
+		break;
+	}
 	case LUA_TTABLE:
 		if (strcmp(OPTIONS[i].name, "encode_key_order") == 0) {
 			luaL_serializer_parse_encode_key_order(L, cfg);
@@ -365,6 +401,10 @@ luaL_newserializer(struct lua_State *L, const char *modname,
 			break;
 		case LUA_TNUMBER:
 			lua_pushinteger(L, *pval);
+			break;
+		case LUA_TSTRING:
+			assert(strcmp(OPTIONS[i].name, "decode_overflow") == 0);
+			lua_pushstring(L, json_decode_overflow_strs[*pval]);
 			break;
 		case LUA_TTABLE:
 			if (strcmp(OPTIONS[i].name, "encode_key_order") == 0) {
