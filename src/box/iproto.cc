@@ -700,6 +700,8 @@ struct iproto_msg
 	struct rlist in_inprogress;
 	/** Serving thread fiber processing this message. */
 	struct fiber *fiber;
+	/** Opaque audit context (MP_STR), if any. */
+	const char *audit_context;
 };
 
 /**
@@ -1141,6 +1143,7 @@ iproto_msg_new(struct iproto_connection *con)
 	msg->srv_id = 0;
 	msg->stream = NULL;
 	msg->fiber = NULL;
+	msg->audit_context = NULL;
 	rmean_collect(con->iproto_thread->rmean, IPROTO_REQUESTS, 1);
 	con->request_count++;
 	if (con->request_count == 1 && con->idle_timeout > 0)
@@ -2137,6 +2140,10 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 	handler = mh_i32_find(handlers, type, NULL);
 	if (handler != mh_end(handlers)) {
 		assert(!con->is_in_replication);
+		/* Override handlers run before the request decoders. */
+		if (xrow_decode_audit_context(&msg->header,
+					      &msg->audit_context) != 0)
+			goto error;
 		cmsg_init(&msg->base, iproto_thread->override_route);
 		return;
 	}
@@ -2155,6 +2162,9 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 	if (route == NULL) {
 		handler = mh_i32_find(handlers, IPROTO_UNKNOWN, NULL);
 		if (handler != mh_end(handlers)) {
+			if (xrow_decode_audit_context(&msg->header,
+						      &msg->audit_context) != 0)
+				goto error;
 			cmsg_init(&msg->base, iproto_thread->override_route);
 			return;
 		}
@@ -2193,19 +2203,25 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		 * replica id. Ignore the header received over network.
 		 */
 		msg->dml.header = NULL;
+		msg->audit_context = msg->dml.audit_context;
 		return 0;
 	case IPROTO_BEGIN:
 		*route = iproto_thread->begin_route;
 		if (xrow_decode_begin(&msg->header, &msg->begin) != 0)
 			return -1;
+		msg->audit_context = msg->begin.audit_context;
 		return 0;
 	case IPROTO_COMMIT:
 		*route = iproto_thread->commit_route;
 		if (xrow_decode_commit(&msg->header, &msg->commit) != 0)
 			return -1;
+		msg->audit_context = msg->commit.audit_context;
 		return 0;
 	case IPROTO_ROLLBACK:
 		*route = iproto_thread->rollback_route;
+		if (xrow_decode_audit_context(&msg->header,
+					      &msg->audit_context) != 0)
+			return -1;
 		return 0;
 	case IPROTO_CALL_16:
 	case IPROTO_CALL:
@@ -2213,6 +2229,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		*route = iproto_thread->srv[msg->srv_id].call_route;
 		if (xrow_decode_call(&msg->header, &msg->call))
 			return -1;
+		msg->audit_context = msg->call.audit_context;
 		return 0;
 	case IPROTO_WATCH:
 	case IPROTO_UNWATCH:
@@ -2224,15 +2241,20 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		});
 		if (xrow_decode_watch(&msg->header, &msg->watch) != 0)
 			return -1;
+		msg->audit_context = msg->watch.audit_context;
 		return 0;
 	case IPROTO_EXECUTE:
 	case IPROTO_PREPARE:
 		*route = iproto_thread->sql_route;
 		if (xrow_decode_sql(&msg->header, &msg->sql) != 0)
 			return -1;
+		msg->audit_context = msg->sql.audit_context;
 		return 0;
 	case IPROTO_PING:
 		*route = iproto_thread->misc_route;
+		if (xrow_decode_audit_context(&msg->header,
+					      &msg->audit_context) != 0)
+			return -1;
 		return 0;
 	case IPROTO_ID:
 		*route = iproto_thread->misc_route;
@@ -2242,6 +2264,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		});
 		if (xrow_decode_id(&msg->header, &msg->id) != 0)
 			return -1;
+		msg->audit_context = msg->id.audit_context;
 		return 0;
 	case IPROTO_JOIN:
 	case IPROTO_FETCH_SNAPSHOT:
@@ -2260,6 +2283,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		if (xrow_decode_auth(&msg->header, &msg->auth))
 			return -1;
 		msg->auth_successful = false;
+		msg->audit_context = msg->auth.audit_context;
 		return 0;
 	default:
 		*route = NULL;
@@ -2535,6 +2559,11 @@ srv_accept_msg(struct cmsg *m)
 	assert(msg->fiber->storage.runtime_credentials == NULL);
 	msg->fiber->storage.runtime_credentials =
 		&msg->connection->srv[msg->srv_id].runtime_credentials;
+	if (msg->audit_context != NULL) {
+		const char *ctx = msg->audit_context;
+		uint32_t len = mp_decode_strl(&ctx);
+		fiber_set_audit_context(msg->fiber, ctx, ctx + len);
+	}
 	return msg;
 }
 
@@ -2598,6 +2627,7 @@ srv_end_msg(struct iproto_msg *msg)
 	assert(msg->srv_id == app_thread_id);
 	rlist_del(&msg->in_inprogress);
 	msg->fiber->storage.runtime_credentials = NULL;
+	fiber_set_audit_context(msg->fiber, NULL, NULL);
 	msg->fiber = NULL;
 }
 

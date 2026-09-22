@@ -299,6 +299,39 @@ dump:
 	return -1;
 }
 
+int
+xrow_decode_audit_context(const struct xrow_header *row,
+			  const char **audit_context)
+{
+	*audit_context = NULL;
+	if (row->bodycnt == 0)
+		return 0;
+	assert(row->bodycnt == 1);
+	const char *data = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*data) != MP_MAP)
+		return 0;
+	uint32_t size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (mp_typeof(*data) != MP_UINT) {
+			mp_next(&data);
+			mp_next(&data);
+			continue;
+		}
+		uint64_t key = mp_decode_uint(&data);
+		if (key == IPROTO_AUDIT_CONTEXT) {
+			if (mp_typeof(*data) != MP_STR) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "packet body");
+				return -1;
+			}
+			*audit_context = data;
+			return 0;
+		}
+		mp_next(&data);
+	}
+	return 0;
+}
+
 /**
  * @pre pos points at a valid msgpack
  */
@@ -844,22 +877,29 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->stmt_id = NULL;
+	request->audit_context = NULL;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT &&
-		    key != IPROTO_STMT_ID) {
+		    key != IPROTO_STMT_ID && key != IPROTO_AUDIT_CONTEXT) {
 			mp_next(&data);         /* skip the key */
 			mp_next(&data);         /* skip the value */
 			continue;
 		}
 		const char *value = ++data;     /* skip the key */
 		mp_next(&data);                 /* skip the value */
+		if (key == IPROTO_AUDIT_CONTEXT && mp_typeof(*value) != MP_STR) {
+			xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
+			return -1;
+		}
 		if (key == IPROTO_SQL_BIND)
 			request->bind = value;
 		else if (key == IPROTO_SQL_TEXT)
 			request->sql_text = value;
-		else
+		else if (key == IPROTO_STMT_ID)
 			request->stmt_id = value;
+		else
+			request->audit_context = value;
 	}
 	if (request->sql_text != NULL && request->stmt_id != NULL) {
 		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
@@ -1058,6 +1098,9 @@ error:
 		case IPROTO_END_KEY:
 			request->end_key = value;
 			request->end_key_end = data;
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			request->audit_context = value;
 			break;
 		default:
 			break;
@@ -1286,6 +1329,7 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 	iproto_features_create(&request->features);
 	request->auth_type = NULL;
 	request->auth_type_len = 0;
+	request->audit_context = NULL;
 
 	uint32_t map_size = mp_decode_map(&p);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1307,6 +1351,10 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 		case IPROTO_AUTH_TYPE:
 			request->auth_type = mp_decode_str(
 					&p, &request->auth_type_len);
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			request->audit_context = p;
+			mp_next(&p);
 			break;
 		default:
 			/* Ignore unknown keys for forward compatibility. */
@@ -1733,6 +1781,11 @@ error:
 			request->tuple_formats = value;
 			request->tuple_formats_end = data;
 			break;
+		case IPROTO_AUDIT_CONTEXT:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->audit_context = value;
+			break;
 		default:
 			continue; /* unknown key */
 		}
@@ -1809,6 +1862,12 @@ error:
 			mp_next(&data);
 			request->data_end = data;
 			break;
+		case IPROTO_AUDIT_CONTEXT:
+			if (mp_typeof(*data) != MP_STR)
+				goto error;
+			request->audit_context = data;
+			mp_next(&data);
+			break;
 		default:
 			mp_next(&data);
 			break;
@@ -1860,6 +1919,11 @@ error:
 			if (mp_typeof(*value) != MP_ARRAY)
 				goto error;
 			request->scramble = value;
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->audit_context = value;
 			break;
 		default:
 			continue; /* unknown key */
@@ -1999,6 +2063,10 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 				return -1;
 			}
 			break;
+		case IPROTO_AUDIT_CONTEXT:
+			request->audit_context = d;
+			mp_next(&d);
+			break;
 		default:
 			mp_next(&d);
 			break;
@@ -2043,6 +2111,10 @@ xrow_decode_commit(const struct xrow_header *row, struct commit_request *request
 						   "is_sync can only be true");
 				return -1;
 			}
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			request->audit_context = d;
+			mp_next(&d);
 			break;
 		default:
 			mp_next(&d);

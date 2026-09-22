@@ -595,6 +595,33 @@ fiber_get_ctx(struct fiber *f)
 }
 
 void
+fiber_set_audit_context(struct fiber *f, const char *ctx, const char *ctx_end)
+{
+	assert(f != NULL);
+	char *copy = NULL;
+	size_t size = 0;
+	if (ctx != NULL) {
+		assert(ctx_end != NULL && ctx_end >= ctx);
+		size = ctx_end - ctx;
+		copy = xmalloc(size);
+		memcpy(copy, ctx, size);
+	}
+	free((void *)f->storage.propagation_context.audit_context);
+	f->storage.propagation_context.audit_context = copy;
+	f->storage.propagation_context.audit_context_end =
+		copy != NULL ? copy + size : NULL;
+}
+
+void
+fiber_get_audit_context(struct fiber *f, const char **ctx,
+			const char **ctx_end)
+{
+	assert(f != NULL);
+	*ctx = f->storage.propagation_context.audit_context;
+	*ctx_end = f->storage.propagation_context.audit_context_end;
+}
+
+void
 fiber_wakeup(struct fiber *f)
 {
 	/*
@@ -1036,6 +1063,7 @@ fiber_reset(struct fiber *fiber)
 	rlist_create(&fiber->on_stop);
 	rlist_create(&fiber->on_destroy);
 	clock_stat_reset(&fiber->clock_stat);
+	fiber_set_audit_context(fiber, NULL, NULL);
 }
 
 /** Destroy an active fiber and prepare it for reuse or delete it. */
@@ -1572,6 +1600,14 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 	fiber->flags = fiber_attr->flags;
 	fiber->f = f;
+	struct fiber *creator = fiber();
+	if (creator != NULL && !(fiber->flags & FIBER_IS_SYSTEM)) {
+		const char *ctx;
+		const char *ctx_end;
+		fiber_get_audit_context(creator, &ctx, &ctx_end);
+		if (ctx != NULL)
+			fiber_set_audit_context(fiber, ctx, ctx_end);
+	}
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
@@ -1616,6 +1652,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	rlist_del(&f->state);
 	rlist_del(&f->link);
 	rlist_del(&f->wake);
+	fiber_set_audit_context(f, NULL, NULL);
 #ifdef ENABLE_BACKTRACE
 	region_set_callbacks(&f->gc, NULL, NULL, NULL);
 #endif
@@ -1824,6 +1861,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i64ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
+	memset(&cord->sched, 0, sizeof(cord->sched));
 	rlist_create(&cord->sched.state);
 	rlist_create(&cord->sched.link);
 	rlist_create(&cord->sched.wake);
