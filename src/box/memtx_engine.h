@@ -262,7 +262,7 @@ memtx_stmt_rollback_info_delete(struct memtx_stmt_rollback_info *undo)
 }
 
 /**
- * Add a deleted tuple to the rollback info.
+ * Add a deleted tuple to the rollback info. Steals the tuple reference.
  */
 static inline void
 memtx_stmt_rollback_info_add_old_tuple(struct memtx_stmt_rollback_info *undo,
@@ -274,11 +274,10 @@ memtx_stmt_rollback_info_add_old_tuple(struct memtx_stmt_rollback_info *undo,
 		xregion_alloc_object(region, struct memtx_tuple_list);
 	undo->old_tuples->tuple = old_tuple;
 	undo->old_tuples->next = prev_deleted;
-	tuple_ref(old_tuple);
 }
 
 /**
- * Set the new tuple in the rollback info.
+ * Set the new tuple in the rollback info. Steals the tuple reference.
  */
 static inline void
 memtx_stmt_rollback_info_set_new_tuple(struct memtx_stmt_rollback_info *undo,
@@ -286,7 +285,6 @@ memtx_stmt_rollback_info_set_new_tuple(struct memtx_stmt_rollback_info *undo,
 {
 	assert(undo->new_tuple == NULL);
 	undo->new_tuple = new_tuple;
-	tuple_ref(new_tuple);
 }
 
 struct memtx_gc_task;

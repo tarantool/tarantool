@@ -330,18 +330,6 @@ txn_stmt_destroy(struct txn_stmt *stmt)
 		engine_destroy_savepoint(stmt->engine, stmt->engine_savepoint);
 }
 
-void
-txn_stmt_set_tuples(struct txn_stmt *stmt, struct tuple *old_tuple,
-		    struct tuple *new_tuple)
-{
-	stmt->old_tuple = old_tuple;
-	if (stmt->old_tuple != NULL)
-		tuple_ref(stmt->old_tuple);
-	stmt->new_tuple = new_tuple;
-	if (stmt->new_tuple != NULL)
-		tuple_ref(stmt->new_tuple);
-}
-
 /*
  * Run the statement's rollback triggers and undo changes done by the statement.
  *
