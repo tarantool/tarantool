@@ -838,13 +838,6 @@ txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
 	trigger_add(&stmt->on_rollback, trigger);
 }
 
-/**
- * Save @a old_tuple and @a new_tuple of replace in @a stmt.
- */
-void
-txn_stmt_set_tuples(struct txn_stmt *stmt, struct tuple *old_tuple,
-		    struct tuple *new_tuple);
-
 /*
  * Return the total number of rows committed in the txn.
  */
