@@ -533,6 +533,39 @@ lbox_is_bootstrap_leader(struct lua_State *L)
 	return 1;
 }
 
+/** Sets audit context to the current fiber. */
+static int
+lbox_set_audit_context(struct lua_State *L)
+{
+	if (lua_gettop(L) == 0 ||
+	    (lua_gettop(L) == 1 && (lua_isnil(L, 1) || luaL_isnull(L, 1)))) {
+		fiber_set_audit_context(fiber(), NULL, 0);
+		return 0;
+	}
+	if (lua_gettop(L) != 1 || lua_type(L, 1) != LUA_TSTRING) {
+		diag_set(IllegalParams,
+			 "Usage: audit.set_context([string or nil])");
+		return luaT_error(L);
+	}
+	size_t len;
+	const char *context = lua_tolstring(L, 1, &len);
+	fiber_set_audit_context(fiber(), context, len);
+	return 0;
+}
+
+/** Gets audit context of the current fiber. */
+static int
+lbox_get_audit_context(struct lua_State *L)
+{
+	size_t size;
+	const char *context = fiber_get_audit_context(fiber(), &size);
+	if (context == NULL)
+		lua_pushnil(L);
+	else
+		lua_pushlstring(L, context, size);
+	return 1;
+}
+
 void
 box_lua_misc_init(struct lua_State *L)
 {
@@ -544,6 +577,8 @@ box_lua_misc_init(struct lua_State *L)
 		{"generate_func_id", lbox_generate_func_id},
 		{"memtx_tx_gc", lbox_memtx_tx_gc},
 		{"is_bootstrap_leader", lbox_is_bootstrap_leader},
+		{"set_audit_context", lbox_set_audit_context},
+		{"get_audit_context", lbox_get_audit_context},
 		{NULL, NULL}
 	};
 

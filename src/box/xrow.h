@@ -99,6 +99,13 @@ struct xrow_header {
 	 * Zero if stream is not used.
 	 */
 	uint64_t stream_id;
+	/**
+	 * Audit context. Propagated to all child fibers and requests, and
+	 * printed to audit log.
+	 */
+	const char *audit_context;
+	/** Length of audit context. */
+	uint32_t audit_context_len;
 	/** Transaction meta flags set only in the last transaction row. */
 	union {
 		uint8_t flags;

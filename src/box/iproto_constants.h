@@ -94,6 +94,12 @@ extern const char *iproto_flag_bit_strs[];
 	_(FLAGS, 0x09, MP_UINT)						\
 	_(STREAM_ID, 0x0a, MP_UINT)					\
 	_(THREAD_ID, 0x0b, MP_UINT)					\
+	 /**
+	  * An audit context propagated to all child requests and fibers,
+	  * and printed in the audit log. Tarantool does not parse, validate
+	  * or modify the value.
+	  */								\
+	 _(AUDIT_CONTEXT, 0x0c, MP_STR)					\
 	/* Leave a gap for other keys in the header. */			\
 	_(SPACE_ID, 0x10, MP_UINT)					\
 	_(INDEX_ID, 0x11, MP_UINT)					\
