@@ -226,25 +226,6 @@ prebuild-osx:
 	sysctl vm.swapusage
 
 ##############################
-# Jepsen testing             #
-##############################
-
-.PHONY: prebuild-jepsen
-prebuild-jepsen:
-	# Jepsen build uses git commands internally, like command `git stash --all` that fails w/o
-	# git configuration setup.
-	git config --get user.name || git config --global user.name "Nodody User"
-	git config --get user.email || git config --global user.email "nobody@nowhere.com"
-
-.PHONY: test-jepsen
-test-jepsen: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                            -DENABLE_WERROR=ON \
-                            -DWITH_JEPSEN=ON \
-                            -DTEST_BUILD=ON
-test-jepsen: configure prebuild-jepsen
-	${CMAKE_BUILD} --target run-jepsen
-
-##############################
 # LuaJIT integration testing #
 ##############################
 
