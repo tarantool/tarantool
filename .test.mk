@@ -226,23 +226,6 @@ prebuild-osx:
 	sysctl vm.swapusage
 
 ##############################
-# FreeBSD                    #
-##############################
-
-.PHONY: prebuild-freebsd
-prebuild-freebsd:
-	if [ "$$(swapctl -l | wc -l)" != "1" ]; then swapoff -a; fi
-	swapctl -l
-
-# Release build
-
-.PHONY: test-freebsd-release
-test-freebsd-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                                     -DENABLE_WERROR=ON \
-                                     -DTEST_BUILD=ON
-test-freebsd-release: prebuild-freebsd build run-luajit-test run-test
-
-##############################
 # Jepsen testing             #
 ##############################
 
