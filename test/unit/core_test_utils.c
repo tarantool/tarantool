@@ -30,6 +30,7 @@
  */
 
 #include <stdint.h>
+#include "trivia/util.h"
 
 /**
  * Mock function to resolve circular dependencies in unit tests
@@ -48,4 +49,17 @@ uint32_t
 iproto_key_hash(const char *str, uint32_t len)
 {
 	return str[0] + len;
+}
+
+void *
+fiber_alloc_data(size_t size)
+{
+	return xmalloc(size);
+}
+
+void
+fiber_free_data(void *data, size_t size)
+{
+	(void)size;
+	return free(data);
 }

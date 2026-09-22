@@ -493,7 +493,7 @@ create_unit_test(PREFIX luaT_tuple_new
 )
 
 create_unit_test(PREFIX luaL_iterator
-                 SOURCES luaL_iterator.c
+                 SOURCES luaL_iterator.c server_test_utils.c
                  LIBRARIES unit server coll core misc
                            ${CURL_LIBRARIES}
                            ${LIBYAML_LIBRARIES}
@@ -735,7 +735,7 @@ create_unit_test(PREFIX getenv_safe
 )
 
 create_unit_test(PREFIX lua_utils
-                 SOURCES lua_utils.c
+                 SOURCES lua_utils.c server_test_utils.c
                  LIBRARIES unit core server
                            ${LUAJIT_LIBRARIES}
                            ${CURL_LIBRARIES}
@@ -744,7 +744,7 @@ create_unit_test(PREFIX lua_utils
 )
 
 create_unit_test(PREFIX lua_error
-                 SOURCES lua_error.c
+                 SOURCES lua_error.c server_test_utils.c
                  LIBRARIES unit core server
                            ${LUAJIT_LIBRARIES}
                            ${CURL_LIBRARIES}
@@ -753,7 +753,7 @@ create_unit_test(PREFIX lua_error
 )
 
 create_unit_test(PREFIX lua_msgpack
-                 SOURCES lua_msgpack.c
+                 SOURCES lua_msgpack.c server_test_utils.c
                  LIBRARIES unit core server
                            ${LUAJIT_LIBRARIES}
                            ${CURL_LIBRARIES}
@@ -767,7 +767,7 @@ create_unit_test(PREFIX tweaks
 )
 
 create_unit_test(PREFIX lua_tweaks
-                 SOURCES lua_tweaks.c
+                 SOURCES lua_tweaks.c server_test_utils.c
                  LIBRARIES unit core server
                            ${LUAJIT_LIBRARIES}
                            ${CURL_LIBRARIES}

@@ -6693,6 +6693,20 @@ box_on_journal_cascading_rollback(void)
 	txn_limbo_rollback_all_volatile(&txn_limbo);
 }
 
+/** Allocator of external data for module fiber. */
+extern "C" void *
+fiber_alloc_data(size_t size)
+{
+	return runtime_memory_alloc(size);
+}
+
+/** Deallocator of external data for module fiber. */
+extern "C" void
+fiber_free_data(void *data, size_t size)
+{
+	runtime_memory_free(data, size);
+}
+
 static void
 box_storage_init(void)
 {

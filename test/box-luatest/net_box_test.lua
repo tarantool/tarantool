@@ -388,17 +388,17 @@ g.test_worker_yield_from_on_connect_trigger = function()
 end
 
 g.before_test('test_net_box_connect_before_box_cfg', function(cg)
-    cg.server = server:new{alias = 'net_box_connect', box_cfg = {}}
-    cg.server:start()
+    cg.conn_server = server:new{alias = 'net_box_connect', box_cfg = {}}
+    cg.conn_server:start()
 end)
 
 g.after_test('test_net_box_connect_before_box_cfg', function(cg)
-    cg.server:drop()
+    cg.conn_server:drop()
 end)
 
 -- Check that `net.box` is correct without box.cfg{}.
 g.test_net_box_connect_before_box_cfg = function(cg)
-    local conn = cg.server.net_box
+    local conn = cg.conn_server.net_box
     t.assert_equals(conn:is_connected(), true)
     t.assert_not_equals(conn.space, nil, 'space exists')
     -- gh-1814: Segfault if using `net.box` before `box.cfg` start.
@@ -409,3 +409,21 @@ g.test_net_box_connect_before_box_cfg = function(cg)
     t.assert_equals(tostring(err), "View '_vspace' is read-only",
                     'error message')
 end
+
+g.test_audit_context = function(cg)
+    box.internal.set_audit_context('audit_ctx')
+    local conn = cg.server.net_box
+    t.assert_equals(conn:is_connected(), true)
+    cg.server:exec(function()
+        box.iproto.override(box.iproto.type.EVAL, function(_header, body)
+            t.assert_equals(box.internal.get_audit_context(), 'audit_ctx')
+            t.assert_equals(body[box.iproto.key.AUDIT_CONTEXT], 'audit_ctx')
+            return false
+        end)
+    end)
+    t.assert({conn:eval("return true")}, {true, {true}})
+end
+
+g.after_test('test_audit_context', function()
+    box.internal.set_audit_context(nil)
+end)
