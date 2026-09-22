@@ -226,7 +226,7 @@ struct applier {
 	bool is_ack_sent;
 	/** True if ACK was signalled in tx while ack_msg was en route. */
 	bool is_ack_pending;
-	/** Number of rows received during initial and final join. */
+	/** Number of rows received during join, including metadata. */
 	uint64_t row_count;
 	/** Fields used only by applier thread. */
 	struct {
