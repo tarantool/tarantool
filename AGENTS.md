@@ -140,9 +140,7 @@ ones are listed below.
   via `ctest -L performance` or `cmake --build build --target test-perf`
   (targets `test-c-perf`, `test-lua-perf`, `test-perf-aggregate`). Both kinds
   write results as JSON, which can be compared with
-  `perf/tools/compare/compare.py benchmarks <old>.json <new>.json`. Heavier
-  end-to-end workloads (sysbench, TPC-C/H, YCSB, nosqlbench) are run in CI only,
-  see `.github/actions/perf/` and `.github/workflows/perf_*.yml`.
+  `perf/tools/compare/compare.py benchmarks <old>.json <new>.json`.
 
 Testing usually tries to cover 100% of new code. When some cases are very tricky
 to cover, sometimes the tests use error injections - a debug-build option added
