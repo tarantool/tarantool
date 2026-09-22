@@ -311,29 +311,6 @@ unset(SOURCE_REALPATH)
 unset(BINARY_DIR_INSIDE_SOURCE_DIR)
 unset(EXCLUDE_FILES)
 
-if (WITH_JEPSEN)
-    ExternalProject_Add(
-        jepsen-tests
-        GIT_REPOSITORY https://github.com/tarantool/jepsen.tarantool
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-        TEST_COMMAND ""
-    )
-
-    #
-    # Enable 'make run-jepsen' target.
-    #
-
-    add_custom_target(run-jepsen DEPENDS jepsen-tests)
-    add_custom_command(TARGET run-jepsen
-        COMMAND ${BASH} ${PROJECT_SOURCE_DIR}/tools/run-jepsen-tests.sh
-				${PROJECT_SOURCE_DIR}
-                                ${PROJECT_BINARY_DIR}
-        COMMENT "Running Jepsen tests"
-    )
-endif()
-
 #
 # Get version
 #
