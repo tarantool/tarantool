@@ -892,10 +892,13 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		break;
 	}
 	case TK_RAISE:
-		if (expr->on_conflict_action != ON_CONFLICT_ACTION_IGNORE)
-			res = expr_leaf(expr->left, FIELD_TYPE_STRING);
-		else
+		if (expr->on_conflict_action != ON_CONFLICT_ACTION_IGNORE) {
+			struct ast_expr *msg = expr->left;
+			res = sql_expr_new_string(msg->str, msg->len);
+			res->v.s[sql_dequote(res->v.s, msg->len)] = '\0';
+		} else {
 			res = sql_expr_new_anon(expr->op);
+		}
 		res->op = TK_RAISE;
 		res->on_conflict_action = expr->on_conflict_action;
 		break;

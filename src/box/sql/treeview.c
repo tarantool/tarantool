@@ -573,7 +573,7 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 				unreachable();
 			}
 			sqlTreeViewLine(pView, "RAISE %s(%Q)", zType,
-					    pExpr->u.zToken);
+					    pExpr->v.s);
 			break;
 		}
 	case TK_MATCH:{

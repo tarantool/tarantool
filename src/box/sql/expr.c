@@ -1255,7 +1255,7 @@ sqlExprDeleteNN(struct Expr *p)
 		}
 	}
 	if (ExprHasProperty(p, EP_MemToken)) {
-		if (p->op == TK_STRING)
+		if (p->op == TK_STRING || p->op == TK_RAISE)
 			sql_xfree(p->v.s);
 		else if (p->op == TK_BLOB)
 			sql_xfree(p->v.z);
@@ -1350,8 +1350,8 @@ dupedExprStructSize(Expr * p, int flags)
 /*
  * This function returns the space in bytes required to store the copy
  * of the Expr structure and a copy of the Expr.u.zToken string (if that
- * string is defined) or the Expr.v.s string (if the node is TK_STRING) or
- * the Expr.v.z blob (if the node is TK_BLOB).
+ * string is defined) or the Expr.v.s string (if the node is TK_STRING or
+ * TK_RAISE) or the Expr.v.z blob (if the node is TK_BLOB).
  */
 static int
 dupedExprNodeSize(Expr * p, int flags)
@@ -1362,7 +1362,8 @@ dupedExprNodeSize(Expr * p, int flags)
 	}
 	if (p->op == TK_DECIMAL)
 		nByte += sizeof(decimal_t);
-	else if (p->op == TK_STRING)
+	else if (p->op == TK_STRING ||
+		 (p->op == TK_RAISE && p->v.s != NULL))
 		nByte += sqlStrlen30(p->v.s) + 1;
 	else if (p->op == TK_BLOB)
 		nByte += p->v.n;
@@ -1430,7 +1431,9 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 		nToken = sqlStrlen30(p->u.zToken) + 1;
 	else
 		nToken = 0;
-	int nStr = p->op == TK_STRING ? sqlStrlen30(p->v.s) + 1 : 0;
+	int nStr = (p->op == TK_STRING ||
+		    (p->op == TK_RAISE && p->v.s != NULL)) ?
+		   sqlStrlen30(p->v.s) + 1 : 0;
 	int nBlob = p->op == TK_BLOB ? p->v.n : 0;
 	if (flags != 0) {
 		assert(ExprHasProperty(p, EP_Reduced) == 0);
@@ -1464,7 +1467,7 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 		*pNew->v.d = *p->v.d;
 	}
 
-	/* Copy the p->v.s string, if the node is TK_STRING. */
+	/* Copy the p->v.s string, if the node is TK_STRING or TK_RAISE. */
 	if (nStr != 0) {
 		pNew->v.s = &zAlloc[nNewSize + nToken];
 		memcpy(pNew->v.s, p->v.s, nStr);
@@ -4092,7 +4095,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Halt, 0, ON_CONFLICT_ACTION_IGNORE);
 		} else {
 			sqlVdbeAddOp4(v, OP_SetDiag, ER_SQL_EXECUTE, 0, 0,
-				      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
+				      sql_xstrdup(pExpr->v.s), P4_DYNAMIC);
 			sqlVdbeAddOp2(v, OP_Halt, -1,
 				      pExpr->on_conflict_action);
 		}
