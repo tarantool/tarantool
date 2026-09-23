@@ -974,6 +974,7 @@ sql_expr_new_string(const char *str, uint32_t n)
 	e->v.s = (char *)&e[1];
 	memcpy(e->v.s, str, n);
 	e->v.s[n] = '\0';
+	e->v.len = n;
 	return e;
 }
 
@@ -1364,7 +1365,7 @@ dupedExprNodeSize(Expr * p, int flags)
 		nByte += sizeof(decimal_t);
 	else if (p->op == TK_STRING ||
 		 (p->op == TK_RAISE && p->v.s != NULL))
-		nByte += sqlStrlen30(p->v.s) + 1;
+		nByte += p->v.len + 1;
 	else if (p->op == TK_BLOB)
 		nByte += p->v.n;
 	return ROUND8(nByte);
@@ -1433,7 +1434,7 @@ sql_expr_dup(struct Expr *p, int flags, char **buffer)
 		nToken = 0;
 	int nStr = (p->op == TK_STRING ||
 		    (p->op == TK_RAISE && p->v.s != NULL)) ?
-		   sqlStrlen30(p->v.s) + 1 : 0;
+		   p->v.len + 1 : 0;
 	int nBlob = p->op == TK_BLOB ? p->v.n : 0;
 	if (flags != 0) {
 		assert(ExprHasProperty(p, EP_Reduced) == 0);
@@ -4703,7 +4704,8 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 		return pA->v.n == pB->v.n &&
 		       memcmp(pA->v.z, pB->v.z, pA->v.n) == 0 ? 0 : 2;
 	case TK_STRING:
-		return strcmp(pA->v.s, pB->v.s) == 0 ? 0 : 2;
+		return pA->v.len == pB->v.len &&
+		       memcmp(pA->v.s, pB->v.s, pA->v.len) == 0 ? 0 : 2;
 	case TK_INTEGER:
 		return pA->v.u == pB->v.u &&
 		       (pA->flags & EP_Negative) == (pB->flags & EP_Negative) ?

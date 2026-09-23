@@ -1134,7 +1134,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 
 		/* Last character before the first wildcard */
 		u8 c, *pC;
-		pC = (u8 *)&pStr2->v.s[sqlStrlen30(pStr2->v.s) - 1];
+		pC = (u8 *)&pStr2->v.s[pStr2->v.len - 1];
 		c = *pC;
 		*pC = c + 1;
 		pNewExpr1 = sqlExprDup(pLeft, 0);

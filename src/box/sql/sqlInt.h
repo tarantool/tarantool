@@ -1269,7 +1269,12 @@ struct Expr {
 		/** Value for TK_DECIMAL. */
 		decimal_t *d;
 		/** Value for TK_STRING. */
-		char *s;
+		struct {
+			/** String value, zero-terminated. */
+			char *s;
+			/** Length of the string, not including '\0'. */
+			uint32_t len;
+		};
 		/** Value for TK_BLOB. */
 		struct {
 			/** Varbinary string in hexadecimal format. */
