@@ -659,3 +659,21 @@ g.test_4007_collation_feature_request = function (cg)
         s:drop()
     end)
 end
+
+--
+-- A COLLATE clause must contribute to the expression tree height, so that
+-- the SQL_MAX_EXPR_DEPTH (200) limit accounts for the COLLATE node.
+--
+g.test_13205_collate_counts_towards_expr_depth = function(cg)
+    cg.server:exec(function()
+        local expr = "'a'" .. string.rep(" || 'a'", 199)
+
+        local _, err = box.execute('SELECT ' .. expr .. ';')
+        t.assert_equals(err, nil)
+
+        local exp_err = 'Number of nodes in expression tree 201 exceeds ' ..
+                        'the limit (200)'
+        _, err = box.execute('SELECT (' .. expr .. ') COLLATE binary;')
+        t.assert_equals(err.message, exp_err)
+    end)
+end
