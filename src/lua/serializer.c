@@ -84,7 +84,7 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_use_tostring, 0),
 	OPTION(LUA_TBOOLEAN, encode_invalid_as_nil, 0),
 	OPTION(LUA_TBOOLEAN, encode_error_as_ext, 1),
-	OPTION(LUA_TTABLE,   encode_key_order, 0),
+	OPTION(LUA_TTABLE,   encode_key_order, LUA_NOREF),
 	OPTION(LUA_TBOOLEAN, decode_invalid_numbers, 1),
 	OPTION(LUA_TBOOLEAN, decode_save_metatables, 1),
 	OPTION(LUA_TNUMBER,  decode_max_depth, 128),
@@ -97,6 +97,12 @@ luaL_serializer_create(struct luaL_serializer *cfg)
 	rlist_create(&cfg->on_update);
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		switch (OPTIONS[i].type) {
+		case LUA_TTABLE: {
+			if (strcmp(OPTIONS[i].name, "encode_key_order") != 0) {
+				unreachable();
+			}
+			FALLTHROUGH;
+		}
 		case LUA_TBOOLEAN:
 		case LUA_TSTRING:
 		case LUA_TNUMBER: {
@@ -104,15 +110,7 @@ luaL_serializer_create(struct luaL_serializer *cfg)
 			*pval = OPTIONS[i].defvalue;
 			break;
 		}
-		case LUA_TTABLE: {
-			if (strcmp(OPTIONS[i].name, "encode_key_order") != 0) {
-				unreachable();
-			}
 
-			char **p = (char **)((char *)cfg + OPTIONS[i].offset);
-			*p = NULL;
-			break;
-		}
 		default:
 			unreachable();
 		}
@@ -120,63 +118,50 @@ luaL_serializer_create(struct luaL_serializer *cfg)
 }
 
 void
-luaL_serializer_copy_options(struct luaL_serializer *dst,
-			     const struct luaL_serializer *src)
+luaL_push_encode_key_order(struct lua_State *L, struct luaL_serializer *cfg)
 {
-	luaL_serializer_options_delete(dst);
-	memcpy(dst, src, offsetof(struct luaL_serializer, end_of_options));
-
-	/*
-	 * Do a deep copy of the encoder key order. Not doing so would lead to
-	 * double free.
-	 */
-	size_t encode_key_order_len = 0;
-	while (src->encode_key_order != NULL &&
-	       src->encode_key_order[encode_key_order_len] != NULL) {
-		encode_key_order_len++;
-	}
-
-	if (encode_key_order_len > 0) {
-		dst->encode_key_order = xcalloc(
-			encode_key_order_len + 1, sizeof(char *));
-
-		for (size_t i = 0; i < encode_key_order_len; i++) {
-			size_t len = strlen(src->encode_key_order[i]);
-			dst->encode_key_order[i] = xcalloc(len + 1,
-							   sizeof(char));
-			memcpy(dst->encode_key_order[i],
-			       src->encode_key_order[i],
-			       len);
-		}
-	} else {
-		dst->encode_key_order = NULL;
-	}
-}
-
-/**
- * Free memory allocated for encode_key_order.
- * @param cfg Serializer configuration.
- */
-static void
-luaL_serializer_free_encode_key_order(struct luaL_serializer *cfg)
-{
-	if (cfg->encode_key_order == NULL) {
+	if (cfg->encode_key_order == LUA_NOREF) {
+		lua_pushnil(L);
 		return;
 	}
 
-	for (size_t i = 0; cfg->encode_key_order[i] != NULL; i++) {
-		free(cfg->encode_key_order[i]);
-	}
-
-	free(cfg->encode_key_order);
-	cfg->encode_key_order = NULL;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cfg->encode_key_order);
 }
 
 void
-luaL_serializer_options_delete(struct luaL_serializer *cfg)
+luaL_serializer_copy_options(struct luaL_serializer *dst,
+			     const struct luaL_serializer *src)
+{
+	memcpy(dst, src, offsetof(struct luaL_serializer, end_of_options));
+	if (dst->encode_key_order == LUA_NOREF)
+		return;
+	/*
+	 * XXX: Additional reference of the table. Use the global
+	 * Lua state, since there is no L available in tuple
+	 * triggers. Assume that this stack won't overflow.
+	 */
+	luaL_push_encode_key_order(tarantool_L, dst);
+	dst->encode_key_order = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+}
+
+/**
+ * Remove from registry table reserved for encode_key_order.
+ * @param L Lua stack.
+ * @param cfg Serializer configuration.
+ */
+static void
+luaL_serializer_free_encode_key_order(struct lua_State *L,
+				      struct luaL_serializer *cfg)
+{
+	luaL_unref(L, LUA_REGISTRYINDEX, cfg->encode_key_order);
+	cfg->encode_key_order = LUA_NOREF;
+}
+
+void
+luaL_serializer_options_delete(struct lua_State *L, struct luaL_serializer *cfg)
 {
 	assert(cfg);
-	luaL_serializer_free_encode_key_order(cfg);
+	luaL_serializer_free_encode_key_order(L, cfg);
 	/* This is a partial TRASH(cfg), only for options. */
 	memset(cfg, '#', offsetof(struct luaL_serializer, end_of_options));
 }
@@ -190,7 +175,7 @@ static int
 luaL_serializer_destroy(struct lua_State *L)
 {
 	struct luaL_serializer *cfg = lua_touserdata(L, 1);
-	luaL_serializer_options_delete(cfg);
+	luaL_serializer_options_delete(L, cfg);
 	return 0;
 }
 
@@ -203,37 +188,43 @@ static void
 luaL_serializer_parse_encode_key_order(struct lua_State *L,
 				       struct luaL_serializer *cfg)
 {
-	if (!(lua_istable(L, -1) || lua_isnil(L, -1) || luaL_isnull(L, -1))) {
+	if (lua_isnil(L, -1) || luaL_isnull(L, -1)) {
+		luaL_serializer_free_encode_key_order(L, cfg);
+		return;
+	}
+
+	if (!lua_istable(L, -1)) {
 		luaL_error(L, "encode_key_order option must be a table");
 		unreachable();
 		return;
 	}
 
-	luaL_serializer_free_encode_key_order(cfg);
-
 	size_t key_order_len = lua_objlen(L, -1);
-	if (key_order_len > 0) {
-		cfg->encode_key_order = xcalloc(
-			key_order_len + 1, sizeof(char *));
-	}
+	/* Copy table to prevent configuration modifications. */
+	lua_createtable(L, key_order_len, 0);
+	/* const table, copy table */
 
-	for (size_t i = 0, j = 0; i < key_order_len; i++) {
-		lua_pushinteger(L, i + 1);
-		lua_gettable(L, -2);
+	for (size_t i = 1, j = 1; i <= key_order_len; i++) {
+		lua_pushinteger(L, i);
+		lua_gettable(L, -3);
+		/* const table, copy table, v */
 
-		/* Skip keys that are not strings or numbers. */
-		if (!lua_isstring(L, -1)) {
+		/* Skip nils. */
+		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
 			continue;
 		}
 
-		size_t len = 0;
-		const char *key = lua_tolstring(L, -1, &len);
-		cfg->encode_key_order[j] = xcalloc(len + 1, sizeof(char));
-		memcpy(cfg->encode_key_order[j], key, len);
-		lua_pop(L, 1);
+		lua_rawseti(L, -2, j);
+		/* const table, copy table */
 		j++;
 	}
+
+	/*
+	 * Free previous reference that we are going to redefine.
+	 */
+	luaL_serializer_free_encode_key_order(L, cfg);
+	cfg->encode_key_order = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 /**
@@ -335,22 +326,6 @@ luaL_serializer_cfg(struct lua_State *L)
 	}
 	trigger_run(&cfg->on_update, cfg);
 	return 0;
-}
-
-void
-luaL_push_encode_key_order(struct lua_State *L, struct luaL_serializer *cfg)
-{
-	if (cfg->encode_key_order == NULL) {
-		lua_pushnil(L);
-		return;
-	}
-
-	lua_newtable(L);
-	for (size_t i = 0; cfg->encode_key_order[i] != NULL; i++) {
-		lua_pushinteger(L, i + 1);
-		lua_pushstring(L, cfg->encode_key_order[i]);
-		lua_settable(L, -3);
-	}
 }
 
 struct luaL_serializer *
@@ -638,20 +613,21 @@ lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 static int
 luaL_next_field_unsorted(struct lua_State *L)
 {
-	assert(lua_gettop(L) >= 4);
+	assert(lua_gettop(L) >= 5);
 	assert(lua_isnil(L, -2));
 	assert(lua_istable(L, -3));
-	assert(lua_istable(L, -4));
+	assert(lua_istable(L, -4) || lua_isnil(L, -4));
+	assert(lua_istable(L, -5));
 
-	/* const table, table, nil, key */
+	/* const table, t order, table, nil, key */
 	int r = lua_next(L, -3);
 
 	if (r == 0) {
 		/*
-		 * No more elements in the table. Delete the copy of the table.
-		 * const table, table, nil
+		 * No more elements in the table. Drop excess slots.
+		 * const table, t order, table, nil
 		 */
-		lua_pop(L, 2);
+		lua_pop(L, 3);
 		/* const table */
 		return 0;
 	}
@@ -688,59 +664,62 @@ luaL_next_field_fallback(struct lua_State *L)
 int
 luaL_next_field(struct lua_State *L, struct luaL_serializer *cfg)
 {
-	/* const table, (table ?), key_idx, key */
+	/* const table, (t order, table ?), key_idx, key */
 	assert(lua_gettop(L) >= 3);
 	assert(lua_isnil(L, -2) || lua_isnumber(L, -2));
 	assert(lua_istable(L, -3));
 
 	/* No need to sort anything */
-	if (cfg->encode_key_order == NULL) {
+	if (cfg->encode_key_order == LUA_NOREF) {
 		return luaL_next_field_fallback(L);
 	}
 
 	/*
-	 * Both key_idx and key are nil, first call, copy the table
-	 * so that we can remove printed elements from its copy, leaving
-	 * the initial table intact.
+	 * t order, key_idx and key are nil -- first call.
+	 * Push the table with elements order on stack. Copy the
+	 * original table so that we can remove printed elements
+	 * from this copy, leaving the initial table intact.
 	 */
 	if (lua_isnil(L, -1) && lua_isnil(L, -2)) {
 		/* const table, nil, nil */
 		lua_pop(L, 2);
+		luaL_push_encode_key_order(L, cfg);
 		lua_newtable(L);
-		/* const table, table */
+		/* const table, table order, table */
 
 		/* Copy the table. */
 		lua_pushnil(L);
-		/* const table, table, nil */
-		while (lua_next(L, -3)) {
-			/* const table, table, key, value */
+		/* const table, t order, table, nil */
+		while (lua_next(L, -4)) {
+			/* const table, t order, table, key, val */
 			lua_pushvalue(L, -2);
-			/* const table, table, key, value, key */
+			/* const table, t order, table, key, val, key */
 			lua_pushvalue(L, -2);
-			/* const table, table, key, value, key, value */
+			/* const table, t order, table, key, val, key, val */
 			lua_settable(L, -5);
-			/* const table, table, key, value */
+			/* const table, t order, table, key, val */
 			lua_pop(L, 1);
-			/* const table, table, key */
+			/* const table, t order, table, key */
 		}
-		/* const table, table */
+		/* const table, t order, table */
 		lua_pushnil(L);
 		lua_pushnil(L);
-		/* const table, table, nil, nil */
+		/* const table, t order, table, nil, nil */
 	}
 
-	/* Going through the unsorted part */
+	/* Going through the unsorted part. */
 	if (!lua_isnil(L, -1) && lua_isnil(L, -2)) {
+		/* const table, t order, table, nil, key. */
 		return luaL_next_field_unsorted(L);
 	}
 
 	/**
 	 * We are iterating through sorted part of the table
 	 * don't need to know the key.
-	 * const table, table, key_idx, key
+	 * const table, t order, table, key_idx, key
 	 */
 	lua_pop(L, 1);
-	/* const table, table, key_idx */
+	/* const table, t order, table, key_idx */
 
 	assert(lua_isnil(L, -1) || lua_isnumber(L, -1));
 
@@ -748,38 +727,55 @@ luaL_next_field(struct lua_State *L, struct luaL_serializer *cfg)
 	lua_Integer key_idx = 0;
 	if (lua_isnumber(L, -1)) {
 		/* Get next key index if it is a number */
-		key_idx = lua_tointeger(L, -1) + 1;
+		key_idx = lua_tointeger(L, -1);
+		/* Check that index is correct. */
 		assert(key_idx >= 0);
 	}
-	/* const table, table, key_idx */
-	lua_pop(L, 1);
-	/* const table, table */
+	/* const table, t order, table, key_idx */
+	const int table_slot = lua_gettop(L) - 1;
 
 	/* Find the key in the key order. */
-	char *key = cfg->encode_key_order[key_idx];
+	do {
+		lua_settop(L, table_slot);
+		/* const table, t order, table */
+		key_idx++;
+		lua_rawgeti(L, -2, key_idx);
+		/* const table, t order, table, key */
 
-	/* encode_key_order end, continue iterating over the unsorted part. */
-	if (key == NULL) {
-		/* const table, table */
-		lua_pushnil(L);
-		lua_pushnil(L);
-		/* const table, table, nil, nil */
-		return luaL_next_field_unsorted(L);
-	}
+		if (lua_isnil(L, -1)) {
+			/*
+			 * encode_key_order end, continue
+			 * iterating over the unsorted part.
+			 * Remove sorted table from stack.
+			 */
+			lua_pushnil(L);
+			/*
+			 * const table, t order, table, nil, nil
+			 */
+			return luaL_next_field_unsorted(L);
+		}
 
-	/* Push current key_idx, key and value. */
-	/* const table, table */
+		lua_pushvalue(L, -1);
+		/* const table, t order, table, key, key */
+		lua_gettable(L, -3);
+		/* const table, t order, table, key, value */
+		/* Check that this key has a value. */
+	} while (lua_isnil(L, -1));
+
+	/* const table, t order, table, key, value */
+
+	/* Push current key_idx. */
 	lua_pushinteger(L, key_idx);
-	lua_pushstring(L, key);
-	lua_getfield(L, -3, key);
-	/* const table, table, key_idx, key, value */
+	lua_insert(L, -3);
+	/* const table, t order, table, key_idx, key, value */
 
 	/* Remove the key from the table. */
+	lua_pushvalue(L, -2);
 	lua_pushnil(L);
-	lua_setfield(L, -5, key);
+	lua_settable(L, -6);
 
-	/* const table, table, key_idx, key, value */
-	return 5;
+	/* const table, t order, table, key_idx, key, value */
+	return 6;
 }
 
 int
