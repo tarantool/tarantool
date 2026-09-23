@@ -197,8 +197,6 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_TRIGGER_ID);
 		sqlVdbeAddOp2(v, OP_IdxInsert, record, reg);
 		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
-
-		sql_set_multi_write(parse, false);
 	} else {
 		parse->parsed_ast.trigger = trigger;
 		parse->parsed_ast_type = AST_TYPE_TRIGGER;

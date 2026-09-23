@@ -2117,15 +2117,12 @@ sqlSelectAddColumnTypeAndCollation(struct Parse *pParse,
 				       struct space_def *def,
 				       struct Select *pSelect)
 {
-	NameContext sNC;
 	Expr *p;
 	struct ExprList_item *a;
 
 	assert(pSelect != 0);
 	assert((pSelect->selFlags & SF_Resolved) != 0);
 	assert((int)def->field_count == pSelect->pEList->nExpr);
-	memset(&sNC, 0, sizeof(sNC));
-	sNC.pSrcList = pSelect->pSrc;
 	a = pSelect->pEList->a;
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		p = a[i].pExpr;
@@ -2138,31 +2135,6 @@ sqlSelectAddColumnTypeAndCollation(struct Parse *pParse,
 				  &unused) == 0 && coll_id != COLL_NONE)
 			def->fields[i].coll_id = coll_id;
 	}
-}
-
-/*
- * Given a SELECT statement, generate a space structure that describes
- * the result set of that SELECT.
- */
-struct space *
-sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
-{
-	uint32_t saved_flags = pParse->sql_flags;
-	pParse->sql_flags = 0;
-	sqlSelectPrep(pParse, pSelect, 0);
-	if (pParse->is_aborted)
-		return NULL;
-	while (pSelect->pPrior)
-		pSelect = pSelect->pPrior;
-	pParse->sql_flags = saved_flags;
-	struct space *space = sql_template_space_new(pParse, NULL);
-	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
-	 * is disabled
-	 */
-	assert(sql_get()->lookaside.bDisable);
-	sqlColumnsFromExprList(pParse, pSelect->pEList, space->def);
-	sqlSelectAddColumnTypeAndCollation(pParse, space->def, pSelect);
-	return space;
 }
 
 /** Get a VDBE for the given parser context. Create a new one if necessary. */
