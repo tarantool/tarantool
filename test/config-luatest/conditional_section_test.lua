@@ -136,8 +136,8 @@ g.test_validation = function()
     end)
 
     -- The 'if' expression should be correct.
-    local exp_err = '[cluster_config] conditional[1]: An expression should ' ..
-        'be a predicate, got variable'
+    local exp_err = '[cluster_config] conditional[1]: Unknown variable: ' ..
+        '"incorrect"'
     t.assert_error_msg_equals(exp_err, function()
         cluster_config:validate({
             ['conditional'] = {
