@@ -29,7 +29,7 @@ test:plan(1)
 --
 local engine = test:engine()
 local time_quota
-if tarantool.build.asan then
+if tarantool.build.asan or tarantool.build.tsan then
     time_quota = engine == 'memtx' and 80 or (
                  engine == 'vinyl' and 140 or 0) -- seconds
 else

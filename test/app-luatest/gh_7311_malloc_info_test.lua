@@ -21,7 +21,7 @@ local function is_supported()
     end
     -- If ASAN is enabled, malloc_info() exists but it is not implemented
     -- (all counters in the returned document are set to zeros).
-    if tarantool.build.asan then
+    if tarantool.build.asan or tarantool.build.tsan then
         return false
     end
     return true
@@ -60,7 +60,7 @@ end
 g.test_unsupported = function()
     skip_if_supported()
 
-    t.assert_equals(box.malloc.info(), {size = 0, used = 0})
+    t.assert_equals(box.malloc.info(), { size = 0, used = 0 })
 end
 
 g.test_malloc_small = function()

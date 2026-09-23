@@ -678,10 +678,17 @@ create_unit_test(PREFIX tt_static
                  LIBRARIES unit small
 )
 
-create_unit_test(PREFIX ev_signal_pid
-                 SOURCES ev_signal_pid.cc core_test_utils.c
-                 LIBRARIES unit core
-)
+if (NOT ENABLE_TSAN)
+    # This test is known to be broken under ThreadSanitizer: TSAN's
+    # sigaction() interceptor perturbs the timing/ordering of signal
+    # delivery to the user handler, so the test's assumptions about
+    # "last sender wins" do not hold, even though there is no actual
+    # data race (TSAN itself reports no warning here).
+    create_unit_test(PREFIX ev_signal_pid
+                     SOURCES ev_signal_pid.cc core_test_utils.c
+                     LIBRARIES unit core
+    )
+endif ()
 
 create_unit_test(PREFIX iterator_position
                  SOURCES iterator_position.c box_test_utils.c

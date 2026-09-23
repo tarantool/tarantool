@@ -107,7 +107,7 @@
 #  undef EV_USE_POLL
 #  define EV_USE_POLL 0
 # endif
- 
+
 # if HAVE_EPOLL_CTL && HAVE_SYS_EPOLL_H
 #  ifndef EV_USE_EPOLL
 #   define EV_USE_EPOLL EV_FEATURE_BACKENDS
@@ -143,7 +143,7 @@
 #  undef EV_USE_KQUEUE
 #  define EV_USE_KQUEUE 0
 # endif
- 
+
 # if HAVE_PORT_H && HAVE_PORT_CREATE
 #  ifndef EV_USE_PORT
 #   define EV_USE_PORT EV_FEATURE_BACKENDS
@@ -5706,4 +5706,3 @@ ev_walk (EV_P_ int types, void (*cb)(EV_P_ int type, void *w)) EV_NOEXCEPT
 #if EV_MULTIPLICITY
   #include "ev_wrap.h"
 #endif
-
