@@ -9,7 +9,7 @@ session = box.session
 remote = require('net.box')
 c = remote.connect(box.cfg.listen)
 c:eval("session.su('admin')")
-c:eval("return session.user()")
+c:eval("return session.effective_user()")
 c:close()
 box.schema.user.revoke('guest', 'execute', 'universe')
 
