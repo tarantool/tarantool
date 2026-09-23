@@ -13,7 +13,7 @@ message(STATUS "Add test suite ${TEST_SUITE_NAME}")
 # as a side effect.
 _add_test_suite_target(${TEST_SUITE_NAME}
   LABELS "${TEST_SUITE_NAME};regression;"
-  DEPENDS libyield
+  DEPENDS libyield tx_user_fiber_pool
 )
 
 list(APPEND TEST_ENV
