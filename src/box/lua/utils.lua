@@ -168,6 +168,7 @@ local function check_pairs_opts(opts, key_is_nil, level)
     local iterator = check_iterator_type(opts, key_is_nil, level and level + 1)
     local offset = 0
     local after = nil
+    local yield_period = nil
     if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
             offset = opts.offset
@@ -179,8 +180,17 @@ local function check_pairs_opts(opts, key_is_nil, level)
                 box.error(box.error.ITERATOR_POSITION, level and level + 1)
             end
         end
+        if opts.yield_period ~= nil then
+            if type(opts.yield_period) ~= "number" or
+                    opts.yield_period < 0 or opts.yield_period % 1 ~= 0 then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options.yield_period must be a non-negative " ..
+                          "integer", level and level + 1)
+            end
+            yield_period = opts.yield_period
+        end
     end
-    return iterator, after, offset
+    return iterator, after, offset, yield_period
 end
 box.internal.check_pairs_opts = check_pairs_opts
 
