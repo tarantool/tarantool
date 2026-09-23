@@ -684,6 +684,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res->op = TK_COLLATE;
 		res->flags |= EP_Collate | EP_Skip;
 		res->pLeft = expr_from_ast(parser, expr->left);
+		sqlExprSetHeightAndFlags(parser, res);
 		break;
 	case TK_CAST:
 		res = expr_unary(parser, expr);
