@@ -45,9 +45,3 @@ jobs:
 
       - name: Check entrypoint tag
         run: ./tools/check-entrypoint-tag.sh
-
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}

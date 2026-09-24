@@ -73,16 +73,6 @@ jobs:
           fuzz-seconds: 600
           dry-run: false
           sanitizer: ${{ matrix.sanitizer }}
-      - uses: actions/checkout@v4
-        id: checkout
-        if: failure()
-        with:
-          path: tarantool
-      - name: Send VK Teams message on failure
-        if: failure() && steps.checkout.outcome == 'success'
-        uses: ./tarantool/.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: upload crash
         uses: actions/upload-artifact@v4
         if: failure() && steps.build.outcome == 'success'
