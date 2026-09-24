@@ -308,13 +308,6 @@ error:
 static int
 func_index_check_func(struct func *func) {
 	assert(func != NULL);
-
-	if (memtx_tx_manager_use_mvcc_engine && func->def->opts.is_multikey) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Memtx MVCC engine",
-			 "functional multikey indexes");
-		return -1;
-	}
-
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
 	    func->def->body == NULL || !func->def->is_deterministic) {
 		const char *errmsg = tt_sprintf(
