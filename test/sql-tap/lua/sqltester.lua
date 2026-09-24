@@ -86,7 +86,7 @@ local function is_deeply_regex(got, expected)
     -- function.
     local table_match_regex_p = nil
     if string_regex_p(expected) then
-        return table_match_regex_p(got, expected)
+        return table_match_regex_p ~= nil and table_match_regex_p(got, expected)
     end
 
     if got == nil and expected == nil then return true end
