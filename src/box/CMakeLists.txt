@@ -75,6 +75,8 @@ lua_source(lua_sources lua/config/roles/recovery-point-manager/init.lua
            config_roles_rpm_lua)
 # }}} config
 
+lua_source(lua_sources lua/ssl_certificate.lua ssl_certificate_lua)
+
 lua_source(lua_sources lua/connpool.lua connpool_lua)
 
 if (ENABLE_BOX_LUA_EXTRAS)
