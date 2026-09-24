@@ -17,6 +17,32 @@
 
 static char *main_script = NULL;
 
+const char *
+minifio_dirname(const char *path, size_t *dir_len)
+{
+	size_t len = strlen(path);
+	if (len == 0) {
+		*dir_len = 1;
+		return ".";
+	}
+	while (len > 0 && path[len - 1] == '/')
+		len--;
+	if (len == 0) {
+		*dir_len = 1;
+		return "/";
+	}
+	while (len > 0 && path[len - 1] != '/')
+		len--;
+	if (len == 0) {
+		*dir_len = 1;
+		return ".";
+	}
+	while (len > 1 && path[len - 1] == '/')
+		len--;
+	*dir_len = len;
+	return path;
+}
+
 void
 minifio_set_script(const char *script)
 {
@@ -63,6 +89,23 @@ lbox_minifio_cwd(struct lua_State *L)
 }
 
 /**
+ * minifio.dirname() -- get the directory part of a path.
+ */
+static int
+lbox_minifio_dirname(struct lua_State *L)
+{
+	if (lua_type(L, 1) != LUA_TSTRING) {
+		lua_pushliteral(L, "Usage: minifio.dirname(path)");
+		return lua_error(L);
+	}
+	const char *path = lua_tostring(L, 1);
+	size_t len;
+	const char *dir = minifio_dirname(path, &len);
+	lua_pushlstring(L, dir, len);
+	return 1;
+}
+
+/**
  * minifio.script() -- get path of the main script.
  *
  * Important: the path is returned verbatim as provided in the
@@ -89,6 +132,7 @@ tarantool_lua_minifio_init(struct lua_State *L)
 {
 	static const struct luaL_Reg minifio_methods[] = {
 		{"cwd", lbox_minifio_cwd},
+		{"dirname", lbox_minifio_dirname},
 		{"script", lbox_minifio_script},
 		{NULL, NULL}
 	};
