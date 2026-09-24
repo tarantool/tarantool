@@ -1540,6 +1540,29 @@ local function upgrade_to_3_8_0()
     create_recovery_point()
 end
 
+-- Quiver stored boolean fields in an on-disk format that is incompatible
+-- across the 3.9.0 version boundary (byte-per-value before, bit-packed after).
+local function check_no_quiver_boolean_field(report)
+    for _, space in box.space._space:pairs() do
+        if space.engine == 'quiver' then
+            for _, field in ipairs(space.format) do
+                if field.type == 'boolean' then
+                    report("Space '%s' has boolean field '%s' and is stored " ..
+                           "with the 'quiver' engine, which is not supported" ..
+                           " across the 3.9.0 version boundary.",
+                           space.name, field.name)
+                end
+            end
+        end
+    end
+end
+
+local function upgrade_to_3_9_0()
+    check_no_quiver_boolean_field(function(fmt, ...)
+        error(string.format(fmt, ...))
+    end)
+end
+
 --------------------------------------------------------------------------------
 
 local handlers = {
@@ -1567,6 +1590,7 @@ local handlers = {
     {version = mkversion.new(3, 1, 0), func = upgrade_to_3_1_0},
     {version = mkversion.new(3, 3, 0), func = upgrade_to_3_3_0},
     {version = mkversion.new(3, 8, 0), func = upgrade_to_3_8_0},
+    {version = mkversion.new(3, 9, 0), func = upgrade_to_3_9_0},
 }
 
 builtin.box_init_latest_dd_version_id(
@@ -2166,6 +2190,10 @@ local function downgrade_from_3_8_0(issue_handler)
     drop_recovery_point(issue_handler)
 end
 
+local function downgrade_from_3_9_0(issue_handler)
+    check_no_quiver_boolean_field(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -2183,6 +2211,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion.new(3, 9, 0), func = downgrade_from_3_9_0},
     {version = mkversion.new(3, 8, 0), func = downgrade_from_3_8_0},
     {version = mkversion.new(3, 3, 0), func = downgrade_from_3_3_0},
     {version = mkversion.new(3, 1, 0), func = downgrade_from_3_1_0},
