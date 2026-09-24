@@ -247,7 +247,10 @@ memtx_allocator_stats_add(struct memtx_allocator_stats *dst,
 	dst->used_gc += src->used_gc;
 }
 
-template<class Allocator>
+/** Default Tag for MemtxAllocator, used by the memtx engine itself. */
+struct MemtxAllocatorTag {};
+
+template<class Allocator, class Tag = MemtxAllocatorTag>
 class MemtxAllocator {
 public:
 	/**
@@ -519,26 +522,27 @@ private:
 	static bool may_reuse_read_view;
 };
 
-template<class Allocator>
-struct stailq MemtxAllocator<Allocator>::gc;
+template<class Allocator, class Tag>
+struct stailq MemtxAllocator<Allocator, Tag>::gc;
 
-template<class Allocator>
-uint32_t MemtxAllocator<Allocator>::read_view_version;
+template<class Allocator, class Tag>
+uint32_t MemtxAllocator<Allocator, Tag>::read_view_version;
 
-template<class Allocator>
-struct rlist MemtxAllocator<Allocator>::read_views[memtx_block_rv_type_MAX];
+template<class Allocator, class Tag>
+struct rlist
+MemtxAllocator<Allocator, Tag>::read_views[memtx_block_rv_type_MAX];
 
-template<class Allocator>
-double MemtxAllocator<Allocator>::read_view_reuse_interval = 0.1;
+template<class Allocator, class Tag>
+double MemtxAllocator<Allocator, Tag>::read_view_reuse_interval = 0.1;
 
-template<class Allocator>
-double MemtxAllocator<Allocator>::read_view_timestamp;
+template<class Allocator, class Tag>
+double MemtxAllocator<Allocator, Tag>::read_view_timestamp;
 
-template<class Allocator>
-bool MemtxAllocator<Allocator>::may_reuse_read_view;
+template<class Allocator, class Tag>
+bool MemtxAllocator<Allocator, Tag>::may_reuse_read_view;
 
-template<class Allocator>
-struct memtx_allocator_stats MemtxAllocator<Allocator>::stats;
+template<class Allocator, class Tag>
+struct memtx_allocator_stats MemtxAllocator<Allocator, Tag>::stats;
 
 void
 memtx_allocators_init(struct allocator_settings *settings);
@@ -546,8 +550,14 @@ memtx_allocators_init(struct allocator_settings *settings);
 void
 memtx_allocators_destroy();
 
-using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc>,
-				    MemtxAllocator<SysAlloc>>;
+/**
+ * Tuple of MemtxAllocator<Allocator, Tag> for every Allocator specialization,
+ * for the given Tag. Allows a subsystem that tags its allocators with a
+ * dedicated Tag to group operations, in particular statistics, over that Tag.
+ */
+template<class Tag>
+using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc, Tag>,
+				    MemtxAllocator<SysAlloc, Tag>>;
 
 using memtx_allocators_read_view =
 		std::tuple<MemtxAllocator<SmallAlloc>::ReadView *,
@@ -561,15 +571,39 @@ memtx_allocators_open_read_view(const struct read_view_opts *opts);
 void
 memtx_allocators_close_read_view(memtx_allocators_read_view rv);
 
-/** Returns allocator statistics sum over all MemtxAllocators.  */
+/**
+ * Returns allocator statistics sum over all MemtxAllocators tagged with
+ * MemtxAllocatorTag.
+ */
 void
 memtx_allocators_stats(struct memtx_allocator_stats *stats);
 
-template<class F, class...Arg>
+template<class Tag, class F, class...Arg>
 static void
 foreach_memtx_allocator(Arg&&...arg)
 {
 	F f;
-	foreach_allocator_internal((memtx_allocators *) nullptr, f,
+	foreach_allocator_internal((memtx_allocators<Tag> *) nullptr, f,
 				   std::forward<Arg>(arg)...);
+}
+
+/** Sums allocator statistics. */
+struct memtx_allocator_add_stats {
+	template<typename Allocator>
+	void invoke(struct memtx_allocator_stats &stats)
+	{
+		memtx_allocator_stats_add(&stats, &Allocator::stats);
+	}
+};
+
+/**
+ * Returns allocator statistics summed over all MemtxAllocator<Allocator, Tag>
+ * for the given Tag.
+ */
+template<class Tag>
+void
+memtx_allocators_stats_tagged(struct memtx_allocator_stats *stats)
+{
+	memtx_allocator_stats_create(stats);
+	foreach_memtx_allocator<Tag, memtx_allocator_add_stats>(*stats);
 }
