@@ -668,6 +668,9 @@ local text_connection_mt = {
                 return
             end
             local nr_items, items = parse_operators(command)
+            if items == nil then
+                return text
+            end
             if nr_items == 3 then
                 --
                 -- Make sure it is exactly "\set output" command.
