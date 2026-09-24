@@ -5,11 +5,20 @@
  */
 #pragma once
 
+#include <stddef.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
+
+/**
+ * Return the directory part of path and write its length to dir_len.
+ * The result may point into path and need not be null-terminated.
+ */
+const char *
+minifio_dirname(const char *path, size_t *dir_len);
 
 /**
  * Set path to the main script.
