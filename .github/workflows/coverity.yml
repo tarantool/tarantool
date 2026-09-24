@@ -41,9 +41,3 @@ jobs:
           email: admin@tarantool.org
           command: cmake --build . --parallel $(nproc)
           version: ${{ steps.version.outputs.version }}
-
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
