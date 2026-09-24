@@ -94,9 +94,3 @@ jobs:
           no-cache: true
           push: true
           tags: ${{ env.TAGS }}
-
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}

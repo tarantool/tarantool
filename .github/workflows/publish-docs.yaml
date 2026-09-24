@@ -109,12 +109,6 @@ jobs:
         with:
           path: site
 
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-
   deploy:
     needs: build
 
