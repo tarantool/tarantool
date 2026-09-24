@@ -90,11 +90,6 @@ jobs:
           revision: ${{ inputs.revision }}
       - name: test
         run: make -f .test.mk test-release
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: artifacts
         uses: actions/upload-artifact@v4
         if: failure()
