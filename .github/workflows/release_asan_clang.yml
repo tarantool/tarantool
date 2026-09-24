@@ -90,11 +90,6 @@ jobs:
           CC: clang-16
           CXX: clang++-16
         run: make -f .test.mk test-release-asan
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: artifacts
         uses: actions/upload-artifact@v4
         if: failure()

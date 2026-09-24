@@ -79,11 +79,6 @@ jobs:
           # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
           PACKPACK_EXTRA_DOCKER_RUN_PARAMS: '--init -e CC=/usr/bin/gcc -e CXX=/usr/bin/g++'
         run: OS=el DIST=7 ${CI_MAKE} package
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: artifacts
         uses: actions/upload-artifact@v4
         if: failure()
