@@ -39,6 +39,10 @@
 
 #include <lua.h>
 #include <lauxlib.h>
+#include "lua/msgpack.h" /* luaL_msgpack_default */
+#include "mpstream/mpstream.h"
+#include "cord_buf.h"
+#include <small/ibuf.h>
 
 static_assert(FIBER_LUA_NOREF == LUA_NOREF, "FIBER_LUA_NOREF is ok");
 
@@ -100,8 +104,15 @@ static int
 lbox_fiber_on_stop(struct trigger *trigger, void *event)
 {
 	struct fiber *f = event;
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->storage.lua.storage_ref);
-	f->storage.lua.storage_ref = FIBER_LUA_NOREF;
+	if (f->storage.lua.storage_ref != FIBER_LUA_NOREF) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX,
+			   f->storage.lua.storage_ref);
+		f->storage.lua.storage_ref = FIBER_LUA_NOREF;
+	}
+	if (f->cnt_ref != FIBER_LUA_NOREF) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->cnt_ref);
+		f->cnt_ref = FIBER_LUA_NOREF;
+	}
 	trigger_clear(trigger);
 	free(trigger);
 	return 0;
@@ -169,6 +180,27 @@ lbox_checkfiber(struct lua_State *L, int index)
 		luaT_error(L);
 	}
 	return f;
+}
+
+/**
+ * Puts fiber metadata in Lua stack.
+ */
+static int
+lbox_fiber_get_cnt(struct lua_State *L)
+{
+	struct fiber *f;
+	if (lua_gettop(L) == 0)
+		f = fiber();
+	else
+		f = lbox_checkfiber(L, 1);
+	if (f->cnt_ref == FIBER_LUA_NOREF) {
+		lua_pushnil(L);
+	} else {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, f->cnt_ref);
+		const char *cnt = lua_tolstring(L, -1, &f->cnt_len);
+		luamp_decode(L, luaL_msgpack_default, &cnt);
+	}
+	return 1;
 }
 
 static int
@@ -475,6 +507,19 @@ fiber_create(struct lua_State *L)
 	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	struct fiber *f = fiber_new("lua", lua_fiber_run_f);
+
+	if (f == NULL) {
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+		luaT_error(L);
+	}
+	struct fiber *fib = fiber();
+	if (fib->cnt_ref != FIBER_LUA_NOREF) {
+		f->cnt_len = fib->cnt_len;
+		lua_rawgeti(L, LUA_REGISTRYINDEX, fib->cnt_ref);
+		f->cnt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	} else {
+		f->cnt_ref = FIBER_LUA_NOREF;
+	}
 #ifdef ENABLE_BACKTRACE
 	if (fiber_parent_backtrace_is_enabled()) {
 		struct fiber *parent = fiber();
@@ -663,6 +708,49 @@ lbox_fiber_name(struct lua_State *L)
 		lua_pushstring(L, fiber_name(f));
 		return 1;
 	}
+}
+
+/*
+ * This function encodes context of type map from lua stack,
+ * puts it in lua storage and save in fiber ref on cnt and its len.
+ */
+static int
+lbox_fiber_set_cnt(struct lua_State *L)
+{
+	struct fiber *f = fiber();
+	if (lua_type(L, 1) == LUA_TUSERDATA) {
+		f = lbox_checkfiber(L, 1);
+	}
+	if (f->flags & FIBER_IS_DEAD) {
+		diag_set(IllegalParams, "the fiber is dead");
+		luaT_error(L);
+	}
+	int index = lua_gettop(L);
+	if (index < 1)
+		return luaL_error(L, "msgpack.encode: a Lua object expected");
+
+	struct ibuf *buf = cord_ibuf_take();
+	struct mpstream stream;
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      luamp_error, L);
+	luamp_encode(L, luaL_msgpack_default, &stream, index);
+	mpstream_flush(&stream);
+
+	if (f->cnt_ref != FIBER_LUA_NOREF) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->cnt_ref);
+	} else {
+		struct trigger *on_stop = xmalloc(sizeof(*on_stop));
+		trigger_create(on_stop, lbox_fiber_on_stop, NULL,
+			       (trigger_f0)free);
+		trigger_add(&f->on_stop, on_stop);
+	}
+	size_t cnt_len = ibuf_used(buf);
+	lua_pushlstring(L, buf->buf, cnt_len);
+	f->cnt_len = cnt_len;
+	int cnt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	f->cnt_ref = cnt_ref;
+	cord_ibuf_drop(buf);
+	return 0;
 }
 
 static int
@@ -1063,6 +1151,8 @@ lbox_fiber_set_max_slice(struct lua_State *L)
 }
 
 static const struct luaL_Reg lbox_fiber_meta [] = {
+	{"get_cnt", lbox_fiber_get_cnt},
+	{"set_cnt", lbox_fiber_set_cnt},
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
 	{"cancel", lbox_fiber_cancel},
@@ -1095,6 +1185,8 @@ static const struct luaL_Reg fiberlib[] = {
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},
 	{"self", lbox_fiber_self},
+	{"get_cnt", lbox_fiber_get_cnt},
+	{"set_cnt", lbox_fiber_set_cnt},
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
 	{"kill", lbox_fiber_cancel},

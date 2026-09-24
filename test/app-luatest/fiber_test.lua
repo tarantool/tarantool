@@ -96,3 +96,58 @@ g.test_gh_10196_no_hang_on_self_join = function()
         message = 'cannot join itself',
     })
 end
+
+g.test_check_distribution_meta_data_in_fiber = function()
+    local f = fiber.self()
+
+    local res, err = f:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+
+    local sleep = function() require('fiber').sleep(500) end
+    local f_new = fiber.new(sleep)
+    res, err = f_new:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+    f_new:cancel()
+
+    local f_create = fiber.create(sleep)
+    res, err = f_create:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+    f_create:cancel()
+
+    local exp = {id = 0, a = 1, b = '2'}
+    f:set_cnt(exp)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+
+    f_new = fiber.new(sleep)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp)
+
+    f_create = fiber.create(sleep)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp)
+
+    local exp_new = {c = 'llll'}
+    f_new:set_cnt(exp_new)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp_new)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp)
+
+    local exp_create = {p = 0}
+    f_create:set_cnt(exp_create)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp_create)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp_new)
+
+    f_new:cancel()
+    f_create:cancel()
+end
