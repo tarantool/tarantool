@@ -32,6 +32,7 @@
 #include "box/call.h"
 #include "lua/call.h"
 #include "../lua/init.h" /* tarantool_lua_is_builtin_global */
+#include "lua/fiber.h"
 #include "schema.h"
 #include "session.h"
 #include "fiber.h"
@@ -225,6 +226,11 @@ access_check_lua_eval(void)
 int
 box_process_call(struct call_request *request, struct port *port)
 {
+	fiber()->cnt_ref = request->request_cnt;
+	fiber()->cnt_len = request->request_cnt_len;
+	struct trigger *on_stop = xmalloc(sizeof(*on_stop));
+	trigger_create(on_stop, lbox_fiber_on_stop, NULL, (trigger_f0)free);
+	trigger_add(&fiber()->on_stop, on_stop);
 	rmean_collect(rmean_box, IPROTO_CALL, 1);
 	/**
 	 * Find the function definition and check access.

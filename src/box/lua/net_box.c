@@ -838,7 +838,7 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_CALL,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 3);
+	mpstream_encode_map(ctx->stream, 5);
 
 	/* encode proc name */
 	size_t name_len;
@@ -846,9 +846,20 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	mpstream_encode_uint(ctx->stream, IPROTO_FUNCTION_NAME);
 	mpstream_encode_strn(ctx->stream, name, name_len);
 
+	int cnt_ref = fiber()->cnt_ref;
+	if (cnt_ref != FIBER_LUA_NOREF) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, fiber()->cnt_ref);
+		cnt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	mpstream_encode_uint(ctx->stream, IPROTO_REQUEST_CNT);
+	mpstream_encode_int64(ctx->stream, cnt_ref);
+	mpstream_encode_uint(ctx->stream, IPROTO_REQUEST_CNT_LEN);
+	mpstream_encode_uint(ctx->stream, fiber()->cnt_len);
 	if (netbox_encode_call_or_eval_args(L, idx + 1, ctx->stream,
-					    ctx->box_tuple_arg_as_ext) != 0)
+					    ctx->box_tuple_arg_as_ext) != 0) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, cnt_ref);
 		return -1;
+	}
 
 	netbox_end_encode(ctx->stream, svp);
 	return 0;

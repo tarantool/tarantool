@@ -96,3 +96,120 @@ g.test_gh_10196_no_hang_on_self_join = function()
         message = 'cannot join itself',
     })
 end
+
+g.test_check_distribution_meta_data_in_fiber = function()
+    local f = fiber.self()
+
+    local res, err = f:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+
+    local sleep = function() require('fiber').sleep(500) end
+    local f_new = fiber.new(sleep)
+    res, err = f_new:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+    f_new:cancel()
+
+    local f_create = fiber.create(sleep)
+    res, err = f_create:get_cnt()
+    t.assert_equals(res, nil)
+    t.assert_equals(err, nil)
+    f_create:cancel()
+
+    local exp = {id = 0, a = 1, b = '2'}
+    f:set_cnt(exp)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+
+    f_new = fiber.new(sleep)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp)
+
+    f_create = fiber.create(sleep)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp)
+
+    local exp_new = {c = 'llll'}
+    f_new:set_cnt(exp_new)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp_new)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp)
+
+    local exp_create = {p = 0}
+    f_create:set_cnt(exp_create)
+    res = f_create:get_cnt()
+    t.assert_equals(res, exp_create)
+    res = f:get_cnt()
+    t.assert_equals(res, exp)
+    res = f_new:get_cnt()
+    t.assert_equals(res, exp_new)
+
+    f_new:cancel()
+    f_create:cancel()
+end
+
+g = t.group("fiber2")
+local server = require('luatest.server')
+
+g.before_all(function()
+    g.server = server:new({alias = 'master'})
+    g.server:start()
+end)
+
+g.after_all(function()
+    g.server:drop()
+end)
+
+g.test_check_distribution_meta_data_in_fiber_call = function()
+    g.server:exec(function()
+        local netbox = require('net.box')
+        local fiber = require('fiber')
+        box.schema.user.create('test_user', {password = 'test'})
+        box.schema.user.grant('test_user', 'read, write, execute', 'universe')
+        box.schema.user.grant('test_user', 'create', 'space')
+        local cn = netbox.connect(box.cfg.listen,{user = 'test_user', password = 'test'})
+
+        box.schema.func.create('f_nil', {
+            body = [[
+                function()
+                    return require('fiber').self():get_cnt()
+                end
+            ]],
+            language = 'Lua'
+        })
+
+        box.schema.func.create('f_set', {
+            body = [[
+                function()
+                    require('fiber').self():set_cnt({a = 0, b = 1})
+                    return require('fiber').self():get_cnt()
+                end
+            ]],
+            language = 'Lua'
+        })
+
+        local f = fiber.self()
+        local res = cn:call('f_nil', {})
+        t.assert_equals(res, nil)
+
+        res = cn:call('f_set', {})
+        t.assert_equals(res, {a = 0, b = 1})
+        t.assert_equals(f:get_cnt(), nil)
+
+        f:set_cnt({c = 'abd'})
+
+        res = cn:call('f_nil', {})
+        t.assert_equals(res, {c = 'abd'})
+
+        res = cn:call('f_set', {})
+        t.assert_equals(res, {a = 0, b = 1})
+        t.assert_equals(f:get_cnt(), {c = 'abd'})
+
+        cn:close()
+        box.schema.user.drop('test_user')
+    end)
+end
