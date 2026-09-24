@@ -1864,6 +1864,26 @@ fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
 	return *links_offset + link_count * sizeof(struct field_link);
 }
 
+/**
+ * The function checks whether the table reference is self-referencing.
+ * `true` returns if the link is self-referential;
+ * `false` returns otherwise.
+ */
+static bool
+sql_find_foregin_key_name(const Token *parent, const char *space_name)
+{
+	const char *parent_name = sql_name_from_token(parent);
+	bool is_self_referenced = strcmp(parent_name, space_name) == 0;
+	if (!is_self_referenced && parent->z[0] != '"' &&
+	    sql_legacy_name_normalization) {
+		char *old_name = sql_legacy_name_new(parent->z,
+						     parent->n);
+		is_self_referenced = strcmp(old_name, space_name) == 0;
+		sql_xfree(old_name);
+	}
+	return is_self_referenced;
+}
+
 void
 sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 		       struct Token *name, struct ExprList *child_cols,
@@ -1926,23 +1946,20 @@ sql_create_foreign_key(struct Parse *parse_context, struct Token *table,
 	}
 	assert(parent != NULL);
 	parent_name = sql_name_from_token(parent);
-	/*
-	 * Within ALTER TABLE ADD CONSTRAINT FK also can be
-	 * self-referenced, but in this case parent (which is
-	 * also child) table will definitely exist.
-	 */
-	if (!is_alter_add_constr) {
-		const char *space_name = space->def->name;
-		is_self_referenced = strcmp(parent_name, space_name) == 0;
-		if (!is_self_referenced && parent->z[0] != '"' &&
-		    sql_legacy_name_normalization) {
-			char *old_name = sql_legacy_name_new(parent->z,
-							     parent->n);
-			is_self_referenced = strcmp(old_name, space_name) == 0;
-			sql_xfree(old_name);
+	const struct space *parent_space = sql_space_by_token(parent);
+	if (parent_space == NULL ||
+	    (space != NULL && space->def->id == parent_space->def->id)) {
+		/*
+		 * Within ALTER TABLE ADD CONSTRAINT FK also can be
+		 * self-referenced, but in this case parent (which is
+		 * also child) table will definitely exist.
+		 */
+		if (!is_alter_add_constr) {
+			const char *space_name = space->def->name;
+			is_self_referenced =
+			sql_find_foregin_key_name(parent, space_name);
 		}
 	}
-	const struct space *parent_space = sql_space_by_token(parent);
 	if (parent_space == NULL && !is_self_referenced) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);
 		goto tnt_error;

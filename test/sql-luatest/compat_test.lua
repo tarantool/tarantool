@@ -195,11 +195,20 @@ g.test_option_sql_legacy_name_normalization = function(cg)
         _, err = box.execute([[SELECT * FROM test ORDER BY a;]])
         t.assert_equals(tostring(err), exp_err)
 
+        box.execute([[CREATE TABLE Bst (i INT PRIMARY KEY);]])
+        box.execute([[CREATE TABLE BST (i INT PRIMARY KEY,
+                      a INT REFERENCES Bst(i));]])
+        local foreign_key = box.space.BST:format()[2]['foreign_key']
+        t.assert_equals(foreign_key['fk_unnamed_BST_a_1']['space'],
+                        box.space.Bst.id)
+
         box.execute("DROP INDEX idx ON test;")
         box.execute([[DROP TABLE ASD;]])
         box.execute([[DROP TABLE T;]])
         box.execute([[DROP TABLE test;]])
         box.execute([[DROP VIEW BSD;]])
         box.execute([[COMMIT;]])
+        box.execute([[DROP TABLE BSD;]])
+        box.execute([[DROP TABLE Bsd;]])
     end)
 end
