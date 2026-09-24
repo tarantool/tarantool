@@ -54,9 +54,3 @@ jobs:
             NO_DOC=submodule update
             NO_TEST=submodule update
             NO_CHANGELOG=submodule update
-
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}

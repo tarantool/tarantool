@@ -65,12 +65,6 @@ jobs:
           path: build/test-libs*.tgz
           if-no-files-found: error
 
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-
   test:
     runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' ||
                  fromJSON('["self-hosted", "Linux", "x86_64", "regular"]') }}
@@ -168,12 +162,6 @@ jobs:
             --builddir ../build \
             --executable /usr/bin/tarantool
         working-directory: test
-
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
   deploy:
     if: startsWith(github.ref, 'refs/tags/') &&

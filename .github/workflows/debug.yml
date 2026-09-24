@@ -97,12 +97,6 @@ jobs:
       - name: Run testing
         run: make -f .test.mk test-debug
 
-      - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
-        with:
-          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-
       - name: Collect artifacts
         uses: actions/upload-artifact@v4
         if: failure()
