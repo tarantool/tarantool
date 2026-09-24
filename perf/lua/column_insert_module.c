@@ -15,6 +15,11 @@
 # define ENABLE_BATCH_INSERT 1
 #endif
 
+enum insert_mode {
+	INSERT_MODE_SEQ,
+	INSERT_MODE_RAND,
+};
+
 enum sparse_mode {
 	SPARSE_MODE_SEQ,
 	SPARSE_MODE_RAND,
@@ -39,6 +44,16 @@ rand_bool_with_probability(int probability)
 		return true;
 	int rand_value = rand() % 100;
 	return rand_value < probability;
+}
+
+static enum insert_mode
+insert_mode_from_str(const char *insert_mode)
+{
+	if (strcmp(insert_mode, "seq") == 0)
+		return INSERT_MODE_SEQ;
+	else if (strcmp(insert_mode, "rand") == 0)
+		return INSERT_MODE_RAND;
+	panic("Unknown insert_mode: %s", insert_mode);
 }
 
 static enum sparse_mode
@@ -86,11 +101,25 @@ encode_mp_data(char *data, int row, int column_count,
 	return data_end;
 }
 
+static void
+array_int64_shuffle(int64_t *array, size_t size)
+{
+	for (size_t i = 0; i < size; i++) {
+		size_t j = rand() % (size - i);
+		int64_t tmp = array[i];
+		array[i] = array[i + j];
+		array[i + j] = tmp;
+	}
+}
+
 static int
 insert_serial_lua_func(struct lua_State *L)
 {
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	luaL_checktype(L, 2, LUA_TTABLE);
+	lua_getfield(L, 2, "insert_mode");
+	enum insert_mode insert_mode = insert_mode_from_str(
+		luaL_checklstring(L, -1, NULL));
 	lua_getfield(L, 2, "sparse_mode");
 	enum sparse_mode sparse_mode = sparse_mode_from_str(
 		luaL_checklstring(L, -1, NULL));
@@ -98,22 +127,32 @@ insert_serial_lua_func(struct lua_State *L)
 	int column_count = luaL_checkinteger(L, -1);
 	lua_getfield(L, 2, "row_count_batch");
 	int row_count = luaL_checkinteger(L, -1);
-	lua_pop(L, 3);
+	lua_pop(L, 4);
 
 	static char mp_data[1000 * 1000];
+	int64_t *row_i = xmalloc(sizeof(*row_i) * dataset.row_count);
+	for (int64_t i = 0; i < dataset.row_count; i++)
+		row_i[i] = i;
+	if (insert_mode != INSERT_MODE_SEQ) {
+		BUG_ON(insert_mode != INSERT_MODE_RAND);
+		array_int64_shuffle(row_i, dataset.row_count);
+	}
 	VERIFY(box_txn_begin() == 0);
 	for (int64_t i = 0; i < dataset.row_count; i++) {
 		char *mp_data_end = encode_mp_data(
-			mp_data, i, column_count, sparse_mode);
+			mp_data, row_i[i], column_count, sparse_mode);
 		size_t data_size = mp_data_end - mp_data;
 		BUG_ON(data_size > sizeof(mp_data));
-		if (box_insert(space_id, mp_data, mp_data_end, NULL) != 0)
+		if (box_insert(space_id, mp_data, mp_data_end, NULL) != 0) {
+			free(row_i);
 			return luaT_error(L);
+		}
 		if (i % row_count == 0) {
 			VERIFY(box_txn_commit() == 0);
 			VERIFY(box_txn_begin() == 0);
 		}
 	}
+	free(row_i);
 	VERIFY(box_txn_commit() == 0);
 	return 0;
 }
@@ -259,6 +298,9 @@ insert_batch_lua_func(struct lua_State *L)
 {
 	uint32_t space_id = luaL_checkinteger(L, 1);
 	luaL_checktype(L, 2, LUA_TTABLE);
+	lua_getfield(L, 2, "insert_mode");
+	enum insert_mode insert_mode = insert_mode_from_str(
+		luaL_checklstring(L, -1, NULL));
 	lua_getfield(L, 2, "sparse_mode");
 	enum sparse_mode sparse_mode = sparse_mode_from_str(
 		luaL_checklstring(L, -1, NULL));
@@ -266,19 +308,31 @@ insert_batch_lua_func(struct lua_State *L)
 	int batch_column_count = luaL_checkinteger(L, -1);
 	lua_getfield(L, 2, "row_count_batch");
 	int batch_row_count = luaL_checkinteger(L, -1);
-	lua_pop(L, 3);
+	lua_pop(L, 4);
 
 	struct ArrowSchema schema;
 	struct ArrowArray array;
 
 	if (dataset.row_count % batch_row_count != 0)
 		panic("Total row count divisible by batch size expected");
-	for (int i = 0; i < dataset.row_count / batch_row_count; i++) {
-		arrow_batch_init(&schema, &array, i, batch_column_count,
-				 batch_row_count, sparse_mode);
-		if (box_insert_arrow(space_id, &array, &schema) != 0)
-			return luaT_error(L);
+	int batch_count = dataset.row_count / batch_row_count;
+	int64_t *batch_i = xmalloc(sizeof(*batch_i) * batch_count);
+	for (int i = 0; i < batch_count; i++)
+		batch_i[i] = i;
+	if (insert_mode != INSERT_MODE_SEQ) {
+		BUG_ON(insert_mode != INSERT_MODE_RAND);
+		array_int64_shuffle(batch_i, batch_count);
 	}
+	for (int i = 0; i < batch_count; i++) {
+		arrow_batch_init(&schema, &array,
+				 batch_i[i], batch_column_count,
+				 batch_row_count, sparse_mode);
+		if (box_insert_arrow(space_id, &array, &schema) != 0) {
+			free(batch_i);
+			return luaT_error(L);
+		}
+	}
+	free(batch_i);
 	return 0;
 }
 #endif /* defined(ENABLE_BATCH_INSERT) */
