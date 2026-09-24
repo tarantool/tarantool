@@ -5,6 +5,7 @@
  */
 #include "lua/minifio.h"
 
+#include <libgen.h>
 #include <string.h>
 #include <unistd.h>
 #include <lua.h>
@@ -16,6 +17,22 @@
 #include "lua/error.h"
 
 static char *main_script = NULL;
+
+char *
+minifio_dirname(const char *path, char *buf)
+{
+	char *result;
+#ifdef __APPLE__
+	result = dirname_r(path, buf);
+#else
+	/* dirname() may modify its argument. */
+	memcpy(buf, path, strlen(path) + 1);
+	result = dirname(buf);
+#endif
+	if (result != buf)
+		memmove(buf, result, strlen(result) + 1);
+	return buf;
+}
 
 void
 minifio_set_script(const char *script)
@@ -63,6 +80,23 @@ lbox_minifio_cwd(struct lua_State *L)
 }
 
 /**
+ * minifio.dirname() -- get the directory part of a path.
+ */
+static int
+lbox_minifio_dirname(struct lua_State *L)
+{
+	if (lua_type(L, 1) != LUA_TSTRING) {
+		lua_pushliteral(L, "Usage: minifio.dirname(path)");
+		return lua_error(L);
+	}
+	size_t len;
+	const char *path = lua_tolstring(L, 1, &len);
+	char *buf = (char *)lua_newuserdata(L, len + 2);
+	lua_pushstring(L, minifio_dirname(path, buf));
+	return 1;
+}
+
+/**
  * minifio.script() -- get path of the main script.
  *
  * Important: the path is returned verbatim as provided in the
@@ -89,6 +123,7 @@ tarantool_lua_minifio_init(struct lua_State *L)
 {
 	static const struct luaL_Reg minifio_methods[] = {
 		{"cwd", lbox_minifio_cwd},
+		{"dirname", lbox_minifio_dirname},
 		{"script", lbox_minifio_script},
 		{NULL, NULL}
 	};
