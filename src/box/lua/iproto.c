@@ -233,7 +233,7 @@ lbox_iproto_drop_connections(struct lua_State *L)
 {
 	int n_args = lua_gettop(L);
 	if (n_args != 1 || lua_type(L, 1) != LUA_TNUMBER)
-		return luaL_error(L, "Usage: box.iproto.internal."
+		return luaL_error(L, "Usage: box.iproto."
 				  "drop_connections(timeout)");
 	double timeout = lua_tonumber(L, 1);
 	int rc = iproto_drop_connections(timeout);
@@ -614,6 +614,7 @@ box_lua_iproto_init(struct lua_State *L)
 	push_iproto_protocol_features(L);
 	static const struct luaL_Reg funcs_main[] = {
 		{"send", lbox_iproto_send},
+		{"drop_connections", lbox_iproto_drop_connections},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg funcs_common[] = {
@@ -629,7 +630,6 @@ box_lua_iproto_init(struct lua_State *L)
 	luaL_findtable(L, -1, "internal", 0);
 	static const struct luaL_Reg internal_funcs_main[] = {
 		{"session_new", lbox_iproto_session_new},
-		{"drop_connections", lbox_iproto_drop_connections},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg internal_funcs_common[] = {
