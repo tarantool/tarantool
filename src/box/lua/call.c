@@ -530,19 +530,23 @@ port_lua_do_dump(struct port *base, struct mpstream *stream,
 	ctx.port = port;
 	ctx.stream = stream;
 	lua_State *L = port->L;
+	int top = lua_gettop(L);
 	/*
-	 * At the moment Lua stack holds only values to encode.
-	 * Insert corresponding encoder to the bottom and push
-	 * encode context as lightuserdata to the top.
+	 * Preserve the original values so an encoding error cannot consume
+	 * them. Push the encoder and copies of its arguments above them.
 	 */
-	const int size = lua_gettop(L);
+	const int size = top;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
 	assert(lua_isfunction(L, -1) && lua_iscfunction(L, -1));
-	lua_insert(L, 1);
+	for (int i = 1; i <= size; i++)
+		lua_pushvalue(L, i);
 	lua_pushlightuserdata(L, &ctx);
 	/* nargs -- all arguments + lightuserdata. */
-	if (luaT_call(L, size + 1, 0) != 0)
+	if (luaT_call(L, size + 1, 0) != 0) {
+		/* luaT_call() has already saved the error in diag. */
+		lua_settop(L, top);
 		return -1;
+	}
 	return port->size;
 }
 
