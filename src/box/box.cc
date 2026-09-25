@@ -1559,6 +1559,7 @@ box_eval_replication_quorum(const char *cfg_name, int nr_replicas,
 	if (lua_pcall(tarantool_L, 3, 1, 0) != 0) {
 		diag_set(ClientError, ER_CFG, cfg_name,
 			 lua_tostring(tarantool_L, -1));
+		lua_pop(tarantool_L, 1);
 		return -1;
 	}
 
