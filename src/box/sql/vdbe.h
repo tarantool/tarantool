@@ -241,7 +241,6 @@ void sqlVdbeMakeReady(Vdbe *, Parse *);
 int sqlVdbeFinalize(Vdbe *);
 void sqlVdbeResolveLabel(Vdbe *, int);
 int sqlVdbeCurrentAddr(Vdbe *);
-void sqlVdbeResetStepResult(Vdbe *);
 void sqlVdbeRewind(Vdbe *);
 int sqlVdbeReset(Vdbe *);
 void sqlVdbeSetNumCols(Vdbe *, int);
@@ -270,16 +269,11 @@ vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx);
 int
 vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span);
 
-const struct Mem *
-vdbe_get_bound_value(struct Vdbe *vdbe, int id);
-
 void sqlVdbeCountChanges(Vdbe *);
 
 /** Remember the SQL string for a prepared statement. */
 void
 sqlVdbeSetSql(struct Vdbe *vdbe, const char *z);
-
-void sqlVdbeSwap(Vdbe *, Vdbe *);
 
 struct VdbeOp *
 sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp);

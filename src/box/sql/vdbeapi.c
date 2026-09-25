@@ -521,9 +521,3 @@ sql_stmt_busy(const struct Vdbe *v)
 	assert(v != NULL);
 	return v->magic == VDBE_MAGIC_RUN && v->pc >= 0;
 }
-
-const char *
-sql_sql(struct Vdbe *p)
-{
-	return p ? p->zSql : 0;
-}
