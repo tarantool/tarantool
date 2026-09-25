@@ -845,21 +845,36 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	request->bind = NULL;
 	request->stmt_id = NULL;
 	for (uint32_t i = 0; i < map_size; ++i) {
-		uint8_t key = *data;
-		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT &&
-		    key != IPROTO_STMT_ID) {
+		if (mp_typeof(*data) != MP_UINT) {
 			mp_next(&data);         /* skip the key */
 			mp_next(&data);         /* skip the value */
 			continue;
 		}
-		const char *value = ++data;     /* skip the key */
+		uint64_t key = mp_decode_uint(&data);
+		const char *value = data;
 		mp_next(&data);                 /* skip the value */
-		if (key == IPROTO_SQL_BIND)
+
+		/*
+		 * (gh-13258): IPROTO_OPTIONS has type mismatch.
+		 * It's safe to ignore it because it's not used anyway.
+		 */
+		if (key < iproto_key_MAX && key != IPROTO_OPTIONS &&
+		    iproto_key_type[key] != mp_typeof(*value))
+			goto error;
+
+		switch (key) {
+		case IPROTO_SQL_BIND:
 			request->bind = value;
-		else if (key == IPROTO_SQL_TEXT)
+			break;
+		case IPROTO_SQL_TEXT:
 			request->sql_text = value;
-		else
+			break;
+		case IPROTO_STMT_ID:
 			request->stmt_id = value;
+			break;
+		default:
+			break;
+		}
 	}
 	if (request->sql_text != NULL && request->stmt_id != NULL) {
 		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
@@ -875,6 +890,9 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 		return -1;
 	}
 	return 0;
+error:
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
+	return -1;
 }
 
 void
