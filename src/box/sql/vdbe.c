@@ -4313,7 +4313,6 @@ case OP_Expire: {
  *
  * If tracing is enabled (by the sql_trace()) interface, then
  * the UTF-8 string contained in P4 is emitted on the trace callback.
- * Or if P4 is blank, use the string returned by sql_sql().
  *
  * If P2 is not zero, jump to instruction P2.
  *
