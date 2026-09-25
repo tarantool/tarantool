@@ -91,6 +91,7 @@ cfg_geti_default(const char *param, int default_val)
 	cfg_get(param);
 	int ok;
 	int val = lua_tointegerx(tarantool_L, -1, &ok);
+	lua_pop(tarantool_L, 1);
 	return ok ? val : default_val;
 }
 
@@ -136,6 +137,7 @@ cfg_getd_default(const char *param, double default_val)
 	cfg_get(param);
 	int ok;
 	double val = lua_tonumberx(tarantool_L, -1, &ok);
+	lua_pop(tarantool_L, 1);
 	return ok ? val : default_val;
 }
 
