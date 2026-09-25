@@ -3,7 +3,9 @@
  *
  * Copyright 2010-2026, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include "box/box.h"
 #include "cfg.h"
+#include "diag.h"
 #include "fiber.h"
 #include "lua/utils.h"
 #include "memory.h"
@@ -35,10 +37,32 @@ test_numeric_default_getters(struct lua_State *L)
 	check_plan();
 }
 
+static void
+test_quorum_formula_error(struct lua_State *L)
+{
+	plan(2);
+	header();
+
+	const char *config =
+		"box = {cfg = {replication_synchro_quorum = '('}}";
+	fail_unless(luaL_dostring(L, config) == 0);
+	lua_pushliteral(L, "existing value");
+	int top = lua_gettop(L);
+
+	is(box_set_replication_synchro_quorum(), -1,
+	   "Invalid quorum formula is rejected");
+	is(lua_gettop(L), top, "Formula error preserves the stack height");
+	lua_settop(L, 0);
+	diag_clear(diag_get());
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(2);
 	header();
 
 	memory_init();
@@ -47,6 +71,7 @@ main(void)
 	tarantool_L = L;
 
 	test_numeric_default_getters(L);
+	test_quorum_formula_error(L);
 
 	lua_close(L);
 	tarantool_L = NULL;
