@@ -1395,7 +1395,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	do {
 		x.nNeeded = 0;
 		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(Mem));
-		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(Mem));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)
@@ -1410,8 +1409,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	p->explain = pParse->explain;
 	p->nCursor = nCursor;
 	p->nVar = nVar;
-	for (int i = 0; i < nVar; ++i)
-		mem_create(&p->aVar[i]);
 	p->nMem = nMem;
 	for (int i = 0; i < nMem; ++i) {
 		mem_create(&p->aMem[i]);
@@ -1931,7 +1928,6 @@ sqlVdbeClearObject(struct Vdbe *p)
 		sql_xfree(pSub);
 	}
 	if (p->magic != VDBE_MAGIC_INIT) {
-		releaseMemArray(p->aVar, p->nVar);
 		sql_xfree(p->pVList);
 		sql_xfree(p->pFree);
 	}

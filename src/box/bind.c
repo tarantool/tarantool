@@ -186,42 +186,31 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 	}
 	switch (p->type) {
 	case MP_INT:
-		return sql_bind_int64(stmt, pos, p->i64);
 	case MP_UINT:
-		return sql_bind_uint64(stmt, pos, p->u64);
+		return sql_bind_set_type(stmt, pos, "integer");
 	case MP_BOOL:
-		return sql_bind_boolean(stmt, pos, p->b);
+	case MP_NIL:
+		return sql_bind_set_type(stmt, pos, "boolean");
 	case MP_DOUBLE:
 	case MP_FLOAT:
-		return sql_bind_double(stmt, pos, p->d);
-	case MP_STR:
-		/*
-		 * Parameters are allocated within message pack,
-		 * received from the iproto thread. IProto thread
-		 * now is waiting for the response and it will not
-		 * free the packet until sql_stmt_finalize. So
-		 * there is no need to copy the packet and we can
-		 * use SQL_STATIC.
-		 */
-		return sql_bind_str_static(stmt, pos, p->s, p->bytes);
-	case MP_NIL:
-		return sql_bind_null(stmt, pos);
+		return sql_bind_set_type(stmt, pos, "numeric");
 	case MP_BIN:
-		return sql_bind_bin_static(stmt, pos, p->s, p->bytes);
+	case MP_STR:
+		return sql_bind_set_type(stmt, pos, "text");
 	case MP_ARRAY:
-		return sql_bind_array_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_set_type(stmt, pos, "array");
 	case MP_MAP:
-		return sql_bind_map_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_set_type(stmt, pos, "map");
 	case MP_EXT:
 		switch (p->ext_type) {
 		case MP_UUID:
-			return sql_bind_uuid(stmt, pos, &p->uuid);
+			return sql_bind_set_type(stmt, pos, "uuid");
 		case MP_DECIMAL:
-			return sql_bind_dec(stmt, pos, &p->dec);
+			return sql_bind_set_type(stmt, pos, "decimal");
 		case MP_DATETIME:
-			return sql_bind_datetime(stmt, pos, &p->dt);
+			return sql_bind_set_type(stmt, pos, "datetime");
 		case MP_INTERVAL:
-			return sql_bind_interval(stmt, pos, &p->itv);
+			return sql_bind_set_type(stmt, pos, "interval");
 		default:
 			unreachable();
 		}
