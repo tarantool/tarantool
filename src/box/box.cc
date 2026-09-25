@@ -1366,6 +1366,7 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 		diag_set(ClientError, ER_CFG,
 			 "replication_synchro_quorum",
 			 lua_tostring(tarantool_L, -1));
+		lua_pop(tarantool_L, 1);
 		return -1;
 	}
 
