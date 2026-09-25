@@ -1,3 +1,5 @@
+#include "benchmark_helpers.h"
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <module.h>
@@ -46,7 +48,7 @@ sparse_mode_from_str(const char *sparse_mode)
 		return SPARSE_MODE_SEQ;
 	else if (strcmp(sparse_mode, "rand") == 0)
 		return SPARSE_MODE_RAND;
-	abort();
+	panic("Unknown sparse_mode: %s", sparse_mode);
 }
 
 static char *
@@ -79,7 +81,7 @@ encode_mp_data(char *data, int row, int column_count,
 		break;
 	}
 	default:
-		abort();
+		panic("Unexpected sparse mode: %d", sparse_mode);
 	}
 	return data_end;
 }
@@ -104,8 +106,7 @@ insert_serial_lua_func(struct lua_State *L)
 		char *mp_data_end = encode_mp_data(
 			mp_data, i, column_count, sparse_mode);
 		size_t data_size = mp_data_end - mp_data;
-		if (data_size > sizeof(mp_data))
-			abort();
+		BUG_ON(data_size > sizeof(mp_data));
 		if (box_insert(space_id, mp_data, mp_data_end, NULL) != 0)
 			return luaT_error(L);
 		if (i % row_count == 0) {
@@ -149,7 +150,7 @@ arrow_schema_init(struct ArrowSchema *schema, int *column_numbers,
 	};
 	for (int i = 0; i < column_count; i++) {
 		int num = column_numbers[i];
-		assert(num < dataset.column_count);
+		BUG_ON(num >= dataset.column_count);
 		schema->children[i] = xmalloc(sizeof(*schema->children[i]));
 		*schema->children[i] = (struct ArrowSchema) {
 			.format = dataset.columns[num].type,
@@ -212,7 +213,7 @@ arrow_array_init(struct ArrowArray *array, int *column_numbers,
 			.private_data = NULL,
 		};
 		int num = column_numbers[i];
-		assert(num < dataset.column_count);
+		BUG_ON(num >= dataset.column_count);
 		array->children[i]->buffers[1] =
 			&dataset.columns[num].data[row_offset];
 	};
@@ -245,7 +246,7 @@ gen_rand_column_number:
 		break;
 	}
 	default:
-		abort();
+		panic("Unexpected sparse mode: %d", sparse_mode);
 	}
 
 	arrow_schema_init(schema, column_numbers, batch_column_count);
@@ -270,7 +271,8 @@ insert_batch_lua_func(struct lua_State *L)
 	struct ArrowSchema schema;
 	struct ArrowArray array;
 
-	assert(dataset.row_count % batch_row_count == 0);
+	if (dataset.row_count % batch_row_count != 0)
+		panic("Total row count divisible by batch size expected");
 	for (int i = 0; i < dataset.row_count / batch_row_count; i++) {
 		arrow_batch_init(&schema, &array, i, batch_column_count,
 				 batch_row_count, sparse_mode);
