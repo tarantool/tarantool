@@ -287,7 +287,7 @@ sql_vsnprintf(int, char *, const char *, va_list);
 
 /** Compile the UTF-8 encoded SQL statement into a statement handle. */
 struct Vdbe *
-sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
+sql_stmt_compile(const char *sql);
 
 /** This is the top-level implementation of sqlStep(). */
 int
@@ -1896,7 +1896,6 @@ struct Parse {
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
-	Vdbe *pReprepare;	/* VM being reprepared (sqlReprepare()) */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
@@ -4239,8 +4238,6 @@ int sqlVdbeParameterIndex(Vdbe *, const char *, int);
 /** Transfer all bindings from the first statement over to the second. */
 int
 sqlTransferBindings(struct Vdbe *from, struct Vdbe *to);
-
-int sqlReprepare(Vdbe *);
 
 /**
  * This function verifies that two collations (to be more precise
