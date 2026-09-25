@@ -12,6 +12,13 @@ extern "C" {
 struct lua_State;
 
 /**
+ * Write the directory part of path to buf and return buf. The buffer must
+ * be at least two bytes long and large enough for path and its terminator.
+ */
+char *
+minifio_dirname(const char *path, char *buf);
+
+/**
  * Set path to the main script.
  */
 void
