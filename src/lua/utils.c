@@ -1021,10 +1021,13 @@ struct lua_State *
 luaT_newthread(struct lua_State *L)
 {
 	assert(luaT_newthread_ref != LUA_NOREF);
+	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_newthread_ref);
 	assert(lua_isfunction(L, -1));
-	if (luaT_call(L, 0, 1) != 0)
+	if (luaT_call(L, 0, 1) != 0) {
+		lua_settop(L, top);
 		return NULL;
+	}
 	struct lua_State *L1 = lua_tothread(L, -1);
 	assert(L1 != NULL);
 	return L1;
