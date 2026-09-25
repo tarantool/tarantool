@@ -14,6 +14,8 @@ if(APPLE)
     set(OPENSSL_CPPFLAGS "${OPENSSL_CPPFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
 endif()
 
+include(utils)
+
 ExternalProject_Add(bundled-openssl-project
     PREFIX ${OPENSSL_INSTALL_DIR}
     SOURCE_DIR ${OPENSSL_INSTALL_DIR}/src/openssl
@@ -32,7 +34,7 @@ ExternalProject_Add(bundled-openssl-project
         --libdir=lib
         no-shared
         no-module
-    INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install_sw
+    INSTALL_COMMAND ${EP_MAKE_COMMAND} install_sw
     BUILD_BYPRODUCTS ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY}
 )
 
