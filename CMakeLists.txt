@@ -690,6 +690,34 @@ if(ENABLE_BACKTRACE)
 endif()
 
 #
+# mimalloc
+#
+
+# Enabled by default on Linux, but disabled under ASAN and valgrind: the
+# malloc override would hide the allocator from them. If the user enables
+# mimalloc explicitly in an incompatible configuration, fail below.
+if(TARGET_OS_LINUX AND NOT ENABLE_ASAN AND NOT ENABLE_VALGRIND)
+    set(ENABLE_MIMALLOC_DEFAULT ON)
+else()
+    set(ENABLE_MIMALLOC_DEFAULT OFF)
+endif()
+option(ENABLE_MIMALLOC
+    "Override the system allocator with the bundled mimalloc"
+    ${ENABLE_MIMALLOC_DEFAULT})
+if(ENABLE_MIMALLOC)
+    if(NOT TARGET_OS_LINUX)
+        message(FATAL_ERROR "ENABLE_MIMALLOC is supported only on Linux")
+    endif()
+    if(ENABLE_ASAN OR ENABLE_VALGRIND)
+        message(FATAL_ERROR
+            "ENABLE_MIMALLOC is incompatible with ASAN and valgrind builds")
+    endif()
+    include(BuildMimalloc)
+    include_directories(${MIMALLOC_INCLUDE_DIR})
+    add_dependencies(build_bundled_libs bundled-mimalloc)
+endif()
+
+#
 # LuaJIT
 #
 # Patched.
@@ -932,6 +960,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_SSE2 ENABLE_AVX
     ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN ENABLE_UB_SANITIZER ENABLE_FUZZER
     ENABLE_BACKTRACE
+    ENABLE_MIMALLOC
     ABORT_ON_LEAK
     FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     ENABLE_HARDENING

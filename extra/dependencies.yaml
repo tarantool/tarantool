@@ -25,6 +25,8 @@ dependencies:
     version: 0.13.71
   - name: lua-zlib
     version: 2219aff270036650c4b9d478d10d44256c9df751
+  - name: mimalloc
+    version: 3.5.1
   - name: nghttp2
     version: 1.52.0
   - name: openssl

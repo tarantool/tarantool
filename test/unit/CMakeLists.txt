@@ -798,3 +798,14 @@ create_unit_test(PREFIX key_def_raw
                  SOURCES key_def_raw.c box_test_utils.c
                  LIBRARIES unit box core
 )
+
+if (ENABLE_MIMALLOC)
+    include_directories(${MIMALLOC_INCLUDE_DIR})
+    set_source_files_properties(${MIMALLOC_OBJECT} PROPERTIES
+        EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    create_unit_test(PREFIX mimalloc
+                     SOURCES mimalloc_test.cc ${MIMALLOC_OBJECT}
+                     LIBRARIES unit pthread
+    )
+    add_dependencies(mimalloc.test bundled-mimalloc)
+endif()

@@ -45,7 +45,16 @@ local function check_malloc_info(info)
     -- memory usage infinitely. So we check that the system memory usage never
     -- exceeds the allocated memory usage by more than the test allocation size
     -- plus 10% overhead for internal housekeeping and fragmentation.
-    t.assert_le(info.size, info.used + 1.1 * ALLOC_SIZE)
+    local overhead = 1.1 * ALLOC_SIZE
+
+    -- mimalloc is excepted from the tight bound below: it commits arena memory
+    -- in large chunks (tens of MiB) and keeps the pages of freed allocations
+    -- committed for reuse, so its system memory usage naturally exceeds the
+    -- live allocation size by more than 10%.
+    if tarantool.build.mimalloc then
+        overhead = 32 * 1024 * 1024
+    end
+    t.assert_le(info.size, info.used + overhead)
 end
 
 g.test_malloc_info = function()

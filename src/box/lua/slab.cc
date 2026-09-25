@@ -49,6 +49,11 @@
 # include <malloc.h>
 #endif /* defined(HAVE_MALLOC_INFO) */
 
+#if defined(ENABLE_MIMALLOC)
+# include <mimalloc.h>
+# include <mimalloc-stats.h>
+#endif /* defined(ENABLE_MIMALLOC) */
+
 #include "small/small.h"
 #include "small/quota.h"
 #include "memory.h"
@@ -259,13 +264,14 @@ lbox_slab_check(MAYBE_UNUSED struct lua_State *L)
  * This is an internal function that isn't supposed to be called by users,
  * but it may be useful for developers.
  *
- * Returns an empty table if malloc_info() isn't supported by the system.
+ * Returns an empty table if malloc_info() isn't supported by the system or
+ * the allocator is overridden with the bundled mimalloc.
  * Raises a Lua error if it fails to retrieve or parse malloc_info() output.
  */
 static int
 lbox_malloc_internal_info(struct lua_State *L)
 {
-#if defined(HAVE_MALLOC_INFO)
+#if defined(HAVE_MALLOC_INFO) && !defined(ENABLE_MIMALLOC)
 	char *buf = NULL;
 	size_t buf_size = 0;
 	FILE *fp = open_memstream(&buf, &buf_size);
@@ -283,10 +289,10 @@ lbox_malloc_internal_info(struct lua_State *L)
 	lua_pushlstring(L, buf, buf_size);
 	free(buf);
 	return luaT_xml_decode(L);
-#else /* !defined(HAVE_MALLOC_INFO) */
+#else /* !defined(HAVE_MALLOC_INFO) || defined(ENABLE_MIMALLOC) */
 	lua_newtable(L);
 	return 1;
-#endif /* defined(HAVE_MALLOC_INFO) */
+#endif /* defined(HAVE_MALLOC_INFO) && !defined(ENABLE_MIMALLOC) */
 }
 
 /*
@@ -299,14 +305,44 @@ lbox_malloc_internal_info(struct lua_State *L)
  *
  * (all numbers are in bytes).
  *
- * The information is retrieved with malloc_info(). If it isn't supported by
- * the system or its format is unknown, {size = 0, used = 0} is returned.
+ * The information is retrieved with malloc_info() for glibc, or, if the
+ * allocator is overridden with the bundled mimalloc, with its own statistics.
+ * If memory usage information can't be obtained, {size = 0, used = 0} is
+ * returned.
  *
  * This function never raises.
  */
 static int
 lbox_malloc_info(struct lua_State *L)
 {
+#if defined(ENABLE_MIMALLOC)
+	/*
+	 * The allocator is overridden with the bundled mimalloc, so the glibc
+	 * malloc_info() would report the state of the idle heap rather than
+	 * the actual memory usage. Report the mimalloc statistics instead:
+	 * `size` is the memory committed by the allocator, `used` is the live
+	 * allocation size (block sizes of the normal and huge allocations).
+	 */
+	mi_stats_t stats;
+	mi_stats_init(&stats);
+	if (mi_stats_get(&stats)) {
+		uint64_t size = (uint64_t)stats.committed.current;
+		uint64_t used = (uint64_t)stats.malloc_normal.current +
+					  stats.malloc_huge.current;
+		lua_newtable(L);
+		luaL_pushuint64(L, size);
+		lua_setfield(L, -2, "size");
+		luaL_pushuint64(L, used);
+		lua_setfield(L, -2, "used");
+		return 1;
+	}
+	lua_newtable(L);
+	luaL_pushuint64(L, 0);
+	lua_setfield(L, -2, "size");
+	luaL_pushuint64(L, 0);
+	lua_setfield(L, -2, "used");
+	return 1;
+#else /* !defined(ENABLE_MIMALLOC) */
 	int version = 0;
 	uint64_t total = 0;
 	uint64_t available = 0;
@@ -389,6 +425,7 @@ out:
 	luaL_pushuint64(L, total - available);
 	lua_setfield(L, -2, "used");
 	return 1;
+#endif /* defined(ENABLE_MIMALLOC) */
 }
 
 /** Initialize box.slab package. */
