@@ -3157,11 +3157,9 @@ sqlSrcListDelete(struct SrcList *pList)
 		sql_xfree(pItem->zAlias);
 		sql_xfree(pItem->legacy_name);
 		if (pItem->fg.isIndexedBy) {
-			sql_xfree(pItem->u1.zIndexedBy);
+			sql_xfree(pItem->indexed_by);
 			sql_xfree(pItem->legacy_index_name);
 		}
-		if (pItem->fg.isTabFunc)
-			sql_expr_list_delete(pItem->u1.pFuncArg);
 		/*
 		* Space is either not ephemeral which means that
 		* it came from space cache; or space is ephemeral
@@ -3213,14 +3211,13 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 		struct SrcList_item *pItem = &p->a[p->nSrc - 1];
 		assert(pItem->fg.notIndexed == 0);
 		assert(pItem->fg.isIndexedBy == 0);
-		assert(pItem->fg.isTabFunc == 0);
 		if (pIndexedBy->n == 1 && !pIndexedBy->z) {
 			/* A "NOT INDEXED" clause was supplied. See parse.y
 			 * construct "indexed_opt" for details.
 			 */
 			pItem->fg.notIndexed = 1;
 		} else if (pIndexedBy->z != NULL) {
-			pItem->u1.zIndexedBy = sql_name_from_token(pIndexedBy);
+			pItem->indexed_by = sql_name_from_token(pIndexedBy);
 			pItem->fg.isIndexedBy = true;
 			if (pIndexedBy->z[0] != '"') {
 				pItem->legacy_index_name =
@@ -3228,25 +3225,6 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 							    pIndexedBy->n);
 			}
 		}
-	}
-}
-
-/*
- * Add the list of function arguments to the SrcList entry for a
- * table-valued-function.
- */
-void
-sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList)
-{
-	if (p) {
-		struct SrcList_item *pItem = &p->a[p->nSrc - 1];
-		assert(pItem->fg.notIndexed == 0);
-		assert(pItem->fg.isIndexedBy == 0);
-		assert(pItem->fg.isTabFunc == 0);
-		pItem->u1.pFuncArg = pList;
-		pItem->fg.isTabFunc = 1;
-	} else {
-		sql_expr_list_delete(pList);
 	}
 }
 
