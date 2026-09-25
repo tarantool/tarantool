@@ -175,7 +175,6 @@ sqlReprepare(Vdbe * p)
 	if (pNew == NULL)
 		return -1;
 	sqlVdbeSwap(pNew, p);
-	sqlTransferBindings(pNew, p);
 	sqlVdbeResetStepResult(pNew);
 	sqlVdbeFinalize(pNew);
 	return 0;

@@ -275,7 +275,6 @@ sql_stmt_get_id(const struct Vdbe *stmt)
 static int
 vdbeUnbind(struct Vdbe *p, int i)
 {
-	Mem *pVar;
 	assert(p != NULL);
 	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
 	assert(i > 0);
@@ -285,8 +284,6 @@ vdbeUnbind(struct Vdbe *p, int i)
 		return -1;
 	}
 	i--;
-	pVar = &p->aVar[i];
-	mem_destroy(pVar);
 	return 0;
 }
 
@@ -355,120 +352,11 @@ sql_reset_autoinc_id_list(struct Vdbe *v)
 }
 
 int
-sql_bind_double(struct Vdbe *p, int i, double rValue)
+sql_bind_set_type(struct Vdbe *v, int i, const char *type, bool is_static)
 {
-	if (vdbeUnbind(p, i) != 0)
+	if ((is_static == 0) && (vdbeUnbind(v, i) != 0))
 		return -1;
-	int rc = sql_bind_type(p, i, "numeric");
-	mem_set_double(&p->aVar[i - 1], rValue);
-	return rc;
-}
-
-int
-sql_bind_boolean(struct Vdbe *p, int i, bool value)
-{
-	if (vdbeUnbind(p, i) != 0)
-		return -1;
-	int rc = sql_bind_type(p, i, "boolean");
-	mem_set_bool(&p->aVar[i - 1], value);
-	return rc;
-}
-
-int
-sql_bind_int(struct Vdbe *p, int i, int iValue)
-{
-	return sql_bind_int64(p, i, (i64) iValue);
-}
-
-int
-sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
-{
-	if (vdbeUnbind(p, i) != 0)
-		return -1;
-	int rc = sql_bind_type(p, i, "integer");
-	mem_set_int(&p->aVar[i - 1], iValue);
-	return rc;
-}
-
-int
-sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
-{
-	if (vdbeUnbind(p, i) != 0)
-		return -1;
-	int rc = sql_bind_type(p, i, "integer");
-	mem_set_uint(&p->aVar[i - 1], value);
-	return rc;
-}
-
-int
-sql_bind_null(struct Vdbe *p, int i)
-{
-	if (vdbeUnbind(p, i) != 0)
-		return -1;
-	return sql_bind_type(p, i, "boolean");
-}
-
-int
-sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
-{
-	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
-	return sql_bind_type(vdbe, i, "text");
-}
-
-int
-sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
-{
-	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "text");
-}
-
-int
-sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
-{
-	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "array");
-}
-
-int
-sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
-{
-	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
-	return sql_bind_type(vdbe, i, "map");
-}
-
-int
-sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
-{
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
-		return -1;
-	mem_set_uuid(&p->aVar[i - 1], uuid);
-	return 0;
-}
-
-int
-sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
-{
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
-		return -1;
-	mem_set_dec(&p->aVar[i - 1], dec);
-	return 0;
-}
-
-int
-sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
-{
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
-		return -1;
-	mem_set_datetime(&p->aVar[i - 1], dt);
-	return 0;
-}
-
-int
-sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
-{
-	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
-		return -1;
-	mem_set_interval(&p->aVar[i - 1], itv);
+	sql_bind_type(v, i, type);
 	return 0;
 }
 
@@ -503,17 +391,6 @@ int
 sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName)
 {
 	return sqlVdbeParameterIndex(v, zName, nName);
-}
-
-int
-sqlTransferBindings(struct Vdbe *pFrom, struct Vdbe *pTo)
-{
-	int i;
-	assert(pTo->nVar == pFrom->nVar);
-	for (i = 0; i < pFrom->nVar; i++) {
-		mem_move(&pTo->aVar[i], &pFrom->aVar[i]);
-	}
-	return 0;
 }
 
 int
