@@ -308,12 +308,11 @@ sql_vsnprintf(int, char *, const char *, va_list);
  *
  * @param sql UTF-8 encoded SQL statement.
  * @param sql_len Length of @sql in bytes.
- * @param re_prepared VM being re-compiled. Can be NULL.
  * @param[out] stmt A pointer to the compiled statement.
  * @param[out] sql_tail End of parsed string.
  */
 int
-sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
+sql_stmt_compile(const char *sql, int bytes_count,
 		 struct Vdbe **stmt, const char **sql_tail);
 
 /** This is the top-level implementation of sqlStep(). */
@@ -463,10 +462,6 @@ sql_temp_directory;
 const char *
 sql_uri_parameter(const char *zFilename,
 		      const char *zParam);
-
-/** Return the query associated with a prepared statement */
-const char *
-sql_sql(struct Vdbe *v);
 
 int
 sql_vfs_register(sql_vfs *, int makeDflt);
@@ -2019,7 +2014,6 @@ struct Parse {
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
-	Vdbe *pReprepare;	/* VM being reprepared (sqlReprepare()) */
 	const char *zTail;	/* All SQL text past the last semicolon parsed */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
@@ -4311,8 +4305,6 @@ int sqlVdbeParameterIndex(Vdbe *, const char *, int);
 /** Transfer all bindings from the first statement over to the second. */
 int
 sqlTransferBindings(struct Vdbe *from, struct Vdbe *to);
-
-int sqlReprepare(Vdbe *);
 
 /**
  * This function verifies that two collations (to be more precise

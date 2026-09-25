@@ -858,7 +858,7 @@ key_alloc(BtCursor *cur, size_t key_size)
 	return 0;
 }
 
-/*
+/*sql_stmt_compile
  * Create new Tarantool iterator and set it to the first entry found by
  * given key. If cursor already contains iterator, it will be freed.
  *
