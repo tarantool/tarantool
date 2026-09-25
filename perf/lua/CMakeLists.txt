@@ -65,6 +65,7 @@ function(create_perf_lua_test)
 endfunction()
 
 create_perf_lua_test(NAME 1mops_write)
+create_perf_lua_test(NAME box_delete)
 create_perf_lua_test(NAME box_select)
 create_perf_lua_test(NAME gh-7089-vclock-copy)
 create_perf_lua_test(NAME luafun)
