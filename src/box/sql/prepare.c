@@ -41,11 +41,10 @@
 #include "box/schema.h"
 
 struct Vdbe *
-sql_stmt_compile(const char *zSql, struct Vdbe *pReprepare)
+sql_stmt_compile(const char *zSql)
 {
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, current_session()->sql_flags);
-	sParse.pReprepare = pReprepare;
 
 	struct sql_ast *ast = sql_parse_statement(&sParse, zSql);
 	if (ast == NULL) {
@@ -157,26 +156,6 @@ sql_trigger_compile(const char *sql)
 	struct sql_trigger *res = sql_parse_trigger(&parser, sql);
 	sql_parser_destroy(&parser);
 	return res;
-}
-
-/*
- * Rerun the compilation of a statement after a schema change.
- */
-int
-sqlReprepare(Vdbe * p)
-{
-	const char *zSql;
-
-	zSql = sql_sql(p);
-	assert(zSql != 0);
-	struct Vdbe *pNew = sql_stmt_compile(zSql, p);
-	if (pNew == NULL)
-		return -1;
-	sqlVdbeSwap(pNew, p);
-	sqlTransferBindings(pNew, p);
-	sqlVdbeResetStepResult(pNew);
-	sqlVdbeFinalize(pNew);
-	return 0;
 }
 
 void

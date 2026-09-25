@@ -93,28 +93,6 @@ sqlVdbeSetSql(struct Vdbe *p, const char *z)
 }
 
 /*
- * Swap all content between two VDBE structures.
- */
-void
-sqlVdbeSwap(Vdbe * pA, Vdbe * pB)
-{
-	Vdbe tmp, *pTmp;
-	char *zTmp;
-	tmp = *pA;
-	*pA = *pB;
-	*pB = tmp;
-	pTmp = pA->pNext;
-	pA->pNext = pB->pNext;
-	pB->pNext = pTmp;
-	pTmp = pA->pPrev;
-	pA->pPrev = pB->pPrev;
-	pB->pPrev = pTmp;
-	zTmp = pA->zSql;
-	pA->zSql = pB->zSql;
-	pB->zSql = zTmp;
-}
-
-/*
  * Resize the Vdbe.aOp array so that it is at least nOp elements larger
  * than its current size. nOp is guaranteed to be less than or equal
  * to 1024/sizeof(Op).
@@ -1842,15 +1820,6 @@ sqlVdbeHalt(Vdbe * p)
 }
 
 /*
- * This routine sets is_aborted of VDBE to false.
- */
-void
-sqlVdbeResetStepResult(Vdbe * p)
-{
-	p->is_aborted = false;
-}
-
-/*
  * Clean up a VDBE after execution but do not delete the VDBE just yet.
  * Return the result code.
  *
@@ -2010,14 +1979,6 @@ sqlExpirePreparedStatements(void)
 	Vdbe *p;
 	for (p = sql_get()->pVdbe; p; p = p->pNext)
 		p->expired = p->is_sandboxed == 0 ? 1 : 0;
-}
-
-const struct Mem *
-vdbe_get_bound_value(struct Vdbe *vdbe, int id)
-{
-	if (vdbe == NULL || id < 0 || id >= vdbe->nVar)
-		return NULL;
-	return &vdbe->aVar[id];
 }
 
 void
