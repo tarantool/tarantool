@@ -143,7 +143,7 @@ struct luaL_serializer {
 	int decode_invalid_numbers;
 	/** Save __serialize meta-value for decoded arrays and maps */
 	int decode_save_metatables;
-	/** Max recursion depts for decoding (CJSON only) */
+	/** Max recursion depth for decoding (CJSON only) */
 	int decode_max_depth;
 
 	/** Enable support for compact represenation (internal, YAML-only). */

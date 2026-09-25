@@ -425,7 +425,7 @@ cleanup:
 
 void
 luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
-		      const char **data, struct mp_ctx *ctx)
+		      const char **data, struct mp_ctx *ctx, int depth)
 {
 	double d;
 	switch (mp_typeof(**data)) {
@@ -471,10 +471,12 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 		return;
 	case MP_ARRAY:
 	{
+		if (depth >= cfg->decode_max_depth)
+			luaL_error(L, "msgpack.decode: too high nest level");
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode_with_ctx(L, cfg, data, ctx);
+			luamp_decode_with_ctx(L, cfg, data, ctx, depth + 1);
 			lua_rawseti(L, -2, i + 1);
 		}
 		if (cfg->decode_save_metatables)
@@ -483,11 +485,13 @@ luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 	case MP_MAP:
 	{
+		if (depth >= cfg->decode_max_depth)
+			luaL_error(L, "msgpack.decode: too high nest level");
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode_with_ctx(L, cfg, data, ctx);
-			luamp_decode_with_ctx(L, cfg, data, ctx);
+			luamp_decode_with_ctx(L, cfg, data, ctx, depth + 1);
+			luamp_decode_with_ctx(L, cfg, data, ctx, depth + 1);
 			lua_settable(L, -3);
 		}
 		if (cfg->decode_save_metatables)
@@ -907,7 +911,7 @@ luamp_object_decode(struct lua_State *L)
 {
 	struct luamp_object *obj = luamp_check_object(L, 1);
 	const char *data = obj->data;
-	luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx);
+	luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx, 0);
 	assert(data == obj->data_end);
 	return 1;
 }
@@ -945,7 +949,7 @@ luamp_object_get(struct lua_State *L)
 		return luaL_error(L, "not an array or map");
 	if (obj->decoded_ref == LUA_NOREF) {
 		const char *data = obj->data;
-		luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx);
+		luamp_decode_with_ctx(L, obj->cfg, &data, &obj->ctx, 0);
 		assert(data == obj->data_end);
 		obj->decoded_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
@@ -1101,7 +1105,8 @@ luamp_iterator_decode(struct lua_State *L)
 {
 	struct luamp_iterator *it = luamp_check_iterator(L, 1);
 	luamp_iterator_check_data_end(L, it);
-	luamp_decode_with_ctx(L, it->source->cfg, &it->pos, &it->source->ctx);
+	luamp_decode_with_ctx(L, it->source->cfg, &it->pos,
+			      &it->source->ctx, 0);
 	return 1;
 }
 

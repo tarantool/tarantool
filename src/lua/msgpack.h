@@ -126,16 +126,17 @@ luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
 
 /**
  * Decode MsgPack data to Lua stack.
+ * @param depth current recursion depth (must be 0 for top-level callers).
  */
 void
 luamp_decode_with_ctx(struct lua_State *L, struct luaL_serializer *cfg,
-		      const char **data, struct mp_ctx *ctx);
+		      const char **data, struct mp_ctx *ctx, int depth);
 
 static inline void
 luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	     const char **data)
 {
-	luamp_decode_with_ctx(L, cfg, data, NULL);
+	luamp_decode_with_ctx(L, cfg, data, NULL, 0);
 }
 
 /**
