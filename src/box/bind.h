@@ -119,9 +119,9 @@ int
 sql_bind_decode(struct sql_bind *bind, int i, const char **packet);
 
 /**
- * Bind SQL parameter value to its position.
+ * Bind SQL parameter type to its position.
  * @param stmt Prepared statement.
- * @param p Parameter value.
+ * @param p Parameter value contained by the type.
  * @param pos Ordinal bind position.
  *
  * @retval  0 Success.
