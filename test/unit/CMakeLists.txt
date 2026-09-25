@@ -719,12 +719,13 @@ create_unit_test(PREFIX getenv_safe
 )
 
 create_unit_test(PREFIX cfg
-                 SOURCES cfg.cc
-                 LIBRARIES unit core server
-                           ${LUAJIT_LIBRARIES}
+                 SOURCES cfg.cc box_test_utils.c
+                 LIBRARIES unit box server core misc
                            ${CURL_LIBRARIES}
                            ${LIBYAML_LIBRARIES}
                            ${READLINE_LIBRARIES}
+                           ${ICU_LIBRARIES}
+                           ${LUAJIT_LIBRARIES}
 )
 
 create_unit_test(PREFIX lua_utils
