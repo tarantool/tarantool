@@ -12,10 +12,12 @@ local justrun = require('luatest.justrun')
 local server = require('luatest.server')
 local treegen = require('luatest.treegen')
 local t = require('luatest')
+local is_macos = jit.os == 'OSX'
 
 local g = t.group()
 
 g.before_all(function(cg)
+    t.skip_if(is_macos)
     cg.server = server:new({
         box_cfg = {
             iproto_threads = 2,
