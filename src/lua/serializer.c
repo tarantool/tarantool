@@ -1101,7 +1101,15 @@ luaT_reftable_new(struct lua_State *L, struct luaL_serializer *cfg, int idx)
 {
 	/*
 	 * Fill the traversal context.
-	 *
+	 */
+
+	/*
+	 * Copy the object to the stack to work correctly with
+	 * negative indices.
+	 */
+	lua_pushvalue(L, idx);
+
+	/*
 	 * Create a reference table and a visited objects table.
 	 */
 	struct reftable_new_ctx ctx;
@@ -1114,11 +1122,10 @@ luaT_reftable_new(struct lua_State *L, struct luaL_serializer *cfg, int idx)
 	/*
 	 * Copy the given object on top of the Lua stack and
 	 * traverse all its descendants recursively.
-	 *
 	 * Fill the reference table for all the met objects that
 	 * are changed by the serialization.
 	 */
-	lua_pushvalue(L, idx);
+	lua_pushvalue(L, -3);
 	luaT_reftable_new_impl(L, &ctx);
 
 	/*
@@ -1126,6 +1133,7 @@ luaT_reftable_new(struct lua_State *L, struct luaL_serializer *cfg, int idx)
 	 * objects table. Leave the reference table on the top.
 	 */
 	lua_pop(L, 2);
+	lua_remove(L, -2);  /* Remove old copy of the object. */
 
 	return 1;
 }
