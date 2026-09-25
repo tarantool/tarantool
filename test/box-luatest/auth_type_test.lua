@@ -109,6 +109,12 @@ common.before_test('test_replication', function(cg)
         },
     })
     cg.replica:start()
+    cg.replica:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert(box.info.replication[1].upstream)
+            t.assert_equals(box.info.replication[1].upstream.status, 'follow')
+        end)
+    end)
 end)
 
 common.after_test('test_replication', function(cg)
@@ -117,8 +123,6 @@ end)
 
 common.test_replication = function(cg)
     cg.replica:exec(function(uri, transport, auth_test_data)
-        t.assert(box.info.replication[1].upstream)
-        t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         local urilib = require('uri')
         local parsed_uri = urilib.parse(uri)
         parsed_uri.params = parsed_uri.params or {}
@@ -276,6 +280,12 @@ pap_sha256.before_test('test_unencrypted_replication', function(cg)
         },
     })
     cg.replica:start()
+    cg.replica:exec(function()
+        t.helpers.retrying({}, function()
+            t.assert(box.info.replication[1].upstream)
+            t.assert_equals(box.info.replication[1].upstream.status, 'follow')
+        end)
+    end)
 end)
 
 pap_sha256.after_test('test_unencrypted_replication', function(cg)
@@ -284,8 +294,6 @@ end)
 
 pap_sha256.test_unencrypted_replication = function(cg)
     cg.replica:exec(function(uri)
-        t.assert(box.info.replication[1].upstream)
-        t.assert_equals(box.info.replication[1].upstream.status, 'follow')
         local urilib = require('uri')
         local parsed_uri = urilib.parse(uri)
         parsed_uri.login = 'test'
