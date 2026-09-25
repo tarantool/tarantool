@@ -2681,8 +2681,10 @@ static void
 netbox_transport_on_state_change_pcall(struct netbox_transport *transport,
 				       struct lua_State *L)
 {
+	int top = lua_gettop(L);
 	if (luaT_cpcall(L, netbox_transport_on_state_change_f, transport) != 0)
 		diag_log();
+	lua_settop(L, top);
 }
 
 /**
@@ -3148,6 +3150,12 @@ netbox_worker_f(va_list ap)
 			/* The worker loop can only be broken by an error. */
 			assert(rc != 0);
 			(void)rc;
+			/*
+			 * The worker's Lua stack is empty before the handler
+			 * call. The error is already in the fiber's diag, so
+			 * discard all values left by the call and conversion.
+			 */
+			lua_settop(L, 0);
 			iostream_close(&transport->io);
 		}
 		if (fiber_is_cancelled())
