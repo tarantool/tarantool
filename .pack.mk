@@ -27,6 +27,8 @@ package: prepare
 	if [ "${OS}" = "alpine" ]; then \
 		if [ -n "${GIT_TAG}" ]; then \
 			export VERSION="$$(echo ${GIT_TAG} | sed 's/-/_/' | sed 's/entrypoint/alpha0/')"; \
+		elif [ "$(words $(subst -, ,${GIT_DESCRIBE}))" = 3 ]; then \
+			export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX})_alpha"; \
 		else \
 			RELEASE="$(word 1, $(subst -, ,${GIT_DESCRIBE}))"; \
 			TYPE="$(word 2, $(subst -, ,${GIT_DESCRIBE}))"; \
