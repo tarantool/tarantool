@@ -196,6 +196,11 @@ int
 xrow_decode(struct xrow_header *header, const char **pos,
 	    const char *end, bool end_is_exact);
 
+/** Decode IPROTO_AUDIT_CONTEXT from an IPROTO request body. */
+int
+xrow_decode_audit_context(const struct xrow_header *row,
+			  const char **audit_context);
+
 /**
  * DML request.
  */
@@ -275,6 +280,8 @@ struct request {
 	const char *end_key;
 	/** End of @end_key. */
 	const char *end_key_end;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -345,6 +352,8 @@ struct id_request {
 	const char *auth_type;
 	/** Length of auth_type. */
 	uint32_t auth_type_len;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -489,6 +498,8 @@ struct call_request {
 	const char *tuple_formats;
 	/** End of tuple formats of CALL/EVAL parameters. */
 	const char *tuple_formats_end;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -514,6 +525,8 @@ struct watch_request {
 	const char *data;
 	/** End of the data. */
 	const char *data_end;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -543,6 +556,8 @@ struct auth_request {
 	const char *user_name;
 	/** Auth scramble. @sa scramble.h */
 	const char *scramble;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -985,6 +1000,8 @@ struct sql_request {
 	const char *bind;
 	/** ID of prepared statement. In this case @sql_text == NULL. */
 	const char *stmt_id;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -1134,6 +1151,8 @@ struct begin_request {
 	 * is_sync that determines the synchronism of transactions.
 	 */
 	bool is_sync;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**
@@ -1155,6 +1174,8 @@ struct commit_request {
 	 * is_sync that determines the synchronism of transactions.
 	 */
 	bool is_sync;
+	/** Opaque audit context (MP_STR) from the request body, if any. */
+	const char *audit_context;
 };
 
 /**

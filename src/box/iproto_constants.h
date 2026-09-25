@@ -243,6 +243,12 @@ extern const char *iproto_flag_bit_strs[];
 	  * true and CHECKPOINT_VCLOCK to be set.
 	  */								\
 	 _(CHECKPOINT_LSN, 0x64, MP_UINT)				\
+	 /**
+	  * An opaque audit context propagated to all child
+	  * requests and fibers, and printed in the audit log. Tarantool
+	  * does not parse, validate or modify the value.
+	  */								\
+	 _(AUDIT_CONTEXT, 0x65, MP_STR)					\
 
 #define IPROTO_KEY_MEMBER(s, v, ...) IPROTO_ ## s = v,
 

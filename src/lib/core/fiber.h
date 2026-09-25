@@ -578,6 +578,19 @@ box_region_truncate(size_t size);
 /** \endcond public */
 
 /**
+ * Set the opaque audit context propagated to all child fibers and IPROTO
+ * requests spawned by the fiber. The context is copied, any previously set
+ * context is released. Pass NULL to reset the context.
+ */
+API_EXPORT void
+fiber_set_audit_context(struct fiber *f, const char *ctx, const char *ctx_end);
+
+/** Get the audit context of the fiber, if any. */
+API_EXPORT void
+fiber_get_audit_context(struct fiber *f, const char **ctx,
+			const char **ctx_end);
+
+/**
  * Fiber attribute container
  */
 struct fiber_attr {
@@ -762,6 +775,16 @@ struct fiber {
 		struct {
 			uint64_t sync;
 		} net;
+		/**
+		 * Context propagated to all child fibers and IPROTO
+		 * requests spawned while this fiber is running.
+		 */
+		struct {
+			/** An opaque audit context, if any. */
+			const char *audit_context;
+			/** End of `audit_context`. */
+			const char *audit_context_end;
+		} propagation_context;
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;

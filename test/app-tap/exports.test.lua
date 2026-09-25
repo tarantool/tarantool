@@ -30,6 +30,8 @@ local check_symbols = {
     'cord_ibuf_put',
     'cord_ibuf_take',
     'random_bytes',
+    'fiber_get_audit_context',
+    'fiber_set_audit_context',
     'fiber_time',
     'ibuf_create',
     'ibuf_destroy',

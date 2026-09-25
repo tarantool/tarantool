@@ -251,6 +251,7 @@ fiber_cond_wait
 fiber_cond_wait_timeout
 fiber_csw
 fiber_find
+fiber_get_audit_context
 fiber_get_ctx
 fiber_id
 fiber_is_cancelled
@@ -261,6 +262,7 @@ fiber_new
 fiber_new_ex
 fiber_reschedule
 fiber_self
+fiber_set_audit_context
 fiber_set_cancellable
 fiber_set_ctx
 fiber_set_joinable

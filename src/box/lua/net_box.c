@@ -695,6 +695,34 @@ netbox_end_encode(struct mpstream *stream, size_t initial_size)
 }
 
 /**
+ * Number of extra body-map entries contributed by the propagated context of
+ * the current fiber (0 or 1).
+ */
+static inline uint32_t
+netbox_propagated_context_map_size(void)
+{
+	const char *ctx, *ctx_end;
+	fiber_get_audit_context(fiber(), &ctx, &ctx_end);
+	return ctx != NULL ? 1 : 0;
+}
+
+/**
+ * Append the propagated audit context (if any) to the request body as the
+ * IPROTO_AUDIT_CONTEXT key. Its slot must be accounted for in the body map
+ * size (see netbox_propagated_context_map_size()).
+ */
+static inline void
+netbox_encode_propagated_context(struct mpstream *stream)
+{
+	const char *ctx, *ctx_end;
+	fiber_get_audit_context(fiber(), &ctx, &ctx_end);
+	if (ctx == NULL)
+		return;
+	mpstream_encode_uint(stream, IPROTO_AUDIT_CONTEXT);
+	mpstream_encode_strn(stream, ctx, ctx_end - ctx);
+}
+
+/**
  * Encode an `IPROTO_PING` request and write it to the provided MsgPack stream.
  */
 static int
@@ -704,6 +732,11 @@ netbox_encode_ping(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	(void)idx;
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_PING,
 					 ctx->thread_id, ctx->stream_id);
+	uint32_t map_size = netbox_propagated_context_map_size();
+	if (map_size != 0) {
+		mpstream_encode_map(ctx->stream, map_size);
+		netbox_encode_propagated_context(ctx->stream);
+	}
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -737,7 +770,8 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_ID,
 					 XROW_THREAD_UNSPEC, /*stream_id=*/0);
 
-	mpstream_encode_map(&stream, 2);
+	mpstream_encode_map(&stream,
+			    2 + netbox_propagated_context_map_size());
 	mpstream_encode_uint(&stream, IPROTO_VERSION);
 	mpstream_encode_uint(&stream, NETBOX_IPROTO_VERSION);
 	mpstream_encode_uint(&stream, IPROTO_FEATURES);
@@ -746,6 +780,7 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 	mp_encode_iproto_features(data, &features);
 	mpstream_advance(&stream, size);
 
+	netbox_encode_propagated_context(&stream);
 	netbox_end_encode(&stream, svp);
 }
 
@@ -772,13 +807,15 @@ netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_AUTH,
 					 XROW_THREAD_UNSPEC, /*stream_id=*/0);
-	mpstream_encode_map(&stream, 2);
+	mpstream_encode_map(&stream,
+			    2 + netbox_propagated_context_map_size());
 	mpstream_encode_uint(&stream, IPROTO_USER_NAME);
 	mpstream_encode_strn(&stream, user, strlen(user));
 	mpstream_encode_uint(&stream, IPROTO_TUPLE);
 	mpstream_encode_array(&stream, 2);
 	mpstream_encode_str(&stream, method->name);
 	mpstream_memcpy(&stream, auth_request, auth_request_end - auth_request);
+	netbox_encode_propagated_context(&stream);
 	netbox_end_encode(&stream, svp);
 	region_truncate(region, region_svp);
 }
@@ -796,13 +833,15 @@ netbox_encode_select_all(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_SELECT,
 					 XROW_THREAD_UNSPEC, /*stream_id=*/0);
-	mpstream_encode_map(&stream, 3);
+	mpstream_encode_map(&stream,
+			    3 + netbox_propagated_context_map_size());
 	mpstream_encode_uint(&stream, IPROTO_SPACE_ID);
 	mpstream_encode_uint(&stream, space_id);
 	mpstream_encode_uint(&stream, IPROTO_LIMIT);
 	mpstream_encode_uint(&stream, UINT32_MAX);
 	mpstream_encode_uint(&stream, IPROTO_KEY);
 	mpstream_encode_array(&stream, 0);
+	netbox_encode_propagated_context(&stream);
 	netbox_end_encode(&stream, svp);
 }
 
@@ -838,7 +877,8 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_CALL,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 3);
+	mpstream_encode_map(ctx->stream,
+			    3 + netbox_propagated_context_map_size());
 
 	/* encode proc name */
 	size_t name_len;
@@ -850,6 +890,7 @@ netbox_encode_call(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 					    ctx->box_tuple_arg_as_ext) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -864,7 +905,8 @@ netbox_encode_eval(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_EVAL,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 3);
+	mpstream_encode_map(ctx->stream,
+			    3 + netbox_propagated_context_map_size());
 
 	/* encode expr */
 	size_t expr_len;
@@ -876,6 +918,7 @@ netbox_encode_eval(lua_State *L, int idx, struct netbox_method_encode_ctx *ctx)
 					    ctx->box_tuple_arg_as_ext) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -929,7 +972,7 @@ netbox_encode_select(lua_State *L, int idx,
 	 */
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_SELECT,
 					 ctx->thread_id, ctx->stream_id);
-	uint32_t map_size = 6;
+	uint32_t map_size = 6 + netbox_propagated_context_map_size();
 
 	bool have_after = !lua_isnil(L, idx + 6);
 	if (have_after)
@@ -986,6 +1029,7 @@ netbox_encode_select(lua_State *L, int idx,
 		mpstream_encode_bool(ctx->stream, fetch_pos);
 	}
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -999,7 +1043,8 @@ netbox_encode_insert_or_replace(lua_State *L, int idx, struct mpstream *stream,
 	size_t svp = netbox_begin_encode(stream, sync, type,
 					 thread_id, stream_id);
 
-	mpstream_encode_map(stream, 2);
+	mpstream_encode_map(stream,
+			    2 + netbox_propagated_context_map_size());
 
 	netbox_encode_space_id_or_name(L, idx, stream);
 
@@ -1008,6 +1053,7 @@ netbox_encode_insert_or_replace(lua_State *L, int idx, struct mpstream *stream,
 	if (luamp_encode_tuple(L, cfg, stream, idx + 1) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(stream);
 	netbox_end_encode(stream, svp);
 	return 0;
 }
@@ -1038,7 +1084,8 @@ netbox_encode_delete(lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_DELETE,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 3);
+	mpstream_encode_map(ctx->stream,
+			    3 + netbox_propagated_context_map_size());
 
 	netbox_encode_space_id_or_name(L, idx, ctx->stream);
 
@@ -1049,6 +1096,7 @@ netbox_encode_delete(lua_State *L, int idx,
 	if (luamp_convert_key(L, cfg, ctx->stream, idx + 2) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1065,7 +1113,8 @@ netbox_encode_update(lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_UPDATE,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 5);
+	mpstream_encode_map(ctx->stream,
+			    5 + netbox_propagated_context_map_size());
 
 	netbox_encode_space_id_or_name(L, idx, ctx->stream);
 
@@ -1085,6 +1134,7 @@ netbox_encode_update(lua_State *L, int idx,
 	if (luamp_encode_tuple(L, cfg, ctx->stream, idx + 3) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1101,7 +1151,8 @@ netbox_encode_upsert(lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_UPSERT,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 4);
+	mpstream_encode_map(ctx->stream,
+			    4 + netbox_propagated_context_map_size());
 
 	netbox_encode_space_id_or_name(L, idx, ctx->stream);
 
@@ -1119,6 +1170,7 @@ netbox_encode_upsert(lua_State *L, int idx,
 	if (luamp_encode_tuple(L, cfg, ctx->stream, idx + 2) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1326,7 +1378,8 @@ netbox_encode_execute(lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_EXECUTE,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 3);
+	mpstream_encode_map(ctx->stream,
+			    3 + netbox_propagated_context_map_size());
 
 	if (lua_type(L, idx) == LUA_TNUMBER) {
 		uint32_t query_id = lua_tointeger(L, idx);
@@ -1347,6 +1400,7 @@ netbox_encode_execute(lua_State *L, int idx,
 	if (luamp_encode_tuple(L, cfg, ctx->stream, idx + 2) != 0)
 		return -1;
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1363,7 +1417,8 @@ netbox_encode_prepare(lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_PREPARE,
 					 ctx->thread_id, ctx->stream_id);
 
-	mpstream_encode_map(ctx->stream, 1);
+	mpstream_encode_map(ctx->stream,
+			    1 + netbox_propagated_context_map_size());
 
 	if (lua_type(L, idx) == LUA_TNUMBER) {
 		uint32_t query_id = lua_tointeger(L, idx);
@@ -1376,6 +1431,7 @@ netbox_encode_prepare(lua_State *L, int idx,
 		mpstream_encode_strn(ctx->stream, query, len);
 	};
 
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1400,12 +1456,12 @@ netbox_encode_begin(struct lua_State *L, int idx,
 	bool has_timeout = !lua_isnoneornil(L, idx);
 	bool has_txn_isolation = !lua_isnoneornil(L, idx + 1);
 	bool has_is_sync = !lua_isnoneornil(L, idx + 2);
-	if (has_timeout || has_txn_isolation || has_is_sync) {
-		uint32_t map_size = (has_timeout ? 1 : 0) +
-				    (has_txn_isolation ? 1 : 0) +
-				    (has_is_sync ? 1 : 0);
+	uint32_t map_size = (has_timeout ? 1 : 0) +
+			    (has_txn_isolation ? 1 : 0) +
+			    (has_is_sync ? 1 : 0) +
+			    netbox_propagated_context_map_size();
+	if (map_size != 0)
 		mpstream_encode_map(ctx->stream, map_size);
-	}
 	if (has_timeout) {
 		assert(lua_type(L, idx) == LUA_TNUMBER);
 		double timeout = lua_tonumber(L, idx);
@@ -1425,6 +1481,7 @@ netbox_encode_begin(struct lua_State *L, int idx,
 			mpstream_encode_bool(ctx->stream, is_sync);
 		}
 	}
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1436,15 +1493,18 @@ netbox_encode_commit(struct lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync, IPROTO_COMMIT,
 					 ctx->thread_id, ctx->stream_id);
 	bool has_is_sync = !lua_isnoneornil(L, idx);
-	if (has_is_sync) {
-		uint32_t map_size = 1;
+	uint32_t map_size = (has_is_sync ? 1 : 0) +
+			    netbox_propagated_context_map_size();
+	if (map_size != 0)
 		mpstream_encode_map(ctx->stream, map_size);
+	if (has_is_sync) {
 		if (lua_type(L, idx) == LUA_TBOOLEAN) {
 			bool is_sync = lua_toboolean(L, idx);
 			mpstream_encode_uint(ctx->stream, IPROTO_IS_SYNC);
 			mpstream_encode_bool(ctx->stream, is_sync);
 		}
 	}
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1458,6 +1518,11 @@ netbox_encode_rollback(struct lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync,
 					 IPROTO_ROLLBACK,
 					 ctx->thread_id, ctx->stream_id);
+	uint32_t map_size = netbox_propagated_context_map_size();
+	if (map_size != 0) {
+		mpstream_encode_map(ctx->stream, map_size);
+		netbox_encode_propagated_context(ctx->stream);
+	}
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
@@ -1475,9 +1540,11 @@ netbox_encode_watch_once(struct lua_State *L, int idx,
 	size_t svp = netbox_begin_encode(ctx->stream, ctx->sync,
 					 IPROTO_WATCH_ONCE,
 					 ctx->thread_id, ctx->stream_id);
-	mpstream_encode_map(ctx->stream, 1);
+	mpstream_encode_map(ctx->stream,
+			    1 + netbox_propagated_context_map_size());
 	mpstream_encode_uint(ctx->stream, IPROTO_EVENT_KEY);
 	mpstream_encode_strn(ctx->stream, key, key_len);
+	netbox_encode_propagated_context(ctx->stream);
 	netbox_end_encode(ctx->stream, svp);
 	return 0;
 }
