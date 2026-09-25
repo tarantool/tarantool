@@ -28,6 +28,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * AI review test block B, line 1.
+ * AI review test block B, line 2.
+ */
+/*
+ * AI review test block A, line 1.
+ * AI review test block A, line 3.
+ * AI review test block A, line 4, edited in a later commit.
+ */
 #include "box/box.h"
 
 #include "trivia/config.h"
@@ -114,7 +123,6 @@ static char status[64] = "unconfigured";
 /**
  * Storage for WAL vclock. Not in-memory but specifically for what is the
  * vclock of the end of WAL.
- *
  * It is encapsulated inside this file to protect it from any illegal changes
  * by outside code.
  */
