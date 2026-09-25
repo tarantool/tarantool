@@ -2060,14 +2060,6 @@ sqlExpirePreparedStatements(void)
 		p->expired = p->is_sandboxed == 0 ? 1 : 0;
 }
 
-const struct Mem *
-vdbe_get_bound_value(struct Vdbe *vdbe, int id)
-{
-	if (vdbe == NULL || id < 0 || id >= vdbe->nVar)
-		return NULL;
-	return &vdbe->aVar[id];
-}
-
 void
 sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the record format */
 			       const void *pKey,	/* The binary record */
