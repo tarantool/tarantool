@@ -282,8 +282,6 @@ void sqlVdbeSwap(Vdbe *, Vdbe *);
 struct VdbeOp *
 sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp);
 
-char *sqlVdbeExpandSql(Vdbe *, const char *);
-
 /**
  * Perform unpacking of provided message pack.
  *
