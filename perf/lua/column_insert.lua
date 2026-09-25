@@ -18,6 +18,9 @@ local benchmark = require('benchmark')
 local USAGE = [[
    engine <string, 'memtx'>          - space engine to use for the test
    wal_mode <string, 'write'>        - write-ahead log mode to use for the test
+   insert_mode <string, 'seq'>       -
+     * seq - the tuples/batches are inserted in sequential order;
+     * rand - the tuples/batches are in random order.
    sparse_mode <string, 'rand'>      -
      * seq - the first 10% (column_count_batch / column_count_total) columns are
              filled in sequential order;
@@ -37,6 +40,7 @@ local USAGE = [[
 local params = benchmark.argparse(arg, {
     {'engine', 'string'},
     {'wal_mode', 'string'},
+    {'insert_mode', 'string'},
     {'sparse_mode', 'string'},
     {'column_count_total', 'number'},
     {'column_count_batch', 'number'},
@@ -49,6 +53,7 @@ local params = benchmark.argparse(arg, {
 
 local DEFAULT_ENGINE = 'memtx'
 local DEFAULT_WAL_MODE = 'write'
+local DEFAULT_INSERT_MODE = 'seq'
 local DEFAULT_SPARSE_MODE = 'rand'
 local DEFAULT_COLUMN_COUNT_TOTAL = 1000
 local DEFAULT_COLUMN_COUNT_BATCH = 100
@@ -58,6 +63,7 @@ local DEFAULT_SECONDARY_COVERS = 0
 
 params.engine = params.engine or DEFAULT_ENGINE
 params.wal_mode = params.wal_mode or DEFAULT_WAL_MODE
+params.insert_mode = params.insert_mode or DEFAULT_INSERT_MODE
 params.sparse_mode = params.sparse_mode or DEFAULT_SPARSE_MODE
 params.column_count_total = params.column_count_total or
                             DEFAULT_COLUMN_COUNT_TOTAL

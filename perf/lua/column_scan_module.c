@@ -1,3 +1,5 @@
+#include "benchmark_helpers.h"
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <module.h>
@@ -189,7 +191,7 @@ arrow_array_fill_int(struct ArrowArray *array, int column_count, int row_count,
 			int val = row_offset + j + 1;
 			if (i % 2 == 1)
 				val = total_row_count - val + 1;
-			assert(val > 0);
+			BUG_ON(val <= 0);
 			data[j] = (uint64_t)val;
 		}
 		array->children[i]->buffers[1] = data;
