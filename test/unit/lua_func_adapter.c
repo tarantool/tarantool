@@ -683,10 +683,48 @@ test_lua_args_on_fiber_stack(void)
 	check_plan();
 }
 
+static void
+test_stack_cleanup(const char *function, struct port *ret, int expected_rc)
+{
+	plan(2);
+	header();
+
+	struct lua_State *L = tarantool_L;
+	int idx = generate_function(function);
+	struct func_adapter *func = func_adapter_lua_create(L, idx);
+	fiber()->storage.lua.stack = L;
+	int top = lua_gettop(L);
+	is(func_adapter_call(func, NULL, ret), expected_rc,
+	   "Call returns the expected status");
+	is(lua_gettop(L), top, "%s preserves the stack height", function);
+
+	func_adapter_destroy(func);
+	lua_settop(L, 0);
+	fiber()->storage.lua.stack = NULL;
+	diag_clear(diag_get());
+
+	footer();
+	check_plan();
+}
+
+static void
+test_lua_stack_cleanup(void)
+{
+	plan(2);
+	header();
+
+	struct port ret;
+	test_stack_cleanup("function() error({}) end", &ret, -1);
+	test_stack_cleanup("function() return {} end", NULL, 0);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_lua_func_adapter(void)
 {
-	plan(13);
+	plan(14);
 	header();
 
 	test_numeric();
@@ -702,6 +740,7 @@ test_lua_func_adapter(void)
 	test_iterator_error();
 	test_translation();
 	test_lua_args_on_fiber_stack();
+	test_lua_stack_cleanup();
 
 	footer();
 	return check_plan();
