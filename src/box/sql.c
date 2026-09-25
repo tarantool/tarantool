@@ -858,7 +858,7 @@ key_alloc(BtCursor *cur, size_t key_size)
 	return 0;
 }
 
-/*
+/*sql_stmt_compile
  * Create new Tarantool iterator and set it to the first entry found by
  * given key. If cursor already contains iterator, it will be freed.
  *
@@ -1796,7 +1796,7 @@ sql_field_ck_by_token(const struct space *space, uint32_t fieldno,
 int
 sql_fuzz(const char *sql)
 {
-	struct Vdbe *stmt = sql_stmt_compile(sql, NULL);
+	struct Vdbe *stmt = sql_stmt_compile(sql);
 	if (stmt == NULL)
 		return -1;
 	return sqlVdbeFinalize(stmt);
