@@ -73,11 +73,6 @@ src_list_from_ast(struct Parse *parser, struct ast_source_list *list)
 					       src->disallow_scan);
 		if (src->indexed_by.n != 0)
 			sqlSrcListIndexedBy(res, &src->indexed_by);
-		if (src->is_tab_func) {
-			struct ExprList *func_args =
-				expr_list_from_ast(parser, src->func_args);
-			sqlSrcListFuncArgs(res, func_args);
-		}
 		res->a[res->nSrc - 1].fg.jointype = src->join_type;
 		if ((src->join_type & JT_INNER) != 0 &&
 		    (src->join_type & JT_OUTER) != 0) {
@@ -432,6 +427,78 @@ expr_unary(struct Parse *parser, struct ast_expr *expr)
 }
 
 /**
+ * Build a `struct Expr` for unary minus. A unary minus applied to a numeric
+ * literal is folded into a single signed literal, so the sign is resolved once
+ * here rather than lazily at opcode creation.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_uminus(struct Parse *parser, struct ast_expr *expr)
+{
+	struct Expr *left = expr_from_ast(parser, expr->left);
+	if (parser->is_aborted)
+		return NULL;
+	if (left->op == TK_DECIMAL) {
+		decimal_minus(left->v.d, left->v.d);
+		return left;
+	}
+	if (left->op == TK_FLOAT) {
+		left->v.f = -left->v.f;
+		return left;
+	}
+	if (left->op == TK_INTEGER) {
+		if ((left->flags & EP_Negative) != 0) {
+			/* Compute -u in unsigned to avoid signed overflow. */
+			left->v.u = ~left->v.u + 1;
+			left->flags &= ~EP_Negative;
+			return left;
+		}
+		if (left->v.u == 0)
+			return left;
+		int64_t value;
+		if (sql_neg_uint(&value, left->v.u) != 0) {
+			parser->is_aborted = true;
+			sql_expr_delete(left);
+			return NULL;
+		}
+		left->v.u = (uint64_t)value;
+		left->flags |= EP_Negative;
+		return left;
+	}
+	struct Expr *res = sqlPExpr(parser, TK_UMINUS, left, NULL);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
+	return res;
+}
+
+/**
+ * Build a `struct Expr` for unary plus. A unary plus applied to a numeric
+ * literal is a no-op, so it is folded away and the literal is returned as is.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_uplus(struct Parse *parser, struct ast_expr *expr)
+{
+	struct Expr *left = expr_from_ast(parser, expr->left);
+	if (parser->is_aborted)
+		return NULL;
+	if (left->op == TK_DECIMAL || left->op == TK_FLOAT)
+		return left;
+	if (left->op == TK_INTEGER)
+		return left;
+	struct Expr *res = sqlPExpr(parser, TK_UPLUS, left, NULL);
+	if (parser->is_aborted) {
+		sql_expr_delete(res);
+		return NULL;
+	}
+	return res;
+}
+
+/**
  * Build a `struct Expr` for a binary operator applied to left and right.
  *
  * Return NULL on error.
@@ -620,6 +687,104 @@ expr_getitem(struct Parse *parser, struct ast_expr *expr)
 	return res;
 }
 
+/**
+ * Build a `struct Expr` for a VARBINARY value.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_varbinary(struct ast_expr *expr)
+{
+	assert(expr->op == TK_BLOB);
+	assert(expr->str[0] == 'x' || expr->str[0] == 'X');
+	assert(expr->str[1] == '\'' && expr->str[expr->len - 1] == '\'');
+	assert(expr->len > 2 && expr->len % 2 == 1);
+
+	uint32_t len = (expr->len - 3) / 2;
+	struct Expr *res = sql_expr_new_empty(expr->op, len);
+	res->type = FIELD_TYPE_VARBINARY;
+	res->flags |= EP_Leaf;
+	res->v.n = len;
+	res->v.z = (char *)&res[1];
+	for (uint32_t i = 0; i < len; ++i) {
+		res->v.z[i] = (sqlHexToInt(expr->str[2 + i * 2]) << 4 |
+			       sqlHexToInt(expr->str[3 + i * 2]));
+	}
+	return res;
+}
+
+/**
+ * Build a `struct Expr` for an INTEGER value.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_integer(struct Parse *parser, struct ast_expr *expr)
+{
+	uint32_t used = region_used(&parser->region);
+	char *str = xregion_alloc(&parser->region, expr->len + 1);
+	memcpy(str, expr->str, expr->len);
+	str[expr->len] = '\0';
+
+	struct Expr *res = sql_expr_new_empty(expr->op, 0);
+	res->type = FIELD_TYPE_INTEGER;
+	res->flags |= EP_Leaf;
+	if (sql_uint_from_str(&res->v.u, str) != 0) {
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
+	}
+
+	region_truncate(&parser->region, used);
+	return res;
+}
+
+/**
+ * Build a `struct Expr` for a DECIMAL value.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_decimal(struct Parse *parser, struct ast_expr *expr)
+{
+	uint32_t used = region_used(&parser->region);
+	char *str = xregion_alloc(&parser->region, expr->len + 1);
+	memcpy(str, expr->str, expr->len);
+	str[expr->len] = '\0';
+
+	struct Expr *res = sql_expr_new_empty(expr->op, sizeof(decimal_t));
+	res->type = FIELD_TYPE_DECIMAL;
+	res->flags |= EP_Leaf;
+	res->v.d = (decimal_t *)&res[1];
+	if (sql_dec_from_str(res->v.d, str) != 0) {
+		parser->is_aborted = true;
+		sql_expr_delete(res);
+		return NULL;
+	}
+
+	region_truncate(&parser->region, used);
+	return res;
+}
+
+/**
+ * Build a `struct Expr` for a COLLATE.
+ *
+ * Return NULL on error.
+ */
+static struct Expr *
+expr_collate(struct Parse *parser, struct ast_expr *expr)
+{
+	uint32_t id;
+	if (sql_coll_id(&id, expr->right->str, expr->right->len) != 0) {
+		parser->is_aborted = true;
+		return NULL;
+	}
+	struct Expr *left = expr_from_ast(parser, expr->left);
+	if (parser->is_aborted)
+		return NULL;
+	return sql_expr_new_collate(left, id);
+}
+
 struct Expr *
 expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 {
@@ -628,24 +793,37 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 	struct Expr *res = NULL;
 	switch (expr->op) {
 	case TK_STRING:
-		res = expr_leaf(expr, FIELD_TYPE_STRING);
+		res = sql_expr_new_string(expr->str, expr->len);
+		res->v.len = sql_dequote(res->v.s, expr->len);
+		res->v.s[res->v.len] = '\0';
 		break;
 	case TK_BLOB:
-		res = expr_leaf(expr, FIELD_TYPE_VARBINARY);
+		res = expr_varbinary(expr);
 		break;
 	case TK_INTEGER:
-		res = expr_leaf(expr, FIELD_TYPE_INTEGER);
+		res = expr_integer(parser, expr);
 		break;
 	case TK_FLOAT:
-		res = expr_leaf(expr, FIELD_TYPE_DOUBLE);
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_DOUBLE;
+		res->flags |= EP_Leaf;
+		sqlAtoF(expr->str, &res->v.f, expr->len);
 		break;
 	case TK_DECIMAL:
-		res = expr_leaf(expr, FIELD_TYPE_DECIMAL);
+		res = expr_decimal(parser, expr);
 		break;
 	case TK_TRUE:
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_BOOLEAN;
+		res->flags |= EP_Leaf;
+		res->v.b = true;
+		break;
 	case TK_FALSE:
 	case TK_UNKNOWN:
-		res = expr_leaf(expr, FIELD_TYPE_BOOLEAN);
+		res = sql_expr_new_empty(expr->op, 0);
+		res->type = FIELD_TYPE_BOOLEAN;
+		res->flags |= EP_Leaf;
+		assert(!res->v.b);
 		break;
 	case TK_VAR_ANON:
 	case TK_VAR_NUM:
@@ -679,11 +857,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_from_ast(parser, expr);
 		break;
 	case TK_COLLATE:
-		res = expr_id(expr->right);
-		assert(res != NULL);
-		res->op = TK_COLLATE;
-		res->flags |= EP_Collate | EP_Skip;
-		res->pLeft = expr_from_ast(parser, expr->left);
+		res = expr_collate(parser, expr);
 		break;
 	case TK_CAST:
 		res = expr_unary(parser, expr);
@@ -693,11 +867,15 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		break;
 	case TK_NOT:
 	case TK_BITNOT:
-	case TK_UMINUS:
-	case TK_UPLUS:
 	case TK_NOTNULL:
 	case TK_ISNULL:
 		res = expr_unary(parser, expr);
+		break;
+	case TK_UPLUS:
+		res = expr_uplus(parser, expr);
+		break;
+	case TK_UMINUS:
+		res = expr_uminus(parser, expr);
 		break;
 	case TK_ARRAY:
 		res = expr_list(parser, expr, FIELD_TYPE_ARRAY);
@@ -730,10 +908,14 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		break;
 	}
 	case TK_RAISE:
-		if (expr->on_conflict_action != ON_CONFLICT_ACTION_IGNORE)
-			res = expr_leaf(expr->left, FIELD_TYPE_STRING);
-		else
+		if (expr->on_conflict_action != ON_CONFLICT_ACTION_IGNORE) {
+			struct ast_expr *msg = expr->left;
+			res = sql_expr_new_string(msg->str, msg->len);
+			res->v.len = sql_dequote(res->v.s, msg->len);
+			res->v.s[res->v.len] = '\0';
+		} else {
 			res = sql_expr_new_anon(expr->op);
+		}
 		res->op = TK_RAISE;
 		res->on_conflict_action = expr->on_conflict_action;
 		break;

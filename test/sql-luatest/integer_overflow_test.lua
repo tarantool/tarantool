@@ -104,3 +104,49 @@ g.test_3810_integers_in_range = function(cg)
         box.space.t:drop()
     end)
 end
+
+--
+-- Make sure the unary minus applied to the integer literal 0 yields an
+-- unsigned zero. An INTEGER value is required to be negative, so a zero
+-- built as a negative INTEGER used to break the result encoding.
+--
+g.test_uminus_of_zero = function(cg)
+    cg.server:exec(function()
+        local res = box.execute('SELECT -0, -(0);')
+        t.assert_equals(res.rows, {{0, 0}})
+        res = box.execute('SELECT typeof(-0), typeof(-(0));')
+        t.assert_equals(res.rows, {{'integer', 'integer'}})
+    end)
+end
+
+--
+-- A unary minus applied to an integer literal is folded into a single signed
+-- integer literal. Make sure the folded value keeps its sign across the edge
+-- cases: INT64_MIN, nested minus, out-of-range magnitude, and that a negative
+-- literal is not confused with the unsigned literal sharing its bit pattern.
+--
+g.test_uminus_literal_fold = function(cg)
+    cg.server:exec(function()
+        local res = box.execute('SELECT -5, - -5, -(-5);')
+        t.assert_equals(res.rows, {{-5, 5, 5}})
+
+        -- Unary plus on an integer literal is a no-op and folds away.
+        res = box.execute('SELECT +5, +-5, -+5;')
+        t.assert_equals(res.rows, {{5, -5, -5}})
+
+        res = box.execute('SELECT -9223372036854775808;')
+        t.assert_equals(res.rows, {{-9223372036854775807LL - 1}})
+        res = box.execute('SELECT - -9223372036854775808;')
+        t.assert_equals(res.rows, {{9223372036854775808ULL}})
+
+        -- -1 and its unsigned bit-pattern twin must not compare equal.
+        res = box.execute('SELECT -1 = 18446744073709551615;')
+        t.assert_equals(res.rows, {{false}})
+
+        local _, err = box.execute('SELECT -9223372036854775809;')
+        local exp_err = "Integer literal -9223372036854775809 exceeds the " ..
+                        "supported range [-9223372036854775808, " ..
+                        "18446744073709551615]"
+        t.assert_equals(err.message, exp_err)
+    end)
+end

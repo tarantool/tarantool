@@ -320,11 +320,7 @@ struct WhereClause {
 	int nTerm;		/* Number of terms */
 	int nSlot;		/* Number of entries in a[] */
 	WhereTerm *a;		/* Each a[] describes a term of the WHERE cluase */
-#if defined(SQL_SMALL_STACK)
-	WhereTerm aStatic[1];	/* Initial static space for a[] */
-#else
 	WhereTerm aStatic[8];	/* Initial static space for a[] */
-#endif
 };
 
 /*
@@ -467,7 +463,6 @@ void sqlWhereSplit(WhereClause *, Expr *, u8);
 Bitmask sqlWhereExprUsage(WhereMaskSet *, Expr *);
 Bitmask sqlWhereExprListUsage(WhereMaskSet *, ExprList *);
 void sqlWhereExprAnalyze(SrcList *, WhereClause *);
-void sqlWhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
 
 /*
  * Bitmasks for the operators on WhereTerm objects.  These are all

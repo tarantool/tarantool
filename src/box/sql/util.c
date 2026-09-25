@@ -74,47 +74,37 @@ sqlStrlen30(const char *z)
 	return 0x3fffffff & (unsigned)strlen(z);
 }
 
-/*
- * Convert an SQL-style quoted string into a normal string by removing
- * the quote characters.  The conversion is done in-place.  If the
- * input does not begin with a quote character, then this routine
- * is a no-op.
- *
- * The input string must be zero-terminated. The resulting dequoted
- * string will also be zero-terminated.
- *
- * The return value is -1 if no dequoting occurs or the length of the
- * dequoted string, exclusive of the zero terminator, if dequoting does
- * occur.
- *
- * 2002-Feb-14: This routine is extended to remove MS-Access style
- * brackets from around identifiers.  For example:  "[a-b-c]" becomes
- * "a-b-c".
- */
-void
-sqlDequote(char *z)
+uint32_t
+sql_dequote(char *str, uint32_t size)
 {
-	char quote;
-	int i, j;
-	if (z == 0)
-		return;
-	quote = z[0];
-	if (!sqlIsquote(quote))
-		return;
-	for (i = 1, j = 0;; i++) {
-		if (z[i] == quote) {
-			if (z[i + 1] == quote) {
-				z[j++] = quote;
+	if (size == 0)
+		return 0;
+
+	char quote = str[0];
+	if (sqlIsquote(quote) == 0)
+		return size;
+
+	uint32_t len = 0;
+	for (uint32_t i = 1; i < size; i++) {
+		if (str[i] == quote) {
+			if (i + 1 < size && str[i + 1] == quote) {
+				str[len++] = quote;
 				i++;
 			}
-		} else if (z[i] == 0) {
-			z[j] = 0;
-			return;
 		} else {
-			z[j++] = z[i];
+			str[len++] = str[i];
 		}
-		assert(z[i] != 0);
 	}
+	return len;
+}
+
+void
+sqlDequote(char *str)
+{
+	if (str == NULL)
+		return;
+	uint32_t len = sql_dequote(str, strlen(str));
+	str[len] = '\0';
 }
 
 char *
@@ -776,20 +766,6 @@ sqlHexToInt(int h)
 	return (u8) (h & 0xf);
 }
 
-void *
-sqlHexToBlob(const char *z, int n)
-{
-	char *zBlob;
-	int i;
-
-	zBlob = sql_xmalloc(n / 2 + 1);
-	n--;
-	for (i = 0; i < n; i += 2)
-		zBlob[i / 2] = (sqlHexToInt(z[i]) << 4) | sqlHexToInt(z[i + 1]);
-	zBlob[i / 2] = 0;
-	return zBlob;
-}
-
 #if ENABLE_UB_SANITIZER
 /* See https://github.com/tarantool/tarantool/issues/10703. */
 int
@@ -1193,5 +1169,67 @@ sql_legacy_name_new(const char *name, int len)
 	assert(U_SUCCESS(status));
 	assert((size_t)new_len < size);
 	(void)new_len;
+	return res;
+}
+
+int
+sql_dec_from_str(decimal_t *dec, const char *str)
+{
+	if (decimal_from_string(dec, str) == NULL) {
+		diag_set(ClientError, ER_INVALID_DEC, str);
+		return -1;
+	}
+	return 0;
+}
+
+int
+sql_uint_from_str(uint64_t *res, const char *str)
+{
+	assert(strlen(str) > 0);
+	errno = 0;
+	int base = 10;
+	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+		base = 16;
+	*res = strtoull(str, NULL, base);
+	if (errno == 0)
+		return 0;
+	if (base == 16) {
+		diag_set(ClientError, ER_HEX_LITERAL_MAX, str, strlen(str) - 2,
+			 16);
+	} else {
+		diag_set(ClientError, ER_INT_LITERAL_MAX, str);
+	}
+	return -1;
+}
+
+int
+sql_neg_uint(int64_t *res, uint64_t val)
+{
+	if (val < (uint64_t)INT64_MIN) {
+		*res = -(int64_t)val;
+		return 0;
+	} else if (val == (uint64_t)INT64_MIN) {
+		*res = INT64_MIN;
+		return 0;
+	}
+	diag_set(ClientError, ER_INT_LITERAL_MAX,
+		 tt_sprintf("-%llu", (unsigned long long)val));
+	return -1;
+}
+
+char *
+sql_str_to_hex(const char *str, uint32_t len)
+{
+	static const char hexdigits[] = {
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+	};
+	uint32_t size = 2 * len;
+	char *res = sql_xmalloc(size);
+	for (size_t i = 0; i < len; ++i) {
+		char c = str[i];
+		res[2 * i] = hexdigits[(c >> 4) & 0xf];
+		res[2 * i + 1] = hexdigits[c & 0xf];
+	}
 	return res;
 }

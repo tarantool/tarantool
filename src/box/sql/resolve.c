@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "box/schema.h"
+#include "box/coll_id_cache.h"
 
 /*
  * Walk the expression tree pExpr and increase the aggregate function
@@ -110,7 +111,7 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 	if (zType[0] != 'G')
 		incrAggFunctionDepth(pDup, nSubquery);
 	if (pExpr->op == TK_COLLATE)
-		pDup = sqlExprAddCollateString(pDup, pExpr->u.zToken);
+		pDup = sql_expr_new_collate(pDup, pExpr->v.id);
 
 	/* Before calling sql_expr_delete(), set the EP_Static flag. This
 	 * prevents ExprDelete() from deleting the Expr structure itself,
@@ -122,9 +123,15 @@ resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
 	ExprSetProperty(pExpr, EP_Static);
 	sql_expr_delete(pExpr);
 	memcpy(pExpr, pDup, sizeof(*pExpr));
-	if (!ExprHasProperty(pExpr, EP_IntValue) && pExpr->u.zToken != 0) {
+	if (pExpr->u.zToken != NULL) {
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
 		pExpr->u.zToken = sql_xstrdup(pExpr->u.zToken);
+		pExpr->flags |= EP_MemToken;
+	} else if (pExpr->op == TK_STRING || pExpr->op == TK_RAISE) {
+		pExpr->v.s = sql_xstrdup(pExpr->v.s);
+		pExpr->flags |= EP_MemToken;
+	} else if (pExpr->op == TK_BLOB) {
+		pExpr->v.z = sql_xstrndup(pExpr->v.z, pExpr->v.n);
 		pExpr->flags |= EP_MemToken;
 	}
 	sql_xfree(pDup);
@@ -559,12 +566,10 @@ sql_expr_new_column(struct SrcList *src_list, int src_idx, int column)
 static int
 exprProbability(Expr * p)
 {
-	double r = -1.0;
 	if (p->op != TK_FLOAT)
 		return -1;
-	sqlAtoF(p->u.zToken, &r, sqlStrlen30(p->u.zToken));
-	assert(r >= 0.0);
-	if (r > 1.0)
+	double r = p->v.f;
+	if (r < 0.0 || r > 1.0)
 		return -1;
 	return (int)(r * 134217728.0);
 }
@@ -881,7 +886,6 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	pOrderBy = pSelect->pOrderBy;
 	if (pOrderBy == 0)
 		return 0;
-#if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 			 "The number of terms in ORDER BY clause",
@@ -889,7 +893,6 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 		pParse->is_aborted = true;
 		return 1;
 	}
-#endif
 	for (i = 0; i < pOrderBy->nExpr; i++) {
 		pOrderBy->a[i].done = 0;
 	}
@@ -939,8 +942,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 				 */
 				struct Expr *pNew =
 					sql_expr_new_anon(TK_INTEGER);
-				pNew->flags |= EP_IntValue;
-				pNew->u.iValue = iCol;
+				pNew->v.u = iCol;
 				pNew->type = FIELD_TYPE_INTEGER;
 				if (pItem->pExpr == pE) {
 					pItem->pExpr = pNew;
@@ -997,7 +999,6 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 
 	if (pOrderBy == NULL)
 		return 0;
-#if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		const char *err = tt_sprintf("The number of terms in %s BY "\
 					     "clause", zType);
@@ -1006,7 +1007,6 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 		pParse->is_aborted = true;
 		return 1;
 	}
-#endif
 	pEList = pSelect->pEList;
 	assert(pEList != 0);	/* sqlSelectNew() guarantees this */
 	for (i = 0, pItem = pOrderBy->a; i < pOrderBy->nExpr; i++, pItem++) {
@@ -1311,24 +1311,15 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			 * restrict it directly).
 			 */
 			sql_expr_delete(p->pLimit);
-			p->pLimit = sql_expr_new(TK_INTEGER, &sqlIntTokens[1]);
+			p->pLimit = sql_expr_new(TK_INTEGER, NULL);
+			p->pLimit->v.u = 1;
+			p->pLimit->type = FIELD_TYPE_INTEGER;
 		} else {
 			if (sqlResolveExprNames(&sNC, p->pHaving))
 				return WRC_Abort;
 		}
 		if (sqlResolveExprNames(&sNC, p->pWhere))
 			return WRC_Abort;
-
-		/* Resolve names in table-valued-function arguments */
-		for (i = 0; i < p->pSrc->nSrc; i++) {
-			struct SrcList_item *pItem = &p->pSrc->a[i];
-			if (pItem->fg.isTabFunc
-			    && sqlResolveExprListNames(&sNC,
-							   pItem->u1.pFuncArg)
-			    ) {
-				return WRC_Abort;
-			}
-		}
 
 		/* The ORDER BY and GROUP BY clauses may not refer to terms in
 		 * outer queries
@@ -1482,7 +1473,6 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 
 	if (pExpr == 0)
 		return 0;
-#if SQL_MAX_EXPR_DEPTH>0
 	{
 		Parse *pParse = pNC->pParse;
 		if (sqlExprCheckHeight
@@ -1491,7 +1481,6 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 		}
 		pParse->nHeight += pExpr->nHeight;
 	}
-#endif
 	savedHasAgg = pNC->ncFlags & (NC_HasAgg | NC_MinMaxAgg);
 	pNC->ncFlags &= ~(NC_HasAgg | NC_MinMaxAgg);
 	w.pParse = pNC->pParse;
@@ -1502,9 +1491,7 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 	w.eCode = 0;
 	w.u.pNC = pNC;
 	sqlWalkExpr(&w, pExpr);
-#if SQL_MAX_EXPR_DEPTH>0
 	pNC->pParse->nHeight -= pExpr->nHeight;
-#endif
 	if (pNC->nErr > 0 || w.pParse->is_aborted) {
 		ExprSetProperty(pExpr, EP_Error);
 	}
@@ -1592,4 +1579,29 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 	sNC.pSrcList = &sSrc;
 	sNC.ncFlags = NC_IdxExpr;
 	sqlResolveExprNames(&sNC, expr);
+}
+
+int
+sql_coll_id(uint32_t *id, const char *name, uint32_t len)
+{
+	char *name_str = sql_name_new(name, len);
+	struct coll_id *coll_id = coll_by_name(name_str, strlen(name_str));
+	sql_xfree(name_str);
+	if (coll_id != NULL) {
+		*id = coll_id->id;
+		return 0;
+	}
+	if (name[0] != '"') {
+		name_str = sql_legacy_name_new(name, len);
+		coll_id = coll_by_name(name_str, strlen(name_str));
+		sql_xfree(name_str);
+		if (coll_id != NULL) {
+			*id = coll_id->id;
+			return 0;
+		}
+	}
+	name_str = sql_name_new(name, len);
+	diag_set(ClientError, ER_NO_SUCH_COLLATION, name_str);
+	sql_xfree(name_str);
+	return -1;
 }

@@ -1669,7 +1669,7 @@ uint32_t
 sql_index_id_by_src(const struct SrcList_item *src)
 {
 	assert(src->space != NULL && src->fg.isIndexedBy != 0);
-	uint32_t res = sql_space_index_id(src->space, src->u1.zIndexedBy);
+	uint32_t res = sql_space_index_id(src->space, src->indexed_by);
 	if (res != UINT32_MAX || src->legacy_index_name == NULL)
 		return res;
 	return sql_space_index_id(src->space, src->legacy_index_name);
@@ -1701,25 +1701,6 @@ sql_fieldno_by_id(const struct space *space, const struct IdList_item *id)
 	if (res != UINT32_MAX || id->legacy_name == NULL)
 		return res;
 	return sql_space_fieldno(space, id->legacy_name);
-}
-
-uint32_t
-sql_coll_id_by_token(const struct Token *name)
-{
-	char *name_str = sql_name_from_token(name);
-	struct coll_id *coll_id = coll_by_name(name_str, strlen(name_str));
-	sql_xfree(name_str);
-	if (coll_id != NULL)
-		return coll_id->id;
-	if (name->z[0] == '"')
-		return UINT32_MAX;
-
-	char *old_name_str = sql_legacy_name_new(name->z, name->n);
-	coll_id = coll_by_name(old_name_str, strlen(old_name_str));
-	sql_xfree(old_name_str);
-	if (coll_id != NULL)
-		return coll_id->id;
-	return UINT32_MAX;
 }
 
 /**
