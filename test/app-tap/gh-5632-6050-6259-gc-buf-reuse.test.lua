@@ -28,7 +28,7 @@ local function test_uuid(test)
         local str2 = uu:str()
         if str1 ~= str2 then
             is_success = false
-            assert(false)
+            error('unreachable')
         end
     end
 
@@ -84,7 +84,7 @@ local function test_uri(test)
         if u.host ~= loc_ip or u.login ~= loc_login or u.service ~= loc_port or
            u.password ~= loc_pass then
             is_success = false
-            assert(false)
+            error('unreachable')
         end
     end
 

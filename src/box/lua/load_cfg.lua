@@ -700,6 +700,9 @@ local dynamic_cfg = {
     wal_ext                 = private.cfg_set_wal_ext,
 
     metrics = function()
+        -- emmylua_check: false positive, see
+        -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1251
+        ---@diagnostic disable-next-line: missing-parameter
         require('metrics').cfg(box.cfg.metrics)
     end,
 }
@@ -1537,7 +1540,7 @@ box.internal.cfg = setmetatable({}, {
         if key == 'env' then
             return env_cfg(template_cfg)
         end
-        assert(false)
+        error('unreachable')
     end,
     __newindex = function(self, key, value) -- luacheck: no unused args
         error('Attempt to modify a read-only table')

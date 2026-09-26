@@ -5,6 +5,7 @@ local fio = require('fio')
 local msgpack = require('msgpack')
 local socket = require('socket')
 local uri = require('uri')
+local json = require('json')
 
 local listen_sock_path = './tarantool.sock'
 os.remove(listen_sock_path)
@@ -236,9 +237,6 @@ end
 -- Verify box_tuple_field_by_path() on several basic JSON path
 -- selectors.
 local function test_tuple_field_by_path(test, module)
-    local msgpack = require('msgpack')
-    local json = require('json')
-
     local space = box.schema.space.create('messages', {
         format = {
             {name = 'id', type = 'unsigned'},

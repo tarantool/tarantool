@@ -609,7 +609,7 @@ encode_field = function(protocol, field_def, value, ignore_repeated)
         validate_length(encoded_msg)
         return wireformat.encode_len(field_def.id, encoded_msg, true)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 

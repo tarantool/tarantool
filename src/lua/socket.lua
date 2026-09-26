@@ -1416,7 +1416,7 @@ local lsocket_tcp_client_mt
 
 local function lsocket_tcp_tostring(self)
     local fd = check_socket(self)
-    return string.format("tcp{master}: fd=%d", fd)
+    return format("tcp{master}: fd=%d", fd)
 end
 
 local function lsocket_tcp_close(self)
@@ -1530,7 +1530,7 @@ lsocket_tcp_mt = {
 
 local function lsocket_tcp_server_tostring(self)
     local fd = check_socket(self)
-    return string.format("tcp{server}: fd=%d", fd)
+    return format("tcp{server}: fd=%d", fd)
 end
 
 local function lsocket_tcp_accept(self)
@@ -1569,7 +1569,7 @@ lsocket_tcp_server_mt = {
 
 local function lsocket_tcp_client_tostring(self)
     local fd = check_socket(self)
-    return string.format("tcp{client}: fd=%d", fd)
+    return format("tcp{client}: fd=%d", fd)
 end
 
 local function lsocket_tcp_receive(self, pattern, prefix)
