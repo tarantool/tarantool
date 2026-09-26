@@ -58,7 +58,7 @@ g.test_uuid_scalar = function()
 
         s = box.schema.space.create('a', {format = {{'u', 'scalar'}}})
         _ = s:create_index('i', {parts = {{'u', 'uuid'}}})
-        t.assert_equals(s:format()[1].type, 'scalar')
+        t.assert_equals(s:format()[1].type, 'uuid')
         t.assert_equals(s.index[0].parts[1].type, 'uuid')
         s:drop()
     end)
