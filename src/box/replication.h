@@ -447,6 +447,8 @@ struct replica {
 	 * registered in the _cluster space yet.
 	 */
 	uint32_t id;
+	/** References held by pending registration changes. */
+	unsigned int registration_refs;
 	/**
 	 * Whether this is an anonymous replica, e.g. a read-only
 	 * replica that doesn't have an id and isn't present in
@@ -575,6 +577,22 @@ replica_clear_id(struct replica *replica);
  */
 bool
 replica_has_connections(const struct replica *replica);
+
+/** Keep a replica alive until a registration change is completed. */
+static inline void
+replica_ref(struct replica *replica)
+{
+	++replica->registration_refs;
+}
+
+/** Release a registration reference without discarding an existing applier. */
+void
+replica_unref(struct replica *replica);
+
+/** Transfer a stopped applier, or log its error if the destination has one. */
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica);
 
 /**
  * Collects garbage of a replica that is gone for a while: removes associated
