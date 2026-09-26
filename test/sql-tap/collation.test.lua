@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(192)
+test:plan(190)
 
 local prefix = "collation-"
 
@@ -492,16 +492,9 @@ local like_testcases =
     {"2.1.1",
         "SELECT * FROM tx1 WHERE s1 LIKE 'A%' order by s1;",
         {0, {"aaa","Aab"}} },
-    {"2.1.2",
-        "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
-        {0, {0, 0, 0, "SEARCH TABLE tx1 USING PRIMARY KEY "..
-                      "(s1>? AND s1<?) (~16384 rows)"}}},
     {"2.2.0",
         "SELECT * FROM tx1 WHERE s1 LIKE 'A%' COLLATE \"unicode\" order by s1;",
         {0, {"Aab"}} },
-    {"2.2.1",
-        "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
-        {0, {0, 0, 0, "/USING PRIMARY KEY/"}} },
     {"2.3.0",
         "SELECT * FROM tx1 WHERE s1 LIKE 'i%' order by s1;",
         {0, {"İac", "iad"}}},

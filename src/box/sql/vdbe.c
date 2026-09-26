@@ -48,6 +48,7 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/bind.h"
 
 #include "msgpuck/msgpuck.h"
 #include "mpstream/mpstream.h"
@@ -356,7 +357,8 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
  * Execute as much of a VDBE program as we can.
  * This is the core of sql_step().
  */
-int sqlVdbeExec(Vdbe *p)
+int
+sqlVdbeExec(struct Vdbe *p, const struct sql_bind *bind, uint32_t bind_count)
 {
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
@@ -860,16 +862,20 @@ case OP_Blob: {                /* out2 */
  * The P4 value is used by sql_bind_parameter_name().
  */
 case OP_Variable: {            /* out2 */
-	Mem *pVar;       /* Value being transferred */
-
-	assert(pOp->p1>0 && pOp->p1<=p->nVar);
-	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
-	pVar = &p->aVar[pOp->p1 - 1];
-	if (sqlVdbeMemTooBig(pVar)) {
-		goto too_big;
-	}
+	assert(pOp->p1 >= 0);
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	mem_copy_as_ephemeral(pOut, pVar);
+	uint32_t pos = 0;
+	if (pOp->p4.z != NULL) {
+		pos = sql_bind_lookup(bind, bind_count, pOp->p4.z);
+		if (pos == 0)
+			break;
+	}
+	pos += pOp->p1;
+	if (pos > bind_count)
+		break;
+	sql_mem_create_from_bind(pOut, &bind[pos - 1]);
+	if (sqlVdbeMemTooBig(pOut))
+		goto too_big;
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
 }

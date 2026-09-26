@@ -268,9 +268,6 @@ vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx);
 int
 vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span);
 
-const struct Mem *
-vdbe_get_bound_value(struct Vdbe *vdbe, int id);
-
 void sqlVdbeCountChanges(Vdbe *);
 
 /** Remember the SQL string for a prepared statement. */
@@ -281,8 +278,6 @@ void sqlVdbeSwap(Vdbe *, Vdbe *);
 
 struct VdbeOp *
 sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp);
-
-char *sqlVdbeExpandSql(Vdbe *, const char *);
 
 /**
  * Perform unpacking of provided message pack.
