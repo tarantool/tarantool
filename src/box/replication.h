@@ -576,6 +576,14 @@ replica_clear_id(struct replica *replica);
 bool
 replica_has_connections(const struct replica *replica);
 
+/** Detach a stopped applier from a replica. */
+struct applier *
+replica_take_stopped_applier(struct replica *replica);
+
+/** Attach a stopped applier to a replica. */
+void
+replica_set_stopped_applier(struct replica *replica, struct applier *applier);
+
 /**
  * Collects garbage of a replica that is gone for a while: removes associated
  * WAL GC state including persistent one and if the replica is anonymous, it
