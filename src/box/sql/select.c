@@ -184,9 +184,8 @@ sql_space_info_new_from_order_by(struct Parse *parser, struct Select *select,
 		info->coll_ids[i] = multi_select_coll_seq(parser, select,
 							  fieldno);
 		if (info->coll_ids[i] != COLL_NONE) {
-			const char *name = coll_by_id(info->coll_ids[i])->name;
-			order_by->a[i].pExpr =
-				sqlExprAddCollateString(expr, name);
+			uint32_t id = info->coll_ids[i];
+			order_by->a[i].pExpr = sql_expr_new_collate(expr, id);
 		}
 	}
 	info->types[order_by->nExpr] = FIELD_TYPE_INTEGER;
@@ -1995,7 +1994,6 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 				space_def = pColExpr->space_def;
 				name = space_def->fields[iCol].name;
 			} else if (pColExpr->op == TK_ID) {
-				assert(!ExprHasProperty(pColExpr, EP_IntValue));
 				name = pColExpr->u.zToken;
 			}
 		}
@@ -2296,9 +2294,8 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 			id = multi_select_coll_seq(parse, s,
 						   item->u.x.iOrderByCol - 1);
 			if (id != COLL_NONE) {
-				const char *name = coll_by_id(id)->name;
 				order_by->a[i].pExpr =
-					sqlExprAddCollateString(term, name);
+					sql_expr_new_collate(term, id);
 			}
 		}
 		part->coll_id = id;
@@ -3300,8 +3297,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			if (j == nOrderBy) {
 				struct Expr *pNew =
 					sql_expr_new_anon(TK_INTEGER);
-				pNew->flags |= EP_IntValue;
-				pNew->u.iValue = i;
+				pNew->v.u = i;
 				pNew->type = FIELD_TYPE_INTEGER;
 				pOrderBy = sql_expr_list_append(pOrderBy, pNew);
 				pOrderBy->a[nOrderBy++].u.x.iOrderByCol = i;
@@ -3638,13 +3634,8 @@ substSelect(Parse * pParse,	/* Report errors here */
 		p->pWhere = substExpr(pParse, p->pWhere, iTable, pEList);
 		pSrc = p->pSrc;
 		assert(pSrc != 0);
-		for (i = pSrc->nSrc, pItem = pSrc->a; i > 0; i--, pItem++) {
+		for (i = pSrc->nSrc, pItem = pSrc->a; i > 0; i--, pItem++)
 			substSelect(pParse, pItem->pSelect, iTable, pEList, 1);
-			if (pItem->fg.isTabFunc) {
-				substExprList(pParse, pItem->u1.pFuncArg,
-					      iTable, pEList);
-			}
-		}
 	} while (doPrior && (p = p->pPrior) != 0);
 }
 
@@ -4087,7 +4078,6 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		 */
 		for (i = 0; i < nSubSrc; i++) {
 			sqlIdListDelete(pSrc->a[i + iFrom].pUsing);
-			assert(pSrc->a[i + iFrom].fg.isTabFunc == 0);
 			pSrc->a[i + iFrom] = pSubSrc->a[i];
 			memset(&pSubSrc->a[i], 0, sizeof(pSubSrc->a[i]));
 		}
@@ -4360,7 +4350,7 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 	uint32_t index_id = sql_index_id_by_src(pFrom);
 	if (index_id == UINT32_MAX) {
 		diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
-			 pFrom->u1.zIndexedBy, pFrom->space->def->name);
+			 pFrom->indexed_by, pFrom->space->def->name);
 		pParse->is_aborted = true;
 		return -1;
 	}
@@ -4538,13 +4528,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		if (pCte->zCteErr) {
 			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 				 tt_sprintf(pCte->zCteErr, pCte->zName));
-			pParse->is_aborted = true;
-			return -1;
-		}
-		if (pFrom->fg.isTabFunc) {
-			const char *err = "'%s' is not a function";
-			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-				 tt_sprintf(err, pFrom->zName));
 			pParse->is_aborted = true;
 			return -1;
 		}
@@ -4764,15 +4747,6 @@ selectExpander(Walker * pWalker, Select * p)
 			struct space *space = sql_lookup_space(pParse, pFrom);
 			if (space == NULL)
 				return WRC_Abort;
-			if (pFrom->fg.isTabFunc) {
-				const char *err =
-					tt_sprintf("'%s' is not a function",
-						   pFrom->zName);
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 err);
-				pParse->is_aborted = true;
-				return WRC_Abort;
-			}
 			if (space->def->opts.is_view) {
 				struct Select *select =
 					sql_view_compile(space->def->opts.sql);
@@ -4869,7 +4843,6 @@ selectExpander(Walker * pWalker, Select * p)
 		char *zTName = NULL;
 		if (pE->op == TK_DOT) {
 			assert(pE->pLeft != NULL);
-			assert(!ExprHasProperty(pE->pLeft, EP_IntValue));
 			zTName = pE->pLeft->u.zToken;
 		}
 		for (i = 0, pFrom = pTabList->a;
@@ -4970,7 +4943,6 @@ selectExpander(Walker * pWalker, Select * p)
 	sql_expr_list_delete(pEList);
 	p->pEList = pNew;
 end:
-#if SQL_MAX_COLUMN
 	if (p->pEList && p->pEList->nExpr > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of "\
 			 "columns in result set", p->pEList->nExpr,
@@ -4978,7 +4950,6 @@ end:
 		pParse->is_aborted = true;
 		return WRC_Abort;
 	}
-#endif
 	return WRC_Continue;
 }
 

@@ -32,13 +32,6 @@
 
 #include "sqlInt.h"
 
-const struct Token sqlIntTokens[] = {
-	{"0", 1, false},
-	{"1", 1, false},
-	{"2", 1, false},
-	{"3", 1, false},
-};
-
 void
 sqlTokenInit(struct Token *p, char *z)
 {

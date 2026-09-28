@@ -81,36 +81,18 @@
 #include "datetime.h"
 
 /*
- * These #defines should enable >2GB file support on POSIX if the
- * underlying operating system supports it.  If the OS lacks
- * large file support, these should be no-ops.
+ * These #defines enable >2GB file support on POSIX if the underlying
+ * operating system supports it.  If the OS lacks large file support, they
+ * should be no-ops.
  *
- * Ticket #2739:  The _LARGEFILE_SOURCE macro must appear before any
- * system #includes.  Hence, this block of code must be the very first
- * code in all source files.
- *
- * Large file support can be disabled using the -Dsql_DISABLE_LFS switch
- * on the compiler command line.  This is necessary if you are compiling
- * on a recent machine (ex: Red Hat 7.2) but you want your code to work
- * on an older machine (ex: Red Hat 6.0).  If you compile on Red Hat 7.2
- * without this option, LFS is enable.  But LFS does not exist in the kernel
- * in Red Hat 6.0, so the code won't work.  Hence, for maximum binary
- * portability you should omit LFS.
- *
- * The previous paragraph was written in 2005.  (This paragraph is written
- * on 2008-11-28.) These days, all Linux kernels support large files, so
- * you should probably leave LFS enabled.  But some embedded platforms might
- * lack LFS in which case the sql_DISABLE_LFS macro might still be useful.
- *
- * Similar is true for Mac OS X.  LFS is only supported on Mac OS X 9 and later.
+ * The _LARGEFILE_SOURCE macro must appear before any system #includes.
+ * Hence, this block of code must be the very first code in all source files.
  */
-#ifndef SQL_DISABLE_LFS
 #define _LARGE_FILE       1
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
 #define _LARGEFILE_SOURCE 1
-#endif
 
 /* What version of GCC is being used.  0 means GCC is not being used */
 #ifdef __GNUC__
@@ -573,17 +555,6 @@ sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName);
  */
 #ifndef SQL_BIG_DBL
 #define SQL_BIG_DBL (1e99)
-#endif
-
-/*
- * OMIT_TEMPDB is set to 1 if sql_OMIT_TEMPDB is defined, or 0
- * afterward. Having this macro allows us to cause the C compiler
- * to omit code used by TEMP tables without messy #ifndef statements.
- */
-#ifdef SQL_OMIT_TEMPDB
-#define OMIT_TEMPDB 1
-#else
-#define OMIT_TEMPDB 0
 #endif
 
 /*
@@ -1285,8 +1256,35 @@ struct Expr {
 	u32 flags;		/* Various flags.  EP_* See below */
 	union {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
-		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
+
+	/** Resolved value of the expression. */
+	union {
+		/** Value for TK_TRUE and TK_FALSE. */
+		bool b;
+		/** Value for TK_INTEGER. */
+		uint64_t u;
+		/** Value for TK_FLOAT. */
+		double f;
+		/** Value for TK_DECIMAL. */
+		decimal_t *d;
+		/** Value for TK_STRING. */
+		struct {
+			/** String value, zero-terminated. */
+			char *s;
+			/** Length of the string, not including '\0'. */
+			uint32_t len;
+		};
+		/** Value for TK_BLOB. */
+		struct {
+			/** Varbinary string in hexadecimal format. */
+			char *z;
+			/** Length of the varbinary string. */
+			uint32_t n;
+		};
+		/** ID for TK_COLLATE. */
+		uint32_t id;
+	} v;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
 	 * space is allocated for the fields below this point. An attempt to
@@ -1305,9 +1303,7 @@ struct Expr {
 	 * access them will result in a segfault or malfunction.
 	 ********************************************************************/
 
-#if SQL_MAX_EXPR_DEPTH>0
 	int nHeight;		/* Height of the tree headed by this node */
-#endif
 	int iTable;		/* TK_COLUMN_REF: cursor number of table holding column
 				 * TK_REGISTER: register number
 				 * TK_TRIGGER: 1 -> new, 0 -> old
@@ -1342,13 +1338,15 @@ struct Expr {
 /** Second lookup could be performed for the ID. */
 #define EP_Lookup2   0x000040
 #define EP_Collate   0x000100	/* Tree contains a TK_COLLATE operator */
-#define EP_IntValue  0x000400	/* Integer value contained in u.iValue */
+/** TK_INTEGER literal holds a negative value */
+#define EP_Negative  0x000400
 #define EP_xIsSelect 0x000800	/* x.pSelect is valid (otherwise x.pList is) */
 #define EP_Skip      0x001000	/* COLLATE, AS, or UNLIKELY */
 #define EP_Reduced   0x002000	/* Expr struct EXPR_REDUCEDSIZE bytes only */
 #define EP_TokenOnly 0x004000	/* Expr struct EXPR_TOKENONLYSIZE bytes only */
 #define EP_Static    0x008000	/* Held in memory not obtained from malloc() */
-#define EP_MemToken  0x010000	/* Need to sql_xfree() Expr.zToken */
+/** Need to free Expr.u.zToken or Expr.v.s. */
+#define EP_MemToken  0x010000
 #define EP_NoReduce  0x020000	/* Cannot EXPRDUP_REDUCE this Expr */
 #define EP_Unlikely  0x040000	/* unlikely() or likelihood() function */
 #define EP_ConstFunc 0x080000	/* A sql_FUNC_CONSTANT or _SLOCHNG function */
@@ -1531,7 +1529,6 @@ struct SrcList {
 			u8 jointype;	/* Type of join between this table and the previous */
 			unsigned notIndexed:1;	/* True if there is a NOT INDEXED clause */
 			unsigned isIndexedBy:1;	/* True if there is an INDEXED BY clause */
-			unsigned isTabFunc:1;	/* True if table-valued-function syntax */
 			unsigned isCorrelated:1;	/* True if sub-query is correlated */
 			unsigned viaCoroutine:1;	/* Implemented as a co-routine */
 			unsigned isRecursive:1;	/* True for recursive reference in WITH */
@@ -1548,10 +1545,8 @@ struct SrcList {
 		Expr *pOn;	/* The ON clause of a join */
 		IdList *pUsing;	/* The USING clause of a join */
 		Bitmask colUsed;	/* Bit N (1<<N) set if column N of space is used */
-		union {
-			char *zIndexedBy;	/* Identifier from "INDEXED BY <zIndex>" clause */
-			ExprList *pFuncArg;	/* Arguments to table-valued-function */
-		} u1;
+		/** Identifier from "INDEXED BY <index>" clause. */
+		char *indexed_by;
 		/** Normalized index name for the second lookup. */
 		char *legacy_index_name;
 		struct index_def *pIBIndex;
@@ -2267,23 +2262,9 @@ sql_xrealloc(void *buf, size_t n);
 void
 sql_xfree(void *buf);
 
-/*
- * On systems with ample stack space and that support alloca(), make
- * use of alloca() to obtain space for large automatic objects.  By default,
- * obtain space from malloc().
- *
- * The alloca() routine never returns NULL.  This will cause code paths
- * that deal with sqlStackAlloc() failures to be unreachable.
- */
-#ifdef SQL_USE_ALLOCA
-#define sqlStackAllocRaw(N)   alloca(N)
-#define sqlStackAllocZero(D,N)  memset(alloca(N), 0, N)
-#define sqlStackFree(P)
-#else
 #define sqlStackAllocRaw(N)   sql_xmalloc(N)
 #define sqlStackAllocZero(N)  sql_xmalloc0(N)
 #define sqlStackFree(P)       sql_xfree(P)
-#endif
 
 int sqlIsNaN(double);
 
@@ -2330,7 +2311,27 @@ void sqlTreeViewSelect(TreeView *, const Select *, u8);
 void sqlTreeViewWith(TreeView *, const With *);
 #endif
 
-void sqlDequote(char *);
+/*
+ * Convert an SQL-style quoted string into a normal string by removing the quote
+ * characters. The conversion is done in-place. If the input does not begin with
+ * a quote character, then this routine is a no-op.
+ *
+ * The string is defined by a pointer and its size, so it does not have
+ * to be zero-terminated, and the resulting dequoted string is not
+ * zero-terminated either.
+ *
+ * The return value is the length of the dequoted string, or size if no
+ * dequoting occurs.
+ */
+uint32_t
+sql_dequote(char *str, uint32_t size);
+
+/*
+ * Same as sql_dequote(), but the string is zero-terminated and the
+ * resulting dequoted string remains zero-terminated.
+ */
+void
+sqlDequote(char *z);
 
 /** Duplicate the string and remove the double quotes if necessary. */
 char *
@@ -2363,6 +2364,34 @@ sql_legacy_name_new0(const char *name)
  */
 char *
 sql_escaped_name_new(const char *name);
+
+/**
+ * Parse DECIMAL value from string representation.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_dec_from_str(decimal_t *dec, const char *str);
+
+/**
+ * Parse INTEGER value from string representation.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_uint_from_str(uint64_t *res, const char *str);
+
+/**
+ * Negate an unsigned value.
+ *
+ * Return 0 on success. Return -1 on error and sets a diag.
+ */
+int
+sql_neg_uint(int64_t *res, uint64_t val);
+
+/** Convert the string to hex and store the result in the allocated memory. */
+char *
+sql_str_to_hex(const char *str, uint32_t len);
 
 int sqlKeywordCode(const unsigned char *, int);
 
@@ -2425,18 +2454,30 @@ void sqlClearTempRegCache(Parse *);
  * sql_xmalloc(). The calling function is responsible for making
  * sure the node eventually gets freed.
  *
- * Special case: If op==TK_INTEGER and token points to a string
- * that can be translated into a 32-bit integer, then the token is
- * not stored in u.zToken. Instead, the integer values is written
- * into u.iValue and the EP_IntValue flag is set. No extra storage
- * is allocated to hold the integer text.
- *
  * @param op Expression opcode (TK_*).
  * @param token Source token. Might be NULL.
  * @retval Not NULL New expression object on success.
  */
 struct Expr *
 sql_expr_new(int op, const struct Token *token);
+
+/** Allocate a new empty expression object with reserved extra memory. */
+struct Expr *
+sql_expr_new_empty(int op, int extra_size);
+
+/**
+ * Create a TK_STRING expression holding a copy of `n` bytes of the `str`.
+ * The resulting string is NULL-terminated.
+ */
+struct Expr *
+sql_expr_new_string(const char *str, uint32_t n);
+
+/**
+ * Create a TK_COLLATE expression that contains the ID of a collation and
+ * the specified expression to which the collation applies.
+ */
+struct Expr *
+sql_expr_new_collate(struct Expr *expr, uint32_t coll_id);
 
 /**
  * The same as @sa sql_expr_new, but normalizes name, stored in
@@ -2863,13 +2904,6 @@ sqlSrcListAppendFromTerm(struct SrcList *p, struct Token *pTable,
 void
 sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy);
 
-/**
- * Add the list of function arguments to the SrcList entry for a
- * table-valued-function.
- */
-void
-sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList);
-
 int sqlIndexedByLookup(Parse *, struct SrcList_item *);
 void sqlSrcListAssignCursors(Parse *, SrcList *);
 
@@ -3143,22 +3177,10 @@ uint32_t
 sql_fieldno_by_item(const struct space *space, const struct ExprList_item *it);
 
 /**
- * Return the ID of the collation with the name defined by the token. A second
- * lookup will be performed if the collation is not found on the first try and
- * token is not start with double quote. Return UINT32_MAX if the field was not
- * found.
+ * Find collation by name. If no collation is found, return -1 and set the diag.
  */
-uint32_t
-sql_coll_id_by_token(const struct Token *name);
-
-/**
- * Return the ID of the collation with the name defined by the expression. A
- * second lookup will be performed if the collation is not found on the first
- * try and EP_Lookup2 flag is set. Return UINT32_MAX if the collation was not
- * found.
- */
-uint32_t
-sql_coll_id_by_expr(const struct Expr *expr);
+int
+sql_coll_id(uint32_t *id, const char *name, uint32_t len);
 
 /**
  * Return the tuple foreign key constraint with the name defined by the token.
@@ -3937,15 +3959,6 @@ field_type_sequence_dup(enum field_type *types, uint32_t len);
 int
 sql_atoi64(const char *z, int64_t *val, bool *is_neg, int length);
 
-/**
- * Convert a BLOB literal of the form "x'hhhhhh'" into its binary
- * value.  Return a pointer to its binary value.  Space to hold the
- * binary value has been obtained from malloc and must be freed by
- * the calling routine.
- */
-void *
-sqlHexToBlob(const char *z, int n);
-
 u8 sqlHexToInt(int h);
 
 /**
@@ -3970,22 +3983,6 @@ u8 sqlHexToInt(int h);
 int
 sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 	      struct coll **coll);
-
-/**
- * Set the collating sequence for expression pExpr to be the collating sequence
- * named by pCollName. Return a pointer to a new Expr node that implements the
- * COLLATE operator.
- */
-struct Expr *
-sqlExprAddCollateToken(struct Expr *pExpr, const Token *pCollName, int dequote);
-
-/**
- * Set the collating sequence for expression pExpr to be the collating sequence
- * named by zC. Return a pointer to a new Expr node that implements the COLLATE
- * operator.
- */
-struct Expr *
-sqlExprAddCollateString(struct Expr *pExpr, const char *zC);
 
 Expr *sqlExprSkipCollate(Expr *);
 int sqlCheckIdentifierName(Parse *, char *);
@@ -4030,7 +4027,6 @@ sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 extern const unsigned char sqlOpcodeProperty[];
 extern const unsigned char sqlUpperToLower[];
 extern const unsigned char sqlCtypeMap[];
-extern const Token sqlIntTokens[];
 extern SQL_WSD struct sqlConfig sqlConfig;
 extern int sqlPendingByte;
 
@@ -4365,13 +4361,8 @@ void sqlWithPush(Parse *, With *, u8);
 int sqlFindInIndex(Parse *, Expr *, u32, int *, int *, int *);
 
 void sqlExprSetHeightAndFlags(Parse * pParse, Expr * p);
-#if SQL_MAX_EXPR_DEPTH>0
 int sqlSelectExprHeight(Select *);
 int sqlExprCheckHeight(Parse *, int);
-#else
-#define sqlSelectExprHeight(x) 0
-#define sqlExprCheckHeight(x,y)
-#endif
 
 #ifdef SQL_DEBUG
 void sqlParserTrace(FILE *, char *);

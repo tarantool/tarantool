@@ -317,14 +317,12 @@ sql_create_column_start(struct Parse *parse, struct Token *table,
 	struct space_def *def = space->def;
 	assert(def->opts.is_ephemeral);
 
-#if SQL_MAX_COLUMN
 	if ((int)def->field_count + 1 > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_COLUMN_COUNT_MAX, def->name,
 			 def->field_count + 1, SQL_MAX_COLUMN);
 		parse->is_aborted = true;
 		return;
 	}
-#endif
 
 	char *column_name = sql_name_temp(parse, name->z, name->n);
 
@@ -450,40 +448,6 @@ sql_column_add_nullable_action(struct Parse *parser,
 	field->is_nullable = action_is_nullable(nullable_action);
 }
 
-/** Fetch negative integer value from the expr. */
-static int
-sql_expr_nint(const struct Expr *expr, int64_t *res)
-{
-	assert(expr->op == TK_INTEGER);
-	if ((expr->flags & EP_IntValue) != 0) {
-		*res = -expr->u.iValue;
-		return 0;
-	}
-	assert(strlen(expr->u.zToken) > 2);
-	const char *str = tt_sprintf("-%s", expr->u.zToken);
-	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
-	errno = 0;
-	*res = strtoll(str, NULL, base);
-	return errno == 0 ? 0 : -1;
-}
-
-/** Fetch non-negative integer value from the expr. */
-static int
-sql_expr_uint(const struct Expr *expr, uint64_t *res)
-{
-	assert(expr->op == TK_INTEGER);
-	if ((expr->flags & EP_IntValue) != 0) {
-		*res = expr->u.iValue;
-		return 0;
-	}
-	assert(strlen(expr->u.zToken) > 2);
-	const char *str = expr->u.zToken;
-	int base = str[1] == '0' && (str[2] == 'x' || str[2] == 'X') ? 16 : 10;
-	errno = 0;
-	*res = strtoull(str, NULL, base);
-	return errno == 0 ? 0 : -1;
-}
-
 /** This function adds literal default value for a column. */
 static void
 sql_add_term_default(struct Parse *parser, struct Expr *expr)
@@ -495,123 +459,53 @@ sql_add_term_default(struct Parse *parser, struct Expr *expr)
 	switch (sql_expr_type(expr)) {
 	case FIELD_TYPE_BOOLEAN: {
 		assert(expr->op == TK_TRUE || expr->op == TK_FALSE);
-		bool val = expr->op == TK_TRUE;
-		size = mp_sizeof_bool(val);
+		size = mp_sizeof_bool(expr->v.b);
 		buf = xregion_alloc(region, size);
-		mp_encode_bool(buf, val);
+		mp_encode_bool(buf, expr->v.b);
 		break;
 	}
 	case FIELD_TYPE_VARBINARY: {
-		assert(expr->u.zToken[0] == 'x' || expr->u.zToken[0] == 'X');
-		assert(expr->u.zToken[1] == '\'');
-		const char *val_hex = &expr->u.zToken[2];
-		uint32_t len = strlen(val_hex) - 1;
-		assert(val_hex[len] == '\'');
-		size = mp_sizeof_bin(len / 2);
+		assert(expr->op == TK_BLOB);
+		size = mp_sizeof_bin(expr->v.n);
 		buf = xregion_alloc(region, size);
-		char *val = sqlHexToBlob(val_hex, len);
-		mp_encode_bin(buf, val, len / 2);
-		sql_xfree(val);
+		mp_encode_bin(buf, expr->v.z, expr->v.n);
 		break;
 	}
 	case FIELD_TYPE_STRING: {
-		const char *val = expr->u.zToken;
-		uint32_t len = strlen(val);
+		const char *val = expr->v.s;
+		uint32_t len = expr->v.len;
 		size = mp_sizeof_str(len);
 		buf = xregion_alloc(region, size);
 		mp_encode_str(buf, val, len);
 		break;
 	}
-	case FIELD_TYPE_DOUBLE: {
-		const char *str;
-		if (expr->op == TK_UMINUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_FLOAT);
-			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
-		} else if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_FLOAT);
-			str = expr->pLeft->u.zToken;
-		} else {
-			assert(expr->op == TK_FLOAT);
-			str = expr->u.zToken;
-		}
-		double val;
-		sqlAtoF(str, &val, strlen(str));
-		assert(!sqlIsNaN(val));
-		size = mp_sizeof_double(val);
+	case FIELD_TYPE_DOUBLE:
+		assert(expr->op == TK_FLOAT && !sqlIsNaN(expr->v.f));
+		size = mp_sizeof_double(expr->v.f);
 		buf = xregion_alloc(region, size);
-		mp_encode_double(buf, val);
+		mp_encode_double(buf, expr->v.f);
 		break;
-	}
-	case FIELD_TYPE_DECIMAL: {
-		const char *str;
-		if (expr->op == TK_UMINUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_DECIMAL);
-			str = tt_sprintf("-%s", expr->pLeft->u.zToken);
-		} else if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_DECIMAL);
-			str = expr->pLeft->u.zToken;
-		} else {
-			assert(expr->op == TK_DECIMAL);
-			str = expr->u.zToken;
-		}
-		decimal_t val;
-		if (decimal_from_string(&val, str) == NULL) {
-			diag_set(ClientError, ER_INVALID_DEC, str);
-			parser->is_aborted = true;
-			break;
-		}
-		size = mp_sizeof_decimal(&val);
+	case FIELD_TYPE_DECIMAL:
+		assert(expr->op == TK_DECIMAL);
+		size = mp_sizeof_decimal(expr->v.d);
 		buf = xregion_alloc(region, size);
-		mp_encode_decimal(buf, &val);
+		mp_encode_decimal(buf, expr->v.d);
 		break;
-	}
 	case FIELD_TYPE_INTEGER: {
-		if (expr->op == TK_UMINUS) {
-			int64_t val;
-			if (sql_expr_nint(expr->pLeft, &val) == 0) {
-				if (val == 0) {
-					size = mp_sizeof_uint(val);
-					buf = xregion_alloc(region, size);
-					mp_encode_uint(buf, val);
-					break;
-				}
-				size = mp_sizeof_int(val);
-				buf = xregion_alloc(region, size);
-				mp_encode_int(buf, val);
-				break;
-			}
-			int errcode = ER_INT_LITERAL_MAX;
-			const char *str = expr->pLeft->u.zToken;
-			if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-				errcode = ER_HEX_LITERAL_MAX;
-			diag_set(ClientError, errcode,
-				 tt_sprintf("%s%s", "-", str));
-			parser->is_aborted = true;
-			break;
-		}
-		const struct Expr *int_expr = expr;
-		if (expr->op == TK_UPLUS) {
-			assert(expr->pLeft != NULL &&
-			       expr->pLeft->op == TK_INTEGER);
-			int_expr = expr->pLeft;
-		}
-		uint64_t val;
-		if (sql_expr_uint(int_expr, &val) == 0) {
-			size = mp_sizeof_uint(val);
+		assert(expr->op == TK_INTEGER);
+		if ((expr->flags & EP_Negative) != 0) {
+			int64_t val = (int64_t)expr->v.u;
+			assert(val < 0);
+			size = mp_sizeof_int(val);
 			buf = xregion_alloc(region, size);
-			mp_encode_uint(buf, val);
+			mp_encode_int(buf, val);
 			break;
 		}
-		int errcode = ER_INT_LITERAL_MAX;
-		const char *str = int_expr->u.zToken;
-		if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-			errcode = ER_HEX_LITERAL_MAX;
-		diag_set(ClientError, errcode, str);
-		parser->is_aborted = true;
+
+		uint64_t val = expr->v.u;
+		size = mp_sizeof_uint(val);
+		buf = xregion_alloc(region, size);
+		mp_encode_uint(buf, val);
 		break;
 	}
 	default:
@@ -863,10 +757,8 @@ sql_create_check_constraint(struct Parse *parser, struct Token *table,
 void
 sqlAddCollateType(Parse * pParse, Token * pToken)
 {
-	uint32_t coll_id = sql_coll_id_by_token(pToken);
-	if (coll_id == UINT32_MAX) {
-		diag_set(ClientError, ER_NO_SUCH_COLLATION,
-			 sql_tt_name_from_token(pToken));
+	uint32_t coll_id;
+	if (sql_coll_id(&coll_id, pToken->z, pToken->n) != 0) {
 		pParse->is_aborted = true;
 		return;
 	}
@@ -1268,22 +1160,11 @@ sql_add_func_default(struct Parse *parser, struct Expr *expr, const char *str,
 	parser->default_funcs[id].reg_func_id = reg_id;
 }
 
-static bool
-sql_expr_is_number_term(const struct Expr *expr)
-{
-	return expr->op == TK_INTEGER || expr->op == TK_FLOAT ||
-	       expr->op == TK_DECIMAL;
-}
-
 void
 sql_column_add_default(struct Parse *parser, struct Expr *expr, const char *str,
 		       uint32_t len)
 {
 	if (sql_expr_is_term(expr))
-		sql_add_term_default(parser, expr);
-	else if (expr->op == TK_UPLUS && sql_expr_is_number_term(expr->pLeft))
-		sql_add_term_default(parser, expr);
-	else if (expr->op == TK_UMINUS && sql_expr_is_number_term(expr->pLeft))
 		sql_add_term_default(parser, expr);
 	else
 		sql_add_func_default(parser, expr, str, len);
@@ -2568,16 +2449,10 @@ index_fill_def(struct Parse *parse, struct index *index,
 			*parse->autoinc_fieldno = fieldno;
 		}
 		uint32_t coll_id;
-		if (expr->op == TK_COLLATE) {
-			coll_id = sql_coll_id_by_expr(expr);
-			if (coll_id == UINT32_MAX) {
-				diag_set(ClientError, ER_NO_SUCH_COLLATION,
-					 expr->u.zToken);
-				goto tnt_error;
-			}
-		} else {
+		if (expr->op == TK_COLLATE)
+			coll_id = expr->v.id;
+		else
 			sql_column_collation(space_def, fieldno, &coll_id);
-		}
 		/*
 		 * Tarantool: DESC indexes are not supported so
 		 * far.
@@ -3157,11 +3032,9 @@ sqlSrcListDelete(struct SrcList *pList)
 		sql_xfree(pItem->zAlias);
 		sql_xfree(pItem->legacy_name);
 		if (pItem->fg.isIndexedBy) {
-			sql_xfree(pItem->u1.zIndexedBy);
+			sql_xfree(pItem->indexed_by);
 			sql_xfree(pItem->legacy_index_name);
 		}
-		if (pItem->fg.isTabFunc)
-			sql_expr_list_delete(pItem->u1.pFuncArg);
 		/*
 		* Space is either not ephemeral which means that
 		* it came from space cache; or space is ephemeral
@@ -3213,14 +3086,13 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 		struct SrcList_item *pItem = &p->a[p->nSrc - 1];
 		assert(pItem->fg.notIndexed == 0);
 		assert(pItem->fg.isIndexedBy == 0);
-		assert(pItem->fg.isTabFunc == 0);
 		if (pIndexedBy->n == 1 && !pIndexedBy->z) {
 			/* A "NOT INDEXED" clause was supplied. See parse.y
 			 * construct "indexed_opt" for details.
 			 */
 			pItem->fg.notIndexed = 1;
 		} else if (pIndexedBy->z != NULL) {
-			pItem->u1.zIndexedBy = sql_name_from_token(pIndexedBy);
+			pItem->indexed_by = sql_name_from_token(pIndexedBy);
 			pItem->fg.isIndexedBy = true;
 			if (pIndexedBy->z[0] != '"') {
 				pItem->legacy_index_name =
@@ -3228,25 +3100,6 @@ sqlSrcListIndexedBy(struct SrcList *p, struct Token *pIndexedBy)
 							    pIndexedBy->n);
 			}
 		}
-	}
-}
-
-/*
- * Add the list of function arguments to the SrcList entry for a
- * table-valued-function.
- */
-void
-sqlSrcListFuncArgs(struct SrcList *p, struct ExprList *pList)
-{
-	if (p) {
-		struct SrcList_item *pItem = &p->a[p->nSrc - 1];
-		assert(pItem->fg.notIndexed == 0);
-		assert(pItem->fg.isIndexedBy == 0);
-		assert(pItem->fg.isTabFunc == 0);
-		pItem->u1.pFuncArg = pList;
-		pItem->fg.isTabFunc = 1;
-	} else {
-		sql_expr_list_delete(pList);
 	}
 }
 

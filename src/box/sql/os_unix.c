@@ -114,10 +114,6 @@ static pid_t randomnessPid = 0;
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
 #endif
-#ifdef SQL_DISABLE_LFS
-#undef O_LARGEFILE
-#define O_LARGEFILE 0
-#endif
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0
 #endif

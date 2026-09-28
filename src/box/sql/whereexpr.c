@@ -305,7 +305,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			z = str;
 		}
 	} else if (op == TK_STRING) {
-		z = pRight->u.zToken;
+		z = pRight->v.s;
 	}
 	if (z) {
 		cnt = 0;
@@ -316,8 +316,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			Expr *pPrefix;
 			*pisComplete = c == MATCH_ALL_WILDCARD &&
 				       z[cnt + 1] == 0;
-			pPrefix = sql_expr_new_named(TK_STRING, z);
-			pPrefix->u.zToken[cnt] = 0;
+			pPrefix = sql_expr_new_string(z, cnt);
 			*ppPrefix = pPrefix;
 			if (sql_token_is_variable(op)) {
 				Vdbe *v = pParse->pVdbe;
@@ -1135,7 +1134,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 
 		/* Last character before the first wildcard */
 		u8 c, *pC;
-		pC = (u8 *)&pStr2->u.zToken[sqlStrlen30(pStr2->u.zToken) - 1];
+		pC = (u8 *)&pStr2->v.s[pStr2->v.len - 1];
 		c = *pC;
 		*pC = c + 1;
 		pNewExpr1 = sqlExprDup(pLeft, 0);
@@ -1380,44 +1379,5 @@ sqlWhereExprAnalyze(SrcList * pTabList,	/* the FROM clause */
 	int i;
 	for (i = pWC->nTerm - 1; i >= 0; i--) {
 		exprAnalyze(pTabList, pWC, i);
-	}
-}
-
-/*
- * For table-valued-functions, transform the function arguments into
- * new WHERE clause terms.
- */
-void
-sqlWhereTabFuncArgs(Parse * pParse,	/* Parsing context */
-			struct SrcList_item *pItem,	/* The FROM clause term to process */
-			WhereClause * pWC	/* Xfer function arguments to here */
-    )
-{
-	int j, k;
-	ExprList *pArgs;
-	Expr *pColRef;
-	Expr *pTerm;
-	if (pItem->fg.isTabFunc == 0)
-		return;
-	struct space_def *space_def = pItem->space->def;
-	pArgs = pItem->u1.pFuncArg;
-	if (pArgs == 0)
-		return;
-	for (j = k = 0; j < pArgs->nExpr; j++) {
-		while (k < (int)space_def->field_count)
-			k++;
-		/*
-		 * This assert replaces error. At the moment, this
-		 * error cannot appear due to this function being
-		 * unused.
-		 */
-		assert(k < (int)space_def->field_count);
-		pColRef = sql_expr_new_anon(TK_COLUMN_REF);
-		pColRef->iTable = pItem->iCursor;
-		pColRef->iColumn = k++;
-		pColRef->space_def = space_def;
-		pTerm = sqlPExpr(pParse, TK_EQ, pColRef,
-				 sqlExprDup(pArgs->a[j].pExpr, 0));
-		whereClauseInsert(pWC, pTerm, TERM_DYNAMIC);
 	}
 }
