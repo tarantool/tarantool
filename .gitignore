@@ -23,6 +23,7 @@ coverage.info
 .tdbg_history*
 CMakeFiles
 CMakeCache.txt
+CMakeUserPresets.json
 CPackConfig.cmake
 CPackSourceConfig.cmake
 CTestTestfile.cmake
