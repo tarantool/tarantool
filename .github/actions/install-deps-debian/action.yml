@@ -6,8 +6,10 @@ runs:
   using: composite
   steps:
     - run: |
-        apt-get --allow-releaseinfo-change update
-        apt-get -y -f install \
+        # GitHub-hosted runners run the steps as a regular user.
+        SUDO=$([ "$(id -u)" = 0 ] || echo sudo)
+        ${SUDO} apt-get --allow-releaseinfo-change update
+        ${SUDO} apt-get -y -f install \
           build-essential \
           ninja-build \
           lua5.1 \
@@ -30,9 +32,9 @@ runs:
           CURRENT_VERSION=$(cmake --version | head -n 1 | awk '{print $3}')
         fi
         if version_gt "3.26.0" "$CURRENT_VERSION"; then
-          apt-get purge --auto-remove cmake -y
+          ${SUDO} apt-get purge --auto-remove cmake -y
           curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
-          && tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
+          && ${SUDO} tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
           && rm cmake-3.26.0-linux-$(uname -i).tar.gz
         fi
 
@@ -44,6 +46,7 @@ runs:
         #
         # https://github.com/tarantool/tarantool/issues/12600
         # https://github.com/tarantool/tarantool/issues/12783
-        luarocks show luacheck 0.26.1 || luarocks install luacheck 0.26.1
-        gem install coveralls-lcov
+        luarocks show luacheck 0.26.1 ||
+          ${SUDO} luarocks install luacheck 0.26.1
+        ${SUDO} gem install coveralls-lcov
       shell: bash
