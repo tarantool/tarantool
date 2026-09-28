@@ -49,7 +49,10 @@ on:
 
 jobs:
   luajit-integration:
-    runs-on: [self-hosted, regular, '${{ inputs.os }}', '${{ inputs.arch }}']
+    runs-on: ${{ inputs.os == 'Linux' && inputs.arch == 'ARM64' &&
+                 'ubuntu-26.04-arm' ||
+                 fromJSON(format('["self-hosted", "regular", "{0}", "{1}"]',
+                                 inputs.os, inputs.arch)) }}
     timeout-minutes: 60
     steps:
       - name: Prepare checkout
