@@ -102,13 +102,19 @@ runs:
         git clean -xffd
         git submodule foreach --recursive 'git clean -xffd'
 
+        # Limit the size of the LuaJIT tests' work directory on self-hosted
+        # runners.
+        #
+        # The reason is that in bad circumstances a profiler test (sysprof
+        # or memprof) may write a huge profile file.
+        #
+        # Generally, it is harmless (only the job fails), but our
+        # self-hosted runners are reused between jobs and a filled disk may
+        # cause other jobs to fail.
+        #
         # See for details: https://github.com/tarantool/tarantool/issues/7472.
-        # However, this workaround doesn't work on our aarch64 runners due to
-        # the following error:
-        #     mount: /tmp/luajit-test-vardir: mount failed: Operation not permitted
-        # Looks like it happens because our aarch64 runners are LXD containers.
-        if ${{ runner.os == 'Linux' && runner.arch != 'ARM64' &&
-               !contains(runner.name, 'GitHub Actions') }}; then
+        if ${{ runner.os == 'Linux' &&
+               runner.environment == 'self-hosted' }}; then
             LUAJIT_TEST_VARDIR=/tmp/luajit-test-vardir
             LUAJIT_TEST_VARDIR_DISK=/tmp/luajit-test-vardir-disk/disk.ext4
 
