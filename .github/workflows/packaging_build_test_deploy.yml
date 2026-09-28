@@ -16,7 +16,8 @@ on:
 
 jobs:
   build:
-    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+    runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' ||
+                 fromJSON('["self-hosted", "Linux", "x86_64", "regular"]') }}
 
     timeout-minutes: 60
 
@@ -71,7 +72,8 @@ jobs:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
 
   test:
-    runs-on: [ self-hosted, Linux, '${{ inputs.arch }}', regular ]
+    runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' ||
+                 fromJSON('["self-hosted", "Linux", "x86_64", "regular"]') }}
 
     timeout-minutes: 60
 
