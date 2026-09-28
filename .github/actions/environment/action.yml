@@ -49,6 +49,15 @@ runs:
                 free
             fi
         fi
+        # A container job on a GitHub-hosted runner runs git as root in a
+        # checkout owned by the runner's user, and git refuses to work in a
+        # repository owned by someone else. actions/checkout marks it as
+        # safe only for its own step, see
+        # https://github.com/actions/checkout/issues/766. The submodules are
+        # repositories too, hence the wildcard.
+        if ${{ runner.environment == 'github-hosted' }}; then
+            git config --global --add safe.directory '*'
+        fi
         # Found that Github checkout Actions pulls all the tags, but
         # right it deannotates the testing tag, check:
         #   https://github.com/actions/checkout/issues/290
