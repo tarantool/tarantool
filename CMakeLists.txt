@@ -688,6 +688,31 @@ if(ENABLE_BACKTRACE)
 endif()
 
 #
+# mimalloc
+#
+# Do not support ASAN and valgrind builds, because neither LeakSanitizer nor
+# valgrind would see the leaks of the memory served mimalloc.
+# From the mimalloc's readme.md: "we recommend using the standard allocator with
+# memory tracking tools".
+#
+if(NOT ENABLE_ASAN AND NOT ENABLE_VALGRIND)
+    set(ENABLE_BUNDLED_MIMALLOC_DEFAULT ON)
+else()
+    set(ENABLE_BUNDLED_MIMALLOC_DEFAULT OFF)
+endif()
+option(ENABLE_BUNDLED_MIMALLOC "Build the bundled mimalloc allocator"
+    ${ENABLE_BUNDLED_MIMALLOC_DEFAULT})
+if(ENABLE_BUNDLED_MIMALLOC)
+    if(ENABLE_ASAN OR ENABLE_VALGRIND)
+        message(FATAL_ERROR "ENABLE_BUNDLED_MIMALLOC is incompatible with "
+                            "ENABLE_ASAN or ENABLE_VALGRIND")
+    endif()
+    include(BuildMimalloc)
+    include_directories(${MIMALLOC_INCLUDE_DIR})
+    add_dependencies(build_bundled_libs bundled-mimalloc)
+endif()
+
+#
 # LuaJIT
 #
 # Patched.
@@ -946,6 +971,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND
+    ENABLE_BUNDLED_MIMALLOC
     ENABLE_FEEDBACK_DAEMON)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})
