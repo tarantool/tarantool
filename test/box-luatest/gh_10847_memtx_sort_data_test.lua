@@ -586,31 +586,43 @@ g_generic.test_gc = function(cg)
 
     cg.server:exec(function()
         local fio = require('fio')
-        local glob_snap = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
-        local glob_sortdata = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
 
-        local prev_snapshots = nil
-        local function check()
-            local snapshots = fio.glob(glob_snap)
-            local sort_data_files = fio.glob(glob_sortdata)
+        local function snapshot_count()
+            local glob_snap = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
+            return #fio.glob(glob_snap)
+        end
 
-            t.assert_equals(#sort_data_files, #snapshots)
-            if #snapshots < box.cfg.checkpoint_count then
-                if prev_snapshots ~= nil then
-                    t.assert_equals(#snapshots, #prev_snapshots + 1)
-                end
-            else
-                t.assert_equals(#snapshots, box.cfg.checkpoint_count)
-            end
-            prev_snapshots = snapshots
+        local function sortdata_count()
+            local glob_sortdata = fio.pathjoin(box.cfg.memtx_dir, '*.sortdata')
+            return #fio.glob(glob_sortdata)
+        end
+
+        local function check(prev_snap_count)
+            local snap_count = snapshot_count()
+            local sortdata_count = sortdata_count()
+
+            -- *.sortdata count is the same as *.snap.
+            t.assert_equals(sortdata_count, snap_count)
+
+            -- *.snap count is one more than on previous check, but not above
+            -- configured checkpoint count.
+            local limit = box.cfg.checkpoint_count
+            local expected_snap_count = math.min(prev_snap_count + 1, limit)
+            t.assert_equals(snap_count, expected_snap_count)
+
+            return snap_count
         end
 
         -- Create checkpoints and verify the .sortdata file count is valid.
+        local snap_count = snapshot_count()
         assert(box.cfg.checkpoint_count == 2) -- The expected default value.
         for i = 1, box.cfg.checkpoint_count * 2 do -- luacheck: no unused
             box.space._space:alter({}) -- No-op to update the VClock.
             box.snapshot()
-            check()
+
+            -- Checkpoint GC is asynchronous, so we have to check with
+            -- retries.
+            snap_count = t.helpers.retrying({timeout = 20}, check, snap_count)
         end
     end)
 end
