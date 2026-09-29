@@ -798,3 +798,11 @@ create_unit_test(PREFIX key_def_raw
                  SOURCES key_def_raw.c box_test_utils.c
                  LIBRARIES unit box core
 )
+
+if(ENABLE_MIMALLOC_NEW_DELETE)
+    create_unit_test(PREFIX mimalloc
+                     SOURCES mimalloc_test.cc
+                         ${PROJECT_SOURCE_DIR}/src/box/mimalloc_new_delete.cc
+                     LIBRARIES unit bundled-mimalloc pthread
+    )
+endif()
