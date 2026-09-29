@@ -226,7 +226,7 @@ local function test_api(test, s)
 end
 
 local function test_encode_key_order(test, serializer)
-    test:plan(19)
+    test:plan(21)
 
     local map_1 = {a = 1, c = 100, b = 2}
     local map_2 = {a = 1, c = 100, b = 2, inner = {a = 1, c = 100, b = 2}}
@@ -337,6 +337,19 @@ local function test_encode_key_order(test, serializer)
     collectgarbage()
 
     test:is(alive, 0, 'all objects deleted')
+
+    local map_4 = {[-1] = -1, [0] = 0, [1] = 1}
+    local function sort_ascending(a, b)
+        return a < b
+    end
+    local function sort_descending(a, b)
+        return a > b
+    end
+    test:is(y.encode(map_4, {encode_key_order = sort_ascending}),
+            '---\n-1: -1\n0: 0\n1: 1\n...\n', 'custom order function ascending')
+    test:is(y.encode(map_4, {encode_key_order = sort_descending}),
+            '---\n1: 1\n0: 0\n-1: -1\n...\n',
+            'custom order function descending')
 end
 
 local test = tap.test("yaml")

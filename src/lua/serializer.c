@@ -193,8 +193,17 @@ luaL_serializer_parse_encode_key_order(struct lua_State *L,
 		return;
 	}
 
+	if (lua_isfunction(L, -1)) {
+		luaL_serializer_free_encode_key_order(L, cfg);
+		/* Push a copy of function to ref. */
+		lua_pushvalue(L, -1);
+		cfg->encode_key_order = luaL_ref(L, LUA_REGISTRYINDEX);
+		return;
+	}
+
 	if (!lua_istable(L, -1)) {
-		luaL_error(L, "encode_key_order option must be a table");
+		luaL_error(L, "encode_key_order option must be a table or "
+			   "function");
 		unreachable();
 		return;
 	}
@@ -661,6 +670,54 @@ luaL_next_field_fallback(struct lua_State *L)
 	return r;
 }
 
+/**
+ * Build the table with the order of serialization by using the
+ * comparator function to sort its keys.
+ * @param L Lua stack.
+ */
+static void
+luaL_build_encode_key_order(struct lua_State *L)
+{
+	assert(lua_isfunction(L, -1));
+	assert(lua_istable(L, -2));
+	/* const tab, func */
+
+	int len = 0;
+	lua_newtable(L);
+	/* const table, func, table */
+	lua_pushnil(L);
+	while (lua_next(L, -4)) {
+		/* const table, t order, table, key, val */
+		lua_pushinteger(L, ++len);
+		/* const table, t order, table, key, val, i */
+		lua_pushvalue(L, -3);
+		/* const table, t order, table, key, val, i, key */
+		lua_rawset(L, -5);
+		/* const table, t order, table, key, val */
+		lua_pop(L, 1);
+		/* const table, t order, table, key */
+	}
+	/* const table, func, table */
+	lua_insert(L, -2);
+	/* const table, table, func */
+	/*
+	 * Push reserved copy of the table.
+	 * `table.sort()` returns 0 results.
+	 */
+	lua_pushvalue(L, -2);
+	lua_insert(L, -2);
+	/* const table, table, table, func */
+
+	lua_getglobal(L, "table");
+	lua_getfield(L, -1, "sort");
+	/* const table, table, table, func, tab module, table.sort */
+	lua_remove(L, -2);
+	lua_insert(L, -3);
+	/* const table, table, table.sort, table, func */
+	lua_call(L, 2, 0);
+	/* const table, t order */
+}
+
 int
 luaL_next_field(struct lua_State *L, struct luaL_serializer *cfg)
 {
@@ -684,6 +741,8 @@ luaL_next_field(struct lua_State *L, struct luaL_serializer *cfg)
 		/* const table, nil, nil */
 		lua_pop(L, 2);
 		luaL_push_encode_key_order(L, cfg);
+		if (lua_isfunction(L, -1))
+			luaL_build_encode_key_order(L);
 		lua_newtable(L);
 		/* const table, table order, table */
 

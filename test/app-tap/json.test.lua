@@ -25,7 +25,7 @@ test:plan(1)
 
 test:test("json", function(test)
     local serializer = require('json')
-    test:plan(84)
+    test:plan(86)
 
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
@@ -335,6 +335,18 @@ test:test("json", function(test)
 
     test:is(alive, 0, 'all objects deleted')
 
+    local map_4 = {[-1] = -1, [0] = 0, [1] = 1}
+    local function sort_ascending(a, b)
+        return a < b
+    end
+    local function sort_descending(a, b)
+        return a > b
+    end
+    test:is(j.encode(map_4, {encode_key_order = sort_ascending}),
+            '{"-1":-1,"0":0,"1":1}', 'custom order function ascending')
+    test:is(j.encode(map_4, {encode_key_order = sort_descending}),
+            '{"1":1,"0":0,"-1":-1}', 'custom order function descending')
+
     -- Memory leak tests when encode fails with encode_key_order set.
     _, err_msg = pcall(j.encode, {a = 1, [{}] = 2},
                        {encode_key_order = {'a'}})
@@ -355,7 +367,7 @@ test:test("json", function(test)
             "Expected value but found invalid token on line 1 at character 1 here ' >> a'",
             'mem-leak test for .decode error with options')
     _, err_msg = pcall(j.encode, {}, {encode_key_order = 1})
-    test:is(err_msg, 'encode_key_order option must be a table')
+    test:is(err_msg, 'encode_key_order option must be a table or function')
     --
     -- gh-12726: Check that we used an original key while
     -- iterating, not its serialized form.
