@@ -39,6 +39,7 @@
 #include "trivia/util.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 #include <math.h>
 #include <limits.h>
@@ -48,6 +49,7 @@
 #include "strbuf.h"
 
 #include "lua/utils.h"
+#include "lua/decimal.h"
 #include "lua/serializer.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "diag.h"
@@ -65,6 +67,9 @@ typedef enum {
     T_UINT,
     T_INT,
     T_NUMBER,
+    T_DECIMAL,
+    /* An unquoted integer converted to a string, not an object key. */
+    T_INT_STRING,
     T_BOOLEAN,
     T_NULL,
     T_COLON,
@@ -85,6 +90,8 @@ static const char *json_token_type_name[] = {
     "unsigned int",
     "int",
     "number",
+    "decimal",
+    "int",
     "boolean",
     "null",
     "colon",
@@ -732,10 +739,11 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
 {
     char *endptr;
 
-
+    errno = 0;
     token->type = T_INT;
     token->value.ival = strtoll(json->ptr, &endptr, 10);
     if (token->value.ival == LLONG_MAX) {
+        errno = 0;
         token->type = T_UINT;
         token->value.ival = strtoull(json->ptr, &endptr, 10);
     }
@@ -744,14 +752,55 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
         token->value.number = fpconv_strtod(json->ptr, &endptr);
     }
 
-    if (json->ptr == endptr)
+    if (json->ptr == endptr) {
         json_set_token_error(token, json, "invalid number");
-    else
-        json->ptr = endptr;     /* Skip the processed number */
+        return;
+    }
+    if (token->type != T_NUMBER && errno == ERANGE) {
+        switch (json->cfg->decode_overflow) {
+        case JSON_DECODE_OVERFLOW_CLAMP:
+            /* strtoll()/strtoull() already returned the range boundary. */
+            break;
+        case JSON_DECODE_OVERFLOW_ERROR:
+            json_set_token_error(token, json, "integer outside the supported "
+                                 "range [INT64_MIN, UINT64_MAX]");
+            return;
+        case JSON_DECODE_OVERFLOW_NUMBER:
+            token->type = T_NUMBER;
+            /* strtod() may treat a JSON comma as a decimal separator. */
+            strbuf_reset(json->tmp);
+            strbuf_append_mem_unsafe(json->tmp, json->ptr, endptr - json->ptr);
+            strbuf_ensure_null(json->tmp);
+            token->value.number = fpconv_strtod(strbuf_string(json->tmp, NULL),
+                                              NULL);
+            if (!json->cfg->decode_invalid_numbers &&
+                !isfinite(token->value.number)) {
+                json_set_token_error(token, json,
+                                     "number must not be NaN or Inf");
+                return;
+            }
+            break;
+        case JSON_DECODE_OVERFLOW_DECIMAL:
+        case JSON_DECODE_OVERFLOW_STRING:
+            token->type = json->cfg->decode_overflow ==
+                          JSON_DECODE_OVERFLOW_DECIMAL ? T_DECIMAL :
+                          T_INT_STRING;
+            token->value.string = json->ptr;
+            token->string_len = endptr - json->ptr;
+            break;
+        case JSON_DECODE_OVERFLOW_NIL:
+            token->type = T_NULL;
+            break;
+        default:
+            unreachable();
+        }
+    }
+    json->ptr = endptr;     /* Skip the processed number */
 }
 
 /* Fills in the token struct.
- * T_STRING will return a pointer to the json_parse_t temporary string
+ * Decoded strings use the temporary buffer; overflowing integers converted
+ * to strings or decimals reference the input string directly.
  * T_ERROR will leave the json->ptr pointer at the error.
  */
 static void json_next_token(json_parse_t *json, json_token_t *token)
@@ -1040,6 +1089,7 @@ static void json_process_value(lua_State *l, json_parse_t *json,
 {
     switch (token->type) {
     case T_STRING:
+    case T_INT_STRING:
         lua_pushlstring(l, token->value.string, token->string_len);
         break;;
     case T_UINT:
@@ -1055,6 +1105,17 @@ static void json_process_value(lua_State *l, json_parse_t *json,
     case T_BOOLEAN:
         lua_pushboolean(l, token->value.boolean);
         break;;
+    case T_DECIMAL: {
+        decimal_t dec;
+        if (strtodec(&dec, token->value.string, NULL) == NULL) {
+            json->ptr = token->value.string;
+            json_set_token_error(token, json,
+                                 "integer outside the supported decimal range");
+            json_throw_parse_error(l, json, "value", token);
+        }
+        luaT_pushdecimal(l, &dec);
+        break;
+    }
     case T_OBJ_BEGIN:
         json_parse_object_context(l, json);
         break;;

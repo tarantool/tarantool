@@ -69,6 +69,17 @@ extern __thread int luaL_array_metatable_ref;
 
 /* {{{ luaL_serializer manipulations */
 
+/** How to decode JSON integers outside [INT64_MIN, UINT64_MAX]. */
+enum json_decode_overflow {
+	JSON_DECODE_OVERFLOW_CLAMP,
+	JSON_DECODE_OVERFLOW_ERROR,
+	JSON_DECODE_OVERFLOW_NUMBER,
+	JSON_DECODE_OVERFLOW_DECIMAL,
+	JSON_DECODE_OVERFLOW_STRING,
+	JSON_DECODE_OVERFLOW_NIL,
+	json_decode_overflow_MAX,
+};
+
 /**
  * Common configuration options for Lua serializers (MsgPack, YAML, JSON)
  */
@@ -145,6 +156,8 @@ struct luaL_serializer {
 	int decode_save_metatables;
 	/** Max recursion depts for decoding (CJSON only) */
 	int decode_max_depth;
+	/** JSON integer overflow policy (enum json_decode_overflow). */
+	int decode_overflow;
 
 	/** Enable support for compact represenation (internal, YAML-only). */
 	int has_compact;
