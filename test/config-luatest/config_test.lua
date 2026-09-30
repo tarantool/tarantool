@@ -1828,8 +1828,8 @@ g.test_replication_ssl = function()
     local passwd_file = fio.pathjoin(dir, 'passwd.txt')
     local file = fio.open(passwd_file, {'O_WRONLY', 'O_CREAT'},
                           tonumber('666', 8))
-    file:write('123qwe')
     t.assert(file ~= nil)
+    file:write('123qwe')
     local passwd = '1q2w3e'
     local ciphers = 'ECDHE-RSA-AES256-GCM-SHA384'
 
