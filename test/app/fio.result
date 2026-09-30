@@ -719,7 +719,7 @@ fio.mktree(tree2, tonumber('0777', 8))
 --
 -- The test is skipped for the super user, because it has ability
 -- to perform any file access despite file permissions.
-uid = ffi.C.getuid()
+uid = require('pwd').getpw().id
 ---
 ...
 tmp3 = fio.pathjoin(tmpdir, '5')
