@@ -1,6 +1,14 @@
 local t = require('luatest')
 local treegen = require('luatest.treegen')
-local justrun = require('luatest.justrun').tarantool
+local justrun_tarantool = require('luatest.justrun').tarantool
+
+-- The config module stub below is an override, which is looked up from
+-- the search root, so keep the search root in the process directory.
+local function justrun(dir, env, args, opts)
+    opts = table.copy(opts)
+    opts.setsearchroot = false
+    return justrun_tarantool(dir, env, args, opts)
+end
 
 local g = t.group()
 
