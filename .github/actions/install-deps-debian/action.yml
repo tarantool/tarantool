@@ -24,6 +24,7 @@ runs:
           util-linux
         # Install cmake 3.26.0 if cmake was missing or the cmake version was
         # less than 3.26.0.
+        CMAKE_VERSION=3.26.0
         version_gt() {
           [ "$1" != "$2" ] && [ "$2" = "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" ]
         }
@@ -31,11 +32,12 @@ runs:
         if command -v cmake >/dev/null 2>&1; then
           CURRENT_VERSION=$(cmake --version | head -n 1 | awk '{print $3}')
         fi
-        if version_gt "3.26.0" "$CURRENT_VERSION"; then
+        if version_gt "$CMAKE_VERSION" "$CURRENT_VERSION"; then
           ${SUDO} apt-get purge --auto-remove cmake -y
-          curl -O -L https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-linux-$(uname -i).tar.gz \
-          && ${SUDO} tar -xvf cmake-3.26.0-linux-$(uname -i).tar.gz -C /usr/local --strip-components=1 \
-          && rm cmake-3.26.0-linux-$(uname -i).tar.gz
+          ARCH=$(uname -m)
+          curl -f -O -L https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz
+          ${SUDO} tar -xvf cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz -C /usr/local --strip-components=1
+          rm cmake-${CMAKE_VERSION}-linux-${ARCH}.tar.gz
         fi
         # (Re)install luacheck only if it is not installed (or if another
         # version is installed).
