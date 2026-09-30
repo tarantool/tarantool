@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      - '**full-ci**'
     tags:
       - '**'
     paths:
@@ -73,8 +74,11 @@ jobs:
 
     strategy:
       matrix:
+        # Collect no statistics for a 'full-ci' branch: it is pushed only to
+        # run the CI.
         runner_label:
-          - ${{ (github.event_name != 'pull_request' ||
+          - ${{ ((github.event_name != 'pull_request' &&
+                  !contains(github.ref_name, 'full-ci')) ||
               (github.event.pull_request.head.repo.full_name == github.repository &&
                contains(github.event.pull_request.labels.*.name, 'performance'))) &&
               'performance' || 'regular' }}
