@@ -811,6 +811,12 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 	 * "@builtin/internal.argparse.lua".
 	 */
 	const char *modfile = lua_pushfstring(L, "@builtin/%s.lua", modname);
+	if (luaT_set_module_lazy(L, modname, modsrc, modfile, true)) {
+		if (cord_is_main())
+			builtin_modcache_put(modname, modsrc);
+		lua_pop(L, 1); /* modfile */
+		return;
+	}
 	if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
 		panic("Error loading Lua module %s...: %s",
 		      modname, lua_tostring(L, -1));
@@ -843,6 +849,7 @@ tarantool_lua_init_minimal_impl(lua_State *L)
 	 */
 	lua_newtable(L);
 	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	luaT_builtin_lazy_init(L);
 
 	/*
 	 * Setup paths and loaders.

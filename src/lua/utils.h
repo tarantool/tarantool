@@ -374,6 +374,23 @@ int
 luaT_setmodule(struct lua_State *L, const char *modname);
 
 /**
+ * Make loaders.builtin load a module registered by luaT_set_module_lazy()
+ * at the first access to it.
+ */
+void
+luaT_builtin_lazy_init(struct lua_State *L);
+
+/**
+ * Register a built-in module to be loaded at its first require(), unless
+ * it has to be loaded at startup. Returns whether it is registered. The
+ * module's code gets its name as the argument if pass_modname is set.
+ */
+bool
+luaT_set_module_lazy(struct lua_State *L, const char *modname,
+		     const char *modsrc, const char *chunkname,
+		     bool pass_modname);
+
+/**
  * Extract a string from the Lua stack.
  *
  * Return (const char *) for a string, otherwise return NULL.

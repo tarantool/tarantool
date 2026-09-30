@@ -1178,6 +1178,13 @@ load_lua_sources(struct lua_State *L, const char *const *lua_sources)
 
 		const char *modfile = lua_pushfstring(L,
 			"@builtin/%s.lua", modfile_raw);
+		if (modname != NULL &&
+		    luaT_set_module_lazy(L, modname, modsrc, modfile, false)) {
+			lua_pop(L, 1); /* modfile */
+			if (cord_is_main())
+				builtin_modcache_put(modfile_raw, modsrc);
+			continue;
+		}
 		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile) != 0 ||
 		    lua_pcall(L, 0, 1, 0) != 0)
 			panic("Error loading Lua module %s...: %s",

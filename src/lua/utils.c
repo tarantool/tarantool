@@ -470,7 +470,8 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
 
 	/* Verify that the module is not already registered. */
-	lua_getfield(L, -1, modname);
+	lua_pushstring(L, modname);
+	lua_rawget(L, -2);
 	if (!lua_isnil(L, -1))
 		panic("%s(%s): the module is already registered",
 		      __func__, modname);
@@ -516,7 +517,8 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 
 	/* Get loaders.builtin[modname]. */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
-	lua_getfield(L, -1, modname);
+	lua_pushstring(L, modname);
+	lua_rawget(L, -2);
 
 	/*
 	 * If the same module value is already assigned, do
@@ -552,6 +554,128 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 
 	say_debug("%s(%s): success", __func__, modname);
 	return 0;
+}
+
+/** Registry table: module name -> its loader, until it is loaded. */
+#define BUILTIN_LAZY "_TARANTOOL_BUILTIN_LAZY"
+
+/*
+ * Built-in modules that are loaded at startup all the same: they set up
+ * the module loading itself, extend standard libraries, set globals, set
+ * ffi metatypes of values that C code pushes or register compat options.
+ */
+static const char *const builtin_eager[] = {
+	"internal.minifio", "internal.loaders", "strict", "debug",
+	"tarantool", "table", "string", "buffer", "error", "uuid",
+	"varbinary", "datetime", "compat", "internal.print",
+	"internal.pairs", "help", "env", "iproto", "experimental.threads",
+	"console", "checks.version", "checks", NULL,
+};
+
+/** Load a built-in module registered by luaT_set_module_lazy(). */
+static int
+builtin_lazy_load(struct lua_State *L)
+{
+	const char *modsrc = lua_touserdata(L, lua_upvalueindex(1));
+	const char *chunkname = lua_tostring(L, lua_upvalueindex(2));
+	if (luaL_loadbuffer(L, modsrc, strlen(modsrc), chunkname) != 0)
+		return lua_error(L);
+	int nargs = 0;
+	if (!lua_isnil(L, lua_upvalueindex(3))) {
+		lua_pushvalue(L, lua_upvalueindex(3));
+		nargs = 1;
+	}
+	lua_call(L, nargs, 1);
+	return 1;
+}
+
+/**
+ * __index of loaders.builtin: load a module registered as a lazy one and
+ * register it.
+ */
+static int
+builtin_lazy_index(struct lua_State *L)
+{
+	lua_getfield(L, LUA_REGISTRYINDEX, BUILTIN_LAZY);
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+	if (lua_isnil(L, -1))
+		return 1;
+	/*
+	 * Forget the loader first: a module that requires itself while
+	 * being loaded gets nil, as it would at startup.
+	 */
+	lua_pushvalue(L, 2);
+	lua_pushnil(L);
+	lua_rawset(L, -4);
+	lua_call(L, 0, 1);
+	if (!lua_isnil(L, -1)) {
+		lua_pushvalue(L, 2);
+		lua_pushvalue(L, -2);
+		lua_rawset(L, 1);
+	}
+	return 1;
+}
+
+/**
+ * __newindex of loaders.builtin: an assignment replaces or removes the
+ * module, so the loader of a module that is not loaded yet goes away.
+ */
+static int
+builtin_lazy_newindex(struct lua_State *L)
+{
+	lua_getfield(L, LUA_REGISTRYINDEX, BUILTIN_LAZY);
+	lua_pushvalue(L, 2);
+	lua_pushnil(L);
+	lua_rawset(L, -3);
+	lua_pop(L, 1);
+	lua_rawset(L, 1);
+	return 0;
+}
+
+void
+luaT_builtin_lazy_init(struct lua_State *L)
+{
+	lua_newtable(L);
+	lua_setfield(L, LUA_REGISTRYINDEX, BUILTIN_LAZY);
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	lua_newtable(L);
+	lua_pushcfunction(L, builtin_lazy_index);
+	lua_setfield(L, -2, "__index");
+	lua_pushcfunction(L, builtin_lazy_newindex);
+	lua_setfield(L, -2, "__newindex");
+	lua_setmetatable(L, -2);
+	lua_pop(L, 1);
+}
+
+bool
+luaT_set_module_lazy(struct lua_State *L, const char *modname,
+		     const char *modsrc, const char *chunkname,
+		     bool pass_modname)
+{
+	for (const char *const *p = builtin_eager; *p != NULL; p++) {
+		if (strcmp(*p, modname) == 0)
+			return false;
+	}
+	/* A Lua module that extends a module registered from C. */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	lua_pushstring(L, modname);
+	lua_rawget(L, -2);
+	bool is_registered = !lua_isnil(L, -1);
+	lua_pop(L, 2);
+	if (is_registered)
+		return false;
+	lua_getfield(L, LUA_REGISTRYINDEX, BUILTIN_LAZY);
+	lua_pushlightuserdata(L, (void *)modsrc);
+	lua_pushstring(L, chunkname);
+	if (pass_modname)
+		lua_pushstring(L, modname);
+	else
+		lua_pushnil(L);
+	lua_pushcclosure(L, builtin_lazy_load, 3);
+	lua_setfield(L, -2, modname);
+	lua_pop(L, 1);
+	return true;
 }
 
 const char *
