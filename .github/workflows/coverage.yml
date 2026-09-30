@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      - '**full-ci**'
     tags:
       - '**'
   pull_request:
@@ -98,8 +99,9 @@ jobs:
         run: make -f .test.mk test-coverage
 
       - name: Upload coverage results to coveralls.io
-        # Avoid interference with the coverage of a submodule.
-        if: ${{ !inputs.submodule }}
+        # Avoid interference with the coverage of a submodule. Report no
+        # coverage for a 'full-ci' branch: it is pushed only to run the CI.
+        if: ${{ !inputs.submodule && !contains(github.ref_name, 'full-ci') }}
         run: |
           coveralls-lcov \
             --service-name=github \
