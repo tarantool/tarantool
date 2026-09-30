@@ -2332,7 +2332,7 @@ applier_unwatch_ballot(struct applier *applier)
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
-applier_subscribe(struct applier *applier)
+applier_subscribe(struct applier *applier, bool stop_on_follow)
 {
 	/*
 	 * Applier doesn't need ballot updates once it subscribes. They were
@@ -2493,7 +2493,11 @@ applier_subscribe(struct applier *applier)
 		fiber_testcancel();
 		struct applier_msg *msg = applier_thread_msg_take(applier);
 		msg->f(&msg->base);
+		if (stop_on_follow && applier->state == APPLIER_FOLLOW)
+			break;
 	}
+	if (stop_on_follow)
+		return;
 	unreachable();
 }
 
@@ -2513,6 +2517,8 @@ applier_set_last_error(struct applier *applier, struct error *e)
 {
 	diag_set_error(&applier->diag, e);
 }
+
+#define NO_FINAL_JOIN applier->version_id >= version_id(3, 8, 0)
 
 static int
 applier_f(va_list ap)
@@ -2536,6 +2542,14 @@ applier_f(va_list ap)
 	while (true) {
 		bool try_reconnect = true;
 		bool log_error = true;
+		/*
+		 * Set when this very connection fetched the master's
+		 * snapshot as a part of the new bootstrap protocol of a
+		 * named replica. The replica must first subscribe
+		 * anonymously and catch up, and only then register - see
+		 * below in this function and bootstrap_from_master().
+		 */
+		bool anon_catchup = false;
 		applier_state applier_next_state = APPLIER_OFF;
 		FiberGCChecker gc_check;
 		try {
@@ -2548,6 +2562,24 @@ applier_f(va_list ap)
 			if (tt_uuid_is_nil(&REPLICASET_UUID)) {
 				was_anon = cfg_replication_anon;
 				applier_fetch_snapshot(applier);
+<<<<<<< HEAD
+=======
+				anon_catchup = !was_anon;
+			}
+			if (applier->register_after_catchup &&
+				   !cfg_replication_anon && box_is_anon() &&
+				   applier->version_id >= version_id(3, 8, 0)) {
+				/*
+				 * The instance recovered a snapshot written by
+				 * the new bootstrap protocol but died before it
+				 * could register, so it is still anonymous on
+				 * disk while configured as a named one. Catch up
+				 * as an anonymous subscriber first, exactly like
+				 * a fresh bootstrap does, and only then register
+				 * on a fresh connection - see below.
+				 */
+				anon_catchup = true;
+>>>>>>> c4b3431b39 (Initial commit)
 			}
 			/*
 			 * The instance transitioned from anonymous or is
@@ -2562,8 +2594,10 @@ applier_f(va_list ap)
 			bool need_name =
 				*cfg_instance_name != 0 &&
 				strcmp(INSTANCE_NAME, cfg_instance_name) != 0;
-			if (need_id || need_name) {
-				applier_register(applier);
+			if ((need_id || need_name) && !anon_catchup) {
+				ERROR_INJECT(ERRINJ_APPLIER_BEFORE_REGISTER,
+					     fiber_sleep(TIMEOUT_INFINITY));
+				applier_register(applier, was_anon);
 				/*
 				 * It's hard to catch the exact moment when
 				 * instance id settles, for example, it could
@@ -2577,8 +2611,15 @@ applier_f(va_list ap)
 					raft_cfg_instance_id(box_raft(),
 							     instance_id);
 				}
+			} else if (anon_catchup) {
+				anon_catchup = false;
+				applier->register_after_catchup = false;
+				applier_subscribe(applier, true);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
+				was_anon = true;
+				continue;
 			}
-			applier_subscribe(applier);
+			applier_subscribe(applier, false);
 			/*
 			 * subscribe() has an infinite loop which
 			 * is stoppable only with fiber_cancel().

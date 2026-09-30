@@ -5454,6 +5454,10 @@ bootstrap_from_master(struct replica *master)
 
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	try {
+		/*
+		 * Send FETCH_SNAPSHOT to master and let the applier apply the
+		 * snapshot rows. See box_process_fetch_snapshot().
+		 */
 		applier_resume_to_state(applier, APPLIER_FETCH_SNAPSHOT,
 					TIMEOUT_INFINITY);
 	} catch (FiberIsCancelled *e) {
@@ -5505,12 +5509,29 @@ bootstrap_from_master(struct replica *master)
 	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
+<<<<<<< HEAD
 	if (!cfg_replication_anon) {
+=======
+
+	if (new_bootstrap) {
+		/*
+		 * The applier fiber is paused in APPLIER_READY since the fetch
+		 * has finished. Wake it up and let the applier subscribe to
+		 * the master anonymously, catch up, then register itself on a
+		 * fresh connection and pause again - all inside applier_f().
+		 * The waits below are the same as in box_register_on_master(),
+		 * which promotes a running anonymous replica.
+		 */
+>>>>>>> c4b3431b39 (Initial commit)
 		applier_resume_to_state(applier, APPLIER_REGISTERED,
 					TIMEOUT_INFINITY);
 		applier_resume_to_state(applier, APPLIER_READY,
 					TIMEOUT_INFINITY);
 	}
+<<<<<<< HEAD
+=======
+
+>>>>>>> c4b3431b39 (Initial commit)
 	return true;
 }
 
@@ -5872,6 +5893,42 @@ box_check_configured(void)
 	return 0;
 }
 
+/**
+ * Register a named instance which recovered a checkpoint written by the new
+ * bootstrap protocol (gh-11039) but was restarted before it managed to send
+ * REGISTER. Its snapshot has valid REPLICASET_UUID and INSTANCE_UUID, yet the
+ * instance is absent from _cluster, so it is still anonymous while configured
+ * as a named one. Catch up with the master as a temporary anonymous subscriber
+ * and only then register - the very same order a fresh bootstrap follows - so
+ * as not to deadlock on synchronous transactions. This runs inside box.cfg() so
+ * that it returns with a real non-zero box.info.id.
+ */
+static void
+box_recover_register_named(void)
+{
+	assert(!cfg_replication_anon);
+	assert(box_is_anon());
+	struct replica *master = replicaset_find_join_master();
+	if (master == NULL || master->applier == NULL ||
+	    master->applier->state != APPLIER_CONNECTED) {
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	}
+	struct applier *applier = master->applier;
+	/*
+	 * The applier is parked in APPLIER_CONNECTED after local recovery. Ask
+	 * it to subscribe anonymously, catch up, then register on a fresh
+	 * connection and pause - see applier_f(). It is cleared by the applier
+	 * itself once the catch-up is done; the guard covers a failure.
+	 */
+	applier->register_after_catchup = true;
+	auto guard = make_scoped_guard([applier] {
+		applier->register_after_catchup = false;
+	});
+	applier_resume_to_state(applier, APPLIER_REGISTERED, TIMEOUT_INFINITY);
+	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
+	guard.is_active = false;
+}
+
 static void
 box_cfg_xc(void)
 {
@@ -5997,6 +6054,15 @@ box_cfg_xc(void)
 	 * The instance won't exist in _cluster space if it is an
 	 * anonymous replica, add it manually.
 	 */
+	if (!cfg_replication_anon && box_is_anon()) {
+		/*
+		 * A named instance recovered a new-protocol checkpoint created
+		 * before its REGISTER (gh-11039). Recover as a temporary
+		 * anonymous replica, catch up and register, so that box.cfg()
+		 * still returns with a non-zero box.info.id.
+		 */
+		box_recover_register_named();
+	}
 	if (cfg_replication_anon != box_is_anon())
 		panic("'replication_anon' cfg didn't work");
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
