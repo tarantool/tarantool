@@ -1648,7 +1648,7 @@ netbox_decode_table(struct lua_State *L, const char **data,
 				    (struct mp_ctx *)&ctx);
 	} else {
 		luamp_decode_with_ctx(L, cfg, &response_body.data,
-				      (struct mp_ctx *)&ctx);
+				      (struct mp_ctx *)&ctx, 0);
 	}
 	mp_ctx_destroy((struct mp_ctx *)&ctx);
 }
@@ -1678,7 +1678,7 @@ netbox_decode_value(struct lua_State *L, const char **data,
 				    (struct mp_ctx *)&ctx);
 	} else {
 		luamp_decode_with_ctx(L, cfg, &response_body.data,
-				      (struct mp_ctx *)&ctx);
+				      (struct mp_ctx *)&ctx, 0);
 	}
 	mp_ctx_destroy((struct mp_ctx *)&ctx);
 }
