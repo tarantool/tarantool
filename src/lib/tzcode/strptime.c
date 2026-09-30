@@ -555,11 +555,11 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				/* empty */;
 			int len = cp - buf;
 			if (0 < len && len <= TZ_NAME_MAX_LEN) {
-				strlcpy(zonestr, buf, sizeof(zonestr));
+				strlcpy(zonestr, buf, len + 1);
 
 				const struct date_time_zone *zone;
-				size_t n = timezone_tm_lookup(zonestr, len,
-							      &zone, tm);
+				ssize_t n = timezone_tm_lookup(zonestr, len,
+							       &zone, tm);
 				if (n <= 0)
 					return NULL;
 
