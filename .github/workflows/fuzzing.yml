@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - 'master'
+      # DO NOT MERGE: run the full CI on a push of a 'full-ci' branch.
+      - '**full-ci**'
     tags:
       - '**'
     paths:

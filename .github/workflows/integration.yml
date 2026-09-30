@@ -5,6 +5,8 @@ on:
     branches:
       - 'master'
       - 'release/**'  # release branches
+      # DO NOT MERGE: run the full CI on a push of a 'full-ci' branch.
+      - '**full-ci**'
     tags:
       - '*'
   pull_request:

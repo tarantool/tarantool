@@ -5,6 +5,8 @@ on:
     branches:
       - 'master'
       - 'release/**'
+      # DO NOT MERGE: run the full CI on a push of a 'full-ci' branch.
+      - '**full-ci**'
     tags:
       - '**'
   pull_request:
@@ -99,7 +101,9 @@ jobs:
 
       - name: Upload coverage results to coveralls.io
         # Avoid interference with the coverage of a submodule.
-        if: ${{ !inputs.submodule }}
+        # DO NOT MERGE: don't report the coverage of a branch pushed to run
+        # the CI.
+        if: ${{ !inputs.submodule && !contains(github.ref_name, 'full-ci') }}
         run: |
           coveralls-lcov \
             --service-name=github \
