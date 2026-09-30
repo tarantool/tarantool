@@ -1,6 +1,10 @@
 local t = require('luatest')
 local justrun = require('luatest.justrun')
 
+-- The test uses overrides of built-in modules, which test/helper.lua
+-- disables by default.
+os.setenv('TT_OVERRIDE_BUILTIN', 'true')
+
 local g = t.group('gh-4975')
 
 --[[

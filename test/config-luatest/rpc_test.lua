@@ -10,6 +10,10 @@ local cluster = require('luatest.cluster')
 local socket = require('socket')
 local helpers = require('test.config-luatest.helpers')
 
+-- The test uses overrides of built-in modules, which test/helper.lua
+-- disables by default.
+os.setenv('TT_OVERRIDE_BUILTIN', 'true')
+
 local g = helpers.group()
 
 local function skip_if_no_vshard()

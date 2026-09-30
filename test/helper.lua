@@ -18,3 +18,12 @@ box.cfg = setmetatable({}, {__call = function()
     error('A direct call to `box.cfg` is forbidden' ..
           ' (you are changing the test runner instance)', 0)
 end})
+
+-- Tests start tarantool processes all the time, and a few of them use
+-- overrides of built-in modules, whose lookup takes ~16 ms of every start
+-- (x86_64, RelWithDebInfo). Disable the lookup in the processes that tests
+-- start, unless it is set explicitly: the tests that use overrides enable
+-- it back.
+if os.getenv('TT_OVERRIDE_BUILTIN') == nil then
+    os.setenv('TT_OVERRIDE_BUILTIN', 'false')
+end

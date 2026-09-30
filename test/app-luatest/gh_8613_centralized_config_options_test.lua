@@ -2,6 +2,10 @@ local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun_tarantool = require('luatest.justrun').tarantool
 
+-- The test uses overrides of built-in modules, which test/helper.lua
+-- disables by default.
+os.setenv('TT_OVERRIDE_BUILTIN', 'true')
+
 -- The config module stub below is an override, which is looked up from
 -- the search root, so keep the search root in the process directory.
 local function justrun(dir, env, args, opts)

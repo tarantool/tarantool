@@ -2,6 +2,10 @@ local t = require('luatest')
 local treegen = require('luatest.treegen')
 local justrun = require('luatest.justrun')
 
+-- The test uses overrides of built-in modules, which test/helper.lua
+-- disables by default.
+os.setenv('TT_OVERRIDE_BUILTIN', 'true')
+
 local g = t.group()
 
 -- Core idea: return something that differs from the corresponding
