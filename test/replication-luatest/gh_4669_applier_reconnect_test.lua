@@ -1,6 +1,5 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
-local server = require('luatest.server')
 
 local g = t.group('gh-4669-applier-reconnect')
 
@@ -34,9 +33,9 @@ g.test_applier_connection_on_reconfig = function(g)
             replication = {
                 box.cfg.listen,
                 box.cfg.replication[1],
-                "%s/replica2.sock",
+                "%s",
             }
-        }]]):format(server.vardir))
+        }]]):format(g.replica2.net_box_uri))
     g.replica:eval([[
         box.cfg{
             replication = {
