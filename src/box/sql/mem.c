@@ -781,8 +781,10 @@ str_to_bool(struct Mem *mem)
 	size_t len_true = strlen(str_true);
 	size_t len_false = strlen(str_false);
 
-	for (; isspace(str[0]); str++, len--);
-	for (; isspace(str[len - 1]); len--);
+	for (; len > 0 && isspace(str[0]); str++, len--)
+		;
+	for (; len > 0 && isspace(str[len - 1]); len--)
+		;
 	if (len != len_true && len != len_false)
 		return -1;
 
