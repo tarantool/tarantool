@@ -1550,6 +1550,21 @@ box_eval_replication_quorum(const char *cfg_name, int nr_replicas,
 		"end\n"
 		"return math.floor(res)\n";
 	const char *expr = cfg_gets(cfg_name);
+	/*
+	 * Checking a formula evaluates it for every N and Q, 527 times per
+	 * box.cfg{} with the defaults, which costs ~7 ms in Lua. So the
+	 * default formulas are computed here. With a positive N,
+	 * math.floor(N / 2 + 1) is N / 2 + 1 in integers. Q is undefined
+	 * in Lua when it is zero, and the formula using it fails then.
+	 */
+	if (strcmp(expr, "N / 2 + 1") == 0) {
+		*result_quorum = nr_replicas / 2 + 1;
+		return 0;
+	}
+	if (strcmp(expr, "N - Q + 1") == 0 && synchro_quorum != 0) {
+		*result_quorum = nr_replicas - synchro_quorum + 1;
+		return 0;
+	}
 
 	luaL_loadstring(tarantool_L, loadable);
 	lua_pushstring(tarantool_L, expr);
