@@ -1653,6 +1653,7 @@ box_check_replication_linearizable_quorum(void)
 			tnt_raise(ClientError, ER_CFG, cfg_name,
 				  "the value must be greater than zero and less "
 				  "than maximal number of replicas");
+		return;
 	}
 	/* Same approach as in box_check_replication_synchro_quorum. */
 	for (int i = 1; i < VCLOCK_MAX; i++)
