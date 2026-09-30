@@ -299,6 +299,42 @@ dump:
 	return -1;
 }
 
+int
+xrow_decode_audit_context(const struct xrow_header *row,
+			  const char **audit_context,
+			  uint32_t *audit_context_len)
+{
+	*audit_context = NULL;
+	*audit_context_len = 0;
+	if (row->bodycnt == 0)
+		return 0;
+	assert(row->bodycnt == 1);
+	const char *data = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*data) != MP_MAP)
+		return 0;
+	uint32_t size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (mp_typeof(*data) != MP_UINT) {
+			mp_next(&data);
+			mp_next(&data);
+			continue;
+		}
+		uint64_t key = mp_decode_uint(&data);
+		if (key == IPROTO_AUDIT_CONTEXT) {
+			if (mp_typeof(*data) != iproto_key_type[key]) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "packet body");
+				return -1;
+			}
+			*audit_context = mp_decode_str(
+				&data, audit_context_len);
+			return 0;
+		}
+		mp_next(&data);
+	}
+	return 0;
+}
+
 /**
  * @pre pos points at a valid msgpack
  */
@@ -844,22 +880,34 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->stmt_id = NULL;
+	request->audit_context = NULL;
+	request->audit_context_len = 0;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT &&
-		    key != IPROTO_STMT_ID) {
+		    key != IPROTO_STMT_ID && key != IPROTO_AUDIT_CONTEXT) {
 			mp_next(&data);         /* skip the key */
 			mp_next(&data);         /* skip the value */
 			continue;
 		}
 		const char *value = ++data;     /* skip the key */
 		mp_next(&data);                 /* skip the value */
+		if (key == IPROTO_AUDIT_CONTEXT &&
+		    mp_typeof(*value) != MP_STR) {
+			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+					   "packet body");
+			return -1;
+		}
 		if (key == IPROTO_SQL_BIND)
 			request->bind = value;
 		else if (key == IPROTO_SQL_TEXT)
 			request->sql_text = value;
-		else
+		else if (key == IPROTO_STMT_ID)
 			request->stmt_id = value;
+		else
+			request->audit_context =
+				mp_decode_str(&value,
+					      &request->audit_context_len);
 	}
 	if (request->sql_text != NULL && request->stmt_id != NULL) {
 		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
@@ -1058,6 +1106,10 @@ error:
 		case IPROTO_END_KEY:
 			request->end_key = value;
 			request->end_key_end = data;
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			request->audit_context = mp_decode_str(
+				&value, &request->audit_context_len);
 			break;
 		default:
 			break;
@@ -1733,6 +1785,12 @@ error:
 			request->tuple_formats = value;
 			request->tuple_formats_end = data;
 			break;
+		case IPROTO_AUDIT_CONTEXT:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->audit_context = mp_decode_str(
+				&value, &request->audit_context_len);
+			break;
 		default:
 			continue; /* unknown key */
 		}
@@ -1860,6 +1918,12 @@ error:
 			if (mp_typeof(*value) != MP_ARRAY)
 				goto error;
 			request->scramble = value;
+			break;
+		case IPROTO_AUDIT_CONTEXT:
+			if (mp_typeof(*value) != MP_STR)
+				goto error;
+			request->audit_context = mp_decode_str(
+				&value, &request->audit_context_len);
 			break;
 		default:
 			continue; /* unknown key */
