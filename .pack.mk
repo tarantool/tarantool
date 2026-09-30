@@ -22,6 +22,10 @@ prepare:
 	git clone https://github.com/packpack/packpack.git
 
 package: prepare
+	# The directory is mounted into the build container below. Docker
+	# creates a missing one owned by root, and a build run by a regular
+	# user can't write there then.
+	mkdir -p ${VARDIR}
 	if [ "${OS}" = "alpine" ]; then \
 		if [ -n "${GIT_TAG}" ]; then \
 			export VERSION="$$(echo ${GIT_TAG} | sed 's/-/_/' | sed 's/entrypoint/alpha0/')"; \
