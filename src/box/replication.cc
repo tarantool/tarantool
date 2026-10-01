@@ -744,6 +744,21 @@ replica_clear_applier(struct replica *replica)
 	replica_update_applier_health(replica);
 }
 
+/** Move a non-healthy applier without changing replicaset counters. */
+static void
+replica_rebind_applier(struct replica *src, struct replica *dst)
+{
+	assert(src != dst);
+	assert(src->applier != NULL);
+	assert(dst->applier == NULL);
+	assert(dst->applier_sync_state == APPLIER_DISCONNECTED);
+	assert(!src->is_applier_healthy && !dst->is_applier_healthy);
+	dst->applier_sync_state = src->applier_sync_state;
+	replica_set_applier(dst, src->applier);
+	replica_clear_applier(src);
+	src->applier_sync_state = APPLIER_DISCONNECTED;
+}
+
 static void
 replica_on_applier_sync(struct replica *replica)
 {
@@ -798,10 +813,7 @@ replica_on_applier_connect(struct replica *replica)
 
 	if (orig != NULL) {
 		/* Use existing struct replica */
-		assert(orig->applier_sync_state == APPLIER_DISCONNECTED);
-		orig->applier_sync_state = replica->applier_sync_state;
-		replica_set_applier(orig, applier);
-		replica_clear_applier(replica);
+		replica_rebind_applier(replica, orig);
 		replica_delete(replica);
 		replica = orig;
 	} else {
@@ -848,9 +860,7 @@ replica_on_applier_reconnect(struct replica *replica)
 				  "duplicate connection to the same replica");
 		}
 
-		replica_set_applier(orig, applier);
-		replica_clear_applier(replica);
-		replica->applier_sync_state = APPLIER_DISCONNECTED;
+		replica_rebind_applier(replica, orig);
 		replica = orig;
 	}
 
@@ -1098,8 +1108,7 @@ next:
 							   replica);
 		if (orig != NULL) {
 			/* Use existing struct replica */
-			replica_set_applier(orig, replica->applier);
-			replica_clear_applier(replica);
+			replica_rebind_applier(replica, orig);
 			replica_delete(replica);
 			replica = orig;
 		} else {
