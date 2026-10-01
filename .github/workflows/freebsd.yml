@@ -1,18 +1,22 @@
 name: freebsd
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - 'master'
+      - 'release/**'
+    tags:
+      - '**'
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
   freebsd:
-    # Run on a branch push and on a pull request from a fork. A pull request
-    # from a branch of this repository is tested by the push of that branch.
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name != github.repository
+    # The workflow-level `on` clause skips most runs in a fork, but we have to
+    # skip long-lived branches and tags on the job level.
+    if: github.repository_owner == 'tarantool'
 
     # ubuntu-latest will be 26.04 soon. Switch ahead of time.
     #
