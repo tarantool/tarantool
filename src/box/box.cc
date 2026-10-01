@@ -4760,7 +4760,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	     strcmp(replica->name, req.instance_name) != 0)) {
 		struct replica *other = replica_by_name(req.instance_name);
 		if (other != NULL && other != replica &&
-		    replica_has_connections(other)) {
+		    !replica_can_replace(other)) {
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));

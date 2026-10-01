@@ -578,6 +578,10 @@ replica_clear_id(struct replica *replica);
 bool
 replica_has_connections(const struct replica *replica);
 
+/** Check whether connections allow replacing the replica's registration. */
+bool
+replica_can_replace(const struct replica *replica);
+
 /** Keep a replica alive until a registration change is completed. */
 static inline void
 replica_ref(struct replica *replica)

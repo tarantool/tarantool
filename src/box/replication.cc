@@ -717,6 +717,12 @@ replica_has_connections(const struct replica *replica)
 	return replica->has_incoming_connection || replica->applier != NULL;
 }
 
+bool
+replica_can_replace(const struct replica *replica)
+{
+	return !replica_has_connections(replica);
+}
+
 /** A helper to track applier health on its state change. */
 static void
 replica_update_applier_health(struct replica *replica)
