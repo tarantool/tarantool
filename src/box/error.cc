@@ -346,8 +346,11 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 	/*
 	 * Don't run the triggers when create after marshaling
 	 * through network.
+	 *
+	 * Don't run the triggers in application threads to avoid
+	 * MT races.
 	 */
-	if (run_triggers) {
+	if (run_triggers && cord_is_main()) {
 		if (trigger_run(&on_access_denied, &trigger_ctx) != 0)
 			diag_log();
 	}
