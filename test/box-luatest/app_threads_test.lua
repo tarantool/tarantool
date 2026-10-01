@@ -1,6 +1,7 @@
 local datetime = require('datetime')
 local decimal = require('decimal')
 local ffi = require('ffi')
+local fiber = require('fiber')
 local net = require('net.box')
 local socket = require('socket')
 local uuid = require('uuid')
@@ -784,4 +785,39 @@ g.test_metrics = function(cg)
             },
         })
     end, {}, {_thread_id = 1})
+end
+
+g.test_concurrent_access_denial = function(cg)
+    local conn = net.connect(cg.server.net_box_uri)
+    local fibers = {}
+    for _ = 1, 10 do
+        local f = fiber.new(function()
+            for _ = 1, 100 do
+                t.assert_error_covers({
+                    type = 'AccessDeniedError',
+                    access_type = 'Execute',
+                    object_type = 'function',
+                    object_name = 'tonumber',
+                    user = 'guest',
+                }, conn.call, conn, 'tonumber', {'123'}, {
+                    _thread_id = math.random(4),
+                })
+                t.assert_error_covers({
+                    type = 'AccessDeniedError',
+                    access_type = 'Execute',
+                    object_type = 'universe',
+                    object_name = '',
+                    user = 'guest',
+                }, conn.eval, conn, [[return 123]], {}, {
+                    _thread_id = math.random(4),
+                })
+            end
+        end)
+        f:set_joinable(true)
+        table.insert(fibers, f)
+    end
+    for _, f in ipairs(fibers) do
+        t.assert_equals({f:join(10)}, {true})
+    end
+    conn:close()
 end
