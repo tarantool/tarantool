@@ -3574,7 +3574,12 @@ tx_process_override(struct cmsg *m)
 		unreachable();
 	}
 	if (route != NULL) {
-		assert(m->hop[1].f == route[1].f);
+		/*
+		 * The fallback route can have a different next hop, but
+		 * the next pipe was already saved by cmsg_deliver().
+		 */
+		assert(m->hop->pipe == route->pipe);
+		cmsg_init(m, route);
 		route->f(m);
 		return;
 	}
