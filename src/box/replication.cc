@@ -93,6 +93,10 @@ enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
 static void
 replica_delete(struct replica *replica);
 
+/** Detach the applier from the replica. */
+static void
+replica_clear_applier(struct replica *replica);
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -551,8 +555,12 @@ replica_delete(struct replica *replica)
 	assert(replica->ref_count == 0);
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
-	if (replica->applier != NULL)
-		applier_delete(replica->applier);
+	if (replica->applier != NULL) {
+		struct applier *applier = replica->applier;
+		replica_clear_applier(replica);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	if (replica->gc_checkpoint_ref != NULL)
@@ -720,7 +728,9 @@ replica_has_connections(const struct replica *replica)
 bool
 replica_can_replace(const struct replica *replica)
 {
-	return !replica_has_connections(replica);
+	return !replica->has_incoming_connection &&
+	       (replica->applier == NULL ||
+		replica->applier->state == APPLIER_STOPPED);
 }
 
 /** A helper to track applier health on its state change. */
@@ -776,6 +786,34 @@ replica_rebind_applier(struct replica *src, struct replica *dst)
 	replica_set_applier(dst, src->applier);
 	replica_clear_applier(src);
 	src->applier_sync_state = APPLIER_DISCONNECTED;
+}
+
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica)
+{
+	if (old_replica->id != REPLICA_ID_NIL)
+		return;
+	struct applier *applier = old_replica->applier;
+	if (applier == NULL || applier->state != APPLIER_STOPPED)
+		return;
+	assert(old_replica->applier_sync_state == APPLIER_STOPPED);
+	if (new_replica->applier == NULL) {
+		replica_rebind_applier(old_replica, new_replica);
+	} else {
+		replica_clear_applier(old_replica);
+		old_replica->applier_sync_state = APPLIER_DISCONNECTED;
+		say_warn("replica %s already has an applier; "
+			 "discarding stopped applier to %s at %s",
+			 tt_uuid_str(&new_replica->uuid),
+			 tt_uuid_str(&old_replica->uuid),
+			 applier_uri_str(applier));
+		struct error *error = diag_last_error(&applier->diag);
+		if (error != NULL)
+			error_log(error);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 }
 
 static void

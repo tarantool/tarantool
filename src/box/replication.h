@@ -593,6 +593,11 @@ replica_ref(struct replica *replica)
 void
 replica_unref(struct replica *replica);
 
+/** Transfer a stopped applier, or log its error if the destination has one. */
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica);
+
 /**
  * Collects garbage of a replica that is gone for a while: removes associated
  * WAL GC state including persistent one and if the replica is anonymous, it

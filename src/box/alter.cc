@@ -4692,6 +4692,8 @@ struct cluster_uuid_change {
 	uint32_t id;
 	/** Name before the replacement. */
 	char name[NODE_NAME_SIZE_MAX];
+	/** Commit handler. */
+	struct trigger on_commit;
 	/** Rollback handler. */
 	struct trigger on_rollback;
 };
@@ -4703,6 +4705,20 @@ cluster_uuid_change_destroy(struct trigger *trigger)
 	struct cluster_uuid_change *change = (typeof(change))trigger->data;
 	replica_unref(change->old_replica);
 	replica_unref(change->new_replica);
+}
+
+/** Commit an instance UUID replacement. */
+static int
+on_commit_cluster_set_uuid(struct trigger *trigger, void * /* event */)
+{
+	struct cluster_uuid_change *change = (typeof(change))trigger->data;
+	/*
+	 * Defer the transfer: replication reconfiguration may make it
+	 * impossible to roll back.
+	 */
+	replica_rebind_stopped_applier(
+		change->old_replica, change->new_replica);
+	return 0;
 }
 
 /** Roll back an instance UUID replacement. */
@@ -4828,6 +4844,8 @@ on_replace_dd_cluster_set_uuid(struct replica *old_replica,
 	change->old_replica = old_replica;
 	trigger_create(&change->on_rollback, on_rollback_cluster_set_uuid,
 		       change, cluster_uuid_change_destroy);
+	trigger_create(&change->on_commit, on_commit_cluster_set_uuid,
+		       change, NULL);
 	replica_ref(old_replica);
 	replica_set_name(old_replica, "");
 	replica_clear_id(old_replica);
@@ -4839,6 +4857,7 @@ on_replace_dd_cluster_set_uuid(struct replica *old_replica,
 	change->new_replica = new_replica;
 	replica_ref(new_replica);
 	txn_stmt_on_rollback(stmt, &change->on_rollback);
+	txn_stmt_on_commit(stmt, &change->on_commit);
 	return 0;
 }
 
