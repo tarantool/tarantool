@@ -1,14 +1,8 @@
-local ffi = require('ffi')
 local minifio = require('internal.minifio')
 
 -- Several file manipulation functions without dependencies on
 -- tarantool's built-in modules to use at early initialization
 -- stage.
-
-ffi.cdef([[
-    char *
-    dirname(char *path);
-]])
 
 -- {{{ Functions exposed by fio
 
@@ -16,6 +10,7 @@ ffi.cdef([[
 --
 -- List them to ease searching by a function name.
 assert(type(minifio.cwd) == 'function')
+assert(type(minifio.dirname) == 'function')
 assert(type(minifio.script) == 'function')
 
 function minifio.pathjoin(...)
@@ -87,24 +82,6 @@ function minifio.abspath(path)
 end
 
 -- }}} Functions exposed by fio
-
--- {{{ Functions replaced by fio
-
--- Similar to fio.dirname, but it doesn't use
--- cord_ibuf_take()/cord_ibuf_put().
-function minifio.dirname(path)
-    if type(path) ~= 'string' then
-        error("Usage: minifio.dirname(path)", 0)
-    end
-    -- Can't just cast path to char * - on Linux dirname modifies
-    -- its argument.
-    local bsize = #path + 1
-    local buf = ffi.new('char[?]', bsize)
-    ffi.copy(buf, ffi.cast('const char *', path), bsize)
-    return ffi.string(ffi.C.dirname(buf))
-end
-
--- }}} Functions replaced by fio
 
 -- Functions to expose from fio as is. List them separately to
 -- reduce probability of a mistake.
