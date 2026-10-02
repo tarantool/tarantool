@@ -100,7 +100,7 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	if (trigger->push_event != NULL) {
 		nargs = trigger->push_event(L, event);
 		if (nargs < 0)
-			goto out;
+			goto cleanup;
 	}
 	/*
 	 * There are two cases why we can't access `trigger` after
@@ -115,19 +115,14 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	lbox_pop_event_f pop_event = trigger->pop_event;
 	trigger = NULL;
 	if (luaT_call(L, nargs, LUA_MULTRET))
-		goto out;
+		goto cleanup;
 	int nret = lua_gettop(L) - top;
 	if (pop_event != NULL &&
-	    pop_event(L, nret, event) != 0) {
-		lua_settop(L, top);
-		goto out;
-	}
-	/*
-	 * Clear the stack after pop_event saves all
-	 * the needed return values.
-	 */
-	lua_settop(L, top);
+	    pop_event(L, nret, event) != 0)
+		goto cleanup;
 	rc = 0;
+cleanup:
+	lua_settop(L, top);
 out:
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	return rc;
