@@ -435,7 +435,7 @@ function methods._collect(self, opts)
         elseif source.type == 'cluster' then
             cluster_config:validate(source:get())
         else
-            assert(false)
+            error('unreachable')
         end
 
         -- Merge configurations from the sources.
@@ -478,7 +478,7 @@ function methods._collect(self, opts)
         elseif source.type == 'instance' then
             source_iconfig = source:get()
         else
-            assert(false)
+            error('unreachable')
         end
         iconfig = instance_config:merge(source_iconfig, iconfig)
 
@@ -595,7 +595,7 @@ function methods._apply_on_startup(self, opts)
 
         self._configdata_applied = self._configdata
     else
-        assert(false)
+        error('unreachable')
     end
 end
 

@@ -44,7 +44,7 @@ g.test_wal_queue_rollback_in_flight = function(cg)
             end)
         end
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        local f2, f3 = nil
+        local f2, f3 = nil, nil
         --
         -- The first txn goes to WAL. The other 2 txns wait for free space in
         -- the journal queue. When the first txn gets committed, it wakes the

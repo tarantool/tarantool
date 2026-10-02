@@ -39,7 +39,7 @@ local function as_int32(value)
     elseif type(value) == 'cdata' and ffi.istype(uint64_t, value) then
         ctype = 'uint32_t[1]'
     else
-        assert(false)
+        error('unreachable')
     end
     local p = ffi.new(ctype)
     p[0] = value
@@ -57,7 +57,7 @@ local function as_int64(value)
     elseif type(value) == 'cdata' and ffi.istype(uint64_t, value) then
         ctype = 'uint64_t[1]'
     else
-        assert(false)
+        error('unreachable')
     end
     local p = ffi.new(ctype)
     p[0] = value

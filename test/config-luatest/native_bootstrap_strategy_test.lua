@@ -88,7 +88,7 @@ local function verify_bootstrap_leader(cluster, exp_leader)
     elseif type(exp_leader) == 'table' then
         t.assert_items_include(exp_leader, {leader})
     else
-        assert(false)
+        error('unreachable')
     end
 
     return leader

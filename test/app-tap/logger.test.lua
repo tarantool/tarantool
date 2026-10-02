@@ -283,7 +283,7 @@ test:is(file:read():match('I>%s+(.*)'), '{"message":"value"}', "message not drop
 local gh3853 = {file = 'c://autorun.bat'}
 log.info(gh3853)
 test:is(gh3853.file, "c://autorun.bat", "gh3853 is not modified")
-file:read() -- skip line
+local _ = file:read() -- skip line
 
 local function help() log.info("gh-2340: %s %s", 'help') end
 

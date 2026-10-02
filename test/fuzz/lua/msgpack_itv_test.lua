@@ -74,6 +74,8 @@ local function TestOneInput(buf)
   end
   local encoded_itv = msgpack.encode(dt_itv)
   local res = msgpack.decode(encoded_itv)
+  -- The analyzer considers is_equal_itv() to be always truthy.
+  ---@diagnostic disable-next-line: unnecessary-assert
   assert(is_equal_itv(itv, res))
 end
 

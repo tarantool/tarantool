@@ -140,8 +140,13 @@ g.test_entity_execute_access = function(cg)
     for _, f in fun.chain(lua_funcs, registered_lua_funcs) do
         t.assert(cg.call(f))
     end
-    for _, f in ipairs(
-            stored_lua_funcs, c_funcs, builtins, registered_builtins) do
+    for _, f in ipairs(stored_lua_funcs) do
+        t.assert_error_msg_equals(access_err(f), cg.call, f)
+    end
+    for _, f in ipairs(c_funcs) do
+        t.assert_error_msg_equals(access_err(f), cg.call, f)
+    end
+    for _, f in fun.chain(builtins, registered_builtins) do
         t.assert_error_msg_equals(access_err(f), cg.call, f)
     end
 end
@@ -187,7 +192,10 @@ g.test_entity_plus_object_execute_access = function(cg)
     for _, f in fun.chain(lua_funcs, registered_lua_funcs) do
         t.assert(cg.call(f))
     end
-    for _, f in ipairs(stored_lua_funcs, c_funcs) do
+    for _, f in ipairs(stored_lua_funcs) do
+        t.assert_error_msg_equals(access_err(f), cg.call, f)
+    end
+    for _, f in ipairs(c_funcs) do
         t.assert_error_msg_equals(access_err(f), cg.call, f)
     end
     for _, f in fun.chain(builtins, registered_builtins) do

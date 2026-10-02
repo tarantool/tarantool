@@ -231,7 +231,7 @@ local function oneof(tbl)
     assert(type(tbl) == 'table')
     assert(next(tbl) ~= nil)
 
-    local n = table.getn(tbl)
+    local n = #tbl
     local idx = math.random(1, n)
     return tbl[idx]
 end
@@ -244,6 +244,8 @@ local function unique_ids(max_num_ids)
     return function()
         local id = math.random(#ids)
         local v = ids[id]
+        -- The analyzer considers ids[id] to be always falsy.
+        ---@diagnostic disable-next-line: unnecessary-assert
         assert(v)
         table.remove(ids, id)
         return v
@@ -458,7 +460,7 @@ local function random_space_format(engine)
     assert(type(engine) == 'string')
     local types = supported_tarantool_types(engine)
     local space_format = {}
-    local min_num_fields = table.getn(keys(types))
+    local min_num_fields = #keys(types)
     local max_num_fields = min_num_fields + 10
     local num_fields = math.random(min_num_fields, max_num_fields)
     for i, datatype in ipairs(keys(types)) do
@@ -744,14 +746,14 @@ local function setup_space(engine_name, space_name)
     -- TODO: support `foreign_key`.
     local space_opts = {
         engine = engine_name,
-        field_count = oneof({0, table.getn(space_format)}),
+        field_count = oneof({0, #space_format}),
         format = space_format,
         if_not_exists = oneof({true, false}),
         is_local = oneof({true, false}),
     }
     -- Memcs does not support variable field count.
     if space_opts.engine == 'memcs' then
-        space_opts.field_count = table.getn(space_format)
+        space_opts.field_count = #space_format
     end
     if space_opts.engine == 'memtx' then
         space_opts.temporary = oneof({true, false})
@@ -846,7 +848,7 @@ local function index_opts(space, is_primary)
     -- We need at least one field in a table `possible_fields` and
     -- code below add such field. Field types passed to `oneof()`
     -- is a set of types supported by all indices except `RTREE`.
-    if (table.getn(possible_fields) == 0) then
+    if (#possible_fields == 0) then
         local field = {
             type = idx ~= 'RTREE' and
                    oneof({'string', 'unsigned', 'varbinary'}) or 'array',
@@ -854,10 +856,10 @@ local function index_opts(space, is_primary)
         }
         table.insert(possible_fields, field)
     end
-    local n_parts = math.random(1, table.getn(possible_fields))
+    local n_parts = math.random(1, #possible_fields)
     local id = unique_ids(n_parts)
     local is_nullable_support = not is_primary and
-        tarantool_indices[opts.type].is_nullable_support
+        tarantool_indices[idx].is_nullable_support
     for i = 1, n_parts do
         local field_id = id()
         local field = possible_fields[field_id]
@@ -885,7 +887,7 @@ local function index_opts(space, is_primary)
             part.type = 'unsigned'
         end
         table.insert(opts.parts, part)
-        if not tarantool_indices[opts.type].is_multipart and
+        if not tarantool_indices[idx].is_multipart and
            i == 1 then
             break
         end
@@ -1091,7 +1093,7 @@ end
 --  - value (lua_value) – what value will be applied.
 local function random_tuple_operations(space)
     local space_format = space.format_object:totable()
-    local num_fields = math.random(table.getn(space_format))
+    local num_fields = math.random(#space_format)
     local tuple_ops = {}
     local id = unique_ids(num_fields)
     for _ = 1, math.random(num_fields) do
@@ -1502,7 +1504,7 @@ local function toggle_random_errinj(errinj, max_enabled, space)
     log.info('Enabled fault injections: %s',
              json.encode(enabled_errinj))
     local errinj_val, errinj_name
-    if table.getn(enabled_errinj) >= max_enabled then
+    if #enabled_errinj >= max_enabled then
         errinj_name = oneof(enabled_errinj)
         errinj_val = errinj[errinj_name].disable(space)
         errinj[errinj_name].is_enabled = false

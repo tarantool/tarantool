@@ -64,7 +64,6 @@ local function parse_expr(lexer, min_bpower)
         -- All the exits from the recursive parse_expr() call with
         -- zero min_bpower are either with ')' or if there are no
         -- more tokens.
-        assert(token.value == ')')
     else
         error(('Unexpected token %q'):format(token.value), 0)
     end
@@ -183,7 +182,7 @@ local function validate_expr(node, vars)
         validate_expr(node.left, vars)
         validate_expr(node.right, vars)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -248,7 +247,7 @@ local function evaluate(node, vars)
         local right = evaluate(node.right, vars)
         return op(left, right)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 

@@ -831,6 +831,9 @@ local samples = {
     true,
     {},
     function() end,
+    -- emmylua_check: false positive, see
+    -- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1249
+    ---@diagnostic disable-next-line: missing-parameter
     newproxy(),
     box.NULL,
     1LL,
@@ -2942,7 +2945,7 @@ g.test_filter_array = function()
                 data = data[path],
             }
         else
-            assert(false)
+            error("unreachable")
         end
     end
 
@@ -4072,7 +4075,7 @@ local function verify_merge(s)
             bv = 'bbb'
         end
     else
-        assert(false)
+        error("unreachable")
     end
 
     -- 1. A scalar/array field is present only in record/map A.

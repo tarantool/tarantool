@@ -81,6 +81,7 @@ M['metrics.include'] = function(data, w)
         return nil
     end
 
+    ---@type table|nil, table|nil
     local schema_enum, schema_string
 
     -- We cannot use `find_variant` here because both variants have the same

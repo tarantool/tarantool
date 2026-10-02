@@ -598,7 +598,7 @@ local function filter(opts)
         -- Only continue with already polled instances.
         connected_candidates = static_candidates
     else
-        assert(false, 'Unexpected _wait_mode value.')
+        error('Unexpected _wait_mode value.')
     end
 
     local dynamic_candidates = {}

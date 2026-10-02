@@ -659,6 +659,7 @@ local on_schema_replace_trigger_is_set = false
 -- version. It's impossible to use the internal call
 -- `box.schema.needs_upgrade()` because at the moment we
 -- are granting/revoking privileges its value isn't updated.
+---@type boolean
 local schema_is_upgraded = false
 
 -- The conditional is broadcasted when the schema was upgraded to
@@ -1053,6 +1054,9 @@ local function sync_credentials_worker()
         }, {key = not_upgraded_alert_key})
 
         schema_is_upgraded_cond:wait()
+        -- The analyzer narrows schema_is_upgraded to false and does not
+        -- invalidate the narrowing after wait().
+        ---@diagnostic disable-next-line: unnecessary-assert
         assert(schema_is_upgraded)
 
         config._aboard:drop(not_upgraded_alert_key)

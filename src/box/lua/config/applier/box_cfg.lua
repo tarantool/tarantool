@@ -134,7 +134,7 @@ local function log_destination(log)
         end
         return res
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -270,7 +270,7 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
             assert(mode == nil)
             box_cfg.read_only = true
         else
-            assert(false)
+            error('unreachable')
         end
     elseif failover == 'manual' then
         -- Set RO/RW based on the 'leader' replicaset option.
@@ -330,7 +330,7 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
         elseif box_cfg.election_mode == 'candidate' then
             box_cfg.read_only = false -- means no restrictions
         else
-            assert(false)
+            error('unreachable')
         end
     elseif failover == 'supervised' then
         -- If replication.bootstrap_strategy = supervised or
@@ -418,7 +418,7 @@ local function set_ro_rw(config, box_cfg, post_box_cfg_hooks)
             post_box_cfg_hooks:add(normalize_read_only)
         end
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -1112,7 +1112,7 @@ local function force_ro_on_startup(configdata, box_cfg)
         elseif failover == 'manual' then
             has_rw = configdata:leader() ~= nil
         else
-            assert(false)
+            error('unreachable')
         end
         if not has_rw then
             error(('Startup failure.\nNo leader to register new ' ..
@@ -1382,11 +1382,9 @@ local function set_bootstrap_strategy_native(configdata, box_cfg)
             box.ctl.make_bootstrap_leader({graceful = true})
         end
     elseif failover == 'supervised' then
-        -- Unreachable.
-        assert(false)
+        error('unreachable')
     else
-        -- Unreachable.
-        assert(false)
+        error('unreachable')
     end
 end
 

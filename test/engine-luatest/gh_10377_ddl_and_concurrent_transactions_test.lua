@@ -40,7 +40,7 @@ local function tx_abort_on_ddl_test_prepare(cg)
                 elseif params.scenario == 'drop_space' then
                     space:drop()
                 else
-                    assert(false)
+                    error('unreachable')
                 end
             end)
             f:set_joinable(true)

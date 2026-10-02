@@ -661,7 +661,6 @@ local function never_accept_nonempty_array(schema)
     --  | }))
     --  |
     --  | s:validate({'a', 'b', 'c'}) -- OK
-    assert(schema.type == 'map')
     local function schema_never_accept_number(schema)
         if is_scalar(schema) then
             local scalar_def = scalars[schema.type]
@@ -984,7 +983,7 @@ local function validate_impl(schema, data, ctx)
                 'variant #%d (%s)', variant_index, table.concat(errors, '; '))
         end
     else
-        assert(false)
+        error('unreachable')
     end
 
     validate_by_allowed_values(schema, data, ctx)
@@ -1208,7 +1207,7 @@ local function get_impl(schema, data, ctx)
         -- normalize_path() function.
         walkthrough_error(ctx, 'Indexing an array is not supported yet')
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -1379,7 +1378,6 @@ local function set_impl(schema, data, rhs, ctx)
                 walkthrough_error(ctx, 'No such field in the schema')
             end
         else
-            assert(schema.type == 'map')
             field_def = schema.value
         end
         assert(field_def ~= nil)
@@ -1417,7 +1415,7 @@ local function set_impl(schema, data, rhs, ctx)
         -- normalize_path() function.
         walkthrough_error(ctx, 'Indexing an array is not supported yet')
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -1603,7 +1601,7 @@ local function filter_impl(schema, data, f, ctx)
             walkthrough_leave(ctx)
         end
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -1822,7 +1820,7 @@ function map_impl(schema, data, f, ctx)
         end
         return res
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -2156,7 +2154,7 @@ local function merge_impl(schema, a, b, ctx)
         end
         return res
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -2238,7 +2236,7 @@ local function schema_pairs_impl(schema, ctx)
     elseif schema.type == 'array' then
         schema_pairs_append_node(schema, ctx)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -2334,7 +2332,7 @@ local function jsonschema_impl(schema, ctx)
         end
         return set_common_jsonschema_fields(res, schema)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 
@@ -2504,7 +2502,7 @@ local function preprocess_schema(schema, ctx)
     elseif schema.type == 'array' then
         res.items = preprocess_schema(schema.items, ctx)
     else
-        assert(false)
+        error('unreachable')
     end
 
     res.computed = preprocess_leave(ctx)
@@ -2612,7 +2610,7 @@ local function validate_schema_impl(schema, ctx)
         validate_schema_impl(schema.items, ctx)
         walkthrough_leave(ctx)
     else
-        assert(false)
+        error("unreachable")
     end
 end
 
@@ -2950,7 +2948,7 @@ fromenv = function(env_var_name, raw_value, schema)
     elseif schema.type == 'array' then
         return array_from_env(env_var_name, raw_value, schema)
     else
-        assert(false)
+        error('unreachable')
     end
 end
 

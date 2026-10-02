@@ -30,6 +30,7 @@ local function wait_process_completion(pid, timeout)
 end
 
 --- Open file on reading with timeout.
+---@return any
 local function open_with_timeout(filename, timeout)
     local fh
     local start_time = clock.monotonic()

@@ -271,7 +271,6 @@ local function build_opts(opts)
     end
     -- Attention: setting RFC3986.plus to true will break expression with
     -- choosing user and default value below.
-    assert(RFC3986.plus == false)
     local options = {
         unreserved = (opts and opts.unreserved) or RFC3986.unreserved,
         plus = (opts and opts.plus) or RFC3986.plus,

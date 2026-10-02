@@ -309,7 +309,7 @@ local function read_context_var_noexc(base_dir, def)
         local path = file.rebase_file_path(base_dir, def.file)
         return pcall(file.universal_read, path, 'file')
     else
-        assert(false)
+        error("unreachable")
     end
 end
 

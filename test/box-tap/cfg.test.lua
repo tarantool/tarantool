@@ -93,6 +93,9 @@ status, result = pcall(function() return box.NULL end)
 test:ok(status and result == msgpack.NULL, "box.NULL without box.cfg")
 status = pcall(box.session.id)
 test:ok(status, "box.session without box.cfg")
+-- emmylua_check: false positive, see
+-- https://github.com/EmmyLuaLs/emmylua-analyzer-rust/issues/1250
+---@diagnostic disable-next-line: missing-parameter
 status, result = pcall(box.tuple.new, {1, 2, 3})
 test:ok(status and result[1] == 1, "box.tuple without box.cfg")
 
