@@ -176,6 +176,8 @@ struct ast_select {
 	struct ast_expr *limit;
 	/** OFFSET clause of the SELECT. */
 	struct ast_expr *offset;
+	/** True if the OFFSET precedes the LIMIT: LIMIT <offset>, <limit>. */
+	bool is_offset_first;
 	/** WITH clause of the SELECT. */
 	struct ast_with_list *with;
 	/** Flags of the SELECT. */
