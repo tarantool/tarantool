@@ -327,14 +327,6 @@ lbox_fio_lseek(struct lua_State *L)
 	return 1;
 }
 
-#if defined(__APPLE__)
-static int
-lbox_fio_pushtimespec(struct lua_State *L, const time_t *ts)
-{
-	lua_pushnumber(L, *ts);
-	return 1;
-}
-#else
 static int
 lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 {
@@ -343,7 +335,6 @@ lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 	lua_pushnumber(L, ts->tv_sec + nsec);
 	return 1;
 }
-#endif
 
 #define PUSHTABLE(name, method, value)	{	\
 	lua_pushliteral(L, name);		\
@@ -395,9 +386,9 @@ lbox_fio_pushstat(struct lua_State *L, int res, const struct stat *stat)
 	PUSHTABLE("blksize", lua_pushinteger, stat->st_blksize);
 	PUSHTABLE("blocks", lua_pushinteger, stat->st_blocks);
 	#if defined(__APPLE__)
-		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctime);
-		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtime);
-		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atime);
+		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctimespec);
+		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtimespec);
+		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atimespec);
 	#else
 		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
 		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
