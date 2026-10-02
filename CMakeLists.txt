@@ -690,6 +690,27 @@ if(ENABLE_BACKTRACE)
 endif()
 
 #
+# mimalloc
+#
+if(TARGET_OS_LINUX)
+    set(ENABLE_MIMALLOC_NEW_DELETE_DEFAULT ON)
+else()
+    set(ENABLE_MIMALLOC_NEW_DELETE_DEFAULT OFF)
+endif()
+option(ENABLE_MIMALLOC_NEW_DELETE
+    "Serve C++ operator new/delete from the bundled mimalloc"
+    ${ENABLE_MIMALLOC_NEW_DELETE_DEFAULT})
+if(ENABLE_MIMALLOC_NEW_DELETE)
+    if(NOT TARGET_OS_LINUX)
+        message(FATAL_ERROR
+            "ENABLE_MIMALLOC_NEW_DELETE is supported only on Linux")
+    endif()
+    include(BuildMimalloc)
+    include_directories(${MIMALLOC_INCLUDE_DIR})
+    add_dependencies(build_bundled_libs bundled-mimalloc)
+endif()
+
+#
 # LuaJIT
 #
 # Patched.
@@ -948,6 +969,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND
+    ENABLE_MIMALLOC_NEW_DELETE
     ENABLE_FEEDBACK_DAEMON)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})

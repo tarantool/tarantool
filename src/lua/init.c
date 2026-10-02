@@ -788,6 +788,19 @@ luaopen_tarantool(lua_State *L)
 #endif
 	lua_settable(L, -3);
 
+	/*
+	 * build.mimalloc: the allocator scope served by mimalloc, "cpp" for the
+	 * operator new/delete override, "none" when it is not used at all. The
+	 * malloc/free family is never overridden.
+	 */
+	lua_pushstring(L, "mimalloc");
+#ifdef ENABLE_MIMALLOC_NEW_DELETE
+	lua_pushstring(L, "cpp");
+#else
+	lua_pushstring(L, "none");
+#endif
+	lua_settable(L, -3);
+
 	lua_settable(L, -3);    /* box.info.build */
 
 	/* debug */

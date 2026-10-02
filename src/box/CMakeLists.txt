@@ -364,6 +364,10 @@ if(ENABLE_QUIVER_ENGINE)
     list(APPEND box_sources ${QUIVER_ENGINE_SOURCES})
 endif()
 
+if(ENABLE_MIMALLOC_NEW_DELETE)
+    list(APPEND box_sources mimalloc_new_delete.cc)
+endif()
+
 add_library(box STATIC ${box_sources})
 if(OSS_FUZZ)
   target_link_options(box PUBLIC "-stdlib=libstdc++")
@@ -417,5 +421,9 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
 
 target_link_libraries(box box_error tuple xrow xlog vclock digest raft
     node_name ${common_libraries} ${EXTRA_BOX_LINK_LIBRARIES})
+
+if(ENABLE_MIMALLOC_NEW_DELETE)
+    target_link_libraries(box bundled-mimalloc)
+endif()
 
 add_dependencies(box build_bundled_libs generate_sql_files)
