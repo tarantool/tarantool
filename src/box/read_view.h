@@ -236,6 +236,14 @@ struct read_view_opts {
 	 * encoded in the MP_COMPRESSION MsgPack extension manually.
 	 */
 	bool disable_decompression;
+	/**
+	 * If set, read_view_new() doesn't yield when the read view can't be
+	 * opened immediately because of the rate limit imposed by the
+	 * read_view_throttle_interval. Instead, it fails immediately, setting
+	 * diag to ER_READ_VIEW_THROTTLED. Ignored if is_system is set.
+	 * Default: false.
+	 */
+	bool disable_wait;
 };
 
 /** Sets read view options to default values. */

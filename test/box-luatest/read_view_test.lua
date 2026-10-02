@@ -6,6 +6,9 @@ local g_tweaks = t.group('read_view.tweaks')
 g_tweaks.before_all(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_tweaks.after_all(function(cg)
@@ -48,6 +51,7 @@ g.before_all(function(cg)
     cg.server:exec(function(ffi)
         local tweaks = require('internal.tweaks')
         tweaks.box_read_view_ffi = ffi
+        tweaks.read_view_throttle_interval = 0
     end, {cg.params.ffi})
 end)
 
@@ -2499,6 +2503,9 @@ local g_mvcc = t.group('read_view.mvcc', t.helpers.matrix{
 g_mvcc.before_all(function(cg)
     cg.server = server:new({box_cfg = {memtx_use_mvcc_engine = true}})
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_mvcc.after_all(function(cg)
@@ -2769,6 +2776,9 @@ g_threads.before_all(function(cg)
         net_box_credentials = {user = 'admin'}
     })
     cg.server:start()
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
 end)
 
 g_threads.after_all(function(cg)
@@ -3145,3 +3155,44 @@ g_threads.after_test('test_list', function(cg)
         rawset(_G, 'test_rvs', nil)
     end)
 end)
+
+local g_throttle = t.group('read_view.throttle')
+
+g_throttle.before_all(function(cg)
+    cg.server = server:new({alias = 'master'})
+    cg.server:start()
+end)
+
+g_throttle.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g_throttle.after_each(function(cg)
+    cg.server:exec(function()
+        require('internal.tweaks').read_view_throttle_interval = 0
+    end)
+end)
+
+-- Checks that opening a read view before the throttle interval elapsed
+-- since the previous one blocks the caller for the remainder of the
+-- interval, and that the interval can be changed or disabled.
+g_throttle.test_throttle = function(cg)
+    cg.server:exec(function()
+        local fiber_clock = require('fiber').clock
+        local tweaks = require('internal.tweaks')
+
+        tweaks.read_view_throttle_interval = 0.1
+        box.read_view.open():close()
+        local start = fiber_clock()
+        box.read_view.open():close()
+        local throttled = fiber_clock() - start
+        t.assert_ge(throttled, 0.09)
+        t.assert_lt(throttled, 1)
+
+        tweaks.read_view_throttle_interval = 0
+        local start = fiber_clock()
+        box.read_view.open():close()
+        local unthrottled = fiber_clock() - start
+        t.assert_lt(unthrottled, 0.09)
+    end)
+end

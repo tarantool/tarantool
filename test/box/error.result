@@ -512,6 +512,7 @@ t;
  |   303: box.error.XLOG_NOT_FOUND
  |   304: box.error.RECOVERY_POINT_TXN_LAST_ROW
  |   305: box.error.NO_SUCH_READ_VIEW
+ |   306: box.error.READ_VIEW_THROTTLED
  | ...
 
 test_run:cmd("setopt delimiter ''");

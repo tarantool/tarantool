@@ -31,10 +31,9 @@
 #pragma once
 
 #include "allocator.h"
-#include "clock.h"
-#include "clock_lowres.h"
 #include "read_view.h"
 #include "salad/stailq.h"
+#include "say.h"
 #include "small/rlist.h"
 #include "tuple.h"
 
@@ -154,8 +153,6 @@ struct memtx_block_rv_list {
 struct memtx_block_rv {
 	/** Link in the list of all open read views. */
 	struct rlist link;
-	/** Reference counter. */
-	int refs;
 	/** Number of entries in the array. */
 	int count;
 	/**
@@ -193,8 +190,7 @@ enum memtx_block_rv_type {
  * Allocates a list array for a read view and initializes it using the list of
  * all open read views. Adds the new read view to the list.
  *
- * If the version of the most recent read view matches the new version,
- * the function will reuse it instead of creating a new one.
+ * The version must be greater than the version of any open read view.
  */
 struct memtx_block_rv *
 memtx_block_rv_new(uint32_t version, struct rlist *list);
@@ -279,25 +275,15 @@ public:
 	}
 
 	/**
-	 * Sets read_view_reuse_interval. Useful for testing.
-	 */
-	static void set_read_view_reuse_interval(double interval)
-	{
-		read_view_reuse_interval = interval;
-	}
-
-	/**
 	 * Opens a block read view: blocks visible from the read view
 	 * (allocated before the read view was created) won't be freed
 	 * until the read view is closed with close_read_view().
 	 */
 	static ReadView *open_read_view(const struct read_view_opts *opts)
 	{
-		if (!may_reuse_read_view) {
-			read_view_version++;
-			may_reuse_read_view = true;
-			read_view_timestamp = clock_monotonic();
-		}
+		if (read_view_version == UINT32_MAX)
+			panic("read view version counter overflow");
+		read_view_version++;
 		ReadView *rv = (ReadView *)xcalloc(1, sizeof(*rv));
 		for (int type = 0; type < memtx_block_rv_type_MAX; type++) {
 			if (!opts->enable_data_temporary_spaces &&
@@ -434,16 +420,7 @@ private:
 			return nullptr;
 		struct memtx_block *block = (struct memtx_block *)ptr;
 		stats.used_total += size;
-		/* Use low-resolution clock, because it's hot path. */
-		double now = clock_lowres_monotonic();
-		if (read_view_version > 0 && read_view_reuse_interval > 0 &&
-		    now - read_view_timestamp < read_view_reuse_interval) {
-			/* See the comment to read_view_reuse_interval. */
-			block->version = read_view_version - 1;
-		} else {
-			block->version = read_view_version;
-			may_reuse_read_view = false;
-		}
+		block->version = read_view_version;
 		return block;
 	}
 
@@ -485,38 +462,6 @@ private:
 	 * ascending (the oldest read view comes first).
 	 */
 	static struct rlist read_views[];
-	/**
-	 * If the last read view was created less than read_view_reuse_interval
-	 * seconds ago, reuse it instead of creating a new one. Setting to 0
-	 * effectively disables read view reusing.
-	 *
-	 * We reuse read views to ensure that read_view_version never wraps
-	 * around. Here's how it works. When a block is allocated, we compare
-	 * the current time with the time when the most recent read view was
-	 * opened. If the difference is less than the reuse interval, we assign
-	 * the previous read view version to it, read_view_version - 1, instead
-	 * of read_view_version, like it was allocated before the last read
-	 * view was created.
-	 *
-	 * When a read view is opened, we check if there were any blocks
-	 * allocated with the current read_view_version. If such blocks exist,
-	 * we proceed to creation of a new read view, as usual. Otherwise, we
-	 * create a new read view with the previous read view's version
-	 * (read_view_version, without bumping) and reuse its garbage
-	 * collection lists (with reference counting).
-	 */
-	static double read_view_reuse_interval;
-	/**
-	 * Monotonic clock time when the most recent read view was opened.
-	 * See also read_view_reuse_interval.
-	 */
-	static double read_view_timestamp;
-	/**
-	 * Set if the most recent read view may be reused (that is no new
-	 * blocks were allocated with the current value of read_view_version).
-	 * See also read_view_reuse_interval.
-	 */
-	static bool may_reuse_read_view;
 };
 
 template<class Allocator>
@@ -527,15 +472,6 @@ uint32_t MemtxAllocator<Allocator>::read_view_version;
 
 template<class Allocator>
 struct rlist MemtxAllocator<Allocator>::read_views[memtx_block_rv_type_MAX];
-
-template<class Allocator>
-double MemtxAllocator<Allocator>::read_view_reuse_interval = 0.1;
-
-template<class Allocator>
-double MemtxAllocator<Allocator>::read_view_timestamp;
-
-template<class Allocator>
-bool MemtxAllocator<Allocator>::may_reuse_read_view;
 
 template<class Allocator>
 struct memtx_allocator_stats MemtxAllocator<Allocator>::stats;
