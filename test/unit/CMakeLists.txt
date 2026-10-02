@@ -99,6 +99,23 @@ endfunction()
 
 add_library(unit STATIC unit.c)
 
+if(TARGET_OS_DARWIN AND ENABLE_BACKTRACE)
+    add_library(dladdr_no_symbol SHARED dladdr_no_symbol.c)
+    # The first function precedes every exported symbol and has no local symbol.
+    set(order_file "${CMAKE_CURRENT_SOURCE_DIR}/dladdr_no_symbol.order")
+    set_target_properties(dladdr_no_symbol PROPERTIES
+        LINK_FLAGS "-Wl,-x -Wl,-order_file,${order_file}"
+    )
+    unset(order_file)
+    create_unit_test(PREFIX backtrace
+                     SOURCES backtrace.c core_test_utils.c
+                     LIBRARIES core unit pthread
+                     COMPILE_DEFINITIONS
+                         DLADDR_NO_SYMBOL_LIB="$<TARGET_FILE:dladdr_no_symbol>"
+    )
+    add_dependencies(backtrace.test dladdr_no_symbol)
+endif()
+
 create_unit_test(PREFIX heap
                  SOURCES heap.c
                  LIBRARIES unit
