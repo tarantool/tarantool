@@ -1281,7 +1281,7 @@ xlog_tx_write(struct xlog *log)
 				SYNC_FILE_RANGE_WRITE |
 				SYNC_FILE_RANGE_WAIT_AFTER);
 #else
-		fdatasync(log->fd);
+		fio_fdatasync(log->fd);
 #endif /* HAVE_SYNC_FILE_RANGE */
 		log->sync_time = ev_monotonic_time();
 		if (log->opts.free_cache) {
@@ -1419,10 +1419,17 @@ sync_cb(eio_req *req)
 	return 0;
 }
 
+static void
+xlog_sync_f(eio_req *req)
+{
+	int fd = (intptr_t)req->data;
+	req->result = fio_fsync(fd);
+}
+
 /**
  * Syncs an xlog object to disk.
  *
- * If the sync_is_async flag is set in xlog_opts, fsync is called
+ * If the sync_is_async flag is set in xlog_opts, synchronization is done
  * asynchronously, without checking the result.
  *
  * Returns 0 on success. On failure, sets diag returns -1.
@@ -1437,8 +1444,8 @@ xlog_sync(struct xlog *l)
 				 l->fd);
 			return -1;
 		}
-		eio_fsync(fd, 0, sync_cb, (void *) (intptr_t) fd);
-	} else if (fsync(l->fd) < 0) {
+		eio_custom(xlog_sync_f, 0, sync_cb, (void *)(intptr_t)fd);
+	} else if (fio_fsync(l->fd) < 0) {
 		diag_set(SystemError, "failed to sync file '%s'", l->filename);
 		return -1;
 	}
