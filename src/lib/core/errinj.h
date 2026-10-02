@@ -81,6 +81,7 @@ struct errinj {
  * KEEP SORTED PLEASE!
  */
 #define ERRINJ_LIST(_) \
+	_(ERRINJ_APPLIER_BEFORE_REGISTER, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_APPLIER_DESTROY_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_APPLIER_READ_TX_ROW_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_APPLIER_SLOW_ACK, ERRINJ_BOOL, {.bparam = false}) \
