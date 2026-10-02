@@ -377,7 +377,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	it->base.position = generic_iterator_position;
 	it->base.free = bitset_index_iterator_free;
 
-	tt_bitset_iterator_create(&it->bitset_it, realloc);
+	tt_bitset_iterator_create(&it->bitset_it, realloc_with_free);
 	const void *bitset_key = NULL;
 	uint32_t bitset_key_size = 0;
 
@@ -387,7 +387,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 
 	struct tt_bitset_expr expr;
-	tt_bitset_expr_create(&expr, realloc);
+	tt_bitset_expr_create(&expr, realloc_with_free);
 
 	int rc = 0;
 	switch (type) {
@@ -561,6 +561,6 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	index->tuple_to_id = mh_bitset_index_new();
 #endif /* #ifndef OLD_GOOD_BITSET */
 
-	tt_bitset_index_create(&index->index, realloc);
+	tt_bitset_index_create(&index->index, realloc_with_free);
 	return &index->base;
 }
