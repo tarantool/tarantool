@@ -388,6 +388,11 @@ create_unit_test(PREFIX coio
                  LIBRARIES core eio bit uri unit
 )
 
+create_unit_test(PREFIX coio_connect
+                 SOURCES coio_connect.c core_test_utils.c
+                 LIBRARIES core eio bit uri unit
+)
+
 if (ENABLE_BUNDLED_MSGPUCK)
     set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
     set_source_files_properties(

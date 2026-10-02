@@ -281,8 +281,13 @@ coio_connect(const char *host, const char *service, int host_hint,
 	if (host != NULL && service != NULL &&
 	    strcmp(host, URI_HOST_UNIX) == 0) {
 		/* UNIX socket */
-		struct sockaddr_un un;
-		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
+		struct sockaddr_un un = {0};
+		int len = snprintf(un.sun_path, sizeof(un.sun_path), "%s",
+				   service);
+		if (len < 0 || (size_t)len >= sizeof(un.sun_path)) {
+			diag_set(IllegalParams, "Unix socket path is too long");
+			return -1;
+		}
 		un.sun_family = AF_UNIX;
 		fd = coio_connect_addr((struct sockaddr *)&un, sizeof(un),
 				       delay, iface);
