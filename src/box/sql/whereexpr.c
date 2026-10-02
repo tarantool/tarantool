@@ -241,8 +241,7 @@ operatorMask(int op)
  *         optimizable using inequality constraints.
  */
 static int
-like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
-			   int *pisComplete)
+like_optimization_is_valid(Expr *pExpr, Expr **ppPrefix, int *pisComplete)
 {
 	/* String on RHS of LIKE operator. */
 	const char *z = 0;
@@ -291,22 +290,8 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 		return 0;
 
 	op = pRight->op;
-	struct region *region = &pParse->region;
-	size_t svp = region_used(region);
-	if (sql_token_is_variable(op)) {
-		Vdbe *pReprepare = pParse->pReprepare;
-		int iCol = pRight->iColumn;
-		const struct Mem *var = vdbe_get_bound_value(pReprepare, iCol);
-		if (var != NULL && mem_is_str(var)) {
-			uint32_t size = var->n + 1;
-			char *str = xregion_alloc(region, size);
-			memcpy(str, var->z, var->n);
-			str[var->n] = '\0';
-			z = str;
-		}
-	} else if (op == TK_STRING) {
+	if (op == TK_STRING)
 		z = pRight->u.zToken;
-	}
 	if (z) {
 		cnt = 0;
 		while ((c = z[cnt]) != 0 && c != MATCH_ONE_WILDCARD &&
@@ -319,30 +304,11 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			pPrefix = sql_expr_new_named(TK_STRING, z);
 			pPrefix->u.zToken[cnt] = 0;
 			*ppPrefix = pPrefix;
-			if (sql_token_is_variable(op)) {
-				Vdbe *v = pParse->pVdbe;
-				if (*pisComplete && pRight->u.zToken[1]) {
-					/* If the rhs of the LIKE expression is a variable, and the current
-					 * value of the variable means there is no need to invoke the LIKE
-					 * function, then no OP_Variable will be added to the program.
-					 * This causes problems for the sql_bind_parameter_name()
-					 * API. To work around them, add a dummy OP_Variable here.
-					 */
-					int r1 = sqlGetTempReg(pParse);
-					sqlExprCodeTarget(pParse, pRight,
-							      r1);
-					sqlVdbeChangeP3(v,
-							    sqlVdbeCurrentAddr
-							    (v) - 1, 0);
-					sqlReleaseTempReg(pParse, r1);
-				}
-			}
 		} else {
 			z = 0;
 		}
 	}
 
-	region_truncate(region, svp);
 	rc = (z != 0);
 	return rc;
 }
@@ -1119,8 +1085,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	 * amount of scanned entries.
 	 */
 	if (pWC->op == TK_AND &&
-	    like_optimization_is_valid(pParse, pExpr, &pStr1,
-				       &isComplete)) {
+	    like_optimization_is_valid(pExpr, &pStr1, &isComplete)) {
 		Expr *pLeft;
 		/* Copy of pStr1 - RHS of LIKE operator. */
 		Expr *pStr2;

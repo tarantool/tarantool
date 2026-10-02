@@ -124,7 +124,7 @@ static int
 sql_reprepare(struct Vdbe **stmt)
 {
 	const char *sql_str = sql_stmt_query_str(*stmt);
-	struct Vdbe *new_stmt = sql_stmt_compile(sql_str, NULL);
+	struct Vdbe *new_stmt = sql_stmt_compile(sql_str);
 	if (new_stmt == NULL)
 		return -1;
 	sql_stmt_set_id(new_stmt, sql_stmt_get_id(*stmt));
@@ -164,7 +164,7 @@ sql_prepare(const char *sql, size_t len, struct port *port)
 	}
 	if (stmt == NULL) {
 		char *sql_str = xstrndup(sql, len);
-		stmt = sql_stmt_compile(sql_str, NULL);
+		stmt = sql_stmt_compile(sql_str);
 		free(sql_str);
 		if (stmt == NULL)
 			return -1;
@@ -224,20 +224,21 @@ sql_unprepare(uint32_t stmt_id)
  * @retval -1 Error.
  */
 static inline int
-sql_execute(struct Vdbe *stmt, struct port *port, struct region *region)
+sql_execute(struct Vdbe *stmt, struct port *port, struct region *region,
+	    const struct sql_bind *bind, uint32_t bind_count)
 {
 	int rc, column_count = sql_column_count(stmt);
 	rmean_collect(rmean_box, IPROTO_EXECUTE, 1);
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
-		while ((rc = sql_step(stmt)) == SQL_ROW) {
+		while ((rc = sql_step(stmt, bind, bind_count)) == SQL_ROW) {
 			if (sql_row_to_port(stmt, region, port) != 0)
 				return -1;
 		}
 		assert(rc == SQL_DONE || rc != 0);
 	} else {
 		/* No rows. Either DONE or ERROR. */
-		rc = sql_step(stmt);
+		rc = sql_step(stmt, bind, bind_count);
 		assert(rc != SQL_ROW && rc != 0);
 	}
 	if (rc != SQL_DONE)
@@ -277,7 +278,7 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					       DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, false);
-	if (sql_execute(stmt, port, region) != 0) {
+	if (sql_execute(stmt, port, region, bind, bind_count) != 0) {
 		port_destroy(port);
 		sql_stmt_reset(stmt);
 		return -1;
@@ -293,7 +294,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			struct region *region)
 {
 	char *sql_str = xstrndup(sql, len);
-	struct Vdbe *stmt = sql_stmt_compile(sql_str, NULL);
+	struct Vdbe *stmt = sql_stmt_compile(sql_str);
 	free(sql_str);
 	if (stmt == NULL)
 		return -1;
@@ -301,7 +302,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 					   DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, true);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
-	    sql_execute(stmt, port, region) == 0)
+	    sql_execute(stmt, port, region, bind, bind_count) == 0)
 		return 0;
 	port_destroy(port);
 	return -1;

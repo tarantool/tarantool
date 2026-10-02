@@ -119,7 +119,6 @@ set(sql_sources
     sql/vdbeapi.c
     sql/vdbeaux.c
     sql/vdbesort.c
-    sql/vdbetrace.c
     sql/walker.c
     sql/where.c
     sql/wherecode.c
