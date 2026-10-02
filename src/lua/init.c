@@ -66,6 +66,7 @@
 #include "lua/httpc.h"
 #include "lua/utf8.h"
 #include "lua/swim.h"
+#include "lua/tracer_opentelemetry.h"
 #include "lua/decimal.h"
 #include "lua/uri.h"
 #include "lua/builtin_modcache.h"
@@ -202,7 +203,8 @@ extern char minifio_lua[],
 	print_lua[],
 	pairs_lua[],
 	luadebug_lua[],
-	version_lua[]
+	version_lua[],
+	tracer_lua[]
 ;
 
 /** List of modules available in all threads. */
@@ -281,6 +283,7 @@ static const char * const lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
+	"tracer", tracer_lua,
 	EXTRA_LUA_MODULES
 	NULL
 };
@@ -950,6 +953,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_xml_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_swim_init(L);
+	tarantool_lua_tracer_opentelemetry_init(L);
 	tarantool_lua_extras_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);

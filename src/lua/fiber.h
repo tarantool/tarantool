@@ -35,12 +35,22 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
+struct fiber;
 
 /**
 * Initialize box.fiber system
 */
 void
 tarantool_lua_fiber_init(struct lua_State *L);
+
+/**
+ * Create a fiber running the Lua function found at the bottom of
+ * the stack, with the rest of the stack passed as its arguments.
+ * Used by fiber.create/fiber.new and by other built-in modules that
+ * need to run a Lua function on a new fiber.
+ */
+struct fiber *
+fiber_create(struct lua_State *L);
 
 void
 luaL_testcancel(struct lua_State *L);

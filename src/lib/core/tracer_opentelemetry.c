@@ -30,6 +30,9 @@
  */
 
 #include "tracer_opentelemetry.h"
+#include <string.h>
+#include "clock.h"
+#include <stdbool.h>
 
 bool trace_opentelemetry_enabled = false;
 
@@ -37,4 +40,30 @@ void
 trace_opentelemetry_set_enabled(bool enabled)
 {
 	trace_opentelemetry_enabled = enabled;
+}
+
+bool
+trace_opentelemetry_get_enabled(void)
+{
+	return trace_opentelemetry_enabled;
+}
+
+void
+span_start(struct span_opentelemetry *span, const char *name,
+	   char span_id[16], char traceparent[55], enum span_kind kind)
+{
+	if (trace_opentelemetry_enabled) {
+		span->name = name;
+		memcpy(span->traceparent, traceparent, 55);
+		memcpy(span->span_id, span_id, 16);
+		span->kind = kind;
+		span->start_time = clock_realtime64();
+		span->trace_flag = 1;
+	}
+}
+
+void
+span_end(struct span_opentelemetry *span)
+{
+	span->end_time = clock_realtime64();
 }

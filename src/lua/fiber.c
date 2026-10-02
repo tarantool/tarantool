@@ -464,9 +464,10 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 }
 
 /**
- * Utility function for fiber.create and fiber.new
+ * Utility function for fiber.create and fiber.new, and for other
+ * built-in modules that need to run a Lua function on a new fiber.
  */
-static struct fiber *
+struct fiber *
 fiber_create(struct lua_State *L)
 {
 	lua_State *child_L = luaT_newthread(L);
