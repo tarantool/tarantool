@@ -289,6 +289,21 @@ macro(curl_build)
     endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
+    # NB: Requires the listed packages (and their headers) to be installed on
+    # the system. Also, requires the `tarantool` executable to be in `PATH`.
+    include(OptionCheck)
+    add_option_check(curl
+        SOURCE_DIR ${LIBCURL_SOURCE_DIR}
+        OPTIONS_FILE ${PROJECT_SOURCE_DIR}/cmake/BuildLibCURL.cmake
+        FLAGS ${LIBCURL_CMAKE_FLAGS}
+        INCLUDES GNUInstallDirs
+        PACKAGES OpenSSL ZLIB Perl Cares NGHTTP2
+        MODULE_PATH ${LIBCURL_SOURCE_DIR}/CMake
+        # curl's CMake script drops CURL_CA_BUNDLE and CURL_CA_PATH from the
+        # cache, which breaks our diagnostics: they are based on parsing the
+        # CMake cache.
+        IGNORED CURL_CA_BUNDLE CURL_CA_PATH)
+
     # Setup CURL_INCLUDE_DIRS & CURL_LIBRARIES for global use.
     set(CURL_INCLUDE_DIRS ${LIBCURL_INSTALL_DIR}/include)
     set(CURL_LIBRARIES bundled-libcurl ${ZLIB_LIBRARIES})
