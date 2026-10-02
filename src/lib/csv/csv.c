@@ -59,7 +59,7 @@ csv_create(struct csv *csv)
 	memset(csv, 0, sizeof(struct csv));
 	csv->delimiter= ',';
 	csv->quote_char = '\"';
-	csv->realloc = realloc;
+	csv->realloc = realloc_with_free;
 	csv->emit_field = csv_emit_field_empty;
 	csv->emit_row = csv_emit_row_empty;
 }
