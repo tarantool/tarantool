@@ -5452,10 +5452,6 @@ bootstrap_from_master(struct replica *master)
 		 tt_uuid_str(&master->uuid),
 		 applier_addr_str(applier));
 
-	/*
-	 * Send JOIN request to master
-	 * See box_process_join().
-	 */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	try {
 		applier_resume_to_state(applier, APPLIER_FETCH_SNAPSHOT,
@@ -5470,10 +5466,7 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	enum applier_state wait_state = cfg_replication_anon ?
-					APPLIER_FETCHED_SNAPSHOT :
-					APPLIER_FINAL_JOIN;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	applier_resume_to_state(applier, APPLIER_FETCHED_SNAPSHOT, TIMEOUT_INFINITY);
 
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
@@ -5483,10 +5476,6 @@ bootstrap_from_master(struct replica *master)
 	engine_begin_final_recovery_xc();
 	recovery_journal_create(&instance_vclock_storage);
 
-	if (!cfg_replication_anon) {
-		applier_resume_to_state(applier, APPLIER_JOINED,
-					TIMEOUT_INFINITY);
-	}
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 	if (box_set_replication_synchro_queue_max_size() != 0)
@@ -5516,7 +5505,12 @@ bootstrap_from_master(struct replica *master)
 	}
 
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
-
+	if (!cfg_replication_anon) {
+		applier_resume_to_state(applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
+	}
 	return true;
 }
 
