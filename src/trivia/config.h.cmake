@@ -118,15 +118,6 @@
  */
 #cmakedefine HAVE_FDATASYNC 1
 
-#ifndef HAVE_FDATASYNC
-#if defined(__APPLE__)
-#include <fcntl.h>
-#define fdatasync(fd) fcntl(fd, F_FULLFSYNC)
-#else
-#define fdatasync fsync
-#endif
-#endif
-
 /*
  * Defined if this platform has GNU specific memmem().
  */
