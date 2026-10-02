@@ -1,0 +1,19 @@
+name: Disable man-db triggers
+
+description: |
+  Disable man-db triggers. They're executed after each
+  $(apt-get install <...>) call and it sometimes takes
+  about a minute.
+
+  https://github.com/actions/runner-images/issues/10977
+  https://stackoverflow.com/a/77841777/1598057
+
+  Use on ubuntu-* GitHub-hosted runners.
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        echo "set man-db/auto-update false" | sudo debconf-communicate
+        sudo dpkg-reconfigure man-db
+      shell: bash

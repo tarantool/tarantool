@@ -1,0 +1,44 @@
+name: optcheck
+
+on: [pull_request]
+
+jobs:
+  optcheck:
+    # Can't use ubuntu-26.04 due to a problem in setup-tarantool.
+    #
+    # https://github.com/tarantool/setup-tarantool/issues/65
+    runs-on: ubuntu-24.04
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # A little speedup hack.
+      - name: Disable man-db triggers
+        uses: ./.github/actions/disable-man-db-triggers
+
+      # `make optcheck` dependency: it is implemented as a Lua script.
+      - uses: tarantool/setup-tarantool@v4
+        with:
+          tarantool-version: '3'
+
+      # readline is required for a successful `cmake .` (the only requirement
+      # that is not preinstalled on GitHub-hosted runners).
+      #
+      # c-ares and nghttp2 are the `make optcheck` dependencies.
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
+            libreadline-dev       \
+            libc-ares-dev         \
+            libnghttp2-dev
+
+      - name: Configure
+        run: cmake .
+
+      - name: The check itself
+        run: cmake --build . --parallel $(nproc) --target optcheck
