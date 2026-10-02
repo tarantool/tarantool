@@ -49,6 +49,9 @@ struct coio_file_task {
 	bool done;
 
 	union {
+		/** File descriptor to synchronize. */
+		int sync_fd;
+
 		struct {
 			int fd;
 			struct stat *buf;
@@ -532,19 +535,35 @@ coio_sync(void)
 	return coio_wait_done(req, &eio);
 }
 
+static void
+coio_do_fsync(eio_req *req)
+{
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
+	req->result = fio_fsync(eio->sync_fd);
+}
+
 int
 coio_fsync(int fd)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_fsync(fd, 0, coio_complete, &eio);
+	eio.sync_fd = fd;
+	eio_req *req = eio_custom(coio_do_fsync, 0, coio_complete, &eio);
 	return coio_wait_done(req, &eio);
+}
+
+static void
+coio_do_fdatasync(eio_req *req)
+{
+	struct coio_file_task *eio = (struct coio_file_task *)req->data;
+	req->result = fio_fdatasync(eio->sync_fd);
 }
 
 int
 coio_fdatasync(int fd)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_fdatasync(fd, 0, coio_complete, &eio);
+	eio.sync_fd = fd;
+	eio_req *req = eio_custom(coio_do_fdatasync, 0, coio_complete, &eio);
 	return coio_wait_done(req, &eio);
 }
 

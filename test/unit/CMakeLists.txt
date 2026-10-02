@@ -314,6 +314,15 @@ create_unit_test(PREFIX xlog
                  SOURCES xlog.c core_test_utils.c
                  LIBRARIES xlog xrow unit
 )
+create_unit_test(PREFIX fio
+                 SOURCES fio.c core_test_utils.c
+                 LIBRARIES core unit ${LIB_DL}
+)
+if(NOT TARGET_OS_DARWIN)
+    set_target_properties(fio.test PROPERTIES
+        LINK_FLAGS "-Wl,--wrap=fsync -Wl,--wrap=fdatasync"
+    )
+endif()
 create_unit_test(PREFIX decimal
                  SOURCES decimal.c
                  LIBRARIES core unit
