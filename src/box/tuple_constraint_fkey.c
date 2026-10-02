@@ -376,7 +376,7 @@ get_or_extract_key_tuple(const struct tuple_constraint *constr,
 		int16_t pair_no = constr->fkey->data[i].local_index_order;
 		int32_t field_no = constr->fkey->data[pair_no].foreign_field_no;
 		const char *field = tuple_field(tuple, field_no);
-		if (field == NULL || *field == MP_NIL)
+		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return NULL;
 		info[i].mp_data = field;
 		mp_next(&field);
@@ -458,11 +458,12 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 	const char *key = get_or_extract_key_tuple(constr, key_def,
 						   &key_buffer, deleted_tuple);
 
+	int rc = -1;
 	if (key == NULL || mp_typeof(*key) == MP_NIL) {
 		/* No field(s) - nobody can be bound to them.*/
-		return 0;
+		rc = 0;
+		goto done;
 	}
-	int rc = -1;
 
 	const char *unused;
 	if (key_validate_parts(key_def, key, part_count, false, &unused) != 0) {
