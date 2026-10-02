@@ -277,6 +277,9 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 		say_debug("unwinding error: `dladdr` failed");
 		return NULL;
 	}
+	/* dladdr can find the image without finding a symbol. */
+	if (dli.dli_sname == NULL)
+		return NULL;
 
 	*offset = (uintptr_t)frame->ip - (uintptr_t)dli.dli_saddr;
 	const char *proc_name_buf = dli.dli_sname;
