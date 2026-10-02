@@ -218,6 +218,7 @@ sqlExprAddCollateToken(struct Expr *pExpr, const Token *pCollName, int dequote)
 		new_expr = sql_expr_new(TK_COLLATE, pCollName);
 	new_expr->pLeft = pExpr;
 	new_expr->flags |= EP_Collate | EP_Skip;
+	new_expr->nHeight = pExpr->nHeight + 1;
 	return new_expr;
 }
 
