@@ -466,6 +466,49 @@ g.test_box_iproto_override_fallback_double_accounting = function(cg)
     end)
 end
 
+-- gh-13291: Crash on fallback from auth request handler.
+g.test_box_iproto_override_auth_fallback_crash = function(cg)
+    local net = require('net.box')
+    cg.server:exec(function()
+        local function cb_fallback()
+            return false
+        end
+        box.iproto.override(box.iproto.type.AUTH, cb_fallback)
+    end)
+    local c = net.connect(cg.server.net_box_uri, {
+        user = 'guest', password = '', wait_connected = 10,
+    })
+    t.assert_equals(c.state, 'active')
+    c:close()
+    cg.server:exec(function()
+        box.iproto.override(box.iproto.type.AUTH, nil)
+    end)
+end
+
+-- gh-13320: Crash on fallback from unknown request handler.
+g.test_box_iproto_override_unknown_fallback_crash = function(cg)
+    local net = require('net.box')
+    cg.server:exec(function()
+        local function cb_fallback()
+            return false
+        end
+        box.iproto.override(box.iproto.type.UNKNOWN, cb_fallback)
+    end)
+    local c = net.connect(cg.server.net_box_uri)
+    local request = box.iproto.encode_packet({
+        request_type = 777, sync = c:_next_sync(),
+    })
+    t.assert_error_covers({
+        type = 'ClientError',
+        code = box.error.UNKNOWN_REQUEST_TYPE,
+        message = 'Unknown request type 777',
+    }, c._inject, c, request)
+    c:close()
+    cg.server:exec(function()
+        box.iproto.override(box.iproto.type.UNKNOWN, nil)
+    end)
+end
+
 -- Start server and set global functions.
 local function init_server(cg, server_env)
     cg.server = server:new({env = server_env})

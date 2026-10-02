@@ -2155,10 +2155,10 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend)
 	if (route == NULL) {
 		handler = mh_i32_find(handlers, IPROTO_UNKNOWN, NULL);
 		if (handler != mh_end(handlers)) {
+			diag_clear(diag_get());
 			cmsg_init(&msg->base, iproto_thread->override_route);
 			return;
 		}
-		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, (uint32_t)type);
 	}
 error:
 	/** Log and send the error. */
@@ -2220,6 +2220,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		*route = iproto_thread->misc_route;
 		ERROR_INJECT(ERRINJ_IPROTO_DISABLE_WATCH, {
 			*route = NULL;
+			diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, type);
 			return -1;
 		});
 		if (xrow_decode_watch(&msg->header, &msg->watch) != 0)
@@ -2238,6 +2239,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		*route = iproto_thread->misc_route;
 		ERROR_INJECT(ERRINJ_IPROTO_DISABLE_ID, {
 			*route = NULL;
+			diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, type);
 			return -1;
 		});
 		if (xrow_decode_id(&msg->header, &msg->id) != 0)
@@ -2263,6 +2265,7 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		return 0;
 	default:
 		*route = NULL;
+		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, type);
 		return -1;
 	}
 }
@@ -3651,9 +3654,10 @@ tx_process_override(struct cmsg *m)
 	}
 	case IPROTO_HANDLER_FALLBACK: {
 		int rc = iproto_msg_decode(msg, &route);
-		assert(route != NULL);
 		if (rc != 0)
 			route = NULL;
+		else
+			assert(route != NULL);
 		FALLTHROUGH;
 	}
 	case IPROTO_HANDLER_ERROR:
@@ -3662,7 +3666,12 @@ tx_process_override(struct cmsg *m)
 		unreachable();
 	}
 	if (route != NULL) {
-		assert(m->hop[1].f == route[1].f);
+		/*
+		 * The fallback route can have a different next hop, but
+		 * the next pipe was already saved by cmsg_deliver().
+		 */
+		assert(m->hop->pipe == route->pipe);
+		cmsg_init(m, route);
 		route->f(m);
 		return;
 	}
