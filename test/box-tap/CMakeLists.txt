@@ -41,7 +41,9 @@ foreach(test_path ${tests})
   # `LISTEN` is required by the following tests:
   # - test/box-tap/auth.test.lua
   # - test/box-tap/extended_error.test.lua
-  set(TEST_ENV_VARS "${TEST_ENV};LISTEN=${WORK_DIR}/listen.sock;")
+  # - test/box-tap/gh-4954-merger-via-net-box.test.lua
+  # Keep the socket path short for nested out-of-source builds.
+  set(TEST_ENV_VARS "${TEST_ENV};LISTEN=unix/:./listen.sock;")
   # The tests below could be broken by setting environment
   # variable `TT_WORK_DIR`, so `TT_WORK_DIR` is not set.
   if(NOT ${TEST_TITLE} STREQUAL test/box-tap/cfg.test.lua AND
