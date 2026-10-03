@@ -3,7 +3,6 @@ GDB extension for Tarantool post-mortem analysis.
 To use, just put 'source <path-to-this-file>' in gdb.
 """
 
-import gdb
 import argparse
 import base64
 import logging
@@ -11,6 +10,9 @@ import struct
 import itertools
 import re
 import sys
+
+import gdb
+import gdb.printing
 
 if sys.version_info[0] == 2:
     map = itertools.imap
@@ -2588,13 +2590,13 @@ TtListWalk()
 def cord():
     return gdb.parse_and_eval('cord_ptr')
 
-def fiber():
-    return cord()['fiber']
-
 
 class Cord(object):
     def __init__(self):
         self.__cord_ptr = cord()
+
+    def fiber(self):
+        return self.__cord_ptr["fiber"]
 
     def fibers(self):
         fibers = self.__cord_ptr['alive']
@@ -2603,7 +2605,7 @@ class Cord(object):
         fibers = map(lambda x: list_entry_info.container_from_field(x), fibers)
         return itertools.chain(fibers, [self.__cord_ptr['sched'].address])
 
-    def fiber(self, fid):
+    def find_fiber(self, fid):
         return next((f for f in self.fibers() if f['fid'] == fid), None)
 
 
@@ -2613,7 +2615,7 @@ try:
 
 except ImportError as e:
     support_unwinders = False
-    msg_cant_explore_fiber_stack = "Exploring stack of non-current fiber is not supported with this version of GDB."
+    msg_cant_explore_fiber_stack = "Exploring stack of non-running fiber is not supported with this version of GDB (requires GDB 8+)"
     gdb.write("WARNING: " + msg_cant_explore_fiber_stack + '\n')
 
 
@@ -2646,17 +2648,58 @@ if support_unwinders:
         def instance(cls):
             if cls.__instance is None:
                 cls.__instance = cls()
+                gdb.unwinder.register_unwinder(gdb.current_progspace(), cls.__instance, True)
             return cls.__instance
 
         def __init__(self):
             super(FiberUnwinder, self).__init__('TtFiberUnwinder')
-            self.reset_fiber()
-            self.__frame_filter = None
+            self.__frame_filter = FiberUnwinderFrameFilter()
+            self.__unwind_mode = True
+            self.__arch = None
+            self.__set_fiber_internal(None)
 
-            # Initialize architecture specific parameters of coro context
-            arch = gdb.selected_inferior().architecture().name().lower()
+        def fiber(self):
+            return self.__fiber
+
+        def set_fiber(self, f):
+            self.__set_fiber_internal(f)
+            self.__arch = self.get_arch()
+            gdb.invalidate_cached_frames()
+
+        def __set_fiber_internal(self, f):
+            self.__fiber = f
+            self.__is_running_fiber_frame_unwound = False
+            self.__cord = cord()
+
+        def get_arch(self):
+            if hasattr(gdb.selected_inferior(), "architecture"):
+                return gdb.selected_inferior().architecture()
+            self.__unwind_mode = False
+            arch = gdb.selected_frame().architecture()
+            self.__unwind_mode = True
+            return arch
+
+        def __call__(self, pending_frame):
+            if not self.__unwind_mode:
+                return None
+
+            # Reset fiber if the unwinder is called due to thread (and hence cord) switching
+            if self.__cord != cord():
+                self.__set_fiber_internal(None)
+
+            # For the currently running fiber use the default unwinder and don't filter frames
+            if self.__fiber is None:
+                self.__frame_filter.skip_frame_sp = None
+                return None
+
+            # Once running fiber frame is unwinded proceed with the default unwinder.
+            if self.__is_running_fiber_frame_unwound:
+                return None
+
+            # Architecture specific parameters of coro context
+            arch = self.__arch.name().lower()
             if arch.find('x86-64') != -1:
-                self.__coro_ctx_regs = [
+                coro_ctx_regs = [
                     'r15',
                     'r14',
                     'r13',
@@ -2665,12 +2708,12 @@ if support_unwinders:
                     'rbp',
                     'rip',
                 ]
-                self.__ctx_offs_lr = self.__coro_ctx_regs.index('rip')
-                self.__reg_pc = 'rip'
-                self.__reg_sp = 'rsp'
+                ctx_offs_lr = coro_ctx_regs.index('rip')
+                reg_pc = 'rip'
+                reg_sp = 'rsp'
 
             elif arch.find('aarch64') != -1:
-                self.__coro_ctx_regs = [
+                coro_ctx_regs = [
                     'x19', 'x20',
                     'x21', 'x22',
                     'x23', 'x24',
@@ -2682,55 +2725,22 @@ if support_unwinders:
                     'd12', 'd13',
                     'd14', 'd15',
                 ]
-                self.__ctx_offs_lr = self.__coro_ctx_regs.index('x30')
-                self.__reg_pc = 'pc'
-                self.__reg_sp = 'sp'
+                ctx_offs_lr = coro_ctx_regs.index('x30')
+                reg_pc = 'pc'
+                reg_sp = 'sp'
 
             else:
                 raise gdb.GdbError("FiberUnwinder: architecture '{}' is not supported".format(arch))
 
-            if support_unwinders:
-                gdb.unwinder.register_unwinder(gdb.current_progspace(), self, True)
-
-        def fiber(self):
-            return self.__fiber if self.__cord == cord() else fiber()
-
-        def set_fiber(self, f):
-            self.__fiber = f
-            self.__cord = cord()
-
-        def reset_fiber(self):
-            self.set_fiber(fiber())
-
-        def __call__(self, pending_frame):
-            # Reset fiber if the unwinder is called due to thread (and hence cord) switching
-            if self.__cord != cord():
-                self.reset_fiber()
-
-            # Make sure unwinder frame filter is initialized
-            if self.__frame_filter is None:
-                self.__frame_filter = FiberUnwinderFrameFilter()
-
-            # For the currently running fiber use the default unwinder and don't filter frames
-            if self.fiber() == fiber():
-                self.__frame_filter.skip_frame_sp = None
-                return None
-
-            orig_sp = pending_frame.read_register(self.__reg_sp)
-            orig_pc = pending_frame.read_register(self.__reg_pc)
-
-            # Register 'sp' is used to identify that the outermost frame of the fiber has been
-            # injected already. After that proceed with the default unwinder.
-            reg_sp_exp = '${}'.format(self.__reg_sp)
-            if orig_sp != gdb.parse_and_eval(reg_sp_exp):
-                return None
+            orig_sp = pending_frame.read_register(reg_sp)
+            orig_pc = pending_frame.read_register(reg_pc)
 
             # Frame matching actual stack pointer should be skipped as it refers to
             # the running fiber
-            self.__frame_filter.skip_frame_sp = (self.__reg_sp, orig_sp)
+            self.__frame_filter.skip_frame_sp = (reg_sp, orig_sp)
 
             # Get fiber stack
-            sp = self.fiber()['ctx']['sp']
+            sp = self.__fiber['ctx']['sp']
 
             # Create UnwindInfo. Usually the frame is identified by the stack
             # pointer and the program counter.
@@ -2738,12 +2748,14 @@ if support_unwinders:
 
             # Find the values of the registers in the caller's frame and
             # save them in the result:
-            pc = (sp + self.__ctx_offs_lr).dereference()
-            for reg in self.__coro_ctx_regs:
+            pc = (sp + ctx_offs_lr).dereference()
+            for reg in coro_ctx_regs:
                 unwind_info.add_saved_register(reg, sp.dereference())
                 sp += 1
-            unwind_info.add_saved_register(self.__reg_pc, pc)
-            unwind_info.add_saved_register(self.__reg_sp, sp)
+            unwind_info.add_saved_register(reg_pc, pc)
+            unwind_info.add_saved_register(reg_sp, sp)
+
+            self.__is_running_fiber_frame_unwound = True
 
             # Return the result:
             return unwind_info
@@ -2759,15 +2771,18 @@ Otherwise, all fibers of the current cord are displayed."""
         super(FibersInfo, self).__init__("info tt-fibers", gdb.COMMAND_STATUS)
 
     def invoke(self, arg, from_tty):
+        cord = Cord()
+
         # Prepare sequence of fibers
-        fibers = Cord().fibers()
+        fibers = cord.fibers()
         ids = arg.split()
         if len(ids) > 0:
             ids = set(map(lambda x: int(x), ids))
             fibers = filter(lambda f: int(f['fid']) in ids, fibers)
 
-        fiber_cur = fiber()
-        fiber_to_unwind = FiberUnwinder.instance().fiber() if support_unwinders else fiber_cur
+        fiber_cur = fiber_to_unwind = cord.fiber()
+        if support_unwinders and FiberUnwinder.instance().fiber():
+            fiber_to_unwind = FiberUnwinder.instance().fiber()
         gdb.write('{marker_cur} {id:6} {target:8} {name:32} {marker_unwind} {stack:18} {func}\n'.format(
             marker_cur=' ',
             marker_unwind=' ',
@@ -2812,8 +2827,10 @@ it just selects stack to explore w/o changing any register/data."""
         if not support_unwinders:
             raise gdb.GdbError(msg_cant_explore_fiber_stack)
 
+        cord = Cord()
+
         if not arg:
-            f = FiberUnwinder.instance().fiber()
+            f = FiberUnwinder.instance().fiber() or cord.fiber()
             gdb.write('Current fiber is {id} "{name}" {func}\n'.format(
                 id=f['fid'],
                 name=f['name'].string(),
@@ -2825,17 +2842,20 @@ it just selects stack to explore w/o changing any register/data."""
         try:
             fid = int(argv[0])
         except Exception as e:
-            gdb.write('Invalid fiber ID: {}\n'.format(argv[0]))
-            return
+            raise gdb.GdbError("Invalid fiber ID: {}".format(argv[0]))
 
-        f = Cord().fiber(fid)
+        f = cord.find_fiber(fid)
         if f is None:
-            gdb.write("Unknown fiber {}.\n".format(argv[0]))
-            return
+            raise gdb.GdbError("Unknown fiber {}.".format(argv[0]))
 
-        FiberUnwinder.instance().set_fiber(f)
-        gdb.invalidate_cached_frames()
+        fiber_to_unwind, frame_to_select = (None, 0) if f == cord.fiber() else (f, 1)
+        FiberUnwinder.instance().set_fiber(fiber_to_unwind)
+        gdb.write("Switching stack unwinder to fiber {} ({:#x} ({}))\n".format(
+            f["fid"],
+            int_from_address(f),
+            f["name"].string(),
+        ))
 
-        gdb.execute('frame {}'.format(0 if f == fiber() else 1))
+        gdb.execute("frame {}".format(frame_to_select), False, True)
 
 Fiber()

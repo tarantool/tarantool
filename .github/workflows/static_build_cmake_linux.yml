@@ -90,6 +90,8 @@ jobs:
           submodule: ${{ inputs.submodule }}
           revision: ${{ inputs.revision }}
       - name: test
+        env:
+          ENABLE_COREDUMP_TESTS: 1
         run: make -f .test.mk test-static-cmake
       - name: Send VK Teams message on failure
         if: failure()
