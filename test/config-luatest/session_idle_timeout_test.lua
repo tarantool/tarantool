@@ -1,4 +1,4 @@
-local t = require('luatest')
+local t = require("luatest")
 local net = require('net.box')
 local fiber = require('fiber')
 local cbuilder = require('luatest.cbuilder')
