@@ -275,6 +275,8 @@ struct request {
 	const char *end_key;
 	/** End of @end_key. */
 	const char *end_key_end;
+	int request_cnt;
+	uint32_t request_cnt_len;
 };
 
 /**
@@ -489,6 +491,8 @@ struct call_request {
 	const char *tuple_formats;
 	/** End of tuple formats of CALL/EVAL parameters. */
 	const char *tuple_formats_end;
+	int request_cnt;
+	uint32_t request_cnt_len;
 };
 
 /**

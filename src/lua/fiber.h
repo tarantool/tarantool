@@ -35,6 +35,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
+struct trigger;
 
 /**
 * Initialize box.fiber system
@@ -44,6 +45,10 @@ tarantool_lua_fiber_init(struct lua_State *L);
 
 void
 luaL_testcancel(struct lua_State *L);
+
+int
+lbox_fiber_on_stop(struct trigger *trigger, void *event);
+
 
 #if defined(__cplusplus)
 } /* extern "C" */
