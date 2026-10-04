@@ -301,7 +301,6 @@ struct errcode_record {
 	_(ER_SQL_BIND_PARAMETER_MAX, 158,	"SQL bind parameter limit reached: %d", "max", INT) \
 	_(ER_SQL_EXECUTE, 159,			"Failed to execute SQL statement: %s", "details", STRING) \
 	_(ER_UPDATE_DECIMAL_OVERFLOW, 160,	"Decimal overflow when performing operation '%c' on field %s", "operation", CHAR, "field", STRING) \
-	_(ER_SQL_BIND_NOT_FOUND, 161,		"Parameter %s was not found in the statement", "parameter", STRING) \
 	_(ER_ACTION_MISMATCH, 162,		"Field %s contains %s on conflict action, but %s in index parts", "field", STRING, "expected", STRING, "actual", STRING) \
 	_(ER_VIEW_MISSING_SQL, 163,		"Space declared as a view must have SQL statement") \
 	_(ER_FOREIGN_KEY_CONSTRAINT, 164,	"Can not commit transaction: deferred foreign keys violations are not resolved") \

@@ -124,6 +124,22 @@ g.test_bind_3 = function()
     end)
 end
 
+--
+-- gh-13338: Check that queries with an excessive number of variables
+-- do not cause errors.
+--
+g.test_13338_queries_with_excessive_variables = function()
+    g.server:exec(function()
+        local res, err = box.execute([[SELECT ?;]], {{[':a'] = 1}})
+        t.assert_equals(err, nil)
+        t.assert_equals(res.rows, {{1}})
+
+        res, err = box.execute([[SELECT $1;]], {1, 2, 3})
+        t.assert_equals(err, nil)
+        t.assert_equals(res.rows, {{1}})
+    end)
+end
+
 g = t.group("bind2", {{remote = true}, {remote = false}})
 
 g.before_all(function(cg)
@@ -217,21 +233,8 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         res = _G.execute('SELECT ? AS kek, ? AS kek2;', {1, 2})
         t.assert_equals(res.rows, {{1, 2}})
 
-        -- Try to bind not existing name.
-        parameters = {}
-        parameters[1] = {}
-        parameters[1]['name'] = 300
-
-        local exp_err = {
-            message = "Parameter 'name' was not found in the statement",
-            name = "SQL_BIND_NOT_FOUND",
-            parameter = "'name'",
-        }
-        sql = 'SELECT ? AS kek'
-        t.assert_error_covers(exp_err, _G.execute, sql, parameters)
-
         -- Try too many parameters in a statement.
-        exp_err = {
+        local exp_err = {
             message = "SQL bind parameter limit reached: 65000",
             name = "SQL_BIND_PARAMETER_MAX",
         }
@@ -259,12 +262,7 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         -- suitable method in its bind API.
         res = _G.execute('SELECT ? AS big_uint;', {0xefffffffffffffff})
         t.assert_equals(res.rows, {{17293822569102704640}})
-        -- Bind incorrect parameters.
-        parameters = {}
-        parameters[1] = {}
-        parameters[1][100] = 200
-        local ok = pcall(_G.execute, 'SELECT ?', parameters)
-        t.assert_equals(ok, false)
+
         parameters = {}
         parameters[1] = {}
         parameters[1][':value'] = {kek = 300}
@@ -272,14 +270,6 @@ g.test_3401_box_execute_parameter_binding = function(cg)
         t.assert_equals(res.rows, {{{kek = 300}}})
 
         box.execute('DROP TABLE test;')
-
-        exp_err = "Failed to execute SQL statement: "..
-                  "The number of parameters is too large"
-        local _, err = box.execute('SELECT ?;', {1, 2})
-        t.assert_equals(tostring(err), exp_err)
-
-        _, err = box.execute('SELECT $2;', {1, 2, 3})
-        t.assert_equals(tostring(err), exp_err)
     end)
 end
 

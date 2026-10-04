@@ -278,14 +278,10 @@ vdbeUnbind(struct Vdbe *p, int i)
 	assert(p != NULL);
 	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
 	assert(i > 0);
-	if(i > p->nVar) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "The number of "\
-			 "parameters is too large");
-		return -1;
+	if (i <= p->nVar) {
+		pVar = &p->aVar[i - 1];
+		mem_destroy(pVar);
 	}
-	i--;
-	pVar = &p->aVar[i];
-	mem_destroy(pVar);
 	return 0;
 }
 

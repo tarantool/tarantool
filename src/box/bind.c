@@ -177,12 +177,10 @@ int
 sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
 	if (p->name != NULL) {
-		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
-		if (pos == 0) {
-			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
-				 sql_bind_name(p));
-			return -1;
-		}
+		uint32_t i;
+		i =sql_bind_parameter_lindex(stmt, p->name, p->name_len);
+		if (i != 0)
+			pos = i;
 	}
 	switch (p->type) {
 	case MP_INT:
