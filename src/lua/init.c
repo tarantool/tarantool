@@ -450,10 +450,13 @@ lbox_tarantool_package_setsearchroot(struct lua_State *L)
 		struct lua_Debug info;
 		VERIFY(lua_getstack(L, 1, &info) == 1);
 		VERIFY(lua_getinfo(L, "S", &info) == 1);
-		char *path = xstrdup(info.source[0] == '@' ?
-				     info.source + 1 : info.source);
-		new_root = abspath(dirname(path));
-		free(path);
+		const char *path = info.source[0] == '@' ?
+				   info.source + 1 : info.source;
+		size_t dir_len;
+		const char *dir = minifio_dirname(path, &dir_len);
+		char *dir_copy = xstrndup(dir, dir_len);
+		new_root = abspath(dir_copy);
+		free(dir_copy);
 	} else if (lua_type(L, 1) == LUA_TSTRING) {
 		new_root = abspath(lua_tostring(L, 1));
 	} else {
