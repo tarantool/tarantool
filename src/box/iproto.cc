@@ -4086,7 +4086,18 @@ iproto_process_push(struct cmsg *m)
 		container_of(kharon, struct iproto_connection, kharon);
 	con->srv[0].wend = kharon->wpos;
 	kharon->wpos = con->srv[0].wpos;
-	if (con->state == IPROTO_CONNECTION_ALIVE)
+	/*
+	 * Skip connections in replication: since a JOIN/SUBSCRIBE request
+	 * is accepted, the socket belongs to the replication code, which
+	 * runs in the TX thread, so we must not signal the output watcher
+	 * here. It would trip an assertion in debug mode and lead to a
+	 * concurrent socket access in release mode. Such a push may be
+	 * in flight when the request is parsed, because the check in
+	 * iproto_process_replication() only sees the write positions
+	 * already reported to the IPROTO thread.
+	 */
+	if (con->state == IPROTO_CONNECTION_ALIVE &&
+	    !con->is_in_replication)
 		iproto_connection_feed_output(con);
 }
 
