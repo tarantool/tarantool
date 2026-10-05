@@ -731,7 +731,7 @@ lbox_txn_iterator_next(struct lua_State *L)
 		(struct txn_stmt *) lua_topointer(L, lua_upvalueindex(2));
 	if (stmt == NULL)
 		return 0;
-	while (stmt->row == NULL) {
+	while (stmt->row == NULL || stmt->type == IPROTO_NOP) {
 		stmt = stailq_next_entry(stmt, next);
 		if (stmt == NULL) {
 			lua_pushnil(L);
