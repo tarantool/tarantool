@@ -2807,7 +2807,6 @@ end
 
 g_threads.test_reuse_in_main_thread = function(cg)
     cg.server:exec(function()
-        local fiber = require('fiber')
         local rv = box.read_view.open()
         local id = rv.id
 
@@ -2829,16 +2828,25 @@ g_threads.test_reuse_in_main_thread = function(cg)
             type = 'ClientError',
             name = 'NO_SUCH_READ_VIEW',
         }, box.read_view.open, {id = id})
+    end)
+end
 
-        -- Try to reuse a system read view.
+-- Try to reuse a system read view. This part requires an error injection to
+-- keep the checkpoint read view open, thus skipped on non-debug builds.
+g_threads.test_reuse_system_in_main_thread = function(cg)
+    t.tarantool.skip_if_not_debug()
+    cg.server:exec(function()
+        local fiber = require('fiber')
+
         t.assert_equals(box.read_view.list(), {})
         box.space._schema:delete('dummy')
+        box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', true)
         local f = fiber.new(box.snapshot)
         f:set_joinable(true)
         fiber.yield()
-        rv = box.read_view.list()[1]
+        local rv = box.read_view.list()[1]
         t.assert_covers(rv, {is_system = true, name = 'checkpoint'})
-        id = rv.id
+        local id = rv.id
         t.assert_error_covers({
             type = 'ClientError',
             name = 'READ_VIEW_BUSY',
@@ -2852,6 +2860,7 @@ g_threads.test_reuse_in_main_thread = function(cg)
             type = 'ClientError',
             name = 'READ_VIEW_BUSY',
         }, box.read_view.open, {id = id})
+        box.error.injection.set('ERRINJ_SNAP_WRITE_DELAY', false)
         t.assert_equals({f:join()}, {true, 'ok'})
     end)
 end
