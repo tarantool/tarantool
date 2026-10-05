@@ -139,13 +139,11 @@ txn_iterator_next(struct port_c_iterator *it, struct port *out, bool *is_eof)
 		return -1;
 	}
 
-	/* Skip unwanted spaces if space id filter is set. */
-	if (txn_it->space_id_filter != SPACE_ID_FILTER_ALL_SPACES) {
-		while (stmt != NULL &&
-		       space_id(stmt->space) != txn_it->space_id_filter) {
-			stmt = stailq_next_entry(stmt, next);
-		}
-	}
+	while (stmt != NULL &&
+	       (stmt->type == IPROTO_NOP ||
+		(txn_it->space_id_filter != SPACE_ID_FILTER_ALL_SPACES &&
+		 space_id(stmt->space) != txn_it->space_id_filter)))
+		stmt = stailq_next_entry(stmt, next);
 
 	if (stmt == NULL) {
 		*is_eof = true;
@@ -288,8 +286,8 @@ run_triggers_of_multi_spaces(struct txn *txn, struct txn_stmt *stmt,
 	struct txn_stmt *first_stmt = stmt;
 	struct mh_i32ptr_t *spaces = mh_i32ptr_new();
 	while (stmt != NULL) {
-		struct space_event *e = &stmt->space->txn_events[event_id];
-		if (space_event_has_triggers(e)) {
+		if (stmt->space != NULL && space_event_has_triggers(
+				&stmt->space->txn_events[event_id])) {
 			struct mh_i32ptr_node_t node = {
 				space_id(stmt->space),
 				stmt->space
