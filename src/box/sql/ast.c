@@ -242,12 +242,164 @@ with_from_ast(struct Parse *parser, struct ast_with_list *list)
 	return res;
 }
 
-struct ast_expr *
+/** Allocate a new expression node with all operands set to zero. */
+static struct ast_expr *
 ast_expr_new(struct region *region, uint8_t op)
 {
 	struct ast_expr *expr = xregion_alloc_object(region, typeof(*expr));
 	memset(expr, 0, sizeof(*expr));
 	expr->op = op;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_leaf(struct region *region, uint8_t op, const char *str,
+		  uint32_t len)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->val.str = str;
+	expr->val.len = len;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_var(struct region *region, uint8_t op, const char *str,
+		 uint32_t len)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->val.str = str;
+	expr->val.len = len;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_asterisk(struct region *region)
+{
+	return ast_expr_new(region, TK_ASTERISK);
+}
+
+struct ast_expr *
+ast_expr_new_unary(struct region *region, uint8_t op, struct ast_expr *operand)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->arg = operand;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_binary(struct region *region, uint8_t op, struct ast_expr *left,
+		    struct ast_expr *right)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->bin.left = left;
+	expr->bin.right = right;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_list(struct region *region, uint8_t op,
+		  struct ast_expr_list *list)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->list = list;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_select(struct region *region, uint8_t op,
+		    struct ast_select *select)
+{
+	struct ast_expr *expr = ast_expr_new(region, op);
+	expr->select = select;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_cast(struct region *region, struct ast_expr *operand,
+		  enum field_type type)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_CAST);
+	expr->cast.expr = operand;
+	expr->cast.type = type;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_collate(struct region *region, struct ast_expr *operand,
+		     const struct Token *name)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_COLLATE);
+	expr->coll.expr = operand;
+	expr->coll.name = name->z;
+	expr->coll.name_len = name->n;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_function(struct region *region, const struct Token *name,
+		      bool is_distinct, struct ast_expr_list *args)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_FUNCTION);
+	expr->func.name = name->z;
+	expr->func.name_len = name->n;
+	expr->func.is_distinct = is_distinct;
+	expr->func.args = args;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_in(struct region *region, struct ast_expr *value,
+		struct ast_expr_list *list, struct ast_select *select)
+{
+	assert(list == NULL || select == NULL);
+	struct ast_expr *expr = ast_expr_new(region, TK_IN);
+	expr->in.value = value;
+	expr->in.list = list;
+	expr->in.select = select;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_between(struct region *region, struct ast_expr *value,
+		     struct ast_expr *lower, struct ast_expr *upper)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_BETWEEN);
+	expr->between.value = value;
+	expr->between.lower = lower;
+	expr->between.upper = upper;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_case(struct region *region, struct ast_expr *value,
+		  struct ast_expr_list *list)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_CASE);
+	expr->cs.value = value;
+	expr->cs.list = list;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_getitem(struct region *region, struct ast_expr *value,
+		     struct ast_expr_list *keys)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_GETITEM);
+	expr->getitem.value = value;
+	expr->getitem.keys = keys;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_raise(struct region *region, const struct Token *message,
+		   enum on_conflict_action action)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_RAISE);
+	if (message != NULL) {
+		expr->raise.str = message->z;
+		expr->raise.len = message->n;
+	}
+	expr->raise.action = action;
 	return expr;
 }
 
