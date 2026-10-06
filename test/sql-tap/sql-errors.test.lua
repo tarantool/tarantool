@@ -169,7 +169,7 @@ test:do_catchsql_test(
 	select_statement,
 	{
 		-- <sql-errors-1.15>
-		1,"Number of nodes in expression tree 201 exceeds the limit (200)"
+        1,"Number of nodes in expression tree 202 exceeds the limit (200)"
 		-- </sql-errors-1.15>
 	})
 

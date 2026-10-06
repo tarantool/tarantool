@@ -312,6 +312,8 @@ struct ast_expr {
 	};
 	/** Parser token code identifying the kind of expression. */
 	uint8_t op;
+	/** Height of the expression tree headed by this node. */
+	uint32_t height;
 };
 
 /** Element of the expressions list. */
