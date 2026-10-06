@@ -1712,11 +1712,13 @@ cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
         nm(T) eidlist_opt(TA). {
   create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA);
   sql_create_foreign_key(pParse);
+  sqlSrcListDelete(N.table_name);
 }
 
 cmd ::= alter_add_constraint(N) CHECK LP expr(X) RP. {
     create_ck_def_init(&pParse->create_ck_def, N.table_name, &N.name, &X);
     sql_create_check_contraint(pParse, false);
+    sqlSrcListDelete(N.table_name);
 }
 
 cmd ::= alter_add_constraint(N) UNIQUE LP sortlist(X) RP. {
