@@ -50,7 +50,6 @@ extras="            \
     ASTERISK        \
     SPAN            \
     ANALYZE         \
-    PARENTHESES     \
     LINEFEED        \
     SPACE           \
     ILLEGAL         \
