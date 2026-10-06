@@ -104,6 +104,38 @@ enum ast_property_type {
 	SQL_AST_PROPERTY_NULL,
 };
 
+/** Type of member of the union of `struct ast_expr` that holds the operands. */
+enum ast_expr_type {
+	/** No operands. */
+	AST_EXPR_NONE,
+	/** Member `val`. */
+	AST_EXPR_VAL,
+	/** Member `arg`. */
+	AST_EXPR_ARG,
+	/** Member `list`. */
+	AST_EXPR_LIST,
+	/** Member `select`. */
+	AST_EXPR_SELECT,
+	/** Member `bin`. */
+	AST_EXPR_BIN,
+	/** Member `cast`. */
+	AST_EXPR_CAST,
+	/** Member `coll`. */
+	AST_EXPR_COLL,
+	/** Member `func`. */
+	AST_EXPR_FUNC,
+	/** Member `in`. */
+	AST_EXPR_IN,
+	/** Member `between`. */
+	AST_EXPR_BETWEEN,
+	/** Member `cs`. */
+	AST_EXPR_CASE,
+	/** Member `getitem`. */
+	AST_EXPR_GETITEM,
+	/** Member `raise`. */
+	AST_EXPR_RAISE,
+};
+
 enum ast_explain_type {
 	SQL_AST_EXPLAIN_NONE = 0,
 	SQL_AST_EXPLAIN_VDBE,
@@ -310,6 +342,8 @@ struct ast_expr {
 			enum on_conflict_action action;
 		} raise;
 	};
+	/** Type of member of the union that holds the operands. */
+	enum ast_expr_type type;
 	/** Parser token code identifying the kind of expression. */
 	uint8_t op;
 };
@@ -762,9 +796,81 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 struct With *
 with_from_ast(struct Parse *parser, struct ast_with_list *list);
 
-/** Allocate a new expression node with all operands set to zero. */
+/** Create an expression without operands from the text of a token. */
 struct ast_expr *
-ast_expr_new(struct region *region, uint8_t op);
+ast_expr_new_leaf(struct region *region, uint8_t op, const char *str,
+		  uint32_t len);
+
+/** Create an expression for a bind variable. */
+struct ast_expr *
+ast_expr_new_var(struct region *region, uint8_t op, const char *str,
+		 uint32_t len);
+
+/** Create an asterisk expression of the column list of SELECT. */
+struct ast_expr *
+ast_expr_new_asterisk(struct region *region);
+
+/** Create an expression with a single operand. */
+struct ast_expr *
+ast_expr_new_unary(struct region *region, uint8_t op, struct ast_expr *operand);
+
+/** Create an expression with two operands. */
+struct ast_expr *
+ast_expr_new_binary(struct region *region, uint8_t op, struct ast_expr *left,
+		    struct ast_expr *right);
+
+/** Create a TK_ARRAY, TK_MAP or TK_VECTOR expression. */
+struct ast_expr *
+ast_expr_new_list(struct region *region, uint8_t op,
+		  struct ast_expr_list *list);
+
+/** Create a TK_SELECT or TK_EXISTS expression. */
+struct ast_expr *
+ast_expr_new_select(struct region *region, uint8_t op,
+		    struct ast_select *select);
+
+/** Create a CAST expression. */
+struct ast_expr *
+ast_expr_new_cast(struct region *region, struct ast_expr *operand,
+		  enum field_type type);
+
+/** Create a COLLATE expression. */
+struct ast_expr *
+ast_expr_new_collate(struct region *region, struct ast_expr *operand,
+		     const struct Token *name);
+
+/** Create a function call expression. */
+struct ast_expr *
+ast_expr_new_function(struct region *region, const struct Token *name,
+		      bool is_distinct, struct ast_expr_list *args);
+
+/**
+ * Create an IN expression. Either the list of values or the subquery is
+ * given, or none of them for an empty list of values.
+ */
+struct ast_expr *
+ast_expr_new_in(struct region *region, struct ast_expr *value,
+		struct ast_expr_list *list, struct ast_select *select);
+
+/** Create a BETWEEN expression. */
+struct ast_expr *
+ast_expr_new_between(struct region *region, struct ast_expr *value,
+		     struct ast_expr *lower, struct ast_expr *upper);
+
+/** Create a CASE expression. The value is NULL if there is no operand. */
+struct ast_expr *
+ast_expr_new_case(struct region *region, struct ast_expr *value,
+		  struct ast_expr_list *list);
+
+/** Create a subscript expression. */
+struct ast_expr *
+ast_expr_new_getitem(struct region *region, struct ast_expr *value,
+		     struct ast_expr_list *keys);
+
+/** Create a RAISE expression. The message is NULL for the IGNORE action. */
+struct ast_expr *
+ast_expr_new_raise(struct region *region, const struct Token *message,
+		   enum on_conflict_action action);
 
 /** Append an expression to the expressions list, creating it if needed. */
 struct ast_expr_list *
