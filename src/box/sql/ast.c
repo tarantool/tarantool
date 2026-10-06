@@ -242,12 +242,168 @@ with_from_ast(struct Parse *parser, struct ast_with_list *list)
 	return res;
 }
 
-struct ast_expr *
-ast_expr_new(struct region *region, uint8_t op)
+/** Allocate a new expression node with all operands set to zero. */
+static struct ast_expr *
+ast_expr_new(struct region *region, uint8_t op, enum ast_expr_type type)
 {
 	struct ast_expr *expr = xregion_alloc_object(region, typeof(*expr));
 	memset(expr, 0, sizeof(*expr));
 	expr->op = op;
+	expr->type = type;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_leaf(struct region *region, uint8_t op, const char *str,
+		  uint32_t len)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_VAL);
+	expr->val.str = str;
+	expr->val.len = len;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_var(struct region *region, uint8_t op, const char *str,
+		 uint32_t len)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_VAL);
+	expr->val.str = str;
+	expr->val.len = len;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_asterisk(struct region *region)
+{
+	return ast_expr_new(region, TK_ASTERISK, AST_EXPR_NONE);
+}
+
+struct ast_expr *
+ast_expr_new_unary(struct region *region, uint8_t op, struct ast_expr *operand)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_ARG);
+	expr->arg = operand;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_binary(struct region *region, uint8_t op, struct ast_expr *left,
+		    struct ast_expr *right)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_BIN);
+	expr->bin.left = left;
+	expr->bin.right = right;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_list(struct region *region, uint8_t op,
+		  struct ast_expr_list *list)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_LIST);
+	expr->list = list;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_select(struct region *region, uint8_t op,
+		    struct ast_select *select)
+{
+	struct ast_expr *expr = ast_expr_new(region, op, AST_EXPR_SELECT);
+	expr->select = select;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_cast(struct region *region, struct ast_expr *operand,
+		  enum field_type type)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_CAST, AST_EXPR_CAST);
+	expr->cast.expr = operand;
+	expr->cast.type = type;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_collate(struct region *region, struct ast_expr *operand,
+		     const struct Token *name)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_COLLATE, AST_EXPR_COLL);
+	expr->coll.expr = operand;
+	expr->coll.name = name->z;
+	expr->coll.name_len = name->n;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_function(struct region *region, const struct Token *name,
+		      bool is_distinct, struct ast_expr_list *args)
+{
+	struct ast_expr *expr =
+		ast_expr_new(region, TK_FUNCTION, AST_EXPR_FUNC);
+	expr->func.name = name->z;
+	expr->func.name_len = name->n;
+	expr->func.is_distinct = is_distinct;
+	expr->func.args = args;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_in(struct region *region, struct ast_expr *value,
+		struct ast_expr_list *list, struct ast_select *select)
+{
+	assert(list == NULL || select == NULL);
+	struct ast_expr *expr = ast_expr_new(region, TK_IN, AST_EXPR_IN);
+	expr->in.value = value;
+	expr->in.list = list;
+	expr->in.select = select;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_between(struct region *region, struct ast_expr *value,
+		     struct ast_expr *lower, struct ast_expr *upper)
+{
+	struct ast_expr *expr =
+		ast_expr_new(region, TK_BETWEEN, AST_EXPR_BETWEEN);
+	expr->between.value = value;
+	expr->between.lower = lower;
+	expr->between.upper = upper;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_case(struct region *region, struct ast_expr *value,
+		  struct ast_expr_list *list)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_CASE, AST_EXPR_CASE);
+	expr->cs.value = value;
+	expr->cs.list = list;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_getitem(struct region *region, struct ast_expr *value,
+		     struct ast_expr_list *keys)
+{
+	struct ast_expr *expr =
+		ast_expr_new(region, TK_GETITEM, AST_EXPR_GETITEM);
+	expr->getitem.value = value;
+	expr->getitem.keys = keys;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_new_raise(struct region *region, const struct Token *message,
+		   enum on_conflict_action action)
+{
+	struct ast_expr *expr = ast_expr_new(region, TK_RAISE, AST_EXPR_RAISE);
+	if (message != NULL) {
+		expr->raise.str = message->z;
+		expr->raise.len = message->n;
+	}
+	expr->raise.action = action;
 	return expr;
 }
 
@@ -375,6 +531,7 @@ expr_id(uint8_t op, const char *str, uint32_t len)
 static struct Expr *
 expr_leaf(struct ast_expr *expr, enum field_type type)
 {
+	assert(expr->type == AST_EXPR_VAL);
 	struct Expr *res = expr_token(expr->op, expr->val.str, expr->val.len);
 	res->type = type;
 	res->flags |= EP_Leaf;
@@ -389,6 +546,7 @@ expr_leaf(struct ast_expr *expr, enum field_type type)
 static struct Expr *
 expr_var(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_VAL);
 	struct Token t;
 	t.z = expr->val.str;
 	t.n = expr->val.len;
@@ -443,6 +601,7 @@ expr_unary(struct Parse *parser, uint8_t op, struct ast_expr *operand)
 static struct Expr *
 expr_binary(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_BIN);
 	struct Expr *left = expr_from_ast(parser, expr->bin.left);
 	if (parser->is_aborted)
 		return NULL;
@@ -509,6 +668,7 @@ expr_left_and_list(struct Parse *parser, uint8_t op, struct ast_expr *left_ast,
 static struct Expr *
 expr_between(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_BETWEEN);
 	struct Expr *value = expr_from_ast(parser, expr->between.value);
 	if (parser->is_aborted)
 		return NULL;
@@ -541,6 +701,7 @@ expr_between(struct Parse *parser, struct ast_expr *expr)
 static struct Expr *
 expr_function(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_FUNC);
 	struct Expr *res = expr_id(TK_FUNCTION, expr->func.name,
 				   expr->func.name_len);
 	if (expr->func.is_distinct)
@@ -573,6 +734,7 @@ expr_function(struct Parse *parser, struct ast_expr *expr)
 static struct Expr *
 expr_in(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_IN);
 	if (expr->in.select != NULL) {
 		struct Expr *left = expr_from_ast(parser, expr->in.value);
 		if (parser->is_aborted)
@@ -636,6 +798,7 @@ expr_in(struct Parse *parser, struct ast_expr *expr)
 static struct Expr *
 expr_getitem(struct Parse *parser, struct ast_expr *expr)
 {
+	assert(expr->type == AST_EXPR_GETITEM);
 	struct ExprList *list = expr_list_from_ast(parser, expr->getitem.keys);
 	if (parser->is_aborted)
 		return NULL;
@@ -709,11 +872,13 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_binary(parser, expr);
 		break;
 	case TK_COLLATE:
+		assert(expr->type == AST_EXPR_COLL);
 		res = expr_id(TK_COLLATE, expr->coll.name, expr->coll.name_len);
 		res->flags |= EP_Collate | EP_Skip;
 		res->pLeft = expr_from_ast(parser, expr->coll.expr);
 		break;
 	case TK_CAST:
+		assert(expr->type == AST_EXPR_CAST);
 		res = expr_unary(parser, expr->op, expr->cast.expr);
 		if (res == NULL)
 			break;
@@ -725,12 +890,15 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 	case TK_UPLUS:
 	case TK_NOTNULL:
 	case TK_ISNULL:
+		assert(expr->type == AST_EXPR_ARG);
 		res = expr_unary(parser, expr->op, expr->arg);
 		break;
 	case TK_ARRAY:
+		assert(expr->type == AST_EXPR_LIST);
 		res = expr_list(parser, expr->op, expr->list, FIELD_TYPE_ARRAY);
 		break;
 	case TK_MAP:
+		assert(expr->type == AST_EXPR_LIST);
 		res = expr_list(parser, expr->op, expr->list, FIELD_TYPE_MAP);
 		break;
 	case TK_GETITEM:
@@ -743,16 +911,19 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res = expr_between(parser, expr);
 		break;
 	case TK_VECTOR:
+		assert(expr->type == AST_EXPR_LIST);
 		res = expr_list(parser, expr->op, expr->list, FIELD_TYPE_ANY);
 		break;
 	case TK_IN:
 		res = expr_in(parser, expr);
 		break;
 	case TK_ASTERISK:
+		assert(expr->type == AST_EXPR_NONE);
 		res = sql_expr_new_anon(TK_ASTERISK);
 		break;
 	case TK_EXISTS:
 	case TK_SELECT: {
+		assert(expr->type == AST_EXPR_SELECT);
 		struct Select *select = select_from_ast(parser, expr->select);
 		if (parser->is_aborted)
 			return NULL;
@@ -761,6 +932,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		break;
 	}
 	case TK_RAISE:
+		assert(expr->type == AST_EXPR_RAISE);
 		if (expr->raise.str != NULL) {
 			res = expr_token(TK_RAISE, expr->raise.str,
 					 expr->raise.len);
@@ -772,6 +944,7 @@ expr_from_ast(struct Parse *parser, struct ast_expr *expr)
 		res->on_conflict_action = expr->raise.action;
 		break;
 	case TK_CASE:
+		assert(expr->type == AST_EXPR_CASE);
 		if (expr->cs.value == NULL) {
 			res = expr_list(parser, expr->op, expr->cs.list,
 					FIELD_TYPE_ANY);
