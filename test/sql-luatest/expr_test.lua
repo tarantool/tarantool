@@ -44,3 +44,111 @@ g.test_expr_text = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- gh-13205: make sure that COLLATE contributes to the expression tree
+-- height.
+--
+g.test_collate_counts_towards_height = function()
+    g.server:exec(function()
+        local expr = "'a'" .. string.rep(" || 'a'", 198)
+
+        local _, err = box.execute('SELECT (' .. expr .. " || 'a');")
+        t.assert_equals(err, nil)
+
+        _, err = box.execute('SELECT (' .. expr .. ') COLLATE binary;')
+        t.assert_equals(err, nil)
+
+        local exp_err = 'Number of nodes in expression tree 201 exceeds ' ..
+                        'the limit (200)'
+        _, err = box.execute('SELECT (' .. expr .. " || 'a') COLLATE binary;")
+        t.assert_equals(err.message, exp_err)
+
+        expr = "'a'" .. string.rep(' COLLATE binary', 199)
+        _, err = box.execute('SELECT ' .. expr .. ';')
+        t.assert_equals(err, nil)
+
+        _, err = box.execute('SELECT ' .. expr .. ' COLLATE binary;')
+        t.assert_equals(err.message, exp_err)
+    end)
+end
+
+--
+-- gh-13205: make sure that a too deep expression tree is rejected instead
+-- of overflowing the stack.
+--
+g.test_very_deep_expr = function()
+    g.server:exec(function()
+        local n = 100000
+        local function exp_err(height)
+            return ('Number of nodes in expression tree %d exceeds ' ..
+                    'the limit (200)'):format(height)
+        end
+        local concat = "'a'" .. string.rep(" || 'a'", n)
+        local collate = "'a'" .. string.rep(' COLLATE binary', n)
+        local cases = {
+            {'SELECT ' .. concat .. ';', n + 1},
+            {'SELECT ' .. collate .. ';', n + 1},
+            {'SELECT 1' .. string.rep(' IN ()', n) .. ';', n + 1},
+            {'SELECT false' .. string.rep(' AND false', n) .. ';', n + 1},
+            {'SELECT 1 WHERE ' .. concat .. ' = 1;', n + 2},
+            {'SELECT (SELECT ' .. concat .. ');', n + 2},
+            {'VALUES (1), (' .. concat .. ');', n + 1},
+            {'CREATE TABLE t (i INT PRIMARY KEY, s STRING DEFAULT (' ..
+             concat .. '));', n + 1},
+            {'CREATE TABLE t (i INT PRIMARY KEY, s STRING CHECK (s = ' ..
+             concat .. '));', n + 2},
+            {'CREATE VIEW v AS SELECT ' .. concat .. ';', n + 1},
+        }
+        for _, case in pairs(cases) do
+            local _, err = box.execute(case[1])
+            t.assert_equals(err.message, exp_err(case[2]), case[1]:sub(1, 40))
+        end
+
+        box.execute('CREATE TABLE t (i INT PRIMARY KEY, s STRING);')
+        local _, err = box.execute('CREATE TRIGGER tr AFTER INSERT ON t ' ..
+                                   'FOR EACH ROW BEGIN SELECT ' .. concat ..
+                                   '; END;')
+        t.assert_equals(err.message, exp_err(n + 1))
+        box.execute('DROP TABLE t;')
+    end)
+end
+
+--
+-- gh-13205: make sure that the heights of the expressions of nested
+-- subqueries, views and CTEs are summed up and checked.
+--
+g.test_nested_subqueries_height = function()
+    g.server:exec(function()
+        local expr = '1' .. string.rep(' + 1', 149)
+        local exp_err = 'Number of nodes in expression tree 301 exceeds ' ..
+                        'the limit (200)'
+
+        local _, err = box.execute('SELECT ' .. expr ..
+                                   ' + (SELECT a FROM (SELECT 1 AS a));')
+        t.assert_equals(err, nil)
+
+        _, err = box.execute('SELECT ' .. expr .. ' + (SELECT a FROM ' ..
+                             '(SELECT ' .. expr .. ' AS a));')
+        t.assert_equals(err.message, exp_err)
+
+        _, err = box.execute('CREATE VIEW v1 AS SELECT ' .. expr .. ' AS a;')
+        t.assert_equals(err, nil)
+        _, err = box.execute('CREATE VIEW v2 AS SELECT ' .. expr ..
+                             ' + (SELECT a FROM SEQSCAN v1) AS a;')
+        t.assert_equals(err.message, exp_err)
+        box.execute('DROP VIEW v1;')
+
+        _, err = box.execute('WITH c1 AS (SELECT ' .. expr .. ' AS a), ' ..
+                             'c2 AS (SELECT ' .. expr .. ' + (SELECT a ' ..
+                             'FROM SEQSCAN c1) AS a) SELECT a FROM ' ..
+                             'SEQSCAN c2;')
+        t.assert_equals(err.message, exp_err)
+
+        -- COLLATE contributes to the sum too.
+        local coll = "('a'" .. string.rep(" || 'a'", 148) .. ') COLLATE binary'
+        _, err = box.execute('SELECT ' .. coll .. ' || (SELECT a FROM ' ..
+                             '(SELECT ' .. coll .. ' AS a));')
+        t.assert_equals(err.message, exp_err)
+    end)
+end
