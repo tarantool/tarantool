@@ -210,30 +210,106 @@ struct ast_expr_list {
 	struct stailq head;
 	/** Length of the list. */
 	uint32_t len;
-	/** True if this is the column list of a SELECT statement. */
-	bool is_select_list;
 };
 
 /** Description of a parsed expression. */
 struct ast_expr {
-	/** Left (or the only) operand of the expression. */
-	struct ast_expr *left;
 	union {
-		/** Right operand of a binary expression. */
-		struct ast_expr *right;
-		/** Sub-expressions, e.g. function args or an IN list. */
+		/** Operand of a unary expression. */
+		struct ast_expr *arg;
+		/** Elements of a TK_ARRAY, TK_MAP or TK_VECTOR expression. */
 		struct ast_expr_list *list;
-		/** Subquery of an EXISTS, SELECT, or IN expression. */
+		/** Subquery of a TK_SELECT or TK_EXISTS expression. */
 		struct ast_select *select;
-		/** Target type of a CAST expression. */
-		enum field_type type;
-		/** Conflict resolution action of a RAISE expression. */
-		enum on_conflict_action on_conflict_action;
+		/**
+		 * Text of the token of an expression without operands, e.g.
+		 * a literal, an identifier or a bound variable.
+		 */
+		struct {
+			/** Pointer to the text. */
+			const char *str;
+			/** Length of the text. */
+			uint32_t len;
+		} val;
+		/** Operands of a binary expression. */
+		struct {
+			/** Left operand. */
+			struct ast_expr *left;
+			/** Right operand. */
+			struct ast_expr *right;
+		} bin;
+		/** Operand and type of a TK_CAST expression. */
+		struct {
+			/** Expression being converted. */
+			struct ast_expr *expr;
+			/** Target type. */
+			enum field_type type;
+		} cast;
+		/** Operand and collation of a TK_COLLATE expression. */
+		struct {
+			/** Expression the collation is applied to. */
+			struct ast_expr *expr;
+			/** Name of the collation. */
+			const char *name;
+			/** Length of the name. */
+			uint32_t name_len;
+		} coll;
+		/** Name and arguments of a TK_FUNCTION expression. */
+		struct {
+			/** Name of the function. */
+			const char *name;
+			/** Length of the name. */
+			uint32_t name_len;
+			/** True if DISTINCT is specified for the arguments. */
+			bool is_distinct;
+			/** Arguments, NULL if there are none. */
+			struct ast_expr_list *args;
+		} func;
+		/** Operands of a TK_IN expression. */
+		struct {
+			/** Expression tested for membership. */
+			struct ast_expr *value;
+			/** Values to test against, unless it is a subquery. */
+			struct ast_expr_list *list;
+			/** Subquery, or NULL for a list of values. */
+			struct ast_select *select;
+		} in;
+		/** Operands of a TK_BETWEEN expression. */
+		struct {
+			/** Expression tested against the range. */
+			struct ast_expr *value;
+			/** Lower bound of the range. */
+			struct ast_expr *lower;
+			/** Upper bound of the range. */
+			struct ast_expr *upper;
+		} between;
+		/** Operands of a TK_CASE expression. */
+		struct {
+			/** Operand of the CASE, or NULL if there is none. */
+			struct ast_expr *value;
+			/**
+			 * WHEN and THEN expressions in pairs, followed by the
+			 * ELSE expression, if there is one.
+			 */
+			struct ast_expr_list *list;
+		} cs;
+		/** Operand and keys of a TK_GETITEM expression. */
+		struct {
+			/** Expression the subscript is applied to. */
+			struct ast_expr *value;
+			/** Keys. */
+			struct ast_expr_list *keys;
+		} getitem;
+		/** Message and action of a TK_RAISE expression. */
+		struct {
+			/** Message token, or NULL for the IGNORE action. */
+			const char *str;
+			/** Length of the error message token. */
+			uint32_t len;
+			/** Conflict resolution action. */
+			enum on_conflict_action action;
+		} raise;
 	};
-	/** Pointer to the token text this expression is built from. */
-	const char *str;
-	/** Length of the token text pointed to by str. */
-	uint32_t len;
 	/** Parser token code identifying the kind of expression. */
 	uint8_t op;
 };
@@ -250,6 +326,10 @@ struct ast_expr_list_entry {
 	struct Token name;
 	/** The expression itself. */
 	struct ast_expr *expr;
+	/** Text of the expression, set only for the column list of SELECT. */
+	const char *span;
+	/** Length of the text of the expression. */
+	uint32_t span_len;
 	/** Sort order of the entry, used for ORDER BY lists. */
 	enum sort_order order;
 	/** AUTOINCREMENT feature indicator for primary key columns. */
@@ -376,7 +456,14 @@ struct ast_property {
 	struct Token name;
 	union {
 		/** Expression for DEFAULT property and CHECK constraint. */
-		struct ast_expr *expr;
+		struct {
+			/** The expression itself. */
+			struct ast_expr *expr;
+			/** Text of the expression. */
+			const char *span;
+			/** Length of the text of the expression. */
+			uint32_t span_len;
+		};
 		/** Column list for PRIMARY KEY and UNIQUE table constraint. */
 		struct ast_expr_list *columns;
 		/** Description of FOREIGN KEY constraint. */
@@ -675,10 +762,9 @@ ast_with_list_append(struct region *region, struct ast_with_list *list,
 struct With *
 with_from_ast(struct Parse *parser, struct ast_with_list *list);
 
-/** Allocate a new expression node from a token's text. */
+/** Allocate a new expression node with all operands set to zero. */
 struct ast_expr *
-ast_expr_new(struct region *region, const char *start, uint32_t len,
-	     uint8_t op);
+ast_expr_new(struct region *region, uint8_t op);
 
 /** Append an expression to the expressions list, creating it if needed. */
 struct ast_expr_list *
@@ -688,6 +774,14 @@ ast_expr_list_append(struct region *region, struct ast_expr_list *list,
 /** Set the name of the last expression appended to the list. */
 void
 ast_expr_list_set_name(struct ast_expr_list *list, struct Token *name);
+
+/**
+ * Set the text of the last expression appended to the list. The text spans
+ * from `start` to `end`, not including `end`.
+ */
+void
+ast_expr_list_set_span(struct ast_expr_list *list, const char *start,
+		       const char *end);
 
 /** Set the sort order of the last expression appended to the list. */
 void
