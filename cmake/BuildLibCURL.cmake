@@ -45,11 +45,19 @@ macro(curl_build)
 
     # Let's disable testing for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_TESTING=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_BUILD_EVERYTHING=OFF")
 
     # Let's disable building documentation for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_MISC_DOCS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_LIBCURL_DOCS=OFF")
+
+    # That's for curl maintainers.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CLANG_TIDY=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CODE_COVERAGE=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_LINT=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DEBUG_GLOBAL_MEM=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_GCC_ANALYZER=OFF")
 
     # Setup use of openssl, use the same OpenSSL library
     # for libcurl as is used for tarantool itself.
@@ -60,19 +68,31 @@ macro(curl_build)
 
     set(LIBCURL_FIND_ROOT_PATH "")
 
-    # Setup ARES and its library path, use either c-ares bundled
-    # with tarantool or libcurl-default threaded resolver.
+    # libcurl supports several DNS resolving mechanisms.
+    #
+    # | c-ares | th. res. | outcome                                        |
+    # | ------ | -------- | ---------------------------------------------- |
+    # | OFF    | OFF      | blocking DNS resolver (getaddrinfo)            |
+    # | OFF    | ON       | mostly non-blocking via th. res.               |
+    # | ON     | OFF      | non-blocking via c-ares                        |
+    # | ON     | ON       | c-ares for HTTPS RR, th. res. for the rest [1] |
+    #
+    # We prefer c-ares if possible (see [2]). The threaded resolver otherwise.
+    #
+    # [1]: https://github.com/curl/curl/pull/16054
+    # [2]: https://github.com/tarantool/tarantool/issues/4591
     if(BUNDLED_LIBCURL_USE_ARES)
         set(ENABLE_ARES "ON")
+        set(ENABLE_THREADED_RESOLVER "OFF")
         list(APPEND LIBCURL_FIND_ROOT_PATH ${ARES_INSTALL_DIR})
     else()
         set(ENABLE_ARES "OFF")
-        # libcurl build system enables threaded resolver when c-ares is
-        # disabled, we duplicate this logic because we cannot rely on upstream
-        # defaults, they may vary across time.
-        list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_THREADED_RESOLVER=ON")
+        set(ENABLE_THREADED_RESOLVER "ON")
     endif()
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_ARES=${ENABLE_ARES}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_THREADED_RESOLVER=${ENABLE_THREADED_RESOLVER}")
+    unset(ENABLE_ARES)
+    unset(ENABLE_THREADED_RESOLVER)
 
     # Setup http2 and nghttp2 library path
     if(BUNDLED_LIBCURL_USE_NGHTTP2)
@@ -101,7 +121,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DHTTP_ONLY=OFF")
 
     # Additionaly disable some more protocols.
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMB=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ENABLE_SMB=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_GOPHER=ON")
 
     # Enable basic and digest auth methods, disable all the others.
@@ -130,6 +150,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_NATIVE=OFF")
     # The curl tool isn't built, so no CA bundle is embedded into it.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_EMBED=")
 
@@ -163,14 +184,12 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GNUTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_MBEDTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_WOLFSSL=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBRTMP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_RUSTLS=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_WOLFSSH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GSASL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBIDN2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGTCP2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_QUICHE=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_OPENSSL_QUIC=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_PROXY_HTTP3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HTTP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROXY=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SHA512_256=OFF")
@@ -195,7 +214,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_IPFS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMTP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_ALTSVC=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SRP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_DOH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_GETOPTIONS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HSTS=OFF")
@@ -204,7 +222,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_MIME=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_FORM_API=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_NETRC=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_NTLM=ON")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ENABLE_NTLM=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PARSEDATE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROGRESS_METER=OFF")
@@ -214,7 +232,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ENABLE_EXPORT_TARGET=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ENABLE_SSL=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_LTO=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_BEARSSL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GSSAPI=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_LIBSSH=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_LIBPSL=OFF")
@@ -224,9 +241,7 @@ macro(curl_build)
     # catch the symbols may require extra work.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_ZSTD=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DLIBCURL_OUTPUT_NAME=libcurl")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURLDEBUG=${TARANTOOL_DEBUG}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_DEBUG=${TARANTOOL_DEBUG}")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_MSH3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_WEBSOCKETS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_UNITY_BUILD=OFF")
     # Note that CMake build does not allow build curl and libcurl debug
@@ -250,6 +265,62 @@ macro(curl_build)
 
     # Disables headers-api support.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HEADERS_API=OFF")
+
+    # The import/export sessions functionality is not provided by our
+    # http.client.
+    #
+    # https://github.com/curl/curl/pull/15924
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_SSLS_EXPORT=OFF")
+
+    # curl's internal option, added here with its curl's default for
+    # completeness.
+    #
+    # https://github.com/curl/curl/pull/16278
+    # https://github.com/curl/curl/pull/15841
+    list(APPEND LIBCURL_CMAKE_FLAGS "-D_CURL_PREFILL=OFF")
+
+    # When ON curl_easy_setopt()/curl_easy_getinfo() skips argument type
+    # checking. Needed only to speedup build time of testing targets.
+    # Not recommended for a usual build.
+    #
+    # https://github.com/curl/curl/pull/19637
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_TYPECHECK=OFF")
+
+    # When ON enables libbacktrace, a library to produce symbolic backtraces.
+    #
+    # For us it would require to add an extra dependency, so disabled.
+    #
+    # https://github.com/curl/curl/pull/19666
+    # https://github.com/ianlancetaylor/libbacktrace
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_LIBBACKTRACE=OFF")
+
+    # When ON enables options that aim to reduce executable size, but they
+    # increase the static library size.
+    #
+    # Linux:
+    # CFLAGS+=(-ffunction-sections -fdata-sections)
+    # LDFLAGS+=-Wl,--gc-sections
+    #
+    # macOS:
+    # LDFLAGS+=-Wl,-dead_strip
+    #
+    # The per-function sections are only profitable if we enable the
+    # gc-sections linker flag *for our executable*.
+    #
+    # https://github.com/curl/curl/pull/20357
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DROP_UNUSED=OFF")
+
+    # An alternative dependency detection method.
+    #
+    # https://github.com/curl/curl/pull/20814
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_CMAKECONFIG=OFF")
+
+    # RFC 9421 HTTP Message Signatures.
+    #
+    # Needs support in our http.client to actually be useful.
+    #
+    # https://github.com/curl/curl/pull/21239
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HTTPSIG=ON")
 
     include(ExternalProject)
     ExternalProject_Add(
@@ -296,7 +367,7 @@ macro(curl_build)
         SOURCE_DIR ${LIBCURL_SOURCE_DIR}
         OPTIONS_FILE ${PROJECT_SOURCE_DIR}/cmake/BuildLibCURL.cmake
         FLAGS ${LIBCURL_CMAKE_FLAGS}
-        INCLUDES GNUInstallDirs
+        INCLUDES GNUInstallDirs CPack
         PACKAGES OpenSSL ZLIB Perl Cares NGHTTP2
         MODULE_PATH ${LIBCURL_SOURCE_DIR}/CMake
         # curl's CMake script drops CURL_CA_BUNDLE and CURL_CA_PATH from the

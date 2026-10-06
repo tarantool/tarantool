@@ -32,7 +32,7 @@ local expected = {
         https = 'ALPN: curl offers http/1.1',
     },
     ['2'] = {
-        http = 'Connection: Upgrade, HTTP2-Settings',
+        http = 'Connection: close, Upgrade, HTTP2-Settings',
         https = 'ALPN: curl offers h2,http/1.1',
     },
     ['2-tls'] = {
