@@ -1,17 +1,29 @@
 # The following list was obtained by parsing libcurl.a static
-# library: nm libcurl.a | grep -oP 'T \K(curl_.+)$' | sort
+# library built as part of tarantool's RelWithDebInfo build.
+#
+# $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j
+# $ nm build/curl/dest/lib/libcurl.a | grep -oP 'T \K(curl_.+)$' | sort
+#
+# Last update: 2026-10-23, libcurl from commit curl-8_23_0-114-g2afc2a40b9.
 
 curl_easy_cleanup
 curl_easy_duphandle
 curl_easy_escape
 curl_easy_getinfo
+curl_easy_header
 curl_easy_init
+curl_easy_nextheader
+curl_easy_option_by_id
+curl_easy_option_by_name
+curl_easy_option_next
 curl_easy_pause
 curl_easy_perform
 curl_easy_recv
 curl_easy_reset
 curl_easy_send
 curl_easy_setopt
+curl_easy_ssls_export
+curl_easy_ssls_import
 curl_easy_strerror
 curl_easy_unescape
 curl_easy_upkeep
@@ -26,6 +38,7 @@ curl_global_cleanup
 curl_global_init
 curl_global_init_mem
 curl_global_sslset
+curl_global_trace
 curl_maprintf
 curl_mfprintf
 curl_mime_addpart
@@ -47,8 +60,12 @@ curl_multi_add_handle
 curl_multi_assign
 curl_multi_cleanup
 curl_multi_fdset
+curl_multi_get_handles
+curl_multi_get_offt
 curl_multi_info_read
 curl_multi_init
+curl_multi_notify_disable
+curl_multi_notify_enable
 curl_multi_perform
 curl_multi_poll
 curl_multi_remove_handle
@@ -59,6 +76,8 @@ curl_multi_socket_all
 curl_multi_strerror
 curl_multi_timeout
 curl_multi_wait
+curl_multi_waitfds
+curl_multi_wakeup
 curl_mvaprintf
 curl_mvfprintf
 curl_mvprintf
@@ -80,5 +99,10 @@ curl_url_cleanup
 curl_url_dup
 curl_url_get
 curl_url_set
+curl_url_strerror
 curl_version
 curl_version_info
+curl_ws_meta
+curl_ws_recv
+curl_ws_send
+curl_ws_start_frame
