@@ -261,6 +261,23 @@ tuple_hash_impl(struct tuple *tuple, struct key_def *key_def)
 }
 
 uint32_t
+tuple_hash_multikey(struct tuple *tuple, struct key_def *key_def,
+		    int multikey_idx)
+{
+	assert(key_def->is_multikey);
+	uint32_t h = HASH_SEED;
+	uint32_t carry = 0;
+	uint32_t total_size = 0;
+
+	for (struct key_part *part = key_def->parts;
+	     part < key_def->parts + key_def->part_count; part++)
+		total_size += tuple_hash_key_part(&h, &carry, tuple, part,
+						  multikey_idx);
+
+	return PMurHash32_Result(h, carry, total_size);
+}
+
+uint32_t
 key_hash(const char *key, struct key_def *key_def)
 {
 	uint32_t h = HASH_SEED;

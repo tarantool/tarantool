@@ -1139,6 +1139,18 @@ tuple_hash(struct tuple *tuple, struct key_def *key_def)
 }
 
 /**
+ * Calculates a hash value for a multikey tuple entry, consistently with
+ * key_hash() of the extracted key.
+ * @param tuple - a tuple
+ * @param key_def - key_def for field description
+ * @param multikey_idx - multikey index of the entry
+ * @return - hash value
+ */
+uint32_t
+tuple_hash_multikey(struct tuple *tuple, struct key_def *key_def,
+		    int multikey_idx);
+
+/**
  * Calculate a common hash value for a key
  * @param key - full key (msgpack fields w/o array marker)
  * @param key_def - key_def for field description
