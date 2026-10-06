@@ -1129,10 +1129,10 @@ test_xrow_decode_dml_requests()
 }
 
 /**
- * Check that xrow_decode_* functions silently ignore unknown keys.
+ * Check that xrow_decode_* functions silently ignore the unknown key.
  */
 static void
-test_xrow_decode_unknown_key(void)
+test_xrow_decode_unknown_key(uint32_t key)
 {
 	header();
 	plan(16);
@@ -1141,7 +1141,7 @@ test_xrow_decode_unknown_key(void)
 
 	const char *p = buf;
 	const char *end = buf + mp_format(buf, sizeof(buf), "{%u%s}",
-					  0xDEAD, "foobar");
+					  key, "foobar");
 	struct xrow_header header;
 	is(xrow_decode(&header, &p, end, /*end_is_exact=*/true), 0,
 	   "xrow_decode");
@@ -1150,7 +1150,7 @@ test_xrow_decode_unknown_key(void)
 	header.bodycnt = 1;
 	header.body[0].iov_base = buf;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s}",
-					   0xDEAD, "foobar");
+					   key, "foobar");
 
 	struct request dml;
 	header.type = IPROTO_SELECT;
@@ -1201,35 +1201,35 @@ test_xrow_decode_unknown_key(void)
 	header.type = IPROTO_OK;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u{%u%b}%u%s}",
 					   IPROTO_BALLOT, IPROTO_BALLOT_IS_RO,
-					   true, 0xDEAD, "foobar");
+					   true, key, "foobar");
 	is(xrow_decode_ballot(&header, &ballot), 0, "xrow_decode_ballot");
 
 	struct call_request call;
 	header.type = IPROTO_CALL;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s%u%s}",
 					   IPROTO_FUNCTION_NAME, "foo",
-					   0xDEAD, "foobar");
+					   key, "foobar");
 	is(xrow_decode_call(&header, &call), 0, "xrow_decode_call");
 
 	struct watch_request watch;
 	header.type = IPROTO_WATCH;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s%u%s}",
 					   IPROTO_EVENT_KEY, "foo",
-					   0xDEAD, "foobar");
+					   key, "foobar");
 	is(xrow_decode_watch(&header, &watch), 0, "xrow_decode_watch");
 
 	struct sql_request sql;
 	header.type = IPROTO_EXECUTE;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s%u%s}",
 					   IPROTO_SQL_TEXT, "SELECT 1",
-					   0xDEAD, "foobar");
+					   key, "foobar");
 	is(xrow_decode_sql(&header, &sql), 0, "xrow_decode_sql");
 
 	struct auth_request auth;
 	header.type = IPROTO_AUTH;
 	header.body[0].iov_len = mp_format(buf, sizeof(buf), "{%u%s%u[]%u%s}",
 					   IPROTO_USER_NAME, "guest",
-					   IPROTO_TUPLE, 0xDEAD, "foobar");
+					   IPROTO_TUPLE, key, "foobar");
 	is(xrow_decode_auth(&header, &auth), 0, "xrow_decode_auth");
 
 	check_plan();
@@ -1490,7 +1490,7 @@ main(void)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	header();
-	plan(15);
+	plan(16);
 
 	random_init();
 
@@ -1502,7 +1502,9 @@ main(void)
 	test_xrow_encode_dml();
 	test_xrow_decode_dml_keys();
 	test_xrow_decode_dml_requests();
-	test_xrow_decode_unknown_key();
+	test_xrow_decode_unknown_key(0xDEAD);
+	/* Unassigned key below iproto_key_MAX (gh-13282). */
+	test_xrow_decode_unknown_key(0x16);
 	test_xrow_decode_error_1();
 	test_xrow_decode_error_2();
 	test_xrow_decode_error_3();
