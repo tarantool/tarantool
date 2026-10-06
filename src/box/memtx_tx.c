@@ -4559,20 +4559,33 @@ memtx_tx_clean_txn(struct txn *txn)
 	memtx_tx_story_gc();
 }
 
+/** Hash a snapshot cleaner entry by its tuple and key data. */
 static uint32_t
-memtx_tx_snapshot_cleaner_hash(const struct tuple *a)
+memtx_tx_snapshot_cleaner_hash(const struct memtx_index_entry *a)
 {
-	uintptr_t u = (uintptr_t)a;
+	uintptr_t u = (uintptr_t)a->tuple ^ (uintptr_t)a->key_data;
 	if (sizeof(uintptr_t) <= sizeof(uint32_t))
 		return u;
 	else
 		return u ^ (u >> 32);
 }
 
+/** Compare snapshot cleaner entries by their tuple and key data. */
+static inline bool
+memtx_tx_snapshot_cleaner_entry_equal(const struct memtx_index_entry *a,
+				      const struct memtx_index_entry *b)
+{
+	return a->tuple == b->tuple && a->key_data == b->key_data;
+}
+
 struct memtx_tx_snapshot_cleaner_entry
 {
-	/* A dirty tuple that is present in read-view but should be cleaned. */
-	struct tuple *from;
+	/*
+	 * A dirty index entry that is present in read-view but should be
+	 * cleaned. Multikey and functional indexes may have several entries of
+	 * one tuple, each one is cleaned separately.
+	 */
+	struct memtx_index_entry from;
 	/* Cleaned version of the tuple. */
 	struct tuple *to;
 	/* The tuples share the same key, so one hint is enough. */
@@ -4580,13 +4593,15 @@ struct memtx_tx_snapshot_cleaner_entry
 };
 
 #define mh_name _snapshot_cleaner
-#define mh_key_t struct tuple *
+#define mh_key_t struct memtx_index_entry *
 #define mh_node_t struct memtx_tx_snapshot_cleaner_entry
 #define mh_arg_t int
-#define mh_hash(a, arg) (memtx_tx_snapshot_cleaner_hash((a)->from))
+#define mh_hash(a, arg) (memtx_tx_snapshot_cleaner_hash(&(a)->from))
 #define mh_hash_key(a, arg) (memtx_tx_snapshot_cleaner_hash(a))
-#define mh_cmp(a, b, arg) (((a)->from) != ((b)->from))
-#define mh_cmp_key(a, b, arg) ((a) != ((b)->from))
+#define mh_cmp(a, b, arg) \
+	(!memtx_tx_snapshot_cleaner_entry_equal(&(a)->from, &(b)->from))
+#define mh_cmp_key(a, b, arg) \
+	(!memtx_tx_snapshot_cleaner_entry_equal((a), &(b)->from))
 #define MH_SOURCE
 #include "salad/mhash.h"
 
@@ -4609,7 +4624,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 			continue;
 
 		struct memtx_tx_snapshot_cleaner_entry entry;
-		entry.from = tuple;
+		entry.from.tuple = tuple;
+		entry.from.key_data = link->key_data;
 		entry.to = clean;
 		entry.hint =
 			memtx_tx_story_link_hint(link, index,
@@ -4634,7 +4650,8 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct space_alter_stmt *alter_stmt;
 		rlist_foreach_entry(alter_stmt, &space->alter_stmts, link) {
 			struct memtx_tx_snapshot_cleaner_entry entry;
-			entry.from = alter_stmt->new_tuple;
+			entry.from.tuple = alter_stmt->new_tuple;
+			entry.from.key_data = HINT_NONE;
 			entry.to = alter_stmt->old_tuple;
 			/* Hint is not used if MVCC is off. */
 			entry.hint = HINT_NONE;
@@ -4646,18 +4663,19 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 
 struct tuple *
 memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
-			       struct tuple *tuple)
+			       struct memtx_index_entry entry)
 {
 	assert(cleaner->ht != NULL);
 
 	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
-	mh_int_t pos = mh_snapshot_cleaner_find(ht, tuple, 0);
+	mh_int_t pos = mh_snapshot_cleaner_find(ht, &entry, 0);
 	if (pos == mh_end(ht))
-		return tuple;
-	struct memtx_tx_snapshot_cleaner_entry *entry =
+		return entry.tuple;
+	struct memtx_tx_snapshot_cleaner_entry *cleaner_entry =
 		mh_snapshot_cleaner_node(ht, pos);
-	assert(entry->from == tuple);
-	return entry->to;
+	assert(memtx_tx_snapshot_cleaner_entry_equal(&cleaner_entry->from,
+						     &entry));
+	return cleaner_entry->to;
 }
 
 void
@@ -4697,12 +4715,12 @@ memtx_tx_snapshot_invisible_count_matching_until_slow(
 		/* Only in-index tuples must exist in the snapshot. */
 		assert(!tuple_key_is_excluded(cmp_def->for_func_index ?
 					      (struct tuple *)entry->hint :
-					      entry->from,
+					      entry->from.tuple,
 					      cmp_def,
 					      MULTIKEY_NONE));
 
 		/* Does not match with the key and border. */
-		if (!memtx_tx_tuple_matches_until(cmp_def, entry->from,
+		if (!memtx_tx_tuple_matches_until(cmp_def, entry->from.tuple,
 						  entry->hint, type,
 						  key, part_count,
 						  until, until_hint))

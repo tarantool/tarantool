@@ -721,6 +721,31 @@ g.test_snapshot_and_recovery = function(cg)
     end)
 end
 
+-- Check read views over multikey index see each index entry separately.
+g.test_read_view = function(cg)
+    local stream = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {0, 1}}
+    end)
+
+    stream:begin()
+    stream.space.s:replace{0, {0, 2}}
+
+    cg.server:exec(function()
+        local rv = box.read_view.open()
+        local mk = rv.space.s.index.mk
+        t.assert_equals(mk:select{}, {{0, {0, 1}}, {0, {0, 1}}})
+        t.assert_equals(mk:select{0}, {{0, {0, 1}}})
+        t.assert_equals(mk:select{1}, {{0, {0, 1}}})
+        t.assert_equals(mk:select{2}, {})
+        t.assert_equals(mk:count(), 2)
+        rv:close()
+    end)
+
+    stream:rollback()
+end
+
 -- Check sinking of story for commit preparation works correctly.
 g.test_prepare_story_sink = function(cg)
     local stream1 = cg.server.net_box:new_stream()

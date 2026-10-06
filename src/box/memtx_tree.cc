@@ -2332,7 +2332,9 @@ tree_read_view_get_raw(struct index_read_view *base,
 		*result = read_view_tuple_none();
 		return 0;
 	}
-	return memtx_prepare_read_view_tuple(res->tuple, &rv->base,
+	struct memtx_index_entry entry =
+		memtx_tree_index_entry(&rv->index->base, res);
+	return memtx_prepare_read_view_tuple(entry, &rv->base,
 					     &rv->cleaner, result);
 }
 
@@ -2436,7 +2438,9 @@ tree_read_view_iterator_next_raw_impl(struct index_read_view_iterator *iterator,
 			return 0;
 		}
 		it->last = tree_data;
-		if (memtx_prepare_read_view_tuple(tree_data->tuple, &rv->base,
+		struct memtx_index_entry entry =
+			memtx_tree_index_entry(&rv->index->base, tree_data);
+		if (memtx_prepare_read_view_tuple(entry, &rv->base,
 						  &rv->cleaner, result) != 0)
 			return -1;
 		if (result->data != NULL)
@@ -2513,13 +2517,15 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 		 * target (potentially), so it's skipped too and also must be
 		 * checked for visibility so we do it manually.
 		 */
+		struct memtx_index_entry prev_entry =
+				memtx_tree_index_entry(&rv->index->base, prev);
 		size_t skip_more_visible =
 			memtx_tx_snapshot_invisible_count_matching_until(
 				&rv->cleaner, rv->base.def, type,
 				start_data.key, start_data.part_count,
 				prev->tuple, prev->hint) +
-			!memtx_tx_snapshot_tuple_key_is_visible(&rv->cleaner,
-								prev->tuple);
+			!memtx_tx_snapshot_entry_is_visible(&rv->cleaner,
+							    prev_entry);
 		memtx_tree_iterator_t<USE_HINT> *iterator = &it->tree_iterator;
 		while (skip_more_visible != 0) {
 			if (iterator_type_is_reverse(type)) {
@@ -2535,9 +2541,10 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 			/* Check if we've skipped too much. */
 			if (prev == NULL)
 				return 0; /* The iterator is exhausted. */
-
-			if (memtx_tx_snapshot_tuple_key_is_visible(
-					&rv->cleaner, prev->tuple))
+			prev_entry =
+				memtx_tree_index_entry(&rv->index->base, prev);
+			if (memtx_tx_snapshot_entry_is_visible(&rv->cleaner,
+							       prev_entry))
 				skip_more_visible--;
 		}
 	}
@@ -2712,8 +2719,10 @@ memtx_tree_index_read_view_dump_sort_data(
 			memtx_tree_view_iterator_get_elem(
 				&rv->tree_view, &rv->dump_iterator);
 		/* Only dump visible data. */
+		struct memtx_index_entry entry =
+				memtx_tree_index_entry(&rv->index->base, data);
 		struct tuple *clarified =
-			memtx_tx_snapshot_clarify(&rv->cleaner, data->tuple);
+			memtx_tx_snapshot_clarify(&rv->cleaner, entry);
 		if (clarified == NULL)
 			continue;
 		/* Dump clarified tuples with hints (optionally). */
