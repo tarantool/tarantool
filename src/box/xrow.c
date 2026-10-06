@@ -66,6 +66,17 @@ static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
 	      "one byte");
 
+/**
+ * Check if a value of the given MsgPack type is not allowed for the IPROTO
+ * key. Keys without a fixed type (unknown or unassigned) accept any value.
+ */
+static inline bool
+iproto_key_type_is_invalid(uint64_t key, enum mp_type type)
+{
+	return key < iproto_key_MAX && iproto_key_type[key] != MP_NIL &&
+	       iproto_key_type[key] != type;
+}
+
 uint32_t
 mp_sizeof_vclock_ignore0(const struct vclock *vclock)
 {
@@ -212,8 +223,7 @@ xrow_decode(struct xrow_header *header, const char **pos,
 		if (mp_typeof(**pos) != MP_UINT)
 			goto bad_header;
 		uint64_t key = mp_decode_uint(pos);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(**pos))
+		if (iproto_key_type_is_invalid(key, mp_typeof(**pos)))
 			goto bad_header;
 		switch (key) {
 		case IPROTO_REQUEST_TYPE:
@@ -858,8 +868,8 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 		 * (gh-13258): IPROTO_OPTIONS has type mismatch.
 		 * It's safe to ignore it because it's not used anyway.
 		 */
-		if (key < iproto_key_MAX && key != IPROTO_OPTIONS &&
-		    iproto_key_type[key] != mp_typeof(*value))
+		if (key != IPROTO_OPTIONS &&
+		    iproto_key_type_is_invalid(key, mp_typeof(*value)))
 			goto error;
 
 		switch (key) {
@@ -992,8 +1002,7 @@ error:
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
 		mp_next(&data);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*value))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*value)))
 			goto error;
 		if (key < 64)
 			key_map &= ~iproto_key_bit(key);
@@ -1310,8 +1319,7 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 		if (mp_typeof(*p) != MP_UINT)
 			goto error;
 		uint64_t key = mp_decode_uint(&p);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*p))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*p)))
 			goto error;
 		switch (key) {
 		case IPROTO_VERSION:
@@ -1426,8 +1434,7 @@ xrow_decode_synchro_confirm(struct synchro_request *req, const char *d)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*d))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*d)))
 			return -1;
 		switch (key) {
 		case IPROTO_REPLICA_ID:
@@ -1457,8 +1464,7 @@ xrow_decode_synchro_rollback(struct synchro_request *req, const char *d)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*d))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*d)))
 			return -1;
 		switch (key) {
 		case IPROTO_REPLICA_ID:
@@ -1490,8 +1496,7 @@ xrow_decode_synchro_promote(struct synchro_request *req, const char *d)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != mp_typeof(*d))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*d)))
 			return -1;
 		switch (key) {
 		case IPROTO_REPLICA_ID:
@@ -1814,9 +1819,7 @@ error:
 		if (mp_typeof(*data) != MP_UINT)
 			goto error;
 		uint64_t key = mp_decode_uint(&data);
-		if (key < iproto_key_MAX &&
-		    iproto_key_type[key] != MP_NIL &&
-		    iproto_key_type[key] != mp_typeof(*data))
+		if (iproto_key_type_is_invalid(key, mp_typeof(*data)))
 			goto error;
 		switch (key) {
 		case IPROTO_EVENT_KEY:
@@ -1997,8 +2000,7 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 		if (mp_typeof(*d) != MP_UINT)
 			goto bad_msgpack;
 		uint64_t key = mp_decode_uint(&d);
-		if (key < iproto_key_MAX &&
-		    mp_typeof(*d) != iproto_key_type[key])
+		if (iproto_key_type_is_invalid(key, mp_typeof(*d)))
 			goto bad_msgpack;
 		switch (key) {
 		case IPROTO_TIMEOUT:
@@ -2048,8 +2050,7 @@ xrow_decode_commit(const struct xrow_header *row, struct commit_request *request
 		if (mp_typeof(*d) != MP_UINT)
 			goto bad_msgpack;
 		uint64_t key = mp_decode_uint(&d);
-		if (key < iproto_key_MAX &&
-		    mp_typeof(*d) != iproto_key_type[key])
+		if (iproto_key_type_is_invalid(key, mp_typeof(*d)))
 			goto bad_msgpack;
 		switch (key) {
 		case IPROTO_IS_SYNC:
