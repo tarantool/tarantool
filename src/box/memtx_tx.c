@@ -436,33 +436,30 @@ point_hole_storage_combine_index_and_tuple_hash(struct index *index,
 	return (uintptr_t)index ^ tuple_hash;
 }
 
+/** Hash the logical key of an index entry, consistently with its key_def. */
+static uint32_t
+memtx_tx_index_entry_hash(struct index *index, struct memtx_index_entry entry)
+{
+	struct key_def *def = index->def->key_def;
+	if (likely(!def->is_multikey && !def->for_func_index)) {
+		assert(entry.key_data == HINT_NONE);
+		return def->tuple_hash(entry.tuple, def);
+	}
+	assert(entry.key_data != HINT_NONE);
+	if (def->for_func_index) {
+		struct tuple *func_key = (struct tuple *)entry.key_data;
+		const char *data = tuple_data(func_key);
+		mp_decode_array(&data);
+		return key_hash(data, def);
+	}
+	return tuple_hash_multikey(entry.tuple, def, (int)entry.key_data);
+}
+
 /** Hash calculatore for the key. */
 static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
-	struct key_def *def = key->index->def->key_def;
-	uint32_t tuple_hash = 0;
-	if (likely(!def->is_multikey && !def->for_func_index)) {
-		assert(key->entry.key_data == HINT_NONE);
-		tuple_hash = def->tuple_hash(key->entry.tuple, def);
-	} else if (def->for_func_index) {
-		assert(key->entry.key_data != HINT_NONE);
-		struct tuple *func_key = (struct tuple *)key->entry.key_data;
-		const char *data = tuple_data(func_key);
-		mp_decode_array(&data);
-		tuple_hash = key_hash(data, def);
-	} else {
-		assert(key->entry.key_data != HINT_NONE);
-		uint32_t key_size;
-		struct region *region = &fiber()->gc;
-		size_t region_svp = region_used(region);
-		const char *data = tuple_extract_key(key->entry.tuple, def,
-						     (int)key->entry.key_data,
-						     &key_size);
-		mp_decode_array(&data);
-		tuple_hash = key_hash(data, def);
-		region_truncate(region, region_svp);
-	}
+	uint32_t tuple_hash = memtx_tx_index_entry_hash(key->index, key->entry);
 	return point_hole_storage_combine_index_and_tuple_hash(key->index,
 							       tuple_hash);
 }
@@ -523,17 +520,20 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 struct story_link_storage_key {
 	/** Index entry whose `memtx_story_link` we are searching for. */
 	struct memtx_index_entry entry;
+	/** The index of the entry. */
+	struct index *index;
 	/** Dense id of the index. */
 	uint32_t index_id;
 };
 
 /**
- * Hash a story-link lookup by tuple and index.
+ * Hash a story-link lookup by tuple, index and logical key.
  *
- * Different key data may identify equal keys: functional keys are pointers
- * and duplicate multikey positions may compare equal. Hashing the key data
- * would give equal entries different hashes, so equality compares the keys
- * after the tuple and index hash match.
+ * The key data is not hashed: functional keys are pointers and duplicate
+ * multikey positions may compare equal, so equal entries would get different
+ * hashes. The key contents are hashed instead, otherwise all entries of one
+ * tuple collide and their lookups degrade to a linear scan of the tuple's
+ * links.
  */
 static uint32_t
 story_link_storage_key_hash(const struct story_link_storage_key *key)
@@ -542,7 +542,8 @@ story_link_storage_key_hash(const struct story_link_storage_key *key)
 		      "The following code relies on it");
 	uintptr_t u = (uintptr_t)key->entry.tuple;
 	u ^= u >> 32;
-	return key->index_id ^ u;
+	return key->index_id ^ (uint32_t)u ^
+	       memtx_tx_index_entry_hash(key->index, key->entry);
 }
 
 /** An element of story_link_storage. */
@@ -886,6 +887,7 @@ memtx_tx_story_link_find(struct memtx_story *story, struct index *index,
 			.tuple = story->tuple,
 			.key_data = key_data,
 		},
+		.index = index,
 		.index_id = index->dense_id,
 	};
 	mh_int_t pos =
@@ -1192,6 +1194,7 @@ memtx_tx_story_add_link(struct memtx_story *story, struct index *index,
 			.tuple = link->story->tuple,
 			.key_data = link->key_data,
 		},
+		.index = index,
 		.index_id = index->dense_id,
 	};
 	struct story_link_storage_item node = {
@@ -1405,6 +1408,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 						.tuple = story->tuple,
 						.key_data = link->key_data,
 					},
+					.index = story->space->index[i],
 					.index_id = i,
 				};
 				mh_int_t pos = mh_story_link_storage_find(
