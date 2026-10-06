@@ -34,6 +34,8 @@ ExternalProject_Add(bundled-openssl-project
         --libdir=lib
         no-shared
         no-module
+        no-tests
+        no-apps
     INSTALL_COMMAND ${EP_MAKE_COMMAND} install_sw
     BUILD_BYPRODUCTS ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY}
 )
