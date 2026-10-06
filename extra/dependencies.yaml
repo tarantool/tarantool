@@ -8,7 +8,7 @@ dependencies:
   - name: decNumber
     version: 7a598bf5fc24e3abdc2062e3530e70a7591e4363
   - name: libcurl
-    version: 461ce6c6160b86439ddd74c59541231ec9e8558e
+    version: ef6b17cf12d4af4dfb2af4f9bc35861772be71c7
   - name: libiconv
     version: 1.17
   - name: libicu
