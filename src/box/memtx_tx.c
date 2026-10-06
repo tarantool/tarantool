@@ -2682,6 +2682,25 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		else
 			del_story = memtx_tx_story_get(old_tuple);
 		memtx_tx_story_link_deleted_by(del_story, stmt);
+		/*
+		 * Multikey and functional entries of the old tuple that have
+		 * no counterpart in the new tuple stay in the index like the
+		 * entries of a deleted tuple, let's see if anyone had counted
+		 * them.
+		 */
+		for (uint32_t i = 0; i < space->index_count; i++) {
+			struct index *index = space->index[i];
+			if (!memtx_tx_index_uses_story_link_storage(index))
+				continue;
+			memtx_tx_story_add_index_links(del_story, index);
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link, &del_story->link[i].list,
+					    link) {
+				if (link->in_index != NULL)
+					memtx_tx_handle_counted_write(
+						space, index, link);
+			}
+		}
 	}
 
 	/*

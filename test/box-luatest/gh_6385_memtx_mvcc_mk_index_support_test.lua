@@ -631,6 +631,8 @@ local function test_count_on_op(cg, op)
 
     cg.server:exec(function()
         box.space.s:replace{0, {0, 1, 0}}
+        -- Count must rely on gap tracking, not on an existing story.
+        box.internal.memtx_tx_gc(100)
     end)
 
     stream1:begin()
@@ -638,6 +640,10 @@ local function test_count_on_op(cg, op)
     t.assert_equals(stream1.space.s.index.mk:count{}, 2)
     if op == 'replace' then
         stream2.space.s:replace{0, {1, 2, 1}}
+    elseif op == 'replace_dropping_entries' then
+        -- Nothing is inserted into the index, only the entry of key 0 is
+        -- dropped.
+        stream2.space.s:replace{0, {1}}
     else
         stream2.space.s:delete{0}
     end
@@ -657,6 +663,11 @@ end
 -- Check count conflict works correctly on deletion of tuple.
 g.test_count_on_delete = function(cg)
     test_count_on_op(cg, 'delete')
+end
+
+-- Check count conflict works correctly on replace dropping index entries.
+g.test_count_on_replace_dropping_entries = function(cg)
+    test_count_on_op(cg, 'replace_dropping_entries')
 end
 
 -- Check space invalidation on DDL works correctly.
