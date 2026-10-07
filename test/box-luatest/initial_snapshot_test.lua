@@ -78,7 +78,7 @@ end
 g.test_schema = function(cg)
     assert_equals_with_placeholders(cg.space._schema, {
         {'replicaset_uuid', '<uuid_str>'},
-        {'version', 3, 9, 0},
+        {'version', 3, 10, 0},
     })
 end
 
