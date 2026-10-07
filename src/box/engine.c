@@ -111,6 +111,17 @@ engine_begin_initial_recovery(const struct vclock *recovery_vclock)
 }
 
 int
+engine_recover_snapshot(const struct vclock *vclock)
+{
+	struct engine *engine;
+	engine_foreach(engine) {
+		if (engine->vtab->recover_snapshot(engine, vclock) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+int
 engine_begin_final_recovery(void)
 {
 	recovery_state = FINAL_RECOVERY;
@@ -380,6 +391,15 @@ generic_engine_bootstrap(struct engine *engine)
 int
 generic_engine_begin_initial_recovery(struct engine *engine,
 				      const struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+	return 0;
+}
+
+int
+generic_engine_recover_snapshot(struct engine *engine,
+				const struct vclock *vclock)
 {
 	(void)engine;
 	(void)vclock;
