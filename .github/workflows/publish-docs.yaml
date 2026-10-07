@@ -5,8 +5,12 @@ on:
     branches:
       - 'master'
     paths:
+      - '.github/actions/setup-emmylua-analyzer/**'
       - '.github/workflows/publish-docs.yaml'
+      - 'cmake/lapi-doc.cmake'
       - 'src/**'
+      - 'third_party/checks'
+      - 'third_party/metrics'
   pull_request:
   workflow_dispatch:
 
@@ -52,6 +56,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Setup EmmyLua tools
+        uses: ./.github/actions/setup-emmylua-analyzer
+        with:
+          doc-cli: "true"
+
       - name: Setup Doxygen
         run: sudo apt install -y doxygen
 
@@ -70,6 +79,12 @@ jobs:
             mkdir -p site/capi
             cp -r doc/api/html/. site/capi/
 
+      - name: Build Lua API documentation
+        run: |
+            make lapi
+            mkdir -p site/lapi
+            cp -r lapi-doc/site/. site/lapi/
+
       - name: Create the site index
         run: |
             mkdir -p site
@@ -83,6 +98,7 @@ jobs:
             <body>
             <ul>
             <li><a href="capi/">Tarantool C API</a></li>
+            <li><a href="lapi/">Tarantool Lua API</a></li>
             </ul>
             </body>
             </html>
