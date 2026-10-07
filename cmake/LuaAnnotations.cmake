@@ -5,15 +5,20 @@
 # Gathers EmmyLua annotation comments (---@...) from the given files
 # together with bodyless declarations they annotate and writes the result
 # as a single `---@meta` file named `<module>.lua` into the
-# `${PROJECT_BINARY_DIR}/emmylua` directory.
+# `${PROJECT_BINARY_DIR}/emmylua` directory. The file is installed
+# into `${MODULE_LUADIR}/emmylua`.
 #
-# The file is generated at build time by the `emmylua-stubs` target. The
-# extraction runs in a Lua helper (tools/gen-emmylua-stubs.lua) executed
-# by the bundled LuaJIT.
+# The file is generated at build time by the `emmylua-stubs` target. When
+# ENABLE_DIST is set, the target is a part of the default build, so that
+# the stubs are ready for installation. The extraction itself runs in a
+# Lua helper (tools/gen-emmylua-stubs.lua) executed by the bundled LuaJIT.
 function(lua_stub name)
     cmake_parse_arguments(ARG "" "" "FILES" ${ARGN})
     if(NOT ARG_FILES)
         message(FATAL_ERROR "lua_stub(${name}): FILES is not specified")
+    endif()
+    if(NOT DEFINED MODULE_LUADIR)
+        message(FATAL_ERROR "lua_stub(${name}): MODULE_LUADIR is not set")
     endif()
 
     set(_out_file "${PROJECT_BINARY_DIR}/emmylua/${name}.lua")
@@ -38,7 +43,12 @@ function(lua_stub name)
 
     add_custom_target(${name}-stub DEPENDS "${_out_file}")
     if(NOT TARGET emmylua-stubs)
-        add_custom_target(emmylua-stubs)
+        if(ENABLE_DIST)
+            add_custom_target(emmylua-stubs ALL)
+        else()
+            add_custom_target(emmylua-stubs)
+        endif()
     endif()
     add_dependencies(emmylua-stubs ${name}-stub)
+    install(FILES "${_out_file}" DESTINATION "${MODULE_LUADIR}/emmylua")
 endfunction()

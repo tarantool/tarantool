@@ -38,6 +38,12 @@ install(DIRECTORY tarantool-prefix/share/man/man1 DESTINATION share/man/
         EXCLUDE_FROM_ALL
         FILES_MATCHING PATTERN "tarantool.1")
 
+install(DIRECTORY tarantool-prefix/share/tarantool/emmylua
+        DESTINATION share/tarantool
+        USE_SOURCE_PERMISSIONS
+        COMPONENT server
+        EXCLUDE_FROM_ALL)
+
 install(FILES ../README.md
         DESTINATION /usr/share/doc/tarantool
         COMPONENT server)
