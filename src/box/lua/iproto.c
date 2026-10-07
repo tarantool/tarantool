@@ -36,6 +36,11 @@
 #include <lauxlib.h>
 
 /**
+ * Default timeout used in box.iproto.drop_connections.
+ */
+const double IPROTO_DEFAULT_DROP_CONNECTION_TIMEOUT = 3.0;
+
+/**
  * Pushes IPROTO constants generated from `IPROTO_FLAGS` onto Lua stack.
  */
 static void
@@ -220,23 +225,51 @@ lbox_iproto_session_new(struct lua_State *L)
 }
 
 /**
- * Drop all current connections.
+ * Drop current connections.
  *
- * Accepts a timeout (in seconds).
+ * Accepts a table with the following fields (all optional):
+ *   - timeout: timeout in seconds.
+ *     Default: 3.0.
+ *   - stale_only: boolean flag that indicates whether we should drop only the
+ *     connections that correspond to the uris that are not being listened.
+ *     Default: false.
  *
  * Returns nothing on success, raises an error on a failure.
  *
- * See iproto_drop_connections() for details.
+ * See iproto_drop_connections_ex() for details.
  */
 static int
 lbox_iproto_drop_connections(struct lua_State *L)
 {
 	int n_args = lua_gettop(L);
-	if (n_args != 1 || lua_type(L, 1) != LUA_TNUMBER)
-		return luaL_error(L, "Usage: box.iproto.internal."
-				  "drop_connections(timeout)");
-	double timeout = lua_tonumber(L, 1);
-	int rc = iproto_drop_connections(timeout);
+	if (n_args == 0) {
+		lua_newtable(L);
+	} else if (n_args != 1 || lua_type(L, 1) != LUA_TTABLE) {
+		return luaL_error(L, "Usage: box.iproto.drop_connections("
+				  "options)");
+	}
+
+	double timeout;
+	lua_getfield(L, 1, "timeout");
+	if (lua_isnil(L, -1))
+		timeout = IPROTO_DEFAULT_DROP_CONNECTION_TIMEOUT;
+	else if (lua_type(L, -1) == LUA_TNUMBER)
+		timeout = lua_tonumber(L, -1);
+	else
+		return luaL_error(L, "timeout must be a number");
+	lua_pop(L, 1); /* timeout */
+
+	bool stale_only;
+	lua_getfield(L, 1, "stale_only");
+	if (lua_isnil(L, -1))
+		stale_only = false;
+	else if (lua_type(L, -1) == LUA_TBOOLEAN)
+		stale_only = lua_toboolean(L, -1);
+	else
+		return luaL_error(L, "stale_only must be a boolean");
+	lua_pop(L, 1); /* stale_only */
+
+	int rc = iproto_drop_connections_ex(timeout, stale_only);
 	if (rc < 0)
 		return luaT_error(L);
 	return 0;
@@ -614,6 +647,7 @@ box_lua_iproto_init(struct lua_State *L)
 	push_iproto_protocol_features(L);
 	static const struct luaL_Reg funcs_main[] = {
 		{"send", lbox_iproto_send},
+		{"drop_connections", lbox_iproto_drop_connections},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg funcs_common[] = {
@@ -629,7 +663,6 @@ box_lua_iproto_init(struct lua_State *L)
 	luaL_findtable(L, -1, "internal", 0);
 	static const struct luaL_Reg internal_funcs_main[] = {
 		{"session_new", lbox_iproto_session_new},
-		{"drop_connections", lbox_iproto_drop_connections},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg internal_funcs_common[] = {
