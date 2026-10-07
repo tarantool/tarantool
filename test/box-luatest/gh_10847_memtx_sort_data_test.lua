@@ -711,9 +711,14 @@ g_generic.test_box_backup = function(cg)
         box.backup.stop()
 
         -- Check the garbage is removed after next GC run.
+        -- Checkpoint GC is asynchronous, so we have to check with retries.
         snapshot(false)
-        t.assert_equals(#fio.glob(glob_snap), 1)
-        t.assert_equals(#fio.glob(glob_sortdata), 0)
+        t.helpers.retrying({timeout = 20}, function()
+            t.assert_equals(#fio.glob(glob_snap), 1)
+        end)
+        t.helpers.retrying({timeout = 20}, function()
+            t.assert_equals(#fio.glob(glob_sortdata), 0)
+        end)
         t.assert(fio.path.exists(string.format(fmt_snap, box.info.vclock[1])))
     end)
 end
