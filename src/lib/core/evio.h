@@ -101,10 +101,12 @@ struct evio_service_entry;
 struct evio_service;
 struct iostream;
 struct uri_set;
+struct uri;
 
 typedef void
-(*evio_accept_f)(struct evio_service *service, struct iostream *io,
-		 struct sockaddr *addr, socklen_t addrlen);
+(*evio_accept_f)(struct evio_service *service, const struct uri *uri,
+		 struct iostream *io, struct sockaddr *addr,
+		 socklen_t addrlen);
 
 struct evio_service {
 	/** Total count of services */

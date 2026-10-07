@@ -139,6 +139,10 @@ uri_set_copy(struct uri_set *dst, const struct uri_set *src);
 bool
 uri_set_is_equal(const struct uri_set *a, const struct uri_set *b);
 
+/** Check whether the given URI belongs to the set. */
+bool
+uri_set_contains(const struct uri_set *a, const struct uri *uri);
+
 /**
  * Implements snprintf-style (may be used with SNPRINT macro).
  */

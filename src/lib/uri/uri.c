@@ -449,6 +449,16 @@ uri_set_is_equal(const struct uri_set *a, const struct uri_set *b)
 	return true;
 }
 
+bool
+uri_set_contains(const struct uri_set *a, const struct uri *uri)
+{
+	for (int i = 0; i < a->uri_count; i++) {
+		if (uri_is_equal(&a->uris[i], uri))
+			return true;
+	}
+	return false;
+}
+
 /**
  * String percent-encoding.
  */
