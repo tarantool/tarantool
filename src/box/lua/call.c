@@ -573,21 +573,24 @@ port_lua_do_dump_with_ctx(struct port *base, struct mpstream *stream,
 		.mp_ctx = mp_ctx,
 	};
 	lua_State *L = port->L;
+	int top = lua_gettop(L);
 	/*
 	 * At the moment Lua stack holds only values to encode.
 	 * Push corresponding encoder, push duplicates of values
 	 * so that the port can be dumped multiple times and push
 	 * encode context as lightuserdata to the top.
 	 */
-	const int size = lua_gettop(L) - port->bottom + 1;
+	const int size = top - port->bottom + 1;
 	lua_rawgeti(L, LUA_REGISTRYINDEX, execute_lua_refs[handler]);
 	assert(lua_isfunction(L, -1) && lua_iscfunction(L, -1));
 	for (int i = 0; i < size; i++)
 		lua_pushvalue(L, port->bottom + i);
 	lua_pushlightuserdata(L, &encode_lua_ctx);
 	/* nargs -- all arguments + lightuserdata. */
-	if (luaT_call(L, size + 1, 0) != 0)
+	if (luaT_call(L, size + 1, 0) != 0) {
+		lua_settop(L, top);
 		return -1;
+	}
 	return port->size;
 }
 

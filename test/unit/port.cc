@@ -1041,9 +1041,75 @@ test_port_lua_get_c_entries_with_bottom(void)
 }
 
 static void
+test_port_lua_msgpack_errors(void)
+{
+	plan(30);
+	header();
+	struct lua_State *L = lua_newthread(tarantool_L);
+	lua_pushinteger(L, 123);
+	const char *expr =
+		"return setmetatable({42}, {__serialize = function() "
+		"error('serialize failure', 0) end})";
+	fail_unless(luaT_dostring(L, expr) == 0);
+	const void *value = lua_topointer(L, 2);
+	struct port port;
+	port_lua_create_at(&port, L, 2);
+	struct obuf obuf;
+	size_t region_svp = region_used(&fiber()->gc);
+	obuf_create(&obuf, &cord()->slabc, 512);
+	for (int i = 0; i < 3; ++i) {
+		uint32_t size;
+		is(port_get_msgpack(&port, &size), NULL,
+		   "get_msgpack reports serialization failure");
+		is(lua_gettop(L), 2, "get_msgpack preserves stack height");
+		is(strcmp(diag_last_error(diag_get())->errmsg,
+			  "serialize failure"), 0,
+		   "get_msgpack preserves the diag");
+		is(port_dump_msgpack_16(&port, &obuf), -1,
+		   "dump_msgpack_16 reports serialization failure");
+		is(lua_gettop(L), 2, "dump_msgpack_16 preserves stack height");
+		is(strcmp(diag_last_error(diag_get())->errmsg,
+			  "serialize failure"), 0,
+		   "dump_msgpack_16 preserves the diag");
+		is(lua_tointeger(L, 1), 123, "sentinel is preserved");
+		is(lua_topointer(L, 2), value, "port value is preserved");
+		obuf_reset(&obuf);
+	}
+	lua_pushnil(L);
+	lua_setmetatable(L, 2);
+	char expected[16];
+	char *end = mp_encode_array(expected, 1);
+	end = mp_encode_array(end, 1);
+	end = mp_encode_uint(end, 42);
+	uint32_t expected_size = end - expected;
+	uint32_t size;
+	const char *mp = port_get_msgpack(&port, &size);
+	ok(mp != NULL && size == expected_size &&
+	   memcmp(mp, expected, size) == 0,
+	   "get_msgpack retry encodes only the original value");
+	is(port_dump_msgpack_16(&port, &obuf), 1,
+	   "dump_msgpack_16 retry returns one tuple");
+	mp = (const char *)test_obuf_to_region(&obuf, &fiber()->gc, &size);
+	const char *expected_tuple = expected;
+	mp_decode_array(&expected_tuple);
+	ok(size == end - expected_tuple &&
+	   memcmp(mp, expected_tuple, size) == 0,
+	   "dump_msgpack_16 retry encodes only the original value");
+	is(lua_gettop(L), 2, "successful retries preserve stack height");
+	is(lua_tointeger(L, 1), 123, "successful retries preserve sentinel");
+	obuf_destroy(&obuf);
+	region_truncate(&fiber()->gc, region_svp);
+	port_destroy(&port);
+	is(lua_gettop(L), 1, "destroy preserves the stack below the port");
+	lua_pop(tarantool_L, 1);
+	footer();
+	check_plan();
+}
+
+static void
 test_port_lua(void)
 {
-	plan(6);
+	plan(7);
 	header();
 
 	test_port_lua_dump_lua();
@@ -1052,6 +1118,7 @@ test_port_lua(void)
 	test_port_lua_all_msgpack_methods_with_bottom();
 	test_port_lua_get_c_entries();
 	test_port_lua_get_c_entries_with_bottom();
+	test_port_lua_msgpack_errors();
 
 	footer();
 	check_plan();

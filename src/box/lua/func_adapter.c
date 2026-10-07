@@ -62,6 +62,7 @@ func_adapter_lua_call(struct func_adapter *func, struct port *args, struct port 
 	bool ok = luaT_call(L, nargs, LUA_MULTRET) == 0;
 
 	if (!ok || ret == NULL) {
+		lua_settop(L, top_svp);
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	} else {
 		port_lua_create_at(ret, L, top_svp + 1);
