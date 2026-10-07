@@ -460,6 +460,11 @@ struct iproto_cfg_msg: public cbus_call_msg
 			 * invocation
 			 */
 			unsigned generation;
+			/**
+			 * Drop only the connections with uri that is not
+			 * being listened.
+			 */
+			bool stale_only;
 		} drop_connections;
 	};
 	struct iproto_thread *iproto_thread;
@@ -1029,6 +1034,8 @@ struct iproto_connection
 	 * accepted through iproto listening socket.
 	 */
 	bool is_internal;
+	/** The uri the connection was accepted on. */
+	struct uri uri;
 	/**
 	 * Session idle timeout. Resolved by the TX thread at
 	 * connect/auth time (session_idle_timeout) and cached here so
@@ -1926,6 +1933,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	con->request_count = 0;
 	con->is_internal = false;
+	uri_create(&con->uri, NULL);
 	con->idle_timeout = 0;
 	con->disconnected_by_timeout = false;
 	con->idle_timer.data = con;
@@ -1987,6 +1995,7 @@ iproto_connection_delete(struct iproto_connection *con)
 			iproto_send_drop_finished(iproto_thread,
 						  con->drop_generation);
 	}
+	uri_destroy(&con->uri);
 	free(con->srv);
 	TRASH(con);
 	free(con);
@@ -3909,12 +3918,14 @@ static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
 		     struct session *session, const char *user_name,
-		     bool is_internal)
+		     bool is_internal, const struct uri *uri)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
 	struct iproto_msg *msg = iproto_msg_new(con);
 	con->is_internal = is_internal;
+	if (uri != NULL)
+		uri_copy(&con->uri, uri);
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
@@ -3933,14 +3944,15 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 }
 
 static void
-iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
-		    struct sockaddr *addr, socklen_t addrlen)
+iproto_on_accept_cb(struct evio_service *service, const struct uri *uri,
+		    struct iostream *io, struct sockaddr *addr,
+		    socklen_t addrlen)
 {
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
 			     /*session=*/NULL, /*user_name=*/NULL,
-			     /*is_internal=*/false);
+			     /*is_internal=*/false, uri);
 }
 
 /**
@@ -4624,7 +4636,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
-				     session, user_name, /*is_internal*/true);
+				     session, user_name, /*is_internal=*/true,
+				     /*uri=*/NULL);
 		free(user_name);
 		break;
 	}
@@ -4633,8 +4646,10 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		iproto_thread->drop_pending_connection_count = 0;
 		rlist_foreach_entry(con, &iproto_thread->connections,
 				    in_connections) {
-			if (con->is_internal &&
-			    !iproto_thread->is_shutting_down)
+			if ((con->is_internal &&
+			     !iproto_thread->is_shutting_down) ||
+			    (cfg_msg->drop_connections.stale_only &&
+			     uri_set_contains(&iproto_uris, &con->uri)))
 				continue;
 			/*
 			 * Replication IO is done outside iproto so we
@@ -4735,6 +4750,12 @@ iproto_send_start_msg(void)
 int
 iproto_drop_connections(double timeout)
 {
+	return iproto_drop_connections_ex(timeout, false);
+}
+
+int
+iproto_drop_connections_ex(double timeout, bool stale_only)
+{
 	static struct latch latch = LATCH_INITIALIZER(latch);
 	latch_lock(&latch);
 	struct iproto_connection *owner = NULL;
@@ -4749,6 +4770,7 @@ iproto_drop_connections(double timeout)
 		iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_DROP_CONNECTIONS);
 		cfg_msg->drop_connections.owner = owner;
 		cfg_msg->drop_connections.generation = drop_generation;
+		cfg_msg->drop_connections.stale_only = stale_only;
 		iproto_do_cfg_async(&iproto_threads[i], cfg_msg);
 	}
 
