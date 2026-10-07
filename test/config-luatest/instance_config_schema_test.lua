@@ -1071,6 +1071,15 @@ g.test_vinyl = function()
     t.assert_equals(res, exp)
 end
 
+g.test_memcs_enterprise = function()
+    t.tarantool.skip_if_not_enterprise()
+    local iconfig = {memcs = {dir = 'one'}}
+    instance_config:validate(iconfig)
+    validate_fields(iconfig.memcs, instance_config.schema.fields.memcs)
+    t.assert_equals(instance_config:apply_default({}).memcs,
+                    {dir = 'var/lib/{{ instance_name }}'})
+end
+
 g.test_wal = function()
     t.tarantool.skip_if_enterprise()
     local iconfig = {
@@ -1504,6 +1513,7 @@ g.test_box_cfg_coverage = function()
         wal_dir = true,
         vinyl_dir = true,
         quiver_dir = true,
+        memcs_dir = true,
 
         -- The effective default is determined depending of
         -- the replication.failover option.
