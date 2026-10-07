@@ -101,9 +101,11 @@ struct evio_service_entry;
 struct evio_service;
 struct iostream;
 struct uri_set;
+struct uri;
 
 typedef void
-(*evio_accept_f)(struct evio_service *service, struct iostream *io,
+(*evio_accept_f)(struct evio_service *service, const struct uri *uri,
+		 struct iostream *io,
 		 struct sockaddr *addr, socklen_t addrlen);
 
 struct evio_service {
@@ -144,6 +146,11 @@ evio_service_count(const struct evio_service *service);
  */
 const struct sockaddr *
 evio_service_addr(const struct evio_service *service, int idx, socklen_t *size);
+
+/** Check whether the given uri belongs to the service. */
+bool
+evio_service_check_contains_uri(const struct evio_service *service,
+				const struct uri *uri);
 
 /** Initialize the service. Don't bind to the port yet. */
 void
