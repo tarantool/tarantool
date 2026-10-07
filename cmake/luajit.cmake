@@ -128,6 +128,10 @@ set(LUAJIT_BINARY_ROOT ${PROJECT_BINARY_DIR}/third_party/luajit)
 
 add_subdirectory(${LUAJIT_SOURCE_ROOT} ${LUAJIT_BINARY_ROOT} EXCLUDE_FROM_ALL)
 
+# The interpreter used by build-time Lua helpers. BUILDMODE is forced to
+# 'static' above, hence the 'luajit_static' target always exists.
+set(LUAJIT_EXECUTABLE $<TARGET_FILE:luajit_static>)
+
 set(LUAJIT_PREFIX ${LUAJIT_BINARY_ROOT}/src)
 set(LUAJIT_INCLUDE_DIRS ${LUAJIT_PREFIX})
 set(LUAJIT_LIBRARIES ${LUAJIT_PREFIX}/libluajit.a)
