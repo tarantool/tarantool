@@ -285,6 +285,11 @@ I['audit_log.syslog.server'] = format_text([[
 
 -- }}} audit_log configuration
 
+I['enable_tracing'] = format_text([[
+    Indicates whether OpenTelemetry tracing should be performed. Setting to
+    `true` means "do tracing".
+]])
+
 -- {{{ compat configuration
 
 I['compat'] = format_text([[

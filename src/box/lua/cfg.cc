@@ -548,6 +548,14 @@ lbox_cfg_set_auth_type(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_enable_tracing(struct lua_State *L)
+{
+	(void)L;
+	box_set_enable_tracing();
+	return 0;
+}
+
+static int
 lbox_cfg_get_force_recovery(struct lua_State *L)
 {
 	lua_pushboolean(L, box_is_force_recovery);
@@ -610,6 +618,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_txn_synchro_timeout", lbox_cfg_set_txn_synchro_timeout},
 		{"cfg_set_txn_isolation", lbox_cfg_set_txn_isolation},
 		{"cfg_set_auth_type", lbox_cfg_set_auth_type},
+		{"cfg_set_enable_tracing", lbox_cfg_set_enable_tracing},
 		{"cfg_get_force_recovery", lbox_cfg_get_force_recovery},
 		{NULL, NULL}
 	};

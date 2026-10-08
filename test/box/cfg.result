@@ -37,6 +37,8 @@ cfg_filter(box.cfg)
  |     - off
  |   - - election_timeout
  |     - 5
+ |   - - enable_tracing
+ |     - false
  |   - - feedback_crashinfo
  |     - true
  |   - - feedback_enabled
@@ -199,6 +201,8 @@ cfg_filter(box.cfg)
  |     - off
  |   - - election_timeout
  |     - 5
+ |   - - enable_tracing
+ |     - false
  |   - - feedback_crashinfo
  |     - true
  |   - - feedback_enabled

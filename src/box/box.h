@@ -501,6 +501,7 @@ int box_set_txn_timeout(void);
 int box_set_txn_synchro_timeout(void);
 int box_set_txn_isolation(void);
 int box_set_auth_type(void);
+void box_set_enable_tracing(void);
 int box_set_bootstrap_strategy(void);
 int box_set_bootstrap_leader(void);
 

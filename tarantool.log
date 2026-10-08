@@ -1,0 +1,232 @@
+2026-10-09 13:31:16.071 [27901] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-272-g95dcf85518 Linux-x86_64-Debug
+2026-10-09 13:31:16.071 [27901] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:31:16.071 [27901] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:31:16.074 [27901] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:31:16.074 [27901] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:31:16.074 [27901] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:31:16.075 [27901] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:31:16.084 [27901] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:31:16.084 [27901] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:31:16.084 [27901] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:31:16.084 [27901] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:31:16.085 [27901] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:31:16.085 [27901] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:31:16.085 [27901] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:31:16.096 [27901] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:31:16.108 [27901] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:31:16.108 [27901] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:31:16.108 [27901] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:31:16.108 [27901] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:31:16.109 [27901] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:31:16.110 [27901] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:31:16.112 [27901] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:31:16.112 [27901] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:31:16.112 [27901] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:31:16.112 [27901] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:31:16.112 [27901] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:31:16.112 [27901] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:31:16.112 [27901] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:08:34 2026
+2026-10-09 13:31:16.113 [27901] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:31:16.113 [27901] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-272-g95dcf85518 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:34:00.905 [30608] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-272-g95dcf85518 Linux-x86_64-Debug
+2026-10-09 13:34:00.905 [30608] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:34:00.905 [30608] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:34:00.907 [30608] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:34:00.907 [30608] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:34:00.907 [30608] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:34:00.909 [30608] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:34:00.918 [30608] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:34:00.918 [30608] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:34:00.918 [30608] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:34:00.918 [30608] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:34:00.919 [30608] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:34:00.919 [30608] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:34:00.919 [30608] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:34:00.932 [30608] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:34:00.943 [30608] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:34:00.944 [30608] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:34:00.944 [30608] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:34:00.944 [30608] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:34:00.945 [30608] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:34:00.945 [30608] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:34:00.945 [30608] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:34:00.945 [30608] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:34:00.945 [30608] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:34:00.946 [30608] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:34:00.946 [30608] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:34:00.946 [30608] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:34:00.947 [30608] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:34:00.947 [30608] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:34:00.947 [30608] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:34:00.947 [30608] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:34:00.947 [30608] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:34:00.948 [30608] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:34:00.948 [30608] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:19:18 2026
+2026-10-09 13:34:00.948 [30608] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:34:00.949 [30608] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-272-g95dcf85518 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:36:24.019 [53678] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-273-gbb658b3891 Linux-x86_64-Debug
+2026-10-09 13:36:24.019 [53678] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:36:24.019 [53678] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:36:24.022 [53678] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:36:24.022 [53678] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:36:24.022 [53678] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:36:24.024 [53678] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:36:24.033 [53678] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:36:24.033 [53678] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:36:24.033 [53678] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:36:24.033 [53678] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:36:24.034 [53678] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:36:24.035 [53678] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:36:24.035 [53678] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:36:24.047 [53678] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:36:24.058 [53678] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:36:24.059 [53678] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:36:24.059 [53678] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:36:24.059 [53678] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:36:24.060 [53678] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:36:24.060 [53678] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:36:24.060 [53678] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:36:24.060 [53678] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:36:24.060 [53678] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:36:24.061 [53678] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:36:24.061 [53678] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:36:24.061 [53678] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:36:24.062 [53678] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:36:24.062 [53678] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:36:24.062 [53678] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:36:24.062 [53678] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:36:24.062 [53678] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:36:24.062 [53678] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:36:24.062 [53678] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:01:45 2026
+2026-10-09 13:36:24.063 [53678] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:36:24.063 [53678] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-273-gbb658b3891 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:36:37.623 [53678] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'enable_tracing' configuration option to true
+2026-10-09 13:36:55.554 [53678] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000001 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791542215554153068 end_time=1791542215554245126
+2026-10-09 13:44:05.033 [54495] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-273-gbb658b3891 Linux-x86_64-Debug
+2026-10-09 13:44:05.033 [54495] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:44:05.033 [54495] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:44:05.034 [54495] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:44:05.034 [54495] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:44:05.034 [54495] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:44:05.035 [54495] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:44:05.040 [54495] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:44:05.040 [54495] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:44:05.040 [54495] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:44:05.040 [54495] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:44:05.040 [54495] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:44:05.041 [54495] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:44:05.041 [54495] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:44:05.047 [54495] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:44:05.052 [54495] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:44:05.052 [54495] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:44:05.052 [54495] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:44:05.052 [54495] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:44:05.053 [54495] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:44:05.054 [54495] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:44:05.054 [54495] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:44:05.054 [54495] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:44:05.054 [54495] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:44:05.054 [54495] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:44:05.054 [54495] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:44:05.054 [54495] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:43:42 2026
+2026-10-09 13:44:05.055 [54495] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:44:05.055 [54495] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-273-gbb658b3891 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:44:07.571 [54495] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'enable_tracing' configuration option to true
+2026-10-09 13:46:43.439 [54495] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000001 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791542803438895046 end_time=1791542803438952570
+2026-10-09 13:47:21.675 [54820] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-273-gbb658b3891 Linux-x86_64-Debug
+2026-10-09 13:47:21.675 [54820] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:47:21.675 [54820] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:47:21.677 [54820] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:47:21.677 [54820] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:47:21.677 [54820] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:47:21.677 [54820] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:47:21.683 [54820] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:47:21.683 [54820] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:47:21.683 [54820] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:47:21.683 [54820] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:47:21.683 [54820] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:47:21.683 [54820] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:47:21.683 [54820] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:47:21.690 [54820] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:47:21.695 [54820] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:47:21.695 [54820] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:47:21.695 [54820] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:47:21.695 [54820] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:47:21.696 [54820] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:47:21.697 [54820] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:47:21.697 [54820] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:47:21.697 [54820] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:47:21.697 [54820] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:47:21.697 [54820] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:47:21.697 [54820] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:47:21.697 [54820] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:14:12 2026
+2026-10-09 13:47:21.697 [54820] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:47:21.698 [54820] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-273-gbb658b3891 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:47:25.628 [54820] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'enable_tracing' configuration option to true
+2026-10-09 13:48:00.165 [54820] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000001 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791542880164887342 end_time=1791542880164951975
+2026-10-09 13:49:54.141 [57303] main/104/interactive main.cc:502 I> Tarantool 3.9.0-entrypoint-273-gbb658b3891 Linux-x86_64-Debug
+2026-10-09 13:49:54.141 [57303] main/104/interactive main.cc:505 I> log level 5 (INFO)
+2026-10-09 13:49:54.141 [57303] main/104/interactive gc.c:132 I> wal/engine cleanup is paused
+2026-10-09 13:49:54.142 [57303] main/104/interactive tuple.c:408 I> mapping 268435456 bytes for memtx tuple arena...
+2026-10-09 13:49:54.142 [57303] main/104/interactive memtx_engine.cc:2055 I> Actual slab_alloc_factor calculated on the basis of desired slab_alloc_factor = 1.044274
+2026-10-09 13:49:54.142 [57303] main/104/interactive tuple.c:408 I> mapping 134217728 bytes for vinyl tuple arena...
+2026-10-09 13:49:54.143 [57303] main/104/interactive/box.upgrade upgrade.lua:1631 I> Recovering snapshot with schema version 3.3.0
+2026-10-09 13:49:54.148 [57303] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:49:54.148 [57303] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:49:54.148 [57303] main/104/interactive box.cc:3324 I> The option replication_synchro_queue_max_size will actually take effect after the recovery is finished
+2026-10-09 13:49:54.148 [57303] main/104/interactive box.cc:5638 I> instance uuid 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:49:54.148 [57303] main/104/interactive box.cc:5670 I> instance vclock {1: 33}
+2026-10-09 13:49:54.148 [57303] main/104/interactive memtx_engine.cc:393 I> recovery start
+2026-10-09 13:49:54.148 [57303] main/104/interactive memtx_engine.cc:398 I> recovering from `./00000000000000000019.snap'
+2026-10-09 13:49:54.155 [57303] main/104/interactive alter.cc:4261 I> replicaset uuid 3aa714f3-ba43-4a92-9e0b-80171324a49a
+2026-10-09 13:49:54.160 [57303] main/104/interactive replication.cc:605 I> assigned id 1 to replica 431d651e-b314-4b95-b8f7-878834de22fd
+2026-10-09 13:49:54.160 [57303] main/104/interactive box.cc:2702 I> update replication_synchro_quorum = 1
+2026-10-09 13:49:54.160 [57303] main/104/interactive box.cc:2668 I> update replication_linearizable_quorum = 1
+2026-10-09 13:49:54.160 [57303] main/104/interactive memtx_engine.cc:588 W> snapshot recovery performance is better with new value of compat.box_recovery_triggers_deprecation
+2026-10-09 13:49:54.160 [57303] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000019.xlog'
+2026-10-09 13:49:54.160 [57303] main/104/interactive recovery.cc:170 W> file `./00000000000000000019.xlog` wasn't correctly closed
+2026-10-09 13:49:54.160 [57303] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000029.xlog'
+2026-10-09 13:49:54.160 [57303] main/104/interactive recovery.cc:168 I> done `./00000000000000000029.xlog'
+2026-10-09 13:49:54.161 [57303] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000030.xlog'
+2026-10-09 13:49:54.161 [57303] main/104/interactive recovery.cc:168 I> done `./00000000000000000030.xlog'
+2026-10-09 13:49:54.161 [57303] main/104/interactive recovery.cc:381 I> recover from `./00000000000000000033.xlog'
+2026-10-09 13:49:54.161 [57303] main/104/interactive recovery.cc:168 I> done `./00000000000000000033.xlog'
+2026-10-09 13:49:54.161 [57303] main/104/interactive box.cc:709 I> leaving waiting_for_own_rows mode
+2026-10-09 13:49:54.161 [57303] main/104/interactive raft.c:1033 I> RAFT: start state machine
+2026-10-09 13:49:54.161 [57303] main/104/interactive box.cc:6079 I> ready to accept requests
+2026-10-09 13:49:54.161 [57303] main/104/interactive box.cc:696 I> leaving orphan mode
+2026-10-09 13:49:54.161 [57303] main/105/gc gc.c:314 I> wal/engine cleanup is resumed
+2026-10-09 13:49:54.161 [57303] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'log' configuration option to "tarantool.log"
+2026-10-09 13:49:54.161 [57303] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 13:50:08 2026
+2026-10-09 13:49:54.162 [57303] main/104/interactive box.cc:470 I> box switched to rw
+2026-10-09 13:49:54.162 [57303] main/104/interactive/box.load_cfg load_cfg.lua:1390 W> Your schema version is 3.3.0 while Tarantool 3.9.0-entrypoint-273-gbb658b3891 requires a more recent schema version. Please, consider using box.schema.upgrade().
+2026-10-09 13:49:55.929 [57303] main/104/interactive/box.load_cfg load_cfg.lua:1099 I> set 'enable_tracing' configuration option to true
+2026-10-09 13:50:08.166 [57303] snapshot/101/main memtx_engine.cc:1370 I> saving snapshot `./00000000000000000033.snap.inprogress'
+2026-10-09 13:50:08.171 [57303] snapshot/101/main memtx_engine.cc:1533 I> done
+2026-10-09 13:50:08.172 [57303] main/106/checkpoint_daemon gc.c:608 I> scheduled next checkpoint for Fri Oct  9 14:50:08 2026
+2026-10-09 13:50:08.173 [57303] coio xlog.c:2146 I> removed ./00000000000000000015.snap
+2026-10-09 13:50:08.173 [57303] coio xlog.c:2146 I> removed ./00000000000000000015.xlog
+2026-10-09 13:50:14.314 [57303] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000001 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791543014313699937 end_time=1791543014313757806
+2026-10-09 13:51:00.306 [57303] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000002 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791543060306380827 end_time=1791543060306445650
+2026-10-09 13:51:35.665 [57303] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000003 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791543095664782147 end_time=1791543095664889287
+2026-10-09 13:52:02.492 [57303] main/104/interactive tracer_opentelemetry.c:75 I> TRACER OPENTELEMETRY: span_id=0000000000000004 parent_id=0000000000000000 name=span_1 kind=1 start_time=1791543122491830751 end_time=1791543122491887857
