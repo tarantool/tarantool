@@ -499,6 +499,13 @@ fiber_create(struct lua_State *L)
 	 */
 	lua_pushinteger(child_L, coro_ref);
 	f->storage.lua.stack = child_L;
+	f->storage.traceparent.span_id = fiber()->storage.traceparent.span_id;
+	f->storage.traceparent.trace_id_start =
+		fiber()->storage.traceparent.trace_id_start;
+	f->storage.traceparent.trace_id_end =
+		fiber()->storage.traceparent.trace_id_end;
+	f->storage.traceparent.trace_flag =
+		fiber()->storage.traceparent.trace_flag;
 	return f;
 }
 
@@ -966,6 +973,80 @@ lbox_fiber_set_managed_shutdown(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Set tracing context for the fiber. Takes the fiber
+ * and the span_id as arguments.
+ */
+static int
+lbox_fiber_set_span_id(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2) {
+		diag_set(IllegalParams,
+			 "fiber.set_span_id(id): "
+			 "bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	uint64_t span_id = luaL_touint64(L, 2);
+	fiber->storage.traceparent.span_id = span_id;
+	return 0;
+}
+
+/**
+ * Set tracing context for the fiber. Takes the fiber
+ * and the trace_flag as arguments.
+ */
+static int
+lbox_fiber_set_trace_flag(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2) {
+		diag_set(IllegalParams,
+			 "fiber.set_trace_flag(flag): "
+			 "bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	bool trace_flag = lua_toboolean(L, 2);
+	fiber->storage.traceparent.trace_flag = trace_flag;
+	return 0;
+}
+
+/**
+ * Get the span_id from traceparent of the fiber.
+ * Takes the fiber as argument.
+ */
+static int
+lbox_fiber_get_span_id(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams,
+			 "fiber.get_span_id(): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	uint64_t span_id = fiber->storage.traceparent.span_id;
+	luaL_pushuint64(L, span_id);
+	return 1;
+}
+
+/**
+ * Get the trace_flag from traceparent of the fiber.
+ * Takes the fiber as argument.
+ */
+static int
+lbox_fiber_get_trace_flag(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams,
+			 "fiber.get_trace_flag(): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	bool trace_flag = fiber->storage.traceparent.trace_flag;
+	lua_pushboolean(L, trace_flag);
+	return 1;
+}
+
 /** Helper for fiber slice parsing. */
 static struct fiber_slice
 lbox_fiber_slice_parse(struct lua_State *L, int idx)
@@ -1115,6 +1196,10 @@ static const struct luaL_Reg fiberlib[] = {
 	{"stall", lbox_fiber_stall},
 	{"set_system", lbox_fiber_set_system},
 	{"set_managed_shutdown", lbox_fiber_set_managed_shutdown},
+	{"set_span_id", lbox_fiber_set_span_id},
+	{"get_span_id", lbox_fiber_get_span_id},
+	{"set_trace_flag", lbox_fiber_set_trace_flag},
+	{"get_trace_flag", lbox_fiber_get_trace_flag},
 	{NULL, NULL}
 };
 
