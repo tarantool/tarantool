@@ -1625,6 +1625,8 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 	if (!(fiber->flags & FIBER_IS_SYSTEM))
 		cord()->client_fiber_count++;
+	if (fiber()->storage.traceparent.trace_flag)
+		fiber->storage.traceparent = fiber()->storage.traceparent;
 
 	return fiber;
 
