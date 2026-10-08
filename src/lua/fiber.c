@@ -499,6 +499,9 @@ fiber_create(struct lua_State *L)
 	 */
 	lua_pushinteger(child_L, coro_ref);
 	f->storage.lua.stack = child_L;
+	char traceparent[55];
+	fiber_get_traceparent(fiber(), traceparent);
+	fiber_set_traceparent(f, traceparent);
 	return f;
 }
 
@@ -966,6 +969,43 @@ lbox_fiber_set_managed_shutdown(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Set tracing context for the fiber. Takes the fiber
+ * and the traceparent as arguments.
+ */
+static int
+lbox_fiber_set_traceparent(struct lua_State *L)
+{
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	size_t traceparent_len;
+	const char *traceparent = lua_tolstring(L, 2, &traceparent_len);
+	if (lua_gettop(L) != 2 || traceparent == NULL ||
+	    traceparent_len != sizeof(fiber->storage.traceparent)) {
+		diag_set(IllegalParams,
+			 "fiber.set_traceparent(id, traceparent): "
+			 "bad arguments");
+		luaT_error(L);
+	}
+	fiber_set_traceparent(fiber, traceparent);
+	return 0;
+}
+
+/** Get the traceparent of the fiber. Takes the fiber as argument. */
+static int
+lbox_fiber_get_traceparent(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1) {
+		diag_set(IllegalParams,
+			 "fiber.get_traceparent(id): bad arguments");
+		luaT_error(L);
+	}
+	struct fiber *fiber = lbox_checkfiber(L, 1);
+	char traceparent[55];
+	fiber_get_traceparent(fiber, traceparent);
+	lua_pushlstring(L, traceparent, sizeof(traceparent));
+	return 1;
+}
+
 /** Helper for fiber slice parsing. */
 static struct fiber_slice
 lbox_fiber_slice_parse(struct lua_State *L, int idx)
@@ -1115,6 +1155,8 @@ static const struct luaL_Reg fiberlib[] = {
 	{"stall", lbox_fiber_stall},
 	{"set_system", lbox_fiber_set_system},
 	{"set_managed_shutdown", lbox_fiber_set_managed_shutdown},
+	{"set_traceparent", lbox_fiber_set_traceparent},
+	{"get_traceparent", lbox_fiber_get_traceparent},
 	{NULL, NULL}
 };
 
