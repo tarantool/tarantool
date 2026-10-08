@@ -794,6 +794,13 @@ struct fiber {
 		/** Length of `audit_context`. */
 		size_t audit_context_len;
 
+		/**
+		 * ID of the current tracing span, inherited by the fibers
+		 * created by this one. 0 - the fiber is not inside a trace,
+		 * 1 - it is inside a trace that is not recorded, any other
+		 * value - the ID of the current recorded span.
+		 */
+		uint64_t span_id;
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;
