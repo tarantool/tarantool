@@ -118,6 +118,7 @@ lbox_tracer_opentelemetry_call_span(struct lua_State *L)
 		fiber_start(f_new);
 		fiber_join(f_new);
 		span_end(span);
+		call_back(span);
 		free(span);
 	} else {
 		struct fiber *f_new = fiber_create(L);

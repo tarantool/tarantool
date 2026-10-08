@@ -33,6 +33,7 @@
 #include <string.h>
 #include "clock.h"
 #include <stdbool.h>
+#include "say.h"
 
 bool trace_opentelemetry_enabled = false;
 
@@ -66,4 +67,14 @@ void
 span_end(struct span_opentelemetry *span)
 {
 	span->end_time = clock_realtime64();
+}
+
+int
+call_back(struct span_opentelemetry *span)
+{
+	say_info("TRACER OPENTELEMETRY: span_id=%.16s parent_id=%.16s "
+		 "name=%s kind=%d start_time=%lld end_time=%lld",
+		 span->span_id, span->traceparent + 36, span->name, span->kind,
+		 (long long)span->start_time, (long long)span->end_time);
+	return 0;
 }

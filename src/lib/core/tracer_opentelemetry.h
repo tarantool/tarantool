@@ -93,6 +93,10 @@ span_start(struct span_opentelemetry *span, const char *name,
 void
 span_end(struct span_opentelemetry *span);
 
+/** Dump the span. Returns 0 on success. */
+int
+call_back(struct span_opentelemetry *span);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
