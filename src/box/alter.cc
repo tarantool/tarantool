@@ -4682,13 +4682,58 @@ replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
 	return def;
 }
 
-/** Add an instance on commit/rollback. */
-static int
-on_replace_cluster_add_replica(struct trigger *trigger, void * /* event */)
+/** State of a replica UUID replacement. */
+struct cluster_uuid_change {
+	/** Original object, kept alive until the change is destroyed. */
+	struct replica *old_replica;
+	/** Replacement object, kept alive until the change is destroyed. */
+	struct replica *new_replica;
+	/** Numeric ID before the replacement. */
+	uint32_t id;
+	/** Name before the replacement. */
+	char name[NODE_NAME_SIZE_MAX];
+	/** Commit handler. */
+	struct trigger on_commit;
+	/** Rollback handler. */
+	struct trigger on_rollback;
+};
+
+/** Release replica references even on shutdown without rollback. */
+static void
+cluster_uuid_change_destroy(struct trigger *trigger)
 {
-	const struct replica_def *def = (typeof(def))trigger->data;
-	struct replica *r = replicaset_add(def->id, &def->uuid);
-	replica_set_name(r, def->name);
+	struct cluster_uuid_change *change = (typeof(change))trigger->data;
+	replica_unref(change->old_replica);
+	replica_unref(change->new_replica);
+}
+
+/** Commit an instance UUID replacement. */
+static int
+on_commit_cluster_set_uuid(struct trigger *trigger, void * /* event */)
+{
+	struct cluster_uuid_change *change = (typeof(change))trigger->data;
+	/*
+	 * Defer the transfer: replication reconfiguration may make it
+	 * impossible to roll back.
+	 */
+	replica_rebind_stopped_applier(
+		change->old_replica, change->new_replica);
+	return 0;
+}
+
+/** Roll back an instance UUID replacement. */
+static int
+on_rollback_cluster_set_uuid(struct trigger *trigger, void * /* event */)
+{
+	struct cluster_uuid_change *change = (typeof(change))trigger->data;
+	struct replica *new_replica = change->new_replica;
+	struct replica *old_replica = change->old_replica;
+	assert(new_replica != NULL && new_replica->id == change->id);
+	/* An incoming connection may keep the unregistered replica alive. */
+	replica_set_name(new_replica, "");
+	replica_clear_id(new_replica);
+	replica_set_id(old_replica, change->id);
+	replica_set_name(old_replica, change->name);
 	return 0;
 }
 
@@ -4760,12 +4805,12 @@ on_replace_dd_cluster_set_name(struct replica *replica, const char *new_name,
 
 /** Set instance UUID on _cluster update. */
 static int
-on_replace_dd_cluster_set_uuid(struct replica *replica,
+on_replace_dd_cluster_set_uuid(struct replica *old_replica,
 			       const struct replica_def *new_def,
 			       struct txn_stmt *stmt)
 {
-	struct replica *old_replica = replica;
-	if (replica_has_connections(old_replica)) {
+	assert(old_replica->id != REPLICA_ID_NIL);
+	if (!replica_can_replace(old_replica)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID update when the old replica is still here");
 		return -1;
@@ -4781,36 +4826,38 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 			 "UUID update when the new UUID is already registered");
 		return -1;
 	}
-	if (strcmp(new_def->name, replica->name) != 0) {
+	if (strcmp(new_def->name, old_replica->name) != 0) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID and name update together");
 		return -1;
 	}
-	struct trigger *on_rollback_drop_new = txn_alter_trigger_new(
-		on_replace_cluster_clear_id, NULL);
-	struct trigger *on_rollback_add_old = txn_alter_trigger_new(
-		on_replace_cluster_add_replica, NULL);
-	if (on_rollback_drop_new == NULL || on_rollback_add_old == NULL)
+	size_t size;
+	struct cluster_uuid_change *change = region_alloc_object(
+		&stmt->txn->region, typeof(*change), &size);
+	if (change == NULL) {
+		diag_set(OutOfMemory, size, "region",
+			 "struct cluster_uuid_change");
 		return -1;
-	struct replica_def *old_def = xregion_alloc_object(
-		&in_txn()->region, typeof(*old_def));
-	memset(old_def, 0, sizeof(*old_def));
-	old_def->id = old_replica->id;
-	strlcpy(old_def->name, old_replica->name, NODE_NAME_SIZE_MAX);
-	old_def->uuid = old_replica->uuid;
-
+	}
+	change->id = old_replica->id;
+	strlcpy(change->name, old_replica->name, sizeof(change->name));
+	change->old_replica = old_replica;
+	trigger_create(&change->on_rollback, on_rollback_cluster_set_uuid,
+		       change, cluster_uuid_change_destroy);
+	trigger_create(&change->on_commit, on_commit_cluster_set_uuid,
+		       change, NULL);
+	replica_ref(old_replica);
+	replica_set_name(old_replica, "");
 	replica_clear_id(old_replica);
-	if (replica_by_uuid(&old_def->uuid) != NULL)
-		panic("Replica with old UUID wasn't deleted");
 	if (new_replica == NULL)
-		new_replica = replicaset_add(new_def->id, &new_def->uuid);
+		new_replica = replicaset_add(change->id, &new_def->uuid);
 	else
-		replica_set_id(new_replica, new_def->id);
-	replica_set_name(new_replica, old_def->name);
-	on_rollback_drop_new->data = new_replica;
-	on_rollback_add_old->data = old_def;
-	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
-	txn_stmt_on_rollback(stmt, on_rollback_add_old);
+		replica_set_id(new_replica, change->id);
+	replica_set_name(new_replica, change->name);
+	change->new_replica = new_replica;
+	replica_ref(new_replica);
+	txn_stmt_on_rollback(stmt, &change->on_rollback);
+	txn_stmt_on_commit(stmt, &change->on_commit);
 	return 0;
 }
 
@@ -4840,7 +4887,7 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 			return -1;
 		if (on_replace_dd_cluster_set_uuid(replica, new_def, stmt) != 0)
 			return -1;
-		/* The replica was re-created. */
+		/* The registration now belongs to another replica object. */
 		replica = replica_by_id(new_def->id);
 	}
 	return on_replace_dd_cluster_set_name(replica, new_def->name, stmt);

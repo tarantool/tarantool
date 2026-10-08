@@ -93,6 +93,10 @@ enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
 static void
 replica_delete(struct replica *replica);
 
+/** Detach the applier from the replica. */
+static void
+replica_clear_applier(struct replica *replica);
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -513,7 +517,8 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL && !replica->anon &&
+	return replica->ref_count == 0 &&
+	       replica->id == REPLICA_ID_NIL && !replica->anon &&
 	       !replica_has_connections(replica);
 }
 
@@ -526,6 +531,7 @@ replica_new(void)
 	struct replica *replica = xalloc_object(struct replica);
 	replica->relay = relay_new(replica);
 	replica->id = 0;
+	replica->ref_count = 0;
 	replica->anon = false;
 	replica->uuid = uuid_nil;
 	*replica->name = 0;
@@ -546,16 +552,32 @@ replica_new(void)
 static void
 replica_delete(struct replica *replica)
 {
+	assert(replica->ref_count == 0);
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
-	if (replica->applier != NULL)
-		applier_delete(replica->applier);
+	if (replica->applier != NULL) {
+		struct applier *applier = replica->applier;
+		replica_clear_applier(replica);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	if (replica->gc_checkpoint_ref != NULL)
 		gc_unref_checkpoint(replica->gc_checkpoint_ref);
 	TRASH(replica);
 	free(replica);
+}
+
+void
+replica_unref(struct replica *replica)
+{
+	assert(replica->ref_count > 0);
+	--replica->ref_count;
+	if (replica_is_orphan(replica)) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replica_delete(replica);
+	}
 }
 
 struct replica *
@@ -703,6 +725,14 @@ replica_has_connections(const struct replica *replica)
 	return replica->has_incoming_connection || replica->applier != NULL;
 }
 
+bool
+replica_can_replace(const struct replica *replica)
+{
+	return !replica->has_incoming_connection &&
+	       (replica->applier == NULL ||
+		replica->applier->state == APPLIER_STOPPED);
+}
+
 /** A helper to track applier health on its state change. */
 static void
 replica_update_applier_health(struct replica *replica)
@@ -741,6 +771,49 @@ replica_clear_applier(struct replica *replica)
 	replica->applier = NULL;
 	trigger_clear(&replica->on_applier_state);
 	replica_update_applier_health(replica);
+}
+
+/** Move a non-healthy applier without changing replicaset counters. */
+static void
+replica_rebind_applier(struct replica *src, struct replica *dst)
+{
+	assert(src != dst);
+	assert(src->applier != NULL);
+	assert(dst->applier == NULL);
+	assert(dst->applier_sync_state == APPLIER_DISCONNECTED);
+	assert(!src->is_applier_healthy && !dst->is_applier_healthy);
+	dst->applier_sync_state = src->applier_sync_state;
+	replica_set_applier(dst, src->applier);
+	replica_clear_applier(src);
+	src->applier_sync_state = APPLIER_DISCONNECTED;
+}
+
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica)
+{
+	if (old_replica->id != REPLICA_ID_NIL)
+		return;
+	struct applier *applier = old_replica->applier;
+	if (applier == NULL || applier->state != APPLIER_STOPPED)
+		return;
+	assert(old_replica->applier_sync_state == APPLIER_STOPPED);
+	if (new_replica->applier == NULL) {
+		replica_rebind_applier(old_replica, new_replica);
+	} else {
+		replica_clear_applier(old_replica);
+		old_replica->applier_sync_state = APPLIER_DISCONNECTED;
+		say_warn("replica %s already has an applier; "
+			 "discarding stopped applier to %s at %s",
+			 tt_uuid_str(&new_replica->uuid),
+			 tt_uuid_str(&old_replica->uuid),
+			 applier_uri_str(applier));
+		struct error *error = diag_last_error(&applier->diag);
+		if (error != NULL)
+			error_log(error);
+		applier_stop(applier);
+		applier_delete(applier);
+	}
 }
 
 static void
@@ -797,10 +870,7 @@ replica_on_applier_connect(struct replica *replica)
 
 	if (orig != NULL) {
 		/* Use existing struct replica */
-		assert(orig->applier_sync_state == APPLIER_DISCONNECTED);
-		orig->applier_sync_state = replica->applier_sync_state;
-		replica_set_applier(orig, applier);
-		replica_clear_applier(replica);
+		replica_rebind_applier(replica, orig);
 		replica_delete(replica);
 		replica = orig;
 	} else {
@@ -847,9 +917,7 @@ replica_on_applier_reconnect(struct replica *replica)
 				  "duplicate connection to the same replica");
 		}
 
-		replica_set_applier(orig, applier);
-		replica_clear_applier(replica);
-		replica->applier_sync_state = APPLIER_DISCONNECTED;
+		replica_rebind_applier(replica, orig);
 		replica = orig;
 	}
 
@@ -1097,8 +1165,7 @@ next:
 							   replica);
 		if (orig != NULL) {
 			/* Use existing struct replica */
-			replica_set_applier(orig, replica->applier);
-			replica_clear_applier(replica);
+			replica_rebind_applier(replica, orig);
 			replica_delete(replica);
 			replica = orig;
 		} else {
