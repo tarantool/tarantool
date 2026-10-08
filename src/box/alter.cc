@@ -4692,6 +4692,14 @@ on_replace_cluster_add_replica(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+static int
+on_rollback_cluster_drop_replica(struct trigger *trigger, void *event)
+{
+	struct replica *replica = (struct replica *)trigger->data;
+	replica_set_name(replica, "");
+	return on_replace_cluster_clear_id(trigger, event);
+}
+
 /** Set instance name on commit/rollback. */
 static int
 on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
@@ -4787,7 +4795,7 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 		return -1;
 	}
 	struct trigger *on_rollback_drop_new = txn_alter_trigger_new(
-		on_replace_cluster_clear_id, NULL);
+		on_rollback_cluster_drop_replica, NULL);
 	struct trigger *on_rollback_add_old = txn_alter_trigger_new(
 		on_replace_cluster_add_replica, NULL);
 	if (on_rollback_drop_new == NULL || on_rollback_add_old == NULL)
@@ -4809,8 +4817,8 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 	replica_set_name(new_replica, old_def->name);
 	on_rollback_drop_new->data = new_replica;
 	on_rollback_add_old->data = old_def;
-	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
 	txn_stmt_on_rollback(stmt, on_rollback_add_old);
+	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
 	return 0;
 }
 
