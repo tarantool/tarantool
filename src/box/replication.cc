@@ -513,7 +513,8 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	return replica->id == REPLICA_ID_NIL && !replica->anon &&
+	return replica->ref_count == 0 &&
+	       replica->id == REPLICA_ID_NIL && !replica->anon &&
 	       !replica_has_connections(replica);
 }
 
@@ -526,6 +527,7 @@ replica_new(void)
 	struct replica *replica = xalloc_object(struct replica);
 	replica->relay = relay_new(replica);
 	replica->id = 0;
+	replica->ref_count = 0;
 	replica->anon = false;
 	replica->uuid = uuid_nil;
 	*replica->name = 0;
@@ -546,6 +548,7 @@ replica_new(void)
 static void
 replica_delete(struct replica *replica)
 {
+	assert(replica->ref_count == 0);
 	if (replica->relay != NULL)
 		relay_delete(replica->relay);
 	if (replica->applier != NULL)
@@ -556,6 +559,17 @@ replica_delete(struct replica *replica)
 		gc_unref_checkpoint(replica->gc_checkpoint_ref);
 	TRASH(replica);
 	free(replica);
+}
+
+void
+replica_unref(struct replica *replica)
+{
+	assert(replica->ref_count > 0);
+	--replica->ref_count;
+	if (replica_is_orphan(replica)) {
+		replica_hash_remove(&replicaset.hash, replica);
+		replica_delete(replica);
+	}
 }
 
 struct replica *
