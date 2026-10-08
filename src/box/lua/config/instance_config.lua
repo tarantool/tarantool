@@ -1140,6 +1140,15 @@ return schema.new('instance_config', schema.record({
             default = 4,
         }),
     }),
+    memcs = enterprise_edition(schema.record({
+        dir = enterprise_edition(schema.scalar({
+            type = 'string',
+            box_cfg = 'memcs_dir',
+            box_cfg_nondynamic = true,
+            mkdir = true,
+            default = 'var/lib/{{ instance_name }}',
+        })),
+    })),
     quiver = enterprise_edition(schema.record({
         dir = enterprise_edition(schema.scalar({
             type = 'string',

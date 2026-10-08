@@ -4761,6 +4761,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .abort_with_conflict = */ vinyl_engine_abort_with_conflict,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
+	/* .recover_snapshot = */ generic_engine_recover_snapshot,
 	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
 	/* .begin_hot_standby = */ vinyl_engine_begin_hot_standby,
 	/* .end_recovery = */ vinyl_engine_end_recovery,

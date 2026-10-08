@@ -3075,6 +3075,25 @@ I['vinyl.write_threads'] = format_text([[
 
 -- }}} vinyl configuration
 
+-- {{{ memcs configuration
+
+I['memcs'] = format_text([[
+    This section defines configuration parameters for the MemCS storage engine.
+]])
+
+I['memcs.dir'] = format_text([[
+    A directory where MemCS stores columnar checkpoint (`.memcs`) directories.
+    A relative path is interpreted relative to `process.work_dir`. By default,
+    it is `var/lib/{{ instance_name }}` in declarative configuration (and `.`
+    with `box.cfg`), independently of `snapshot.dir` / `memtx_dir`.
+
+    Keep the matching `.memcs` directories when moving this path: each
+    checkpoint is paired with a `.snap` file by vclock signature. Restore
+    both directories together when restoring a backup.
+]])
+
+-- }}} memcs configuration
+
 -- {{{ quiver configuration
 
 I['quiver'] = format_text([[

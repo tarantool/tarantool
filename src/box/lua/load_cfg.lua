@@ -9,6 +9,7 @@ local fiber = require('fiber')
 local fio = require('fio')
 local compat = require('compat')
 local units = require('internal.config.utils.units')
+local tarantool = require('tarantool')
 
 local function nop() end
 
@@ -84,6 +85,12 @@ local function ifdef_wal_retention_period(value)
     end
 end
 
+local function ifdef_memcs(value)
+    if tarantool.package == 'Tarantool Enterprise' then
+        return value
+    end
+end
+
 local function ifdef_quiver(value)
     if private.cfg_set_quiver_memory ~= nil then
         return value
@@ -104,6 +111,7 @@ local default_cfg = {
     memtx_allocator     = "small",
     work_dir            = nil,
     memtx_dir           = ".",
+    memcs_dir           = ifdef_memcs('.'),
     wal_dir             = ".",
 
     vinyl_dir           = '.',
@@ -316,6 +324,7 @@ local template_cfg = {
     memtx_allocator     = 'string',
     work_dir            = 'string',
     memtx_dir            = 'string',
+    memcs_dir            = ifdef_memcs('string'),
     wal_dir             = 'string',
     vinyl_dir           = 'string',
     vinyl_memory        = 'number',
