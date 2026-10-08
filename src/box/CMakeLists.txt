@@ -31,6 +31,7 @@ lua_source(lua_sources lua/backup.lua backup_lua)
 lua_source(lua_sources lua/recovery_point_manager.lua recovery_point_manager_lua)
 lua_source(lua_sources lua/healthcheck.lua healthcheck_lua)
 lua_source(lua_sources lua/healthcheck_defaults.lua healthcheck_defaults_lua)
+lua_source(lua_sources lua/httpd_role.lua httpd_role_wrapper_lua)
 
 # {{{ config
 lua_source(lua_sources lua/config/applier/app.lua          config_applier_app_lua)
@@ -43,6 +44,8 @@ lua_source(lua_sources lua/config/applier/connpool.lua     config_applier_connpo
 lua_source(lua_sources lua/config/applier/console.lua      config_applier_console_lua)
 lua_source(lua_sources lua/config/applier/credentials.lua  config_applier_credentials_lua)
 lua_source(lua_sources lua/config/applier/fiber.lua        config_applier_fiber_lua)
+lua_source(lua_sources lua/config/applier/metrics_export.lua
+           config_applier_metrics_export_lua)
 lua_source(lua_sources lua/config/applier/lua.lua          config_applier_lua_lua)
 lua_source(lua_sources lua/config/applier/mkdir.lua        config_applier_mkdir_lua)
 lua_source(lua_sources lua/config/applier/roles.lua        config_applier_roles_lua)
