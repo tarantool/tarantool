@@ -4809,8 +4809,9 @@ on_replace_dd_cluster_set_uuid(struct replica *replica,
 	replica_set_name(new_replica, old_def->name);
 	on_rollback_drop_new->data = new_replica;
 	on_rollback_add_old->data = old_def;
-	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
+	/* Rollback triggers run in reverse order: drop new, then add old. */
 	txn_stmt_on_rollback(stmt, on_rollback_add_old);
+	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
 	return 0;
 }
 
