@@ -96,3 +96,27 @@ g.test_gh_10196_no_hang_on_self_join = function()
         message = 'cannot join itself',
     })
 end
+
+g.test_12998_tracer = function()
+    local function f1()
+        fiber.sleep(10)
+    end
+    local span_id = 12345
+    local self = fiber.self()
+    fiber._internal.set_span_id(self, span_id)
+    local res = fiber._internal.get_span_id(self)
+    t.assert_equals(res, span_id)
+    -- A fiber created with fiber.new() inherits the parent's span_id.
+    local f_new = fiber.new(f1)
+    res = fiber._internal.get_span_id(f_new)
+    t.assert_equals(res, span_id)
+
+    -- Same for fiber.create().
+    local f_create = fiber.create(f1)
+    res = fiber._internal.get_span_id(f_create)
+    t.assert_equals(res, span_id)
+
+    f_new:cancel()
+    f_create:cancel()
+    fiber._internal.set_span_id(self, 0)
+end
