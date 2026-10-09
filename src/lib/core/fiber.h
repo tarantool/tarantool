@@ -42,6 +42,7 @@
 #include "small/mempool.h"
 #include "small/region.h"
 #include "small/rlist.h"
+#include "small/small.h"
 #include "salad/stailq.h"
 #include "clock_lowres.h"
 #include "backtrace.h"
@@ -849,6 +850,8 @@ struct cord {
 	struct mempool fiber_mempool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
+	/** An allocator for runtime data in this cord. */
+	struct small_alloc runtime_alloc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
 	/**

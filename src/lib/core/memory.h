@@ -45,11 +45,38 @@ extern "C" {
 /* Global runtime memory. */
 extern struct slab_arena runtime;
 
+/**
+ * Allocate size bytes on runtime_alloc. The allocator is thread-local.
+ * NB: Allocated memory will be accounted in runtime statisitcs
+ * as if it was allocated for tuples.
+ */
+void *
+runtime_memory_alloc(size_t size);
+
+/**
+ * Free memory of size bytes allocated on runtime_alloc.
+ */
+void
+runtime_memory_free(void *ptr, size_t size);
+
+/**
+ * Amount of allocated runtime memory.
+ *
+ * This metric disregards the internal fragmentation: it does not
+ * count unused parts of slabs.
+ *
+ * Example: a tuple created using `box.tuple.new(<...>)` from Lua
+ * uses this memory.
+ */
+size_t
+runtime_memory_used(void);
+
 void
 memory_init(void);
 
 void
 memory_free(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

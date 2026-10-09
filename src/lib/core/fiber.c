@@ -1817,6 +1817,14 @@ cord_create(struct cord *cord, const char *name)
 	slab_cache_create(&cord->slabc, &runtime);
 	mempool_create(&cord->fiber_mempool, &cord->slabc,
 		       sizeof(struct fiber));
+
+	const int RUNTIME_OBJSIZE_MIN = 16;
+	const double RUNTIME_ALLOC_FACTOR = 1.05;
+	float actual_alloc_factor;
+	small_alloc_create(
+		&cord->runtime_alloc, &cord()->slabc, RUNTIME_OBJSIZE_MIN,
+		sizeof(intptr_t), RUNTIME_ALLOC_FACTOR, &actual_alloc_factor);
+
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
 	rlist_create(&cord->dead);
@@ -1925,6 +1933,7 @@ cord_destroy(struct cord *cord)
 	cord->sched.stack_size = 0;
 #endif
 	fiber_destroy(cord, &cord->sched);
+	small_alloc_destroy(&cord->runtime_alloc);
 	slab_cache_destroy(&cord->slabc);
 }
 
