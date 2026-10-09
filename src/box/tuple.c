@@ -40,14 +40,6 @@
 /** Memory pool used for allocating tuple_iterator objects. */
 static __thread struct mempool tuple_iterator_pool;
 
-/** Runtime tuple allocator. */
-static __thread struct small_alloc runtime_alloc;
-
-enum {
-	/** Lowest allowed slab_alloc_minimal */
-	OBJSIZE_MIN = 16,
-};
-
 const char *tuple_arena_type_strs[tuple_arena_type_MAX] = {
 	[TUPLE_ARENA_MEMTX] = "memtx",
 	[TUPLE_ARENA_MALLOC] = "malloc",
@@ -84,8 +76,6 @@ tuple_pointer_hash(const struct tuple *a)
 #include "salad/mhash.h"
 
 static __thread struct mh_tuple_uploaded_refs_t *tuple_uploaded_refs;
-
-static const double ALLOC_FACTOR = 1.05;
 
 /**
  * Last tuple returned by public C API
@@ -137,7 +127,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 		data_offset -= TUPLE_COMPACT_SAVINGS;
 
 	size_t total = data_offset + data_len;
-	tuple = (struct tuple *) smalloc(&runtime_alloc, total);
+	tuple = (struct tuple *)runtime_memory_alloc(total);
 	if (tuple == NULL) {
 		diag_set(OutOfMemory, (unsigned) total,
 			 "malloc", "tuple");
@@ -163,7 +153,7 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(!tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
 	size_t total = tuple_size(tuple);
 	tuple_format_unref(format);
-	smfree(&runtime_alloc, tuple, total);
+	runtime_memory_free(tuple, total);
 }
 
 static void
@@ -374,11 +364,6 @@ tuple_init(void)
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_runtime);
 
-	float actual_alloc_factor;
-	small_alloc_create(&runtime_alloc, &cord()->slabc, OBJSIZE_MIN,
-			   sizeof(intptr_t), ALLOC_FACTOR,
-			   &actual_alloc_factor);
-
 	mempool_create(&tuple_iterator_pool, &cord()->slabc,
 		       sizeof(struct tuple_iterator));
 
@@ -436,39 +421,10 @@ tuple_free(void)
 	}
 
 	mempool_destroy(&tuple_iterator_pool);
-	small_alloc_destroy(&runtime_alloc);
 
 	tuple_format_free();
 
 	mh_tuple_uploaded_refs_delete(tuple_uploaded_refs);
-}
-
-static int
-small_stats_noop_cb(const void *stats, void *cb_ctx)
-{
-	(void)stats;
-	(void)cb_ctx;
-	return 0;
-}
-
-size_t
-tuple_runtime_memory_used(void)
-{
-	struct small_stats data_stats;
-	small_stats(&runtime_alloc, &data_stats, small_stats_noop_cb, NULL);
-	return data_stats.used;
-}
-
-void *
-runtime_memory_alloc(size_t size)
-{
-	return smalloc(&runtime_alloc, size);
-}
-
-void
-runtime_memory_free(void *ptr, size_t size)
-{
-	smfree(&runtime_alloc, ptr, size);
 }
 
 /* {{{ tuple_field_* getters */

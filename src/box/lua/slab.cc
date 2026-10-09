@@ -240,7 +240,7 @@ lbox_runtime_info(struct lua_State *L)
 	lua_pushinteger(L, luaL_getgctotal(L));
 	lua_settable(L, -3);
 
-	luaL_pushuint64(L, tuple_runtime_memory_used());
+	luaL_pushuint64(L, runtime_memory_used());
 	lua_setfield(L, -2, "tuple");
 
 	return 1;

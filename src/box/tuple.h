@@ -1550,32 +1550,6 @@ tuple_bless(struct tuple *tuple)
 ssize_t
 tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 
-/**
- * Amount of memory allocated on runtime arena for tuples.
- *
- * This metric disregards the internal fragmentation: it does not
- * count unused parts of slabs.
- *
- * Example: a tuple created using `box.tuple.new(<...>)` from Lua
- * uses this memory.
- */
-size_t
-tuple_runtime_memory_used(void);
-
-/**
- * Allocate size bytes on runtime_alloc.
- * NB: Allocated memory will be accounted in runtime statisitcs
- * as if it was allocated for tuples.
- */
-void *
-runtime_memory_alloc(size_t size);
-
-/**
- * Free memory of size bytes allocated on runtime_alloc.
- */
-void
-runtime_memory_free(void *ptr, size_t size);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -1595,4 +1569,3 @@ tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
-
