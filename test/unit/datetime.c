@@ -618,7 +618,7 @@ mp_datetime_unpack_ok_test(void)
 		{.nsec = 0},
 		{.tzoffset = TZOFFSET_MIN},
 		{.tzoffset = TZOFFSET_MAX},
-		{.tzindex = MAX_TZINDEX},
+		{.tzindex = MAX_TZINDEX - 1},
 		{.tzindex = 0},
 	};
 	size_t index;
@@ -650,7 +650,7 @@ mp_datetime_unpack_fail_test(void)
 		{.nsec = -1},
 		{.tzoffset = TZOFFSET_MIN - 1},
 		{.tzoffset = TZOFFSET_MAX + 1},
-		{.tzindex = MAX_TZINDEX + 1},
+		{.tzindex = MAX_TZINDEX},
 		{.tzindex = -1},
 	};
 
