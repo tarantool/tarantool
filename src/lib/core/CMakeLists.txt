@@ -2,6 +2,7 @@ set(core_sources
     diag.c
     crash.c
     say.c
+    tracer_opentelemetry.c
     memory.c
     clock.c
     fiber.c

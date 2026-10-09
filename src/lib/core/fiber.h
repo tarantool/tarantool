@@ -762,6 +762,20 @@ struct fiber {
 		struct {
 			uint64_t sync;
 		} net;
+		/**
+		 * Context, propagated to all child fibers and
+		 * IPROTO requests.
+		 */
+		struct {
+			/**
+			 * Flag indicating whether the traceparent field
+			 * is populated.
+			 */
+			bool is_traceparent_null;
+			char span_id[16];
+			/** Tracing data in OpenTelemetry format. */
+			char traceparent[55];
+		} propagation_context;
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;

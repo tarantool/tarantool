@@ -1,7 +1,5 @@
-#ifndef TARANTOOL_LUA_FIBER_H_INCLUDED
-#define TARANTOOL_LUA_FIBER_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,33 +28,53 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
 
-struct lua_State;
-struct fiber;
+#include "tracer_opentelemetry.h"
+#include <string.h>
+#include "clock.h"
+#include <stdbool.h>
+#include "say.h"
 
-/**
-* Initialize box.fiber system
-*/
-void
-tarantool_lua_fiber_init(struct lua_State *L);
-
-/**
- * Create a fiber running the Lua function found at the bottom of
- * the stack, with the rest of the stack passed as its arguments.
- * Used by fiber.create/fiber.new and by other built-in modules that
- * need to run a Lua function on a new fiber.
- */
-struct fiber *
-fiber_create(struct lua_State *L);
+bool trace_opentelemetry_enabled = false;
 
 void
-luaL_testcancel(struct lua_State *L);
+trace_opentelemetry_set_enabled(bool enabled)
+{
+	trace_opentelemetry_enabled = enabled;
+}
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
+bool
+trace_opentelemetry_get_enabled(void)
+{
+	return trace_opentelemetry_enabled;
+}
 
-#endif /* TARANTOOL_LUA_FIBER_H_INCLUDED */
+void
+span_start(struct span_opentelemetry *span, const char *name,
+	   char span_id[16], char traceparent[55], enum span_kind kind)
+{
+	if (trace_opentelemetry_enabled) {
+		span->name = name;
+		memcpy(span->traceparent, traceparent, 55);
+		memcpy(span->span_id, span_id, 16);
+		span->kind = kind;
+		span->start_time = clock_realtime64();
+		span->trace_flag = 1;
+	}
+}
+
+void
+span_end(struct span_opentelemetry *span)
+{
+	span->end_time = clock_realtime64();
+}
+
+int
+call_back(struct span_opentelemetry *span)
+{
+	say_info("TRACER OPENTELEMETRY: span_id=%.16s parent_id=%.16s "
+		 "name=%s kind=%d start_time=%lld end_time=%lld",
+		 span->span_id, span->traceparent + 36, span->name, span->kind,
+		 (long long)span->start_time, (long long)span->end_time);
+	return 0;
+}

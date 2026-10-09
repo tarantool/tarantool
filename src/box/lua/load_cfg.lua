@@ -137,6 +137,8 @@ local default_cfg = {
     audit_spaces        = ifdef_audit(nil),
     audit_extract_key   = ifdef_audit(false),
 
+    enable_tracing      = false,
+
     auth_type           = 'chap-sha1',
     auth_delay          = ifdef_security(0),
     auth_retries        = ifdef_security(0),
@@ -347,6 +349,8 @@ local template_cfg = {
     audit_filter        = ifdef_audit('string'),
     audit_spaces        = ifdef_audit('table'),
     audit_extract_key   = ifdef_audit('boolean'),
+
+    enable_tracing      = 'boolean',
 
     auth_type           = 'string',
     auth_delay          = ifdef_security('number'),
@@ -698,6 +702,7 @@ local dynamic_cfg = {
     password_enforce_specialchars = ifdef_security(nop),
     password_history_length = ifdef_security(nop),
     wal_ext                 = private.cfg_set_wal_ext,
+    enable_tracing = private.cfg_set_enable_tracing,
 
     metrics = function()
         -- emmylua_check: false positive, see

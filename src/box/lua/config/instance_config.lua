@@ -2289,6 +2289,11 @@ return schema.new('instance_config', schema.record({
     }, {
         validate = validators['failover'],
     }),
+    enable_tracing = schema.scalar({
+        type = 'boolean',
+        box_cfg = 'enable_tracing',
+        default = false,
+    }),
     -- Compatibility options.
     compat = schema.record({
         json_escape_forward_slash = schema.enum({

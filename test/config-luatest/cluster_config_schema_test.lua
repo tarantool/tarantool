@@ -77,6 +77,7 @@ local instance_config_fields = {
     'iproto',
     'session',
     'database',
+    'enable_tracing',
     'sql',
     'memtx',
     'vinyl',
@@ -312,6 +313,7 @@ g.test_defaults = function()
             txn_isolation = 'best-effort',
             use_mvcc_engine = false,
         },
+        enable_tracing = false,
         replication = {
             failover = 'off',
             anon = false,

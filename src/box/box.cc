@@ -38,6 +38,7 @@
 #include "box/allocator.h"
 #include "lua/utils.h"
 #include "fiber_pool.h"
+#include "tracer_opentelemetry.h"
 #include <say.h>
 #include <scoped_guard.h>
 #include "identifier.h"
@@ -2361,6 +2362,12 @@ box_set_auth_type(void)
 		return -1;
 	box_auth_type = method->name;
 	return 0;
+}
+
+void
+box_set_enable_tracing(void)
+{
+	trace_opentelemetry_set_enabled(cfg_getb("enable_tracing"));
 }
 
 int
