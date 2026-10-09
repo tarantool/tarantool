@@ -384,8 +384,8 @@ str_escape_inplace(char *buf, int size, str_escape_char_f escape_func)
 	}
 
 	/* Write the null terminator. */
-	assert(total + 1 <= size); /* Guaranteed by the loop above. */
-	buf[total + 1] = '\0';
+	assert(total < size); /* Guaranteed by the loop above. */
+	buf[total] = '\0';
 
 	/* Write the escaped string from the end to the beginning. */
 	char *pw = buf + total;
