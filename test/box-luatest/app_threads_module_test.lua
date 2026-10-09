@@ -43,8 +43,7 @@ g.test_threads_config_propagation = function()
     }
     cluster.server:exec(function(expected_threads_info)
         t.assert_equals(box.cfg.app_threads, 6)
-        t.assert_equals(require('experimental.threads').info(),
-                        expected_threads_info)
+        t.assert_equals(require('threads').info(), expected_threads_info)
     end, {expected_threads_info})
     --
     -- Check that the threads configuration is updated only after
@@ -66,8 +65,7 @@ g.test_threads_config_propagation = function()
                       'will not be set until the instance is restarted',
         })
         t.assert_equals(box.cfg.app_threads, 6)
-        t.assert_equals(require('experimental.threads').info(),
-                        expected_threads_info)
+        t.assert_equals(require('threads').info(), expected_threads_info)
     end, {expected_threads_info})
     cluster.server:restart()
     local expected_threads_info = {
@@ -83,8 +81,7 @@ g.test_threads_config_propagation = function()
     }
     cluster.server:exec(function(expected_threads_info)
         t.assert_equals(box.cfg.app_threads, 10)
-        t.assert_equals(require('experimental.threads').info(),
-                        expected_threads_info)
+        t.assert_equals(require('threads').info(), expected_threads_info)
     end, {expected_threads_info})
     --
     -- Check configuration in other threads.
@@ -107,8 +104,7 @@ g.test_threads_config_propagation = function()
         expected_threads_info.thread_id = thread_id
         expected_threads_info.group_name = group_name
         cluster.server:exec(function(expected_threads_info)
-            t.assert_equals(require('experimental.threads').info(),
-                            expected_threads_info)
+            t.assert_equals(require('threads').info(), expected_threads_info)
         end, {expected_threads_info}, {_thread_id = i})
     end
 end
@@ -117,7 +113,7 @@ end
 -- Check the threads module when no thread groups are configured.
 --
 local function test_threads_not_configured()
-    local threads = require('experimental.threads')
+    local threads = require('threads')
     t.assert_equals(box.cfg.app_threads, 0)
     t.assert_equals(threads.info(), {
         thread_id = 1,
@@ -186,7 +182,7 @@ g.test_thread_function_export = function()
     -- Argument checking.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'IllegalParams',
             message = 'function name should be a string',
@@ -200,7 +196,7 @@ g.test_thread_function_export = function()
     -- Duplicate name.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         threads.export('test_func_1', function() end)
         threads.export('test_func_2', function() end)
         t.assert_error_covers({
@@ -224,7 +220,7 @@ g.test_threads_call = function()
     -- Argument checking.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'IllegalParams',
             message = 'group name should be a string',
@@ -260,7 +256,7 @@ g.test_threads_call = function()
     -- Unknown group.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'ClientError',
             name = 'NO_SUCH_THREAD_GROUP',
@@ -270,7 +266,7 @@ g.test_threads_call = function()
     -- Unknown thread.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         for _, p in ipairs({{'test1', -1}, {'test2', 0},
                             {'test1', 4}, {'test2', 3}}) do
             local group, target = unpack(p)
@@ -285,7 +281,7 @@ g.test_threads_call = function()
     -- Unknown function.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'ClientError',
             name = 'NO_SUCH_FUNCTION',
@@ -295,11 +291,11 @@ g.test_threads_call = function()
     -- Target handling.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test1'
         local func = 'test_func_1'
         local func_def = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_1', function()
                 return threads.info().thread_id
             end)
@@ -321,11 +317,11 @@ g.test_threads_call = function()
     -- Default arguments.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test2'
         local func = 'test_func_2'
         threads.eval(group, [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_2', function(...) return ... end)
         ]])
         t.assert_equals(threads.call(group, func), {{}, {}})
@@ -342,10 +338,10 @@ g.test_threads_call = function()
     -- Return value and error handling.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test1'
         threads.eval(group, [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_3', function()
                 local thread_id = threads.info().thread_id
                 if thread_id == 1 then
@@ -360,7 +356,7 @@ g.test_threads_call = function()
             {{1, 2, 3}, {}, {{1, 2, 3}}}
         )
         threads.eval(group, [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_4', function()
                 local thread_id = threads.info().thread_id
                 if thread_id == 1 then
@@ -379,10 +375,10 @@ g.test_threads_call = function()
     -- Calling tx thread group from tx.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local func = 'test_func_5'
         threads.eval('tx', [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_5', threads.info)
         ]])
         local expected = {{threads.info()}}
@@ -395,14 +391,14 @@ g.test_threads_call = function()
     -- Usage in other a non-tx thread.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_covers(threads.info(), {
             thread_id = 2,
             group_name = 'test2',
         })
         local func = 'test_func_6'
         local expr = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func_6', function()
                 local info = threads.info()
                 return info.group_name, info.thread_id
@@ -434,7 +430,7 @@ g.test_threads_eval = function()
     -- Argument checking.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'IllegalParams',
             message = 'group name should be a string',
@@ -470,7 +466,7 @@ g.test_threads_eval = function()
     -- Unknown group.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_error_covers({
             type = 'ClientError',
             name = 'NO_SUCH_THREAD_GROUP',
@@ -480,7 +476,7 @@ g.test_threads_eval = function()
     -- Unknown thread.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         for _, p in ipairs({{'test1', -1}, {'test2', 0},
                             {'test1', 4}, {'test2', 3}}) do
             local group, target = unpack(p)
@@ -495,10 +491,10 @@ g.test_threads_eval = function()
     -- Target handling.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test1'
         local expr = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             return threads.info().thread_id
         ]]
         local ret_all = threads.eval(group, expr, {}, {target = 'all'})
@@ -516,7 +512,7 @@ g.test_threads_eval = function()
     -- Default arguments.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test2'
         local expr = [[return ...]]
         t.assert_equals(threads.eval(group, expr), {{}, {}})
@@ -533,10 +529,10 @@ g.test_threads_eval = function()
     -- Return value and error handling.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local group = 'test1'
         local expr = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             local thread_id = threads.info().thread_id
             if thread_id == 1 then
                 return 1, 2, 3
@@ -547,7 +543,7 @@ g.test_threads_eval = function()
         t.assert_equals(threads.eval(group, expr, {}, {target = 'all'}),
                         {{1, 2, 3}, {}, {{1, 2, 3}}})
         expr = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             local thread_id = threads.info().thread_id
             if thread_id == 1 then
                 box.error({type = 'MyErrorType', name = 'MyError1'})
@@ -562,9 +558,9 @@ g.test_threads_eval = function()
     -- Calling tx thread group from tx.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local expr = [[
-            return require('experimental.threads').info()
+            return require('threads').info()
         ]]
         local expected = {{threads.info()}}
         t.assert_equals(threads.eval('tx', expr, {}, {target = 'any'}),
@@ -576,13 +572,13 @@ g.test_threads_eval = function()
     -- Usage in other a non-tx thread.
     --
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_covers(threads.info(), {
             thread_id = 2,
             group_name = 'test2',
         })
         local expr = [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             local info = threads.info()
             return info.group_name, info.thread_id
         ]]
@@ -628,7 +624,7 @@ g.test_threads_priv = function()
     local cluster = cluster:new(config, SERVER_OPTS)
     cluster.server:start()
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         for _, group in ipairs(threads.info().groups) do
             threads.eval(group.name, [[
                 for _, f in ipairs({
@@ -725,7 +721,7 @@ g.test_box_cfg = function(cg)
     cg.server:exec(test_threads_not_configured)
     cg.server:restart({box_cfg = {app_threads = 4}})
     cg.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         t.assert_equals(threads.info(), {
             thread_id = 1,
             group_name = 'tx',
@@ -735,7 +731,7 @@ g.test_box_cfg = function(cg)
             },
         })
         threads.eval('app', [[
-            local threads = require('experimental.threads')
+            local threads = require('threads')
             threads.export('test_func', function()
                 local info = threads.info()
                 return info.group_name, info.thread_id
@@ -763,7 +759,7 @@ g.test_thread_names_in_logs = function()
     local cluster = cluster:new(config, SERVER_OPTS)
     cluster:start()
     cluster.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         require('log').info('foobar1')
         threads.eval('fuzz', [[
             require('log').info('foobar2')
@@ -792,7 +788,7 @@ g.test_threads_connection_on_shutdown = function(cg)
     local path = fio.pathjoin(cg.server.workdir, 'test.txt')
     cg.server:exec(function(path)
         local fio = require('fio')
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         box.ctl.on_shutdown(function()
             local fh = fio.open(path, {'O_CREAT', 'O_WRONLY', 'O_TRUNC'},
                                 tonumber('666', 8))
@@ -825,4 +821,25 @@ end
 g.after_test('test_threads_connection_on_shutdown', function(cg)
     cg.server:drop()
     cg.server = nil
+end)
+
+g.before_test('test_threads_module_alias', function(cg)
+    cg.server = server:new({
+        box_cfg = {app_threads = 1},
+        net_box_credentials = {user = 'admin'},
+    })
+    cg.server:start()
+end)
+
+g.test_threads_module_alias = function(cg)
+    cg.server:exec(function()
+        t.assert_is(require('experimental.threads'), require('threads'))
+    end)
+    cg.server:exec(function()
+        t.assert_is(require('experimental.threads'), require('threads'))
+    end, {}, {_thread_id = 1})
+end
+
+g.after_test('test_threads_module_alias', function(cg)
+    cg.server:drop()
 end)

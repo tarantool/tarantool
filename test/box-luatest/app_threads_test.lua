@@ -801,7 +801,7 @@ end
 g.test_fiber_cond_exit = function()
     local dir = treegen.prepare_directory({}, {})
     treegen.write_file(dir, 'test.lua', [=[
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         box.cfg{app_threads = 1, log_level = 'warn'}
         threads.eval('app', [[
             local fiber = require('fiber')
