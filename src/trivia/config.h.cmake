@@ -313,6 +313,8 @@
 #cmakedefine EMBED_LUAZIP 1
 #cmakedefine TEST_BUILD 1
 
+#cmakedefine MIMALLOC_OVERRIDE_CPP 1
+
 /*
  * vim: syntax=c
  */
