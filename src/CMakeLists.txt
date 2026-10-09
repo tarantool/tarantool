@@ -129,6 +129,15 @@ lua_source(lua_sources ../third_party/metrics/metrics/tarantool.lua metrics_tara
 lua_source(lua_sources ../third_party/metrics/metrics/utils.lua metrics_utils_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/version.lua metrics_version_lua)
 
+# Export EmmyLua annotations of the bundled Lua modules into stubs.
+lua_stub(checks FILES
+    ../third_party/checks/checks.lua
+    ../third_party/checks/checks/version.lua)
+file(GLOB_RECURSE METRICS_SOURCE_FILES
+    "${PROJECT_SOURCE_DIR}/third_party/metrics/metrics/*.lua"
+)
+lua_stub(metrics FILES ${METRICS_SOURCE_FILES})
+
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bcsave.lua jit_bcsave_lua)

@@ -176,6 +176,7 @@ make test-force
 %files
 %{_bindir}/tarantool
 %{_mandir}/man1/tarantool.1*
+%{_datadir}/tarantool/emmylua
 %doc README.md
 %{!?_licensedir:%global license %doc}
 %license LICENSE AUTHORS

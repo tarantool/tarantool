@@ -1,4 +1,16 @@
-name: Setup emmylua_check on Linux
+name: Setup EmmyLua tools on Linux
+
+description: Install emmylua_check and, optionally, emmylua_doc_cli
+
+inputs:
+  doc-cli:
+    description: Also install emmylua_doc_cli
+    required: false
+    default: "false"
+  emmylua-version:
+    description: Version of the EmmyLua tools to install
+    required: false
+    default: "0.25.1"
 
 runs:
   using: composite
@@ -20,5 +32,10 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Setup emmylua_check
-      run: cargo install emmylua_check --version 0.25.1
+      run: cargo install emmylua_check --version ${{ inputs.emmylua-version }}
+      shell: bash
+
+    - name: Setup emmylua_doc_cli
+      if: inputs.doc-cli == 'true'
+      run: cargo install emmylua_doc_cli --version ${{ inputs.emmylua-version }}
       shell: bash
