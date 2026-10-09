@@ -712,6 +712,33 @@ if(ENABLE_BUNDLED_MIMALLOC)
     add_dependencies(build_bundled_libs bundled-mimalloc)
 endif()
 
+# MIMALLOC_OVERRIDE selects what is served by the bundled mimalloc:
+#   none - nothing, mimalloc is only built (e.g. for direct mi_* API users);
+#   cpp  - C++ operator new/delete; malloc/free stay on the system allocator.
+#
+if(ENABLE_BUNDLED_MIMALLOC)
+    set(MIMALLOC_OVERRIDE_DEFAULT cpp)
+else()
+    set(MIMALLOC_OVERRIDE_DEFAULT none)
+endif()
+set(MIMALLOC_OVERRIDE ${MIMALLOC_OVERRIDE_DEFAULT} CACHE STRING
+    "What is served by the bundled mimalloc: none or cpp")
+set_property(CACHE MIMALLOC_OVERRIDE PROPERTY STRINGS none cpp)
+if(NOT MIMALLOC_OVERRIDE MATCHES "^(none|cpp)$")
+    message(FATAL_ERROR "Invalid MIMALLOC_OVERRIDE value '${MIMALLOC_OVERRIDE}'"
+                        ": expected none or cpp")
+endif()
+if(NOT MIMALLOC_OVERRIDE STREQUAL "none")
+    if(NOT ENABLE_BUNDLED_MIMALLOC)
+        message(FATAL_ERROR "MIMALLOC_OVERRIDE=${MIMALLOC_OVERRIDE} requires "
+                            "ENABLE_BUNDLED_MIMALLOC")
+    endif()
+endif()
+set(MIMALLOC_OVERRIDE_CPP OFF)
+if(MIMALLOC_OVERRIDE STREQUAL "cpp")
+    set(MIMALLOC_OVERRIDE_CPP ON)
+endif()
+
 #
 # LuaJIT
 #
@@ -972,6 +999,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND
     ENABLE_BUNDLED_MIMALLOC
+    MIMALLOC_OVERRIDE
     ENABLE_FEEDBACK_DAEMON)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})
