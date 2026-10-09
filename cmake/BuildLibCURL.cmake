@@ -45,7 +45,6 @@ macro(curl_build)
 
     # Let's disable testing for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_TESTING=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_TEST_BUNDLES=OFF")
 
     # Let's disable building documentation for curl to save build time.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURL_MANUAL=OFF")
@@ -87,6 +86,10 @@ macro(curl_build)
     string(REPLACE ";" "$<SEMICOLON>" LIBCURL_FIND_ROOT_PATH_STR "${LIBCURL_FIND_ROOT_PATH}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${LIBCURL_FIND_ROOT_PATH_STR}")
 
+    # Look for c-ares and nghttp2 at the paths above, not at the ones given
+    # by pkg-config, which describes the packages installed on the host.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_PKGCONFIG=OFF")
+
     # On cmake CURL_USE_LIBSSH2 flag is enabled by default, we need to switch it
     # off to avoid of issues, like:
     #   ld: libssh2.c:(.text+0x4d8): undefined reference to `libssh2_*...
@@ -127,6 +130,8 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=ON")
+    # The curl tool isn't built, so no CA bundle is embedded into it.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_EMBED=")
 
     # Even though we set the external project's install dir
     # below, we still need to pass the corresponding install
@@ -155,7 +160,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DPICKY_COMPILER=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DBUILD_CURL_EXE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_BROTLI=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_GNUTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GNUTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_MBEDTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_WOLFSSL=OFF")
@@ -165,7 +169,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_GSASL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBIDN2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGTCP2=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_QUICHE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_OPENSSL_QUIC=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HTTP=OFF")
@@ -205,7 +208,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PARSEDATE=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROGRESS_METER=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_PROXY=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SHUFFLE_DNS=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SOCKETPAIR=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_VERBOSE_STRINGS=OFF")
@@ -249,6 +251,12 @@ macro(curl_build)
     # Disables headers-api support.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_HEADERS_API=OFF")
 
+    # macOS-specific features.
+    if(APPLE)
+        list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_SECTRANSP=OFF")
+        list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_APPLE_IDN=OFF")
+    endif()
+
     include(ExternalProject)
     ExternalProject_Add(
         bundled-libcurl-project
@@ -286,6 +294,21 @@ macro(curl_build)
         add_dependencies(bundled-libcurl-project bundled-nghttp2)
     endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
+
+    # NB: Requires the listed packages (and their headers) to be installed on
+    # the system. Also, requires the `tarantool` executable to be in `PATH`.
+    include(OptionCheck)
+    add_option_check(curl
+        SOURCE_DIR ${LIBCURL_SOURCE_DIR}
+        OPTIONS_FILE ${PROJECT_SOURCE_DIR}/cmake/BuildLibCURL.cmake
+        FLAGS ${LIBCURL_CMAKE_FLAGS}
+        INCLUDES GNUInstallDirs
+        PACKAGES OpenSSL ZLIB Perl Cares NGHTTP2
+        MODULE_PATH ${LIBCURL_SOURCE_DIR}/CMake
+        # curl's CMake script drops CURL_CA_BUNDLE and CURL_CA_PATH from the
+        # cache, which breaks our diagnostics: they are based on parsing the
+        # CMake cache.
+        IGNORED CURL_CA_BUNDLE CURL_CA_PATH)
 
     # Setup CURL_INCLUDE_DIRS & CURL_LIBRARIES for global use.
     set(CURL_INCLUDE_DIRS ${LIBCURL_INSTALL_DIR}/include)

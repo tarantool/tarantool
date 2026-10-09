@@ -1,0 +1,93 @@
+name: optcheck
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/optcheck.yml'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'third_party/**'
+
+jobs:
+  optcheck:
+    # Skip in forks, run only for pull requests to the main repository.
+    if: github.repository_owner == 'tarantool'
+
+    # Run on Linux and macOS to catch platform-dependent options.
+    #
+    # Can't use ubuntu-26.04 due to a problem in setup-tarantool:
+    # https://github.com/tarantool/setup-tarantool/issues/65
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    timeout-minutes: 15
+
+    steps:
+      # Speeds up actions/checkout.
+      #
+      # https://github.com/actions/checkout/issues/945
+      - name: Parallelize submodules fetching
+        run: git config --global submodule.fetchJobs 8
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # A little speedup hack (for ubuntu runners).
+      - name: Disable man-db triggers
+        uses: ./.github/actions/disable-man-db-triggers
+
+      # `make optcheck` dependency: it is implemented as a Lua script.
+      - uses: tarantool/setup-tarantool@v4
+        with:
+          tarantool-version: '3'
+        if: runner.os == 'Linux'
+
+      # Configuring tarantool needs readline whatever the target, and it is the
+      # only build dependency GitHub-hosted runners lack.
+      #
+      # c-ares and nghttp2 are needed by `make optcheck` only.
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y \
+            libreadline-dev       \
+            libc-ares-dev         \
+            libnghttp2-dev
+        if: runner.os == 'Linux'
+
+      - name: Install tarantool and dependencies
+        run: |
+          brew install tarantool c-ares libnghttp2
+        if: runner.os == 'macOS'
+
+      - name: Configure
+        run: |
+          cmake -S . -B ~/build      \
+            -G Ninja                 \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: The check itself
+        run: |
+          cmake --build ~/build --target optcheck
+
+      # Ensure that optcheck actually reports a problem if it happens.
+      # Mangle the build options and verify that the error is reported.
+      - name: Negative self-test
+        run: |
+          # Mangle.
+          sed -i.orig s/CURL_ZSTD/CURL_ZSTX/ cmake/BuildLibCURL.cmake
+
+          # Run.
+          rc=0
+          cmake --build ~/build --target optcheck >out 2>&1 || rc=$?
+          cat out
+
+          # Verify.
+          [ $rc -gt 0 ]
+          grep -F -e '-CURL_ZSTX' out
+          grep -F -e '+CURL_ZSTD' out
+        # Both platforms are able to do the check, but Linux runners are faster.
+        if: runner.os == 'Linux'
