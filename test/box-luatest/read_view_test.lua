@@ -2986,7 +2986,7 @@ g_threads.test_reuse_error_after_acquire = function(cg)
     -- the read view is released in the main thread.
     t.tarantool.skip_if_not_debug()
     cg.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local rv = box.read_view.open()
         t.assert_equals(rv.status, 'open')
         box.error.injection.set('ERRINJ_READ_VIEW_HANDLE_NEW', true)
@@ -3011,7 +3011,7 @@ g_threads.test_close_pending = function(cg)
     -- closes it.
     cg.server:exec(function()
         local fun = require('fun')
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local rv = box.read_view.open()
         threads.eval('app', [[
             rawset(_G, 'test_rv', box.read_view.open({id = ...}))
@@ -3095,7 +3095,7 @@ end
 
 g_threads.after_test('test_close_pending', function(cg)
     cg.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         threads.eval('app', [[rawset(_G, 'test_rv', nil)]], {},
                      {target = 'all'})
     end)
@@ -3105,7 +3105,7 @@ g_threads.test_gc = function(cg)
     -- Check that read view handles closed by the garbage collector release
     -- the backing read view in the main thread.
     local rv_id, rv_name = cg.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local rv = box.read_view.open({name = 'test_gc_in_threads'})
         threads.eval('app', [[box.read_view.open({id = ...})]], {rv.id})
         rv:close()
@@ -3125,7 +3125,7 @@ end
 
 g_threads.test_data_access = function(cg)
     cg.server:exec(function()
-        local threads = require('experimental.threads')
+        local threads = require('threads')
         local s = box.schema.space.create('test', {
             format = {{'a', 'unsigned'}, {'b', 'string'}},
         })

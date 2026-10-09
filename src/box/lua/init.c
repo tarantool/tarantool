@@ -237,7 +237,7 @@ static const char * const lua_sources_minimal[] = {
 	"box/iproto", "iproto", iproto_lua,
 	"box/net_box", "net.box", net_box_lua,
 	"box/net_replicaset", "internal.net.replicaset", net_replicaset_lua,
-	"box/app_threads", "experimental.threads", app_threads_lua,
+	"box/app_threads", "threads", app_threads_lua,
 	"box/recovery_point_manager", NULL, recovery_point_manager_lua,
 	"box/read_view", NULL, read_view_lua,
 	/*
@@ -1110,6 +1110,8 @@ box_lua_init_minimal(struct lua_State *L)
 	lua_pop(L, 1);
 
 	load_lua_sources(L, lua_sources_minimal);
+
+	luaT_module_alias(L, "threads", "experimental.threads");
 
 	assert(lua_gettop(L) == 0);
 }

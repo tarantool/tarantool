@@ -554,6 +554,16 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 	return 0;
 }
 
+void
+luaT_module_alias(struct lua_State *L, const char *modname,
+		  const char *alias)
+{
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	lua_getfield(L, -1, modname);
+	lua_setfield(L, -2, alias);
+	lua_pop(L, 1);
+}
+
 const char *
 luaL_tolstring_strict(struct lua_State *L, int idx, size_t *len_ptr)
 {

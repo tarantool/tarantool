@@ -2,7 +2,7 @@ local fun = require('fun')
 local utils = require('internal.utils')
 
 local fiber = require('fiber')
-local threads = require('experimental.threads')
+local threads = require('threads')
 
 local check_index_arg = box.internal.check_index_arg
 local check_param = utils.check_param

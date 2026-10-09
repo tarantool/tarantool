@@ -374,6 +374,18 @@ int
 luaT_setmodule(struct lua_State *L, const char *modname);
 
 /**
+ * Creates an alias for a built-in tarantool module.
+ *
+ * Pseudocode:
+ *  | local function module_alias(modname, alias)
+ *  |     loaders.builtin[alias] = loaders.builtin[modname]
+ *  | end
+ */
+void
+luaT_module_alias(struct lua_State *L, const char *modname,
+		  const char *alias);
+
+/**
  * Extract a string from the Lua stack.
  *
  * Return (const char *) for a string, otherwise return NULL.
