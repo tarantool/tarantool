@@ -661,6 +661,8 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * of tuples in the trigger.
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
+	if (request->type == IPROTO_NOP)
+		stmt->type = IPROTO_NOP;
 
 	/*
 	 * Create WAL record for the write requests in
