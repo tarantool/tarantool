@@ -134,6 +134,22 @@ alloc_failure(const char *filename, int line, size_t size)
 #define xrealloc(ptr, size)	xalloc_impl((size), realloc, (ptr), (size))
 #define xstrdup(s)		xalloc_impl(strlen((s)) + 1, strdup, (s))
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
+
+/**
+ * Realloc callback that frees the block and returns NULL for a zero size.
+ * Allocation failures are returned to the caller instead of aborting.
+ * Unlike glibc, Darwin's realloc(ptr, 0) returns a new allocation.
+ */
+static inline void *
+realloc_with_free(void *ptr, size_t size)
+{
+	if (size == 0) {
+		free(ptr);
+		return NULL;
+	}
+	return (realloc)(ptr, size);
+}
+
 #define xaligned_alloc(size, align) \
 		xalloc_impl((size), aligned_alloc, (align), (size))
 #define xalloc_object(T) ({							\
