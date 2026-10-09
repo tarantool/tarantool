@@ -43,6 +43,7 @@
 #include "box.h"
 #include "base64.h"
 #include "scoped_guard.h"
+#include "memory.h"
 
 struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 

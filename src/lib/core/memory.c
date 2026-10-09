@@ -29,7 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "memory.h"
+
+#include "fiber.h"
 #include "small/quota.h"
+#include "small/small.h"
 
 struct slab_arena runtime;
 
@@ -44,6 +47,34 @@ memory_init(void)
 	/* No limit on the runtime memory. */
 	slab_arena_create(&runtime, &runtime_quota, 0,
 			  SLAB_SIZE, SLAB_ARENA_PRIVATE);
+}
+
+void *
+runtime_memory_alloc(size_t size)
+{
+	return smalloc(&cord()->small, size);
+}
+
+void
+runtime_memory_free(void *ptr, size_t size)
+{
+	smfree(&cord()->small, ptr, size);
+}
+
+static int
+small_stats_noop_cb(const void *stats, void *cb_ctx)
+{
+	(void)stats;
+	(void)cb_ctx;
+	return 0;
+}
+
+size_t
+runtime_memory_used(void)
+{
+	struct small_stats data_stats;
+	small_stats(&cord()->small, &data_stats, small_stats_noop_cb, NULL);
+	return data_stats.used;
 }
 
 void
