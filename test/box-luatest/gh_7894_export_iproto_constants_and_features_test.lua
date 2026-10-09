@@ -95,6 +95,7 @@ local reference_table = {
         IS_CHECKPOINT_JOIN = 0x62,
         CHECKPOINT_VCLOCK = 0x63,
         CHECKPOINT_LSN = 0x64,
+        AUDIT_CONTEXT = 0x65,
     },
 
     -- `iproto_metadata_key` enumeration.

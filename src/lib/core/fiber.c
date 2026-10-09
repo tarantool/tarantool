@@ -49,6 +49,13 @@
 
 extern void cord_on_yield(void);
 
+/** Mustn't return NULL. */
+extern void *
+fiber_alloc_data(size_t size);
+
+extern void
+fiber_free_data(void *data, size_t size);
+
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
 
 /**
@@ -595,6 +602,38 @@ fiber_get_ctx(struct fiber *f)
 }
 
 void
+fiber_set_audit_context(struct fiber *f, const char *ctx, size_t size)
+{
+	assert(f != NULL);
+	char *copy = NULL;
+	if (ctx != NULL) {
+		copy = fiber_alloc_data(size + 1);
+		memcpy(copy, ctx, size);
+		copy[size] = '\0';
+	}
+	fiber_move_audit_context(f, copy, size);
+}
+
+void
+fiber_move_audit_context(struct fiber *f, char *ctx, size_t size)
+{
+	if (f->storage.audit_context != NULL)
+		fiber_free_data(f->storage.audit_context,
+				f->storage.audit_context_len + 1);
+	f->storage.audit_context = ctx;
+	f->storage.audit_context_len = size;
+}
+
+const char *
+fiber_get_audit_context(struct fiber *f, size_t *size)
+{
+	assert(f != NULL);
+	if (size != NULL)
+		*size = f->storage.audit_context_len;
+	return f->storage.audit_context;
+}
+
+void
 fiber_wakeup(struct fiber *f)
 {
 	/*
@@ -1036,6 +1075,7 @@ fiber_reset(struct fiber *fiber)
 	rlist_create(&fiber->on_stop);
 	rlist_create(&fiber->on_destroy);
 	clock_stat_reset(&fiber->clock_stat);
+	fiber_set_audit_context(fiber, NULL, 0);
 }
 
 /** Destroy an active fiber and prepare it for reuse or delete it. */
@@ -1572,6 +1612,13 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 	fiber->flags = fiber_attr->flags;
 	fiber->f = f;
+	struct fiber *creator = fiber();
+	if (creator != NULL && !(fiber->flags & FIBER_IS_SYSTEM)) {
+		size_t size;
+		const char *ctx = fiber_get_audit_context(creator, &size);
+		if (ctx != NULL)
+			fiber_set_audit_context(fiber, ctx, size);
+	}
 	fiber->fid = cord->next_fid;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
@@ -1616,6 +1663,7 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	rlist_del(&f->state);
 	rlist_del(&f->link);
 	rlist_del(&f->wake);
+	fiber_set_audit_context(f, NULL, 0);
 #ifdef ENABLE_BACKTRACE
 	region_set_callbacks(&f->gc, NULL, NULL, NULL);
 #endif
@@ -1817,6 +1865,14 @@ cord_create(struct cord *cord, const char *name)
 	slab_cache_create(&cord->slabc, &runtime);
 	mempool_create(&cord->fiber_mempool, &cord->slabc,
 		       sizeof(struct fiber));
+
+	const int RUNTIME_OBJSIZE_MIN = 16;
+	const double RUNTIME_ALLOC_FACTOR = 1.05;
+	float actual_alloc_factor;
+	small_alloc_create(
+		&cord->runtime_alloc, &cord()->slabc, RUNTIME_OBJSIZE_MIN,
+		sizeof(intptr_t), RUNTIME_ALLOC_FACTOR, &actual_alloc_factor);
+
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
 	rlist_create(&cord->dead);
@@ -1824,6 +1880,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i64ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
+	memset(&cord->sched, 0, sizeof(cord->sched));
 	rlist_create(&cord->sched.state);
 	rlist_create(&cord->sched.link);
 	rlist_create(&cord->sched.wake);
@@ -1925,6 +1982,7 @@ cord_destroy(struct cord *cord)
 	cord->sched.stack_size = 0;
 #endif
 	fiber_destroy(cord, &cord->sched);
+	small_alloc_destroy(&cord->runtime_alloc);
 	slab_cache_destroy(&cord->slabc);
 }
 
@@ -2341,6 +2399,7 @@ fiber_shutdown(double timeout)
 		if (!(fiber->flags & FIBER_IS_SYSTEM) ||
 		    (fiber->flags & FIBER_MANAGED_SHUTDOWN))
 			fiber_cancel(fiber);
+		fiber_set_audit_context(fiber, NULL, 0);
 	}
 	cord()->shutdown_fiber = fiber();
 	double deadline = ev_monotonic_now(loop()) + timeout;

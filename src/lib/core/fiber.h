@@ -42,6 +42,7 @@
 #include "small/mempool.h"
 #include "small/region.h"
 #include "small/rlist.h"
+#include "small/small.h"
 #include "salad/stailq.h"
 #include "clock_lowres.h"
 #include "backtrace.h"
@@ -578,6 +579,29 @@ box_region_truncate(size_t size);
 /** \endcond public */
 
 /**
+ * Set the audit context propagated to all child fibers and IPROTO
+ * requests spawned by the fiber. The context is copied, any previously set
+ * context is released. Pass NULL to reset the context.
+ */
+void
+fiber_set_audit_context(struct fiber *f, const char *ctx, size_t size);
+
+/**
+ * The same as `fiber_set_audit_context` but takes ownership of context.
+ * NB: must be used the same allocator as in `fiber_alloc_data`. Must be
+ *     a zero-terminated string.
+ */
+void
+fiber_move_audit_context(struct fiber *f, char *ctx, size_t size);
+
+/**
+ * Get the audit context of the fiber, if any. Returns zero-terminated string.
+ * Output parameter `size` can be NULL.
+ */
+const char *
+fiber_get_audit_context(struct fiber *f, size_t *size);
+
+/**
  * Fiber attribute container
  */
 struct fiber_attr {
@@ -762,6 +786,15 @@ struct fiber {
 		struct {
 			uint64_t sync;
 		} net;
+		/**
+		 * Zero-terminated string audit context, if any.
+		 * Is propagated to all child fibers and IPROTO requests
+		 * spawned while this fiber is running.
+		 */
+		char *audit_context;
+		/** Length of `audit_context`. */
+		size_t audit_context_len;
+
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;
@@ -849,6 +882,8 @@ struct cord {
 	struct mempool fiber_mempool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
+	/** An allocator for runtime data in this cord. */
+	struct small_alloc runtime_alloc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
 	/**

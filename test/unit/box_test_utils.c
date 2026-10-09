@@ -1,5 +1,7 @@
 #include <limits.h>
 
+#include "trivia/util.h"
+
 /*
  * The definition of function set_sigint_cb is needed to avoid the error
  * while linking. This occurs because libbox.a contains the unresolved
@@ -26,3 +28,17 @@ tarantool_uptime(void) { return 0; }
 
 void
 load_cfg(void) {}
+
+/** For some tests, linker doesn't take this symbol from box as unneeded. */
+__attribute__((weak)) void *
+fiber_alloc_data(size_t size)
+{
+	return xmalloc(size);
+}
+
+__attribute__((weak)) void
+fiber_free_data(void *data, size_t size)
+{
+	(void)size;
+	return free(data);
+}

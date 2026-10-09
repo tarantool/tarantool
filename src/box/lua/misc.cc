@@ -533,6 +533,31 @@ lbox_is_bootstrap_leader(struct lua_State *L)
 	return 1;
 }
 
+/** Internal method for testing IPROTO_AUDIT_CONTEXT in Tarantool CE. */
+static int
+lbox_set_audit_context(struct lua_State *L)
+{
+	const char *ctx = NULL;
+	size_t len = 0;
+	if (lua_gettop(L) > 0 && lua_type(L, 1) == LUA_TSTRING) {
+		ctx = lua_tolstring(L, 1, &len);
+	}
+	fiber_set_audit_context(fiber(), ctx, len);
+	return 0;
+}
+
+/** Internal method for testing IPROTO_AUDIT_CONTEXT in Tarantool CE. */
+static int
+lbox_get_audit_context(struct lua_State *L)
+{
+	size_t len;
+	const char *ctx = fiber_get_audit_context(fiber(), &len);
+	if (ctx == NULL)
+		return 0;
+	lua_pushlstring(L, ctx, len);
+	return 1;
+}
+
 void
 box_lua_misc_init(struct lua_State *L)
 {
@@ -544,6 +569,8 @@ box_lua_misc_init(struct lua_State *L)
 		{"generate_func_id", lbox_generate_func_id},
 		{"memtx_tx_gc", lbox_memtx_tx_gc},
 		{"is_bootstrap_leader", lbox_is_bootstrap_leader},
+		{"set_audit_context", lbox_set_audit_context},
+		{"get_audit_context", lbox_get_audit_context},
 		{NULL, NULL}
 	};
 
