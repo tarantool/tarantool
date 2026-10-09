@@ -900,13 +900,11 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 
 	struct tuple *old_tuple;
 	for (uint32_t i = 0; i < index_count; i++) {
-		struct tuple *unused;
 		struct index *index = space->index[i];
 		memtx_tuple_list_foreach_or_null(old_tuples, old_tuple, {
 			/* Rollback must not fail. */
-			if (memtx_index_replace(index, new_tuple,
-						old_tuple, DUP_INSERT,
-						&unused, &unused) != 0) {
+			if (memtx_index_replace(index, new_tuple, old_tuple,
+						DUP_INSERT, NULL) != 0) {
 				diag_log();
 				unreachable();
 				panic("failed to rollback change");
@@ -2554,12 +2552,12 @@ memtx_prepare_result_tuple(struct space *space, struct tuple **result)
 }
 
 int
-memtx_prepare_read_view_tuple(struct tuple *tuple,
+memtx_prepare_read_view_tuple(struct memtx_index_entry entry,
 			      struct index_read_view *index,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
 			      struct read_view_tuple *result)
 {
-	tuple = memtx_tx_snapshot_clarify(cleaner, tuple);
+	struct tuple *tuple = memtx_tx_snapshot_clarify(cleaner, entry);
 	if (tuple == NULL) {
 		*result = read_view_tuple_none();
 		return 0;

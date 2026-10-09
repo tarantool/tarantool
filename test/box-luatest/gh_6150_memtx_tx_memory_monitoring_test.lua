@@ -7,13 +7,19 @@ local g = t.group()
 -- Please update them, if you changed the relevant structures.
 local SIZE_OF_STMT = 136
 -- Size of story with one link (for spaces with 1 index).
-local SIZE_OF_STORY = 152
+local SIZE_OF_STORY = 216
+-- Size of the links of each additional index in a story.
+local SIZE_OF_STORY_INDEX_LINKS = 96
+-- Size of an additional (not inline) story link of a multikey index.
+local SIZE_OF_STORY_LINK = 80
 -- Size of a deleted story list entry.
 local SIZE_OF_DEL_STORY_LINK = 24
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
 local SIZE_OF_XROW = 163
+-- Size of xrow for tuples with a number field and a 3-number array field
+local SIZE_OF_MULTIKEY_XROW = 166
 -- Size of rollback info.
 local SIZE_OF_UNDO = 16
 -- Tracker can allocate additional memory, be careful!
@@ -240,6 +246,97 @@ g.test_simple = function()
     }
     tx_gc(g.server, 100, diff)
     t.assert(table_values_are_zeros(current_stat))
+end
+
+local function test_multikey(index_opts)
+    g.server:exec(function(index_opts)
+        box.space.test:create_index('mk', index_opts)
+    end, {index_opts})
+    g.server:eval('box.internal.memtx_tx_gc(100)')
+    current_stat = g.server:eval('return box.stat.memtx.tx()')
+    t.assert(table_values_are_zeros(current_stat))
+    g.server:eval('tx1 = txn_proxy.new()')
+    g.server:eval('tx1:begin()')
+    -- The story has an inline link for the first entry of each index, the
+    -- other two multikey entries get separately allocated links.
+    local size_of_story = SIZE_OF_STORY + SIZE_OF_STORY_INDEX_LINKS +
+                          2 * SIZE_OF_STORY_LINK
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = SIZE_OF_STMT,
+                ["avg"] = SIZE_OF_STMT,
+                ["max"] = SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+                ["avg"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+                ["max"] = SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO,
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = size_of_story,
+                        ["count"] = 1,
+                    }
+                }
+            }
+        }
+    }
+    tx_step(g.server, 'tx1', "s:replace{1, {1, 2, 3}}", diff)
+    t.assert_equals(g.server:eval('return tx1:commit()'), '')
+    diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["total"] = -1 * SIZE_OF_STMT,
+                ["avg"] = -1 * SIZE_OF_STMT,
+                ["max"] = -1 * SIZE_OF_STMT,
+            },
+            ["system"] = {
+                ["total"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+                ["avg"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+                ["max"] = -1 * (SIZE_OF_MULTIKEY_XROW + SIZE_OF_UNDO),
+            }
+        },
+        ["mvcc"] = {
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = -1 * size_of_story,
+                        ["count"] = -1,
+                    }
+                }
+            }
+        }
+    }
+    tx_gc(g.server, 100, diff)
+    t.assert(table_values_are_zeros(current_stat))
+end
+
+g.test_multikey = function()
+    test_multikey({parts = {{field = 2, path = '[*]'}}, unique = false})
+end
+
+g.test_func_multikey = function()
+    g.server:exec(function()
+        box.schema.func.create('f', {
+            body = [[
+                function(tuple)
+                    local keys = {}
+                    for _, k in ipairs(tuple[2]) do
+                        table.insert(keys, {k})
+                    end
+                    return keys
+                end
+            ]],
+            is_deterministic = true,
+            is_sandboxed = true,
+            opts = {is_multikey = true},
+        })
+    end)
+    test_multikey({parts = {{1, 'unsigned'}}, func = 'f', unique = false})
 end
 
 g.test_read_view = function()
