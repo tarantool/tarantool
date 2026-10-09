@@ -449,6 +449,8 @@ struct errcode_record {
 	_(ER_NO_SUCH_THREAD_GROUP, 302,		"Thread group does not exist", "thread_group", STRING) \
 	_(ER_XLOG_NOT_FOUND, 303,		"xlog file not found", "vclock", STRING) \
 	_(ER_RECOVERY_POINT_TXN_LAST_ROW, 304,	"Last row of recovery point transaction should not be local") \
+	/* ER_NO_SUCH_READ_VIEW , 305, Unused */ \
+	_(ER_READ_VIEW_THROTTLED, 306,		"Read view creation is throttled, try again later") \
 	TEST_ERROR_CODES(_) /** This one should be last. */
 
 /*
