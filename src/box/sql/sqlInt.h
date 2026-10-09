@@ -195,6 +195,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+struct sql_bind;
 typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
@@ -287,7 +288,7 @@ sql_vsnprintf(int, char *, const char *, va_list);
 
 /** Compile the UTF-8 encoded SQL statement into a statement handle. */
 struct Vdbe *
-sql_stmt_compile(const char *sql, struct Vdbe *re_prepared);
+sql_stmt_compile(const char *sql);
 
 /** This is the top-level implementation of sqlStep(). */
 int
@@ -432,10 +433,6 @@ const char *
 sql_uri_parameter(const char *zFilename,
 		      const char *zParam);
 
-/** Return the query associated with a prepared statement */
-const char *
-sql_sql(struct Vdbe *v);
-
 int
 sql_vfs_register(sql_vfs *, int makeDflt);
 
@@ -448,6 +445,11 @@ sql_vfs_register(sql_vfs *, int makeDflt);
 void
 sql_unbind(struct Vdbe *stmt);
 
+/** Set bind parameters in vdbe. */
+void
+sql_set_bind_vdbe(struct Vdbe *v, uint32_t bind_count,
+		  const struct sql_bind *bind);
+
 /**
  * Reset the list of identifiers generated during the auto-increment of this
  * prepared statement.
@@ -455,68 +457,29 @@ sql_unbind(struct Vdbe *stmt);
 void
 sql_reset_autoinc_id_list(struct Vdbe *stmt);
 
-/** Perform double parameter binding for the sql statement. */
-int
-sql_bind_double(struct Vdbe *v, int i, double value);
-
 /**
- * Perform boolean parameter binding for the prepared sql
- * statement.
- * @param v Prepared statement.
- * @param i Index of the variable to be binded.
- * @param value Boolean value to use.
- * @retval 0 On Success, not 0 otherwise.
+ * This function sets type for bound variable.
+ * We should bind types only for variables which occur in
+ * result set of SELECT query. For example:
+ *
+ * SELECT id, ?, ?, a WHERE id = ?;
+ *
+ * In this case we should set types only for two variables.
+ * That one which is situated under WHERE condition - is out
+ * of our interest.
+ *
+ * For named binding parameters we should propagate type
+ * for all occurrences of this parameter - since binding
+ * routine takes place only once for each DISTINCT parameter
+ * from list.
+ *
+ * @param v Current VDBE.
+ * @param position Ordinal position of binding parameter.
+ * @param type String literal representing type of binding param.
+ * @retval 0 on success.
  */
 int
-sql_bind_boolean(struct Vdbe *v, int i, bool value);
-
-/** Perform integer parameter binding for the sql statement. */
-int
-sql_bind_int(struct Vdbe *v, int i, int value);
-
-/** Perform 64-bit negative integer parameter binding for the sql statement. */
-int
-sql_bind_int64(struct Vdbe *v, int i, int64_t value);
-
-/** Perform 64-bit unsigned integer parameter binding for the sql statement. */
-int
-sql_bind_uint64(struct Vdbe *v, int i, uint64_t value);
-
-/** Perform NULL parameter binding for the sql statement. */
-int
-sql_bind_null(struct Vdbe *v, int i);
-
-/** Perform string parameter binding for the sql statement. */
-int
-sql_bind_str_static(struct Vdbe *v, int i, const char *str, uint32_t len);
-
-/** Perform binary string parameter binding for the sql statement. */
-int
-sql_bind_bin_static(struct Vdbe *v, int i, const char *str, uint32_t size);
-
-/** Perform array parameter binding for the sql statement. */
-int
-sql_bind_array_static(struct Vdbe *v, int i, const char *str, uint32_t size);
-
-/** Perform map parameter binding for the sql statement. */
-int
-sql_bind_map_static(struct Vdbe *v, int i, const char *str, uint32_t size);
-
-/** Perform UUID parameter binding for the sql statement. */
-int
-sql_bind_uuid(struct Vdbe *v, int i, const struct tt_uuid *uuid);
-
-/** Perform decimal parameter binding for the sql statement. */
-int
-sql_bind_dec(struct Vdbe *v, int i, const decimal_t *dec);
-
-/** Perform DATETIME parameter binding for the sql statement. */
-int
-sql_bind_datetime(struct Vdbe *v, int i, const struct datetime *dt);
-
-/** Perform INTERVAL parameter binding for the SQL statement. */
-int
-sql_bind_interval(struct Vdbe *v, int i, const struct interval *itv);
+sql_bind_type(struct Vdbe *v, uint32_t position, const char *type);
 
 /**
  * Return the number of wildcards that should be bound to.
@@ -1258,6 +1221,12 @@ struct Expr {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
 		int iValue;	/* Non-negative integer value if EP_IntValue */
 	} u;
+	/**
+	 * Position in PVList of last name before anonymous variables (?).
+	 * If it takes the value 0 then there is no named variable before or
+	 * then the last variable was numeric ($N).
+	 */
+	int var_base;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
 	 * space is allocated for the fields below this point. An attempt to
@@ -1890,13 +1859,24 @@ struct Parse {
 		int lru;	/* Least recently used entry has the smallest value */
 	} aColCache[SQL_N_COLCACHE];	/* One for each column cache entry */
 	int aTempReg[8];	/* Holding area for temporary registers */
-	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
+	/** Number of parameters reported in the statement's bind metadata. */
+	ynVar nVar;
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
 	int iSelectId;		/* ID of current select for EXPLAIN output */
 	int iNextSelectId;	/* Next available select ID for EXPLAIN output */
 	VList *pVList;		/* Mapping between variable names and numbers */
-	Vdbe *pReprepare;	/* VM being reprepared (sqlReprepare()) */
+	/** Information about last name before anonymous variables (?). */
+	struct {
+		/**
+		 * Relative position of the next anonymous variable (?):
+		 * an offset from the variable `name` when it is set,
+		 * otherwise an absolute position.
+		 */
+		int offset;
+		/** Position of last named variable. */
+		int pos;
+	} var;
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
@@ -4235,12 +4215,6 @@ int sqlParserStackPeak(void *);
 #endif
 
 int sqlVdbeParameterIndex(Vdbe *, const char *, int);
-
-/** Transfer all bindings from the first statement over to the second. */
-int
-sqlTransferBindings(struct Vdbe *from, struct Vdbe *to);
-
-int sqlReprepare(Vdbe *);
 
 /**
  * This function verifies that two collations (to be more precise

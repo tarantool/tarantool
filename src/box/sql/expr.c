@@ -1168,23 +1168,24 @@ sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
  * Assign a variable number to an expression that encodes a
  * wildcard in the original SQL statement.
  *
- * Wildcards consisting of a single "?" are assigned the next
- * sequential variable number.
+ * Wildcards consisting of a single "?" character are assigned
+ * an offset from the preceding named variable; if no named variables
+ * have appeared yet, the next sequential variable number is assigned.
  *
  * Wildcards of the form "$nnn" are assigned the number "nnn".
  * We make sure "nnn" is not too big to avoid a denial of service
  * attack when the SQL statement comes from an external source.
  *
- * Wildcards of the form ":aaa", "@aaa", are assigned the same
- * number as the previous instance of the same wildcard.  Or if
- * this is the first instance of the wildcard, the next sequential variable
- * number is assigned.
+ * Patterns of the form ":aaa" or "@aaa" are assigned the number 0.
+ * Their actual position is calculated at runtime as the position
+ * of the actual parameter with the matching name.
  */
 void
 sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 {
 	const char *z;
 	ynVar x;
+	ynVar num;
 
 	if (pExpr == 0)
 		return;
@@ -1197,7 +1198,17 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	if (z[1] == 0) {
 		/* Wildcard of the form "?".  Assign the next variable number */
 		assert(z[0] == '?');
-		x = (ynVar) (++pParse->nVar);
+		x = pParse->var.offset;
+		int nVar = x;
+		if (pParse->var.pos != 0) {
+			nVar += pParse->var.pos;
+			pExpr->var_base = pParse->var.pos;
+		} else {
+			pExpr->var_base = 0;
+		}
+		if (nVar > pParse->nVar)
+			pParse->nVar = nVar;
+		pParse->var.offset++;
 	} else {
 		int doAdd = 0;
 		assert(z[0] != '?');
@@ -1224,26 +1235,34 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 				pParse->is_aborted = true;
 				return;
 			}
-			if (x > pParse->nVar) {
-				pParse->nVar = (int)x;
+			pParse->var.pos = 0;
+			pParse->var.offset = x + 1;
+			if (x > pParse->nVar)
+				pParse->nVar = x;
+			num = sqlVListNameToNum(pParse->pVList, z, n);
+			if (num == 0) {
 				doAdd = 1;
-			} else if (sqlVListNumToName(pParse->pVList, x) ==
-				   0) {
-				doAdd = 1;
+				num = x;
 			}
 		} else {
 			/* Wildcards like ":aaa", or "@aaa".  Reuse the same variable
 			 * number as the prior appearance of the same name, or if the name
 			 * has never appeared before, reuse the same variable number
 			 */
-			x = (ynVar) sqlVListNameToNum(pParse->pVList, z, n);
-			if (x == 0) {
-				x = (ynVar) (++pParse->nVar);
+			num = sqlVListNameToNum(pParse->pVList, z, n);
+			if (num == 0) {
+				pParse->nVar++;
+				num = pParse->nVar;
 				doAdd = 1;
 			}
+			x = (ynVar)0;
+			pParse->var.offset = 1;
+			pParse->var.pos = num;
+			pExpr->var_base = num;
 		}
 		if (doAdd) {
-			pParse->pVList = sqlVListAdd(pParse->pVList, z, n, x);
+			pParse->pVList = sqlVListAdd(pParse->pVList,
+						     z, n, num);
 		}
 	}
 	pExpr->iColumn = x;
@@ -3656,28 +3675,24 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			return target;
 		}
 	case TK_VAR_NUM:
-	case TK_VAR_NAME: {
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
+	case TK_VAR_NAME:
+	case TK_VAR_ANON:
+			assert(pExpr->u.zToken[0] == '?' ||
+			       !ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
-			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
-					  target);
-			assert(pExpr->u.zToken[1] != 0);
-			const char *z = sqlVListNumToName(pParse->pVList,
-							  pExpr->iColumn);
-			assert(pExpr->u.zToken[0] == '$' ||
-			       strcmp(pExpr->u.zToken, z) == 0);
-			/* Indicate VList may no longer be enlarged */
-			pParse->pVList[0] = 0;
-			sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn, target);
+			assert(pExpr->u.zToken[1] != 0 || op == TK_VAR_ANON);
+			if (pExpr->var_base != 0) {
+				const char *z =
+					sqlVListNumToName(pParse->pVList,
+							  pExpr->var_base);
+				assert(z != NULL);
+				/* Indicate VList may no longer be enlarged */
+				pParse->pVList[0] = 0;
+				sqlVdbeAppendP4(v, (char *)z, P4_STATIC);
+			}
 			return target;
-		}
-	case TK_VAR_ANON: {
-			assert(pExpr->u.zToken[0] == '?');
-			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
-				      target);
-			return target;
-		}
 	case TK_REGISTER:{
 			return pExpr->iTable;
 		}
@@ -4875,7 +4890,8 @@ sqlExprCompare(Expr * pA, Expr * pB, int iTab)
 			return 2;
 		if (ALWAYS((combinedFlags & EP_Reduced) == 0)
 		    && pA->op != TK_STRING) {
-			if (pA->iColumn != pB->iColumn)
+			if (pA->iColumn != pB->iColumn ||
+			    pA->var_base != pB->var_base)
 				return 2;
 			if (pA->iTable != pB->iTable
 			    && (pA->iTable != iTab || NEVER(pB->iTable >= 0)))

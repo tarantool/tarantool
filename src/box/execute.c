@@ -124,7 +124,7 @@ static int
 sql_reprepare(struct Vdbe **stmt)
 {
 	const char *sql_str = sql_stmt_query_str(*stmt);
-	struct Vdbe *new_stmt = sql_stmt_compile(sql_str, NULL);
+	struct Vdbe *new_stmt = sql_stmt_compile(sql_str);
 	if (new_stmt == NULL)
 		return -1;
 	sql_stmt_set_id(new_stmt, sql_stmt_get_id(*stmt));
@@ -164,7 +164,7 @@ sql_prepare(const char *sql, size_t len, struct port *port)
 	}
 	if (stmt == NULL) {
 		char *sql_str = xstrndup(sql, len);
-		stmt = sql_stmt_compile(sql_str, NULL);
+		stmt = sql_stmt_compile(sql_str);
 		free(sql_str);
 		if (stmt == NULL)
 			return -1;
@@ -277,6 +277,7 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					       DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, false);
+	sql_set_bind_vdbe(stmt, bind_count, bind);
 	if (sql_execute(stmt, port, region) != 0) {
 		port_destroy(port);
 		sql_stmt_reset(stmt);
@@ -293,13 +294,14 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			struct region *region)
 {
 	char *sql_str = xstrndup(sql, len);
-	struct Vdbe *stmt = sql_stmt_compile(sql_str, NULL);
+	struct Vdbe *stmt = sql_stmt_compile(sql_str);
 	free(sql_str);
 	if (stmt == NULL)
 		return -1;
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					   DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, true);
+	sql_set_bind_vdbe(stmt, bind_count, bind);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
 	    sql_execute(stmt, port, region) == 0)
 		return 0;
