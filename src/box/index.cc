@@ -114,6 +114,7 @@ iterator_validate(struct index_def *index_def, enum iterator_type type,
 		return -1;
 	}
 	if ((type == ITER_NP || type == ITER_PP) && part_count > 0 &&
+	    part_count <= index_def->key_def->part_count &&
 	    index_def->key_def->parts[part_count - 1].coll != NULL) {
 		diag_set(UnsupportedIndexFeature, index_def,
 			 "requested iterator type along with collation");
