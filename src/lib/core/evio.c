@@ -205,7 +205,7 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 		struct iostream io;
 		if (iostream_create(&io, fd, &entry->io_ctx) != 0)
 			break;
-		entry->service->on_accept(entry->service, &io,
+		entry->service->on_accept(entry->service, &entry->uri, &io,
 					  (struct sockaddr *)&addr, addrlen);
 		/* Must be moved by the callback. */
 		assert(!iostream_is_initialized(&io));
@@ -542,6 +542,18 @@ evio_service_addr(const struct evio_service *service, int idx, socklen_t *size)
 		}
 	}
 	unreachable();
+}
+
+bool
+evio_service_check_contains_uri(const struct evio_service *service,
+				const struct uri *uri)
+{
+	struct evio_service_entry *entry;
+	rlist_foreach_entry(entry, &service->entries, link) {
+		if (uri_is_equal(&entry->uri, uri))
+			return true;
+	}
+	return false;
 }
 
 void

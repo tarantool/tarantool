@@ -211,6 +211,14 @@ int
 iproto_drop_connections(double timeout);
 
 /**
+ * The same is iproto_drop_connections, but if drop_old_connections is set,
+ * only the connections that correspond to the uris that are not being
+ * listened will be dropped.
+ */
+int
+iproto_drop_connections_ex(double timeout, bool drop_old_connections);
+
+/**
  * Prepare for freeing resources in iproto_free while TX event loop is still
  * running.
  *

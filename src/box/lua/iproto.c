@@ -242,6 +242,28 @@ lbox_iproto_drop_connections(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Same as lbox_iproto_drop_connections, but drop only the connections that
+ * correspond to the uris that are not being listened.
+ *
+ * Accepts a timeout (in seconds).
+ *
+ * Returns nothing on success, raises an error on a failure.
+ */
+static int
+lbox_iproto_drop_old_connections(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args != 1 || lua_type(L, 1) != LUA_TNUMBER)
+		return luaL_error(L, "Usage: box.iproto.internal."
+				  "drop_old_connections(timeout)");
+	double timeout = lua_tonumber(L, 1);
+	int rc = iproto_drop_connections_ex(timeout, true);
+	if (rc < 0)
+		return luaT_error(L);
+	return 0;
+}
+
 /** Lua wrapper around iproto_register_func(). */
 static int
 lbox_iproto_register_func(struct lua_State *L)
@@ -630,6 +652,7 @@ box_lua_iproto_init(struct lua_State *L)
 	static const struct luaL_Reg internal_funcs_main[] = {
 		{"session_new", lbox_iproto_session_new},
 		{"drop_connections", lbox_iproto_drop_connections},
+		{"drop_old_connections", lbox_iproto_drop_old_connections},
 		{NULL, NULL}
 	};
 	static const struct luaL_Reg internal_funcs_common[] = {

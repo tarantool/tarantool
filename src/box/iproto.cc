@@ -460,6 +460,11 @@ struct iproto_cfg_msg: public cbus_call_msg
 			 * invocation
 			 */
 			unsigned generation;
+			/**
+			 * Drop only the connections with uri that is not
+			 * being listened.
+			 */
+			bool old_only;
 		} drop_connections;
 	};
 	struct iproto_thread *iproto_thread;
@@ -1029,6 +1034,11 @@ struct iproto_connection
 	 * accepted through iproto listening socket.
 	 */
 	bool is_internal;
+	/**
+	 * The uri the connection was accepted on. Valid only if the
+	 * connection is not internal.
+	 */
+	struct uri uri;
 	/**
 	 * Session idle timeout. Resolved by the TX thread at
 	 * connect/auth time (session_idle_timeout) and cached here so
@@ -1987,6 +1997,8 @@ iproto_connection_delete(struct iproto_connection *con)
 			iproto_send_drop_finished(iproto_thread,
 						  con->drop_generation);
 	}
+	if (!con->is_internal)
+		uri_destroy(&con->uri);
 	free(con->srv);
 	TRASH(con);
 	free(con);
@@ -3904,12 +3916,16 @@ static void
 iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 		     struct sockaddr *addr, socklen_t addrlen,
 		     struct session *session, const char *user_name,
-		     bool is_internal)
+		     bool is_internal, const struct uri *uri)
 {
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	struct cpipe *tx_pipe = &iproto_thread->srv[0].pipe;
 	struct iproto_msg *msg = iproto_msg_new(con);
 	con->is_internal = is_internal;
+	if (!is_internal) {
+		assert(uri != NULL);
+		uri_copy(&con->uri, uri);
+	}
 	assert(addrlen <= sizeof(msg->connect.addrstorage));
 	memcpy(&msg->connect.addrstorage, addr, addrlen);
 	msg->connect.addrlen = addrlen;
@@ -3928,14 +3944,15 @@ iproto_thread_accept(struct iproto_thread *iproto_thread, struct iostream *io,
 }
 
 static void
-iproto_on_accept_cb(struct evio_service *service, struct iostream *io,
+iproto_on_accept_cb(struct evio_service *service, const struct uri *uri,
+		    struct iostream *io,
 		    struct sockaddr *addr, socklen_t addrlen)
 {
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	iproto_thread_accept(iproto_thread, io, addr, addrlen,
 			     /*session=*/NULL, /*user_name=*/NULL,
-			     /*is_internal=*/false);
+			     /*is_internal=*/false, /*uri=*/uri);
 }
 
 /**
@@ -4619,7 +4636,8 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		if (sio_getpeername(io->fd, addr, &addrlen) != 0)
 			addrlen = 0;
 		iproto_thread_accept(iproto_thread, io, addr, addrlen,
-				     session, user_name, /*is_internal*/true);
+				     session, user_name, /*is_internal*/true,
+				     /*uri*/NULL);
 		free(user_name);
 		break;
 	}
@@ -4631,6 +4649,10 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			if (con->is_internal &&
 			    !iproto_thread->is_shutting_down)
 				continue;
+			bool drop_old =
+				!(cfg_msg->drop_connections.old_only &&
+				  evio_service_check_contains_uri(binary,
+								  &con->uri));
 			/*
 			 * Replication IO is done outside iproto so we
 			 * cannot close them as usual. Anyway we cancel
@@ -4645,19 +4667,21 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			 */
 			if (!con->is_in_replication &&
 			    con->state == IPROTO_CONNECTION_ALIVE &&
-			    con->is_established)
+			    con->is_established && drop_old)
 				iproto_connection_close(con);
 			/*
 			 * Do not wait deletion of connection that called
 			 * iproto_drop_connections to avoid deadlock.
 			 */
-			if (con != cfg_msg->drop_connections.owner) {
+			if (con != cfg_msg->drop_connections.owner &&
+			    drop_old) {
 				con->is_drop_pending = true;
 				con->drop_generation =
 					cfg_msg->drop_connections.generation;
 				iproto_thread->drop_pending_connection_count++;
 			}
-			if (con->state != IPROTO_CONNECTION_DESTROYED)
+			if (con->state != IPROTO_CONNECTION_DESTROYED &&
+			    drop_old)
 				iproto_send_cancel_inprogress(con);
 		}
 		if (iproto_thread->drop_pending_connection_count == 0)
@@ -4730,6 +4754,12 @@ iproto_send_start_msg(void)
 int
 iproto_drop_connections(double timeout)
 {
+	return iproto_drop_connections_ex(timeout, false);
+}
+
+int
+iproto_drop_connections_ex(double timeout, bool drop_old_connections)
+{
 	static struct latch latch = LATCH_INITIALIZER(latch);
 	latch_lock(&latch);
 	struct iproto_connection *owner = NULL;
@@ -4744,6 +4774,7 @@ iproto_drop_connections(double timeout)
 		iproto_cfg_msg_create(cfg_msg, IPROTO_CFG_DROP_CONNECTIONS);
 		cfg_msg->drop_connections.owner = owner;
 		cfg_msg->drop_connections.generation = drop_generation;
+		cfg_msg->drop_connections.old_only = drop_old_connections;
 		iproto_do_cfg_async(&iproto_threads[i], cfg_msg);
 	}
 
