@@ -67,6 +67,25 @@ g.test_next_prefix_collation_unsupported = function(cg)
     end)
 end
 
+-- A key with more parts than the index is rejected before the collation
+-- check reads the index key parts (gh-13286).
+g.test_next_prefix_too_many_parts = function(cg)
+    cg.server:exec(function()
+        local s = box.space.test
+        s:create_index('pk', {parts = {{1, 'str', collation = 'unicode_ci'}}})
+        local key = {}
+        for i = 1, 100 do
+            key[i] = 'a'
+        end
+        local err = {
+            type = 'ClientError',
+            code = box.error.KEY_PART_COUNT,
+        }
+        t.assert_error_covers(err, s.select, s, key, {iterator = 'np'})
+        t.assert_error_covers(err, s.select, s, key, {iterator = 'pp'})
+    end)
+end
+
 -- Simple test of next prefix and previous prefix iterators.
 g.test_next_prefix_simple = function(cg)
     cg.server:exec(function()
