@@ -536,8 +536,8 @@ sql_code_ast_property(struct Parse *parser, struct Token *table,
 	switch (property->type) {
 	case SQL_AST_PROPERTY_CHECK:
 		sql_create_check_constraint(parser, table, &property->name,
-					    property->expr->str,
-					    property->expr->len, is_column);
+					    property->span,
+					    property->span_len, is_column);
 		break;
 	case SQL_AST_PROPERTY_FOREIGN_KEY: {
 		struct ast_foreign_key *fk = &property->foreign_key;
@@ -588,8 +588,8 @@ sql_code_ast_property(struct Parse *parser, struct Token *table,
 		struct Expr *expr = expr_from_ast(parser, property->expr);
 		if (parser->is_aborted)
 			break;
-		sql_column_add_default(parser, expr, property->expr->str,
-				       property->expr->len);
+		sql_column_add_default(parser, expr, property->span,
+				       property->span_len);
 		break;
 	}
 	case SQL_AST_PROPERTY_COLLATE:
@@ -1008,7 +1008,9 @@ sql_run_parser(struct region *region, const char *zSql, int seed_token)
 			ctx.pos = 1;
 			continue;
 		} else {
+			ctx.token_start = last.z;
 			sqlParser(pEngine, tokenType, last, &ctx);
+			ctx.prev_token_end = last.z + last.n;
 			lastTokenParsed = tokenType;
 			if (ctx.is_aborted)
 				break;
