@@ -20,6 +20,7 @@ include(FindPackageMessage)
 include(ExternalProject)
 include(CheckPatch)
 include(MakeLuaPath)
+include(LuaStub)
 
 # We have to set OLD or NEW to silence warnings on CMake 3.24+.
 #
