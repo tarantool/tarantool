@@ -1,12 +1,66 @@
 local urilib = require('uri')
 local uuid = require('uuid')
 local network = require('internal.config.utils.network')
+local log = require('internal.config.utils.log')
+local tarantool = require('tarantool')
 
 
 -- Store validation functions. Each key in this table corresponds
 -- to a specific schema field path, and the associated value is a
 -- function that validates the data for that field.
 local M = {}
+
+-- Whether the truncated SSL parameter names are still accepted
+-- alongside the full ones.
+--
+-- Driven by the SSL_PARAMS_ALLOW_DOUBLE_NAMES CMake option.
+-- Tarantool 3.x: ON, both name variants accepted, the truncated
+-- ones are deprecated.
+-- Tarantool 4.x: OFF, the truncated names will be disabled, only
+-- the full names are accepted.
+local SSL_PARAMS_ALLOW_DOUBLE_NAMES =
+    tarantool.build.ssl_params_allow_double_names or false
+
+-- Truncated SSL parameter names that alias the full ones.
+local SSL_SHORT_TO_FULL = {
+    ca_file = 'ssl_ca_file',
+    ssl_cert = 'ssl_cert_file',
+    ssl_key = 'ssl_key_file',
+}
+
+-- Warn (Tarantool 3.x, SSL_PARAMS_ALLOW_DOUBLE_NAMES is on) or
+-- error (4.x / off) when deprecated truncated SSL parameter names
+-- are used in iproto.ssl / failover.iproto.ssl.
+local function validate_ssl_short_names(path)
+    return function(data, w)
+        local deprecated = {}
+        local valid = {}
+        for short, full in pairs(SSL_SHORT_TO_FULL) do
+            if data[short] ~= nil then
+                deprecated[#deprecated + 1] = short
+                valid[#valid + 1] = full
+            end
+        end
+        if #deprecated == 0 then
+            return
+        end
+        local deprecated_list = table.concat(deprecated, ', ')
+        local valid_list = table.concat(valid, ', ')
+        if SSL_PARAMS_ALLOW_DOUBLE_NAMES then
+            log.warn('%s: SSL parameters use deprecated names (%s); ' ..
+                'they will be disabled in Tarantool 4.x, use the full' ..
+                ' names (%s)', path, deprecated_list, valid_list)
+        else
+            w.error('SSL parameters use deprecated names (%s); ' ..
+                'these names are disabled in this build ' ..
+                '(Tarantool 4.x behavior), use the full names (%s) instead',
+                deprecated_list, valid_list)
+        end
+    end
+end
+
+M['iproto.ssl'] = validate_ssl_short_names('iproto.ssl')
+M['failover.iproto.ssl'] = validate_ssl_short_names('failover.iproto.ssl')
 
 local function validate_privilege_definition(data, w)
     if data.permissions == nil then

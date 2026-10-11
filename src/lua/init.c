@@ -788,6 +788,11 @@ luaopen_tarantool(lua_State *L)
 #endif
 	lua_settable(L, -3);
 
+	/* build.ssl_params_allow_double_names */
+	lua_pushstring(L, "ssl_params_allow_double_names");
+	lua_pushboolean(L, SSL_PARAMS_ALLOW_DOUBLE_NAMES);
+	lua_settable(L, -3);
+
 	lua_settable(L, -3);    /* box.info.build */
 
 	/* debug */

@@ -903,6 +903,25 @@ option(TEST_BUILD "Use defaults suited for tests" OFF)
 set(ABORT_ON_LEAK_DEFAULT ${TEST_BUILD})
 option(ABORT_ON_LEAK "Abort if memory leak is found." ${ABORT_ON_LEAK_DEFAULT})
 
+option(SSL_PARAMS_ALLOW_DOUBLE_NAMES
+    "Allow truncated SSL parameter names alongside the full ones \
+in the declarative config. ON in Tarantool 3.x for backward \
+compatibility (the truncated names are deprecated and will be \
+disabled in Tarantool 4.x); OFF in Tarantool 4.x, where only the \
+full names are accepted."
+    ON)
+
+# Normalize the ON/OFF cache bool into a 0/1 value for the
+# config.h macro. The macro is always defined (0 or 1): 1 in
+# Tarantool 3.x (truncated names accepted, deprecated), 0 in 4.x
+# (truncated names disabled). The cache bool itself is kept as
+# ON/OFF for the build status display below.
+if(SSL_PARAMS_ALLOW_DOUBLE_NAMES)
+    set(SSL_PARAMS_ALLOW_DOUBLE_NAMES_DEFINE 1)
+else()
+    set(SSL_PARAMS_ALLOW_DOUBLE_NAMES_DEFINE 0)
+endif()
+
 #
 # tarantool info summary (used in server version output)
 #
@@ -948,7 +967,8 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_BUNDLED_LIBYAML
     ENABLE_BUNDLED_MSGPUCK
     ENABLE_BUNDLED_LIBUNWIND
-    ENABLE_FEEDBACK_DAEMON)
+    ENABLE_FEEDBACK_DAEMON
+    SSL_PARAMS_ALLOW_DOUBLE_NAMES)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})
         set(value "${TARANTOOL_${option}}")

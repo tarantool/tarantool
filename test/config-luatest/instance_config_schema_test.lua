@@ -3,10 +3,17 @@ local log = require('log')
 local t = require('luatest')
 local instance_config = require('internal.config.instance_config')
 local helpers = require('test.config-luatest.helpers')
+local tarantool = require('tarantool')
 
 local g = t.group()
 
-local is_enterprise = require('tarantool').package == 'Tarantool Enterprise'
+local is_enterprise = tarantool.package == 'Tarantool Enterprise'
+
+-- Whether the truncated SSL parameter names are accepted alongside
+-- the full ones. Driven by the SSL_PARAMS_ALLOW_DOUBLE_NAMES build
+-- switch: on in Tarantool 3.x (deprecated), off in 4.x.
+local SSL_ALLOW_DOUBLE_NAMES =
+    tarantool.build.ssl_params_allow_double_names
 
 -- Check that all record element names can be found in the table and vice versa.
 local function validate_fields(config, record)
@@ -54,6 +61,44 @@ local function validate_fields(config, record)
             table.insert(record_fields, k)
         end
         ::continue::
+    end
+
+    local ssl_params_may_be_short = record.validate ==
+        instance_config.schema.fields.iproto.fields.ssl.validate or
+        record.validate ==
+        instance_config.schema.fields.failover.fields.iproto.fields.ssl.validate
+    if ssl_params_may_be_short then
+        local drop = {}
+        if not SSL_ALLOW_DOUBLE_NAMES then
+            -- Short-name schema fields are present for custom error validation:
+            -- If config_fields.ca_file is present, then error is raised, etc.
+            -- In the valid configs this fields may not be present.
+            drop = {ca_file = true, ssl_cert = true, ssl_key = true}
+        elseif type(config) == 'table' then
+            -- Full-name is optional if deprecated short-name is present.
+            if config.ssl_ca_file == nil and config.ca_file ~= nil then
+                drop.ssl_ca_file = true
+            end
+            if config.ssl_cert_file == nil and config.ssl_cert ~= nil then
+                drop.ssl_cert_file = true
+            end
+            if config.ssl_key_file == nil and config.ssl_key ~= nil then
+                drop.ssl_key_file = true
+            end
+            -- Deprecated short-name is optional if full-name is present.
+            if config.ssl_ca_file ~= nil and config.ca_file == nil then
+                drop.ca_file = true
+            end
+            if config.ssl_cert_file ~= nil and config.ssl_cert == nil then
+                drop.ssl_cert = true
+            end
+            if config.ssl_key_file ~= nil and config.ssl_key == nil then
+                drop.ssl_key = true
+            end
+        end
+        record_fields = fun.iter(record_fields):filter(function(k)
+            return drop[k] == nil
+        end):totable()
     end
 
     t.assert_items_equals(config_fields, record_fields)
@@ -463,6 +508,32 @@ local function check_validate_iproto()
     t.assert_error_msg_equals(err, function()
         instance_config:validate(iconfig)
     end)
+
+    if not SSL_ALLOW_DOUBLE_NAMES then
+        iconfig = {
+            iproto = {
+                listen = {{
+                    uri = 'one',
+                    params = {
+                        transport = 'ssl',
+                    },
+                }},
+                ssl = {
+                    ca_file = 'one',
+                    ssl_cert = 'two',
+                    ssl_key = 'three',
+                },
+            },
+        }
+        err = '[instance_config] iproto.ssl: SSL parameters use ' ..
+              'deprecated names (ssl_cert, ca_file, ssl_key); ' ..
+              'these names are disabled in this build ' ..
+              '(Tarantool 4.x behavior), use the full names ' ..
+              '(ssl_cert_file, ssl_ca_file, ssl_key_file) instead'
+        t.assert_error_msg_equals(err, function()
+            instance_config:validate(iconfig)
+        end)
+    end
 end
 
 g.test_iproto = function()
@@ -515,9 +586,9 @@ g.test_iproto = function()
             net_msg_max = 1,
             readahead = 1,
             ssl = {
-                ssl_key = 'one',
-                ssl_cert = 'two',
-                ca_file = 'three',
+                ssl_ca_file = 'one',
+                ssl_cert_file = 'two',
+                ssl_key_file = 'three',
                 ssl_ciphers = 'four',
                 ssl_password = 'five',
                 ssl_password_file = 'six',
@@ -526,6 +597,22 @@ g.test_iproto = function()
     }
     instance_config:validate(iconfig)
     validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
+    -- Check short-name cases.
+    if SSL_ALLOW_DOUBLE_NAMES then
+        -- Both present.
+        iconfig.iproto.ssl.ca_file = 'seven'
+        iconfig.iproto.ssl.ssl_cert = 'eight'
+        iconfig.iproto.ssl.ssl_key = 'nine'
+        instance_config:validate(iconfig)
+        validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
+
+        -- Only short.
+        iconfig.iproto.ssl.ssl_ca_file = nil
+        iconfig.iproto.ssl.ssl_cert_file = nil
+        iconfig.iproto.ssl.ssl_key_file = nil
+        instance_config:validate(iconfig)
+        validate_fields(iconfig.iproto, instance_config.schema.fields.iproto)
+    end
     check_validate_iproto()
     local exp = {
         advertise = {
@@ -1989,9 +2076,9 @@ g.test_failover = function()
         }
         iconfig.failover.iproto = {
             ssl = {
-                ca_file = 'one',
-                ssl_cert = 'two',
-                ssl_key = 'three',
+                ssl_ca_file = 'one',
+                ssl_cert_file = 'two',
+                ssl_key_file = 'three',
                 ssl_ciphers = 'four',
                 ssl_password = 'five',
                 ssl_password_file = 'six',
@@ -2001,6 +2088,22 @@ g.test_failover = function()
 
     instance_config:validate(iconfig)
     validate_fields(iconfig.failover, instance_config.schema.fields.failover)
+    -- Check short-name cases.
+    if is_enterprise and SSL_ALLOW_DOUBLE_NAMES then
+        -- Both present.
+        iconfig.failover.iproto.ssl.ca_file = 'seven'
+        iconfig.failover.iproto.ssl.ssl_cert = 'eight'
+        iconfig.failover.iproto.ssl.ssl_key = 'nine'
+        instance_config:validate(iconfig)
+        validate_fields(iconfig.failover, instance_config.schema.fields.failover)
+
+        -- Only short.
+        iconfig.failover.iproto.ssl.ssl_ca_file = nil
+        iconfig.failover.iproto.ssl.ssl_cert_file = nil
+        iconfig.failover.iproto.ssl.ssl_key_file = nil
+        instance_config:validate(iconfig)
+        validate_fields(iconfig.failover, instance_config.schema.fields.failover)
+    end
 
     local exp = {
         probe_interval = 10,

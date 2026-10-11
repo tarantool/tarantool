@@ -1822,11 +1822,11 @@ I['iproto.ssl'] = format_text([[
     require certificate authority (CA).
 ]])
 
-I['iproto.ssl.ca_file'] = format_text([[
+I['iproto.ssl.ssl_ca_file'] = format_text([[
     (Optional) A path to a trusted certificate authorities (CA) file. If not
     set, the peer won't be checked for authenticity.
 
-    Both a server and a client can use the ca_file parameter:
+    Both a server and a client can use the ssl_ca_file parameter:
 
     - If it's on the server side, the server verifies the client.
     - If it's on the client side, the client verifies the server.
@@ -1834,11 +1834,11 @@ I['iproto.ssl.ca_file'] = format_text([[
       other.
 ]])
 
-I['iproto.ssl.ssl_cert'] = format_text([[
+I['iproto.ssl.ssl_cert_file'] = format_text([[
     A path to an SSL certificate file:
 
     - For a server, it's mandatory.
-    - For a client, it's mandatory if the ca_file parameter is set for a
+    - For a client, it's mandatory if the ssl_ca_file parameter is set for a
       server; otherwise, optional.
 ]])
 
@@ -1849,11 +1849,11 @@ I['iproto.ssl.ssl_ciphers'] = format_text([[
     log that no shared cipher was found.
 ]])
 
-I['iproto.ssl.ssl_key'] = format_text([[
+I['iproto.ssl.ssl_key_file'] = format_text([[
     A path to a private SSL key file:
 
     - For a server, it's mandatory.
-    - For a client, it's mandatory if the `ca_file` parameter is set for a
+    - For a client, it's mandatory if the `ssl_ca_file` parameter is set for a
       server; otherwise, optional.
 
     If the private key is encrypted, provide a password for it in the
@@ -1862,7 +1862,7 @@ I['iproto.ssl.ssl_key'] = format_text([[
 
 I['iproto.ssl.ssl_password'] = format_text([[
     (Optional) A password for an encrypted private SSL key provided using
-    `ssl_key`. Alternatively, the password can be provided in
+    `ssl_key_file`. Alternatively, the password can be provided in
     `ssl_password_file`.
 
     Tarantool applies the `ssl_password` and `ssl_password_file` parameters in
@@ -1880,8 +1880,25 @@ I['iproto.ssl.ssl_password'] = format_text([[
 
 I['iproto.ssl.ssl_password_file'] = format_text([[
     (Optional) A text file with one or more passwords for encrypted private
-    SSL keys provided using `ssl_key` (each on a separate line). Alternatively,
-    the password can be provided in `ssl_password`.
+    SSL keys provided using `ssl_key_file` (each on a separate line).
+    Alternatively, the password can be provided in `ssl_password`.
+]])
+
+-- Deprecated truncated names (Tarantool 3.x only, will be disabled in 4.x).
+I['iproto.ssl.ca_file'] = format_text([[
+    Deprecated alias for `ssl_ca_file`. Supported in Tarantool 3.x for
+    backward compatibility (requires the SSL_PARAMS_ALLOW_DOUBLE_NAMES build
+    option); will be disabled in Tarantool 4.x. Use `ssl_ca_file`.
+]])
+I['iproto.ssl.ssl_cert'] = format_text([[
+    Deprecated alias for `ssl_cert_file`. Supported in Tarantool 3.x for
+    backward compatibility (requires the SSL_PARAMS_ALLOW_DOUBLE_NAMES build
+    option); will be disabled in Tarantool 4.x. Use `ssl_cert_file`.
+]])
+I['iproto.ssl.ssl_key'] = format_text([[
+    Deprecated alias for `ssl_key_file`. Supported in Tarantool 3.x for
+    backward compatibility (requires the SSL_PARAMS_ALLOW_DOUBLE_NAMES build
+    option); will be disabled in Tarantool 4.x. Use `ssl_key_file`.
 ]])
 
 I['iproto.threads'] = format_text([[
@@ -1930,17 +1947,23 @@ I['failover.iproto.ssl'] = format_text([[
     Tarantool Enterprise.
 ]])
 
-I['failover.iproto.ssl.ca_file'] = I['iproto.ssl.ca_file']
+I['failover.iproto.ssl.ssl_ca_file'] = I['iproto.ssl.ssl_ca_file']
 
-I['failover.iproto.ssl.ssl_cert'] = I['iproto.ssl.ssl_cert']
+I['failover.iproto.ssl.ssl_cert_file'] = I['iproto.ssl.ssl_cert_file']
 
-I['failover.iproto.ssl.ssl_key'] = I['iproto.ssl.ssl_key']
+I['failover.iproto.ssl.ssl_key_file'] = I['iproto.ssl.ssl_key_file']
 
 I['failover.iproto.ssl.ssl_ciphers'] = I['iproto.ssl.ssl_ciphers']
 
 I['failover.iproto.ssl.ssl_password'] = I['iproto.ssl.ssl_password']
 
 I['failover.iproto.ssl.ssl_password_file'] = I['iproto.ssl.ssl_password_file']
+
+I['failover.iproto.ssl.ca_file'] = I['iproto.ssl.ca_file']
+
+I['failover.iproto.ssl.ssl_cert'] = I['iproto.ssl.ssl_cert']
+
+I['failover.iproto.ssl.ssl_key'] = I['iproto.ssl.ssl_key']
 
 -- }}} failover.iproto configuration
 
