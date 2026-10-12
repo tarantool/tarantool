@@ -4575,63 +4575,167 @@ memtx_tx_clean_txn(struct txn *txn)
 	memtx_tx_story_gc();
 }
 
+/**
+ * Hash a snapshot cleaner entry by its tuple and key data.
+ *
+ * Multikey entries are hashed by their position: the cleaner has an entry for
+ * each position of the logical key, see memtx_tx_snapshot_cleaner_create().
+ * Functional entries are hashed by the logical key, because a story link may
+ * hold a different functional key tuple than the index for the same logical
+ * entry (lazily created links extract their own keys).
+ *
+ * NB: a snapshot is written by another thread, which has no tuple formats, so
+ *     the tuple fields must not be accessed: the sort data of multikey
+ *     indexes is cleaned by that thread, functional indexes have none.
+ */
 static uint32_t
-memtx_tx_snapshot_cleaner_hash(const struct tuple *a)
+memtx_tx_snapshot_cleaner_hash(const struct memtx_index_entry *a,
+			       struct index *index)
 {
-	uintptr_t u = (uintptr_t)a;
-	if (sizeof(uintptr_t) <= sizeof(uint32_t))
-		return u;
-	else
-		return u ^ (u >> 32);
+	uintptr_t u = (uintptr_t)a->tuple;
+	uint32_t h = sizeof(uintptr_t) <= sizeof(uint32_t) ? u : u ^ (u >> 32);
+	if (a->key_data == HINT_NONE)
+		return h;
+	if (index->def->key_def->is_multikey)
+		return h ^ (uint32_t)a->key_data;
+	assert(index->def->key_def->for_func_index);
+	return h ^ memtx_tx_index_entry_hash(index, *a);
+}
+
+/** Compare snapshot cleaner entries, see memtx_tx_snapshot_cleaner_hash(). */
+static inline bool
+memtx_tx_snapshot_cleaner_entry_equal(const struct memtx_index_entry *a,
+				      const struct memtx_index_entry *b,
+				      struct index *index)
+{
+	if (a->tuple != b->tuple)
+		return false;
+	/* The records of a cleaner either all have a key or all have none. */
+	assert((a->key_data == HINT_NONE) == (b->key_data == HINT_NONE));
+	if (a->key_data == HINT_NONE || index->def->key_def->is_multikey)
+		return a->key_data == b->key_data;
+	return tuple_compare(a->tuple, a->key_data, b->tuple, b->key_data,
+			     index->def->key_def) == 0;
 }
 
 struct memtx_tx_snapshot_cleaner_entry
 {
-	/* A dirty tuple that is present in read-view but should be cleaned. */
-	struct tuple *from;
+	/*
+	 * A dirty index entry that is present in read-view but should be
+	 * cleaned. Multikey and functional indexes may have several entries of
+	 * one tuple, each one is cleaned separately.
+	 */
+	struct memtx_index_entry from;
 	/* Cleaned version of the tuple. */
 	struct tuple *to;
 	/* The tuples share the same key, so one hint is enough. */
 	hint_t hint;
+	/*
+	 * Whether this record corresponds to the index entry. A regular
+	 * multikey index entry is identified by a position of the tuple, and
+	 * the index may hold any of the positions with an equal key, while the
+	 * story link is created for one of them. The records cannot be matched
+	 * by the key value: a snapshot is written by another thread, which has
+	 * no tuple formats, so they are hashed by the position and a logical
+	 * key with duplicate positions gets a record per position, all cleaned
+	 * to the same tuple. The record at the own position of the link
+	 * corresponds to the index entry, the others are aliases, which the
+	 * snapshot count must not count.
+	 */
+	bool is_present;
 };
 
 #define mh_name _snapshot_cleaner
-#define mh_key_t struct tuple *
+#define mh_key_t struct memtx_index_entry *
 #define mh_node_t struct memtx_tx_snapshot_cleaner_entry
-#define mh_arg_t int
-#define mh_hash(a, arg) (memtx_tx_snapshot_cleaner_hash((a)->from))
-#define mh_hash_key(a, arg) (memtx_tx_snapshot_cleaner_hash(a))
-#define mh_cmp(a, b, arg) (((a)->from) != ((b)->from))
-#define mh_cmp_key(a, b, arg) ((a) != ((b)->from))
+#define mh_arg_t struct index *
+#define mh_hash(a, arg) (memtx_tx_snapshot_cleaner_hash(&(a)->from, arg))
+#define mh_hash_key(a, arg) (memtx_tx_snapshot_cleaner_hash(a, arg))
+#define mh_cmp(a, b, arg) \
+	(!memtx_tx_snapshot_cleaner_entry_equal(&(a)->from, &(b)->from, arg))
+#define mh_cmp_key(a, b, arg) \
+	(!memtx_tx_snapshot_cleaner_entry_equal((a), &(b)->from, arg))
 #define MH_SOURCE
 #include "salad/mhash.h"
+
+/**
+ * Add a cleaner entry for the index entry of @a link stored at @a key_data,
+ * unless the entry is clean.
+ */
+static void
+memtx_tx_snapshot_cleaner_add(struct mh_snapshot_cleaner_t *ht,
+			      struct space *space, struct index *index,
+			      struct memtx_story_link *link, hint_t key_data,
+			      bool is_present)
+{
+	struct tuple *tuple = link->story->tuple;
+	struct tuple *clean =
+		memtx_tx_story_link_clarify_impl(NULL, space, link, true);
+	if (clean == tuple)
+		return;
+	struct memtx_tx_snapshot_cleaner_entry entry = {
+		.from = {
+			.tuple = tuple,
+			.key_data = key_data,
+		},
+		.to = clean,
+		.hint = memtx_tx_story_link_hint(link, index,
+						 index->def->cmp_def),
+		.is_present = is_present,
+	};
+	mh_snapshot_cleaner_put(ht, &entry, NULL, index);
+}
 
 void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 				 struct space *space, struct index *index)
 {
 	cleaner->ht = NULL;
+	cleaner->index = index;
 	if (rlist_empty(&space->memtx_stories) &&
 	    rlist_empty(&space->alter_stmts))
 		return;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
-	struct memtx_story_link *link;
-	memtx_tx_foreach_in_index_tuple_story_link(space, index, link, {
-		struct tuple *tuple = link->story->tuple;
-		struct tuple *clean =
-			memtx_tx_story_link_clarify_impl(NULL, space, link,
-							 true);
-		if (clean == tuple)
+	struct key_def *key_def = index->def->key_def;
+	struct memtx_story *story;
+	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
+		assert(index->dense_id < story->index_count);
+		memtx_tx_story_add_index_links(story, index);
+		if (!key_def->is_multikey) {
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link,
+					    &story->link[index->dense_id].list,
+					    link) {
+				if (link->in_index == NULL)
+					continue;
+				memtx_tx_snapshot_cleaner_add(ht, space, index,
+							      link,
+							      link->key_data,
+							      true);
+			}
 			continue;
-
-		struct memtx_tx_snapshot_cleaner_entry entry;
-		entry.from = tuple;
-		entry.to = clean;
-		entry.hint =
-			memtx_tx_story_link_hint(link, index,
-						 index->def->cmp_def);
-		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
-	});
+		}
+		/*
+		 * The index entry of a logical key may be stored at any
+		 * position with that key, add a record for each one. The
+		 * positions of one key share the link, the record at the own
+		 * position of the link corresponds to the index entry.
+		 */
+		struct tuple *tuple = story->tuple;
+		uint32_t mk_count =
+			tuple_multikey_count(tuple, index->def->cmp_def);
+		for (uint32_t i = 0; i < mk_count; i++) {
+			if (tuple_key_is_excluded(tuple, key_def, (int)i))
+				continue;
+			struct memtx_story_link *link =
+				memtx_tx_story_link_find(story, index, i);
+			assert(link != NULL);
+			if (link->in_index == NULL)
+				continue;
+			memtx_tx_snapshot_cleaner_add(ht, space, index, link, i,
+						      link->key_data == i);
+		}
+	}
 	/*
 	 * With MVCC off (box.cfg.memtx_use_mvcc_engine = false), a memtx space
 	 * read view may include a dirty (not committed to WAL) record. In order
@@ -4650,11 +4754,13 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct space_alter_stmt *alter_stmt;
 		rlist_foreach_entry(alter_stmt, &space->alter_stmts, link) {
 			struct memtx_tx_snapshot_cleaner_entry entry;
-			entry.from = alter_stmt->new_tuple;
+			entry.from.tuple = alter_stmt->new_tuple;
+			entry.from.key_data = HINT_NONE;
 			entry.to = alter_stmt->old_tuple;
 			/* Hint is not used if MVCC is off. */
 			entry.hint = HINT_NONE;
-			mh_snapshot_cleaner_put(ht, &entry, NULL, 0);
+			entry.is_present = true;
+			mh_snapshot_cleaner_put(ht, &entry, NULL, index);
 		}
 	}
 	cleaner->ht = ht;
@@ -4662,18 +4768,28 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 
 struct tuple *
 memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
-			       struct tuple *tuple)
+			       struct memtx_index_entry entry)
 {
 	assert(cleaner->ht != NULL);
 
 	struct mh_snapshot_cleaner_t *ht = cleaner->ht;
-	mh_int_t pos = mh_snapshot_cleaner_find(ht, tuple, 0);
+	/*
+	 * With MVCC off there are no stories, and the only records are the
+	 * ones of the running yielding alters of the space, see above: they
+	 * hide a dirty _index row as a whole, so they are recorded by the
+	 * tuple without key data, while the read view looks up an index
+	 * entry.
+	 */
+	if (!memtx_tx_manager_use_mvcc_engine)
+		entry.key_data = HINT_NONE;
+	mh_int_t pos = mh_snapshot_cleaner_find(ht, &entry, cleaner->index);
 	if (pos == mh_end(ht))
-		return tuple;
-	struct memtx_tx_snapshot_cleaner_entry *entry =
+		return entry.tuple;
+	struct memtx_tx_snapshot_cleaner_entry *cleaner_entry =
 		mh_snapshot_cleaner_node(ht, pos);
-	assert(entry->from == tuple);
-	return entry->to;
+	assert(memtx_tx_snapshot_cleaner_entry_equal(&cleaner_entry->from,
+						     &entry, cleaner->index));
+	return cleaner_entry->to;
 }
 
 void
@@ -4709,16 +4825,21 @@ memtx_tx_snapshot_invisible_count_matching_until_slow(
 	mh_foreach(ht, i) {
 		struct memtx_tx_snapshot_cleaner_entry *entry =
 			mh_snapshot_cleaner_node(ht, i);
+		if (!entry->is_present)
+			continue;
 
 		/* Only in-index tuples must exist in the snapshot. */
-		assert(!tuple_key_is_excluded(cmp_def->for_func_index ?
-					      (struct tuple *)entry->hint :
-					      entry->from,
-					      cmp_def,
-					      MULTIKEY_NONE));
+		struct tuple *keyed = cmp_def->for_func_index ?
+				      (struct tuple *)entry->hint :
+				      entry->from.tuple;
+		int mk_idx = cmp_def->is_multikey ? (int)entry->hint :
+			     MULTIKEY_NONE;
+		assert(!tuple_key_is_excluded(keyed, cmp_def, mk_idx));
+		(void)keyed;
+		(void)mk_idx;
 
 		/* Does not match with the key and border. */
-		if (!memtx_tx_tuple_matches_until(cmp_def, entry->from,
+		if (!memtx_tx_tuple_matches_until(cmp_def, entry->from.tuple,
 						  entry->hint, type,
 						  key, part_count,
 						  until, until_hint))

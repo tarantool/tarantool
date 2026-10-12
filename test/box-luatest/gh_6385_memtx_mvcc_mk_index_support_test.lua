@@ -721,6 +721,87 @@ g.test_snapshot_and_recovery = function(cg)
     end)
 end
 
+-- Check read views over multikey index see each index entry separately.
+g.test_read_view = function(cg)
+    local stream = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {0, 1}}
+    end)
+
+    stream:begin()
+    stream.space.s:replace{0, {0, 2}}
+
+    cg.server:exec(function()
+        local rv = box.read_view.open()
+        local mk = rv.space.s.index.mk
+        t.assert_equals(mk:select{}, {{0, {0, 1}}, {0, {0, 1}}})
+        t.assert_equals(mk:select{0}, {{0, {0, 1}}})
+        t.assert_equals(mk:select{1}, {{0, {0, 1}}})
+        t.assert_equals(mk:select{2}, {})
+        t.assert_equals(mk:count(), 2)
+        rv:close()
+    end)
+
+    stream:rollback()
+end
+
+-- Check read views do not see deleted tuples whose story links were created
+-- lazily: such links may identify the index entry by a different multikey
+-- position (duplicate keys) or functional key tuple than the index itself.
+g.test_read_view_lazy_links = function(cg)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5, 5}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    -- Force the story and its links for the clean tuple, and keep the story
+    -- alive after the tuple is deleted.
+    stream1:begin()
+    stream1.space.s:get{0}
+    stream1.space.s.index.mk:count{}
+
+    stream2.space.s:replace{0, {6}}
+
+    cg.server:exec(function()
+        box.internal.memtx_tx_gc(100)
+        local rv = box.read_view.open()
+        t.assert_equals(rv.space.s.index.mk:select{}, {{0, {6}}})
+        t.assert_equals(rv.space.s.index.mk:select{5}, {})
+        t.assert_equals(rv.space.s.index.mk:count(), 1)
+        rv:close()
+    end)
+
+    stream1:rollback()
+end
+
+-- Check that a snapshot with sort data is written while the index has
+-- invisible entries: the snapshot thread cleans them without tuple formats.
+g.test_snapshot_sort_data_with_stories = function(cg)
+    local stream = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5, 5}}
+        box.space.s:replace{1, {7}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    stream:begin()
+    stream.space.s:replace{0, {5, 6}}
+    stream.space.s:delete{1}
+    stream.space.s:replace{2, {9}}
+
+    cg.server:exec(function()
+        box.cfg{memtx_use_sort_data = true}
+        box.snapshot()
+        box.cfg{memtx_use_sort_data = false}
+    end)
+    stream:rollback()
+end
+
 -- Check sinking of story for commit preparation works correctly.
 g.test_prepare_story_sink = function(cg)
     local stream1 = cg.server.net_box:new_stream()
@@ -982,5 +1063,54 @@ g.test_nullable = function(cg)
     cg.server:exec(function()
         t.assert_equals(box.space.s.index.mk:select{},
                         {{0, {0, box.NULL, 0}}})
+    end)
+end
+
+-- With MVCC off, a snapshot cleaner has records of the yielding DDL
+-- statements, which have no key, unlike the records of a functional index.
+local g_mvcc_off = t.group('gh-6385-mvcc-off')
+
+g_mvcc_off.before_all(function(cg)
+    -- The index build is parked by an error injection.
+    t.tarantool.skip_if_not_debug()
+    cg.server = server:new{
+        box_cfg = {memtx_use_mvcc_engine = false}
+    }
+    cg.server:start()
+end)
+
+g_mvcc_off.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Check that a read view of a functional index with a record of a yielding
+-- DDL statement hides the record and is closed correctly.
+g_mvcc_off.test_read_view_with_alter_stmt = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        box.schema.func.create('f', {
+            body = 'function(tuple) return {tuple[1]} end',
+            is_deterministic = true,
+            is_sandboxed = true,
+        })
+        box.space._index:create_index('f', {parts = {{1, 'unsigned'}},
+                                            unique = false, func = 'f'})
+        local s = box.schema.create_space('s')
+        s:create_index('pk')
+        s:insert{1}
+        box.error.injection.set('ERRINJ_BUILD_INDEX_DELAY', true)
+        local f = fiber.new(function()
+            s:create_index('sk', {parts = {{1, 'unsigned'}}, unique = false})
+        end)
+        f:set_joinable(true)
+        -- Let the build of the index start and yield.
+        fiber.yield()
+        local rv = box.read_view.open()
+        -- The record of the index being built is not visible.
+        t.assert_equals(#rv.space._index.index.primary:select{s.id}, 1)
+        t.assert_equals(#rv.space._index.index.f:select{s.id}, 1)
+        rv:close()
+        box.error.injection.set('ERRINJ_BUILD_INDEX_DELAY', false)
+        f:join()
     end)
 end
