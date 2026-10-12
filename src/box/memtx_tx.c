@@ -2697,6 +2697,37 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		else
 			del_story = memtx_tx_story_get(old_tuple);
 		memtx_tx_story_link_deleted_by(del_story, stmt);
+		/*
+		 * Multikey and functional entries of the old tuple that have
+		 * no counterpart in the new tuple are deleted like the entries
+		 * of a deleted tuple, let's see if anyone had counted them.
+		 * Such an entry may be physically replaced by an entry of
+		 * another in-progress transaction, it is still deleted by this
+		 * statement from the point of view of the counting ones.
+		 */
+		for (uint32_t i = 0; i < space->index_count; i++) {
+			struct index *index = space->index[i];
+			if (!memtx_tx_index_uses_story_link_storage(index))
+				continue;
+			memtx_tx_story_add_index_links(del_story, index);
+			struct memtx_story_link *link;
+			rlist_foreach_entry(link, &del_story->link[i].list,
+					    link) {
+				/*
+				 * The chains have just been formed above: the
+				 * link of the new story for a retained key
+				 * tops the chain of the old link, whatever
+				 * versions of other transactions are in
+				 * between. The old and the new tuple share
+				 * the primary key, so the chain of a
+				 * non-unique index is the same one too.
+				 */
+				if (memtx_tx_story_link_find_top(link)->story !=
+				    add_story)
+					memtx_tx_handle_counted_write(
+						space, index, link);
+			}
+		}
 	}
 
 	/*
