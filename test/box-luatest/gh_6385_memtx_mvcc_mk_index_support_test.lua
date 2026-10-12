@@ -1448,3 +1448,51 @@ g_mvcc_off.test_read_view_with_alter_stmt = function(cg)
         f:join()
     end)
 end
+
+-- With MVCC, the keys of an indexed tuple are rebuilt by the story garbage
+-- collector and the snapshot cleaner, which cannot fail.
+local g_func_failure = t.group('gh-6385-func-failure-panic')
+
+g_func_failure.before_all(function(cg)
+    cg.server = server:new{
+        box_cfg = {memtx_use_mvcc_engine = true}
+    }
+    cg.server:start()
+end)
+
+g_func_failure.after_all(function(cg)
+    cg.server:drop()
+end)
+
+-- Check that a functional index function failing on a tuple it has already
+-- indexed stops the server with a clear message.
+g_func_failure.test_func_fails_on_indexed_tuple = function(cg)
+    pcall(cg.server.exec, cg.server, function()
+        box.schema.func.create('f', {
+            body = [[
+                function(tuple)
+                    calls = (calls or 0) + 1
+                    if calls > 2 then
+                        error('boom')
+                    end
+                    return {{tuple[1]}}
+                end
+            ]],
+            is_deterministic = true,
+            is_sandboxed = true,
+            opts = {is_multikey = true},
+        })
+        local s = box.schema.create_space('s')
+        s:create_index('pk')
+        s:create_index('f', {parts = {{1, 'unsigned'}}, func = 'f',
+                             unique = false})
+        s:insert{1}
+        -- The third call rebuilds the keys of the replaced tuple.
+        s:replace{1}
+    end)
+    t.helpers.retrying({}, function()
+        t.assert(cg.server:grep_log("failed to rebuild the keys of " ..
+                                    "functional index 'f' of space 's'"))
+        t.assert_not(cg.server.process:is_alive())
+    end)
+end

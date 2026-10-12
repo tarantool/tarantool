@@ -1285,14 +1285,28 @@ memtx_tx_story_add_index_links(struct memtx_story *story, struct index *index)
 		struct region *region = &fiber()->gc;
 		size_t region_svp = region_used(region);
 		struct key_list_iterator it;
-		VERIFY(key_list_iterator_create(&it, tuple, index_def, false,
-						tuple_format_runtime) == 0);
 		struct tuple *key;
-		while ((VERIFY(key_list_iterator_next(&it, &key) == 0), true) &&
+		int rc = key_list_iterator_create(&it, tuple, index_def, false,
+						  tuple_format_runtime);
+		while (rc == 0 &&
+		       (rc = key_list_iterator_next(&it, &key)) == 0 &&
 		       key != NULL) {
 			if (tuple_key_is_excluded(key, key_def, MULTIKEY_NONE))
 				continue;
 			memtx_tx_story_add_link(story, index, (hint_t)key);
+		}
+		if (rc != 0) {
+			/*
+			 * The function is deterministic and has already built
+			 * the keys of this tuple on its insertion, but it can
+			 * still fail here, e.g. on OOM. Story GC and the
+			 * snapshot cleaner cannot propagate the failure, so
+			 * panic here.
+			 */
+			diag_log();
+			panic("failed to rebuild the keys of functional index "
+			      "'%s' of space '%s'", index_def->name,
+			      story->space->def->name);
 		}
 		region_truncate(region, region_svp);
 	}
