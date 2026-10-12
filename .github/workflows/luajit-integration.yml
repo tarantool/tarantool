@@ -82,6 +82,30 @@ jobs:
       - name: Install deps on Darwin
         uses: ./.github/actions/install-deps-osx
         if: ${{ inputs.os == 'macOS' }}
+      - name: Inlined install deps on Darwin
+        run: |
+          # [for test] enshure default openssl is installed:
+          brew install --force openssl
+          # brew's default openssl version is BREW_DEFAULT_OPENSSL_V > 3.
+          # Ensure it is removed:
+          brew uninstall --force --ignore-dependencies openssl@$BREW_DEFAULT_OPENSSL_V
+          brew install --force openssl@3
+          brew link --force openssl@3
+          brew install --force \
+            readline \
+            curl \
+            icu4c \
+            libiconv \
+            zlib \
+            cmake \
+            ninja \
+            autoconf \
+            automake \
+            libtool
+        shell: bash
+        env:
+          BREW_DEFAULT_OPENSSL_V: 4
+        if: ${{ inputs.os == 'macOS' }}
 
       - name: Run tests
         env:

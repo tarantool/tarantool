@@ -5,9 +5,16 @@ description: Install build and test dependencies on OSX systems
 runs:
   using: composite
   steps:
-    - run: |
+    - shell: bash
+      env: # XXX need to update this after version goes up
+        BREW_DEFAULT_OPENSSL_V: 4
+      run: |
+        # brew's default openssl version is BREW_DEFAULT_OPENSSL_V > 3.
+        # Ensure it is removed:
+        brew uninstall --force --ignore-dependencies openssl@$BREW_DEFAULT_OPENSSL_V
+        brew install --force openssl@3
+        brew link --force openssl@3
         brew install --force \
-          openssl \
           readline \
           curl \
           icu4c \
@@ -18,4 +25,3 @@ runs:
           autoconf \
           automake \
           libtool
-      shell: bash

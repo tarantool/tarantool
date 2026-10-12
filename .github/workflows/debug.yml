@@ -48,7 +48,7 @@ jobs:
   debug:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'notest' label is not set.
-    if: github.repository_owner == 'tarantool' &&
+    if: false && github.repository_owner == 'tarantool' &&
         ( github.event_name != 'pull_request' ||
           ( github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.labels.*.name, 'notest') ) )
@@ -121,3 +121,41 @@ jobs:
           access-key-id: ${{ secrets.MULTIVAC_S3_ACCESS_KEY_ID }}
           secret-access-key: ${{ secrets.MULTIVAC_S3_SECRET_ACCESS_KEY }}
           source: ${{ env.VARDIR }}/artifacts
+
+  # Temporary job to test CI fix
+  tmp-luajit-test-tarantool:
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [ARM64, x86_64]
+        BUILDTYPE: [Debug, Release]
+        GC64: [ON, OFF]
+        OS: [Linux, macOS]
+        include:
+          - BUILDTYPE: Debug
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=Debug
+          - BUILDTYPE: Release
+            CMAKEFLAGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        exclude:
+          - ARCH: ARM64
+            GC64: OFF
+          - OS: macOS
+            GC64: OFF
+    name: >
+      Tarantool
+      (${{ matrix.OS }}/${{ matrix.ARCH }})
+      ${{ matrix.BUILDTYPE }}
+      GC64:${{ matrix.GC64 }}
+    # XXX: Only LuaJIT-tests are running in this workflow.
+    uses: ./.github/workflows/luajit-integration.yml
+    with:
+      CMAKE_EXTRA_PARAMS: >
+        -G Ninja
+        ${{ matrix.CMAKEFLAGS }}
+        -DLUAJIT_ENABLE_GC64=${{ matrix.GC64 }}
+      arch: ${{ matrix.ARCH }}
+      os: ${{ matrix.OS }}
+      # revision: ${{ github.sha }}
+      # Used a fixed commit from tarantool/luajit:
+      # https://github.com/tarantool/luajit/compare/tarantool/master...tarantool:luajit:tmr_g/gh-13621-flaky-fix-mips64-se
+      revision: fd51e2d5f6eb5820114c25e1a8cfab4ffc3f5c3e
