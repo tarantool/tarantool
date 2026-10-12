@@ -909,7 +909,7 @@ in the declarative config. ON in Tarantool 3.x for backward \
 compatibility (the truncated names are deprecated and will be \
 disabled in Tarantool 4.x); OFF in Tarantool 4.x, where only the \
 full names are accepted."
-    ON)
+    OFF)
 
 # Normalize the ON/OFF cache bool into a 0/1 value for the
 # config.h macro. The macro is always defined (0 or 1): 1 in
