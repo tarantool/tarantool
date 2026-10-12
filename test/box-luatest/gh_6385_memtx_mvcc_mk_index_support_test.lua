@@ -789,6 +789,42 @@ g.test_read_view_lazy_links = function(cg)
     stream1:rollback()
 end
 
+-- Check that a read view outlives the story of a deleted tuple whose index
+-- entry is cleaned by the read view.
+g.test_read_view_outlives_story = function(cg)
+    local stream = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5}}
+        box.space.s:replace{1, {7}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    -- Keep the story of the deleted tuple alive until the read view is open.
+    stream:begin()
+    stream.space.s:get{0}
+    cg.server:exec(function()
+        box.space.s:delete{0}
+        box.internal.memtx_tx_gc(100)
+        rawset(_G, 'rv', box.read_view.open())
+    end)
+    stream:rollback()
+
+    cg.server:exec(function()
+        -- Garbage collect the story and reuse the released memory.
+        box.internal.memtx_tx_gc(100)
+        for i = 10, 40 do
+            box.space.s:replace{i, {i}}
+        end
+        box.internal.memtx_tx_gc(100)
+        local rv = rawget(_G, 'rv')
+        t.assert_equals(rv.space.s.index.mk:select{}, {{1, {7}}})
+        t.assert_equals(rv.space.s.index.mk:select{5}, {})
+        rv:close()
+        rawset(_G, 'rv', nil)
+    end)
+end
+
 -- Check that a snapshot with sort data is written while the index has
 -- invisible entries: the snapshot thread cleans them without tuple formats.
 g.test_snapshot_sort_data_with_stories = function(cg)
@@ -811,6 +847,71 @@ g.test_snapshot_sort_data_with_stories = function(cg)
         box.cfg{memtx_use_sort_data = false}
     end)
     stream:rollback()
+end
+
+-- Check that a story link key moved into the index by a rollback outlives the
+-- index entry in a read view, like the keys created by the index.
+g.test_read_view_relinked_key = function(cg)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5}}
+        box.space.s:replace{1, {7}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    -- The delete creates the links of {0, {5}} with keys of its own, the
+    -- rollback of the replacement moves them into the index.
+    stream1:begin()
+    stream1.space.s:delete{0}
+    stream1.space.s:replace{0, {5}}
+    stream1:rollback()
+
+    -- Open a read view with a story to clean, so that the read view looks
+    -- up its entries.
+    stream2:begin()
+    stream2.space.s:replace{2, {9}}
+    cg.server:exec(function()
+        box.internal.memtx_tx_gc(100)
+        rawset(_G, 'rv', box.read_view.open())
+    end)
+    stream2:rollback()
+
+    cg.server:exec(function()
+        -- Remove the relinked entry from the index and reuse its memory.
+        box.space.s:delete{0}
+        box.internal.memtx_tx_gc(100)
+        for i = 10, 40 do
+            box.space.s:replace{i, {i}}
+        end
+        box.internal.memtx_tx_gc(100)
+        local rv = rawget(_G, 'rv')
+        t.assert_equals(rv.space.s.index.mk:select{}, {{0, {5}}, {1, {7}}})
+        t.assert_equals(rv.space.s.index.mk:select{5}, {{0, {5}}})
+        rv:close()
+        rawset(_G, 'rv', nil)
+    end)
+end
+
+-- Check that a rollback moving an entry back into the index does not
+-- allocate: the links of {0, {5}} are created by the delete with keys of
+-- their own, the replacement takes the index keys over to the links, and the
+-- rollback moves them back while tuple allocation fails.
+g.test_rollback_relinks_index_key = function(cg)
+    cg.server:exec(function()
+        local s = box.space.s
+        s:replace{0, {5}}
+        box.internal.memtx_tx_gc(100)
+        box.begin()
+        s:delete{0}
+        s:replace{0, {5}}
+        box.error.injection.set('ERRINJ_TUPLE_ALLOC', true)
+        box.rollback()
+        box.error.injection.set('ERRINJ_TUPLE_ALLOC', false)
+        t.assert_equals(s.index.mk:select{}, {{0, {5}}})
+        t.assert_equals(s.index.mk:select{5}, {{0, {5}}})
+    end)
 end
 
 -- Check that a count tracker bounded by an index entry survives the
