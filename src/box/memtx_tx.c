@@ -1146,6 +1146,24 @@ memtx_tx_story_link_create(struct memtx_story_link *link,
 	rlist_add(&story->link[index->dense_id].list, &link->link);
 }
 
+#ifndef NDEBUG
+/**
+ * Check that a functional index @a entry holds a key of the index format:
+ * only such keys may be put into the index, see
+ * memtx_tx_story_link_take_index_key().
+ */
+static inline bool
+memtx_tx_index_entry_has_index_key(struct index *index,
+				   struct memtx_index_entry entry)
+{
+	if (entry.tuple == NULL || !index->def->key_def->for_func_index)
+		return true;
+	struct tuple_format *index_format =
+		((struct memtx_engine *)index->engine)->func_key_format;
+	return tuple_format((struct tuple *)entry.key_data) == index_format;
+}
+#endif
+
 /**
  * Create and register one owned story link.
  *
@@ -1650,6 +1668,7 @@ memtx_tx_story_link_top(struct memtx_story_link *new_top,
 			.tuple = new_top->story->tuple,
 			.key_data = new_top->key_data,
 		};
+		assert(memtx_tx_index_entry_has_index_key(index, new_entry));
 		struct tuple *removed;
 		if (memtx_index_replace_entry(index, old_entry, new_entry,
 					      DUP_REPLACE, &removed) != 0) {
@@ -2601,6 +2620,30 @@ memtx_tx_history_add_stmt_prepare_result(struct tuple *old_tuple,
 }
 
 /**
+ * Make the @a link of a replaced functional entry hold the key stored in the
+ * index.
+ *
+ * A link created from the tuple rather than from an index entry (by story
+ * garbage collection, the snapshot cleaner or the linking of a deleted story)
+ * holds a key of its own, of the runtime format, which is freed as soon as it
+ * is dereferenced, unlike the index keys, which are freed lazily while read
+ * views exist. The index releases its key with the replaced entry, but the
+ * key is needed again to put the entry back on rollback or garbage
+ * collection, which must not allocate and thus must not fail: take it over
+ * here, before the entry becomes an older version in its chain.
+ */
+static void
+memtx_tx_story_link_take_index_key(struct memtx_story_link *link,
+				   struct memtx_index_entry replaced)
+{
+	if (!link->is_func || link->key_data == replaced.key_data)
+		return;
+	tuple_ref((struct tuple *)replaced.key_data);
+	tuple_unref((struct tuple *)link->key_data);
+	link->key_data = replaced.key_data;
+}
+
+/**
  * Helper of @sa memtx_tx_history_add_stmt, does actual work in case when
  * new_tuple != NULL.
  * Just for understanding, that might be:
@@ -2679,6 +2722,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 					memtx_tx_story_link_get(
 						space->index[i],
 						result->replaced);
+				memtx_tx_story_link_take_index_key(
+					next_link, result->replaced);
 				memtx_tx_story_link_top(link, next_link, true);
 			}
 		}
@@ -4019,6 +4064,8 @@ memtx_tx_invalidate_space(struct space *space, struct txn *ddl_owner)
 					.tuple = story->tuple,
 					.key_data = link->key_data,
 				};
+				assert(memtx_tx_index_entry_has_index_key(
+					index, new_entry));
 				struct tuple *result;
 				if (memtx_index_replace_entry(index, old_entry,
 							      new_entry,
@@ -4729,6 +4776,13 @@ memtx_tx_snapshot_cleaner_add(struct mh_snapshot_cleaner_t *ht,
 		.is_present = is_present,
 	};
 	mh_snapshot_cleaner_put(ht, &entry, NULL, index);
+	/*
+	 * The story may be garbage collected while the read view is alive,
+	 * but its functional key must outlive the read view, unlike the
+	 * tuples, which are freed lazily by the engine.
+	 */
+	if (index->def->key_def->for_func_index)
+		tuple_ref((struct tuple *)key_data);
 }
 
 void
@@ -4840,8 +4894,20 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner)
 {
-	if (cleaner->ht != NULL)
-		mh_snapshot_cleaner_delete(cleaner->ht);
+	if (cleaner->ht == NULL)
+		return;
+	if (cleaner->index->def->key_def->for_func_index) {
+		mh_int_t i;
+		mh_foreach(cleaner->ht, i) {
+			struct memtx_tx_snapshot_cleaner_entry *entry =
+				mh_snapshot_cleaner_node(cleaner->ht, i);
+			/* Alter statement entries have no key. */
+			if (entry->from.key_data == HINT_NONE)
+				continue;
+			tuple_unref((struct tuple *)entry->from.key_data);
+		}
+	}
+	mh_snapshot_cleaner_delete(cleaner->ht);
 }
 
 size_t
