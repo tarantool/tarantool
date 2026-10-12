@@ -125,6 +125,27 @@ memtx_tree_data_is_equal(const struct memtx_tree_data_common *a,
 	return a->tuple == b->tuple;
 }
 
+/**
+ * Test whether the tree element under an iterator is the element the
+ * iterator has fetched last. Unlike memtx_tree_data_is_equal(), the hint is
+ * compared too: a multikey or functional index has several elements of one
+ * tuple, and after a tree modification the iterator must not take one of
+ * them for another. Regular indexes have one element per tuple, so their
+ * hints are equal whenever the tuples are.
+ *
+ * memtx_tree_data_is_equal() itself must not compare hints: it is the
+ * identity check of the tree deletion by value, and a functional index
+ * deletes the entries of a tuple by freshly built keys, whose hints (pointers)
+ * differ from the ones in the tree.
+ */
+template<bool USE_HINT>
+static bool
+tree_iterator_at_last(const struct memtx_tree_data<USE_HINT> *check,
+		      const struct memtx_tree_data<USE_HINT> *last)
+{
+	return check->tuple == last->tuple && check->hint == last->hint;
+}
+
 #define BPS_INNER_CARD
 #define BPS_TREE_NAME memtx_tree
 #define BPS_TREE_BLOCK_SIZE (512)
@@ -426,7 +447,7 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->last.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->last)) {
+	if (check == NULL || !tree_iterator_at_last(check, &it->last)) {
 		it->tree_iterator = memtx_tree_upper_bound_elem(&index->tree,
 								it->last, NULL);
 	} else {
@@ -469,7 +490,7 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->last.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->last))
+	if (check == NULL || !tree_iterator_at_last(check, &it->last))
 		tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->last.tuple;
@@ -511,7 +532,7 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->last.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->last)) {
+	if (check == NULL || !tree_iterator_at_last(check, &it->last)) {
 		it->tree_iterator = memtx_tree_upper_bound_elem(&index->tree,
 								it->last, NULL);
 	} else {
@@ -568,7 +589,7 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->last.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->last))
+	if (check == NULL || !tree_iterator_at_last(check, &it->last))
 		tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->last.tuple;
