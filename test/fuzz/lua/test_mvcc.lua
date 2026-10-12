@@ -208,7 +208,7 @@ generic_idx_meta.ops = {
         },
 }
 
-local tree_idx_meta = table.copy(generic_idx_meta)
+local tree_idx_meta = table.deepcopy(generic_idx_meta)
 tree_idx_meta.iters = {'EQ', 'REQ', 'GT', 'GE', 'LT', 'LE'}
 local tree_idx_meta_additional_ops = {
         {
@@ -231,7 +231,7 @@ for _, op in ipairs(tree_idx_meta_additional_ops) do
     table.insert(tree_idx_meta.ops, op)
 end
 
-local hash_idx_meta = table.copy(generic_idx_meta)
+local hash_idx_meta = table.deepcopy(generic_idx_meta)
 hash_idx_meta.iters = {'EQ'}
 
 local function create_idx_meta(fields, type)
