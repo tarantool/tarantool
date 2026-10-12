@@ -802,6 +802,98 @@ g.test_snapshot_sort_data_with_stories = function(cg)
     stream:rollback()
 end
 
+-- Check that a count tracker bounded by an index entry survives the
+-- replacement of the bound entry: the bound is described by the key stored in
+-- the index, which is released with the entry.
+g.test_count_until_bound_replaced = function(cg)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5}}
+        box.space.s:replace{1, {6}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    stream1:begin()
+    -- Materialize the stories, the garbage collector creates their links.
+    stream1.space.s:get{0}
+    stream1.space.s:get{1}
+    cg.server:exec(function()
+        box.internal.memtx_tx_gc(100)
+    end)
+    -- Skip one tuple and reach the bound {1, {6}}: the skipped tuples are
+    -- tracked by a count up to the bound.
+    t.assert_equals(stream1.space.s.index.mk:select({}, {offset = 1}),
+                    {{1, {6}}})
+
+    -- Replace the bound: its old index entry is released.
+    stream2.space.s:replace{1, {6}}
+    -- Reuse the released memory with a key that sorts after any other key.
+    stream2.space.s:replace{2, {50}}
+    cg.server:exec(function()
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    -- Insert into the index: the count tracker is checked against the bound.
+    stream2.space.s:replace{3, {7}}
+    t.assert_equals(stream1.space.s.index.mk:select({}, {offset = 1}),
+                    {{1, {6}}})
+    stream1:commit()
+end
+
+-- Check that a count tracker bounded by an index entry survives the rollback
+-- and garbage collection of the story of the bound.
+g.test_count_until_bound_rolled_back = function(cg)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {5}}
+        box.space.s:replace{1, {7}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    -- The bound is the invisible replacement of {1, {7}}: the transaction
+    -- reads the older version of the tuple and does not keep the bound alive.
+    stream1:begin()
+    stream1.space.s:replace{1, {7}}
+    stream2:begin()
+    t.assert_equals(stream2.space.s.index.mk:select({}, {offset = 1}),
+                    {{1, {7}}})
+    stream1:rollback()
+
+    cg.server:exec(function()
+        -- Garbage collect the story of the bound and reuse its memory.
+        box.internal.memtx_tx_gc(100)
+        for i = 10, 40 do
+            box.space.s:replace{i, {i}}
+        end
+        for i = 10, 40 do
+            box.space.s:delete{i}
+        end
+        box.internal.memtx_tx_gc(100)
+        -- Insert into the index: the count tracker is checked against the
+        -- bound.
+        box.space.s:replace{2, {6}}
+    end)
+    t.assert_equals(stream2.space.s.index.mk:select({}, {offset = 1}),
+                    {{1, {7}}})
+    stream2:commit()
+end
+
+-- Check that an offset select outside of a transaction reaches a bound that
+-- has no story.
+g.test_count_until_bound_no_txn = function(cg)
+    cg.server:exec(function()
+        box.space.s:replace{0, {5}}
+        box.space.s:replace{1, {6}}
+        box.internal.memtx_tx_gc(100)
+        t.assert_equals(box.space.s.index.mk:select({}, {offset = 1}),
+                        {{1, {6}}})
+    end)
+end
+
 -- Check sinking of story for commit preparation works correctly.
 g.test_prepare_story_sink = function(cg)
     local stream1 = cg.server.net_box:new_stream()

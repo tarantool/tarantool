@@ -368,8 +368,13 @@ struct count_gap_item {
 	 * the tracker is alive, e.g. after that transaction is rolled back.
 	 */
 	struct tuple *until;
-	/** The bound tuple hint. */
+	/**
+	 * The bound tuple hint. A functional index key is referenced for
+	 * the same reason as the bound tuple.
+	 */
 	hint_t until_hint;
+	/** Whether @a until_hint is a referenced functional index key. */
+	bool until_hint_is_func_key;
 };
 
 /**
@@ -414,7 +419,8 @@ memtx_tx_full_scan_gap_item_new(struct txn *txn);
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    const char *key, uint32_t part_count,
-			    struct tuple *until, hint_t until_hint);
+			    struct tuple *until, hint_t until_hint,
+			    bool until_hint_is_func_key);
 
 /**
  * Destroy and free any kind of gap item.
@@ -3849,6 +3855,8 @@ memtx_tx_delete_gap(struct gap_item_base *item)
 		pool = &txm.count_gap_item_mempool;
 		struct count_gap_item *count_item =
 			(struct count_gap_item *)item;
+		if (count_item->until_hint_is_func_key)
+			tuple_unref((struct tuple *)count_item->until_hint);
 		if (count_item->until != NULL)
 			tuple_unref(count_item->until);
 		break;
@@ -4326,9 +4334,11 @@ memtx_tx_nearby_gap_item_new(struct txn *txn, enum iterator_type type,
 static struct count_gap_item *
 memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 			    const char *key, uint32_t part_count,
-			    struct tuple *until, hint_t until_hint)
+			    struct tuple *until, hint_t until_hint,
+			    bool until_hint_is_func_key)
 {
 	assert(until == NULL || tuple_has_flag(until, TUPLE_IS_DIRTY));
+	assert(until != NULL || !until_hint_is_func_key);
 
 	struct memtx_tx_mempool *pool = &txm.count_gap_item_mempool;
 	struct count_gap_item *item = memtx_tx_xmempool_alloc(txn, pool);
@@ -4340,8 +4350,11 @@ memtx_tx_count_gap_item_new(struct txn *txn, enum iterator_type type,
 				      sizeof(item->short_key), &item->key_len);
 	item->until = until;
 	item->until_hint = until_hint;
+	item->until_hint_is_func_key = until_hint_is_func_key;
 	if (until != NULL)
 		tuple_ref(until);
+	if (until_hint_is_func_key)
+		tuple_ref((struct tuple *)until_hint);
 
 	return item;
 }
@@ -4464,7 +4477,8 @@ memtx_tx_track_count_until_slow(struct txn *txn, struct space *space,
 
 	if (txn != NULL && txn->status == TXN_INPROGRESS) {
 		struct count_gap_item *item = memtx_tx_count_gap_item_new(
-			txn, type, key, part_count, until, until_hint);
+			txn, type, key, part_count, until, until_hint,
+			until != NULL && cmp_def->for_func_index);
 		/*
 		 * Empty key count trackers are inserted in the end of the index
 		 * gap list, so we can search for an existing empty key gap item
