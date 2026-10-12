@@ -1097,6 +1097,45 @@ g.test_count_until_bound_no_txn = function(cg)
     end)
 end
 
+-- Check that a reverse iterator goes on correctly after the transaction
+-- deleted the tuple the iterator stands on and another transaction replaced
+-- the entry: the iterator must not take another entry of the same tuple for
+-- its position, otherwise the gap is tracked on an entry that is not in the
+-- index.
+g.test_reverse_iterator_after_delete_and_replace = function(cg)
+    cg.server:exec(function()
+        local fiber = require('fiber')
+        local s = box.space.s
+        s:replace{2, {5, 1, 2, 6}}
+        box.internal.memtx_tx_gc(100)
+        local res = {}
+        local ch = fiber.channel(1)
+        local f = fiber.new(function()
+            box.begin()
+            local gen, param, state = s.index.mk:pairs({}, {iterator = 'LE'})
+            state, res.first = gen(param, state)
+            s:delete{2}
+            ch:get()
+            local _, second = gen(param, state)
+            res.second = second
+            box.rollback()
+            ch:put(true)
+        end)
+        f:set_joinable(true)
+        fiber.sleep(0)
+        box.begin()
+        -- Replaces the entries of keys 6 and 1 and adds the entry of key 4
+        -- before the old entries of keys 5 and 2, which stay in the index.
+        s:replace{2, {6, 1, 4}}
+        ch:put(true)
+        ch:get()
+        box.rollback()
+        f:join()
+        t.assert_equals(res.first, {2, {5, 1, 2, 6}})
+        t.assert_equals(res.second, nil)
+    end)
+end
+
 -- Check sinking of story for commit preparation works correctly.
 g.test_prepare_story_sink = function(cg)
     local stream1 = cg.server.net_box:new_stream()
