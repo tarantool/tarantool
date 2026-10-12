@@ -631,6 +631,8 @@ local function test_count_on_op(cg, op)
 
     cg.server:exec(function()
         box.space.s:replace{0, {0, 1, 0}}
+        -- Count must rely on gap tracking, not on an existing story.
+        box.internal.memtx_tx_gc(100)
     end)
 
     stream1:begin()
@@ -638,6 +640,10 @@ local function test_count_on_op(cg, op)
     t.assert_equals(stream1.space.s.index.mk:count{}, 2)
     if op == 'replace' then
         stream2.space.s:replace{0, {1, 2, 1}}
+    elseif op == 'replace_dropping_entries' then
+        -- Nothing is inserted into the index, only the entry of key 0 is
+        -- dropped.
+        stream2.space.s:replace{0, {1}}
     else
         stream2.space.s:delete{0}
     end
@@ -657,6 +663,11 @@ end
 -- Check count conflict works correctly on deletion of tuple.
 g.test_count_on_delete = function(cg)
     test_count_on_op(cg, 'delete')
+end
+
+-- Check count conflict works correctly on replace dropping index entries.
+g.test_count_on_replace_dropping_entries = function(cg)
+    test_count_on_op(cg, 'replace_dropping_entries')
 end
 
 -- Check space invalidation on DDL works correctly.
@@ -880,6 +891,97 @@ g.test_count_until_bound_rolled_back = function(cg)
     t.assert_equals(stream2.space.s.index.mk:select({}, {offset = 1}),
                     {{1, {7}}})
     stream2:commit()
+end
+
+-- Check that a count conflicts with the replacement of a counted tuple, which
+-- moves its key out of the counted range, while the counting transaction has
+-- replaced the same tuple keeping the key.
+g.test_count_conflicts_with_replace_of_own_replaced = function(cg)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:replace{0, {3}}
+        box.space.s:replace{1, {2}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    stream1:begin()
+    t.assert_equals(stream1.space.s.index.mk:count({3}, {iterator = 'LE'}),
+                    2)
+    stream1.space.s:replace{0, {3}}
+    -- Serialized before stream1: its count becomes 1.
+    stream2.space.s:replace{0, {5}}
+    t.assert_error_msg_content_equals(
+        'Transaction has been aborted by conflict',
+        function() stream1:commit() end)
+end
+
+-- Run the scenario of a count conflict with a replace of a counted tuple
+-- under an uncommitted version of its entry by another transaction, which is
+-- rolled back later, on the index @a index_name. The replace retains or drops
+-- the counted key 1, which has duplicate positions in the old and the new
+-- tuple.
+local function test_count_on_replace_under_uncommitted_version(cg, index_name,
+                                                               drops_key)
+    local stream1 = cg.server.net_box:new_stream()
+    local stream2 = cg.server.net_box:new_stream()
+
+    cg.server:exec(function()
+        box.space.s:truncate()
+        box.space.s:replace{0, {1, 1}}
+        box.space.s:replace{1, {2, 2}}
+        box.internal.memtx_tx_gc(100)
+    end)
+
+    local index = stream1.space.s.index[index_name]
+    stream1:begin()
+    t.assert_equals(index:count({2}, {iterator = 'LE'}), 2)
+    -- Another transaction puts an uncommitted version of the entry of the
+    -- key 1 on top of the counted one.
+    stream2:begin()
+    stream2.space.s:replace{0, {1, 1}}
+    cg.server:exec(function(drops_key)
+        box.space.s:replace{0, drops_key and {3, 3} or {1, 1}}
+    end, {drops_key})
+    stream2:rollback()
+    -- The counting transaction either sees the same keys or is sent to a read
+    -- view, which it cannot write from.
+    t.assert_equals(index:count({2}, {iterator = 'LE'}), 2)
+    if drops_key then
+        t.assert_error_msg_content_equals(
+            'Transaction has been aborted by conflict',
+            function() stream1.space.s:replace{5, {5}} end)
+    else
+        stream1.space.s:replace{5, {5}}
+        stream1:commit()
+    end
+end
+
+-- Run @a scenario on the unique index of the space and on a non-unique one.
+local function test_on_unique_and_non_unique_index(cg, scenario)
+    scenario(cg, 'mk')
+    cg.server:exec(function(index_opts)
+        index_opts.unique = false
+        box.space.s:create_index('nu', index_opts)
+    end, {cg.params.index_opts})
+    scenario(cg, 'nu')
+end
+
+-- Check that a replace retaining a counted key under an uncommitted version of
+-- its entry does not conflict with the count.
+g.test_count_on_replace_retaining_key_under_uncommitted_version = function(cg)
+    test_on_unique_and_non_unique_index(cg, function(cg, index_name)
+        test_count_on_replace_under_uncommitted_version(cg, index_name, false)
+    end)
+end
+
+-- Check that a replace dropping a counted key under an uncommitted version of
+-- its entry conflicts with the count.
+g.test_count_on_replace_dropping_key_under_uncommitted_version = function(cg)
+    test_on_unique_and_non_unique_index(cg, function(cg, index_name)
+        test_count_on_replace_under_uncommitted_version(cg, index_name, true)
+    end)
 end
 
 -- Check that an offset select outside of a transaction reaches a bound that
