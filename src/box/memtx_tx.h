@@ -113,6 +113,8 @@ extern const char *memtx_tx_story_status_strs[];
  */
 struct memtx_tx_snapshot_cleaner {
 	struct mh_snapshot_cleaner_t *ht;
+	/** Index whose entries are cleaned, used to compare logical keys. */
+	struct index *index;
 };
 
 /**
@@ -591,22 +593,22 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 /** Helper of txm_snapshot_clafify. */
 struct tuple *
 memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
-			       struct tuple *tuple);
+			       struct memtx_index_entry entry);
 
 /**
  * Like a common clarify that function returns proper tuple if original
  * tuple in index is dirty.
  * @param cleaner - pre-created snapshot cleaner.
- * @param tuple - tuple to clean.
+ * @param entry - index entry to clean.
  * @return cleaned tuple, can be NULL.
  */
 static inline struct tuple *
 memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
-			  struct tuple *tuple)
+			  struct memtx_index_entry entry)
 {
 	if (cleaner->ht == NULL)
-		return tuple;
-	return memtx_tx_snapshot_clarify_slow(cleaner, tuple);
+		return entry.tuple;
+	return memtx_tx_snapshot_clarify_slow(cleaner, entry);
 }
 
 /**
@@ -662,14 +664,14 @@ memtx_tx_snapshot_invisible_count_matching_until(
 }
 
 /**
- * Detect whether the key of @a tuple from an index with the given @a key_def
- * is visible in the snapshot with the given @a cleaner.
+ * Detect whether the index @a entry is visible in the snapshot with the given
+ * @a cleaner.
  */
 static inline bool
-memtx_tx_snapshot_tuple_key_is_visible(
-	struct memtx_tx_snapshot_cleaner *cleaner, struct tuple *tuple)
+memtx_tx_snapshot_entry_is_visible(struct memtx_tx_snapshot_cleaner *cleaner,
+				   struct memtx_index_entry entry)
 {
-	return memtx_tx_snapshot_clarify(cleaner, tuple) != NULL;
+	return memtx_tx_snapshot_clarify(cleaner, entry) != NULL;
 }
 
 #if defined(__cplusplus)

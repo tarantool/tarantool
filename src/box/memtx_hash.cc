@@ -618,8 +618,11 @@ hash_read_view_get_raw(struct index_read_view *base,
 		*result = read_view_tuple_none();
 		return 0;
 	}
-	struct tuple *tuple = light_index_view_get(&rv->view, k);
-	return memtx_prepare_read_view_tuple(tuple, &rv->base,
+	struct memtx_index_entry entry = {
+		.tuple = light_index_view_get(&rv->view, k),
+		.key_data = HINT_NONE,
+	};
+	return memtx_prepare_read_view_tuple(entry, &rv->base,
 					     &rv->cleaner, result);
 }
 
@@ -638,7 +641,11 @@ hash_read_view_iterator_ge(struct index_read_view_iterator *iterator,
 			*result = read_view_tuple_none();
 			return 0;
 		}
-		if (memtx_prepare_read_view_tuple(*res, &rv->base,
+		struct memtx_index_entry entry = {
+			.tuple = *res,
+			.key_data = HINT_NONE,
+		};
+		if (memtx_prepare_read_view_tuple(entry, &rv->base,
 						  &rv->cleaner, result) != 0)
 			return -1;
 		if (result->data != NULL)
