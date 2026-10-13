@@ -56,6 +56,8 @@ local params = require('internal.argparse').parse(arg, {
     {'p_commit', 'number'},
     {'max_key', 'number'},
     {'p_null_key', 'number'},
+    {'max_offset', 'number'},
+    {'max_limit', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -78,6 +80,10 @@ local DEFAULT_P_COMMIT = 0.1
 local DEFAULT_MAX_KEY = 8
 -- Default probability of NULL value for nullable keys.
 local DEFAULT_P_NULL_KEY = 0.1
+-- Default maximum select offset (minimum is 0).
+local DEFAULT_MAX_OFFSET = 4
+-- Default maximum select limit (minimum is 1).
+local DEFAULT_MAX_LIMIT = 4
 
 if params.help then
     print(([[
@@ -97,10 +103,13 @@ if params.help then
    p_commit <number, %.2f>   - probability of transaction commit
    max_key <number, %d>      - maximum random unsigned key used (minimum is 1)
    p_null_key <number, %.2f> - probability of NULL value for nullable keys
+   max_offset <number, %d>   - maximum select offset (minimum is 0)
+   max_limit <number, %d>    - maximum select limit (minimum is 1)
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
-           DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY))
+           DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
+           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT))
     os.exit(0)
 end
 
@@ -124,6 +133,10 @@ local ARG_P_COMMIT = params.p_commit or DEFAULT_P_COMMIT
 local ARG_MAX_KEY = params.max_key or DEFAULT_MAX_KEY
 -- Probability of NULL value for nullable keys.
 local ARG_P_NULL_KEY = params.p_null_key or DEFAULT_P_NULL_KEY
+-- Maximum select offset (minimum is 0).
+local ARG_MAX_OFFSET = params.max_offset or DEFAULT_MAX_OFFSET
+-- Maximum select limit (minimum is 1).
+local ARG_MAX_LIMIT = params.max_limit or DEFAULT_MAX_LIMIT
 
 -- Global test constants.
 
@@ -148,6 +161,7 @@ local GET = 1
 local COUNT = 2
 local MIN = 3
 local MAX = 4
+local OFFSET = 5
 
 -- Format of test space.
 local SPACE_FORMAT = {
@@ -159,7 +173,8 @@ local SPACE_FORMAT = {
 }
 
 -- A DQL operation format takes the space, the index, the key (`key_cnt` or
--- `full_key`) and the iterator (`has_iter`) in this order.
+-- `full_key`), the iterator (`has_iter`) and the offset and the limit
+-- (`has_window`) in this order.
 local generic_idx_meta = {
     ro_ops = {
         {
@@ -246,6 +261,33 @@ local tree_idx_meta_additional_ops = {
             has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            key_cnt = 0,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            key_cnt = 1,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
+        },
+        {
+            type = DQL,
+            subtype = OFFSET,
+            full_key = true,
+            has_iter = true,
+            has_window = true,
+            fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
+                  '{iterator = \'%s\', offset = %d, limit = %d})',
         },
         {
             type = DQL,
@@ -693,6 +735,10 @@ local function gen_random_operation(tx)
         end
         if op.has_iter then
             table.insert(args, idx.iters[math.random(#idx.iters)])
+        end
+        if op.has_window then
+            table.insert(args, math.random(0, ARG_MAX_OFFSET))
+            table.insert(args, math.random(ARG_MAX_LIMIT))
         end
         op.str = op.fmt:format(unpack(args))
     else
