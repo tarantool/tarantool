@@ -60,6 +60,7 @@ local params = require('internal.argparse').parse(arg, {
     {'max_limit', 'number'},
     {'p_next_page', 'number'},
     {'prefill_cnt', 'number'},
+    {'p_next_tuples', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -90,6 +91,8 @@ local DEFAULT_MAX_LIMIT = 4
 local DEFAULT_P_NEXT_PAGE = 0.5
 -- Default number of random tuples put into each space before a round.
 local DEFAULT_PREFILL_CNT = 32
+-- Default probability of fetching the next tuples of a held iterator.
+local DEFAULT_P_NEXT_TUPLES = 0.5
 
 if params.help then
     print(([[
@@ -115,12 +118,14 @@ if params.help then
                                 paginated select
    prefill_cnt <number, %d>  - number of random tuples put into each space
                                before a round
+   p_next_tuples <number, %.2f> - probability of fetching the next tuples of
+                                  a held iterator
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
            DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
            DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE,
-           DEFAULT_PREFILL_CNT))
+           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES))
     os.exit(0)
 end
 
@@ -152,6 +157,8 @@ local ARG_MAX_LIMIT = params.max_limit or DEFAULT_MAX_LIMIT
 local ARG_P_NEXT_PAGE = params.p_next_page or DEFAULT_P_NEXT_PAGE
 -- Number of random tuples put into each space before a round.
 local ARG_PREFILL_CNT = params.prefill_cnt or DEFAULT_PREFILL_CNT
+-- Probability of fetching the next tuples of a held iterator.
+local ARG_P_NEXT_TUPLES = params.p_next_tuples or DEFAULT_P_NEXT_TUPLES
 
 -- Global test constants.
 
@@ -179,6 +186,8 @@ local MAX = 4
 local OFFSET = 5
 local PAGE = 6
 local NEXT_PAGE = 7
+local ITERATOR = 8
+local NEXT_TUPLES = 9
 
 -- Format of test space.
 local SPACE_FORMAT = {
@@ -384,6 +393,30 @@ local tree_idx_meta_additional_ops = {
             has_iter = true,
             has_limit = true,
             fmt = 'select_first_page(%d, \'%s\', %d, {%s}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            key_cnt = 0,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {}, \'%s\')',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            key_cnt = 1,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {%s}, \'%s\')',
+        },
+        {
+            type = DQL,
+            subtype = ITERATOR,
+            has_tid = true,
+            full_key = true,
+            has_iter = true,
+            fmt = 'open_iterator(%d, \'%s\', %d, {%s}, \'%s\')',
         },
     }
 for _, op in ipairs(tree_idx_meta_additional_ops) do
@@ -615,6 +648,33 @@ function select_next_page(tid, limit)
     return tuples
 end
 
+-- The iterator held open by each transaction across its other statements.
+iterators = {}
+
+function open_iterator(tid, space, idx, key, iter)
+    local gen, param, state = box.space[space].index[idx]:pairs(key, {
+        iterator = iter}):unwrap()
+    iterators[tid] = {gen = gen, param = param, state = state}
+    return true
+end
+
+function next_tuples(tid, count)
+    local iterator = iterators[tid]
+    local tuples = {}
+    if iterator == nil or iterator.state == nil then
+        return tuples
+    end
+    for _ = 1, count do
+        local tuple
+        iterator.state, tuple = iterator.gen(iterator.param, iterator.state)
+        if iterator.state == nil then
+            break
+        end
+        table.insert(tuples, tuple)
+    end
+    return tuples
+end
+
 ]]
 
 local function generate_txn_proxy(id)
@@ -664,6 +724,9 @@ local function tx_call(tx, operation)
     end
     if ok and operation.subtype == PAGE then
         tx.page = true
+    end
+    if ok and operation.subtype == ITERATOR then
+        tx.iterator = true
     end
     if not ok then
         if res.message == 'Transaction has been aborted by conflict' then
@@ -746,6 +809,7 @@ local function tx_new(conn, id)
         committed = false,
         eng       = ENGINES[math.random(#ENGINES)],
         id        = id,
+        iterator  = false,
         page      = false,
         ro        = true,
         running   = false,
@@ -818,6 +882,15 @@ local function gen_random_operation(tx)
             subtype = NEXT_PAGE,
             ordered = true,
             str = ('select_next_page(%d, %d)'):format(
+                tx.id, math.random(ARG_MAX_LIMIT)),
+        }
+    end
+    if tx.iterator and math.random() < ARG_P_NEXT_TUPLES then
+        return {
+            type = DQL,
+            subtype = NEXT_TUPLES,
+            ordered = true,
+            str = ('next_tuples(%d, %d)'):format(
                 tx.id, math.random(ARG_MAX_LIMIT)),
         }
     end
