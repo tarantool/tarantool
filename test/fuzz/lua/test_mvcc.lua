@@ -61,6 +61,7 @@ local params = require('internal.argparse').parse(arg, {
     {'p_next_page', 'number'},
     {'prefill_cnt', 'number'},
     {'p_next_tuples', 'number'},
+    {'p_gc', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -93,6 +94,8 @@ local DEFAULT_P_NEXT_PAGE = 0.5
 local DEFAULT_PREFILL_CNT = 32
 -- Default probability of fetching the next tuples of a held iterator.
 local DEFAULT_P_NEXT_TUPLES = 0.5
+-- Default probability of a story garbage collection step between statements.
+local DEFAULT_P_GC = 0.1
 
 if params.help then
     print(([[
@@ -120,12 +123,14 @@ if params.help then
                                before a round
    p_next_tuples <number, %.2f> - probability of fetching the next tuples of
                                   a held iterator
+   p_gc <number, %.2f>       - probability of a story garbage collection step
+                               between statements
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
            DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
            DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE,
-           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES))
+           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES, DEFAULT_P_GC))
     os.exit(0)
 end
 
@@ -159,6 +164,8 @@ local ARG_P_NEXT_PAGE = params.p_next_page or DEFAULT_P_NEXT_PAGE
 local ARG_PREFILL_CNT = params.prefill_cnt or DEFAULT_PREFILL_CNT
 -- Probability of fetching the next tuples of a held iterator.
 local ARG_P_NEXT_TUPLES = params.p_next_tuples or DEFAULT_P_NEXT_TUPLES
+-- Probability of a story garbage collection step between statements.
+local ARG_P_GC = params.p_gc or DEFAULT_P_GC
 
 -- Global test constants.
 
@@ -169,6 +176,9 @@ local DML = 0
 local DQL = 1
 -- Transaction control language (BEGIN, COMMIT, ROLLBACK).
 local TCL = 2
+-- Statements executed outside of the transactions, like the story garbage
+-- collection.
+local ENV = 3
 
 -- DML operation subtypes.
 local DELETE = 0
@@ -509,6 +519,12 @@ local random_tx_executor
 local consistency_checker
 
 local function generate_txn_repro_stmt(stmt)
+    if stmt.type == ENV then
+        if stmt.res == nil then
+            return ('%s\n'):format(stmt.str)
+        end
+        return ('%s -- %s\n'):format(stmt.str, json.encode(stmt.res))
+    end
     return ('tx%d(%q) -- %s\n'):format(stmt.tid, stmt.str,
                                       json.encode(stmt.res))
 end
@@ -679,6 +695,13 @@ function next_tuples(tid, count)
     return tuples
 end
 
+-- The number of stories of the memtx transaction manager.
+function stories_count()
+    local stats = box.stat.memtx.tx().mvcc.tuples
+    return stats.used.stories.count + stats.tracking.stories.count +
+           stats.read_view.stories.count
+end
+
 ]]
 
 local function generate_txn_proxy(id)
@@ -749,6 +772,22 @@ local function tx_call(tx, operation)
         os.exit(1)
     end
     return ok, res
+end
+
+-- Execute a statement outside of the transactions on the executor, recording
+-- it and its result for the reproducer.
+local function env_call(str)
+    local stmt = {type = ENV, str = str}
+    table.insert(stmts, stmt)
+    local ok, res = pcall(random_tx_executor.eval, random_tx_executor,
+                          'return ' .. str)
+    if not ok then
+        dump_repro()
+        log.info(('statement \'%s\' failed: %s'):format(str, tostring(res)))
+        os.exit(1)
+    end
+    stmt.res = res
+    return res
 end
 
 local function tx_begin(tx)
@@ -1003,8 +1042,25 @@ local function execute_random_txs()
             break
         end
         tx_execute_stmt(tx, gen_random_operation(tx))
+        if math.random() < ARG_P_GC then
+            env_call(('box.internal.memtx_tx_gc(%d)'):format(
+                math.random(100)))
+        end
     end
     txs_stop(txs)
+end
+
+-- With no transaction left, the garbage collector must be able to collect
+-- all the stories.
+local function check_stories_collected()
+    env_call('box.internal.memtx_tx_gc(1000000)')
+    local stories = env_call('stories_count()')
+    if stories ~= 0 then
+        dump_repro()
+        log.info(('%d stories left after the garbage collection'):format(
+            stories))
+        os.exit(1)
+    end
 end
 
 local function cast(v)
@@ -1168,7 +1224,7 @@ local function try_serialize()
 
     for i = 1, #stmts do
         local stmt = stmts[i]
-        if not committed_txs_mask[stmt.tid] then
+        if stmt.type == ENV or not committed_txs_mask[stmt.tid] then
             goto continue
         end
 
@@ -1309,6 +1365,7 @@ local function run_test()
         ro_txs_mask = {}
         bad_dml_txs_mask = {}
         execute_random_txs()
+        check_stories_collected()
         random_tx_executor:exec(function()
             box.space.m:drop()
             box.space.v:drop()
