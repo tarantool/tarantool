@@ -759,7 +759,7 @@ end
 local function gen_array()
     local array = {}
     for _ = 1, math.random(4) do
-        table.insert(array, random_number())
+        table.insert(array, math.random(ARG_MAX_KEY * 8))
     end
     return ('{%s}'):format(table.concat(array, ', '))
 end
