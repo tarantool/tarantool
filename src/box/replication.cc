@@ -632,6 +632,7 @@ void
 replica_clear_id(struct replica *replica)
 {
 	assert(replica->id != REPLICA_ID_NIL);
+	replica_set_name(replica, "");
 	/*
 	 * Don't remove replicas from vclock here.
 	 * The vclock_sum() must always grow, it is a core invariant of

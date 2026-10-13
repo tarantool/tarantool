@@ -562,7 +562,7 @@ void
 replica_set_name(struct replica *replica, const char *name);
 
 /*
- * Clear the numeric replica-set-local id of a replica.
+ * Clear the numeric replica-set-local id and name of a replica.
  *
  * The replica is removed from the replication vector clock.
  */
