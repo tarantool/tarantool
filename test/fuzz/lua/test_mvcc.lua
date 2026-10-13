@@ -155,6 +155,8 @@ local SPACE_FORMAT = {
     {'5', type = 'array'},
 }
 
+-- A DQL operation format takes the space, the index, the key (`key_cnt` or
+-- `full_key`) and the iterator (`has_iter`) in this order.
 local generic_idx_meta = {
     ro_ops = {
         {
@@ -168,12 +170,14 @@ local generic_idx_meta = {
             type = DQL,
             subtype = SELECT,
             full_key = true,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
         {
             type = DQL,
             subtype = GET,
+            full_key = true,
             fmt = 'box.space.%s.index[%d]:get{%s}',
         },
     }
@@ -215,6 +219,7 @@ local tree_idx_meta_additional_ops = {
             type = DQL,
             subtype = SELECT,
             key_cnt = 0,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
@@ -222,6 +227,7 @@ local tree_idx_meta_additional_ops = {
             type = DQL,
             subtype = SELECT,
             key_cnt = 1,
+            has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
         },
@@ -611,18 +617,16 @@ local function gen_random_operation(ro)
     -- A tree index returns its tuples in the order of the index.
     op.ordered = idx.type == 'TREE'
     if op.type == DQL then
-        if op.subtype == SELECT then
-            local iter = idx.iters[math.random(#idx.iters)]
-            if op.key_cnt == 0 then
-                op.str = op.fmt:format(eng.space, idx_id, iter)
-            elseif op.key_cnt == 1 then
-                op.str = op.fmt:format(eng.space, idx_id, keys[1], iter)
-            elseif op.full_key then
-                op.str = op.fmt:format(eng.space, idx_id, key, iter)
-            end
-        elseif op.subtype == GET then
-            op.str = op.fmt:format(eng.space, idx_id, key)
+        local args = {eng.space, idx_id}
+        if op.key_cnt == 1 then
+            table.insert(args, keys[1])
+        elseif op.full_key then
+            table.insert(args, key)
         end
+        if op.has_iter then
+            table.insert(args, idx.iters[math.random(#idx.iters)])
+        end
+        op.str = op.fmt:format(unpack(args))
     else
         local tuple = gen_tuple()
         local tuple_str = table.concat(tuple, ', ')
