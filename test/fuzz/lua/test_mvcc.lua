@@ -556,6 +556,7 @@ local function tx_new(conn, id)
         aborted   = false,
         bad_dml   = false,
         committed = false,
+        eng       = ENGINES[math.random(#ENGINES)],
         id        = id,
         ro        = true,
         running   = false,
@@ -606,8 +607,9 @@ local function gen_update(fields)
             ('{\'=\', 4, %s}'):format(gen_field(fields[2]))}
 end
 
-local function gen_random_operation(ro)
-    local eng = ENGINES[math.random(#ENGINES)]
+local function gen_random_operation(tx)
+    local ro = tx.id <= ARG_RO_TX_CNT
+    local eng = tx.eng
     local idx_id = math.random(#eng.idxs) - 1
     local idx = eng.idxs[idx_id + 1]
     local op = ro and idx.ro_ops[math.random(#idx.ro_ops)] or
@@ -698,7 +700,7 @@ local function execute_random_txs()
         if tx == nil then
             break
         end
-        tx_execute_stmt(tx, gen_random_operation(tx.id <= ARG_RO_TX_CNT))
+        tx_execute_stmt(tx, gen_random_operation(tx))
     end
     txs_stop(txs)
 end
