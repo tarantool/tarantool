@@ -145,6 +145,9 @@ local UPSERT = 4
 -- DQL operation subtypes.
 local SELECT = 0
 local GET = 1
+local COUNT = 2
+local MIN = 3
+local MAX = 4
 
 -- Format of test space.
 local SPACE_FORMAT = {
@@ -179,6 +182,20 @@ local generic_idx_meta = {
             subtype = GET,
             full_key = true,
             fmt = 'box.space.%s.index[%d]:get{%s}',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:count()',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            full_key = true,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({%s}, ' ..
+                  '{iterator = \'%s\'})',
         },
     },
     dml_ops = {
@@ -229,6 +246,57 @@ local tree_idx_meta_additional_ops = {
             has_iter = true,
             fmt = 'box.space.%s.index[%d]:select({%s}, ' ..
                   '{iterator = \'%s\', fullscan = true})',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 0,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({}, {iterator = \'%s\'})',
+        },
+        {
+            type = DQL,
+            subtype = COUNT,
+            key_cnt = 1,
+            has_iter = true,
+            fmt = 'box.space.%s.index[%d]:count({%s}, ' ..
+                  '{iterator = \'%s\'})',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:min()',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            key_cnt = 1,
+            fmt = 'box.space.%s.index[%d]:min({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MIN,
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:min({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            key_cnt = 0,
+            fmt = 'box.space.%s.index[%d]:max()',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            key_cnt = 1,
+            fmt = 'box.space.%s.index[%d]:max({%s})',
+        },
+        {
+            type = DQL,
+            subtype = MAX,
+            full_key = true,
+            fmt = 'box.space.%s.index[%d]:max({%s})',
         },
     }
 for _, op in ipairs(tree_idx_meta_additional_ops) do
