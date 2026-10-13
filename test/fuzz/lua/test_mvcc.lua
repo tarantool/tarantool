@@ -1276,6 +1276,45 @@ local function try_serialize()
     end
 end
 
+-- The contents of every index of every space, read with @a eval.
+local function space_states(eval)
+    local states = {}
+    for _, eng in ipairs(ENGINES) do
+        states[eng.space] = {}
+        for idx_id = 0, #eng.idxs - 1 do
+            states[eng.space][idx_id] = eval(
+                ('box.space.%s.index[%d]:select({}, ' ..
+                 '{fullscan = true})'):format(eng.space, idx_id))
+        end
+    end
+    return states
+end
+
+-- Compare the spaces of the executor at the end of the round with the spaces
+-- of the checker after the serial execution of the committed transactions.
+local function check_final_state(expected)
+    local got = space_states(function(str)
+        return consistency_checker:eval('return ' .. str)
+    end)
+    for _, eng in ipairs(ENGINES) do
+        for idx_id = 0, #eng.idxs - 1 do
+            local tuples = expected[eng.space][idx_id]
+            local ordered = eng.idxs[idx_id + 1].type == 'TREE'
+            if not is_equal(tuples, got[eng.space][idx_id], ordered) then
+                dump_repro()
+                dump_serial()
+                local msg = ('final state of index %d of space %s differs ' ..
+                             'from the serial one:\n' ..
+                             'expected:\n%s\ngot:\n%s\n'):format(
+                             idx_id, eng.space, yaml.encode(tuples),
+                             yaml.encode(got[eng.space][idx_id]))
+                log.info(msg)
+                os.exit(1)
+            end
+        end
+    end
+end
+
 local function open_files()
     local repro_file_name = 'repro.lua'
     local repro_file_path = fio.pathjoin(random_tx_executor.workdir, '..',
@@ -1366,6 +1405,7 @@ local function run_test()
         bad_dml_txs_mask = {}
         execute_random_txs()
         check_stories_collected()
+        local final_state = space_states(env_call)
         random_tx_executor:exec(function()
             box.space.m:drop()
             box.space.v:drop()
@@ -1376,6 +1416,7 @@ local function run_test()
 
         serial = {}
         try_serialize()
+        check_final_state(final_state)
         consistency_checker:exec(function()
             box.space.m:drop()
             box.space.v:drop()
