@@ -242,6 +242,7 @@ local function create_idx_meta(fields, type)
     else
         res = table.copy(hash_idx_meta)
     end
+    res.type = type
     res.fields = fields
     return res
 end
@@ -460,11 +461,12 @@ end
 local function tx_call(tx, operation)
     local ok, res = pcall(tx._strm.eval, tx._strm, 'return ' .. operation.str)
     table.insert(stmts, {
-        tid  = tx.id,
-        type = operation.type,
-        str  = operation.str,
-        ok   = ok,
-        res  = res,
+        tid     = tx.id,
+        type    = operation.type,
+        str     = operation.str,
+        ordered = operation.ordered,
+        ok      = ok,
+        res     = res,
     })
     if ok and operation.type == DML then
         tx.ro = false
@@ -606,6 +608,8 @@ local function gen_random_operation(ro)
                idx.ops[math.random(#idx.ops)]
     local keys = gen_key(idx.fields)
     local key = table.concat(keys, ', ')
+    -- A tree index returns its tuples in the order of the index.
+    op.ordered = idx.type == 'TREE'
     if op.type == DQL then
         if op.subtype == SELECT then
             local iter = idx.iters[math.random(#idx.iters)]
@@ -733,7 +737,9 @@ local function is_less(lhs, rhs)
     return false
 end
 
-local function is_equal(lhs, rhs)
+-- Compare two results. Lists of tuples are compared as sets unless @a ordered
+-- is set.
+local function is_equal(lhs, rhs, ordered)
     lhs = cast(lhs)
     rhs = cast(rhs)
 
@@ -758,8 +764,10 @@ local function is_equal(lhs, rhs)
         if type(rhs[1]) ~= 'table' then
             return false
         end
-        table.sort(lhs, is_less)
-        table.sort(rhs, is_less)
+        if not ordered then
+            table.sort(lhs, is_less)
+            table.sort(rhs, is_less)
+        end
     end
 
     for k, v in ipairs(lhs) do
@@ -788,7 +796,7 @@ local function try_apply_tx(tx_operations, rw)
         local _, res = pcall(function()
             return consistency_checker:eval('return ' .. operation.str)
         end)
-        if not is_equal(res, operation.res) then
+        if not is_equal(res, operation.res, operation.ordered) then
             if not rw then
                 return false
             end
