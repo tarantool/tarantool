@@ -62,6 +62,7 @@ local params = require('internal.argparse').parse(arg, {
     {'prefill_cnt', 'number'},
     {'p_next_tuples', 'number'},
     {'p_gc', 'number'},
+    {'p_read_view', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -96,6 +97,8 @@ local DEFAULT_PREFILL_CNT = 32
 local DEFAULT_P_NEXT_TUPLES = 0.5
 -- Default probability of a story garbage collection step between statements.
 local DEFAULT_P_GC = 0.1
+-- Default probability of opening a read view between statements.
+local DEFAULT_P_READ_VIEW = 0.02
 
 if params.help then
     print(([[
@@ -125,12 +128,15 @@ if params.help then
                                   a held iterator
    p_gc <number, %.2f>       - probability of a story garbage collection step
                                between statements
+   p_read_view <number, %.2f> - probability of opening a read view between
+                                statements
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
            DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
            DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE,
-           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES, DEFAULT_P_GC))
+           DEFAULT_PREFILL_CNT, DEFAULT_P_NEXT_TUPLES, DEFAULT_P_GC,
+           DEFAULT_P_READ_VIEW))
     os.exit(0)
 end
 
@@ -166,6 +172,8 @@ local ARG_PREFILL_CNT = params.prefill_cnt or DEFAULT_PREFILL_CNT
 local ARG_P_NEXT_TUPLES = params.p_next_tuples or DEFAULT_P_NEXT_TUPLES
 -- Probability of a story garbage collection step between statements.
 local ARG_P_GC = params.p_gc or DEFAULT_P_GC
+-- Probability of opening a read view between statements.
+local ARG_P_READ_VIEW = params.p_read_view or DEFAULT_P_READ_VIEW
 
 -- Global test constants.
 
@@ -512,6 +520,12 @@ local bad_dml_txs_mask
 local serial
 -- Code putting the initial tuples into the spaces for the current round.
 local prefill_code
+-- Number of committed read-write transactions in the current round.
+local rw_commit_cnt
+-- Read views opened during the current round: the number of read-write
+-- transactions committed before each one and, at the end of the round, the
+-- contents of the memtx indexes it sees.
+local read_views
 -- Server used for executing random transactions with MVCC enabled.
 local random_tx_executor
 -- Server used for checking consistency of executed transactions with MVCC
@@ -695,6 +709,25 @@ function next_tuples(tid, count)
     return tuples
 end
 
+-- The read views opened during a round.
+read_views = {}
+
+function open_read_view(i)
+    read_views[i] = box.read_view.open()
+end
+
+-- The contents of the memtx indexes seen by a read view, which is closed.
+function read_view_state(i)
+    local rv = read_views[i]
+    local state = {}
+    for idx_id = 0, #box.space.m.index do
+        state[idx_id + 1] = rv.space.m.index[idx_id]:select({}, {
+            fullscan = true})
+    end
+    rv:close()
+    return state
+end
+
 -- The number of stories of the memtx transaction manager.
 function stories_count()
     local stats = box.stat.memtx.tx().mvcc.tuples
@@ -839,6 +872,9 @@ local function tx_commit(tx)
     end
     tx.running = false
     tx.committed = true
+    if not tx.ro then
+        rw_commit_cnt = rw_commit_cnt + 1
+    end
     return true
 end
 
@@ -1046,8 +1082,19 @@ local function execute_random_txs()
             env_call(('box.internal.memtx_tx_gc(%d)'):format(
                 math.random(100)))
         end
+        if math.random() < ARG_P_READ_VIEW then
+            table.insert(read_views, {prefix = rw_commit_cnt})
+            env_call(('open_read_view(%d)'):format(#read_views))
+        end
     end
     txs_stop(txs)
+end
+
+-- Read the memtx indexes through every read view of the round and close it.
+local function read_read_views()
+    for i, rv in ipairs(read_views) do
+        rv.state = env_call(('read_view_state(%d)'):format(i))
+    end
 end
 
 -- With no transaction left, the garbage collector must be able to collect
@@ -1145,6 +1192,44 @@ local function is_equal(lhs, rhs, ordered)
         end
     end
     return true
+end
+
+local function memtx_idxs()
+    for _, eng in ipairs(ENGINES) do
+        if eng.name == 'memtx' then
+            return eng.idxs
+        end
+    end
+end
+
+-- Compare the read views opened after @a prefix committed read-write
+-- transactions with the checker after the serial execution of these.
+local function check_read_views(prefix)
+    local idxs = memtx_idxs()
+    for i, rv in ipairs(read_views) do
+        if rv.prefix ~= prefix then
+            goto continue
+        end
+        for idx_id = 0, #idxs - 1 do
+            local got = consistency_checker:eval(
+                ('return box.space.m.index[%d]:select({}, ' ..
+                 '{fullscan = true})'):format(idx_id))
+            local ordered = idxs[idx_id + 1].type == 'TREE'
+            if not is_equal(rv.state[idx_id + 1], got, ordered) then
+                dump_repro()
+                dump_serial()
+                local msg = ('read view %d of index %d of space m differs ' ..
+                             'from the serial state after %d read-write ' ..
+                             'transactions:\nexpected:\n%s\ngot:\n%s\n'):format(
+                             i, idx_id, prefix,
+                             yaml.encode(rv.state[idx_id + 1]),
+                             yaml.encode(got))
+                log.info(msg)
+                os.exit(1)
+            end
+        end
+        ::continue::
+    end
 end
 
 -- A vinyl transaction is re-executed in a transaction of the checker, so that
@@ -1250,8 +1335,9 @@ local function try_serialize()
             ro_txs[i] = nil
         end
     end
+    check_read_views(0)
 
-    for _, rw_tid in ipairs(rw_txs) do
+    for prefix, rw_tid in ipairs(rw_txs) do
         -- Try to serialize read-write transactions.
         try_apply_tx(tx_operations[rw_tid], true)
         -- Afterwards, try to serialize read-only transactions again.
@@ -1260,6 +1346,7 @@ local function try_serialize()
                 ro_txs[i] = nil
             end
         end
+        check_read_views(prefix)
     end
 
     if next(ro_txs) ~= nil then
@@ -1400,10 +1487,13 @@ local function run_test()
         random_tx_executor:eval(prefill_code)
 
         stmts = {}
+        rw_commit_cnt = 0
+        read_views = {}
         committed_txs_mask = {}
         ro_txs_mask = {}
         bad_dml_txs_mask = {}
         execute_random_txs()
+        read_read_views()
         check_stories_collected()
         local final_state = space_states(env_call)
         random_tx_executor:exec(function()
