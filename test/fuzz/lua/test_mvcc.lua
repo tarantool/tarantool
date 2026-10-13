@@ -59,6 +59,7 @@ local params = require('internal.argparse').parse(arg, {
     {'max_offset', 'number'},
     {'max_limit', 'number'},
     {'p_next_page', 'number'},
+    {'prefill_cnt', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -87,6 +88,8 @@ local DEFAULT_MAX_OFFSET = 4
 local DEFAULT_MAX_LIMIT = 4
 -- Default probability of fetching the next page of a paginated select.
 local DEFAULT_P_NEXT_PAGE = 0.5
+-- Default number of random tuples put into each space before a round.
+local DEFAULT_PREFILL_CNT = 32
 
 if params.help then
     print(([[
@@ -110,11 +113,14 @@ if params.help then
    max_limit <number, %d>    - maximum select limit (minimum is 1)
    p_next_page <number, %.2f> - probability of fetching the next page of a
                                 paginated select
+   prefill_cnt <number, %d>  - number of random tuples put into each space
+                               before a round
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
            DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
-           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE))
+           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE,
+           DEFAULT_PREFILL_CNT))
     os.exit(0)
 end
 
@@ -144,6 +150,8 @@ local ARG_MAX_OFFSET = params.max_offset or DEFAULT_MAX_OFFSET
 local ARG_MAX_LIMIT = params.max_limit or DEFAULT_MAX_LIMIT
 -- Probability of fetching the next page of a paginated select.
 local ARG_P_NEXT_PAGE = params.p_next_page or DEFAULT_P_NEXT_PAGE
+-- Number of random tuples put into each space before a round.
+local ARG_PREFILL_CNT = params.prefill_cnt or DEFAULT_PREFILL_CNT
 
 -- Global test constants.
 
@@ -455,6 +463,8 @@ local committed_txs_mask
 local bad_dml_txs_mask
 -- Serial schedule of transactions for the current round.
 local serial
+-- Code putting the initial tuples into the spaces for the current round.
+local prefill_code
 -- Server used for executing random transactions with MVCC enabled.
 local random_tx_executor
 -- Server used for checking consistency of executed transactions with MVCC
@@ -618,7 +628,7 @@ os.exit()
 
 local function dump_repro()
     repro_file:write(generate_init_code('repro', true) ..
-                     generate_schema_code() .. HELPERS_CODE)
+                     generate_schema_code() .. HELPERS_CODE .. prefill_code)
     for i = 1, ARG_TX_CNT do
         repro_file:write(generate_txn_proxy(i))
     end
@@ -631,7 +641,7 @@ end
 
 local function dump_serial()
     serial_file:write(generate_init_code('serial', false) ..
-                      generate_schema_code() .. HELPERS_CODE)
+                      generate_schema_code() .. HELPERS_CODE .. prefill_code)
     for _, stmt in ipairs(serial) do
         serial_file:write(generate_txn_serial_stmt(stmt))
     end
@@ -778,6 +788,21 @@ local function gen_tuple()
         table.insert(tuple, gen_field(field))
     end
     return tuple
+end
+
+-- Statements replacing random tuples into the spaces. Replacements failing
+-- on duplicate secondary keys are ignored.
+local function generate_prefill_code()
+    local code = {}
+    for _ = 1, ARG_PREFILL_CNT do
+        for _, eng in ipairs(ENGINES) do
+            table.insert(code, ('pcall(box.space.%s.replace, box.space.%s, ' ..
+                                '{%s})'):format(eng.space, eng.space,
+                                                table.concat(gen_tuple(),
+                                                             ', ')))
+        end
+    end
+    return table.concat(code, '\n') .. '\n'
 end
 
 local function gen_update(fields)
@@ -1161,6 +1186,8 @@ local function run_test()
 
     for _ = 1, ARG_N_ROUNDS do
         random_tx_executor:eval(schema_creation_code)
+        prefill_code = generate_prefill_code()
+        random_tx_executor:eval(prefill_code)
 
         stmts = {}
         committed_txs_mask = {}
@@ -1173,6 +1200,7 @@ local function run_test()
         end)
 
         consistency_checker:eval(schema_creation_code)
+        consistency_checker:eval(prefill_code)
 
         serial = {}
         try_serialize()
