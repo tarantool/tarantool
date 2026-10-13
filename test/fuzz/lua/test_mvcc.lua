@@ -180,10 +180,8 @@ local generic_idx_meta = {
             full_key = true,
             fmt = 'box.space.%s.index[%d]:get{%s}',
         },
-    }
-}
-generic_idx_meta.ops = {
-        unpack(generic_idx_meta.ro_ops),
+    },
+    dml_ops = {
         {
             type = DML,
             subtype = UPDATE,
@@ -210,6 +208,7 @@ generic_idx_meta.ops = {
             subtype = UPSERT,
             fmt = 'box.space.%s:upsert({%s}, {%s, %s})',
         },
+    },
 }
 
 local tree_idx_meta = table.deepcopy(generic_idx_meta)
@@ -234,7 +233,6 @@ local tree_idx_meta_additional_ops = {
     }
 for _, op in ipairs(tree_idx_meta_additional_ops) do
     table.insert(tree_idx_meta.ro_ops, op)
-    table.insert(tree_idx_meta.ops, op)
 end
 
 local hash_idx_meta = table.deepcopy(generic_idx_meta)
@@ -612,8 +610,8 @@ local function gen_random_operation(tx)
     local eng = tx.eng
     local idx_id = math.random(#eng.idxs) - 1
     local idx = eng.idxs[idx_id + 1]
-    local op = ro and idx.ro_ops[math.random(#idx.ro_ops)] or
-               idx.ops[math.random(#idx.ops)]
+    local ops = (ro or math.random(2) == 1) and idx.ro_ops or idx.dml_ops
+    local op = ops[math.random(#ops)]
     local keys = gen_key(idx.fields)
     local key = table.concat(keys, ', ')
     -- A tree index returns its tuples in the order of the index.
