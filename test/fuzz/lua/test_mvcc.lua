@@ -189,6 +189,10 @@ local NEXT_PAGE = 7
 local ITERATOR = 8
 local NEXT_TUPLES = 9
 
+-- Transaction isolation levels, besides the default one. The linearizable
+-- level needs synchronous replication.
+local ISOLATION_LEVELS = {'best-effort', 'read-committed', 'read-confirmed'}
+
 -- Format of test space.
 local SPACE_FORMAT = {
     {'1', type = 'uint'},
@@ -749,10 +753,15 @@ end
 
 local function tx_begin(tx)
     assert(not tx.running and not tx.committed and not tx.aborted)
+    local str = 'box.begin()'
+    if math.random(2) == 1 then
+        str = ('box.begin({txn_isolation = \'%s\'})'):format(
+            ISOLATION_LEVELS[math.random(#ISOLATION_LEVELS)])
+    end
     tx({
         tid  = tx.id,
         type = TCL,
-        str  = 'box.begin()',
+        str  = str,
     })
     tx.running = true
 end
@@ -1163,12 +1172,12 @@ local function try_serialize()
             goto continue
         end
 
-        if stmt.str:find('begin') and committed_txs_mask[stmt.tid] and
+        if stmt.str:startswith('box.begin') and committed_txs_mask[stmt.tid] and
            ro_txs_mask[stmt.tid] and not bad_dml_txs_mask[stmt.tid] then
             table.insert(ro_txs, stmt.tid)
         end
 
-        if stmt.str:find('commit') and committed_txs_mask[stmt.tid] and
+        if stmt.str == 'box.commit()' and committed_txs_mask[stmt.tid] and
            not ro_txs_mask[stmt.tid] then
             table.insert(rw_txs, stmt.tid)
         end
