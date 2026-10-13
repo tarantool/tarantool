@@ -652,6 +652,7 @@ local function tx_call(tx, operation)
     local ok, res = pcall(tx._strm.eval, tx._strm, 'return ' .. operation.str)
     table.insert(stmts, {
         tid     = tx.id,
+        eng     = tx.eng.name,
         type    = operation.type,
         str     = operation.str,
         ordered = operation.ordered,
@@ -1008,7 +1009,33 @@ local function is_equal(lhs, rhs, ordered)
     return true
 end
 
+-- A vinyl transaction is re-executed in a transaction of the checker, so that
+-- the reads keeping a state across its statements see its own writes. A memtx
+-- transaction cannot span the requests of a stream without MVCC, so it is
+-- re-executed statement by statement.
 local function try_apply_tx(tx_operations, rw)
+    local first = tx_operations[1]
+    local stream
+    if first ~= nil and first.eng == 'vinyl' then
+        stream = consistency_checker.net_box:new_stream()
+        stream:begin()
+        if rw then
+            table.insert(serial, {tid = first.tid, str = 'box.begin()'})
+        end
+    end
+    local function finish(ok)
+        if stream == nil then
+            return
+        end
+        if ok then
+            stream:commit()
+        else
+            stream:rollback()
+        end
+        if rw then
+            table.insert(serial, {tid = first.tid, str = 'box.commit()'})
+        end
+    end
     for i, operation in ipairs(tx_operations) do
         if not operation.ok then
             goto continue
@@ -1019,10 +1046,15 @@ local function try_apply_tx(tx_operations, rw)
         end
 
         local _, res = pcall(function()
-            return consistency_checker:eval('return ' .. operation.str)
+            local code = 'return ' .. operation.str
+            if stream ~= nil then
+                return stream:eval(code)
+            end
+            return consistency_checker:eval(code)
         end)
         if not is_equal(res, operation.res, operation.ordered) then
             if not rw then
+                finish(false)
                 return false
             end
             dump_repro()
@@ -1039,6 +1071,7 @@ local function try_apply_tx(tx_operations, rw)
         end
         ::continue::
     end
+    finish(true)
     return true
 end
 
