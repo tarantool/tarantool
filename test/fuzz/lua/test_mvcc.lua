@@ -58,6 +58,7 @@ local params = require('internal.argparse').parse(arg, {
     {'p_null_key', 'number'},
     {'max_offset', 'number'},
     {'max_limit', 'number'},
+    {'p_next_page', 'number'},
 })
 
 local DEFAULT_TEST_DIR_NAME = 'test_mvcc'
@@ -84,6 +85,8 @@ local DEFAULT_P_NULL_KEY = 0.1
 local DEFAULT_MAX_OFFSET = 4
 -- Default maximum select limit (minimum is 1).
 local DEFAULT_MAX_LIMIT = 4
+-- Default probability of fetching the next page of a paginated select.
+local DEFAULT_P_NEXT_PAGE = 0.5
 
 if params.help then
     print(([[
@@ -105,11 +108,13 @@ if params.help then
    p_null_key <number, %.2f> - probability of NULL value for nullable keys
    max_offset <number, %d>   - maximum select offset (minimum is 0)
    max_limit <number, %d>    - maximum select limit (minimum is 1)
+   p_next_page <number, %.2f> - probability of fetching the next page of a
+                                paginated select
    help (same as -h)         - print this message
 ]]):format(DEFAULT_TEST_DIR_NAME, DEFAULT_N_ROUNDS, DEFAULT_TX_CNT,
            DEFAULT_RO_TX_CNT, DEFAULT_STMT_CNT, DEFAULT_P_ROLLBACK,
            DEFAULT_P_COMMIT, DEFAULT_MAX_KEY, DEFAULT_P_NULL_KEY,
-           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT))
+           DEFAULT_MAX_OFFSET, DEFAULT_MAX_LIMIT, DEFAULT_P_NEXT_PAGE))
     os.exit(0)
 end
 
@@ -137,6 +142,8 @@ local ARG_P_NULL_KEY = params.p_null_key or DEFAULT_P_NULL_KEY
 local ARG_MAX_OFFSET = params.max_offset or DEFAULT_MAX_OFFSET
 -- Maximum select limit (minimum is 1).
 local ARG_MAX_LIMIT = params.max_limit or DEFAULT_MAX_LIMIT
+-- Probability of fetching the next page of a paginated select.
+local ARG_P_NEXT_PAGE = params.p_next_page or DEFAULT_P_NEXT_PAGE
 
 -- Global test constants.
 
@@ -162,6 +169,8 @@ local COUNT = 2
 local MIN = 3
 local MAX = 4
 local OFFSET = 5
+local PAGE = 6
+local NEXT_PAGE = 7
 
 -- Format of test space.
 local SPACE_FORMAT = {
@@ -172,9 +181,10 @@ local SPACE_FORMAT = {
     {'5', type = 'array'},
 }
 
--- A DQL operation format takes the space, the index, the key (`key_cnt` or
--- `full_key`), the iterator (`has_iter`) and the offset and the limit
--- (`has_window`) in this order.
+-- A DQL operation format takes the transaction id (`has_tid`), the space, the
+-- index, the key (`key_cnt` or `full_key`), the iterator (`has_iter`) and the
+-- offset and the limit (`has_window`) or the limit alone (`has_limit`) in this
+-- order.
 local generic_idx_meta = {
     ro_ops = {
         {
@@ -339,6 +349,33 @@ local tree_idx_meta_additional_ops = {
             subtype = MAX,
             full_key = true,
             fmt = 'box.space.%s.index[%d]:max({%s})',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            key_cnt = 0,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            key_cnt = 1,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {%s}, \'%s\', %d)',
+        },
+        {
+            type = DQL,
+            subtype = PAGE,
+            has_tid = true,
+            full_key = true,
+            has_iter = true,
+            has_limit = true,
+            fmt = 'select_first_page(%d, \'%s\', %d, {%s}, \'%s\', %d)',
         },
     }
 for _, op in ipairs(tree_idx_meta_additional_ops) do
@@ -541,6 +578,35 @@ local function generate_schema_code()
     return SCHEMA_CODE
 end
 
+-- Helpers of the statements that keep a state across the statements of a
+-- transaction. The state is keyed by the transaction id, so that the serial
+-- re-execution of the statements of a transaction finds the same state.
+local HELPERS_CODE = [[
+-- The last fetched page of each transaction: the select arguments and the
+-- position to continue from.
+pages = {}
+
+function select_first_page(tid, space, idx, key, iter, limit)
+    local tuples, pos = box.space[space].index[idx]:select(key, {
+        iterator = iter, limit = limit, fetch_pos = true, fullscan = true})
+    pages[tid] = {space = space, idx = idx, key = key, iter = iter, pos = pos}
+    return tuples
+end
+
+function select_next_page(tid, limit)
+    local page = pages[tid]
+    if page == nil or page.pos == nil then
+        return {}
+    end
+    local tuples, pos = box.space[page.space].index[page.idx]:select(page.key, {
+        iterator = page.iter, limit = limit, after = page.pos,
+        fetch_pos = true, fullscan = true})
+    page.pos = pos
+    return tuples
+end
+
+]]
+
 local function generate_txn_proxy(id)
     return ('local tx%d = txn_proxy:new()\n'):format(id)
 end
@@ -552,7 +618,7 @@ os.exit()
 
 local function dump_repro()
     repro_file:write(generate_init_code('repro', true) ..
-                     generate_schema_code())
+                     generate_schema_code() .. HELPERS_CODE)
     for i = 1, ARG_TX_CNT do
         repro_file:write(generate_txn_proxy(i))
     end
@@ -565,7 +631,7 @@ end
 
 local function dump_serial()
     serial_file:write(generate_init_code('serial', false) ..
-                      generate_schema_code())
+                      generate_schema_code() .. HELPERS_CODE)
     for _, stmt in ipairs(serial) do
         serial_file:write(generate_txn_serial_stmt(stmt))
     end
@@ -584,6 +650,9 @@ local function tx_call(tx, operation)
     })
     if ok and operation.type == DML then
         tx.ro = false
+    end
+    if ok and operation.subtype == PAGE then
+        tx.page = true
     end
     if not ok then
         if res.message == 'Transaction has been aborted by conflict' then
@@ -666,6 +735,7 @@ local function tx_new(conn, id)
         committed = false,
         eng       = ENGINES[math.random(#ENGINES)],
         id        = id,
+        page      = false,
         ro        = true,
         running   = false,
         _strm     = conn:new_stream(),
@@ -716,6 +786,15 @@ local function gen_update(fields)
 end
 
 local function gen_random_operation(tx)
+    if tx.page and math.random() < ARG_P_NEXT_PAGE then
+        return {
+            type = DQL,
+            subtype = NEXT_PAGE,
+            ordered = true,
+            str = ('select_next_page(%d, %d)'):format(
+                tx.id, math.random(ARG_MAX_LIMIT)),
+        }
+    end
     local ro = tx.id <= ARG_RO_TX_CNT
     local eng = tx.eng
     local idx_id = math.random(#eng.idxs) - 1
@@ -727,7 +806,8 @@ local function gen_random_operation(tx)
     -- A tree index returns its tuples in the order of the index.
     op.ordered = idx.type == 'TREE'
     if op.type == DQL then
-        local args = {eng.space, idx_id}
+        local args = op.has_tid and {tx.id, eng.space, idx_id} or
+                     {eng.space, idx_id}
         if op.key_cnt == 1 then
             table.insert(args, keys[1])
         elseif op.full_key then
@@ -738,6 +818,8 @@ local function gen_random_operation(tx)
         end
         if op.has_window then
             table.insert(args, math.random(0, ARG_MAX_OFFSET))
+        end
+        if op.has_window or op.has_limit then
             table.insert(args, math.random(ARG_MAX_LIMIT))
         end
         op.str = op.fmt:format(unpack(args))
@@ -1059,6 +1141,8 @@ local function setup_test()
     consistency_checker:start()
     random_tx_executor:exec(fiber_set_max_slice)
     consistency_checker:exec(fiber_set_max_slice)
+    random_tx_executor:eval(HELPERS_CODE)
+    consistency_checker:eval(HELPERS_CODE)
 
     open_files()
 end
