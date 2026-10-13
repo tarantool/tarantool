@@ -311,6 +311,18 @@
 #cmakedefine BUILD_STATIC 1
 #cmakedefine EMBED_LUAZLIB 1
 #cmakedefine EMBED_LUAZIP 1
+
+/*
+ * Allow the truncated SSL parameter names alongside the full
+ * ones in the declarative config (iproto.ssl, failover.iproto.ssl).
+ *
+ * Always defined: 1 in Tarantool 3.x for backward compatibility
+ * (the truncated names are accepted but deprecated); 0 in
+ * Tarantool 4.x (the truncated names will be disabled, only the
+ * full names are accepted).
+ */
+#define SSL_PARAMS_ALLOW_DOUBLE_NAMES @SSL_PARAMS_ALLOW_DOUBLE_NAMES_DEFINE@
+
 #cmakedefine TEST_BUILD 1
 
 /*

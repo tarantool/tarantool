@@ -124,144 +124,144 @@ local CIPHERS2 = 'AES256-SHA'
 
 local CERTS = {}
 CERTS.NC_CA1_S1 = {
-    ssl_key = CA1_SERVER1_KEY_FILE,
-    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_key_file = CA1_SERVER1_KEY_FILE,
+    ssl_cert_file = CA1_SERVER1_CERT_FILE,
 }
 CERTS.NC_CA1_S1_H1 = {
-    ssl_key = CA1_SERVER1_KEY_FILE,
-    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_key_file = CA1_SERVER1_KEY_FILE,
+    ssl_cert_file = CA1_SERVER1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.NC_CA1_S1_H2 = {
-    ssl_key = CA1_SERVER1_KEY_FILE,
-    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_key_file = CA1_SERVER1_KEY_FILE,
+    ssl_cert_file = CA1_SERVER1_CERT_FILE,
     ssl_ciphers = CIPHERS2,
 }
 CERTS.NC_CA1_S2 = {
-    ssl_key = CA1_SERVER2_KEY_FILE,
-    ssl_cert = CA1_SERVER2_CERT_FILE,
+    ssl_key_file = CA1_SERVER2_KEY_FILE,
+    ssl_cert_file = CA1_SERVER2_CERT_FILE,
 }
 CERTS.NC_CA1_S3 = {
-    ssl_key = CA1_SERVER3_KEY_FILE,
-    ssl_cert = CA1_SERVER3_CERT_FILE,
+    ssl_key_file = CA1_SERVER3_KEY_FILE,
+    ssl_cert_file = CA1_SERVER3_CERT_FILE,
 }
 CERTS.NC_CA1_C1 = {
-    ssl_key = CA1_CLIENT1_KEY_FILE,
-    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_key_file = CA1_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA1_CLIENT1_CERT_FILE,
 }
 CERTS.NC_CA1_C1_H1 = {
-    ssl_key = CA1_CLIENT1_KEY_FILE,
-    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_key_file = CA1_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA1_CLIENT1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.NC_CA1_C1_H2 = {
-    ssl_key = CA1_CLIENT1_KEY_FILE,
-    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_key_file = CA1_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA1_CLIENT1_CERT_FILE,
     ssl_ciphers = CIPHERS2,
 }
 CERTS.NC_CA2_S1 = {
-    ssl_key = CA2_SERVER1_KEY_FILE,
-    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_key_file = CA2_SERVER1_KEY_FILE,
+    ssl_cert_file = CA2_SERVER1_CERT_FILE,
 }
 CERTS.NC_CA2_S1_H1 = {
-    ssl_key = CA2_SERVER1_KEY_FILE,
-    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_key_file = CA2_SERVER1_KEY_FILE,
+    ssl_cert_file = CA2_SERVER1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.NC_CA2_S1_H2 = {
-    ssl_key = CA2_SERVER1_KEY_FILE,
-    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_key_file = CA2_SERVER1_KEY_FILE,
+    ssl_cert_file = CA2_SERVER1_CERT_FILE,
     ssl_ciphers = CIPHERS2,
 }
 CERTS.NC_CA2_C1 = {
-    ssl_key = CA2_CLIENT1_KEY_FILE,
-    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_key_file = CA2_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT1_CERT_FILE,
 }
 CERTS.NC_CA2_C1_H1 = {
-    ssl_key = CA2_CLIENT1_KEY_FILE,
-    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_key_file = CA2_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.NC_CA2_C1_H2 = {
-    ssl_key = CA2_CLIENT1_KEY_FILE,
-    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_key_file = CA2_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT1_CERT_FILE,
     ssl_ciphers = CIPHERS2,
 }
 -- CA1.
 CERTS.CA1_S1 = {
-    ca_file = CA1_FILE,
-    ssl_key = CA1_SERVER1_KEY_FILE,
-    ssl_cert = CA1_SERVER1_CERT_FILE,
+    ssl_ca_file = CA1_FILE,
+    ssl_key_file = CA1_SERVER1_KEY_FILE,
+    ssl_cert_file = CA1_SERVER1_CERT_FILE,
 }
 CERTS.CA1_S2 = {
-    ca_file = CA1_FILE,
-    ssl_key = CA1_SERVER2_KEY_FILE,
-    ssl_cert = CA1_SERVER2_CERT_FILE,
+    ssl_ca_file = CA1_FILE,
+    ssl_key_file = CA1_SERVER2_KEY_FILE,
+    ssl_cert_file = CA1_SERVER2_CERT_FILE,
 }
 CERTS.CA1_S3 = {
-    ca_file = CA1_FILE,
-    ssl_key = CA1_SERVER3_KEY_FILE,
-    ssl_cert = CA1_SERVER3_CERT_FILE,
+    ssl_ca_file = CA1_FILE,
+    ssl_key_file = CA1_SERVER3_KEY_FILE,
+    ssl_cert_file = CA1_SERVER3_CERT_FILE,
 }
 CERTS.CA1_C1 = {
-    ca_file = CA1_FILE,
-    ssl_key = CA1_CLIENT1_KEY_FILE,
-    ssl_cert = CA1_CLIENT1_CERT_FILE,
+    ssl_ca_file = CA1_FILE,
+    ssl_key_file = CA1_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA1_CLIENT1_CERT_FILE,
 }
 CERTS.CA1_C2 = {
-    ca_file = CA1_FILE,
-    ssl_key = CA1_CLIENT2_KEY_FILE,
-    ssl_cert = CA1_CLIENT2_CERT_FILE,
+    ssl_ca_file = CA1_FILE,
+    ssl_key_file = CA1_CLIENT2_KEY_FILE,
+    ssl_cert_file = CA1_CLIENT2_CERT_FILE,
 }
 -- CA2.
 CERTS.CA2_S1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER1_KEY_FILE,
-    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER1_KEY_FILE,
+    ssl_cert_file = CA2_SERVER1_CERT_FILE,
 }
 CERTS.CA2_S1_H1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER1_KEY_FILE,
-    ssl_cert = CA2_SERVER1_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER1_KEY_FILE,
+    ssl_cert_file = CA2_SERVER1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_S2 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER2_KEY_FILE,
-    ssl_cert = CA2_SERVER2_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER2_KEY_FILE,
+    ssl_cert_file = CA2_SERVER2_CERT_FILE,
 }
 CERTS.CA2_S2_H1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER2_KEY_FILE,
-    ssl_cert = CA2_SERVER2_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER2_KEY_FILE,
+    ssl_cert_file = CA2_SERVER2_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_S3 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER3_KEY_FILE,
-    ssl_cert = CA2_SERVER3_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER3_KEY_FILE,
+    ssl_cert_file = CA2_SERVER3_CERT_FILE,
 }
 CERTS.CA2_S3_H1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_SERVER3_KEY_FILE,
-    ssl_cert = CA2_SERVER3_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_SERVER3_KEY_FILE,
+    ssl_cert_file = CA2_SERVER3_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_C1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_CLIENT1_KEY_FILE,
-    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT1_CERT_FILE,
 }
 CERTS.CA2_C1_H1 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_CLIENT1_KEY_FILE,
-    ssl_cert = CA2_CLIENT1_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_CLIENT1_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT1_CERT_FILE,
     ssl_ciphers = CIPHERS1,
 }
 CERTS.CA2_C2 = {
-    ca_file = CA2_FILE,
-    ssl_key = CA2_CLIENT2_KEY_FILE,
-    ssl_cert = CA2_CLIENT2_CERT_FILE,
+    ssl_ca_file = CA2_FILE,
+    ssl_key_file = CA2_CLIENT2_KEY_FILE,
+    ssl_cert_file = CA2_CLIENT2_CERT_FILE,
 }
 
 local COMMON_URI = 'unix/:./{{ instance_name }}.iproto'
@@ -349,9 +349,9 @@ local function server_net_box_uri_with_opts(server, opts)
         -- Transport.
         [1] = '?string',
         -- SSL opts:
-        ca_file = '?string',
-        ssl_key = '?string',
-        ssl_cert = '?string',
+        ssl_ca_file = '?string',
+        ssl_key_file = '?string',
+        ssl_cert_file = '?string',
         ssl_ciphers = '?string',
     })
     local uri = {}
@@ -366,14 +366,14 @@ local function server_net_box_uri_with_opts(server, opts)
     end
 
     if opts ~= nil then
-        local has_ssl_opts = opts.ca_file ~= nil or
-            opts.ssl_key ~= nil or opts.ssl_cert ~= nil or
+        local has_ssl_opts = opts.ssl_ca_file ~= nil or
+            opts.ssl_key_file ~= nil or opts.ssl_cert_file ~= nil or
             opts.ssl_ciphers ~= nil
         uri.params = {
             transport = opts[1] or (has_ssl_opts and 'ssl' or nil),
-            ssl_ca_file = opts.ca_file,
-            ssl_key_file = opts.ssl_key,
-            ssl_cert_file = opts.ssl_cert,
+            ssl_ca_file = opts.ssl_ca_file,
+            ssl_key_file = opts.ssl_key_file,
+            ssl_cert_file = opts.ssl_cert_file,
             ssl_ciphers = opts.ssl_ciphers,
         }
     end
@@ -1037,15 +1037,15 @@ g2.test_replication_ssl_reconfig = function(cg)
         local u_p = u.params
         t.assert(u_p ~= nil)
         local actual = {
-            ssl_cert = u_p.ssl_cert_file[1],
-            ssl_key = u_p.ssl_key_file[1],
+            ssl_cert_file = u_p.ssl_cert_file[1],
+            ssl_key_file = u_p.ssl_key_file[1],
             ssl_ciphers = u_p.ssl_ciphers and u_p.ssl_ciphers[1] or nil,
-            ca_file = u_p.ssl_ca_file and u_p.ssl_ca_file[1] or nil,
+            ssl_ca_file = u_p.ssl_ca_file and u_p.ssl_ca_file[1] or nil,
         }
-        t.assert_equals(actual.ssl_cert, expected_params.ssl_cert)
-        t.assert_equals(actual.ssl_key, expected_params.ssl_key)
+        t.assert_equals(actual.ssl_cert_file, expected_params.ssl_cert_file)
+        t.assert_equals(actual.ssl_key_file, expected_params.ssl_key_file)
         t.assert_equals(actual.ssl_ciphers, expected_params.ssl_ciphers)
-        t.assert_equals(actual.ca_file, expected_params.ca_file)
+        t.assert_equals(actual.ssl_ca_file, expected_params.ssl_ca_file)
     end
 
     local chk_set
