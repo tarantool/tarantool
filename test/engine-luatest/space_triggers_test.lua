@@ -354,15 +354,17 @@ g.test_recovery_replace = function(cg)
                     tuple = {i, i - 1}
                     req_tuple = {i, i - 2}
                 end
+                local request_type = j < first + 2 and 'INSERT' or 'REPLACE'
                 t.assert_equals(states[j][2][2], tuple)
+                t.assert_equals(states[j][2][4], request_type)
                 t.assert_equals(states[j][2][6][box.iproto.key.TUPLE],
                     req_tuple)
                 states[j][2][2] = nil
+                states[j][2][4] = nil
                 states[j][2][6][box.iproto.key.TUPLE] = nil
             end
-            -- All arguments instead of new_tuple and tuple in request must be
-            -- the same for the same request
-            for j = 1, 3 do
+            -- All remaining arguments must be the same for the same request.
+            for j = first, last - 1 do
                 t.assert_equals(states[j][2], states[j + 1][2])
             end
 
