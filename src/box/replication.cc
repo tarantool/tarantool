@@ -558,6 +558,16 @@ replica_delete(struct replica *replica)
 	free(replica);
 }
 
+/** Remove an orphan replica from the registry and free it. */
+static void
+replica_delete_if_orphan(struct replica *replica)
+{
+	if (!replica_is_orphan(replica))
+		return;
+	replica_hash_remove(&replicaset.hash, replica);
+	replica_delete(replica);
+}
+
 struct replica *
 replicaset_add(uint32_t replica_id, const struct tt_uuid *replica_uuid)
 {
@@ -667,15 +677,7 @@ replica_clear_id(struct replica *replica)
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
-	if (replica_is_orphan(replica)) {
-		replica_hash_remove(&replicaset.hash, replica);
-		/*
-		 * The replica had an ID, it couldn't be anon by
-		 * definition.
-		 */
-		assert(!replica->anon);
-		replica_delete(replica);
-	}
+	replica_delete_if_orphan(replica);
 	box_broadcast_ballot();
 }
 
@@ -702,6 +704,14 @@ replica_has_connections(const struct replica *replica)
 	assert(relay_get_state(replica->relay) != RELAY_FOLLOW ||
 	       replica->has_incoming_connection);
 	return replica->has_incoming_connection || replica->applier != NULL;
+}
+
+bool
+replica_has_alive_connections(const struct replica *replica)
+{
+	return replica->has_incoming_connection ||
+	       (replica->applier != NULL &&
+		replica->applier->state != APPLIER_STOPPED);
 }
 
 /** A helper to track applier health on its state change. */
@@ -757,6 +767,32 @@ replica_rebind_applier(struct replica *src, struct replica *dst)
 	replica_set_applier(dst, src->applier);
 	replica_clear_applier(src);
 	src->applier_sync_state = APPLIER_DISCONNECTED;
+}
+
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica)
+{
+	struct applier *applier = old_replica->applier;
+	if (applier == NULL || applier->state != APPLIER_STOPPED)
+		return;
+	auto guard = make_scoped_guard([=] {
+		replica_delete_if_orphan(old_replica);
+	});
+	assert(old_replica->applier_sync_state == APPLIER_STOPPED);
+	if (new_replica->applier == NULL)
+		return replica_rebind_applier(old_replica, new_replica);
+	replica_clear_applier(old_replica);
+	old_replica->applier_sync_state = APPLIER_DISCONNECTED;
+	struct error *error = diag_last_error(&applier->diag);
+	assert(error != NULL);
+	say_warn("replica %s already has an applier; "
+		 "discarding stopped applier to %s: %s",
+		 replica_to_string(new_replica, NULL),
+		 replica_to_string(old_replica, applier_uri_str(applier)),
+		 error->errmsg);
+	applier_stop(applier);
+	applier_delete(applier);
 }
 
 static void
@@ -1123,14 +1159,8 @@ next:
 	rlist_swap(&replicaset.anon, &anon_replicas);
 
 	assert(replica_hash_first(&uniq) == NULL);
-	replica_hash_foreach_safe(&replicaset.hash, replica, next) {
-		if (replica_is_orphan(replica)) {
-			replica_hash_remove(&replicaset.hash, replica);
-			replicaset.anon_count -= replica->anon;
-			assert(replicaset.anon_count >= 0);
-			replica_delete(replica);
-		}
-	}
+	replica_hash_foreach_safe(&replicaset.hash, replica, next)
+		replica_delete_if_orphan(replica);
 }
 
 struct applier_on_connect {
@@ -1656,12 +1686,7 @@ replica_on_disconnect(struct replica *replica)
 		gc_consumer_unregister(replica->gc);
 		replica->gc = NULL;
 	}
-	if (replica_is_orphan(replica)) {
-		replica_hash_remove(&replicaset.hash, replica);
-		replicaset.anon_count -= replica->anon;
-		assert(replicaset.anon_count >= 0);
-		replica_delete(replica);
-	}
+	replica_delete_if_orphan(replica);
 }
 
 struct replica *
