@@ -2558,7 +2558,7 @@ tx_accept_msg(struct cmsg *m)
 	msg->connection->iproto_thread->tx.requests_in_progress++;
 	rmean_collect(msg->connection->iproto_thread->tx.rmean,
 		      REQUESTS_IN_PROGRESS, 1);
-	flightrec_write_request(msg->reqstart, msg->len);
+	flightrec_write_request(msg->header.type, msg->reqstart, msg->len);
 	return msg;
 }
 
