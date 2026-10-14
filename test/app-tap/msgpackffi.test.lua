@@ -83,13 +83,15 @@ local function test_other(test, s)
     end
     local msgpack = require('msgpack')
     local deep_as_nil = msgpack.cfg.encode_deep_as_nil
+    local decode_max_depth = msgpack.cfg.decode_max_depth
     msgpack.cfg({encode_deep_as_nil = true})
     local max_depth = msgpack.cfg.encode_max_depth
     local result_depth = check_depth(max_depth + 5)
     test:is(result_depth, max_depth,
             "msgpackffi uses msgpack.cfg.encode_max_depth")
 
-    msgpack.cfg({encode_max_depth = max_depth + 5})
+    msgpack.cfg({encode_max_depth = max_depth + 5,
+                 decode_max_depth = max_depth + 5})
     result_depth = check_depth(max_depth + 5)
     test:is(result_depth, max_depth + 5, "and uses it dynamically")
 
@@ -112,7 +114,41 @@ local function test_other(test, s)
     test:ok(not ok, "exception is thrown when crop is not allowed")
 
     msgpack.cfg({encode_deep_as_nil = deep_as_nil,
-                 encode_max_depth = max_depth})
+                 encode_max_depth = max_depth,
+                 decode_max_depth = decode_max_depth})
+end
+
+-- Check that decoding of deeply nested arrays and maps is limited by
+-- `decode_max_depth` to prevent a stack overflow.
+local function test_decode_depth(test, s)
+    test:plan(4)
+    local msgpack = require('msgpack')
+    local depth = 3
+    local decode_max_depth = msgpack.cfg.decode_max_depth
+    msgpack.cfg({decode_max_depth = depth})
+
+    local function nested_array(n)
+        return string.rep('\x91', n) .. '\xc0'
+    end
+    local function nested_map(n)
+        return string.rep('\x81\xa1k', n) .. '\xc0'
+    end
+
+    test:is(type(s.decode(nested_array(depth))), 'table',
+            'array at the limit is decoded')
+    test:is(type(s.decode(nested_map(depth))), 'table',
+            'map at the limit is decoded')
+
+    local ok, err = pcall(s.decode, nested_array(depth + 1))
+    test:ok(not ok and string.find(tostring(err),
+            'Too high nest level - 4', 1, true) ~= nil,
+            'array over the limit is rejected')
+    ok, err = pcall(s.decode, nested_map(depth + 1))
+    test:ok(not ok and string.find(tostring(err),
+            'Too high nest level - 4', 1, true) ~= nil,
+            'map over the limit is rejected')
+
+    msgpack.cfg({decode_max_depth = decode_max_depth})
 end
 
 local test = tap.test("msgpackffi")
@@ -120,7 +156,7 @@ local test = tap.test("msgpackffi")
 test:plan(1)
 test:test("msgpackffi", function(test)
     local serializer = require('msgpackffi')
-    test:plan(14)
+    test:plan(15)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -135,6 +171,7 @@ test:test("msgpackffi", function(test)
     --test:test("ucdata", common.test_ucdata, serializer)
     test:test("offsets", test_offsets, serializer)
     test:test("other", test_other, serializer)
+    test:test("decode_depth", test_decode_depth, serializer)
     test:test("decode_buffer", common.test_decode_buffer, serializer)
     test:test("error", common.test_error, serializer)
 end)

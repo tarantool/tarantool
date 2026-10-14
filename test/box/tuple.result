@@ -1395,6 +1395,9 @@ max_depth = msgpack.cfg.encode_max_depth
 deep_as_nil = msgpack.cfg.encode_deep_as_nil
 ---
 ...
+decode_max_depth = msgpack.cfg.decode_max_depth
+---
+...
 msgpack.cfg({encode_deep_as_nil = true})
 ---
 ...
@@ -1418,6 +1421,9 @@ level == max_depth or {level, max_depth}
 - true
 ...
 msgpack.cfg({encode_max_depth = max_depth + 5})
+---
+...
+msgpack.cfg({decode_max_depth = max_depth + 5})
 ---
 ...
 tuple = box.tuple.new(t):totable()
@@ -1556,6 +1562,12 @@ t:bsize()
 ---
 - 45
 ...
-msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
+msgpack.cfg({encode_max_depth = max_depth})
+---
+...
+msgpack.cfg({encode_deep_as_nil = deep_as_nil})
+---
+...
+msgpack.cfg({decode_max_depth = decode_max_depth})
 ---
 ...
