@@ -4700,6 +4700,28 @@ struct cluster_change {
 	struct trigger on_commit;
 };
 
+/** Check later changes in reverse order for the old UUID's registration. */
+static bool
+cluster_uuid_is_reregistered(const struct cluster_change *change)
+{
+	const struct tt_uuid *uuid = &change->old_def->uuid;
+	struct trigger *trigger;
+	rlist_foreach_entry(trigger, &change->stmt->txn->on_commit, link) {
+		if (trigger == &change->on_commit)
+			break;
+		if (trigger->run != change->on_commit.run)
+			continue;
+		struct cluster_change *next = (typeof(next))trigger->data;
+		if (next->new_def != NULL &&
+		    tt_uuid_is_equal(&next->new_def->uuid, uuid))
+			return true;
+		if (next->old_def != NULL &&
+		    tt_uuid_is_equal(&next->old_def->uuid, uuid))
+			return false;
+	}
+	return false;
+}
+
 /** Apply a committed _cluster change to the replica registry. */
 static int
 on_commit_cluster(struct trigger *trigger, void * /* event */)
@@ -4725,6 +4747,11 @@ on_commit_cluster(struct trigger *trigger, void * /* event */)
 	else
 		replica_set_id(replica, new_def->id);
 	replica_set_name(replica, new_def->name);
+	if (old_def != NULL) {
+		struct replica *old = replica_by_uuid(&old_def->uuid);
+		if (old != NULL && !cluster_uuid_is_reregistered(change))
+			replica_rebind_stopped_applier(old, replica);
+	}
 	if (old_def == NULL)
 		cluster_reserved_ids &= ~(1U << new_def->id);
 	return 0;
@@ -4778,7 +4805,7 @@ cluster_check_uuid_change(const struct replica_def *old_def,
 			  const struct replica_def *new_def)
 {
 	struct replica *old_replica = replica_by_uuid(&old_def->uuid);
-	if (old_replica != NULL && replica_has_connections(old_replica)) {
+	if (old_replica != NULL && replica_has_alive_connections(old_replica)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID update when the old replica is still here");
 		return -1;

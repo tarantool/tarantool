@@ -704,6 +704,14 @@ replica_has_connections(const struct replica *replica)
 	return replica->has_incoming_connection || replica->applier != NULL;
 }
 
+bool
+replica_has_alive_connections(const struct replica *replica)
+{
+	return replica->has_incoming_connection ||
+	       (replica->applier != NULL &&
+		replica->applier->state != APPLIER_STOPPED);
+}
+
 /** A helper to track applier health on its state change. */
 static void
 replica_update_applier_health(struct replica *replica)
@@ -757,6 +765,35 @@ replica_rebind_applier(struct replica *src, struct replica *dst)
 	replica_set_applier(dst, src->applier);
 	replica_clear_applier(src);
 	src->applier_sync_state = APPLIER_DISCONNECTED;
+}
+
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica)
+{
+	struct applier *applier = old_replica->applier;
+	if (applier == NULL || applier->state != APPLIER_STOPPED)
+		return;
+	auto guard = make_scoped_guard([=] {
+		if (replica_is_orphan(old_replica)) {
+			replica_hash_remove(&replicaset.hash, old_replica);
+			replica_delete(old_replica);
+		}
+	});
+	assert(old_replica->applier_sync_state == APPLIER_STOPPED);
+	if (new_replica->applier == NULL)
+		return replica_rebind_applier(old_replica, new_replica);
+	replica_clear_applier(old_replica);
+	old_replica->applier_sync_state = APPLIER_DISCONNECTED;
+	struct error *error = diag_last_error(&applier->diag);
+	assert(error != NULL);
+	say_warn("replica %s already has an applier; "
+		 "discarding stopped applier to %s: %s",
+		 replica_to_string(new_replica, NULL),
+		 replica_to_string(old_replica, applier_uri_str(applier)),
+		 error->errmsg);
+	applier_stop(applier);
+	applier_delete(applier);
 }
 
 static void
