@@ -1341,6 +1341,9 @@ after_old_tuple_lookup:;
 					       new_data, new_size,
 					       txn_region, false);
 		tx_region_release(txn, TX_ALLOC_SYSTEM);
+		/* on_replace triggers must see the new request type. */
+		if (rc == 0)
+			txn_current_stmt(txn)->type = request->type;
 	}
 out:
 	if (new_tuple != NULL)
