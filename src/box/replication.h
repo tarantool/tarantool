@@ -573,6 +573,18 @@ bool
 replica_has_connections(const struct replica *replica);
 
 /**
+ * Check for incoming connections or a non-stopped applier.
+ * This includes disconnected appliers.
+ */
+bool
+replica_has_alive_connections(const struct replica *replica);
+
+/** Transfer a stopped applier, or log its error if the destination has one. */
+void
+replica_rebind_stopped_applier(struct replica *old_replica,
+			       struct replica *new_replica);
+
+/**
  * Collects garbage of a replica that is gone for a while: removes associated
  * WAL GC state including persistent one and if the replica is anonymous, it
  * is deleted. If the replica is connected or does not exist, an error is

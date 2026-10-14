@@ -4715,6 +4715,11 @@ on_commit_cluster(struct trigger *trigger, void * /* event */)
 		else
 			replica_set_id(replica, new_def->id);
 		replica_set_name(replica, new_def->name);
+		if (old_def != NULL) {
+			struct replica *old = replica_by_uuid(&old_def->uuid);
+			if (old != NULL)
+				replica_rebind_stopped_applier(old, replica);
+		}
 	}
 	return 0;
 }
@@ -4765,7 +4770,7 @@ cluster_check_uuid_change(const struct replica_def *old_def,
 			  const struct replica_def *new_def)
 {
 	struct replica *old_replica = replica_by_uuid(&old_def->uuid);
-	if (old_replica != NULL && replica_has_connections(old_replica)) {
+	if (old_replica != NULL && replica_has_alive_connections(old_replica)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
 			 "UUID update when the old replica is still here");
 		return -1;
