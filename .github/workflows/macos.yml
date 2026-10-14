@@ -38,12 +38,18 @@ jobs:
           ~/venv/bin/pip install gevent pyyaml
           echo ~/venv/bin >> "$GITHUB_PATH"
 
+      # Homebrew's `openssl` is OpenSSL 4 now, but the bundled libcurl
+      # can't be built against it (gh-13292). Use OpenSSL 3, which the
+      # runner image keeps installed.
+      #
+      # https://github.com/actions/runner-images/issues/14856
       - name: Build
         run: |
           cmake -S . -B ~/build      \
             -G Ninja                 \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DTEST_BUILD=ON
+            -DTEST_BUILD=ON          \
+            -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
           cmake --build ~/build
 
       # http_client_test.lua hangs in test_http_client_content_length_invalid.
