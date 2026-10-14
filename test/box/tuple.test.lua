@@ -476,6 +476,7 @@ d:update{{'-', 1, dec.new('1e37')}}
 --
 max_depth = msgpack.cfg.encode_max_depth
 deep_as_nil = msgpack.cfg.encode_deep_as_nil
+decode_max_depth = msgpack.cfg.decode_max_depth
 msgpack.cfg({encode_deep_as_nil = true})
 t = nil
 for i = 1, max_depth + 5 do t = {t} end
@@ -485,6 +486,7 @@ while tuple ~= nil do level = level + 1 tuple = tuple[1] end
 level == max_depth or {level, max_depth}
 
 msgpack.cfg({encode_max_depth = max_depth + 5})
+msgpack.cfg({decode_max_depth = max_depth + 5})
 tuple = box.tuple.new(t):totable()
 level = 0
 while tuple ~= nil do level = level + 1 tuple = tuple[1] end
@@ -531,4 +533,6 @@ msgpack.decode(msgpack.encode(t))
 msgpackffi.decode(msgpackffi.encode(t))
 t:bsize()
 
-msgpack.cfg({encode_max_depth = max_depth, encode_deep_as_nil = deep_as_nil})
+msgpack.cfg({encode_max_depth = max_depth})
+msgpack.cfg({encode_deep_as_nil = deep_as_nil})
+msgpack.cfg({decode_max_depth = decode_max_depth})
