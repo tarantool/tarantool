@@ -641,3 +641,94 @@ g.test_func_index_func_added_at_alter = function(cg)
         t.assert_equals(sk:get({3}), {1, -3})
     end)
 end
+
+-- ghs-176. Stranger with write access to _func_index should not be
+-- able to disable func index of space he does not own.
+g.test_func_index_space_delete = function(cg)
+    cg.server:exec(function()
+        box.schema.func.create('test', {
+            body = 'function(tuple) return {tuple[2]} end',
+            is_deterministic = true,
+            is_sandboxed = true
+        })
+
+        local s = box.schema.space.create('test')
+        s:create_index('pk')
+        s:create_index('sk', {
+            parts = {{1, 'unsigned'}},
+            func = box.func.test.id,
+        })
+
+        s:insert({1, 20})
+        s:insert({2, 10})
+
+        box.schema.user.create('user')
+        box.schema.user.grant('user', 'write', 'space', '_func_index')
+        box.session.su('user', function()
+            t.assert_error_covers({
+                type = 'AccessDeniedError',
+                object_name = 'test',
+                object_type = 'space',
+                user = 'user',
+            }, box.space._func_index.delete, box.space._func_index,
+            {s.id, s.index.sk.id})
+        end)
+
+        s:insert({3, 15})
+        t.assert_equals(s.index.sk:select(), {{2, 10}, {3, 15}, {1, 20}})
+    end)
+end
+
+g.after_test('test_func_index_space_delete', function(cg)
+    cg.server:exec(function()
+        box.schema.user.drop('user', {if_exists = true})
+    end)
+end)
+
+g.test_func_index_deletion_privileges = function(cg)
+    cg.server:exec(function()
+        box.schema.user.create('user')
+
+        -- Privileges for creating functions.
+        box.schema.user.grant('user', 'create', 'function')
+        box.schema.user.grant('user', 'read,write', 'space', '_func')
+
+        -- Privileges for creating spaces.
+        box.schema.user.grant('user', 'create', 'space')
+        box.schema.user.grant('user', 'write', 'space', '_schema')
+        box.schema.user.grant('user', 'write', 'space', '_space')
+
+        -- Privileges for creating indexes.
+        box.schema.user.grant('user', 'read,write', 'space', '_space_sequence')
+        box.schema.user.grant('user', 'write', 'space', '_index')
+
+        -- Privileges for creating functional indexes.
+        box.schema.user.grant('user', 'read,write', 'space', '_func_index')
+
+        box.session.su('user', function()
+            box.schema.func.create('test', {
+                body = 'function(tuple) return {tuple[2]} end',
+                is_deterministic = true,
+                is_sandboxed = true
+            })
+
+            local s = box.schema.space.create('test')
+            s:create_index('pk')
+            s:create_index('sk', {
+                parts = {{1, 'unsigned'}},
+                func = box.func.test.id,
+            })
+
+            s:insert({1, 20})
+            s:insert({2, 10})
+
+            s.index.sk:drop()
+        end)
+    end)
+end
+
+g.after_test('test_func_index_deletion_privileges', function(cg)
+    cg.server:exec(function()
+        box.schema.user.drop('user', {if_exists = true})
+    end)
+end)
