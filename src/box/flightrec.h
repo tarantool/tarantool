@@ -17,6 +17,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 struct obuf;
 struct obuf_svp;
@@ -31,8 +32,10 @@ flightrec_free(void)
 
 /** Dump request (which is already packed into msgapck) to flight recorder. */
 static inline void
-flightrec_write_request(const char *request_msgpack, size_t len)
+flightrec_write_request(uint32_t req_type, const char *request_msgpack,
+			size_t len)
 {
+	(void)req_type;
 	(void)request_msgpack;
 	(void)len;
 }
