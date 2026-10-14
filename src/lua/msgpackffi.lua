@@ -552,11 +552,14 @@ local function decode_bin(data, size)
     return ret
 end
 
-local function decode_array(data, size)
+local function decode_array(data, size, level)
+    if level >= msgpack.cfg.decode_max_depth then
+        error(string.format('Too high nest level - %d', level + 1))
+    end
     assert (type(size) == "number")
     local arr = {}
     for _ = 1, size do
-        table.insert(arr, decode_r(data))
+        table.insert(arr, decode_r(data, level + 1))
     end
     if not msgpack.cfg.decode_save_metatables then
         return arr
@@ -564,12 +567,15 @@ local function decode_array(data, size)
     return setmetatable(arr, msgpack.array_mt)
 end
 
-local function decode_map(data, size)
+local function decode_map(data, size, level)
+    if level >= msgpack.cfg.decode_max_depth then
+        error(string.format('Too high nest level - %d', level + 1))
+    end
     assert (type(size) == "number")
     local map = {}
     for _ = 1, size do
-        local key = decode_r(data);
-        local val = decode_r(data);
+        local key = decode_r(data, level + 1);
+        local val = decode_r(data, level + 1);
         map[key] = val
     end
     if not msgpack.cfg.decode_save_metatables then
@@ -659,15 +665,23 @@ local decoder_hint = {
     [0xdb] = function(data) return decode_str(data, decode_u32(data)) end;
 
     --[[MP_ARRAY]]
-    [0xdc] = function(data) return decode_array(data, decode_u16(data)) end;
-    [0xdd] = function(data) return decode_array(data, decode_u32(data)) end;
+    [0xdc] = function(data, level)
+        return decode_array(data, decode_u16(data), level)
+    end;
+    [0xdd] = function(data, level)
+        return decode_array(data, decode_u32(data), level)
+    end;
 
     --[[MP_MAP]]
-    [0xde] = function(data) return decode_map(data, decode_u16(data)) end;
-    [0xdf] = function(data) return decode_map(data, decode_u32(data)) end;
+    [0xde] = function(data, level)
+        return decode_map(data, decode_u16(data), level)
+    end;
+    [0xdf] = function(data, level)
+        return decode_map(data, decode_u32(data), level)
+    end;
 }
 
-decode_r = function(data)
+decode_r = function(data, level)
     local c = data[0][0]
     data[0] = data[0] + 1
     if c <= 0x7f then
@@ -675,9 +689,9 @@ decode_r = function(data)
     elseif c >= 0xa0 and c <= 0xbf then
         return decode_str(data, bit.band(c, 0x1f)) -- fixstr
     elseif c >= 0x90 and c <= 0x9f then
-        return decode_array(data, bit.band(c, 0xf)) -- fixarray
+        return decode_array(data, bit.band(c, 0xf), level) -- fixarray
     elseif c >= 0x80 and c <= 0x8f then
-        return decode_map(data, bit.band(c, 0xf)) -- fixmap
+        return decode_map(data, bit.band(c, 0xf), level) -- fixmap
     elseif c >= 0xe0 then
         return tonumber(ffi.cast('signed char',c)) -- negfixint
     elseif c == 0xc0 then
@@ -691,7 +705,7 @@ decode_r = function(data)
     else
         local fun = decoder_hint[c];
         assert (type(fun) == "function")
-        return fun(data)
+        return fun(data, level)
     end
 end
 
@@ -721,13 +735,13 @@ local function decode_unchecked(str, offset)
         offset = check_offset(offset, #str)
         local buf = ffi.cast(char_ptr_t, str)
         local bufp = ffi.new('const unsigned char *[1]', buf + offset - 1)
-        local r = decode_r(bufp)
+        local r = decode_r(bufp, 0)
         return r, bufp[0] - buf + 1
     elseif ffi.istype(char_ptr_t, str) then
         -- Note: ffi.istype() ignores the const qualifier, so both
         -- (char *) and (const char *) buffers are valid.
         local bufp = ffi.new('const unsigned char *[1]', str)
-        local r = decode_r(bufp)
+        local r = decode_r(bufp, 0)
         return r, ffi.cast(ffi.typeof(str), bufp[0])
     else
         error("msgpackffi.decode_unchecked(str, offset) -> res, new_offset | "..
