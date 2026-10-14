@@ -5756,6 +5756,9 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		space = space_cache_find(space_id);
 		if (space == NULL)
 			return -1;
+		if (access_check_ddl(space->def->name, space->def->uid,
+				     space->access, SC_SPACE, PRIV_D) != 0)
+			return -1;
 		index = index_find(space, index_id);
 		if (index == NULL)
 			return -1;
