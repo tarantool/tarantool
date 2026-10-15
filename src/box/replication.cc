@@ -1896,7 +1896,8 @@ int
 replica_find_new_id(uint32_t *replica_id)
 {
 	for (uint32_t i = 1; i < VCLOCK_MAX; ++i) {
-		if (replicaset.replica_by_id[i] == NULL) {
+		if (replicaset.replica_by_id[i] == NULL &&
+		    !replica_id_is_reserved(i)) {
 			*replica_id = i;
 			return 0;
 		}
