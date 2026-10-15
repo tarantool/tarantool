@@ -1247,6 +1247,12 @@ I['failover.replicasets.*.learners.*'] = format_text([[
     coordinator when selecting a master.
 ]])
 
+I['failover.replicasets.*.synchro_min_quorum'] = format_text([[
+    The minimal synchronous quorum the supervised failover
+    coordinator may set in the replicaset when `synchro_mode` is
+    `true`.
+]])
+
 I['failover.replicasets.*.synchro_mode'] = format_text([[
     The coordinator supports two leader appoint modes: one suits
     better for asynchronous replication, the other one better

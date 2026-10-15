@@ -2199,6 +2199,10 @@ return schema.new('instance_config', schema.record({
                     type = 'boolean',
                     default = false,
                 }),
+                synchro_min_quorum = schema.scalar({
+                    type = 'integer',
+                    default = 1,
+                }),
             }),
         }),
         log = schema.record({
