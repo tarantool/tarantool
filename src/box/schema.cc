@@ -45,6 +45,7 @@
 #include "event.h"
 #include "port.h"
 #include "tt_static.h"
+#include "replication.h"
 
 /**
  * @module Data Dictionary
@@ -268,6 +269,112 @@ sc_space_new(uint32_t id, const char *name,
 	 *   a snapshot of older version.
 	 */
 	init_system_space(space);
+}
+
+int
+tuple_field_node_name(char *out, struct tuple *tuple, uint32_t fieldno,
+		      const char *field_name)
+{
+	const char *name, *field;
+	uint32_t len;
+	if (tuple == NULL)
+		goto nil;
+	field = tuple_field(tuple, fieldno);
+	if (field == NULL || mp_typeof(*field) == MP_NIL)
+		goto nil;
+	if (mp_typeof(*field) != MP_STR)
+		goto error;
+	name = mp_decode_str(&field, &len);
+	if (!node_name_is_valid_n(name, len))
+		goto error;
+	memcpy(out, name, len);
+	out[len] = 0;
+	return 0;
+nil:
+	*out = 0;
+	return 0;
+error:
+	diag_set(ClientError, ER_FIELD_TYPE, field_name, "a valid name",
+		 "a bad name");
+	return -1;
+}
+
+/** Decode a replica definition from a _cluster tuple. */
+static int
+replica_def_create_from_tuple(struct replica_def *def, struct tuple *tuple)
+{
+	memset(def, 0, sizeof(*def));
+	if (tuple_field_u32(tuple, BOX_CLUSTER_FIELD_ID, &def->id) != 0)
+		return -1;
+	if (replica_check_id(def->id) != 0)
+		return -1;
+	if (tuple_field_uuid(tuple, BOX_CLUSTER_FIELD_UUID, &def->uuid) != 0)
+		return -1;
+	if (tt_uuid_is_nil(&def->uuid)) {
+		diag_set(ClientError, ER_INVALID_UUID, tt_uuid_str(&def->uuid));
+		return -1;
+	}
+	return tuple_field_node_name(def->name, tuple, BOX_CLUSTER_FIELD_NAME,
+				     "_cluster.name");
+}
+
+struct replica_def *
+replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
+{
+	struct replica_def *def = xregion_alloc_object(region, typeof(*def));
+	if (replica_def_create_from_tuple(def, tuple) != 0)
+		return NULL;
+	return def;
+}
+
+int
+schema_find_replica_by_uuid(const struct tt_uuid *uuid,
+			    struct replica_def *result)
+{
+	result->id = REPLICA_ID_NIL;
+	struct space *space = space_cache_find(BOX_CLUSTER_ID);
+	if (space == NULL)
+		return -1;
+	struct index *index = index_find(space, 1);
+	if (index == NULL)
+		return -1;
+	char key[UUID_STR_LEN + 2];
+	mp_encode_str(key, tt_uuid_str(uuid), UUID_STR_LEN);
+	struct tuple *tuple;
+	if (index_get(index, key, 1, &tuple) != 0)
+		return -1;
+	if (tuple == NULL)
+		return 0;
+	return replica_def_create_from_tuple(result, tuple);
+}
+
+int
+schema_find_replica_by_name(const char *name, uint32_t exclude_id,
+			    struct replica_def *result)
+{
+	result->id = REPLICA_ID_NIL;
+	if (*name == 0)
+		return 0;
+	struct space *space = space_cache_find(BOX_CLUSTER_ID);
+	if (space == NULL)
+		return -1;
+	struct index *index = index_find(space, 0);
+	if (index == NULL)
+		return -1;
+	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+	IteratorGuard guard(it);
+	struct tuple *tuple;
+	int rc;
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+		if (replica_def_create_from_tuple(result, tuple) != 0)
+			return -1;
+		if (result->id != exclude_id && strcmp(name, result->name) == 0)
+			return 0;
+	}
+	result->id = REPLICA_ID_NIL;
+	return rc;
 }
 
 int
