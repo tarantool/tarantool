@@ -1970,6 +1970,7 @@ g.test_failover = function()
                         instance001 = 1
                     },
                     synchro_mode = false,
+                    synchro_min_quorum = 1,
                 }
             },
             log = {
