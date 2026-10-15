@@ -58,18 +58,22 @@ g.after_each(function(cg)
     end
 end)
 
-g.test_delete = function(cg)
-    cg.server:exec(function()
+local function test_subscribe_during_change(cg, delete)
+    cg.server:exec(function(delete)
         local fiber = require('fiber')
         local iproto_type = box.iproto.type
         local uuid = require('uuid')
-        local old_uuid = uuid.str()
+        local old_uuid, new_uuid = uuid.str(), uuid.str()
         box.space._cluster:insert{2, old_uuid, 'replica'}
 
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local writer = fiber.create(function()
             fiber.self():set_joinable(true)
-            return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            if delete then
+                return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            end
+            return pcall(box.space._cluster.update, box.space._cluster,
+                         2, {{'=', 2, new_uuid}})
         end)
         t.helpers.retrying({}, function()
             t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
@@ -89,15 +93,30 @@ g.test_delete = function(cg)
             t.assert_lt(fiber.clock(), deadline)
             local request_type, body = _G.read_type(s)
             t.assert_lt(request_type, iproto_type.TYPE_ERROR)
-            if request_type == iproto_type.DELETE and
-               body[key.SPACE_ID] == box.space._cluster.id then
+            if body[key.SPACE_ID] == box.space._cluster.id then
+                t.assert_equals(request_type,
+                                delete and iproto_type.DELETE or
+                                           iproto_type.UPDATE)
                 t.assert_equals(body[key.KEY], {2})
                 break
             end
         end
         s:close()
 
-        t.assert_equals(box.space._cluster:get{2}, nil)
-        t.assert_equals(box.info.replication[2], nil)
-    end)
+        if delete then
+            t.assert_equals(box.space._cluster:get{2}, nil)
+            t.assert_equals(box.info.replication[2], nil)
+        else
+            t.assert_equals(box.space._cluster:get{2}[2], new_uuid)
+            t.assert_equals(box.info.replication[2].uuid, new_uuid)
+        end
+    end, {delete})
+end
+
+g.test_uuid_update = function(cg)
+    test_subscribe_during_change(cg, false)
+end
+
+g.test_delete = function(cg)
+    test_subscribe_during_change(cg, true)
 end
