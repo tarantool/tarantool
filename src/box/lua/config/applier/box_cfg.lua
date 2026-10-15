@@ -111,6 +111,113 @@ end
 
 -- }}} replication.peers
 
+-- {{{ Deferred replication reconnect
+
+-- The pending reconnect, replaced keeping the deadline on reload.
+local pending_reconnect
+
+-- The fiber doing the pending reconnect.
+local reconnect_fiber
+
+-- The URI to connect to the instance and its own SSL certificates.
+local function peer_endpoint(configdata, name)
+    local peer = configdata._peers[name]
+    if peer == nil then
+        return nil
+    end
+    return {
+        uri = instance_config:instance_uri(peer.iconfig_def, 'peer',
+            {self_iconfig = configdata._iconfig_def}),
+        ssl = instance_config:get(peer.iconfig_def, 'iproto.ssl'),
+    }
+end
+
+local function is_peer_uri_changed(old_configdata, new_configdata)
+    for _, name in ipairs(new_configdata:peers()) do
+        local old_endpoint = peer_endpoint(old_configdata, name)
+        if old_endpoint ~= nil and
+           not table.equals(old_endpoint,
+                            peer_endpoint(new_configdata, name)) then
+            return true
+        end
+    end
+    return false
+end
+
+-- The time to let the other instances apply the new
+-- configuration: the reload jitter, or the time to fetch the
+-- configuration from the remote storage.
+local function reconnect_delay(configdata)
+    local jitter = configdata:get('config.reload_jitter',
+        {use_default = true}) or 0
+    if jitter > 0 then
+        return jitter
+    end
+    if configdata:get('config.etcd.prefix') ~= nil then
+        return configdata:get('config.etcd.http.request.timeout') or 0.3
+    end
+    if configdata:get('config.storage.endpoints') ~= nil then
+        return configdata:get('config.storage.timeout',
+            {use_default = true})
+    end
+    return 0
+end
+
+local function do_replication_reconnect(config, reconnect)
+    local alert_key = 'box_cfg_replication_reconnect'
+    local function run(action, func, ...)
+        local ok, err = pcall(func, ...)
+        if not ok then
+            config._aboard:set({
+                type = 'warn',
+                message = ('unable to %s: %s'):format(action, err),
+            }, {key = alert_key})
+        end
+        return ok
+    end
+
+    local ok = true
+    if reconnect.replication ~= nil then
+        log.info('reconnecting the replication with the new instance URIs')
+        ok = run('reconnect the replication with the new instance URIs',
+                 box.cfg, {replication = reconnect.replication})
+    end
+    if ok then
+        config._aboard:drop(alert_key)
+    end
+    return ok
+end
+
+local function replication_reconnect_worker(config)
+    fiber.self():name('config.box_cfg.replication_reconnect',
+        {truncate = true})
+    while pending_reconnect ~= nil do
+        local reconnect = pending_reconnect
+        local timeout = reconnect.deadline - clock.monotonic()
+        if timeout > 0 then
+            fiber.sleep(timeout)
+        elseif do_replication_reconnect(config, reconnect) then
+            if pending_reconnect == reconnect then
+                pending_reconnect = nil
+            end
+        elseif pending_reconnect == reconnect then
+            -- Leave the failed reconnect to the next
+            -- reconfiguration.
+            break
+        end
+    end
+    reconnect_fiber = nil
+end
+
+local function schedule_replication_reconnect(config, reconnect)
+    pending_reconnect = reconnect
+    if reconnect_fiber == nil then
+        reconnect_fiber = fiber.new(replication_reconnect_worker, config)
+    end
+end
+
+-- }}} Deferred replication reconnect
+
 -- {{{ log/audit_log helpers
 
 local function log_destination(log)
@@ -1486,8 +1593,39 @@ local function apply(config)
     -- Finally, run box.cfg().
     local is_startup = type(box.cfg) == 'function'
     log.debug('box_cfg.apply (is_startup = %s)', is_startup)
+
+    -- Let the other instances of the replicaset start serving the
+    -- new SSL certificates before reconnecting to them.
+    local reconnect
+    if not is_startup then
+        -- No applied configuration yet on a startup retry.
+        local old_configdata = config._configdata_applied
+        local changed = old_configdata ~= nil and
+            is_peer_uri_changed(old_configdata, configdata)
+        if changed or pending_reconnect ~= nil then
+            local delay = reconnect_delay(configdata)
+            reconnect = {
+                -- Unrelated reloads don't defer the reconnect.
+                deadline = changed and clock.monotonic() + delay or
+                    pending_reconnect.deadline,
+            }
+            if box_cfg.replication ~= nil then
+                if changed and delay > 0 then
+                    log.info('URIs of the replicaset instances are ' ..
+                        'changed, the replication will be reconnected ' ..
+                        'with them in %.3g seconds', delay)
+                end
+                reconnect.replication = box_cfg.replication
+                box_cfg.replication = nil
+            end
+        end
+    end
+
     box.cfg(box_cfg)
     post_box_cfg_hooks:run()
+    if reconnect ~= nil then
+        schedule_replication_reconnect(config, reconnect)
+    end
 
     -- Ask for reapply with the new configuration if the startup
     -- may be long and the new configuration may appear during it.
