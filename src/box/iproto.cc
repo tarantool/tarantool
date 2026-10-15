@@ -1560,7 +1560,7 @@ err_msgpack:
 				 errmsg);
 			return -1;
 		}
-		if (mp_check_uint(pos, in->wpos) >= 0)
+		if (mp_check_uint(pos, in->wpos) > 0)
 			break;
 		uint64_t len = mp_decode_uint(&pos);
 		if (len > IPROTO_PACKET_SIZE_MAX) {
