@@ -752,11 +752,22 @@ recovery_journal_write(struct journal *base,
 	return 0;
 }
 
+/** Recovery journal writes complete immediately. */
+static int
+recovery_journal_sync(struct journal *base, struct vclock *out)
+{
+	struct recovery_journal *journal = (struct recovery_journal *)base;
+	if (out != NULL)
+		vclock_copy(out, journal->vclock);
+	return 0;
+}
+
 static void
 recovery_journal_create(struct vclock *v)
 {
 	static struct recovery_journal journal;
-	journal_create(&journal.base, recovery_journal_write, NULL, NULL, NULL);
+	journal_create(&journal.base, recovery_journal_write,
+		       recovery_journal_sync, NULL, NULL);
 	journal.vclock = v;
 	journal_set(&journal.base);
 }
