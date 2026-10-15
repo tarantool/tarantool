@@ -270,35 +270,6 @@ out:
 	return rc;
 }
 
-/** Decode an optional node name field from the tuple. */
-static int
-tuple_field_node_name(char *out, struct tuple *tuple, uint32_t fieldno,
-		      const char *field_name)
-{
-	const char *name, *field;
-	uint32_t len;
-	if (tuple == NULL)
-		goto nil;
-	field = tuple_field(tuple, fieldno);
-	if (field == NULL || mp_typeof(*field) == MP_NIL)
-		goto nil;
-	if (mp_typeof(*field) != MP_STR)
-		goto error;
-	name = mp_decode_str(&field, &len);
-	if (!node_name_is_valid_n(name, len))
-		goto error;
-	memcpy(out, name, len);
-	out[len] = 0;
-	return 0;
-nil:
-	*out = 0;
-	return 0;
-error:
-	diag_set(ClientError, ER_FIELD_TYPE, field_name, "a valid name",
-		 "a bad name");
-	return -1;
-}
-
 /**
  * Helper routine for functional index function verification:
  * only a deterministic persistent Lua function may be used in
@@ -4648,38 +4619,6 @@ on_replace_cluster_update_quorum(struct trigger * /* trigger */,
 {
 	box_update_replication_synchro_quorum();
 	return 0;
-}
-
-/** Replica definition. */
-struct replica_def {
-	/** Instance ID. */
-	uint32_t id;
-	/** Instance UUID. */
-	struct tt_uuid uuid;
-	/** Instance name. */
-	char name[NODE_NAME_SIZE_MAX];
-};
-
-/** Build replica definition from a _cluster's tuple. */
-static struct replica_def *
-replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
-{
-	struct replica_def *def = xregion_alloc_object(region, typeof(*def));
-	memset(def, 0, sizeof(*def));
-	if (tuple_field_u32(tuple, BOX_CLUSTER_FIELD_ID, &def->id) != 0)
-		return NULL;
-	if (replica_check_id(def->id) != 0)
-		return NULL;
-	if (tuple_field_uuid(tuple, BOX_CLUSTER_FIELD_UUID, &def->uuid) != 0)
-		return NULL;
-	if (tt_uuid_is_nil(&def->uuid)) {
-		diag_set(ClientError, ER_INVALID_UUID, tt_uuid_str(&def->uuid));
-		return NULL;
-	}
-	if (tuple_field_node_name(def->name, tuple, BOX_CLUSTER_FIELD_NAME,
-				  "_cluster.name") != 0)
-		return NULL;
-	return def;
 }
 
 /** Add an instance on commit/rollback. */

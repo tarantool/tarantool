@@ -4333,21 +4333,19 @@ static void
 box_register_replica(const struct tt_uuid *uuid,
 		     const char *name)
 {
-	struct replica *replica = replica_by_uuid(uuid);
 	/*
 	 * Find required changes.
 	 */
-	bool need_name = false;
-	bool need_id = false;
-	if (replica == NULL) {
-		need_name = *name != 0;
-		need_id = true;
-	} else {
-		need_name = strcmp(replica->name, name) != 0;
-		need_id = replica->id == REPLICA_ID_NIL;
-	}
-	if (!need_name && !need_id)
+	struct replica_def def;
+	if (schema_find_replica_by_uuid(uuid, REPLICA_ID_NIL, &def) != 0)
+		diag_raise();
+	bool need_id = def.id == REPLICA_ID_NIL;
+	if (!need_id && strcmp(def.name, name) == 0) {
+		struct box_checkpoint checkpoint;
+		if (box_checkpoint_build_in_memory(&checkpoint) != 0)
+			diag_raise();
 		return;
+	}
 	/*
 	 * Apply the changes.
 	 */
@@ -4356,21 +4354,23 @@ box_register_replica(const struct tt_uuid *uuid,
 		int rc;
 		if (*name == 0) {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%dNIL]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%dNIL]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME);
 		} else {
 			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
-				  "[%u][[%s%d%s]]", (unsigned)replica->id, "=",
+				  "[%u][[%s%d%s]]", (unsigned)def.id, "=",
 				  BOX_CLUSTER_FIELD_NAME, name);
 		}
 		if (rc != 0)
 			diag_raise();
 		return;
 	}
-	struct replica *other = replica_by_name(name);
-	if (other != NULL && other != replica) {
+	struct replica_def other;
+	if (schema_find_replica_by_name(name, REPLICA_ID_NIL, &other) != 0)
+		diag_raise();
+	if (other.id != REPLICA_ID_NIL) {
 		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
-			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
+			 (unsigned)other.id, "=", BOX_CLUSTER_FIELD_UUID,
 			 tt_uuid_str(uuid)) != 0)
 			diag_raise();
 		return;
