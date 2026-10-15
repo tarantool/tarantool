@@ -1,6 +1,7 @@
 @INCLUDE = @PROJECT_SOURCE_DIR@/Doxyfile
 INPUT                  = @PROJECT_BINARY_DIR@/src/module.h
-OUTPUT_DIRECTORY       = @PROJECT_BINARY_DIR@/doc/api/
+OUTPUT_DIRECTORY       = @PROJECT_BINARY_DIR@/doc/capi-site/
+HTML_OUTPUT            = .
 ENABLED_SECTIONS       = public
 DISABLE_INDEX          = YES
 GENERATE_TREEVIEW      = NO

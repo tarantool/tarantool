@@ -71,7 +71,7 @@ config.mk
 config.guess
 config.sub
 doc/doxygen
-doc/api
+doc/capi-site
 doc/www/content/doc/dev_guide.html
 doc/www/content/doc/tnt.css
 doc/www/content/doc/user_guide.html
