@@ -28,8 +28,8 @@ end
 g.before_each(before_each)
 g.after_each(after_each)
 
-g.test_delete = function(cg)
-    cg.server:exec(function(listen, rollback)
+local function test_subscribe_during_change(cg, delete)
+    cg.server:exec(function(listen, rollback, delete)
         local fiber = require('fiber')
         local msgpack = require('msgpack')
         local socket = require('socket')
@@ -71,15 +71,22 @@ g.test_delete = function(cg)
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
         local writer = fiber.create(function()
             fiber.self():set_joinable(true)
-            return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            if delete then
+                return pcall(box.space._cluster.delete, box.space._cluster, 2)
+            end
+            return pcall(box.space._cluster.update, box.space._cluster,
+                         2, {{'=', 2, new_uuid}})
         end)
         t.helpers.retrying({}, function()
             t.assert(box.error.injection.get('ERRINJ_WAL_DELAY'))
         end)
         local s = subscribe(old_uuid)
+        -- Wait for either an early rejection or the GC consumer's WAL write.
         t.helpers.retrying({}, function()
-            t.assert(box.space._gc_consumers:get{old_uuid})
+            t.assert(s:readable(0) or box.space._gc_consumers:get{old_uuid})
         end)
+        local waiting_for_wal = box.space._gc_consumers:get{old_uuid} ~= nil
+        t.assert_equals(waiting_for_wal, delete)
         box.error.injection.set('ERRINJ_WAL_WRITE', rollback)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         local joined, ok, err = writer:join()
@@ -95,10 +102,13 @@ g.test_delete = function(cg)
             response_type = read_type(s)
         end
         local expected_error = box.error.TOO_EARLY_SUBSCRIBE
-        if rollback then
+        if rollback and waiting_for_wal then
             expected_error = box.error.CASCADE_ROLLBACK
         end
         t.assert_equals(response_type, iproto_type.TYPE_ERROR + expected_error)
+        if not delete then
+            t.assert_equals(box.space._gc_consumers:get{old_uuid}, nil)
+        end
         s:close()
         box.error.injection.set('ERRINJ_WAL_WRITE', false)
 
@@ -107,18 +117,33 @@ g.test_delete = function(cg)
             t.assert_equals(box.info.replication[2].uuid, old_uuid)
             s = subscribe(old_uuid)
         else
-            t.assert_equals(box.space._cluster:get{2}, nil)
-            t.assert_equals(box.info.replication[2], nil)
+            if delete then
+                t.assert_equals(box.space._cluster:get{2}, nil)
+                t.assert_equals(box.info.replication[2], nil)
+            else
+                t.assert_equals(box.space._cluster:get{2}[2], new_uuid)
+                t.assert_equals(box.info.replication[2].uuid, new_uuid)
+            end
             s = subscribe(old_uuid)
             t.assert_equals(read_type(s), iproto_type.TYPE_ERROR +
                                          box.error.TOO_EARLY_SUBSCRIBE)
             s:close()
-            box.space._cluster:insert{2, new_uuid, 'replica'}
+            if delete then
+                box.space._cluster:insert{2, new_uuid, 'replica'}
+            end
             s = subscribe(new_uuid)
         end
         t.assert_equals(read_type(s), iproto_type.OK)
         s:close()
-    end, {cg.server.net_box_uri, cg.params.rollback})
+    end, {cg.server.net_box_uri, cg.params.rollback, delete})
+end
+
+g.test_uuid_update = function(cg)
+    test_subscribe_during_change(cg, false)
+end
+
+g.test_delete = function(cg)
+    test_subscribe_during_change(cg, true)
 end
 
 local h = t.group('subscribe_with_pending_delete', t.helpers.matrix({
